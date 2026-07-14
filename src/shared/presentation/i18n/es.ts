@@ -16,12 +16,12 @@ export const es = {
     downloadAudioWithSize: 'Descargar audio ({size})',
     downloadImageWithSize: 'Descargar imagen ({size})',
     downloadVideoWithSize: 'Descargar video ({size})',
+    file: 'Archivo',
     nextImage: 'Siguiente imagen',
     openImage: 'Abrir imagen',
     previewVideo: 'Previsualizar video',
     previousImage: 'Imagen anterior',
     publicUnencrypted: 'Media público sin cifrar en chat cifrado',
-    file: 'Archivo',
     shareIpfs: 'Copiar enlace',
   },
 
@@ -36,6 +36,7 @@ export const es = {
     heroTitle: 'Mensajeria P2P para todos.',
     identityIdHelp: identityLookup.help,
     identityIdLabel: identityLookup.label,
+    identityPreviewVersion: 'Identidad v{version}',
     installApp: 'Instalar app',
     installAppChecking: 'Comprobando soporte de instalacion...',
     installAppDevHelp:
@@ -65,17 +66,16 @@ export const es = {
     mobileIntro: 'Mensajeria P2P cifrada con identidades en tu nodo.',
     networkLabel: 'Red',
     networksLabel: 'Redes',
+    nodeNetworksNone: 'Sin redes',
+    nodeNetworkSyncLoading: 'Cargando...',
+    nodeNetworkSyncUnavailable: '—',
     nodeOwner: 'Propietario',
     nodeOwnerUnclaimed: 'Sin reclamar',
-    nodeNetworksNone: 'Sin redes',
     nodePeers: 'Pares',
     nodePeersCount: '{count} pares',
     nodePeersLoading: 'Buscando...',
     nodePeersOne: '1 par',
-    nodeNetworkSyncLoading: 'Cargando...',
-    nodeNetworkSyncUnavailable: '—',
     nodeSummaryTitle: 'Nodo local',
-    identityPreviewVersion: 'Identidad v{version}',
     passkeyPrf: 'Proteger con desbloqueo del dispositivo',
     passkeyPrfChecking: 'Comprobando si este navegador lo permite...',
     passkeyPrfHelp:
@@ -343,9 +343,6 @@ export const es = {
     encryptionNote: 'Los mensajes están cifrados de extremo a extremo.',
     initialChannelName: 'Nombre del canal',
     initialChannelRequired: 'Añade al menos un canal para continuar.',
-    profileSetupBody:
-      'Elige un nombre y una imagen reconocibles. Podrás cambiarlos más adelante.',
-    profileSetupTitle: 'Perfil de la comunidad',
     initialChannels: 'Canales iniciales',
     initialChannelsBody:
       'Añade los canales que se crearán junto con la comunidad.',
@@ -371,11 +368,11 @@ export const es = {
     manage: 'Gestionar comunidad',
     memberCount: '{count} miembro',
     memberError: 'No se pudo añadir el miembro.',
+    memberIdentity: identityLookup.label,
+    memberIdentityPlaceholder: identityLookup.placeholder,
     memberPreview: 'Identidad encontrada',
     memberPreviewEmpty:
       'La identidad aparecerá aquí antes de enviar la invitación.',
-    memberIdentity: identityLookup.label,
-    memberIdentityPlaceholder: identityLookup.placeholder,
     memberRolesError: 'No se pudieron guardar los roles del miembro.',
     members: 'Miembros',
     membersCount: '{count} miembros',
@@ -459,6 +456,9 @@ export const es = {
     privateCommunityHelp:
       'Solo los miembros pueden ver sus canales y contenido.',
     profile: 'Perfil',
+    profileSetupBody:
+      'Elige un nombre y una imagen reconocibles. Podrás cambiarlos más adelante.',
+    profileSetupTitle: 'Perfil de la comunidad',
     publicCommunity: 'Comunidad pública',
     publicCommunityHelp:
       'Puede mostrarse en Descubrir y aceptar solicitudes según la configuración.',
@@ -519,8 +519,8 @@ export const es = {
     placeholder: 'Escribe un mensaje',
     publicAttachments: 'Los adjuntos usaran almacenamiento publico',
     removeAttachment: 'Quitar adjunto',
-    selectedAttachments: 'Adjuntos seleccionados · {count}',
     roleMention: 'Rol',
+    selectedAttachments: 'Adjuntos seleccionados · {count}',
     send: 'Enviar',
     sending: 'Enviando',
     uploadingAttachment: 'Subiendo',
@@ -532,6 +532,18 @@ export const es = {
     kicker: 'Conexion perdida',
     retry: 'Reintentar conexion',
     title: 'Sin conexion con el servidor',
+  },
+  dataViewer: {
+    additional: 'Datos adicionales',
+    array: 'Array ({count})',
+    copied: 'JSON copiado',
+    copyJson: 'Copiar JSON',
+    decrypted: 'Contenido descifrado',
+    derived: 'Derivado en este dispositivo',
+    description:
+      'Separa los datos recibidos del servidor, el contenido descifrado localmente y los valores derivados por la interfaz.',
+    object: 'Objeto ({count})',
+    received: 'Recibido del servidor',
   },
   date: {
     today: 'Hoy',
@@ -572,6 +584,33 @@ export const es = {
     selectSwarm: 'Selecciona una red',
     sharedNetwork: 'Red',
   },
+  encryption: {
+    algorithm: 'Algoritmo',
+    communityKey: 'Clave de comunidad',
+    communityNote:
+      'Los mensajes del canal usan esta clave simétrica de tu llavero.',
+    communityTitle: 'Cifrado de comunidad',
+    conversationNote:
+      'Los mensajes de la conversación usan esta clave simétrica de tu llavero.',
+    conversationTitle: 'Cifrado de conversación',
+    createdAt: 'Creada',
+    empty: 'Sin valor',
+    keys: 'Claves',
+    keyVersion: 'Versión de clave',
+    missing: 'Falta la clave de cifrado',
+    missingNote:
+      'La clave no está disponible en tu llavero, así que este contenido cifrado no se puede descifrar aquí.',
+    network: 'Red',
+    peerIdentity: 'Identidad remota',
+    plaintext: 'Texto plano',
+    public: 'Texto plano público',
+    publicCommunityNote:
+      'Esta comunidad pública guarda mensajes buscables en texto plano. Este canal no usa clave de mensajes de comunidad.',
+    ready: 'Cifrado extremo a extremo activo',
+    scope: 'Ámbito',
+    symmetricKey: 'Clave simétrica',
+    unknown: 'Desconocido',
+  },
   errors: {
     backend: {
       503020:
@@ -610,48 +649,9 @@ export const es = {
     privateKey: 'Estado del llavero',
     storedOneKeys: 'Claves guardadas',
   },
-  encryption: {
-    algorithm: 'Algoritmo',
-    communityKey: 'Clave de comunidad',
-    communityNote:
-      'Los mensajes del canal usan esta clave simétrica de tu llavero.',
-    communityTitle: 'Cifrado de comunidad',
-    conversationNote:
-      'Los mensajes de la conversación usan esta clave simétrica de tu llavero.',
-    conversationTitle: 'Cifrado de conversación',
-    createdAt: 'Creada',
-    empty: 'Sin valor',
-    keyVersion: 'Versión de clave',
-    keys: 'Claves',
-    missing: 'Falta la clave de cifrado',
-    missingNote:
-      'La clave no está disponible en tu llavero, así que este contenido cifrado no se puede descifrar aquí.',
-    network: 'Red',
-    peerIdentity: 'Identidad remota',
-    plaintext: 'Texto plano',
-    public: 'Texto plano público',
-    publicCommunityNote:
-      'Esta comunidad pública guarda mensajes buscables en texto plano. Este canal no usa clave de mensajes de comunidad.',
-    ready: 'Cifrado extremo a extremo activo',
-    scope: 'Ámbito',
-    symmetricKey: 'Clave simétrica',
-    unknown: 'Desconocido',
-  },
   ipfs: {
     links: 'Enlaces IPFS',
     open: 'Abrir enlace IPFS',
-  },
-  dataViewer: {
-    additional: 'Datos adicionales',
-    array: 'Array ({count})',
-    copied: 'JSON copiado',
-    copyJson: 'Copiar JSON',
-    decrypted: 'Contenido descifrado',
-    derived: 'Derivado en este dispositivo',
-    description:
-      'Separa los datos recibidos del servidor, el contenido descifrado localmente y los valores derivados por la interfaz.',
-    object: 'Objeto ({count})',
-    received: 'Recibido del servidor',
   },
   messages: {
     addReaction: 'Anadir reaccion',
@@ -678,9 +678,9 @@ export const es = {
     pin: 'Fijar',
     pinError: 'No se pudo fijar el mensaje.',
     pinned: 'Fijado',
+    pinnedMessages: 'Mensajes fijados',
     pinnedMessagesBody:
       'Mensajes guardados para que las personas del chat puedan encontrarlos rápidamente.',
-    pinnedMessages: 'Mensajes fijados',
     rawTitle: 'Datos del mensaje',
     reactionError: 'No se pudo actualizar la reaccion.',
     reply: 'Responder',
@@ -731,6 +731,9 @@ export const es = {
   nodeSettings: {
     addNetwork: 'Añadir red privada',
     body: 'Gestiona las redes en las que participa este nodo local.',
+    callsRelayPort: 'Puerto de llamadas',
+    callsRelayPortBody:
+      'Opcional. Permite retransmitir llamadas cuando no hay conexión directa.',
     claim: 'Reclamar nodo',
     claimAvailable: 'Listo para reclamar',
     claimSuccess: 'Nodo reclamado.',
@@ -748,6 +751,9 @@ export const es = {
     join: 'Unirse a red',
     joinLabel: 'Unirse a una red',
     joinSuccess: 'Red anadida al nodo.',
+    manualRelayMultiaddrs: 'Direcciones manuales de conexión',
+    manualRelayMultiaddrsBody:
+      'Opcional. Una dirección por línea para redes privadas cuando no quieras depender del descubrimiento automático.',
     networkIdCopied: 'ID de red copiado.',
     networks: 'Redes del nodo',
     networksBody:
@@ -765,21 +771,44 @@ export const es = {
     open: 'Abrir ajustes del nodo',
     owner: 'Propietario',
     ownerOnly: 'Solo el propietario del nodo puede gestionar redes.',
+    ownerOnlyRelay:
+      'Solo el propietario del nodo puede cambiar esta configuración.',
     peersTab: 'Pares ({count})',
     privateNetwork: 'Red privada',
+    privateRelayBody:
+      'Encuentra nodos de enlace para comunicarte con tus redes privadas aunque este dispositivo no sea accesible directamente.',
+    privateRelayDiscoverRecords: 'Buscar nodos de enlace',
+    privateRelayDiscoverRecordsBody:
+      'Busca automáticamente nodos que ayudan a conectar los dispositivos de tus redes privadas.',
+    privateRelayDiscoveryOnlyBody:
+      'Modo cliente: este nodo puede encontrar relays de redes privadas sin exponer un rango de puertos.',
+    privateRelayEnabledBody:
+      'Permite que otros nodos de tus redes privadas se conecten a través de este nodo.',
+    privateRelayEnabledSetting: 'Habilitar relay para redes privadas',
+    privateRelayPortEnd: 'Puerto final',
+    privateRelayPortRangeHelp:
+      'Necesitas un puerto por cada red privada servida por este nodo. Una red puede usar 4172-4172; tres redes necesitan al menos 4172-4174.',
+    privateRelayPortStart: 'Puerto inicial',
+    privateRelayTitle: 'Nodos de enlace',
+    publicAccessBody:
+      'Activa esta opción solo si otros dispositivos deben conectarse directamente a este nodo desde Internet.',
+    publicAccessTitle: 'Acceso remoto',
     publicNetworkBody:
       'Anade la red publica fija requerida por las comunidades publicas en este nodo.',
     publicNetworkName: 'Red publica',
+    publicNetworkPort: 'Puerto de red pública',
+    publicNetworkPortBody: 'Opcional. Expone la red pública desde este nodo.',
     publicNetworkSuccess: 'Red publica anadida.',
     relay: 'Relay',
     relayAdvertised: 'Disponible',
     relayAutoEnabled: 'Automático',
-    relayCheckPorts: 'Comprobar acceso',
     relayCheckingPorts: 'Comprobando...',
-    relayDiscoveryEnabled: 'Buscar direcciones publicadas',
+    relayCheckPorts: 'Comprobar acceso',
     relayDisabled: 'Desactivado',
+    relayDiscoveryEnabled: 'Buscar direcciones publicadas',
     relayEnabled: 'Activado',
     relayLoadError: 'No se pudo cargar la configuración de conexión.',
+    relayLoading: 'Cargando configuración...',
     relayPeer: 'Identificador de conexión',
     relayPortReachable: 'Accesible',
     relayPortUnknown: 'Desconocido',
@@ -801,38 +830,9 @@ export const es = {
     relaySaveError: 'No se pudo guardar la configuración.',
     relaySaveSuccess: 'Configuración guardada.',
     relayTab: 'Configuración',
-    relayLoading: 'Cargando configuración...',
-    publicAccessBody:
-      'Activa esta opción solo si otros dispositivos deben conectarse directamente a este nodo desde Internet.',
-    publicAccessTitle: 'Acceso remoto',
     remoteAccess: 'Habilitar acceso remoto',
     remoteAccessBody:
       'Permite configurar la dirección pública y los servicios que este nodo ofrece desde fuera de tu red local.',
-    publicNetworkPort: 'Puerto de red pública',
-    publicNetworkPortBody: 'Opcional. Expone la red pública desde este nodo.',
-    callsRelayPort: 'Puerto de llamadas',
-    callsRelayPortBody:
-      'Opcional. Permite retransmitir llamadas cuando no hay conexión directa.',
-    manualRelayMultiaddrs: 'Direcciones manuales de conexión',
-    manualRelayMultiaddrsBody:
-      'Opcional. Una dirección por línea para redes privadas cuando no quieras depender del descubrimiento automático.',
-    ownerOnlyRelay:
-      'Solo el propietario del nodo puede cambiar esta configuración.',
-    privateRelayBody:
-      'Encuentra nodos de enlace para comunicarte con tus redes privadas aunque este dispositivo no sea accesible directamente.',
-    privateRelayDiscoverRecords: 'Buscar nodos de enlace',
-    privateRelayDiscoverRecordsBody:
-      'Busca automáticamente nodos que ayudan a conectar los dispositivos de tus redes privadas.',
-    privateRelayDiscoveryOnlyBody:
-      'Modo cliente: este nodo puede encontrar relays de redes privadas sin exponer un rango de puertos.',
-    privateRelayEnabledSetting: 'Habilitar relay para redes privadas',
-    privateRelayEnabledBody:
-      'Permite que otros nodos de tus redes privadas se conecten a través de este nodo.',
-    privateRelayPortEnd: 'Puerto final',
-    privateRelayPortRangeHelp:
-      'Necesitas un puerto por cada red privada servida por este nodo. Una red puede usar 4172-4172; tres redes necesitan al menos 4172-4174.',
-    privateRelayPortStart: 'Puerto inicial',
-    privateRelayTitle: 'Nodos de enlace',
     removeNetwork: 'Eliminar red',
     removeNetworkConfirm:
       'Eliminar {name} de este nodo? Se borraran el storage IPFS local y la metadata de esta red.',
@@ -850,6 +850,8 @@ export const es = {
     replicationReleasable: 'Se pueden liberar',
     replicationResponsible: 'Asignados a este nodo',
     replicationTotalSize: 'Espacio usado',
+    saving: 'Guardando...',
+    server: 'Nodo',
     synchronizationAwaitingSnapshot:
       'Esperando el estado en tiempo real del nodo...',
     synchronizationBody:
@@ -859,13 +861,11 @@ export const es = {
     synchronizationConnections: '{count} conexiones de red',
     synchronizationConverged: 'Sincronizada',
     synchronizationEmpty: 'Este nodo todavía no informa redes sincronizadas.',
-    synchronizationStores: '{converged} de {total} sincronizados',
     synchronizationProgress: '{percentage}% sincronizado',
+    synchronizationStores: '{converged} de {total} sincronizados',
     synchronizationSyncing: 'Sincronizando',
     synchronizationTitle: 'Sincronización de redes',
     synchronizationWaitingForPeers: 'Esperando conexiones',
-    saving: 'Guardando...',
-    server: 'Nodo',
     title: 'Ajustes del nodo',
     unclaimed: 'Nodo sin reclamar',
     unclaimedBody: 'Este nodo local todavía no tiene propietario.',
@@ -1029,30 +1029,30 @@ export const es = {
     changeBanner: 'Cambiar banner de perfil',
     changePassword: 'Cambiar contraseña',
     changePicture: 'Cambiar imagen de perfil',
+    communityKey: 'Clave de comunidad',
     communityRoles: 'Roles de comunidad',
+    conversationKey: 'Clave de conversación',
     copied: 'Copiado',
+    copy: 'Copiar',
     copySensitiveKeyConfirm:
       'Esta clave permite descifrar contenido privado. Si la copias sin cifrar, cualquier persona o aplicación con acceso al portapapeles podría leerla. ¿Seguro que quieres continuar?',
-    copy: 'Copiar',
     currentPassword: 'Contraseña actual',
     currentPasswordForPasskeyHelp:
       'Se verifican la contraseña actual y la clave de recuperación antes de crear el desbloqueo local. No se guardan.',
     discardChanges: 'Descartar',
     discardChangesBody: 'Hay cambios sin guardar. ¿Quieres descartarlos?',
     edit: 'Editar perfil',
+    encryptedMasterKey: 'Clave maestra cifrada',
+    encryptedPrivateKey: 'Clave privada cifrada',
     handle: 'Usuario',
     hoverToEdit: 'Pasa el raton y haz clic en la imagen para editarla.',
     identityId: 'ID de identidad',
+    identityKeys: 'Claves de identidad',
     identityVersion: 'Identidad',
     keepEditing: 'Seguir editando',
     keychainHelp:
       'Las claves locales disponibles se muestran censuradas. Cópialas solo si necesitas inspeccionar. Nunca compartas tus claves privadas sin encriptar.',
     keychainTab: 'Llavero',
-    communityKey: 'Clave de comunidad',
-    conversationKey: 'Clave de conversación',
-    encryptedMasterKey: 'Clave maestra cifrada',
-    encryptedPrivateKey: 'Clave privada cifrada',
-    identityKeys: 'Claves de identidad',
     keychainVersion: 'Llavero',
     language: 'Idioma',
     localDeviceUnlock: 'Usar desbloqueo del dispositivo',
@@ -1110,6 +1110,11 @@ export const es = {
     saving: 'Guardando...',
     security: 'Seguridad',
     securityTab: 'Seguridad',
+    technicalDetails: 'Ver datos para nerds',
+    technicalDetailsHelp:
+      'Muestra identificadores técnicos, versiones, metadatos de cifrado y controles de diagnóstico en toda la aplicación. Esta preferencia solo se guarda en este navegador.',
+    technicalDetailsWarning:
+      'Los datos técnicos pueden exponer metadatos sensibles. No los compartas si no sabes exactamente qué contienen.',
     updateError: 'No se pudo actualizar el perfil.',
     versions: 'Versiones',
   },
