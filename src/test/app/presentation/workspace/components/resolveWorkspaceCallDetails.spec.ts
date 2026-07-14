@@ -32,6 +32,12 @@ describe(resolveWorkspaceCallDetails.name, () => {
           connected: false,
           identityId: 'identity-2',
           mediaConnections: [],
+          status: 'joined',
+        },
+        {
+          connected: false,
+          identityId: 'identity-3',
+          mediaConnections: [],
           status: 'left',
         },
       ],
@@ -62,6 +68,11 @@ describe(resolveWorkspaceCallDetails.name, () => {
         {
           identityId: 'identity-1',
           name: 'Hasko',
+          status: 'joined',
+        },
+        {
+          identityId: 'identity-2',
+          name: 'Den',
           status: 'joined',
         },
       ],
