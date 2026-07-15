@@ -32,7 +32,6 @@ import {
   needsAudioGraph,
   remoteAudioKey,
 } from './remoteAudioOutput';
-import { safeRtcConfiguration } from './safeRtcConfiguration';
 import { screenShareEncodingParameters } from './ScreenShareQuality';
 
 export type { PeerMediaStats } from './collectPeerMediaStats';
@@ -322,9 +321,7 @@ export class CallPeerConnectionManager {
       throw new Error('RTCPeerConnection configuration is not loaded.');
     }
 
-    const rtcConfiguration = safeRtcConfiguration(
-      await this.rtcConfigurationProvider(),
-    );
+    const rtcConfiguration = await this.rtcConfigurationProvider();
     const peer = new RTCPeerConnection(rtcConfiguration);
 
     logCallDebug('peer-manager:create-peer', {
