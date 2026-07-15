@@ -144,6 +144,7 @@ export const en = {
     camera: 'Start camera',
     connectionQuality: 'Connection quality',
     connectionQualityConnecting: 'Connecting',
+    connectionQualityDisconnected: 'Disconnected',
     connectionQualityGood: 'Good connection',
     connectionQualityPoor: 'Poor connection',
     connectionQualityWeak: 'Weak connection',

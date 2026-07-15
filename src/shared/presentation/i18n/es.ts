@@ -146,6 +146,7 @@ export const es = {
     camera: 'Activar camara',
     connectionQuality: 'Calidad de conexion',
     connectionQualityConnecting: 'Conectando',
+    connectionQualityDisconnected: 'Desconectado',
     connectionQualityGood: 'Buena conexion',
     connectionQualityPoor: 'Mala conexion',
     connectionQualityWeak: 'Conexion debil',

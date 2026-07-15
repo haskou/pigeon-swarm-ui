@@ -429,7 +429,7 @@ describe(CallPeerConnectionManager.name, () => {
     expect(peer.restartIce).not.toHaveBeenCalled();
   });
 
-  it('drops TURN ICE servers without credentials before creating a peer connection', async () => {
+  it('passes backend ICE configuration to the peer connection unchanged', async () => {
     const peers: FakePeerConnection[] = [];
     const configurations: RTCConfiguration[] = [];
 
@@ -457,8 +457,15 @@ describe(CallPeerConnectionManager.name, () => {
     expect(peers).toHaveLength(1);
     expect(configurations).toEqual([
       {
-        iceServers: [],
-        iceTransportPolicy: 'all',
+        iceServers: [
+          {
+            urls: [
+              'turn:relay.example.test:4101?transport=udp',
+              'turn:relay.example.test:4101?transport=tcp',
+            ],
+          },
+        ],
+        iceTransportPolicy: 'relay',
       },
     ]);
   });
