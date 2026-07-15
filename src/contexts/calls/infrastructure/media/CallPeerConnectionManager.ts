@@ -217,6 +217,8 @@ export class CallPeerConnectionManager {
     sendSignal: SignalSender,
   ): Promise<void> {
     const description = new RTCSessionDescription(payload);
+    const wasSendingEncryptedMedia =
+      this.outboundMediaEncryptionEnabled(senderIdentityId);
 
     if (
       !(await this.acceptRemoteDescription(
@@ -240,7 +242,16 @@ export class CallPeerConnectionManager {
     });
     await this.flushIceCandidates(senderIdentityId, peer);
 
-    if (description.type !== 'offer') return;
+    if (description.type !== 'offer') {
+      if (
+        !wasSendingEncryptedMedia &&
+        this.outboundMediaEncryptionEnabled(senderIdentityId)
+      ) {
+        await this.sendRenegotiationOffer(senderIdentityId, peer, sendSignal);
+      }
+
+      return;
+    }
 
     const answer = await peer.createAnswer();
 
