@@ -1,7 +1,7 @@
 import { Timestamp } from '@haskou/value-objects';
 
 import { Attachment } from '../../../../contexts/attachments/domain/Attachment';
-import { AttachmentPublicationPlan } from '../../../../contexts/attachments/domain/AttachmentPublicationPlan';
+import { PublicAttachmentStrategy } from '../../../../contexts/attachments/domain/strategies/PublicAttachmentStrategy';
 import { AttachmentByteSize } from '../../../../contexts/attachments/domain/value-objects/AttachmentByteSize';
 import { AttachmentContentType } from '../../../../contexts/attachments/domain/value-objects/AttachmentContentType';
 import { AttachmentExternalIdentifier } from '../../../../contexts/attachments/domain/value-objects/AttachmentExternalIdentifier';
@@ -15,7 +15,7 @@ describe(Attachment.name, () => {
       AttachmentFilename.fromString('photo.webp'),
       AttachmentContentType.fromString('image/webp'),
       AttachmentByteSize.fromBytes(2048),
-      AttachmentPublicationPlan.public(),
+      PublicAttachmentStrategy.create(),
       new Timestamp(100),
     );
   }
@@ -61,5 +61,20 @@ describe(Attachment.name, () => {
         new Timestamp(300),
       ),
     ).toThrow('Attachment has already been published.');
+  });
+
+  it('restores a published attachment without recording domain events', () => {
+    const attachment = Attachment.restorePublished(
+      AttachmentId.fromString('attachment-1'),
+      AttachmentFilename.fromString('photo.webp'),
+      AttachmentContentType.fromString('image/webp'),
+      AttachmentByteSize.fromBytes(2048),
+      PublicAttachmentStrategy.create(),
+      AttachmentExternalIdentifier.fromString('external-1'),
+    );
+
+    expect(attachment.isPublished()).toBe(true);
+    expect(attachment.getExternalIdentifier().toString()).toBe('external-1');
+    expect(attachment.pullDomainEvents()).toEqual([]);
   });
 });

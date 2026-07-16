@@ -1,7 +1,7 @@
 import { NullObject, Timestamp } from '@haskou/value-objects';
 
 import { Attachment } from '../../../domain/Attachment';
-import { AttachmentUploadPolicy } from '../../../domain/AttachmentUploadPolicy';
+import { AttachmentUploadStrategy } from '../../../domain/strategies/AttachmentUploadStrategy';
 import { AttachmentByteSize } from '../../../domain/value-objects/AttachmentByteSize';
 import { AttachmentContentType } from '../../../domain/value-objects/AttachmentContentType';
 import { AttachmentEncryptionPreference } from '../../../domain/value-objects/AttachmentEncryptionPreference';
@@ -48,7 +48,7 @@ export class PublishMessageAttachmentMessage {
 
   public getAttachment(): Attachment {
     const size = AttachmentByteSize.fromBytes(this.primitives.size);
-    const policy = AttachmentUploadPolicy.define(
+    const strategy = AttachmentUploadStrategy.define(
       this.getEncryptionPreference(),
       this.primitives.networkId
         ? AttachmentNetworkId.fromString(this.primitives.networkId)
@@ -60,7 +60,7 @@ export class PublishMessageAttachmentMessage {
       AttachmentFilename.fromString(this.primitives.filename),
       AttachmentContentType.fromString(this.primitives.contentType),
       size,
-      policy.planFor(size),
+      strategy.publicationFor(size),
       this.getOccurredAt(),
     );
   }

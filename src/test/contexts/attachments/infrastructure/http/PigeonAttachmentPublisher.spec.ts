@@ -3,7 +3,7 @@ import { Timestamp } from '@haskou/value-objects';
 import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 
 import { Attachment } from '../../../../../contexts/attachments/domain/Attachment';
-import { AttachmentPublicationPlan } from '../../../../../contexts/attachments/domain/AttachmentPublicationPlan';
+import { PublicAttachmentStrategy } from '../../../../../contexts/attachments/domain/strategies/PublicAttachmentStrategy';
 import { AttachmentByteSize } from '../../../../../contexts/attachments/domain/value-objects/AttachmentByteSize';
 import { AttachmentContentType } from '../../../../../contexts/attachments/domain/value-objects/AttachmentContentType';
 import { AttachmentFilename } from '../../../../../contexts/attachments/domain/value-objects/AttachmentFilename';
@@ -37,7 +37,7 @@ describe(PigeonAttachmentPublisher.name, () => {
         AttachmentFilename.fromString('file.txt'),
         AttachmentContentType.fromString('text/plain'),
         AttachmentByteSize.fromBytes(file.size),
-        AttachmentPublicationPlan.public(),
+        PublicAttachmentStrategy.create(),
         new Timestamp(100),
       ),
       AttachmentSourceExternalIdentifier.fromString('source-1'),

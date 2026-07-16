@@ -1,7 +1,8 @@
 import { NullObject, Timestamp, assert } from '@haskou/value-objects';
 
+import type { PublicationStrategy } from './strategies/PublicationStrategy';
+
 import { AggregateRoot } from '../../../shared/domain/AggregateRoot';
-import { AttachmentPublicationPlan } from './AttachmentPublicationPlan';
 import { AttachmentAlreadyPublishedError } from './errors/AttachmentAlreadyPublishedError';
 import { AttachmentPublicationWasPlanned } from './events/AttachmentPublicationWasPlanned';
 import { AttachmentWasPublished } from './events/AttachmentWasPublished';
@@ -19,7 +20,7 @@ export class Attachment extends AggregateRoot {
     filename: AttachmentFilename,
     contentType: AttachmentContentType,
     size: AttachmentByteSize,
-    publication: AttachmentPublicationPlan,
+    publication: PublicationStrategy,
     occurredAt: Timestamp,
   ): Attachment {
     const attachment = new Attachment(
@@ -37,12 +38,31 @@ export class Attachment extends AggregateRoot {
     return attachment;
   }
 
+  public static restorePublished(
+    id: AttachmentId,
+    filename: AttachmentFilename,
+    contentType: AttachmentContentType,
+    size: AttachmentByteSize,
+    publication: PublicationStrategy,
+    externalIdentifier: AttachmentExternalIdentifier,
+  ): Attachment {
+    return new Attachment(
+      id,
+      filename,
+      contentType,
+      size,
+      publication,
+      AttachmentPublicationStatus.PUBLISHED,
+      externalIdentifier,
+    );
+  }
+
   private constructor(
     private readonly id: AttachmentId,
     private readonly filename: AttachmentFilename,
     private readonly contentType: AttachmentContentType,
     private readonly size: AttachmentByteSize,
-    private readonly publication: AttachmentPublicationPlan,
+    private readonly publication: PublicationStrategy,
     private status: AttachmentPublicationStatus,
     private externalIdentifier: AttachmentExternalIdentifier,
   ) {
