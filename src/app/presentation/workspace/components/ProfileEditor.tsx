@@ -31,6 +31,7 @@ import {
   isValidPassword,
   passwordValidationChecks,
 } from '../../../../contexts/identities/presentation/auth/credentialsValidation';
+import { PasswordRequirementProgress } from '../../../../contexts/identities/presentation/auth/PasswordRequirementProgress';
 import {
   isValidHandle,
   normalizeHandle,
@@ -655,7 +656,8 @@ export function ProfileEditor({
                               </div>
                             )}
                           </div>
-                          <PasswordChecklist
+                          <PasswordRequirementProgress
+                            className="mt-4"
                             checks={{
                               ...passwordChecks,
                               match: passwordsMatch,
@@ -1177,47 +1179,4 @@ function sameStringArray(left: string[], right: string[]): boolean {
   if (left.length !== right.length) return false;
 
   return left.every((value, index) => value === right[index]);
-}
-
-function PasswordChecklist({
-  checks,
-}: {
-  checks: {
-    lowercase: boolean;
-    match: boolean;
-    maxLength: boolean;
-    minLength: boolean;
-    number: boolean;
-    symbol: boolean;
-    uppercase: boolean;
-  };
-}) {
-  const items = [
-    [copy.profile.passwordRequirements.minLength, checks.minLength],
-    [copy.profile.passwordRequirements.maxLength, checks.maxLength],
-    [copy.profile.passwordRequirements.uppercase, checks.uppercase],
-    [copy.profile.passwordRequirements.lowercase, checks.lowercase],
-    [copy.profile.passwordRequirements.number, checks.number],
-    [copy.profile.passwordRequirements.symbol, checks.symbol],
-    [copy.profile.passwordRequirements.match, checks.match],
-  ] as const;
-
-  return (
-    <div className="mt-4 grid grid-cols-1 gap-1.5 text-xs font-black">
-      {items.map(([label, complete]) => (
-        <div
-          key={label}
-          className={cx(
-            'flex min-h-8 items-center gap-2 rounded-xl px-3 py-1.5',
-            complete
-              ? 'bg-emerald-400/10 text-emerald-200'
-              : 'bg-white/5 text-white/45',
-          )}
-        >
-          <span aria-hidden="true">{complete ? '✓' : '×'}</span>
-          <span>{label}</span>
-        </div>
-      ))}
-    </div>
-  );
 }

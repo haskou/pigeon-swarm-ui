@@ -99,7 +99,10 @@ export const en = {
       uppercase: 'Uppercase',
     },
     passwordRequirementNext: {
+      lowercase: 'Missing a lowercase letter',
       match: 'Passwords do not match',
+      maxLength: 'Password must be 256 characters or fewer',
+      minLength: 'Use at least {minimum} characters',
       number: 'Missing a number',
       symbol: 'Missing a symbol',
       uppercase: 'Missing an uppercase letter',
