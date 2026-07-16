@@ -31,6 +31,12 @@ import {
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 
 type CallController = ReturnType<typeof useCallSession>;
+type CallMediaEncryptionInput = Pick<
+  Parameters<CallController['startCall']>[0],
+  | 'mediaEncryptionEnabled'
+  | 'mediaEncryptionKey'
+  | 'mediaEncryptionUnavailableReason'
+>;
 type SignalSender = (
   recipientIdentityId: string,
   signalType: CallSignalType,
@@ -41,6 +47,9 @@ type CallStartActionsInput = {
   activeCall: CallController['activeCall'];
   activeCommunity: Community | null;
   callDetailsForResource: (call: Parameters<CallController['reconcileCall']>[0]) => WorkspaceCallDetails;
+  callMediaEncryptionForResource: (
+    call: Parameters<CallController['reconcileCall']>[0],
+  ) => CallMediaEncryptionInput;
   callNoiseCancellationEnabled: boolean;
   callSignalSender: (callId: string) => SignalSender;
   cleanupJoinedCalls: (exceptCallId?: string) => Promise<void>;
@@ -59,6 +68,7 @@ export function useCallStartActions({
   activeCall,
   activeCommunity,
   callDetailsForResource,
+  callMediaEncryptionForResource,
   callNoiseCancellationEnabled,
   callSignalSender,
   cleanupJoinedCalls,
@@ -152,6 +162,7 @@ export function useCallStartActions({
             })),
           });
           const details = callDetailsForResource(call);
+          const mediaEncryption = callMediaEncryptionForResource(call);
 
           await startCall({
             ...details,
@@ -160,6 +171,7 @@ export function useCallStartActions({
             id: call.id,
             loadIceConfig: loadCallIceConfig,
             localStream,
+            ...mediaEncryption,
             noiseCancellationEnabled: callNoiseCancellationEnabled,
             onSignal: callSignalSender(call.id),
             participants:
@@ -183,6 +195,7 @@ export function useCallStartActions({
       activeCall?.kind,
       callNoiseCancellationEnabled,
       callDetailsForResource,
+      callMediaEncryptionForResource,
       callSignalSender,
       cleanupJoinedCalls,
       leaveCurrentCallForSwitch,
@@ -267,6 +280,7 @@ export function useCallStartActions({
         });
         const currentIdentityId = sessionRef.current.identity.id;
         const details = callDetailsForResource(call);
+        const mediaEncryption = callMediaEncryptionForResource(call);
 
         logCallDebug('workspace:community-voice:start-local-session', {
           callId: call.id,
@@ -279,6 +293,7 @@ export function useCallStartActions({
           id: call.id,
           loadIceConfig: loadCallIceConfig,
           localStream,
+          ...mediaEncryption,
           noiseCancellationEnabled: callNoiseCancellationEnabled,
           onSignal: callSignalSender(call.id),
         });
@@ -306,6 +321,7 @@ export function useCallStartActions({
       activeCall?.kind,
       callNoiseCancellationEnabled,
       callDetailsForResource,
+      callMediaEncryptionForResource,
       callSignalSender,
       cleanupJoinedCalls,
       leaveCurrentCallForSwitch,
@@ -396,6 +412,7 @@ export function useCallStartActions({
         })),
       });
       const details = callDetailsForResource(call);
+      const mediaEncryption = callMediaEncryptionForResource(call);
 
       await startCall({
         ...details,
@@ -404,6 +421,7 @@ export function useCallStartActions({
         id: call.id,
         loadIceConfig: loadCallIceConfig,
         localStream,
+        ...mediaEncryption,
         noiseCancellationEnabled: callNoiseCancellationEnabled,
         onSignal: callSignalSender(call.id),
       });
@@ -418,6 +436,7 @@ export function useCallStartActions({
   }, [
     callNoiseCancellationEnabled,
     callDetailsForResource,
+    callMediaEncryptionForResource,
     callSignalSender,
     cleanupJoinedCalls,
     incomingCall,

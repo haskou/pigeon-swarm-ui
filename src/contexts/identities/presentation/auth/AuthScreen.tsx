@@ -40,9 +40,7 @@ import {
 } from './authFormRules';
 import {
   AuthSwitch,
-  createPasswordRequirementProgress,
   PasskeyPrfUnavailableNotice,
-  PasswordRequirementProgress,
   RecoveryKeyPanel,
 } from './AuthSecurityControls';
 import {
@@ -52,6 +50,7 @@ import {
 import { Field } from './Field';
 import { LoginIdentityPreview } from './LoginIdentityPreview';
 import { NodeLoginSummary } from './NodeLoginSummary';
+import { PasswordRequirementProgress } from './PasswordRequirementProgress';
 
 type LoadState = 'idle' | 'loading' | 'error';
 type PasskeyPrfSupportState = 'available' | 'checking' | 'unavailable';
@@ -178,12 +177,10 @@ export function AuthScreen({
   const passkeyPrfAvailable = passkeyPrfSupport === 'available';
   const passkeyPrfUnavailable = passkeyPrfSupport === 'unavailable';
   const passwordChecks = passwordValidationChecks(password);
-  const passwordRequirementProgress = createPasswordRequirementProgress({
-    checks: {
-      ...passwordChecks,
-      match: password.length > 0 && password === passwordConfirmation,
-    },
-  });
+  const passwordRequirementChecks = {
+    ...passwordChecks,
+    match: password.length > 0 && password === passwordConfirmation,
+  };
   const canShowInstallButton = installState !== 'installed';
   const installButtonDisabled =
     installState === 'checking' || installState === 'prompting';
@@ -259,6 +256,15 @@ export function AuthScreen({
 
     setLoginProgressStep(null);
     setState('idle');
+  };
+
+  const handleModeChange = (nextMode: AuthMode) => {
+    if (state === 'loading') return;
+
+    setMode(nextMode);
+    setError(null);
+    setState('idle');
+    setLoginProgressStep(null);
   };
 
   const handleInstallApp = async () => {
@@ -348,7 +354,7 @@ export function AuthScreen({
 
           <SegmentedControl
             value={mode}
-            onChange={setMode}
+            onChange={handleModeChange}
             options={modeOptions}
             data-testid="auth-mode-control"
           />
@@ -448,9 +454,7 @@ export function AuthScreen({
                   />
                 </Field>
                 <PasswordRequirementProgress
-                  complete={passwordRequirementProgress.complete}
-                  total={passwordRequirementProgress.total}
-                  message={passwordRequirementProgress.message}
+                  checks={passwordRequirementChecks}
                 />
                 <RecoveryKeyPanel
                   recoveryKey={recoveryKey}

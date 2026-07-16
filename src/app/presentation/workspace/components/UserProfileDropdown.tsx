@@ -71,6 +71,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
   onCallToggleCamera,
   onCallToggleDeafen,
   onCallToggleMute,
+  onCallToggleMediaEncryption,
   onCallToggleNoiseCancellation,
   onCallToggleScreenShare,
   onLogout,
@@ -108,6 +109,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
   onCallToggleCamera?: () => void;
   onCallToggleDeafen?: () => void;
   onCallToggleMute?: () => void;
+  onCallToggleMediaEncryption?: () => void;
   onCallToggleNoiseCancellation?: () => void;
   onCallRetryMicrophone?: () => void;
   onCallToggleScreenShare?: () => void;
@@ -202,6 +204,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
         onCallToggleCamera &&
         onCallToggleDeafen &&
         onCallToggleMute &&
+        onCallToggleMediaEncryption &&
         onCallToggleNoiseCancellation &&
         onCallRetryMicrophone &&
         onCallToggleScreenShare && (
@@ -218,6 +221,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
                 onToggleCamera={onCallToggleCamera}
                 onToggleDeafen={onCallToggleDeafen}
                 onToggleMute={onCallToggleMute}
+                onToggleMediaEncryption={onCallToggleMediaEncryption}
                 onToggleNoiseCancellation={onCallToggleNoiseCancellation}
                 onRetryMicrophone={onCallRetryMicrophone}
                 onToggleScreenShare={onCallToggleScreenShare}

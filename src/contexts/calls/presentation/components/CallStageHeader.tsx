@@ -3,8 +3,8 @@ import type { CallSession } from '../../domain/callSession.types';
 import { DialogCloseButton } from '../../../../shared/presentation/components/DialogCloseButton';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
-import { SpeakerIcon } from './callIcons';
 import { callSessionTitle } from './callSessionDisplay';
+import { SpeakerIcon } from './callIcons';
 import { MicrophoneBlockedNotice } from './MicrophoneBlockedNotice';
 
 export function CallStageHeader({
