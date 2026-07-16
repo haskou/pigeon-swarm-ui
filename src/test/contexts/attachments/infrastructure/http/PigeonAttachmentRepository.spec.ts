@@ -1,9 +1,65 @@
+import { Timestamp } from '@haskou/value-objects';
+
+import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+
+import { Attachment } from '../../../../../contexts/attachments/domain/Attachment';
 import { EncryptedAttachmentStrategy } from '../../../../../contexts/attachments/domain/strategies/EncryptedAttachmentStrategy';
 import { PublicAttachmentStrategy } from '../../../../../contexts/attachments/domain/strategies/PublicAttachmentStrategy';
+import { AttachmentByteSize } from '../../../../../contexts/attachments/domain/value-objects/AttachmentByteSize';
+import { AttachmentContentType } from '../../../../../contexts/attachments/domain/value-objects/AttachmentContentType';
 import { AttachmentExternalIdentifier } from '../../../../../contexts/attachments/domain/value-objects/AttachmentExternalIdentifier';
+import { AttachmentFilename } from '../../../../../contexts/attachments/domain/value-objects/AttachmentFilename';
+import { AttachmentId } from '../../../../../contexts/attachments/domain/value-objects/AttachmentId';
+import { AttachmentPublisherExternalIdentifier } from '../../../../../contexts/attachments/domain/value-objects/AttachmentPublisherExternalIdentifier';
+import { AttachmentSourceExternalIdentifier } from '../../../../../contexts/attachments/domain/value-objects/AttachmentSourceExternalIdentifier';
+import { AttachmentPublicationContexts } from '../../../../../contexts/attachments/infrastructure/http/AttachmentPublicationContexts';
 import { PigeonAttachmentRepository } from '../../../../../contexts/attachments/infrastructure/http/PigeonAttachmentRepository';
 
 describe(PigeonAttachmentRepository.name, () => {
+  it('creates a public attachment using its registered browser source', async () => {
+    const file = new File(['content'], 'file.txt', { type: 'text/plain' });
+    const session = { identity: { id: 'identity-1' } } as Session;
+    const contexts = new AttachmentPublicationContexts();
+    const uploader = {
+      publishEncrypted: jest.fn(),
+      publishPublic: jest.fn().mockResolvedValue({
+        cid: 'external-1',
+        contentType: 'text/plain',
+        filename: 'file.txt',
+        size: file.size,
+      }),
+    };
+    const repository = new PigeonAttachmentRepository(
+      { findPrivate: jest.fn(), findPublic: jest.fn() },
+      uploader,
+      contexts,
+    );
+    contexts.register('source-1', 'identity-1', { file, session });
+
+    const result = await repository.create(
+      Attachment.planPublication(
+        AttachmentId.fromString('attachment-1'),
+        AttachmentFilename.fromString('file.txt'),
+        AttachmentContentType.fromString('text/plain'),
+        AttachmentByteSize.fromBytes(file.size),
+        PublicAttachmentStrategy.create(),
+        new Timestamp(100),
+      ),
+      AttachmentSourceExternalIdentifier.fromString('source-1'),
+      AttachmentPublisherExternalIdentifier.fromString('identity-1'),
+    );
+
+    expect(result.toString()).toBe('external-1');
+    expect(contexts.takePublished('source-1')).toEqual(
+      expect.objectContaining({ cid: 'external-1' }),
+    );
+    expect(uploader.publishPublic).toHaveBeenCalledWith(
+      session,
+      file,
+      undefined,
+    );
+  });
+
   it('hydrates a public attachment aggregate', async () => {
     const findPublic = jest.fn().mockResolvedValue({
       blob: new Blob(['notes']),
@@ -12,10 +68,11 @@ describe(PigeonAttachmentRepository.name, () => {
       filename: 'notes.txt',
       size: 5,
     });
-    const repository = new PigeonAttachmentRepository({
-      findPrivate: jest.fn(),
-      findPublic,
-    });
+    const repository = new PigeonAttachmentRepository(
+      { findPrivate: jest.fn(), findPublic },
+      { publishEncrypted: jest.fn(), publishPublic: jest.fn() },
+      new AttachmentPublicationContexts(),
+    );
 
     const attachment = await repository.find(
       AttachmentExternalIdentifier.fromString('public-1'),
@@ -36,10 +93,11 @@ describe(PigeonAttachmentRepository.name, () => {
       filename: 'archive.bin',
       size: 3,
     });
-    const repository = new PigeonAttachmentRepository({
-      findPrivate,
-      findPublic: jest.fn(),
-    });
+    const repository = new PigeonAttachmentRepository(
+      { findPrivate, findPublic: jest.fn() },
+      { publishEncrypted: jest.fn(), publishPublic: jest.fn() },
+      new AttachmentPublicationContexts(),
+    );
 
     const attachment = await repository.find(
       AttachmentExternalIdentifier.fromString('private-1'),

@@ -9,6 +9,9 @@ import type { RequestSigner } from '../../../../../shared/infrastructure/http/Re
 import { AttachmentNetworkId } from '../../../../../contexts/attachments/domain/value-objects/AttachmentNetworkId';
 import { AttachmentCipher } from '../../../../../contexts/attachments/infrastructure/crypto/AttachmentCipher';
 import { PigeonAttachmentBlobUploader } from '../../../../../contexts/attachments/infrastructure/http/PigeonAttachmentBlobUploader';
+import { PigeonAttachmentPreviewCreator } from '../../../../../contexts/attachments/infrastructure/http/PigeonAttachmentPreviewCreator';
+import { PigeonChunkedAttachmentUploader } from '../../../../../contexts/attachments/infrastructure/http/PigeonChunkedAttachmentUploader';
+import { PigeonDirectAttachmentUploader } from '../../../../../contexts/attachments/infrastructure/http/PigeonDirectAttachmentUploader';
 import { PigeonMessageAttachmentUploader } from '../../../../../contexts/attachments/infrastructure/http/PigeonMessageAttachmentUploader';
 import { PigeonPrivateFilesClient } from '../../../../../contexts/attachments/infrastructure/http/PigeonPrivateFilesClient';
 import { PigeonPublicFilesClient } from '../../../../../contexts/attachments/infrastructure/http/PigeonPublicFilesClient';
@@ -49,14 +52,18 @@ function messageUploader(
     'prepare'
   > = new MessageAttachmentThumbnailPreparer(),
 ): PigeonMessageAttachmentUploader {
+  const privateFiles = new PigeonPrivateFilesClient(http, requestSigner);
+  const publicFiles = new PigeonPublicFilesClient(http, requestSigner);
+  const blobs = new PigeonAttachmentBlobUploader(
+    new PigeonDirectAttachmentUploader(privateFiles, publicFiles),
+    new PigeonChunkedAttachmentUploader(privateFiles, publicFiles),
+  );
+
   return new PigeonMessageAttachmentUploader(
     cipher,
-    new PigeonAttachmentBlobUploader(
-      new PigeonPrivateFilesClient(http, requestSigner),
-      new PigeonPublicFilesClient(http, requestSigner),
-    ),
+    blobs,
     publicImages,
-    thumbnails,
+    new PigeonAttachmentPreviewCreator(cipher, blobs, thumbnails),
   );
 }
 

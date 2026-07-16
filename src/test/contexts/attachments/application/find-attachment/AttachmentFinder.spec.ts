@@ -13,6 +13,7 @@ import { AttachmentId } from '../../../../../contexts/attachments/domain/value-o
 describe(AttachmentFinder.name, () => {
   it('finds the aggregate through its domain repository', async () => {
     const repository: jest.Mocked<AttachmentRepository> = {
+      create: jest.fn(),
       find: jest.fn(),
     };
     const attachment = Attachment.restorePublished(

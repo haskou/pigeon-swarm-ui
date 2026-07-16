@@ -66,8 +66,10 @@ import { AttachmentCipher } from '../../contexts/attachments/infrastructure/cryp
 import { AttachmentPublicationContexts } from '../../contexts/attachments/infrastructure/http/AttachmentPublicationContexts';
 import { PigeonAttachmentBlobUploader } from '../../contexts/attachments/infrastructure/http/PigeonAttachmentBlobUploader';
 import { PigeonAttachmentDownloader } from '../../contexts/attachments/infrastructure/http/PigeonAttachmentDownloader';
-import { PigeonAttachmentPublisher } from '../../contexts/attachments/infrastructure/http/PigeonAttachmentPublisher';
+import { PigeonAttachmentPreviewCreator } from '../../contexts/attachments/infrastructure/http/PigeonAttachmentPreviewCreator';
 import { PigeonAttachmentRepository } from '../../contexts/attachments/infrastructure/http/PigeonAttachmentRepository';
+import { PigeonChunkedAttachmentUploader } from '../../contexts/attachments/infrastructure/http/PigeonChunkedAttachmentUploader';
+import { PigeonDirectAttachmentUploader } from '../../contexts/attachments/infrastructure/http/PigeonDirectAttachmentUploader';
 import { PigeonFilesGateway } from '../../contexts/attachments/infrastructure/http/PigeonFilesGateway';
 import { PigeonMessageAttachmentUploader } from '../../contexts/attachments/infrastructure/http/PigeonMessageAttachmentUploader';
 import { PigeonPrivateFilesClient } from '../../contexts/attachments/infrastructure/http/PigeonPrivateFilesClient';
@@ -253,17 +255,27 @@ export class PigeonApiGateway {
       new AttachmentBinaryCodec(),
     );
     const attachmentPublicationContexts = new AttachmentPublicationContexts();
+    const attachmentBlobUploader = new PigeonAttachmentBlobUploader(
+      new PigeonDirectAttachmentUploader(privateFiles, publicFiles),
+      new PigeonChunkedAttachmentUploader(privateFiles, publicFiles),
+    );
     const attachmentUploader = new PigeonMessageAttachmentUploader(
       attachmentCipher,
-      new PigeonAttachmentBlobUploader(privateFiles, publicFiles),
+      attachmentBlobUploader,
       new PublicImageUploadPreparer(),
-      new MessageAttachmentThumbnailPreparer(),
+      new PigeonAttachmentPreviewCreator(
+        attachmentCipher,
+        attachmentBlobUploader,
+        new MessageAttachmentThumbnailPreparer(),
+      ),
+    );
+    const attachmentRepository = new PigeonAttachmentRepository(
+      attachmentDownloader,
+      attachmentUploader,
+      attachmentPublicationContexts,
     );
     this.publishMessageAttachmentUseCase = new PublishMessageAttachment(
-      new PigeonAttachmentPublisher(
-        attachmentUploader,
-        attachmentPublicationContexts,
-      ),
+      attachmentRepository,
     );
 
     this.files = new PigeonFilesGateway(
@@ -274,9 +286,7 @@ export class PigeonApiGateway {
         new PublicImageUploadPreparer(),
       ),
       this.publishMessageAttachmentUseCase,
-      new AttachmentFinder(
-        new PigeonAttachmentRepository(attachmentDownloader),
-      ),
+      new AttachmentFinder(attachmentRepository),
       attachmentPublicationContexts,
     );
     this.filesGateway = this.files;

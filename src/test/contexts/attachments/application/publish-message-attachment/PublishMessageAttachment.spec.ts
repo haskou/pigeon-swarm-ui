@@ -1,4 +1,4 @@
-import type { AttachmentPublisher } from '../../../../../contexts/attachments/application/publish-message-attachment/AttachmentPublisher';
+import type { AttachmentRepository } from '../../../../../contexts/attachments/domain/repositories/AttachmentRepository';
 
 import { PublishMessageAttachmentMessage } from '../../../../../contexts/attachments/application/publish-message-attachment/messages/PublishMessageAttachmentMessage';
 import { PublishMessageAttachment } from '../../../../../contexts/attachments/application/publish-message-attachment/PublishMessageAttachment';
@@ -6,14 +6,15 @@ import { AttachmentExternalIdentifier } from '../../../../../contexts/attachment
 
 describe(PublishMessageAttachment.name, () => {
   it('publishes through the aggregate transaction boundary', async () => {
-    const publisher: jest.Mocked<AttachmentPublisher> = {
-      publish: jest
+    const attachments: jest.Mocked<AttachmentRepository> = {
+      create: jest
         .fn()
         .mockResolvedValue(
           AttachmentExternalIdentifier.fromString('external-1'),
         ),
+      find: jest.fn(),
     };
-    const useCase = new PublishMessageAttachment(publisher);
+    const useCase = new PublishMessageAttachment(attachments);
 
     const attachment = await useCase.publish(
       new PublishMessageAttachmentMessage({
@@ -40,10 +41,11 @@ describe(PublishMessageAttachment.name, () => {
   });
 
   it('rejects encrypted publication without a network before infrastructure', async () => {
-    const publisher: jest.Mocked<AttachmentPublisher> = {
-      publish: jest.fn(),
+    const attachments: jest.Mocked<AttachmentRepository> = {
+      create: jest.fn(),
+      find: jest.fn(),
     };
-    const useCase = new PublishMessageAttachment(publisher);
+    const useCase = new PublishMessageAttachment(attachments);
 
     await expect(
       useCase.publish(
@@ -58,6 +60,6 @@ describe(PublishMessageAttachment.name, () => {
         }),
       ),
     ).rejects.toThrow('Encrypted attachment publication requires a network.');
-    expect(publisher.publish).not.toHaveBeenCalled();
+    expect(attachments.create).not.toHaveBeenCalled();
   });
 });
