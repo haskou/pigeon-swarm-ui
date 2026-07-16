@@ -8,6 +8,11 @@ import type {
 import { cx } from '../../../../shared/presentation/cx';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
+import {
+  callParticipantConnectionQuality,
+  callParticipantConnectionStatus,
+  type CallParticipantConnectionQuality as ParticipantConnectionQuality,
+} from '../view-models/CallParticipantConnectionQuality';
 
 export function CallParticipantMetrics({
   call,
@@ -80,7 +85,7 @@ export function CallParticipantMetrics({
           />
           <Metric
             label={copy.calls.callMetricStatus}
-            value={callParticipantStatus(participant, call)}
+            value={callParticipantConnectionStatus(participant, call)}
           />
         </dl>
       )}
@@ -104,7 +109,7 @@ function Metric({ label, value }: { label: string; value: string }) {
 function ConnectionQualityIcon({
   quality,
 }: {
-  quality: 'connecting' | 'good' | 'poor' | 'weak';
+  quality: ParticipantConnectionQuality;
 }) {
   const bars = quality === 'good' ? 3 : quality === 'weak' ? 2 : 1;
 
@@ -116,7 +121,7 @@ function ConnectionQualityIcon({
           ? 'text-emerald-300'
           : quality === 'weak'
             ? 'text-amber-300'
-            : quality === 'poor'
+            : quality === 'poor' || quality === 'disconnected'
               ? 'text-rose-300'
               : 'text-white/45',
       )}
@@ -137,56 +142,6 @@ function ConnectionQualityIcon({
   );
 }
 
-function callParticipantStatus(
-  participant: CallParticipant,
-  call: CallSession,
-): string {
-  if (participant.connected === false) return 'disconnected';
-
-  if (participant.identityId === call.currentIdentityId) return call.status;
-
-  if (participant.connectionState) return participant.connectionState;
-
-  if (participant.status) return participant.status;
-
-  return call.status;
-}
-
-function callParticipantConnectionQuality(
-  participant: CallParticipant,
-  call: CallSession,
-): 'connecting' | 'good' | 'poor' | 'weak' {
-  const status = callParticipantStatus(participant, call);
-
-  if (
-    status === 'connecting' ||
-    status === 'new' ||
-    status === 'checking' ||
-    status === 'reconnecting' ||
-    status === 'ringing'
-  ) {
-    return 'connecting';
-  }
-
-  if (
-    status === 'failed' ||
-    status === 'disconnected' ||
-    status === 'closed' ||
-    (participant.packetsLost ?? 0) >= 20
-  ) {
-    return 'poor';
-  }
-
-  if (
-    (participant.latencyMs ?? 0) > 250 ||
-    (participant.packetsLost ?? 0) > 3
-  ) {
-    return 'weak';
-  }
-
-  return 'good';
-}
-
 function connectionPathLabel(path?: 'direct' | 'relay' | 'unknown'): string {
   if (path === 'direct') return copy.calls.callMetricPathDirect;
 
@@ -195,14 +150,16 @@ function connectionPathLabel(path?: 'direct' | 'relay' | 'unknown'): string {
   return '-';
 }
 
-function connectionQualityLabel(
-  quality: 'connecting' | 'good' | 'poor' | 'weak',
-): string {
+function connectionQualityLabel(quality: ParticipantConnectionQuality): string {
   if (quality === 'good') return copy.calls.connectionQualityGood;
 
   if (quality === 'weak') return copy.calls.connectionQualityWeak;
 
   if (quality === 'poor') return copy.calls.connectionQualityPoor;
+
+  if (quality === 'disconnected') {
+    return copy.calls.connectionQualityDisconnected;
+  }
 
   return copy.calls.connectionQualityConnecting;
 }

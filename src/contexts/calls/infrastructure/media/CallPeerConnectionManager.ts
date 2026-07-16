@@ -33,7 +33,6 @@ import {
   needsAudioGraph,
   remoteAudioKey,
 } from './remoteAudioOutput';
-import { safeRtcConfiguration } from './safeRtcConfiguration';
 import { screenShareEncodingParameters } from './ScreenShareQuality';
 
 export type { PeerMediaStats } from './collectPeerMediaStats';
@@ -351,7 +350,7 @@ export class CallPeerConnectionManager {
     }
 
     const rtcConfiguration = this.peerConnectionConfiguration(
-      safeRtcConfiguration(await this.rtcConfigurationProvider()),
+      await this.rtcConfigurationProvider(),
     );
     const peer = new RTCPeerConnection(rtcConfiguration);
 
