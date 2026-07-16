@@ -2,7 +2,7 @@ import type { AttachmentProgress } from '../../../../shared/domain/pigeonResourc
 
 import { AttachmentCipher } from './AttachmentCipher';
 
-const cipher = new AttachmentCipher();
+const cipher = AttachmentCipher.inCurrentThread();
 const workerScope = self as unknown as {
   postMessage: (message: unknown, transfer?: Transferable[]) => void;
 };

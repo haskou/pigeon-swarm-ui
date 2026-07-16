@@ -47,7 +47,7 @@ import type { PreloadedConversationMessages } from '../PreloadedConversationMess
 import type { MessageContextMenuState } from './messageContextMenu';
 
 import { applicationContainer } from '../../../composition/applicationContainer';
-import { PendingMessageAttachments } from '../../../../contexts/attachments/domain/PendingMessageAttachments';
+import { PendingMessageAttachments } from '../../../../contexts/attachments/presentation/view-models/PendingMessageAttachments';
 import { useAttachmentDownload } from '../../../../contexts/attachments/presentation/hooks/useAttachmentDownload';
 import { CommunityAccessPolicy } from '../../../../contexts/communities/domain/CommunityAccessPolicy';
 import { CommunityChannels } from '../../../../contexts/communities/domain/CommunityChannels';

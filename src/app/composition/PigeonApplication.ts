@@ -1,9 +1,8 @@
-import type { PublishMessageAttachmentsMessage } from '../../contexts/attachments/application/publish-message-attachments/messages/PublishMessageAttachmentsMessage';
 import type { ListCallsMessage } from '../../contexts/calls/application/list-calls/messages/ListCallsMessage';
 import type { ListCommunitiesMessage } from '../../contexts/communities/application/list-communities/messages/ListCommunitiesMessage';
 import type { ListStickerPacksMessage } from '../../contexts/stickers/application/list-sticker-packs/messages/ListStickerPacksMessage';
 
-import { PigeonAttachmentsApplication } from '../../contexts/attachments/application/PigeonAttachmentsApplication';
+import { PigeonFilesGateway } from '../../contexts/attachments/infrastructure/http/PigeonFilesGateway';
 import { PigeonCallsApplication } from '../../contexts/calls/application/PigeonCallsApplication';
 import { PigeonCommunitiesApplication } from '../../contexts/communities/application/PigeonCommunitiesApplication';
 import { PigeonConversationsApplication } from '../../contexts/conversations/application/PigeonConversationsApplication';
@@ -20,7 +19,7 @@ import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonRealtimeApplication } from './PigeonRealtimeApplication';
 
 export class PigeonApplication {
-  public readonly attachments: PigeonAttachmentsApplication;
+  public readonly attachments: PigeonFilesGateway;
 
   public readonly calls: PigeonCallsApplication;
 
@@ -48,20 +47,7 @@ export class PigeonApplication {
     gateway: PigeonApiGateway = new PigeonApiGateway(),
     realtime: RealtimeGateway = new RealtimeGateway(),
   ) {
-    this.attachments = new PigeonAttachmentsApplication({
-      downloadAttachment: gateway.filesGateway,
-      getPublicFile: gateway.filesGateway,
-      publishMessageAttachments: {
-        publish: async (message: PublishMessageAttachmentsMessage) =>
-          await gateway.filesGateway.publishMessageAttachments(
-            message.getSession(),
-            message.getAttachments(),
-            message.getProgressReporter(),
-            message.getOptions(),
-          ),
-      },
-      uploadPublicFile: gateway.filesGateway,
-    });
+    this.attachments = gateway.filesGateway;
     this.calls = new PigeonCallsApplication({
       endCall: gateway.calls,
       getCall: gateway.calls,

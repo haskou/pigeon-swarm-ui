@@ -1,5 +1,6 @@
 import { EncryptedPayload } from '@haskou/value-objects';
 
+import type { PendingMessageAttachment } from '../../contexts/attachments/infrastructure/crypto/resources/PendingMessageAttachment';
 import type { CommunityChannelMessageEditInput } from '../../contexts/communities/infrastructure/http/CommunityChannelMessageEditInput';
 import type { CommunityChannelMessageInput } from '../../contexts/communities/infrastructure/http/CommunityChannelMessageInput';
 import type { CommunityInviteLinkInput } from '../../contexts/communities/infrastructure/http/CommunityInviteLinkInput';
@@ -44,7 +45,6 @@ import type {
   NotificationScopeSetting,
   NotificationScopeSettingInput,
   NotificationSettingScope,
-  PendingMessageAttachment,
   PrivateFileContent,
   PrivateFileUpload,
   PollResource,
@@ -59,9 +59,20 @@ import type {
 } from '../../shared/domain/pigeonResources.types';
 import type { RequestCacheOptions } from '../../shared/infrastructure/http/RequestCacheOptions';
 
+import { PublishMessageAttachment } from '../../contexts/attachments/application/publish-message-attachment/PublishMessageAttachment';
+import { AttachmentBinaryCodec } from '../../contexts/attachments/infrastructure/crypto/AttachmentBinaryCodec';
 import { AttachmentCipher } from '../../contexts/attachments/infrastructure/crypto/AttachmentCipher';
-import { PigeonFilesApi } from '../../contexts/attachments/infrastructure/http/PigeonFilesApi';
+import { AttachmentPublicationContexts } from '../../contexts/attachments/infrastructure/http/AttachmentPublicationContexts';
+import { PigeonAttachmentBlobUploader } from '../../contexts/attachments/infrastructure/http/PigeonAttachmentBlobUploader';
+import { PigeonAttachmentDownloader } from '../../contexts/attachments/infrastructure/http/PigeonAttachmentDownloader';
+import { PigeonAttachmentPublisher } from '../../contexts/attachments/infrastructure/http/PigeonAttachmentPublisher';
 import { PigeonFilesGateway } from '../../contexts/attachments/infrastructure/http/PigeonFilesGateway';
+import { PigeonMessageAttachmentUploader } from '../../contexts/attachments/infrastructure/http/PigeonMessageAttachmentUploader';
+import { PigeonPrivateFilesClient } from '../../contexts/attachments/infrastructure/http/PigeonPrivateFilesClient';
+import { PigeonPublicFilesClient } from '../../contexts/attachments/infrastructure/http/PigeonPublicFilesClient';
+import { PigeonPublicFileUploader } from '../../contexts/attachments/infrastructure/http/PigeonPublicFileUploader';
+import { MessageAttachmentThumbnailPreparer } from '../../contexts/attachments/infrastructure/media/MessageAttachmentThumbnailPreparer';
+import { PublicImageUploadPreparer } from '../../contexts/attachments/infrastructure/media/PublicImageUploadPreparer';
 import { PigeonCallsApi } from '../../contexts/calls/infrastructure/http/PigeonCallsApi';
 import { PigeonCallsGateway } from '../../contexts/calls/infrastructure/http/PigeonCallsGateway';
 import { PigeonCommunitiesApi } from '../../contexts/communities/infrastructure/http/PigeonCommunitiesApi';
@@ -184,6 +195,8 @@ export class PigeonApiGateway {
 
   public readonly filesGateway: PigeonFilesGateway;
 
+  public readonly publishMessageAttachmentUseCase: PublishMessageAttachment;
+
   public readonly pollsGateway: PigeonPollsGateway;
 
   public readonly notificationsGateway: PigeonNotificationsGateway;
@@ -208,7 +221,7 @@ export class PigeonApiGateway {
     messages: MessageProjector = new MessageProjector(copy.messages),
     keychains: KeychainCipher = new KeychainCipher(),
     ids: ConversationIdFactory = new ConversationIdFactory(),
-    attachmentCipher: AttachmentCipher = new AttachmentCipher(),
+    attachmentCipher: AttachmentCipher = AttachmentCipher.inCurrentThread(),
   ) {
     this.calls = new PigeonCallsGateway(new PigeonCallsApi(http, signer));
     this.communities = new PigeonCommunitiesApi(
@@ -229,8 +242,37 @@ export class PigeonApiGateway {
       this.conversations,
       this.requestCache,
     );
+    const privateFiles = new PigeonPrivateFilesClient(http, signer);
+    const publicFiles = new PigeonPublicFilesClient(http, signer);
+    const attachmentDownloader = new PigeonAttachmentDownloader(
+      privateFiles,
+      publicFiles,
+      attachmentCipher,
+      new AttachmentBinaryCodec(),
+    );
+    const attachmentPublicationContexts = new AttachmentPublicationContexts();
+    const attachmentUploader = new PigeonMessageAttachmentUploader(
+      attachmentCipher,
+      new PigeonAttachmentBlobUploader(privateFiles, publicFiles),
+      new PublicImageUploadPreparer(),
+      new MessageAttachmentThumbnailPreparer(),
+    );
+    this.publishMessageAttachmentUseCase = new PublishMessageAttachment(
+      new PigeonAttachmentPublisher(
+        attachmentUploader,
+        attachmentPublicationContexts,
+      ),
+    );
+
     this.files = new PigeonFilesGateway(
-      new PigeonFilesApi(http, signer, attachmentCipher),
+      attachmentDownloader,
+      privateFiles,
+      new PigeonPublicFileUploader(
+        publicFiles,
+        new PublicImageUploadPreparer(),
+      ),
+      this.publishMessageAttachmentUseCase,
+      attachmentPublicationContexts,
     );
     this.filesGateway = this.files;
     this.ids = ids;

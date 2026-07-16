@@ -26,7 +26,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
-import { PendingMessageAttachments } from '../../../attachments/domain/PendingMessageAttachments';
+import { PendingMessageAttachments } from '../../../attachments/presentation/view-models/PendingMessageAttachments';
 import { useAttachmentDownload } from '../../../attachments/presentation/hooks/useAttachmentDownload';
 import { MessageLinkPreviews } from '../../../messages/domain/MessageLinkPreviews';
 import { MessageReactionUpdater } from '../../../messages/presentation/view-models/MessageReactionUpdater';
