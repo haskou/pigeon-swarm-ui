@@ -1,9 +1,0 @@
-export type { PublicFileUpload } from './PublicFileUpload';
-export type { PublicFileContent } from './PublicFileContent';
-export type { PrivateFileUpload } from './PrivateFileUpload';
-export type { PrivateFileContent } from './PrivateFileContent';
-export type { MessageAttachmentEncryption } from './MessageAttachmentEncryption';
-export type { MessageAttachment } from './MessageAttachment';
-export type { PendingMessageAttachment } from './PendingMessageAttachment';
-export type { AttachmentProgress } from './AttachmentProgress';
-export type { AttachmentUploadOptions } from './AttachmentUploadOptions';
