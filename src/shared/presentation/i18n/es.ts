@@ -102,7 +102,10 @@ export const es = {
       uppercase: 'Mayuscula',
     },
     passwordRequirementNext: {
+      lowercase: 'Falta una minúscula',
       match: 'Las contraseñas no coinciden',
+      maxLength: 'La contraseña debe tener 256 caracteres o menos',
+      minLength: 'Usa al menos {minimum} caracteres',
       number: 'Falta un número',
       symbol: 'Falta un símbolo',
       uppercase: 'Falta una mayúscula',
