@@ -259,6 +259,8 @@ export function AuthScreen({
   };
 
   const handleModeChange = (nextMode: AuthMode) => {
+    if (state === 'loading') return;
+
     setMode(nextMode);
     setError(null);
     setState('idle');
