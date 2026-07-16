@@ -59,6 +59,7 @@ import type {
 } from '../../shared/domain/pigeonResources.types';
 import type { RequestCacheOptions } from '../../shared/infrastructure/http/RequestCacheOptions';
 
+import { AttachmentFinder } from '../../contexts/attachments/application/find-attachment/AttachmentFinder';
 import { PublishMessageAttachment } from '../../contexts/attachments/application/publish-message-attachment/PublishMessageAttachment';
 import { AttachmentBinaryCodec } from '../../contexts/attachments/infrastructure/crypto/AttachmentBinaryCodec';
 import { AttachmentCipher } from '../../contexts/attachments/infrastructure/crypto/AttachmentCipher';
@@ -66,6 +67,7 @@ import { AttachmentPublicationContexts } from '../../contexts/attachments/infras
 import { PigeonAttachmentBlobUploader } from '../../contexts/attachments/infrastructure/http/PigeonAttachmentBlobUploader';
 import { PigeonAttachmentDownloader } from '../../contexts/attachments/infrastructure/http/PigeonAttachmentDownloader';
 import { PigeonAttachmentPublisher } from '../../contexts/attachments/infrastructure/http/PigeonAttachmentPublisher';
+import { PigeonAttachmentRepository } from '../../contexts/attachments/infrastructure/http/PigeonAttachmentRepository';
 import { PigeonFilesGateway } from '../../contexts/attachments/infrastructure/http/PigeonFilesGateway';
 import { PigeonMessageAttachmentUploader } from '../../contexts/attachments/infrastructure/http/PigeonMessageAttachmentUploader';
 import { PigeonPrivateFilesClient } from '../../contexts/attachments/infrastructure/http/PigeonPrivateFilesClient';
@@ -272,6 +274,9 @@ export class PigeonApiGateway {
         new PublicImageUploadPreparer(),
       ),
       this.publishMessageAttachmentUseCase,
+      new AttachmentFinder(
+        new PigeonAttachmentRepository(attachmentDownloader),
+      ),
       attachmentPublicationContexts,
     );
     this.filesGateway = this.files;

@@ -12,6 +12,8 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 import type { PendingMessageAttachment } from '../crypto/resources/PendingMessageAttachment';
 
+import { AttachmentFinder } from '../../application/find-attachment/AttachmentFinder';
+import { FindAttachmentMessage } from '../../application/find-attachment/messages/FindAttachmentMessage';
 import { PublishMessageAttachmentMessage } from '../../application/publish-message-attachment/messages/PublishMessageAttachmentMessage';
 import { PublishMessageAttachment } from '../../application/publish-message-attachment/PublishMessageAttachment';
 import { AttachmentPublicationContexts } from './AttachmentPublicationContexts';
@@ -31,6 +33,7 @@ export class PigeonFilesGateway {
       PublishMessageAttachment,
       'publish'
     >,
+    private readonly findAttachment: Pick<AttachmentFinder, 'find'>,
     private readonly publicationContexts: AttachmentPublicationContexts,
   ) {}
 
@@ -49,11 +52,23 @@ export class PigeonFilesGateway {
   }
 
   public async getPrivateFile(cid: string): Promise<PrivateFileContent> {
-    return await this.downloader.findPrivate(cid);
+    const attachment = await this.findAttachment.find(
+      new FindAttachmentMessage(cid, true),
+    );
+
+    return await this.downloader.findPrivate(
+      attachment.getExternalIdentifier().toString(),
+    );
   }
 
   public async getPublicFile(cid: string): Promise<PublicFileContent> {
-    return await this.downloader.findPublic(cid);
+    const attachment = await this.findAttachment.find(
+      new FindAttachmentMessage(cid, false),
+    );
+
+    return await this.downloader.findPublic(
+      attachment.getExternalIdentifier().toString(),
+    );
   }
 
   public async publish(
