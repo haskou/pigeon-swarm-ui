@@ -1,4 +1,5 @@
 import type { CallKind } from './CallKind';
+import type { CallMediaEncryptionState } from './CallMediaEncryptionState';
 import type { CallMicrophoneErrorCode } from './CallMicrophoneErrorCode';
 import type { CallParticipant } from './CallParticipant';
 import type { CallResource } from './CallResource';
@@ -12,6 +13,7 @@ export type CallSession = {
   channelId?: string;
   conversationId?: string;
   kind: CallKind;
+  mediaEncryption: CallMediaEncryptionState;
   muted: boolean;
   microphoneError?: CallMicrophoneErrorCode;
   noiseCancellationEnabled: boolean;

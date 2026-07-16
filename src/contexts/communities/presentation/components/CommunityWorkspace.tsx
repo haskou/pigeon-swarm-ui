@@ -153,6 +153,7 @@ interface CommunityWorkspaceProps {
   onCallToggleCamera?: () => void;
   onCallToggleDeafen?: () => void;
   onCallToggleMute?: () => void;
+  onCallToggleMediaEncryption?: () => void;
   onCallToggleNoiseCancellation?: () => void;
   onCallRetryMicrophone?: () => void;
   onCallToggleScreenShare?: () => void;
@@ -331,6 +332,7 @@ export function CommunityWorkspace({
   onCallToggleCamera,
   onCallToggleDeafen,
   onCallToggleMute,
+  onCallToggleMediaEncryption,
   onCallToggleNoiseCancellation,
   onCallToggleScreenShare,
   onChannelSelected,
@@ -1599,6 +1601,7 @@ export function CommunityWorkspace({
         onCallToggleCamera={onCallToggleCamera}
         onCallToggleDeafen={onCallToggleDeafen}
         onCallToggleMicrophone={onCallToggleMute}
+        onCallToggleMediaEncryption={onCallToggleMediaEncryption}
         onCallToggleNoiseCancellation={onCallToggleNoiseCancellation}
         onCallRetryMicrophone={onCallRetryMicrophone}
         onCallToggleScreenShare={onCallToggleScreenShare}
@@ -1733,6 +1736,9 @@ export function CommunityWorkspace({
 
         {threadPanel ? (
           <MessageThreadPanel
+            attachmentEncryptionAvailable={
+              !communityIsPublic && Boolean(communityKey)
+            }
             currentIdentityId={session.identity.id}
             disabled={
               threadPanel.state === 'loading' ||
@@ -1888,6 +1894,9 @@ export function CommunityWorkspace({
               />
             )}
             <Composer
+              attachmentEncryptionAvailable={
+                !communityIsPublic && Boolean(communityKey)
+              }
               disabled={
                 messageState === 'loading' ||
                 (!communityIsPublic && !communityKey) ||

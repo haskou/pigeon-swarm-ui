@@ -795,6 +795,7 @@ export function ChatColumn({
             />
           )}
           <Composer
+            attachmentEncryptionAvailable={hasConversationKey}
             disabled={messageState === 'loading' || !hasConversationKey}
             draft={draft}
             editingMessage={editingMessage}

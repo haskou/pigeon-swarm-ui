@@ -41,6 +41,12 @@ function callSession(input: {
     hasMicrophone: true,
     id: 'call-1',
     kind: input.kind,
+    mediaEncryption: {
+      active: false,
+      available: false,
+      enabled: false,
+      reason: 'missing-key',
+    },
     muted: false,
     noiseCancellationEnabled: false,
     participants: [

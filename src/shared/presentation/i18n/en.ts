@@ -183,6 +183,18 @@ export const en = {
       'Microphone permission is unavailable. Check browser permissions and HTTPS.',
     microphoneUnknown: 'The microphone could not be started.',
     microphoneUnsupported: 'This browser does not expose microphone capture.',
+    mediaEncryptionActive: 'E2EE active',
+    mediaEncryptionDisabled: 'E2EE disabled',
+    mediaEncryptionMissingKey: 'No key is available to encrypt this call.',
+    mediaEncryptionOff: 'Turn off call E2EE',
+    mediaEncryptionOn: 'Turn on call E2EE',
+    participantMediaEncrypted:
+      'Media with this participant is end-to-end encrypted.',
+    participantMediaNotEncrypted:
+      'Media with this participant is not end-to-end encrypted.',
+    mediaEncryptionPublicCommunity: 'Public community calls do not use E2EE.',
+    mediaEncryptionUnsupported:
+      'This browser does not support media E2EE.',
     missed: 'Missed call',
     mute: 'Mute microphone',
     muted: 'Muted',

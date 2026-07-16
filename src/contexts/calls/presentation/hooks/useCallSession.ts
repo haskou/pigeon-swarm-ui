@@ -4,6 +4,8 @@ import type {
   CallParticipant,
   CallParticipantMediaConnection,
   CallIceServerConfig,
+  CallMediaEncryptionState,
+  CallMediaEncryptionUnavailableReason,
   CallMicrophoneErrorCode,
   CallResource,
   CallSignalType,
@@ -49,6 +51,9 @@ type StartCallInput = {
   kind: CallSession['kind'];
   loadIceConfig: () => Promise<CallIceServerConfig>;
   localStream?: MediaStream | null;
+  mediaEncryptionEnabled: boolean;
+  mediaEncryptionKey?: string;
+  mediaEncryptionUnavailableReason?: CallMediaEncryptionUnavailableReason;
   noiseCancellationEnabled: boolean;
   onSignal: SignalSender;
   participants: CallParticipant[];
@@ -62,6 +67,9 @@ type ReconcileCallInput = Omit<
   | 'currentIdentityId'
   | 'id'
   | 'loadIceConfig'
+  | 'mediaEncryptionEnabled'
+  | 'mediaEncryptionKey'
+  | 'mediaEncryptionUnavailableReason'
   | 'noiseCancellationEnabled'
   | 'onSignal'
 >;
@@ -82,6 +90,7 @@ export function useCallSession(): {
   toggleCamera: () => Promise<void>;
   toggleDeafen: () => void;
   toggleMute: () => void;
+  toggleMediaEncryption: () => void;
   toggleNoiseCancellation: (enabled: boolean) => Promise<void>;
   retryMicrophone: () => Promise<void>;
   toggleScreenShare: () => Promise<void>;
@@ -133,6 +142,8 @@ export function useCallSession(): {
           remoteStreams,
           remoteScreenStreams,
           localAudioLevel,
+          (identityId) =>
+            peerManager.isMediaEncryptionActiveWith(identityId),
           screenStream,
         );
         const nextCameraEnabled = mediaManager.hasCamera();
@@ -198,6 +209,11 @@ export function useCallSession(): {
     });
     currentIdentityIdRef.current = input.currentIdentityId;
     sendSignalRef.current = input.onSignal;
+    const mediaEncryption = callMediaEncryptionState({
+      enabled: input.mediaEncryptionEnabled,
+      key: input.mediaEncryptionKey,
+      reason: input.mediaEncryptionUnavailableReason,
+    });
     const nextCall: CallSession = {
       call: input.call,
       cameraEnabled: false,
@@ -209,6 +225,7 @@ export function useCallSession(): {
       hasMicrophone: input.localStream !== null,
       id: input.id,
       kind: input.kind,
+      mediaEncryption,
       muted: input.localStream === null,
       noiseCancellationEnabled: input.noiseCancellationEnabled,
       participants: input.participants,
@@ -276,6 +293,10 @@ export function useCallSession(): {
         hasStream: Boolean(stream),
       });
       peerManager.configure(input.loadIceConfig);
+      peerManager.configureMediaEncryption(
+        input.mediaEncryptionKey ?? null,
+        mediaEncryption.active,
+      );
       peerManager.setLocalStream(stream);
       setActiveCall((current) =>
         current?.id === nextCall.id
@@ -490,6 +511,26 @@ export function useCallSession(): {
             ? { ...participant, deafened }
             : participant,
         ),
+      };
+    });
+  };
+
+  const toggleMediaEncryption = () => {
+    setActiveCall((current) => {
+      if (!current || !current.mediaEncryption.available) return current;
+
+      const enabled = !current.mediaEncryption.enabled;
+
+      peerManager.setMediaEncryptionEnabled(enabled);
+
+      return {
+        ...current,
+        mediaEncryption: {
+          ...current.mediaEncryption,
+          active: enabled,
+          enabled,
+          reason: enabled ? undefined : 'disabled',
+        },
       };
     });
   };
@@ -755,6 +796,7 @@ export function useCallSession(): {
     startCall,
     toggleCamera,
     toggleDeafen,
+    toggleMediaEncryption,
     toggleMute,
     toggleNoiseCancellation,
     retryMicrophone,
@@ -861,6 +903,7 @@ function callSessionForJoinedPeerConnection(
     id: call.id,
     localPreviewStream: activeCall?.localPreviewStream,
     muted: activeCall?.muted ?? false,
+    mediaEncryption: activeCall?.mediaEncryption ?? disabledMediaEncryption(),
     noiseCancellationEnabled: activeCall?.noiseCancellationEnabled ?? true,
     participants,
     participantVolumes: activeCall?.participantVolumes ?? {},
@@ -873,12 +916,57 @@ function callSessionForJoinedPeerConnection(
   };
 }
 
+function disabledMediaEncryption(): CallMediaEncryptionState {
+  return {
+    active: false,
+    available: false,
+    enabled: false,
+    reason: 'missing-key',
+  };
+}
+
+function callMediaEncryptionState({
+  enabled,
+  key,
+  reason,
+}: {
+  enabled: boolean;
+  key?: string;
+  reason?: CallMediaEncryptionUnavailableReason;
+}): CallMediaEncryptionState {
+  if (!key) {
+    return {
+      active: false,
+      available: false,
+      enabled: false,
+      reason: reason ?? 'missing-key',
+    };
+  }
+
+  if (!CallPeerConnectionManager.mediaEncryptionSupported()) {
+    return {
+      active: false,
+      available: false,
+      enabled: false,
+      reason: 'unsupported',
+    };
+  }
+
+  return {
+    active: enabled,
+    available: true,
+    enabled,
+    reason: enabled ? undefined : 'disabled',
+  };
+}
+
 function participantsWithMediaState(
   call: CallSession,
   stats: Record<string, PeerMediaStats>,
   remoteStreams: Record<string, MediaStream>,
   remoteScreenStreams: Record<string, MediaStream>,
   localAudioLevel: number,
+  isMediaEncryptionActiveWith: (identityId: string) => boolean,
   screenStream?: MediaStream,
 ): CallParticipant[] {
   return call.participants.map((participant) =>
@@ -894,6 +982,7 @@ function participantsWithMediaState(
           stats,
           remoteStreams,
           remoteScreenStreams,
+          isMediaEncryptionActiveWith,
         ),
   );
 }
@@ -909,6 +998,7 @@ function localParticipantWithMediaState(
     audioLevel,
     deafened: call.deafened,
     mediaStream: call.localPreviewStream,
+    mediaEncryptionActive: call.mediaEncryption.active,
     muted: call.muted,
     screenSharing: call.screenSharing,
     screenStream,
@@ -922,6 +1012,7 @@ function remoteParticipantWithMediaState(
   stats: Record<string, PeerMediaStats>,
   remoteStreams: Record<string, MediaStream>,
   remoteScreenStreams: Record<string, MediaStream>,
+  isMediaEncryptionActiveWith: (identityId: string) => boolean,
 ): CallParticipant {
   const stat = stats[participant.identityId];
   const mediaStream = remoteStreams[participant.identityId];
@@ -938,6 +1029,9 @@ function remoteParticipantWithMediaState(
     jitterMs: stat?.jitterMs,
     latencyMs: stat?.latencyMs,
     mediaStream,
+    mediaEncryptionActive: isMediaEncryptionActiveWith(
+      participant.identityId,
+    ),
     packetsLost: stat?.packetsLost,
     screenSharing: hasVideoTrack(screenStream),
     screenStream,
@@ -1004,6 +1098,8 @@ function callParticipantsMediaStateEqual(
       currentParticipant.jitterMs === nextParticipant.jitterMs &&
       currentParticipant.latencyMs === nextParticipant.latencyMs &&
       currentParticipant.mediaStream === nextParticipant.mediaStream &&
+      currentParticipant.mediaEncryptionActive ===
+        nextParticipant.mediaEncryptionActive &&
       currentParticipant.muted === nextParticipant.muted &&
       currentParticipant.packetsLost === nextParticipant.packetsLost &&
       currentParticipant.screenSharing === nextParticipant.screenSharing &&

@@ -185,6 +185,19 @@ export const es = {
       'El permiso del microfono no esta disponible. Revisa permisos y HTTPS.',
     microphoneUnknown: 'No se pudo iniciar el microfono.',
     microphoneUnsupported: 'Este navegador no expone captura de microfono.',
+    mediaEncryptionActive: 'E2EE activo',
+    mediaEncryptionDisabled: 'E2EE desactivado',
+    mediaEncryptionMissingKey: 'No hay clave para cifrar esta llamada.',
+    mediaEncryptionOff: 'Desactivar E2EE de llamada',
+    mediaEncryptionOn: 'Activar E2EE de llamada',
+    participantMediaEncrypted:
+      'El contenido con este participante esta cifrado de extremo a extremo.',
+    participantMediaNotEncrypted:
+      'El contenido con este participante no esta cifrado de extremo a extremo.',
+    mediaEncryptionPublicCommunity:
+      'Las llamadas de comunidades publicas no usan E2EE.',
+    mediaEncryptionUnsupported:
+      'Este navegador no soporta cifrado E2EE de media.',
     missed: 'Llamada perdida',
     mute: 'Silenciar microfono',
     muted: 'Silenciado',
