@@ -10,7 +10,7 @@ import { AttachmentId } from '../../../../contexts/attachments/domain/value-obje
 
 describe(Attachment.name, () => {
   function plannedAttachment(): Attachment {
-    return Attachment.plan(
+    return Attachment.planPublication(
       AttachmentId.fromString('attachment-1'),
       AttachmentFilename.fromString('photo.webp'),
       AttachmentContentType.fromString('image/webp'),
@@ -24,6 +24,9 @@ describe(Attachment.name, () => {
     const attachment = plannedAttachment();
 
     expect(attachment.isPublished()).toBe(false);
+    expect(() => attachment.getPublishedExternalIdentifier()).toThrow(
+      'Attachment has not been published.',
+    );
     expect(attachment.pullDomainEvents()).toEqual([
       expect.objectContaining({
         aggregateId: 'attachment-1',
@@ -74,7 +77,9 @@ describe(Attachment.name, () => {
     );
 
     expect(attachment.isPublished()).toBe(true);
-    expect(attachment.getExternalIdentifier().toString()).toBe('external-1');
+    expect(attachment.getPublishedExternalIdentifier().toString()).toBe(
+      'external-1',
+    );
     expect(attachment.pullDomainEvents()).toEqual([]);
   });
 });

@@ -30,7 +30,9 @@ describe(PublishMessageAttachment.name, () => {
     );
 
     expect(attachment.isPublished()).toBe(true);
-    expect(attachment.getExternalIdentifier().toString()).toBe('external-1');
+    expect(attachment.getPublishedExternalIdentifier().toString()).toBe(
+      'external-1',
+    );
     expect(attachment.pullDomainEvents()).toEqual([
       expect.objectContaining({ type: 'AttachmentPublicationWasPlanned' }),
       expect.objectContaining({ type: 'AttachmentWasPublished' }),

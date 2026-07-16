@@ -32,7 +32,7 @@ describe(PigeonAttachmentPublisher.name, () => {
     contexts.register('source-1', 'identity-1', { file, session });
 
     const result = await publisher.publish(
-      Attachment.plan(
+      Attachment.planPublication(
         AttachmentId.fromString('attachment-1'),
         AttachmentFilename.fromString('file.txt'),
         AttachmentContentType.fromString('text/plain'),

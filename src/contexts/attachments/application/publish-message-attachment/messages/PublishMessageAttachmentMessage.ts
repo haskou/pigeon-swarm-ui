@@ -55,7 +55,7 @@ export class PublishMessageAttachmentMessage {
         : NullObject.new(AttachmentNetworkId),
     );
 
-    return Attachment.plan(
+    return Attachment.planPublication(
       AttachmentId.fromString(this.primitives.id),
       AttachmentFilename.fromString(this.primitives.filename),
       AttachmentContentType.fromString(this.primitives.contentType),

@@ -4,6 +4,7 @@ import type { PublicationStrategy } from './strategies/PublicationStrategy';
 
 import { AggregateRoot } from '../../../shared/domain/AggregateRoot';
 import { AttachmentAlreadyPublishedError } from './errors/AttachmentAlreadyPublishedError';
+import { AttachmentNotPublishedError } from './errors/AttachmentNotPublishedError';
 import { AttachmentPublicationWasPlanned } from './events/AttachmentPublicationWasPlanned';
 import { AttachmentWasPublished } from './events/AttachmentWasPublished';
 import { AttachmentByteSize } from './value-objects/AttachmentByteSize';
@@ -15,7 +16,7 @@ import { AttachmentNetworkId } from './value-objects/AttachmentNetworkId';
 import { AttachmentPublicationStatus } from './value-objects/AttachmentPublicationStatus';
 
 export class Attachment extends AggregateRoot {
-  public static plan(
+  public static planPublication(
     id: AttachmentId,
     filename: AttachmentFilename,
     contentType: AttachmentContentType,
@@ -69,28 +70,14 @@ export class Attachment extends AggregateRoot {
     super();
   }
 
-  public getContentType(): AttachmentContentType {
-    return this.contentType;
-  }
+  public getPublishedExternalIdentifier(): AttachmentExternalIdentifier {
+    assert(this.isPublished(), new AttachmentNotPublishedError());
 
-  public getExternalIdentifier(): AttachmentExternalIdentifier {
     return this.externalIdentifier;
   }
 
-  public getFilename(): AttachmentFilename {
-    return this.filename;
-  }
-
-  public getId(): AttachmentId {
-    return this.id;
-  }
-
-  public getNetworkId(): AttachmentNetworkId {
+  public getEncryptionNetworkId(): AttachmentNetworkId {
     return this.publication.getEncryptionNetworkId();
-  }
-
-  public getSize(): AttachmentByteSize {
-    return this.size;
   }
 
   public isEncrypted(): boolean {

@@ -24,7 +24,6 @@ describe(PigeonAttachmentRepository.name, () => {
 
     expect(attachment.isPublished()).toBe(true);
     expect(attachment.isEncrypted()).toBe(false);
-    expect(attachment.getFilename().toString()).toBe('notes.txt');
     expect(findPublic).toHaveBeenCalledWith('public-1');
   });
 
@@ -49,9 +48,6 @@ describe(PigeonAttachmentRepository.name, () => {
 
     expect(attachment.isPublished()).toBe(true);
     expect(attachment.isEncrypted()).toBe(true);
-    expect(attachment.getContentType().toString()).toBe(
-      'application/octet-stream',
-    );
     expect(findPrivate).toHaveBeenCalledWith('private-1');
   });
 });

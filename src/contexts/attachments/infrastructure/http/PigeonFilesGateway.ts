@@ -57,7 +57,7 @@ export class PigeonFilesGateway {
     );
 
     return await this.downloader.findPrivate(
-      attachment.getExternalIdentifier().toString(),
+      attachment.getPublishedExternalIdentifier().toString(),
     );
   }
 
@@ -67,7 +67,7 @@ export class PigeonFilesGateway {
     );
 
     return await this.downloader.findPublic(
-      attachment.getExternalIdentifier().toString(),
+      attachment.getPublishedExternalIdentifier().toString(),
     );
   }
 

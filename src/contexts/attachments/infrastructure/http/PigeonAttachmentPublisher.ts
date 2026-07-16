@@ -29,7 +29,7 @@ export class PigeonAttachmentPublisher implements AttachmentPublisher {
       ? await this.uploader.publishEncrypted(
           session,
           file,
-          attachment.getNetworkId(),
+          attachment.getEncryptionNetworkId(),
           onProgress,
         )
       : await this.uploader.publishPublic(session, file, onProgress);
