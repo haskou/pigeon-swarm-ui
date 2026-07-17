@@ -1,4 +1,11 @@
-/* eslint-disable @typescript-eslint/require-await, max-classes-per-file */
+/* eslint-disable
+  @typescript-eslint/member-ordering,
+  @typescript-eslint/no-unsafe-argument,
+  @typescript-eslint/no-use-before-define,
+  @typescript-eslint/require-await,
+  max-classes-per-file,
+  no-restricted-syntax
+*/
 
 import {
   createCipheriv,
@@ -16,6 +23,18 @@ function assert(condition: unknown, error: Error | string): void {
 }
 
 class DomainError extends Error {}
+
+class ValueObject<T> {
+  public constructor(private readonly value: T) {}
+
+  public isEqual(other: ValueObject<T>): boolean {
+    return JSON.stringify(this.value) === JSON.stringify(other.valueOf());
+  }
+
+  public valueOf(): T {
+    return this.value;
+  }
+}
 
 class NumberValueObject {
   public constructor(private readonly value: number) {}
@@ -395,5 +414,6 @@ export {
   SymmetricKey,
   Timestamp,
   UUID,
+  ValueObject,
   ValueNotInEnumError,
 };
