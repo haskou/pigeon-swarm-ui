@@ -31,7 +31,7 @@ export type { PeerMediaStats } from './collectPeerMediaStats';
 const disconnectedPeerRecoveryDelayMs = 3_000;
 const maximumPeerRecoveryDelayMs = 15_000;
 
-export class CallPeerConnectionManager {
+export class CallPeerConnections {
   private mediaEncryptionCipher: EncodedCallMediaCipher | null = null;
 
   private mediaEncryptionEnabled = false;

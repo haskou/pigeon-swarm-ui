@@ -1,4 +1,4 @@
-import { LocalMediaManager } from '../../../../../contexts/calls/infrastructure/media/LocalMediaManager';
+import { LocalCallMedia } from '../../../../../contexts/calls/infrastructure/media/LocalCallMedia';
 
 const originalMediaStream = Object.getOwnPropertyDescriptor(
   globalThis,
@@ -124,7 +124,7 @@ function restoreGlobalProperty(
   Reflect.deleteProperty(globalThis, property);
 }
 
-describe(LocalMediaManager.name, () => {
+describe(LocalCallMedia.name, () => {
   afterEach(() => {
     restoreGlobalProperty('MediaStream', originalMediaStream);
     restoreGlobalProperty('navigator', originalNavigator);
@@ -134,7 +134,7 @@ describe(LocalMediaManager.name, () => {
   it('keeps the screen preview stream stable while screen sharing is active', async () => {
     const screenTrack = mediaTrack('screen-video', 'video');
     const screenStream = mediaStreamWithTracks([screenTrack]);
-    const manager = new LocalMediaManager();
+    const manager = new LocalCallMedia();
 
     installMediaStreamMock();
     installNavigatorMock(screenStream);
@@ -151,7 +151,7 @@ describe(LocalMediaManager.name, () => {
   it('requests screen audio by default when screen sharing starts', async () => {
     const screenTrack = mediaTrack('screen-video', 'video');
     const screenStream = mediaStreamWithTracks([screenTrack]);
-    const manager = new LocalMediaManager();
+    const manager = new LocalCallMedia();
 
     installMediaStreamMock();
     const getDisplayMedia = installNavigatorMock(screenStream);
@@ -167,7 +167,7 @@ describe(LocalMediaManager.name, () => {
   it('clears the screen preview stream when screen sharing stops', async () => {
     const screenTrack = mediaTrack('screen-video', 'video');
     const screenStream = mediaStreamWithTracks([screenTrack]);
-    const manager = new LocalMediaManager();
+    const manager = new LocalCallMedia();
 
     installMediaStreamMock();
     installNavigatorMock(screenStream);
@@ -187,7 +187,7 @@ describe(LocalMediaManager.name, () => {
     const sourceAudioTrack = mediaTrack('screen-audio-source', 'audio');
     const outputAudioTrack = mediaTrack('screen-audio-output', 'audio');
     const screenStream = mediaStreamWithTracks([screenTrack, sourceAudioTrack]);
-    const manager = new LocalMediaManager();
+    const manager = new LocalCallMedia();
     const audioContext = installAudioContextMock(outputAudioTrack);
 
     installMediaStreamMock();

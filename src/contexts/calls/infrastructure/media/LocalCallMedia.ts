@@ -24,7 +24,7 @@ function describeTracks(stream: MediaStream): Array<Record<string, unknown>> {
   return stream.getTracks().map(describeTrack);
 }
 
-export class LocalMediaManager {
+export class LocalCallMedia {
   private stream: MediaStream | null = null;
 
   private microphoneStream: MediaStream | null = null;

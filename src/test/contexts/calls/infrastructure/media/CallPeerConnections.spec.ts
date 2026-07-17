@@ -5,7 +5,7 @@ import type { FakePeerConnection } from '../../../../../contexts/calls/infrastru
 import type { FakeSender } from '../../../../../contexts/calls/infrastructure/media/FakeSender';
 import type { PeerConnectionManagerInternals } from '../../../../../contexts/calls/infrastructure/media/PeerConnectionManagerInternals';
 
-import { CallPeerConnectionManager } from '../../../../../contexts/calls/infrastructure/media/CallPeerConnectionManager';
+import { CallPeerConnections } from '../../../../../contexts/calls/infrastructure/media/CallPeerConnections';
 import { EncodedCallMediaCipher } from '../../../../../contexts/calls/infrastructure/media/EncodedCallMediaCipher';
 import { RemoteCallAudio } from '../../../../../contexts/calls/infrastructure/media/RemoteCallAudio';
 
@@ -89,8 +89,8 @@ function remoteAudioElement(): HTMLAudioElement {
   } as unknown as HTMLAudioElement;
 }
 
-function callPeerConnectionManager(): CallPeerConnectionManager {
-  return new CallPeerConnectionManager(
+function callPeerConnectionManager(): CallPeerConnections {
+  return new CallPeerConnections(
     new RemoteCallAudio({
       create: remoteAudioElement,
       mount: jest.fn(),
@@ -99,7 +99,7 @@ function callPeerConnectionManager(): CallPeerConnectionManager {
 }
 
 function managerInternals(
-  manager: CallPeerConnectionManager,
+  manager: CallPeerConnections,
 ): PeerConnectionManagerInternals {
   return manager as unknown as PeerConnectionManagerInternals;
 }
@@ -308,7 +308,7 @@ function restoreGlobalProperty(
   Reflect.deleteProperty(globalThis, property);
 }
 
-describe(CallPeerConnectionManager.name, () => {
+describe(CallPeerConnections.name, () => {
   afterEach(() => {
     jest.useRealTimers();
     restoreGlobalProperty('MediaStream', originalMediaStream);
