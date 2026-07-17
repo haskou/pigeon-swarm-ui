@@ -29,7 +29,15 @@ import { CommunityRoleUpdater } from '../../contexts/communities/application/upd
 import { CommunityAccessContexts } from '../../contexts/communities/infrastructure/http/CommunityAccessContexts';
 import { CommunityMapper } from '../../contexts/communities/infrastructure/http/CommunityMapper';
 import { PigeonCommunityRepository } from '../../contexts/communities/infrastructure/http/PigeonCommunityRepository';
-import { PigeonConversationsApplication } from '../../contexts/conversations/application/PigeonConversationsApplication';
+import { ConversationCreator } from '../../contexts/conversations/application/create-conversation/ConversationCreator';
+import { GroupConversationCreator } from '../../contexts/conversations/application/create-group-conversation/GroupConversationCreator';
+import { ConversationParticipantInviter } from '../../contexts/conversations/application/invite-to-group-conversation/ConversationParticipantInviter';
+import { ConversationReadMarker } from '../../contexts/conversations/application/mark-conversation-read-until/ConversationReadMarker';
+import { ConversationsSearcher } from '../../contexts/conversations/application/search-conversations/ConversationsSearcher';
+import { ConversationIdFactory } from '../../contexts/conversations/domain/ConversationIdFactory';
+import { ConversationAccessContexts } from '../../contexts/conversations/infrastructure/http/ConversationAccessContexts';
+import { ConversationMapper } from '../../contexts/conversations/infrastructure/http/ConversationMapper';
+import { PigeonConversationRepository } from '../../contexts/conversations/infrastructure/http/PigeonConversationRepository';
 import { PigeonIdentitiesApplication } from '../../contexts/identities/application/PigeonIdentitiesApplication';
 import { PigeonSessionApplication } from '../../contexts/identities/application/PigeonSessionApplication';
 import { PigeonMessagesApplication } from '../../contexts/messages/application/PigeonMessagesApplication';
@@ -45,6 +53,7 @@ import { PigeonCallReader } from './calls/PigeonCallReader';
 import { PigeonCallSignaling } from './calls/PigeonCallSignaling';
 import { PigeonCallStarter } from './calls/PigeonCallStarter';
 import { PigeonCommunityManagement } from './communities/PigeonCommunityManagement';
+import { PigeonConversationsFacade } from './conversations/PigeonConversationsFacade';
 import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonAttachmentsFacade } from './PigeonAttachmentsFacade';
 import { PigeonCallsFacade } from './PigeonCallsFacade';
@@ -58,7 +67,7 @@ export class PigeonApplication {
 
   public readonly communities: PigeonCommunitiesFacade;
 
-  public readonly conversations: PigeonConversationsApplication;
+  public readonly conversations: PigeonConversationsFacade;
 
   public readonly identities: PigeonIdentitiesApplication;
 
@@ -147,20 +156,33 @@ export class PigeonApplication {
         unbanner: new CommunityMemberUnbanner(communityRepository),
       }),
     );
-    this.conversations = new PigeonConversationsApplication({
-      createConversation: gateway.conversationsGateway,
-      createGroupConversation: gateway.conversationsGateway,
-      inviteToGroupConversation: gateway.conversationsGateway,
-      listConversations: {
-        listConversations: gateway.conversationsGateway.listConversations.bind(
-          gateway.conversationsGateway,
+    const conversationContexts = new ConversationAccessContexts();
+    const conversationMapper = new ConversationMapper();
+    const conversationRepository = new PigeonConversationRepository(
+      gateway.conversationsGateway,
+      gateway.messagesGateway,
+      conversationContexts,
+      conversationMapper,
+    );
+    this.conversations = new PigeonConversationsFacade(
+      conversationContexts,
+      conversationMapper,
+      {
+        creator: new ConversationCreator(
+          conversationRepository,
+          new ConversationIdFactory(),
         ),
-        loadMessages: gateway.messagesGateway.loadMessages.bind(
-          gateway.messagesGateway,
+        groupCreator: new GroupConversationCreator(
+          conversationRepository,
+          new ConversationIdFactory(),
         ),
+        participantInviter: new ConversationParticipantInviter(
+          conversationRepository,
+        ),
+        readMarker: new ConversationReadMarker(conversationRepository),
+        searcher: new ConversationsSearcher(conversationRepository),
       },
-      markConversationReadUntil: gateway.conversationsGateway,
-    });
+    );
     this.identities = new PigeonIdentitiesApplication({
       keychain: gateway.identityGateway,
       login: gateway.identityGateway,

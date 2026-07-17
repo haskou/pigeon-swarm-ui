@@ -3,8 +3,8 @@ import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { LeaveCommunityResult } from '../create-community/LeaveCommunityResult';
 
 import { PigeonCommunitiesGateway } from '../../../../contexts/communities/infrastructure/http/PigeonCommunitiesGateway';
-import { ConversationKeychain as ConversationKeychainService } from '../../../../contexts/conversations/domain/ConversationKeychain';
 import { PigeonIdentitiesGateway } from '../../../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
+import { ConversationKeychain as ConversationKeychainService } from '../../../../contexts/identities/infrastructure/keychain/ConversationKeychain';
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 
 export class LeaveCommunity {

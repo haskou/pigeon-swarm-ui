@@ -1,4 +1,4 @@
-import type { ConversationResource } from '../../conversations/domain/conversationResources.types';
+import type { ConversationResource } from '../../conversations/infrastructure/http/ConversationResource';
 import type { Session } from './Session';
 
 export type LoginResult = {

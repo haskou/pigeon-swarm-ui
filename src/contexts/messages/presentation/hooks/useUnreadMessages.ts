@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 
 import type { ConversationResource } from '../../../../shared/domain/pigeonResources.types';
 
-import { ConversationTimeline } from '../../../conversations/application/list-conversations/ConversationTimeline';
+import { ConversationTimeline } from '../../../conversations/presentation/view-models/ConversationTimeline';
 
 type UnreadCountsByConversation = Record<string, number>;
 

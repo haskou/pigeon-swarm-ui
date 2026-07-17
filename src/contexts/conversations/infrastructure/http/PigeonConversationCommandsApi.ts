@@ -19,6 +19,8 @@ import type { ConversationMapper } from './ConversationMapper';
 import type { GroupConversationInput } from './GroupConversationInput';
 
 import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
+import { ConversationNetworkId } from '../../domain/value-objects/ConversationNetworkId';
+import { ConversationParticipantId } from '../../domain/value-objects/ConversationParticipantId';
 
 export class PigeonConversationCommandsApi {
   public constructor(
@@ -79,7 +81,13 @@ export class PigeonConversationCommandsApi {
   ): ConversationKeyEntry {
     return {
       algorithm: 'aes-256-gcm',
-      conversationId: this.ids.create(identityId, peerIdentityId, networkId),
+      conversationId: this.ids
+        .create(
+          ConversationParticipantId.fromString(identityId),
+          ConversationParticipantId.fromString(peerIdentityId),
+          ConversationNetworkId.fromString(networkId),
+        )
+        .toString(),
       createdAt: Date.now(),
       key: SymmetricKey.generate().valueOf(),
       kind: 'conversation',

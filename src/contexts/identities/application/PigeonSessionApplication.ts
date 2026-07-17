@@ -5,7 +5,7 @@ import type {
 import type { LoginIdentityProgressReporter } from './login-identity/LoginIdentityProgressReporter';
 import type { SessionApplicationPort } from './session/SessionApplicationPort';
 
-import { ConversationTimeline } from '../../conversations/application/list-conversations/ConversationTimeline';
+import { ConversationTimeline } from '../../conversations/presentation/view-models/ConversationTimeline';
 
 export class PigeonSessionApplication {
   public constructor(private readonly gateway: SessionApplicationPort) {}

@@ -1,19 +1,9 @@
-import type { ConversationResource } from '../../../../shared/domain/pigeonResources.types';
+import type { PrimitiveOf } from '@haskou/value-objects';
+
 import type { ConversationListEnvelope } from './ConversationListEnvelope';
+import type { ConversationResource } from './ConversationResource';
 
-import { ConversationIdFactory } from '../../domain/ConversationIdFactory';
-
-function conversationId(
-  input: ConversationResource,
-  fallbackPeer: string | undefined,
-  idFactory: ConversationIdFactory,
-): string {
-  return (
-    input.id ??
-    input.conversationId ??
-    idFactory.create('', fallbackPeer ?? 'unknown')
-  );
-}
+import { Conversation } from '../../domain/Conversation';
 
 function conversationPeerId(
   input: ConversationResource,
@@ -26,14 +16,6 @@ function conversationPeerId(
 }
 
 export class ConversationMapper {
-  private readonly idFactory: ConversationIdFactory;
-
-  public constructor(
-    idFactory: ConversationIdFactory = new ConversationIdFactory(),
-  ) {
-    this.idFactory = idFactory;
-  }
-
   public list(value: unknown): ConversationResource[] {
     if (Array.isArray(value)) {
       return value.map((item) => this.normalize(item as ConversationResource));
@@ -50,7 +32,9 @@ export class ConversationMapper {
     input: ConversationResource,
     fallbackPeer?: string,
   ): ConversationResource {
-    const id = conversationId(input, fallbackPeer, this.idFactory);
+    const id = input.id?.trim() || input.conversationId?.trim();
+
+    if (!id) throw new TypeError('Conversation resource id is required.');
 
     return {
       ...input,
@@ -60,6 +44,55 @@ export class ConversationMapper {
         input.participantIdentityIds ?? input.participantIds,
       peerIdentityId: conversationPeerId(input, id, fallbackPeer),
       title: input.title ?? input.name,
+    };
+  }
+
+  public fromPrimitives(
+    resource: ConversationResource,
+    fallbackPeer?: string,
+  ): Conversation {
+    const normalized = this.normalize(resource, fallbackPeer);
+    const type =
+      normalized.type ??
+      (normalized.id.startsWith('group:') ? 'group' : 'one-to-one');
+
+    return Conversation.fromPrimitives({
+      id: normalized.id,
+      latestMessageAt: normalized.latestMessageAt ?? 0,
+      latestMessagePreview: normalized.latestMessagePreview,
+      name: normalized.title,
+      networkId: normalized.networkId,
+      participantIds:
+        normalized.participantIdentityIds ??
+        normalized.participantIds ??
+        normalized.participants ??
+        [],
+      peerIdentityId: conversationPeerId(
+        normalized,
+        normalized.id,
+        fallbackPeer,
+      ),
+      type,
+      unreadCount: normalized.unreadCount ?? 0,
+    });
+  }
+
+  public toResource(conversation: Conversation): ConversationResource {
+    const primitives: PrimitiveOf<Conversation> = conversation.toPrimitives();
+
+    return {
+      conversationId: primitives.id,
+      id: primitives.id,
+      latestMessageAt: primitives.latestMessageAt,
+      latestMessagePreview: primitives.latestMessagePreview,
+      name: primitives.name,
+      networkId: primitives.networkId,
+      participantIdentityIds: primitives.participantIds,
+      participantIds: primitives.participantIds,
+      peerIdentityId: primitives.peerIdentityId,
+      title: primitives.name,
+      type: primitives.type,
+      unreadCount: primitives.unreadCount,
     };
   }
 }

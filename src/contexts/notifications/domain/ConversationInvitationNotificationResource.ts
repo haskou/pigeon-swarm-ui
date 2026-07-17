@@ -1,4 +1,4 @@
-import type { ConversationInvitationPayload } from '../../conversations/domain/conversationResources.types';
+import type { ConversationInvitationPayload } from '../infrastructure/http/resources/ConversationInvitationPayload';
 import type { BaseNotificationResource } from './BaseNotificationResource';
 
 export type ConversationInvitationNotificationResource =
