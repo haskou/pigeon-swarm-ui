@@ -8,8 +8,8 @@ import type { RequestSigner } from '../../../../shared/infrastructure/http/Reque
 
 export class PigeonPrivateFilesClient {
   public constructor(
-    private readonly http: HttpJsonClient,
-    private readonly signer: RequestSigner,
+    private readonly http: Pick<HttpJsonClient, 'request'>,
+    private readonly signer: Pick<RequestSigner, 'headers'>,
   ) {}
 
   public async fetch(cid: string): Promise<PrivateFileContent> {

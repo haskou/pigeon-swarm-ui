@@ -11,8 +11,8 @@ import type { LegacyPublicFileContent } from './LegacyPublicFileContent';
 
 export class PigeonPublicFilesClient {
   public constructor(
-    private readonly http: HttpJsonClient,
-    private readonly signer: RequestSigner,
+    private readonly http: Pick<HttpJsonClient, 'request' | 'requestBlob'>,
+    private readonly signer: Pick<RequestSigner, 'headers'>,
   ) {}
 
   private async content(cid: string, blob: Blob): Promise<PublicFileContent> {

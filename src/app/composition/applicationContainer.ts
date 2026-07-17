@@ -11,6 +11,6 @@ export const applicationContainer = new PigeonApplication(
     undefined,
     undefined,
     undefined,
-    new AttachmentCipher(browserAttachmentWorkerFactory),
+    AttachmentCipher.withWorker(browserAttachmentWorkerFactory),
   ),
 );

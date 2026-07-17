@@ -1,11 +1,11 @@
 import { EncryptedPayload, KeyPair, SymmetricKey } from '@haskou/value-objects';
 
+import type { PendingMessageAttachment } from '../../../contexts/attachments/infrastructure/crypto/resources/PendingMessageAttachment';
 import type { CallResource } from '../../../contexts/calls/domain/callSession.types';
 import type {
   ConversationKeyEntry,
   IdentityResource,
   LocalKeychain,
-  PendingMessageAttachment,
   Session,
   StickerInput,
 } from '../../../shared/domain/pigeonResources.types';
@@ -3328,7 +3328,6 @@ describe(PigeonApiGateway.name, () => {
   });
 
   it('downloads encrypted private attachment content', async () => {
-    const encryptedBytes = new Uint8Array([1, 2, 3]);
     const decrypted = new Blob(['clear'], { type: 'image/png' });
     const http = {
       request: jest.fn().mockResolvedValue({
@@ -3341,8 +3340,6 @@ describe(PigeonApiGateway.name, () => {
       }),
     } as unknown as HttpJsonClient;
     const attachmentCipher = {
-      base64ToBytes: jest.fn().mockReturnValue(encryptedBytes),
-      bytesToArrayBuffer: jest.fn().mockReturnValue(encryptedBytes.buffer),
       decrypt: jest.fn().mockResolvedValue(decrypted),
     } as unknown as AttachmentCipher;
     const gateway = new PigeonApiGateway(
@@ -3367,10 +3364,9 @@ describe(PigeonApiGateway.name, () => {
     );
 
     expect(http.request).toHaveBeenCalledWith('/ipfs/bafy%2Fattachment');
-    expect(attachmentCipher.base64ToBytes).toHaveBeenCalledWith('AQID');
     expect(attachmentCipher.decrypt).toHaveBeenCalledWith(
       attachment,
-      encryptedBytes.buffer,
+      expect.any(ArrayBuffer),
       undefined,
     );
   });

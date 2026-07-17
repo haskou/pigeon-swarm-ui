@@ -17,6 +17,78 @@ function assert(condition: unknown, error: Error | string): void {
 
 class DomainError extends Error {}
 
+class NumberValueObject {
+  public constructor(private readonly value: number) {}
+
+  public isEqual(other: NumberValueObject): boolean {
+    return this.value === other.valueOf();
+  }
+
+  public isGreaterOrEqualThan(other: number | NumberValueObject): boolean {
+    return this.value >= NumberValueObject.primitive(other);
+  }
+
+  public isLessOrEqualThan(other: number | NumberValueObject): boolean {
+    return this.value <= NumberValueObject.primitive(other);
+  }
+
+  public valueOf(): number {
+    return this.value;
+  }
+
+  private static primitive(value: number | NumberValueObject): number {
+    return typeof value === 'number' ? value : value.valueOf();
+  }
+}
+
+class Integer extends NumberValueObject {
+  public constructor(value: number) {
+    super(value);
+
+    if (!Number.isInteger(value)) throw new Error('InvalidIntegerError');
+  }
+}
+
+abstract class Enum<T extends string> {
+  public constructor(private readonly value: T) {
+    if (!this.getValues().includes(value)) {
+      throw new ValueNotInEnumError(value, this.getValues());
+    }
+  }
+
+  public abstract getValues(): T[];
+
+  public isEqual(other: Enum<T>): boolean {
+    return this.value === other.valueOf();
+  }
+
+  public valueOf(): T {
+    return this.value;
+  }
+}
+
+const nullObjectMarker = Symbol('NullObject');
+
+class NullObject {
+  public static new<T>(klass: abstract new (...args: never[]) => T): T {
+    const value = Object.create(klass.prototype) as T & {
+      [nullObjectMarker]: boolean;
+    };
+
+    value[nullObjectMarker] = true;
+
+    return value;
+  }
+
+  public static isNullObject(value: unknown): boolean {
+    return Boolean(
+      value &&
+      typeof value === 'object' &&
+      nullObjectMarker in (value as Record<PropertyKey, unknown>),
+    );
+  }
+}
+
 class ValueNotInEnumError extends DomainError {
   public constructor(value: string, validValues: string[]) {
     super(`Value "${value}" must be one of: ${validValues.join(', ')}`);
@@ -311,7 +383,10 @@ export {
   EncryptedKeyPair,
   EncryptedPayload,
   EncryptedPrivateKey,
+  Enum,
+  Integer,
   KeyPair,
+  NullObject,
   PrivateKey,
   PublicKey,
   SHA256Hash,
