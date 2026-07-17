@@ -16,6 +16,25 @@ describe(CallAccessContexts.name, () => {
     );
   });
 
+  it('normalizes a PEM identity before registering its session', () => {
+    const contexts = new CallAccessContexts();
+    const session = {
+      identity: {
+        id: [
+          '-----BEGIN PUBLIC KEY-----',
+          'identity-a',
+          '-----END PUBLIC KEY-----',
+        ].join('\n'),
+      },
+    } as Session;
+
+    contexts.register(session);
+
+    expect(contexts.find(CallIdentityId.fromString('identity-a'))).toBe(
+      session,
+    );
+  });
+
   it('rejects access without a registered infrastructure context', () => {
     expect(() =>
       new CallAccessContexts().find(CallIdentityId.fromString('identity-a')),
