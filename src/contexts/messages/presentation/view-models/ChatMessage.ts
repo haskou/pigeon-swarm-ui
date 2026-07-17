@@ -2,7 +2,7 @@ import type {
   AttachmentProgress,
   MessageAttachment,
 } from '../../../attachments/infrastructure/attachmentResources.types';
-import type { CommunityMessageMention } from '../../../communities/domain/communityResources.types';
+import type { CommunityMessageMentionResource as CommunityMessageMention } from '../../../communities/infrastructure/http/resources/CommunityMessageMentionResource';
 import type { PollResource } from '../../../polls/domain/pollResources.types';
 import type { StickerMessageReference } from '../../../stickers/domain/stickerResources.types';
 import type { MessageLinkPreview } from '../../domain/MessageLinkPreview';

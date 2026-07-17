@@ -6,7 +6,7 @@ import type {
   IdentityResource,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { CommunityAccessPolicy } from '../../domain/CommunityAccessPolicy';
+import { CommunityAccessPolicy } from '../view-models/CommunityAccessPolicy';
 import { memberDisplayName } from './communityMemberNames';
 
 type CommunityMentionInput = {

@@ -1,6 +1,21 @@
-import type { Community } from '../../../../../contexts/communities/domain/Community';
+import type { CommunityResource as Community } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
 
 import { CommunityList } from '../../../../../contexts/communities/presentation/view-models/CommunityList';
+
+function community(overrides: Partial<Community> = {}): Community {
+  return {
+    createdAt: 1,
+    description: 'description',
+    id: 'community-1',
+    memberIds: [],
+    name: 'Community',
+    networkId: 'network-1',
+    ownerIdentityId: 'identity-1',
+    textChannels: [],
+    visibility: 'private',
+    ...overrides,
+  };
+}
 
 describe(CommunityList.name, () => {
   it('keeps one community per id preserving the first occurrence', () => {
@@ -57,18 +72,3 @@ describe(CommunityList.name, () => {
     ]);
   });
 });
-
-function community(overrides: Partial<Community> = {}): Community {
-  return {
-    createdAt: 1,
-    description: 'description',
-    id: 'community-1',
-    memberIds: [],
-    name: 'Community',
-    networkId: 'network-1',
-    ownerIdentityId: 'identity-1',
-    textChannels: [],
-    visibility: 'private',
-    ...overrides,
-  };
-}

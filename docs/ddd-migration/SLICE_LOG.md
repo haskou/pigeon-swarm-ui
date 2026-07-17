@@ -1,5 +1,29 @@
 # Migration slice log
 
+## Slice COMMUNITY-001: Community aggregate and explicit workflows
+
+- Date: 2026-07-17
+- Size: L
+- Status: completed
+- Goal: replace the resource-shaped community domain and application port facade
+  with a behavior-rich aggregate, primitive application messages, domain-owned
+  repositories, and context infrastructure adapters.
+- Changes:
+  - hydrate community membership, roles, and channels through `Community.fromPrimitives`
+  - move permission, membership, role, and channel mutations onto the aggregate
+  - replace `PigeonCommunitiesApplication` orchestration and application `*Port`
+    contracts with explicit use cases and domain repositories
+  - keep timelines, drafts, pins, discovery, invitations, and moderation logs as
+    explicit workflow/read-model boundaries
+- Behavior changed/preserved: preserve REST, encrypted payload, keychain, cache,
+  and presentation contracts
+- Contracts changed: none planned
+- Validation level: L2
+- Tests/checks: 29 communities suites / 101 tests, direct aggregate, use-case,
+  mapper, access-context, repository, and composition coverage; strict slice
+  lint; TypeScript typecheck; full lint and Jest suite
+- Next slice: `CONVERSATION-001`
+
 ## Slice INFRA-001: Calls and networks own their HTTP gateways
 
 - Date: 2026-07-11

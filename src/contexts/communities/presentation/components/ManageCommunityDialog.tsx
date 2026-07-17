@@ -20,8 +20,8 @@ import { useCloseTransition } from '../../../../shared/presentation/hooks/useClo
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
-import { CommunityAccessPolicy } from '../../domain/CommunityAccessPolicy';
-import { CommunityChannels } from '../../domain/CommunityChannels';
+import { CommunityAccessPolicy } from '../view-models/CommunityAccessPolicy';
+import { CommunityChannels } from '../view-models/CommunityChannels';
 import { CommunityBannedMembersPanel } from './CommunityBannedMembersPanel';
 import { DialogHeader } from './communityDialogPrimitives';
 import { loadIdentityPicture, loadPublicImage } from './communityImages';

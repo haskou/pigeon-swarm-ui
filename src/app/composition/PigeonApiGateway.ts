@@ -16,7 +16,6 @@ import type {
   CommunityDiscoveryResource,
   CommunityInviteLinkResource,
   CommunityMembershipRequest,
-  CommunityMembershipRequestStatus,
   CommunityModerationLogPage,
   CommunityPermission,
   CommunityRoleResource,
@@ -680,7 +679,10 @@ export class PigeonApiGateway {
   public async updateCommunityMembershipRequest(
     session: Session,
     requestId: string,
-    status: Extract<CommunityMembershipRequestStatus, 'accepted' | 'declined'>,
+    status: Extract<
+      CommunityMembershipRequest['status'],
+      'accepted' | 'declined'
+    >,
   ): Promise<CommunityMembershipRequest> {
     return await this.communityGateway.updateCommunityMembershipRequest(
       session,

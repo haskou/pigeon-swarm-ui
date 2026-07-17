@@ -6,7 +6,6 @@ import type {
   CommunityDiscoveryResource,
   CommunityInviteLinkResource,
   CommunityMembershipRequest,
-  CommunityMembershipRequestStatus,
   CommunityModerationLogPage,
   CommunityPermission,
   CommunityRoleResource,
@@ -17,7 +16,7 @@ import type {
   MessageResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { CommunityMediaPort } from '../../application/upload-community-media/CommunityMediaPort';
+import type { PigeonFilesGateway } from '../../../attachments/infrastructure/http/PigeonFilesGateway';
 import type { CommunityChannelMessageEditInput } from './CommunityChannelMessageEditInput';
 import type { CommunityChannelMessageInput } from './CommunityChannelMessageInput';
 import type { CommunityInviteLinkInput } from './CommunityInviteLinkInput';
@@ -31,7 +30,7 @@ export class PigeonCommunitiesGateway {
     private readonly communities: PigeonCommunitiesApi,
     private readonly invitations: PigeonCommunityInvitationApi,
     private readonly requestCache: RequestCache,
-    private readonly media: CommunityMediaPort,
+    private readonly media: Pick<PigeonFilesGateway, 'uploadPublicFile'>,
   ) {}
 
   private invalidateChannelPins(
@@ -177,7 +176,10 @@ export class PigeonCommunitiesGateway {
   public async updateCommunityMembershipRequest(
     session: Session,
     requestId: string,
-    status: Extract<CommunityMembershipRequestStatus, 'accepted' | 'declined'>,
+    status: Extract<
+      CommunityMembershipRequest['status'],
+      'accepted' | 'declined'
+    >,
   ): Promise<CommunityMembershipRequest> {
     const request = await this.communities.updateMembershipRequest(
       session,

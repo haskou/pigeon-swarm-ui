@@ -10,7 +10,7 @@ import type { CommunityMemberListItem } from './communityMembersPanel';
 import type { CommunityMentionSuggestion } from './communityMentionPanel';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
-import { CommunityAccessPolicy } from '../../domain/CommunityAccessPolicy';
+import { CommunityAccessPolicy } from '../view-models/CommunityAccessPolicy';
 import { CommunityMessageMentions } from './CommunityMessageMentions';
 import { memberDisplayName } from './communityMemberNames';
 import { findMentionTrigger } from './communityMentionTrigger';

@@ -7,7 +7,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 
-import { CommunityChannels } from '../../../../contexts/communities/domain/CommunityChannels';
+import { CommunityChannels } from '../../../../contexts/communities/presentation/view-models/CommunityChannels';
 import {
   communityAttribute,
   communityChannelAttribute,

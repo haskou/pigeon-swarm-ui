@@ -7,7 +7,7 @@ import type {
 import { MessageEditability } from '../../../messages/presentation/view-models/MessageEditability';
 import { communityRoleDisplayName } from '../view-models/communityRoleDisplayName';
 import { copy } from '../../../../shared/presentation/i18n/copy';
-import { CommunityAccessPolicy } from '../../domain/CommunityAccessPolicy';
+import { CommunityAccessPolicy } from '../view-models/CommunityAccessPolicy';
 
 type DeleteMessageInput = {
   currentPermissions: Set<CommunityPermission>;

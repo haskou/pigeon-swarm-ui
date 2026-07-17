@@ -6,7 +6,6 @@ import type {
   CommunityDiscoveryResource,
   CommunityMessageMention,
   CommunityMembershipRequest,
-  CommunityMembershipRequestStatus,
   CommunityModerationLogPage,
   CommunityPermission,
   CommunityRoleResource,
@@ -94,6 +93,24 @@ export class PigeonCommunitiesApi {
     return `GET /communities/${encodeURIComponent(communityId)}/channels ${
       session.identity.id
     }`;
+  }
+
+  private communityDetailCacheKey(
+    session: Session,
+    communityId: string,
+  ): string {
+    return `GET /communities/${encodeURIComponent(communityId)} ${
+      session.identity.id
+    }`;
+  }
+
+  private invalidateCommunityDetailCache(
+    session: Session,
+    communityId: string,
+  ): void {
+    this.invalidateCachedRequest(
+      this.communityDetailCacheKey(session, communityId),
+    );
   }
 
   private invalidateChannelListCache(
@@ -462,7 +479,10 @@ export class PigeonCommunitiesApi {
   public async updateMembershipRequest(
     session: Session,
     requestId: string,
-    status: Extract<CommunityMembershipRequestStatus, 'accepted' | 'declined'>,
+    status: Extract<
+      CommunityMembershipRequest['status'],
+      'accepted' | 'declined'
+    >,
   ): Promise<CommunityMembershipRequest> {
     const path = `/communities/membership-requests/${encodeURIComponent(
       requestId,
@@ -584,11 +604,15 @@ export class PigeonCommunitiesApi {
     )}/members/${encodeURIComponent(identityId)}/roles`;
     const body = { roleIds };
 
-    return await this.http.request<Community>(path, {
+    const community = await this.http.request<Community>(path, {
       body: JSON.stringify(body),
       headers: await this.signer.headers(session, 'PUT', path, body),
       method: 'PUT',
     });
+
+    this.invalidateCommunityDetailCache(session, communityId);
+
+    return community;
   }
 
   public async createTextChannel(

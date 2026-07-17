@@ -12,7 +12,7 @@ import type {
   IdentityPictures,
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
 
-import { CommunityChannels } from '../../../../contexts/communities/domain/CommunityChannels';
+import { CommunityChannels } from '../../../../contexts/communities/presentation/view-models/CommunityChannels';
 import { ConversationPeer } from '../../../../contexts/conversations/presentation/view-models/ConversationPeer';
 import { shortId } from '../../../../shared/presentation/formatting';
 

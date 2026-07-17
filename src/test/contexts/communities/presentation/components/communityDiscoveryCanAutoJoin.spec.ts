@@ -1,4 +1,4 @@
-import type { CommunityDiscoveryResource } from '../../../../../contexts/communities/domain/CommunityDiscoveryResource';
+import type { CommunityDiscoveryResource } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityDiscoveryResource';
 
 import { communityDiscoveryCanAutoJoin } from '../../../../../contexts/communities/presentation/components/communityDiscoveryCanAutoJoin';
 

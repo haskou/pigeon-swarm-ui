@@ -40,25 +40,28 @@ adapters into application services without containing context behavior.
 
 ## Active slice
 
-- Id: `APPLICATION-011`
-- Title: Replace compatibility aggregators with explicit application use cases
+- Id: `COMMUNITY-001`
+- Title: Model community membership, roles, and channels behind the community aggregate
 - Size: L
-- Status: in progress
-- Business capability: Context-owned application workflows and transport
-- Source area: `src/app/composition/PigeonApiGateway.ts`
-- Target boundary: context application services and context infrastructure
-  adapters
-- Target files/folders: `contexts/*/application` and their owning
-  `infrastructure/http` or `crypto` modules
+- Status: completed
+- Business capability: Community lifecycle, membership, roles, channels, invitations,
+  and channel-scoped read models
+- Source area: `src/contexts/communities`
+- Target boundary: a behavior-rich `Community` aggregate, explicit use cases and
+  messages, domain repositories, and context-owned infrastructure mappers
+- Target files/folders: `contexts/communities/{domain,application,infrastructure}`
 - Compatibility constraints: REST, websocket, encrypted payload, and existing
   presentation APIs remain stable while callers migrate by capability
 - Validation level: L2
-- Affected behavior/tests: application bootstrap, messages, conversations,
-  communities, identities, notifications, and attachments
-- Tests/checks run: typecheck, lint, message context tests, and gateway tests
+- Affected behavior/tests: community creation, profile updates, membership, roles,
+  channels, invitations, drafts, pins, and channel message queries/commands
+- Tests/checks run: communities domain/application/infrastructure and app
+  composition tests, strict slice lint, TypeScript typecheck, full lint, and full
+  Jest suite
 - Full-suite status: deferred until the infrastructure milestone closes
-- Done criteria: no context behavior is reached through `PigeonApiGateway`; it
-  is reduced to composition wiring or removed
+- Done criteria: application receives primitive messages, community decisions run
+  through domain objects, resources stay outside domain, and infrastructure
+  implements domain-owned repositories without application `Port` contracts
 
 ## Risks
 
@@ -146,7 +149,6 @@ adapters into application services without containing context behavior.
 
 ## Next slices
 
-1. `APPLICATION-011Y`: extract remaining realtime/community routing from
-   `GlassWorkspace` only where it forms a cohesive responsibility.
+1. `CONVERSATION-001`: migrate conversation lifecycle and membership from the
+   completed community/calls architecture.
 2. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
-3. `COMMUNITY-001`: complete community membership/channel aggregate behavior.

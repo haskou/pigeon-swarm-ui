@@ -21,7 +21,7 @@ import { DateSeparator } from '../../../messages/presentation/components/DateSep
 import { MessageBubble } from '../../../messages/presentation/components/MessageBubble';
 import { TimelineJumpButton } from '../../../messages/presentation/components/TimelineJumpButton';
 import { InvitationKeyPrompt } from '../../../notifications/presentation/components/InvitationKeyPrompt';
-import { CommunityMentionHighlightPolicy } from '../../domain/CommunityMentionHighlightPolicy';
+import { CommunityMentionHighlightPolicy } from '../view-models/CommunityMentionHighlightPolicy';
 import {
   messageReplyImage,
   messageReplySticker,

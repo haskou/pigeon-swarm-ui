@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 
 import type { Community } from '../../../../shared/domain/pigeonResources.types';
 
-import { CommunityChannels } from '../../../../contexts/communities/domain/CommunityChannels';
+import { CommunityChannels } from '../../../../contexts/communities/presentation/view-models/CommunityChannels';
 import { CommunityList } from '../../../../contexts/communities/presentation/view-models/CommunityList';
 
 export function useCommunitySelection({

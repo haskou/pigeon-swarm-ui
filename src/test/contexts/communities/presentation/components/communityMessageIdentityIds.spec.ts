@@ -5,6 +5,46 @@ import type {
 
 import { communityMessageIdentityIds } from '../../../../../contexts/communities/presentation/components/communityMessageIdentityIds';
 
+function chatMessage(
+  overrides: Partial<ChatMessage> & Pick<ChatMessage, 'authorIdentityId'>,
+): ChatMessage {
+  return {
+    attachments: [],
+    content: 'message',
+    encrypted: false,
+    id: 'message-id',
+    mine: false,
+    raw: {
+      id: 'message-id',
+      type: 'sent',
+    },
+    reactions: [],
+    timestamp: 1,
+    ...overrides,
+  };
+}
+
+function poll(
+  overrides: Partial<PollResource> & Pick<PollResource, 'creatorIdentityId'>,
+): PollResource {
+  return {
+    allowsMultipleVotes: false,
+    createdAt: 1,
+    id: 'poll-id',
+    options: [],
+    question: 'question',
+    scope: {
+      channelId: 'channel-id',
+      communityId: 'community-id',
+      networkId: 'network-id',
+      type: 'community_channel',
+    },
+    status: 'open',
+    votes: [],
+    ...overrides,
+  };
+}
+
 describe('communityMessageIdentityIds', () => {
   it('collects historical authors from messages, replies, reactions, and polls', () => {
     const message = chatMessage({
@@ -59,43 +99,3 @@ describe('communityMessageIdentityIds', () => {
     ]);
   });
 });
-
-function chatMessage(
-  overrides: Partial<ChatMessage> & Pick<ChatMessage, 'authorIdentityId'>,
-): ChatMessage {
-  return {
-    attachments: [],
-    content: 'message',
-    encrypted: false,
-    id: 'message-id',
-    mine: false,
-    raw: {
-      id: 'message-id',
-      type: 'sent',
-    },
-    reactions: [],
-    timestamp: 1,
-    ...overrides,
-  };
-}
-
-function poll(
-  overrides: Partial<PollResource> & Pick<PollResource, 'creatorIdentityId'>,
-): PollResource {
-  return {
-    allowsMultipleVotes: false,
-    createdAt: 1,
-    id: 'poll-id',
-    options: [],
-    question: 'question',
-    scope: {
-      channelId: 'channel-id',
-      communityId: 'community-id',
-      networkId: 'network-id',
-      type: 'community_channel',
-    },
-    status: 'open',
-    votes: [],
-    ...overrides,
-  };
-}
