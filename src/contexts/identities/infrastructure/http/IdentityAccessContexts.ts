@@ -1,8 +1,9 @@
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { LoginIdentityProgressReporter } from '../../application/login-identity/LoginIdentityProgressReporter';
-import type { IdentityId } from '../../domain/value-objects/IdentityId';
+import type { Identity } from '../../domain/Identity';
 import type { IdentityAccessContext } from './IdentityAccessContext';
 
+import { IdentityId } from '../../domain/value-objects/IdentityId';
 import { IdentityAccessContextNotFoundError } from './errors/IdentityAccessContextNotFoundError';
 
 export class IdentityAccessContexts {
@@ -15,6 +16,16 @@ export class IdentityAccessContexts {
 
   public find(identityId: IdentityId): IdentityAccessContext {
     const context = this.contexts.get(identityId.toString());
+
+    if (!context) throw new IdentityAccessContextNotFoundError();
+
+    return context;
+  }
+
+  public findFor(identity: Identity): IdentityAccessContext {
+    const context = [...this.contexts.values()].find(({ session }) =>
+      identity.belongsTo(IdentityId.fromString(session.identity.id)),
+    );
 
     if (!context) throw new IdentityAccessContextNotFoundError();
 

@@ -108,11 +108,11 @@ export class PigeonIdentitiesFacade {
     });
 
     this.contexts.registerProgress(identityId, onProgress);
-    await this.useCases.login.login(message);
+    const identity = await this.useCases.login.login(message);
 
     return this.hydrateLoginResult(
       await this.gateway.hydrateSession(
-        this.contexts.find(message.getIdentityId()).session,
+        this.contexts.findFor(identity).session,
         onProgress,
       ),
     );

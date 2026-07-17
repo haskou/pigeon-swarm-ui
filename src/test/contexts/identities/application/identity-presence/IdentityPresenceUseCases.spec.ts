@@ -55,14 +55,19 @@ describe('identity presence use cases', () => {
     const repository = mock<IdentityPresenceRepository>();
     const result = presence();
 
-    repository.find.mockResolvedValue(result);
     repository.update.mockResolvedValue(result);
 
     await new IdentityPresenceUpdater(repository).update(
       new UpdateIdentityPresenceMessage('identity-a', 'away', 200),
     );
 
-    expect(result.pullDomainEvents()).toHaveLength(1);
-    expect(repository.update).toHaveBeenCalledWith(result, expect.anything());
+    const persistedPresence = repository.update.mock.calls[0]?.[0];
+
+    expect(repository.find).not.toHaveBeenCalled();
+    expect(persistedPresence?.pullDomainEvents()).toHaveLength(1);
+    expect(repository.update).toHaveBeenCalledWith(
+      persistedPresence,
+      expect.anything(),
+    );
   });
 });

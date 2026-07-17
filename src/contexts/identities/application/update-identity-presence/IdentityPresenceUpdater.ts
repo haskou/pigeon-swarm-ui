@@ -1,6 +1,6 @@
-import type { IdentityPresence } from '../../domain/IdentityPresence';
 import type { IdentityPresenceRepository } from '../../domain/repositories/IdentityPresenceRepository';
 
+import { IdentityPresence } from '../../domain/IdentityPresence';
 import { UpdateIdentityPresenceMessage } from './messages/UpdateIdentityPresenceMessage';
 
 export class IdentityPresenceUpdater {
@@ -12,12 +12,11 @@ export class IdentityPresenceUpdater {
     message: UpdateIdentityPresenceMessage,
   ): Promise<IdentityPresence> {
     const actorIdentityId = message.getActorIdentityId();
-    const presence = await this.identityPresenceRepository.find(
+    const presence = IdentityPresence.create(
       actorIdentityId,
-      actorIdentityId,
+      message.getStatus(),
+      message.getOccurredAt(),
     );
-
-    presence.update(message.getStatus(), message.getOccurredAt());
 
     return await this.identityPresenceRepository.update(
       presence,

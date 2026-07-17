@@ -7,6 +7,28 @@ import { IdentityPresenceEventType } from './value-objects/IdentityPresenceEvent
 import { IdentityPresenceStatus } from './value-objects/IdentityPresenceStatus';
 
 export class IdentityPresence extends AggregateRoot {
+  public static create(
+    identityId: IdentityId,
+    status: IdentityPresenceStatus,
+    occurredAt: Timestamp,
+  ): IdentityPresence {
+    status.assertSelectable();
+    const presence = new IdentityPresence(
+      identityId,
+      status,
+      occurredAt,
+      IdentityNetworkMemberships.fromPrimitives([]),
+    );
+
+    presence.record({
+      aggregateId: identityId.toString(),
+      occurredAt: occurredAt.valueOf(),
+      type: IdentityPresenceEventType.UPDATED.valueOf(),
+    });
+
+    return presence;
+  }
+
   public static fromPrimitives(
     primitives: PrimitiveOf<IdentityPresence>,
   ): IdentityPresence {

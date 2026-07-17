@@ -55,4 +55,39 @@ describe(PigeonIdentitiesFacade.name, () => {
     ]);
     expect(gateway.hydrateSession).toHaveBeenCalledWith(session, undefined);
   });
+
+  it('hydrates the canonical unlocked identity when login uses a handle', async () => {
+    const gateway = mock<PigeonIdentitiesGateway>();
+    const contexts = new IdentityAccessContexts();
+    const useCases = mockDeep<IdentityUseCases>();
+    const session = {
+      identity: { id: 'canonical-identity' },
+    } as unknown as Session;
+    const identity = Identity.fromPrimitives({
+      createdAt: 100,
+      id: 'canonical-identity',
+      networkIds: [],
+      profile: {
+        banner: undefined,
+        biography: undefined,
+        handle: 'ada',
+        name: 'Ada',
+        picture: undefined,
+      },
+    });
+
+    contexts.register(session);
+    useCases.login.login.mockResolvedValue(identity);
+    gateway.hydrateSession.mockResolvedValue({ conversations: [], session });
+
+    await new PigeonIdentitiesFacade(
+      gateway,
+      contexts,
+      mock<IdentityMapper>(),
+      mock<IdentityPresenceMapper>(),
+      useCases,
+    ).login('@ada', 'Correct-Horse-Battery-9!');
+
+    expect(gateway.hydrateSession).toHaveBeenCalledWith(session, undefined);
+  });
 });
