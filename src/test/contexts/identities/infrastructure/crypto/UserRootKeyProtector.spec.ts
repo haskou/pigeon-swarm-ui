@@ -1,7 +1,7 @@
 import { KeyPair, SymmetricKey } from '@haskou/value-objects';
 
-import type { IdentityResource } from '../../../../../contexts/identities/domain/IdentityResource';
-import type { PasskeyPrfMasterKeyProtection } from '../../../../../contexts/identities/domain/PasskeyPrfMasterKeyProtection';
+import type { PasskeyPrfMasterKeyProtection } from '../../../../../contexts/identities/infrastructure/crypto/PasskeyPrfMasterKeyProtection';
+import type { IdentityResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 
 import { RecoveryKey } from '../../../../../contexts/identities/domain/value-objects/RecoveryKey';
 import { UserRootKeyProtector } from '../../../../../contexts/identities/infrastructure/crypto/UserRootKeyProtector';

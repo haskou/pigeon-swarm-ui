@@ -1,32 +1,17 @@
-import type {
-  ConversationResource,
-  LoginResult,
-} from '../../../../shared/domain/pigeonResources.types';
-import type { LoginIdentityPort } from './LoginIdentityPort';
+import type { Identity } from '../../domain/Identity';
+import type { IdentityUnlockRepository } from '../../domain/repositories/IdentityUnlockRepository';
 
-import { ConversationTimeline } from '../../../conversations/presentation/view-models/ConversationTimeline';
 import { LoginIdentityMessage } from './messages/LoginIdentityMessage';
 
 export class LoginIdentity {
-  public constructor(private readonly identities: LoginIdentityPort) {}
+  public constructor(
+    private readonly identityUnlockRepository: IdentityUnlockRepository,
+  ) {}
 
-  private sortConversations(
-    conversations: ConversationResource[],
-  ): ConversationResource[] {
-    return ConversationTimeline.sortByLatestMessage(conversations);
-  }
-
-  public async login(message: LoginIdentityMessage): Promise<LoginResult> {
-    const result = await this.identities.login(
+  public async login(message: LoginIdentityMessage): Promise<Identity> {
+    return await this.identityUnlockRepository.unlock(
       message.getIdentityId(),
-      message.getPassword(),
-      message.getProgressReporter(),
-      message.getRecoveryKey(),
+      message.getProtection(),
     );
-
-    return {
-      ...result,
-      conversations: this.sortConversations(result.conversations),
-    };
   }
 }

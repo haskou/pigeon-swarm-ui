@@ -1,77 +1,40 @@
-import type { LoginIdentityPort } from '../../../../../contexts/identities/application/login-identity/LoginIdentityPort';
-import type { LoginResult } from '../../../../../shared/domain/pigeonResources.types';
+import { mock } from 'jest-mock-extended';
+
+import type { IdentityUnlockRepository } from '../../../../../contexts/identities/domain/repositories/IdentityUnlockRepository';
 
 import { LoginIdentity } from '../../../../../contexts/identities/application/login-identity/LoginIdentity';
 import { LoginIdentityMessage } from '../../../../../contexts/identities/application/login-identity/messages/LoginIdentityMessage';
+import { Identity } from '../../../../../contexts/identities/domain/Identity';
 
 describe(LoginIdentity.name, () => {
-  it('delegates login and orders conversations by latest message', async () => {
-    const expected = {
-      conversations: [
-        { id: 'old', latestMessageAt: 1, networkId: 'net' },
-        { id: 'new', latestMessageAt: 2, networkId: 'net' },
-      ],
-      session: { password: 'secret' },
-    } as unknown as LoginResult;
-    const loadMessages = jest.fn();
-    const gateway = {
-      loadMessages,
-      login: jest.fn().mockResolvedValue(expected),
-    } as unknown as LoginIdentityPort;
-    const useCase = new LoginIdentity(gateway);
+  it('unlocks the identity through its domain repository', async () => {
+    const repository = mock<IdentityUnlockRepository>();
+    const identity = Identity.fromPrimitives({
+      createdAt: 100,
+      id: 'identity-a',
+      networkIds: [],
+      profile: {
+        banner: undefined,
+        biography: undefined,
+        handle: undefined,
+        name: 'Ada',
+        picture: undefined,
+      },
+    });
+
+    repository.unlock.mockResolvedValue(identity);
 
     await expect(
-      useCase.login(
+      new LoginIdentity(repository).login(
         new LoginIdentityMessage({
-          identityId: 'identity-1',
-          password: 'secret',
+          identityId: 'identity-a',
+          password: 'correct horse battery staple!',
         }),
       ),
-    ).resolves.toEqual({
-      ...expected,
-      conversations: [
-        { id: 'new', latestMessageAt: 2, networkId: 'net' },
-        { id: 'old', latestMessageAt: 1, networkId: 'net' },
-      ],
-    });
-    expect(gateway.login).toHaveBeenCalledWith(
-      'identity-1',
-      'secret',
-      undefined,
-      undefined,
+    ).resolves.toBe(identity);
+    expect(repository.unlock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
     );
-    expect(loadMessages).not.toHaveBeenCalled();
-  });
-
-  it('keeps login conversations without activity timestamps without loading messages', async () => {
-    const expected = {
-      conversations: [
-        { id: 'with-activity', latestMessageAt: 10, networkId: 'net' },
-        { id: 'without-activity', networkId: 'net' },
-      ],
-      session: { identity: { id: 'identity-1' }, password: 'secret' },
-    } as unknown as LoginResult;
-    const loadMessages = jest.fn();
-    const gateway = {
-      loadMessages,
-      login: jest.fn().mockResolvedValue(expected),
-    } as unknown as LoginIdentityPort;
-    const useCase = new LoginIdentity(gateway);
-
-    await expect(
-      useCase.login(
-        new LoginIdentityMessage({
-          identityId: 'identity-1',
-          password: 'secret',
-        }),
-      ),
-    ).resolves.toEqual({
-      ...expected,
-      conversations: [
-        { id: 'with-activity', latestMessageAt: 10, networkId: 'net' },
-        { id: 'without-activity', networkId: 'net' },
-      ],
-    });
-    expect(loadMessages).not.toHaveBeenCalled();
   });
 });

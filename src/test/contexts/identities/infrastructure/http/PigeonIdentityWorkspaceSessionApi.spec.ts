@@ -1,5 +1,5 @@
-import type { IdentityWorkspaceSessionPort } from '../../../../../contexts/identities/application/login-identity/IdentityWorkspaceSessionPort';
 import type { LoginIdentityProgressReporter } from '../../../../../contexts/identities/application/login-identity/LoginIdentityProgressReporter';
+import type { IdentityWorkspaceSource } from '../../../../../contexts/identities/infrastructure/http/IdentityWorkspaceSource';
 import type {
   ConversationResource,
   KeychainResource,
@@ -21,7 +21,7 @@ describe(PigeonIdentityWorkspaceSessionApi.name, () => {
     { id: 'conversation-1' },
   ] as unknown as ConversationResource[];
 
-  function port(): jest.Mocked<IdentityWorkspaceSessionPort> {
+  function port(): jest.Mocked<IdentityWorkspaceSource> {
     return {
       decryptKeychain: jest.fn().mockReturnValue({
         conversations: {},

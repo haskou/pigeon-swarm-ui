@@ -1,4 +1,4 @@
-import type { PasskeyPrfMasterKeyProtection } from '../../domain/PasskeyPrfMasterKeyProtection';
+import type { PasskeyPrfMasterKeyProtection } from './PasskeyPrfMasterKeyProtection';
 
 export type UserRootKeyPasskeyPrfInput =
   | {

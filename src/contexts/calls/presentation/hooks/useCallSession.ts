@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CallIceServerResource as CallIceServerConfig } from '../../infrastructure/http/resources/CallIceServerResource';
 import type { CallParticipantMediaConnectionResource as CallParticipantMediaConnection } from '../../infrastructure/http/resources/CallParticipantMediaConnectionResource';
 import type { CallResource } from '../../infrastructure/http/resources/CallResource';
-import type { PeerMediaStats } from '../../infrastructure/media/CallPeerConnectionManager';
+import type { PeerMediaStats } from '../../infrastructure/media/CallPeerConnections';
 import type { CallSignalType } from '../../infrastructure/media/CallSignalType';
 import type { ScreenShareQualityPreset } from '../../infrastructure/media/ScreenShareQualityPreset';
 import type { CallMediaEncryptionUnavailableReason } from '../view-models/CallMediaEncryptionUnavailableReason';
@@ -17,8 +17,8 @@ import {
   logCallError,
   logCallWarning,
 } from '../../infrastructure/media/callDebugLogger';
-import { CallPeerConnectionManager } from '../../infrastructure/media/CallPeerConnectionManager';
-import { LocalMediaManager } from '../../infrastructure/media/LocalMediaManager';
+import { CallPeerConnections } from '../../infrastructure/media/CallPeerConnections';
+import { LocalCallMedia } from '../../infrastructure/media/LocalCallMedia';
 import { RemoteCallAudio } from '../../infrastructure/media/RemoteCallAudio';
 import {
   retainedRemotePeerIdentityIds,
@@ -104,10 +104,10 @@ export function useCallSession(): {
   retryMicrophone: () => Promise<void>;
   toggleScreenShare: () => Promise<void>;
 } {
-  const mediaManager = useMemo(() => new LocalMediaManager(), []);
+  const mediaManager = useMemo(() => new LocalCallMedia(), []);
   const peerManager = useMemo(
     () =>
-      new CallPeerConnectionManager(
+      new CallPeerConnections(
         new RemoteCallAudio(new BrowserRemoteAudioElementHost()),
       ),
     [],

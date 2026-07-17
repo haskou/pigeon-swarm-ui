@@ -4,7 +4,7 @@ import type {
   IdentityResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { IdentityUpdateProfileInput } from '../../domain/IdentitySignaturePayloadFactory';
+import type { IdentityUpdateProfileInput } from '../http/IdentitySignaturePayloadFactory';
 import type { IdentityProfileKeyProtectionOptions } from './IdentityProfileKeyProtectionOptions';
 import type { UserRootKeyPasskeyPrfInput } from './UserRootKeyPasskeyPrfInput';
 

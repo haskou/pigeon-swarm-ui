@@ -29,6 +29,34 @@ export class PigeonIdentityLoginApi {
     return await this.workspace.hydrate(session, onProgress);
   }
 
+  public async hydrate(
+    session: Session,
+    onProgress?: LoginIdentityProgressReporter,
+  ): Promise<LoginResult> {
+    return await this.workspace.hydrate(session, onProgress);
+  }
+
+  public async restore(
+    identityId: string,
+    onProgress?: LoginIdentityProgressReporter,
+  ): Promise<Session> {
+    return await this.session.restoreRemembered(identityId, onProgress);
+  }
+
+  public async unlock(
+    identityId: string,
+    password: string,
+    onProgress?: LoginIdentityProgressReporter,
+    recoveryKey?: string,
+  ): Promise<Session> {
+    return await this.session.unlock(
+      identityId,
+      password,
+      onProgress,
+      recoveryKey,
+    );
+  }
+
   public async refreshSession(session: Session): Promise<LoginResult> {
     return await this.workspace.refresh(session);
   }

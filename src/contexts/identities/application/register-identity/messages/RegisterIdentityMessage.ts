@@ -1,54 +1,45 @@
-import { ProfileHandle } from '../../../domain/profile/ProfileHandle';
-import { ProfileName } from '../../../domain/profile/ProfileName';
+import { Timestamp } from '@haskou/value-objects';
+
+import { IdentityProfile } from '../../../domain/profile/IdentityProfile';
+import { IdentityMasterKeyProtection } from '../../../domain/value-objects/IdentityMasterKeyProtection';
 import { IdentityNetworkMemberships } from '../../../domain/value-objects/IdentityNetworkMemberships';
 
 export class RegisterIdentityMessage {
-  private readonly handle?: ProfileHandle;
-  private readonly name: ProfileName;
-  private readonly networks: IdentityNetworkMemberships;
-  private readonly password: string;
-  private readonly passkeyPrfEnabled: boolean;
-  private readonly recoveryKey?: string;
+  public constructor(
+    private readonly input: {
+      handle?: string;
+      name: string;
+      networks: string[];
+      occurredAt: number;
+      password: string;
+      passkeyPrfEnabled?: boolean;
+      recoveryKey?: string;
+    },
+  ) {}
 
-  public constructor(input: {
-    handle?: string;
-    name: string;
-    networks: string[];
-    password: string;
-    passkeyPrfEnabled?: boolean;
-    recoveryKey?: string;
-  }) {
-    this.handle = input.handle
-      ? ProfileHandle.fromString(input.handle)
-      : undefined;
-    this.name = ProfileName.fromString(input.name);
-    this.networks = IdentityNetworkMemberships.fromPrimitives(input.networks);
-    this.password = input.password;
-    this.passkeyPrfEnabled = input.passkeyPrfEnabled ?? false;
-    this.recoveryKey = input.recoveryKey;
+  public getNetworkMemberships(): IdentityNetworkMemberships {
+    return IdentityNetworkMemberships.fromPrimitives(this.input.networks);
   }
 
-  public getHandle(): ProfileHandle | undefined {
-    return this.handle;
+  public getOccurredAt(): Timestamp {
+    return new Timestamp(this.input.occurredAt);
   }
 
-  public getName(): ProfileName {
-    return this.name;
+  public getProfile(): IdentityProfile {
+    return IdentityProfile.fromPrimitives({
+      banner: undefined,
+      biography: undefined,
+      handle: this.input.handle?.trim() || undefined,
+      name: this.input.name.trim(),
+      picture: undefined,
+    });
   }
 
-  public getNetworks(): IdentityNetworkMemberships {
-    return this.networks;
-  }
-
-  public getPassword(): string {
-    return this.password;
-  }
-
-  public isPasskeyPrfEnabled(): boolean {
-    return this.passkeyPrfEnabled;
-  }
-
-  public getRecoveryKey(): string | undefined {
-    return this.recoveryKey;
+  public getProtection(): IdentityMasterKeyProtection {
+    return IdentityMasterKeyProtection.fromPrimitives({
+      passkeyPrfEnabled: this.input.passkeyPrfEnabled ?? false,
+      password: this.input.password,
+      recoveryKey: this.input.recoveryKey,
+    });
   }
 }

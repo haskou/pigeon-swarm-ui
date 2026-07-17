@@ -2,7 +2,6 @@ import type { PigeonIdentityKeyProtectionGateway } from '../../../../../contexts
 import type { PigeonIdentityCommandsApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityCommandsApi';
 import type { PigeonIdentityGateway as IdentityProfileGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityGateway';
 import type { PigeonIdentityLoginApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityLoginApi';
-import type { PigeonIdentityRegistrationApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityRegistrationApi';
 import type { PigeonKeychainApi } from '../../../../../contexts/identities/infrastructure/http/PigeonKeychainApi';
 import type { PigeonPresenceGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonPresenceGateway';
 import type {
@@ -52,7 +51,6 @@ function gatewayDouble(): {
     publishKeychain: jest.fn(),
   } as jest.Mocked<Pick<PigeonKeychainApi, 'publishKeychain'>>;
   const presence = {} as PigeonPresenceGateway;
-  const registration = {} as PigeonIdentityRegistrationApi;
 
   return {
     gateway: new PigeonIdentitiesGateway(
@@ -62,7 +60,6 @@ function gatewayDouble(): {
       protection,
       keychain as unknown as PigeonKeychainApi,
       presence,
-      registration,
     ),
     keychain,
     profile,

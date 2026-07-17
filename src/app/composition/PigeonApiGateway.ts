@@ -5,7 +5,7 @@ import type { CommunityChannelMessageEditInput } from '../../contexts/communitie
 import type { CommunityChannelMessageInput } from '../../contexts/communities/infrastructure/http/CommunityChannelMessageInput';
 import type { CommunityInviteLinkInput } from '../../contexts/communities/infrastructure/http/CommunityInviteLinkInput';
 import type { LoginIdentityProgressReporter } from '../../contexts/identities/application/login-identity/LoginIdentityProgressReporter';
-import type { IdentityUpdateProfileInput } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
+import type { IdentityUpdateProfileInput } from '../../contexts/identities/infrastructure/http/IdentitySignaturePayloadFactory';
 import type { MessageDecryptWorkerPort } from '../../contexts/messages/infrastructure/crypto/MessageDecryptWorkerPort';
 import type { MessageProjectionPort } from '../../contexts/messages/infrastructure/crypto/MessageProjectionPort';
 import type { MessageLoadOptions } from '../../contexts/messages/infrastructure/http/MessageLoadOptions';
@@ -87,17 +87,13 @@ import { ConversationMapper } from '../../contexts/conversations/infrastructure/
 import { PigeonConversationCommandsApi } from '../../contexts/conversations/infrastructure/http/PigeonConversationCommandsApi';
 import { PigeonConversationsApi } from '../../contexts/conversations/infrastructure/http/PigeonConversationsApi';
 import { PigeonConversationsGateway } from '../../contexts/conversations/infrastructure/http/PigeonConversationsGateway';
-import { IdentitySignaturePayloadFactory } from '../../contexts/identities/domain/IdentitySignaturePayloadFactory';
-import { ProfileHandle } from '../../contexts/identities/domain/profile/ProfileHandle';
-import { ProfileName } from '../../contexts/identities/domain/profile/ProfileName';
-import { IdentityNetworkMemberships } from '../../contexts/identities/domain/value-objects/IdentityNetworkMemberships';
 import { KeychainCipher } from '../../contexts/identities/infrastructure/crypto/KeychainCipher';
 import { PigeonIdentityKeyProtectionGateway } from '../../contexts/identities/infrastructure/crypto/PigeonIdentityKeyProtectionGateway';
+import { IdentitySignaturePayloadFactory } from '../../contexts/identities/infrastructure/http/IdentitySignaturePayloadFactory';
 import { PigeonIdentitiesGateway } from '../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
 import { PigeonIdentityCommandsApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityCommandsApi';
 import { PigeonIdentityGateway } from '../../contexts/identities/infrastructure/http/PigeonIdentityGateway';
 import { PigeonIdentityLoginApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityLoginApi';
-import { PigeonIdentityRegistrationApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityRegistrationApi';
 import { PigeonIdentitySessionApi } from '../../contexts/identities/infrastructure/http/PigeonIdentitySessionApi';
 import { PigeonIdentityWorkspaceSessionApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityWorkspaceSessionApi';
 import { PigeonKeychainApi } from '../../contexts/identities/infrastructure/http/PigeonKeychainApi';
@@ -161,7 +157,7 @@ export class PigeonApiGateway {
 
   private readonly identities: PigeonIdentityGateway;
 
-  private readonly identityKeyProtection: PigeonIdentityKeyProtectionGateway;
+  public readonly identityKeyProtection: PigeonIdentityKeyProtectionGateway;
 
   private readonly keychainApi: PigeonKeychainApi;
 
@@ -184,8 +180,6 @@ export class PigeonApiGateway {
   private readonly requestCache = new RequestCache();
 
   private readonly stickers: PigeonStickersGateway;
-
-  public readonly identityRegistration: PigeonIdentityRegistrationApi;
 
   public readonly identityGateway: PigeonIdentitiesGateway;
 
@@ -318,11 +312,6 @@ export class PigeonApiGateway {
       loadKeychain: async (session) =>
         await this.keychainApi.loadOptional(session),
     });
-    this.identityRegistration = new PigeonIdentityRegistrationApi(
-      this.identityCommands,
-      this.identityWorkspace,
-      this.identityKeyProtection,
-    );
     this.identityLogin = new PigeonIdentityLoginApi(
       this.identitySession,
       this.identityWorkspace,
@@ -419,7 +408,6 @@ export class PigeonApiGateway {
       this.identityKeyProtection,
       this.keychainApi,
       this.presence,
-      this.identityRegistration,
     );
     this.notificationsGateway = this.notifications;
     this.pushGateway = this.push;
@@ -1644,22 +1632,6 @@ export class PigeonApiGateway {
     nextKeychain: LocalKeychain,
   ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
     return await this.identityGateway.publishKeychain(session, nextKeychain);
-  }
-
-  public async register(
-    name: string,
-    password: string,
-    networks: string[],
-    handle?: string,
-    options: { passkeyPrfEnabled?: boolean; recoveryKey?: string } = {},
-  ): Promise<LoginResult> {
-    return await this.identityGateway.register(
-      ProfileName.fromString(name),
-      password,
-      IdentityNetworkMemberships.fromPrimitives(networks),
-      handle ? ProfileHandle.fromString(handle) : undefined,
-      options,
-    );
   }
 
   public async sendMessage(

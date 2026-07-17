@@ -38,8 +38,23 @@ import { ConversationIdFactory } from '../../contexts/conversations/domain/Conve
 import { ConversationAccessContexts } from '../../contexts/conversations/infrastructure/http/ConversationAccessContexts';
 import { ConversationMapper } from '../../contexts/conversations/infrastructure/http/ConversationMapper';
 import { PigeonConversationRepository } from '../../contexts/conversations/infrastructure/http/PigeonConversationRepository';
-import { PigeonIdentitiesApplication } from '../../contexts/identities/application/PigeonIdentitiesApplication';
-import { PigeonSessionApplication } from '../../contexts/identities/application/PigeonSessionApplication';
+import { IdentityPresenceFinder } from '../../contexts/identities/application/find-identity-presence/IdentityPresenceFinder';
+import { IdentityFinder } from '../../contexts/identities/application/find-identity/IdentityFinder';
+import { LoginIdentity } from '../../contexts/identities/application/login-identity/LoginIdentity';
+import { IdentityRefresher } from '../../contexts/identities/application/refresh-identity/IdentityRefresher';
+import { RegisterIdentity } from '../../contexts/identities/application/register-identity/RegisterIdentity';
+import { RememberedIdentityRestorer } from '../../contexts/identities/application/restore-remembered-identity/RememberedIdentityRestorer';
+import { IdentityPresencesSearcher } from '../../contexts/identities/application/search-identity-presences/IdentityPresencesSearcher';
+import { IdentityPresenceUpdater } from '../../contexts/identities/application/update-identity-presence/IdentityPresenceUpdater';
+import { IdentityProfileUpdater } from '../../contexts/identities/application/update-identity-profile/IdentityProfileUpdater';
+import { IdentityCreationMaterials } from '../../contexts/identities/infrastructure/crypto/IdentityCreationMaterials';
+import { PigeonIdentityIdFactory } from '../../contexts/identities/infrastructure/crypto/PigeonIdentityIdFactory';
+import { IdentityAccessContexts } from '../../contexts/identities/infrastructure/http/IdentityAccessContexts';
+import { IdentityMapper } from '../../contexts/identities/infrastructure/http/IdentityMapper';
+import { IdentityPresenceMapper } from '../../contexts/identities/infrastructure/http/IdentityPresenceMapper';
+import { PigeonIdentityRepository } from '../../contexts/identities/infrastructure/http/PigeonIdentityRepository';
+import { PigeonIdentityUnlockRepository } from '../../contexts/identities/infrastructure/http/PigeonIdentityUnlockRepository';
+import { PigeonPresenceRepository } from '../../contexts/identities/infrastructure/http/PigeonPresenceRepository';
 import { PigeonMessagesApplication } from '../../contexts/messages/application/PigeonMessagesApplication';
 import { PigeonNetworksApplication } from '../../contexts/networks/application/PigeonNetworksApplication';
 import { PigeonNotificationsApplication } from '../../contexts/notifications/application/PigeonNotificationsApplication';
@@ -54,6 +69,8 @@ import { PigeonCallSignaling } from './calls/PigeonCallSignaling';
 import { PigeonCallStarter } from './calls/PigeonCallStarter';
 import { PigeonCommunityManagement } from './communities/PigeonCommunityManagement';
 import { PigeonConversationsFacade } from './conversations/PigeonConversationsFacade';
+import { PigeonIdentitiesFacade } from './identities/PigeonIdentitiesFacade';
+import { PigeonSessionFacade } from './identities/PigeonSessionFacade';
 import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonAttachmentsFacade } from './PigeonAttachmentsFacade';
 import { PigeonCallsFacade } from './PigeonCallsFacade';
@@ -69,7 +86,7 @@ export class PigeonApplication {
 
   public readonly conversations: PigeonConversationsFacade;
 
-  public readonly identities: PigeonIdentitiesApplication;
+  public readonly identities: PigeonIdentitiesFacade;
 
   public readonly messages: PigeonMessagesApplication;
 
@@ -81,7 +98,7 @@ export class PigeonApplication {
 
   public readonly realtime: PigeonRealtimeApplication;
 
-  public readonly session: PigeonSessionApplication;
+  public readonly session: PigeonSessionFacade;
 
   public readonly stickers: PigeonStickersApplication;
 
@@ -183,14 +200,53 @@ export class PigeonApplication {
         searcher: new ConversationsSearcher(conversationRepository),
       },
     );
-    this.identities = new PigeonIdentitiesApplication({
-      keychain: gateway.identityGateway,
-      login: gateway.identityGateway,
-      presence: gateway.identityGateway,
-      profile: gateway.identityGateway,
-      protection: gateway.identityGateway,
-      register: gateway.identityGateway,
-    });
+    const identityContexts = new IdentityAccessContexts();
+    const identityCreationMaterials = new IdentityCreationMaterials();
+    const identityIdFactory = new PigeonIdentityIdFactory(
+      identityCreationMaterials,
+    );
+    const identityMapper = new IdentityMapper();
+    const identityPresenceMapper = new IdentityPresenceMapper();
+    const identityRepository = new PigeonIdentityRepository(
+      gateway.identityGateway,
+      identityContexts,
+      identityMapper,
+      identityCreationMaterials,
+      gateway.identityKeyProtection,
+    );
+    const identityUnlockRepository = new PigeonIdentityUnlockRepository(
+      gateway.identityGateway,
+      identityContexts,
+      identityMapper,
+    );
+    const identityPresenceRepository = new PigeonPresenceRepository(
+      gateway.presence,
+      identityContexts,
+      identityPresenceMapper,
+    );
+    this.identities = new PigeonIdentitiesFacade(
+      gateway.identityGateway,
+      identityContexts,
+      identityMapper,
+      identityPresenceMapper,
+      {
+        finder: new IdentityFinder(identityRepository),
+        login: new LoginIdentity(identityUnlockRepository),
+        presenceFinder: new IdentityPresenceFinder(identityPresenceRepository),
+        presenceSearcher: new IdentityPresencesSearcher(
+          identityPresenceRepository,
+        ),
+        presenceUpdater: new IdentityPresenceUpdater(
+          identityPresenceRepository,
+        ),
+        profileUpdater: new IdentityProfileUpdater(identityRepository),
+        refresher: new IdentityRefresher(identityRepository),
+        register: new RegisterIdentity(identityRepository, identityIdFactory),
+        rememberedIdentityRestorer: new RememberedIdentityRestorer(
+          identityUnlockRepository,
+        ),
+      },
+    );
     this.messages = new PigeonMessagesApplication({
       addMessageReaction: gateway.messagesGateway,
       createLinkPreview: gateway.messagesGateway,
@@ -273,7 +329,10 @@ export class PigeonApplication {
       },
     });
     this.realtime = new PigeonRealtimeApplication(realtime);
-    this.session = new PigeonSessionApplication(gateway.identityGateway);
+    this.session = new PigeonSessionFacade(
+      gateway.identityGateway,
+      this.identities,
+    );
     this.stickers = new PigeonStickersApplication({
       addStickerToPack: {
         addStickerToPack: gateway.stickersGateway.addSticker.bind(

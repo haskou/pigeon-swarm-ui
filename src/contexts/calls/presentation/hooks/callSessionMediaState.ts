@@ -1,10 +1,11 @@
 import type { CallResource } from '../../infrastructure/http/resources/CallResource';
-import type { PeerMediaStats } from '../../infrastructure/media/CallPeerConnectionManager';
-import { CallPeerConnectionManager } from '../../infrastructure/media/CallPeerConnectionManager';
-import type { CallParticipant } from '../view-models/CallParticipant';
+import type { PeerMediaStats } from '../../infrastructure/media/CallPeerConnections';
 import type { CallMediaEncryptionState } from '../view-models/CallMediaEncryptionState';
 import type { CallMediaEncryptionUnavailableReason } from '../view-models/CallMediaEncryptionUnavailableReason';
+import type { CallParticipant } from '../view-models/CallParticipant';
 import type { CallSession } from '../view-models/CallSession';
+
+import { CallPeerConnections } from '../../infrastructure/media/CallPeerConnections';
 
 type ReconcileCallInput = Pick<
   CallSession,
@@ -46,8 +47,8 @@ export function callSessionForJoinedPeerConnection(
     hasMicrophone: activeCall?.hasMicrophone ?? false,
     id: call.id,
     localPreviewStream: activeCall?.localPreviewStream,
-    muted: activeCall?.muted ?? false,
     mediaEncryption: activeCall?.mediaEncryption ?? disabledMediaEncryption(),
+    muted: activeCall?.muted ?? false,
     noiseCancellationEnabled: activeCall?.noiseCancellationEnabled ?? true,
     participants,
     participantVolumes: activeCall?.participantVolumes ?? {},
@@ -87,7 +88,7 @@ export function callMediaEncryptionState({
     };
   }
 
-  if (!CallPeerConnectionManager.mediaEncryptionSupported()) {
+  if (!CallPeerConnections.mediaEncryptionSupported()) {
     return {
       active: false,
       available: false,
@@ -122,8 +123,8 @@ function localParticipantWithMediaState(
     ...participant,
     audioLevel,
     deafened: call.deafened,
-    mediaStream: call.localPreviewStream,
     mediaEncryptionActive: call.mediaEncryption.active,
+    mediaStream: call.localPreviewStream,
     muted: call.muted,
     screenSharing: call.screenSharing,
     screenStream,
@@ -153,8 +154,8 @@ function remoteParticipantWithMediaState(
     iceState: stat?.iceState,
     jitterMs: stat?.jitterMs,
     latencyMs: stat?.latencyMs,
-    mediaStream,
     mediaEncryptionActive: isMediaEncryptionActiveWith(participant.identityId),
+    mediaStream,
     packetsLost: stat?.packetsLost,
     screenSharing: hasVideoTrack(screenStream),
     screenStream,
