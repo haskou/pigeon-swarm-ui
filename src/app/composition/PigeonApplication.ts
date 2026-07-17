@@ -14,7 +14,6 @@ import { CallAccessContexts } from '../../contexts/calls/infrastructure/http/Cal
 import { CallMapper } from '../../contexts/calls/infrastructure/http/CallMapper';
 import { PigeonCallRepository } from '../../contexts/calls/infrastructure/http/PigeonCallRepository';
 import { PigeonCallSignalRepository } from '../../contexts/calls/infrastructure/http/PigeonCallSignalRepository';
-import { PigeonCommunitiesApplication } from '../../contexts/communities/application/PigeonCommunitiesApplication';
 import { PigeonConversationsApplication } from '../../contexts/conversations/application/PigeonConversationsApplication';
 import { PigeonIdentitiesApplication } from '../../contexts/identities/application/PigeonIdentitiesApplication';
 import { PigeonSessionApplication } from '../../contexts/identities/application/PigeonSessionApplication';
@@ -33,6 +32,7 @@ import { PigeonCallStarter } from './calls/PigeonCallStarter';
 import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonAttachmentsFacade } from './PigeonAttachmentsFacade';
 import { PigeonCallsFacade } from './PigeonCallsFacade';
+import { PigeonCommunitiesFacade } from './PigeonCommunitiesFacade';
 import { PigeonRealtimeApplication } from './PigeonRealtimeApplication';
 
 export class PigeonApplication {
@@ -40,7 +40,7 @@ export class PigeonApplication {
 
   public readonly calls: PigeonCallsFacade;
 
-  public readonly communities: PigeonCommunitiesApplication;
+  public readonly communities: PigeonCommunitiesFacade;
 
   public readonly conversations: PigeonConversationsApplication;
 
@@ -103,7 +103,7 @@ export class PigeonApplication {
         ),
       ),
     );
-    this.communities = new PigeonCommunitiesApplication({
+    this.communities = new PigeonCommunitiesFacade({
       channelDrafts: gateway.communityGateway,
       channelMessages: gateway.communityGateway,
       channelPins: gateway.communityGateway,

@@ -1,3 +1,30 @@
+import type { AcceptCommunityInviteLinkWithKeyPort } from '../../contexts/communities/application/accept-community-invite-link-with-key/AcceptCommunityInviteLinkWithKeyPort';
+import type { AcceptCommunityInviteLinkPort } from '../../contexts/communities/application/accept-community-invite-link/AcceptCommunityInviteLinkPort';
+import type { CreateCommunityInvitationPort } from '../../contexts/communities/application/create-community-invitation/CreateCommunityInvitationPort';
+import type { CreateCommunityInviteLinkPort } from '../../contexts/communities/application/create-community-invite-link/CreateCommunityInviteLinkPort';
+import type { CreateCommunityInput } from '../../contexts/communities/application/create-community/CreateCommunityInput';
+import type { CreateCommunityPort } from '../../contexts/communities/application/create-community/CreateCommunityPort';
+import type { CreateCommunityResult } from '../../contexts/communities/application/create-community/CreateCommunityResult';
+import type { LeaveCommunityResult } from '../../contexts/communities/application/create-community/LeaveCommunityResult';
+import type { DiscoverCommunitiesPort } from '../../contexts/communities/application/discover-communities/DiscoverCommunitiesPort';
+import type { GetCommunityInviteLinkPort } from '../../contexts/communities/application/get-community-invite-link/GetCommunityInviteLinkPort';
+import type { GetCommunityPort } from '../../contexts/communities/application/get-community/GetCommunityPort';
+import type { LeaveCommunityPort } from '../../contexts/communities/application/leave-community/LeaveCommunityPort';
+import type { ListCommunitiesPort } from '../../contexts/communities/application/list-communities/ListCommunitiesPort';
+import type { ListCommunityModerationLogsPort } from '../../contexts/communities/application/list-community-moderation-logs/ListCommunityModerationLogsPort';
+import type { ManageCommunityChannelDraftsPort } from '../../contexts/communities/application/manage-community-channel-drafts/ManageCommunityChannelDraftsPort';
+import type { ManageCommunityChannelMessagesPort } from '../../contexts/communities/application/manage-community-channel-messages/ManageCommunityChannelMessagesPort';
+import type { ManageCommunityChannelPinsPort } from '../../contexts/communities/application/manage-community-channel-pins/ManageCommunityChannelPinsPort';
+import type { ManageCommunityChannelsPort } from '../../contexts/communities/application/manage-community-channels/ManageCommunityChannelsPort';
+import type { ManageCommunityMembersPort } from '../../contexts/communities/application/manage-community-members/ManageCommunityMembersPort';
+import type { ManageCommunityMembershipRequestsPort } from '../../contexts/communities/application/manage-community-membership-requests/ManageCommunityMembershipRequestsPort';
+import type { ManageCommunityRolesPort } from '../../contexts/communities/application/manage-community-roles/ManageCommunityRolesPort';
+import type { CommunityKeychainPort } from '../../contexts/communities/application/publish-community-keychain/CommunityKeychainPort';
+import type { ReadCommunityChannelMessagesPort } from '../../contexts/communities/application/read-community-channel-messages/ReadCommunityChannelMessagesPort';
+import type { UpdateCommunityPort } from '../../contexts/communities/application/update-community/UpdateCommunityPort';
+import type { CommunityMediaPort } from '../../contexts/communities/application/upload-community-media/CommunityMediaPort';
+import type { CommunityChannelMessageEditInput } from '../../contexts/communities/infrastructure/http/CommunityChannelMessageEditInput';
+import type { CommunityChannelMessageInput } from '../../contexts/communities/infrastructure/http/CommunityChannelMessageInput';
 import type {
   Community,
   CommunityChannel,
@@ -16,43 +43,16 @@ import type {
   LocalKeychain,
   MessageResource,
   Session,
-} from '../../../shared/domain/pigeonResources.types';
-import type { CommunityChannelMessageEditInput } from '../infrastructure/http/CommunityChannelMessageEditInput';
-import type { CommunityChannelMessageInput } from '../infrastructure/http/CommunityChannelMessageInput';
-import type { AcceptCommunityInviteLinkWithKeyPort } from './accept-community-invite-link-with-key/AcceptCommunityInviteLinkWithKeyPort';
-import type { AcceptCommunityInviteLinkPort } from './accept-community-invite-link/AcceptCommunityInviteLinkPort';
-import type { CreateCommunityInvitationPort } from './create-community-invitation/CreateCommunityInvitationPort';
-import type { CreateCommunityInviteLinkPort } from './create-community-invite-link/CreateCommunityInviteLinkPort';
-import type { CreateCommunityInput } from './create-community/CreateCommunityInput';
-import type { CreateCommunityPort } from './create-community/CreateCommunityPort';
-import type { CreateCommunityResult } from './create-community/CreateCommunityResult';
-import type { LeaveCommunityResult } from './create-community/LeaveCommunityResult';
-import type { DiscoverCommunitiesPort } from './discover-communities/DiscoverCommunitiesPort';
-import type { GetCommunityInviteLinkPort } from './get-community-invite-link/GetCommunityInviteLinkPort';
-import type { GetCommunityPort } from './get-community/GetCommunityPort';
-import type { LeaveCommunityPort } from './leave-community/LeaveCommunityPort';
-import type { ListCommunitiesPort } from './list-communities/ListCommunitiesPort';
-import type { ListCommunityModerationLogsPort } from './list-community-moderation-logs/ListCommunityModerationLogsPort';
-import type { ManageCommunityChannelDraftsPort } from './manage-community-channel-drafts/ManageCommunityChannelDraftsPort';
-import type { ManageCommunityChannelMessagesPort } from './manage-community-channel-messages/ManageCommunityChannelMessagesPort';
-import type { ManageCommunityChannelPinsPort } from './manage-community-channel-pins/ManageCommunityChannelPinsPort';
-import type { ManageCommunityChannelsPort } from './manage-community-channels/ManageCommunityChannelsPort';
-import type { ManageCommunityMembersPort } from './manage-community-members/ManageCommunityMembersPort';
-import type { ManageCommunityMembershipRequestsPort } from './manage-community-membership-requests/ManageCommunityMembershipRequestsPort';
-import type { ManageCommunityRolesPort } from './manage-community-roles/ManageCommunityRolesPort';
-import type { CommunityKeychainPort } from './publish-community-keychain/CommunityKeychainPort';
-import type { ReadCommunityChannelMessagesPort } from './read-community-channel-messages/ReadCommunityChannelMessagesPort';
-import type { UpdateCommunityPort } from './update-community/UpdateCommunityPort';
-import type { CommunityMediaPort } from './upload-community-media/CommunityMediaPort';
+} from '../../shared/domain/pigeonResources.types';
 
-import { CreateCommunity } from './create-community/CreateCommunity';
-import { CreateCommunityMessage } from './create-community/messages/CreateCommunityMessage';
-import { LeaveCommunity } from './leave-community/LeaveCommunity';
-import { LeaveCommunityMessage } from './leave-community/messages/LeaveCommunityMessage';
-import { ListCommunities } from './list-communities/ListCommunities';
-import { ListCommunitiesMessage } from './list-communities/messages/ListCommunitiesMessage';
+import { CreateCommunity } from '../../contexts/communities/application/create-community/CreateCommunity';
+import { CreateCommunityMessage } from '../../contexts/communities/application/create-community/messages/CreateCommunityMessage';
+import { LeaveCommunity } from '../../contexts/communities/application/leave-community/LeaveCommunity';
+import { LeaveCommunityMessage } from '../../contexts/communities/application/leave-community/messages/LeaveCommunityMessage';
+import { ListCommunities } from '../../contexts/communities/application/list-communities/ListCommunities';
+import { ListCommunitiesMessage } from '../../contexts/communities/application/list-communities/messages/ListCommunitiesMessage';
 
-export class PigeonCommunitiesApplication {
+export class PigeonCommunitiesFacade {
   private readonly channelDrafts: ManageCommunityChannelDraftsPort;
 
   private readonly channelMessages: ManageCommunityChannelMessagesPort;

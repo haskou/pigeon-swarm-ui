@@ -2,13 +2,13 @@ import type {
   Community,
   LocalKeychain,
   Session,
-} from '../../../../shared/domain/pigeonResources.types';
+} from '../../../shared/domain/pigeonResources.types';
 
-import { PigeonCommunitiesApplication } from '../../../../contexts/communities/application/PigeonCommunitiesApplication';
-import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
+import { PigeonCommunitiesFacade } from '../../../app/composition/PigeonCommunitiesFacade';
+import { HttpJsonError } from '../../../shared/infrastructure/http/HttpJsonError';
 
 type CommunityApplicationDependencies = ConstructorParameters<
-  typeof PigeonCommunitiesApplication
+  typeof PigeonCommunitiesFacade
 >[0];
 
 function gatewayDouble(overrides: {
@@ -128,14 +128,14 @@ function httpJsonError(code: string): HttpJsonError {
   return new HttpJsonError(409, 'Conflict', JSON.stringify({ code }));
 }
 
-describe(PigeonCommunitiesApplication.name, () => {
+describe(PigeonCommunitiesFacade.name, () => {
   it('publishes a keychain without the community key when leaving', async () => {
     const gateway = gatewayDouble({
       leaveCommunity: jest
         .fn<Promise<Community>, [Session, string]>()
         .mockResolvedValue(community()),
     });
-    const application = new PigeonCommunitiesApplication(gateway);
+    const application = new PigeonCommunitiesFacade(gateway);
 
     const result = await application.leave(session(), 'community-1');
 
@@ -156,7 +156,7 @@ describe(PigeonCommunitiesApplication.name, () => {
         .fn<Promise<Community>, [Session, string]>()
         .mockRejectedValue(httpJsonError('CommunityMemberNotFoundError')),
     });
-    const application = new PigeonCommunitiesApplication(gateway);
+    const application = new PigeonCommunitiesFacade(gateway);
 
     const result = await application.leave(session(), 'community-1');
 
