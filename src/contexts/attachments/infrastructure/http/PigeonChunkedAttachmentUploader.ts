@@ -2,9 +2,9 @@ import { SHA256Hash } from '@haskou/value-objects';
 import { Buffer } from 'buffer';
 
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { AttachmentProgress } from '../../application/contracts/AttachmentProgress';
+import type { MessageAttachment } from '../../application/contracts/MessageAttachment';
 import type { PendingMessageAttachment } from '../crypto/resources/PendingMessageAttachment';
-import type { AttachmentProgress } from '../resources/AttachmentProgress';
-import type { MessageAttachment } from '../resources/MessageAttachment';
 import type { EncryptedAttachmentUpload } from './EncryptedAttachmentUpload';
 
 import { PigeonPrivateFilesClient } from './PigeonPrivateFilesClient';

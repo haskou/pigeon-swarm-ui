@@ -1,7 +1,7 @@
 import { UUID } from '@haskou/value-objects';
 import { CryptoAdapter } from '@haskou/value-objects/dist/value-objects/crypto/CryptoAdapter';
 
-import type { MessageAttachment } from '../resources/MessageAttachment';
+import type { MessageAttachment } from '../../application/contracts/MessageAttachment';
 import type { AttachmentProgressHandler } from './AttachmentProgressHandler';
 import type { WorkerResponse } from './WorkerResponse';
 

@@ -1,6 +1,6 @@
 import { UUID } from '@haskou/value-objects';
 
-import type { MessageAttachment } from '../resources/MessageAttachment';
+import type { MessageAttachment } from '../../application/contracts/MessageAttachment';
 import type { AttachmentProgressHandler } from './AttachmentProgressHandler';
 import type { AttachmentWorkerFactory } from './AttachmentWorkerFactory';
 import type { PendingMessageAttachment } from './resources/PendingMessageAttachment';

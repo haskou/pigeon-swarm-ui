@@ -1,4 +1,4 @@
-import type { MessageAttachment } from '../../infrastructure/resources/MessageAttachment';
+import type { MessageAttachment } from '../../application/contracts/MessageAttachment';
 
 export class PendingMessageAttachments {
   public static fromFiles(

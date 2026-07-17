@@ -1,4 +1,4 @@
-import type { MessageAttachment } from '../../resources/MessageAttachment';
+import type { MessageAttachment } from '../../../application/contracts/MessageAttachment';
 
 export type PendingMessageAttachment = {
   encryptedBytes: ArrayBuffer;

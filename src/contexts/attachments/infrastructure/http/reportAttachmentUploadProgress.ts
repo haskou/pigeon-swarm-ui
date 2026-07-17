@@ -1,4 +1,4 @@
-import type { AttachmentProgress } from '../resources/AttachmentProgress';
+import type { AttachmentProgress } from '../../application/contracts/AttachmentProgress';
 
 export function reportAttachmentUploadProgress(
   reporter: ((progress: AttachmentProgress) => void) | undefined,

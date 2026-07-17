@@ -1,6 +1,6 @@
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { MessageAttachment } from '../../application/contracts/MessageAttachment';
 import type { AttachmentNetworkId } from '../../domain/value-objects/AttachmentNetworkId';
-import type { MessageAttachment } from '../resources/MessageAttachment';
 
 import { AttachmentCipher } from '../crypto/AttachmentCipher';
 import { MessageAttachmentThumbnailPreparer } from '../media/MessageAttachmentThumbnailPreparer';
