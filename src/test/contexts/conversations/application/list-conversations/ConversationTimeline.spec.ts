@@ -1,4 +1,4 @@
-import { ConversationTimeline } from '../../../../../contexts/conversations/application/list-conversations/ConversationTimeline';
+import { ConversationTimeline } from '../../../../../contexts/conversations/presentation/view-models/ConversationTimeline';
 
 describe('conversation ordering', () => {
   it('orders conversations with the newest latest message first', () => {

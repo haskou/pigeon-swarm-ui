@@ -1,23 +1,29 @@
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import { Timestamp } from '@haskou/value-objects';
+
+import { ConversationNetworkId } from '../../../domain/value-objects/ConversationNetworkId';
+import { ConversationParticipantId } from '../../../domain/value-objects/ConversationParticipantId';
 
 export class CreateConversationMessage {
   public constructor(
-    private readonly input: {
-      networkId: string;
-      peerIdentityId: string;
-      session: Session;
-    },
+    private readonly networkId: string,
+    private readonly peerIdentityId: string,
+    private readonly actorIdentityId: string,
+    private readonly occurredAt: number,
   ) {}
 
-  public getNetworkId(): string {
-    return this.input.networkId;
+  public getActorIdentityId(): ConversationParticipantId {
+    return ConversationParticipantId.fromString(this.actorIdentityId);
   }
 
-  public getPeerIdentityId(): string {
-    return this.input.peerIdentityId;
+  public getNetworkId(): ConversationNetworkId {
+    return ConversationNetworkId.fromString(this.networkId);
   }
 
-  public getSession(): Session {
-    return this.input.session;
+  public getPeerIdentityId(): ConversationParticipantId {
+    return ConversationParticipantId.fromString(this.peerIdentityId);
+  }
+
+  public getOccurredAt(): Timestamp {
+    return new Timestamp(this.occurredAt);
   }
 }
