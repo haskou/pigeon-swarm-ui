@@ -86,27 +86,32 @@ export class CommunityMapper {
     });
   }
 
+  public toChannelResource(
+    channel: ReturnType<Community['toPrimitives']>['channels'][number],
+  ): CommunityChannelResource {
+    return channel.type === 'voice'
+      ? {
+          connectedIdentityIds: channel.connectedIdentityIds,
+          createdAt: channel.createdAt,
+          id: channel.id,
+          name: channel.name,
+          permissions: { visibleRoleIds: channel.visibleRoleIds },
+          type: 'voice',
+        }
+      : {
+          createdAt: channel.createdAt,
+          id: channel.id,
+          name: channel.name,
+          permissions: { visibleRoleIds: channel.visibleRoleIds },
+          threads: channel.threads,
+          type: 'text',
+        };
+  }
+
   public toResource(community: Community): CommunityResource {
     const primitives = community.toPrimitives();
     const channels: CommunityChannelResource[] = primitives.channels.map(
-      (channel) =>
-        channel.type === 'voice'
-          ? {
-              connectedIdentityIds: channel.connectedIdentityIds,
-              createdAt: channel.createdAt,
-              id: channel.id,
-              name: channel.name,
-              permissions: { visibleRoleIds: channel.visibleRoleIds },
-              type: 'voice',
-            }
-          : {
-              createdAt: channel.createdAt,
-              id: channel.id,
-              name: channel.name,
-              permissions: { visibleRoleIds: channel.visibleRoleIds },
-              threads: channel.threads,
-              type: 'text',
-            },
+      (channel) => this.toChannelResource(channel),
     );
 
     return {

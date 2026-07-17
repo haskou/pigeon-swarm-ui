@@ -95,6 +95,24 @@ export class PigeonCommunitiesApi {
     }`;
   }
 
+  private communityDetailCacheKey(
+    session: Session,
+    communityId: string,
+  ): string {
+    return `GET /communities/${encodeURIComponent(communityId)} ${
+      session.identity.id
+    }`;
+  }
+
+  private invalidateCommunityDetailCache(
+    session: Session,
+    communityId: string,
+  ): void {
+    this.invalidateCachedRequest(
+      this.communityDetailCacheKey(session, communityId),
+    );
+  }
+
   private invalidateChannelListCache(
     session: Session,
     communityId: string,
@@ -586,11 +604,15 @@ export class PigeonCommunitiesApi {
     )}/members/${encodeURIComponent(identityId)}/roles`;
     const body = { roleIds };
 
-    return await this.http.request<Community>(path, {
+    const community = await this.http.request<Community>(path, {
       body: JSON.stringify(body),
       headers: await this.signer.headers(session, 'PUT', path, body),
       method: 'PUT',
     });
+
+    this.invalidateCommunityDetailCache(session, communityId);
+
+    return community;
   }
 
   public async createTextChannel(

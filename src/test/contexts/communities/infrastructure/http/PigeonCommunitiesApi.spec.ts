@@ -680,4 +680,33 @@ describe(PigeonCommunitiesApi.name, () => {
       },
     );
   });
+
+  it('invalidates the community detail cache after assigning member roles', async () => {
+    const community = { id: 'community-1' };
+    const http = {
+      request: jest.fn().mockResolvedValue(community),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
+    } as unknown as RequestSigner;
+    const invalidateCachedRequest = jest.fn();
+    const session = {
+      identity: { id: 'identity-1' },
+    } as unknown as Session;
+    const api = new PigeonCommunitiesApi(
+      http,
+      signer,
+      async (_key, loader) => await loader(),
+      undefined,
+      invalidateCachedRequest,
+    );
+
+    await expect(
+      api.assignMemberRoles(session, 'community-1', 'member-1', ['role-1']),
+    ).resolves.toBe(community);
+
+    expect(invalidateCachedRequest).toHaveBeenCalledWith(
+      'GET /communities/community-1 identity-1',
+    );
+  });
 });

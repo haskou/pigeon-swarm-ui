@@ -41,24 +41,7 @@ export class PigeonCommunityManagement {
   }
 
   private channelResource(channel: CommunityChannel): CommunityChannelResource {
-    const primitives = channel.toPrimitives();
-
-    return primitives.type === 'voice'
-      ? {
-          connectedIdentityIds: primitives.connectedIdentityIds,
-          createdAt: primitives.createdAt,
-          id: primitives.id,
-          name: primitives.name,
-          permissions: { visibleRoleIds: primitives.visibleRoleIds },
-          type: 'voice',
-        }
-      : {
-          createdAt: primitives.createdAt,
-          id: primitives.id,
-          name: primitives.name,
-          permissions: { visibleRoleIds: primitives.visibleRoleIds },
-          type: 'text',
-        };
+    return this.mapper.toChannelResource(channel.toPrimitives());
   }
 
   private roleResource(role: CommunityRole): CommunityRoleResource {
