@@ -2,31 +2,22 @@ import type { Session } from '../../../../../shared/domain/pigeonResources.types
 
 import { PublishMessageAttachmentMessage } from '../../../../../contexts/attachments/application/publish-message-attachment/messages/PublishMessageAttachmentMessage';
 import { Attachment } from '../../../../../contexts/attachments/domain/Attachment';
-import { EncryptedAttachmentStrategy } from '../../../../../contexts/attachments/domain/strategies/EncryptedAttachmentStrategy';
-import { PublicAttachmentStrategy } from '../../../../../contexts/attachments/domain/strategies/PublicAttachmentStrategy';
-import { AttachmentByteSize } from '../../../../../contexts/attachments/domain/value-objects/AttachmentByteSize';
-import { AttachmentContentType } from '../../../../../contexts/attachments/domain/value-objects/AttachmentContentType';
-import { AttachmentExternalIdentifier } from '../../../../../contexts/attachments/domain/value-objects/AttachmentExternalIdentifier';
-import { AttachmentFilename } from '../../../../../contexts/attachments/domain/value-objects/AttachmentFilename';
-import { AttachmentId } from '../../../../../contexts/attachments/domain/value-objects/AttachmentId';
-import { AttachmentNetworkId } from '../../../../../contexts/attachments/domain/value-objects/AttachmentNetworkId';
 import { AttachmentPublicationContexts } from '../../../../../contexts/attachments/infrastructure/http/AttachmentPublicationContexts';
 import { PigeonFilesGateway } from '../../../../../contexts/attachments/infrastructure/http/PigeonFilesGateway';
 
 describe(PigeonFilesGateway.name, () => {
   function publishedAttachment(encrypted: boolean): Attachment {
-    return Attachment.restorePublished(
-      AttachmentId.fromString('external-1'),
-      AttachmentFilename.fromString('notes.txt'),
-      AttachmentContentType.fromString('text/plain'),
-      AttachmentByteSize.fromBytes(5),
-      encrypted
-        ? EncryptedAttachmentStrategy.forNetwork(
-            AttachmentNetworkId.fromString('network-1'),
-          )
-        : PublicAttachmentStrategy.create(),
-      AttachmentExternalIdentifier.fromString('external-1'),
-    );
+    return Attachment.fromPrimitives({
+      contentType: 'text/plain',
+      externalIdentifier: 'external-1',
+      filename: 'notes.txt',
+      id: 'external-1',
+      publication: encrypted
+        ? { encrypted: true, networkId: 'network-1' }
+        : { encrypted: false },
+      size: 5,
+      status: 'published',
+    });
   }
 
   it('publishes browser files through the attachment use case', async () => {

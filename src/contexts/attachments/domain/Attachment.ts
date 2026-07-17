@@ -1,4 +1,9 @@
-import { NullObject, Timestamp, assert } from '@haskou/value-objects';
+import {
+  NullObject,
+  Timestamp,
+  assert,
+  type PrimitiveOf,
+} from '@haskou/value-objects';
 
 import type { PublicationStrategy } from './strategies/PublicationStrategy';
 
@@ -7,6 +12,8 @@ import { AttachmentAlreadyPublishedError } from './errors/AttachmentAlreadyPubli
 import { AttachmentNotPublishedError } from './errors/AttachmentNotPublishedError';
 import { AttachmentPublicationWasPlanned } from './events/AttachmentPublicationWasPlanned';
 import { AttachmentWasPublished } from './events/AttachmentWasPublished';
+import { EncryptedAttachmentStrategy } from './strategies/EncryptedAttachmentStrategy';
+import { PublicAttachmentStrategy } from './strategies/PublicAttachmentStrategy';
 import { AttachmentByteSize } from './value-objects/AttachmentByteSize';
 import { AttachmentContentType } from './value-objects/AttachmentContentType';
 import { AttachmentExternalIdentifier } from './value-objects/AttachmentExternalIdentifier';
@@ -39,21 +46,32 @@ export class Attachment extends AggregateRoot {
     return attachment;
   }
 
-  public static restorePublished(
-    id: AttachmentId,
-    filename: AttachmentFilename,
-    contentType: AttachmentContentType,
-    size: AttachmentByteSize,
-    publication: PublicationStrategy,
-    externalIdentifier: AttachmentExternalIdentifier,
+  public static fromPrimitives(
+    primitives: PrimitiveOf<Attachment>,
   ): Attachment {
+    const publication = primitives.publication.encrypted
+      ? primitives.publication.networkId
+        ? EncryptedAttachmentStrategy.forNetwork(
+            AttachmentNetworkId.fromString(primitives.publication.networkId),
+          )
+        : EncryptedAttachmentStrategy.restore()
+      : PublicAttachmentStrategy.create();
+    const status = AttachmentPublicationStatus.fromPrimitives(
+      primitives.status,
+    );
+    const externalIdentifier = status.isPublished()
+      ? AttachmentExternalIdentifier.fromString(
+          primitives.externalIdentifier ?? '',
+        )
+      : NullObject.new(AttachmentExternalIdentifier);
+
     return new Attachment(
-      id,
-      filename,
-      contentType,
-      size,
+      AttachmentId.fromString(primitives.id),
+      AttachmentFilename.fromString(primitives.filename),
+      AttachmentContentType.fromString(primitives.contentType),
+      AttachmentByteSize.fromBytes(primitives.size),
       publication,
-      AttachmentPublicationStatus.PUBLISHED,
+      status,
       externalIdentifier,
     );
   }
@@ -68,6 +86,19 @@ export class Attachment extends AggregateRoot {
     private externalIdentifier: AttachmentExternalIdentifier,
   ) {
     super();
+  }
+
+  private publicationPrimitives():
+    | { encrypted: false }
+    | { encrypted: true; networkId?: string } {
+    if (!this.publication.isEncrypted()) return { encrypted: false };
+
+    if (!this.publication.hasEncryptionNetwork()) return { encrypted: true };
+
+    return {
+      encrypted: true,
+      networkId: this.publication.getEncryptionNetworkId().toString(),
+    };
   }
 
   public getPublishedExternalIdentifier(): AttachmentExternalIdentifier {
@@ -97,5 +128,32 @@ export class Attachment extends AggregateRoot {
     this.externalIdentifier = externalIdentifier;
     this.status = AttachmentPublicationStatus.PUBLISHED;
     this.record(new AttachmentWasPublished(this.id, occurredAt));
+  }
+
+  public toPrimitives() {
+    const primitives: {
+      contentType: string;
+      externalIdentifier?: string;
+      filename: string;
+      id: string;
+      publication:
+        | { encrypted: false }
+        | { encrypted: true; networkId?: string };
+      size: number;
+      status: ReturnType<AttachmentPublicationStatus['valueOf']>;
+    } = {
+      contentType: this.contentType.toString(),
+      filename: this.filename.toString(),
+      id: this.id.toString(),
+      publication: this.publicationPrimitives(),
+      size: this.size.valueOf(),
+      status: this.status.valueOf(),
+    };
+
+    if (this.isPublished()) {
+      primitives.externalIdentifier = this.externalIdentifier.toString();
+    }
+
+    return primitives;
   }
 }

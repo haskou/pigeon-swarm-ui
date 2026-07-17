@@ -15,6 +15,10 @@ export class PublicAttachmentStrategy implements PublicationStrategy {
     return NullObject.new(AttachmentNetworkId);
   }
 
+  public hasEncryptionNetwork(): boolean {
+    return false;
+  }
+
   public isEncrypted(): boolean {
     return false;
   }

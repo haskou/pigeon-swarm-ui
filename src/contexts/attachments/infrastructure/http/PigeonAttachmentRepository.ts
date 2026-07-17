@@ -4,11 +4,7 @@ import type { AttachmentPublisherExternalIdentifier } from '../../domain/value-o
 import type { AttachmentSourceExternalIdentifier } from '../../domain/value-objects/AttachmentSourceExternalIdentifier';
 
 import { Attachment } from '../../domain/Attachment';
-import { AttachmentByteSize } from '../../domain/value-objects/AttachmentByteSize';
-import { AttachmentContentType } from '../../domain/value-objects/AttachmentContentType';
 import { AttachmentExternalIdentifier } from '../../domain/value-objects/AttachmentExternalIdentifier';
-import { AttachmentFilename } from '../../domain/value-objects/AttachmentFilename';
-import { AttachmentId } from '../../domain/value-objects/AttachmentId';
 import { AttachmentPublicationContexts } from './AttachmentPublicationContexts';
 import { PigeonAttachmentDownloader } from './PigeonAttachmentDownloader';
 import { PigeonMessageAttachmentUploader } from './PigeonMessageAttachmentUploader';
@@ -58,13 +54,23 @@ export class PigeonAttachmentRepository implements AttachmentRepository {
       ? await this.downloader.findPrivate(identifier)
       : await this.downloader.findPublic(identifier);
 
-    return Attachment.restorePublished(
-      AttachmentId.fromString(identifier),
-      AttachmentFilename.fromString(resource.filename),
-      AttachmentContentType.fromString(resource.contentType),
-      AttachmentByteSize.fromBytes(resource.size),
-      publication,
-      externalIdentifier,
-    );
+    return Attachment.fromPrimitives({
+      contentType: resource.contentType,
+      externalIdentifier: identifier,
+      filename: resource.filename,
+      id: identifier,
+      publication: publication.isEncrypted()
+        ? {
+            encrypted: true,
+            ...(publication.hasEncryptionNetwork()
+              ? {
+                  networkId: publication.getEncryptionNetworkId().toString(),
+                }
+              : {}),
+          }
+        : { encrypted: false },
+      size: resource.size,
+      status: 'published',
+    });
   }
 }

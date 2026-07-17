@@ -67,14 +67,15 @@ describe(Attachment.name, () => {
   });
 
   it('restores a published attachment without recording domain events', () => {
-    const attachment = Attachment.restorePublished(
-      AttachmentId.fromString('attachment-1'),
-      AttachmentFilename.fromString('photo.webp'),
-      AttachmentContentType.fromString('image/webp'),
-      AttachmentByteSize.fromBytes(2048),
-      PublicAttachmentStrategy.create(),
-      AttachmentExternalIdentifier.fromString('external-1'),
-    );
+    const attachment = Attachment.fromPrimitives({
+      contentType: 'image/webp',
+      externalIdentifier: 'external-1',
+      filename: 'photo.webp',
+      id: 'attachment-1',
+      publication: { encrypted: false },
+      size: 2048,
+      status: 'published',
+    });
 
     expect(attachment.isPublished()).toBe(true);
     expect(attachment.getPublishedExternalIdentifier().toString()).toBe(
