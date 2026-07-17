@@ -12,7 +12,7 @@ import {
 
 import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
 
-import { MessageCollection } from '../../../messages/domain/MessageCollection';
+import { MessageCollection } from '../../../messages/presentation/view-models/MessageCollection';
 import {
   MessageScrollAnchor,
   type MessageScrollAnchorSnapshot,

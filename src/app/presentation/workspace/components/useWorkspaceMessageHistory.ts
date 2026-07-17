@@ -12,7 +12,7 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { MessageCollection } from '../../../../contexts/messages/domain/MessageCollection';
+import { MessageCollection } from '../../../../contexts/messages/presentation/view-models/MessageCollection';
 import {
   MessageScrollAnchor,
   type MessageScrollAnchorSnapshot,

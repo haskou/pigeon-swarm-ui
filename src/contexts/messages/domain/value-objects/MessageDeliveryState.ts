@@ -1,38 +1,34 @@
-import { StringValueObject, ValueNotInEnumError } from '@haskou/value-objects';
+import { Enum, ValueNotInEnumError } from '@haskou/value-objects';
 
-import type { MessageDeliveryStatePrimitive } from './MessageDeliveryStatePrimitive';
+const values = ['delivered', 'failed', 'pending'] as const;
 
-const delivered = 'delivered';
-const failed = 'failed';
-const pending = 'pending';
-
-export class MessageDeliveryState extends StringValueObject {
+export class MessageDeliveryState extends Enum<(typeof values)[number]> {
   public static delivered(): MessageDeliveryState {
-    return new MessageDeliveryState(delivered);
+    return new MessageDeliveryState('delivered');
   }
 
   public static failed(): MessageDeliveryState {
-    return new MessageDeliveryState(failed);
+    return new MessageDeliveryState('failed');
   }
 
-  public static fromPrimitive(value?: string): MessageDeliveryState {
-    if (value === undefined) return MessageDeliveryState.delivered();
+  public static fromPrimitives(value = 'delivered'): MessageDeliveryState {
+    const state = values.find((candidate) => candidate === value);
 
-    if (value === delivered) return MessageDeliveryState.delivered();
+    if (!state) throw new ValueNotInEnumError(value, values);
 
-    if (value === failed) return MessageDeliveryState.failed();
-
-    if (value === pending) return MessageDeliveryState.pending();
-
-    throw new ValueNotInEnumError(value, [delivered, failed, pending]);
+    return new MessageDeliveryState(state);
   }
 
   public static pending(): MessageDeliveryState {
-    return new MessageDeliveryState(pending);
+    return new MessageDeliveryState('pending');
   }
 
-  private constructor(value: MessageDeliveryStatePrimitive) {
+  private constructor(value: (typeof values)[number]) {
     super(value);
+  }
+
+  public getValues(): Array<(typeof values)[number]> {
+    return [...values];
   }
 
   public isDelivered(): boolean {

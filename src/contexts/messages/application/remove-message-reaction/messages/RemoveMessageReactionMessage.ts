@@ -1,28 +1,38 @@
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import { Timestamp } from '@haskou/value-objects';
+
+import { MessageAuthorId } from '../../../domain/value-objects/MessageAuthorId';
+import { MessageConversationId } from '../../../domain/value-objects/MessageConversationId';
+import { MessageId } from '../../../domain/value-objects/MessageId';
+import { MessageReactionEmoji } from '../../../domain/value-objects/MessageReactionEmoji';
 
 export class RemoveMessageReactionMessage {
   public constructor(
     private readonly input: {
+      authorIdentityId: string;
       conversationId: string;
       emoji: string;
       messageId: string;
-      session: Session;
+      occurredAt: number;
     },
   ) {}
 
-  public getConversationId(): string {
-    return this.input.conversationId;
+  public getAuthorId(): MessageAuthorId {
+    return MessageAuthorId.fromString(this.input.authorIdentityId);
   }
 
-  public getEmoji(): string {
-    return this.input.emoji;
+  public getConversationId(): MessageConversationId {
+    return MessageConversationId.fromString(this.input.conversationId);
   }
 
-  public getMessageId(): string {
-    return this.input.messageId;
+  public getEmoji(): MessageReactionEmoji {
+    return MessageReactionEmoji.fromString(this.input.emoji);
   }
 
-  public getSession(): Session {
-    return this.input.session;
+  public getMessageId(): MessageId {
+    return MessageId.fromString(this.input.messageId);
+  }
+
+  public getOccurredAt(): Timestamp {
+    return new Timestamp(this.input.occurredAt);
   }
 }

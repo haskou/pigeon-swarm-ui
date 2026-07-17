@@ -1,28 +1,31 @@
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import { MessageAuthorId } from '../../../domain/value-objects/MessageAuthorId';
+import { MessageConversationId } from '../../../domain/value-objects/MessageConversationId';
+import { MessageId } from '../../../domain/value-objects/MessageId';
+import { MessagePageLimit } from '../../../domain/value-objects/MessagePageLimit';
 
 export class LoadMessageThreadMessage {
   public constructor(
     private readonly input: {
+      actorIdentityId: string;
       conversationId: string;
+      limit?: number;
       messageId: string;
-      options?: { limit?: number };
-      session: Session;
     },
   ) {}
 
-  public getConversationId(): string {
-    return this.input.conversationId;
+  public getActorIdentityId(): MessageAuthorId {
+    return MessageAuthorId.fromString(this.input.actorIdentityId);
   }
 
-  public getMessageId(): string {
-    return this.input.messageId;
+  public getConversationId(): MessageConversationId {
+    return MessageConversationId.fromString(this.input.conversationId);
   }
 
-  public getOptions(): { limit?: number } {
-    return this.input.options ?? {};
+  public getLimit(): MessagePageLimit {
+    return MessagePageLimit.fromNumber(this.input.limit ?? 50);
   }
 
-  public getSession(): Session {
-    return this.input.session;
+  public getMessageId(): MessageId {
+    return MessageId.fromString(this.input.messageId);
   }
 }

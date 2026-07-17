@@ -5,7 +5,7 @@ import type {
   ConversationResource,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { MessageCollection } from '../../../../contexts/messages/domain/MessageCollection';
+import { MessageCollection } from '../../../../contexts/messages/presentation/view-models/MessageCollection';
 import { isBrowserPageVisible } from './isBrowserPageVisible';
 
 const MIN_RESUME_SYNC_INTERVAL_MS = 1500;

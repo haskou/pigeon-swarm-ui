@@ -1,28 +1,32 @@
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import { Timestamp } from '@haskou/value-objects';
+
+import { MessageAuthorId } from '../../../domain/value-objects/MessageAuthorId';
+import { MessageContent } from '../../../domain/value-objects/MessageContent';
+import { MessageConversationId } from '../../../domain/value-objects/MessageConversationId';
 
 export class SaveConversationDraftMessage {
   public constructor(
     private readonly input: {
+      authorIdentityId: string;
       content: string;
       conversationId: string;
-      session: Session;
-      updatedAt?: number;
+      updatedAt: number;
     },
   ) {}
 
-  public getContent(): string {
-    return this.input.content;
+  public getAuthorId(): MessageAuthorId {
+    return MessageAuthorId.fromString(this.input.authorIdentityId);
   }
 
-  public getConversationId(): string {
-    return this.input.conversationId;
+  public getContent(): MessageContent {
+    return MessageContent.fromString(this.input.content);
   }
 
-  public getSession(): Session {
-    return this.input.session;
+  public getConversationId(): MessageConversationId {
+    return MessageConversationId.fromString(this.input.conversationId);
   }
 
-  public getUpdatedAt(): number | undefined {
-    return this.input.updatedAt;
+  public getUpdatedAt(): Timestamp {
+    return new Timestamp(this.input.updatedAt);
   }
 }

@@ -100,7 +100,6 @@ import { PigeonKeychainApi } from '../../contexts/identities/infrastructure/http
 import { PigeonPresenceApi } from '../../contexts/identities/infrastructure/http/PigeonPresenceApi';
 import { PigeonPresenceGateway } from '../../contexts/identities/infrastructure/http/PigeonPresenceGateway';
 import { ConversationKeychain } from '../../contexts/identities/infrastructure/keychain/ConversationKeychain';
-import { MessageSignaturePayloadFactory } from '../../contexts/messages/domain/MessageSignaturePayloadFactory';
 import { DraftPayloadCipher } from '../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
 import { hasEncryptedPayload } from '../../contexts/messages/infrastructure/crypto/hasEncryptedPayload';
 import { MessageProjector } from '../../contexts/messages/infrastructure/crypto/MessageProjector';
@@ -108,6 +107,7 @@ import { yieldAfterMessageDecryptBatch } from '../../contexts/messages/infrastru
 import { PigeonMessageCommandsApi } from '../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
 import { PigeonMessagesApi } from '../../contexts/messages/infrastructure/http/PigeonMessagesApi';
 import { PigeonMessagesGateway } from '../../contexts/messages/infrastructure/http/PigeonMessagesGateway';
+import { MessageSignaturePayloadFactory } from '../../contexts/messages/infrastructure/http/signing/MessageSignaturePayloadFactory';
 import { throwIfMessageLoadAborted } from '../../contexts/messages/infrastructure/http/throwIfMessageLoadAborted';
 import { PigeonNodeApi } from '../../contexts/networks/infrastructure/http/PigeonNodeApi';
 import { PigeonNodeGateway } from '../../contexts/networks/infrastructure/http/PigeonNodeGateway';
@@ -157,13 +157,7 @@ export class PigeonApiGateway {
 
   private readonly identities: PigeonIdentityGateway;
 
-  public readonly identityKeyProtection: PigeonIdentityKeyProtectionGateway;
-
   private readonly keychainApi: PigeonKeychainApi;
-
-  private readonly messagesApi: PigeonMessagesApi;
-
-  private readonly messageCommands: PigeonMessageCommandsApi;
 
   private readonly messages: MessageProjector;
 
@@ -181,7 +175,13 @@ export class PigeonApiGateway {
 
   private readonly stickers: PigeonStickersGateway;
 
+  public readonly identityKeyProtection: PigeonIdentityKeyProtectionGateway;
+
   public readonly identityGateway: PigeonIdentitiesGateway;
+
+  public readonly messageCommands: PigeonMessageCommandsApi;
+
+  public readonly messagesApi: PigeonMessagesApi;
 
   public readonly calls: PigeonCallsApi;
 

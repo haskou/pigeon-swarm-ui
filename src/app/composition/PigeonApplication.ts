@@ -55,7 +55,25 @@ import { IdentityPresenceMapper } from '../../contexts/identities/infrastructure
 import { PigeonIdentityRepository } from '../../contexts/identities/infrastructure/http/PigeonIdentityRepository';
 import { PigeonIdentityUnlockRepository } from '../../contexts/identities/infrastructure/http/PigeonIdentityUnlockRepository';
 import { PigeonPresenceRepository } from '../../contexts/identities/infrastructure/http/PigeonPresenceRepository';
-import { PigeonMessagesApplication } from '../../contexts/messages/application/PigeonMessagesApplication';
+import { MessageReactionAdder } from '../../contexts/messages/application/add-message-reaction/MessageReactionAdder';
+import { ConversationDraftDeleter } from '../../contexts/messages/application/delete-conversation-draft/ConversationDraftDeleter';
+import { MessageDeleter } from '../../contexts/messages/application/delete-message/MessageDeleter';
+import { MessageEditor } from '../../contexts/messages/application/edit-message/MessageEditor';
+import { ConversationDraftsSearcher } from '../../contexts/messages/application/list-conversation-drafts/ConversationDraftsSearcher';
+import { PinnedMessagesSearcher } from '../../contexts/messages/application/list-message-pins/PinnedMessagesSearcher';
+import { MessageThreadSearcher } from '../../contexts/messages/application/load-message-thread/MessageThreadSearcher';
+import { MessageFinder } from '../../contexts/messages/application/load-message/MessageFinder';
+import { MessagesAroundSearcher } from '../../contexts/messages/application/load-messages-around/MessagesAroundSearcher';
+import { MessagesSearcher } from '../../contexts/messages/application/load-messages/MessagesSearcher';
+import { MessagePinner } from '../../contexts/messages/application/pin-message/MessagePinner';
+import { MessageReactionRemover } from '../../contexts/messages/application/remove-message-reaction/MessageReactionRemover';
+import { ConversationDraftSaver } from '../../contexts/messages/application/save-conversation-draft/ConversationDraftSaver';
+import { MessageSender } from '../../contexts/messages/application/send-message/MessageSender';
+import { MessageUnpinner } from '../../contexts/messages/application/unpin-message/MessageUnpinner';
+import { MessageMapper } from '../../contexts/messages/infrastructure/http/MessageMapper';
+import { MessageOperationContexts } from '../../contexts/messages/infrastructure/http/MessageOperationContexts';
+import { PigeonDraftRepository } from '../../contexts/messages/infrastructure/http/PigeonDraftRepository';
+import { PigeonMessageRepository } from '../../contexts/messages/infrastructure/http/PigeonMessageRepository';
 import { PigeonNetworksApplication } from '../../contexts/networks/application/PigeonNetworksApplication';
 import { PigeonNotificationsApplication } from '../../contexts/notifications/application/PigeonNotificationsApplication';
 import { PigeonConversationInvitationKeyDecryptor } from '../../contexts/notifications/infrastructure/crypto/PigeonConversationInvitationKeyDecryptor';
@@ -71,6 +89,12 @@ import { PigeonCommunityManagement } from './communities/PigeonCommunityManageme
 import { PigeonConversationsFacade } from './conversations/PigeonConversationsFacade';
 import { PigeonIdentitiesFacade } from './identities/PigeonIdentitiesFacade';
 import { PigeonSessionFacade } from './identities/PigeonSessionFacade';
+import { PigeonConversationDrafts } from './messages/PigeonConversationDrafts';
+import { PigeonMessagePins } from './messages/PigeonMessagePins';
+import { PigeonMessageReactions } from './messages/PigeonMessageReactions';
+import { PigeonMessageReader } from './messages/PigeonMessageReader';
+import { PigeonMessagesFacade } from './messages/PigeonMessagesFacade';
+import { PigeonMessageWriter } from './messages/PigeonMessageWriter';
 import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonAttachmentsFacade } from './PigeonAttachmentsFacade';
 import { PigeonCallsFacade } from './PigeonCallsFacade';
@@ -88,7 +112,7 @@ export class PigeonApplication {
 
   public readonly identities: PigeonIdentitiesFacade;
 
-  public readonly messages: PigeonMessagesApplication;
+  public readonly messages: PigeonMessagesFacade;
 
   public readonly networks: PigeonNetworksApplication;
 
@@ -247,25 +271,57 @@ export class PigeonApplication {
         ),
       },
     );
-    this.messages = new PigeonMessagesApplication({
-      addMessageReaction: gateway.messagesGateway,
-      createLinkPreview: gateway.messagesGateway,
-      decryptMessage: gateway.messagesGateway,
-      deleteConversationDraft: gateway.messagesGateway,
-      deleteMessage: gateway.messagesGateway,
-      editMessage: gateway.messagesGateway,
-      listConversationDrafts: gateway.messagesGateway,
-      listMessagePins: gateway.messagesGateway,
-      loadMessage: gateway.messagesGateway,
-      loadMessages: gateway.messagesGateway,
-      loadMessagesAround: gateway.messagesGateway,
-      loadMessageThread: gateway.messagesGateway,
-      pinMessage: gateway.messagesGateway,
-      removeMessageReaction: gateway.messagesGateway,
-      saveConversationDraft: gateway.messagesGateway,
-      sendMessage: gateway.messagesGateway,
-      unpinMessage: gateway.messagesGateway,
-    });
+    const messageMapper = new MessageMapper();
+    const messageOperationContexts = new MessageOperationContexts();
+    const messageRepository = new PigeonMessageRepository(
+      gateway.messagesApi,
+      gateway.messageCommands,
+      identityContexts,
+      messageMapper,
+      messageOperationContexts,
+    );
+    const conversationDraftRepository = new PigeonDraftRepository(
+      gateway.messagesApi,
+      identityContexts,
+    );
+    this.messages = new PigeonMessagesFacade(
+      new PigeonMessageReader(
+        identityContexts,
+        messageOperationContexts,
+        messageMapper,
+        new MessageFinder(messageRepository),
+        new MessagesSearcher(messageRepository),
+        new MessagesAroundSearcher(messageRepository),
+        new MessageThreadSearcher(messageRepository),
+      ),
+      new PigeonMessageWriter(
+        identityContexts,
+        messageOperationContexts,
+        messageMapper,
+        new MessageSender(messageRepository),
+        new MessageEditor(messageRepository),
+        new MessageDeleter(messageRepository),
+      ),
+      new PigeonConversationDrafts(
+        identityContexts,
+        new ConversationDraftDeleter(conversationDraftRepository),
+        new ConversationDraftsSearcher(conversationDraftRepository),
+        new ConversationDraftSaver(conversationDraftRepository),
+      ),
+      new PigeonMessageReactions(
+        identityContexts,
+        new MessageReactionAdder(messageRepository),
+        new MessageReactionRemover(messageRepository),
+      ),
+      new PigeonMessagePins(
+        identityContexts,
+        messageMapper,
+        new PinnedMessagesSearcher(messageRepository),
+        new MessagePinner(messageRepository),
+        new MessageUnpinner(messageRepository),
+      ),
+      gateway.messagesGateway,
+    );
     this.networks = new PigeonNetworksApplication({
       checkRelayPorts: gateway.node,
       claimNode: gateway.node,

@@ -5,8 +5,8 @@ import type {
 import type { CommunityMessageMentionResource as CommunityMessageMention } from '../../../communities/infrastructure/http/resources/CommunityMessageMentionResource';
 import type { PollResource } from '../../../polls/domain/pollResources.types';
 import type { StickerMessageReference } from '../../../stickers/domain/stickerResources.types';
-import type { MessageLinkPreview } from '../../domain/MessageLinkPreview';
-import type { MessageReplyPreview } from '../../domain/MessageReplyPreview';
+import type { MessageLinkPreview } from '../../infrastructure/http/resources/MessageLinkPreview';
+import type { MessageReplyPreview } from '../../infrastructure/crypto/resources/MessageReplyPreview';
 import type { MessageReaction } from '../../infrastructure/http/MessageReaction';
 import type { MessageResource } from '../../infrastructure/http/MessageResource';
 

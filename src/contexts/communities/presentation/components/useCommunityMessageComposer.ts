@@ -28,7 +28,7 @@ import type {
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { PendingMessageAttachments } from '../../../attachments/presentation/view-models/PendingMessageAttachments';
 import { useAttachmentDownload } from '../../../attachments/presentation/hooks/useAttachmentDownload';
-import { MessageLinkPreviews } from '../../../messages/domain/MessageLinkPreviews';
+import { MessageContent } from '../../../messages/domain/value-objects/MessageContent';
 import { MessageReactionUpdater } from '../../../messages/presentation/view-models/MessageReactionUpdater';
 import { isBrowserPreviewImage } from '../../../../shared/presentation/isBrowserPreviewImage';
 import { copy } from '../../../../shared/presentation/i18n/copy';
@@ -706,11 +706,11 @@ function replyPreviewFromMessage(
 }
 
 async function createLinkPreviewForContent(session: Session, content: string) {
-  const url = MessageLinkPreviews.firstUrl(content);
+  const url = MessageContent.fromString(content).findFirstLinkPreviewUrl();
 
   if (!url) return undefined;
 
   return await applicationContainer
-    .messages.createLinkPreview(session, url)
+    .messages.createLinkPreview(session, url.toString())
     .catch(() => undefined);
 }

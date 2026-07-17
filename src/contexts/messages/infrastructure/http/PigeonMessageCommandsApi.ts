@@ -12,12 +12,13 @@ import type { RequestSigner } from '../../../../shared/infrastructure/http/Reque
 import type { EncryptMessagePayloadInput } from '../crypto/EncryptMessagePayloadInput';
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { MessageAttachmentPublisher } from './MessageAttachmentPublisher';
+import type { MessageCommandIdentity } from './resources/MessageCommandIdentity';
 
 import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
 import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
-import { MessageLinkPreviews } from '../../domain/MessageLinkPreviews';
-import { MessageSignaturePayloadFactory } from '../../domain/MessageSignaturePayloadFactory';
+import { MessageContent } from '../../domain/value-objects/MessageContent';
 import { PigeonMessagesApi } from './PigeonMessagesApi';
+import { MessageSignaturePayloadFactory } from './signing/MessageSignaturePayloadFactory';
 
 export class PigeonMessageCommandsApi {
   public constructor(
@@ -30,12 +31,12 @@ export class PigeonMessageCommandsApi {
   ) {}
 
   private async linkPreviewForContent(session: Session, content: string) {
-    const url = MessageLinkPreviews.firstUrl(content);
+    const url = MessageContent.fromString(content).findFirstLinkPreviewUrl();
 
     if (!url) return undefined;
 
     return await this.messages
-      .createLinkPreview(session, url)
+      .createLinkPreview(session, url.toString())
       .catch(() => undefined);
   }
 
@@ -77,6 +78,7 @@ export class PigeonMessageCommandsApi {
     conversationId: string,
     content: string,
     options: SendMessageOptions = {},
+    commandIdentity?: MessageCommandIdentity,
   ): Promise<ChatMessage> {
     const key = ConversationKeychain.entry(
       session.keychain,
@@ -95,7 +97,7 @@ export class PigeonMessageCommandsApi {
       replyToMessageId,
       threadRootMessageId,
     } = options;
-    const timestamp = Date.now();
+    const timestamp = commandIdentity?.createdAt ?? Date.now();
     const messageAttachments = await this.attachments.publishMessageAttachments(
       session,
       attachments,
@@ -124,7 +126,9 @@ export class PigeonMessageCommandsApi {
       threadRootMessageId,
       timestamp,
     });
-    const id = `${conversationId}:${timestamp}:${UUID.generate().toString()}`;
+    const id =
+      commandIdentity?.id ??
+      `${conversationId}:${timestamp}:${UUID.generate().toString()}`;
     const signature = await signSessionPayload(
       session,
       JSON.stringify(
@@ -165,6 +169,7 @@ export class PigeonMessageCommandsApi {
     messageId: string,
     content: string,
     options: EditMessageOptions = {},
+    commandIdentity?: MessageCommandIdentity,
   ): Promise<ChatMessage> {
     const key = ConversationKeychain.entry(
       session.keychain,
@@ -174,7 +179,7 @@ export class PigeonMessageCommandsApi {
 
     if (!key) throw new Error('Conversation key is required.');
 
-    const timestamp = Date.now();
+    const timestamp = commandIdentity?.createdAt ?? Date.now();
     const linkPreview =
       options.linkPreview ??
       (await this.linkPreviewForContent(session, content));
@@ -228,8 +233,9 @@ export class PigeonMessageCommandsApi {
     session: Session,
     conversationId: string,
     messageId: string,
+    commandIdentity?: MessageCommandIdentity,
   ): Promise<void> {
-    const createdAt = Date.now();
+    const createdAt = commandIdentity?.createdAt ?? Date.now();
     const id = `${conversationId}:${createdAt}:${UUID.generate().toString()}:deleted`;
     const signature = await signSessionPayload(
       session,
