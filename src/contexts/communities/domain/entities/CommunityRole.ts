@@ -27,26 +27,6 @@ export class CommunityRole {
     return this.id.isEqual(id);
   }
 
-  public grants(permission: CommunityPermission): boolean {
-    return this.permissions.some((candidate) => candidate.isEqual(permission));
-  }
-
-  public getId(): CommunityRoleId {
-    return this.id;
-  }
-
-  public getName(): CommunityRoleName {
-    return this.name;
-  }
-
-  public getPermissions(): CommunityPermission[] {
-    return [...this.permissions];
-  }
-
-  public isEveryone(): boolean {
-    return this.id.isEveryone();
-  }
-
   public update(
     name: CommunityRoleName,
     permissions: CommunityPermission[],

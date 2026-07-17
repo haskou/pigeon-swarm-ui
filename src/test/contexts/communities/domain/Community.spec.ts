@@ -4,7 +4,6 @@ import { Community } from '../../../../contexts/communities/domain/Community';
 import { CommunityChannelId } from '../../../../contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelName } from '../../../../contexts/communities/domain/value-objects/CommunityChannelName';
 import { CommunityIdentityId } from '../../../../contexts/communities/domain/value-objects/CommunityIdentityId';
-import { CommunityPermission } from '../../../../contexts/communities/domain/value-objects/CommunityPermission';
 import { CommunityRoleId } from '../../../../contexts/communities/domain/value-objects/CommunityRoleId';
 
 const community = (): Community =>
@@ -55,27 +54,6 @@ const community = (): Community =>
   });
 
 describe(Community.name, () => {
-  it('owns channel visibility and permission decisions', () => {
-    const aggregate = community();
-    const memberId = CommunityIdentityId.fromString('member-a');
-
-    expect(
-      aggregate.canSeeChannel(
-        CommunityChannelId.fromString('channel-a'),
-        memberId,
-      ),
-    ).toBe(true);
-    expect(
-      aggregate
-        .permissionsFor(memberId)
-        .some((permission) =>
-          permission.isEqual(
-            CommunityPermission.fromPrimitives('send_messages'),
-          ),
-        ),
-    ).toBe(true);
-  });
-
   it('renames channels and records the domain fact', () => {
     const aggregate = community();
 

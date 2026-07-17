@@ -1,5 +1,5 @@
-import type { CommunityChannelResource } from '../../application/resources/CommunityChannelResource';
-import type { CommunityResource } from '../../application/resources/CommunityResource';
+import type { CommunityChannelResource } from './resources/CommunityChannelResource';
+import type { CommunityResource } from './resources/CommunityResource';
 
 import { Community } from '../../domain/Community';
 
@@ -30,7 +30,7 @@ export class CommunityMapper {
     return [...ordered, ...currentById.values()];
   }
 
-  public fromResource(resource: CommunityResource): Community {
+  public fromPrimitives(resource: CommunityResource): Community {
     const assignedRoles = new Map(
       (resource.memberRoles ?? []).map((assignment) => [
         assignment.identityId,

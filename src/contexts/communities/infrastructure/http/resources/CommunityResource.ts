@@ -2,6 +2,7 @@ import type { CommunityChannelResource } from './CommunityChannelResource';
 import type { CommunityMemberRolesResource } from './CommunityMemberRolesResource';
 import type { CommunityRoleResource } from './CommunityRoleResource';
 import type { CommunityTextChannelResource } from './CommunityTextChannelResource';
+import type { CommunityVisibilityResource } from './CommunityVisibilityResource';
 import type { CommunityVoiceChannelResource } from './CommunityVoiceChannelResource';
 
 export type CommunityResource = {
@@ -21,6 +22,6 @@ export type CommunityResource = {
   ownerIdentityId: string;
   roles?: CommunityRoleResource[];
   textChannels: CommunityTextChannelResource[];
-  visibility: 'private' | 'public';
+  visibility: CommunityVisibilityResource;
   voiceChannels?: CommunityVoiceChannelResource[];
 };

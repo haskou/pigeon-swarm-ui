@@ -4,25 +4,27 @@ import type { CommunityRepository } from '../../domain/repositories/CommunityRep
 import { AssignCommunityMemberRolesMessage } from './messages/AssignCommunityMemberRolesMessage';
 
 export class CommunityMemberRolesAssigner {
-  public constructor(private readonly communities: CommunityRepository) {}
+  public constructor(
+    private readonly communityRepository: CommunityRepository,
+  ) {}
 
   public async assign(
     message: AssignCommunityMemberRolesMessage,
   ): Promise<Community> {
-    const community = await this.communities.find(
+    const community = await this.communityRepository.find(
       message.getCommunityId(),
       message.getActorIdentityId(),
     );
 
-    community.assignMemberRoles(
+    const member = community.assignMemberRoles(
       message.getMemberIdentityId(),
       message.getRoleIds(),
       message.getOccurredAt(),
     );
 
-    return await this.communities.assignMemberRoles(
+    return await this.communityRepository.assignMemberRoles(
       community,
-      message.getMemberIdentityId(),
+      member,
       message.getActorIdentityId(),
     );
   }

@@ -1,5 +1,6 @@
 import type { Community } from '../Community';
 import type { CommunityChannel } from '../entities/CommunityChannel';
+import type { CommunityMember } from '../entities/CommunityMember';
 import type { CommunityRole } from '../entities/CommunityRole';
 import type { CommunityChannelId } from '../value-objects/CommunityChannelId';
 import type { CommunityChannelName } from '../value-objects/CommunityChannelName';
@@ -12,7 +13,7 @@ import type { CommunityRoleName } from '../value-objects/CommunityRoleName';
 export interface CommunityRepository {
   assignMemberRoles(
     community: Community,
-    memberIdentityId: CommunityIdentityId,
+    member: CommunityMember,
     actorIdentityId: CommunityIdentityId,
   ): Promise<Community>;
   banMember(
@@ -61,12 +62,12 @@ export interface CommunityRepository {
   ): Promise<void>;
   renameChannel(
     community: Community,
-    channelId: CommunityChannelId,
+    channel: CommunityChannel,
     actorIdentityId: CommunityIdentityId,
   ): Promise<CommunityChannel>;
   restrictChannel(
     community: Community,
-    channelId: CommunityChannelId,
+    channel: CommunityChannel,
     actorIdentityId: CommunityIdentityId,
   ): Promise<CommunityChannel>;
   search(actorIdentityId: CommunityIdentityId): Promise<Community[]>;
@@ -81,7 +82,7 @@ export interface CommunityRepository {
   ): Promise<Community>;
   updateRole(
     community: Community,
-    roleId: CommunityRoleId,
+    role: CommunityRole,
     actorIdentityId: CommunityIdentityId,
   ): Promise<CommunityRole>;
 }

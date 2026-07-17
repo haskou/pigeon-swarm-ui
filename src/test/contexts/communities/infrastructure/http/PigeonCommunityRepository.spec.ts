@@ -1,4 +1,4 @@
-import type { CommunityResource } from '../../../../../contexts/communities/application/resources/CommunityResource';
+import type { CommunityResource } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
 import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 
 import { CommunityId } from '../../../../../contexts/communities/domain/value-objects/CommunityId';
@@ -53,16 +53,14 @@ describe(PigeonCommunityRepository.name, () => {
       actorIdentityId,
     );
 
-    expect(
-      community.getId().isEqual(CommunityId.fromString('community-a')),
-    ).toBe(true);
+    expect(new CommunityMapper().toResource(community).id).toBe('community-a');
     expect(gateway.getCommunity).toHaveBeenCalledWith(session, 'community-a');
   });
 
   it('serializes aggregate profile state at the HTTP boundary', async () => {
     const { gateway, repository } = setup();
     const mapper = new CommunityMapper();
-    const community = mapper.fromResource(resource());
+    const community = mapper.fromPrimitives(resource());
     gateway.updateCommunity = jest.fn().mockResolvedValue({
       ...resource(),
       name: 'Renamed',

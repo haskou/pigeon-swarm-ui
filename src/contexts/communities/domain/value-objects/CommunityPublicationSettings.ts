@@ -6,10 +6,14 @@ export class CommunityPublicationSettings {
   public static fromPrimitives(
     primitives: PrimitiveOf<CommunityPublicationSettings>,
   ): CommunityPublicationSettings {
+    const visibility = CommunityVisibility.fromPrimitives(
+      primitives.visibility,
+    );
+
     return new CommunityPublicationSettings(
-      CommunityVisibility.fromPrimitives(primitives.visibility),
+      visibility,
       primitives.discoverable,
-      primitives.autoJoinEnabled,
+      visibility.isPublic() && primitives.autoJoinEnabled,
     );
   }
 
@@ -18,19 +22,6 @@ export class CommunityPublicationSettings {
     private discoverable: boolean,
     private autoJoinEnabled: boolean,
   ) {}
-
-  public change(discoverable: boolean, autoJoinEnabled: boolean): void {
-    this.discoverable = discoverable;
-    this.autoJoinEnabled = this.visibility.isPublic() && autoJoinEnabled;
-  }
-
-  public isPrivate(): boolean {
-    return this.visibility.isPrivate();
-  }
-
-  public isPublic(): boolean {
-    return this.visibility.isPublic();
-  }
 
   public toPrimitives() {
     return {

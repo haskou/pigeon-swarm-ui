@@ -47,12 +47,6 @@ export class CommunityPermission extends Enum<
     return CommunityPermission.values.some((candidate) => candidate === value);
   }
 
-  public static all(): CommunityPermission[] {
-    return CommunityPermission.values.map(
-      (permission) => new CommunityPermission(permission),
-    );
-  }
-
   public static fromPrimitives(value: string): CommunityPermission {
     if (!CommunityPermission.isPermission(value)) {
       throw new ValueNotInEnumError(value, CommunityPermission.values);
@@ -67,5 +61,9 @@ export class CommunityPermission extends Enum<
 
   public getValues(): Array<(typeof CommunityPermission.values)[number]> {
     return [...CommunityPermission.values];
+  }
+
+  public toPrimitives() {
+    return this.valueOf();
   }
 }

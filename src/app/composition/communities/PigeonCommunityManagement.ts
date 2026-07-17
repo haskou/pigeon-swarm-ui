@@ -1,7 +1,7 @@
-import type { CommunityTextChannelResource } from '../../../contexts/communities/application/resources/CommunityTextChannelResource';
-import type { CommunityVoiceChannelResource } from '../../../contexts/communities/application/resources/CommunityVoiceChannelResource';
 import type { CommunityChannel } from '../../../contexts/communities/domain/entities/CommunityChannel';
 import type { CommunityRole } from '../../../contexts/communities/domain/entities/CommunityRole';
+import type { CommunityTextChannelResource } from '../../../contexts/communities/infrastructure/http/resources/CommunityTextChannelResource';
+import type { CommunityVoiceChannelResource } from '../../../contexts/communities/infrastructure/http/resources/CommunityVoiceChannelResource';
 import type {
   Community,
   CommunityChannel as CommunityChannelResource,

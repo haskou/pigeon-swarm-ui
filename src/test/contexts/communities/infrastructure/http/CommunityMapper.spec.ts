@@ -1,4 +1,4 @@
-import type { CommunityResource } from '../../../../../contexts/communities/application/resources/CommunityResource';
+import type { CommunityResource } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
 
 import { CommunityMapper } from '../../../../../contexts/communities/infrastructure/http/CommunityMapper';
 
@@ -36,7 +36,7 @@ describe(CommunityMapper.name, () => {
   it('hydrates ordered channels and membership state at the boundary', () => {
     const mapper = new CommunityMapper();
 
-    expect(mapper.toResource(mapper.fromResource(resource()))).toMatchObject({
+    expect(mapper.toResource(mapper.fromPrimitives(resource()))).toMatchObject({
       bannedMemberIds: ['banned-a'],
       channels: [
         expect.objectContaining({ id: 'voice-a' }),

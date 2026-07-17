@@ -1,4 +1,4 @@
-export type CommunityMessageMention =
+export type CommunityMessageMentionResource =
   | { type: 'everyone' }
   | { type: 'here' }
   | { targetId: string; type: 'identity' }

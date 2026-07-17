@@ -27,10 +27,6 @@ export class CommunityChannelType extends Enum<'text' | 'voice'> {
     return CommunityChannelType.values;
   }
 
-  public isText(): boolean {
-    return this.isEqual(CommunityChannelType.TEXT);
-  }
-
   public isVoice(): boolean {
     return this.isEqual(CommunityChannelType.VOICE);
   }

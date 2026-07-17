@@ -1,4 +1,4 @@
-import type { CommunityResource as Community } from '../../application/resources/CommunityResource';
+import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
 
 export class CommunityList {
   public static preservingCommunityVoicePresence(

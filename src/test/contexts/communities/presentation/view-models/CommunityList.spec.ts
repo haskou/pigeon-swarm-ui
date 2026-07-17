@@ -1,4 +1,4 @@
-import type { CommunityResource as Community } from '../../../../../contexts/communities/application/resources/CommunityResource';
+import type { CommunityResource as Community } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
 
 import { CommunityList } from '../../../../../contexts/communities/presentation/view-models/CommunityList';
 

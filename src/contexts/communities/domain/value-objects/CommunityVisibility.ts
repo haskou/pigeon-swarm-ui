@@ -30,11 +30,11 @@ export class CommunityVisibility extends Enum<'private' | 'public'> {
     return CommunityVisibility.values;
   }
 
-  public isPrivate(): boolean {
-    return this.isEqual(CommunityVisibility.PRIVATE);
-  }
-
   public isPublic(): boolean {
     return this.isEqual(CommunityVisibility.PUBLIC);
+  }
+
+  public toPrimitives() {
+    return this.valueOf();
   }
 }

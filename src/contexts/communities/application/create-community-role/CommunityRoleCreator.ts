@@ -4,16 +4,18 @@ import type { CommunityRepository } from '../../domain/repositories/CommunityRep
 import { CreateCommunityRoleMessage } from './messages/CreateCommunityRoleMessage';
 
 export class CommunityRoleCreator {
-  public constructor(private readonly communities: CommunityRepository) {}
+  public constructor(
+    private readonly communityRepository: CommunityRepository,
+  ) {}
 
   public async create(
     message: CreateCommunityRoleMessage,
   ): Promise<CommunityRole> {
-    const community = await this.communities.find(
+    const community = await this.communityRepository.find(
       message.getCommunityId(),
       message.getActorIdentityId(),
     );
-    const role = await this.communities.createRole(
+    const role = await this.communityRepository.createRole(
       community,
       message.getName(),
       message.getPermissions(),

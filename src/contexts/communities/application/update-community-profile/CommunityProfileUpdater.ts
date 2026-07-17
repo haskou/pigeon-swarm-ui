@@ -4,12 +4,14 @@ import type { CommunityRepository } from '../../domain/repositories/CommunityRep
 import { UpdateCommunityProfileMessage } from './messages/UpdateCommunityProfileMessage';
 
 export class CommunityProfileUpdater {
-  public constructor(private readonly communities: CommunityRepository) {}
+  public constructor(
+    private readonly communityRepository: CommunityRepository,
+  ) {}
 
   public async update(
     message: UpdateCommunityProfileMessage,
   ): Promise<Community> {
-    const community = await this.communities.find(
+    const community = await this.communityRepository.find(
       message.getCommunityId(),
       message.getActorIdentityId(),
     );
@@ -22,7 +24,7 @@ export class CommunityProfileUpdater {
       message.getOccurredAt(),
     );
 
-    return await this.communities.updateProfile(
+    return await this.communityRepository.updateProfile(
       community,
       message.getActorIdentityId(),
     );

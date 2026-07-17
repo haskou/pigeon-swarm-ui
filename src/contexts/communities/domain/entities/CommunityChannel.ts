@@ -33,33 +33,6 @@ export class CommunityChannel {
     return this.id.isEqual(id);
   }
 
-  public canBeSeenBy(roleIds: CommunityRoleId[]): boolean {
-    return (
-      this.visibleRoleIds.length === 0 ||
-      this.visibleRoleIds.some(
-        (visibleRoleId) =>
-          visibleRoleId.isEveryone() ||
-          roleIds.some((roleId) => roleId.isEqual(visibleRoleId)),
-      )
-    );
-  }
-
-  public getName(): CommunityChannelName {
-    return this.name;
-  }
-
-  public getVisibleRoleIds(): CommunityRoleId[] {
-    return [...this.visibleRoleIds];
-  }
-
-  public isText(): boolean {
-    return this.type.isText();
-  }
-
-  public isVoice(): boolean {
-    return this.type.isVoice();
-  }
-
   public rename(name: CommunityChannelName): void {
     this.name = name;
   }

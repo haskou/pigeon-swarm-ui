@@ -1,5 +1,8 @@
 import { Timestamp, type PrimitiveOf } from '@haskou/value-objects';
 
+import type { DomainEvent } from '../../../../shared/domain/DomainEvent';
+
+import { CommunityEventType } from './CommunityEventType';
 import { CommunityId } from './CommunityId';
 import { CommunityIdentityId } from './CommunityIdentityId';
 import { CommunityNetworkId } from './CommunityNetworkId';
@@ -23,12 +26,15 @@ export class CommunityMetadata {
     private readonly createdAt: Timestamp,
   ) {}
 
-  public getId(): CommunityId {
-    return this.id;
-  }
-
-  public isOwnedBy(identityId: CommunityIdentityId): boolean {
-    return this.ownerIdentityId.isEqual(identityId);
+  public identifyEvent(
+    type: CommunityEventType,
+    occurredAt: Timestamp,
+  ): DomainEvent {
+    return {
+      aggregateId: this.id.toString(),
+      occurredAt: occurredAt.valueOf(),
+      type: type.valueOf(),
+    };
   }
 
   public toPrimitives() {

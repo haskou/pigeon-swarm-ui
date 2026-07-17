@@ -2,7 +2,7 @@ import type {
   AttachmentProgress,
   AttachmentUploadOptions,
 } from '../../../shared/domain/pigeonResources.types';
-import type { CommunityMessageMention } from '../../communities/application/communityResources.types';
+import type { CommunityMessageMentionResource as CommunityMessageMention } from '../../communities/infrastructure/http/resources/CommunityMessageMentionResource';
 import type { StickerMessageReference } from '../../stickers/domain/stickerResources.types';
 import type { MessageLinkPreview } from './MessageLinkPreview';
 import type { MessageReplyPreview } from './MessageReplyPreview';

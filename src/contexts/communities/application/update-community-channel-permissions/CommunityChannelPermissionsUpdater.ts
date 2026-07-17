@@ -4,25 +4,27 @@ import type { CommunityRepository } from '../../domain/repositories/CommunityRep
 import { UpdateCommunityChannelPermissionsMessage } from './messages/UpdateCommunityChannelPermissionsMessage';
 
 export class CommunityChannelPermissionsUpdater {
-  public constructor(private readonly communities: CommunityRepository) {}
+  public constructor(
+    private readonly communityRepository: CommunityRepository,
+  ) {}
 
   public async update(
     message: UpdateCommunityChannelPermissionsMessage,
   ): Promise<CommunityChannel> {
-    const community = await this.communities.find(
+    const community = await this.communityRepository.find(
       message.getCommunityId(),
       message.getActorIdentityId(),
     );
 
-    community.restrictChannelTo(
+    const channel = community.restrictChannelTo(
       message.getChannelId(),
       message.getVisibleRoleIds(),
       message.getOccurredAt(),
     );
 
-    return await this.communities.restrictChannel(
+    return await this.communityRepository.restrictChannel(
       community,
-      message.getChannelId(),
+      channel,
       message.getActorIdentityId(),
     );
   }

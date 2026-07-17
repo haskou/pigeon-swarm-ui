@@ -4,10 +4,12 @@ import type { CommunityRepository } from '../../domain/repositories/CommunityRep
 import { FindCommunityMessage } from './messages/FindCommunityMessage';
 
 export class CommunityFinder {
-  public constructor(private readonly communities: CommunityRepository) {}
+  public constructor(
+    private readonly communityRepository: CommunityRepository,
+  ) {}
 
   public async find(message: FindCommunityMessage): Promise<Community> {
-    return await this.communities.find(
+    return await this.communityRepository.find(
       message.getCommunityId(),
       message.getActorIdentityId(),
     );

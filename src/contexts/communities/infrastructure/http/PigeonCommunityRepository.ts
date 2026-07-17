@@ -1,6 +1,6 @@
-import type { CommunityChannelResource } from '../../application/resources/CommunityChannelResource';
 import type { Community } from '../../domain/Community';
 import type { CommunityChannel } from '../../domain/entities/CommunityChannel';
+import type { CommunityMember } from '../../domain/entities/CommunityMember';
 import type { CommunityRole } from '../../domain/entities/CommunityRole';
 import type { CommunityRepository } from '../../domain/repositories/CommunityRepository';
 import type { CommunityChannelId } from '../../domain/value-objects/CommunityChannelId';
@@ -10,6 +10,7 @@ import type { CommunityIdentityId } from '../../domain/value-objects/CommunityId
 import type { CommunityPermission } from '../../domain/value-objects/CommunityPermission';
 import type { CommunityRoleId } from '../../domain/value-objects/CommunityRoleId';
 import type { CommunityRoleName } from '../../domain/value-objects/CommunityRoleName';
+import type { CommunityChannelResource } from './resources/CommunityChannelResource';
 
 import { CommunityChannel as CommunityChannelEntity } from '../../domain/entities/CommunityChannel';
 import { CommunityRole as CommunityRoleEntity } from '../../domain/entities/CommunityRole';
@@ -40,19 +41,18 @@ export class PigeonCommunityRepository implements CommunityRepository {
 
   public async assignMemberRoles(
     community: Community,
-    memberIdentityId: CommunityIdentityId,
+    member: CommunityMember,
     actorIdentityId: CommunityIdentityId,
   ): Promise<Community> {
+    const memberPrimitives = member.toPrimitives();
     const resource = await this.gateway.assignCommunityMemberRoles(
       this.contexts.find(actorIdentityId),
-      community.getId().toString(),
-      memberIdentityId.toString(),
-      community
-        .getMemberRoleIds(memberIdentityId)
-        .map((roleId) => roleId.toString()),
+      this.mapper.toResource(community).id,
+      memberPrimitives.identityId,
+      memberPrimitives.roleIds,
     );
 
-    return this.mapper.fromResource(resource);
+    return this.mapper.fromPrimitives(resource);
   }
 
   public async banMember(
@@ -60,10 +60,10 @@ export class PigeonCommunityRepository implements CommunityRepository {
     memberIdentityId: CommunityIdentityId,
     actorIdentityId: CommunityIdentityId,
   ): Promise<Community> {
-    return this.mapper.fromResource(
+    return this.mapper.fromPrimitives(
       await this.gateway.banCommunityMember(
         this.contexts.find(actorIdentityId),
-        community.getId().toString(),
+        this.mapper.toResource(community).id,
         memberIdentityId.toString(),
       ),
     );
@@ -77,7 +77,7 @@ export class PigeonCommunityRepository implements CommunityRepository {
   ): Promise<CommunityRole> {
     const resource = await this.gateway.createCommunityRole(
       this.contexts.find(actorIdentityId),
-      community.getId().toString(),
+      this.mapper.toResource(community).id,
       {
         name: name.toString(),
         permissions: permissions.map((permission) => permission.valueOf()),
@@ -99,7 +99,7 @@ export class PigeonCommunityRepository implements CommunityRepository {
   ): Promise<CommunityChannel> {
     const resource = await this.gateway.createCommunityTextChannel(
       this.contexts.find(actorIdentityId),
-      community.getId().toString(),
+      this.mapper.toResource(community).id,
       name.toString(),
     );
 
@@ -113,7 +113,7 @@ export class PigeonCommunityRepository implements CommunityRepository {
   ): Promise<CommunityChannel> {
     const resource = await this.gateway.createCommunityVoiceChannel(
       this.contexts.find(actorIdentityId),
-      community.getId().toString(),
+      this.mapper.toResource(community).id,
       name.toString(),
     );
 
@@ -125,10 +125,10 @@ export class PigeonCommunityRepository implements CommunityRepository {
     channelId: CommunityChannelId,
     actorIdentityId: CommunityIdentityId,
   ): Promise<Community> {
-    return this.mapper.fromResource(
+    return this.mapper.fromPrimitives(
       await this.gateway.deleteCommunityChannel(
         this.contexts.find(actorIdentityId),
-        community.getId().toString(),
+        this.mapper.toResource(community).id,
         channelId.toString(),
       ),
     );
@@ -141,7 +141,7 @@ export class PigeonCommunityRepository implements CommunityRepository {
   ): Promise<void> {
     await this.gateway.deleteCommunityRole(
       this.contexts.find(actorIdentityId),
-      community.getId().toString(),
+      this.mapper.toResource(community).id,
       roleId.toString(),
     );
   }
@@ -150,7 +150,7 @@ export class PigeonCommunityRepository implements CommunityRepository {
     communityId: CommunityId,
     actorIdentityId: CommunityIdentityId,
   ): Promise<Community> {
-    return this.mapper.fromResource(
+    return this.mapper.fromPrimitives(
       await this.gateway.getCommunity(
         this.contexts.find(actorIdentityId),
         communityId.toString(),
@@ -163,10 +163,10 @@ export class PigeonCommunityRepository implements CommunityRepository {
     memberIdentityId: CommunityIdentityId,
     actorIdentityId: CommunityIdentityId,
   ): Promise<Community> {
-    return this.mapper.fromResource(
+    return this.mapper.fromPrimitives(
       await this.gateway.kickCommunityMember(
         this.contexts.find(actorIdentityId),
-        community.getId().toString(),
+        this.mapper.toResource(community).id,
         memberIdentityId.toString(),
       ),
     );
@@ -178,20 +178,21 @@ export class PigeonCommunityRepository implements CommunityRepository {
   ): Promise<void> {
     await this.gateway.leaveCommunity(
       this.contexts.find(actorIdentityId),
-      community.getId().toString(),
+      this.mapper.toResource(community).id,
     );
   }
 
   public async renameChannel(
     community: Community,
-    channelId: CommunityChannelId,
+    channel: CommunityChannel,
     actorIdentityId: CommunityIdentityId,
   ): Promise<CommunityChannel> {
+    const channelPrimitives = channel.toPrimitives();
     const resource = await this.gateway.renameCommunityChannel(
       this.contexts.find(actorIdentityId),
-      community.getId().toString(),
-      channelId.toString(),
-      community.getChannelName(channelId).toString(),
+      this.mapper.toResource(community).id,
+      channelPrimitives.id,
+      channelPrimitives.name,
     );
 
     return this.channelFromResource(resource);
@@ -199,16 +200,15 @@ export class PigeonCommunityRepository implements CommunityRepository {
 
   public async restrictChannel(
     community: Community,
-    channelId: CommunityChannelId,
+    channel: CommunityChannel,
     actorIdentityId: CommunityIdentityId,
   ): Promise<CommunityChannel> {
+    const channelPrimitives = channel.toPrimitives();
     const resource = await this.gateway.updateCommunityChannelPermissions(
       this.contexts.find(actorIdentityId),
-      community.getId().toString(),
-      channelId.toString(),
-      community
-        .getChannelVisibleRoleIds(channelId)
-        .map((roleId) => roleId.toString()),
+      this.mapper.toResource(community).id,
+      channelPrimitives.id,
+      channelPrimitives.visibleRoleIds,
     );
 
     return this.channelFromResource(resource);
@@ -221,7 +221,7 @@ export class PigeonCommunityRepository implements CommunityRepository {
       this.contexts.find(actorIdentityId),
     );
 
-    return resources.map((resource) => this.mapper.fromResource(resource));
+    return resources.map((resource) => this.mapper.fromPrimitives(resource));
   }
 
   public async unbanMember(
@@ -229,10 +229,10 @@ export class PigeonCommunityRepository implements CommunityRepository {
     memberIdentityId: CommunityIdentityId,
     actorIdentityId: CommunityIdentityId,
   ): Promise<Community> {
-    return this.mapper.fromResource(
+    return this.mapper.fromPrimitives(
       await this.gateway.unbanCommunityMember(
         this.contexts.find(actorIdentityId),
-        community.getId().toString(),
+        this.mapper.toResource(community).id,
         memberIdentityId.toString(),
       ),
     );
@@ -245,7 +245,7 @@ export class PigeonCommunityRepository implements CommunityRepository {
     const profile = this.mapper.toResource(community);
     const resource = await this.gateway.updateCommunity(
       this.contexts.find(actorIdentityId),
-      community.getId().toString(),
+      this.mapper.toResource(community).id,
       {
         autoJoinEnabled: profile.autoJoinEnabled,
         avatar: profile.avatar ?? undefined,
@@ -256,23 +256,22 @@ export class PigeonCommunityRepository implements CommunityRepository {
       },
     );
 
-    return this.mapper.fromResource(resource);
+    return this.mapper.fromPrimitives(resource);
   }
 
   public async updateRole(
     community: Community,
-    roleId: CommunityRoleId,
+    role: CommunityRole,
     actorIdentityId: CommunityIdentityId,
   ): Promise<CommunityRole> {
+    const rolePrimitives = role.toPrimitives();
     const resource = await this.gateway.updateCommunityRole(
       this.contexts.find(actorIdentityId),
-      community.getId().toString(),
-      roleId.toString(),
+      this.mapper.toResource(community).id,
+      rolePrimitives.id,
       {
-        name: community.getRoleName(roleId).toString(),
-        permissions: community
-          .getRolePermissions(roleId)
-          .map((permission) => permission.valueOf()),
+        name: rolePrimitives.name,
+        permissions: rolePrimitives.permissions,
       },
     );
 

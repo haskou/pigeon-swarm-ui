@@ -4,17 +4,19 @@ import type { CommunityRepository } from '../../domain/repositories/CommunityRep
 import { BanCommunityMemberMessage } from './messages/BanCommunityMemberMessage';
 
 export class CommunityMemberBanner {
-  public constructor(private readonly communities: CommunityRepository) {}
+  public constructor(
+    private readonly communityRepository: CommunityRepository,
+  ) {}
 
   public async ban(message: BanCommunityMemberMessage): Promise<Community> {
-    const community = await this.communities.find(
+    const community = await this.communityRepository.find(
       message.getCommunityId(),
       message.getActorIdentityId(),
     );
 
     community.banMember(message.getMemberIdentityId(), message.getOccurredAt());
 
-    return await this.communities.banMember(
+    return await this.communityRepository.banMember(
       community,
       message.getMemberIdentityId(),
       message.getActorIdentityId(),

@@ -4,22 +4,24 @@ import type { CommunityRepository } from '../../domain/repositories/CommunityRep
 import { CreateCommunityChannelMessage } from './messages/CreateCommunityChannelMessage';
 
 export class CommunityChannelCreator {
-  public constructor(private readonly communities: CommunityRepository) {}
+  public constructor(
+    private readonly communityRepository: CommunityRepository,
+  ) {}
 
   public async create(
     message: CreateCommunityChannelMessage,
   ): Promise<CommunityChannel> {
-    const community = await this.communities.find(
+    const community = await this.communityRepository.find(
       message.getCommunityId(),
       message.getActorIdentityId(),
     );
     const channel = message.getType().isVoice()
-      ? await this.communities.createVoiceChannel(
+      ? await this.communityRepository.createVoiceChannel(
           community,
           message.getName(),
           message.getActorIdentityId(),
         )
-      : await this.communities.createTextChannel(
+      : await this.communityRepository.createTextChannel(
           community,
           message.getName(),
           message.getActorIdentityId(),

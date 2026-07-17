@@ -4,10 +4,12 @@ import type { CommunityRepository } from '../../domain/repositories/CommunityRep
 import { KickCommunityMemberMessage } from './messages/KickCommunityMemberMessage';
 
 export class CommunityMemberKicker {
-  public constructor(private readonly communities: CommunityRepository) {}
+  public constructor(
+    private readonly communityRepository: CommunityRepository,
+  ) {}
 
   public async kick(message: KickCommunityMemberMessage): Promise<Community> {
-    const community = await this.communities.find(
+    const community = await this.communityRepository.find(
       message.getCommunityId(),
       message.getActorIdentityId(),
     );
@@ -17,7 +19,7 @@ export class CommunityMemberKicker {
       message.getOccurredAt(),
     );
 
-    return await this.communities.kickMember(
+    return await this.communityRepository.kickMember(
       community,
       message.getMemberIdentityId(),
       message.getActorIdentityId(),

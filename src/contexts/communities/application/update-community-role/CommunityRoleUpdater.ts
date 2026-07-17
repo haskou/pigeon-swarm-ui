@@ -4,26 +4,28 @@ import type { CommunityRepository } from '../../domain/repositories/CommunityRep
 import { UpdateCommunityRoleMessage } from './messages/UpdateCommunityRoleMessage';
 
 export class CommunityRoleUpdater {
-  public constructor(private readonly communities: CommunityRepository) {}
+  public constructor(
+    private readonly communityRepository: CommunityRepository,
+  ) {}
 
   public async update(
     message: UpdateCommunityRoleMessage,
   ): Promise<CommunityRole> {
-    const community = await this.communities.find(
+    const community = await this.communityRepository.find(
       message.getCommunityId(),
       message.getActorIdentityId(),
     );
 
-    community.updateRole(
+    const role = community.updateRole(
       message.getRoleId(),
       message.getName(),
       message.getPermissions(),
       message.getOccurredAt(),
     );
 
-    return await this.communities.updateRole(
+    return await this.communityRepository.updateRole(
       community,
-      message.getRoleId(),
+      role,
       message.getActorIdentityId(),
     );
   }

@@ -20,10 +20,6 @@ export class CommunityMember {
     private banned: boolean,
   ) {}
 
-  private roleIdsWithEveryone(): CommunityRoleId[] {
-    return [CommunityRoleId.EVERYONE, ...this.roleIds];
-  }
-
   public assignRoles(roleIds: CommunityRoleId[]): void {
     this.roleIds = [...roleIds];
   }
@@ -34,28 +30,6 @@ export class CommunityMember {
 
   public belongsTo(identityId: CommunityIdentityId): boolean {
     return this.identityId.isEqual(identityId);
-  }
-
-  public canAccess(
-    channel: import('./CommunityChannel').CommunityChannel,
-  ): boolean {
-    return !this.banned && channel.canBeSeenBy(this.roleIdsWithEveryone());
-  }
-
-  public hasRole(roleId: CommunityRoleId): boolean {
-    return this.roleIds.some((candidate) => candidate.isEqual(roleId));
-  }
-
-  public getIdentityId(): CommunityIdentityId {
-    return this.identityId;
-  }
-
-  public getRoleIds(): CommunityRoleId[] {
-    return [...this.roleIds];
-  }
-
-  public isBanned(): boolean {
-    return this.banned;
   }
 
   public removeRole(roleId: CommunityRoleId): void {

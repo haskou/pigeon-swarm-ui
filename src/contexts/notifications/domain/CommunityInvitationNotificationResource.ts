@@ -1,4 +1,4 @@
-import type { CommunityInvitationPayload } from '../../communities/application/communityResources.types';
+import type { CommunityInvitationPayloadResource as CommunityInvitationPayload } from '../../communities/infrastructure/http/resources/CommunityInvitationPayloadResource';
 import type { BaseNotificationResource } from './BaseNotificationResource';
 
 export type CommunityInvitationNotificationResource =

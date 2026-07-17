@@ -4,19 +4,21 @@ import type { CommunityRepository } from '../../domain/repositories/CommunityRep
 import { RemoveCommunityChannelMessage } from './messages/RemoveCommunityChannelMessage';
 
 export class CommunityChannelRemover {
-  public constructor(private readonly communities: CommunityRepository) {}
+  public constructor(
+    private readonly communityRepository: CommunityRepository,
+  ) {}
 
   public async remove(
     message: RemoveCommunityChannelMessage,
   ): Promise<Community> {
-    const community = await this.communities.find(
+    const community = await this.communityRepository.find(
       message.getCommunityId(),
       message.getActorIdentityId(),
     );
 
     community.deleteChannel(message.getChannelId(), message.getOccurredAt());
 
-    return await this.communities.deleteChannel(
+    return await this.communityRepository.deleteChannel(
       community,
       message.getChannelId(),
       message.getActorIdentityId(),

@@ -4,10 +4,12 @@ import type { CommunityRepository } from '../../domain/repositories/CommunityRep
 import { UnbanCommunityMemberMessage } from './messages/UnbanCommunityMemberMessage';
 
 export class CommunityMemberUnbanner {
-  public constructor(private readonly communities: CommunityRepository) {}
+  public constructor(
+    private readonly communityRepository: CommunityRepository,
+  ) {}
 
   public async unban(message: UnbanCommunityMemberMessage): Promise<Community> {
-    const community = await this.communities.find(
+    const community = await this.communityRepository.find(
       message.getCommunityId(),
       message.getActorIdentityId(),
     );
@@ -17,7 +19,7 @@ export class CommunityMemberUnbanner {
       message.getOccurredAt(),
     );
 
-    return await this.communities.unbanMember(
+    return await this.communityRepository.unbanMember(
       community,
       message.getMemberIdentityId(),
       message.getActorIdentityId(),

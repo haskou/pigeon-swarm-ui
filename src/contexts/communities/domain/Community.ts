@@ -1,16 +1,16 @@
-import { Timestamp, assert, type PrimitiveOf } from '@haskou/value-objects';
+import { Timestamp, type PrimitiveOf } from '@haskou/value-objects';
 
 import { AggregateRoot } from '../../../shared/domain/AggregateRoot';
 import { CommunityChannel } from './entities/CommunityChannel';
+import { CommunityChannels } from './entities/CommunityChannels';
 import { CommunityMember } from './entities/CommunityMember';
+import { CommunityMembers } from './entities/CommunityMembers';
 import { CommunityRole } from './entities/CommunityRole';
-import { CommunityChannelNotFoundError } from './errors/CommunityChannelNotFoundError';
-import { CommunityMemberNotFoundError } from './errors/CommunityMemberNotFoundError';
-import { CommunityRoleNotFoundError } from './errors/CommunityRoleNotFoundError';
+import { CommunityRoles } from './entities/CommunityRoles';
 import { CommunityChannelId } from './value-objects/CommunityChannelId';
 import { CommunityChannelName } from './value-objects/CommunityChannelName';
 import { CommunityDescription } from './value-objects/CommunityDescription';
-import { CommunityId } from './value-objects/CommunityId';
+import { CommunityEventType } from './value-objects/CommunityEventType';
 import { CommunityIdentityId } from './value-objects/CommunityIdentityId';
 import { CommunityMediaIdentifier } from './value-objects/CommunityMediaIdentifier';
 import { CommunityMetadata } from './value-objects/CommunityMetadata';
@@ -27,9 +27,9 @@ export class Community extends AggregateRoot {
       CommunityMetadata.fromPrimitives(primitives.metadata),
       CommunityProfile.fromPrimitives(primitives.profile),
       CommunityPublicationSettings.fromPrimitives(primitives.publication),
-      primitives.members.map(CommunityMember.fromPrimitives),
-      primitives.roles.map(CommunityRole.fromPrimitives),
-      primitives.channels.map(CommunityChannel.fromPrimitives),
+      CommunityMembers.fromPrimitives(primitives.members),
+      CommunityRoles.fromPrimitives(primitives.roles),
+      CommunityChannels.fromPrimitives(primitives.channels),
     );
   }
 
@@ -37,238 +37,101 @@ export class Community extends AggregateRoot {
     private readonly metadata: CommunityMetadata,
     private readonly profile: CommunityProfile,
     private readonly publication: CommunityPublicationSettings,
-    private readonly members: CommunityMember[],
-    private readonly roles: CommunityRole[],
-    private readonly channels: CommunityChannel[],
+    private readonly members: CommunityMembers,
+    private readonly roles: CommunityRoles,
+    private readonly channels: CommunityChannels,
   ) {
     super();
   }
 
-  private channel(channelId: CommunityChannelId): CommunityChannel {
-    const channel = this.channels.find((candidate) =>
-      candidate.belongsTo(channelId),
-    );
-
-    assert(channel, new CommunityChannelNotFoundError());
-
-    return channel;
-  }
-
-  private member(identityId: CommunityIdentityId): CommunityMember {
-    const member = this.members.find((candidate) =>
-      candidate.belongsTo(identityId),
-    );
-
-    assert(member, new CommunityMemberNotFoundError());
-
-    return member;
-  }
-
-  private role(roleId: CommunityRoleId): CommunityRole {
-    const role = this.roles.find((candidate) => candidate.belongsTo(roleId));
-
-    assert(role, new CommunityRoleNotFoundError());
-
-    return role;
+  private recordChange(type: CommunityEventType, occurredAt: Timestamp): void {
+    this.record(this.metadata.identifyEvent(type, occurredAt));
   }
 
   public addChannel(channel: CommunityChannel, occurredAt: Timestamp): void {
-    this.channels.push(channel);
-    this.record({
-      aggregateId: this.getId().toString(),
-      occurredAt: occurredAt.valueOf(),
-      type: 'CommunityChannelAdded',
-    });
+    this.channels.add(channel);
+    this.recordChange(CommunityEventType.CHANNEL_ADDED, occurredAt);
   }
 
   public addRole(role: CommunityRole, occurredAt: Timestamp): void {
-    this.roles.push(role);
-    this.record({
-      aggregateId: this.getId().toString(),
-      occurredAt: occurredAt.valueOf(),
-      type: 'CommunityRoleAdded',
-    });
+    this.roles.add(role);
+    this.recordChange(CommunityEventType.ROLE_ADDED, occurredAt);
   }
 
   public assignMemberRoles(
     identityId: CommunityIdentityId,
     roleIds: CommunityRoleId[],
     occurredAt: Timestamp,
-  ): void {
-    roleIds.forEach((roleId) => this.role(roleId));
-    this.member(identityId).assignRoles(roleIds);
-    this.record({
-      aggregateId: this.getId().toString(),
-      occurredAt: occurredAt.valueOf(),
-      type: 'CommunityMemberRolesAssigned',
-    });
+  ): CommunityMember {
+    this.roles.assertExist(roleIds);
+    const member = this.members.assignRoles(identityId, roleIds);
+    this.recordChange(CommunityEventType.MEMBER_ROLES_ASSIGNED, occurredAt);
+
+    return member;
   }
 
   public banMember(
     identityId: CommunityIdentityId,
     occurredAt: Timestamp,
   ): void {
-    this.member(identityId).ban();
-    this.record({
-      aggregateId: this.getId().toString(),
-      occurredAt: occurredAt.valueOf(),
-      type: 'CommunityMemberBanned',
-    });
-  }
-
-  public canSeeChannel(
-    channelId: CommunityChannelId,
-    identityId: CommunityIdentityId,
-  ): boolean {
-    if (this.isOwnedBy(identityId)) return true;
-
-    return this.member(identityId).canAccess(this.channel(channelId));
+    this.members.ban(identityId);
+    this.recordChange(CommunityEventType.MEMBER_BANNED, occurredAt);
   }
 
   public deleteChannel(
     channelId: CommunityChannelId,
     occurredAt: Timestamp,
   ): void {
-    const channel = this.channel(channelId);
-    const index = this.channels.indexOf(channel);
-
-    this.channels.splice(index, 1);
-    this.record({
-      aggregateId: this.getId().toString(),
-      occurredAt: occurredAt.valueOf(),
-      type: 'CommunityChannelRemoved',
-    });
+    this.channels.remove(channelId);
+    this.recordChange(CommunityEventType.CHANNEL_REMOVED, occurredAt);
   }
 
   public deleteRole(roleId: CommunityRoleId, occurredAt: Timestamp): void {
-    const role = this.role(roleId);
-    const index = this.roles.indexOf(role);
-
-    this.roles.splice(index, 1);
-    this.members.forEach((member) => member.removeRole(roleId));
-    this.record({
-      aggregateId: this.getId().toString(),
-      occurredAt: occurredAt.valueOf(),
-      type: 'CommunityRoleRemoved',
-    });
-  }
-
-  public getId(): CommunityId {
-    return this.metadata.getId();
-  }
-
-  public getChannelName(channelId: CommunityChannelId): CommunityChannelName {
-    return this.channel(channelId).getName();
-  }
-
-  public getChannelVisibleRoleIds(
-    channelId: CommunityChannelId,
-  ): CommunityRoleId[] {
-    return this.channel(channelId).getVisibleRoleIds();
-  }
-
-  public getMemberRoleIds(identityId: CommunityIdentityId): CommunityRoleId[] {
-    return this.member(identityId).getRoleIds();
-  }
-
-  public getRoleName(roleId: CommunityRoleId): CommunityRoleName {
-    return this.role(roleId).getName();
-  }
-
-  public getRolePermissions(roleId: CommunityRoleId): CommunityPermission[] {
-    return this.role(roleId).getPermissions();
-  }
-
-  public isOwnedBy(identityId: CommunityIdentityId): boolean {
-    return this.metadata.isOwnedBy(identityId);
-  }
-
-  public isPrivate(): boolean {
-    return this.publication.isPrivate();
-  }
-
-  public isPublic(): boolean {
-    return this.publication.isPublic();
+    this.roles.remove(roleId);
+    this.members.removeRole(roleId);
+    this.recordChange(CommunityEventType.ROLE_REMOVED, occurredAt);
   }
 
   public kickMember(
     identityId: CommunityIdentityId,
     occurredAt: Timestamp,
   ): void {
-    const member = this.member(identityId);
-    const index = this.members.indexOf(member);
-
-    this.members.splice(index, 1);
-    this.record({
-      aggregateId: this.getId().toString(),
-      occurredAt: occurredAt.valueOf(),
-      type: 'CommunityMemberKicked',
-    });
-  }
-
-  public membersWithChannelAccess(
-    channelId: CommunityChannelId,
-  ): CommunityIdentityId[] {
-    const channel = this.channel(channelId);
-
-    return this.members
-      .filter((member) => member.canAccess(channel))
-      .map((member) => member.getIdentityId());
-  }
-
-  public permissionsFor(
-    identityId: CommunityIdentityId,
-  ): CommunityPermission[] {
-    if (this.isOwnedBy(identityId)) return CommunityPermission.all();
-
-    const member = this.member(identityId);
-
-    return CommunityPermission.all().filter((permission) =>
-      this.roles.some(
-        (role) =>
-          (role.isEveryone() || member.hasRole(role.getId())) &&
-          role.grants(permission),
-      ),
-    );
+    this.members.remove(identityId);
+    this.recordChange(CommunityEventType.MEMBER_KICKED, occurredAt);
   }
 
   public renameChannel(
     channelId: CommunityChannelId,
     name: CommunityChannelName,
     occurredAt: Timestamp,
-  ): void {
-    this.channel(channelId).rename(name);
-    this.record({
-      aggregateId: this.getId().toString(),
-      occurredAt: occurredAt.valueOf(),
-      type: 'CommunityChannelRenamed',
-    });
+  ): CommunityChannel {
+    const channel = this.channels.rename(channelId, name);
+    this.recordChange(CommunityEventType.CHANNEL_RENAMED, occurredAt);
+
+    return channel;
   }
 
   public restrictChannelTo(
     channelId: CommunityChannelId,
     roleIds: CommunityRoleId[],
     occurredAt: Timestamp,
-  ): void {
-    roleIds.forEach((roleId) => this.role(roleId));
-    this.channel(channelId).restrictTo(roleIds);
-    this.record({
-      aggregateId: this.getId().toString(),
-      occurredAt: occurredAt.valueOf(),
-      type: 'CommunityChannelPermissionsUpdated',
-    });
+  ): CommunityChannel {
+    this.roles.assertExist(roleIds);
+    const channel = this.channels.restrict(channelId, roleIds);
+    this.recordChange(
+      CommunityEventType.CHANNEL_PERMISSIONS_UPDATED,
+      occurredAt,
+    );
+
+    return channel;
   }
 
   public unbanMember(
     identityId: CommunityIdentityId,
     occurredAt: Timestamp,
   ): void {
-    this.member(identityId).unban();
-    this.record({
-      aggregateId: this.getId().toString(),
-      occurredAt: occurredAt.valueOf(),
-      type: 'CommunityMemberUnbanned',
-    });
+    this.members.unban(identityId);
+    this.recordChange(CommunityEventType.MEMBER_UNBANNED, occurredAt);
   }
 
   public updateProfile(
@@ -279,11 +142,7 @@ export class Community extends AggregateRoot {
     occurredAt: Timestamp,
   ): void {
     this.profile.update(name, description, avatar, banner);
-    this.record({
-      aggregateId: this.getId().toString(),
-      occurredAt: occurredAt.valueOf(),
-      type: 'CommunityProfileUpdated',
-    });
+    this.recordChange(CommunityEventType.PROFILE_UPDATED, occurredAt);
   }
 
   public updateRole(
@@ -291,23 +150,21 @@ export class Community extends AggregateRoot {
     name: CommunityRoleName,
     permissions: CommunityPermission[],
     occurredAt: Timestamp,
-  ): void {
-    this.role(roleId).update(name, permissions);
-    this.record({
-      aggregateId: this.getId().toString(),
-      occurredAt: occurredAt.valueOf(),
-      type: 'CommunityRoleUpdated',
-    });
+  ): CommunityRole {
+    const role = this.roles.update(roleId, name, permissions);
+    this.recordChange(CommunityEventType.ROLE_UPDATED, occurredAt);
+
+    return role;
   }
 
   public toPrimitives() {
     return {
-      channels: this.channels.map((channel) => channel.toPrimitives()),
-      members: this.members.map((member) => member.toPrimitives()),
+      channels: this.channels.toPrimitives(),
+      members: this.members.toPrimitives(),
       metadata: this.metadata.toPrimitives(),
       profile: this.profile.toPrimitives(),
       publication: this.publication.toPrimitives(),
-      roles: this.roles.map((role) => role.toPrimitives()),
+      roles: this.roles.toPrimitives(),
     };
   }
 }
