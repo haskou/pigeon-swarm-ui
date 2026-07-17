@@ -51,6 +51,7 @@ export class CommunityMapper {
         createdAt: channel.createdAt,
         id: channel.id,
         name: channel.name,
+        threads: channel.type === 'text' ? (channel.threads ?? []) : [],
         type: channel.type,
         visibleRoleIds: channel.permissions?.visibleRoleIds ?? [],
       })),
@@ -103,6 +104,7 @@ export class CommunityMapper {
               id: channel.id,
               name: channel.name,
               permissions: { visibleRoleIds: channel.visibleRoleIds },
+              threads: channel.threads,
               type: 'text',
             },
     );

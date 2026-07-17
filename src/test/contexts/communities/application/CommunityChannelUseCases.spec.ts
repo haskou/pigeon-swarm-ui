@@ -17,6 +17,7 @@ const channel = (): CommunityChannel =>
     createdAt: 200,
     id: 'channel-created',
     name: 'created',
+    threads: [],
     type: 'text',
     visibleRoleIds: ['everyone'],
   });

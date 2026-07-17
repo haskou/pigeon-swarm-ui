@@ -34,6 +34,7 @@ export class PigeonCommunityRepository implements CommunityRepository {
       createdAt: resource.createdAt,
       id: resource.id,
       name: resource.name,
+      threads: resource.type === 'text' ? (resource.threads ?? []) : [],
       type: resource.type,
       visibleRoleIds: resource.permissions?.visibleRoleIds ?? [],
     });

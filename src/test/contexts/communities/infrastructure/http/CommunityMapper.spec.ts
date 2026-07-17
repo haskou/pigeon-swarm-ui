@@ -24,7 +24,20 @@ const resource = (): CommunityResource => ({
     },
   ],
   textChannels: [
-    { createdAt: 100, id: 'text-a', name: 'current', type: 'text' },
+    {
+      createdAt: 100,
+      id: 'text-a',
+      name: 'current',
+      threads: [
+        {
+          lastReplyAt: 300,
+          lastReplyMessageId: 'reply-a',
+          replyCount: 2,
+          rootMessageId: 'root-a',
+        },
+      ],
+      type: 'text',
+    },
   ],
   visibility: 'private',
   voiceChannels: [
@@ -46,6 +59,19 @@ describe(CommunityMapper.name, () => {
       memberRoles: expect.arrayContaining([
         { identityId: 'member-a', roleIds: ['member-role'] },
       ]),
+      textChannels: [
+        expect.objectContaining({
+          id: 'text-a',
+          threads: [
+            {
+              lastReplyAt: 300,
+              lastReplyMessageId: 'reply-a',
+              replyCount: 2,
+              rootMessageId: 'root-a',
+            },
+          ],
+        }),
+      ],
     });
   });
 });

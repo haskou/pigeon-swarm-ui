@@ -5,6 +5,7 @@ import { CommunityChannelName } from '../value-objects/CommunityChannelName';
 import { CommunityChannelType } from '../value-objects/CommunityChannelType';
 import { CommunityIdentityId } from '../value-objects/CommunityIdentityId';
 import { CommunityRoleId } from '../value-objects/CommunityRoleId';
+import { CommunityChannelThreadSummary } from './CommunityChannelThreadSummary';
 
 export class CommunityChannel {
   public static fromPrimitives(
@@ -17,6 +18,7 @@ export class CommunityChannel {
       new Timestamp(primitives.createdAt),
       primitives.visibleRoleIds.map(CommunityRoleId.fromString),
       primitives.connectedIdentityIds.map(CommunityIdentityId.fromString),
+      primitives.threads.map(CommunityChannelThreadSummary.fromPrimitives),
     );
   }
 
@@ -27,6 +29,7 @@ export class CommunityChannel {
     private readonly createdAt: Timestamp,
     private visibleRoleIds: CommunityRoleId[],
     private readonly connectedIdentityIds: CommunityIdentityId[],
+    private readonly threads: CommunityChannelThreadSummary[],
   ) {}
 
   public belongsTo(id: CommunityChannelId): boolean {
@@ -49,6 +52,7 @@ export class CommunityChannel {
       createdAt: this.createdAt.valueOf(),
       id: this.id.toString(),
       name: this.name.toString(),
+      threads: this.threads.map((thread) => thread.toPrimitives()),
       type: this.type.valueOf(),
       visibleRoleIds: this.visibleRoleIds.map((id) => id.toString()),
     };

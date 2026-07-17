@@ -10,6 +10,7 @@ export const communityFixture = (): Community =>
         createdAt: 100,
         id: 'channel-a',
         name: 'general',
+        threads: [],
         type: 'text',
         visibleRoleIds: ['everyone'],
       },
