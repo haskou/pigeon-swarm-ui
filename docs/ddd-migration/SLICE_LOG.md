@@ -1296,3 +1296,37 @@
   - focused ESLint for the extracted history hook
 - Next slice: extract the remaining realtime/community routing from
   `GlassWorkspace` only where it forms a cohesive responsibility.
+
+## Slice CONVERSATION-002: Rich conversation lifecycle boundary
+
+- Date: 2026-07-17
+- Size: L
+- Status: completed
+- Goal: replace the resource-shaped conversation application facade with a
+  behavior-rich aggregate, primitive boundary messages, explicit use cases,
+  and a domain-owned repository.
+- Changed areas:
+  - `contexts/conversations/domain`
+  - `contexts/conversations/application`
+  - `contexts/conversations/infrastructure/http`
+  - `app/composition/conversations`
+  - conversation tests under `src/test`
+- Behavior changed/preserved: direct and group creation, participant
+  invitations, read markers, latest-activity ordering, keychain publication,
+  and presentation resources preserve their external behavior. Conversation
+  mutations now run through `Conversation` and record domain events.
+- Boundaries changed: `Session`, resources, HTTP contracts, and keychain
+  serialization no longer enter Conversations application/domain. The local
+  keychain adapter moved to identity infrastructure and presentation mapping
+  moved outside application.
+- Contracts changed: no REST, websocket, encrypted payload, or keychain wire
+  contract changes.
+- Validation level: L3
+- Tests/checks:
+  - Conversations domain, application, infrastructure, presentation, and
+    composition tests
+  - `yarn typecheck`
+  - `yarn lint` (zero errors; existing unrelated test warnings remain)
+  - full Jest suite: 203 suites and 747 tests passing
+- Next slice: `IDENTITY-001`, complete identity/session/keychain domain and
+  infrastructure boundaries.

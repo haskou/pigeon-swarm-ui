@@ -40,28 +40,28 @@ adapters into application services without containing context behavior.
 
 ## Active slice
 
-- Id: `COMMUNITY-001`
-- Title: Model community membership, roles, and channels behind the community aggregate
+- Id: `CONVERSATION-002`
+- Title: Rebuild conversation lifecycle behind a rich aggregate and repository
 - Size: L
 - Status: completed
-- Business capability: Community lifecycle, membership, roles, channels, invitations,
-  and channel-scoped read models
-- Source area: `src/contexts/communities`
-- Target boundary: a behavior-rich `Community` aggregate, explicit use cases and
-  messages, domain repositories, and context-owned infrastructure mappers
-- Target files/folders: `contexts/communities/{domain,application,infrastructure}`
+- Business capability: Direct/group conversation creation, membership,
+  activity ordering, invitations, and read state
+- Source area: `src/contexts/conversations`
+- Target boundary: a behavior-rich `Conversation` aggregate, explicit use cases
+  and primitive application messages, a domain repository, and context-owned
+  HTTP/keychain adapters
+- Target files/folders: `contexts/conversations/{domain,application,infrastructure}`
 - Compatibility constraints: REST, websocket, encrypted payload, and existing
   presentation APIs remain stable while callers migrate by capability
 - Validation level: L2
-- Affected behavior/tests: community creation, profile updates, membership, roles,
-  channels, invitations, drafts, pins, and channel message queries/commands
-- Tests/checks run: communities domain/application/infrastructure and app
-  composition tests, strict slice lint, TypeScript typecheck, full lint, and full
-  Jest suite
-- Full-suite status: deferred until the infrastructure milestone closes
-- Done criteria: application receives primitive messages, community decisions run
-  through domain objects, resources stay outside domain, and infrastructure
-  implements domain-owned repositories without application `Port` contracts
+- Affected behavior/tests: direct/group creation, invitation, read markers,
+  timeline ordering, keychain publication, and conversation resource mapping
+- Tests/checks run: conversation domain/application/infrastructure/presentation
+  and composition tests, TypeScript typecheck, full lint, and full Jest suite
+- Full-suite status: 203 suites and 747 tests passing
+- Done criteria: application receives primitive messages, lifecycle decisions
+  run through `Conversation`, resources stay outside domain/application, and
+  infrastructure implements `ConversationRepository` without application ports
 
 ## Risks
 
@@ -149,6 +149,5 @@ adapters into application services without containing context behavior.
 
 ## Next slices
 
-1. `CONVERSATION-001`: migrate conversation lifecycle and membership from the
-   completed community/calls architecture.
-2. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
+1. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
+2. `MESSAGE-001`: migrate message lifecycle behind aggregates and repositories.

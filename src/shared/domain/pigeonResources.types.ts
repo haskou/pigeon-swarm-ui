@@ -16,11 +16,14 @@ export type { CommunityMembershipRequestResource as CommunityMembershipRequest }
 export type { CommunityDiscoveryResource } from '../../contexts/communities/infrastructure/http/resources/CommunityDiscoveryResource';
 export type { CommunityPermissionResource as CommunityPermission } from '../../contexts/communities/infrastructure/http/resources/CommunityPermissionResource';
 export type { CommunityVisibilityResource as CommunityVisibility } from '../../contexts/communities/infrastructure/http/resources/CommunityVisibilityResource';
-export type * from '../../contexts/conversations/domain/conversationResources.types';
+export type { ConversationResource } from '../../contexts/conversations/infrastructure/http/ConversationResource';
+export type { ConversationKeyEntry } from '../../contexts/identities/infrastructure/keychain/ConversationKeyEntry';
+export type { ConversationInvitationPayload } from '../../contexts/notifications/infrastructure/http/resources/ConversationInvitationPayload';
+export type { LoginResult } from '../../contexts/identities/infrastructure/http/resources/LoginResult';
 export type * from '../../contexts/identities/domain/identityResources.types';
 export type * from '../../contexts/messages/domain/messageResources.types';
 export type * from '../../contexts/networks/domain/networkResources.types';
-export type * from '../../contexts/notifications/domain/notificationResources.types';
+export type * from '../../contexts/notifications/infrastructure/http/notificationResources.types';
 export type * from '../../contexts/notifications/domain/notificationSettings.types';
 export type * from '../../contexts/polls/domain/pollResources.types';
 export type * from '../../contexts/stickers/domain/stickerResources.types';

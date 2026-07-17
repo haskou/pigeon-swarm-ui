@@ -51,6 +51,10 @@ class NumberValueObject {
     return this.value <= NumberValueObject.primitive(other);
   }
 
+  public isZero(): boolean {
+    return this.value === 0;
+  }
+
   public valueOf(): number {
     return this.value;
   }
@@ -277,6 +281,12 @@ class UUID extends StringValueObject {
   }
 }
 
+class ShortId extends StringValueObject {
+  public static generate(): ShortId {
+    return new ShortId(randomBytes(12).toString('hex'));
+  }
+}
+
 class CryptoAdapter {
   public static decryptAes256Gcm(
     key: Uint8Array,
@@ -409,6 +419,7 @@ export {
   PrivateKey,
   PublicKey,
   SHA256Hash,
+  ShortId,
   Signature,
   StringValueObject,
   SymmetricKey,

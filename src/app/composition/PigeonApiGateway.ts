@@ -81,7 +81,8 @@ import { PigeonCommunitiesApi } from '../../contexts/communities/infrastructure/
 import { PigeonCommunitiesGateway } from '../../contexts/communities/infrastructure/http/PigeonCommunitiesGateway';
 import { PigeonCommunityInvitationApi } from '../../contexts/communities/infrastructure/http/PigeonCommunityInvitationApi';
 import { ConversationIdFactory } from '../../contexts/conversations/domain/ConversationIdFactory';
-import { ConversationKeychain } from '../../contexts/conversations/domain/ConversationKeychain';
+import { ConversationNetworkId } from '../../contexts/conversations/domain/value-objects/ConversationNetworkId';
+import { ConversationParticipantId } from '../../contexts/conversations/domain/value-objects/ConversationParticipantId';
 import { ConversationMapper } from '../../contexts/conversations/infrastructure/http/ConversationMapper';
 import { PigeonConversationCommandsApi } from '../../contexts/conversations/infrastructure/http/PigeonConversationCommandsApi';
 import { PigeonConversationsApi } from '../../contexts/conversations/infrastructure/http/PigeonConversationsApi';
@@ -102,6 +103,7 @@ import { PigeonIdentityWorkspaceSessionApi } from '../../contexts/identities/inf
 import { PigeonKeychainApi } from '../../contexts/identities/infrastructure/http/PigeonKeychainApi';
 import { PigeonPresenceApi } from '../../contexts/identities/infrastructure/http/PigeonPresenceApi';
 import { PigeonPresenceGateway } from '../../contexts/identities/infrastructure/http/PigeonPresenceGateway';
+import { ConversationKeychain } from '../../contexts/identities/infrastructure/keychain/ConversationKeychain';
 import { MessageSignaturePayloadFactory } from '../../contexts/messages/domain/MessageSignaturePayloadFactory';
 import { DraftPayloadCipher } from '../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
 import { hasEncryptedPayload } from '../../contexts/messages/infrastructure/crypto/hasEncryptedPayload';
@@ -1264,7 +1266,13 @@ export class PigeonApiGateway {
     rightIdentityId: string,
     networkId: string,
   ): string {
-    return this.ids.create(leftIdentityId, rightIdentityId, networkId);
+    return this.ids
+      .create(
+        ConversationParticipantId.fromString(leftIdentityId),
+        ConversationParticipantId.fromString(rightIdentityId),
+        ConversationNetworkId.fromString(networkId),
+      )
+      .toString();
   }
 
   public async getIdentity(identityId: string): Promise<IdentityResource> {

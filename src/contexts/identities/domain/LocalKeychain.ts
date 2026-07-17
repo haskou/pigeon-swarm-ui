@@ -1,4 +1,4 @@
-import type { ConversationKeyEntry } from '../../conversations/domain/conversationResources.types';
+import type { ConversationKeyEntry } from '../infrastructure/keychain/ConversationKeyEntry';
 
 export type LocalKeychain = {
   conversations: Record<string, ConversationKeyEntry>;

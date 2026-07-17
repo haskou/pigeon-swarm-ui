@@ -38,8 +38,8 @@ src/
 | Context/module | Owns | Does not own | Integrates with | Boundary style |
 | --- | --- | --- | --- | --- |
 | identities | Identity, profile, presence, session key material | Conversation/community keys | conversations, communities | signed identity/keychain adapters |
-| conversations | participants, direct/group conversation key entries | Community channels | identities, messages | conversation-key and message ports |
-| messages | message lifecycle, replies, reactions, pins, drafts | channel membership | conversations, communities, attachments | command/query ports |
+| conversations | participants and direct/group lifecycle | Community channels | identities, messages | conversation repository and context-owned HTTP adapters |
+| messages | message lifecycle, replies, reactions, pins, drafts | channel membership | conversations, communities, attachments | message repositories and context-owned adapters |
 | communities | community membership, roles, channels, permissions | identity profile/session | identities, messages, polls | community adapters and policies |
 | attachments | public/private media and upload progress | message lifecycle | messages, networks | file/IPFS adapter ports |
 | calls | call lifecycle, participants, signaling, media state | presence persistence | identities, communities, conversations | WebRTC and signaling adapters |

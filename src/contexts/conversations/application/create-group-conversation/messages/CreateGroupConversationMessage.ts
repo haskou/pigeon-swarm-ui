@@ -1,21 +1,35 @@
-import type { CreateGroupConversationInput } from './CreateGroupConversationInput';
+import { Timestamp } from '@haskou/value-objects';
 
-export type { CreateGroupConversationInput } from './CreateGroupConversationInput';
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import { ConversationName } from '../../../domain/value-objects/ConversationName';
+import { ConversationNetworkId } from '../../../domain/value-objects/ConversationNetworkId';
+import { ConversationParticipantId } from '../../../domain/value-objects/ConversationParticipantId';
 
 export class CreateGroupConversationMessage {
   public constructor(
-    private readonly input: {
-      group: CreateGroupConversationInput;
-      session: Session;
-    },
+    private readonly name: string,
+    private readonly networkId: string,
+    private readonly participantIds: string[],
+    private readonly actorIdentityId: string,
+    private readonly occurredAt: number,
   ) {}
 
-  public getGroup(): CreateGroupConversationInput {
-    return this.input.group;
+  public getActorIdentityId(): ConversationParticipantId {
+    return ConversationParticipantId.fromString(this.actorIdentityId);
   }
 
-  public getSession(): Session {
-    return this.input.session;
+  public getName(): ConversationName {
+    return ConversationName.fromOptional(this.name);
+  }
+
+  public getNetworkId(): ConversationNetworkId {
+    return ConversationNetworkId.fromString(this.networkId);
+  }
+
+  public getParticipantIds(): ConversationParticipantId[] {
+    return this.participantIds.map(ConversationParticipantId.fromString);
+  }
+
+  public getOccurredAt(): Timestamp {
+    return new Timestamp(this.occurredAt);
   }
 }

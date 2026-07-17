@@ -14,7 +14,7 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { ConversationKeychain } from '../../../conversations/domain/ConversationKeychain';
+import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
 import { PollMessageProjection } from './PollMessageProjection';
 
 export class MessageProjector {

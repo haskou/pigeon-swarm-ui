@@ -32,6 +32,7 @@
     "vite": "^6.3.7"
   },
   "devDependencies": {
+    "@jest/globals": "^30.4.1",
     "@playwright/test": "^1.60.0",
     "@types/jest": "^30.0.0",
     "@types/react": "^19.2.7",
@@ -45,6 +46,7 @@
     "eslint-plugin-sonarjs": "^3.0.4",
     "eslint-plugin-unused-imports": "^4.1.4",
     "jest": "^30.4.2",
+    "jest-mock-extended": "^4.0.1",
     "prettier": "^3.8.3",
     "ts-jest": "^29.4.9"
   }

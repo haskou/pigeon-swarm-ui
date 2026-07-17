@@ -1,4 +1,6 @@
-import { DomainError, StringValueObject } from '@haskou/value-objects';
+import { StringValueObject, assert } from '@haskou/value-objects';
+
+import { ConversationParticipantIdRequiredError } from '../errors/ConversationParticipantIdRequiredError';
 
 export class ConversationParticipantId extends StringValueObject {
   private static normalize(value: string): string {
@@ -15,16 +17,21 @@ export class ConversationParticipantId extends StringValueObject {
   }
 
   public static fromString(value: string): ConversationParticipantId {
-    const normalizedValue = ConversationParticipantId.normalize(value);
-
-    if (!normalizedValue) {
-      throw new DomainError('Conversation participant id is required.');
-    }
-
-    return new ConversationParticipantId(normalizedValue);
+    return new ConversationParticipantId(
+      ConversationParticipantId.normalize(value),
+    );
   }
 
   private constructor(value: string) {
-    super(ConversationParticipantId.normalize(value));
+    super(value);
+    assert(!this.isEmpty(), new ConversationParticipantIdRequiredError());
+  }
+
+  public orderedWith(
+    participantId: ConversationParticipantId,
+  ): [ConversationParticipantId, ConversationParticipantId] {
+    return this.toString().localeCompare(participantId.toString()) <= 0
+      ? [this, participantId]
+      : [participantId, this];
   }
 }

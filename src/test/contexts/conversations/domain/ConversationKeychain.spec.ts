@@ -3,7 +3,7 @@ import type {
   LocalKeychain,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { ConversationKeychain } from '../../../../contexts/conversations/domain/ConversationKeychain';
+import { ConversationKeychain } from '../../../../contexts/identities/infrastructure/keychain/ConversationKeychain';
 
 const keychain = {
   conversations: {

@@ -14,7 +14,7 @@ import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { MessageAttachmentPublisher } from './MessageAttachmentPublisher';
 
 import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
-import { ConversationKeychain } from '../../../conversations/domain/ConversationKeychain';
+import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
 import { MessageLinkPreviews } from '../../domain/MessageLinkPreviews';
 import { MessageSignaturePayloadFactory } from '../../domain/MessageSignaturePayloadFactory';
 import { PigeonMessagesApi } from './PigeonMessagesApi';

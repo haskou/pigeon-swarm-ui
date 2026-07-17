@@ -20,7 +20,7 @@
 | Upstream | Downstream | Relationship | Contract | Translation/ACL | Notes |
 | --- | --- | --- | --- | --- | --- |
 | identities | conversations | customer/supplier | session identity and key material | keychain entry mapper | no identity DTO inside conversation domain |
-| conversations | messages | customer/supplier | conversation id and encryption key entry | message command message | messages do not mutate conversation membership |
+| conversations | messages | customer/supplier | conversation id and participant scope | message application message | messages do not mutate conversation membership or own identity keychain entries |
 | communities | messages | customer/supplier | channel permissions and community key | channel message command | community owns authorization |
 | messages | notifications | published language | mention/read state | notification preview mapper | notification does not decrypt messages |
 | networks | attachments | provider | private network id | upload adapter | attachments own file encryption |

@@ -35,4 +35,41 @@ describe(ConversationMapper.name, () => {
       ).peerIdentityId,
     ).toBe('peer-1');
   });
+
+  it('maps resources to the aggregate and back at the HTTP boundary', () => {
+    const mapper = new ConversationMapper();
+    const conversation = mapper.fromPrimitives({
+      id: 'group:a',
+      latestMessageAt: 100,
+      name: 'Friends',
+      networkId: 'network-a',
+      participantIds: ['identity-a', 'identity-b'],
+      type: 'group',
+      unreadCount: 2,
+    });
+
+    expect(mapper.toResource(conversation)).toMatchObject({
+      id: 'group:a',
+      participantIdentityIds: ['identity-a', 'identity-b'],
+      title: 'Friends',
+      type: 'group',
+      unreadCount: 2,
+    });
+  });
+
+  it('preserves an absent latest message timestamp', () => {
+    const mapper = new ConversationMapper();
+
+    expect(
+      mapper.toResource(
+        mapper.fromPrimitives({
+          id: 'group:empty',
+          name: 'Empty group',
+          networkId: 'network-a',
+          participantIds: ['identity-a', 'identity-b'],
+          type: 'group',
+        }),
+      ).latestMessageAt,
+    ).toBeUndefined();
+  });
 });

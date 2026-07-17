@@ -4,7 +4,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 import type { LoginIdentityPort } from './LoginIdentityPort';
 
-import { ConversationTimeline } from '../../../conversations/application/list-conversations/ConversationTimeline';
+import { ConversationTimeline } from '../../../conversations/presentation/view-models/ConversationTimeline';
 import { LoginIdentityMessage } from './messages/LoginIdentityMessage';
 
 export class LoginIdentity {

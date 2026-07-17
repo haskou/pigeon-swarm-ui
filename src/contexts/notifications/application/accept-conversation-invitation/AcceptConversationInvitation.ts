@@ -6,7 +6,7 @@ import type { UpdateNotificationPort } from '../update-notification/UpdateNotifi
 import type { ConversationInvitationKeychainPublisher } from './ConversationInvitationKeychainPublisher';
 import type { ConversationInvitationKeyDecryptor } from './ConversationInvitationKeyDecryptor';
 
-import { ConversationKeychain } from '../../../conversations/domain/ConversationKeychain';
+import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
 import { NotificationDecision } from '../../domain/NotificationDecision';
 import { NotificationId } from '../../domain/NotificationId';
 import { AcceptConversationInvitationMessage } from './messages/AcceptConversationInvitationMessage';
