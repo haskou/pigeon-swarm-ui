@@ -1,33 +1,9 @@
-import type { CallSession } from '../../../../../contexts/calls/domain/callSession.types';
+import type { CallSession } from '../../../../../contexts/calls/presentation/view-models/CallSession';
 
 import {
   callSessionSubtitle,
   callSessionTitle,
 } from '../../../../../contexts/calls/presentation/components/callSessionDisplay';
-
-describe('callSessionDisplay', () => {
-  it('uses community and channel names for community voice calls', () => {
-    const call = callSession({
-      kind: 'community-voice',
-      subtitle: 'Beta community',
-      title: 'voice chat',
-    });
-
-    expect(callSessionTitle(call)).toBe('Beta community');
-    expect(callSessionSubtitle(call)).toBe('voice chat');
-  });
-
-  it('keeps conversation titles for direct calls', () => {
-    const call = callSession({
-      kind: 'one-to-one',
-      subtitle: '@den',
-      title: 'Den',
-    });
-
-    expect(callSessionTitle(call)).toBe('Den');
-    expect(callSessionSubtitle(call)).toBe('@den');
-  });
-});
 
 function callSession(input: {
   kind: CallSession['kind'];
@@ -64,3 +40,27 @@ function callSession(input: {
     title: input.title,
   };
 }
+
+describe('callSessionDisplay', () => {
+  it('uses community and channel names for community voice calls', () => {
+    const call = callSession({
+      kind: 'community-voice',
+      subtitle: 'Beta community',
+      title: 'voice chat',
+    });
+
+    expect(callSessionTitle(call)).toBe('Beta community');
+    expect(callSessionSubtitle(call)).toBe('voice chat');
+  });
+
+  it('keeps conversation titles for direct calls', () => {
+    const call = callSession({
+      kind: 'one-to-one',
+      subtitle: '@den',
+      title: 'Den',
+    });
+
+    expect(callSessionTitle(call)).toBe('Den');
+    expect(callSessionSubtitle(call)).toBe('@den');
+  });
+});

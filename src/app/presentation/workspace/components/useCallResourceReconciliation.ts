@@ -6,12 +6,9 @@ import {
   type Dispatch,
   type SetStateAction,
 } from 'react';
-
-import type {
-  CallParticipant,
-  CallParticipantStatus,
-  CallResource,
-} from '../../../../contexts/calls/domain/callSession.types';
+import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
+import type { CallParticipantStatus } from '../../../../contexts/calls/infrastructure/http/resources/CallParticipantStatus';
+import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
 import type { Community } from '../../../../shared/domain/pigeonResources.types';
 import type { WorkspaceCallDetails } from './resolveWorkspaceCallDetails';
 import type { useCallSession } from '../../../../contexts/calls/presentation/hooks/useCallSession';
@@ -265,8 +262,7 @@ function projectCommunityVoicePresence(
         if (
           currentIdentityIds.length === connectedIdentityIds.length &&
           currentIdentityIds.every(
-            (identityId, index) =>
-              identityId === connectedIdentityIds[index],
+            (identityId, index) => identityId === connectedIdentityIds[index],
           )
         ) {
           return channel;

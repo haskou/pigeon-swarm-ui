@@ -1,4 +1,4 @@
-import type { CallSignalType } from '../../domain/callSession.types';
+import type { CallSignalType } from './CallSignalType';
 
 export type SignalSender = (
   recipientIdentityId: string,

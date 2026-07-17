@@ -5,8 +5,7 @@ import {
   type Dispatch,
   type SetStateAction,
 } from 'react';
-
-import type { CallResource } from '../../../../contexts/calls/domain/callSession.types';
+import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
 import type { useCallSession } from '../../../../contexts/calls/presentation/hooks/useCallSession';
 import type {
   Community,
@@ -72,7 +71,10 @@ export function useCallDeparture({
       const request =
         callDepartureAction(kind) === 'end'
           ? applicationContainer.calls.end(currentSession, callId)
-          : applicationContainer.calls.leave(currentSession, callId);
+          : applicationContainer.calls.leaveOnPageDeparture(
+              currentSession,
+              callId,
+            );
 
       void request.catch(() => undefined);
     };
@@ -173,9 +175,10 @@ export function useCallDeparture({
 
     if (!callId) return;
 
-    const request = callDepartureAction(activeCall?.kind) === 'end'
-      ? applicationContainer.calls.end(session, callId)
-      : applicationContainer.calls.leave(session, callId);
+    const request =
+      callDepartureAction(activeCall?.kind) === 'end'
+        ? applicationContainer.calls.end(session, callId)
+        : applicationContainer.calls.leave(session, callId);
 
     void request
       .then(async () => {

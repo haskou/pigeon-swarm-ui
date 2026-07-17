@@ -1,0 +1,31 @@
+import type { IdentityResource } from '../../../../shared/domain/pigeonResources.types';
+import type { CallParticipantMediaConnectionResource } from '../../infrastructure/http/resources/CallParticipantMediaConnectionResource';
+
+export type CallParticipant = {
+  audioLevel?: number;
+  bitrateKbps?: number;
+  codec?: string;
+  connectionPath?: 'direct' | 'relay' | 'unknown';
+  connectionState?: RTCPeerConnectionState;
+  connected?: boolean;
+  deafened?: boolean;
+  identity?: IdentityResource;
+  identityId: string;
+  iceState?: RTCIceConnectionState;
+  jitterMs?: number;
+  lastHeartbeatAt?: number;
+  latencyMs?: number;
+  mediaEncryptionActive?: boolean;
+  mediaConnections?: CallParticipantMediaConnectionResource[];
+  mediaStream?: MediaStream;
+  muted: boolean;
+  name: string;
+  packetsLost?: number;
+  picture?: null | string;
+  screenStream?: MediaStream;
+  screenSharing?: boolean;
+  speaking?: boolean;
+  status?: 'declined' | 'joined' | 'left' | 'missed' | 'ringing';
+  transport?: string;
+  videoEnabled?: boolean;
+};

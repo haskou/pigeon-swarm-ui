@@ -14,14 +14,12 @@ import {
 import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import type { Peer } from '../../../../contexts/networks/application/list-peers/ListPeers';
 import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
-import type {
-  CallMediaEncryptionUnavailableReason,
-  CallParticipant,
-  CallParticipantMediaConnection,
-  CallResource,
-  CallSignalType,
-  CallSession,
-} from '../../../../contexts/calls/domain/callSession.types';
+import type { CallMediaEncryptionUnavailableReason } from '../../../../contexts/calls/presentation/view-models/CallMediaEncryptionUnavailableReason';
+import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
+import type { CallParticipantMediaConnectionResource as CallParticipantMediaConnection } from '../../../../contexts/calls/infrastructure/http/resources/CallParticipantMediaConnectionResource';
+import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
+import type { CallSignalType } from '../../../../contexts/calls/infrastructure/media/CallSignalType';
+import type { CallSession } from '../../../../contexts/calls/presentation/view-models/CallSession';
 import type {
   ChatMessage,
   AttachmentProgress,
@@ -80,9 +78,7 @@ import {
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { useIdentityDirectory } from '../../../../contexts/identities/presentation/hooks/useIdentityDirectory';
-import {
-  useRealtimeEvents,
-} from '../../../../app/presentation/realtime/useRealtimeEvents';
+import { useRealtimeEvents } from '../../../../app/presentation/realtime/useRealtimeEvents';
 import { useUnreadMessages } from '../../../../contexts/messages/presentation/hooks/useUnreadMessages';
 import {
   deletePwaPushSubscription,
@@ -1077,9 +1073,7 @@ export function GlassWorkspace({
           return disabled('public-community');
         }
 
-        return enabled(
-          session.keychain.conversations[scope.communityId],
-        );
+        return enabled(session.keychain.conversations[scope.communityId]);
       }
 
       return enabled(

@@ -1,9 +1,6 @@
 import { useState } from 'react';
-
-import type {
-  CallParticipant,
-  CallSession,
-} from '../../domain/callSession.types';
+import type { CallParticipant } from '../view-models/CallParticipant';
+import type { CallSession } from '../view-models/CallSession';
 
 import { cx } from '../../../../shared/presentation/cx';
 import { copy } from '../../../../shared/presentation/i18n/copy';

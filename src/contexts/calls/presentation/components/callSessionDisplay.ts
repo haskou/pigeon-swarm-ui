@@ -1,4 +1,4 @@
-import type { CallSession } from '../../domain/callSession.types';
+import type { CallSession } from '../view-models/CallSession';
 
 export function callSessionTitle(call: CallSession): string {
   return call.kind === 'community-voice'

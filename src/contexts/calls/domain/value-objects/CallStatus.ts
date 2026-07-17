@@ -1,45 +1,47 @@
-import { StringValueObject, ValueNotInEnumError } from '@haskou/value-objects';
+import { Enum, ValueNotInEnumError } from '@haskou/value-objects';
 
-import type { CallResource } from '../callSession.types';
+export class CallStatus extends Enum<'active' | 'ended' | 'missed'> {
+  private static readonly values: Array<'active' | 'ended' | 'missed'> = [
+    'active',
+    'ended',
+    'missed',
+  ];
 
-export class CallStatus extends StringValueObject {
-  private static isValid(value: string): value is CallResource['status'] {
-    return value === 'active' || value === 'ended' || value === 'missed';
+  public static readonly ACTIVE = new CallStatus('active');
+  public static readonly ENDED = new CallStatus('ended');
+  public static readonly MISSED = new CallStatus('missed');
+
+  private static isStatus(
+    value: string,
+  ): value is 'active' | 'ended' | 'missed' {
+    return CallStatus.values.some((status) => status === value);
   }
 
-  public static active(): CallStatus {
-    return new CallStatus('active');
-  }
-
-  public static ended(): CallStatus {
-    return new CallStatus('ended');
-  }
-
-  public static fromPrimitive(value: string): CallStatus {
-    if (!CallStatus.isValid(value)) {
-      throw new ValueNotInEnumError(value, ['active', 'ended', 'missed']);
+  public static fromPrimitives(value: string): CallStatus {
+    if (!CallStatus.isStatus(value)) {
+      throw new ValueNotInEnumError(value, CallStatus.values);
     }
 
     return new CallStatus(value);
   }
 
-  public static missed(): CallStatus {
-    return new CallStatus('missed');
-  }
-
-  private constructor(value: CallResource['status']) {
+  private constructor(value: 'active' | 'ended' | 'missed') {
     super(value);
   }
 
+  public getValues(): Array<'active' | 'ended' | 'missed'> {
+    return CallStatus.values;
+  }
+
   public isActive(): boolean {
-    return this.isEqual(CallStatus.active());
+    return this.isEqual(CallStatus.ACTIVE);
   }
 
   public isEnded(): boolean {
-    return this.isEqual(CallStatus.ended());
+    return this.isEqual(CallStatus.ENDED);
   }
 
   public isMissed(): boolean {
-    return this.isEqual(CallStatus.missed());
+    return this.isEqual(CallStatus.MISSED);
   }
 }

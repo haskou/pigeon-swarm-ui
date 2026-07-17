@@ -1,7 +1,5 @@
-import type {
-  CallResource,
-  CallSession,
-} from '../../../../../contexts/calls/domain/callSession.types';
+import type { CallResource } from '../../../../../contexts/calls/infrastructure/http/resources/CallResource';
+import type { CallSession } from '../../../../../contexts/calls/presentation/view-models/CallSession';
 import type {
   Community,
   IdentityResource,

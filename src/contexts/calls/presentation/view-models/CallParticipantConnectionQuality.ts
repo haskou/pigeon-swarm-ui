@@ -1,7 +1,5 @@
-import type {
-  CallParticipant,
-  CallSession,
-} from '../../domain/callSession.types';
+import type { CallParticipant } from './CallParticipant';
+import type { CallSession } from './CallSession';
 
 export type CallParticipantConnectionQuality =
   | 'connecting'

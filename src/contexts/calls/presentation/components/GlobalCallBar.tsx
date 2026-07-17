@@ -1,7 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-
-import type { CallSession } from '../../domain/callSession.types';
+import type { CallSession } from '../view-models/CallSession';
 
 import {
   dialingCallSoundUrl,

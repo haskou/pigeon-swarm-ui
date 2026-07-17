@@ -7,8 +7,7 @@ import {
   useRef,
   useState,
 } from 'react';
-
-import type { CallSession } from '../../../../contexts/calls/domain/callSession.types';
+import type { CallSession } from '../../../../contexts/calls/presentation/view-models/CallSession';
 import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import type {
   Community,

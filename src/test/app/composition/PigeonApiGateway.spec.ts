@@ -1,7 +1,7 @@
 import { EncryptedPayload, KeyPair, SymmetricKey } from '@haskou/value-objects';
 
 import type { PendingMessageAttachment } from '../../../contexts/attachments/infrastructure/crypto/resources/PendingMessageAttachment';
-import type { CallResource } from '../../../contexts/calls/domain/callSession.types';
+import type { CallResource } from '../../../contexts/calls/infrastructure/http/resources/CallResource';
 import type {
   ConversationKeyEntry,
   IdentityResource,
@@ -765,6 +765,7 @@ describe(PigeonApiGateway.name, () => {
         protocol: 'udp',
         remoteIdentityId: 'identity-2',
         state: 'connected' as const,
+        usesRelay: true,
       },
     ];
 

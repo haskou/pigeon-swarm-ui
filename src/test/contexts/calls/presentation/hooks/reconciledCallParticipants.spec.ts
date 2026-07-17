@@ -1,9 +1,22 @@
-import type {
-  CallParticipant,
-  CallResource,
-} from '../../../../../contexts/calls/domain/callSession.types';
+import type { CallResource } from '../../../../../contexts/calls/infrastructure/http/resources/CallResource';
+import type { CallParticipant } from '../../../../../contexts/calls/presentation/view-models/CallParticipant';
 
 import { reconciledCallParticipants } from '../../../../../contexts/calls/presentation/hooks/reconciledCallParticipants';
+
+function callResource(
+  participant: CallResource['participants'][number],
+): CallResource {
+  return {
+    createdAt: 1,
+    creatorIdentityId: 'alice',
+    id: 'call-1',
+    networkId: 'network-1',
+    participantIds: ['alice', participant.identityId],
+    participants: [participant],
+    scope: { conversationId: 'conversation-1', type: 'conversation' },
+    status: 'active',
+  };
+}
 
 describe(reconciledCallParticipants.name, () => {
   it('preserves browser media state while applying resource status', () => {
@@ -63,18 +76,3 @@ describe(reconciledCallParticipants.name, () => {
     ]);
   });
 });
-
-function callResource(
-  participant: CallResource['participants'][number],
-): CallResource {
-  return {
-    createdAt: 1,
-    creatorIdentityId: 'alice',
-    id: 'call-1',
-    networkId: 'network-1',
-    participantIds: ['alice', participant.identityId],
-    participants: [participant],
-    scope: { conversationId: 'conversation-1', type: 'conversation' },
-    status: 'active',
-  };
-}

@@ -1,4 +1,4 @@
-import type { ScreenShareQualityPreset } from '../../domain/callSession.types';
+import type { ScreenShareQualityPreset } from './ScreenShareQualityPreset';
 
 type ScreenShareQualityProfile = {
   frameRate?: number;

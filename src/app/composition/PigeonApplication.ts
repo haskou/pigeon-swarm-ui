@@ -1,8 +1,19 @@
-import type { ListCallsMessage } from '../../contexts/calls/application/list-calls/messages/ListCallsMessage';
 import type { ListCommunitiesMessage } from '../../contexts/communities/application/list-communities/messages/ListCommunitiesMessage';
 import type { ListStickerPacksMessage } from '../../contexts/stickers/application/list-sticker-packs/messages/ListStickerPacksMessage';
 
-import { PigeonCallsApplication } from '../../contexts/calls/application/PigeonCallsApplication';
+import { CallEnder } from '../../contexts/calls/application/end-call/CallEnder';
+import { CallFinder } from '../../contexts/calls/application/find-call/CallFinder';
+import { CallParticipantHeartbeater } from '../../contexts/calls/application/heartbeat-participant/CallParticipantHeartbeater';
+import { CallJoiner } from '../../contexts/calls/application/join-call/CallJoiner';
+import { CallLeaver } from '../../contexts/calls/application/leave-call/CallLeaver';
+import { CallsSearcher } from '../../contexts/calls/application/search-calls/CallsSearcher';
+import { CallSignalSender } from '../../contexts/calls/application/send-call-signal/CallSignalSender';
+import { CommunityChannelCallStarter } from '../../contexts/calls/application/start-community-channel-call/CommunityChannelCallStarter';
+import { ConversationCallStarter } from '../../contexts/calls/application/start-conversation-call/ConversationCallStarter';
+import { CallAccessContexts } from '../../contexts/calls/infrastructure/http/CallAccessContexts';
+import { CallMapper } from '../../contexts/calls/infrastructure/http/CallMapper';
+import { PigeonCallRepository } from '../../contexts/calls/infrastructure/http/PigeonCallRepository';
+import { PigeonCallSignalRepository } from '../../contexts/calls/infrastructure/http/PigeonCallSignalRepository';
 import { PigeonCommunitiesApplication } from '../../contexts/communities/application/PigeonCommunitiesApplication';
 import { PigeonConversationsApplication } from '../../contexts/conversations/application/PigeonConversationsApplication';
 import { PigeonIdentitiesApplication } from '../../contexts/identities/application/PigeonIdentitiesApplication';
@@ -14,14 +25,20 @@ import { PigeonConversationInvitationKeyDecryptor } from '../../contexts/notific
 import { PigeonPollsApplication } from '../../contexts/polls/application/PigeonPollsApplication';
 import { PigeonStickersApplication } from '../../contexts/stickers/application/PigeonStickersApplication';
 import { RealtimeGateway } from '../../shared/infrastructure/realtime/RealtimeGateway';
+import { CallSessionRegistrar } from './calls/CallSessionRegistrar';
+import { PigeonCallParticipation } from './calls/PigeonCallParticipation';
+import { PigeonCallReader } from './calls/PigeonCallReader';
+import { PigeonCallSignaling } from './calls/PigeonCallSignaling';
+import { PigeonCallStarter } from './calls/PigeonCallStarter';
 import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonAttachmentsFacade } from './PigeonAttachmentsFacade';
+import { PigeonCallsFacade } from './PigeonCallsFacade';
 import { PigeonRealtimeApplication } from './PigeonRealtimeApplication';
 
 export class PigeonApplication {
   public readonly attachments: PigeonAttachmentsFacade;
 
-  public readonly calls: PigeonCallsApplication;
+  public readonly calls: PigeonCallsFacade;
 
   public readonly communities: PigeonCommunitiesApplication;
 
@@ -48,21 +65,44 @@ export class PigeonApplication {
     realtime: RealtimeGateway = new RealtimeGateway(),
   ) {
     this.attachments = new PigeonAttachmentsFacade(gateway.filesGateway);
-    this.calls = new PigeonCallsApplication({
-      endCall: gateway.calls,
-      getCall: gateway.calls,
-      getIceServers: gateway.calls,
-      heartbeatParticipant: gateway.calls,
-      joinCall: gateway.calls,
-      leaveCall: gateway.calls,
-      listCalls: {
-        list: async (message: ListCallsMessage) =>
-          await gateway.calls.list(message.getSession()),
-      },
-      sendCallSignal: gateway.calls,
-      startCommunityChannelCall: gateway.calls,
-      startConversationCall: gateway.calls,
-    });
+    const callContexts = new CallAccessContexts();
+    const callMapper = new CallMapper();
+    const callRepository = new PigeonCallRepository(
+      gateway.calls,
+      callContexts,
+      callMapper,
+    );
+    const callSessions = new CallSessionRegistrar(callContexts);
+    this.calls = new PigeonCallsFacade(
+      new PigeonCallReader(
+        callSessions,
+        callMapper,
+        gateway.calls,
+        new CallFinder(callRepository),
+        new CallsSearcher(callRepository),
+      ),
+      new PigeonCallStarter(
+        callSessions,
+        callMapper,
+        new ConversationCallStarter(callRepository),
+        new CommunityChannelCallStarter(callRepository),
+      ),
+      new PigeonCallParticipation(
+        gateway.calls,
+        callSessions,
+        callMapper,
+        new CallJoiner(callRepository),
+        new CallLeaver(callRepository),
+        new CallParticipantHeartbeater(callRepository),
+        new CallEnder(callRepository),
+      ),
+      new PigeonCallSignaling(
+        callSessions,
+        new CallSignalSender(
+          new PigeonCallSignalRepository(gateway.calls, callContexts),
+        ),
+      ),
+    );
     this.communities = new PigeonCommunitiesApplication({
       channelDrafts: gateway.communityGateway,
       channelMessages: gateway.communityGateway,

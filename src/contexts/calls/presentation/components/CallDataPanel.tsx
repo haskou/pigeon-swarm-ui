@@ -1,4 +1,4 @@
-import type { CallSession } from '../../domain/callSession.types';
+import type { CallSession } from '../view-models/CallSession';
 
 import { JsonDataViewer } from '../../../../shared/presentation/components/JsonDataViewer';
 import { copy } from '../../../../shared/presentation/i18n/copy';

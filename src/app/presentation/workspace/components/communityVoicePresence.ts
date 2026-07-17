@@ -1,7 +1,5 @@
-import type {
-  CallResource,
-  CallResourceParticipant,
-} from '../../../../contexts/calls/domain/callSession.types';
+import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
+import type { CallResourceParticipant } from '../../../../contexts/calls/infrastructure/http/resources/CallResourceParticipant';
 import type { Community } from '../../../../shared/domain/pigeonResources.types';
 
 const keySeparator = '\u0000';

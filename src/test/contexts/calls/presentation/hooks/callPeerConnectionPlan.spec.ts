@@ -1,4 +1,4 @@
-import type { CallResource } from '../../../../../contexts/calls/domain/callSession.types';
+import type { CallResource } from '../../../../../contexts/calls/infrastructure/http/resources/CallResource';
 
 import {
   joinedRemotePeerIdentityIds,
@@ -7,6 +7,43 @@ import {
   signalingRemotePeerIdentityIds,
   shouldCreateInitialOffer,
 } from '../../../../../contexts/calls/presentation/hooks/callPeerConnectionPlan';
+
+function callResource({
+  currentIdentityId,
+  remoteIdentityId,
+}: {
+  currentIdentityId: string;
+  remoteIdentityId: string;
+}): CallResource {
+  return {
+    createdAt: 1_780_000_000_000,
+    creatorIdentityId: currentIdentityId,
+    id: 'call-1',
+    networkId: 'network-1',
+    participantIds: [currentIdentityId, remoteIdentityId],
+    participants: [
+      {
+        connected: true,
+        identityId: currentIdentityId,
+        joinedAt: 1_780_000_000_000,
+        mediaConnections: [],
+        status: 'joined',
+      },
+      {
+        connected: true,
+        identityId: remoteIdentityId,
+        joinedAt: 1_780_000_000_001,
+        mediaConnections: [],
+        status: 'joined',
+      },
+    ],
+    scope: {
+      conversationId: 'one-to-one:alice:bob',
+      type: 'conversation',
+    },
+    status: 'active',
+  };
+}
 
 describe('callPeerConnectionPlan', () => {
   it('uses connected participants from the call resource even when UI participants are not hydrated yet', () => {
@@ -136,40 +173,3 @@ describe('callPeerConnectionPlan', () => {
     expect(shouldCreateInitialOffer('bob', 'alice')).toBe(false);
   });
 });
-
-function callResource({
-  currentIdentityId,
-  remoteIdentityId,
-}: {
-  currentIdentityId: string;
-  remoteIdentityId: string;
-}): CallResource {
-  return {
-    createdAt: 1_780_000_000_000,
-    creatorIdentityId: currentIdentityId,
-    id: 'call-1',
-    networkId: 'network-1',
-    participantIds: [currentIdentityId, remoteIdentityId],
-    participants: [
-      {
-        connected: true,
-        identityId: currentIdentityId,
-        joinedAt: 1_780_000_000_000,
-        mediaConnections: [],
-        status: 'joined',
-      },
-      {
-        connected: true,
-        identityId: remoteIdentityId,
-        joinedAt: 1_780_000_000_001,
-        mediaConnections: [],
-        status: 'joined',
-      },
-    ],
-    scope: {
-      conversationId: 'one-to-one:alice:bob',
-      type: 'conversation',
-    },
-    status: 'active',
-  };
-}

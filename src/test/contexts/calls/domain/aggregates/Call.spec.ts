@@ -1,60 +1,82 @@
 import { Timestamp } from '@haskou/value-objects';
 
-import type { CallResource } from '../../../../../contexts/calls/domain/callSession.types';
-
-import { Call } from '../../../../../contexts/calls/domain/aggregates/Call';
+import { Call } from '../../../../../contexts/calls/domain/Call';
 import { CallIdentityId } from '../../../../../contexts/calls/domain/value-objects/CallIdentityId';
+import { CallParticipantStatus } from '../../../../../contexts/calls/domain/value-objects/CallParticipantStatus';
 
-const callResource = (overrides: Partial<CallResource> = {}): CallResource => ({
-  createdAt: 100,
-  creatorIdentityId: 'identity-a',
-  id: 'call-a',
-  networkId: 'network-a',
-  participantIds: ['identity-a', 'identity-b'],
-  participants: [
-    {
-      connected: true,
-      identityId: 'identity-a',
-      mediaConnections: [],
-      status: 'joined',
-    },
-    {
-      connected: false,
-      identityId: 'identity-b',
-      mediaConnections: [],
-      status: 'ringing',
-    },
-  ],
-  scope: { conversationId: 'conversation-a', type: 'conversation' },
-  status: 'active',
-  ...overrides,
-});
+const identityA = CallIdentityId.fromString('identity-a');
+const identityB = CallIdentityId.fromString('identity-b');
 
-describe('Call', () => {
-  it('joins a ringing participant through the call aggregate', () => {
-    const call = Call.fromResource(callResource());
-    const participantId = CallIdentityId.fromString('identity-b');
-
-    call.joinParticipant(participantId, new Timestamp(200));
-
-    expect(call.hasParticipantStatus(participantId, 'joined')).toBe(true);
-    expect(
-      call
-        .toResource()
-        .participants.find(
-          (participant) => participant.identityId === 'identity-b',
-        )?.connected,
-    ).toBe(false);
-    expect(call.pullDomainEvents()).toHaveLength(1);
+const activeCall = (): Call =>
+  Call.fromPrimitives({
+    createdAt: 100,
+    creatorIdentityId: 'identity-a',
+    endedAt: undefined,
+    id: 'call-a',
+    networkId: 'network-a',
+    participantIds: ['identity-a', 'identity-b'],
+    participants: [
+      {
+        connected: true,
+        identityId: 'identity-a',
+        mediaConnections: [],
+        status: 'joined',
+      },
+      {
+        connected: false,
+        identityId: 'identity-b',
+        mediaConnections: [],
+        status: 'ringing',
+      },
+    ],
+    scope: { conversationId: 'conversation-a', type: 'conversation' },
+    status: 'active',
   });
 
-  it('ends an active call once', () => {
-    const call = Call.fromResource(callResource());
+describe(Call.name, () => {
+  it('joins a ringing participant and records the transition', () => {
+    const call = activeCall();
+
+    call.joinParticipant(identityB, new Timestamp(200));
+
+    expect(
+      call.hasParticipantStatus(identityB, CallParticipantStatus.JOINED),
+    ).toBe(true);
+    expect(call.pullDomainEvents()).toEqual([
+      {
+        aggregateId: 'call-a',
+        occurredAt: 200,
+        type: 'CallParticipantJoined',
+      },
+    ]);
+  });
+
+  it('ends an active call only once', () => {
+    const call = activeCall();
 
     call.end(new Timestamp(250));
     call.end(new Timestamp(300));
 
-    expect(call.toResource().status).toBe('ended');
+    expect(call.toPrimitives().status).toBe('ended');
+    expect(call.toPrimitives().endedAt).toBe(250);
     expect(call.pullDomainEvents()).toHaveLength(1);
+  });
+
+  it('updates participant presence through the aggregate', () => {
+    const call = activeCall();
+
+    call.heartbeatParticipant(identityA, new Timestamp(400), []);
+    call.leaveParticipant(identityA, new Timestamp(500));
+
+    const participant = call
+      .toPrimitives()
+      .participants.find(({ identityId }) => identityId === 'identity-a');
+
+    expect(participant).toMatchObject({
+      connected: false,
+      lastHeartbeatAt: 400,
+      leftAt: 500,
+      status: 'left',
+    });
   });
 });

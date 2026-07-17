@@ -1,13 +1,11 @@
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
-import type {
-  CallIceServerConfig,
-  CallParticipantMediaConnection,
-  CallResource,
-  CallSignalDelivery,
-  CallSignalPayload,
-} from '../../domain/callSession.types';
+import type { CallSignalPayload } from '../media/CallSignalPayload';
+import type { CallIceServerResource as CallIceServerConfig } from './resources/CallIceServerResource';
+import type { CallParticipantMediaConnectionResource as CallParticipantMediaConnection } from './resources/CallParticipantMediaConnectionResource';
+import type { CallResource } from './resources/CallResource';
+import type { CallSignalDeliveryResource as CallSignalDelivery } from './resources/CallSignalDeliveryResource';
 
 import { CallSignalRequestBody } from './CallSignalRequestBody';
 
