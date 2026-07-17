@@ -7,8 +7,8 @@ import type {
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
-import { IdentitySignaturePayloadFactory } from '../../../../../contexts/identities/domain/IdentitySignaturePayloadFactory';
 import { PigeonIdentityKeyProtectionGateway } from '../../../../../contexts/identities/infrastructure/crypto/PigeonIdentityKeyProtectionGateway';
+import { IdentitySignaturePayloadFactory } from '../../../../../contexts/identities/infrastructure/http/IdentitySignaturePayloadFactory';
 import { PigeonIdentityCommandsApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityCommandsApi';
 import { PigeonIdentityGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityGateway';
 

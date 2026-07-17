@@ -1,6 +1,6 @@
-import type { IdentityResource } from '../../../../shared/domain/pigeonResources.types';
+import type { IdentityResource } from '../../../../../shared/domain/pigeonResources.types';
 
-import { IdentitySignaturePayloadFactory } from '../../../../contexts/identities/domain/IdentitySignaturePayloadFactory';
+import { IdentitySignaturePayloadFactory } from '../../../../../contexts/identities/infrastructure/http/IdentitySignaturePayloadFactory';
 
 describe(IdentitySignaturePayloadFactory.name, () => {
   it('builds the canonical initial identity payload', () => {
