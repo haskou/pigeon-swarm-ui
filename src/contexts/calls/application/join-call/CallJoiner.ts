@@ -4,14 +4,17 @@ import type { CallRepository } from '../../domain/repositories/CallRepository';
 import { JoinCallMessage } from './messages/JoinCallMessage';
 
 export class CallJoiner {
-  public constructor(private readonly calls: CallRepository) {}
+  public constructor(private readonly callRepository: CallRepository) {}
 
   public async join(message: JoinCallMessage): Promise<Call> {
     const actorIdentityId = message.getActorIdentityId();
-    const call = await this.calls.find(message.getCallId(), actorIdentityId);
+    const call = await this.callRepository.find(
+      message.getCallId(),
+      actorIdentityId,
+    );
 
     call.joinParticipant(actorIdentityId, message.getOccurredAt());
 
-    return await this.calls.join(call, actorIdentityId);
+    return await this.callRepository.join(call, actorIdentityId);
   }
 }

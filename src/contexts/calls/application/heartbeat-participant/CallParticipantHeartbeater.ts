@@ -4,13 +4,16 @@ import type { CallRepository } from '../../domain/repositories/CallRepository';
 import { HeartbeatCallParticipantMessage } from './messages/HeartbeatCallParticipantMessage';
 
 export class CallParticipantHeartbeater {
-  public constructor(private readonly calls: CallRepository) {}
+  public constructor(private readonly callRepository: CallRepository) {}
 
   public async heartbeat(
     message: HeartbeatCallParticipantMessage,
   ): Promise<Call> {
     const actorIdentityId = message.getActorIdentityId();
-    const call = await this.calls.find(message.getCallId(), actorIdentityId);
+    const call = await this.callRepository.find(
+      message.getCallId(),
+      actorIdentityId,
+    );
     const mediaConnections = message.getMediaConnections();
 
     call.heartbeatParticipant(
@@ -19,6 +22,10 @@ export class CallParticipantHeartbeater {
       mediaConnections,
     );
 
-    return await this.calls.heartbeat(call, actorIdentityId, mediaConnections);
+    return await this.callRepository.heartbeat(
+      call,
+      actorIdentityId,
+      mediaConnections,
+    );
   }
 }

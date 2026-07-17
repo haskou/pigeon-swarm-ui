@@ -4,10 +4,10 @@ import type { CallRepository } from '../../domain/repositories/CallRepository';
 import { FindCallMessage } from './messages/FindCallMessage';
 
 export class CallFinder {
-  public constructor(private readonly calls: CallRepository) {}
+  public constructor(private readonly callRepository: CallRepository) {}
 
   public async find(message: FindCallMessage): Promise<Call> {
-    return await this.calls.find(
+    return await this.callRepository.find(
       message.getCallId(),
       message.getActorIdentityId(),
     );
