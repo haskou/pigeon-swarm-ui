@@ -1,5 +1,4 @@
-import type { CommunityMembershipRequest } from './CommunityMembershipRequest';
-import type { CommunityVisibility } from './CommunityVisibility';
+import type { CommunityMembershipRequestResource } from './CommunityMembershipRequestResource';
 
 export type CommunityDiscoveryResource = {
   autoJoinEnabled?: boolean;
@@ -9,10 +8,10 @@ export type CommunityDiscoveryResource = {
   discoverable?: boolean;
   id: string;
   memberCount: number;
-  membershipRequest?: CommunityMembershipRequest;
+  membershipRequest?: CommunityMembershipRequestResource;
   membershipStatus: 'invited' | 'member' | 'none' | 'requested';
   name: string;
   networkId: string;
   ownerIdentityId: string;
-  visibility: CommunityVisibility;
+  visibility: 'private' | 'public';
 };

@@ -1,6 +1,6 @@
-import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../../../shared/domain/pigeonResources.types';
 
-import { CommunityMentionHighlightPolicy } from '../../../../contexts/communities/domain/CommunityMentionHighlightPolicy';
+import { CommunityMentionHighlightPolicy } from '../../../../../contexts/communities/presentation/view-models/CommunityMentionHighlightPolicy';
 
 const message = (overrides: Partial<ChatMessage> = {}): ChatMessage => ({
   attachments: [],

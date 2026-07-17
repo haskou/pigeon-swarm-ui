@@ -3,7 +3,7 @@ import type {
   CommunityChannel,
   CommunityTextChannel,
   CommunityVoiceChannel,
-} from '../../../shared/domain/pigeonResources.types';
+} from '../../../../shared/domain/pigeonResources.types';
 
 export class CommunityChannelCollection {
   private static mergeCurrentChannelsWithPreferredOrder({

@@ -1,4 +1,4 @@
-import type { CommunityDiscoveryResource } from '../../domain/CommunityDiscoveryResource';
+import type { CommunityDiscoveryResource } from '../../application/resources/CommunityDiscoveryResource';
 
 export function communityDiscoveryCanAutoJoin(
   community: CommunityDiscoveryResource,

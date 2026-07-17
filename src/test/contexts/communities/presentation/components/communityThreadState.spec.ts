@@ -9,6 +9,42 @@ import {
   visibleCommunityThreadSummaries,
 } from '../../../../../contexts/communities/presentation/components/communityThreadState';
 
+function communityThreadSummary(
+  rootMessageId: string,
+  input: Partial<CommunityChannelThreadSummary> = {},
+): CommunityChannelThreadSummary {
+  return {
+    lastReplyAt: input.lastReplyAt ?? 1,
+    lastReplyMessageId: input.lastReplyMessageId ?? `${rootMessageId}:reply`,
+    replyCount: input.replyCount ?? 1,
+    rootMessageId,
+  };
+}
+
+function chatMessage(input: {
+  id: string;
+  replyToMessageId?: string;
+  threadRootMessageId?: string;
+}): ChatMessage {
+  return {
+    attachments: [],
+    authorIdentityId: 'identity-1',
+    content: input.id,
+    encrypted: false,
+    id: input.id,
+    mine: false,
+    raw: {
+      id: input.id,
+      replyToMessageId: input.replyToMessageId,
+      type: 'sent',
+    },
+    reactions: [],
+    replyToMessageId: input.replyToMessageId,
+    threadRootMessageId: input.threadRootMessageId,
+    timestamp: 1,
+  };
+}
+
 describe(visibleCommunityThreadSummaries.name, () => {
   it('keeps thread summaries whose root was not rejected', () => {
     const thread = communityThreadSummary('root-message');
@@ -92,39 +128,3 @@ describe(hiddenCommunityThreadSummaryKeysFromMessages.name, () => {
     ).toEqual([]);
   });
 });
-
-function communityThreadSummary(
-  rootMessageId: string,
-  input: Partial<CommunityChannelThreadSummary> = {},
-): CommunityChannelThreadSummary {
-  return {
-    lastReplyAt: input.lastReplyAt ?? 1,
-    lastReplyMessageId: input.lastReplyMessageId ?? `${rootMessageId}:reply`,
-    replyCount: input.replyCount ?? 1,
-    rootMessageId,
-  };
-}
-
-function chatMessage(input: {
-  id: string;
-  replyToMessageId?: string;
-  threadRootMessageId?: string;
-}): ChatMessage {
-  return {
-    attachments: [],
-    authorIdentityId: 'identity-1',
-    content: input.id,
-    encrypted: false,
-    id: input.id,
-    mine: false,
-    raw: {
-      id: input.id,
-      replyToMessageId: input.replyToMessageId,
-      type: 'sent',
-    },
-    reactions: [],
-    replyToMessageId: input.replyToMessageId,
-    threadRootMessageId: input.threadRootMessageId,
-    timestamp: 1,
-  };
-}

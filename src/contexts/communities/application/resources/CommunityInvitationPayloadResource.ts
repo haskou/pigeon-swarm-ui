@@ -1,4 +1,4 @@
-export type CommunityInvitationPayload = {
+export type CommunityInvitationPayloadResource = {
   communityId: string;
   encryptedCommunityKey: string;
   inviterIdentityId: string;

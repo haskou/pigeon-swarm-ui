@@ -1,7 +1,7 @@
-import type { CommunityModerationAction } from './CommunityModerationAction';
-import type { CommunityModerationTargetType } from './CommunityModerationTargetType';
+import type { CommunityModerationAction } from '../../domain/CommunityModerationAction';
+import type { CommunityModerationTargetType } from '../../domain/CommunityModerationTargetType';
 
-export type CommunityModerationLog = {
+export type CommunityModerationLogResource = {
   action: CommunityModerationAction;
   actorIdentityId: string;
   communityId: string;

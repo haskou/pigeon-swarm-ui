@@ -1,4 +1,4 @@
-export type CommunityChannelThreadSummary = {
+export type CommunityChannelThreadSummaryResource = {
   lastReplyAt: number;
   lastReplyMessageId: string;
   replyCount: number;

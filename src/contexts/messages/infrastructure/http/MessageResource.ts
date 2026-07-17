@@ -1,4 +1,4 @@
-import type { CommunityMessageMention } from '../../../communities/domain/communityResources.types';
+import type { CommunityMessageMention } from '../../../communities/application/communityResources.types';
 import type {
   PollOption,
   PollResource,

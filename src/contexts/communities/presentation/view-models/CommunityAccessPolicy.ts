@@ -4,7 +4,7 @@ import type {
   CommunityChannel,
   CommunityPermission,
   CommunityRoleResource,
-} from '../../../shared/domain/pigeonResources.types';
+} from '../../../../shared/domain/pigeonResources.types';
 
 export const ALL_COMMUNITY_PERMISSIONS: CommunityPermission[] = [
   'view_channels',

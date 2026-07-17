@@ -52,8 +52,8 @@ import { MessageCollectionDialog } from '../../../messages/presentation/componen
 import { MessageThreadPanel } from '../../../messages/presentation/components/MessageThreadPanel';
 import { TypingIndicator } from '../../../messages/presentation/components/TypingIndicator';
 import { NotificationSettingsPolicy } from '../../../notifications/domain/NotificationSettingsPolicy';
-import { CommunityAccessPolicy } from '../../domain/CommunityAccessPolicy';
-import { CommunityChannels } from '../../domain/CommunityChannels';
+import { CommunityAccessPolicy } from '../view-models/CommunityAccessPolicy';
+import { CommunityChannels } from '../view-models/CommunityChannels';
 import { CommunityMessageDecryptWorkerClient } from '../../infrastructure/crypto/CommunityMessageDecryptWorkerClient';
 import { CommunityHeader } from './CommunityHeader';
 import { CommunityHeaderActionsMenu } from './CommunityHeaderActionsMenu';

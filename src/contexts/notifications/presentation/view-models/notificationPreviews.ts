@@ -8,7 +8,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
-import { CommunityChannels } from '../../../communities/domain/CommunityChannels';
+import { CommunityChannels } from '../../../communities/presentation/view-models/CommunityChannels';
 import { ConversationPeer } from '../../../conversations/presentation/view-models/ConversationPeer';
 import { identityDisplayName } from '../../../identities/presentation/view-models/identityDisplay';
 

@@ -1,4 +1,4 @@
-import type { ChatMessage } from '../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
 
 export class CommunityMentionHighlightPolicy {
   public static mentionsIdentity(

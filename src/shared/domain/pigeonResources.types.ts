@@ -1,5 +1,5 @@
 export type * from '../../contexts/attachments/application/contracts/attachmentResources.types';
-export type * from '../../contexts/communities/domain/communityResources.types';
+export type * from '../../contexts/communities/application/communityResources.types';
 export type * from '../../contexts/conversations/domain/conversationResources.types';
 export type * from '../../contexts/identities/domain/identityResources.types';
 export type * from '../../contexts/messages/domain/messageResources.types';

@@ -1,4 +1,4 @@
-export type CommunityPermission =
+export type CommunityPermissionPrimitive =
   | 'approve_members'
   | 'attach_files'
   | 'ban_members'

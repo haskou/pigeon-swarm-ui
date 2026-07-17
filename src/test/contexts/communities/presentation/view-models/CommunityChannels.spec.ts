@@ -2,9 +2,9 @@ import type {
   Community,
   CommunityTextChannel,
   CommunityVoiceChannel,
-} from '../../../../shared/domain/pigeonResources.types';
+} from '../../../../../shared/domain/pigeonResources.types';
 
-import { CommunityChannels } from '../../../../contexts/communities/domain/CommunityChannels';
+import { CommunityChannels } from '../../../../../contexts/communities/presentation/view-models/CommunityChannels';
 
 const textChannel = (
   overrides: Partial<CommunityTextChannel> = {},
