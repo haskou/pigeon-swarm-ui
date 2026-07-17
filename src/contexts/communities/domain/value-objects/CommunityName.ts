@@ -1,4 +1,6 @@
-import { DomainError, StringValueObject } from '@haskou/value-objects';
+import { StringValueObject, assert } from '@haskou/value-objects';
+
+import { CommunityNameRequiredError } from '../errors/CommunityNameRequiredError';
 
 export class CommunityName extends StringValueObject {
   public static readonly MAX_LENGTH = 80;
@@ -6,9 +8,7 @@ export class CommunityName extends StringValueObject {
   public static fromString(value: string): CommunityName {
     const trimmedValue = value.trim();
 
-    if (!trimmedValue) {
-      throw new DomainError('Community name is required.');
-    }
+    assert(trimmedValue.length > 0, new CommunityNameRequiredError());
 
     return new CommunityName(trimmedValue);
   }

@@ -1,4 +1,6 @@
-import { DomainError, StringValueObject } from '@haskou/value-objects';
+import { StringValueObject, assert } from '@haskou/value-objects';
+
+import { CommunityIdentityIdRequiredError } from '../errors/CommunityIdentityIdRequiredError';
 
 export class CommunityIdentityId extends StringValueObject {
   private static normalize(value: string): string {
@@ -17,9 +19,7 @@ export class CommunityIdentityId extends StringValueObject {
   public static fromString(value: string): CommunityIdentityId {
     const normalizedValue = CommunityIdentityId.normalize(value);
 
-    if (!normalizedValue) {
-      throw new DomainError('Community identity id is required.');
-    }
+    assert(normalizedValue.length > 0, new CommunityIdentityIdRequiredError());
 
     return new CommunityIdentityId(normalizedValue);
   }

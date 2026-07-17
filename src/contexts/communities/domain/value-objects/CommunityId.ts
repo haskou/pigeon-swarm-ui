@@ -1,12 +1,12 @@
-import { DomainError, StringValueObject } from '@haskou/value-objects';
+import { StringValueObject, assert } from '@haskou/value-objects';
+
+import { CommunityIdRequiredError } from '../errors/CommunityIdRequiredError';
 
 export class CommunityId extends StringValueObject {
   public static fromString(value: string): CommunityId {
     const trimmedValue = value.trim();
 
-    if (!trimmedValue) {
-      throw new DomainError('Community id is required.');
-    }
+    assert(trimmedValue.length > 0, new CommunityIdRequiredError());
 
     return new CommunityId(trimmedValue);
   }
