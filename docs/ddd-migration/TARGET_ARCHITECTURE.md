@@ -55,7 +55,7 @@ src/
 | Identity | profile, network memberships, keychain reference | stable identity id; profile constraints | identity/keychain HTTP adapter | identity updated |
 | Conversation | participants and key-entry relationship | participant membership and deterministic scope | conversation adapter | conversation created/invited |
 | Message | content, reply/thread relation, reaction lifecycle | author-only edit/delete; thread root consistency | message adapter | sent, edited, deleted, reacted |
-| Community | membership, roles, channel configuration | permission and role transitions | community adapter | member/channel/role changes |
+| Community | membership, roles, channel configuration | permission and role transitions | `CommunityRepository` | member/channel/role changes |
 | Call | scope, participants and lifecycle | valid joins/leaves/signals | calls adapter | started, joined, ended |
 | Poll | options, votes and state | open/closed vote rules | poll adapter | created, voted, closed |
 
@@ -64,7 +64,7 @@ src/
 | Use case/workflow | Message/command/query | Inputs | Result | Contracts touched |
 | --- | --- | --- | --- | --- |
 | Send message | `SendMessageMessage` | content, attachments, reply/thread relation | projected message | encrypted message REST/event |
-| Create community | `CreateCommunityMessage` | profile, visibility, channels | community and keychain update | community REST/keychain |
+| Create community | `CreateCommunityInput` composition workflow | profile, visibility, channels | community and keychain update | community REST/keychain |
 | Update membership | membership command | actor, community, member, decision | community update | community REST/event |
 | Unlock identity | `LoginIdentityMessage` | identity id and local unlock proof | authenticated session | identity/keychain REST |
 | Configure node | relay configuration message | public host, ports, relay policy | node configuration | node REST |
@@ -73,7 +73,7 @@ src/
 
 | Adapter/repository/gateway | Domain/application port | External system or persistence model | Mapping strategy |
 | --- | --- | --- | --- |
-| `<context>/infrastructure/http/*` | context query/command ports | signed backend REST | DTO to context resource/aggregate mapper |
+| `<context>/infrastructure/http/*` | domain repositories or explicit query contracts | signed backend REST | DTO to context resource/aggregate mapper |
 | `<context>/infrastructure/crypto/*` | encryption/key ports | Web Crypto and value objects | encrypted payload/envelope mapper |
 | `shared/infrastructure/http/*` | generic transport | fetch, URL, HTTP signature | no context semantics |
 | `app/composition/*` | concrete construction only | browser application bootstrap | dependency wiring only |
@@ -90,6 +90,10 @@ Keep current application façades while a context adapter moves. Migrate all
 callers in the same capability slice, then delete the compatibility façade.
 External REST/websocket payloads remain stable unless their contract is explicitly
 changed and documented.
+
+For `COMMUNITY-001`, channel timelines, drafts, pins, discovery, and moderation
+logs remain explicit query-side resources. They are not hydrated into the
+`Community` aggregate merely because their HTTP paths are community-scoped.
 
 ## Migration order
 
