@@ -4,12 +4,14 @@ import type { CallSignalRepository } from '../../domain/repositories/CallSignalR
 import { SendCallSignalMessage } from './messages/SendCallSignalMessage';
 
 export class CallSignalSender {
-  public constructor(private readonly repository: CallSignalRepository) {}
+  public constructor(
+    private readonly callSignalRepository: CallSignalRepository,
+  ) {}
 
   public async send(
     message: SendCallSignalMessage,
   ): Promise<CallSignalDelivery> {
-    return await this.repository.create(
+    return await this.callSignalRepository.create(
       message.getCallId(),
       message.getActorIdentityId(),
       message.getSignal(),

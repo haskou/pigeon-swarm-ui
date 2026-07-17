@@ -4,9 +4,9 @@ import type { CallRepository } from '../../domain/repositories/CallRepository';
 import { SearchCallsMessage } from './messages/SearchCallsMessage';
 
 export class CallsSearcher {
-  public constructor(private readonly calls: CallRepository) {}
+  public constructor(private readonly callRepository: CallRepository) {}
 
   public async search(message: SearchCallsMessage): Promise<Call[]> {
-    return await this.calls.search(message.getActorIdentityId());
+    return await this.callRepository.search(message.getActorIdentityId());
   }
 }
