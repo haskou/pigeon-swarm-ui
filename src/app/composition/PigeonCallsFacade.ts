@@ -50,6 +50,13 @@ export class PigeonCallsFacade {
     await this.participation.leave(session, callId);
   }
 
+  public async leaveOnPageDeparture(
+    session: Session,
+    callId: string,
+  ): Promise<void> {
+    await this.participation.leaveOnPageDeparture(session, callId);
+  }
+
   public async list(session: Session): Promise<CallResource[]> {
     return await this.reader.search(session);
   }

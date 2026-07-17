@@ -88,6 +88,7 @@ export class PigeonApplication {
         new CommunityChannelCallStarter(callRepository),
       ),
       new PigeonCallParticipation(
+        gateway.calls,
         callSessions,
         callMapper,
         new CallJoiner(callRepository),

@@ -11,10 +11,12 @@ import { JoinCallMessage } from '../../../contexts/calls/application/join-call/m
 import { CallLeaver } from '../../../contexts/calls/application/leave-call/CallLeaver';
 import { LeaveCallMessage } from '../../../contexts/calls/application/leave-call/messages/LeaveCallMessage';
 import { CallMapper } from '../../../contexts/calls/infrastructure/http/CallMapper';
+import { PigeonCallsApi } from '../../../contexts/calls/infrastructure/http/PigeonCallsApi';
 import { CallSessionRegistrar } from './CallSessionRegistrar';
 
 export class PigeonCallParticipation {
   public constructor(
+    private readonly api: PigeonCallsApi,
     private readonly sessions: CallSessionRegistrar,
     private readonly mapper: CallMapper,
     private readonly joiner: CallJoiner,
@@ -58,5 +60,12 @@ export class PigeonCallParticipation {
     await this.leaver.leave(
       new LeaveCallMessage(callId, this.sessions.register(session), Date.now()),
     );
+  }
+
+  public async leaveOnPageDeparture(
+    session: Session,
+    callId: string,
+  ): Promise<void> {
+    await this.api.leave(session, callId);
   }
 }
