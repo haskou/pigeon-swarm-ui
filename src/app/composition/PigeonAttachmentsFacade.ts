@@ -6,7 +6,7 @@ import type {
   PublicFileUpload,
 } from '../../contexts/attachments/infrastructure/attachmentResources.types';
 import type { PigeonFilesGateway } from '../../contexts/attachments/infrastructure/http/PigeonFilesGateway';
-import type { Session } from '../../contexts/identities/domain/Session';
+import type { Session } from '../../shared/domain/pigeonResources.types';
 
 export class PigeonAttachmentsFacade {
   public constructor(
