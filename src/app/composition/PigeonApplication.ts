@@ -2,7 +2,6 @@ import type { ListCallsMessage } from '../../contexts/calls/application/list-cal
 import type { ListCommunitiesMessage } from '../../contexts/communities/application/list-communities/messages/ListCommunitiesMessage';
 import type { ListStickerPacksMessage } from '../../contexts/stickers/application/list-sticker-packs/messages/ListStickerPacksMessage';
 
-import { PigeonFilesGateway } from '../../contexts/attachments/infrastructure/http/PigeonFilesGateway';
 import { PigeonCallsApplication } from '../../contexts/calls/application/PigeonCallsApplication';
 import { PigeonCommunitiesApplication } from '../../contexts/communities/application/PigeonCommunitiesApplication';
 import { PigeonConversationsApplication } from '../../contexts/conversations/application/PigeonConversationsApplication';
@@ -16,10 +15,11 @@ import { PigeonPollsApplication } from '../../contexts/polls/application/PigeonP
 import { PigeonStickersApplication } from '../../contexts/stickers/application/PigeonStickersApplication';
 import { RealtimeGateway } from '../../shared/infrastructure/realtime/RealtimeGateway';
 import { PigeonApiGateway } from './PigeonApiGateway';
+import { PigeonAttachmentsFacade } from './PigeonAttachmentsFacade';
 import { PigeonRealtimeApplication } from './PigeonRealtimeApplication';
 
 export class PigeonApplication {
-  public readonly attachments: PigeonFilesGateway;
+  public readonly attachments: PigeonAttachmentsFacade;
 
   public readonly calls: PigeonCallsApplication;
 
@@ -47,7 +47,7 @@ export class PigeonApplication {
     gateway: PigeonApiGateway = new PigeonApiGateway(),
     realtime: RealtimeGateway = new RealtimeGateway(),
   ) {
-    this.attachments = gateway.filesGateway;
+    this.attachments = new PigeonAttachmentsFacade(gateway.filesGateway);
     this.calls = new PigeonCallsApplication({
       endCall: gateway.calls,
       getCall: gateway.calls,

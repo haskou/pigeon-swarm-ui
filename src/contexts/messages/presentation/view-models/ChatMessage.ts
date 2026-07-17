@@ -1,13 +1,13 @@
 import type {
   AttachmentProgress,
   MessageAttachment,
-} from '../../../attachments/infrastructure/attachmentResources.types';
+} from '../../../attachments/application/attachmentResources.types';
 import type { CommunityMessageMention } from '../../../communities/domain/communityResources.types';
 import type { PollResource } from '../../../polls/domain/pollResources.types';
 import type { StickerMessageReference } from '../../../stickers/domain/stickerResources.types';
 import type { MessageLinkPreview } from '../../domain/MessageLinkPreview';
-import type { MessageReaction } from '../../infrastructure/http/MessageReaction';
 import type { MessageReplyPreview } from '../../domain/MessageReplyPreview';
+import type { MessageReaction } from '../../infrastructure/http/MessageReaction';
 import type { MessageResource } from '../../infrastructure/http/MessageResource';
 
 export type ChatMessage = {

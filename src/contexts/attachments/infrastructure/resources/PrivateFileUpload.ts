@@ -1,5 +1,1 @@
-import type { PublicFileUpload } from './PublicFileUpload';
-
-export type PrivateFileUpload = PublicFileUpload & {
-  encrypted: true;
-};
+export type { PrivateFileUpload } from '../../application/resources/PrivateFileUpload';

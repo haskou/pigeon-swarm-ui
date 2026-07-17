@@ -1,5 +1,1 @@
-export type AttachmentProgress = {
-  filename: string;
-  percent: number;
-  phase: 'decrypt' | 'download' | 'encrypt' | 'upload';
-};
+export type { AttachmentProgress } from '../../application/resources/AttachmentProgress';
