@@ -1,16 +1,16 @@
 import type { Community } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { LeaveCommunityResult } from '../create-community/LeaveCommunityResult';
-import type { CommunityKeychainPort } from '../publish-community-keychain/CommunityKeychainPort';
-import type { LeaveCommunityPort } from './LeaveCommunityPort';
-import type { LeaveCommunityMessage } from './messages/LeaveCommunityMessage';
 
+import { PigeonCommunitiesGateway } from '../../../../contexts/communities/infrastructure/http/PigeonCommunitiesGateway';
+import { ConversationKeychain as ConversationKeychainService } from '../../../../contexts/conversations/domain/ConversationKeychain';
+import { PigeonIdentitiesGateway } from '../../../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
-import { ConversationKeychain as ConversationKeychainService } from '../../../conversations/domain/ConversationKeychain';
 
 export class LeaveCommunity {
   public constructor(
-    private readonly membership: LeaveCommunityPort,
-    private readonly keychain: CommunityKeychainPort,
+    private readonly communities: PigeonCommunitiesGateway,
+    private readonly identities: PigeonIdentitiesGateway,
   ) {}
 
   private isAlreadyApplied(caught: unknown): boolean {
@@ -22,19 +22,18 @@ export class LeaveCommunity {
   }
 
   public async leave(
-    message: LeaveCommunityMessage,
+    session: Session,
+    communityId: string,
   ): Promise<LeaveCommunityResult> {
-    const session = message.getSession();
-    const communityId = message.getCommunityId();
     let community: Community | null = null;
 
     try {
-      community = await this.membership.leaveCommunity(session, communityId);
+      community = await this.communities.leaveCommunity(session, communityId);
     } catch (caught) {
       if (!this.isAlreadyApplied(caught)) throw caught;
     }
 
-    const published = await this.keychain.publishKeychain(
+    const published = await this.identities.publishKeychain(
       session,
       ConversationKeychainService.withoutCommunityEntry(
         session.keychain,

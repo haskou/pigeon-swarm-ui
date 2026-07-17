@@ -1,4 +1,3 @@
-import type { ListCommunitiesMessage } from '../../contexts/communities/application/list-communities/messages/ListCommunitiesMessage';
 import type { ListStickerPacksMessage } from '../../contexts/stickers/application/list-sticker-packs/messages/ListStickerPacksMessage';
 
 import { CallEnder } from '../../contexts/calls/application/end-call/CallEnder';
@@ -14,6 +13,22 @@ import { CallAccessContexts } from '../../contexts/calls/infrastructure/http/Cal
 import { CallMapper } from '../../contexts/calls/infrastructure/http/CallMapper';
 import { PigeonCallRepository } from '../../contexts/calls/infrastructure/http/PigeonCallRepository';
 import { PigeonCallSignalRepository } from '../../contexts/calls/infrastructure/http/PigeonCallSignalRepository';
+import { CommunityMemberRolesAssigner } from '../../contexts/communities/application/assign-community-member-roles/CommunityMemberRolesAssigner';
+import { CommunityMemberBanner } from '../../contexts/communities/application/ban-community-member/CommunityMemberBanner';
+import { CommunityChannelCreator } from '../../contexts/communities/application/create-community-channel/CommunityChannelCreator';
+import { CommunityRoleCreator } from '../../contexts/communities/application/create-community-role/CommunityRoleCreator';
+import { CommunityFinder } from '../../contexts/communities/application/find-community/CommunityFinder';
+import { CommunityMemberKicker } from '../../contexts/communities/application/kick-community-member/CommunityMemberKicker';
+import { CommunityChannelRemover } from '../../contexts/communities/application/remove-community-channel/CommunityChannelRemover';
+import { CommunityRoleRemover } from '../../contexts/communities/application/remove-community-role/CommunityRoleRemover';
+import { CommunityChannelRenamer } from '../../contexts/communities/application/rename-community-channel/CommunityChannelRenamer';
+import { CommunitiesSearcher } from '../../contexts/communities/application/search-communities/CommunitiesSearcher';
+import { CommunityMemberUnbanner } from '../../contexts/communities/application/unban-community-member/CommunityMemberUnbanner';
+import { CommunityChannelPermissionsUpdater } from '../../contexts/communities/application/update-community-channel-permissions/CommunityChannelPermissionsUpdater';
+import { CommunityRoleUpdater } from '../../contexts/communities/application/update-community-role/CommunityRoleUpdater';
+import { CommunityAccessContexts } from '../../contexts/communities/infrastructure/http/CommunityAccessContexts';
+import { CommunityMapper } from '../../contexts/communities/infrastructure/http/CommunityMapper';
+import { PigeonCommunityRepository } from '../../contexts/communities/infrastructure/http/PigeonCommunityRepository';
 import { PigeonConversationsApplication } from '../../contexts/conversations/application/PigeonConversationsApplication';
 import { PigeonIdentitiesApplication } from '../../contexts/identities/application/PigeonIdentitiesApplication';
 import { PigeonSessionApplication } from '../../contexts/identities/application/PigeonSessionApplication';
@@ -29,6 +44,7 @@ import { PigeonCallParticipation } from './calls/PigeonCallParticipation';
 import { PigeonCallReader } from './calls/PigeonCallReader';
 import { PigeonCallSignaling } from './calls/PigeonCallSignaling';
 import { PigeonCallStarter } from './calls/PigeonCallStarter';
+import { PigeonCommunityManagement } from './communities/PigeonCommunityManagement';
 import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonAttachmentsFacade } from './PigeonAttachmentsFacade';
 import { PigeonCallsFacade } from './PigeonCallsFacade';
@@ -103,33 +119,34 @@ export class PigeonApplication {
         ),
       ),
     );
-    this.communities = new PigeonCommunitiesFacade({
-      channelDrafts: gateway.communityGateway,
-      channelMessages: gateway.communityGateway,
-      channelPins: gateway.communityGateway,
-      channelReads: gateway.communityGateway,
-      channels: gateway.communityGateway,
-      communityCreator: gateway.communityGateway,
-      communityDiscoverer: gateway.communityGateway,
-      communityGetter: gateway.communityGateway,
-      communityInvitationCreator: gateway.communityGateway,
-      communityInviteLinkAcceptor: gateway.communityGateway,
-      communityInviteLinkAcceptorWithKey: gateway.communityGateway,
-      communityInviteLinkCreator: gateway.communityGateway,
-      communityInviteLinkGetter: gateway.communityGateway,
-      communityUpdater: gateway.communityGateway,
-      keychain: gateway,
-      leaveCommunity: gateway.communityGateway,
-      listCommunities: {
-        list: async (message: ListCommunitiesMessage) =>
-          await gateway.communityGateway.listCommunities(message.getSession()),
-      },
-      media: gateway.communityGateway,
-      members: gateway.communityGateway,
-      membershipRequests: gateway.communityGateway,
-      moderationLogs: gateway.communityGateway,
-      roles: gateway.communityGateway,
-    });
+    const communityContexts = new CommunityAccessContexts();
+    const communityMapper = new CommunityMapper();
+    const communityRepository = new PigeonCommunityRepository(
+      gateway.communityGateway,
+      communityContexts,
+      communityMapper,
+    );
+    this.communities = new PigeonCommunitiesFacade(
+      gateway.communityGateway,
+      gateway.identityGateway,
+      new PigeonCommunityManagement(communityContexts, communityMapper, {
+        assigner: new CommunityMemberRolesAssigner(communityRepository),
+        banner: new CommunityMemberBanner(communityRepository),
+        channelCreator: new CommunityChannelCreator(communityRepository),
+        channelRemover: new CommunityChannelRemover(communityRepository),
+        channelRenamer: new CommunityChannelRenamer(communityRepository),
+        finder: new CommunityFinder(communityRepository),
+        kicker: new CommunityMemberKicker(communityRepository),
+        permissionsUpdater: new CommunityChannelPermissionsUpdater(
+          communityRepository,
+        ),
+        roleCreator: new CommunityRoleCreator(communityRepository),
+        roleRemover: new CommunityRoleRemover(communityRepository),
+        roleUpdater: new CommunityRoleUpdater(communityRepository),
+        searcher: new CommunitiesSearcher(communityRepository),
+        unbanner: new CommunityMemberUnbanner(communityRepository),
+      }),
+    );
     this.conversations = new PigeonConversationsApplication({
       createConversation: gateway.conversationsGateway,
       createGroupConversation: gateway.conversationsGateway,

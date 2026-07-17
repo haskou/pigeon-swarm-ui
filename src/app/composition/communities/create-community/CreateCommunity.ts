@@ -7,21 +7,17 @@ import type {
   ConversationKeyEntry,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { ManageCommunityChannelsPort } from '../manage-community-channels/ManageCommunityChannelsPort';
-import type { CommunityKeychainPort } from '../publish-community-keychain/CommunityKeychainPort';
-import type { CommunityMediaPort } from '../upload-community-media/CommunityMediaPort';
 import type { CommunityImageCids } from './CommunityImageCids';
 import type { CreateCommunityInput } from './CreateCommunityInput';
-import type { CreateCommunityPort } from './CreateCommunityPort';
 import type { CreateCommunityResult } from './CreateCommunityResult';
-import type { CreateCommunityMessage } from './messages/CreateCommunityMessage';
+
+import { PigeonCommunitiesGateway } from '../../../../contexts/communities/infrastructure/http/PigeonCommunitiesGateway';
+import { PigeonIdentitiesGateway } from '../../../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
 
 export class CreateCommunity {
   public constructor(
-    private readonly communityCreator: CreateCommunityPort,
-    private readonly channels: ManageCommunityChannelsPort,
-    private readonly keychain: CommunityKeychainPort,
-    private readonly media: CommunityMediaPort,
+    private readonly communities: PigeonCommunitiesGateway,
+    private readonly identities: PigeonIdentitiesGateway,
   ) {}
 
   private async uploadImages(
@@ -29,10 +25,10 @@ export class CreateCommunity {
     input: CreateCommunityInput,
   ): Promise<CommunityImageCids> {
     const avatarCid = input.avatar
-      ? (await this.media.uploadPublicFile(session, input.avatar)).cid
+      ? (await this.communities.uploadPublicFile(session, input.avatar)).cid
       : undefined;
     const bannerCid = input.banner
-      ? (await this.media.uploadPublicFile(session, input.banner)).cid
+      ? (await this.communities.uploadPublicFile(session, input.banner)).cid
       : undefined;
 
     return {
@@ -46,7 +42,7 @@ export class CreateCommunity {
     input: CreateCommunityInput,
     images: CommunityImageCids,
   ): Promise<Community> {
-    return await this.communityCreator.createCommunity(session, {
+    return await this.communities.createCommunity(session, {
       autoJoinEnabled: input.autoJoinEnabled,
       ...(images.avatarCid ? { avatar: images.avatarCid } : {}),
       ...(images.bannerCid ? { banner: images.bannerCid } : {}),
@@ -72,7 +68,7 @@ export class CreateCommunity {
     for (const input of inputs ?? []) {
       if (input.type === 'voice') {
         voiceChannels.push(
-          await this.channels.createCommunityVoiceChannel(
+          await this.communities.createCommunityVoiceChannel(
             session,
             communityId,
             input.name,
@@ -82,7 +78,7 @@ export class CreateCommunity {
       }
 
       textChannels.push(
-        await this.channels.createCommunityTextChannel(
+        await this.communities.createCommunityTextChannel(
           session,
           communityId,
           input.name,
@@ -129,10 +125,9 @@ export class CreateCommunity {
   }
 
   public async create(
-    message: CreateCommunityMessage,
+    session: Session,
+    input: CreateCommunityInput,
   ): Promise<CreateCommunityResult> {
-    const session = message.getSession();
-    const input = message.getInput();
     const images = await this.uploadImages(session, input);
     const community = await this.createResource(session, input, images);
 
@@ -151,7 +146,7 @@ export class CreateCommunity {
     }
 
     const keyEntry = this.createCommunityKeyEntry(community.id);
-    const published = await this.keychain.publishKeychain(session, {
+    const published = await this.identities.publishKeychain(session, {
       ...session.keychain,
       conversations: {
         ...session.keychain.conversations,

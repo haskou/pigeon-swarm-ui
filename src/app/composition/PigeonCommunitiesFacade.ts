@@ -1,28 +1,3 @@
-import type { AcceptCommunityInviteLinkWithKeyPort } from '../../contexts/communities/application/accept-community-invite-link-with-key/AcceptCommunityInviteLinkWithKeyPort';
-import type { AcceptCommunityInviteLinkPort } from '../../contexts/communities/application/accept-community-invite-link/AcceptCommunityInviteLinkPort';
-import type { CreateCommunityInvitationPort } from '../../contexts/communities/application/create-community-invitation/CreateCommunityInvitationPort';
-import type { CreateCommunityInviteLinkPort } from '../../contexts/communities/application/create-community-invite-link/CreateCommunityInviteLinkPort';
-import type { CreateCommunityInput } from '../../contexts/communities/application/create-community/CreateCommunityInput';
-import type { CreateCommunityPort } from '../../contexts/communities/application/create-community/CreateCommunityPort';
-import type { CreateCommunityResult } from '../../contexts/communities/application/create-community/CreateCommunityResult';
-import type { LeaveCommunityResult } from '../../contexts/communities/application/create-community/LeaveCommunityResult';
-import type { DiscoverCommunitiesPort } from '../../contexts/communities/application/discover-communities/DiscoverCommunitiesPort';
-import type { GetCommunityInviteLinkPort } from '../../contexts/communities/application/get-community-invite-link/GetCommunityInviteLinkPort';
-import type { GetCommunityPort } from '../../contexts/communities/application/get-community/GetCommunityPort';
-import type { LeaveCommunityPort } from '../../contexts/communities/application/leave-community/LeaveCommunityPort';
-import type { ListCommunitiesPort } from '../../contexts/communities/application/list-communities/ListCommunitiesPort';
-import type { ListCommunityModerationLogsPort } from '../../contexts/communities/application/list-community-moderation-logs/ListCommunityModerationLogsPort';
-import type { ManageCommunityChannelDraftsPort } from '../../contexts/communities/application/manage-community-channel-drafts/ManageCommunityChannelDraftsPort';
-import type { ManageCommunityChannelMessagesPort } from '../../contexts/communities/application/manage-community-channel-messages/ManageCommunityChannelMessagesPort';
-import type { ManageCommunityChannelPinsPort } from '../../contexts/communities/application/manage-community-channel-pins/ManageCommunityChannelPinsPort';
-import type { ManageCommunityChannelsPort } from '../../contexts/communities/application/manage-community-channels/ManageCommunityChannelsPort';
-import type { ManageCommunityMembersPort } from '../../contexts/communities/application/manage-community-members/ManageCommunityMembersPort';
-import type { ManageCommunityMembershipRequestsPort } from '../../contexts/communities/application/manage-community-membership-requests/ManageCommunityMembershipRequestsPort';
-import type { ManageCommunityRolesPort } from '../../contexts/communities/application/manage-community-roles/ManageCommunityRolesPort';
-import type { CommunityKeychainPort } from '../../contexts/communities/application/publish-community-keychain/CommunityKeychainPort';
-import type { ReadCommunityChannelMessagesPort } from '../../contexts/communities/application/read-community-channel-messages/ReadCommunityChannelMessagesPort';
-import type { UpdateCommunityPort } from '../../contexts/communities/application/update-community/UpdateCommunityPort';
-import type { CommunityMediaPort } from '../../contexts/communities/application/upload-community-media/CommunityMediaPort';
 import type { CommunityChannelMessageEditInput } from '../../contexts/communities/infrastructure/http/CommunityChannelMessageEditInput';
 import type { CommunityChannelMessageInput } from '../../contexts/communities/infrastructure/http/CommunityChannelMessageInput';
 import type {
@@ -44,115 +19,88 @@ import type {
   MessageResource,
   Session,
 } from '../../shared/domain/pigeonResources.types';
+import type { CreateCommunityInput } from './communities/create-community/CreateCommunityInput';
+import type { CreateCommunityResult } from './communities/create-community/CreateCommunityResult';
+import type { LeaveCommunityResult } from './communities/create-community/LeaveCommunityResult';
 
-import { CreateCommunity } from '../../contexts/communities/application/create-community/CreateCommunity';
-import { CreateCommunityMessage } from '../../contexts/communities/application/create-community/messages/CreateCommunityMessage';
-import { LeaveCommunity } from '../../contexts/communities/application/leave-community/LeaveCommunity';
-import { LeaveCommunityMessage } from '../../contexts/communities/application/leave-community/messages/LeaveCommunityMessage';
-import { ListCommunities } from '../../contexts/communities/application/list-communities/ListCommunities';
-import { ListCommunitiesMessage } from '../../contexts/communities/application/list-communities/messages/ListCommunitiesMessage';
+import { PigeonCommunitiesGateway } from '../../contexts/communities/infrastructure/http/PigeonCommunitiesGateway';
+import { PigeonIdentitiesGateway } from '../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
+import { CreateCommunity } from './communities/create-community/CreateCommunity';
+import { LeaveCommunity } from './communities/leave-community/LeaveCommunity';
+import { PigeonCommunityManagement } from './communities/PigeonCommunityManagement';
 
 export class PigeonCommunitiesFacade {
-  private readonly channelDrafts: ManageCommunityChannelDraftsPort;
+  private readonly channelDrafts: PigeonCommunitiesGateway;
 
-  private readonly channelMessages: ManageCommunityChannelMessagesPort;
+  private readonly channelMessages: PigeonCommunitiesGateway;
 
-  private readonly channelPins: ManageCommunityChannelPinsPort;
+  private readonly channelPins: PigeonCommunitiesGateway;
 
-  private readonly channels: ManageCommunityChannelsPort;
+  private readonly channels: PigeonCommunitiesGateway;
 
-  private readonly channelReads: ReadCommunityChannelMessagesPort;
+  private readonly channelReads: PigeonCommunitiesGateway;
 
   private readonly createCommunityUseCase: CreateCommunity;
 
-  private readonly communityDiscoverer: DiscoverCommunitiesPort;
+  private readonly communityDiscoverer: PigeonCommunitiesGateway;
 
-  private readonly communityGetter: GetCommunityPort;
+  private readonly communityGetter: PigeonCommunitiesGateway;
 
-  private readonly communityUpdater: UpdateCommunityPort;
+  private readonly communityUpdater: PigeonCommunitiesGateway;
 
-  private readonly communityInvitationCreator: CreateCommunityInvitationPort;
+  private readonly communityInvitationCreator: PigeonCommunitiesGateway;
 
-  private readonly communityInviteLinkAcceptor: AcceptCommunityInviteLinkPort;
+  private readonly communityInviteLinkAcceptor: PigeonCommunitiesGateway;
 
-  private readonly inviteWithKey: AcceptCommunityInviteLinkWithKeyPort;
+  private readonly inviteWithKey: PigeonCommunitiesGateway;
 
-  private readonly communityInviteLinkCreator: CreateCommunityInviteLinkPort;
+  private readonly communityInviteLinkCreator: PigeonCommunitiesGateway;
 
-  private readonly communityInviteLinkGetter: GetCommunityInviteLinkPort;
+  private readonly communityInviteLinkGetter: PigeonCommunitiesGateway;
 
-  private readonly keychain: CommunityKeychainPort;
-
-  private readonly listCommunitiesUseCase: ListCommunities;
+  private readonly keychain: PigeonIdentitiesGateway;
 
   private readonly leaveCommunityUseCase: LeaveCommunity;
 
-  private readonly media: CommunityMediaPort;
+  private readonly media: PigeonCommunitiesGateway;
 
-  private readonly moderationLogs: ListCommunityModerationLogsPort;
+  private readonly management: PigeonCommunityManagement;
 
-  private readonly members: ManageCommunityMembersPort;
+  private readonly moderationLogs: PigeonCommunitiesGateway;
 
-  private readonly membershipRequests: ManageCommunityMembershipRequestsPort;
+  private readonly members: PigeonCommunitiesGateway;
 
-  private readonly roles: ManageCommunityRolesPort;
+  private readonly membershipRequests: PigeonCommunitiesGateway;
 
-  public constructor(dependencies: {
-    channelDrafts: ManageCommunityChannelDraftsPort;
-    channelMessages: ManageCommunityChannelMessagesPort;
-    channelPins: ManageCommunityChannelPinsPort;
-    channels: ManageCommunityChannelsPort;
-    channelReads: ReadCommunityChannelMessagesPort;
-    communityCreator: CreateCommunityPort;
-    communityDiscoverer: DiscoverCommunitiesPort;
-    communityGetter: GetCommunityPort;
-    communityUpdater: UpdateCommunityPort;
-    communityInvitationCreator: CreateCommunityInvitationPort;
-    communityInviteLinkAcceptor: AcceptCommunityInviteLinkPort;
-    communityInviteLinkAcceptorWithKey: AcceptCommunityInviteLinkWithKeyPort;
-    communityInviteLinkCreator: CreateCommunityInviteLinkPort;
-    communityInviteLinkGetter: GetCommunityInviteLinkPort;
-    keychain: CommunityKeychainPort;
-    leaveCommunity: LeaveCommunityPort;
-    listCommunities: ListCommunitiesPort;
-    media: CommunityMediaPort;
-    members: ManageCommunityMembersPort;
-    membershipRequests: ManageCommunityMembershipRequestsPort;
-    moderationLogs: ListCommunityModerationLogsPort;
-    roles: ManageCommunityRolesPort;
-  }) {
-    this.channelDrafts = dependencies.channelDrafts;
-    this.channelMessages = dependencies.channelMessages;
-    this.channelPins = dependencies.channelPins;
-    this.channels = dependencies.channels;
-    this.channelReads = dependencies.channelReads;
-    this.createCommunityUseCase = new CreateCommunity(
-      dependencies.communityCreator,
-      dependencies.channels,
-      dependencies.keychain,
-      dependencies.media,
-    );
-    this.communityDiscoverer = dependencies.communityDiscoverer;
-    this.communityGetter = dependencies.communityGetter;
-    this.communityUpdater = dependencies.communityUpdater;
-    this.communityInvitationCreator = dependencies.communityInvitationCreator;
-    this.communityInviteLinkAcceptor = dependencies.communityInviteLinkAcceptor;
-    this.inviteWithKey = dependencies.communityInviteLinkAcceptorWithKey;
-    this.communityInviteLinkCreator = dependencies.communityInviteLinkCreator;
-    this.communityInviteLinkGetter = dependencies.communityInviteLinkGetter;
-    this.keychain = dependencies.keychain;
-    this.leaveCommunityUseCase = new LeaveCommunity(
-      dependencies.leaveCommunity,
-      dependencies.keychain,
-    );
-    this.media = dependencies.media;
-    this.members = dependencies.members;
-    this.membershipRequests = dependencies.membershipRequests;
-    this.moderationLogs = dependencies.moderationLogs;
-    this.roles = dependencies.roles;
-    this.listCommunitiesUseCase = new ListCommunities({
-      list: async (message) => await dependencies.listCommunities.list(message),
-    });
+  private readonly roles: PigeonCommunitiesGateway;
+
+  public constructor(
+    communities: PigeonCommunitiesGateway,
+    identities: PigeonIdentitiesGateway,
+    management: PigeonCommunityManagement,
+  ) {
+    this.channelDrafts = communities;
+    this.channelMessages = communities;
+    this.channelPins = communities;
+    this.channels = communities;
+    this.channelReads = communities;
+    this.createCommunityUseCase = new CreateCommunity(communities, identities);
+    this.communityDiscoverer = communities;
+    this.communityGetter = communities;
+    this.communityUpdater = communities;
+    this.communityInvitationCreator = communities;
+    this.communityInviteLinkAcceptor = communities;
+    this.inviteWithKey = communities;
+    this.communityInviteLinkCreator = communities;
+    this.communityInviteLinkGetter = communities;
+    this.keychain = identities;
+    this.leaveCommunityUseCase = new LeaveCommunity(communities, identities);
+    this.media = communities;
+    this.management = management;
+    this.members = communities;
+    this.membershipRequests = communities;
+    this.moderationLogs = communities;
+    this.roles = communities;
   }
 
   private async resolvePublicImageCid(
@@ -167,13 +115,11 @@ export class PigeonCommunitiesFacade {
   }
 
   public async list(session: Session): Promise<Community[]> {
-    return await this.listCommunitiesUseCase.list(
-      new ListCommunitiesMessage(session),
-    );
+    return await this.management.search(session);
   }
 
   public async get(session: Session, communityId: string): Promise<Community> {
-    return await this.communityGetter.getCommunity(session, communityId);
+    return await this.management.find(session, communityId);
   }
 
   public async listModerationLogs(
@@ -199,9 +145,7 @@ export class PigeonCommunitiesFacade {
     session: Session,
     input: CreateCommunityInput,
   ): Promise<CreateCommunityResult> {
-    return await this.createCommunityUseCase.create(
-      new CreateCommunityMessage(session, input),
-    );
+    return await this.createCommunityUseCase.create(session, input);
   }
 
   public async update(
@@ -246,11 +190,7 @@ export class PigeonCommunitiesFacade {
     communityId: string,
     identityId: string,
   ): Promise<Community> {
-    return await this.members.banCommunityMember(
-      session,
-      communityId,
-      identityId,
-    );
+    return await this.management.banMember(session, communityId, identityId);
   }
 
   public async unbanMember(
@@ -258,11 +198,7 @@ export class PigeonCommunitiesFacade {
     communityId: string,
     identityId: string,
   ): Promise<Community> {
-    return await this.members.unbanCommunityMember(
-      session,
-      communityId,
-      identityId,
-    );
+    return await this.management.unbanMember(session, communityId, identityId);
   }
 
   public async kickMember(
@@ -270,11 +206,7 @@ export class PigeonCommunitiesFacade {
     communityId: string,
     identityId: string,
   ): Promise<Community> {
-    return await this.members.kickCommunityMember(
-      session,
-      communityId,
-      identityId,
-    );
+    return await this.management.kickMember(session, communityId, identityId);
   }
 
   public async createJoinRequest(
@@ -311,9 +243,7 @@ export class PigeonCommunitiesFacade {
     session: Session,
     communityId: string,
   ): Promise<LeaveCommunityResult> {
-    return await this.leaveCommunityUseCase.leave(
-      new LeaveCommunityMessage(session, communityId),
-    );
+    return await this.leaveCommunityUseCase.leave(session, communityId);
   }
 
   public async createInvitation(
@@ -402,7 +332,12 @@ export class PigeonCommunitiesFacade {
     communityId: string,
     input: { name: string; permissions: CommunityPermission[] },
   ): Promise<CommunityRoleResource> {
-    return await this.roles.createCommunityRole(session, communityId, input);
+    return await this.management.createRole(
+      session,
+      communityId,
+      input.name,
+      input.permissions,
+    );
   }
 
   public async updateRole(
@@ -411,11 +346,12 @@ export class PigeonCommunitiesFacade {
     roleId: string,
     input: { name: string; permissions: CommunityPermission[] },
   ): Promise<CommunityRoleResource> {
-    return await this.roles.updateCommunityRole(
+    return await this.management.updateRole(
       session,
       communityId,
       roleId,
-      input,
+      input.name,
+      input.permissions,
     );
   }
 
@@ -424,7 +360,7 @@ export class PigeonCommunitiesFacade {
     communityId: string,
     roleId: string,
   ): Promise<void> {
-    await this.roles.deleteCommunityRole(session, communityId, roleId);
+    await this.management.deleteRole(session, communityId, roleId);
   }
 
   public async assignMemberRoles(
@@ -433,7 +369,7 @@ export class PigeonCommunitiesFacade {
     identityId: string,
     roleIds: string[],
   ): Promise<Community> {
-    return await this.roles.assignCommunityMemberRoles(
+    return await this.management.assignMemberRoles(
       session,
       communityId,
       identityId,
@@ -446,10 +382,11 @@ export class PigeonCommunitiesFacade {
     communityId: string,
     name: string,
   ): Promise<CommunityTextChannel> {
-    return await this.channels.createCommunityTextChannel(
+    return await this.management.createChannel(
       session,
       communityId,
       name,
+      'text',
     );
   }
 
@@ -458,10 +395,11 @@ export class PigeonCommunitiesFacade {
     communityId: string,
     name: string,
   ): Promise<CommunityVoiceChannel> {
-    return await this.channels.createCommunityVoiceChannel(
+    return await this.management.createChannel(
       session,
       communityId,
       name,
+      'voice',
     );
   }
 
@@ -478,7 +416,7 @@ export class PigeonCommunitiesFacade {
     channelId: string,
     name: string,
   ): Promise<CommunityChannel> {
-    return await this.channels.renameCommunityChannel(
+    return await this.management.renameChannel(
       session,
       communityId,
       channelId,
@@ -491,11 +429,7 @@ export class PigeonCommunitiesFacade {
     communityId: string,
     channelId: string,
   ): Promise<Community> {
-    return await this.channels.deleteCommunityChannel(
-      session,
-      communityId,
-      channelId,
-    );
+    return await this.management.deleteChannel(session, communityId, channelId);
   }
 
   public async updateChannelPermissions(
@@ -504,7 +438,7 @@ export class PigeonCommunitiesFacade {
     channelId: string,
     visibleRoleIds: string[],
   ): Promise<CommunityChannel> {
-    return await this.channels.updateCommunityChannelPermissions(
+    return await this.management.updateChannelPermissions(
       session,
       communityId,
       channelId,
