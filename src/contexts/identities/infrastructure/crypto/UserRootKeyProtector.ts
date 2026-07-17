@@ -8,8 +8,8 @@ import {
 } from '@haskou/value-objects';
 import { Buffer } from 'buffer';
 
-import type { IdentityResource } from '../../domain/IdentityResource';
-import type { PasskeyPrfMasterKeyProtection } from '../../domain/PasskeyPrfMasterKeyProtection';
+import type { IdentityResource } from '../http/resources/IdentityResource';
+import type { PasskeyPrfMasterKeyProtection } from './PasskeyPrfMasterKeyProtection';
 import type { UserRootKeyPasskeyPrfInput } from './UserRootKeyPasskeyPrfInput';
 
 import { RecoveryKey } from '../../domain/value-objects/RecoveryKey';

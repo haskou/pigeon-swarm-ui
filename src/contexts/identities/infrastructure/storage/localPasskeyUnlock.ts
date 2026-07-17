@@ -1,4 +1,4 @@
-import type { IdentityResource } from '../../domain/IdentityResource';
+import type { IdentityResource } from '../http/resources/IdentityResource';
 
 export type LocalPasskeyUnlockRecord = {
   createdAt: number;

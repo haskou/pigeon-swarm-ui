@@ -20,7 +20,13 @@ export type { ConversationResource } from '../../contexts/conversations/infrastr
 export type { ConversationKeyEntry } from '../../contexts/identities/infrastructure/keychain/ConversationKeyEntry';
 export type { ConversationInvitationPayload } from '../../contexts/notifications/infrastructure/http/resources/ConversationInvitationPayload';
 export type { LoginResult } from '../../contexts/identities/infrastructure/http/resources/LoginResult';
-export type * from '../../contexts/identities/domain/identityResources.types';
+export type { IdentityResource } from '../../contexts/identities/infrastructure/http/resources/IdentityResource';
+export type { IdentityPresenceResource as IdentityPresence } from '../../contexts/identities/infrastructure/http/resources/IdentityPresenceResource';
+export type { PresenceStatusResource as PresenceStatus } from '../../contexts/identities/infrastructure/http/resources/PresenceStatusResource';
+export type { SelectablePresenceStatusResource as SelectablePresenceStatus } from '../../contexts/identities/infrastructure/http/resources/SelectablePresenceStatusResource';
+export type { KeychainResource } from '../../contexts/identities/infrastructure/http/resources/KeychainResource';
+export type { LocalKeychain } from '../../contexts/identities/infrastructure/keychain/LocalKeychain';
+export type { Session } from '../../contexts/identities/infrastructure/session/Session';
 export type * from '../../contexts/messages/domain/messageResources.types';
 export type * from '../../contexts/networks/domain/networkResources.types';
 export type * from '../../contexts/notifications/infrastructure/http/notificationResources.types';

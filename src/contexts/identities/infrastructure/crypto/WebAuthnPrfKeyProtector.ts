@@ -1,6 +1,6 @@
 import { SymmetricKey } from '@haskou/value-objects';
 
-import type { PasskeyPrfMasterKeyProtection } from '../../domain/PasskeyPrfMasterKeyProtection';
+import type { PasskeyPrfMasterKeyProtection } from './PasskeyPrfMasterKeyProtection';
 import type { PrfExtensionResults } from './PrfExtensionResults';
 import type { PublicKeyCredentialWithExtensionResults } from './PublicKeyCredentialWithExtensionResults';
 

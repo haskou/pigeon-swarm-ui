@@ -7,10 +7,13 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
-import type { IdentityUpdateProfileInput } from '../../domain/IdentitySignaturePayloadFactory';
-import type { IdentitySignaturePayloadFactory } from '../../domain/IdentitySignaturePayloadFactory';
+import type { Identity } from '../../domain/Identity';
+import type { IdentityMasterKeyProtection } from '../../domain/value-objects/IdentityMasterKeyProtection';
+import type { IdentityCreationMaterial } from '../crypto/IdentityCreationMaterial';
 import type { PigeonIdentityKeyProtectionGateway } from '../crypto/PigeonIdentityKeyProtectionGateway';
 import type { CreatedIdentityMaterial } from './CreatedIdentityMaterial';
+import type { IdentityUpdateProfileInput } from './IdentitySignaturePayloadFactory';
+import type { IdentitySignaturePayloadFactory } from './IdentitySignaturePayloadFactory';
 import type { PigeonIdentityGateway } from './PigeonIdentityGateway';
 
 import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
@@ -78,6 +81,55 @@ export class PigeonIdentityCommandsApi {
     });
 
     return { identity, keyPair, masterKey };
+  }
+
+  public async createIdentity(
+    identity: Identity,
+    material: IdentityCreationMaterial,
+    protection: IdentityMasterKeyProtection,
+  ): Promise<CreatedIdentityMaterial> {
+    const primitives = identity.toPrimitives();
+    const options = protection.toPrimitives();
+    const { encryptedKeyPair, encryptedMasterKey, masterKeyDerivation } =
+      await this.keyProtection.protectNewIdentity({
+        displayName: primitives.profile.name,
+        identityId: primitives.id,
+        keyPair: material.keyPair,
+        masterKey: material.masterKey,
+        options,
+        password: options.password,
+      });
+    const unsigned = this.signatures.createInitial({
+      encryptedKeyPair,
+      encryptedMasterKey,
+      id: primitives.id,
+      masterKeyDerivation,
+      networks: primitives.networkIds,
+      profile: primitives.profile,
+      timestamp: primitives.createdAt,
+    });
+    const body = {
+      ...unsigned,
+      signature: material.keyPair.sign(JSON.stringify(unsigned)).toString(),
+    };
+    const signingSession = {
+      identity: body,
+      keychain: emptyKeychain,
+      keyPair: material.keyPair,
+      masterKey: material.masterKey,
+    } as Session;
+    const path = '/identities/';
+    const persistedIdentity = await this.http.request<IdentityResource>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(signingSession, 'POST', path, body),
+      method: 'POST',
+    });
+
+    return {
+      identity: persistedIdentity,
+      keyPair: material.keyPair,
+      masterKey: material.masterKey,
+    };
   }
 
   public async updateProfile(

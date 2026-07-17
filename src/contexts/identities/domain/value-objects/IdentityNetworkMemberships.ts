@@ -35,6 +35,13 @@ export class IdentityNetworkMemberships {
     return this.networkIds.some((candidate) => candidate.isEqual(networkId));
   }
 
+  public isEqual(memberships: IdentityNetworkMemberships): boolean {
+    return (
+      this.networkIds.length === memberships.networkIds.length &&
+      this.networkIds.every((networkId) => memberships.has(networkId))
+    );
+  }
+
   public toPrimitives(): string[] {
     return this.networkIds.map((networkId) => networkId.toString());
   }
