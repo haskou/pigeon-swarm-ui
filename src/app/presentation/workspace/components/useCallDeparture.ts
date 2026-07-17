@@ -71,7 +71,10 @@ export function useCallDeparture({
       const request =
         callDepartureAction(kind) === 'end'
           ? applicationContainer.calls.end(currentSession, callId)
-          : applicationContainer.calls.leave(currentSession, callId);
+          : applicationContainer.calls.leaveOnPageDeparture(
+              currentSession,
+              callId,
+            );
 
       void request.catch(() => undefined);
     };
