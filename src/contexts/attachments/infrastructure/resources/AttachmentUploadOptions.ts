@@ -1,1 +1,5 @@
-export type { AttachmentUploadOptions } from '../../application/resources/AttachmentUploadOptions';
+export type AttachmentUploadOptions = {
+  encryptLargeAttachments?: boolean;
+  encryptSmallAttachments?: boolean;
+  networkId?: string;
+};

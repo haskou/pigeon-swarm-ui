@@ -4,7 +4,7 @@ import type {
   MessageAttachment,
   PublicFileContent,
   PublicFileUpload,
-} from '../../contexts/attachments/application/attachmentResources.types';
+} from '../../contexts/attachments/infrastructure/attachmentResources.types';
 import type { PigeonFilesGateway } from '../../contexts/attachments/infrastructure/http/PigeonFilesGateway';
 import type { Session } from '../../contexts/identities/domain/Session';
 

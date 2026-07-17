@@ -3,13 +3,15 @@ import { AttachmentRepository } from '../../domain/repositories/AttachmentReposi
 import { PublishMessageAttachmentMessage } from './messages/PublishMessageAttachmentMessage';
 
 export class PublishMessageAttachment {
-  public constructor(private readonly attachments: AttachmentRepository) {}
+  public constructor(
+    private readonly attachmentRepository: AttachmentRepository,
+  ) {}
 
   public async publish(
     message: PublishMessageAttachmentMessage,
   ): Promise<Attachment> {
     const attachment = message.getAttachment();
-    const externalIdentifier = await this.attachments.create(
+    const externalIdentifier = await this.attachmentRepository.create(
       attachment,
       message.getSourceExternalIdentifier(),
       message.getPublisherIdentifier(),
