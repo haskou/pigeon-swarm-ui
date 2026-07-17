@@ -58,7 +58,7 @@ export class ConversationMapper {
 
     return Conversation.fromPrimitives({
       id: normalized.id,
-      latestMessageAt: normalized.latestMessageAt ?? 0,
+      latestMessageAt: normalized.latestMessageAt,
       latestMessagePreview: normalized.latestMessagePreview,
       name: normalized.title,
       networkId: normalized.networkId,

@@ -28,7 +28,7 @@ export class PigeonConversationRepository implements ConversationRepository {
   ): Promise<Conversation> {
     const primitives = conversation.toPrimitives();
 
-    if (primitives.latestMessageAt > 0) return conversation;
+    if (primitives.latestMessageAt !== undefined) return conversation;
 
     try {
       const result = await this.messagesGateway.loadMessages(

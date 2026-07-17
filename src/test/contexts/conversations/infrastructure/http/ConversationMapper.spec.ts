@@ -56,4 +56,20 @@ describe(ConversationMapper.name, () => {
       unreadCount: 2,
     });
   });
+
+  it('preserves an absent latest message timestamp', () => {
+    const mapper = new ConversationMapper();
+
+    expect(
+      mapper.toResource(
+        mapper.fromPrimitives({
+          id: 'group:empty',
+          name: 'Empty group',
+          networkId: 'network-a',
+          participantIds: ['identity-a', 'identity-b'],
+          type: 'group',
+        }),
+      ).latestMessageAt,
+    ).toBeUndefined();
+  });
 });

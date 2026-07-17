@@ -1,12 +1,13 @@
 import { Timestamp, type PrimitiveOf } from '@haskou/value-objects';
 
+import { ConversationLatestMessageAt } from '../value-objects/ConversationLatestMessageAt';
 import { ConversationPreview } from '../value-objects/ConversationPreview';
 import { ConversationUnreadCount } from '../value-objects/ConversationUnreadCount';
 
 export class ConversationActivity {
   public static empty(): ConversationActivity {
     return new ConversationActivity(
-      new Timestamp(0),
+      ConversationLatestMessageAt.empty(),
       ConversationPreview.fromOptional(),
       ConversationUnreadCount.fromNumber(0),
     );
@@ -16,14 +17,14 @@ export class ConversationActivity {
     primitives: PrimitiveOf<ConversationActivity>,
   ): ConversationActivity {
     return new ConversationActivity(
-      new Timestamp(primitives.latestMessageAt),
+      ConversationLatestMessageAt.fromOptional(primitives.latestMessageAt),
       ConversationPreview.fromOptional(primitives.latestMessagePreview),
       ConversationUnreadCount.fromNumber(primitives.unreadCount),
     );
   }
 
   private constructor(
-    private latestMessageAt: Timestamp,
+    private readonly latestMessageAt: ConversationLatestMessageAt,
     private latestMessagePreview: ConversationPreview,
     private unreadCount: ConversationUnreadCount,
   ) {}
@@ -41,9 +42,7 @@ export class ConversationActivity {
   }
 
   public record(occurredAt: Timestamp, preview?: ConversationPreview): boolean {
-    if (!occurredAt.isAfter(this.latestMessageAt)) return false;
-
-    this.latestMessageAt = occurredAt;
+    if (!this.latestMessageAt.record(occurredAt)) return false;
 
     if (preview) this.latestMessagePreview = preview;
 
@@ -52,7 +51,7 @@ export class ConversationActivity {
 
   public toPrimitives() {
     return {
-      latestMessageAt: this.latestMessageAt.valueOf(),
+      latestMessageAt: this.latestMessageAt.toPrimitives(),
       latestMessagePreview: this.latestMessagePreview.isPresent()
         ? this.latestMessagePreview.toString()
         : undefined,
