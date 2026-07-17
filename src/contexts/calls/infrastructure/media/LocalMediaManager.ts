@@ -1,6 +1,6 @@
-import type { ScreenShareQualityPreset } from '../../domain/callSession.types';
 import type { LocalMediaOptions } from './LocalMediaOptions';
 import type { ScreenShareOptions } from './ScreenShareOptions';
+import type { ScreenShareQualityPreset } from './ScreenShareQualityPreset';
 
 import { logCallDebug, logCallError, logCallWarning } from './callDebugLogger';
 import { CallMicrophoneCapture } from './CallMicrophoneCapture';

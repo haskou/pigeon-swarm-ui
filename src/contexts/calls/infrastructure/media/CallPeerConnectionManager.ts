@@ -1,11 +1,8 @@
-import type {
-  CallParticipantMediaConnection,
-  CallSignalType,
-  ScreenShareQualityPreset,
-} from '../../domain/callSession.types';
-import type { BrowserWindowWithWebkitAudioContext } from './BrowserWindowWithWebkitAudioContext';
+import type { CallParticipantMediaConnectionResource as CallParticipantMediaConnection } from '../http/resources/CallParticipantMediaConnectionResource';
+import type { CallSignalType } from './CallSignalType';
 import type { PeerNegotiationState } from './PeerNegotiationState';
 import type { RtcConfigurationProvider } from './RtcConfigurationProvider';
+import type { ScreenShareQualityPreset } from './ScreenShareQualityPreset';
 
 import { logCallDebug, logCallError, logCallWarning } from './callDebugLogger';
 import {
@@ -26,13 +23,7 @@ import {
   type SignalSender,
 } from './descriptionPayload';
 import { EncodedCallMediaCipher } from './EncodedCallMediaCipher';
-import {
-  graphAudioVolume,
-  isMediaStreamSource,
-  nativeAudioVolume,
-  needsAudioGraph,
-  remoteAudioKey,
-} from './remoteAudioOutput';
+import { RemoteCallAudio } from './RemoteCallAudio';
 import { screenShareEncodingParameters } from './ScreenShareQuality';
 
 export type { PeerMediaStats } from './collectPeerMediaStats';
@@ -77,23 +68,6 @@ export class CallPeerConnectionManager {
     RTCIceCandidateInit[]
   >();
 
-  private readonly remoteAudio = new Map<string, HTMLAudioElement>();
-
-  private readonly remoteAudioContexts = new Map<string, AudioContext>();
-
-  private readonly remoteAudioGains = new Map<string, GainNode>();
-
-  private readonly remoteAudioOutputSources = new Map<
-    string,
-    MediaStreamAudioSourceNode
-  >();
-
-  private readonly remoteAudioOutputStreams = new Map<string, MediaStream>();
-
-  private readonly remoteAudioStreams = new Map<string, MediaStream>();
-
-  private readonly remoteAudioVolumes = new Map<string, number>();
-
   private readonly remoteStreams = new Map<string, MediaStream>();
 
   private readonly remoteScreenStreams = new Map<string, MediaStream>();
@@ -117,37 +91,13 @@ export class CallPeerConnectionManager {
 
   private rtcConfigurationProvider: RtcConfigurationProvider | null = null;
 
-  private deafened = false;
-
   private screenShareQuality: ScreenShareQualityPreset = 'auto';
 
   public static mediaEncryptionSupported(): boolean {
     return EncodedCallMediaCipher.isSupported();
   }
 
-  private setRemoteAudioChannelVolume(
-    audioKey: string,
-    volumePercent: number,
-  ): void {
-    const volume = Math.min(3, Math.max(0, volumePercent / 100));
-
-    this.remoteAudioVolumes.set(audioKey, volume);
-    const audio = this.remoteAudio.get(audioKey);
-    const gain = this.remoteAudioGains.get(audioKey);
-
-    if (audio) {
-      if (isMediaStreamSource(audio.srcObject)) {
-        this.syncRemoteAudioOutput(audioKey, audio.srcObject, volume);
-      }
-
-      audio.volume =
-        gain || this.remoteAudioGains.has(audioKey)
-          ? 0
-          : nativeAudioVolume(volume);
-    }
-
-    this.applyRemoteAudioOutputVolume(audioKey, volume);
-  }
+  public constructor(private readonly remoteAudio: RemoteCallAudio) {}
 
   private bitrateFor(
     identityId: string,
@@ -563,7 +513,7 @@ export class CallPeerConnectionManager {
       !payload.screenAudioTrackIds?.length &&
       !payload.screenAudioStreamIds?.length
     ) {
-      this.removeRemoteAudioChannel(remoteAudioKey(peerIdentityId, 'screen'));
+      this.remoteAudio.removeScreen(peerIdentityId);
     }
   }
 
@@ -608,7 +558,7 @@ export class CallPeerConnectionManager {
     if (event.track.kind === 'audio') {
       this.playRemoteAudioTrack(peerIdentityId, event.track);
     } else if (hasAudioTrack(event.track, stream)) {
-      this.playRemoteStream(peerIdentityId, stream);
+      this.remoteAudio.playVoiceStream(peerIdentityId, stream);
     }
   }
 
@@ -667,37 +617,14 @@ export class CallPeerConnectionManager {
     peerIdentityId: string,
     track: MediaStreamTrack,
   ): void {
-    const stream =
-      this.remoteAudioStreams.get(peerIdentityId) ?? new MediaStream();
-
-    if (
-      !stream.getAudioTracks().some((audioTrack) => audioTrack.id === track.id)
-    ) {
-      stream.addTrack(track);
-    }
-
-    this.remoteAudioStreams.set(peerIdentityId, stream);
-    track.addEventListener('ended', () => {
-      stream.removeTrack(track);
-
-      if (stream.getAudioTracks().length > 0) {
-        this.playRemoteStream(peerIdentityId, stream);
-
-        return;
-      }
-
-      this.remoteAudioStreams.delete(peerIdentityId);
-      this.resetRemoteAudioOutput(peerIdentityId);
-      this.removeRemoteAudio(peerIdentityId);
-    });
-    this.playRemoteStream(peerIdentityId, stream);
+    this.remoteAudio.playVoiceTrack(peerIdentityId, track);
   }
 
   private playRemoteScreenAudioTrack(
     peerIdentityId: string,
     track: MediaStreamTrack,
   ): void {
-    this.playRemoteAudioTrack(remoteAudioKey(peerIdentityId, 'screen'), track);
+    this.remoteAudio.playScreenTrack(peerIdentityId, track);
   }
 
   private syncLocalTracks(): void {
@@ -952,129 +879,6 @@ export class CallPeerConnectionManager {
     }
   }
 
-  private playRemoteStream(peerIdentityId: string, stream: MediaStream): void {
-    const audio =
-      this.remoteAudio.get(peerIdentityId) ?? document.createElement('audio');
-    const volume = this.remoteAudioVolumes.get(peerIdentityId) ?? 1;
-
-    audio.autoplay = true;
-    audio.muted = this.deafened;
-    audio.srcObject = stream;
-
-    if (!this.remoteAudio.has(peerIdentityId)) {
-      audio.dataset.peerIdentityId = peerIdentityId;
-      audio.className = 'hidden';
-      document.body.append(audio);
-      this.remoteAudio.set(peerIdentityId, audio);
-    }
-
-    this.syncRemoteAudioOutput(peerIdentityId, stream, volume);
-    audio.volume = this.remoteAudioGains.has(peerIdentityId)
-      ? 0
-      : nativeAudioVolume(volume);
-    logCallDebug('peer-manager:remote-audio:play-requested', {
-      deafened: this.deafened,
-      peerIdentityId,
-      trackCount: stream.getTracks().length,
-    });
-
-    if (this.deafened) {
-      audio.pause();
-
-      return;
-    }
-
-    void audio.play().catch((error: unknown) => {
-      logCallError('peer-manager:remote-audio:play-failed', error, {
-        peerIdentityId,
-      });
-    });
-  }
-
-  private syncRemoteAudioOutput(
-    peerIdentityId: string,
-    stream: MediaStream,
-    volume: number,
-  ): void {
-    if (this.remoteAudioOutputStreams.get(peerIdentityId) !== stream) {
-      this.resetRemoteAudioOutput(peerIdentityId);
-    }
-
-    if (this.remoteAudioGains.has(peerIdentityId)) {
-      this.applyRemoteAudioOutputVolume(peerIdentityId, volume);
-
-      return;
-    }
-
-    if (!needsAudioGraph(volume)) return;
-
-    this.createRemoteAudioOutput(peerIdentityId, stream, volume);
-  }
-
-  private createRemoteAudioOutput(
-    peerIdentityId: string,
-    stream: MediaStream,
-    volume: number,
-  ): void {
-    const AudioContextConstructor =
-      typeof window === 'undefined'
-        ? undefined
-        : (window.AudioContext ??
-          (window as BrowserWindowWithWebkitAudioContext).webkitAudioContext);
-
-    if (!AudioContextConstructor) {
-      return;
-    }
-
-    try {
-      const audioContext = new AudioContextConstructor();
-      const source = audioContext.createMediaStreamSource(stream);
-      const gain = audioContext.createGain();
-
-      gain.gain.value = graphAudioVolume(volume, this.deafened);
-      source.connect(gain).connect(audioContext.destination);
-      this.remoteAudioContexts.set(peerIdentityId, audioContext);
-      this.remoteAudioGains.set(peerIdentityId, gain);
-      this.remoteAudioOutputSources.set(peerIdentityId, source);
-      this.remoteAudioOutputStreams.set(peerIdentityId, stream);
-      void audioContext.resume().catch(() => undefined);
-    } catch (error) {
-      logCallError('peer-manager:remote-audio:gain-setup-failed', error, {
-        peerIdentityId,
-      });
-    }
-  }
-
-  private applyRemoteAudioOutputVolume(
-    peerIdentityId: string,
-    volume: number,
-  ): void {
-    const gain = this.remoteAudioGains.get(peerIdentityId);
-
-    if (!gain) return;
-
-    gain.gain.setValueAtTime(
-      graphAudioVolume(volume, this.deafened),
-      this.remoteAudioContexts.get(peerIdentityId)?.currentTime ?? 0,
-    );
-    void this.remoteAudioContexts
-      .get(peerIdentityId)
-      ?.resume()
-      .catch(() => undefined);
-  }
-
-  private resetRemoteAudioOutput(peerIdentityId: string): void {
-    this.remoteAudioOutputSources.get(peerIdentityId)?.disconnect();
-    void this.remoteAudioContexts
-      .get(peerIdentityId)
-      ?.close()
-      .catch(() => undefined);
-    this.remoteAudioOutputSources.delete(peerIdentityId);
-    this.remoteAudioGains.delete(peerIdentityId);
-    this.remoteAudioContexts.delete(peerIdentityId);
-    this.remoteAudioOutputStreams.delete(peerIdentityId);
-  }
-
   private removePeer(peerIdentityId: string): void {
     this.cancelPeerRecovery(peerIdentityId);
     this.peers.get(peerIdentityId)?.close();
@@ -1091,26 +895,7 @@ export class CallPeerConnectionManager {
     this.remoteScreenTrackIds.delete(peerIdentityId);
     this.remoteScreenAudioStreamIds.delete(peerIdentityId);
     this.remoteScreenAudioTrackIds.delete(peerIdentityId);
-    this.removeRemoteAudioChannel(remoteAudioKey(peerIdentityId, 'voice'));
-    this.removeRemoteAudioChannel(remoteAudioKey(peerIdentityId, 'screen'));
-  }
-
-  private removeRemoteAudioChannel(audioKey: string): void {
-    this.remoteAudioStreams.delete(audioKey);
-    this.resetRemoteAudioOutput(audioKey);
-    this.removeRemoteAudio(audioKey);
-    this.remoteAudioVolumes.delete(audioKey);
-  }
-
-  private removeRemoteAudio(peerIdentityId: string): void {
-    const audio = this.remoteAudio.get(peerIdentityId);
-
-    if (!audio) return;
-
-    audio.pause();
-    audio.srcObject = null;
-    audio.remove();
-    this.remoteAudio.delete(peerIdentityId);
+    this.remoteAudio.removePeer(peerIdentityId);
   }
 
   private reconcilePeerConnectionHealth(
@@ -1334,36 +1119,11 @@ export class CallPeerConnectionManager {
   }
 
   public setDeafened(deafened: boolean): void {
-    this.deafened = deafened;
-    logCallDebug('peer-manager:set-deafened', {
-      deafened,
-      remoteAudioCount: this.remoteAudio.size,
-    });
-
-    for (const [audioKey, audio] of this.remoteAudio.entries()) {
-      const hasAudioGraph = this.remoteAudioGains.has(audioKey);
-
-      audio.muted = deafened;
-      this.applyRemoteAudioOutputVolume(
-        audioKey,
-        this.remoteAudioVolumes.get(audioKey) ?? 1,
-      );
-
-      if (hasAudioGraph) continue;
-
-      if (deafened) {
-        audio.pause();
-      } else {
-        void audio.play().catch(() => undefined);
-      }
-    }
+    this.remoteAudio.setDeafened(deafened);
   }
 
   public setPeerVolume(peerIdentityId: string, volumePercent: number): void {
-    this.setRemoteAudioChannelVolume(
-      remoteAudioKey(peerIdentityId, 'voice'),
-      volumePercent,
-    );
+    this.remoteAudio.setVoiceVolume(peerIdentityId, volumePercent);
 
     logCallDebug('peer-manager:set-peer-volume', {
       peerIdentityId,
@@ -1375,10 +1135,7 @@ export class CallPeerConnectionManager {
     peerIdentityId: string,
     volumePercent: number,
   ): void {
-    this.setRemoteAudioChannelVolume(
-      remoteAudioKey(peerIdentityId, 'screen'),
-      volumePercent,
-    );
+    this.remoteAudio.setScreenVolume(peerIdentityId, volumePercent);
 
     logCallDebug('peer-manager:set-peer-screen-share-volume', {
       peerIdentityId,
@@ -1486,7 +1243,6 @@ export class CallPeerConnectionManager {
   public reset(): void {
     logCallDebug('peer-manager:reset', {
       peerCount: this.peers.size,
-      remoteAudioCount: this.remoteAudio.size,
     });
     this.peers.forEach((peer) => peer.close());
     this.peers.clear();
@@ -1500,24 +1256,7 @@ export class CallPeerConnectionManager {
     this.peerNegotiationStates.clear();
     this.peerSignalSenders.clear();
 
-    for (const audio of this.remoteAudio.values()) {
-      audio.pause();
-      audio.srcObject = null;
-      audio.remove();
-    }
-    for (const source of this.remoteAudioOutputSources.values()) {
-      source.disconnect();
-    }
-    for (const audioContext of this.remoteAudioContexts.values()) {
-      void audioContext.close().catch(() => undefined);
-    }
-    this.remoteAudio.clear();
-    this.remoteAudioContexts.clear();
-    this.remoteAudioGains.clear();
-    this.remoteAudioOutputSources.clear();
-    this.remoteAudioOutputStreams.clear();
-    this.remoteAudioStreams.clear();
-    this.remoteAudioVolumes.clear();
+    this.remoteAudio.reset();
     this.remoteStreams.clear();
     this.remoteScreenStreams.clear();
     this.remoteScreenStreamIds.clear();
@@ -1531,7 +1270,6 @@ export class CallPeerConnectionManager {
     this.mediaEncryptionCipher = null;
     this.mediaEncryptionEnabled = false;
     this.rtcConfigurationProvider = null;
-    this.deafened = false;
   }
 
   public async collectStats(): Promise<Record<string, PeerMediaStats>> {
@@ -1576,6 +1314,10 @@ export class CallPeerConnectionManager {
           : {}),
         remoteIdentityId,
         state: stats.connectionState,
+        usesRelay:
+          stats.connectionPath === 'relay' ||
+          stats.localCandidateType === 'relay' ||
+          stats.remoteCandidateType === 'relay',
       }));
   }
 }

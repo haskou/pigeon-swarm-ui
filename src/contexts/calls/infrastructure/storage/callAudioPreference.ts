@@ -11,6 +11,23 @@ type CallAudioPreference = {
 const callAudioStorageKey = (identityId: string): string =>
   `pigeon:callAudio:${identityId}`;
 
+function loadCallAudioPreference(identityId: string): CallAudioPreference {
+  return readJsonObjectFromLocalStorage<CallAudioPreference>(
+    callAudioStorageKey(identityId),
+    {},
+  );
+}
+
+function saveCallAudioPreference(
+  identityId: string,
+  preference: CallAudioPreference,
+): void {
+  writeJsonToLocalStorage(callAudioStorageKey(identityId), {
+    ...loadCallAudioPreference(identityId),
+    ...preference,
+  });
+}
+
 export function loadCallNoiseCancellationEnabled(identityId: string): boolean {
   const preference = loadCallAudioPreference(identityId);
 
@@ -36,22 +53,5 @@ export function saveCallMediaEncryptionEnabled(
 ): void {
   saveCallAudioPreference(identityId, {
     mediaEncryptionEnabled: enabled,
-  });
-}
-
-function loadCallAudioPreference(identityId: string): CallAudioPreference {
-  return readJsonObjectFromLocalStorage<CallAudioPreference>(
-    callAudioStorageKey(identityId),
-    {},
-  );
-}
-
-function saveCallAudioPreference(
-  identityId: string,
-  preference: CallAudioPreference,
-): void {
-  writeJsonToLocalStorage(callAudioStorageKey(identityId), {
-    ...loadCallAudioPreference(identityId),
-    ...preference,
   });
 }

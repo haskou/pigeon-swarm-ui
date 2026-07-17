@@ -1,4 +1,4 @@
-import type { CallSignalPayload } from '../../domain/callSession.types';
+import type { CallSignalPayload } from '../media/CallSignalPayload';
 
 const maximumCallSignalBytes = 64 * 1024;
 

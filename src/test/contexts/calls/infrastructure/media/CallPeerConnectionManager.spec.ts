@@ -3,11 +3,11 @@ import { SymmetricKey } from '@haskou/value-objects';
 import type { SignalSender } from '../../../../../contexts/calls/infrastructure/media/descriptionPayload';
 import type { FakePeerConnection } from '../../../../../contexts/calls/infrastructure/media/FakePeerConnection';
 import type { FakeSender } from '../../../../../contexts/calls/infrastructure/media/FakeSender';
-import type { MockAudioContext } from '../../../../../contexts/calls/infrastructure/media/MockAudioContext';
 import type { PeerConnectionManagerInternals } from '../../../../../contexts/calls/infrastructure/media/PeerConnectionManagerInternals';
 
 import { CallPeerConnectionManager } from '../../../../../contexts/calls/infrastructure/media/CallPeerConnectionManager';
 import { EncodedCallMediaCipher } from '../../../../../contexts/calls/infrastructure/media/EncodedCallMediaCipher';
+import { RemoteCallAudio } from '../../../../../contexts/calls/infrastructure/media/RemoteCallAudio';
 
 const originalMediaStream = Object.getOwnPropertyDescriptor(
   globalThis,
@@ -78,8 +78,9 @@ function mediaTrack(
   } as unknown as MediaStreamTrack;
 }
 
-function audioElement(): HTMLAudioElement {
+function remoteAudioElement(): HTMLAudioElement {
   return {
+    dataset: {},
     pause: jest.fn(),
     play: jest.fn(() => Promise.resolve()),
     remove: jest.fn(),
@@ -88,45 +89,13 @@ function audioElement(): HTMLAudioElement {
   } as unknown as HTMLAudioElement;
 }
 
-function gainNode(): GainNode {
-  return {
-    connect: jest.fn((destination: unknown) => destination),
-    gain: {
-      setValueAtTime: jest.fn(),
-      value: 1,
-    },
-  } as unknown as GainNode;
-}
-
-function audioContext(): AudioContext {
-  return {
-    close: jest.fn(() => Promise.resolve()),
-    currentTime: 12,
-    resume: jest.fn(() => Promise.resolve()),
-  } as unknown as AudioContext;
-}
-
-function audioSource(): MediaStreamAudioSourceNode {
-  return {
-    connect: jest.fn((node: unknown) => node),
-    disconnect: jest.fn(),
-  } as unknown as MediaStreamAudioSourceNode;
-}
-
-function mockAudioContext(): MockAudioContext {
-  const source = audioSource();
-  const gain = gainNode();
-
-  return {
-    close: jest.fn(() => Promise.resolve()),
-    createdGain: gain,
-    createdSource: source,
-    createGain: jest.fn(() => gain),
-    createMediaStreamSource: jest.fn(() => source),
-    currentTime: 12,
-    destination: {},
-    resume: jest.fn(() => Promise.resolve()),
-  } as unknown as MockAudioContext;
+function callPeerConnectionManager(): CallPeerConnectionManager {
+  return new CallPeerConnectionManager(
+    new RemoteCallAudio({
+      create: remoteAudioElement,
+      mount: jest.fn(),
+    }),
+  );
 }
 
 function managerInternals(
@@ -320,15 +289,6 @@ function installSessionDescriptionMock(): void {
   });
 }
 
-function installAudioContextMock(context: MockAudioContext): void {
-  Object.defineProperty(globalThis, 'window', {
-    configurable: true,
-    value: {
-      AudioContext: jest.fn(() => context),
-    },
-  });
-}
-
 function restoreGlobalProperty(
   property:
     | 'MediaStream'
@@ -363,7 +323,7 @@ describe(CallPeerConnectionManager.name, () => {
     const peers: FakePeerConnection[] = [];
 
     installPeerConnectionMock(peers);
-    const manager = new CallPeerConnectionManager();
+    const manager = callPeerConnectionManager();
     const initialMicrophone = mediaTrack('microphone-1', 'audio');
     const nextMicrophone = mediaTrack('microphone-2', 'audio');
 
@@ -389,7 +349,7 @@ describe(CallPeerConnectionManager.name, () => {
     const configurations: RTCConfiguration[] = [];
 
     installPeerConnectionMock(peers, configurations);
-    const manager = new CallPeerConnectionManager();
+    const manager = callPeerConnectionManager();
     const firstConfiguration: RTCConfiguration = {
       iceServers: [
         {
@@ -436,7 +396,7 @@ describe(CallPeerConnectionManager.name, () => {
     const peers: FakePeerConnection[] = [];
 
     installPeerConnectionMock(peers);
-    const manager = new CallPeerConnectionManager();
+    const manager = callPeerConnectionManager();
 
     manager.configure(() => Promise.resolve({ iceServers: [] }));
     await manager.ensurePeer('peer-identity-id', false, () =>
@@ -462,7 +422,7 @@ describe(CallPeerConnectionManager.name, () => {
     const peers: FakePeerConnection[] = [];
 
     installPeerConnectionMock(peers);
-    const manager = new CallPeerConnectionManager();
+    const manager = callPeerConnectionManager();
 
     manager.configure(() => Promise.resolve({ iceServers: [] }));
     await manager.ensurePeer('peer-identity-id', false, () =>
@@ -491,7 +451,7 @@ describe(CallPeerConnectionManager.name, () => {
     const configurations: RTCConfiguration[] = [];
 
     installPeerConnectionMock(peers, configurations);
-    const manager = new CallPeerConnectionManager();
+    const manager = callPeerConnectionManager();
 
     manager.configure(() =>
       Promise.resolve({
@@ -529,7 +489,7 @@ describe(CallPeerConnectionManager.name, () => {
 
   it('exchanges offer and answer between joined peers', async () => {
     const peers: FakePeerConnection[] = [];
-    const manager = new CallPeerConnectionManager();
+    const manager = callPeerConnectionManager();
     const sentSignals: Array<{
       payload: Record<string, unknown>;
       recipientIdentityId: string;
@@ -593,7 +553,7 @@ describe(CallPeerConnectionManager.name, () => {
 
     installEncodedStreamSupport();
     installPeerConnectionMock(peers, configurations);
-    const manager = new CallPeerConnectionManager();
+    const manager = callPeerConnectionManager();
     const microphone = mediaTrack('microphone-1', 'audio');
 
     manager.configure(() => Promise.resolve({ iceServers: [] }));
@@ -616,7 +576,7 @@ describe(CallPeerConnectionManager.name, () => {
 
     installEncodedStreamSupport();
     installPeerConnectionMock(peers);
-    const manager = new CallPeerConnectionManager();
+    const manager = callPeerConnectionManager();
     const sendSignal = jest.fn(() =>
       Promise.resolve(),
     ) as unknown as jest.MockedFunction<SignalSender>;
@@ -648,7 +608,7 @@ describe(CallPeerConnectionManager.name, () => {
     installEncodedStreamSupport();
     installSessionDescriptionMock();
     installPeerConnectionMock(peers);
-    const manager = new CallPeerConnectionManager();
+    const manager = callPeerConnectionManager();
     const sendSignal = jest.fn(() =>
       Promise.resolve(),
     ) as unknown as jest.MockedFunction<SignalSender>;
@@ -700,7 +660,7 @@ describe(CallPeerConnectionManager.name, () => {
     installEncodedStreamSupport();
     installSessionDescriptionMock();
     installPeerConnectionMock(peers);
-    const manager = new CallPeerConnectionManager();
+    const manager = callPeerConnectionManager();
     const sendSignal = jest.fn(() =>
       Promise.resolve(),
     ) as unknown as jest.MockedFunction<SignalSender>;
@@ -760,7 +720,7 @@ describe(CallPeerConnectionManager.name, () => {
     const configurations: RTCConfiguration[] = [];
 
     installPeerConnectionMock(peers, configurations);
-    const manager = new CallPeerConnectionManager();
+    const manager = callPeerConnectionManager();
     const rtcConfiguration: RTCConfiguration = {
       iceServers: [
         {
@@ -803,7 +763,7 @@ describe(CallPeerConnectionManager.name, () => {
     const sentSignals: Array<{ signalType: string }> = [];
 
     installPeerConnectionMock(peers);
-    const manager = new CallPeerConnectionManager();
+    const manager = callPeerConnectionManager();
 
     manager.configure(() => Promise.resolve({ iceServers: [] }));
     manager.setLocalStream(
@@ -835,7 +795,7 @@ describe(CallPeerConnectionManager.name, () => {
 
     installMediaStreamMock();
     installPeerConnectionMock(peers);
-    const manager = new CallPeerConnectionManager();
+    const manager = callPeerConnectionManager();
     const microphone = mediaTrack('microphone', 'audio');
     const screen = mediaTrack('screen', 'video', 'detail');
 
@@ -867,7 +827,7 @@ describe(CallPeerConnectionManager.name, () => {
 
     installMediaStreamMock();
     installPeerConnectionMock(peers);
-    const manager = new CallPeerConnectionManager();
+    const manager = callPeerConnectionManager();
     const microphone = mediaTrack('microphone', 'audio');
     const screen = mediaTrack('screen', 'video', 'detail');
     const screenAudio = mediaTrack('screen-audio', 'audio', 'music');
@@ -897,90 +857,8 @@ describe(CallPeerConnectionManager.name, () => {
     );
   });
 
-  it('uses only Web Audio output when gain is already active', () => {
-    const manager = new CallPeerConnectionManager();
-    const audio = audioElement();
-    const gain = gainNode();
-    const context = audioContext();
-    const internals = managerInternals(manager);
-
-    internals.remoteAudio.set('peer-identity-id', audio);
-    internals.remoteAudioGains.set('peer-identity-id', gain);
-    internals.remoteAudioContexts.set('peer-identity-id', context);
-
-    manager.setPeerVolume('peer-identity-id', 300);
-
-    expect(audio.volume).toBe(0);
-    expect(gain.gain.setValueAtTime).toHaveBeenCalledWith(3, 12);
-    expect(context.resume).toHaveBeenCalledTimes(1);
-  });
-
-  it('creates a single Web Audio output path when remote volume exceeds one hundred percent', () => {
-    const manager = new CallPeerConnectionManager();
-    const internals = managerInternals(manager);
-    const audio = audioElement();
-    const audioTrack = mediaTrack('remote-audio-track', 'audio');
-    const audioStream = mediaStreamWithTracks([audioTrack], 'audio-stream');
-    const context = mockAudioContext();
-
-    installAudioContextMock(context);
-    audio.srcObject = audioStream;
-    internals.remoteAudio.set('peer-identity-id', audio);
-
-    manager.setPeerVolume('peer-identity-id', 250);
-
-    expect(audio.volume).toBe(0);
-    expect(context.createMediaStreamSource).toHaveBeenCalledWith(audioStream);
-    expect(context.createdGain.gain.value).toBe(2.5);
-    expect(context.createdSource.connect).toHaveBeenCalledWith(
-      context.createdGain,
-    );
-    expect(internals.remoteAudioGains.get('peer-identity-id')).toBe(
-      context.createdGain,
-    );
-    expect(internals.remoteAudioOutputStreams.get('peer-identity-id')).toBe(
-      audioStream,
-    );
-  });
-
-  it('mutes the Web Audio output while deafened', () => {
-    const manager = new CallPeerConnectionManager();
-    const audio = audioElement();
-    const gain = gainNode();
-    const context = audioContext();
-    const internals = managerInternals(manager);
-
-    internals.remoteAudio.set('peer-identity-id', audio);
-    internals.remoteAudioGains.set('peer-identity-id', gain);
-    internals.remoteAudioContexts.set('peer-identity-id', context);
-
-    manager.setPeerVolume('peer-identity-id', 250);
-    manager.setDeafened(true);
-    manager.setDeafened(false);
-
-    expect(gain.gain.setValueAtTime).toHaveBeenNthCalledWith(1, 2.5, 12);
-    expect(gain.gain.setValueAtTime).toHaveBeenNthCalledWith(2, 0, 12);
-    expect(gain.gain.setValueAtTime).toHaveBeenNthCalledWith(3, 2.5, 12);
-    expect(audio.pause).not.toHaveBeenCalled();
-  });
-
-  it('falls back to native audio volume when Web Audio gain is unavailable', () => {
-    const manager = new CallPeerConnectionManager();
-    const audio = audioElement();
-
-    managerInternals(manager).remoteAudio.set('peer-identity-id', audio);
-
-    manager.setPeerVolume('peer-identity-id', 250);
-
-    expect(audio.volume).toBe(1);
-
-    manager.setPeerVolume('peer-identity-id', 50);
-
-    expect(audio.volume).toBe(0.5);
-  });
-
   it('classifies remote screen share by stream id metadata', () => {
-    const manager = new CallPeerConnectionManager();
+    const manager = callPeerConnectionManager();
     const internals = managerInternals(manager);
     const screenTrack = mediaTrack('receiver-video-track', 'video');
     const screenStream = mediaStreamWithTracks(
@@ -1003,17 +881,11 @@ describe(CallPeerConnectionManager.name, () => {
     expect(internals.remoteStreams.has('peer-identity-id')).toBe(false);
   });
 
-  it('does not replace remote audio output with video-only streams', () => {
-    const manager = new CallPeerConnectionManager();
+  it('tracks video-only remote streams', () => {
+    const manager = callPeerConnectionManager();
     const internals = managerInternals(manager);
-    const audio = audioElement();
-    const audioTrack = mediaTrack('remote-audio-track', 'audio');
-    const audioStream = mediaStreamWithTracks([audioTrack], 'audio-stream');
     const videoTrack = mediaTrack('remote-video-track', 'video');
     const videoStream = mediaStreamWithTracks([videoTrack], 'video-stream');
-
-    audio.srcObject = audioStream;
-    internals.remoteAudio.set('peer-identity-id', audio);
 
     internals.handleRemoteTrack(
       'peer-identity-id',
@@ -1021,108 +893,24 @@ describe(CallPeerConnectionManager.name, () => {
     );
 
     expect(internals.remoteStreams.get('peer-identity-id')).toBe(videoStream);
-    expect(audio.srcObject).toBe(audioStream);
-    expect(audio.play).not.toHaveBeenCalled();
   });
 
-  it('mixes multiple remote voice audio tracks for the same peer', () => {
-    const manager = new CallPeerConnectionManager();
-    const internals = managerInternals(manager);
-    const audio = audioElement();
-    const microphoneTrack = mediaTrack('remote-microphone-track', 'audio');
-    const screenAudioTrack = mediaTrack('remote-second-audio-track', 'audio');
-
-    installMediaStreamMock();
-    internals.remoteAudio.set('peer-identity-id', audio);
-
-    internals.handleRemoteTrack(
-      'peer-identity-id',
-      remoteTrackEvent(microphoneTrack, [
-        mediaStreamWithTracks([microphoneTrack], 'microphone-stream'),
-      ]),
-    );
-    internals.handleRemoteTrack(
-      'peer-identity-id',
-      remoteTrackEvent(screenAudioTrack, [
-        mediaStreamWithTracks([screenAudioTrack], 'screen-audio-stream'),
-      ]),
-    );
-
-    const mixedStream = internals.remoteAudioStreams.get('peer-identity-id');
-
-    expect(mixedStream?.getAudioTracks()).toEqual([
-      microphoneTrack,
-      screenAudioTrack,
-    ]);
-    expect(audio.srcObject).toBe(mixedStream);
-  });
-
-  it('keeps remote screen share audio on a separate volume channel', () => {
-    const manager = new CallPeerConnectionManager();
-    const internals = managerInternals(manager);
-    const voiceAudio = audioElement();
-    const screenAudio = audioElement();
-    const voiceTrack = mediaTrack('remote-microphone-track', 'audio');
-    const screenAudioTrack = mediaTrack('remote-screen-audio-track', 'audio');
-
-    installMediaStreamMock();
-    internals.remoteAudio.set('peer-identity-id', voiceAudio);
-    internals.remoteAudio.set('peer-identity-id:screen', screenAudio);
-    internals.remoteScreenAudioTrackIds.set(
-      'peer-identity-id',
-      new Set(['remote-screen-audio-track']),
-    );
-
-    internals.handleRemoteTrack(
-      'peer-identity-id',
-      remoteTrackEvent(voiceTrack, [
-        mediaStreamWithTracks([voiceTrack], 'microphone-stream'),
-      ]),
-    );
-    internals.handleRemoteTrack(
-      'peer-identity-id',
-      remoteTrackEvent(screenAudioTrack, [
-        mediaStreamWithTracks([screenAudioTrack], 'screen-audio-stream'),
-      ]),
-    );
-
-    manager.setPeerScreenShareVolume('peer-identity-id', 0);
-
-    expect(voiceAudio.srcObject).toBe(
-      internals.remoteAudioStreams.get('peer-identity-id'),
-    );
-    expect(screenAudio.srcObject).toBe(
-      internals.remoteAudioStreams.get('peer-identity-id:screen'),
-    );
-    expect(voiceAudio.volume).toBe(1);
-    expect(screenAudio.volume).toBe(0);
-  });
-
-  it('removes stale peers and their audio output when they leave', async () => {
+  it('removes stale peers and their media when they leave', async () => {
     const peers: FakePeerConnection[] = [];
 
     installPeerConnectionMock(peers);
-    const manager = new CallPeerConnectionManager();
+    const manager = callPeerConnectionManager();
     const internals = managerInternals(manager);
-    const audio = audioElement();
-    const source = audioSource();
-    const context = audioContext();
-    const gain = gainNode();
     const screenTrack = mediaTrack('remote-screen-track', 'video');
 
     manager.configure(() => Promise.resolve({ iceServers: [] }));
     await manager.ensurePeer('peer-identity-id', false, () =>
       Promise.resolve(),
     );
-    audio.srcObject = mediaStreamWithTracks([
-      mediaTrack('remote-audio-track', 'audio'),
-    ]);
-    internals.remoteAudio.set('peer-identity-id', audio);
-    internals.remoteAudioContexts.set('peer-identity-id', context);
-    internals.remoteAudioGains.set('peer-identity-id', gain);
-    internals.remoteAudioOutputSources.set('peer-identity-id', source);
-    internals.remoteAudioOutputStreams.set('peer-identity-id', audio.srcObject);
-    internals.remoteStreams.set('peer-identity-id', audio.srcObject);
+    internals.remoteStreams.set(
+      'peer-identity-id',
+      mediaStreamWithTracks([mediaTrack('remote-audio-track', 'audio')]),
+    );
     internals.remoteScreenStreams.set(
       'peer-identity-id',
       mediaStreamWithTracks([screenTrack]),
@@ -1135,16 +923,6 @@ describe(CallPeerConnectionManager.name, () => {
     manager.retainPeers(new Set());
 
     expect(peers[0]?.close).toHaveBeenCalledTimes(1);
-    expect(source.disconnect).toHaveBeenCalledTimes(1);
-    expect(context.close).toHaveBeenCalledTimes(1);
-    expect(audio.pause).toHaveBeenCalledTimes(1);
-    expect(audio.remove).toHaveBeenCalledTimes(1);
-    expect(audio.srcObject).toBeNull();
-    expect(internals.remoteAudio.has('peer-identity-id')).toBe(false);
-    expect(internals.remoteAudioGains.has('peer-identity-id')).toBe(false);
-    expect(internals.remoteAudioOutputStreams.has('peer-identity-id')).toBe(
-      false,
-    );
     expect(internals.remoteStreams.has('peer-identity-id')).toBe(false);
     expect(internals.remoteScreenStreams.has('peer-identity-id')).toBe(false);
   });
