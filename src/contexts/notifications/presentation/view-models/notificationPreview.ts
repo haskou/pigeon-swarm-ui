@@ -1,6 +1,6 @@
 import type { NotificationResource } from '../../../../shared/domain/pigeonResources.types';
-import type { CommunityInvitationNotificationResource } from '../../domain/CommunityInvitationNotificationResource';
-import type { ConversationInvitationNotificationResource } from '../../domain/ConversationInvitationNotificationResource';
+import type { CommunityInvitationNotificationResource } from '../../infrastructure/http/resources/CommunityInvitationNotificationResource';
+import type { ConversationInvitationNotificationResource } from '../../infrastructure/http/resources/ConversationInvitationNotificationResource';
 import type {
   NotificationPreview,
   NotificationPreviewContext,

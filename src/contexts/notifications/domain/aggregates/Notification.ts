@@ -1,25 +1,28 @@
 import { DomainError } from '@haskou/value-objects';
 
-import type { NotificationResource } from '../../../../shared/domain/pigeonResources.types';
-
 import { AggregateRoot } from '../../../../shared/domain/AggregateRoot';
 import { NotificationDecision } from '../NotificationDecision';
 import { NotificationId } from '../NotificationId';
 import { NotificationState } from '../NotificationState';
+import { NotificationType } from '../NotificationType';
 
 export class Notification extends AggregateRoot {
-  public static fromResource(resource: NotificationResource): Notification {
+  public static fromPrimitives(primitives: {
+    id: string;
+    state: string;
+    type: string;
+  }): Notification {
     return new Notification(
-      NotificationId.fromString(resource.id),
-      NotificationState.fromPrimitive(resource.state),
-      resource.type,
+      NotificationId.fromString(primitives.id),
+      NotificationState.fromPrimitive(primitives.state),
+      NotificationType.fromPrimitives(primitives.type),
     );
   }
 
   private constructor(
     private readonly id: NotificationId,
     private state: NotificationState,
-    private readonly type: NotificationResource['type'],
+    private readonly type: NotificationType,
   ) {
     super();
   }
@@ -59,6 +62,6 @@ export class Notification extends AggregateRoot {
   }
 
   public isRespondable(): boolean {
-    return this.state.isPending() && this.type !== 'missed_call';
+    return this.state.isPending() && !this.type.isMissedCall();
   }
 }

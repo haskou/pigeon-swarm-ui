@@ -20,7 +20,7 @@ describe(Notification.name, () => {
   } satisfies NotificationResource;
 
   it('accepts pending invitations and records a domain event', () => {
-    const notification = Notification.fromResource(pendingInvitation);
+    const notification = Notification.fromPrimitives(pendingInvitation);
 
     notification.accept();
 
@@ -31,14 +31,9 @@ describe(Notification.name, () => {
   });
 
   it('rejects missed calls as respondable invitations', () => {
-    const notification = Notification.fromResource({
-      ...pendingInvitation,
-      payload: {
-        callerIdentityId: 'identity-1',
-        callId: 'call-1',
-        networkId: 'network-1',
-        recipientIdentityId: 'identity-2',
-      },
+    const notification = Notification.fromPrimitives({
+      id: pendingInvitation.id,
+      state: pendingInvitation.state,
       type: 'missed_call',
     });
 

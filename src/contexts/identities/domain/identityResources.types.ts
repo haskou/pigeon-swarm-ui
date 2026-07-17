@@ -6,4 +6,3 @@ export type { IdentityPresence } from './IdentityPresence';
 export type { KeychainResource } from './KeychainResource';
 export type { LocalKeychain } from './LocalKeychain';
 export type { Session } from './Session';
-export type { LoginResult } from './LoginResult';
