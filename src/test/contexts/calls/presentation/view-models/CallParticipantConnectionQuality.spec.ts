@@ -1,7 +1,5 @@
-import type {
-  CallParticipant,
-  CallSession,
-} from '../../../../../contexts/calls/domain/callSession.types';
+import type { CallParticipant } from '../../../../../contexts/calls/presentation/view-models/CallParticipant';
+import type { CallSession } from '../../../../../contexts/calls/presentation/view-models/CallSession';
 
 import {
   callParticipantConnectionQuality,

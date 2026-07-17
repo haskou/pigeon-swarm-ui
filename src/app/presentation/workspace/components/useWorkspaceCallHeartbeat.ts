@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
-
-import type { CallSession } from '../../../../contexts/calls/domain/callSession.types';
-import type { CallParticipantMediaConnection } from '../../../../contexts/calls/domain/callSession.types';
+import type { CallSession } from '../../../../contexts/calls/presentation/view-models/CallSession';
+import type { CallParticipantMediaConnectionResource as CallParticipantMediaConnection } from '../../../../contexts/calls/infrastructure/http/resources/CallParticipantMediaConnectionResource';
 
 import { logCallWarning } from '../../../../contexts/calls/infrastructure/media/callDebugLogger';
 import { startCallHeartbeatLoop } from './startCallHeartbeatLoop';

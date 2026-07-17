@@ -1,6 +1,5 @@
 import { type ReactNode, useRef } from 'react';
-
-import type { CallParticipant } from '../../../../contexts/calls/domain/callSession.types';
+import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
 import type {
   ConversationResource,
   NotificationScopeSetting,

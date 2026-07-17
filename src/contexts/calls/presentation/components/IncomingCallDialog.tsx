@@ -1,4 +1,4 @@
-import type { CallParticipant } from '../../domain/callSession.types';
+import type { CallParticipant } from '../view-models/CallParticipant';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { shortId } from '../../../../shared/presentation/formatting';

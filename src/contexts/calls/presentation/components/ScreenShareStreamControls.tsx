@@ -1,9 +1,6 @@
 import { useMemo, useState } from 'react';
-
-import type {
-  CallParticipant,
-  ScreenShareQualityPreset,
-} from '../../domain/callSession.types';
+import type { CallParticipant } from '../view-models/CallParticipant';
+import type { ScreenShareQualityPreset } from '../../infrastructure/media/ScreenShareQualityPreset';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';

@@ -78,7 +78,6 @@ import { PigeonPublicFileUploader } from '../../contexts/attachments/infrastruct
 import { MessageAttachmentThumbnailPreparer } from '../../contexts/attachments/infrastructure/media/MessageAttachmentThumbnailPreparer';
 import { PublicImageUploadPreparer } from '../../contexts/attachments/infrastructure/media/PublicImageUploadPreparer';
 import { PigeonCallsApi } from '../../contexts/calls/infrastructure/http/PigeonCallsApi';
-import { PigeonCallsGateway } from '../../contexts/calls/infrastructure/http/PigeonCallsGateway';
 import { PigeonCommunitiesApi } from '../../contexts/communities/infrastructure/http/PigeonCommunitiesApi';
 import { PigeonCommunitiesGateway } from '../../contexts/communities/infrastructure/http/PigeonCommunitiesGateway';
 import { PigeonCommunityInvitationApi } from '../../contexts/communities/infrastructure/http/PigeonCommunityInvitationApi';
@@ -189,7 +188,7 @@ export class PigeonApiGateway {
 
   public readonly identityGateway: PigeonIdentitiesGateway;
 
-  public readonly calls: PigeonCallsGateway;
+  public readonly calls: PigeonCallsApi;
 
   public readonly communityGateway: PigeonCommunitiesGateway;
 
@@ -227,7 +226,7 @@ export class PigeonApiGateway {
     ids: ConversationIdFactory = new ConversationIdFactory(),
     attachmentCipher: AttachmentCipher = AttachmentCipher.inCurrentThread(),
   ) {
-    this.calls = new PigeonCallsGateway(new PigeonCallsApi(http, signer));
+    this.calls = new PigeonCallsApi(http, signer);
     this.communities = new PigeonCommunitiesApi(
       http,
       signer,

@@ -1,4 +1,4 @@
-import type { CallResource } from '../../domain/callSession.types';
+import type { CallResource } from '../../infrastructure/http/resources/CallResource';
 
 export function joinedRemotePeerIdentityIds(
   call: CallResource,

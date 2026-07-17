@@ -1,7 +1,5 @@
-import type {
-  CallParticipant,
-  CallResource,
-} from '../../domain/callSession.types';
+import type { CallParticipant } from '../view-models/CallParticipant';
+import type { CallResource } from '../../infrastructure/http/resources/CallResource';
 
 export function reconciledCallParticipants(
   currentParticipants: CallParticipant[],

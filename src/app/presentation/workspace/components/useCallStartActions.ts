@@ -5,14 +5,14 @@ import {
   type Dispatch,
   type SetStateAction,
 } from 'react';
-
-import type {
-  CallIceServerConfig,
-  CallParticipant,
-  CallSignalType,
-} from '../../../../contexts/calls/domain/callSession.types';
+import type { CallIceServerResource as CallIceServerConfig } from '../../../../contexts/calls/infrastructure/http/resources/CallIceServerResource';
+import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
+import type { CallSignalType } from '../../../../contexts/calls/infrastructure/media/CallSignalType';
 import type { useCallSession } from '../../../../contexts/calls/presentation/hooks/useCallSession';
-import type { Community, Session } from '../../../../shared/domain/pigeonResources.types';
+import type {
+  Community,
+  Session,
+} from '../../../../shared/domain/pigeonResources.types';
 import type { IncomingWorkspaceCall } from './useCallResourceReconciliation';
 import type { WorkspaceCallDetails } from './resolveWorkspaceCallDetails';
 
@@ -46,7 +46,9 @@ type SignalSender = (
 type CallStartActionsInput = {
   activeCall: CallController['activeCall'];
   activeCommunity: Community | null;
-  callDetailsForResource: (call: Parameters<CallController['reconcileCall']>[0]) => WorkspaceCallDetails;
+  callDetailsForResource: (
+    call: Parameters<CallController['reconcileCall']>[0],
+  ) => WorkspaceCallDetails;
   callMediaEncryptionForResource: (
     call: Parameters<CallController['reconcileCall']>[0],
   ) => CallMediaEncryptionInput;
@@ -56,7 +58,10 @@ type CallStartActionsInput = {
   incomingCall: IncomingWorkspaceCall | null;
   leaveCurrentCallForSwitch: () => Promise<void>;
   loadCallIceConfig: () => Promise<CallIceServerConfig>;
-  requestOptionalLocalAudio: (event: string, context: Record<string, unknown>) => Promise<MediaStream | null>;
+  requestOptionalLocalAudio: (
+    event: string,
+    context: Record<string, unknown>,
+  ) => Promise<MediaStream | null>;
   session: Session;
   setIncomingCall: Dispatch<SetStateAction<IncomingWorkspaceCall | null>>;
   setSendError: Dispatch<SetStateAction<string | null>>;
@@ -351,8 +356,8 @@ export function useCallStartActions({
     callActionInProgressRef.current = true;
 
     void (async () => {
-      const latestCall = await applicationContainer
-        .calls.get(sessionRef.current, pendingCall.id)
+      const latestCall = await applicationContainer.calls
+        .get(sessionRef.current, pendingCall.id)
         .catch(() => pendingCall);
       const currentParticipant = latestCall.participants.find(
         (participant) =>
@@ -453,8 +458,8 @@ export function useCallStartActions({
 
     setIncomingCall(null);
     stopIncomingCallSound();
-    void applicationContainer
-      .calls.leave(sessionRef.current, callId)
+    void applicationContainer.calls
+      .leave(sessionRef.current, callId)
       .catch(() => undefined);
   }, [incomingCall]);
 
