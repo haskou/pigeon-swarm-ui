@@ -1,4 +1,4 @@
-import type { CallSession } from '../../../../contexts/calls/domain/callSession.types';
+import type { CallSession } from '../../../../contexts/calls/presentation/view-models/CallSession';
 
 export function callDepartureAction(
   kind: CallSession['kind'] | undefined,

@@ -1,8 +1,6 @@
-import type {
-  CallParticipant,
-  CallResource,
-  CallSession,
-} from '../../../../contexts/calls/domain/callSession.types';
+import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
+import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
+import type { CallSession } from '../../../../contexts/calls/presentation/view-models/CallSession';
 import type {
   Community,
   ConversationResource,
@@ -132,8 +130,7 @@ function callParticipantIds(
   return call.participants
     .filter(
       (participant) =>
-        participant.connected ||
-        participant.identityId === currentIdentityId,
+        participant.connected || participant.identityId === currentIdentityId,
     )
     .map((participant) => participant.identityId);
 }

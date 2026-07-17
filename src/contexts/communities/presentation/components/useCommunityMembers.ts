@@ -7,10 +7,8 @@ import type {
   IdentityResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
-import type {
-  CallParticipant,
-  CallSession,
-} from '../../../calls/domain/callSession.types';
+import type { CallParticipant } from '../../../calls/presentation/view-models/CallParticipant';
+import type { CallSession } from '../../../calls/presentation/view-models/CallSession';
 import type { CommunityMemberListItem } from './communityMembersPanel';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';

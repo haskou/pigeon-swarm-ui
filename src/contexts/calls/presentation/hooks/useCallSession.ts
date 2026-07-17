@@ -1,19 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type {
-  CallParticipant,
-  CallParticipantMediaConnection,
-  CallIceServerConfig,
-  CallMediaEncryptionState,
-  CallMediaEncryptionUnavailableReason,
-  CallMicrophoneErrorCode,
-  CallResource,
-  CallSignalType,
-  CallSession,
-  ScreenShareQualityPreset,
-} from '../../domain/callSession.types';
+import type { CallIceServerResource as CallIceServerConfig } from '../../infrastructure/http/resources/CallIceServerResource';
+import type { CallParticipantMediaConnectionResource as CallParticipantMediaConnection } from '../../infrastructure/http/resources/CallParticipantMediaConnectionResource';
+import type { CallResource } from '../../infrastructure/http/resources/CallResource';
 import type { PeerMediaStats } from '../../infrastructure/media/CallPeerConnectionManager';
+import type { CallSignalType } from '../../infrastructure/media/CallSignalType';
+import type { ScreenShareQualityPreset } from '../../infrastructure/media/ScreenShareQualityPreset';
+import type { CallMediaEncryptionUnavailableReason } from '../view-models/CallMediaEncryptionUnavailableReason';
+import type { CallMicrophoneErrorCode } from '../view-models/CallMicrophoneErrorCode';
+import type { CallParticipant } from '../view-models/CallParticipant';
+import type { CallSession } from '../view-models/CallSession';
 
+import { BrowserRemoteAudioElementHost } from '../../infrastructure/media/BrowserRemoteAudioElementHost';
 import {
   logCallDebug,
   logCallError,
@@ -21,11 +19,22 @@ import {
 } from '../../infrastructure/media/callDebugLogger';
 import { CallPeerConnectionManager } from '../../infrastructure/media/CallPeerConnectionManager';
 import { LocalMediaManager } from '../../infrastructure/media/LocalMediaManager';
+import { RemoteCallAudio } from '../../infrastructure/media/RemoteCallAudio';
 import {
   retainedRemotePeerIdentityIds,
   signalingRemotePeerIdentityIds,
   shouldCreateInitialOffer,
 } from './callPeerConnectionPlan';
+import {
+  callMediaEncryptionState,
+  callParticipantsMediaStateEqual,
+  callSessionForJoinedPeerConnection,
+  localMediaFlagsChanged,
+  localMediaSession,
+  participantsWithMediaState,
+  reconciledCallStatus,
+} from './callSessionMediaState';
+import { classifyCallMicrophoneError } from './classifyCallMicrophoneError';
 import { reconciledCallParticipants } from './reconciledCallParticipants';
 
 type SignalSender = (
@@ -96,7 +105,13 @@ export function useCallSession(): {
   toggleScreenShare: () => Promise<void>;
 } {
   const mediaManager = useMemo(() => new LocalMediaManager(), []);
-  const peerManager = useMemo(() => new CallPeerConnectionManager(), []);
+  const peerManager = useMemo(
+    () =>
+      new CallPeerConnectionManager(
+        new RemoteCallAudio(new BrowserRemoteAudioElementHost()),
+      ),
+    [],
+  );
   const [activeCall, setActiveCall] = useState<CallSession | null>(null);
   const activeCallRef = useRef<CallSession | null>(null);
   const currentIdentityIdRef = useRef<string | null>(null);
@@ -131,6 +146,7 @@ export function useCallSession(): {
       const screenStream = mediaManager.screenPreviewStream();
 
       refreshInFlight = false;
+
       if (cancelled) return;
 
       setActiveCall((current) => {
@@ -142,8 +158,7 @@ export function useCallSession(): {
           remoteStreams,
           remoteScreenStreams,
           localAudioLevel,
-          (identityId) =>
-            peerManager.isMediaEncryptionActiveWith(identityId),
+          (identityId) => peerManager.isMediaEncryptionActiveWith(identityId),
           screenStream,
         );
         const nextCameraEnabled = mediaManager.hasCamera();
@@ -270,7 +285,7 @@ export function useCallSession(): {
                     callId: nextCall.id,
                     error,
                   });
-                  microphoneError = classifyMicrophoneError(error);
+                  microphoneError = classifyCallMicrophoneError(error);
 
                   return null;
                 });
@@ -333,7 +348,7 @@ export function useCallSession(): {
           ? {
               ...current,
               hasMicrophone: false,
-              microphoneError: classifyMicrophoneError(error),
+              microphoneError: classifyCallMicrophoneError(error),
               muted: true,
               status: 'permission-denied',
             }
@@ -570,7 +585,7 @@ export function useCallSession(): {
           ? {
               ...active,
               hasMicrophone: false,
-              microphoneError: classifyMicrophoneError(error),
+              microphoneError: classifyCallMicrophoneError(error),
               muted: true,
             }
           : active,
@@ -790,16 +805,16 @@ export function useCallSession(): {
     endCall,
     receiveSignal,
     reconcileCall,
-    setScreenShareQuality,
+    retryMicrophone,
     setParticipantScreenShareVolume,
     setParticipantVolume,
+    setScreenShareQuality,
     startCall,
     toggleCamera,
     toggleDeafen,
     toggleMediaEncryption,
     toggleMute,
     toggleNoiseCancellation,
-    retryMicrophone,
     toggleScreenShare,
   };
 
@@ -815,8 +830,8 @@ export function useCallSession(): {
     logCallDebug('session:connect-signal-ready-peers', {
       callId: call.id,
       currentIdentityId,
-      signalingParticipantCount: peerIdentityIds.length,
       participantCount: call.participants.length,
+      signalingParticipantCount: peerIdentityIds.length,
     });
     await Promise.all(
       peerIdentityIds.map((peerIdentityId) =>
@@ -865,264 +880,4 @@ export function useCallSession(): {
       signalType: signal.signalType,
     });
   }
-}
-
-function reconciledCallStatus(
-  call: CallResource,
-  current: CallSession,
-): CallSession['status'] {
-  if (call.status === 'active') return current.status;
-
-  return call.status === 'missed' ? 'missed' : 'ended';
-}
-
-function localMediaFlagsChanged(
-  call: CallSession,
-  cameraEnabled: boolean,
-  screenSharing: boolean,
-): boolean {
-  return (
-    call.cameraEnabled !== cameraEnabled || call.screenSharing !== screenSharing
-  );
-}
-
-function callSessionForJoinedPeerConnection(
-  call: CallResource,
-  currentIdentityId: string,
-  input: ReconcileCallInput,
-  participants: CallParticipant[],
-  activeCall: CallSession | null,
-): CallSession {
-  return {
-    ...input,
-    call,
-    cameraEnabled: activeCall?.cameraEnabled ?? false,
-    currentIdentityId,
-    deafened: activeCall?.deafened ?? false,
-    hasMicrophone: activeCall?.hasMicrophone ?? false,
-    id: call.id,
-    localPreviewStream: activeCall?.localPreviewStream,
-    muted: activeCall?.muted ?? false,
-    mediaEncryption: activeCall?.mediaEncryption ?? disabledMediaEncryption(),
-    noiseCancellationEnabled: activeCall?.noiseCancellationEnabled ?? true,
-    participants,
-    participantVolumes: activeCall?.participantVolumes ?? {},
-    screenShareAudioEnabled: activeCall?.screenShareAudioEnabled ?? true,
-    screenShareQuality: activeCall?.screenShareQuality ?? 'auto',
-    screenShareVolumes: activeCall?.screenShareVolumes ?? {},
-    screenSharing: activeCall?.screenSharing ?? false,
-    startedAt: activeCall?.startedAt ?? Date.now(),
-    status: activeCall?.status ?? 'live',
-  };
-}
-
-function disabledMediaEncryption(): CallMediaEncryptionState {
-  return {
-    active: false,
-    available: false,
-    enabled: false,
-    reason: 'missing-key',
-  };
-}
-
-function callMediaEncryptionState({
-  enabled,
-  key,
-  reason,
-}: {
-  enabled: boolean;
-  key?: string;
-  reason?: CallMediaEncryptionUnavailableReason;
-}): CallMediaEncryptionState {
-  if (!key) {
-    return {
-      active: false,
-      available: false,
-      enabled: false,
-      reason: reason ?? 'missing-key',
-    };
-  }
-
-  if (!CallPeerConnectionManager.mediaEncryptionSupported()) {
-    return {
-      active: false,
-      available: false,
-      enabled: false,
-      reason: 'unsupported',
-    };
-  }
-
-  return {
-    active: enabled,
-    available: true,
-    enabled,
-    reason: enabled ? undefined : 'disabled',
-  };
-}
-
-function participantsWithMediaState(
-  call: CallSession,
-  stats: Record<string, PeerMediaStats>,
-  remoteStreams: Record<string, MediaStream>,
-  remoteScreenStreams: Record<string, MediaStream>,
-  localAudioLevel: number,
-  isMediaEncryptionActiveWith: (identityId: string) => boolean,
-  screenStream?: MediaStream,
-): CallParticipant[] {
-  return call.participants.map((participant) =>
-    participant.identityId === call.currentIdentityId
-      ? localParticipantWithMediaState(
-          participant,
-          call,
-          localAudioLevel,
-          screenStream,
-        )
-      : remoteParticipantWithMediaState(
-          participant,
-          stats,
-          remoteStreams,
-          remoteScreenStreams,
-          isMediaEncryptionActiveWith,
-        ),
-  );
-}
-
-function localParticipantWithMediaState(
-  participant: CallParticipant,
-  call: CallSession,
-  audioLevel: number,
-  screenStream?: MediaStream,
-): CallParticipant {
-  return {
-    ...participant,
-    audioLevel,
-    deafened: call.deafened,
-    mediaStream: call.localPreviewStream,
-    mediaEncryptionActive: call.mediaEncryption.active,
-    muted: call.muted,
-    screenSharing: call.screenSharing,
-    screenStream,
-    speaking: !call.muted && audioLevel > 0.04,
-    videoEnabled: hasVideoTrack(call.localPreviewStream),
-  };
-}
-
-function remoteParticipantWithMediaState(
-  participant: CallParticipant,
-  stats: Record<string, PeerMediaStats>,
-  remoteStreams: Record<string, MediaStream>,
-  remoteScreenStreams: Record<string, MediaStream>,
-  isMediaEncryptionActiveWith: (identityId: string) => boolean,
-): CallParticipant {
-  const stat = stats[participant.identityId];
-  const mediaStream = remoteStreams[participant.identityId];
-  const screenStream = remoteScreenStreams[participant.identityId];
-
-  return {
-    ...participant,
-    audioLevel: stat?.audioLevel,
-    bitrateKbps: stat?.bitrateKbps,
-    codec: stat?.codec,
-    connectionPath: stat?.connectionPath,
-    connectionState: stat?.connectionState ?? participant.connectionState,
-    iceState: stat?.iceState,
-    jitterMs: stat?.jitterMs,
-    latencyMs: stat?.latencyMs,
-    mediaStream,
-    mediaEncryptionActive: isMediaEncryptionActiveWith(
-      participant.identityId,
-    ),
-    packetsLost: stat?.packetsLost,
-    screenSharing: hasVideoTrack(screenStream),
-    screenStream,
-    speaking: stat?.speaking ?? false,
-    transport: stat?.transport,
-    videoEnabled: hasVideoTrack(mediaStream),
-  };
-}
-
-function localMediaSession(
-  call: CallSession,
-  media: Pick<
-    CallSession,
-    | 'cameraEnabled'
-    | 'localPreviewStream'
-    | 'noiseCancellationEnabled'
-    | 'screenShareAudioEnabled'
-    | 'screenShareQuality'
-    | 'screenSharing'
-  > & { screenStream?: MediaStream },
-): CallSession {
-  return {
-    ...call,
-    ...media,
-    participants: call.participants.map((participant) =>
-      participant.identityId === call.currentIdentityId
-        ? {
-            ...participant,
-            mediaStream: media.localPreviewStream,
-            screenSharing: media.screenSharing,
-            screenStream: media.screenStream,
-            videoEnabled: hasVideoTrack(media.localPreviewStream),
-          }
-        : participant,
-    ),
-  };
-}
-
-function hasVideoTrack(stream?: MediaStream): boolean {
-  return Boolean(
-    stream
-      ?.getVideoTracks()
-      .some((track) => track.readyState === 'live' && !track.muted),
-  );
-}
-
-function callParticipantsMediaStateEqual(
-  currentParticipants: CallParticipant[],
-  nextParticipants: CallParticipant[],
-): boolean {
-  if (currentParticipants.length !== nextParticipants.length) return false;
-
-  return currentParticipants.every((currentParticipant, index) => {
-    const nextParticipant = nextParticipants[index];
-
-    return (
-      currentParticipant.identityId === nextParticipant.identityId &&
-      currentParticipant.bitrateKbps === nextParticipant.bitrateKbps &&
-      currentParticipant.codec === nextParticipant.codec &&
-      currentParticipant.connectionPath === nextParticipant.connectionPath &&
-      currentParticipant.connectionState === nextParticipant.connectionState &&
-      currentParticipant.deafened === nextParticipant.deafened &&
-      currentParticipant.iceState === nextParticipant.iceState &&
-      currentParticipant.jitterMs === nextParticipant.jitterMs &&
-      currentParticipant.latencyMs === nextParticipant.latencyMs &&
-      currentParticipant.mediaStream === nextParticipant.mediaStream &&
-      currentParticipant.mediaEncryptionActive ===
-        nextParticipant.mediaEncryptionActive &&
-      currentParticipant.muted === nextParticipant.muted &&
-      currentParticipant.packetsLost === nextParticipant.packetsLost &&
-      currentParticipant.screenSharing === nextParticipant.screenSharing &&
-      currentParticipant.screenStream === nextParticipant.screenStream &&
-      currentParticipant.speaking === nextParticipant.speaking &&
-      currentParticipant.transport === nextParticipant.transport &&
-      currentParticipant.videoEnabled === nextParticipant.videoEnabled
-    );
-  });
-}
-
-function classifyMicrophoneError(error: unknown): CallMicrophoneErrorCode {
-  if (!window.isSecureContext) return 'not-secure';
-  if (!navigator.mediaDevices?.getUserMedia) return 'unsupported';
-
-  if (!(error instanceof Error)) return 'unknown';
-
-  if (error.name === 'NotAllowedError') return 'denied';
-  if (error.name === 'NotFoundError') return 'missing-device';
-  if (error.name === 'NotReadableError') return 'in-use';
-  if (error.name === 'OverconstrainedError') return 'constraint';
-  if (error.name === 'SecurityError') return 'security';
-  if (error instanceof TypeError) return 'unsupported';
-
-  return 'unknown';
 }

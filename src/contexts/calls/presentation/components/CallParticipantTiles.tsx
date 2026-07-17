@@ -1,4 +1,4 @@
-import type { CallSession } from '../../domain/callSession.types';
+import type { CallSession } from '../view-models/CallSession';
 
 import { ParticipantTile } from './ParticipantTile';
 

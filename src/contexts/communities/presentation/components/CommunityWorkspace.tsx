@@ -32,7 +32,7 @@ import type {
   StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
-import type { CallSession } from '../../../calls/domain/callSession.types';
+import type { CallSession } from '../../../calls/presentation/view-models/CallSession';
 import type { NodeNetwork } from '../../../networks/application/list-node-networks/ListNodeNetworks';
 import type { NotificationScopeSettingsTarget } from '../../../notifications/presentation/components/NotificationScopeSettingsDialog';
 

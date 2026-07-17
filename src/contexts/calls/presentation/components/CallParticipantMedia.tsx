@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-
-import type { CallParticipant } from '../../domain/callSession.types';
+import type { CallParticipant } from '../view-models/CallParticipant';
 
 import { identityPicture } from '../../../identities/presentation/view-models/identityDisplay';
 import { FallbackImage } from '../../../../shared/presentation/components/FallbackImage';

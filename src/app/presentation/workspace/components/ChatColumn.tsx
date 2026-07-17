@@ -13,8 +13,7 @@ import {
   useMemo,
   useState,
 } from 'react';
-
-import type { CallParticipant } from '../../../../contexts/calls/domain/callSession.types';
+import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
 import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import type {
   AttachmentProgress,

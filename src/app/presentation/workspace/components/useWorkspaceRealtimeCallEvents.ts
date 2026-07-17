@@ -1,10 +1,7 @@
 import { useCallback, useRef } from 'react';
-
-import type {
-  CallResource,
-  CallSession,
-  CallSignalType,
-} from '../../../../contexts/calls/domain/callSession.types';
+import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
+import type { CallSession } from '../../../../contexts/calls/presentation/view-models/CallSession';
+import type { CallSignalType } from '../../../../contexts/calls/infrastructure/media/CallSignalType';
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 

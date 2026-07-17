@@ -4,10 +4,8 @@ import type { NodeNetwork } from '../../../../contexts/networks/application/list
 import type { NetworkSynchronizationStatus } from '../../../../contexts/networks/application/find-network-synchronization/NetworkSynchronizationStatus';
 import type { Peer } from '../../../../contexts/networks/application/list-peers/ListPeers';
 import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
-import type {
-  CallParticipant,
-  CallResource,
-} from '../../../../contexts/calls/domain/callSession.types';
+import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
+import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
 import type {
   ChatMessage,
   Community,
