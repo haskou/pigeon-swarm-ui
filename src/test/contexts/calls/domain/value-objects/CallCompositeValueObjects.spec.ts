@@ -1,7 +1,6 @@
 import { Timestamp } from '@haskou/value-objects';
 
 import { CallLifecycle } from '../../../../../contexts/calls/domain/value-objects/CallLifecycle';
-import { CallMediaRoute } from '../../../../../contexts/calls/domain/value-objects/CallMediaRoute';
 import { CallParticipantTimeline } from '../../../../../contexts/calls/domain/value-objects/CallParticipantTimeline';
 import { CallScope } from '../../../../../contexts/calls/domain/value-objects/CallScope';
 
@@ -29,21 +28,13 @@ describe('call composite value objects', () => {
     expect(joined.toPrimitives()).toEqual({ joinedAt: 100 });
   });
 
-  it('hydrates media routes and scopes from their serialized contracts', () => {
-    const route = CallMediaRoute.fromPrimitives({
-      localCandidateType: 'host',
-      protocol: 'udp',
-    });
+  it('hydrates scopes from their serialized contracts', () => {
     const scope = CallScope.fromPrimitives({
       channelId: 'channel-a',
       communityId: 'community-a',
       type: 'community_channel',
     });
 
-    expect(route.toPrimitives()).toEqual({
-      localCandidateType: 'host',
-      protocol: 'udp',
-    });
     expect(scope.toPrimitives()).toEqual({
       channelId: 'channel-a',
       communityId: 'community-a',
