@@ -9,7 +9,7 @@ import {
   currentPwaNotificationPermission,
   ensurePwaPushSubscription,
   type PwaNotificationPermission,
-} from '../../infrastructure/browser/pwaNotifications';
+} from '../services/pwaNotifications';
 
 type PushNotificationRegistrationState = 'error' | 'idle' | 'loading';
 

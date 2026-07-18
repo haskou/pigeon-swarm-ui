@@ -40,30 +40,30 @@ adapters into application services without containing context behavior.
 
 ## Active slice
 
-- Id: `NOTIFICATION-001`
-- Title: Rebuild notification decisions and scope settings behind aggregates
-- Size: L
+- Id: `NOTIFICATION-002`
+- Title: Isolate browser push subscription lifecycle
+- Size: M
 - Status: completed
-- Business capability: Notification decisions, inherited scope preferences,
-  mute visibility, mention delivery, and push subscription coordination
+- Business capability: Browser push registration, removal, server-key lookup,
+  capability detection, and notification presentation
 - Source area: `src/contexts/notifications`
-- Target boundary: behavior-rich `Notification` and `NotificationSetting`
-  aggregates, primitive application messages, domain repositories, and
-  context-owned HTTP/browser adapters
+- Target boundary: `PushSubscription` aggregate, primitive application
+  messages, domain repositories, browser capability adapters, and a
+  presentation-owned lifecycle coordinator
 - Target files/folders: `contexts/notifications/{domain,application,infrastructure}`
 - Compatibility constraints: REST, websocket, encrypted payload, and existing
   presentation APIs remain stable while callers migrate by capability
 - Validation level: L2
-- Affected behavior/tests: notification listing and decisions, invitation
-  acceptance, inherited settings, mute/mention policy, and push registration
-- Tests/checks run: 23 notification suites / 58 tests, direct aggregate,
-  use-case, mapper, access-context, repository, invitation-key recipient, and
-  presentation-policy coverage; TypeScript typecheck and full lint
-- Full-suite status: 230 suites / 792 tests passing
-- Done criteria: application receives primitive messages, notification and
-  settings transitions run through their aggregate roots, resources stay out
-  of domain/application, and infrastructure implements domain repositories
-  without application ports
+- Affected behavior/tests: explicit and automatic push registration,
+  replacement of stale browser subscriptions, permission handling, VAPID
+  lookup, notification display, and subscription removal
+- Tests/checks run: 37 notification/composition suites / 74 tests, direct
+  aggregate, use-case, mapper, repository and browser lifecycle coverage;
+  TypeScript typecheck and full lint
+- Full-suite status: 244 suites / 808 tests passing
+- Done criteria: browser orchestration no longer lives in infrastructure,
+  push REST calls run through explicit use cases and domain repositories, and
+  existing browser/PWA behavior remains covered
 
 ## Risks
 
@@ -151,6 +151,4 @@ adapters into application services without containing context behavior.
 
 ## Next slices
 
-1. `NOTIFICATION-002`: isolate browser push subscription lifecycle if further
-   behavior remains outside explicit use cases after `NOTIFICATION-001`.
-2. `POLL-001`: migrate poll lifecycle behind an aggregate and repository.
+1. `POLL-001`: migrate poll lifecycle behind an aggregate and repository.

@@ -1,4 +1,3 @@
-import type { PigeonPushGateway } from '../../../contexts/notifications/infrastructure/http/PigeonPushGateway';
 import type {
   LocalKeychain,
   NotificationResource,
@@ -12,6 +11,8 @@ import type { NotificationUseCases } from './NotificationUseCases';
 import { AcceptConversationInvitationMessage } from '../../../contexts/notifications/application/accept-conversation-invitation/messages/AcceptConversationInvitationMessage';
 import { ConfigureNotificationSettingMessage } from '../../../contexts/notifications/application/configure-notification-setting/messages/ConfigureNotificationSettingMessage';
 import { DecideNotificationMessage } from '../../../contexts/notifications/application/decide-notification/messages/DecideNotificationMessage';
+import { RegisterPushSubscriptionMessage } from '../../../contexts/notifications/application/register-push-subscription/messages/RegisterPushSubscriptionMessage';
+import { RemovePushSubscriptionMessage } from '../../../contexts/notifications/application/remove-push-subscription/messages/RemovePushSubscriptionMessage';
 import { ResetNotificationSettingMessage } from '../../../contexts/notifications/application/reset-notification-setting/messages/ResetNotificationSettingMessage';
 import { SearchNotificationSettingsMessage } from '../../../contexts/notifications/application/search-notification-settings/messages/SearchNotificationSettingsMessage';
 import { SearchNotificationsMessage } from '../../../contexts/notifications/application/search-notifications/messages/SearchNotificationsMessage';
@@ -19,14 +20,12 @@ import { NotificationRecipientId } from '../../../contexts/notifications/domain/
 import { NotificationAccessContexts } from '../../../contexts/notifications/infrastructure/http/NotificationAccessContexts';
 import { NotificationMapper } from '../../../contexts/notifications/infrastructure/http/NotificationMapper';
 import { NotificationSettingMapper } from '../../../contexts/notifications/infrastructure/http/NotificationSettingMapper';
-import { PushSubscriptionPayloadFactory } from '../../../contexts/notifications/infrastructure/http/PushSubscriptionPayloadFactory';
 
 export class PigeonNotificationsFacade {
   public constructor(
     private readonly contexts: NotificationAccessContexts,
     private readonly notificationMapper: NotificationMapper,
     private readonly settingMapper: NotificationSettingMapper,
-    private readonly push: PigeonPushGateway,
     private readonly useCases: NotificationUseCases,
   ) {}
 
@@ -90,9 +89,15 @@ export class PigeonNotificationsFacade {
     session: Session,
     subscription: PushSubscriptionJSON,
   ): Promise<void> {
-    await this.push.deletePushSubscription(
-      session,
-      PushSubscriptionPayloadFactory.from(subscription),
+    await this.useCases.pushSubscriptionRemover.remove(
+      new RemovePushSubscriptionMessage({
+        auth: subscription.keys?.auth ?? '',
+        endpoint: subscription.endpoint ?? '',
+        expirationTime: subscription.expirationTime,
+        occurredAt: Date.now(),
+        p256dh: subscription.keys?.p256dh ?? '',
+        recipientIdentityId: this.actor(session),
+      }),
     );
   }
 
@@ -100,7 +105,9 @@ export class PigeonNotificationsFacade {
     enabled: boolean;
     publicKey?: string;
   }> {
-    return await this.push.getPushVapidPublicKey();
+    const server = await this.useCases.pushServerFinder.find();
+
+    return server.toPrimitives();
   }
 
   public async list(session: Session): Promise<NotificationResource[]> {
@@ -127,9 +134,15 @@ export class PigeonNotificationsFacade {
     session: Session,
     subscription: PushSubscriptionJSON,
   ): Promise<void> {
-    await this.push.registerPushSubscription(
-      session,
-      PushSubscriptionPayloadFactory.from(subscription),
+    await this.useCases.pushSubscriptionRegistrar.register(
+      new RegisterPushSubscriptionMessage({
+        auth: subscription.keys?.auth ?? '',
+        endpoint: subscription.endpoint ?? '',
+        expirationTime: subscription.expirationTime,
+        occurredAt: Date.now(),
+        p256dh: subscription.keys?.p256dh ?? '',
+        recipientIdentityId: this.actor(session),
+      }),
     );
   }
 

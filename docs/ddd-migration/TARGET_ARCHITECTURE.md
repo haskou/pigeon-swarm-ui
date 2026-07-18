@@ -59,6 +59,7 @@ src/
 | Call | scope, participants and lifecycle | valid joins/leaves/signals | calls adapter | started, joined, ended |
 | Notification | attention type and decision state | only pending, actionable notifications can be accepted or declined | notification adapter | notification accepted/declined |
 | NotificationSetting | delivery policy for one scope | valid scope hierarchy, mute period and mention suppression | notification settings adapter | setting saved/reset |
+| PushSubscription | browser delivery endpoint and credentials | endpoint and both delivery credentials are required | push subscription adapter | subscription registered/removed |
 | Poll | options, votes and state | open/closed vote rules | poll adapter | created, voted, closed |
 
 ## Application boundaries
@@ -73,6 +74,8 @@ src/
 | Search notifications | identity query | actor identity id | notifications | notification repository |
 | Decide notification | notification command | actor, notification id, decision, timestamp | notification | notification repository |
 | Resolve notification settings | identity and scope query | actor identity id, scope | effective setting | notification setting repository |
+| Register push subscription | subscription command | actor identity id, endpoint, credentials, expiration | none | push subscription repository |
+| Remove push subscription | subscription command | actor identity id, endpoint, credentials, expiration | none | push subscription repository |
 
 ## Infrastructure boundaries
 

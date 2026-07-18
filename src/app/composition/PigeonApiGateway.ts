@@ -200,6 +200,8 @@ export class PigeonApiGateway {
 
   public readonly pushGateway: PigeonPushGateway;
 
+  public readonly pushApi: PigeonPushApi;
+
   public readonly stickersGateway: PigeonStickersGateway;
 
   public readonly node: PigeonNodeApi;
@@ -390,7 +392,8 @@ export class PigeonApiGateway {
           session,
         ),
     );
-    this.push = new PigeonPushGateway(new PigeonPushApi(http, signer));
+    this.pushApi = new PigeonPushApi(http, signer);
+    this.push = new PigeonPushGateway(this.pushApi);
     this.presence = new PigeonPresenceGateway(
       new PigeonPresenceApi(http, signer),
       this.requestCache,

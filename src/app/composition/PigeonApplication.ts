@@ -95,6 +95,9 @@ import { NodeRelayConfigurationViewModelMapper } from '../../contexts/networks/p
 import { ConversationInvitationAcceptor } from '../../contexts/notifications/application/accept-conversation-invitation/ConversationInvitationAcceptor';
 import { NotificationSettingConfigurer } from '../../contexts/notifications/application/configure-notification-setting/NotificationSettingConfigurer';
 import { NotificationDecider } from '../../contexts/notifications/application/decide-notification/NotificationDecider';
+import { PushNotificationServerFinder } from '../../contexts/notifications/application/find-push-notification-server/PushNotificationServerFinder';
+import { PushSubscriptionRegistrar } from '../../contexts/notifications/application/register-push-subscription/PushSubscriptionRegistrar';
+import { PushSubscriptionRemover } from '../../contexts/notifications/application/remove-push-subscription/PushSubscriptionRemover';
 import { NotificationSettingResetter } from '../../contexts/notifications/application/reset-notification-setting/NotificationSettingResetter';
 import { NotificationSettingsSearcher } from '../../contexts/notifications/application/search-notification-settings/NotificationSettingsSearcher';
 import { NotificationsSearcher } from '../../contexts/notifications/application/search-notifications/NotificationsSearcher';
@@ -105,6 +108,9 @@ import { NotificationMapper } from '../../contexts/notifications/infrastructure/
 import { NotificationSettingMapper } from '../../contexts/notifications/infrastructure/http/NotificationSettingMapper';
 import { PigeonNotificationRepository } from '../../contexts/notifications/infrastructure/http/PigeonNotificationRepository';
 import { PigeonNotificationSettingRepository } from '../../contexts/notifications/infrastructure/http/PigeonNotificationSettingRepository';
+import { PigeonPushNotificationServerRepository } from '../../contexts/notifications/infrastructure/http/PigeonPushNotificationServerRepository';
+import { PigeonPushSubscriptionRepository } from '../../contexts/notifications/infrastructure/http/PigeonPushSubscriptionRepository';
+import { PushSubscriptionMapper } from '../../contexts/notifications/infrastructure/http/PushSubscriptionMapper';
 import { PigeonPollsApplication } from '../../contexts/polls/application/PigeonPollsApplication';
 import { PigeonStickersApplication } from '../../contexts/stickers/application/PigeonStickersApplication';
 import { RealtimeGateway } from '../../shared/infrastructure/realtime/RealtimeGateway';
@@ -405,11 +411,17 @@ export class PigeonApplication {
         notificationContexts,
         notificationSettingMapper,
       );
+    const pushSubscriptionRepository = new PigeonPushSubscriptionRepository(
+      gateway.pushApi,
+      notificationContexts,
+      new PushSubscriptionMapper(),
+    );
+    const pushNotificationServerRepository =
+      new PigeonPushNotificationServerRepository(gateway.pushApi);
     this.notifications = new PigeonNotificationsFacade(
       notificationContexts,
       notificationMapper,
       notificationSettingMapper,
-      gateway.pushGateway,
       {
         invitationAcceptor: new ConversationInvitationAcceptor(
           notificationRepository,
@@ -421,6 +433,15 @@ export class PigeonApplication {
         ),
         notificationDecider: new NotificationDecider(notificationRepository),
         notificationSearcher: new NotificationsSearcher(notificationRepository),
+        pushServerFinder: new PushNotificationServerFinder(
+          pushNotificationServerRepository,
+        ),
+        pushSubscriptionRegistrar: new PushSubscriptionRegistrar(
+          pushSubscriptionRepository,
+        ),
+        pushSubscriptionRemover: new PushSubscriptionRemover(
+          pushSubscriptionRepository,
+        ),
         settingConfigurer: new NotificationSettingConfigurer(
           notificationSettingRepository,
         ),

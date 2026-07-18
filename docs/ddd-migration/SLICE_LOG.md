@@ -1,5 +1,30 @@
 # Migration slice log
 
+## Slice NOTIFICATION-002: Browser push subscription lifecycle
+
+- Date: 2026-07-18
+- Size: M
+- Status: completed
+- Goal: remove direct push-gateway calls from composition and split browser
+  subscription orchestration into cohesive application and browser boundaries.
+- Changes:
+  - added the `PushSubscription` aggregate and push server domain model
+  - added register, remove, and server-configuration use cases
+  - added domain repositories with context-owned HTTP adapters
+  - split browser capability, key decoding, subscription compatibility, and
+    notification presentation from the PWA lifecycle coordinator
+  - moved application-container orchestration to the presentation boundary
+- Behavior changed/preserved: preserves permission prompts, VAPID handling,
+  stale-subscription replacement, duplicate-request suppression, local
+  notification display, registration, and removal
+- Contracts changed: none
+- Validation level: L3
+- Tests/checks: 37 notification/composition suites / 74 tests, TypeScript
+  typecheck, focused lint, full lint, and full Jest suite
+- Risks: browser implementations expose subtly different Push API behavior;
+  the existing browser matrix remains covered by the PWA lifecycle tests
+- Next slice: `POLL-001`
+
 ## Slice NOTIFICATION-001: Notification decisions and scope settings
 
 - Date: 2026-07-18

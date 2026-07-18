@@ -23,7 +23,7 @@ import {
   playIncomingCallSound,
   stopIncomingCallSound,
 } from '../../../../shared/presentation/sounds';
-import { showPwaNotification } from '../../../../contexts/notifications/infrastructure/browser/pwaNotifications';
+import { showPwaNotification } from '../../../../contexts/notifications/presentation/services/pwaNotifications';
 
 type CallSessionController = ReturnType<typeof useCallSession>;
 

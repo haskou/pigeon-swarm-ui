@@ -82,7 +82,7 @@ import { useUnreadMessages } from '../../../../contexts/messages/presentation/ho
 import {
   deletePwaPushSubscription,
   showPwaNotification,
-} from '../../../../contexts/notifications/infrastructure/browser/pwaNotifications';
+} from '../../../../contexts/notifications/presentation/services/pwaNotifications';
 import { useNotifications } from '../../../../contexts/notifications/presentation/hooks/useNotifications';
 import { useNotificationScopeSettings } from '../../../../contexts/notifications/presentation/hooks/useNotificationScopeSettings';
 import { useNotificationCommunityPreviews } from '../../../../contexts/notifications/presentation/hooks/useNotificationCommunityPreviews';

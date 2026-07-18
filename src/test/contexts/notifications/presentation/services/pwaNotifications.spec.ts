@@ -5,7 +5,7 @@ import {
   currentPwaNotificationPermission,
   ensurePwaPushSubscription,
   showPwaNotification,
-} from '../../../../../contexts/notifications/infrastructure/browser/pwaNotifications';
+} from '../../../../../contexts/notifications/presentation/services/pwaNotifications';
 
 jest.mock('../../../../../app/composition/applicationContainer', () => ({
   applicationContainer: {
