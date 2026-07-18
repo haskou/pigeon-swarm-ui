@@ -74,7 +74,12 @@ import { MessageMapper } from '../../contexts/messages/infrastructure/http/Messa
 import { MessageOperationContexts } from '../../contexts/messages/infrastructure/http/MessageOperationContexts';
 import { PigeonDraftRepository } from '../../contexts/messages/infrastructure/http/PigeonDraftRepository';
 import { PigeonMessageRepository } from '../../contexts/messages/infrastructure/http/PigeonMessageRepository';
-import { PigeonNetworksApplication } from '../../contexts/networks/application/PigeonNetworksApplication';
+import { CreateNetwork } from '../../contexts/networks/application/create-network/CreateNetwork';
+import { JoinNetwork } from '../../contexts/networks/application/join-network/JoinNetwork';
+import { ListNodeNetworks } from '../../contexts/networks/application/list-node-networks/ListNodeNetworks';
+import { RemoveNodeNetwork } from '../../contexts/networks/application/remove-node-network/RemoveNodeNetwork';
+import { NetworkMapper } from '../../contexts/networks/infrastructure/http/mapping/NetworkMapper';
+import { PigeonNetworkRepository } from '../../contexts/networks/infrastructure/http/repositories/PigeonNetworkRepository';
 import { PigeonNotificationsApplication } from '../../contexts/notifications/application/PigeonNotificationsApplication';
 import { PigeonConversationInvitationKeyDecryptor } from '../../contexts/notifications/infrastructure/crypto/PigeonConversationInvitationKeyDecryptor';
 import { PigeonPollsApplication } from '../../contexts/polls/application/PigeonPollsApplication';
@@ -100,6 +105,7 @@ import { PigeonAttachmentsFacade } from './PigeonAttachmentsFacade';
 import { PigeonCallsFacade } from './PigeonCallsFacade';
 import { PigeonCommunitiesFacade } from './PigeonCommunitiesFacade';
 import { PigeonRealtimeApplication } from './PigeonRealtimeApplication';
+import { PigeonNetworksFacade } from './networks/PigeonNetworksFacade';
 
 export class PigeonApplication {
   public readonly attachments: PigeonAttachmentsFacade;
@@ -114,7 +120,7 @@ export class PigeonApplication {
 
   public readonly messages: PigeonMessagesFacade;
 
-  public readonly networks: PigeonNetworksApplication;
+  public readonly networks: PigeonNetworksFacade;
 
   public readonly notifications: PigeonNotificationsApplication;
 
@@ -322,41 +328,20 @@ export class PigeonApplication {
       ),
       gateway.messagesGateway,
     );
-    this.networks = new PigeonNetworksApplication({
-      checkRelayPorts: gateway.node,
-      claimNode: gateway.node,
-      createNetwork: {
-        create: async (name) =>
-          await gateway.node.createNetwork(name.toString()),
-      },
-      createNetworkForNode: gateway.node,
-      createPublicNetwork: {
-        createPublic: async (session) =>
-          await gateway.node.createPublicNetwork(session),
-      },
-      getNodeInfo: gateway.node,
-      getRelayConfiguration: gateway.node,
-      getReplicationStatus: gateway.node,
-      joinNetwork: {
-        joinNetwork: async (id, name, key) =>
-          await gateway.node.joinNetwork(
-            id.toString(),
-            name.toString(),
-            key.toString(),
-          ),
-      },
-      joinNetworkForNode: gateway.node,
-      listNodeNetworks: {
-        getNodeNetworks: async (session) =>
-          await gateway.node.getNetworks(session),
-      },
-      listPeers: gateway.node,
-      removeNodeNetwork: {
-        remove: async (networkId, session) =>
-          await gateway.node.removeNetwork(networkId.toString(), session),
-      },
-      updateRelayConfiguration: gateway.node,
-    });
+    const networkRepository = new PigeonNetworkRepository(
+      gateway.node,
+      identityContexts,
+      new NetworkMapper(),
+    );
+
+    this.networks = new PigeonNetworksFacade(
+      identityContexts,
+      new CreateNetwork(networkRepository),
+      new JoinNetwork(networkRepository),
+      new ListNodeNetworks(networkRepository),
+      new RemoveNodeNetwork(networkRepository),
+      gateway.node,
+    );
     this.notifications = new PigeonNotificationsApplication({
       acceptInvitation: {
         keychainPublisher: gateway.identityGateway,

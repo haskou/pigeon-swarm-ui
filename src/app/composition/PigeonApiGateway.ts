@@ -110,7 +110,6 @@ import { PigeonMessagesGateway } from '../../contexts/messages/infrastructure/ht
 import { MessageSignaturePayloadFactory } from '../../contexts/messages/infrastructure/http/signing/MessageSignaturePayloadFactory';
 import { throwIfMessageLoadAborted } from '../../contexts/messages/infrastructure/http/throwIfMessageLoadAborted';
 import { PigeonNodeApi } from '../../contexts/networks/infrastructure/http/PigeonNodeApi';
-import { PigeonNodeGateway } from '../../contexts/networks/infrastructure/http/PigeonNodeGateway';
 import { NotificationDecision } from '../../contexts/notifications/domain/NotificationDecision';
 import { NotificationId } from '../../contexts/notifications/domain/NotificationId';
 import { PigeonNotificationsApi } from '../../contexts/notifications/infrastructure/http/PigeonNotificationsApi';
@@ -203,7 +202,7 @@ export class PigeonApiGateway {
 
   public readonly stickersGateway: PigeonStickersGateway;
 
-  public readonly node: PigeonNodeGateway;
+  public readonly node: PigeonNodeApi;
 
   public readonly presence: PigeonPresenceGateway;
 
@@ -374,7 +373,7 @@ export class PigeonApiGateway {
       this.messagesApi,
       this.messageCommands,
     );
-    this.node = new PigeonNodeGateway(new PigeonNodeApi(http, signer));
+    this.node = new PigeonNodeApi(http, signer);
     this.notifications = new PigeonNotificationsGateway(
       new PigeonNotificationsApi(
         http,

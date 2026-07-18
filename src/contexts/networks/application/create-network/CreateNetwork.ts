@@ -1,11 +1,18 @@
-import type { CreateNetworkPort } from './CreateNetworkPort';
+import { Timestamp } from '@haskou/value-objects';
 
+import type { Network } from '../../domain/aggregates/Network';
+import type { NetworkRepository } from '../../domain/repositories/NetworkRepository';
+
+import { Network as NetworkAggregate } from '../../domain/aggregates/Network';
 import { CreateNetworkMessage } from './messages/CreateNetworkMessage';
 
 export class CreateNetwork {
-  public constructor(private readonly networks: CreateNetworkPort) {}
+  public constructor(private readonly networkRepository: NetworkRepository) {}
 
-  public async create(message: CreateNetworkMessage): Promise<void> {
-    await this.networks.create(message.getName());
+  public async create(message: CreateNetworkMessage): Promise<Network> {
+    return await this.networkRepository.create(
+      NetworkAggregate.create(message.getName(), Timestamp.now()),
+      message.getActorId(),
+    );
   }
 }

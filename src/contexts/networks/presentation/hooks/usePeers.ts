@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import type { Peer } from '../../application/list-peers/ListPeers';
+import type { Peer } from '../../application/list-peers/Peer';
 import type { NodePeersSnapshot } from '../../infrastructure/http/NodePeersSnapshot';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';

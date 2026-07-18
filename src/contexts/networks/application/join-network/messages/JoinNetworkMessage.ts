@@ -1,27 +1,31 @@
 import { NetworkId } from '../../../domain/value-objects/NetworkId';
+import { NetworkActorId } from '../../../domain/value-objects/NetworkActorId';
 import { NetworkKey } from '../../../domain/value-objects/NetworkKey';
 import { NetworkName } from '../../../domain/value-objects/NetworkName';
 
 export class JoinNetworkMessage {
-  private readonly id: NetworkId;
-  private readonly key: NetworkKey;
-  private readonly name: NetworkName;
+  public constructor(
+    private readonly input: {
+      actorIdentityId?: string;
+      id: string;
+      key: string;
+      name: string;
+    },
+  ) {}
 
-  public constructor(input: { id: string; key: string; name: string }) {
-    this.id = NetworkId.fromString(input.id);
-    this.key = NetworkKey.fromString(input.key);
-    this.name = NetworkName.fromString(input.name);
+  public getActorId(): NetworkActorId {
+    return NetworkActorId.fromOptional(this.input.actorIdentityId);
   }
 
   public getId(): NetworkId {
-    return this.id;
+    return NetworkId.fromString(this.input.id);
   }
 
   public getKey(): NetworkKey {
-    return this.key;
+    return NetworkKey.fromString(this.input.key);
   }
 
   public getName(): NetworkName {
-    return this.name;
+    return NetworkName.fromString(this.input.name);
   }
 }

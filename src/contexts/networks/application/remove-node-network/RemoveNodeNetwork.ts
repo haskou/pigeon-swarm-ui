@@ -1,17 +1,22 @@
-import type { NodeNetwork } from '../list-node-networks/NodeNetwork';
-import type { RemoveNodeNetworkPort } from './RemoveNodeNetworkPort';
+import { Timestamp } from '@haskou/value-objects';
+
+import type { Network } from '../../domain/aggregates/Network';
+import type { NetworkRepository } from '../../domain/repositories/NetworkRepository';
 
 import { RemoveNodeNetworkMessage } from './messages/RemoveNodeNetworkMessage';
 
 export class RemoveNodeNetwork {
-  public constructor(private readonly networks: RemoveNodeNetworkPort) {}
+  public constructor(private readonly networkRepository: NetworkRepository) {}
 
-  public async remove(
-    message: RemoveNodeNetworkMessage,
-  ): Promise<NodeNetwork[]> {
-    return await this.networks.remove(
+  public async remove(message: RemoveNodeNetworkMessage): Promise<Network[]> {
+    const network = await this.networkRepository.find(
       message.getNetworkId(),
-      message.getSession(),
+      message.getActorId(),
     );
+
+    network.remove(Timestamp.now());
+    await this.networkRepository.save(network, message.getActorId());
+
+    return await this.networkRepository.search(message.getActorId());
   }
 }

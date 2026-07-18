@@ -1,47 +1,37 @@
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import { mock } from 'jest-mock-extended';
+
+import type { NetworkRepository } from '../../../../../contexts/networks/domain/repositories/NetworkRepository';
 
 import { RemoveNodeNetworkMessage } from '../../../../../contexts/networks/application/remove-node-network/messages/RemoveNodeNetworkMessage';
 import { RemoveNodeNetwork } from '../../../../../contexts/networks/application/remove-node-network/RemoveNodeNetwork';
+import { Network } from '../../../../../contexts/networks/domain/aggregates/Network';
 
 describe(RemoveNodeNetwork.name, () => {
-  it('removes the node network anonymously', async () => {
-    const expected = [{ id: 'public-network', name: 'public' }];
-    const networks = {
-      remove: jest.fn().mockResolvedValue(expected),
-    };
-    const useCase = new RemoveNodeNetwork(networks);
+  it('removes through the aggregate and returns the remaining networks', async () => {
+    const networkRepository = mock<NetworkRepository>();
+    const network = Network.fromPrimitives({
+      id: 'network-a',
+      key: 'secret-key',
+      name: 'Builders',
+      status: 'attached',
+    });
+
+    networkRepository.find.mockResolvedValue(network);
+    networkRepository.save.mockResolvedValue(network);
+    networkRepository.search.mockResolvedValue([]);
 
     await expect(
-      useCase.remove(
-        new RemoveNodeNetworkMessage({ networkId: 'public-network' }),
+      new RemoveNodeNetwork(networkRepository).remove(
+        new RemoveNodeNetworkMessage({
+          actorIdentityId: 'identity-a',
+          networkId: 'network-a',
+        }),
       ),
-    ).resolves.toBe(expected);
-
-    expect(networks.remove).toHaveBeenCalledWith(
+    ).resolves.toEqual([]);
+    expect(network.toPrimitives().status).toBe('removed');
+    expect(networkRepository.save).toHaveBeenCalledWith(
+      network,
       expect.objectContaining({}),
-      undefined,
-    );
-  });
-
-  it('removes the node network with owner session', async () => {
-    const session = {
-      identity: { id: 'identity-1' },
-    } as unknown as Session;
-    const expected = [{ id: 'network-2', key: 'key', name: 'private' }];
-    const networks = {
-      remove: jest.fn().mockResolvedValue(expected),
-    };
-    const useCase = new RemoveNodeNetwork(networks);
-
-    await expect(
-      useCase.remove(
-        new RemoveNodeNetworkMessage({ networkId: 'network-1', session }),
-      ),
-    ).resolves.toBe(expected);
-
-    expect(networks.remove).toHaveBeenCalledWith(
-      expect.objectContaining({}),
-      session,
     );
   });
 });

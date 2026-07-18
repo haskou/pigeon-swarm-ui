@@ -1,7 +1,7 @@
-import type { NodeNetwork } from '../../application/list-node-networks/NodeNetwork';
-import type { Peer } from '../../application/list-peers/ListPeers';
+import type { Peer } from '../../application/list-peers/Peer';
 import type { NodeInfo } from './NodeInfo';
 import type { NodePeersSnapshot } from './NodePeersSnapshot';
+import type { NetworkResource } from './resources/NetworkResource';
 
 import { API_SERVER_URL } from '../../../../app/API_SERVER_URL';
 import { ApiUrlBuilder } from '../../../../shared/infrastructure/http/ApiUrlBuilder';
@@ -41,11 +41,11 @@ export class NodeBootstrapApi {
     return { ...info, owner: info.owner ?? null };
   }
 
-  public async getNetworks(): Promise<NodeNetwork[]> {
+  public async getNetworks(): Promise<NetworkResource[]> {
     const result = await this.cachedRequest(
       'GET /node/networks/ anonymous',
       () =>
-        this.http.request<{ networks: NodeNetwork[] }>('/node/networks/', {
+        this.http.request<{ networks: NetworkResource[] }>('/node/networks/', {
           method: 'GET',
         }),
     );

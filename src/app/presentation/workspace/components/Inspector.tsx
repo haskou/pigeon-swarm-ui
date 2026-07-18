@@ -2,7 +2,7 @@ import type { MouseEvent } from 'react';
 
 import { lazy, Suspense, useMemo, useState } from 'react';
 
-import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
+import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
 import type {
   ConversationResource,
   IdentityPresence,

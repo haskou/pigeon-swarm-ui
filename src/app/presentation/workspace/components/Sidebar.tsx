@@ -9,7 +9,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import type { CallSession } from '../../../../contexts/calls/presentation/view-models/CallSession';
-import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
+import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
 import type {
   Community,
   ConversationResource,

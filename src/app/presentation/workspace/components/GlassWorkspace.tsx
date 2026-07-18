@@ -11,8 +11,8 @@ import {
   useState,
 } from 'react';
 
-import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
-import type { Peer } from '../../../../contexts/networks/application/list-peers/ListPeers';
+import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
+import type { Peer } from '../../../../contexts/networks/application/list-peers/Peer';
 import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
 import type { CallMediaEncryptionUnavailableReason } from '../../../../contexts/calls/presentation/view-models/CallMediaEncryptionUnavailableReason';
 import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';

@@ -1,5 +1,3 @@
-import { PrivateKey, UUID } from '@haskou/value-objects';
-
 import type {
   IpfsReplicationStatus,
   Session,
@@ -9,8 +7,8 @@ import type { RequestSigner } from '../../../../shared/infrastructure/http/Reque
 import type { NodeRelayConfiguration } from '../../application/configure-node-relay/NodeRelayConfiguration';
 import type { NodeRelayPortCheckResource } from '../../application/configure-node-relay/NodeRelayPortCheckResource';
 import type { NodeRelayPortCheckTarget } from '../../application/configure-node-relay/NodeRelayPortCheckTarget';
-import type { NodeNetwork } from '../../application/list-node-networks/NodeNetwork';
-import type { Peer } from '../../application/list-peers/ListPeers';
+import type { Peer } from '../../application/list-peers/Peer';
+import type { NetworkResource } from './resources/NetworkResource';
 import type { NodeInfo } from './NodeInfo';
 import type { NodePeersSnapshot } from './NodePeersSnapshot';
 
@@ -99,13 +97,13 @@ export class PigeonNodeApi {
     });
   }
 
-  public async getNetworks(session?: Session): Promise<NodeNetwork[]> {
+  public async getNetworks(session?: Session): Promise<NetworkResource[]> {
     const path = '/node/networks/';
     const result = await this.cachedRequest(
       `GET ${path} ${session?.identity.id ?? 'anonymous'}`,
       async () =>
         await this.http.request<{
-          networks: NodeNetwork[];
+          networks: NetworkResource[];
         }>(path, {
           headers: session
             ? await this.signer.headers(session, 'GET', path)
@@ -132,13 +130,12 @@ export class PigeonNodeApi {
     };
   }
 
-  public async createNetwork(name: string, session?: Session): Promise<void> {
+  public async createNetwork(
+    network: NetworkResource,
+    session?: Session,
+  ): Promise<void> {
     const path = '/node/networks/';
-    const body = {
-      id: UUID.generate().toString(),
-      key: PrivateKey.generate().toString(),
-      name,
-    };
+    const body = network;
 
     await this.http.request(path, {
       body: JSON.stringify(body),
@@ -162,32 +159,13 @@ export class PigeonNodeApi {
     this.invalidateNetworksCache();
   }
 
-  public async joinNetwork(
-    id: string,
-    name: string,
-    key: string,
-    session?: Session,
-  ): Promise<void> {
-    const path = '/node/networks/';
-    const body = { id, key, name };
-
-    await this.http.request(path, {
-      body: JSON.stringify(body),
-      headers: session
-        ? await this.signer.headers(session, 'POST', path, body)
-        : undefined,
-      method: 'POST',
-    });
-    this.invalidateNetworksCache();
-  }
-
   public async removeNetwork(
     networkId: string,
     session?: Session,
-  ): Promise<NodeNetwork[]> {
+  ): Promise<NetworkResource[]> {
     const path = `/node/networks/${encodeURIComponent(networkId)}/`;
     const body = {};
-    const result = await this.http.request<{ networks: NodeNetwork[] }>(path, {
+    const result = await this.http.request<{ networks: NetworkResource[] }>(path, {
       headers: session
         ? await this.signer.headers(session, 'DELETE', path, body)
         : undefined,

@@ -1,13 +1,16 @@
 import { NetworkName } from '../../../domain/value-objects/NetworkName';
+import { NetworkActorId } from '../../../domain/value-objects/NetworkActorId';
 
 export class CreateNetworkMessage {
-  private readonly name: NetworkName;
+  public constructor(
+    private readonly input: { actorIdentityId?: string; name: string },
+  ) {}
 
-  public constructor(name: string) {
-    this.name = NetworkName.fromString(name);
+  public getActorId(): NetworkActorId {
+    return NetworkActorId.fromOptional(this.input.actorIdentityId);
   }
 
   public getName(): NetworkName {
-    return this.name;
+    return NetworkName.fromString(this.input.name);
   }
 }

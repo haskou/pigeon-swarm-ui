@@ -1,9 +1,9 @@
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import { NetworkActorId } from '../../../domain/value-objects/NetworkActorId';
 
 export class ListNodeNetworksMessage {
-  public constructor(private readonly session?: Session) {}
+  public constructor(private readonly actorIdentityId?: string) {}
 
-  public getSession(): Session | undefined {
-    return this.session;
+  public getActorId(): NetworkActorId {
+    return NetworkActorId.fromOptional(this.actorIdentityId);
   }
 }

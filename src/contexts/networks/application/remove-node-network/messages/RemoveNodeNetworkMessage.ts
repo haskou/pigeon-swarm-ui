@@ -1,22 +1,19 @@
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
-
+import { NetworkActorId } from '../../../domain/value-objects/NetworkActorId';
 import { NetworkId } from '../../../domain/value-objects/NetworkId';
 
 export class RemoveNodeNetworkMessage {
-  private readonly networkId: NetworkId;
+  public constructor(
+    private readonly input: {
+      actorIdentityId?: string;
+      networkId: string;
+    },
+  ) {}
 
-  private readonly session?: Session;
-
-  public constructor(input: { networkId: string; session?: Session }) {
-    this.networkId = NetworkId.fromString(input.networkId);
-    this.session = input.session;
+  public getActorId(): NetworkActorId {
+    return NetworkActorId.fromOptional(this.input.actorIdentityId);
   }
 
   public getNetworkId(): NetworkId {
-    return this.networkId;
-  }
-
-  public getSession(): Session | undefined {
-    return this.session;
+    return NetworkId.fromString(this.input.networkId);
   }
 }

@@ -1,14 +1,12 @@
-import type { ListNodeNetworksPort } from './ListNodeNetworksPort';
-import type { NodeNetwork } from './NodeNetwork';
+import type { Network } from '../../domain/aggregates/Network';
+import type { NetworkRepository } from '../../domain/repositories/NetworkRepository';
 
 import { ListNodeNetworksMessage } from './messages/ListNodeNetworksMessage';
 
 export class ListNodeNetworks {
-  public constructor(private readonly networks: ListNodeNetworksPort) {}
+  public constructor(private readonly networkRepository: NetworkRepository) {}
 
-  public async list(message: ListNodeNetworksMessage): Promise<NodeNetwork[]> {
-    return await this.networks.getNodeNetworks(message.getSession());
+  public async list(message: ListNodeNetworksMessage): Promise<Network[]> {
+    return await this.networkRepository.search(message.getActorId());
   }
 }
-
-export type { NodeNetwork };

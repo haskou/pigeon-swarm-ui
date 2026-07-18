@@ -33,7 +33,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 import type { CallSession } from '../../../calls/presentation/view-models/CallSession';
-import type { NodeNetwork } from '../../../networks/application/list-node-networks/ListNodeNetworks';
+import type { NodeNetwork } from '../../../networks/presentation/view-models/NodeNetwork';
 import type { NotificationScopeSettingsTarget } from '../../../notifications/presentation/components/NotificationScopeSettingsDialog';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
