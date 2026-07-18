@@ -1,5 +1,5 @@
 import type { Session } from '../../../../../shared/domain/pigeonResources.types';
-import type { Network } from '../../../domain/aggregates/Network';
+import type { Network } from '../../../domain/Network';
 import type { NetworkRepository } from '../../../domain/repositories/NetworkRepository';
 import type { NetworkActorId } from '../../../domain/value-objects/NetworkActorId';
 import type { NetworkId } from '../../../domain/value-objects/NetworkId';

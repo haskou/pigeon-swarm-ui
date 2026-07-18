@@ -5,7 +5,7 @@ import type { PigeonNodeApi } from '../../../../../../contexts/networks/infrastr
 import type { Session } from '../../../../../../shared/domain/pigeonResources.types';
 
 import { IdentityAccessContexts } from '../../../../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
-import { NodeRelayConfiguration } from '../../../../../../contexts/networks/domain/aggregates/NodeRelayConfiguration';
+import { NodeRelayConfiguration } from '../../../../../../contexts/networks/domain/NodeRelayConfiguration';
 import { CallsRelayConfiguration } from '../../../../../../contexts/networks/domain/value-objects/CallsRelayConfiguration';
 import { NetworkActorId } from '../../../../../../contexts/networks/domain/value-objects/NetworkActorId';
 import { NodePublicHost } from '../../../../../../contexts/networks/domain/value-objects/NodePublicHost';

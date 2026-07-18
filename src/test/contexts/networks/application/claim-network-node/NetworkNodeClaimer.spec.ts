@@ -4,7 +4,7 @@ import type { NetworkNodeRepository } from '../../../../../contexts/networks/dom
 
 import { ClaimNetworkNodeMessage } from '../../../../../contexts/networks/application/claim-network-node/messages/ClaimNetworkNodeMessage';
 import { NetworkNodeClaimer } from '../../../../../contexts/networks/application/claim-network-node/NetworkNodeClaimer';
-import { NetworkNode } from '../../../../../contexts/networks/domain/aggregates/NetworkNode';
+import { NetworkNode } from '../../../../../contexts/networks/domain/NetworkNode';
 
 describe(NetworkNodeClaimer.name, () => {
   it('claims the loaded node before persisting it', async () => {

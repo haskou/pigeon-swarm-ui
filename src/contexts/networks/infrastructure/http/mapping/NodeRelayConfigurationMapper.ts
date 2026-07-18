@@ -1,6 +1,6 @@
 import type { NodeRelayConfigurationResource } from '../resources/NodeRelayConfigurationResource';
 
-import { NodeRelayConfiguration } from '../../../domain/aggregates/NodeRelayConfiguration';
+import { NodeRelayConfiguration } from '../../../domain/NodeRelayConfiguration';
 
 export class NodeRelayConfigurationMapper {
   public toAggregate(

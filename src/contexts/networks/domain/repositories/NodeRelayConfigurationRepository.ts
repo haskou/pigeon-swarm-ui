@@ -1,4 +1,4 @@
-import type { NodeRelayConfiguration } from '../aggregates/NodeRelayConfiguration';
+import type { NodeRelayConfiguration } from '../NodeRelayConfiguration';
 import type { NetworkActorId } from '../value-objects/NetworkActorId';
 
 export interface NodeRelayConfigurationRepository {

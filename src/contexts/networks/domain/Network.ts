@@ -1,16 +1,16 @@
 import { assert, type PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
-import { AggregateRoot } from '../../../../shared/domain/AggregateRoot';
-import { NetworkInviteUnavailableError } from '../errors/NetworkInviteUnavailableError';
-import { NetworkNotAttachedError } from '../errors/NetworkNotAttachedError';
-import { NetworkCreated } from '../events/NetworkCreated';
-import { NetworkJoined } from '../events/NetworkJoined';
-import { NetworkRemoved } from '../events/NetworkRemoved';
-import { NetworkInvite } from '../NetworkInvite';
-import { NetworkAttachmentStatus } from '../value-objects/NetworkAttachmentStatus';
-import { NetworkId } from '../value-objects/NetworkId';
-import { NetworkKey } from '../value-objects/NetworkKey';
-import { NetworkName } from '../value-objects/NetworkName';
+import { AggregateRoot } from '../../../shared/domain/AggregateRoot';
+import { NetworkInviteUnavailableError } from './errors/NetworkInviteUnavailableError';
+import { NetworkNotAttachedError } from './errors/NetworkNotAttachedError';
+import { NetworkCreated } from './events/NetworkCreated';
+import { NetworkJoined } from './events/NetworkJoined';
+import { NetworkRemoved } from './events/NetworkRemoved';
+import { NetworkInvite } from './NetworkInvite';
+import { NetworkAttachmentStatus } from './value-objects/NetworkAttachmentStatus';
+import { NetworkId } from './value-objects/NetworkId';
+import { NetworkKey } from './value-objects/NetworkKey';
+import { NetworkName } from './value-objects/NetworkName';
 
 export class Network extends AggregateRoot {
   public static create(name: NetworkName, occurredAt: Timestamp): Network {

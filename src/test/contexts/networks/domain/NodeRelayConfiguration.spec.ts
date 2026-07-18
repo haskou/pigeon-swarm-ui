@@ -1,14 +1,14 @@
 import { Timestamp } from '@haskou/value-objects';
 
-import { NodeRelayConfiguration } from '../../../../../contexts/networks/domain/aggregates/NodeRelayConfiguration';
-import { NodeRelayPortRangeInvalidError } from '../../../../../contexts/networks/domain/errors/NodeRelayPortRangeInvalidError';
-import { NodeRelayPortRequiredError } from '../../../../../contexts/networks/domain/errors/NodeRelayPortRequiredError';
-import { NodeRelayConfigurationUpdated } from '../../../../../contexts/networks/domain/events/NodeRelayConfigurationUpdated';
-import { CallsRelayConfiguration } from '../../../../../contexts/networks/domain/value-objects/CallsRelayConfiguration';
-import { NodePublicHost } from '../../../../../contexts/networks/domain/value-objects/NodePublicHost';
-import { NodeRelayMultiaddress } from '../../../../../contexts/networks/domain/value-objects/NodeRelayMultiaddress';
-import { PrivateRelayConfiguration } from '../../../../../contexts/networks/domain/value-objects/PrivateRelayConfiguration';
-import { PublicNetworkConfiguration } from '../../../../../contexts/networks/domain/value-objects/PublicNetworkConfiguration';
+import { NodeRelayPortRangeInvalidError } from '../../../../contexts/networks/domain/errors/NodeRelayPortRangeInvalidError';
+import { NodeRelayPortRequiredError } from '../../../../contexts/networks/domain/errors/NodeRelayPortRequiredError';
+import { NodeRelayConfigurationUpdated } from '../../../../contexts/networks/domain/events/NodeRelayConfigurationUpdated';
+import { NodeRelayConfiguration } from '../../../../contexts/networks/domain/NodeRelayConfiguration';
+import { CallsRelayConfiguration } from '../../../../contexts/networks/domain/value-objects/CallsRelayConfiguration';
+import { NodePublicHost } from '../../../../contexts/networks/domain/value-objects/NodePublicHost';
+import { NodeRelayMultiaddress } from '../../../../contexts/networks/domain/value-objects/NodeRelayMultiaddress';
+import { PrivateRelayConfiguration } from '../../../../contexts/networks/domain/value-objects/PrivateRelayConfiguration';
+import { PublicNetworkConfiguration } from '../../../../contexts/networks/domain/value-objects/PublicNetworkConfiguration';
 
 describe(NodeRelayConfiguration.name, () => {
   it('hydrates and serializes the complete node relay configuration', () => {

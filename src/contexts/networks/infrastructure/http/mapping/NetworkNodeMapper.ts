@@ -1,6 +1,6 @@
 import type { NodeInfo } from '../NodeInfo';
 
-import { NetworkNode } from '../../../domain/aggregates/NetworkNode';
+import { NetworkNode } from '../../../domain/NetworkNode';
 
 export class NetworkNodeMapper {
   public toAggregate(resource: NodeInfo): NetworkNode {

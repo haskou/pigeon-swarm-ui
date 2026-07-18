@@ -4,7 +4,7 @@ import type { NodeRelayConfigurationRepository } from '../../../../../contexts/n
 
 import { FindNodeRelayConfigurationMessage } from '../../../../../contexts/networks/application/find-node-relay-configuration/messages/FindNodeRelayConfigurationMessage';
 import { NodeRelayConfigurationFinder } from '../../../../../contexts/networks/application/find-node-relay-configuration/NodeRelayConfigurationFinder';
-import { NodeRelayConfiguration } from '../../../../../contexts/networks/domain/aggregates/NodeRelayConfiguration';
+import { NodeRelayConfiguration } from '../../../../../contexts/networks/domain/NodeRelayConfiguration';
 
 describe(NodeRelayConfigurationFinder.name, () => {
   it('finds the aggregate for the actor represented by the message', async () => {

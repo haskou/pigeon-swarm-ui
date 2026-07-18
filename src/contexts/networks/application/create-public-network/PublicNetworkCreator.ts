@@ -1,6 +1,6 @@
 import { Timestamp } from '@haskou/value-objects';
 
-import type { NetworkNode } from '../../domain/aggregates/NetworkNode';
+import type { NetworkNode } from '../../domain/NetworkNode';
 import type { NetworkNodeRepository } from '../../domain/repositories/NetworkNodeRepository';
 
 import { CreatePublicNetworkMessage } from './messages/CreatePublicNetworkMessage';

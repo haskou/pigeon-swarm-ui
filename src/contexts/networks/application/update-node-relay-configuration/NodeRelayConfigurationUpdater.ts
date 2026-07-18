@@ -1,6 +1,6 @@
 import { Timestamp } from '@haskou/value-objects';
 
-import type { NodeRelayConfiguration } from '../../domain/aggregates/NodeRelayConfiguration';
+import type { NodeRelayConfiguration } from '../../domain/NodeRelayConfiguration';
 import type { NodeRelayConfigurationRepository } from '../../domain/repositories/NodeRelayConfigurationRepository';
 
 import { UpdateNodeRelayConfigurationMessage } from './messages/UpdateNodeRelayConfigurationMessage';

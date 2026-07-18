@@ -1,4 +1,4 @@
-import type { Network } from '../aggregates/Network';
+import type { Network } from '../Network';
 import type { NetworkActorId } from '../value-objects/NetworkActorId';
 import type { NetworkId } from '../value-objects/NetworkId';
 

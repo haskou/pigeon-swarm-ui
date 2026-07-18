@@ -1,13 +1,13 @@
 import { Timestamp, type PrimitiveOf } from '@haskou/value-objects';
 
-import { AggregateRoot } from '../../../../shared/domain/AggregateRoot';
-import { NodeRelayConfigurationUpdated } from '../events/NodeRelayConfigurationUpdated';
-import { CallsRelayConfiguration } from '../value-objects/CallsRelayConfiguration';
-import { NetworkNodeId } from '../value-objects/NetworkNodeId';
-import { NodePublicHost } from '../value-objects/NodePublicHost';
-import { NodeRelayMultiaddress } from '../value-objects/NodeRelayMultiaddress';
-import { PrivateRelayConfiguration } from '../value-objects/PrivateRelayConfiguration';
-import { PublicNetworkConfiguration } from '../value-objects/PublicNetworkConfiguration';
+import { AggregateRoot } from '../../../shared/domain/AggregateRoot';
+import { NodeRelayConfigurationUpdated } from './events/NodeRelayConfigurationUpdated';
+import { CallsRelayConfiguration } from './value-objects/CallsRelayConfiguration';
+import { NetworkNodeId } from './value-objects/NetworkNodeId';
+import { NodePublicHost } from './value-objects/NodePublicHost';
+import { NodeRelayMultiaddress } from './value-objects/NodeRelayMultiaddress';
+import { PrivateRelayConfiguration } from './value-objects/PrivateRelayConfiguration';
+import { PublicNetworkConfiguration } from './value-objects/PublicNetworkConfiguration';
 
 export class NodeRelayConfiguration extends AggregateRoot {
   public static fromPrimitives(

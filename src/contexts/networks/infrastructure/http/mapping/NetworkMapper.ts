@@ -1,7 +1,7 @@
-import type { Network } from '../../../domain/aggregates/Network';
+import type { Network } from '../../../domain/Network';
 import type { NetworkResource } from '../resources/NetworkResource';
 
-import { Network as NetworkAggregate } from '../../../domain/aggregates/Network';
+import { Network as NetworkAggregate } from '../../../domain/Network';
 
 export class NetworkMapper {
   public toAggregate(resource: NetworkResource): Network {

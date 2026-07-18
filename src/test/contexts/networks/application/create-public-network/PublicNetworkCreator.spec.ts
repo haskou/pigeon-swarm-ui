@@ -4,7 +4,7 @@ import type { NetworkNodeRepository } from '../../../../../contexts/networks/dom
 
 import { CreatePublicNetworkMessage } from '../../../../../contexts/networks/application/create-public-network/messages/CreatePublicNetworkMessage';
 import { PublicNetworkCreator } from '../../../../../contexts/networks/application/create-public-network/PublicNetworkCreator';
-import { NetworkNode } from '../../../../../contexts/networks/domain/aggregates/NetworkNode';
+import { NetworkNode } from '../../../../../contexts/networks/domain/NetworkNode';
 
 describe(PublicNetworkCreator.name, () => {
   it('attaches a public network through the node aggregate', async () => {

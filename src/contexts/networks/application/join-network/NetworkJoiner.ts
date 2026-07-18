@@ -1,9 +1,9 @@
 import { Timestamp } from '@haskou/value-objects';
 
-import type { Network } from '../../domain/aggregates/Network';
+import type { Network } from '../../domain/Network';
 import type { NetworkRepository } from '../../domain/repositories/NetworkRepository';
 
-import { Network as NetworkAggregate } from '../../domain/aggregates/Network';
+import { Network as NetworkAggregate } from '../../domain/Network';
 import { JoinNetworkMessage } from './messages/JoinNetworkMessage';
 
 export class NetworkJoiner {

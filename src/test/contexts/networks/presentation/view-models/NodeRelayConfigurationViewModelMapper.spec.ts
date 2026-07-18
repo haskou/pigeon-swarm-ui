@@ -1,4 +1,4 @@
-import { NodeRelayConfiguration } from '../../../../../contexts/networks/domain/aggregates/NodeRelayConfiguration';
+import { NodeRelayConfiguration } from '../../../../../contexts/networks/domain/NodeRelayConfiguration';
 import { NodeRelayConfigurationViewModelMapper } from '../../../../../contexts/networks/presentation/view-models/NodeRelayConfigurationViewModelMapper';
 
 describe(NodeRelayConfigurationViewModelMapper.name, () => {

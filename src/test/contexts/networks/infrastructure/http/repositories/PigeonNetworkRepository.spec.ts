@@ -5,8 +5,8 @@ import type { PigeonNodeApi } from '../../../../../../contexts/networks/infrastr
 import type { Session } from '../../../../../../shared/domain/pigeonResources.types';
 
 import { IdentityAccessContexts } from '../../../../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
-import { Network } from '../../../../../../contexts/networks/domain/aggregates/Network';
 import { NetworkNotFoundError } from '../../../../../../contexts/networks/domain/errors/NetworkNotFoundError';
+import { Network } from '../../../../../../contexts/networks/domain/Network';
 import { NetworkActorId } from '../../../../../../contexts/networks/domain/value-objects/NetworkActorId';
 import { NetworkId } from '../../../../../../contexts/networks/domain/value-objects/NetworkId';
 import { NetworkName } from '../../../../../../contexts/networks/domain/value-objects/NetworkName';

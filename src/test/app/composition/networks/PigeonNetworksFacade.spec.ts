@@ -11,8 +11,8 @@ import { PigeonNetworksFacade } from '../../../../app/composition/networks/Pigeo
 import { PigeonNodeFacade } from '../../../../app/composition/networks/PigeonNodeFacade';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { IdentityAccessContexts } from '../../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
-import { Network } from '../../../../contexts/networks/domain/aggregates/Network';
 import { NetworkPeer } from '../../../../contexts/networks/domain/entities/NetworkPeer';
+import { Network } from '../../../../contexts/networks/domain/Network';
 
 describe(PigeonNetworksFacade.name, () => {
   let identities: IdentityAccessContexts;

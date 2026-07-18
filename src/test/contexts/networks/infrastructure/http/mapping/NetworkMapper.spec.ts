@@ -1,4 +1,4 @@
-import { Network } from '../../../../../../contexts/networks/domain/aggregates/Network';
+import { Network } from '../../../../../../contexts/networks/domain/Network';
 import { NetworkMapper } from '../../../../../../contexts/networks/infrastructure/http/mapping/NetworkMapper';
 
 describe(NetworkMapper.name, () => {

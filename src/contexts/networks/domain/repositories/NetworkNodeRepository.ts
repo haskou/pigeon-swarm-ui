@@ -1,4 +1,4 @@
-import type { NetworkNode } from '../aggregates/NetworkNode';
+import type { NetworkNode } from '../NetworkNode';
 import type { NetworkActorId } from '../value-objects/NetworkActorId';
 
 export interface NetworkNodeRepository {

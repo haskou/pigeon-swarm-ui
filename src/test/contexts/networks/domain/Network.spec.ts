@@ -1,14 +1,14 @@
 import { Timestamp } from '@haskou/value-objects';
 
-import { Network } from '../../../../../contexts/networks/domain/aggregates/Network';
-import { NetworkInviteUnavailableError } from '../../../../../contexts/networks/domain/errors/NetworkInviteUnavailableError';
-import { NetworkNotAttachedError } from '../../../../../contexts/networks/domain/errors/NetworkNotAttachedError';
-import { NetworkCreated } from '../../../../../contexts/networks/domain/events/NetworkCreated';
-import { NetworkJoined } from '../../../../../contexts/networks/domain/events/NetworkJoined';
-import { NetworkRemoved } from '../../../../../contexts/networks/domain/events/NetworkRemoved';
-import { NetworkId } from '../../../../../contexts/networks/domain/value-objects/NetworkId';
-import { NetworkKey } from '../../../../../contexts/networks/domain/value-objects/NetworkKey';
-import { NetworkName } from '../../../../../contexts/networks/domain/value-objects/NetworkName';
+import { NetworkInviteUnavailableError } from '../../../../contexts/networks/domain/errors/NetworkInviteUnavailableError';
+import { NetworkNotAttachedError } from '../../../../contexts/networks/domain/errors/NetworkNotAttachedError';
+import { NetworkCreated } from '../../../../contexts/networks/domain/events/NetworkCreated';
+import { NetworkJoined } from '../../../../contexts/networks/domain/events/NetworkJoined';
+import { NetworkRemoved } from '../../../../contexts/networks/domain/events/NetworkRemoved';
+import { Network } from '../../../../contexts/networks/domain/Network';
+import { NetworkId } from '../../../../contexts/networks/domain/value-objects/NetworkId';
+import { NetworkKey } from '../../../../contexts/networks/domain/value-objects/NetworkKey';
+import { NetworkName } from '../../../../contexts/networks/domain/value-objects/NetworkName';
 
 describe(Network.name, () => {
   it('creates an attached private network and records creation', () => {

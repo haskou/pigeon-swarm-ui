@@ -1,11 +1,11 @@
 import { Timestamp } from '@haskou/value-objects';
 
-import { NetworkNode } from '../../../../../contexts/networks/domain/aggregates/NetworkNode';
-import { NetworkNodeAlreadyClaimedError } from '../../../../../contexts/networks/domain/errors/NetworkNodeAlreadyClaimedError';
-import { PublicNetworkAlreadyAttachedError } from '../../../../../contexts/networks/domain/errors/PublicNetworkAlreadyAttachedError';
-import { NetworkNodeClaimed } from '../../../../../contexts/networks/domain/events/NetworkNodeClaimed';
-import { PublicNetworkAttached } from '../../../../../contexts/networks/domain/events/PublicNetworkAttached';
-import { NetworkNodeOwnerId } from '../../../../../contexts/networks/domain/value-objects/NetworkNodeOwnerId';
+import { NetworkNodeAlreadyClaimedError } from '../../../../contexts/networks/domain/errors/NetworkNodeAlreadyClaimedError';
+import { PublicNetworkAlreadyAttachedError } from '../../../../contexts/networks/domain/errors/PublicNetworkAlreadyAttachedError';
+import { NetworkNodeClaimed } from '../../../../contexts/networks/domain/events/NetworkNodeClaimed';
+import { PublicNetworkAttached } from '../../../../contexts/networks/domain/events/PublicNetworkAttached';
+import { NetworkNode } from '../../../../contexts/networks/domain/NetworkNode';
+import { NetworkNodeOwnerId } from '../../../../contexts/networks/domain/value-objects/NetworkNodeOwnerId';
 
 describe(NetworkNode.name, () => {
   it('claims an unowned node through a domain transition', () => {

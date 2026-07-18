@@ -4,7 +4,7 @@ import type { NetworkRepository } from '../../../../../contexts/networks/domain/
 
 import { RemoveNodeNetworkMessage } from '../../../../../contexts/networks/application/remove-node-network/messages/RemoveNodeNetworkMessage';
 import { NodeNetworkRemover } from '../../../../../contexts/networks/application/remove-node-network/NodeNetworkRemover';
-import { Network } from '../../../../../contexts/networks/domain/aggregates/Network';
+import { Network } from '../../../../../contexts/networks/domain/Network';
 
 describe(NodeNetworkRemover.name, () => {
   it('removes and persists the network through the aggregate', async () => {

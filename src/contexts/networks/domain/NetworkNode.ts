@@ -1,13 +1,13 @@
 import { assert, type PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
-import { AggregateRoot } from '../../../../shared/domain/AggregateRoot';
-import { NetworkNodeAlreadyClaimedError } from '../errors/NetworkNodeAlreadyClaimedError';
-import { PublicNetworkAlreadyAttachedError } from '../errors/PublicNetworkAlreadyAttachedError';
-import { NetworkNodeClaimed } from '../events/NetworkNodeClaimed';
-import { PublicNetworkAttached } from '../events/PublicNetworkAttached';
-import { NetworkNodeId } from '../value-objects/NetworkNodeId';
-import { NetworkNodeOwnerId } from '../value-objects/NetworkNodeOwnerId';
-import { NodeCapabilityStatus } from '../value-objects/NodeCapabilityStatus';
+import { AggregateRoot } from '../../../shared/domain/AggregateRoot';
+import { NetworkNodeAlreadyClaimedError } from './errors/NetworkNodeAlreadyClaimedError';
+import { PublicNetworkAlreadyAttachedError } from './errors/PublicNetworkAlreadyAttachedError';
+import { NetworkNodeClaimed } from './events/NetworkNodeClaimed';
+import { PublicNetworkAttached } from './events/PublicNetworkAttached';
+import { NetworkNodeId } from './value-objects/NetworkNodeId';
+import { NetworkNodeOwnerId } from './value-objects/NetworkNodeOwnerId';
+import { NodeCapabilityStatus } from './value-objects/NodeCapabilityStatus';
 
 export class NetworkNode extends AggregateRoot {
   public static fromPrimitives(

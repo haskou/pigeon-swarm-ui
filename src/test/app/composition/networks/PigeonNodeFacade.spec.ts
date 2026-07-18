@@ -11,7 +11,7 @@ import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import { PigeonNodeFacade } from '../../../../app/composition/networks/PigeonNodeFacade';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { IdentityAccessContexts } from '../../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
-import { NodeRelayConfiguration } from '../../../../contexts/networks/domain/aggregates/NodeRelayConfiguration';
+import { NodeRelayConfiguration } from '../../../../contexts/networks/domain/NodeRelayConfiguration';
 
 describe(PigeonNodeFacade.name, () => {
   let identities: IdentityAccessContexts;

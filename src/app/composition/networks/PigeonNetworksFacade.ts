@@ -4,8 +4,8 @@ import type { NetworkJoiner } from '../../../contexts/networks/application/join-
 import type { NodeNetworkRemover } from '../../../contexts/networks/application/remove-node-network/NodeNetworkRemover';
 import type { NetworkPeersSearcher } from '../../../contexts/networks/application/search-network-peers/NetworkPeersSearcher';
 import type { NodeNetworksSearcher } from '../../../contexts/networks/application/search-node-networks/NodeNetworksSearcher';
-import type { Network } from '../../../contexts/networks/domain/aggregates/Network';
 import type { NetworkPeer } from '../../../contexts/networks/domain/entities/NetworkPeer';
+import type { Network } from '../../../contexts/networks/domain/Network';
 import type { IpfsReplicationStatus } from '../../../contexts/networks/presentation/view-models/IpfsReplicationStatus';
 import type { NodeNetwork } from '../../../contexts/networks/presentation/view-models/NodeNetwork';
 import type { NodeRelayConfigurationViewModel } from '../../../contexts/networks/presentation/view-models/NodeRelayConfigurationViewModel';

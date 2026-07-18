@@ -1,4 +1,4 @@
-import type { NodeRelayConfiguration } from '../../domain/aggregates/NodeRelayConfiguration';
+import type { NodeRelayConfiguration } from '../../domain/NodeRelayConfiguration';
 import type { NodeRelayConfigurationViewModel } from './NodeRelayConfigurationViewModel';
 
 export class NodeRelayConfigurationViewModelMapper {

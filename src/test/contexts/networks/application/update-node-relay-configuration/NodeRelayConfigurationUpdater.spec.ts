@@ -4,7 +4,7 @@ import type { NodeRelayConfigurationRepository } from '../../../../../contexts/n
 
 import { UpdateNodeRelayConfigurationMessage } from '../../../../../contexts/networks/application/update-node-relay-configuration/messages/UpdateNodeRelayConfigurationMessage';
 import { NodeRelayConfigurationUpdater } from '../../../../../contexts/networks/application/update-node-relay-configuration/NodeRelayConfigurationUpdater';
-import { NodeRelayConfiguration } from '../../../../../contexts/networks/domain/aggregates/NodeRelayConfiguration';
+import { NodeRelayConfiguration } from '../../../../../contexts/networks/domain/NodeRelayConfiguration';
 
 describe(NodeRelayConfigurationUpdater.name, () => {
   it('changes the loaded aggregate before persisting it', async () => {
