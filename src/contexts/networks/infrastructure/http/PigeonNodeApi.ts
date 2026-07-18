@@ -1,14 +1,12 @@
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
-import type { NodeRelayConfiguration } from '../../application/configure-node-relay/NodeRelayConfiguration';
-import type { NodeRelayPortCheckResource } from '../../application/configure-node-relay/NodeRelayPortCheckResource';
-import type { NodeRelayPortCheckTarget } from '../../application/configure-node-relay/NodeRelayPortCheckTarget';
 import type { NodeInfo } from './NodeInfo';
 import type { NodePeersSnapshot } from './NodePeersSnapshot';
 import type { IpfsReplicationStatusResource } from './resources/IpfsReplicationStatusResource';
 import type { NetworkPeerResource } from './resources/NetworkPeerResource';
 import type { NetworkResource } from './resources/NetworkResource';
+import type { NodeRelayConfigurationResource } from './resources/NodeRelayConfigurationResource';
 
 export class PigeonNodeApi {
   private readonly requestCache = new Map<string, Promise<unknown>>();
@@ -43,7 +41,9 @@ export class PigeonNodeApi {
     }
   }
 
-  private relayConfigurationPayload(configuration: NodeRelayConfiguration) {
+  private relayConfigurationPayload(
+    configuration: NodeRelayConfigurationResource,
+  ) {
     const publicHost = configuration.publicHost?.trim();
     const privateRelayEnabled = configuration.privateRelay.enabled;
     const publicNetworkPort = configuration.publicNetwork.port;
@@ -191,45 +191,32 @@ export class PigeonNodeApi {
   }
 
   public async getRelayConfiguration(
-    session: Session,
-  ): Promise<NodeRelayConfiguration> {
+    session?: Session,
+  ): Promise<NodeRelayConfigurationResource> {
     const path = '/node/relay-configuration/';
     const body = {};
 
-    return await this.http.request<NodeRelayConfiguration>(path, {
-      headers: await this.signer.headers(session, 'GET', path, body),
+    return await this.http.request<NodeRelayConfigurationResource>(path, {
+      headers: session
+        ? await this.signer.headers(session, 'GET', path, body)
+        : undefined,
       method: 'GET',
     });
   }
 
   public async updateRelayConfiguration(
-    configuration: NodeRelayConfiguration,
+    configuration: NodeRelayConfigurationResource,
     session?: Session,
-  ): Promise<NodeRelayConfiguration> {
+  ): Promise<NodeRelayConfigurationResource> {
     const path = '/node/relay-configuration/';
     const body = this.relayConfigurationPayload(configuration);
 
-    return await this.http.request<NodeRelayConfiguration>(path, {
+    return await this.http.request<NodeRelayConfigurationResource>(path, {
       body: JSON.stringify(body),
       headers: session
         ? await this.signer.headers(session, 'PUT', path, body)
         : undefined,
       method: 'PUT',
-    });
-  }
-
-  public async checkRelayPorts(
-    publicHost: string,
-    checks: NodeRelayPortCheckTarget[],
-    session: Session,
-  ): Promise<NodeRelayPortCheckResource> {
-    const path = '/node/relay-configuration/reachability-check/';
-    const body = { checks, publicHost };
-
-    return await this.http.request<NodeRelayPortCheckResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
     });
   }
 }

@@ -1,4 +1,4 @@
-export type NodeRelayConfiguration = {
+export interface NodeRelayConfigurationViewModel {
   callsRelay: {
     port?: number;
   };
@@ -15,4 +15,4 @@ export type NodeRelayConfiguration = {
     enabled: boolean;
     port?: number;
   };
-};
+}

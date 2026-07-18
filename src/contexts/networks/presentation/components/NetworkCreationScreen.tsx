@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react';
 
-import type { NodeRelayConfiguration } from '../../application/configure-node-relay/NodeRelayConfiguration';
+import type { NodeRelayConfigurationViewModel } from '../view-models/NodeRelayConfigurationViewModel';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
@@ -8,8 +8,8 @@ import { cx } from '../../../../shared/presentation/cx';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { Field } from '../../../identities/presentation/auth/Field';
-import { defaultNodeRelayConfiguration } from '../../application/configure-node-relay/defaultNodeRelayConfiguration';
 import { NetworkInviteCode } from '../../domain/NetworkInviteCode';
+import { defaultRelayConfiguration } from '../view-models/defaultRelayConfiguration';
 import { NodeRelayConfigurationForm } from './NodeRelayConfigurationForm';
 
 type NetworkSetupMode = 'create' | 'join' | 'public';
@@ -26,7 +26,9 @@ export function NetworkCreationScreen({
   const [inviteCode, setInviteCode] = useState('');
   const [configureRelay, setConfigureRelay] = useState(false);
   const [relayConfiguration, setRelayConfiguration] =
-    useState<NodeRelayConfiguration>(() => defaultNodeRelayConfiguration());
+    useState<NodeRelayConfigurationViewModel>(() =>
+      defaultRelayConfiguration(),
+    );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const modeOptions = [

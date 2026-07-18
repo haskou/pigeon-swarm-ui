@@ -5,10 +5,10 @@ import type { JoinNetwork } from '../../../../contexts/networks/application/join
 import type { ListNodeNetworks } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import type { RemoveNodeNetwork } from '../../../../contexts/networks/application/remove-node-network/RemoveNodeNetwork';
 import type { NetworkPeersSearcher } from '../../../../contexts/networks/application/search-network-peers/NetworkPeersSearcher';
-import type { PigeonNodeApi } from '../../../../contexts/networks/infrastructure/http/PigeonNodeApi';
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 
 import { PigeonNetworksFacade } from '../../../../app/composition/networks/PigeonNetworksFacade';
+import { PigeonNodeFacade } from '../../../../app/composition/networks/PigeonNodeFacade';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { IdentityAccessContexts } from '../../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
 import { Network } from '../../../../contexts/networks/domain/aggregates/Network';
@@ -21,7 +21,7 @@ describe(PigeonNetworksFacade.name, () => {
   let networkSearcher: MockProxy<ListNodeNetworks>;
   let networkRemover: MockProxy<RemoveNodeNetwork>;
   let networkPeersSearcher: MockProxy<NetworkPeersSearcher>;
-  let node: MockProxy<PigeonNodeApi>;
+  let node: MockProxy<PigeonNodeFacade>;
   let facade: PigeonNetworksFacade;
 
   beforeEach(() => {
@@ -31,7 +31,7 @@ describe(PigeonNetworksFacade.name, () => {
     networkSearcher = mock<ListNodeNetworks>();
     networkRemover = mock<RemoveNodeNetwork>();
     networkPeersSearcher = mock<NetworkPeersSearcher>();
-    node = mock<PigeonNodeApi>();
+    node = mock<PigeonNodeFacade>();
     facade = new PigeonNetworksFacade(
       identities,
       networkCreator,

@@ -1,7 +1,4 @@
 import type { IdentityAccessContexts } from '../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
-import type { NodeRelayConfiguration } from '../../../contexts/networks/application/configure-node-relay/NodeRelayConfiguration';
-import type { NodeRelayPortCheckResource } from '../../../contexts/networks/application/configure-node-relay/NodeRelayPortCheckResource';
-import type { NodeRelayPortCheckTarget } from '../../../contexts/networks/application/configure-node-relay/NodeRelayPortCheckTarget';
 import type { CreateNetwork } from '../../../contexts/networks/application/create-network/CreateNetwork';
 import type { JoinNetwork } from '../../../contexts/networks/application/join-network/JoinNetwork';
 import type { ListNodeNetworks } from '../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
@@ -9,11 +6,12 @@ import type { RemoveNodeNetwork } from '../../../contexts/networks/application/r
 import type { NetworkPeersSearcher } from '../../../contexts/networks/application/search-network-peers/NetworkPeersSearcher';
 import type { Network } from '../../../contexts/networks/domain/aggregates/Network';
 import type { NetworkPeer } from '../../../contexts/networks/domain/entities/NetworkPeer';
-import type { PigeonNodeApi } from '../../../contexts/networks/infrastructure/http/PigeonNodeApi';
 import type { IpfsReplicationStatus } from '../../../contexts/networks/presentation/view-models/IpfsReplicationStatus';
 import type { NodeNetwork } from '../../../contexts/networks/presentation/view-models/NodeNetwork';
+import type { NodeRelayConfigurationViewModel } from '../../../contexts/networks/presentation/view-models/NodeRelayConfigurationViewModel';
 import type { Peer } from '../../../contexts/networks/presentation/view-models/Peer';
 import type { Session } from '../../../shared/domain/pigeonResources.types';
+import type { PigeonNodeFacade } from './PigeonNodeFacade';
 
 import { CreateNetworkMessage } from '../../../contexts/networks/application/create-network/messages/CreateNetworkMessage';
 import { JoinNetworkMessage } from '../../../contexts/networks/application/join-network/messages/JoinNetworkMessage';
@@ -28,7 +26,7 @@ export class PigeonNetworksFacade {
     private readonly networkSearcher: ListNodeNetworks,
     private readonly networkRemover: RemoveNodeNetwork,
     private readonly networkPeersSearcher: NetworkPeersSearcher,
-    private readonly node: PigeonNodeApi,
+    private readonly node: PigeonNodeFacade,
   ) {}
 
   private actorIdentityId(session?: Session): string | undefined {
@@ -53,18 +51,7 @@ export class PigeonNetworksFacade {
     return peer.toPrimitives();
   }
 
-  public async checkRelayPorts(
-    publicHost: string,
-    checks: NodeRelayPortCheckTarget[],
-    session: Session,
-  ): Promise<NodeRelayPortCheckResource> {
-    this.actorIdentityId(session);
-
-    return await this.node.checkRelayPorts(publicHost, checks, session);
-  }
-
   public async claimNode(session: Session): Promise<void> {
-    this.actorIdentityId(session);
     await this.node.claim(session);
   }
 
@@ -82,8 +69,6 @@ export class PigeonNetworksFacade {
   }
 
   public async createPublic(session?: Session): Promise<void> {
-    if (session) this.actorIdentityId(session);
-
     await this.node.createPublicNetwork(session);
   }
 
@@ -93,18 +78,14 @@ export class PigeonNetworksFacade {
 
   public async getRelayConfiguration(
     session: Session,
-  ): Promise<NodeRelayConfiguration> {
-    this.actorIdentityId(session);
-
+  ): Promise<NodeRelayConfigurationViewModel> {
     return await this.node.getRelayConfiguration(session);
   }
 
   public async getReplicationStatus(
     session: Session,
   ): Promise<IpfsReplicationStatus> {
-    this.actorIdentityId(session);
-
-    return await this.node.getIpfsReplicationStatus(session);
+    return await this.node.getReplicationStatus(session);
   }
 
   public async join(id: string, name: string, key: string): Promise<void> {
@@ -156,11 +137,9 @@ export class PigeonNetworksFacade {
   }
 
   public async updateRelayConfiguration(
-    configuration: NodeRelayConfiguration,
+    configuration: NodeRelayConfigurationViewModel,
     session?: Session,
-  ): Promise<NodeRelayConfiguration> {
-    if (session) this.actorIdentityId(session);
-
+  ): Promise<NodeRelayConfigurationViewModel> {
     return await this.node.updateRelayConfiguration(configuration, session);
   }
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import type { NodeRelayConfiguration } from '../../application/configure-node-relay/NodeRelayConfiguration';
+import type { NodeRelayConfigurationViewModel } from '../view-models/NodeRelayConfigurationViewModel';
 
 import { cx } from '../../../../shared/presentation/cx';
 import { copy } from '../../../../shared/presentation/i18n/copy';
@@ -12,9 +12,9 @@ export function NodeRelayConfigurationForm({
   onChange,
 }: {
   className?: string;
-  configuration: NodeRelayConfiguration;
+  configuration: NodeRelayConfigurationViewModel;
   disabled?: boolean;
-  onChange: (configuration: NodeRelayConfiguration) => void;
+  onChange: (configuration: NodeRelayConfigurationViewModel) => void;
 }) {
   const requiresPublicHost = needsPublicHost(configuration);
   const [remoteAccessEnabled, setRemoteAccessEnabled] = useState(() =>
@@ -231,7 +231,7 @@ export function NodeRelayConfigurationForm({
 }
 
 function hasRemoteAccessConfiguration(
-  configuration: NodeRelayConfiguration,
+  configuration: NodeRelayConfigurationViewModel,
 ): boolean {
   return Boolean(
     configuration.publicHost?.trim() ||
@@ -408,7 +408,9 @@ function toOptionalPort(value: string): number | undefined {
   return port;
 }
 
-function needsPublicHost(configuration: NodeRelayConfiguration): boolean {
+function needsPublicHost(
+  configuration: NodeRelayConfigurationViewModel,
+): boolean {
   const publicHost = configuration.publicHost?.trim() ?? '';
 
   if (publicHost) return false;

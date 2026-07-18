@@ -1,6 +1,6 @@
-import type { NodeRelayConfiguration } from './NodeRelayConfiguration';
+import type { NodeRelayConfigurationViewModel } from './NodeRelayConfigurationViewModel';
 
-export function defaultNodeRelayConfiguration(): NodeRelayConfiguration {
+export function defaultRelayConfiguration(): NodeRelayConfigurationViewModel {
   return {
     callsRelay: {},
     manualRelayMultiaddrs: [],
