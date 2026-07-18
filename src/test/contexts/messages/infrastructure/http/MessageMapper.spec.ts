@@ -42,4 +42,15 @@ describe(MessageMapper.name, () => {
       mapper.toChatMessage(Message.fromPrimitives(hydrated)),
     ).toMatchObject({ content: 'Hello', id: 'message-a' });
   });
+
+  it('hydrates pin state from the source projection', () => {
+    const mapper = new MessageMapper();
+    const readModel = projection();
+
+    readModel.raw.pinnedByIdentityId = 'moderator-a';
+
+    expect(
+      mapper.fromChatMessage('conversation-a', readModel).toPrimitives().pinned,
+    ).toBe(true);
+  });
 });

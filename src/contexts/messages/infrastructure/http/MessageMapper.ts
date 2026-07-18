@@ -29,7 +29,7 @@ export class MessageMapper {
   public fromChatMessage(
     conversationId: string,
     projection: ChatMessage,
-    pinned = false,
+    pinned?: boolean,
   ): Message {
     const message = MessageAggregate.fromPrimitives({
       authorId: projection.authorIdentityId,
@@ -41,7 +41,7 @@ export class MessageMapper {
       encrypted: projection.encrypted,
       id: projection.id,
       kind: projection.kind ?? (projection.sticker ? 'sticker' : 'message'),
-      pinned,
+      pinned: pinned ?? Boolean(projection.raw.pinnedByIdentityId),
       reactions: projection.reactions.map((reaction) => ({
         authorId: reaction.authorIdentityId,
         createdAt: reaction.createdAt,

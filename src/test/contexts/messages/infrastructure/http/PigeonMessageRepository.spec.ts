@@ -3,6 +3,7 @@ import { mock } from 'jest-mock-extended';
 
 import type { PigeonMessageCommandsApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
 import type { PigeonMessagesApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessagesApi';
+import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
 import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 
 import { IdentityAccessContexts } from '../../../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
@@ -19,10 +20,11 @@ import { MessageOperationContexts } from '../../../../../contexts/messages/infra
 import { PigeonMessageRepository } from '../../../../../contexts/messages/infrastructure/http/PigeonMessageRepository';
 
 const session = { identity: { id: 'author-a' } } as Session;
-const projection = {
+const projection: ChatMessage = {
   attachments: [],
   authorIdentityId: 'author-a',
   content: 'Hello',
+  edited: true,
   encrypted: true,
   id: 'message-a',
   mine: true,
@@ -108,11 +110,12 @@ describe(PigeonMessageRepository.name, () => {
   it('preserves pin metadata when mapping pinned messages', async () => {
     const messages = mock<PigeonMessagesApi>();
     const identities = new IdentityAccessContexts();
+    const mapper = new MessageMapper();
     const repository = new PigeonMessageRepository(
       messages,
       mock<PigeonMessageCommandsApi>(),
       identities,
-      new MessageMapper(),
+      mapper,
       new MessageOperationContexts(),
     );
 
@@ -136,5 +139,43 @@ describe(PigeonMessageRepository.name, () => {
       messageId: 'message-a',
       pinnedByIdentityId: 'moderator-a',
     });
+    expect(mapper.toChatMessage(pin.getMessage())).toEqual(projection);
+  });
+
+  it('preserves pin state when finding a message to unpin', async () => {
+    const messages = mock<PigeonMessagesApi>();
+    const identities = new IdentityAccessContexts();
+    const repository = new PigeonMessageRepository(
+      messages,
+      mock<PigeonMessageCommandsApi>(),
+      identities,
+      new MessageMapper(),
+      new MessageOperationContexts(),
+    );
+    const pinnedProjection = {
+      ...projection,
+      raw: {
+        ...projection.raw,
+        pinnedByIdentityId: 'moderator-a',
+      },
+    };
+
+    identities.register(session);
+    messages.loadMessage.mockResolvedValue(pinnedProjection);
+
+    const aggregate = await repository.find(
+      MessageConversationId.fromString('conversation-a'),
+      MessageId.fromString('message-a'),
+      MessageAuthorId.fromString('author-a'),
+    );
+
+    aggregate.unpin(new Timestamp(200));
+    await repository.save(aggregate, MessageAuthorId.fromString('author-a'));
+
+    expect(messages.unpinMessage).toHaveBeenCalledWith(
+      session,
+      'conversation-a',
+      'message-a',
+    );
   });
 });

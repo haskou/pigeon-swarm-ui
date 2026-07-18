@@ -1,3 +1,5 @@
+import { Timestamp } from '@haskou/value-objects';
+
 import type { DomainEvent } from '../../../../shared/domain/DomainEvent';
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { IdentityAccessContexts } from '../../../identities/infrastructure/http/IdentityAccessContexts';
@@ -204,14 +206,16 @@ export class PigeonMessageRepository implements MessageRepository {
     );
 
     return pins.map((pin) =>
-      PinnedMessage.fromPrimitives({
-        createdAt: pin.createdAt,
-        message: this.mapper
-          .fromChatMessage(conversationId.toString(), pin.message, true)
-          .toPrimitives(),
-        messageId: pin.messageId,
-        pinnedByIdentityId: pin.pinnedByIdentityId,
-      }),
+      PinnedMessage.create(
+        MessageId.fromString(pin.messageId),
+        MessageAuthorId.fromString(pin.pinnedByIdentityId),
+        new Timestamp(pin.createdAt),
+        this.mapper.fromChatMessage(
+          conversationId.toString(),
+          pin.message,
+          true,
+        ),
+      ),
     );
   }
 

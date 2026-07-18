@@ -5,10 +5,19 @@ import { MessageAuthorId } from '../value-objects/MessageAuthorId';
 import { MessageId } from '../value-objects/MessageId';
 
 export class PinnedMessage {
+  public static create(
+    messageId: MessageId,
+    pinnedByIdentityId: MessageAuthorId,
+    createdAt: Timestamp,
+    message: Message,
+  ): PinnedMessage {
+    return new PinnedMessage(messageId, pinnedByIdentityId, createdAt, message);
+  }
+
   public static fromPrimitives(
     primitives: PrimitiveOf<PinnedMessage>,
   ): PinnedMessage {
-    return new PinnedMessage(
+    return PinnedMessage.create(
       MessageId.fromString(primitives.messageId),
       MessageAuthorId.fromString(primitives.pinnedByIdentityId),
       new Timestamp(primitives.createdAt),
