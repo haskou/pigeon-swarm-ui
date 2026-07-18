@@ -1,5 +1,5 @@
-import { NetworkName } from '../../../domain/value-objects/NetworkName';
 import { NetworkActorId } from '../../../domain/value-objects/NetworkActorId';
+import { NetworkName } from '../../../domain/value-objects/NetworkName';
 
 export class CreateNetworkMessage {
   public constructor(

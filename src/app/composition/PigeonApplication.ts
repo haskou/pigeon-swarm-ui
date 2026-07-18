@@ -81,8 +81,8 @@ import { RemoveNodeNetwork } from '../../contexts/networks/application/remove-no
 import { NetworkPeersSearcher } from '../../contexts/networks/application/search-network-peers/NetworkPeersSearcher';
 import { NetworkMapper } from '../../contexts/networks/infrastructure/http/mapping/NetworkMapper';
 import { NetworkPeerMapper } from '../../contexts/networks/infrastructure/http/mapping/NetworkPeerMapper';
-import { PigeonNetworkRepository } from '../../contexts/networks/infrastructure/http/repositories/PigeonNetworkRepository';
 import { PigeonNetworkPeerRepository } from '../../contexts/networks/infrastructure/http/repositories/PigeonNetworkPeerRepository';
+import { PigeonNetworkRepository } from '../../contexts/networks/infrastructure/http/repositories/PigeonNetworkRepository';
 import { PigeonNotificationsApplication } from '../../contexts/notifications/application/PigeonNotificationsApplication';
 import { PigeonConversationInvitationKeyDecryptor } from '../../contexts/notifications/infrastructure/crypto/PigeonConversationInvitationKeyDecryptor';
 import { PigeonPollsApplication } from '../../contexts/polls/application/PigeonPollsApplication';

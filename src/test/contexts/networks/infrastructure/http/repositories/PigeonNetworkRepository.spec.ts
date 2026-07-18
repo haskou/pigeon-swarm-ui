@@ -1,8 +1,8 @@
 import { Timestamp } from '@haskou/value-objects';
 import { mock, type MockProxy } from 'jest-mock-extended';
 
-import type { Session } from '../../../../../../shared/domain/pigeonResources.types';
 import type { PigeonNodeApi } from '../../../../../../contexts/networks/infrastructure/http/PigeonNodeApi';
+import type { Session } from '../../../../../../shared/domain/pigeonResources.types';
 
 import { IdentityAccessContexts } from '../../../../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
 import { Network } from '../../../../../../contexts/networks/domain/aggregates/Network';

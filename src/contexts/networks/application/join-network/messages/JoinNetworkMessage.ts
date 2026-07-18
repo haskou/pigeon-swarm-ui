@@ -1,5 +1,5 @@
-import { NetworkId } from '../../../domain/value-objects/NetworkId';
 import { NetworkActorId } from '../../../domain/value-objects/NetworkActorId';
+import { NetworkId } from '../../../domain/value-objects/NetworkId';
 import { NetworkKey } from '../../../domain/value-objects/NetworkKey';
 import { NetworkName } from '../../../domain/value-objects/NetworkName';
 

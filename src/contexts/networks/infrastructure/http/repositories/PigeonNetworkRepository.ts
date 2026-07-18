@@ -65,8 +65,8 @@ export class PigeonNetworkRepository implements NetworkRepository {
   }
 
   public async search(actorId: NetworkActorId): Promise<Network[]> {
-    return (await this.node.getNetworks(this.session(actorId))).map((resource) =>
-      this.mapper.toAggregate(resource),
+    return (await this.node.getNetworks(this.session(actorId))).map(
+      (resource) => this.mapper.toAggregate(resource),
     );
   }
 }

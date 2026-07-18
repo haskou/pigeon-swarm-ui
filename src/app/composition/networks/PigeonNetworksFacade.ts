@@ -10,8 +10,8 @@ import type { NetworkPeersSearcher } from '../../../contexts/networks/applicatio
 import type { Network } from '../../../contexts/networks/domain/aggregates/Network';
 import type { NetworkPeer } from '../../../contexts/networks/domain/entities/NetworkPeer';
 import type { PigeonNodeApi } from '../../../contexts/networks/infrastructure/http/PigeonNodeApi';
-import type { NodeNetwork } from '../../../contexts/networks/presentation/view-models/NodeNetwork';
 import type { IpfsReplicationStatus } from '../../../contexts/networks/presentation/view-models/IpfsReplicationStatus';
+import type { NodeNetwork } from '../../../contexts/networks/presentation/view-models/NodeNetwork';
 import type { Peer } from '../../../contexts/networks/presentation/view-models/Peer';
 import type { Session } from '../../../shared/domain/pigeonResources.types';
 

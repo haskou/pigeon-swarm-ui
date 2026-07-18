@@ -78,8 +78,6 @@ describe(Network.name, () => {
       status: 'attached',
     });
 
-    expect(() => network.issueInvite()).toThrow(
-      NetworkInviteUnavailableError,
-    );
+    expect(() => network.issueInvite()).toThrow(NetworkInviteUnavailableError);
   });
 });
