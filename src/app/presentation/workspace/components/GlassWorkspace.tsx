@@ -37,10 +37,8 @@ import type {
   Session,
   StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
-import type {
-  NetworkSynchronizationStatus,
-  RealtimeDomainEvent,
-} from '../../../../shared/infrastructure/realtime/RealtimeGateway';
+import type { NetworkSynchronizationStatus } from '../../../../contexts/networks/presentation/view-models/NetworkSynchronizationStatus';
+import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 import type { PendingCommunityInviteLink } from '../../../../contexts/communities/presentation/view-models/communityInviteLink';
 import type { PreloadedConversationMessages } from '../PreloadedConversationMessages';
 import type { MessageContextMenuState } from './messageContextMenu';

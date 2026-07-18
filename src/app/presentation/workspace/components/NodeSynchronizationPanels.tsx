@@ -1,4 +1,4 @@
-import type { NetworkSynchronizationStatus } from '../../../../contexts/networks/application/find-network-synchronization/NetworkSynchronizationStatus';
+import type { NetworkSynchronizationStatus } from '../../../../contexts/networks/presentation/view-models/NetworkSynchronizationStatus';
 import type { IpfsReplicationStatus } from '../../../../shared/domain/pigeonResources.types';
 
 import { cx } from '../../../../shared/presentation/cx';

@@ -3,8 +3,8 @@ import type { RefObject } from 'react';
 import { useEffect, useRef } from 'react';
 
 import type { Session } from '../../../shared/domain/pigeonResources.types';
+import type { NetworkSynchronizationStatus } from '../../../contexts/networks/presentation/view-models/NetworkSynchronizationStatus';
 import type {
-  NetworkSynchronizationStatus,
   RealtimeDomainEvent,
   RealtimeTypingInput,
   RealtimeTypingMessage,
