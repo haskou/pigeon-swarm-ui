@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import type { NodeRelayConfiguration } from '../../../../contexts/networks/application/configure-node-relay/NodeRelayConfiguration';
 import type { NetworkSynchronizationStatus } from '../../../../contexts/networks/application/find-network-synchronization/NetworkSynchronizationStatus';
 import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
-import type { Peer } from '../../../../contexts/networks/application/list-peers/Peer';
+import type { Peer } from '../../../../contexts/networks/presentation/view-models/Peer';
 import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
 import type {
   IdentityResource,

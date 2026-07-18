@@ -5,8 +5,9 @@ import type {
 import type { CreateNetwork } from '../../../contexts/networks/application/create-network/CreateNetwork';
 import type { JoinNetwork } from '../../../contexts/networks/application/join-network/JoinNetwork';
 import type { ListNodeNetworks } from '../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
-import type { Peer } from '../../../contexts/networks/application/list-peers/Peer';
+import type { Peer } from '../../../contexts/networks/presentation/view-models/Peer';
 import type { RemoveNodeNetwork } from '../../../contexts/networks/application/remove-node-network/RemoveNodeNetwork';
+import type { NetworkPeersSearcher } from '../../../contexts/networks/application/search-network-peers/NetworkPeersSearcher';
 import type { NodeRelayConfiguration } from '../../../contexts/networks/application/configure-node-relay/NodeRelayConfiguration';
 import type { NodeRelayPortCheckResource } from '../../../contexts/networks/application/configure-node-relay/NodeRelayPortCheckResource';
 import type { NodeRelayPortCheckTarget } from '../../../contexts/networks/application/configure-node-relay/NodeRelayPortCheckTarget';
@@ -14,6 +15,7 @@ import type { IdentityAccessContexts } from '../../../contexts/identities/infras
 import type { PigeonNodeApi } from '../../../contexts/networks/infrastructure/http/PigeonNodeApi';
 import type { NodeNetwork } from '../../../contexts/networks/presentation/view-models/NodeNetwork';
 import type { Network } from '../../../contexts/networks/domain/aggregates/Network';
+import type { NetworkPeer } from '../../../contexts/networks/domain/entities/NetworkPeer';
 
 import { CreateNetworkMessage } from '../../../contexts/networks/application/create-network/messages/CreateNetworkMessage';
 import { JoinNetworkMessage } from '../../../contexts/networks/application/join-network/messages/JoinNetworkMessage';
@@ -27,6 +29,7 @@ export class PigeonNetworksFacade {
     private readonly networkJoiner: JoinNetwork,
     private readonly networkSearcher: ListNodeNetworks,
     private readonly networkRemover: RemoveNodeNetwork,
+    private readonly networkPeersSearcher: NetworkPeersSearcher,
     private readonly node: PigeonNodeApi,
   ) {}
 
@@ -46,6 +49,10 @@ export class PigeonNetworksFacade {
       key: primitives.key,
       name: primitives.name,
     };
+  }
+
+  private toPeer(peer: NetworkPeer): Peer {
+    return peer.toPrimitives();
   }
 
   public async checkRelayPorts(
@@ -131,7 +138,9 @@ export class PigeonNetworksFacade {
   }
 
   public async peers(): Promise<Peer[]> {
-    return await this.node.getPeers();
+    const peers = await this.networkPeersSearcher.search();
+
+    return peers.map((peer) => this.toPeer(peer));
   }
 
   public async remove(

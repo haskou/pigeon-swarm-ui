@@ -1,16 +1,16 @@
 import { FormEvent, useState } from 'react';
 
-import { applicationContainer } from '../../../../app/composition/applicationContainer';
-import { Field } from '../../../identities/presentation/auth/Field';
 import type { NodeRelayConfiguration } from '../../application/configure-node-relay/NodeRelayConfiguration';
 
-import { defaultNodeRelayConfiguration } from '../../application/configure-node-relay/defaultNodeRelayConfiguration';
-import { NetworkInviteCode } from '../../domain/NetworkInviteCode';
-import { NodeRelayConfigurationForm } from './NodeRelayConfigurationForm';
+import { applicationContainer } from '../../../../app/composition/applicationContainer';
+import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
 import { cx } from '../../../../shared/presentation/cx';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
-import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
+import { Field } from '../../../identities/presentation/auth/Field';
+import { defaultNodeRelayConfiguration } from '../../application/configure-node-relay/defaultNodeRelayConfiguration';
+import { NetworkInviteCode } from '../../domain/NetworkInviteCode';
+import { NodeRelayConfigurationForm } from './NodeRelayConfigurationForm';
 
 type NetworkSetupMode = 'create' | 'join' | 'public';
 

@@ -1,6 +1,6 @@
-import type { Peer } from '../../application/list-peers/Peer';
 import type { NodeInfo } from './NodeInfo';
 import type { NodePeersSnapshot } from './NodePeersSnapshot';
+import type { NetworkPeerResource } from './resources/NetworkPeerResource';
 import type { NetworkResource } from './resources/NetworkResource';
 
 import { API_SERVER_URL } from '../../../../app/API_SERVER_URL';
@@ -53,7 +53,7 @@ export class NodeBootstrapApi {
     return result.networks;
   }
 
-  public async getPeers(): Promise<Peer[]> {
+  public async getPeers(): Promise<NetworkPeerResource[]> {
     return (await this.getPeerSnapshot()).peers;
   }
 

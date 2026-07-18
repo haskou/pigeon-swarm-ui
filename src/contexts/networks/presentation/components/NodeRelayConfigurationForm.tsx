@@ -2,8 +2,8 @@ import { useState } from 'react';
 
 import type { NodeRelayConfiguration } from '../../application/configure-node-relay/NodeRelayConfiguration';
 
-import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 
 export function NodeRelayConfigurationForm({
   className,
@@ -32,9 +32,9 @@ export function NodeRelayConfigurationForm({
       privateRelay: {
         ...configuration.privateRelay,
         enabled: false,
-        publicationEnabled: false,
         portEnd: undefined,
         portStart: undefined,
+        publicationEnabled: false,
       },
       publicHost: '',
       publicNetwork: { enabled: false },

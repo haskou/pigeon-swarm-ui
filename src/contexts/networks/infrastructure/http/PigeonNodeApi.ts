@@ -7,10 +7,10 @@ import type { RequestSigner } from '../../../../shared/infrastructure/http/Reque
 import type { NodeRelayConfiguration } from '../../application/configure-node-relay/NodeRelayConfiguration';
 import type { NodeRelayPortCheckResource } from '../../application/configure-node-relay/NodeRelayPortCheckResource';
 import type { NodeRelayPortCheckTarget } from '../../application/configure-node-relay/NodeRelayPortCheckTarget';
-import type { Peer } from '../../application/list-peers/Peer';
 import type { NetworkResource } from './resources/NetworkResource';
 import type { NodeInfo } from './NodeInfo';
 import type { NodePeersSnapshot } from './NodePeersSnapshot';
+import type { NetworkPeerResource } from './resources/NetworkPeerResource';
 
 export class PigeonNodeApi {
   private readonly requestCache = new Map<string, Promise<unknown>>();
@@ -115,7 +115,7 @@ export class PigeonNodeApi {
     return result.networks;
   }
 
-  public async getPeers(): Promise<Peer[]> {
+  public async getPeers(): Promise<NetworkPeerResource[]> {
     return (await this.getPeerSnapshot()).peers;
   }
 

@@ -78,8 +78,11 @@ import { CreateNetwork } from '../../contexts/networks/application/create-networ
 import { JoinNetwork } from '../../contexts/networks/application/join-network/JoinNetwork';
 import { ListNodeNetworks } from '../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import { RemoveNodeNetwork } from '../../contexts/networks/application/remove-node-network/RemoveNodeNetwork';
+import { NetworkPeersSearcher } from '../../contexts/networks/application/search-network-peers/NetworkPeersSearcher';
 import { NetworkMapper } from '../../contexts/networks/infrastructure/http/mapping/NetworkMapper';
+import { NetworkPeerMapper } from '../../contexts/networks/infrastructure/http/mapping/NetworkPeerMapper';
 import { PigeonNetworkRepository } from '../../contexts/networks/infrastructure/http/repositories/PigeonNetworkRepository';
+import { PigeonNetworkPeerRepository } from '../../contexts/networks/infrastructure/http/repositories/PigeonNetworkPeerRepository';
 import { PigeonNotificationsApplication } from '../../contexts/notifications/application/PigeonNotificationsApplication';
 import { PigeonConversationInvitationKeyDecryptor } from '../../contexts/notifications/infrastructure/crypto/PigeonConversationInvitationKeyDecryptor';
 import { PigeonPollsApplication } from '../../contexts/polls/application/PigeonPollsApplication';
@@ -100,12 +103,12 @@ import { PigeonMessageReactions } from './messages/PigeonMessageReactions';
 import { PigeonMessageReader } from './messages/PigeonMessageReader';
 import { PigeonMessagesFacade } from './messages/PigeonMessagesFacade';
 import { PigeonMessageWriter } from './messages/PigeonMessageWriter';
+import { PigeonNetworksFacade } from './networks/PigeonNetworksFacade';
 import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonAttachmentsFacade } from './PigeonAttachmentsFacade';
 import { PigeonCallsFacade } from './PigeonCallsFacade';
 import { PigeonCommunitiesFacade } from './PigeonCommunitiesFacade';
 import { PigeonRealtimeApplication } from './PigeonRealtimeApplication';
-import { PigeonNetworksFacade } from './networks/PigeonNetworksFacade';
 
 export class PigeonApplication {
   public readonly attachments: PigeonAttachmentsFacade;
@@ -340,6 +343,9 @@ export class PigeonApplication {
       new JoinNetwork(networkRepository),
       new ListNodeNetworks(networkRepository),
       new RemoveNodeNetwork(networkRepository),
+      new NetworkPeersSearcher(
+        new PigeonNetworkPeerRepository(gateway.node, new NetworkPeerMapper()),
+      ),
       gateway.node,
     );
     this.notifications = new PigeonNotificationsApplication({

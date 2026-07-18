@@ -1,6 +1,4 @@
-import type { PeerNetwork } from './PeerNetwork';
-
-export type Peer = {
+export interface NetworkPeerResource {
   capabilities: {
     gossipsub: boolean;
     privateIpfs: boolean;
@@ -13,7 +11,10 @@ export type Peer = {
   };
   id: string;
   lastSeenAt: number;
-  networks: PeerNetwork[];
+  networks: Array<{
+    id: string;
+    name: string;
+  }>;
   nodeType: 'leaf' | 'reachable' | 'relay' | 'unknown';
   owner?: string;
-};
+}

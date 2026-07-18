@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useState, type ReactElement } from 'react';
 
 import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
 import type { NetworkSynchronizationStatus } from '../../../../contexts/networks/application/find-network-synchronization/NetworkSynchronizationStatus';
-import type { Peer } from '../../../../contexts/networks/application/list-peers/Peer';
+import type { Peer } from '../../../../contexts/networks/presentation/view-models/Peer';
 import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
 import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
 import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';

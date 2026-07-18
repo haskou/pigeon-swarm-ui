@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import type { Peer } from '../../application/list-peers/Peer';
 import type { NodePeersSnapshot } from '../../infrastructure/http/NodePeersSnapshot';
+import type { Peer } from '../view-models/Peer';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrowserIdle';
