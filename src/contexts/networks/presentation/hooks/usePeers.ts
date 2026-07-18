@@ -3,12 +3,10 @@ import { useCallback, useEffect, useState } from 'react';
 import type { PeersState } from './PeersState';
 import type { UsePeersInput } from './UsePeersInput';
 
+import { nodeBootstrapApi } from '../../../../app/composition/nodeBootstrapApi';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrowserIdle';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
-import { NodeBootstrapApi } from '../../infrastructure/http/NodeBootstrapApi';
-
-const nodeBootstrapApi = new NodeBootstrapApi();
 
 export function usePeers({
   autoLoad = true,

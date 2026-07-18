@@ -5,11 +5,9 @@ import type { NodeInfo } from '../../infrastructure/http/NodeInfo';
 import type { NodeNetwork } from '../../presentation/view-models/NodeNetwork';
 
 import { loadApplicationContainer } from '../../../../app/composition/loadApplicationContainer';
+import { nodeBootstrapApi } from '../../../../app/composition/nodeBootstrapApi';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
-import { NodeBootstrapApi } from '../../infrastructure/http/NodeBootstrapApi';
-
-const nodeBootstrapApi = new NodeBootstrapApi();
 
 type NodeNetworksState = {
   error: Error | null;

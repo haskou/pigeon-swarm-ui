@@ -1,20 +1,13 @@
+import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { NodeInfo } from './NodeInfo';
 import type { NodePeersSnapshot } from './NodePeersSnapshot';
 import type { NetworkPeerResource } from './resources/NetworkPeerResource';
 import type { NetworkResource } from './resources/NetworkResource';
 
-import { API_SERVER_URL } from '../../../../app/API_SERVER_URL';
-import { ApiUrlBuilder } from '../../../../shared/infrastructure/http/ApiUrlBuilder';
-import { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
-
 export class NodeBootstrapApi {
   private readonly requestCache = new Map<string, Promise<unknown>>();
 
-  public constructor(
-    private readonly http = new HttpJsonClient(
-      new ApiUrlBuilder(API_SERVER_URL),
-    ),
-  ) {}
+  public constructor(private readonly http: HttpJsonClient) {}
 
   private async cachedRequest<T>(
     key: string,
