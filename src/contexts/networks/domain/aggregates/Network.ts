@@ -6,7 +6,7 @@ import { NetworkNotAttachedError } from '../errors/NetworkNotAttachedError';
 import { NetworkCreated } from '../events/NetworkCreated';
 import { NetworkJoined } from '../events/NetworkJoined';
 import { NetworkRemoved } from '../events/NetworkRemoved';
-import type { NetworkInvite } from '../NetworkInviteCode';
+import { NetworkInvite } from '../NetworkInvite';
 import { NetworkAttachmentStatus } from '../value-objects/NetworkAttachmentStatus';
 import { NetworkId } from '../value-objects/NetworkId';
 import { NetworkKey } from '../value-objects/NetworkKey';
@@ -78,11 +78,11 @@ export class Network extends AggregateRoot {
       new NetworkInviteUnavailableError(),
     );
 
-    return {
+    return NetworkInvite.fromPrimitives({
       id: this.id.toString(),
       key: key.toString(),
       name: this.name.toString(),
-    };
+    });
   }
 
   public remove(occurredAt: Timestamp): void {

@@ -4,6 +4,7 @@ import type { NodeNetwork } from '../../../../contexts/networks/presentation/vie
 import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 
+import { NetworkInvite } from '../../../../contexts/networks/domain/NetworkInvite';
 import { NetworkInviteCode } from '../../../../contexts/networks/domain/NetworkInviteCode';
 import { cx } from '../../../../shared/presentation/cx';
 import { copy } from '../../../../shared/presentation/i18n/copy';
@@ -51,7 +52,7 @@ export function NodeNetworksPanel({
 
     beginMutation('join');
     try {
-      const invite = NetworkInviteCode.decode(joinCode);
+      const invite = NetworkInviteCode.decode(joinCode).toPrimitives();
 
       await applicationContainer.networks.joinForNode(
         session,
@@ -140,13 +141,16 @@ export function NodeNetworksPanel({
   const copyNetworkCode = async (network: NodeNetwork) => {
     if (!navigator.clipboard) return;
 
-    const canShareNetworkKey = isOwner && !!network.key;
+    const key = network.key;
+    const canShareNetworkKey = isOwner && typeof key === 'string' && !!key;
     const text = canShareNetworkKey
-      ? NetworkInviteCode.encode({
-          id: network.id,
-          key: network.key!,
-          name: network.name,
-        })
+      ? NetworkInviteCode.encode(
+          NetworkInvite.fromPrimitives({
+            id: network.id,
+            key,
+            name: network.name,
+          }),
+        )
       : network.id;
 
     await navigator.clipboard.writeText(text);

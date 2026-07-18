@@ -51,7 +51,7 @@ export function NetworkCreationScreen({
       if (mode === 'create') {
         await applicationContainer.networks.create(name);
       } else if (mode === 'join') {
-        const invite = NetworkInviteCode.decode(inviteCode);
+        const invite = NetworkInviteCode.decode(inviteCode).toPrimitives();
 
         await applicationContainer.networks.join(
           invite.id,

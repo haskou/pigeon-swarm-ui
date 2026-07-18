@@ -32,7 +32,7 @@ describe(Network.name, () => {
       new Timestamp(100),
     );
 
-    expect(network.issueInvite()).toEqual({
+    expect(network.issueInvite().toPrimitives()).toEqual({
       id: 'network-a',
       key: 'secret-key',
       name: 'Builders',

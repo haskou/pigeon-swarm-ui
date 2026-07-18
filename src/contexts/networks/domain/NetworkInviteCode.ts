@@ -1,11 +1,28 @@
-import type { NetworkInvite } from './NetworkInvite';
-import type { NetworkInvitePayload } from './NetworkInvitePayload';
-
-export type { NetworkInvite } from './NetworkInvite';
+import { InvalidNetworkInviteCodeError } from './errors/InvalidNetworkInviteCodeError';
+import { NetworkInvite } from './NetworkInvite';
 
 const prefix = 'psn1.';
 
 export class NetworkInviteCode {
+  private static hasTextProperty(value: object, property: string): boolean {
+    const candidate: unknown = Reflect.get(value, property);
+
+    return typeof candidate === 'string' && !!candidate.trim();
+  }
+
+  private static isPayload(
+    value: unknown,
+  ): value is { id: string; key: string; name: string; version: 1 } {
+    if (typeof value !== 'object' || value === null) return false;
+
+    return (
+      this.hasTextProperty(value, 'id') &&
+      this.hasTextProperty(value, 'key') &&
+      this.hasTextProperty(value, 'name') &&
+      Reflect.get(value, 'version') === 1
+    );
+  }
+
   private static encodeBase64Url(value: string): string {
     return btoa(encodeURIComponent(value))
       .replace(/\+/g, '-')
@@ -24,13 +41,15 @@ export class NetworkInviteCode {
   }
 
   public static encode(invite: NetworkInvite): string {
+    const primitives = invite.toPrimitives();
+
     return `${prefix}${this.encodeBase64Url(
       JSON.stringify({
-        id: invite.id.trim(),
-        key: invite.key.trim(),
-        name: invite.name.trim(),
+        id: primitives.id,
+        key: primitives.key,
+        name: primitives.name,
         version: 1,
-      } satisfies NetworkInvitePayload),
+      }),
     )}`;
   }
 
@@ -38,26 +57,25 @@ export class NetworkInviteCode {
     const normalized = value.trim();
 
     if (!normalized.startsWith(prefix)) {
-      throw new Error('Invalid network code.');
+      throw new InvalidNetworkInviteCodeError();
     }
 
-    const payload = JSON.parse(
-      this.decodeBase64Url(normalized.slice(prefix.length)),
-    ) as Partial<NetworkInvitePayload>;
+    let payload: unknown;
 
-    if (
-      payload.version !== 1 ||
-      !payload.id?.trim() ||
-      !payload.key?.trim() ||
-      !payload.name?.trim()
-    ) {
-      throw new Error('Invalid network code.');
+    try {
+      payload = JSON.parse(
+        this.decodeBase64Url(normalized.slice(prefix.length)),
+      );
+    } catch {
+      throw new InvalidNetworkInviteCodeError();
     }
 
-    return {
+    if (!this.isPayload(payload)) throw new InvalidNetworkInviteCodeError();
+
+    return NetworkInvite.fromPrimitives({
       id: payload.id.trim(),
       key: payload.key.trim(),
       name: payload.name.trim(),
-    };
+    });
   }
 }
