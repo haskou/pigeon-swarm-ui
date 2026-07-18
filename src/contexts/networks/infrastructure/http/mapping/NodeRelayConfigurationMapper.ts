@@ -9,7 +9,7 @@ export class NodeRelayConfigurationMapper {
   ): NodeRelayConfiguration {
     return NodeRelayConfiguration.fromPrimitives({
       callsRelay: { port: resource.callsRelay.port },
-      manualRelayMultiaddrs: resource.manualRelayMultiaddrs,
+      manualRelayMultiaddrs: resource.manualRelayMultiaddrs ?? [],
       nodeId,
       privateRelay: {
         ...resource.privateRelay,

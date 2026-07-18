@@ -2,7 +2,7 @@ export interface NodeRelayConfigurationResource {
   callsRelay: {
     port?: number;
   };
-  manualRelayMultiaddrs: string[];
+  manualRelayMultiaddrs?: string[];
   privateRelay: {
     discoveryEnabled: boolean;
     enabled: boolean;

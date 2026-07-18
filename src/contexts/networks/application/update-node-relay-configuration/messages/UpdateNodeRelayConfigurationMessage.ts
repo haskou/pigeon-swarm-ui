@@ -33,9 +33,10 @@ export class UpdateNodeRelayConfigurationMessage {
   }
 
   public getManualRelayMultiaddresses(): NodeRelayMultiaddress[] {
-    return this.input.manualRelayMultiaddrs.map((address) =>
-      NodeRelayMultiaddress.fromString(address),
-    );
+    return this.input.manualRelayMultiaddrs
+      .map((address) => address.trim())
+      .filter(Boolean)
+      .map((address) => NodeRelayMultiaddress.fromString(address));
   }
 
   public getPrivateRelay(): PrivateRelayConfiguration {

@@ -21,4 +21,20 @@ describe(NodeRelayConfigurationMapper.name, () => {
       resource,
     );
   });
+
+  it('normalizes omitted manual relay addresses before hydrating the aggregate', () => {
+    const mapper = new NodeRelayConfigurationMapper();
+
+    const configuration = mapper.toAggregate('node-a', {
+      callsRelay: {},
+      privateRelay: {
+        discoveryEnabled: true,
+        enabled: false,
+        publicationEnabled: false,
+      },
+      publicNetwork: { enabled: false },
+    });
+
+    expect(configuration.toPrimitives().manualRelayMultiaddrs).toEqual([]);
+  });
 });

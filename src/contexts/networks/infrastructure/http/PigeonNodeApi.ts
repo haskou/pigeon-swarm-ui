@@ -52,7 +52,7 @@ export class PigeonNodeApi {
       callsRelay: {
         port: configuration.callsRelay.port,
       },
-      manualRelayMultiaddrs: configuration.manualRelayMultiaddrs
+      manualRelayMultiaddrs: (configuration.manualRelayMultiaddrs ?? [])
         .map((value) => value.trim())
         .filter(Boolean),
       privateRelay: {
