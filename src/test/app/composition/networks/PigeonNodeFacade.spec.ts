@@ -1,5 +1,7 @@
 import { mock, type MockProxy } from 'jest-mock-extended';
 
+import type { NetworkNodeClaimer } from '../../../../contexts/networks/application/claim-network-node/NetworkNodeClaimer';
+import type { PublicNetworkCreator } from '../../../../contexts/networks/application/create-public-network/PublicNetworkCreator';
 import type { NodeRelayConfigurationFinder } from '../../../../contexts/networks/application/find-node-relay-configuration/NodeRelayConfigurationFinder';
 import type { NodeRelayConfigurationUpdater } from '../../../../contexts/networks/application/update-node-relay-configuration/NodeRelayConfigurationUpdater';
 import type { PigeonNodeApi } from '../../../../contexts/networks/infrastructure/http/PigeonNodeApi';
@@ -13,6 +15,8 @@ import { NodeRelayConfiguration } from '../../../../contexts/networks/domain/agg
 
 describe(PigeonNodeFacade.name, () => {
   let identities: IdentityAccessContexts;
+  let nodeClaimer: MockProxy<NetworkNodeClaimer>;
+  let publicNetworkCreator: MockProxy<PublicNetworkCreator>;
   let relayFinder: MockProxy<NodeRelayConfigurationFinder>;
   let relayUpdater: MockProxy<NodeRelayConfigurationUpdater>;
   let relayMapper: MockProxy<NodeRelayConfigurationViewModelMapper>;
@@ -21,12 +25,16 @@ describe(PigeonNodeFacade.name, () => {
 
   beforeEach(() => {
     identities = new IdentityAccessContexts();
+    nodeClaimer = mock<NetworkNodeClaimer>();
+    publicNetworkCreator = mock<PublicNetworkCreator>();
     relayFinder = mock<NodeRelayConfigurationFinder>();
     relayUpdater = mock<NodeRelayConfigurationUpdater>();
     relayMapper = mock<NodeRelayConfigurationViewModelMapper>();
     node = mock<PigeonNodeApi>();
     facade = new PigeonNodeFacade(
       identities,
+      nodeClaimer,
+      publicNetworkCreator,
       relayFinder,
       relayUpdater,
       relayMapper,

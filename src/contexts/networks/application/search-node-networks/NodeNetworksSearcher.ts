@@ -1,12 +1,12 @@
 import type { Network } from '../../domain/aggregates/Network';
 import type { NetworkRepository } from '../../domain/repositories/NetworkRepository';
 
-import { ListNodeNetworksMessage } from './messages/ListNodeNetworksMessage';
+import { SearchNodeNetworksMessage } from './messages/SearchNodeNetworksMessage';
 
-export class ListNodeNetworks {
+export class NodeNetworksSearcher {
   public constructor(private readonly networkRepository: NetworkRepository) {}
 
-  public async list(message: ListNodeNetworksMessage): Promise<Network[]> {
+  public async search(message: SearchNodeNetworksMessage): Promise<Network[]> {
     return await this.networkRepository.search(message.getActorId());
   }
 }

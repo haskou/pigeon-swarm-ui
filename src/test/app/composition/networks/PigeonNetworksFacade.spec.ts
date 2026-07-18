@@ -1,10 +1,10 @@
 import { mock, type MockProxy } from 'jest-mock-extended';
 
-import type { CreateNetwork } from '../../../../contexts/networks/application/create-network/CreateNetwork';
-import type { JoinNetwork } from '../../../../contexts/networks/application/join-network/JoinNetwork';
-import type { ListNodeNetworks } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
-import type { RemoveNodeNetwork } from '../../../../contexts/networks/application/remove-node-network/RemoveNodeNetwork';
+import type { NetworkCreator } from '../../../../contexts/networks/application/create-network/NetworkCreator';
+import type { NetworkJoiner } from '../../../../contexts/networks/application/join-network/NetworkJoiner';
+import type { NodeNetworkRemover } from '../../../../contexts/networks/application/remove-node-network/NodeNetworkRemover';
 import type { NetworkPeersSearcher } from '../../../../contexts/networks/application/search-network-peers/NetworkPeersSearcher';
+import type { NodeNetworksSearcher } from '../../../../contexts/networks/application/search-node-networks/NodeNetworksSearcher';
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 
 import { PigeonNetworksFacade } from '../../../../app/composition/networks/PigeonNetworksFacade';
@@ -16,20 +16,20 @@ import { NetworkPeer } from '../../../../contexts/networks/domain/entities/Netwo
 
 describe(PigeonNetworksFacade.name, () => {
   let identities: IdentityAccessContexts;
-  let networkCreator: MockProxy<CreateNetwork>;
-  let networkJoiner: MockProxy<JoinNetwork>;
-  let networkSearcher: MockProxy<ListNodeNetworks>;
-  let networkRemover: MockProxy<RemoveNodeNetwork>;
+  let networkCreator: MockProxy<NetworkCreator>;
+  let networkJoiner: MockProxy<NetworkJoiner>;
+  let networkSearcher: MockProxy<NodeNetworksSearcher>;
+  let networkRemover: MockProxy<NodeNetworkRemover>;
   let networkPeersSearcher: MockProxy<NetworkPeersSearcher>;
   let node: MockProxy<PigeonNodeFacade>;
   let facade: PigeonNetworksFacade;
 
   beforeEach(() => {
     identities = new IdentityAccessContexts();
-    networkCreator = mock<CreateNetwork>();
-    networkJoiner = mock<JoinNetwork>();
-    networkSearcher = mock<ListNodeNetworks>();
-    networkRemover = mock<RemoveNodeNetwork>();
+    networkCreator = mock<NetworkCreator>();
+    networkJoiner = mock<NetworkJoiner>();
+    networkSearcher = mock<NodeNetworksSearcher>();
+    networkRemover = mock<NodeNetworkRemover>();
     networkPeersSearcher = mock<NetworkPeersSearcher>();
     node = mock<PigeonNodeFacade>();
     facade = new PigeonNetworksFacade(
@@ -62,7 +62,7 @@ describe(PigeonNetworksFacade.name, () => {
   });
 
   it('maps searched aggregates to presentation view models', async () => {
-    networkSearcher.list.mockResolvedValue([
+    networkSearcher.search.mockResolvedValue([
       Network.fromPrimitives({
         id: 'network-a',
         key: 'private-key',

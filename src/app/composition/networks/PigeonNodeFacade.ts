@@ -1,4 +1,6 @@
 import type { IdentityAccessContexts } from '../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
+import type { NetworkNodeClaimer } from '../../../contexts/networks/application/claim-network-node/NetworkNodeClaimer';
+import type { PublicNetworkCreator } from '../../../contexts/networks/application/create-public-network/PublicNetworkCreator';
 import type { NodeRelayConfigurationFinder } from '../../../contexts/networks/application/find-node-relay-configuration/NodeRelayConfigurationFinder';
 import type { NodeRelayConfigurationUpdater } from '../../../contexts/networks/application/update-node-relay-configuration/NodeRelayConfigurationUpdater';
 import type { PigeonNodeApi } from '../../../contexts/networks/infrastructure/http/PigeonNodeApi';
@@ -7,12 +9,16 @@ import type { NodeRelayConfigurationViewModel } from '../../../contexts/networks
 import type { NodeRelayConfigurationViewModelMapper } from '../../../contexts/networks/presentation/view-models/NodeRelayConfigurationViewModelMapper';
 import type { Session } from '../../../shared/domain/pigeonResources.types';
 
+import { ClaimNetworkNodeMessage } from '../../../contexts/networks/application/claim-network-node/messages/ClaimNetworkNodeMessage';
+import { CreatePublicNetworkMessage } from '../../../contexts/networks/application/create-public-network/messages/CreatePublicNetworkMessage';
 import { FindNodeRelayConfigurationMessage } from '../../../contexts/networks/application/find-node-relay-configuration/messages/FindNodeRelayConfigurationMessage';
 import { UpdateNodeRelayConfigurationMessage } from '../../../contexts/networks/application/update-node-relay-configuration/messages/UpdateNodeRelayConfigurationMessage';
 
 export class PigeonNodeFacade {
   public constructor(
     private readonly identities: IdentityAccessContexts,
+    private readonly nodeClaimer: NetworkNodeClaimer,
+    private readonly publicNetworkCreator: PublicNetworkCreator,
     private readonly relayFinder: NodeRelayConfigurationFinder,
     private readonly relayUpdater: NodeRelayConfigurationUpdater,
     private readonly relayMapper: NodeRelayConfigurationViewModelMapper,
@@ -29,13 +35,15 @@ export class PigeonNodeFacade {
 
   public async claim(session: Session): Promise<void> {
     this.actorIdentityId(session);
-    await this.node.claim(session);
+    await this.nodeClaimer.claim(
+      new ClaimNetworkNodeMessage(session.identity.id),
+    );
   }
 
   public async createPublicNetwork(session?: Session): Promise<void> {
-    if (session) this.actorIdentityId(session);
-
-    await this.node.createPublicNetwork(session);
+    await this.publicNetworkCreator.create(
+      new CreatePublicNetworkMessage(this.actorIdentityId(session)),
+    );
   }
 
   public async getInfo(): Promise<{ id: string; owner: string | null }> {

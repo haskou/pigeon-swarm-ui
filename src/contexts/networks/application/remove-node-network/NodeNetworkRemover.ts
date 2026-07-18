@@ -5,18 +5,17 @@ import type { NetworkRepository } from '../../domain/repositories/NetworkReposit
 
 import { RemoveNodeNetworkMessage } from './messages/RemoveNodeNetworkMessage';
 
-export class RemoveNodeNetwork {
+export class NodeNetworkRemover {
   public constructor(private readonly networkRepository: NetworkRepository) {}
 
-  public async remove(message: RemoveNodeNetworkMessage): Promise<Network[]> {
+  public async remove(message: RemoveNodeNetworkMessage): Promise<Network> {
     const network = await this.networkRepository.find(
       message.getNetworkId(),
       message.getActorId(),
     );
 
     network.remove(Timestamp.now());
-    await this.networkRepository.save(network, message.getActorId());
 
-    return await this.networkRepository.search(message.getActorId());
+    return await this.networkRepository.save(network, message.getActorId());
   }
 }

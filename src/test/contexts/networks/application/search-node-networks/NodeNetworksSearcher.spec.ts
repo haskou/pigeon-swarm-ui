@@ -2,18 +2,18 @@ import { mock } from 'jest-mock-extended';
 
 import type { NetworkRepository } from '../../../../../contexts/networks/domain/repositories/NetworkRepository';
 
-import { ListNodeNetworks } from '../../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
-import { ListNodeNetworksMessage } from '../../../../../contexts/networks/application/list-node-networks/messages/ListNodeNetworksMessage';
+import { SearchNodeNetworksMessage } from '../../../../../contexts/networks/application/search-node-networks/messages/SearchNodeNetworksMessage';
+import { NodeNetworksSearcher } from '../../../../../contexts/networks/application/search-node-networks/NodeNetworksSearcher';
 
-describe(ListNodeNetworks.name, () => {
+describe(NodeNetworksSearcher.name, () => {
   it('searches networks using an anonymous actor by default', async () => {
     const networkRepository = mock<NetworkRepository>();
 
     networkRepository.search.mockResolvedValue([]);
 
     await expect(
-      new ListNodeNetworks(networkRepository).list(
-        new ListNodeNetworksMessage(),
+      new NodeNetworksSearcher(networkRepository).search(
+        new SearchNodeNetworksMessage(),
       ),
     ).resolves.toEqual([]);
     expect(networkRepository.search.mock.calls[0][0].isAnonymous()).toBe(true);
@@ -24,8 +24,8 @@ describe(ListNodeNetworks.name, () => {
 
     networkRepository.search.mockResolvedValue([]);
 
-    await new ListNodeNetworks(networkRepository).list(
-      new ListNodeNetworksMessage('identity-a'),
+    await new NodeNetworksSearcher(networkRepository).search(
+      new SearchNodeNetworksMessage('identity-a'),
     );
 
     expect(networkRepository.search.mock.calls[0][0].toString()).toBe(

@@ -1,9 +1,9 @@
 import type { IdentityAccessContexts } from '../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
-import type { CreateNetwork } from '../../../contexts/networks/application/create-network/CreateNetwork';
-import type { JoinNetwork } from '../../../contexts/networks/application/join-network/JoinNetwork';
-import type { ListNodeNetworks } from '../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
-import type { RemoveNodeNetwork } from '../../../contexts/networks/application/remove-node-network/RemoveNodeNetwork';
+import type { NetworkCreator } from '../../../contexts/networks/application/create-network/NetworkCreator';
+import type { NetworkJoiner } from '../../../contexts/networks/application/join-network/NetworkJoiner';
+import type { NodeNetworkRemover } from '../../../contexts/networks/application/remove-node-network/NodeNetworkRemover';
 import type { NetworkPeersSearcher } from '../../../contexts/networks/application/search-network-peers/NetworkPeersSearcher';
+import type { NodeNetworksSearcher } from '../../../contexts/networks/application/search-node-networks/NodeNetworksSearcher';
 import type { Network } from '../../../contexts/networks/domain/aggregates/Network';
 import type { NetworkPeer } from '../../../contexts/networks/domain/entities/NetworkPeer';
 import type { IpfsReplicationStatus } from '../../../contexts/networks/presentation/view-models/IpfsReplicationStatus';
@@ -15,16 +15,16 @@ import type { PigeonNodeFacade } from './PigeonNodeFacade';
 
 import { CreateNetworkMessage } from '../../../contexts/networks/application/create-network/messages/CreateNetworkMessage';
 import { JoinNetworkMessage } from '../../../contexts/networks/application/join-network/messages/JoinNetworkMessage';
-import { ListNodeNetworksMessage } from '../../../contexts/networks/application/list-node-networks/messages/ListNodeNetworksMessage';
 import { RemoveNodeNetworkMessage } from '../../../contexts/networks/application/remove-node-network/messages/RemoveNodeNetworkMessage';
+import { SearchNodeNetworksMessage } from '../../../contexts/networks/application/search-node-networks/messages/SearchNodeNetworksMessage';
 
 export class PigeonNetworksFacade {
   public constructor(
     private readonly identities: IdentityAccessContexts,
-    private readonly networkCreator: CreateNetwork,
-    private readonly networkJoiner: JoinNetwork,
-    private readonly networkSearcher: ListNodeNetworks,
-    private readonly networkRemover: RemoveNodeNetwork,
+    private readonly networkCreator: NetworkCreator,
+    private readonly networkJoiner: NetworkJoiner,
+    private readonly networkSearcher: NodeNetworksSearcher,
+    private readonly networkRemover: NodeNetworkRemover,
     private readonly networkPeersSearcher: NetworkPeersSearcher,
     private readonly node: PigeonNodeFacade,
   ) {}
@@ -109,8 +109,8 @@ export class PigeonNetworksFacade {
   }
 
   public async list(session?: Session): Promise<NodeNetwork[]> {
-    const networks = await this.networkSearcher.list(
-      new ListNodeNetworksMessage(this.actorIdentityId(session)),
+    const networks = await this.networkSearcher.search(
+      new SearchNodeNetworksMessage(this.actorIdentityId(session)),
     );
 
     return networks.map((network) => this.toNodeNetwork(network));
@@ -126,14 +126,14 @@ export class PigeonNetworksFacade {
     networkId: string,
     session?: Session,
   ): Promise<NodeNetwork[]> {
-    const networks = await this.networkRemover.remove(
+    await this.networkRemover.remove(
       new RemoveNodeNetworkMessage({
         actorIdentityId: this.actorIdentityId(session),
         networkId,
       }),
     );
 
-    return networks.map((network) => this.toNodeNetwork(network));
+    return await this.list(session);
   }
 
   public async updateRelayConfiguration(

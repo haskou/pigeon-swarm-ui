@@ -4,19 +4,14 @@ import type { Network } from '../../domain/aggregates/Network';
 import type { NetworkRepository } from '../../domain/repositories/NetworkRepository';
 
 import { Network as NetworkAggregate } from '../../domain/aggregates/Network';
-import { JoinNetworkMessage } from './messages/JoinNetworkMessage';
+import { CreateNetworkMessage } from './messages/CreateNetworkMessage';
 
-export class JoinNetwork {
+export class NetworkCreator {
   public constructor(private readonly networkRepository: NetworkRepository) {}
 
-  public async join(message: JoinNetworkMessage): Promise<Network> {
+  public async create(message: CreateNetworkMessage): Promise<Network> {
     return await this.networkRepository.create(
-      NetworkAggregate.join(
-        message.getId(),
-        message.getName(),
-        message.getKey(),
-        Timestamp.now(),
-      ),
+      NetworkAggregate.create(message.getName(), Timestamp.now()),
       message.getActorId(),
     );
   }
