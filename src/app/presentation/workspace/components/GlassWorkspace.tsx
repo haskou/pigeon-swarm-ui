@@ -1,4 +1,3 @@
-import { UUID } from '@haskou/value-objects';
 import {
   type Dispatch,
   type SetStateAction,
@@ -11,19 +10,19 @@ import {
   useState,
 } from 'react';
 
-import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
-import type { Peer } from '../../../../contexts/networks/presentation/view-models/Peer';
-import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
-import type { CallMediaEncryptionUnavailableReason } from '../../../../contexts/calls/presentation/view-models/CallMediaEncryptionUnavailableReason';
-import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
 import type { CallParticipantMediaConnectionResource as CallParticipantMediaConnection } from '../../../../contexts/calls/infrastructure/http/resources/CallParticipantMediaConnectionResource';
 import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
 import type { CallSignalType } from '../../../../contexts/calls/infrastructure/media/CallSignalType';
+import type { CallMediaEncryptionUnavailableReason } from '../../../../contexts/calls/presentation/view-models/CallMediaEncryptionUnavailableReason';
 import type { CallSession } from '../../../../contexts/calls/presentation/view-models/CallSession';
+import type { PendingCommunityInviteLink } from '../../../../contexts/communities/presentation/view-models/communityInviteLink';
+import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
+import type { NetworkSynchronizationStatus } from '../../../../contexts/networks/presentation/view-models/NetworkSynchronizationStatus';
+import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
+import type { Peer } from '../../../../contexts/networks/presentation/view-models/Peer';
 import type {
   ChatMessage,
   AttachmentProgress,
-  AttachmentUploadOptions,
   Community,
   CommunityChannel,
   CommunityMembershipRequest,
@@ -31,122 +30,108 @@ import type {
   ConversationResource,
   IdentityResource,
   MessageResource,
-  NotificationResource,
   NotificationSettingScope,
   PollResource,
   Session,
-  StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { NetworkSynchronizationStatus } from '../../../../contexts/networks/presentation/view-models/NetworkSynchronizationStatus';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
-import type { PendingCommunityInviteLink } from '../../../../contexts/communities/presentation/view-models/communityInviteLink';
 import type { PreloadedConversationMessages } from '../PreloadedConversationMessages';
 import type { MessageContextMenuState } from './messageContextMenu';
 
-import { applicationContainer } from '../../../composition/applicationContainer';
-import { PendingMessageAttachments } from '../../../../contexts/attachments/presentation/view-models/PendingMessageAttachments';
+import { useRealtimeEvents } from '../../../../app/presentation/realtime/useRealtimeEvents';
 import { useAttachmentDownload } from '../../../../contexts/attachments/presentation/hooks/useAttachmentDownload';
-import { CommunityAccessPolicy } from '../../../../contexts/communities/presentation/view-models/CommunityAccessPolicy';
-import { CommunityChannels } from '../../../../contexts/communities/presentation/view-models/CommunityChannels';
-import { CommunityList } from '../../../../contexts/communities/presentation/view-models/CommunityList';
-import { ConversationKeychain } from '../../../../contexts/identities/infrastructure/keychain/ConversationKeychain';
-import { ConversationTimeline } from '../../../../contexts/conversations/presentation/view-models/ConversationTimeline';
-import { ConversationPeer } from '../../../../contexts/conversations/presentation/view-models/ConversationPeer';
-import { MessageCollection } from '../../../../contexts/messages/presentation/view-models/MessageCollection';
-import { replyPreviewFromMessage } from '../../../../contexts/messages/presentation/view-models/replyPreviewFromMessage';
-import { ThreadMessageVisibility } from '../../../../contexts/messages/presentation/view-models/ThreadMessageVisibility';
-import { MessageReactionUpdater } from '../../../../contexts/messages/presentation/view-models/MessageReactionUpdater';
-import { MessageCollectionDialog } from '../../../../contexts/messages/presentation/components/MessageCollectionDialog';
-import { MessageThreadPanel } from '../../../../contexts/messages/presentation/components/MessageThreadPanel';
-import { SharedNetworkSelectorDomainService } from '../../../../contexts/networks/domain/services/SharedNetworkSelectorDomainService';
-import { NetworkId } from '../../../../contexts/networks/domain/value-objects/NetworkId';
-import { copy } from '../../../../shared/presentation/i18n/copy';
 import {
   logCallDebug,
   logCallError,
-  logCallWarning,
 } from '../../../../contexts/calls/infrastructure/media/callDebugLogger';
-import { useCallSession } from '../../../../contexts/calls/presentation/hooks/useCallSession';
 import { useCallMediaAccess } from '../../../../contexts/calls/presentation/hooks/useCallMediaAccess';
-import { participantJoinWasAccepted } from '../../../../contexts/calls/presentation/hooks/callPeerConnectionPlan';
+import { useCallSession } from '../../../../contexts/calls/presentation/hooks/useCallSession';
 import { SeenCommunityMembershipRequests } from '../../../../contexts/communities/infrastructure/storage/SeenCommunityMembershipRequests';
 import { useCommunityMembershipRequests } from '../../../../contexts/communities/presentation/hooks/useCommunityMembershipRequests';
+import { CommunityAccessPolicy } from '../../../../contexts/communities/presentation/view-models/CommunityAccessPolicy';
+import { CommunityChannels } from '../../../../contexts/communities/presentation/view-models/CommunityChannels';
+import { CommunityList } from '../../../../contexts/communities/presentation/view-models/CommunityList';
+import { ConversationPeer } from '../../../../contexts/conversations/presentation/view-models/ConversationPeer';
+import { ConversationTimeline } from '../../../../contexts/conversations/presentation/view-models/ConversationTimeline';
+import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
+import { ConversationKeychain } from '../../../../contexts/identities/infrastructure/keychain/ConversationKeychain';
+import { useIdentityDirectory } from '../../../../contexts/identities/presentation/hooks/useIdentityDirectory';
 import {
   identityDisplayName,
   identityPrimaryDisplayName,
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
-import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
-import { useIdentityDirectory } from '../../../../contexts/identities/presentation/hooks/useIdentityDirectory';
-import { useRealtimeEvents } from '../../../../app/presentation/realtime/useRealtimeEvents';
+import { MessageCollectionDialog } from '../../../../contexts/messages/presentation/components/MessageCollectionDialog';
+import { MessageThreadPanel } from '../../../../contexts/messages/presentation/components/MessageThreadPanel';
 import { useUnreadMessages } from '../../../../contexts/messages/presentation/hooks/useUnreadMessages';
+import { MessageCollection } from '../../../../contexts/messages/presentation/view-models/MessageCollection';
+import { MessageReactionUpdater } from '../../../../contexts/messages/presentation/view-models/MessageReactionUpdater';
+import { ThreadMessageVisibility } from '../../../../contexts/messages/presentation/view-models/ThreadMessageVisibility';
+import { SharedNetworkSelectorDomainService } from '../../../../contexts/networks/domain/services/SharedNetworkSelectorDomainService';
+import { NetworkId } from '../../../../contexts/networks/domain/value-objects/NetworkId';
+import { useNotificationCommunityPreviews } from '../../../../contexts/notifications/presentation/hooks/useNotificationCommunityPreviews';
+import { useNotifications } from '../../../../contexts/notifications/presentation/hooks/useNotifications';
+import { useNotificationScopeSettings } from '../../../../contexts/notifications/presentation/hooks/useNotificationScopeSettings';
+import { usePushNotificationRegistration } from '../../../../contexts/notifications/presentation/hooks/usePushNotificationRegistration';
 import {
   deletePwaPushSubscription,
   showPwaNotification,
 } from '../../../../contexts/notifications/presentation/services/pwaNotifications';
-import { useNotifications } from '../../../../contexts/notifications/presentation/hooks/useNotifications';
-import { useNotificationScopeSettings } from '../../../../contexts/notifications/presentation/hooks/useNotificationScopeSettings';
-import { useNotificationCommunityPreviews } from '../../../../contexts/notifications/presentation/hooks/useNotificationCommunityPreviews';
-import { usePushNotificationRegistration } from '../../../../contexts/notifications/presentation/hooks/usePushNotificationRegistration';
-import { NotificationSettingsPolicy } from '../../../../contexts/notifications/presentation/view-models/NotificationSettingsPolicy';
 import {
   communityNotificationPreview,
   conversationNotificationPreview,
 } from '../../../../contexts/notifications/presentation/view-models/notificationPreviews';
+import { NotificationSettingsPolicy } from '../../../../contexts/notifications/presentation/view-models/NotificationSettingsPolicy';
+import { cx } from '../../../../shared/presentation/cx';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrowserIdle';
+import { playNotificationSound } from '../../../../shared/presentation/sounds';
+import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import { applicationContainer } from '../../../composition/applicationContainer';
 import { presenceFromRealtimeEvent } from '../presenceFromRealtimeEvent';
 import {
   useWorkspacePreferences,
   useWorkspacePreferenceState,
 } from '../useWorkspacePreferences';
-import { cx } from '../../../../shared/presentation/cx';
-import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrowserIdle';
+import { ChatColumn } from './ChatColumn';
 import {
-  playAnsweredCallSound,
-  playEndedCallSound,
-  playNotificationSound,
-  stopIncomingCallSound,
-} from '../../../../shared/presentation/sounds';
-import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+  communitiesWithCallVoicePresence,
+  communityVoiceChannelTopologyKey,
+} from './communityVoicePresence';
+import { CommunityWorkspaceStartupFallback } from './CommunityWorkspaceStartupFallback';
+import { conversationRealtimeTimelineMessageKind } from './conversationRealtimeTimelineMessage';
+import {
+  type EditingMessage,
+  mergeConversationMessageIfTargetExists,
+  mergeConversationThreadMessage,
+  removeConversationThreadMessage,
+} from './conversationThreadState';
+import { isBrowserPageVisible } from './isBrowserPageVisible';
 import { PushNotificationPrompt } from './PushNotificationPrompt';
 import { Rail } from './Rail';
-import { isBrowserPageVisible } from './isBrowserPageVisible';
-import { useCommunitySelection } from './useCommunitySelection';
-import { usePendingCommunityInvite } from './usePendingCommunityInvite';
-import { useSidebarGesture } from './useSidebarGesture';
-import { useWorkspaceCallHeartbeat } from './useWorkspaceCallHeartbeat';
-import { useCallResourceReconciliation } from './useCallResourceReconciliation';
-import { useCallDeparture } from './useCallDeparture';
-import { useCallStartActions } from './useCallStartActions';
-import { useWorkspaceNotificationActions } from './useWorkspaceNotificationActions';
-import { useWorkspaceTyping } from './useWorkspaceTyping';
-import { useMessageViewport } from './useMessageViewport';
-import { useWorkspacePresence } from './useWorkspacePresence';
-import { useWorkspaceResumeSync } from './useWorkspaceResumeSync';
-import { useWorkspaceRealtimeCallEvents } from './useWorkspaceRealtimeCallEvents';
-import { useWorkspaceMessageHistory } from './useWorkspaceMessageHistory';
-import { useWorkspaceRealtimeCommunityEvents } from './useWorkspaceRealtimeCommunityEvents';
-import { useConversationThread } from './useConversationThread';
-import { useConversationPins } from './useConversationPins';
 import {
   eventAggregateId,
   recordAttribute,
   stringAttribute,
 } from './realtimeEventAttributes';
-import { ChatColumn } from './ChatColumn';
-import { CommunityWorkspaceStartupFallback } from './CommunityWorkspaceStartupFallback';
 import { resolveWorkspaceCallDetails } from './resolveWorkspaceCallDetails';
-import {
-  communitiesWithCallVoicePresence,
-  communityVoiceChannelTopologyKey,
-} from './communityVoicePresence';
-import {
-  type ConversationThreadState,
-  type EditingMessage,
-  type MessageCollectionState,
-  mergeConversationMessageIfTargetExists,
-  mergeConversationThreadMessage,
-  removeConversationThreadMessage,
-} from './conversationThreadState';
-import { conversationRealtimeTimelineMessageKind } from './conversationRealtimeTimelineMessage';
+import { useCallDeparture } from './useCallDeparture';
+import { useCallResourceReconciliation } from './useCallResourceReconciliation';
+import { useCallStartActions } from './useCallStartActions';
+import { useCommunitySelection } from './useCommunitySelection';
+import { useConversationMessageDelivery } from './useConversationMessageDelivery';
+import { useConversationPins } from './useConversationPins';
+import { useConversationThread } from './useConversationThread';
+import { useMessageViewport } from './useMessageViewport';
+import { usePendingCommunityInvite } from './usePendingCommunityInvite';
+import { useSidebarGesture } from './useSidebarGesture';
+import { useWorkspaceCallHeartbeat } from './useWorkspaceCallHeartbeat';
+import { useWorkspaceMessageHistory } from './useWorkspaceMessageHistory';
+import { useWorkspaceNotificationActions } from './useWorkspaceNotificationActions';
+import { useWorkspacePresence } from './useWorkspacePresence';
+import { useWorkspaceRealtimeCallEvents } from './useWorkspaceRealtimeCallEvents';
+import { useWorkspaceRealtimeCommunityEvents } from './useWorkspaceRealtimeCommunityEvents';
+import { useWorkspaceResumeSync } from './useWorkspaceResumeSync';
+import { useWorkspaceTyping } from './useWorkspaceTyping';
 import {
   CommunityWorkspace,
   Inspector,
@@ -163,22 +148,15 @@ import {
   notificationMentionContext,
   stableUniqueKey,
 } from './workspaceNotificationState';
+
 const seenCommunityMembershipRequests = new SeenCommunityMembershipRequests();
 
 type LoadState = 'idle' | 'loading' | 'error';
-type PendingSend = {
-  attachmentUpload: AttachmentUploadOptions;
-  attachments: File[];
-  content: string;
-  replyTarget: ChatMessage | null;
-  sticker?: StickerMessageReference;
-};
 type CallMediaEncryptionInput = {
   mediaEncryptionEnabled: boolean;
   mediaEncryptionKey?: string;
   mediaEncryptionUnavailableReason?: CallMediaEncryptionUnavailableReason;
 };
-type FailedSends = Record<string, PendingSend>;
 interface GlassWorkspaceProps {
   session: Session;
   setSession: (session: Session | null) => void;
@@ -211,8 +189,8 @@ export function GlassWorkspace({
   onNodeNetworksReload,
   onPeersReload,
   onPendingCommunityInviteHandled,
-  peersLoading,
   peers,
+  peersLoading,
   pendingCommunityInvite,
   preloadedConversationMessages,
   session,
@@ -282,7 +260,6 @@ export function GlassWorkspace({
   const [editingMessage, setEditingMessage] = useState<EditingMessage | null>(
     null,
   );
-  const [failedSends, setFailedSends] = useState<FailedSends>({});
   const [newMessageCount, setNewMessageCount] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
@@ -317,8 +294,8 @@ export function GlassWorkspace({
     keepMessageBottomUntilRef,
     lastScrollTopRef,
     messageScrollAnchorRef,
-    scrollMessagesToBottom,
     scrollerRef,
+    scrollMessagesToBottom,
   } = useMessageViewport({
     layoutKey: activeConversationId,
     messageCount: messages.length,
@@ -340,7 +317,6 @@ export function GlassWorkspace({
   const reconcileCallResourceRef = useRef<(call: CallResource) => void>(
     () => undefined,
   );
-  const sendQueueRef = useRef(Promise.resolve());
   const sessionRef = useRef(session);
   const suppressMessageLoadsUntilRef = useRef(0);
   const {
@@ -349,6 +325,7 @@ export function GlassWorkspace({
     endCall,
     receiveSignal,
     reconcileCall,
+    retryMicrophone,
     setParticipantScreenShareVolume,
     setParticipantVolume,
     setScreenShareQuality,
@@ -358,7 +335,6 @@ export function GlassWorkspace({
     toggleMediaEncryption,
     toggleMute,
     toggleNoiseCancellation,
-    retryMicrophone,
     toggleScreenShare,
   } = useCallSession();
   const {
@@ -567,6 +543,7 @@ export function GlassWorkspace({
     communities,
     communityChannelById,
   });
+
   if (!initialRenderedCommunityIdRef.current && activeCommunity?.id) {
     initialRenderedCommunityIdRef.current = activeCommunity.id;
   }
@@ -928,8 +905,8 @@ export function GlassWorkspace({
     messageCursorRef,
     messageRequestRef,
     messageScrollAnchorRef,
-    messageStateRef,
     messagesRef,
+    messageStateRef,
     scrollerRef,
     sessionRef,
     setMessageLoadState,
@@ -1478,168 +1455,22 @@ export function GlassWorkspace({
     workspaceMode,
   });
 
-  const sendPendingMessage = (payload: PendingSend) => {
-    if (!activeConversation?.id) return;
-    const conversationId = activeConversation.id;
-    const conversationNetworkId = activeConversation.networkId;
-    const optimisticTimestamp = Date.now();
-    const optimisticId = `pending:${conversationId}:${optimisticTimestamp}:${UUID.generate().toString()}`;
-
-    setSendError(null);
-    setAttachmentProgress(null);
-    setConversations((current) =>
-      ConversationTimeline.bumpActivity(
-        current,
-        conversationId,
-        optimisticTimestamp,
-      ),
-    );
-    setFailedSends((current) => {
-      const next = { ...current };
-
-      delete next[optimisticId];
-
-      return next;
-    });
-    setMessages((current) => [
-      ...current,
-      {
-        attachments: PendingMessageAttachments.fromFiles(
-          payload.attachments,
-          optimisticId,
-        ),
-        authorIdentityId: session.identity.id,
-        content: payload.sticker
-          ? ''
-          : payload.content ||
-            payload.attachments.map((attachment) => attachment.name).join(', '),
-        deliveryStatus: 'pending',
-        encrypted: false,
-        id: optimisticId,
-        mine: true,
-        raw: { id: optimisticId, type: 'sent' },
-        reactions: [],
-        replyPreview: replyPreviewFromMessage(payload.replyTarget),
-        replyToMessageId: payload.replyTarget?.id,
-        sticker: payload.sticker,
-        timestamp: optimisticTimestamp,
-      },
-    ]);
-    scrollMessagesToBottom('smooth');
-
-    sendQueueRef.current = sendQueueRef.current.then(async () => {
-      try {
-        const lastMessageId = MessageCollection.lastDeliveredMessageTarget(
-          messagesRef.current,
-        )?.id;
-        const sent = await applicationContainer.messages.send(
-          session,
-          conversationId,
-          payload.content,
-          {
-            attachments: payload.attachments,
-            attachmentUpload: {
-              ...payload.attachmentUpload,
-              networkId: conversationNetworkId,
-            },
-            onAttachmentProgress: (progress) => {
-              startTransition(() => {
-                setMessages((current) =>
-                  current.map((message) =>
-                    message.id === optimisticId
-                      ? { ...message, attachmentProgress: progress }
-                      : message,
-                  ),
-                );
-              });
-            },
-            previousMessageIds: lastMessageId ? [lastMessageId] : [],
-            replyPreview: replyPreviewFromMessage(payload.replyTarget),
-            replyToMessageId: payload.replyTarget?.id,
-            sticker: payload.sticker,
-          },
-        );
-
-        if (payload.sticker) {
-          void applicationContainer.stickers.markUsed(session, payload.sticker);
-        }
-
-        setMessages((current) =>
-          MessageCollection.merge(
-            current.filter((message) => message.id !== optimisticId),
-            [sent],
-          ),
-        );
-        setConversations((current) =>
-          ConversationTimeline.bumpActivity(
-            current,
-            conversationId,
-            sent.timestamp,
-          ),
-        );
-        scrollMessagesToBottom('smooth');
-      } catch (caught) {
-        setSendError(toUserErrorMessage(caught, copy.workspace.sendError));
-        setFailedSends((current) => ({ ...current, [optimisticId]: payload }));
-        setMessages((current) =>
-          current.map((message) =>
-            message.id === optimisticId
-              ? {
-                  ...message,
-                  attachmentProgress: undefined,
-                  deliveryStatus: 'failed',
-                }
-              : message,
-          ),
-        );
-      }
-    });
-  };
-
-  const handleSend = (
-    content: string,
-    attachments: File[],
-    attachmentUpload: AttachmentUploadOptions,
-  ): Promise<void> => {
-    const payload = { attachmentUpload, attachments, content, replyTarget };
-
-    setReplyTarget(null);
-    sendPendingMessage(payload);
-
-    return Promise.resolve();
-  };
-  const handleSendSticker = (
-    sticker: StickerMessageReference,
-  ): Promise<void> => {
-    const payload = {
-      attachmentUpload: {},
-      attachments: [],
-      content: '',
-      replyTarget,
-      sticker,
-    };
-
-    setReplyTarget(null);
-    sendPendingMessage(payload);
-
-    return Promise.resolve();
-  };
-
-  const retryMessage = (message: ChatMessage) => {
-    const payload = failedSends[message.id];
-
-    if (!payload) return;
-
-    setFailedSends((current) => {
-      const next = { ...current };
-
-      delete next[message.id];
-
-      return next;
-    });
-    setMessages((current) => current.filter((item) => item.id !== message.id));
-    void sendPendingMessage(payload);
-  };
+  const {
+    retryMessage,
+    sendMessage: handleSend,
+    sendSticker: handleSendSticker,
+  } = useConversationMessageDelivery({
+    activeConversation,
+    messagesRef,
+    onAttachmentProgressChange: setAttachmentProgress,
+    onConversationsChange: setConversations,
+    onErrorChange: setSendError,
+    onMessagesChange: setMessages,
+    onReplyTargetChange: setReplyTarget,
+    replyTarget,
+    scrollToBottom: scrollMessagesToBottom,
+    session,
+  });
 
   const handleMessageMenuOpen = (
     message: ChatMessage,
@@ -1962,6 +1793,7 @@ export function GlassWorkspace({
 
       if (shouldAutoScroll) {
         markConversationReadUntil(conversationId, [message]);
+
         if (!isThreadReply) scrollMessagesToBottom('smooth', true);
       } else if (!isEditMessage && !isThreadReply) {
         const setting = NotificationSettingsPolicy.resolve(
