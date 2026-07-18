@@ -22,4 +22,8 @@ export class PublicAttachmentStrategy implements PublicationStrategy {
   public isEncrypted(): boolean {
     return false;
   }
+
+  public toPrimitives(): { encrypted: false } {
+    return { encrypted: false };
+  }
 }

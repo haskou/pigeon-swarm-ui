@@ -12,6 +12,10 @@ describe('Attachment publication strategies', () => {
 
     expect(strategy.isEncrypted()).toBe(true);
     expect(strategy.getEncryptionNetworkId().toString()).toBe('network-1');
+    expect(strategy.toPrimitives()).toEqual({
+      encrypted: true,
+      networkId: 'network-1',
+    });
   });
 
   it('represents public publication without an encryption network', () => {
@@ -21,5 +25,12 @@ describe('Attachment publication strategies', () => {
     expect(NullObject.isNullObject(strategy.getEncryptionNetworkId())).toBe(
       true,
     );
+    expect(strategy.toPrimitives()).toEqual({ encrypted: false });
+  });
+
+  it('serializes an encrypted strategy restored without its network', () => {
+    const strategy = EncryptedAttachmentStrategy.restore();
+
+    expect(strategy.toPrimitives()).toEqual({ encrypted: true });
   });
 });

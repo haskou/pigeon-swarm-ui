@@ -88,19 +88,6 @@ export class Attachment extends AggregateRoot {
     super();
   }
 
-  private publicationPrimitives():
-    | { encrypted: false }
-    | { encrypted: true; networkId?: string } {
-    if (!this.publication.isEncrypted()) return { encrypted: false };
-
-    if (!this.publication.hasEncryptionNetwork()) return { encrypted: true };
-
-    return {
-      encrypted: true,
-      networkId: this.publication.getEncryptionNetworkId().toString(),
-    };
-  }
-
   public getPublishedExternalIdentifier(): AttachmentExternalIdentifier {
     assert(this.isPublished(), new AttachmentNotPublishedError());
 
@@ -145,7 +132,7 @@ export class Attachment extends AggregateRoot {
       contentType: this.contentType.toString(),
       filename: this.filename.toString(),
       id: this.id.toString(),
-      publication: this.publicationPrimitives(),
+      publication: this.publication.toPrimitives(),
       size: this.size.valueOf(),
       status: this.status.valueOf(),
     };
