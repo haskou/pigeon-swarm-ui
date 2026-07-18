@@ -1,5 +1,5 @@
 import type { NetworkSynchronizationStatus } from '../../../../contexts/networks/presentation/view-models/NetworkSynchronizationStatus';
-import type { IpfsReplicationStatus } from '../../../../shared/domain/pigeonResources.types';
+import type { IpfsReplicationStatus } from '../../../../contexts/networks/presentation/view-models/IpfsReplicationStatus';
 
 import { cx } from '../../../../shared/presentation/cx';
 import { copy } from '../../../../shared/presentation/i18n/copy';
@@ -162,6 +162,7 @@ function networkSynchronizationStateLabel(
   state: NetworkSynchronizationStatus['networks'][number]['state'],
 ): string {
   if (state === 'converged') return copy.nodeSettings.synchronizationConverged;
+
   if (state === 'syncing') return copy.nodeSettings.synchronizationSyncing;
 
   return copy.nodeSettings.synchronizationWaitingForPeers;
@@ -188,7 +189,9 @@ function byteUnit(
   bytes: number,
 ): 'byte' | 'gigabyte' | 'kilobyte' | 'megabyte' {
   if (bytes >= 1024 * 1024 * 1024) return 'gigabyte';
+
   if (bytes >= 1024 * 1024) return 'megabyte';
+
   if (bytes >= 1024) return 'kilobyte';
 
   return 'byte';
@@ -196,7 +199,9 @@ function byteUnit(
 
 function byteUnitDivisor(bytes: number): number {
   if (bytes >= 1024 * 1024 * 1024) return 1024 * 1024 * 1024;
+
   if (bytes >= 1024 * 1024) return 1024 * 1024;
+
   if (bytes >= 1024) return 1024;
 
   return 1;

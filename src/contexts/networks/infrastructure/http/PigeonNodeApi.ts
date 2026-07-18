@@ -1,16 +1,14 @@
-import type {
-  IpfsReplicationStatus,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { NodeRelayConfiguration } from '../../application/configure-node-relay/NodeRelayConfiguration';
 import type { NodeRelayPortCheckResource } from '../../application/configure-node-relay/NodeRelayPortCheckResource';
 import type { NodeRelayPortCheckTarget } from '../../application/configure-node-relay/NodeRelayPortCheckTarget';
-import type { NetworkResource } from './resources/NetworkResource';
 import type { NodeInfo } from './NodeInfo';
 import type { NodePeersSnapshot } from './NodePeersSnapshot';
+import type { IpfsReplicationStatusResource } from './resources/IpfsReplicationStatusResource';
 import type { NetworkPeerResource } from './resources/NetworkPeerResource';
+import type { NetworkResource } from './resources/NetworkResource';
 
 export class PigeonNodeApi {
   private readonly requestCache = new Map<string, Promise<unknown>>();
@@ -165,12 +163,15 @@ export class PigeonNodeApi {
   ): Promise<NetworkResource[]> {
     const path = `/node/networks/${encodeURIComponent(networkId)}/`;
     const body = {};
-    const result = await this.http.request<{ networks: NetworkResource[] }>(path, {
-      headers: session
-        ? await this.signer.headers(session, 'DELETE', path, body)
-        : undefined,
-      method: 'DELETE',
-    });
+    const result = await this.http.request<{ networks: NetworkResource[] }>(
+      path,
+      {
+        headers: session
+          ? await this.signer.headers(session, 'DELETE', path, body)
+          : undefined,
+        method: 'DELETE',
+      },
+    );
 
     this.invalidateNetworksCache();
 
@@ -179,11 +180,11 @@ export class PigeonNodeApi {
 
   public async getIpfsReplicationStatus(
     session: Session,
-  ): Promise<IpfsReplicationStatus> {
+  ): Promise<IpfsReplicationStatusResource> {
     const path = '/ipfs/replication/status';
     const body = {};
 
-    return await this.http.request<IpfsReplicationStatus>(path, {
+    return await this.http.request<IpfsReplicationStatusResource>(path, {
       headers: await this.signer.headers(session, 'GET', path, body),
       method: 'GET',
     });

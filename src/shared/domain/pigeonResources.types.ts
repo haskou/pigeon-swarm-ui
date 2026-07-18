@@ -45,7 +45,6 @@ export type { MessageSignaturePayload } from '../../contexts/messages/infrastruc
 export type { SendMessageOptions } from '../../contexts/messages/infrastructure/http/resources/SendMessageOptions';
 export type { ChatMessage } from '../../contexts/messages/presentation/view-models/ChatMessage';
 export type { MessagePin } from '../../contexts/messages/presentation/view-models/MessagePin';
-export type * from '../../contexts/networks/domain/networkResources.types';
 export type * from '../../contexts/notifications/infrastructure/http/notificationResources.types';
 export type * from '../../contexts/notifications/domain/notificationSettings.types';
 export type * from '../../contexts/polls/domain/pollResources.types';
