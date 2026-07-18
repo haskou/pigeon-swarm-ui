@@ -1,10 +1,10 @@
 import type { CommunityMessageMentionResource as CommunityMessageMention } from '../../../communities/infrastructure/http/resources/CommunityMessageMentionResource';
 import type {
-  PollOption,
   PollResource,
-  PollScope,
-  PollVote,
-} from '../../../polls/domain/pollResources.types';
+} from '../../../polls/infrastructure/http/resources/PollResource';
+import type { PollOptionResource as PollOption } from '../../../polls/infrastructure/http/resources/PollOptionResource';
+import type { PollScopeResource as PollScope } from '../../../polls/infrastructure/http/resources/PollScopeResource';
+import type { PollVoteResource as PollVote } from '../../../polls/infrastructure/http/resources/PollVoteResource';
 import type { MessageReaction } from './MessageReaction';
 
 export type MessageResource = {

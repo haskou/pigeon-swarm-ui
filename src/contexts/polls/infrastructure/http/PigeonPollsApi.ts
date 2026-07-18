@@ -1,10 +1,8 @@
-import type {
-  CreatePollInput,
-  PollResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+import type { CreatePollRequest } from './resources/CreatePollRequest';
+import type { PollResource } from './resources/PollResource';
 
 export class PigeonPollsApi {
   public constructor(
@@ -14,7 +12,7 @@ export class PigeonPollsApi {
 
   public async create(
     session: Session,
-    input: CreatePollInput,
+    input: CreatePollRequest,
   ): Promise<PollResource> {
     const path = '/polls/';
     const body = input;

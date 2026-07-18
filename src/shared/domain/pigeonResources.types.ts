@@ -46,5 +46,9 @@ export type { SendMessageOptions } from '../../contexts/messages/infrastructure/
 export type { ChatMessage } from '../../contexts/messages/presentation/view-models/ChatMessage';
 export type { MessagePin } from '../../contexts/messages/presentation/view-models/MessagePin';
 export type * from '../../contexts/notifications/infrastructure/http/notificationResources.types';
-export type * from '../../contexts/polls/domain/pollResources.types';
+export type { CreatePollRequest as CreatePollInput } from '../../contexts/polls/infrastructure/http/resources/CreatePollRequest';
+export type { PollOptionResource as PollOption } from '../../contexts/polls/infrastructure/http/resources/PollOptionResource';
+export type { PollResource } from '../../contexts/polls/infrastructure/http/resources/PollResource';
+export type { PollScopeResource as PollScope } from '../../contexts/polls/infrastructure/http/resources/PollScopeResource';
+export type { PollVoteResource as PollVote } from '../../contexts/polls/infrastructure/http/resources/PollVoteResource';
 export type * from '../../contexts/stickers/domain/stickerResources.types';

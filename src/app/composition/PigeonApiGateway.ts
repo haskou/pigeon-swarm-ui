@@ -27,7 +27,6 @@ import type {
   ConversationDraft,
   ConversationKeyEntry,
   ConversationResource,
-  CreatePollInput,
   EditMessageOptions,
   AttachmentProgress,
   AttachmentUploadOptions,
@@ -46,7 +45,6 @@ import type {
   NotificationSettingScope,
   PrivateFileContent,
   PrivateFileUpload,
-  PollResource,
   PublicFileContent,
   PublicFileUpload,
   SendMessageOptions,
@@ -120,7 +118,6 @@ import {
 } from '../../contexts/notifications/infrastructure/http/PigeonPushApi';
 import { PigeonPushGateway } from '../../contexts/notifications/infrastructure/http/PigeonPushGateway';
 import { PigeonPollsApi } from '../../contexts/polls/infrastructure/http/PigeonPollsApi';
-import { PigeonPollsGateway } from '../../contexts/polls/infrastructure/http/PigeonPollsGateway';
 import { PigeonStickersApi } from '../../contexts/stickers/infrastructure/http/PigeonStickersApi';
 import { PigeonStickersGateway } from '../../contexts/stickers/infrastructure/http/PigeonStickersGateway';
 import { ApiUrlBuilder } from '../../shared/infrastructure/http/ApiUrlBuilder';
@@ -166,8 +163,6 @@ export class PigeonApiGateway {
 
   private readonly notifications: PigeonNotificationsGateway;
 
-  private readonly polls: PigeonPollsApi;
-
   private readonly push: PigeonPushGateway;
 
   private readonly requestCache = new RequestCache();
@@ -194,7 +189,7 @@ export class PigeonApiGateway {
 
   public readonly publishMessageAttachmentUseCase: PublishMessageAttachment;
 
-  public readonly pollsGateway: PigeonPollsGateway;
+  public readonly pollsApi: PigeonPollsApi;
 
   public readonly notificationsGateway: PigeonNotificationsGateway;
 
@@ -398,8 +393,7 @@ export class PigeonApiGateway {
       new PigeonPresenceApi(http, signer),
       this.requestCache,
     );
-    this.polls = new PigeonPollsApi(http, signer);
-    this.pollsGateway = new PigeonPollsGateway(this.polls);
+    this.pollsApi = new PigeonPollsApi(http, signer);
     this.stickers = new PigeonStickersGateway(
       new PigeonStickersApi(http, signer),
     );
@@ -1055,42 +1049,6 @@ export class PigeonApiGateway {
       messageId,
       emoji,
     );
-  }
-
-  public async createPoll(
-    session: Session,
-    input: CreatePollInput,
-  ): Promise<PollResource> {
-    return await this.pollsGateway.createPoll(session, input);
-  }
-
-  public async getPoll(
-    session: Session,
-    pollId: string,
-  ): Promise<PollResource> {
-    return await this.pollsGateway.getPoll(session, pollId);
-  }
-
-  public async votePoll(
-    session: Session,
-    pollId: string,
-    optionIds: string[],
-  ): Promise<PollResource> {
-    return await this.pollsGateway.votePoll(session, pollId, optionIds);
-  }
-
-  public async removePollVote(
-    session: Session,
-    pollId: string,
-  ): Promise<PollResource> {
-    return await this.pollsGateway.removePollVote(session, pollId);
-  }
-
-  public async closePoll(
-    session: Session,
-    pollId: string,
-  ): Promise<PollResource> {
-    return await this.pollsGateway.closePoll(session, pollId);
   }
 
   public async getPublicFile(cid: string): Promise<PublicFileContent> {

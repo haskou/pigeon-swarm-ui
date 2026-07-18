@@ -1,12 +1,12 @@
-import { DomainError, StringValueObject } from '@haskou/value-objects';
+import { StringValueObject, assert } from '@haskou/value-objects';
+
+import { InvalidPollOptionIdError } from '../errors/InvalidPollOptionIdError';
 
 export class PollOptionId extends StringValueObject {
   public static fromString(value: string): PollOptionId {
     const trimmedValue = value.trim();
 
-    if (!trimmedValue) {
-      throw new DomainError('Poll option id is required.');
-    }
+    assert(trimmedValue.length > 0, new InvalidPollOptionIdError());
 
     return new PollOptionId(trimmedValue);
   }

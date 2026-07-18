@@ -1,26 +1,27 @@
 import { Timestamp } from '@haskou/value-objects';
 
-import type { PollResource } from '../../../../../shared/domain/pigeonResources.types';
-
-import { Poll } from '../../../../../contexts/polls/domain/aggregates/Poll';
+import { Poll } from '../../../../../contexts/polls/domain/Poll';
 import { PollOptionId } from '../../../../../contexts/polls/domain/value-objects/PollOptionId';
 import { PollVoterId } from '../../../../../contexts/polls/domain/value-objects/PollVoterId';
 
-const pollResource = (overrides: Partial<PollResource> = {}): PollResource => ({
-  allowsMultipleVotes: false,
+const pollPrimitives = (overrides: Record<string, unknown> = {}) => ({
   createdAt: 100,
-  creatorIdentityId: 'identity-a',
-  id: 'poll-a',
-  options: [
-    { id: 'option-a', text: 'A' },
-    { id: 'option-b', text: 'B' },
-  ],
-  question: 'Choose?',
-  scope: {
-    conversationId: 'conversation-a',
-    networkId: 'network-a',
-    type: 'group_conversation',
+  definition: {
+    allowsMultipleVotes: false,
+    creatorIdentityId: 'identity-a',
+    expiresAt: null,
+    options: [
+      { id: 'option-a', text: 'A' },
+      { id: 'option-b', text: 'B' },
+    ],
+    question: 'Choose?',
+    scope: {
+      firstIdentifier: 'conversation-a',
+      secondIdentifier: undefined,
+      type: 'group_conversation',
+    },
   },
+  id: 'poll-a',
   status: 'open',
   votes: [],
   ...overrides,
@@ -28,7 +29,7 @@ const pollResource = (overrides: Partial<PollResource> = {}): PollResource => ({
 
 describe('Poll', () => {
   it('casts one vote per voter', () => {
-    const poll = Poll.fromResource(pollResource());
+    const poll = Poll.fromPrimitives(pollPrimitives());
     const voterId = PollVoterId.fromString('identity-b');
 
     poll.vote(
@@ -43,14 +44,14 @@ describe('Poll', () => {
     );
 
     expect(poll.hasVoteFrom(voterId)).toBe(true);
-    expect(poll.toResource().votes).toHaveLength(1);
-    expect(poll.pullDomainEvents()).toHaveLength(3);
+    expect(poll.hasVoteFrom(voterId)).toBe(true);
+    expect(poll.pullDomainEvents()).toHaveLength(2);
   });
 
   it('rejects votes once closed', () => {
-    const poll = Poll.fromResource(pollResource());
+    const poll = Poll.fromPrimitives(pollPrimitives());
 
-    poll.close();
+    poll.close(new Timestamp(150));
 
     expect(() =>
       poll.vote(
@@ -59,5 +60,50 @@ describe('Poll', () => {
         new Timestamp(200),
       ),
     ).toThrow('Closed polls cannot receive votes.');
+  });
+
+  it('rejects unknown options and multiple selections in single-vote polls', () => {
+    const poll = Poll.fromPrimitives(pollPrimitives());
+    const voter = PollVoterId.fromString('identity-b');
+
+    expect(() =>
+      poll.vote(
+        voter,
+        [
+          PollOptionId.fromString('option-a'),
+          PollOptionId.fromString('option-b'),
+        ],
+        new Timestamp(200),
+      ),
+    ).toThrow('This poll accepts one option per vote.');
+    expect(() =>
+      poll.vote(
+        voter,
+        [PollOptionId.fromString('missing')],
+        new Timestamp(200),
+      ),
+    ).toThrow('Poll option does not exist.');
+  });
+
+  it('removes an existing vote and records the lifecycle event', () => {
+    const voter = PollVoterId.fromString('identity-b');
+    const poll = Poll.fromPrimitives(
+      pollPrimitives({
+        votes: [
+          {
+            createdAt: 100,
+            optionIds: ['option-a'],
+            voterIdentityId: 'identity-b',
+          },
+        ],
+      }),
+    );
+
+    poll.removeVote(voter, new Timestamp(300));
+
+    expect(poll.hasVoteFrom(voter)).toBe(false);
+    expect(poll.pullDomainEvents()).toEqual([
+      expect.objectContaining({ type: 'PollVoteRemoved' }),
+    ]);
   });
 });

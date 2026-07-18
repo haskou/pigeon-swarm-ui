@@ -1,37 +1,40 @@
-import { StringValueObject, ValueNotInEnumError } from '@haskou/value-objects';
+import { Enum } from '@haskou/value-objects';
 
-import type { PollResource } from '../../../../shared/domain/pigeonResources.types';
+enum PollStatusPrimitive {
+  CLOSED = 'closed',
+  OPEN = 'open',
+}
 
-export class PollStatus extends StringValueObject {
-  private static isValid(value: string): value is PollResource['status'] {
-    return value === 'closed' || value === 'open';
-  }
+export class PollStatus extends Enum<string> {
+  public static readonly CLOSED = new PollStatus(PollStatusPrimitive.CLOSED);
+
+  public static readonly OPEN = new PollStatus(PollStatusPrimitive.OPEN);
 
   public static closed(): PollStatus {
-    return new PollStatus('closed');
+    return PollStatus.CLOSED;
   }
 
-  public static fromPrimitive(value: string): PollStatus {
-    if (!PollStatus.isValid(value)) {
-      throw new ValueNotInEnumError(value, ['closed', 'open']);
-    }
-
+  public static fromPrimitives(value: string): PollStatus {
     return new PollStatus(value);
   }
 
   public static open(): PollStatus {
-    return new PollStatus('open');
+    return PollStatus.OPEN;
   }
 
-  private constructor(value: PollResource['status']) {
+  private constructor(value: string) {
     super(value);
   }
 
+  public getValues(): string[] {
+    return Object.values(PollStatusPrimitive);
+  }
+
   public isClosed(): boolean {
-    return this.isEqual(PollStatus.closed());
+    return this.isEqual(PollStatus.CLOSED);
   }
 
   public isOpen(): boolean {
-    return this.isEqual(PollStatus.open());
+    return this.isEqual(PollStatus.OPEN);
   }
 }

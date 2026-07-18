@@ -1380,3 +1380,28 @@
   - full Jest suite: 203 suites and 747 tests passing
 - Next slice: `IDENTITY-001`, complete identity/session/keychain domain and
   infrastructure boundaries.
+## Slice POLL-001: Poll lifecycle aggregate and repository
+
+- Date: 2026-07-19
+- Size: L
+- Status: completed
+- Goal: replace resource-shaped poll domain state and pass-through application
+  ports with a behavior-rich aggregate, primitive boundary messages, and a
+  domain-owned repository.
+- Changed files:
+  - `contexts/polls/domain/Poll.ts`, entities, events, errors, repositories, and
+    value objects
+  - action-specific poll use cases and messages under `contexts/polls/application`
+  - poll HTTP resources, mapper, access contexts, API, and repository
+  - `app/composition/polls/PigeonPollsFacade.ts` and composition wiring
+  - direct tests under `src/test/contexts/polls` and `src/test/app/composition/polls`
+- Behavior changed/preserved: creation, reads, votes, vote removal, closure,
+  timeline projection, and REST shapes are preserved.
+- Contracts changed: no public UI or REST wire contract changes; poll DTOs moved
+  from domain to infrastructure.
+- Validation level: L2
+- Tests/checks: 14 poll suites / 20 tests, focused ESLint, and TypeScript
+  typecheck.
+- Risks: backend assigns the persisted poll identifier; the creation aggregate
+  uses a local identifier until the repository returns the persisted aggregate.
+- Next slice: `STICKER-001`
