@@ -5,6 +5,22 @@ import {
   callResourceRefreshIsRequired,
 } from '../../../../../app/presentation/workspace/components/realtimeEventAttributes';
 
+function event(input: {
+  aggregateId: string;
+  attributes: Record<string, unknown>;
+  type: string;
+}): RealtimeDomainEvent {
+  return {
+    aggregate_id: input.aggregateId,
+    attributes: input.attributes,
+    causation_id: 'causation-1',
+    correlation_id: 'correlation-1',
+    event_id: 'event-1',
+    occurred_on: 1_770_000_000_000,
+    type: input.type,
+  };
+}
+
 describe(callIdFromRealtimeEvent.name, () => {
   it('reads the call id from lease attributes instead of the lease aggregate', () => {
     expect(
@@ -112,19 +128,3 @@ describe(callResourceRefreshIsRequired.name, () => {
     ).toBe(true);
   });
 });
-
-function event(input: {
-  aggregateId: string;
-  attributes: Record<string, unknown>;
-  type: string;
-}): RealtimeDomainEvent {
-  return {
-    aggregate_id: input.aggregateId,
-    attributes: input.attributes,
-    causation_id: 'causation-1',
-    correlation_id: 'correlation-1',
-    event_id: 'event-1',
-    occurred_on: 1_770_000_000_000,
-    type: input.type,
-  };
-}

@@ -6,14 +6,14 @@ import type { Session } from '../../../../../shared/domain/pigeonResources.types
 import { ApplicationServerKeyDecoder } from '../../../../../contexts/notifications/infrastructure/browser/ApplicationServerKeyDecoder';
 import { PushSubscriptionCompatibility } from '../../../../../contexts/notifications/infrastructure/browser/PushSubscriptionCompatibility';
 import { PwaNotificationCapability } from '../../../../../contexts/notifications/infrastructure/browser/PwaNotificationCapability';
-import { PwaPushSubscriptionManager } from '../../../../../contexts/notifications/presentation/services/PwaPushSubscriptionManager';
+import { PwaPushSubscriptionRegistrar } from '../../../../../contexts/notifications/presentation/services/PwaPushSubscriptionRegistrar';
 
-describe(PwaPushSubscriptionManager.name, () => {
+describe(PwaPushSubscriptionRegistrar.name, () => {
   it('does not contact the backend when push is unsupported', async () => {
     const backend = mock<PwaPushSubscriptionBackend>();
     const capability = mock<PwaNotificationCapability>();
     capability.canNotify.mockReturnValue(false);
-    const manager = new PwaPushSubscriptionManager(
+    const manager = new PwaPushSubscriptionRegistrar(
       backend,
       capability,
       new ApplicationServerKeyDecoder(),

@@ -11,7 +11,7 @@ import { PushSubscriptionsUnsupportedError } from '../../infrastructure/browser/
 import { PushSubscriptionCompatibility } from '../../infrastructure/browser/PushSubscriptionCompatibility';
 import { PwaNotificationCapability } from '../../infrastructure/browser/PwaNotificationCapability';
 
-export class PwaPushSubscriptionManager {
+export class PwaPushSubscriptionRegistrar {
   private readonly explicitSubscriptions = new Map<
     string,
     Promise<EnsurePwaPushSubscriptionResult>

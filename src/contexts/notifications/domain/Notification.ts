@@ -44,9 +44,7 @@ export class Notification extends AggregateRoot {
     this.record({
       aggregateId: this.id.toString(),
       occurredAt: occurredAt.valueOf(),
-      type: decision.isAccepted()
-        ? NotificationEventType.ACCEPTED.valueOf()
-        : NotificationEventType.DECLINED.valueOf(),
+      type: NotificationEventType.fromDecision(decision).valueOf(),
     });
   }
 
