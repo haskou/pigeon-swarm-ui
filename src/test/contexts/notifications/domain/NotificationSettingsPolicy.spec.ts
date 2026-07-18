@@ -1,6 +1,6 @@
-import type { NotificationScopeSetting } from '../../../../contexts/notifications/domain/notificationSettings.types';
+import type { NotificationScopeSetting } from '../../../../shared/domain/pigeonResources.types';
 
-import { NotificationSettingsPolicy } from '../../../../contexts/notifications/domain/NotificationSettingsPolicy';
+import { NotificationSettingsPolicy } from '../../../../contexts/notifications/presentation/view-models/NotificationSettingsPolicy';
 
 function setting(
   overrides: Partial<NotificationScopeSetting>,

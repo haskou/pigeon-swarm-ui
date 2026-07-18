@@ -40,28 +40,30 @@ adapters into application services without containing context behavior.
 
 ## Active slice
 
-- Id: `CONVERSATION-002`
-- Title: Rebuild conversation lifecycle behind a rich aggregate and repository
+- Id: `NOTIFICATION-001`
+- Title: Rebuild notification decisions and scope settings behind aggregates
 - Size: L
 - Status: completed
-- Business capability: Direct/group conversation creation, membership,
-  activity ordering, invitations, and read state
-- Source area: `src/contexts/conversations`
-- Target boundary: a behavior-rich `Conversation` aggregate, explicit use cases
-  and primitive application messages, a domain repository, and context-owned
-  HTTP/keychain adapters
-- Target files/folders: `contexts/conversations/{domain,application,infrastructure}`
+- Business capability: Notification decisions, inherited scope preferences,
+  mute visibility, mention delivery, and push subscription coordination
+- Source area: `src/contexts/notifications`
+- Target boundary: behavior-rich `Notification` and `NotificationSetting`
+  aggregates, primitive application messages, domain repositories, and
+  context-owned HTTP/browser adapters
+- Target files/folders: `contexts/notifications/{domain,application,infrastructure}`
 - Compatibility constraints: REST, websocket, encrypted payload, and existing
   presentation APIs remain stable while callers migrate by capability
 - Validation level: L2
-- Affected behavior/tests: direct/group creation, invitation, read markers,
-  timeline ordering, keychain publication, and conversation resource mapping
-- Tests/checks run: conversation domain/application/infrastructure/presentation
-  and composition tests, TypeScript typecheck, full lint, and full Jest suite
-- Full-suite status: 203 suites and 747 tests passing
-- Done criteria: application receives primitive messages, lifecycle decisions
-  run through `Conversation`, resources stay outside domain/application, and
-  infrastructure implements `ConversationRepository` without application ports
+- Affected behavior/tests: notification listing and decisions, invitation
+  acceptance, inherited settings, mute/mention policy, and push registration
+- Tests/checks run: 23 notification suites / 58 tests, direct aggregate,
+  use-case, mapper, access-context, repository, invitation-key recipient, and
+  presentation-policy coverage; TypeScript typecheck and full lint
+- Full-suite status: 230 suites / 792 tests passing
+- Done criteria: application receives primitive messages, notification and
+  settings transitions run through their aggregate roots, resources stay out
+  of domain/application, and infrastructure implements domain repositories
+  without application ports
 
 ## Risks
 
@@ -149,5 +151,6 @@ adapters into application services without containing context behavior.
 
 ## Next slices
 
-1. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
-2. `MESSAGE-001`: migrate message lifecycle behind aggregates and repositories.
+1. `NOTIFICATION-002`: isolate browser push subscription lifecycle if further
+   behavior remains outside explicit use cases after `NOTIFICATION-001`.
+2. `POLL-001`: migrate poll lifecycle behind an aggregate and repository.

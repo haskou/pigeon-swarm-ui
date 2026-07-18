@@ -1,26 +1,44 @@
-import type {
-  NotificationSettingScope,
-  Session,
-} from '../../../../../shared/domain/pigeonResources.types';
+import { Timestamp } from '@haskou/value-objects';
+
+import { NotificationRecipientId } from '../../../domain/value-objects/NotificationRecipientId';
+import { NotificationSettingScope } from '../../../domain/value-objects/NotificationSettingScope';
+import { NotificationSettingScopeIdentifier } from '../../../domain/value-objects/NotificationSettingScopeIdentifier';
+import { NotificationSettingScopeType } from '../../../domain/value-objects/NotificationSettingScopeType';
 
 export class ResetNotificationSettingMessage {
-  private readonly scope: NotificationSettingScope;
+  public constructor(
+    private readonly recipientIdentityId: string,
+    private readonly scopeType: string,
+    private readonly firstScopeIdentifier: string,
+    private readonly secondScopeIdentifier: string | undefined,
+    private readonly occurredAt: number,
+  ) {}
 
-  private readonly session: Session;
+  public getOccurredAt(): Timestamp {
+    return new Timestamp(this.occurredAt);
+  }
 
-  public constructor(input: {
-    scope: NotificationSettingScope;
-    session: Session;
-  }) {
-    this.scope = input.scope;
-    this.session = input.session;
+  public getRecipientIdentityId(): NotificationRecipientId {
+    return NotificationRecipientId.fromString(this.recipientIdentityId);
   }
 
   public getScope(): NotificationSettingScope {
-    return this.scope;
-  }
+    const type = NotificationSettingScopeType.fromPrimitives(this.scopeType);
+    const first = NotificationSettingScopeIdentifier.fromString(
+      this.firstScopeIdentifier,
+    );
 
-  public getSession(): Session {
-    return this.session;
+    if (type.isCommunityChannel()) {
+      return NotificationSettingScope.communityChannel(
+        first,
+        NotificationSettingScopeIdentifier.fromString(
+          this.secondScopeIdentifier ?? '',
+        ),
+      );
+    }
+
+    return type.isCommunity()
+      ? NotificationSettingScope.community(first)
+      : NotificationSettingScope.conversation(first);
   }
 }

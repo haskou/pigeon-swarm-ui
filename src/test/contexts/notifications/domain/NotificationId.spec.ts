@@ -1,6 +1,6 @@
 import { DomainError } from '@haskou/value-objects';
 
-import { NotificationId } from '../../../../contexts/notifications/domain/NotificationId';
+import { NotificationId } from '../../../../contexts/notifications/domain/value-objects/NotificationId';
 
 describe(NotificationId.name, () => {
   it('normalizes notification ids before comparing them', () => {

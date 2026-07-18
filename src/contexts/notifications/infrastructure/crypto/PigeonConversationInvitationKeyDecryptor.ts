@@ -4,10 +4,8 @@ import type {
   ConversationKeyEntry,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { ConversationInvitationKeyDecryptor } from '../../application/accept-conversation-invitation/ConversationInvitationKeyDecryptor';
 
-// eslint-disable-next-line max-len
-export class PigeonConversationInvitationKeyDecryptor implements ConversationInvitationKeyDecryptor {
+export class PigeonConversationInvitationKeyDecryptor {
   public async decryptInvitationKey(
     session: Session,
     encryptedKey: string,

@@ -1,5 +1,10 @@
-export type { MissedCallPayload } from '../../domain/MissedCallPayload';
+export type { MissedCallPayload } from './resources/MissedCallPayload';
 export type { ConversationInvitationNotificationResource } from './resources/ConversationInvitationNotificationResource';
 export type { CommunityInvitationNotificationResource } from './resources/CommunityInvitationNotificationResource';
 export type { MissedCallNotificationResource } from './resources/MissedCallNotificationResource';
 export type { NotificationResource } from './resources/NotificationResource';
+export type { NotificationLevelResource as NotificationLevel } from './resources/NotificationLevelResource';
+export type { NotificationScopeSettingResource as NotificationScopeSetting } from './resources/NotificationScopeSettingResource';
+export type { NotificationScopeSettingInputResource as NotificationScopeSettingInput } from './resources/NotificationScopeSettingInputResource';
+export type { NotificationScopeSettingsResource } from './resources/NotificationScopeSettingsResource';
+export type { NotificationSettingScopeResource as NotificationSettingScope } from './resources/NotificationSettingScopeResource';

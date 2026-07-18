@@ -16,7 +16,7 @@ import type {
 
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { CommunityList } from '../../../../contexts/communities/presentation/view-models/CommunityList';
-import { NotificationSettingsPolicy } from '../../../../contexts/notifications/domain/NotificationSettingsPolicy';
+import { NotificationSettingsPolicy } from '../../../../contexts/notifications/presentation/view-models/NotificationSettingsPolicy';
 import { NotificationScopeMenuActions } from '../../../../contexts/notifications/presentation/components/NotificationScopeMenuActions';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';

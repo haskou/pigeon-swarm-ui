@@ -15,7 +15,7 @@ import type {
   NotificationScopeSetting,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { NotificationSettingsPolicy } from '../../../notifications/domain/NotificationSettingsPolicy';
+import { NotificationSettingsPolicy } from '../../../notifications/presentation/view-models/NotificationSettingsPolicy';
 import { NotificationScopeMenuActions } from '../../../notifications/presentation/components/NotificationScopeMenuActions';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';

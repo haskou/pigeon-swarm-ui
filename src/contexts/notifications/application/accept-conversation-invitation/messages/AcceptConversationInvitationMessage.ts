@@ -1,21 +1,30 @@
-import type {
-  NotificationResource,
-  Session,
-} from '../../../../../shared/domain/pigeonResources.types';
+import { Timestamp } from '@haskou/value-objects';
+
+import { EncryptedInvitationKey } from '../../../domain/value-objects/EncryptedInvitationKey';
+import { NotificationId } from '../../../domain/value-objects/NotificationId';
+import { NotificationRecipientId } from '../../../domain/value-objects/NotificationRecipientId';
 
 export class AcceptConversationInvitationMessage {
   public constructor(
-    private readonly input: {
-      notification: NotificationResource;
-      session: Session;
-    },
+    private readonly notificationId: string,
+    private readonly recipientIdentityId: string,
+    private readonly encryptedInvitationKey: string,
+    private readonly occurredAt: number,
   ) {}
 
-  public getNotification(): NotificationResource {
-    return this.input.notification;
+  public getEncryptedInvitationKey(): EncryptedInvitationKey {
+    return EncryptedInvitationKey.fromString(this.encryptedInvitationKey);
   }
 
-  public getSession(): Session {
-    return this.input.session;
+  public getNotificationId(): NotificationId {
+    return NotificationId.fromString(this.notificationId);
+  }
+
+  public getOccurredAt(): Timestamp {
+    return new Timestamp(this.occurredAt);
+  }
+
+  public getRecipientIdentityId(): NotificationRecipientId {
+    return NotificationRecipientId.fromString(this.recipientIdentityId);
   }
 }

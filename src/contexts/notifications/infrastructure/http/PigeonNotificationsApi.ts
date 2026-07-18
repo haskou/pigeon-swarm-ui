@@ -8,8 +8,6 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
-import type { NotificationDecision } from '../../domain/NotificationDecision';
-import type { NotificationId } from '../../domain/NotificationId';
 import type { CachedGetRequest } from './CachedGetRequest';
 
 const startupReadCacheTtlMs = 1500;
@@ -82,11 +80,11 @@ export class PigeonNotificationsApi {
 
   public async update(
     session: Session,
-    notificationId: NotificationId,
-    decision: NotificationDecision,
+    notificationId: string,
+    state: string,
   ): Promise<NotificationResource> {
-    const path = `/notifications/${encodeURIComponent(notificationId.toString())}`;
-    const body = { state: decision.toString() };
+    const path = `/notifications/${encodeURIComponent(notificationId)}`;
+    const body = { state };
 
     return await this.http.request<NotificationResource>(path, {
       body: JSON.stringify(body),

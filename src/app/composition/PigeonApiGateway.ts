@@ -110,8 +110,8 @@ import { PigeonMessagesGateway } from '../../contexts/messages/infrastructure/ht
 import { MessageSignaturePayloadFactory } from '../../contexts/messages/infrastructure/http/signing/MessageSignaturePayloadFactory';
 import { throwIfMessageLoadAborted } from '../../contexts/messages/infrastructure/http/throwIfMessageLoadAborted';
 import { PigeonNodeApi } from '../../contexts/networks/infrastructure/http/PigeonNodeApi';
-import { NotificationDecision } from '../../contexts/notifications/domain/NotificationDecision';
-import { NotificationId } from '../../contexts/notifications/domain/NotificationId';
+import { NotificationDecision } from '../../contexts/notifications/domain/value-objects/NotificationDecision';
+import { NotificationId } from '../../contexts/notifications/domain/value-objects/NotificationId';
 import { PigeonNotificationsApi } from '../../contexts/notifications/infrastructure/http/PigeonNotificationsApi';
 import { PigeonNotificationsGateway } from '../../contexts/notifications/infrastructure/http/PigeonNotificationsGateway';
 import {
@@ -1714,8 +1714,8 @@ export class PigeonApiGateway {
   ): Promise<NotificationResource> {
     return await this.notificationsGateway.updateNotification(
       session,
-      notificationId,
-      decision,
+      notificationId.toString(),
+      decision.valueOf(),
     );
   }
 
@@ -1747,7 +1747,7 @@ export class PigeonApiGateway {
         keychainExternalIdentifier: published.keychainExternalIdentifier,
       },
       NotificationId.fromString(notification.id),
-      NotificationDecision.accepted(),
+      NotificationDecision.ACCEPTED,
     );
 
     return { ...published, notification: updated };

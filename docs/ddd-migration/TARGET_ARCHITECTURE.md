@@ -57,6 +57,8 @@ src/
 | Message | content, reply/thread relation, reaction lifecycle | author-only edit/delete; thread root consistency | message adapter | sent, edited, deleted, reacted |
 | Community | membership, roles, channel configuration | permission and role transitions | `CommunityRepository` | member/channel/role changes |
 | Call | scope, participants and lifecycle | valid joins/leaves/signals | calls adapter | started, joined, ended |
+| Notification | attention type and decision state | only pending, actionable notifications can be accepted or declined | notification adapter | notification accepted/declined |
+| NotificationSetting | delivery policy for one scope | valid scope hierarchy, mute period and mention suppression | notification settings adapter | setting saved/reset |
 | Poll | options, votes and state | open/closed vote rules | poll adapter | created, voted, closed |
 
 ## Application boundaries
@@ -68,6 +70,9 @@ src/
 | Update membership | membership command | actor, community, member, decision | community update | community REST/event |
 | Unlock identity | `LoginIdentityMessage` | identity id and local unlock proof | authenticated session | identity/keychain REST |
 | Configure node | relay configuration message | public host, ports, relay policy | node configuration | node REST |
+| Search notifications | identity query | actor identity id | notifications | notification repository |
+| Decide notification | notification command | actor, notification id, decision, timestamp | notification | notification repository |
+| Resolve notification settings | identity and scope query | actor identity id, scope | effective setting | notification setting repository |
 
 ## Infrastructure boundaries
 
