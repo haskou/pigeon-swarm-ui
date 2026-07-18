@@ -1,17 +1,18 @@
 import { mock, type MockProxy } from 'jest-mock-extended';
 
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { CreateNetwork } from '../../../../contexts/networks/application/create-network/CreateNetwork';
 import type { JoinNetwork } from '../../../../contexts/networks/application/join-network/JoinNetwork';
 import type { ListNodeNetworks } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
 import type { RemoveNodeNetwork } from '../../../../contexts/networks/application/remove-node-network/RemoveNodeNetwork';
 import type { NetworkPeersSearcher } from '../../../../contexts/networks/application/search-network-peers/NetworkPeersSearcher';
 import type { PigeonNodeApi } from '../../../../contexts/networks/infrastructure/http/PigeonNodeApi';
+import type { Session } from '../../../../shared/domain/pigeonResources.types';
 
 import { PigeonNetworksFacade } from '../../../../app/composition/networks/PigeonNetworksFacade';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { IdentityAccessContexts } from '../../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
 import { Network } from '../../../../contexts/networks/domain/aggregates/Network';
+import { NetworkPeer } from '../../../../contexts/networks/domain/entities/NetworkPeer';
 
 describe(PigeonNetworksFacade.name, () => {
   let identities: IdentityAccessContexts;
