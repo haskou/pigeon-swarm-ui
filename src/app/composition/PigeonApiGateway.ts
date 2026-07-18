@@ -506,8 +506,12 @@ export class PigeonApiGateway {
 
     const { MessageDecryptWorkerClient } =
       await import('../../contexts/messages/infrastructure/crypto/MessageDecryptWorkerClient');
+    const { createMessageDecryptWorker } =
+      await import('../../contexts/messages/infrastructure/crypto/createMessageDecryptWorker');
 
-    this.messageDecryptWorker = new MessageDecryptWorkerClient();
+    this.messageDecryptWorker = new MessageDecryptWorkerClient(
+      createMessageDecryptWorker(),
+    );
 
     return this.messageDecryptWorker;
   }

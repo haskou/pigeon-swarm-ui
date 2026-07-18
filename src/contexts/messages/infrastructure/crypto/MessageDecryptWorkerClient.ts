@@ -16,15 +16,7 @@ export class MessageDecryptWorkerClient {
 
   private readonly pending = new Map<number, PendingRequest>();
 
-  private readonly worker: Worker;
-
-  public constructor() {
-    this.worker = new Worker(
-      new URL('./messageDecryptWorker.ts', import.meta.url),
-      {
-        type: 'module',
-      },
-    );
+  public constructor(private readonly worker: Worker) {
     this.worker.onmessage = (
       event: MessageEvent<MessageDecryptWorkerResponse>,
     ) => this.handleMessage(event.data);
