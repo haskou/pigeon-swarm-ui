@@ -38,7 +38,6 @@ import type {
   MessageLinkPreview,
   MessagePin,
   MessageResource,
-  MyStickersResource,
   NotificationResource,
   NotificationScopeSetting,
   NotificationScopeSettingInput,
@@ -49,10 +48,6 @@ import type {
   PublicFileUpload,
   SendMessageOptions,
   Session,
-  StickerInput,
-  StickerPackInput,
-  StickerPackResource,
-  StickerResource,
 } from '../../shared/domain/pigeonResources.types';
 import type { RequestCacheOptions } from '../../shared/infrastructure/http/RequestCacheOptions';
 
@@ -391,7 +386,12 @@ export class PigeonApiGateway {
       this.requestCache,
     );
     this.pollsApi = new PigeonPollsApi(http, signer);
-    this.stickersApi = new PigeonStickersApi(http, signer);
+    this.stickersApi = new PigeonStickersApi(
+      http,
+      signer,
+      publicFiles,
+      new PublicImageUploadPreparer(),
+    );
     this.identityGateway = new PigeonIdentitiesGateway(
       this.identityCommands,
       this.identityLogin,
