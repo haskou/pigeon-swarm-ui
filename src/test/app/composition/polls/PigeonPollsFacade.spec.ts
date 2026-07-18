@@ -7,7 +7,7 @@ import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import { PigeonPollsFacade } from '../../../../app/composition/polls/PigeonPollsFacade';
 import { PollAccessContexts } from '../../../../contexts/polls/infrastructure/http/PollAccessContexts';
 import { PollMapper } from '../../../../contexts/polls/infrastructure/http/PollMapper';
-import { pollResourceFixture } from '../../../contexts/polls/PollResourceFixture';
+import { pollResourceFixture } from '../../../contexts/polls/pollResourceFixture';
 
 describe(PigeonPollsFacade.name, () => {
   it('translates primitive UI input into a vote use case message', async () => {

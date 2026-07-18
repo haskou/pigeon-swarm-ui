@@ -10,7 +10,7 @@ import { PollVoterId } from '../../../../../contexts/polls/domain/value-objects/
 import { PigeonPollRepository } from '../../../../../contexts/polls/infrastructure/http/PigeonPollRepository';
 import { PollAccessContexts } from '../../../../../contexts/polls/infrastructure/http/PollAccessContexts';
 import { PollMapper } from '../../../../../contexts/polls/infrastructure/http/PollMapper';
-import { pollResourceFixture } from '../../PollResourceFixture';
+import { pollResourceFixture } from '../../pollResourceFixture';
 
 describe(PigeonPollRepository.name, () => {
   it('persists the aggregate vote through the poll API', async () => {

@@ -139,12 +139,12 @@ import { PigeonMessageWriter } from './messages/PigeonMessageWriter';
 import { PigeonNetworksFacade } from './networks/PigeonNetworksFacade';
 import { PigeonNodeFacade } from './networks/PigeonNodeFacade';
 import { PigeonNotificationsFacade } from './notifications/PigeonNotificationsFacade';
-import { PigeonPollsFacade } from './polls/PigeonPollsFacade';
 import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonAttachmentsFacade } from './PigeonAttachmentsFacade';
 import { PigeonCallsFacade } from './PigeonCallsFacade';
 import { PigeonCommunitiesFacade } from './PigeonCommunitiesFacade';
 import { PigeonRealtimeApplication } from './PigeonRealtimeApplication';
+import { PigeonPollsFacade } from './polls/PigeonPollsFacade';
 
 export class PigeonApplication {
   public readonly attachments: PigeonAttachmentsFacade;
@@ -472,8 +472,8 @@ export class PigeonApplication {
       closer: new PollCloser(pollRepository),
       creator: new PollCreator(pollRepository),
       finder: new PollFinder(pollRepository),
-      voteRemover: new PollVoteRemover(pollRepository),
       voter: new PollVoter(pollRepository),
+      voteRemover: new PollVoteRemover(pollRepository),
     });
     this.realtime = new PigeonRealtimeApplication(realtime);
     this.session = new PigeonSessionFacade(

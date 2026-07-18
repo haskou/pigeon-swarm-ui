@@ -1,8 +1,6 @@
 import type { CommunityMessageMentionResource as CommunityMessageMention } from '../../../communities/infrastructure/http/resources/CommunityMessageMentionResource';
-import type {
-  PollResource,
-} from '../../../polls/infrastructure/http/resources/PollResource';
 import type { PollOptionResource as PollOption } from '../../../polls/infrastructure/http/resources/PollOptionResource';
+import type { PollResource } from '../../../polls/infrastructure/http/resources/PollResource';
 import type { PollScopeResource as PollScope } from '../../../polls/infrastructure/http/resources/PollScopeResource';
 import type { PollVoteResource as PollVote } from '../../../polls/infrastructure/http/resources/PollVoteResource';
 import type { MessageReaction } from './MessageReaction';

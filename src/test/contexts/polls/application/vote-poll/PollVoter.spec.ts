@@ -5,7 +5,7 @@ import type { PollRepository } from '../../../../../contexts/polls/domain/reposi
 import { VotePollMessage } from '../../../../../contexts/polls/application/vote-poll/messages/VotePollMessage';
 import { PollVoter } from '../../../../../contexts/polls/application/vote-poll/PollVoter';
 import { PollVoterId } from '../../../../../contexts/polls/domain/value-objects/PollVoterId';
-import { pollFixture } from '../../PollFixture';
+import { pollFixture } from '../../pollFixture';
 
 describe(PollVoter.name, () => {
   it('casts the vote on the aggregate before persistence', async () => {

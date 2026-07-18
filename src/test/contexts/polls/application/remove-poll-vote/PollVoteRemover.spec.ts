@@ -5,7 +5,7 @@ import type { PollRepository } from '../../../../../contexts/polls/domain/reposi
 import { RemovePollVoteMessage } from '../../../../../contexts/polls/application/remove-poll-vote/messages/RemovePollVoteMessage';
 import { PollVoteRemover } from '../../../../../contexts/polls/application/remove-poll-vote/PollVoteRemover';
 import { PollVoterId } from '../../../../../contexts/polls/domain/value-objects/PollVoterId';
-import { pollFixture } from '../../PollFixture';
+import { pollFixture } from '../../pollFixture';
 
 describe(PollVoteRemover.name, () => {
   it('removes the actor vote before persistence', async () => {

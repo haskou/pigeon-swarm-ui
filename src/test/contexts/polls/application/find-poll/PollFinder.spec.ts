@@ -4,7 +4,7 @@ import type { PollRepository } from '../../../../../contexts/polls/domain/reposi
 
 import { FindPollMessage } from '../../../../../contexts/polls/application/find-poll/messages/FindPollMessage';
 import { PollFinder } from '../../../../../contexts/polls/application/find-poll/PollFinder';
-import { pollFixture } from '../../PollFixture';
+import { pollFixture } from '../../pollFixture';
 
 describe(PollFinder.name, () => {
   it('finds a poll through its domain repository', async () => {

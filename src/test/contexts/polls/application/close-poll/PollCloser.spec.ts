@@ -4,7 +4,7 @@ import type { PollRepository } from '../../../../../contexts/polls/domain/reposi
 
 import { ClosePollMessage } from '../../../../../contexts/polls/application/close-poll/messages/ClosePollMessage';
 import { PollCloser } from '../../../../../contexts/polls/application/close-poll/PollCloser';
-import { pollFixture } from '../../PollFixture';
+import { pollFixture } from '../../pollFixture';
 
 describe(PollCloser.name, () => {
   it('closes the aggregate before persisting it', async () => {

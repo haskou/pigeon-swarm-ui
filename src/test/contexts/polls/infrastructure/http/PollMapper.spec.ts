@@ -1,5 +1,5 @@
 import { PollMapper } from '../../../../../contexts/polls/infrastructure/http/PollMapper';
-import { pollResourceFixture } from '../../PollResourceFixture';
+import { pollResourceFixture } from '../../pollResourceFixture';
 
 describe(PollMapper.name, () => {
   it('hydrates and projects a poll resource', () => {

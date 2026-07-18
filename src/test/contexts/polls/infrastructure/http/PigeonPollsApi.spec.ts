@@ -5,7 +5,7 @@ import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/H
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
 import { PigeonPollsApi } from '../../../../../contexts/polls/infrastructure/http/PigeonPollsApi';
-import { pollResourceFixture } from '../../PollResourceFixture';
+import { pollResourceFixture } from '../../pollResourceFixture';
 
 describe(PigeonPollsApi.name, () => {
   it('signs the exact poll vote request', async () => {
