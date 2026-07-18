@@ -3,7 +3,7 @@ import type {
   AttachmentUploadOptions,
 } from '../../../../../shared/domain/pigeonResources.types';
 import type { CommunityMessageMentionResource as CommunityMessageMention } from '../../../../communities/infrastructure/http/resources/CommunityMessageMentionResource';
-import type { StickerMessageReference } from '../../../../stickers/domain/stickerResources.types';
+import type { StickerMessageReference } from '../../../../stickers/infrastructure/http/resources/StickerMessageReference';
 import type { MessageReplyPreview } from '../../crypto/resources/MessageReplyPreview';
 import type { MessageLinkPreview } from './MessageLinkPreview';
 

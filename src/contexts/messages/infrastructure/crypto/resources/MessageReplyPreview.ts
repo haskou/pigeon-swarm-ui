@@ -1,5 +1,5 @@
 import type { MessageAttachment } from '../../../../../shared/domain/pigeonResources.types';
-import type { StickerMessageReference } from '../../../../stickers/domain/stickerResources.types';
+import type { StickerMessageReference } from '../../../../stickers/infrastructure/http/resources/StickerMessageReference';
 
 export type MessageReplyPreview = {
   authorIdentityId: string;

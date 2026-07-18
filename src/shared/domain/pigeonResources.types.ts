@@ -51,4 +51,4 @@ export type { PollOptionResource as PollOption } from '../../contexts/polls/infr
 export type { PollResource } from '../../contexts/polls/infrastructure/http/resources/PollResource';
 export type { PollScopeResource as PollScope } from '../../contexts/polls/infrastructure/http/resources/PollScopeResource';
 export type { PollVoteResource as PollVote } from '../../contexts/polls/infrastructure/http/resources/PollVoteResource';
-export type * from '../../contexts/stickers/domain/stickerResources.types';
+export type * from '../../contexts/stickers/infrastructure/http/resources/stickerResources.types';

@@ -1,3 +1,5 @@
+import { StickerOwnerId } from '../../../domain/value-objects/StickerOwnerId';
+
 export class ListStickerPacksMessage {
   public constructor(
     private readonly input: {
@@ -5,7 +7,9 @@ export class ListStickerPacksMessage {
     } = {},
   ) {}
 
-  public getOwnerIdentityId(): string | undefined {
-    return this.input.ownerIdentityId;
+  public getOwnerId(): StickerOwnerId | undefined {
+    return this.input.ownerIdentityId
+      ? StickerOwnerId.fromString(this.input.ownerIdentityId)
+      : undefined;
   }
 }

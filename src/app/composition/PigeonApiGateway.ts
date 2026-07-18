@@ -119,7 +119,6 @@ import {
 import { PigeonPushGateway } from '../../contexts/notifications/infrastructure/http/PigeonPushGateway';
 import { PigeonPollsApi } from '../../contexts/polls/infrastructure/http/PigeonPollsApi';
 import { PigeonStickersApi } from '../../contexts/stickers/infrastructure/http/PigeonStickersApi';
-import { PigeonStickersGateway } from '../../contexts/stickers/infrastructure/http/PigeonStickersGateway';
 import { ApiUrlBuilder } from '../../shared/infrastructure/http/ApiUrlBuilder';
 import { HttpJsonClient } from '../../shared/infrastructure/http/HttpJsonClient';
 import { RequestCache } from '../../shared/infrastructure/http/RequestCache';
@@ -167,8 +166,6 @@ export class PigeonApiGateway {
 
   private readonly requestCache = new RequestCache();
 
-  private readonly stickers: PigeonStickersGateway;
-
   public readonly identityKeyProtection: PigeonIdentityKeyProtectionGateway;
 
   public readonly identityGateway: PigeonIdentitiesGateway;
@@ -191,13 +188,13 @@ export class PigeonApiGateway {
 
   public readonly pollsApi: PigeonPollsApi;
 
+  public readonly stickersApi: PigeonStickersApi;
+
   public readonly notificationsGateway: PigeonNotificationsGateway;
 
   public readonly pushGateway: PigeonPushGateway;
 
   public readonly pushApi: PigeonPushApi;
-
-  public readonly stickersGateway: PigeonStickersGateway;
 
   public readonly node: PigeonNodeApi;
 
@@ -394,9 +391,7 @@ export class PigeonApiGateway {
       this.requestCache,
     );
     this.pollsApi = new PigeonPollsApi(http, signer);
-    this.stickers = new PigeonStickersGateway(
-      new PigeonStickersApi(http, signer),
-    );
+    this.stickersApi = new PigeonStickersApi(http, signer);
     this.identityGateway = new PigeonIdentitiesGateway(
       this.identityCommands,
       this.identityLogin,
@@ -407,7 +402,6 @@ export class PigeonApiGateway {
     );
     this.notificationsGateway = this.notifications;
     this.pushGateway = this.push;
-    this.stickersGateway = this.stickers;
   }
 
   private async decryptInvitationKey(
@@ -1272,112 +1266,6 @@ export class PigeonApiGateway {
     file: File,
   ): Promise<PublicFileUpload> {
     return await this.filesGateway.uploadPublicFile(session, file);
-  }
-
-  public async uploadStickerAsset(
-    session: Session,
-    file: File,
-  ): Promise<PublicFileUpload> {
-    return await this.stickersGateway.uploadAsset(session, file);
-  }
-
-  public async listStickerPacks(
-    input: {
-      ownerIdentityId?: string;
-    } = {},
-  ): Promise<StickerPackResource[]> {
-    return await this.stickersGateway.listPacks(input);
-  }
-
-  public async getStickerPack(packId: string): Promise<StickerPackResource> {
-    return await this.stickersGateway.getPack(packId);
-  }
-
-  public async getMyStickers(session: Session): Promise<MyStickersResource> {
-    return await this.stickersGateway.getMyStickers(session);
-  }
-
-  public async createStickerPack(
-    session: Session,
-    input: StickerPackInput,
-  ): Promise<StickerPackResource> {
-    return await this.stickersGateway.createPack(session, input);
-  }
-
-  public async updateStickerPack(
-    session: Session,
-    packId: string,
-    input: Partial<StickerPackInput>,
-  ): Promise<StickerPackResource> {
-    return await this.stickersGateway.updatePack(session, packId, input);
-  }
-
-  public async addStickerToPack(
-    session: Session,
-    packId: string,
-    input: StickerInput,
-  ): Promise<StickerResource> {
-    return await this.stickersGateway.addSticker(session, packId, input);
-  }
-
-  public async updateSticker(
-    session: Session,
-    packId: string,
-    stickerId: string,
-    input: StickerInput,
-  ): Promise<StickerResource> {
-    return await this.stickersGateway.updateSticker(
-      session,
-      packId,
-      stickerId,
-      input,
-    );
-  }
-
-  public async deleteSticker(
-    session: Session,
-    packId: string,
-    stickerId: string,
-  ): Promise<void> {
-    await this.stickersGateway.deleteSticker(session, packId, stickerId);
-  }
-
-  public async saveStickerPack(
-    session: Session,
-    packId: string,
-  ): Promise<void> {
-    await this.stickersGateway.savePack(session, packId);
-  }
-
-  public async unsaveStickerPack(
-    session: Session,
-    packId: string,
-  ): Promise<void> {
-    await this.stickersGateway.unsavePack(session, packId);
-  }
-
-  public async favoriteSticker(
-    session: Session,
-    packId: string,
-    stickerId: string,
-  ): Promise<void> {
-    await this.stickersGateway.favoriteSticker(session, packId, stickerId);
-  }
-
-  public async unfavoriteSticker(
-    session: Session,
-    packId: string,
-    stickerId: string,
-  ): Promise<void> {
-    await this.stickersGateway.unfavoriteSticker(session, packId, stickerId);
-  }
-
-  public async markStickerUsed(
-    session: Session,
-    packId: string,
-    stickerId: string,
-  ): Promise<void> {
-    await this.stickersGateway.markUsed(session, packId, stickerId);
   }
 
   public async uploadPrivateFile(

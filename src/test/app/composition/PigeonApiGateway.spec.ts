@@ -2430,7 +2430,7 @@ describe(PigeonApiGateway.name, () => {
     } as unknown as File;
     const gateway = new PigeonApiGateway(http, signer);
 
-    await expect(gateway.uploadStickerAsset(session, file)).resolves.toBe(
+    await expect(gateway.stickersApi.uploadAsset(session, file)).resolves.toBe(
       upload,
     );
 
@@ -2499,23 +2499,23 @@ describe(PigeonApiGateway.name, () => {
     };
     const packUpdate = { name: 'Updated pack' };
 
-    await expect(gateway.createStickerPack(session, packInput)).resolves.toBe(
-      pack,
-    );
     await expect(
-      gateway.updateStickerPack(session, pack.id, packUpdate),
+      gateway.stickersApi.createPack(session, packInput),
+    ).resolves.toBe(pack);
+    await expect(
+      gateway.stickersApi.updatePack(session, pack.id, packUpdate),
     ).resolves.toEqual({ ...pack, name: 'Updated pack' });
     await expect(
-      gateway.addStickerToPack(session, pack.id, stickerInput),
+      gateway.stickersApi.addSticker(session, pack.id, stickerInput),
     ).resolves.toBe(sticker);
     await expect(
-      gateway.updateSticker(session, pack.id, sticker.id, {
+      gateway.stickersApi.updateSticker(session, pack.id, sticker.id, {
         ...stickerInput,
         sizeBytes: 215041,
       }),
     ).resolves.toEqual({ ...sticker, sizeBytes: 215041 });
     await expect(
-      gateway.deleteSticker(session, pack.id, sticker.id),
+      gateway.stickersApi.deleteSticker(session, pack.id, sticker.id),
     ).resolves.toBeUndefined();
 
     expect(signer.headers).toHaveBeenNthCalledWith(
@@ -2608,9 +2608,9 @@ describe(PigeonApiGateway.name, () => {
     } as unknown as RequestSigner;
     const gateway = new PigeonApiGateway(http, signer);
 
-    await expect(gateway.listStickerPacks()).resolves.toEqual([pack]);
+    await expect(gateway.stickersApi.listPacks()).resolves.toEqual([pack]);
     await expect(
-      gateway.listStickerPacks({ ownerIdentityId: 'identity 1' }),
+      gateway.stickersApi.listPacks({ ownerIdentityId: 'identity 1' }),
     ).resolves.toEqual([pack]);
 
     expect(signer.headers).not.toHaveBeenCalled();
@@ -2648,25 +2648,27 @@ describe(PigeonApiGateway.name, () => {
     } as unknown as Session;
     const gateway = new PigeonApiGateway(http, signer);
 
-    await expect(gateway.getStickerPack('pack 1')).resolves.toEqual({
+    await expect(gateway.stickersApi.getPack('pack 1')).resolves.toEqual({
       id: 'pack-1',
       stickers: [],
     });
-    await expect(gateway.getMyStickers(session)).resolves.toBe(library);
+    await expect(gateway.stickersApi.getMyStickers(session)).resolves.toBe(
+      library,
+    );
     await expect(
-      gateway.saveStickerPack(session, 'pack-1'),
+      gateway.stickersApi.savePack(session, 'pack-1'),
     ).resolves.toBeUndefined();
     await expect(
-      gateway.unsaveStickerPack(session, 'pack-1'),
+      gateway.stickersApi.unsavePack(session, 'pack-1'),
     ).resolves.toBeUndefined();
     await expect(
-      gateway.favoriteSticker(session, 'pack-1', 'sticker-1'),
+      gateway.stickersApi.favoriteSticker(session, 'pack-1', 'sticker-1'),
     ).resolves.toBeUndefined();
     await expect(
-      gateway.unfavoriteSticker(session, 'pack-1', 'sticker-1'),
+      gateway.stickersApi.unfavoriteSticker(session, 'pack-1', 'sticker-1'),
     ).resolves.toBeUndefined();
     await expect(
-      gateway.markStickerUsed(session, 'pack-1', 'sticker-1'),
+      gateway.stickersApi.markStickerUsed(session, 'pack-1', 'sticker-1'),
     ).resolves.toBeUndefined();
 
     expect(http.request).toHaveBeenNthCalledWith(

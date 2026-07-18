@@ -1,14 +1,12 @@
-import type {
-  MyStickersResource,
-  PublicFileUpload,
-  Session,
-  StickerInput,
-  StickerPackInput,
-  StickerPackResource,
-  StickerResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+import type { PublicFileUpload } from '../../../attachments/application/contracts/PublicFileUpload';
+import type { MyStickersResource } from './resources/MyStickersResource';
+import type { StickerInput } from './resources/StickerInput';
+import type { StickerPackInput } from './resources/StickerPackInput';
+import type { StickerPackResource } from './resources/StickerPackResource';
+import type { StickerResource } from './resources/StickerResource';
 
 import { PigeonPublicFilesClient } from '../../../attachments/infrastructure/http/PigeonPublicFilesClient';
 import { PublicImageUploadPreparer } from '../../../attachments/infrastructure/media/PublicImageUploadPreparer';

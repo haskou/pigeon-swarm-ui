@@ -4,7 +4,7 @@ import type {
 } from '../../../attachments/infrastructure/attachmentResources.types';
 import type { CommunityMessageMentionResource as CommunityMessageMention } from '../../../communities/infrastructure/http/resources/CommunityMessageMentionResource';
 import type { PollResource } from '../../../polls/infrastructure/http/resources/PollResource';
-import type { StickerMessageReference } from '../../../stickers/domain/stickerResources.types';
+import type { StickerMessageReference } from '../../../stickers/infrastructure/http/resources/StickerMessageReference';
 import type { MessageLinkPreview } from '../../infrastructure/http/resources/MessageLinkPreview';
 import type { MessageReplyPreview } from '../../infrastructure/crypto/resources/MessageReplyPreview';
 import type { MessageReaction } from '../../infrastructure/http/MessageReaction';
