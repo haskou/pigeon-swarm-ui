@@ -1,28 +1,33 @@
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import { MessageAuthorId } from '../../../domain/value-objects/MessageAuthorId';
+import { MessageConversationId } from '../../../domain/value-objects/MessageConversationId';
+import { MessageId } from '../../../domain/value-objects/MessageId';
+import { MessagePageLimit } from '../../../domain/value-objects/MessagePageLimit';
 
 export class LoadMessagesMessage {
   public constructor(
     private readonly input: {
+      actorIdentityId: string;
       before?: null | string;
       conversationId: string;
-      options?: { limit?: number; signal?: AbortSignal };
-      session: Session;
+      limit?: number;
     },
   ) {}
 
-  public getBefore(): null | string | undefined {
-    return this.input.before;
+  public getActorIdentityId(): MessageAuthorId {
+    return MessageAuthorId.fromString(this.input.actorIdentityId);
   }
 
-  public getConversationId(): string {
-    return this.input.conversationId;
+  public getBeforeMessageId(): MessageId | undefined {
+    return this.input.before
+      ? MessageId.fromString(this.input.before)
+      : undefined;
   }
 
-  public getOptions(): { limit?: number; signal?: AbortSignal } | undefined {
-    return this.input.options;
+  public getConversationId(): MessageConversationId {
+    return MessageConversationId.fromString(this.input.conversationId);
   }
 
-  public getSession(): Session {
-    return this.input.session;
+  public getLimit(): MessagePageLimit {
+    return MessagePageLimit.fromNumber(this.input.limit ?? 30);
   }
 }

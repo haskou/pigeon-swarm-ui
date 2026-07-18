@@ -18,14 +18,18 @@ export class MessageReactionUpdater {
     const aggregate = MessageReadModelMapper.toAggregate(message);
     const authorId = MessageAuthorId.fromString(authorIdentityId);
     const reactionEmoji = MessageReactionEmoji.fromString(emoji);
-    const reactionAction = MessageReactionAction.fromPrimitive(action);
+    const reactionAction = MessageReactionAction.fromPrimitives(action);
 
     if (reactionAction.isAdd()) {
       aggregate.addReaction(authorId, reactionEmoji, new Timestamp(createdAt));
     }
 
     if (reactionAction.isRemove()) {
-      aggregate.removeReaction(authorId, reactionEmoji);
+      aggregate.removeReaction(
+        authorId,
+        reactionEmoji,
+        new Timestamp(createdAt),
+      );
     }
 
     return MessageReadModelMapper.withAggregate(message, aggregate);

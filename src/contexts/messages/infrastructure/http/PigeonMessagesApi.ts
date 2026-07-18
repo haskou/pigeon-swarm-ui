@@ -1,6 +1,5 @@
 import type {
   ChatMessage,
-  ConversationDraft,
   ConversationDraftsResource,
   ConversationMessagePinsResource,
   MessageLinkPreview,
@@ -12,7 +11,9 @@ import type { HttpJsonClient } from '../../../../shared/infrastructure/http/Http
 import type { RequestCache } from '../../../../shared/infrastructure/http/RequestCache';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
+import type { ConversationDraftResource } from './ConversationDraftResource';
 import type { MessageLoadOptions } from './MessageLoadOptions';
+import type { ConversationDraftProjection } from './resources/ConversationDraftProjection';
 
 import { DraftPayloadCipher } from '../crypto/DraftPayloadCipher';
 import { PigeonLinkPreviewsApi } from './PigeonLinkPreviewsApi';
@@ -261,7 +262,7 @@ export class PigeonMessagesApi {
 
   public async listConversationDrafts(
     session: Session,
-  ): Promise<ConversationDraft[]> {
+  ): Promise<ConversationDraftProjection[]> {
     const path = '/conversations/me/drafts';
 
     return await this.requestCache.load(
@@ -294,18 +295,15 @@ export class PigeonMessagesApi {
     conversationId: string,
     content: string,
     updatedAt = Date.now(),
-  ): Promise<ConversationDraft> {
+  ): Promise<ConversationDraftProjection> {
     const path = `/conversations/${encodeURIComponent(conversationId)}/draft`;
     const encryptedPayload = this.draftPayloads.encrypt(session, content);
     const body = { encryptedPayload, updatedAt };
-    const draft = await this.http.request<Omit<ConversationDraft, 'content'>>(
-      path,
-      {
-        body: JSON.stringify(body),
-        headers: await this.signer.headers(session, 'PUT', path, body),
-        method: 'PUT',
-      },
-    );
+    const draft = await this.http.request<ConversationDraftResource>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'PUT', path, body),
+      method: 'PUT',
+    });
     this.requestCache.invalidateForSession('/conversations/me/drafts', session);
 
     return { ...draft, content };

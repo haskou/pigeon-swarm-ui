@@ -1,4 +1,6 @@
-import { DomainError, StringValueObject } from '@haskou/value-objects';
+import { assert, StringValueObject } from '@haskou/value-objects';
+
+import { MessageAuthorIdRequiredError } from '../errors/MessageAuthorIdRequiredError';
 
 export class MessageAuthorId extends StringValueObject {
   private static normalize(value: string): string {
@@ -17,9 +19,7 @@ export class MessageAuthorId extends StringValueObject {
   public static fromString(value: string): MessageAuthorId {
     const normalizedValue = MessageAuthorId.normalize(value);
 
-    if (!normalizedValue) {
-      throw new DomainError('Message author id is required.');
-    }
+    assert(normalizedValue.length > 0, new MessageAuthorIdRequiredError());
 
     return new MessageAuthorId(normalizedValue);
   }

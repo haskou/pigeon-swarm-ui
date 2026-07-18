@@ -1,15 +1,19 @@
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import { MessageAuthorId } from '../../../domain/value-objects/MessageAuthorId';
+import { MessageConversationId } from '../../../domain/value-objects/MessageConversationId';
 
 export class ListMessagePinsMessage {
   public constructor(
-    private readonly input: { conversationId: string; session: Session },
+    private readonly input: {
+      actorIdentityId: string;
+      conversationId: string;
+    },
   ) {}
 
-  public getConversationId(): string {
-    return this.input.conversationId;
+  public getActorIdentityId(): MessageAuthorId {
+    return MessageAuthorId.fromString(this.input.actorIdentityId);
   }
 
-  public getSession(): Session {
-    return this.input.session;
+  public getConversationId(): MessageConversationId {
+    return MessageConversationId.fromString(this.input.conversationId);
   }
 }

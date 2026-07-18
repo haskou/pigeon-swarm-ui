@@ -1,6 +1,6 @@
-import type { MessageSignaturePayloadFactory } from '../../../../../contexts/messages/domain/MessageSignaturePayloadFactory';
 import type { MessageProjectionPort } from '../../../../../contexts/messages/infrastructure/crypto/MessageProjectionPort';
 import type { MessageAttachmentPublisher } from '../../../../../contexts/messages/infrastructure/http/MessageAttachmentPublisher';
+import type { MessageSignaturePayloadFactory } from '../../../../../contexts/messages/infrastructure/http/signing/MessageSignaturePayloadFactory';
 import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';

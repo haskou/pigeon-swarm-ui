@@ -9,7 +9,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { conversationSupportsThreads } from '../../../../contexts/conversations/presentation/view-models/conversationSupportsThreads';
-import { MessageCollection } from '../../../../contexts/messages/domain/MessageCollection';
+import { MessageCollection } from '../../../../contexts/messages/presentation/view-models/MessageCollection';
 import { replyPreviewFromMessage } from '../../../../contexts/messages/presentation/view-models/replyPreviewFromMessage';
 import { ThreadMessageVisibility } from '../../../../contexts/messages/presentation/view-models/ThreadMessageVisibility';
 import { copy } from '../../../../shared/presentation/i18n/copy';

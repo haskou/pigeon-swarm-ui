@@ -54,7 +54,7 @@ import { CommunityList } from '../../../../contexts/communities/presentation/vie
 import { ConversationKeychain } from '../../../../contexts/identities/infrastructure/keychain/ConversationKeychain';
 import { ConversationTimeline } from '../../../../contexts/conversations/presentation/view-models/ConversationTimeline';
 import { ConversationPeer } from '../../../../contexts/conversations/presentation/view-models/ConversationPeer';
-import { MessageCollection } from '../../../../contexts/messages/domain/MessageCollection';
+import { MessageCollection } from '../../../../contexts/messages/presentation/view-models/MessageCollection';
 import { replyPreviewFromMessage } from '../../../../contexts/messages/presentation/view-models/replyPreviewFromMessage';
 import { ThreadMessageVisibility } from '../../../../contexts/messages/presentation/view-models/ThreadMessageVisibility';
 import { MessageReactionUpdater } from '../../../../contexts/messages/presentation/view-models/MessageReactionUpdater';

@@ -1,19 +1,22 @@
-import { StringValueObject } from '@haskou/value-objects';
+import { Enum } from '@haskou/value-objects';
 
-const encrypted = 'encrypted';
-const readable = 'readable';
+const values = ['encrypted', 'readable'] as const;
 
-export class MessageVisibility extends StringValueObject {
+export class MessageVisibility extends Enum<(typeof values)[number]> {
   public static encrypted(): MessageVisibility {
-    return new MessageVisibility(encrypted);
+    return new MessageVisibility('encrypted');
   }
 
   public static readable(): MessageVisibility {
-    return new MessageVisibility(readable);
+    return new MessageVisibility('readable');
   }
 
-  private constructor(value: typeof encrypted | typeof readable) {
+  private constructor(value: (typeof values)[number]) {
     super(value);
+  }
+
+  public getValues(): Array<(typeof values)[number]> {
+    return [...values];
   }
 
   public isReadable(): boolean {

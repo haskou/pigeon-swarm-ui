@@ -1,36 +1,38 @@
-import type {
-  EditMessageOptions,
-  Session,
-} from '../../../../../shared/domain/pigeonResources.types';
+import { Timestamp } from '@haskou/value-objects';
+
+import { MessageAuthorId } from '../../../domain/value-objects/MessageAuthorId';
+import { MessageContent } from '../../../domain/value-objects/MessageContent';
+import { MessageConversationId } from '../../../domain/value-objects/MessageConversationId';
+import { MessageId } from '../../../domain/value-objects/MessageId';
 
 export class EditMessageMessage {
   public constructor(
     private readonly input: {
+      authorIdentityId: string;
       content: string;
       conversationId: string;
       messageId: string;
-      options?: EditMessageOptions;
-      session: Session;
+      occurredAt: number;
     },
   ) {}
 
-  public getContent(): string {
-    return this.input.content;
+  public getAuthorId(): MessageAuthorId {
+    return MessageAuthorId.fromString(this.input.authorIdentityId);
   }
 
-  public getConversationId(): string {
-    return this.input.conversationId;
+  public getContent(): MessageContent {
+    return MessageContent.fromString(this.input.content);
   }
 
-  public getMessageId(): string {
-    return this.input.messageId;
+  public getConversationId(): MessageConversationId {
+    return MessageConversationId.fromString(this.input.conversationId);
   }
 
-  public getOptions(): EditMessageOptions {
-    return this.input.options ?? {};
+  public getMessageId(): MessageId {
+    return MessageId.fromString(this.input.messageId);
   }
 
-  public getSession(): Session {
-    return this.input.session;
+  public getOccurredAt(): Timestamp {
+    return new Timestamp(this.input.occurredAt);
   }
 }

@@ -1,43 +1,38 @@
-import { StringValueObject, ValueNotInEnumError } from '@haskou/value-objects';
+import { Enum, ValueNotInEnumError } from '@haskou/value-objects';
 
-import type { MessageKindPrimitive } from './MessageKindPrimitive';
+const values = ['call-event', 'message', 'poll', 'sticker'] as const;
 
-const callEvent = 'call-event';
-const message = 'message';
-const poll = 'poll';
-const sticker = 'sticker';
-
-export class MessageKind extends StringValueObject {
+export class MessageKind extends Enum<(typeof values)[number]> {
   public static callEvent(): MessageKind {
-    return new MessageKind(callEvent);
+    return new MessageKind('call-event');
   }
 
-  public static fromPrimitive(value?: string): MessageKind {
-    if (value === undefined || value === message) return MessageKind.message();
+  public static fromPrimitives(value = 'message'): MessageKind {
+    const kind = values.find((candidate) => candidate === value);
 
-    if (value === callEvent) return MessageKind.callEvent();
+    if (!kind) throw new ValueNotInEnumError(value, values);
 
-    if (value === poll) return MessageKind.poll();
-
-    if (value === sticker) return MessageKind.sticker();
-
-    throw new ValueNotInEnumError(value, [callEvent, message, poll, sticker]);
+    return new MessageKind(kind);
   }
 
   public static message(): MessageKind {
-    return new MessageKind(message);
+    return new MessageKind('message');
   }
 
   public static poll(): MessageKind {
-    return new MessageKind(poll);
+    return new MessageKind('poll');
   }
 
   public static sticker(): MessageKind {
-    return new MessageKind(sticker);
+    return new MessageKind('sticker');
   }
 
-  private constructor(value: MessageKindPrimitive) {
+  private constructor(value: (typeof values)[number]) {
     super(value);
+  }
+
+  public getValues(): Array<(typeof values)[number]> {
+    return [...values];
   }
 
   public isEditableText(): boolean {
