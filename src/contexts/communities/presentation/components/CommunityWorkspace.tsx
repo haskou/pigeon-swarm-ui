@@ -243,6 +243,15 @@ export function CommunityWorkspace({
     },
     [community.id, communityKey, session.identity.id],
   );
+  const textChannelsWithThreadSummaries = useMemo(
+    () =>
+      textChannels.map((channel) => ({
+        ...channel,
+        threads:
+          channelThreadsByChannelId[channel.id] ?? channel.threads ?? [],
+      })),
+    [channelThreadsByChannelId, textChannels],
+  );
   const {
     add: addThreadRootLabels,
     hiddenKeys: hiddenThreadRootLabelKeys,
@@ -250,23 +259,22 @@ export function CommunityWorkspace({
     labels: threadRootLabels,
     reveal: revealThreadRootLabel,
   } = useCommunityThreadRootLabels({
-    channels: textChannels,
+    channels: textChannelsWithThreadSummaries,
     communityId: community.id,
     projectMessages: projectChannelMessages,
     session,
   });
   const textChannelsWithThreads = useMemo(
     () =>
-      textChannels.map((channel) => ({
+      textChannelsWithThreadSummaries.map((channel) => ({
         ...channel,
         threads: visibleCommunityThreadSummaries({
           channelId: channel.id,
           hiddenThreadRootLabelKeys,
-          threads:
-            channelThreadsByChannelId[channel.id] ?? channel.threads ?? [],
+          threads: channel.threads ?? [],
         }),
       })),
-    [channelThreadsByChannelId, hiddenThreadRootLabelKeys, textChannels],
+    [hiddenThreadRootLabelKeys, textChannelsWithThreadSummaries],
   );
   useEffect(() => {
     setChannelThreadsByChannelId(

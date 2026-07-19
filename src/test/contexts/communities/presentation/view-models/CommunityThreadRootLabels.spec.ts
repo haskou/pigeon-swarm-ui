@@ -41,6 +41,19 @@ describe('CommunityThreadRootLabels', () => {
     ).toEqual([{ channelId: 'channel-1', rootMessageIds: ['root-2'] }]);
   });
 
+  it('finds roots supplied by a refreshed channel summary', () => {
+    const refreshedChannels = [
+      {
+        id: 'channel-1',
+        threads: [{ rootMessageId: 'cached-root' }],
+      },
+    ] as CommunityTextChannel[];
+
+    expect(
+      CommunityThreadRootLabels.missing(refreshedChannels, {}, new Set()),
+    ).toEqual([{ channelId: 'channel-1', rootMessageIds: ['cached-root'] }]);
+  });
+
   it('separates thread roots from ordinary replies', () => {
     const messages = [
       chatMessage({ id: 'thread-root' }),
