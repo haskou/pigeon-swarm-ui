@@ -10,6 +10,28 @@ import { PrivateRelayConfiguration } from './value-objects/PrivateRelayConfigura
 import { PublicNetworkConfiguration } from './value-objects/PublicNetworkConfiguration';
 
 export class NodeRelayConfiguration extends AggregateRoot {
+  public static create(
+    nodeId: NetworkNodeId,
+    callsRelay: CallsRelayConfiguration,
+    manualRelayMultiaddrs: NodeRelayMultiaddress[],
+    privateRelay: PrivateRelayConfiguration,
+    publicHost: NodePublicHost,
+    publicNetwork: PublicNetworkConfiguration,
+    occurredAt: Timestamp,
+  ): NodeRelayConfiguration {
+    const configuration = new NodeRelayConfiguration(
+      nodeId,
+      callsRelay,
+      manualRelayMultiaddrs,
+      privateRelay,
+      publicHost,
+      publicNetwork,
+    );
+    configuration.record(new NodeRelayConfigurationUpdated(nodeId, occurredAt));
+
+    return configuration;
+  }
+
   public static fromPrimitives(
     primitives: PrimitiveOf<NodeRelayConfiguration>,
   ): NodeRelayConfiguration {

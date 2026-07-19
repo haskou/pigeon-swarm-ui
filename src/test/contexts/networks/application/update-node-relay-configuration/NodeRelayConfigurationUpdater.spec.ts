@@ -33,6 +33,7 @@ describe(NodeRelayConfigurationUpdater.name, () => {
         actorIdentityId: 'identity-a',
         callsRelay: { port: 3478 },
         manualRelayMultiaddrs: [],
+        nodeId: 'node-a',
         privateRelay: {
           discoveryEnabled: true,
           enabled: true,
@@ -53,5 +54,34 @@ describe(NodeRelayConfigurationUpdater.name, () => {
     });
     expect(repository.save.mock.calls[0]?.[0]).toBe(configuration);
     expect(repository.save.mock.calls[0]?.[1].toString()).toBe('identity-a');
+  });
+
+  it('persists anonymous first-run configuration without loading it', async () => {
+    const repository = mock<NodeRelayConfigurationRepository>();
+    repository.save.mockImplementation((aggregate) =>
+      Promise.resolve(aggregate),
+    );
+
+    const updated = await new NodeRelayConfigurationUpdater(repository).update(
+      new UpdateNodeRelayConfigurationMessage({
+        callsRelay: { port: 3478 },
+        manualRelayMultiaddrs: [],
+        nodeId: 'node-a',
+        privateRelay: {
+          discoveryEnabled: true,
+          enabled: false,
+        },
+        publicHost: 'relay.example.com',
+        publicNetwork: { enabled: true, port: 4011 },
+      }),
+    );
+
+    expect(repository.find).not.toHaveBeenCalled();
+    expect(repository.save.mock.calls[0]?.[0]).toBe(updated);
+    expect(repository.save.mock.calls[0]?.[1].isAnonymous()).toBe(true);
+    expect(updated.toPrimitives()).toMatchObject({
+      nodeId: 'node-a',
+      publicHost: 'relay.example.com',
+    });
   });
 });

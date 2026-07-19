@@ -72,10 +72,12 @@ export class PigeonNodeFacade {
     configuration: NodeRelayConfigurationViewModel,
     session?: Session,
   ): Promise<NodeRelayConfigurationViewModel> {
+    const nodeId = (await this.node.getInfo()).id;
     const updated = await this.relayUpdater.update(
       new UpdateNodeRelayConfigurationMessage({
         ...configuration,
         actorIdentityId: this.actorIdentityId(session),
+        nodeId,
         privateRelay: {
           discoveryEnabled: configuration.privateRelay.discoveryEnabled,
           enabled: configuration.privateRelay.enabled,

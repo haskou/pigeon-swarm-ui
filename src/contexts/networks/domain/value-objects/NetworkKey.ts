@@ -1,4 +1,4 @@
-import { StringValueObject, SymmetricKey } from '@haskou/value-objects';
+import { PrivateKey, StringValueObject } from '@haskou/value-objects';
 
 import { NetworkKeyRequiredError } from '../errors/NetworkKeyRequiredError';
 
@@ -14,7 +14,7 @@ export class NetworkKey extends StringValueObject {
   }
 
   public static generate(): NetworkKey {
-    return new NetworkKey(SymmetricKey.generate().toString());
+    return new NetworkKey(PrivateKey.generate().toString());
   }
 
   private constructor(value: string) {

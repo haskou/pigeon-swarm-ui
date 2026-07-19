@@ -9,6 +9,7 @@ describe(UpdateNodeRelayConfigurationMessage.name, () => {
         '',
         '   ',
       ],
+      nodeId: 'node-a',
       privateRelay: {
         discoveryEnabled: true,
         enabled: false,
@@ -21,5 +22,6 @@ describe(UpdateNodeRelayConfigurationMessage.name, () => {
         .getManualRelayMultiaddresses()
         .map((multiaddress) => multiaddress.toString()),
     ).toEqual(['/dns4/relay.example.com/tcp/4100']);
+    expect(message.getNodeId().toString()).toBe('node-a');
   });
 });

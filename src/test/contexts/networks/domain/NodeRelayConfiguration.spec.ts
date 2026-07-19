@@ -5,12 +5,39 @@ import { NodeRelayPortRequiredError } from '../../../../contexts/networks/domain
 import { NodeRelayConfigurationUpdated } from '../../../../contexts/networks/domain/events/NodeRelayConfigurationUpdated';
 import { NodeRelayConfiguration } from '../../../../contexts/networks/domain/NodeRelayConfiguration';
 import { CallsRelayConfiguration } from '../../../../contexts/networks/domain/value-objects/CallsRelayConfiguration';
+import { NetworkNodeId } from '../../../../contexts/networks/domain/value-objects/NetworkNodeId';
 import { NodePublicHost } from '../../../../contexts/networks/domain/value-objects/NodePublicHost';
 import { NodeRelayMultiaddress } from '../../../../contexts/networks/domain/value-objects/NodeRelayMultiaddress';
 import { PrivateRelayConfiguration } from '../../../../contexts/networks/domain/value-objects/PrivateRelayConfiguration';
 import { PublicNetworkConfiguration } from '../../../../contexts/networks/domain/value-objects/PublicNetworkConfiguration';
 
 describe(NodeRelayConfiguration.name, () => {
+  it('creates an initial configuration and records its state transition', () => {
+    const configuration = NodeRelayConfiguration.create(
+      NetworkNodeId.fromString('node-a'),
+      CallsRelayConfiguration.fromPrimitives({ port: undefined }),
+      [],
+      PrivateRelayConfiguration.fromPrimitives({
+        discoveryEnabled: true,
+        enabled: false,
+        portEnd: undefined,
+        portStart: undefined,
+        publicationEnabled: false,
+      }),
+      NodePublicHost.fromOptional(),
+      PublicNetworkConfiguration.fromPrimitives({
+        enabled: false,
+        port: undefined,
+      }),
+      new Timestamp(100),
+    );
+
+    expect(configuration.toPrimitives().nodeId).toBe('node-a');
+    expect(configuration.pullDomainEvents()[0]).toBeInstanceOf(
+      NodeRelayConfigurationUpdated,
+    );
+  });
+
   it('hydrates and serializes the complete node relay configuration', () => {
     const primitives = {
       callsRelay: { port: 3478 },

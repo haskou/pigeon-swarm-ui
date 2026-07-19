@@ -329,6 +329,12 @@ class CryptoAdapter {
 }
 
 class PrivateKey extends StringValueObject {
+  public static generate(): PrivateKey {
+    return new PrivateKey(
+      '-----BEGIN PRIVATE KEY-----\nprivate-key\n-----END PRIVATE KEY-----',
+    );
+  }
+
   public static fromPEM(value: string | StringValueObject): PrivateKey {
     return new PrivateKey(value.toString());
   }

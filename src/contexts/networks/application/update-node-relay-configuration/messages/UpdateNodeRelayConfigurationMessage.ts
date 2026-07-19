@@ -1,5 +1,6 @@
 import { CallsRelayConfiguration } from '../../../domain/value-objects/CallsRelayConfiguration';
 import { NetworkActorId } from '../../../domain/value-objects/NetworkActorId';
+import { NetworkNodeId } from '../../../domain/value-objects/NetworkNodeId';
 import { NodePublicHost } from '../../../domain/value-objects/NodePublicHost';
 import { NodeRelayMultiaddress } from '../../../domain/value-objects/NodeRelayMultiaddress';
 import { PrivateRelayConfiguration } from '../../../domain/value-objects/PrivateRelayConfiguration';
@@ -9,6 +10,7 @@ export class UpdateNodeRelayConfigurationMessage {
   public constructor(
     private readonly input: {
       actorIdentityId?: string;
+      nodeId: string;
       callsRelay: { port?: number };
       manualRelayMultiaddrs: string[];
       privateRelay: {
@@ -24,6 +26,10 @@ export class UpdateNodeRelayConfigurationMessage {
 
   public getActorId(): NetworkActorId {
     return NetworkActorId.fromOptional(this.input.actorIdentityId);
+  }
+
+  public getNodeId(): NetworkNodeId {
+    return NetworkNodeId.fromString(this.input.nodeId);
   }
 
   public getCallsRelay(): CallsRelayConfiguration {
