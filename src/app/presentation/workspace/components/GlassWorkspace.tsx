@@ -29,9 +29,7 @@ import type {
   ConversationKeyEntry,
   ConversationResource,
   IdentityResource,
-  MessageResource,
   NotificationSettingScope,
-  PollResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
@@ -48,12 +46,10 @@ import { useCallMediaAccess } from '../../../../contexts/calls/presentation/hook
 import { useCallSession } from '../../../../contexts/calls/presentation/hooks/useCallSession';
 import { SeenCommunityMembershipRequests } from '../../../../contexts/communities/infrastructure/storage/SeenCommunityMembershipRequests';
 import { useCommunityMembershipRequests } from '../../../../contexts/communities/presentation/hooks/useCommunityMembershipRequests';
-import { CommunityAccessPolicy } from '../../../../contexts/communities/presentation/view-models/CommunityAccessPolicy';
 import { CommunityChannels } from '../../../../contexts/communities/presentation/view-models/CommunityChannels';
 import { CommunityList } from '../../../../contexts/communities/presentation/view-models/CommunityList';
 import { ConversationPeer } from '../../../../contexts/conversations/presentation/view-models/ConversationPeer';
 import { ConversationTimeline } from '../../../../contexts/conversations/presentation/view-models/ConversationTimeline';
-import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { ConversationKeychain } from '../../../../contexts/identities/infrastructure/keychain/ConversationKeychain';
 import { useIdentityDirectory } from '../../../../contexts/identities/presentation/hooks/useIdentityDirectory';
 import {
@@ -71,11 +67,7 @@ import { useNotificationCommunityPreviews } from '../../../../contexts/notificat
 import { useNotifications } from '../../../../contexts/notifications/presentation/hooks/useNotifications';
 import { useNotificationScopeSettings } from '../../../../contexts/notifications/presentation/hooks/useNotificationScopeSettings';
 import { usePushNotificationRegistration } from '../../../../contexts/notifications/presentation/hooks/usePushNotificationRegistration';
-import {
-  deletePwaPushSubscription,
-  showPwaNotification,
-} from '../../../../contexts/notifications/presentation/services/pwaNotifications';
-import { communityNotificationPreview } from '../../../../contexts/notifications/presentation/view-models/notificationPreviews';
+import { deletePwaPushSubscription } from '../../../../contexts/notifications/presentation/services/pwaNotifications';
 import { NotificationSettingsPolicy } from '../../../../contexts/notifications/presentation/view-models/NotificationSettingsPolicy';
 import { cx } from '../../../../shared/presentation/cx';
 import { copy } from '../../../../shared/presentation/i18n/copy';
@@ -83,7 +75,6 @@ import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrows
 import { playNotificationSound } from '../../../../shared/presentation/sounds';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
-import { presenceFromRealtimeEvent } from '../presenceFromRealtimeEvent';
 import {
   useWorkspacePreferences,
   useWorkspacePreferenceState,
@@ -95,14 +86,8 @@ import {
 } from './communityVoicePresence';
 import { CommunityWorkspaceStartupFallback } from './CommunityWorkspaceStartupFallback';
 import { type EditingMessage } from './conversationThreadState';
-import { isBrowserPageVisible } from './isBrowserPageVisible';
 import { PushNotificationPrompt } from './PushNotificationPrompt';
 import { Rail } from './Rail';
-import {
-  eventAggregateId,
-  recordAttribute,
-  stringAttribute,
-} from './realtimeEventAttributes';
 import { resolveWorkspaceCallDetails } from './resolveWorkspaceCallDetails';
 import { useCallDeparture } from './useCallDeparture';
 import { useCallResourceReconciliation } from './useCallResourceReconciliation';
@@ -121,6 +106,7 @@ import { useWorkspacePresence } from './useWorkspacePresence';
 import { useWorkspaceRealtimeCallEvents } from './useWorkspaceRealtimeCallEvents';
 import { useWorkspaceRealtimeCommunityEvents } from './useWorkspaceRealtimeCommunityEvents';
 import { useWorkspaceRealtimeConversationEvents } from './useWorkspaceRealtimeConversationEvents';
+import { useWorkspaceRealtimeEventRouter } from './useWorkspaceRealtimeEventRouter';
 import { useWorkspaceResumeSync } from './useWorkspaceResumeSync';
 import { useWorkspaceTyping } from './useWorkspaceTyping';
 import {
@@ -136,7 +122,6 @@ import {
   canActOnMembershipRequest,
   isPendingCommunityInvitationFor,
   isPendingConversationInvitationFor,
-  notificationMentionContext,
   stableUniqueKey,
 } from './workspaceNotificationState';
 
@@ -1815,253 +1800,39 @@ export function GlassWorkspace({
       setPinnedMessageIds,
       workspaceMode,
     });
-  const handleRealtimeEvent = useCallback(
-    (event: RealtimeDomainEvent) => {
-      // eslint-disable-next-line no-console
-      console.debug('[pigeon realtime] domain_event', event.type, event);
-
-      if (realtimeEventsOpen) {
-        setRealtimeEventLog((current) => {
-          if (current.some((item) => item.event_id === event.event_id)) {
-            return current;
-          }
-
-          return [...current.slice(-99), event];
-        });
-      }
-
-      const presence = presenceFromRealtimeEvent(event);
-
-      if (presence) {
-        mergePresence(presence);
-
-        return;
-      }
-
-      if (event.type === 'identities.v1.identity.was_updated') {
-        const identityId =
-          eventAggregateId(event) ?? stringAttribute(event, 'identityId', 'id');
-
-        if (identityId) {
-          void applicationContainer.identities
-            .refresh(IdentityId.normalize(identityId))
-            .then(rememberIdentity)
-            .catch(() => undefined);
-        }
-
-        return;
-      }
-
-      if (event.type.startsWith('calls.')) {
-        handleRealtimeCallEvent(event);
-
-        return;
-      }
-
-      if (event.type.startsWith('nodes.')) {
-        if (event.type === 'nodes.v1.node.network.was_removed') {
-          const removedNetworkId = stringAttribute(event, 'networkId');
-
-          if (removedNetworkId) {
-            setConversations((current) =>
-              current.filter(
-                (conversation) => conversation.networkId !== removedNetworkId,
-              ),
-            );
-            setCommunities((current) =>
-              current.filter(
-                (community) => community.networkId !== removedNetworkId,
-              ),
-            );
-
-            if (activeConversation?.networkId === removedNetworkId) {
-              setActiveConversationId(null);
-              setMessages([]);
-              updateMessageCursor(null);
-            }
-
-            if (activeCommunity?.networkId === removedNetworkId) {
-              setActiveCommunityId(null);
-            }
-          }
-
-          void onNodeNetworksReload().catch(() => undefined);
-        }
-
-        void onPeersReload().catch(() => undefined);
-
-        return;
-      }
-
-      if (event.type.startsWith('notifications.')) {
-        playNotificationSoundIfAllowed();
-        void showPwaNotification({
-          body: copy.notifications.open,
-          tag: `notification-${event.event_id}`,
-          title: copy.notifications.title,
-        });
-        void refreshNotifications();
-
-        return;
-      }
-
-      if (event.type.startsWith('keychains.')) {
-        void refreshSession().catch(() => undefined);
-
-        return;
-      }
-
-      if (event.type.startsWith('polls.v1.')) {
-        const poll = recordAttribute(event, 'poll') as PollResource | undefined;
-        const scopeType = poll?.scope.type;
-        const participantIds = event.attributes.participantIds;
-        const memberIds = event.attributes.memberIds;
-
-        if (
-          scopeType === 'group_conversation' ||
-          Array.isArray(participantIds)
-        ) {
-          setConversationRealtimeEvent(event);
-
-          return;
-        }
-
-        if (scopeType === 'community_channel' || Array.isArray(memberIds)) {
-          setCommunityRealtimeEvent(event);
-
-          return;
-        }
-      }
-
-      if (event.type.startsWith('identities.')) {
-        if (event.aggregate_id === session.identity.id) {
-          void applicationContainer.identities
-            .get(session.identity.id)
-            .then((identity) => setSession({ ...session, identity }))
-            .catch(() => undefined);
-        }
-
-        return;
-      }
-
-      if (handleRealtimeCommunityEvent(event)) return;
-
-      if (event.type === 'communities.v1.channel.message.was_sent') {
-        const communityId =
-          eventAggregateId(event) ?? stringAttribute(event, 'communityId');
-        const channelId = stringAttribute(event, 'channelId');
-        const authorIdentityId = stringAttribute(event, 'authorIdentityId');
-        const timelineMessage = recordAttribute(event, 'message') as
-          | MessageResource
-          | undefined;
-        const pageVisible = isBrowserPageVisible();
-        const eventCommunity = communityId
-          ? communities.find((community) => community.id === communityId)
-          : undefined;
-        const notificationSetting =
-          communityId && channelId
-            ? NotificationSettingsPolicy.resolve(
-                notificationSettingsRef.current,
-                {
-                  channelId,
-                  communityId,
-                  type: 'community_channel',
-                },
-              )
-            : null;
-        const notificationAllowed =
-          notificationSetting && eventCommunity
-            ? NotificationSettingsPolicy.shouldNotify(
-                notificationSetting,
-                notificationMentionContext({
-                  currentIdentityId: session.identity.id,
-                  currentRoleIds: [
-                    ...CommunityAccessPolicy.assignedRoleIdsFor(
-                      eventCommunity,
-                      session.identity.id,
-                    ),
-                  ],
-                  event,
-                }),
-              )
-            : false;
-        const isActiveChannel =
-          pageVisible &&
-          workspaceMode === 'community' &&
-          communityId === activeCommunity?.id &&
-          channelId === activeCommunityChannelId;
-
-        if (
-          communityId &&
-          channelId &&
-          !isActiveChannel &&
-          notificationAllowed &&
-          authorIdentityId !== session.identity.id
-        ) {
-          const preview = communityNotificationPreview(
-            communities,
-            communityId,
-            channelId,
-            authorIdentityId,
-            identityNames,
-            timelineMessage,
-          );
-
-          playNotificationSoundIfAllowed();
-          void showPwaNotification({
-            body: preview.body,
-            tag: `community-${communityId}-${channelId}`,
-            title: preview.title,
-          });
-          markCommunityChannelUnread(communityId, channelId);
-        }
-
-        setCommunityRealtimeEvent(event);
-
-        return;
-      }
-
-      if (
-        event.type === 'communities.v1.channel.message.was_deleted' ||
-        event.type === 'communities.v1.channel.message.was_pinned' ||
-        event.type === 'communities.v1.channel.message.was_unpinned' ||
-        event.type === 'communities.v1.channel.message.reaction.was_added' ||
-        event.type === 'communities.v1.channel.message.reaction.was_removed' ||
-        event.type === 'communities.v1.call.event.was_recorded'
-      ) {
-        setCommunityRealtimeEvent(event);
-
-        return;
-      }
-
-      if (handleRealtimeConversationEvent(event)) return;
-    },
-    [
-      activeCommunity?.id,
-      activeCommunity?.networkId,
-      activeCommunityChannelId,
-      activeConversation?.id,
-      activeConversation?.networkId,
-      handleRealtimeCallEvent,
-      handleRealtimeConversationEvent,
-      communities,
-      identityNames,
-      markCommunityChannelUnread,
-      mergePresence,
-      onNodeNetworksReload,
-      onPeersReload,
-      playNotificationSoundIfAllowed,
-      refreshNotifications,
-      refreshSession,
-      realtimeEventsOpen,
-      rememberIdentity,
-      session,
-      setConversations,
-      setCommunities,
-      setSession,
-      workspaceMode,
-    ],
-  );
+  const handleRealtimeEvent = useWorkspaceRealtimeEventRouter({
+    activeCommunityChannelId,
+    activeCommunityId: activeCommunity?.id ?? null,
+    activeCommunityNetworkId: activeCommunity?.networkId ?? null,
+    activeConversationNetworkId: activeConversation?.networkId ?? null,
+    communities,
+    handleCallEvent: handleRealtimeCallEvent,
+    handleCommunityDomainEvent: handleRealtimeCommunityEvent,
+    handleConversationEvent: handleRealtimeConversationEvent,
+    identityNames,
+    markCommunityChannelUnread,
+    mergePresence,
+    notificationSettingsRef,
+    onNodeNetworksReload,
+    onNotificationSound: playNotificationSoundIfAllowed,
+    onPeersReload,
+    realtimeEventsOpen,
+    refreshNotifications,
+    refreshSession,
+    rememberIdentity,
+    session,
+    setActiveCommunityId,
+    setActiveConversationId,
+    setCommunities,
+    setCommunityRealtimeEvent,
+    setConversationRealtimeEvent,
+    setConversations,
+    setMessages,
+    setRealtimeEventLog,
+    setSession,
+    updateMessageCursor,
+    workspaceMode,
+  });
 
   const {
     communityTypingIdentityIds,
