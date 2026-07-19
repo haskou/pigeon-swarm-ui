@@ -61,7 +61,7 @@ src/
 | NotificationSetting | delivery policy for one scope | valid scope hierarchy, mute period and mention suppression | notification settings adapter | setting saved/reset |
 | PushSubscription | browser delivery endpoint and credentials | endpoint and both delivery credentials are required | push subscription adapter | subscription registered/removed |
 | Poll | options, votes and state | open/closed vote rules | poll adapter | created, voted, closed |
-| StickerPack | pack metadata, stickers and library lifecycle | binary media transport | sticker repository | created, updated, saved, removed |
+| StickerPack / StickerLibrary | pack metadata, stickers, favorites, recent usage and saved packs | pack membership and personal-library transitions | sticker pack and library repositories | created, updated, favorited, used, saved, removed |
 
 ## Application boundaries
 

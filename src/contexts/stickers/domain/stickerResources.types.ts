@@ -1,9 +1,0 @@
-export type { StickerType } from './StickerType';
-export type { StickerDimensions } from './StickerDimensions';
-export type { StickerResource } from './StickerResource';
-export type { StickerPackResource } from './StickerPackResource';
-export type { StickerPackInput } from './StickerPackInput';
-export type { StickerInput } from './StickerInput';
-export type { StickerMessageReference } from './StickerMessageReference';
-export type { StickerUsageResource } from './StickerUsageResource';
-export type { MyStickersResource } from './MyStickersResource';

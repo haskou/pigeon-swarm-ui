@@ -1,4 +1,6 @@
-import { DomainError, StringValueObject } from '@haskou/value-objects';
+import { StringValueObject, assert } from '@haskou/value-objects';
+
+import { InvalidStickerPackNameError } from '../errors/InvalidStickerPackNameError';
 
 export class StickerPackName extends StringValueObject {
   public static readonly MAX_LENGTH = 80;
@@ -6,9 +8,7 @@ export class StickerPackName extends StringValueObject {
   public static fromString(value: string): StickerPackName {
     const trimmedValue = value.trim();
 
-    if (!trimmedValue) {
-      throw new DomainError('Sticker pack name is required.');
-    }
+    assert(trimmedValue.length > 0, new InvalidStickerPackNameError());
 
     return new StickerPackName(trimmedValue);
   }

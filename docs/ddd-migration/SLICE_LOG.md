@@ -1400,8 +1400,33 @@
 - Contracts changed: no public UI or REST wire contract changes; poll DTOs moved
   from domain to infrastructure.
 - Validation level: L2
-- Tests/checks: 14 poll suites / 20 tests, focused ESLint, and TypeScript
+- Tests/checks: 14 poll suites / 22 tests, focused ESLint, and TypeScript
   typecheck.
 - Risks: backend assigns the persisted poll identifier; the creation aggregate
   uses a local identifier until the repository returns the persisted aggregate.
 - Next slice: `STICKER-001`
+
+## Slice STICKER-001: Sticker pack and personal library lifecycle
+
+- Date: 2026-07-19
+- Size: L
+- Status: completed
+- Goal: replace resource-shaped sticker domain state and pass-through
+  application ports with aggregate-owned pack and personal-library behavior.
+- Changed files/modules:
+  - `src/contexts/stickers/domain/**`
+  - `src/contexts/stickers/application/**`
+  - `src/contexts/stickers/infrastructure/http/**`
+  - `src/app/composition/stickers/**`
+  - sticker composition wiring and direct tests under `src/test/**`
+- Behavior preserved:
+  - sticker pack creation, lookup, listing, renaming, sticker mutations,
+    favorites, recent usage, saved packs, asset upload, and public asset URLs
+  - existing presentation-facing resource contract
+- Contracts changed: none; wire DTOs moved from domain to HTTP infrastructure.
+- Validation level: L3
+- Tests/checks: 12 sticker/composition suites / 21 tests, focused ESLint,
+  TypeScript typecheck, full lint, and full Jest suite.
+- Risks: backend assigns persisted pack and sticker identifiers; repositories
+  reload the canonical aggregate after create and mutation operations.
+- Next slice: architecture audit only; all planned contexts are migrated.

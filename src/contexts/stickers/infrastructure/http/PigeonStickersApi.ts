@@ -1,32 +1,26 @@
-import type {
-  MyStickersResource,
-  PublicFileUpload,
-  Session,
-  StickerInput,
-  StickerPackInput,
-  StickerPackResource,
-  StickerResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+import type { PublicFileUpload } from '../../../attachments/application/contracts/PublicFileUpload';
+import type { PigeonPublicFilesClient } from '../../../attachments/infrastructure/http/PigeonPublicFilesClient';
+import type { MyStickersResource } from './resources/MyStickersResource';
+import type { StickerInput } from './resources/StickerInput';
+import type { StickerPackInput } from './resources/StickerPackInput';
+import type { StickerPackResource } from './resources/StickerPackResource';
+import type { StickerResource } from './resources/StickerResource';
 
-import { PigeonPublicFilesClient } from '../../../attachments/infrastructure/http/PigeonPublicFilesClient';
 import { PublicImageUploadPreparer } from '../../../attachments/infrastructure/media/PublicImageUploadPreparer';
 
 export class PigeonStickersApi {
-  private readonly publicFiles: PigeonPublicFilesClient;
-
   public constructor(
     private readonly http: HttpJsonClient,
     private readonly signer: RequestSigner,
-    publicFiles?: PigeonPublicFilesClient,
+    private readonly publicFiles: PigeonPublicFilesClient,
     private readonly publicImageUploadPreparer: Pick<
       PublicImageUploadPreparer,
       'prepare'
-    > = new PublicImageUploadPreparer(),
-  ) {
-    this.publicFiles = publicFiles ?? new PigeonPublicFilesClient(http, signer);
-  }
+    >,
+  ) {}
 
   private stickerCollectionPath(packId: string): string {
     return `/stickers/packs/${encodeURIComponent(packId)}/stickers`;

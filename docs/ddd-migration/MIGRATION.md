@@ -151,11 +151,15 @@ adapters into application services without containing context behavior.
 
 ## Next slices
 
-1. `STICKER-001`: migrate sticker-pack lifecycle behind aggregate roots and
-   domain repositories.
+No bounded-context migration slices remain. Future work should be driven by
+architecture findings or feature changes rather than another context rewrite.
 
 ## Completed context slices
 
+- `STICKER-001`: sticker packs and personal sticker libraries now own their
+  lifecycle through aggregate roots and domain repositories. Application
+  messages accept primitives, while sessions, HTTP resources, media upload,
+  and API serialization remain in composition or infrastructure.
 - `POLL-001`: poll creation, lookup, voting, vote removal, and closure now pass
   through the `Poll` aggregate and `PollRepository`. HTTP resources and browser
   sessions remain outside domain/application, and the composition facade keeps

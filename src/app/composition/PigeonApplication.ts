@@ -1,5 +1,3 @@
-import type { ListStickerPacksMessage } from '../../contexts/stickers/application/list-sticker-packs/messages/ListStickerPacksMessage';
-
 import { CallEnder } from '../../contexts/calls/application/end-call/CallEnder';
 import { CallFinder } from '../../contexts/calls/application/find-call/CallFinder';
 import { CallParticipantHeartbeater } from '../../contexts/calls/application/heartbeat-participant/CallParticipantHeartbeater';
@@ -119,7 +117,25 @@ import { PollVoter } from '../../contexts/polls/application/vote-poll/PollVoter'
 import { PigeonPollRepository } from '../../contexts/polls/infrastructure/http/PigeonPollRepository';
 import { PollAccessContexts } from '../../contexts/polls/infrastructure/http/PollAccessContexts';
 import { PollMapper } from '../../contexts/polls/infrastructure/http/PollMapper';
-import { PigeonStickersApplication } from '../../contexts/stickers/application/PigeonStickersApplication';
+import { StickerAdder } from '../../contexts/stickers/application/add-sticker-to-pack/StickerAdder';
+import { StickerPackCreator } from '../../contexts/stickers/application/create-sticker-pack/StickerPackCreator';
+import { StickerRemover } from '../../contexts/stickers/application/delete-sticker/StickerRemover';
+import { StickerFavoriter } from '../../contexts/stickers/application/favorite-sticker/StickerFavoriter';
+import { StickerLibraryFinder } from '../../contexts/stickers/application/get-my-stickers/StickerLibraryFinder';
+import { StickerPackFinder } from '../../contexts/stickers/application/get-sticker-pack/StickerPackFinder';
+import { ListStickerPacks } from '../../contexts/stickers/application/list-sticker-packs/ListStickerPacks';
+import { StickerUsageMarker } from '../../contexts/stickers/application/mark-sticker-used/StickerUsageMarker';
+import { StickerPackSaver } from '../../contexts/stickers/application/save-sticker-pack/StickerPackSaver';
+import { StickerUnfavoriter } from '../../contexts/stickers/application/unfavorite-sticker/StickerUnfavoriter';
+import { StickerPackUnsaver } from '../../contexts/stickers/application/unsave-sticker-pack/StickerPackUnsaver';
+import { StickerPackRenamer } from '../../contexts/stickers/application/update-sticker-pack/StickerPackRenamer';
+import { StickerUpdater } from '../../contexts/stickers/application/update-sticker/StickerUpdater';
+import { PigeonStickerLibraryRepository } from '../../contexts/stickers/infrastructure/http/PigeonStickerLibraryRepository';
+import { PigeonStickerPackRepository } from '../../contexts/stickers/infrastructure/http/PigeonStickerPackRepository';
+import { StickerAccessContexts } from '../../contexts/stickers/infrastructure/http/StickerAccessContexts';
+import { StickerLibraryMapper } from '../../contexts/stickers/infrastructure/http/StickerLibraryMapper';
+import { StickerMapper } from '../../contexts/stickers/infrastructure/http/StickerMapper';
+import { StickerPackMapper } from '../../contexts/stickers/infrastructure/http/StickerPackMapper';
 import { RealtimeGateway } from '../../shared/infrastructure/realtime/RealtimeGateway';
 import { CallSessionRegistrar } from './calls/CallSessionRegistrar';
 import { PigeonCallParticipation } from './calls/PigeonCallParticipation';
@@ -145,6 +161,7 @@ import { PigeonCallsFacade } from './PigeonCallsFacade';
 import { PigeonCommunitiesFacade } from './PigeonCommunitiesFacade';
 import { PigeonRealtimeApplication } from './PigeonRealtimeApplication';
 import { PigeonPollsFacade } from './polls/PigeonPollsFacade';
+import { PigeonStickersFacade } from './stickers/PigeonStickersFacade';
 
 export class PigeonApplication {
   public readonly attachments: PigeonAttachmentsFacade;
@@ -169,7 +186,7 @@ export class PigeonApplication {
 
   public readonly session: PigeonSessionFacade;
 
-  public readonly stickers: PigeonStickersApplication;
+  public readonly stickers: PigeonStickersFacade;
 
   public constructor(
     gateway: PigeonApiGateway = new PigeonApiGateway(),
@@ -480,59 +497,55 @@ export class PigeonApplication {
       gateway.identityGateway,
       this.identities,
     );
-    this.stickers = new PigeonStickersApplication({
-      addStickerToPack: {
-        addStickerToPack: gateway.stickersGateway.addSticker.bind(
-          gateway.stickersGateway,
+    const stickerContexts = new StickerAccessContexts();
+    const stickerMapper = new StickerMapper();
+    const stickerPackMapper = new StickerPackMapper(stickerMapper);
+    const stickerLibraryMapper = new StickerLibraryMapper(
+      stickerPackMapper,
+      stickerMapper,
+    );
+    const stickerPackRepository = new PigeonStickerPackRepository(
+      gateway.stickersApi,
+      stickerContexts,
+      stickerPackMapper,
+      stickerMapper,
+    );
+    const stickerLibraryRepository = new PigeonStickerLibraryRepository(
+      gateway.stickersApi,
+      stickerContexts,
+      stickerLibraryMapper,
+    );
+    this.stickers = new PigeonStickersFacade(
+      gateway.stickersApi,
+      gateway.apiUrl.bind(gateway),
+      stickerContexts,
+      stickerLibraryMapper,
+      stickerPackMapper,
+      stickerMapper,
+      {
+        adder: new StickerAdder(stickerPackRepository),
+        creator: new StickerPackCreator(stickerPackRepository),
+        favoriter: new StickerFavoriter(
+          stickerLibraryRepository,
+          stickerPackRepository,
+        ),
+        libraryFinder: new StickerLibraryFinder(stickerLibraryRepository),
+        packFinder: new StickerPackFinder(stickerPackRepository),
+        packLister: new ListStickerPacks(stickerPackRepository),
+        packRenamer: new StickerPackRenamer(stickerPackRepository),
+        packSaver: new StickerPackSaver(
+          stickerLibraryRepository,
+          stickerPackRepository,
+        ),
+        packUnsaver: new StickerPackUnsaver(stickerLibraryRepository),
+        remover: new StickerRemover(stickerPackRepository),
+        unfavoriter: new StickerUnfavoriter(stickerLibraryRepository),
+        updater: new StickerUpdater(stickerPackRepository),
+        usageMarker: new StickerUsageMarker(
+          stickerLibraryRepository,
+          stickerPackRepository,
         ),
       },
-      assetUrl: gateway,
-      createStickerPack: {
-        createStickerPack: gateway.stickersGateway.createPack.bind(
-          gateway.stickersGateway,
-        ),
-      },
-      deleteSticker: gateway.stickersGateway,
-      favoriteSticker: gateway.stickersGateway,
-      getMyStickers: gateway.stickersGateway,
-      getStickerPack: {
-        getStickerPack: gateway.stickersGateway.getPack.bind(
-          gateway.stickersGateway,
-        ),
-      },
-      listStickerPacks: {
-        list: async (message: ListStickerPacksMessage) =>
-          await gateway.stickersGateway.listPacks({
-            ownerIdentityId: message.getOwnerIdentityId(),
-          }),
-      },
-      markStickerUsed: {
-        markStickerUsed: gateway.stickersGateway.markUsed.bind(
-          gateway.stickersGateway,
-        ),
-      },
-      saveStickerPack: {
-        saveStickerPack: gateway.stickersGateway.savePack.bind(
-          gateway.stickersGateway,
-        ),
-      },
-      unfavoriteSticker: gateway.stickersGateway,
-      unsaveStickerPack: {
-        unsaveStickerPack: gateway.stickersGateway.unsavePack.bind(
-          gateway.stickersGateway,
-        ),
-      },
-      updateSticker: gateway.stickersGateway,
-      updateStickerPack: {
-        updateStickerPack: gateway.stickersGateway.updatePack.bind(
-          gateway.stickersGateway,
-        ),
-      },
-      uploadStickerAsset: {
-        uploadStickerAsset: gateway.stickersGateway.uploadAsset.bind(
-          gateway.stickersGateway,
-        ),
-      },
-    });
+    );
   }
 }
