@@ -24,13 +24,13 @@ import type {
   IdentityPresence,
   IdentityResource,
   MessageResource,
-  NotificationSettingMap,
   NotificationSettingScope,
   PollResource,
   SelectablePresenceStatus,
   Session,
   StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { NotificationSettingMap } from '../../../notifications/presentation/view-models/NotificationSettingMap';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 import type { CallSession } from '../../../calls/presentation/view-models/CallSession';
 import type { NodeNetwork } from '../../../networks/presentation/view-models/NodeNetwork';
@@ -51,7 +51,7 @@ import { Composer } from '../../../messages/presentation/components/Composer';
 import { MessageCollectionDialog } from '../../../messages/presentation/components/MessageCollectionDialog';
 import { MessageThreadPanel } from '../../../messages/presentation/components/MessageThreadPanel';
 import { TypingIndicator } from '../../../messages/presentation/components/TypingIndicator';
-import { NotificationSettingsPolicy } from '../../../notifications/domain/NotificationSettingsPolicy';
+import { NotificationSettingsPolicy } from '../../../notifications/presentation/view-models/NotificationSettingsPolicy';
 import { CommunityAccessPolicy } from '../view-models/CommunityAccessPolicy';
 import { CommunityChannels } from '../view-models/CommunityChannels';
 import { CommunityMessageDecryptWorkerClient } from '../../infrastructure/crypto/CommunityMessageDecryptWorkerClient';

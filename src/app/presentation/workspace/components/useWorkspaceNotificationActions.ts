@@ -7,7 +7,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 import type { useNotificationScopeSettings } from '../../../../contexts/notifications/presentation/hooks/useNotificationScopeSettings';
 
-import { NotificationSettingsPolicy } from '../../../../contexts/notifications/domain/NotificationSettingsPolicy';
+import { NotificationSettingsPolicy } from '../../../../contexts/notifications/presentation/view-models/NotificationSettingsPolicy';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 
 type NotificationSettingsController = ReturnType<

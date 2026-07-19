@@ -5,9 +5,9 @@ import type {
   CommunityMembershipRequest,
   ConversationInvitationNotificationResource,
   MessageResource,
-  NotificationMentionContext,
   NotificationResource,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { NotificationMentionContext } from '../../../../contexts/notifications/presentation/view-models/NotificationMentionContext';
 
 export function stableUniqueKey(values: string[]): string {
   return [...new Set(values.filter(Boolean))].sort().join('\u0000');

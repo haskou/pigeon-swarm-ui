@@ -1,7 +1,7 @@
 import type { NotificationScopeSetting } from '../../../../shared/domain/pigeonResources.types';
 
-import { NotificationSettingsPolicy } from '../../domain/NotificationSettingsPolicy';
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { NotificationSettingsPolicy } from './NotificationSettingsPolicy';
 
 export function notificationSettingSummary(
   setting: NotificationScopeSetting,

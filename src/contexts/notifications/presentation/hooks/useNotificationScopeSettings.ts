@@ -1,16 +1,19 @@
+import type { Dispatch, RefObject, SetStateAction } from 'react';
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
   NotificationScopeSettingInput,
-  NotificationSettingMap,
+  NotificationScopeSetting,
   NotificationSettingScope,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 import type { NotificationScopeSettingsTarget } from '../components/NotificationScopeSettingsDialog';
+import type { NotificationSettingMap } from '../view-models/NotificationSettingMap';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
-import { NotificationSettingsPolicy } from '../../domain/NotificationSettingsPolicy';
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { NotificationSettingsPolicy } from '../view-models/NotificationSettingsPolicy';
 
 type UseNotificationScopeSettingsInput = {
   session: Session;
@@ -18,7 +21,18 @@ type UseNotificationScopeSettingsInput = {
 
 export function useNotificationScopeSettings({
   session,
-}: UseNotificationScopeSettingsInput) {
+}: UseNotificationScopeSettingsInput): {
+  close: () => void;
+  error: string | null;
+  open: Dispatch<SetStateAction<NotificationScopeSettingsTarget | null>>;
+  reset: (scope: NotificationSettingScope) => void;
+  save: (setting: NotificationScopeSettingInput) => void;
+  setting: NotificationScopeSetting | null;
+  settingsByScopeKey: NotificationSettingMap;
+  settingsRef: RefObject<NotificationSettingMap>;
+  target: NotificationScopeSettingsTarget | null;
+  toggleMute: (scope: NotificationSettingScope) => void;
+} {
   const [settingsByScopeKey, setSettingsByScopeKey] =
     useState<NotificationSettingMap>({});
   const [error, setError] = useState<string | null>(null);
@@ -34,8 +48,8 @@ export function useNotificationScopeSettings({
   useEffect(() => {
     let cancelled = false;
 
-    void applicationContainer
-      .notifications.listNotificationSettings(session)
+    void applicationContainer.notifications
+      .listNotificationSettings(session)
       .then((settings) => {
         if (cancelled) return;
 
@@ -53,6 +67,14 @@ export function useNotificationScopeSettings({
     };
   }, [session]);
 
+  const applySavedSetting = useCallback((saved: NotificationScopeSetting) => {
+    setSettingsByScopeKey((current) => ({
+      ...current,
+      [NotificationSettingsPolicy.key(saved.scope)]:
+        NotificationSettingsPolicy.normalize(saved),
+    }));
+  }, []);
+
   const save = useCallback(
     (setting: NotificationScopeSettingInput) => {
       const optimistic = NotificationSettingsPolicy.normalize(setting);
@@ -64,20 +86,14 @@ export function useNotificationScopeSettings({
         [key]: optimistic,
       }));
 
-      void applicationContainer
-        .notifications.saveNotificationSetting(session, setting)
-        .then((saved) => {
-          setSettingsByScopeKey((current) => ({
-            ...current,
-            [NotificationSettingsPolicy.key(saved.scope)]:
-              NotificationSettingsPolicy.normalize(saved),
-          }));
-        })
+      void applicationContainer.notifications
+        .saveNotificationSetting(session, setting)
+        .then(applySavedSetting)
         .catch(() => {
           setError(copy.notifications.settingsError);
         });
     },
-    [session],
+    [applySavedSetting, session],
   );
 
   const reset = useCallback(
@@ -93,8 +109,8 @@ export function useNotificationScopeSettings({
         return next;
       });
 
-      void applicationContainer
-        .notifications.resetNotificationSetting(session, scope)
+      void applicationContainer.notifications
+        .resetNotificationSetting(session, scope)
         .catch(() => {
           setError(copy.notifications.settingsError);
         });

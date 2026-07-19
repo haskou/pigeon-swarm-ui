@@ -1,5 +1,55 @@
 # Migration slice log
 
+## Slice NOTIFICATION-002: Browser push subscription lifecycle
+
+- Date: 2026-07-18
+- Size: M
+- Status: completed
+- Goal: remove direct push-gateway calls from composition and split browser
+  subscription orchestration into cohesive application and browser boundaries.
+- Changes:
+  - added the `PushSubscription` aggregate and push server domain model
+  - added register, remove, and server-configuration use cases
+  - added domain repositories with context-owned HTTP adapters
+  - split browser capability, key decoding, subscription compatibility, and
+    notification presentation from the PWA lifecycle coordinator
+  - moved application-container orchestration to the presentation boundary
+- Behavior changed/preserved: preserves permission prompts, VAPID handling,
+  stale-subscription replacement, duplicate-request suppression, local
+  notification display, registration, and removal
+- Contracts changed: none
+- Validation level: L3
+- Tests/checks: 37 notification/composition suites / 74 tests, TypeScript
+  typecheck, focused lint, full lint, and full Jest suite
+- Risks: browser implementations expose subtly different Push API behavior;
+  the existing browser matrix remains covered by the PWA lifecycle tests
+- Next slice: `POLL-001`
+
+## Slice NOTIFICATION-001: Notification decisions and scope settings
+
+- Date: 2026-07-18
+- Size: L
+- Status: completed
+- Goal: replace resource-shaped notification rules and application ports with
+  behavior-rich aggregate roots, primitive boundary messages, domain-owned
+  repositories, and context-owned adapters.
+- Changes:
+  - move notification decision invariants and events onto `Notification`
+  - model per-scope delivery and inheritance through `NotificationSetting`
+  - remove `Session` and transport resources from application messages
+  - map REST resources only inside notification infrastructure/composition
+- Behavior changed/preserved: preserve REST, push, invitation, mute, badge, and
+  presentation contracts while moving decisions to the owning domain
+- Contracts changed: none planned
+- Validation level: L3
+- Tests/checks: 23 notification suites / 58 tests, TypeScript typecheck, full
+  lint, and 230 suites / 792 tests in the complete Jest run
+- Risks: invitation acceptance coordinates notification state with identity
+  keychain publication; notification settings are consumed by workspace and
+  community presentation code
+- Next slice: `NOTIFICATION-002` only if browser push orchestration still needs
+  a separate lifecycle migration
+
 ## Slice COMMUNITY-001: Community aggregate and explicit workflows
 
 - Date: 2026-07-17

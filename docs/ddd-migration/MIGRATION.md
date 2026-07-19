@@ -40,28 +40,30 @@ adapters into application services without containing context behavior.
 
 ## Active slice
 
-- Id: `CONVERSATION-002`
-- Title: Rebuild conversation lifecycle behind a rich aggregate and repository
-- Size: L
+- Id: `NOTIFICATION-002`
+- Title: Isolate browser push subscription lifecycle
+- Size: M
 - Status: completed
-- Business capability: Direct/group conversation creation, membership,
-  activity ordering, invitations, and read state
-- Source area: `src/contexts/conversations`
-- Target boundary: a behavior-rich `Conversation` aggregate, explicit use cases
-  and primitive application messages, a domain repository, and context-owned
-  HTTP/keychain adapters
-- Target files/folders: `contexts/conversations/{domain,application,infrastructure}`
+- Business capability: Browser push registration, removal, server-key lookup,
+  capability detection, and notification presentation
+- Source area: `src/contexts/notifications`
+- Target boundary: `PushSubscription` aggregate, primitive application
+  messages, domain repositories, browser capability adapters, and a
+  presentation-owned lifecycle coordinator
+- Target files/folders: `contexts/notifications/{domain,application,infrastructure}`
 - Compatibility constraints: REST, websocket, encrypted payload, and existing
   presentation APIs remain stable while callers migrate by capability
 - Validation level: L2
-- Affected behavior/tests: direct/group creation, invitation, read markers,
-  timeline ordering, keychain publication, and conversation resource mapping
-- Tests/checks run: conversation domain/application/infrastructure/presentation
-  and composition tests, TypeScript typecheck, full lint, and full Jest suite
-- Full-suite status: 203 suites and 747 tests passing
-- Done criteria: application receives primitive messages, lifecycle decisions
-  run through `Conversation`, resources stay outside domain/application, and
-  infrastructure implements `ConversationRepository` without application ports
+- Affected behavior/tests: explicit and automatic push registration,
+  replacement of stale browser subscriptions, permission handling, VAPID
+  lookup, notification display, and subscription removal
+- Tests/checks run: 37 notification/composition suites / 74 tests, direct
+  aggregate, use-case, mapper, repository and browser lifecycle coverage;
+  TypeScript typecheck and full lint
+- Full-suite status: 244 suites / 808 tests passing
+- Done criteria: browser orchestration no longer lives in infrastructure,
+  push REST calls run through explicit use cases and domain repositories, and
+  existing browser/PWA behavior remains covered
 
 ## Risks
 
@@ -149,5 +151,4 @@ adapters into application services without containing context behavior.
 
 ## Next slices
 
-1. `IDENTITY-001`: complete identity material/session/keychain infrastructure.
-2. `MESSAGE-001`: migrate message lifecycle behind aggregates and repositories.
+1. `POLL-001`: migrate poll lifecycle behind an aggregate and repository.

@@ -1,11 +1,11 @@
 import { ValueNotInEnumError } from '@haskou/value-objects';
 
-import { NotificationType } from '../../../../contexts/notifications/domain/NotificationType';
+import { NotificationType } from '../../../../contexts/notifications/domain/value-objects/NotificationType';
 
 describe(NotificationType.name, () => {
-  it('identifies missed call notifications', () => {
-    expect(NotificationType.fromPrimitives('missed_call').isMissedCall()).toBe(
-      true,
+  it('identifies missed calls as non-actionable notifications', () => {
+    expect(NotificationType.fromPrimitives('missed_call').isActionable()).toBe(
+      false,
     );
   });
 

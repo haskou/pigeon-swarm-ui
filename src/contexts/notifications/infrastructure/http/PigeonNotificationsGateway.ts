@@ -1,12 +1,8 @@
-import type {
-  NotificationResource,
-  NotificationScopeSetting,
-  NotificationScopeSettingInput,
-  NotificationSettingScope,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
-import type { NotificationDecision } from '../../domain/NotificationDecision';
-import type { NotificationId } from '../../domain/NotificationId';
+import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { NotificationResource } from './resources/NotificationResource';
+import type { NotificationScopeSettingInputResource } from './resources/NotificationScopeSettingInputResource';
+import type { NotificationScopeSettingResource } from './resources/NotificationScopeSettingResource';
+import type { NotificationSettingScopeResource } from './resources/NotificationSettingScopeResource';
 
 import { PigeonNotificationsApi } from './PigeonNotificationsApi';
 
@@ -24,14 +20,14 @@ export class PigeonNotificationsGateway {
 
   public async listNotificationSettings(
     session: Session,
-  ): Promise<NotificationScopeSetting[]> {
+  ): Promise<NotificationScopeSettingResource[]> {
     return await this.notifications.listSettings(session);
   }
 
   public async saveNotificationSetting(
     session: Session,
-    setting: NotificationScopeSettingInput,
-  ): Promise<NotificationScopeSetting> {
+    setting: NotificationScopeSettingInputResource,
+  ): Promise<NotificationScopeSettingResource> {
     const saved = await this.notifications.saveSetting(session, setting);
 
     this.invalidateSettings(session);
@@ -41,7 +37,7 @@ export class PigeonNotificationsGateway {
 
   public async resetNotificationSetting(
     session: Session,
-    scope: NotificationSettingScope,
+    scope: NotificationSettingScopeResource,
   ): Promise<void> {
     await this.notifications.resetSetting(session, scope);
     this.invalidateSettings(session);
@@ -49,9 +45,9 @@ export class PigeonNotificationsGateway {
 
   public async updateNotification(
     session: Session,
-    notificationId: NotificationId,
-    decision: NotificationDecision,
+    notificationId: string,
+    state: string,
   ): Promise<NotificationResource> {
-    return await this.notifications.update(session, notificationId, decision);
+    return await this.notifications.update(session, notificationId, state);
   }
 }

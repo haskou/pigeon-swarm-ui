@@ -2,10 +2,10 @@ import type { ReactNode } from 'react';
 
 import type { NotificationScopeSetting } from '../../../../shared/domain/pigeonResources.types';
 
-import { NotificationSettingsPolicy } from '../../domain/NotificationSettingsPolicy';
-import { copy } from '../../../../shared/presentation/i18n/copy';
-import { cx } from '../../../../shared/presentation/cx';
 import { MutedNotificationsIcon } from '../../../../shared/presentation/components/MutedNotificationsIcon';
+import { cx } from '../../../../shared/presentation/cx';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { NotificationSettingsPolicy } from '../view-models/NotificationSettingsPolicy';
 
 type NotificationScopeMenuActionsVariant = 'block' | 'compact';
 

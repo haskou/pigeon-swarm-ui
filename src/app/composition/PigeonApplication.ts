@@ -92,8 +92,25 @@ import { PigeonNetworkPeerRepository } from '../../contexts/networks/infrastruct
 import { PigeonNetworkRepository } from '../../contexts/networks/infrastructure/http/repositories/PigeonNetworkRepository';
 import { PigeonNodeRelayConfigurationRepository } from '../../contexts/networks/infrastructure/http/repositories/PigeonNodeRelayConfigurationRepository';
 import { NodeRelayConfigurationViewModelMapper } from '../../contexts/networks/presentation/view-models/NodeRelayConfigurationViewModelMapper';
-import { PigeonNotificationsApplication } from '../../contexts/notifications/application/PigeonNotificationsApplication';
+import { ConversationInvitationAcceptor } from '../../contexts/notifications/application/accept-conversation-invitation/ConversationInvitationAcceptor';
+import { NotificationSettingConfigurer } from '../../contexts/notifications/application/configure-notification-setting/NotificationSettingConfigurer';
+import { NotificationDecider } from '../../contexts/notifications/application/decide-notification/NotificationDecider';
+import { PushNotificationServerFinder } from '../../contexts/notifications/application/find-push-notification-server/PushNotificationServerFinder';
+import { PushSubscriptionRegistrar } from '../../contexts/notifications/application/register-push-subscription/PushSubscriptionRegistrar';
+import { PushSubscriptionRemover } from '../../contexts/notifications/application/remove-push-subscription/PushSubscriptionRemover';
+import { NotificationSettingResetter } from '../../contexts/notifications/application/reset-notification-setting/NotificationSettingResetter';
+import { NotificationSettingsSearcher } from '../../contexts/notifications/application/search-notification-settings/NotificationSettingsSearcher';
+import { NotificationsSearcher } from '../../contexts/notifications/application/search-notifications/NotificationsSearcher';
 import { PigeonConversationInvitationKeyDecryptor } from '../../contexts/notifications/infrastructure/crypto/PigeonConversationInvitationKeyDecryptor';
+import { PigeonInvitationKeyRecipient } from '../../contexts/notifications/infrastructure/crypto/PigeonInvitationKeyRecipient';
+import { NotificationAccessContexts } from '../../contexts/notifications/infrastructure/http/NotificationAccessContexts';
+import { NotificationMapper } from '../../contexts/notifications/infrastructure/http/NotificationMapper';
+import { NotificationSettingMapper } from '../../contexts/notifications/infrastructure/http/NotificationSettingMapper';
+import { PigeonNotificationRepository } from '../../contexts/notifications/infrastructure/http/PigeonNotificationRepository';
+import { PigeonNotificationSettingRepository } from '../../contexts/notifications/infrastructure/http/PigeonNotificationSettingRepository';
+import { PigeonPushNotificationServerRepository } from '../../contexts/notifications/infrastructure/http/PigeonPushNotificationServerRepository';
+import { PigeonPushSubscriptionRepository } from '../../contexts/notifications/infrastructure/http/PigeonPushSubscriptionRepository';
+import { PushSubscriptionMapper } from '../../contexts/notifications/infrastructure/http/PushSubscriptionMapper';
 import { PigeonPollsApplication } from '../../contexts/polls/application/PigeonPollsApplication';
 import { PigeonStickersApplication } from '../../contexts/stickers/application/PigeonStickersApplication';
 import { RealtimeGateway } from '../../shared/infrastructure/realtime/RealtimeGateway';
@@ -114,6 +131,7 @@ import { PigeonMessagesFacade } from './messages/PigeonMessagesFacade';
 import { PigeonMessageWriter } from './messages/PigeonMessageWriter';
 import { PigeonNetworksFacade } from './networks/PigeonNetworksFacade';
 import { PigeonNodeFacade } from './networks/PigeonNodeFacade';
+import { PigeonNotificationsFacade } from './notifications/PigeonNotificationsFacade';
 import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonAttachmentsFacade } from './PigeonAttachmentsFacade';
 import { PigeonCallsFacade } from './PigeonCallsFacade';
@@ -135,7 +153,7 @@ export class PigeonApplication {
 
   public readonly networks: PigeonNetworksFacade;
 
-  public readonly notifications: PigeonNotificationsApplication;
+  public readonly notifications: PigeonNotificationsFacade;
 
   public readonly polls: PigeonPollsApplication;
 
@@ -379,19 +397,62 @@ export class PigeonApplication {
       ),
       nodeFacade,
     );
-    this.notifications = new PigeonNotificationsApplication({
-      acceptInvitation: {
-        keychainPublisher: gateway.identityGateway,
-        keyDecryptor: new PigeonConversationInvitationKeyDecryptor(),
-        notifications: gateway.notificationsGateway,
+    const notificationContexts = new NotificationAccessContexts();
+    const notificationMapper = new NotificationMapper();
+    const notificationSettingMapper = new NotificationSettingMapper();
+    const notificationRepository = new PigeonNotificationRepository(
+      gateway.notificationsGateway,
+      notificationContexts,
+      notificationMapper,
+    );
+    const notificationSettingRepository =
+      new PigeonNotificationSettingRepository(
+        gateway.notificationsGateway,
+        notificationContexts,
+        notificationSettingMapper,
+      );
+    const pushSubscriptionRepository = new PigeonPushSubscriptionRepository(
+      gateway.pushApi,
+      notificationContexts,
+      new PushSubscriptionMapper(),
+    );
+    const pushNotificationServerRepository =
+      new PigeonPushNotificationServerRepository(gateway.pushApi);
+    this.notifications = new PigeonNotificationsFacade(
+      notificationContexts,
+      notificationMapper,
+      notificationSettingMapper,
+      {
+        invitationAcceptor: new ConversationInvitationAcceptor(
+          notificationRepository,
+          new PigeonInvitationKeyRecipient(
+            notificationContexts,
+            new PigeonConversationInvitationKeyDecryptor(),
+            gateway.identityGateway,
+          ),
+        ),
+        notificationDecider: new NotificationDecider(notificationRepository),
+        notificationSearcher: new NotificationsSearcher(notificationRepository),
+        pushServerFinder: new PushNotificationServerFinder(
+          pushNotificationServerRepository,
+        ),
+        pushSubscriptionRegistrar: new PushSubscriptionRegistrar(
+          pushSubscriptionRepository,
+        ),
+        pushSubscriptionRemover: new PushSubscriptionRemover(
+          pushSubscriptionRepository,
+        ),
+        settingConfigurer: new NotificationSettingConfigurer(
+          notificationSettingRepository,
+        ),
+        settingResetter: new NotificationSettingResetter(
+          notificationSettingRepository,
+        ),
+        settingSearcher: new NotificationSettingsSearcher(
+          notificationSettingRepository,
+        ),
       },
-      listNotifications: gateway.notificationsGateway,
-      listNotificationSettings: gateway.notificationsGateway,
-      push: gateway.pushGateway,
-      resetNotificationSetting: gateway.notificationsGateway,
-      saveNotificationSetting: gateway.notificationsGateway,
-      updateNotification: gateway.notificationsGateway,
-    });
+    );
     this.polls = new PigeonPollsApplication({
       closePoll: gateway.pollsGateway,
       createPoll: gateway.pollsGateway,

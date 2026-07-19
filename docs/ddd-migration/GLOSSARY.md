@@ -11,3 +11,5 @@
 | Channel | Text or voice scope within a community | communities | message channel relation is a foreign reference | frontend/backend |
 | Network | Node/IPFS membership and relay boundary | networks | not a community | frontend/backend |
 | Notification | User attention record and policy scope | notifications | not a websocket event | frontend/backend |
+| Notification setting | Delivery, mute, mention and visibility policy for a conversation, community, or channel scope | notifications | channel settings inherit from community settings before defaults | frontend/backend |
+| Push subscription | Browser endpoint and credentials used to deliver Web Push to one identity | notifications | browser permission is not itself a subscription | frontend/backend/browser |

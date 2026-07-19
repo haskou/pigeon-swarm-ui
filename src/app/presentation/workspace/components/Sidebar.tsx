@@ -29,7 +29,7 @@ import {
   type IdentityNames,
   type IdentityPictures,
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
-import { NotificationSettingsPolicy } from '../../../../contexts/notifications/domain/NotificationSettingsPolicy';
+import { NotificationSettingsPolicy } from '../../../../contexts/notifications/presentation/view-models/NotificationSettingsPolicy';
 import { NotificationScopeMenuActions } from '../../../../contexts/notifications/presentation/components/NotificationScopeMenuActions';
 import { ClearableSearchInput } from '../../../../shared/presentation/components/ClearableSearchInput';
 import { SectionTitle } from '../../../../shared/presentation/components/SectionTitle';

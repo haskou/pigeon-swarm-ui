@@ -7,12 +7,12 @@ import type {
   NotificationSettingScope,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { NotificationSettingsPolicy } from '../../domain/NotificationSettingsPolicy';
 import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
-import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { NotificationSettingsPolicy } from '../view-models/NotificationSettingsPolicy';
 
 export type NotificationScopeSettingsTarget = {
   scope: NotificationSettingScope;
