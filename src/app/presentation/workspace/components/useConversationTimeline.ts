@@ -98,6 +98,8 @@ export function useConversationTimeline({
   suppressMessageLoadsUntilRef,
   workspaceMode,
 }: UseConversationTimelineInput): ConversationTimelineController {
+  const activeConversationId = activeConversation?.id;
+  const activeConversationKeyAvailable = activeConversationKey !== undefined;
   const preloadedConversationMessagesRef = useRef(
     preloadedConversationMessages,
   );
@@ -140,7 +142,7 @@ export function useConversationTimeline({
     scrollerRef,
     scrollMessagesToBottom,
   } = useMessageViewport({
-    layoutKey: activeConversation?.id ?? null,
+    layoutKey: activeConversationId ?? null,
     messageCount: messages.length,
     messageState,
     onJumpToLatest: clearNewMessageCount,
@@ -282,17 +284,17 @@ export function useConversationTimeline({
   const usePreloadedTimeline = useCallback((): void => {
     const preloaded = preloadedConversationMessagesRef.current;
 
-    if (!preloaded || !activeConversation) return;
+    if (!preloaded || !activeConversationId) return;
 
     preloadedConversationMessagesRef.current = null;
-    loadedConversationIdRef.current = activeConversation.id;
+    loadedConversationIdRef.current = activeConversationId;
     setMessages(MessageCollection.merge([], preloaded.messages));
     updateMessageCursor(preloaded.nextCursor ?? null);
     setMessageLoadState('idle');
-    markConversationReadUntil(activeConversation.id, preloaded.messages);
+    markConversationReadUntil(activeConversationId, preloaded.messages);
     scrollMessagesToBottom('auto', true);
   }, [
-    activeConversation,
+    activeConversationId,
     markConversationReadUntil,
     scrollMessagesToBottom,
     setMessageLoadState,
@@ -303,15 +305,15 @@ export function useConversationTimeline({
     scrollMessagesToBottom('auto', true);
   }, [scrollMessagesToBottom, setMessageLoadState]);
   const requestTimeline = useCallback((): void => {
-    if (!activeConversation) return;
+    if (!activeConversationId) return;
 
-    void loadActiveMessages(activeConversation.id);
-  }, [activeConversation, loadActiveMessages]);
+    void loadActiveMessages(activeConversationId);
+  }, [activeConversationId, loadActiveMessages]);
 
   useEffect(() => {
     const action = ConversationTimelineLoadPlan.decide({
-      activeConversationId: activeConversation?.id,
-      activeConversationKeyAvailable: Boolean(activeConversationKey),
+      activeConversationId,
+      activeConversationKeyAvailable,
       loadedConversationId: loadedConversationIdRef.current,
       preloadedConversationId:
         preloadedConversationMessagesRef.current?.conversationId ?? null,
@@ -336,8 +338,8 @@ export function useConversationTimeline({
         break;
     }
   }, [
-    activeConversation?.id,
-    activeConversationKey,
+    activeConversationId,
+    activeConversationKeyAvailable,
     clearTimeline,
     preserveTimeline,
     requestTimeline,
@@ -346,7 +348,7 @@ export function useConversationTimeline({
   ]);
 
   useWorkspaceResumeSync({
-    activeConversationId: activeConversation?.id,
+    activeConversationId,
     activeConversationKeyId: activeConversationKey?.conversationId ?? null,
     loadActiveMessages,
     loadedMessages: messagesRef,

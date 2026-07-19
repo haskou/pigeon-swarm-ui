@@ -495,7 +495,7 @@ export function GlassWorkspace({
     startReplying: startReplyingToConversationThreadMessage,
   } = conversationThreadController;
   const conversationPins = useConversationPins({
-    activeConversation,
+    activeConversationId: activeConversation?.id,
     closeMessageContextMenu: () => setMessageContextMenu(null),
     onError: setSendError,
     session,
