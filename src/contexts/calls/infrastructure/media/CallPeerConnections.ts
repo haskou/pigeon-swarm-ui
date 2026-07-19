@@ -1,5 +1,5 @@
-import type { CallParticipantMediaConnectionResource as CallParticipantMediaConnection } from '../http/resources/CallParticipantMediaConnectionResource';
 import type { CallSignalType } from './CallSignalType';
+import type { PeerMediaStats } from './collectPeerMediaStats';
 import type { PeerNegotiationState } from './PeerNegotiationState';
 import type { RtcConfigurationProvider } from './RtcConfigurationProvider';
 import type { ScreenShareQualityPreset } from './ScreenShareQualityPreset';
@@ -7,16 +7,12 @@ import type { ScreenShareQualityPreset } from './ScreenShareQualityPreset';
 import { logCallDebug, logCallError, logCallWarning } from './callDebugLogger';
 import {
   hasAudioTrack,
-  isRemoteScreenShareAudioTrack,
-  isRemoteScreenShareTrack,
-  isScreenShareAudioTrack,
   isScreenShareTrack,
   replacementLocalTrack,
 } from './callMediaTrackClassification';
-import {
-  collectPeerMediaStats,
-  type PeerMediaStats,
-} from './collectPeerMediaStats';
+import { CallPeerRecovery } from './CallPeerRecovery';
+import { CallPeerStatistics } from './CallPeerStatistics';
+import { CallScreenShareStreams } from './CallScreenShareStreams';
 import {
   descriptionPayload,
   type DescriptionSignalPayload,
@@ -27,9 +23,6 @@ import { RemoteCallAudio } from './RemoteCallAudio';
 import { screenShareEncodingParameters } from './ScreenShareQuality';
 
 export type { PeerMediaStats } from './collectPeerMediaStats';
-
-const disconnectedPeerRecoveryDelayMs = 3_000;
-const maximumPeerRecoveryDelayMs = 15_000;
 
 export class CallPeerConnections {
   private mediaEncryptionCipher: EncodedCallMediaCipher | null = null;
@@ -42,7 +35,9 @@ export class CallPeerConnections {
 
   private readonly peers = new Map<string, RTCPeerConnection>();
 
-  private latestPeerStats: Record<string, PeerMediaStats> = {};
+  private readonly statistics = new CallPeerStatistics();
+
+  private readonly recovery = new CallPeerRecovery();
 
   private readonly peerSignalSenders = new Map<string, SignalSender>();
 
@@ -50,13 +45,6 @@ export class CallPeerConnections {
     string,
     Promise<RTCPeerConnection>
   >();
-
-  private readonly pendingPeerRecoveries = new Map<
-    string,
-    ReturnType<typeof setTimeout>
-  >();
-
-  private readonly peerRecoveryAttempts = new Map<string, number>();
 
   private readonly peerNegotiationStates = new Map<
     string,
@@ -70,22 +58,7 @@ export class CallPeerConnections {
 
   private readonly remoteStreams = new Map<string, MediaStream>();
 
-  private readonly remoteScreenStreams = new Map<string, MediaStream>();
-
-  private readonly remoteScreenStreamIds = new Map<string, Set<string>>();
-
-  private readonly remoteScreenTrackIds = new Map<string, Set<string>>();
-
-  private readonly remoteScreenAudioStreamIds = new Map<string, Set<string>>();
-
-  private readonly remoteScreenAudioTrackIds = new Map<string, Set<string>>();
-
-  private readonly localScreenStreams = new Map<string, MediaStream>();
-
-  private readonly previousStatsSamples = new Map<
-    string,
-    { bytesReceived: number; sampledAt: number }
-  >();
+  private readonly screenShareStreams: CallScreenShareStreams;
 
   private localStream: MediaStream | null = null;
 
@@ -97,30 +70,8 @@ export class CallPeerConnections {
     return EncodedCallMediaCipher.isSupported();
   }
 
-  public constructor(private readonly remoteAudio: RemoteCallAudio) {}
-
-  private bitrateFor(
-    identityId: string,
-    stats: PeerMediaStats,
-  ): number | undefined {
-    if (stats.bytesReceived === undefined) return undefined;
-
-    const sampledAt = Date.now();
-    const previous = this.previousStatsSamples.get(identityId);
-
-    this.previousStatsSamples.set(identityId, {
-      bytesReceived: stats.bytesReceived,
-      sampledAt,
-    });
-
-    if (!previous) return undefined;
-
-    const elapsedSeconds = (sampledAt - previous.sampledAt) / 1000;
-    const bytesDelta = stats.bytesReceived - previous.bytesReceived;
-
-    if (elapsedSeconds <= 0 || bytesDelta < 0) return undefined;
-
-    return Math.round((bytesDelta * 8) / elapsedSeconds / 1000);
+  public constructor(private readonly remoteAudio: RemoteCallAudio) {
+    this.screenShareStreams = new CallScreenShareStreams(remoteAudio);
   }
 
   private async handleIceCandidateSignal(
@@ -181,7 +132,7 @@ export class CallPeerConnections {
     }
 
     this.rememberRemoteMediaEncryptionMetadata(senderIdentityId, payload);
-    this.rememberRemoteScreenShareMetadata(senderIdentityId, payload);
+    this.screenShareStreams.rememberRemoteMetadata(senderIdentityId, payload);
     await peer.setRemoteDescription(description);
     logCallDebug('peer-manager:handle-signal:remote-description-set', {
       screenStreamCount: payload.screenStreamIds?.length ?? 0,
@@ -213,10 +164,10 @@ export class CallPeerConnections {
       'answer',
       descriptionPayload(
         answer,
-        this.localScreenAudioTrackIds(),
-        this.localScreenAudioStreamIds(),
-        this.localScreenTrackIds(),
-        this.localScreenStreamIds(),
+        this.screenShareStreams.localAudioTrackIds(this.localStream),
+        this.screenShareStreams.localAudioStreamIds(this.localStream),
+        this.screenShareStreams.localVideoTrackIds(this.localStream),
+        this.screenShareStreams.localVideoStreamIds(this.localStream),
         this.localMediaEncryptionMetadata(senderIdentityId),
       ),
     );
@@ -324,14 +275,22 @@ export class CallPeerConnections {
         connectionState: peer.connectionState,
         peerIdentityId,
       });
-      this.reconcilePeerConnectionHealth(peerIdentityId, peer);
+      this.recovery.reconcile(
+        peerIdentityId,
+        peer,
+        () => this.peers.get(peerIdentityId) === peer,
+      );
     });
     peer.addEventListener('iceconnectionstatechange', () => {
       logCallDebug('peer-manager:ice-connection-state-change', {
         iceConnectionState: peer.iceConnectionState,
         peerIdentityId,
       });
-      this.reconcilePeerConnectionHealth(peerIdentityId, peer);
+      this.recovery.reconcile(
+        peerIdentityId,
+        peer,
+        () => this.peers.get(peerIdentityId) === peer,
+      );
     });
     peer.addEventListener('signalingstatechange', () => {
       logCallDebug('peer-manager:signaling-state-change', {
@@ -392,73 +351,13 @@ export class CallPeerConnections {
       });
 
       this.configureLocalSender(
-        peer.addTrack(track, this.localTrackStream(track)),
+        peer.addTrack(
+          track,
+          this.screenShareStreams.localStreamFor(track, this.localStream),
+        ),
         peerIdentityId,
       );
     });
-  }
-
-  private localTrackStream(track: MediaStreamTrack): MediaStream {
-    if (isScreenShareTrack(track) || isScreenShareAudioTrack(track)) {
-      const currentStream = this.localScreenStreams.get(track.id);
-
-      if (currentStream) return currentStream;
-
-      const screenStream = new MediaStream([track]);
-
-      this.localScreenStreams.set(track.id, screenStream);
-
-      return screenStream;
-    }
-
-    return this.localStream ?? new MediaStream([track]);
-  }
-
-  private localScreenTrackIds(): string[] {
-    return (
-      this.localStream
-        ?.getVideoTracks()
-        .filter((track) => isScreenShareTrack(track))
-        .map((track) => track.id) ?? []
-    );
-  }
-
-  private localScreenAudioTrackIds(): string[] {
-    return (
-      this.localStream
-        ?.getAudioTracks()
-        .filter((track) => isScreenShareAudioTrack(track))
-        .map((track) => track.id) ?? []
-    );
-  }
-
-  private localScreenStreamIds(): string[] {
-    return this.localMediaStreamIdsFor(this.localScreenTrackIds());
-  }
-
-  private localScreenAudioStreamIds(): string[] {
-    return this.localMediaStreamIdsFor(this.localScreenAudioTrackIds());
-  }
-
-  private localMediaStreamIdsFor(trackIds: string[]): string[] {
-    const activeTrackIds = new Set(trackIds);
-    const streamIds: string[] = [];
-
-    for (const [trackId, stream] of this.localScreenStreams.entries()) {
-      if (!activeTrackIds.has(trackId)) continue;
-
-      streamIds.push(stream.id);
-    }
-
-    return streamIds;
-  }
-
-  private rememberRemoteScreenShareMetadata(
-    peerIdentityId: string,
-    payload: DescriptionSignalPayload,
-  ): void {
-    this.rememberRemoteScreenVideoMetadata(peerIdentityId, payload);
-    this.rememberRemoteScreenAudioMetadata(peerIdentityId, payload);
   }
 
   private rememberRemoteMediaEncryptionMetadata(
@@ -476,45 +375,6 @@ export class CallPeerConnections {
       mediaEncryption?.enabled ?? false,
     );
     this.syncPeerMediaEncryption(peerIdentityId);
-  }
-
-  private rememberRemoteScreenVideoMetadata(
-    peerIdentityId: string,
-    payload: DescriptionSignalPayload,
-  ): void {
-    this.remoteScreenTrackIds.set(
-      peerIdentityId,
-      new Set(payload.screenTrackIds ?? []),
-    );
-    this.remoteScreenStreamIds.set(
-      peerIdentityId,
-      new Set(payload.screenStreamIds ?? []),
-    );
-
-    if (!payload.screenTrackIds?.length && !payload.screenStreamIds?.length) {
-      this.remoteScreenStreams.delete(peerIdentityId);
-    }
-  }
-
-  private rememberRemoteScreenAudioMetadata(
-    peerIdentityId: string,
-    payload: DescriptionSignalPayload,
-  ): void {
-    this.remoteScreenAudioTrackIds.set(
-      peerIdentityId,
-      new Set(payload.screenAudioTrackIds ?? []),
-    );
-    this.remoteScreenAudioStreamIds.set(
-      peerIdentityId,
-      new Set(payload.screenAudioStreamIds ?? []),
-    );
-
-    if (
-      !payload.screenAudioTrackIds?.length &&
-      !payload.screenAudioStreamIds?.length
-    ) {
-      this.remoteAudio.removeScreen(peerIdentityId);
-    }
   }
 
   private configureNegotiationState(
@@ -549,9 +409,9 @@ export class CallPeerConnections {
     const [receivedStream] = event.streams;
     const stream = receivedStream ?? new MediaStream([event.track]);
 
-    if (this.handleRemoteScreenVideoTrack(peerIdentityId, event)) return;
-
-    if (this.handleRemoteScreenAudioTrack(peerIdentityId, event)) return;
+    if (this.screenShareStreams.handleRemoteTrack(peerIdentityId, event)) {
+      return;
+    }
 
     this.remoteStreams.set(peerIdentityId, stream);
 
@@ -562,69 +422,11 @@ export class CallPeerConnections {
     }
   }
 
-  private handleRemoteScreenVideoTrack(
-    peerIdentityId: string,
-    event: RTCTrackEvent,
-  ): boolean {
-    if (
-      !isRemoteScreenShareTrack(
-        event.track,
-        event.streams,
-        this.remoteScreenTrackIds.get(peerIdentityId) ?? new Set(),
-        this.remoteScreenStreamIds.get(peerIdentityId) ?? new Set(),
-      )
-    ) {
-      return false;
-    }
-
-    const screenStream = new MediaStream([event.track]);
-
-    this.remoteScreenStreams.set(peerIdentityId, screenStream);
-    event.track.addEventListener('ended', () => {
-      if (this.remoteScreenStreams.get(peerIdentityId) === screenStream) {
-        this.remoteScreenStreams.delete(peerIdentityId);
-      }
-    });
-    logCallDebug('peer-manager:screen-track-received', {
-      peerIdentityId,
-      trackId: event.track.id,
-    });
-
-    return true;
-  }
-
-  private handleRemoteScreenAudioTrack(
-    peerIdentityId: string,
-    event: RTCTrackEvent,
-  ): boolean {
-    if (
-      !isRemoteScreenShareAudioTrack(
-        event.track,
-        event.streams,
-        this.remoteScreenAudioTrackIds.get(peerIdentityId) ?? new Set(),
-        this.remoteScreenAudioStreamIds.get(peerIdentityId) ?? new Set(),
-      )
-    ) {
-      return false;
-    }
-
-    this.playRemoteScreenAudioTrack(peerIdentityId, event.track);
-
-    return true;
-  }
-
   private playRemoteAudioTrack(
     peerIdentityId: string,
     track: MediaStreamTrack,
   ): void {
     this.remoteAudio.playVoiceTrack(peerIdentityId, track);
-  }
-
-  private playRemoteScreenAudioTrack(
-    peerIdentityId: string,
-    track: MediaStreamTrack,
-  ): void {
-    this.remoteAudio.playScreenTrack(peerIdentityId, track);
   }
 
   private syncLocalTracks(): void {
@@ -707,7 +509,10 @@ export class CallPeerConnections {
     }
 
     this.configureLocalSender(
-      peer.addTrack(track, this.localTrackStream(track)),
+      peer.addTrack(
+        track,
+        this.screenShareStreams.localStreamFor(track, this.localStream),
+      ),
       peerIdentityId,
     );
   }
@@ -867,10 +672,10 @@ export class CallPeerConnections {
         'offer',
         descriptionPayload(
           offer,
-          this.localScreenAudioTrackIds(),
-          this.localScreenAudioStreamIds(),
-          this.localScreenTrackIds(),
-          this.localScreenStreamIds(),
+          this.screenShareStreams.localAudioTrackIds(this.localStream),
+          this.screenShareStreams.localAudioStreamIds(this.localStream),
+          this.screenShareStreams.localVideoTrackIds(this.localStream),
+          this.screenShareStreams.localVideoStreamIds(this.localStream),
           this.localMediaEncryptionMetadata(peerIdentityId),
         ),
       );
@@ -880,119 +685,17 @@ export class CallPeerConnections {
   }
 
   private removePeer(peerIdentityId: string): void {
-    this.cancelPeerRecovery(peerIdentityId);
+    this.recovery.forget(peerIdentityId);
     this.peers.get(peerIdentityId)?.close();
     this.peers.delete(peerIdentityId);
-    this.peerRecoveryAttempts.delete(peerIdentityId);
     this.pendingIceCandidates.delete(peerIdentityId);
     this.peerAcceptsEncryptedMedia.delete(peerIdentityId);
     this.peerSendsEncryptedMedia.delete(peerIdentityId);
     this.peerNegotiationStates.delete(peerIdentityId);
     this.peerSignalSenders.delete(peerIdentityId);
     this.remoteStreams.delete(peerIdentityId);
-    this.remoteScreenStreams.delete(peerIdentityId);
-    this.remoteScreenStreamIds.delete(peerIdentityId);
-    this.remoteScreenTrackIds.delete(peerIdentityId);
-    this.remoteScreenAudioStreamIds.delete(peerIdentityId);
-    this.remoteScreenAudioTrackIds.delete(peerIdentityId);
+    this.screenShareStreams.forget(peerIdentityId);
     this.remoteAudio.removePeer(peerIdentityId);
-  }
-
-  private reconcilePeerConnectionHealth(
-    peerIdentityId: string,
-    peer: RTCPeerConnection,
-  ): void {
-    if (this.peerConnectionIsHealthy(peer)) {
-      this.cancelPeerRecovery(peerIdentityId);
-      this.peerRecoveryAttempts.delete(peerIdentityId);
-
-      return;
-    }
-
-    const attempt = this.peerRecoveryAttempts.get(peerIdentityId) ?? 0;
-    const delay = this.peerRecoveryDelay(peer, attempt);
-
-    if (delay === undefined) return;
-
-    this.schedulePeerRecovery(peerIdentityId, peer, attempt, delay);
-  }
-
-  private peerRecoveryDelay(
-    peer: RTCPeerConnection,
-    attempt: number,
-  ): number | undefined {
-    if (
-      peer.connectionState === 'failed' ||
-      peer.iceConnectionState === 'failed'
-    ) {
-      return Math.min(
-        attempt === 0 ? 0 : 2 ** (attempt - 1) * 1_000,
-        maximumPeerRecoveryDelayMs,
-      );
-    }
-
-    if (
-      peer.connectionState === 'disconnected' ||
-      peer.iceConnectionState === 'disconnected'
-    ) {
-      return disconnectedPeerRecoveryDelayMs;
-    }
-
-    return undefined;
-  }
-
-  private peerConnectionIsHealthy(peer: RTCPeerConnection): boolean {
-    return (
-      peer.connectionState === 'connected' &&
-      (peer.iceConnectionState === 'connected' ||
-        peer.iceConnectionState === 'completed')
-    );
-  }
-
-  private schedulePeerRecovery(
-    peerIdentityId: string,
-    peer: RTCPeerConnection,
-    attempt: number,
-    delay: number,
-  ): void {
-    if (this.pendingPeerRecoveries.has(peerIdentityId)) return;
-
-    logCallWarning('peer-manager:ice-recovery:scheduled', {
-      attempt: attempt + 1,
-      connectionState: peer.connectionState,
-      delay,
-      iceConnectionState: peer.iceConnectionState,
-      peerIdentityId,
-    });
-    const timeout = setTimeout(() => {
-      this.pendingPeerRecoveries.delete(peerIdentityId);
-
-      if (
-        this.peers.get(peerIdentityId) !== peer ||
-        peer.connectionState === 'closed' ||
-        this.peerConnectionIsHealthy(peer)
-      ) {
-        return;
-      }
-
-      this.peerRecoveryAttempts.set(peerIdentityId, attempt + 1);
-      logCallWarning('peer-manager:ice-recovery:restart', {
-        attempt: attempt + 1,
-        peerIdentityId,
-      });
-      peer.restartIce();
-    }, delay);
-
-    this.pendingPeerRecoveries.set(peerIdentityId, timeout);
-  }
-
-  private cancelPeerRecovery(peerIdentityId: string): void {
-    const timeout = this.pendingPeerRecoveries.get(peerIdentityId);
-
-    if (timeout === undefined) return;
-
-    clearTimeout(timeout);
-    this.pendingPeerRecoveries.delete(peerIdentityId);
   }
 
   private async flushIceCandidates(
@@ -1107,7 +810,7 @@ export class CallPeerConnections {
   }
 
   public remoteScreenMediaStreams(): Record<string, MediaStream> {
-    return Object.fromEntries(this.remoteScreenStreams.entries());
+    return this.screenShareStreams.streams();
   }
 
   public retainPeers(peerIdentityIds: Set<string>): void {
@@ -1186,10 +889,10 @@ export class CallPeerConnections {
         'offer',
         descriptionPayload(
           offer,
-          this.localScreenAudioTrackIds(),
-          this.localScreenAudioStreamIds(),
-          this.localScreenTrackIds(),
-          this.localScreenStreamIds(),
+          this.screenShareStreams.localAudioTrackIds(this.localStream),
+          this.screenShareStreams.localAudioStreamIds(this.localStream),
+          this.screenShareStreams.localVideoTrackIds(this.localStream),
+          this.screenShareStreams.localVideoStreamIds(this.localStream),
           this.localMediaEncryptionMetadata(peerIdentityId),
         ),
       );
@@ -1249,75 +952,26 @@ export class CallPeerConnections {
     this.peerAcceptsEncryptedMedia.clear();
     this.peerSendsEncryptedMedia.clear();
     this.pendingPeerCreations.clear();
-    this.pendingPeerRecoveries.forEach((timeout) => clearTimeout(timeout));
-    this.pendingPeerRecoveries.clear();
-    this.peerRecoveryAttempts.clear();
+    this.recovery.reset();
     this.pendingIceCandidates.clear();
     this.peerNegotiationStates.clear();
     this.peerSignalSenders.clear();
 
     this.remoteAudio.reset();
     this.remoteStreams.clear();
-    this.remoteScreenStreams.clear();
-    this.remoteScreenStreamIds.clear();
-    this.remoteScreenTrackIds.clear();
-    this.remoteScreenAudioStreamIds.clear();
-    this.remoteScreenAudioTrackIds.clear();
-    this.localScreenStreams.clear();
-    this.previousStatsSamples.clear();
+    this.screenShareStreams.reset();
+    this.statistics.reset();
     this.localStream = null;
-    this.latestPeerStats = {};
     this.mediaEncryptionCipher = null;
     this.mediaEncryptionEnabled = false;
     this.rtcConfigurationProvider = null;
   }
 
   public async collectStats(): Promise<Record<string, PeerMediaStats>> {
-    const entries = await Promise.all(
-      [...this.peers.entries()].map(
-        async ([identityId, peer]): Promise<[string, PeerMediaStats]> => {
-          const firstPassStats = await collectPeerMediaStats(peer);
-          const bitrateKbps = this.bitrateFor(identityId, firstPassStats);
-
-          return [
-            identityId,
-            bitrateKbps === undefined
-              ? firstPassStats
-              : { ...firstPassStats, bitrateKbps },
-          ];
-        },
-      ),
-    );
-    const stats: Record<string, PeerMediaStats> = {};
-
-    for (const [identityId, peerStats] of entries) {
-      stats[identityId] = peerStats;
-    }
-
-    this.latestPeerStats = stats;
-
-    return stats;
+    return await this.statistics.collect(this.peers);
   }
 
-  public mediaConnections(): CallParticipantMediaConnection[] {
-    return Object.entries(this.latestPeerStats)
-      .slice(0, 32)
-      .map(([remoteIdentityId, stats]) => ({
-        ...(stats.localCandidateType
-          ? { localCandidateType: stats.localCandidateType }
-          : {}),
-        ...(stats.protocol ? { protocol: stats.protocol } : {}),
-        ...(stats.relayProtocol ? { relayProtocol: stats.relayProtocol } : {}),
-        ...(stats.relayUrl ? { relayUrl: stats.relayUrl } : {}),
-        ...(stats.remoteCandidateType
-          ? { remoteCandidateType: stats.remoteCandidateType }
-          : {}),
-        remoteIdentityId,
-        state: stats.connectionState,
-        usesRelay:
-          stats.connectionPath === 'relay' ||
-          stats.localCandidateType === 'relay' ||
-          stats.remoteCandidateType === 'relay',
-      }));
+  public mediaConnections(): ReturnType<CallPeerStatistics['connections']> {
+    return this.statistics.connections();
   }
 }

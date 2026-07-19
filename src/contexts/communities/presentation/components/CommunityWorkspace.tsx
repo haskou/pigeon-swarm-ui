@@ -1,7 +1,5 @@
 import {
   type MouseEvent,
-  type ReactNode,
-  type SetStateAction,
   lazy,
   Suspense,
   useCallback,
@@ -13,27 +11,15 @@ import {
 
 import type { MessageContextMenuState } from '../../../../app/presentation/workspace/components/messageContextMenu';
 import type {
-  Community,
-  CommunityChannel,
   CommunityChannelThreadSummary,
-  CommunityTextChannel,
-  CommunityInvitationNotificationResource,
   CommunityVoiceChannel,
   ChatMessage,
-  IdentityPresence,
   IdentityResource,
   MessageResource,
-  NotificationSettingScope,
   PollResource,
-  SelectablePresenceStatus,
-  Session,
   StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { NotificationSettingMap } from '../../../notifications/presentation/view-models/NotificationSettingMap';
-import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
-import type { CallSession } from '../../../calls/presentation/view-models/CallSession';
-import type { NodeNetwork } from '../../../networks/presentation/view-models/NodeNetwork';
-import type { NotificationScopeSettingsTarget } from '../../../notifications/presentation/components/NotificationScopeSettingsDialog';
+import type { CommunityWorkspaceProps } from './CommunityWorkspaceProps';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { shortId } from '../../../../shared/presentation/formatting';
@@ -50,12 +36,11 @@ import { MessageCollectionDialog } from '../../../messages/presentation/componen
 import { MessageThreadPanel } from '../../../messages/presentation/components/MessageThreadPanel';
 import { TypingIndicator } from '../../../messages/presentation/components/TypingIndicator';
 import { NotificationSettingsPolicy } from '../../../notifications/presentation/view-models/NotificationSettingsPolicy';
+import { CommunityMessageDecryptWorkerClient } from '../../infrastructure/crypto/CommunityMessageDecryptWorkerClient';
 import { CommunityChannelThreadCache } from '../view-models/CommunityChannelThreadCache';
 import { CommunityEncryptionDetails } from '../view-models/CommunityEncryptionDetails';
-import { CommunityMessageDecryptWorkerClient } from '../../infrastructure/crypto/CommunityMessageDecryptWorkerClient';
 import { CommunityHeader } from './CommunityHeader';
 import { CommunityHeaderActionsMenu } from './CommunityHeaderActionsMenu';
-import { loadPublicImage } from './communityImages';
 import { memberDisplayName, memberPrimaryName } from './communityMemberNames';
 import { CommunityMembersPanel } from './communityMembersPanel';
 import { CommunityMentionPanel } from './communityMentionPanel';
@@ -70,7 +55,6 @@ import {
   type CommunityThreadState,
   hiddenCommunityThreadSummaryKeysFromMessages,
   isThreadRootMessage,
-  threadRootLabelKey,
   threadTitleFromMessage,
   visibleCommunityThreadSummaries,
 } from './communityThreadState';
@@ -82,6 +66,7 @@ import { mergeChatMessages } from './communityWorkspaceHelpers';
 import { useCommunityChannelAccess } from './useCommunityChannelAccess';
 import { useCommunityChannelMessages } from './useCommunityChannelMessages';
 import { useCommunityChannelRealtime } from './useCommunityChannelRealtime';
+import { useCommunityDrafts } from './useCommunityDrafts';
 import { useCommunityKeyDialog } from './useCommunityKeyDialog';
 import { useCommunityMembers } from './useCommunityMembers';
 import { useCommunityMentions } from './useCommunityMentions';
@@ -91,6 +76,8 @@ import { useCommunityPinnedMessages } from './useCommunityPinnedMessages';
 import { useCommunityPollWorkflow } from './useCommunityPollWorkflow';
 import { useCommunityThreadActions } from './useCommunityThreadActions';
 import { useCommunityThreadNavigation } from './useCommunityThreadNavigation';
+import { useCommunityThreadRootLabels } from './useCommunityThreadRootLabels';
+import { useCommunityVisualAssets } from './useCommunityVisualAssets';
 
 const CreatePollDialog = lazy(() =>
   import('../../../polls/presentation/components/CreatePollDialog').then(
@@ -106,75 +93,6 @@ const StickerPackPreviewDialog = lazy(() =>
     }),
   ),
 );
-
-interface CommunityWorkspaceProps {
-  activeChannelId?: null | string;
-  activeCall?: CallSession | null;
-  animateSidePanelEntries?: boolean;
-  channelUnreadCounts?: Record<string, number>;
-  community: Community;
-  invitationAccepting?: boolean;
-  invitationError?: null | string;
-  invitationInviterName?: string;
-  timelineFocusKey?: string;
-  mobileMembersOpen: boolean;
-  mobileSidebarOpen: boolean;
-  mobileRail?: ReactNode;
-  nodeNetworks: NodeNetwork[];
-  presenceByIdentityId?: Record<string, IdentityPresence>;
-  onChannelSelected: (channelId: string) => void;
-  onChannelViewed?: (channelId: string) => void;
-  onCommunityLeft: (community: Community) => void;
-  onCommunityChannelsUpdated: (
-    communityId: string,
-    channels: CommunityChannel[],
-  ) => void;
-  onCommunityUpdated: (community: Community) => void;
-  onInvitationAccept?: (
-    notification: CommunityInvitationNotificationResource,
-  ) => void;
-  notificationSettingsByScopeKey: NotificationSettingMap;
-  onCallEnd?: () => void;
-  onCallParticipantVolumeChange?: (
-    identityId: string,
-    volumePercent: number,
-  ) => void;
-  onCallParticipantScreenShareVolumeChange?: (
-    identityId: string,
-    volumePercent: number,
-  ) => void;
-  onCallScreenShareQualityChange?: (
-    quality: CallSession['screenShareQuality'],
-  ) => void;
-  onCallToggleCamera?: () => void;
-  onCallToggleDeafen?: () => void;
-  onCallToggleMute?: () => void;
-  onCallToggleMediaEncryption?: () => void;
-  onCallToggleNoiseCancellation?: () => void;
-  onCallRetryMicrophone?: () => void;
-  onCallToggleScreenShare?: () => void;
-  onLogout: () => void;
-  onPresenceChange?: (presence: IdentityPresence) => void;
-  onPresenceStatusSelected?: (status: SelectablePresenceStatus) => void;
-  onMobileMembersClose: () => void;
-  onMobileSidebarClose: () => void;
-  onOpenMobileSidebar: () => void;
-  onNotificationSettingsOpen: (target: NotificationScopeSettingsTarget) => void;
-  onNotificationMuteToggle: (scope: NotificationSettingScope) => void;
-  onJoinVoiceChannel?: (channel: CommunityVoiceChannel) => void;
-  onOpenConversationWithIdentity?: (
-    identityId: string,
-    identity?: IdentityResource,
-  ) => Promise<void>;
-  onRealtimeEventsOpen?: () => void;
-  onSessionUpdated: (session: Session) => void;
-  onTypingActive?: (channelId: string, active: boolean) => void;
-  pendingInvitation?: CommunityInvitationNotificationResource | null;
-  realtimeEvent?: null | RealtimeDomainEvent;
-  realtimeStatus?: 'connected' | 'reconnecting';
-  session: Session;
-  typingIdentityIds?: string[];
-}
 
 const communityChannelThreadCache = new CommunityChannelThreadCache();
 
@@ -199,8 +117,8 @@ export function CommunityWorkspace({
   onCallScreenShareQualityChange,
   onCallToggleCamera,
   onCallToggleDeafen,
-  onCallToggleMute,
   onCallToggleMediaEncryption,
+  onCallToggleMute,
   onCallToggleNoiseCancellation,
   onCallToggleScreenShare,
   onChannelSelected,
@@ -249,14 +167,11 @@ export function CommunityWorkspace({
     currentIdentityId: session.identity.id,
     notificationSettingsByScopeKey,
   });
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const draftSyncTimersRef = useRef(new Map<string, number>());
   const [stickerPackPreview, setStickerPackPreview] =
     useState<StickerMessageReference | null>(null);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [avatarViewerOpen, setAvatarViewerOpen] = useState(false);
-  const [bannerUrl, setBannerUrl] = useState<string | null>(null);
-  const [bannerViewerOpen, setBannerViewerOpen] = useState(false);
+  const communityVisualAssets = useCommunityVisualAssets(community);
+  const { avatarUrl, avatarViewerOpen, bannerUrl, bannerViewerOpen } =
+    communityVisualAssets;
   const [communityDataOpen, setCommunityDataOpen] = useState(false);
   const [encryptionDetailsOpen, setEncryptionDetailsOpen] = useState(false);
   const [communityMenuOpen, setCommunityMenuOpen] = useState(false);
@@ -278,18 +193,11 @@ export function CommunityWorkspace({
   const [channelThreadsByChannelId, setChannelThreadsByChannelId] = useState<
     Record<string, CommunityChannelThreadSummary[]>
   >(() => CommunityChannelThreadCache.fromChannels(textChannels));
-  const [threadRootLabels, setThreadRootLabels] = useState<
-    Record<string, string>
-  >({});
-  const [hiddenThreadRootLabelKeys, setHiddenThreadRootLabelKeys] = useState<
-    Set<string>
-  >(() => new Set());
   const [polls, setPolls] = useState<PollResource[]>([]);
   const [pollDialogOpen, setPollDialogOpen] = useState(false);
 
   useCloseOnEscape(onMobileSidebarClose, mobileSidebarOpen);
   const memberIdentitiesRef = useRef<Record<string, IdentityResource>>({});
-  const unresolvedThreadRootLabelKeysRef = useRef(new Set<string>());
   const onCommunityUpdatedRef = useRef(onCommunityUpdated);
   const communityMessageDecryptWorkerRef =
     useRef<CommunityMessageDecryptWorkerClient | null>(null);
@@ -319,24 +227,55 @@ export function CommunityWorkspace({
     session,
   });
   const communityIsPublic = community.visibility === 'public';
-  const textChannelsWithThreads = useMemo(
+  const projectChannelMessages = useCallback(
+    async (channelId: string, rawMessages: MessageResource[]) => {
+      communityMessageDecryptWorkerRef.current ??=
+        new CommunityMessageDecryptWorkerClient();
+
+      return await communityMessageDecryptWorkerRef.current.decrypt({
+        channelId,
+        communityId: community.id,
+        communityKey,
+        copy: copy.messages,
+        currentIdentityId: session.identity.id,
+        messages: rawMessages,
+      });
+    },
+    [community.id, communityKey, session.identity.id],
+  );
+  const textChannelsWithThreadSummaries = useMemo(
     () =>
       textChannels.map((channel) => ({
+        ...channel,
+        threads:
+          channelThreadsByChannelId[channel.id] ?? channel.threads ?? [],
+      })),
+    [channelThreadsByChannelId, textChannels],
+  );
+  const {
+    add: addThreadRootLabels,
+    hiddenKeys: hiddenThreadRootLabelKeys,
+    hide: hideThreadRootLabels,
+    labels: threadRootLabels,
+    reveal: revealThreadRootLabel,
+  } = useCommunityThreadRootLabels({
+    channels: textChannelsWithThreadSummaries,
+    communityId: community.id,
+    projectMessages: projectChannelMessages,
+    session,
+  });
+  const textChannelsWithThreads = useMemo(
+    () =>
+      textChannelsWithThreadSummaries.map((channel) => ({
         ...channel,
         threads: visibleCommunityThreadSummaries({
           channelId: channel.id,
           hiddenThreadRootLabelKeys,
-          threads:
-            channelThreadsByChannelId[channel.id] ?? channel.threads ?? [],
+          threads: channel.threads ?? [],
         }),
       })),
-    [channelThreadsByChannelId, hiddenThreadRootLabelKeys, textChannels],
+    [hiddenThreadRootLabelKeys, textChannelsWithThreadSummaries],
   );
-  useEffect(() => {
-    setThreadRootLabels({});
-    setHiddenThreadRootLabelKeys(new Set());
-    unresolvedThreadRootLabelKeysRef.current.clear();
-  }, [community.id]);
   useEffect(() => {
     setChannelThreadsByChannelId(
       CommunityChannelThreadCache.fromChannels(textChannels),
@@ -373,22 +312,6 @@ export function CommunityWorkspace({
       cancelIdleWork();
     };
   }, [channelTopologyKey, community.id, onCommunityChannelsUpdated, session]);
-  const projectChannelMessages = useCallback(
-    async (channelId: string, rawMessages: MessageResource[]) => {
-      communityMessageDecryptWorkerRef.current ??=
-        new CommunityMessageDecryptWorkerClient();
-
-      return await communityMessageDecryptWorkerRef.current.decrypt({
-        channelId,
-        communityId: community.id,
-        communityKey,
-        copy: copy.messages,
-        currentIdentityId: session.identity.id,
-        messages: rawMessages,
-      });
-    },
-    [community.id, communityKey, session.identity.id],
-  );
   const projectChannelMessage = useCallback(
     async (
       channelId: string,
@@ -466,55 +389,18 @@ export function CommunityWorkspace({
 
     if (hiddenKeys.length === 0) return;
 
-    setHiddenThreadRootLabelKeys((current) =>
-      CommunityChannelThreadCache.addLabelKeys(current, hiddenKeys),
-    );
-  }, [channelThreadsByChannelId, messages, selectedChannelId]);
-  const draft = selectedChannelId ? (drafts[selectedChannelId] ?? '') : '';
-  const scheduleChannelDraftSync = useCallback(
-    (channelId: string, value: string) => {
-      const currentTimer = draftSyncTimersRef.current.get(channelId);
-
-      if (currentTimer) window.clearTimeout(currentTimer);
-
-      const timer = window.setTimeout(() => {
-        draftSyncTimersRef.current.delete(channelId);
-
-        if (value.trim()) {
-          void applicationContainer.communities
-            .saveChannelDraft(session, community.id, channelId, value)
-            .catch(() => undefined);
-
-          return;
-        }
-
-        void applicationContainer.communities
-          .deleteChannelDraft(session, community.id, channelId)
-          .catch(() => undefined);
-      }, 700);
-
-      draftSyncTimersRef.current.set(channelId, timer);
-    },
-    [community.id, session],
-  );
-  const setSelectedChannelDraft = useCallback(
-    (next: SetStateAction<string>) => {
-      if (!selectedChannelId) return;
-
-      setDrafts((current) => {
-        const currentValue = current[selectedChannelId] ?? '';
-        const value = typeof next === 'function' ? next(currentValue) : next;
-
-        scheduleChannelDraftSync(selectedChannelId, value);
-
-        return {
-          ...current,
-          [selectedChannelId]: value,
-        };
-      });
-    },
-    [scheduleChannelDraftSync, selectedChannelId],
-  );
+    hideThreadRootLabels(hiddenKeys);
+  }, [
+    channelThreadsByChannelId,
+    hideThreadRootLabels,
+    messages,
+    selectedChannelId,
+  ]);
+  const { draft, setDraft: setSelectedChannelDraft } = useCommunityDrafts({
+    communityId: community.id,
+    selectedChannelId,
+    session,
+  });
   const owner = community.ownerIdentityId === session.identity.id;
   const network =
     nodeNetworks.find((item) => item.id === community.networkId) ?? null;
@@ -629,17 +515,7 @@ export function CommunityWorkspace({
   });
   const upsertChannelThreadSummary = useCallback(
     (channelId: string, summary: CommunityChannelThreadSummary) => {
-      setHiddenThreadRootLabelKeys((current) => {
-        const key = threadRootLabelKey(channelId, summary.rootMessageId);
-
-        if (!current.has(key)) return current;
-
-        const next = new Set(current);
-
-        next.delete(key);
-
-        return next;
-      });
+      revealThreadRootLabel(channelId, summary.rootMessageId);
       setChannelThreadsByChannelId((current) => {
         const currentThreads = current[channelId] ?? [];
         const nextThreads = [
@@ -655,7 +531,7 @@ export function CommunityWorkspace({
         };
       });
     },
-    [],
+    [revealThreadRootLabel],
   );
   const {
     open: openMessageThread,
@@ -704,101 +580,6 @@ export function CommunityWorkspace({
     channelSearch,
     selectedChannelId,
     textChannelsWithThreads,
-  ]);
-  useEffect(() => {
-    const unresolvedKeys = unresolvedThreadRootLabelKeysRef.current;
-    const channelsWithMissingRootLabels = visibleTextChannels
-      .map((channel) => {
-        const rootMessageIds = (channel.threads ?? [])
-          .map((thread) => thread.rootMessageId)
-          .filter(
-            (rootMessageId) =>
-              !threadRootLabels[rootMessageId] &&
-              !unresolvedKeys.has(
-                threadRootLabelKey(channel.id, rootMessageId),
-              ),
-          );
-
-        return {
-          channelId: channel.id,
-          rootMessageIds: [...new Set(rootMessageIds)],
-        };
-      })
-      .filter((channel) => channel.rootMessageIds.length > 0);
-
-    if (channelsWithMissingRootLabels.length === 0) return undefined;
-
-    let cancelled = false;
-
-    void (async () => {
-      for (const channel of channelsWithMissingRootLabels) {
-        const remainingRootMessageIds = new Set(channel.rootMessageIds);
-        let beforeMessageId: string | undefined;
-
-        for (
-          let page = 0;
-          page < 8 && remainingRootMessageIds.size > 0 && !cancelled;
-          page += 1
-        ) {
-          const result =
-            await applicationContainer.communities.listChannelMessages(
-              session,
-              community.id,
-              channel.channelId,
-              { beforeMessageId },
-            );
-          const loadedMessages = await projectChannelMessages(
-            channel.channelId,
-            result.messages,
-          );
-          const labels: Record<string, string> = {};
-          const hiddenKeys: string[] = [];
-
-          for (const message of loadedMessages) {
-            if (!remainingRootMessageIds.has(message.id)) continue;
-
-            if (isThreadRootMessage(message)) {
-              labels[message.id] = threadTitleFromMessage(message);
-              remainingRootMessageIds.delete(message.id);
-              continue;
-            }
-
-            hiddenKeys.push(threadRootLabelKey(channel.channelId, message.id));
-            remainingRootMessageIds.delete(message.id);
-          }
-
-          if (Object.keys(labels).length > 0 && !cancelled) {
-            setThreadRootLabels((current) => ({ ...current, ...labels }));
-          }
-
-          if (hiddenKeys.length > 0 && !cancelled) {
-            setHiddenThreadRootLabelKeys((current) =>
-              CommunityChannelThreadCache.addLabelKeys(current, hiddenKeys),
-            );
-          }
-
-          if (!result.nextBeforeMessageId) break;
-
-          beforeMessageId = result.nextBeforeMessageId;
-        }
-
-        for (const rootMessageId of remainingRootMessageIds) {
-          unresolvedKeys.add(
-            threadRootLabelKey(channel.channelId, rootMessageId),
-          );
-        }
-      }
-    })().catch(() => undefined);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    community.id,
-    projectChannelMessages,
-    session,
-    threadRootLabels,
-    visibleTextChannels,
   ]);
   const visibleVoiceChannels = useMemo(() => {
     const query = channelSearch.trim().toLowerCase();
@@ -895,20 +676,9 @@ export function CommunityWorkspace({
 
     if (entries.length === 0) return;
 
-    setThreadRootLabels((current) => {
-      let changed = false;
-      const next = { ...current };
-
-      for (const [messageId, label] of entries) {
-        if (next[messageId] === label) continue;
-
-        next[messageId] = label;
-        changed = true;
-      }
-
-      return changed ? next : current;
-    });
+    addThreadRootLabels(knownRootLabels);
   }, [
+    addThreadRootLabels,
     messageCollection?.messages,
     messageSearch.results,
     messages,
@@ -956,45 +726,9 @@ export function CommunityWorkspace({
     () => () => {
       communityMessageDecryptWorkerRef.current?.terminate();
       communityMessageDecryptWorkerRef.current = null;
-
-      for (const timer of draftSyncTimersRef.current.values()) {
-        window.clearTimeout(timer);
-      }
-
-      draftSyncTimersRef.current.clear();
     },
     [],
   );
-
-  useEffect(() => {
-    let cancelled = false;
-
-    void applicationContainer.communities
-      .listDrafts(session)
-      .then((remoteDrafts) => {
-        if (cancelled) return;
-
-        setDrafts((current) => {
-          const next = { ...current };
-
-          for (const draft of remoteDrafts) {
-            if (
-              draft.communityId === community.id &&
-              next[draft.channelId] === undefined
-            ) {
-              next[draft.channelId] = draft.content;
-            }
-          }
-
-          return next;
-        });
-      })
-      .catch(() => undefined);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [community.id, session]);
 
   useEffect(() => {
     memberIdentitiesRef.current = memberIdentities;
@@ -1188,44 +922,6 @@ export function CommunityWorkspace({
     };
   }, [community.id, session]);
 
-  useEffect(() => {
-    const avatar = community.avatar?.trim();
-
-    setAvatarUrl(null);
-    setAvatarViewerOpen(false);
-
-    if (!avatar) return undefined;
-
-    let cancelled = false;
-
-    void loadPublicImage(avatar).then((url) => {
-      if (!cancelled) setAvatarUrl(url);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [community.avatar]);
-
-  useEffect(() => {
-    const banner = community.banner?.trim();
-
-    setBannerUrl(null);
-    setBannerViewerOpen(false);
-
-    if (!banner) return undefined;
-
-    let cancelled = false;
-
-    void loadPublicImage(banner).then((url) => {
-      if (!cancelled) setBannerUrl(url);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [community.banner]);
-
   const handleStickerClick = (sticker: StickerMessageReference) => {
     setStickerPackPreview(sticker);
   };
@@ -1363,7 +1059,7 @@ export function CommunityWorkspace({
         mobileRail={mobileRail}
         mobileSidebarOpen={mobileSidebarOpen}
         nodeNetworks={nodeNetworks}
-        onBannerOpen={() => setBannerViewerOpen(true)}
+        onBannerOpen={communityVisualAssets.openBannerViewer}
         onCallEnd={onCallEnd}
         onCallParticipantScreenShareVolumeChange={
           onCallParticipantScreenShareVolumeChange
@@ -1471,7 +1167,9 @@ export function CommunityWorkspace({
             setCommunityMenuOpen((isOpen) => !isOpen)
           }
           onEncryptionDetailsOpen={() => setEncryptionDetailsOpen(true)}
-          onOpenAvatar={avatarUrl ? () => setAvatarViewerOpen(true) : undefined}
+          onOpenAvatar={
+            avatarUrl ? communityVisualAssets.openAvatarViewer : undefined
+          }
           onOpenMobileSidebar={onOpenMobileSidebar}
           onPinsOpen={showPinnedMessages}
           onRealtimeEventsOpen={onRealtimeEventsOpen}
@@ -1832,8 +1530,8 @@ export function CommunityWorkspace({
         memberOpen={memberOpen}
         messageContextMenu={messageContextMenu}
         nodeNetworks={nodeNetworks}
-        onCloseAvatarViewer={() => setAvatarViewerOpen(false)}
-        onCloseBannerViewer={() => setBannerViewerOpen(false)}
+        onCloseAvatarViewer={communityVisualAssets.closeAvatarViewer}
+        onCloseBannerViewer={communityVisualAssets.closeBannerViewer}
         onCloseCommunityData={() => setCommunityDataOpen(false)}
         onCloseEncryptionDetails={() => setEncryptionDetailsOpen(false)}
         onCloseCommunityKey={closeCommunityKeyDialog}

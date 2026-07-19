@@ -3,7 +3,6 @@ import { SymmetricKey } from '@haskou/value-objects';
 import type { SignalSender } from '../../../../../contexts/calls/infrastructure/media/descriptionPayload';
 import type { FakePeerConnection } from '../../../../../contexts/calls/infrastructure/media/FakePeerConnection';
 import type { FakeSender } from '../../../../../contexts/calls/infrastructure/media/FakeSender';
-import type { PeerConnectionManagerInternals } from '../../../../../contexts/calls/infrastructure/media/PeerConnectionManagerInternals';
 
 import { CallPeerConnections } from '../../../../../contexts/calls/infrastructure/media/CallPeerConnections';
 import { EncodedCallMediaCipher } from '../../../../../contexts/calls/infrastructure/media/EncodedCallMediaCipher';
@@ -96,12 +95,6 @@ function callPeerConnectionManager(): CallPeerConnections {
       mount: jest.fn(),
     }),
   );
-}
-
-function managerInternals(
-  manager: CallPeerConnections,
-): PeerConnectionManagerInternals {
-  return manager as unknown as PeerConnectionManagerInternals;
 }
 
 function remoteTrackEvent(
@@ -857,73 +850,48 @@ describe(CallPeerConnections.name, () => {
     );
   });
 
-  it('classifies remote screen share by stream id metadata', () => {
-    const manager = callPeerConnectionManager();
-    const internals = managerInternals(manager);
-    const screenTrack = mediaTrack('receiver-video-track', 'video');
-    const screenStream = mediaStreamWithTracks(
-      [screenTrack],
-      'sender-screen-stream',
-    );
-
-    installMediaStreamMock();
-    internals.remoteScreenStreamIds.set(
-      'peer-identity-id',
-      new Set(['sender-screen-stream']),
-    );
-
-    internals.handleRemoteTrack(
-      'peer-identity-id',
-      remoteTrackEvent(screenTrack, [screenStream]),
-    );
-
-    expect(internals.remoteScreenStreams.get('peer-identity-id')).toBeDefined();
-    expect(internals.remoteStreams.has('peer-identity-id')).toBe(false);
-  });
-
-  it('tracks video-only remote streams', () => {
-    const manager = callPeerConnectionManager();
-    const internals = managerInternals(manager);
-    const videoTrack = mediaTrack('remote-video-track', 'video');
-    const videoStream = mediaStreamWithTracks([videoTrack], 'video-stream');
-
-    internals.handleRemoteTrack(
-      'peer-identity-id',
-      remoteTrackEvent(videoTrack, [videoStream]),
-    );
-
-    expect(internals.remoteStreams.get('peer-identity-id')).toBe(videoStream);
-  });
-
-  it('removes stale peers and their media when they leave', async () => {
+  it('tracks video-only remote streams', async () => {
     const peers: FakePeerConnection[] = [];
 
     installPeerConnectionMock(peers);
     const manager = callPeerConnectionManager();
-    const internals = managerInternals(manager);
-    const screenTrack = mediaTrack('remote-screen-track', 'video');
+    const videoTrack = mediaTrack('remote-video-track', 'video');
+    const videoStream = mediaStreamWithTracks([videoTrack], 'video-stream');
 
     manager.configure(() => Promise.resolve({ iceServers: [] }));
     await manager.ensurePeer('peer-identity-id', false, () =>
       Promise.resolve(),
     );
-    internals.remoteStreams.set(
-      'peer-identity-id',
-      mediaStreamWithTracks([mediaTrack('remote-audio-track', 'audio')]),
+    registeredPeerEventListener(
+      peers[0]!,
+      'track',
+    )(remoteTrackEvent(videoTrack, [videoStream]) as unknown as Event);
+
+    expect(manager.remoteMediaStreams()['peer-identity-id']).toBe(videoStream);
+  });
+
+  it('removes stale peers and their media when they leave', async () => {
+    const peers: FakePeerConnection[] = [];
+
+    installMediaStreamMock();
+    installPeerConnectionMock(peers);
+    const manager = callPeerConnectionManager();
+    const remoteTrack = mediaTrack('remote-audio-track', 'audio');
+    const remoteStream = mediaStreamWithTracks([remoteTrack]);
+
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
+    await manager.ensurePeer('peer-identity-id', false, () =>
+      Promise.resolve(),
     );
-    internals.remoteScreenStreams.set(
-      'peer-identity-id',
-      mediaStreamWithTracks([screenTrack]),
-    );
-    internals.remoteScreenStreamIds.set(
-      'peer-identity-id',
-      new Set(['remote-screen-stream-id']),
-    );
+    registeredPeerEventListener(
+      peers[0]!,
+      'track',
+    )(remoteTrackEvent(remoteTrack, [remoteStream]) as unknown as Event);
 
     manager.retainPeers(new Set());
 
     expect(peers[0]?.close).toHaveBeenCalledTimes(1);
-    expect(internals.remoteStreams.has('peer-identity-id')).toBe(false);
-    expect(internals.remoteScreenStreams.has('peer-identity-id')).toBe(false);
+    expect(manager.remoteMediaStreams()).toEqual({});
+    expect(manager.remoteScreenMediaStreams()).toEqual({});
   });
 });
