@@ -21,7 +21,6 @@ import type {
   CommunityChannel,
   CommunityMembershipRequest,
   ConversationResource,
-  IdentityResource,
   NotificationSettingScope,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
@@ -988,6 +987,57 @@ export function GlassWorkspace({
       setWorkspaceMode,
     ],
   );
+  const handleCommunityJoinRequested = useCallback(
+    (request: CommunityMembershipRequest): void => {
+      setMembershipRequests((current) => [
+        request,
+        ...current.filter((item) => item.id !== request.id),
+      ]);
+
+      if (request.status === 'accepted') {
+        void applicationContainer.communities
+          .get(sessionRef.current, request.communityId)
+          .then((community) => {
+            setCommunities((current) => [
+              community,
+              ...current.filter((item) => item.id !== community.id),
+            ]);
+            setActiveCommunityId(community.id);
+            setWorkspaceMode('community');
+          })
+          .catch((caught) =>
+            setSendError(
+              toUserErrorMessage(caught, copy.communities.membershipError),
+            ),
+          );
+      }
+
+      closeTransientSurface('community-creation');
+    },
+    [
+      closeTransientSurface,
+      setActiveCommunityId,
+      setCommunities,
+      setMembershipRequests,
+      setWorkspaceMode,
+    ],
+  );
+  const handleDialogMessageReply = useCallback(
+    (message: ChatMessage): void => {
+      if (messageContextMenu?.source === 'thread') {
+        startReplyingToConversationThreadMessage(message);
+
+        return;
+      }
+
+      startReplyingToMessage(message);
+    },
+    [
+      messageContextMenu?.source,
+      startReplyingToConversationThreadMessage,
+      startReplyingToMessage,
+    ],
+  );
   const hasWorkspaceDialogOpen =
     inspectorOpen ||
     isCreateCommunityOpen ||
@@ -1440,151 +1490,127 @@ export function GlassWorkspace({
       {hasWorkspaceDialogOpen ? (
         <Suspense fallback={null}>
           <WorkspaceDialogs
-            activeConversation={activeConversation}
-            activeConversationPeerIdentityId={activeConversationPeerIdentityId}
-            archiveNotification={archiveNotification}
-            communities={communities}
-            communityAvatarUrls={notificationCommunityAvatarUrls}
-            communityPreviews={notificationCommunityPreviews}
-            conversations={conversations}
-            identityNames={identityNames}
-            identityPictures={identityPictures}
-            identityProfiles={identityProfiles}
-            incomingCall={incomingCall}
-            inspectorOpen={inspectorOpen}
-            isCreateCommunityOpen={isCreateCommunityOpen}
-            isCreateOpen={isCreateOpen}
-            membershipRequestAction={membershipRequestAction}
-            membershipRequestError={membershipRequestError}
-            membershipRequests={membershipRequests}
-            messageContextMenu={messageContextMenu}
-            messages={messages}
-            node={node}
-            nodeNetworks={nodeNetworks}
-            nodeSettingsOpen={nodeSettingsOpen}
-            networkSynchronizationStatus={networkSynchronizationStatus}
-            notificationAction={notificationAction}
-            notificationError={notificationError}
-            notificationSettingsError={notificationSettingsError}
-            notificationSettingsSetting={notificationSettingsSetting}
-            notificationSettingsTarget={notificationSettingsTarget}
-            notificationsOpen={notificationsOpen}
-            peersLoading={peersLoading}
-            peers={peers}
-            presenceByIdentityId={presenceByIdentityId}
-            rawMessage={rawMessage}
-            realtimeEventLog={realtimeEventLog}
-            realtimeEventsOpen={realtimeEventsOpen}
-            session={session}
-            visibleNotifications={visibleNotifications}
-            onAcceptIncomingCall={acceptIncomingCall}
-            onAcceptNotification={(notification) =>
-              void acceptNotification(notification)
-            }
-            onCloseCreateCommunity={() =>
-              closeTransientSurface('community-creation')
-            }
-            onCloseCreateConversation={() =>
-              closeTransientSurface('conversation-creation')
-            }
-            onCloseInspector={() => closeTransientSurface('inspector')}
-            onCloseMessageContextMenu={closeMessageMenu}
-            onCloseNodeSettings={() => closeTransientSurface('node-settings')}
-            onCloseNotificationSettings={closeNotificationSettings}
-            onCloseNotifications={closeNotificationsPanel}
-            onCloseRawMessage={() => setRawMessage(null)}
-            onCloseRealtimeEvents={() =>
-              closeTransientSurface('realtime-events')
-            }
-            onCommunityCreated={({ community, session: nextSession }) => {
-              setSession(nextSession);
-              setCommunities((current) => [community, ...current]);
-              setActiveCommunityId(community.id);
-              setWorkspaceMode('community');
-              closeTransientSurface('community-creation');
+            creation={{
+              conversations,
+              createCommunityOpen: isCreateCommunityOpen,
+              createConversationOpen: isCreateOpen,
+              nodeNetworks,
+              onCloseCommunity: () =>
+                closeTransientSurface('community-creation'),
+              onCloseConversation: () =>
+                closeTransientSurface('conversation-creation'),
+              onCommunityCreated: ({ community, session: nextSession }) => {
+                setSession(nextSession);
+                setCommunities((current) => [community, ...current]);
+                setActiveCommunityId(community.id);
+                setWorkspaceMode('community');
+                closeTransientSurface('community-creation');
+              },
+              onCommunityJoinRequested: handleCommunityJoinRequested,
+              onConversationCreated: handleConversationCreated,
+              session,
             }}
-            onCommunityJoinRequested={(request: CommunityMembershipRequest) => {
-              setMembershipRequests((current) => [
-                request,
-                ...current.filter((item) => item.id !== request.id),
-              ]);
-
-              if (request.status === 'accepted') {
-                void applicationContainer.communities
-                  .get(sessionRef.current, request.communityId)
-                  .then((community) => {
-                    setCommunities((current) => [
-                      community,
-                      ...current.filter((item) => item.id !== community.id),
-                    ]);
-                    setActiveCommunityId(community.id);
-                    setWorkspaceMode('community');
-                  })
-                  .catch((caught) =>
-                    setSendError(
-                      toUserErrorMessage(
-                        caught,
-                        copy.communities.membershipError,
-                      ),
-                    ),
-                  );
-              }
-
-              closeTransientSurface('community-creation');
+            incomingCall={{
+              incomingCall,
+              onAccept: acceptIncomingCall,
+              onDecline: declineIncomingCall,
             }}
-            onConversationCreated={handleConversationCreated}
-            onGroupInviteOpen={() =>
-              setGroupInviteRequest((request) => request + 1)
-            }
-            onOpenConversationWithIdentity={
-              openOrCreateConversationWithIdentity
-            }
-            onAcceptMembershipRequest={(requestId) =>
-              void acceptMembershipRequest(requestId)
-            }
-            onDeclineIncomingCall={declineIncomingCall}
-            onDeclineMembershipRequest={(requestId) =>
-              void declineMembershipRequest(requestId)
-            }
-            onDeclineNotification={(notificationId) =>
-              void declineNotification(notificationId)
-            }
-            onNotificationSettingReset={resetNotificationSetting}
-            onNotificationSettingSave={saveNotificationSetting}
-            onDeleteMessage={(message) =>
-              void (messageContextMenu?.source === 'thread'
-                ? handleDeleteConversationThreadMessage(message)
-                : handleDeleteMessage(message))
-            }
-            onDownloadAttachment={(attachment) =>
-              void downloadContextAttachment(attachment)
-            }
-            onEditMessage={(message) =>
-              messageContextMenu?.source === 'thread'
-                ? startEditingConversationThreadMessage(message)
-                : startEditingMessage(message)
-            }
-            onCopyMessage={copyMessageContent}
-            onOpenMessageThread={(message) => void openMessageThread(message)}
-            onPinMessage={(message) => void pinMessage(message)}
-            onReplyToMessage={(message) => {
-              if (messageContextMenu?.source === 'thread') {
-                startReplyingToConversationThreadMessage(message);
-
-                return;
-              }
-
-              startReplyingToMessage(message);
+            inspector={{
+              activeConversation,
+              activeConversationPeerIdentityId,
+              identityNames,
+              identityPictures,
+              identityProfiles,
+              nodeNetworks,
+              onClose: () => closeTransientSurface('inspector'),
+              onGroupInviteOpen: () =>
+                setGroupInviteRequest((request) => request + 1),
+              onOpenConversationWithIdentity:
+                openOrCreateConversationWithIdentity,
+              open: inspectorOpen,
+              presenceByIdentityId,
+              session,
             }}
-            onNetworksUpdated={onNodeNetworksReload}
-            onUnpinMessage={(message) => void unpinMessage(message)}
-            pinnedMessageIds={pinnedMessageIds}
-            onToggleReaction={(message, emoji, reacted) =>
-              void handleToggleMessageReaction(message, emoji, reacted)
-            }
-            onViewRawMessage={(message) => {
-              setRawMessage(message);
-              closeMessageMenu();
+            messageActions={{
+              activeConversation,
+              menu: messageContextMenu,
+              onCloseMenu: closeMessageMenu,
+              onCloseRawMessage: () => setRawMessage(null),
+              onCopy: copyMessageContent,
+              onDelete: (message) =>
+                void (messageContextMenu?.source === 'thread'
+                  ? handleDeleteConversationThreadMessage(message)
+                  : handleDeleteMessage(message)),
+              onDownloadAttachment: (attachment) =>
+                void downloadContextAttachment(attachment),
+              onEdit: (message) =>
+                messageContextMenu?.source === 'thread'
+                  ? startEditingConversationThreadMessage(message)
+                  : startEditingMessage(message),
+              onOpenThread: (message) => void openMessageThread(message),
+              onPin: (message) => void pinMessage(message),
+              onReply: handleDialogMessageReply,
+              onToggleReaction: (message, emoji, reacted) =>
+                void handleToggleMessageReaction(message, emoji, reacted),
+              onUnpin: (message) => void unpinMessage(message),
+              onViewRaw: (message) => {
+                setRawMessage(message);
+                closeMessageMenu();
+              },
+              pinnedMessageIds,
+              rawMessage,
+              session,
+            }}
+            nodeSettings={{
+              networkSynchronizationStatus,
+              networks: nodeNetworks,
+              node,
+              onClose: () => closeTransientSurface('node-settings'),
+              onNetworksUpdated: onNodeNetworksReload,
+              open: nodeSettingsOpen,
+              peers,
+              peersLoading,
+              session,
+            }}
+            notificationSettings={{
+              error: notificationSettingsError,
+              onClose: closeNotificationSettings,
+              onReset: resetNotificationSetting,
+              onSave: saveNotificationSetting,
+              setting: notificationSettingsSetting,
+              target: notificationSettingsTarget,
+            }}
+            notifications={{
+              action: notificationAction,
+              archive: archiveNotification,
+              communities,
+              communityAvatarUrls: notificationCommunityAvatarUrls,
+              communityPreviews: notificationCommunityPreviews,
+              conversations,
+              error: notificationError,
+              identityNames,
+              identityPictures,
+              identityProfiles,
+              membershipAction: membershipRequestAction,
+              membershipError: membershipRequestError,
+              membershipRequests,
+              nodeNetworks,
+              notifications: visibleNotifications,
+              onAccept: (notification) => void acceptNotification(notification),
+              onAcceptMembershipRequest: (requestId) =>
+                void acceptMembershipRequest(requestId),
+              onClose: closeNotificationsPanel,
+              onDecline: (notificationId) =>
+                void declineNotification(notificationId),
+              onDeclineMembershipRequest: (requestId) =>
+                void declineMembershipRequest(requestId),
+              open: notificationsOpen,
+              session,
+            }}
+            realtimeEvents={{
+              events: realtimeEventLog,
+              onClose: () => closeTransientSurface('realtime-events'),
+              open: realtimeEventsOpen,
             }}
           />
         </Suspense>
