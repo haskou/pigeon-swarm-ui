@@ -29,8 +29,9 @@ import { UpdateStickerPackMessage } from '../../../../contexts/stickers/applicat
 import { StickerPackRenamer } from '../../../../contexts/stickers/application/update-sticker-pack/StickerPackRenamer';
 import { UpdateStickerMessage } from '../../../../contexts/stickers/application/update-sticker/messages/UpdateStickerMessage';
 import { StickerUpdater } from '../../../../contexts/stickers/application/update-sticker/StickerUpdater';
+import { Sticker } from '../../../../contexts/stickers/domain/entities/Sticker';
 import { stickerLibraryFixture } from '../StickerLibraryFixture';
-import { stickerPackFixture } from '../StickerPackFixture';
+import { stickerPackFixture, stickerPrimitives } from '../StickerPackFixture';
 
 const stickerInput = {
   actorIdentityId: 'identity-a',
@@ -52,6 +53,9 @@ describe('Sticker use cases', () => {
     libraries = mock<StickerLibraryRepository>();
     packs = mock<StickerPackRepository>();
     packs.find.mockResolvedValue(stickerPackFixture());
+    packs.add.mockResolvedValue(
+      Sticker.fromPrimitives(stickerPrimitives('server-sticker')),
+    );
     packs.save.mockResolvedValue(stickerPackFixture());
     libraries.find.mockResolvedValue(stickerLibraryFixture());
     libraries.save.mockResolvedValue(stickerLibraryFixture());
@@ -90,7 +94,8 @@ describe('Sticker use cases', () => {
       new DeleteStickerMessage('identity-a', 'pack-a', 'sticker-a', 200),
     );
 
-    expect(packs.save).toHaveBeenCalledTimes(4);
+    expect(packs.add).toHaveBeenCalledTimes(1);
+    expect(packs.save).toHaveBeenCalledTimes(3);
   });
 
   it('finds and mutates the personal sticker library', async () => {

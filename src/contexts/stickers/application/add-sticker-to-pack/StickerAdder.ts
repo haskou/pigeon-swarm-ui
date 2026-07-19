@@ -1,5 +1,4 @@
 import type { StickerPackRepository } from '../../domain/repositories/StickerPackRepository';
-import type { StickerPack } from '../../domain/StickerPack';
 
 import { Sticker } from '../../domain/entities/Sticker';
 import { StickerDefinition } from '../../domain/StickerDefinition';
@@ -10,24 +9,22 @@ export class StickerAdder {
     private readonly stickerPackRepository: StickerPackRepository,
   ) {}
 
-  public async add(message: AddStickerToPackMessage): Promise<StickerPack> {
+  public async add(message: AddStickerToPackMessage): Promise<Sticker> {
     const actorId = message.getActorId();
     const pack = await this.stickerPackRepository.find(message.getPackId());
 
-    pack.add(
-      Sticker.create(
-        StickerDefinition.create(
-          message.getAssetExternalIdentifier(),
-          message.getContentType(),
-          message.getDimensions(),
-          message.getSize(),
-          message.getType(),
-        ),
-        message.getOccurredAt(),
+    const sticker = Sticker.create(
+      StickerDefinition.create(
+        message.getAssetExternalIdentifier(),
+        message.getContentType(),
+        message.getDimensions(),
+        message.getSize(),
+        message.getType(),
       ),
       message.getOccurredAt(),
     );
+    pack.add(sticker, message.getOccurredAt());
 
-    return await this.stickerPackRepository.save(pack, actorId);
+    return await this.stickerPackRepository.add(pack, actorId);
   }
 }

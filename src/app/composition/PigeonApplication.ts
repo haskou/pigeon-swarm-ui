@@ -521,6 +521,7 @@ export class PigeonApplication {
       stickerContexts,
       stickerLibraryMapper,
       stickerPackMapper,
+      stickerMapper,
       {
         adder: new StickerAdder(stickerPackRepository),
         creator: new StickerPackCreator(stickerPackRepository),

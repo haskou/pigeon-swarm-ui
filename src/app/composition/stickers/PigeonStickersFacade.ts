@@ -26,6 +26,7 @@ import { UpdateStickerMessage } from '../../../contexts/stickers/application/upd
 import { PigeonStickersApi } from '../../../contexts/stickers/infrastructure/http/PigeonStickersApi';
 import { StickerAccessContexts } from '../../../contexts/stickers/infrastructure/http/StickerAccessContexts';
 import { StickerLibraryMapper } from '../../../contexts/stickers/infrastructure/http/StickerLibraryMapper';
+import { StickerMapper } from '../../../contexts/stickers/infrastructure/http/StickerMapper';
 import { StickerPackMapper } from '../../../contexts/stickers/infrastructure/http/StickerPackMapper';
 import { StickerProjectionNotFoundError } from './errors/StickerProjectionNotFoundError';
 
@@ -36,6 +37,7 @@ export class PigeonStickersFacade {
     private readonly contexts: StickerAccessContexts,
     private readonly libraries: StickerLibraryMapper,
     private readonly packs: StickerPackMapper,
+    private readonly stickers: StickerMapper,
     private readonly useCases: StickerUseCases,
   ) {}
 
@@ -68,19 +70,13 @@ export class PigeonStickersFacade {
     packId: string,
     input: StickerInput,
   ): Promise<StickerResource> {
-    const pack = await this.useCases.adder.add(
+    const sticker = await this.useCases.adder.add(
       new AddStickerToPackMessage(
         this.stickerInput(this.actor(session), packId, input),
       ),
     );
-    const resource = this.packs.toResource(pack);
-    const sticker = resource.stickers.find(
-      (candidate) => candidate.assetCid === input.assetCid,
-    );
 
-    if (!sticker) throw new StickerProjectionNotFoundError();
-
-    return sticker;
+    return this.stickers.toResource(sticker);
   }
 
   public assetUrl(assetCid: string): string {

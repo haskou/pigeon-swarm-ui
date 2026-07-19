@@ -20,7 +20,10 @@ import { StickerAccessContexts } from '../../../../../contexts/stickers/infrastr
 import { StickerMapper } from '../../../../../contexts/stickers/infrastructure/http/StickerMapper';
 import { StickerPackMapper } from '../../../../../contexts/stickers/infrastructure/http/StickerPackMapper';
 import { stickerPackFixture } from '../../StickerPackFixture';
-import { stickerPackResource } from '../../StickerResourceFixture';
+import {
+  stickerPackResource,
+  stickerResource,
+} from '../../StickerResourceFixture';
 
 const definition = () =>
   StickerDefinition.create(
@@ -52,8 +55,9 @@ describe(PigeonStickerPackRepository.name, () => {
 
     contexts.register(session);
     api.getPack.mockResolvedValue(stickerPackResource());
-    pack.rename(StickerPackName.fromString('Memes'), new Timestamp(200));
     pack.add(added, new Timestamp(200));
+    pack.pullDomainEvents();
+    pack.rename(StickerPackName.fromString('Memes'), new Timestamp(200));
     pack.replace(
       Sticker.update(added.getId(), definition(), new Timestamp(300)),
       new Timestamp(300),
@@ -63,9 +67,37 @@ describe(PigeonStickerPackRepository.name, () => {
     await repository.save(pack, actorId);
 
     expect(api.updatePack).toHaveBeenCalledTimes(1);
-    expect(api.addSticker).toHaveBeenCalledTimes(1);
     expect(api.updateSticker).toHaveBeenCalledTimes(1);
     expect(api.deleteSticker).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns the sticker resource created by the server', async () => {
+    const api = mock<PigeonStickersApi>();
+    const contexts = new StickerAccessContexts();
+    const stickers = new StickerMapper();
+    const repository = new PigeonStickerPackRepository(
+      api,
+      contexts,
+      new StickerPackMapper(stickers),
+      stickers,
+    );
+    const session = {
+      identity: { id: 'identity-a' },
+    } as unknown as Session;
+    const actorId = StickerOwnerId.fromString('identity-a');
+    const pack = stickerPackFixture();
+
+    contexts.register(session);
+    pack.add(
+      Sticker.create(definition(), new Timestamp(200)),
+      new Timestamp(200),
+    );
+    api.addSticker.mockResolvedValue(stickerResource('server-sticker'));
+
+    const added = await repository.add(pack, actorId);
+
+    expect(added.toPrimitives().id).toBe('server-sticker');
+    expect(api.getPack).not.toHaveBeenCalled();
   });
 
   it('creates, finds, and searches aggregate roots', async () => {

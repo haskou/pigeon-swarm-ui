@@ -4,13 +4,17 @@ import type { StickerUseCases } from '../../../../app/composition/stickers/Stick
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 
 import { PigeonStickersFacade } from '../../../../app/composition/stickers/PigeonStickersFacade';
+import { Sticker } from '../../../../contexts/stickers/domain/entities/Sticker';
 import { PigeonStickersApi } from '../../../../contexts/stickers/infrastructure/http/PigeonStickersApi';
 import { StickerAccessContexts } from '../../../../contexts/stickers/infrastructure/http/StickerAccessContexts';
 import { StickerLibraryMapper } from '../../../../contexts/stickers/infrastructure/http/StickerLibraryMapper';
 import { StickerMapper } from '../../../../contexts/stickers/infrastructure/http/StickerMapper';
 import { StickerPackMapper } from '../../../../contexts/stickers/infrastructure/http/StickerPackMapper';
 import { stickerLibraryFixture } from '../../../contexts/stickers/StickerLibraryFixture';
-import { stickerPackFixture } from '../../../contexts/stickers/StickerPackFixture';
+import {
+  stickerPackFixture,
+  stickerPrimitives,
+} from '../../../contexts/stickers/StickerPackFixture';
 
 describe(PigeonStickersFacade.name, () => {
   it('adapts UI resources to application messages and domain results', async () => {
@@ -26,6 +30,7 @@ describe(PigeonStickersFacade.name, () => {
       contexts,
       libraries,
       packs,
+      stickers,
       useCases,
     );
     const session = {
@@ -33,6 +38,15 @@ describe(PigeonStickersFacade.name, () => {
     } as unknown as Session;
 
     useCases.creator.create.mockResolvedValue(stickerPackFixture());
+    useCases.adder.add.mockResolvedValue(
+      Sticker.fromPrimitives({
+        ...stickerPrimitives('server-sticker'),
+        definition: {
+          ...stickerPrimitives('server-sticker').definition,
+          assetExternalIdentifier: 'duplicate-asset',
+        },
+      }),
+    );
     useCases.packFinder.find.mockResolvedValue(stickerPackFixture());
     useCases.packLister.list.mockResolvedValue([stickerPackFixture()]);
     useCases.libraryFinder.find.mockResolvedValue(stickerLibraryFixture());
@@ -40,6 +54,15 @@ describe(PigeonStickersFacade.name, () => {
     await expect(
       facade.createPack(session, { name: 'Daily' }),
     ).resolves.toEqual(expect.objectContaining({ id: 'pack-a' }));
+    await expect(
+      facade.addToPack(session, 'pack-a', {
+        assetCid: 'duplicate-asset',
+        contentType: 'image/webp',
+        dimensions: { height: 128, width: 128 },
+        sizeBytes: 512,
+        type: 'static',
+      }),
+    ).resolves.toEqual(expect.objectContaining({ id: 'server-sticker' }));
     await expect(facade.getPack('pack-a')).resolves.toEqual(
       expect.objectContaining({ id: 'pack-a' }),
     );
@@ -66,6 +89,7 @@ describe(PigeonStickersFacade.name, () => {
       contexts,
       new StickerLibraryMapper(packs, stickers),
       packs,
+      stickers,
       useCases,
     );
     const session = {

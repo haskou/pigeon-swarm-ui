@@ -1,3 +1,6 @@
+import { assert } from '@haskou/value-objects';
+
+import type { Sticker } from '../../domain/entities/Sticker';
 import type { StickerPackRepository } from '../../domain/repositories/StickerPackRepository';
 import type { StickerPack } from '../../domain/StickerPack';
 import type { StickerOwnerId } from '../../domain/value-objects/StickerOwnerId';
@@ -7,6 +10,7 @@ import { StickerAdded } from '../../domain/events/StickerAdded';
 import { StickerPackRenamed } from '../../domain/events/StickerPackRenamed';
 import { StickerRemoved } from '../../domain/events/StickerRemoved';
 import { StickerUpdated } from '../../domain/events/StickerUpdated';
+import { StickerAdditionNotRecordedError } from './errors/StickerAdditionNotRecordedError';
 import { PigeonStickersApi } from './PigeonStickersApi';
 import { StickerAccessContexts } from './StickerAccessContexts';
 import { StickerMapper } from './StickerMapper';
@@ -19,6 +23,28 @@ export class PigeonStickerPackRepository implements StickerPackRepository {
     private readonly packs: StickerPackMapper,
     private readonly stickers: StickerMapper,
   ) {}
+
+  public async add(
+    pack: StickerPack,
+    actorId: StickerOwnerId,
+  ): Promise<Sticker> {
+    const event = pack
+      .pullDomainEvents()
+      .find((candidate) => candidate instanceof StickerAdded);
+
+    assert(
+      event instanceof StickerAdded,
+      new StickerAdditionNotRecordedError(),
+    );
+
+    return this.stickers.fromResource(
+      await this.api.addSticker(
+        this.contexts.find(actorId),
+        event.aggregateId,
+        this.stickers.toInput(pack.findSticker(event.stickerId)),
+      ),
+    );
+  }
 
   public async create(
     pack: StickerPack,
@@ -49,14 +75,6 @@ export class PigeonStickerPackRepository implements StickerPackRepository {
           this.contexts.find(actorId),
           event.aggregateId,
           this.packs.toCreateInput(pack),
-        );
-      }
-
-      if (event instanceof StickerAdded) {
-        await this.api.addSticker(
-          this.contexts.find(actorId),
-          event.aggregateId,
-          this.stickers.toInput(pack.findSticker(event.stickerId)),
         );
       }
 
