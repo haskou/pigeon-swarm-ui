@@ -19,7 +19,6 @@ import type {
   CommunityTextChannel,
   CommunityInvitationNotificationResource,
   CommunityVoiceChannel,
-  ConversationKeyEntry,
   ChatMessage,
   IdentityPresence,
   IdentityResource,
@@ -42,7 +41,6 @@ import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useClose
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrowserIdle';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
-import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import {
   profileAnchorFromTarget,
   type ProfilePopoverAnchor,
@@ -52,8 +50,8 @@ import { MessageCollectionDialog } from '../../../messages/presentation/componen
 import { MessageThreadPanel } from '../../../messages/presentation/components/MessageThreadPanel';
 import { TypingIndicator } from '../../../messages/presentation/components/TypingIndicator';
 import { NotificationSettingsPolicy } from '../../../notifications/presentation/view-models/NotificationSettingsPolicy';
-import { CommunityAccessPolicy } from '../view-models/CommunityAccessPolicy';
-import { CommunityChannels } from '../view-models/CommunityChannels';
+import { CommunityChannelThreadCache } from '../view-models/CommunityChannelThreadCache';
+import { CommunityEncryptionDetails } from '../view-models/CommunityEncryptionDetails';
 import { CommunityMessageDecryptWorkerClient } from '../../infrastructure/crypto/CommunityMessageDecryptWorkerClient';
 import { CommunityHeader } from './CommunityHeader';
 import { CommunityHeaderActionsMenu } from './CommunityHeaderActionsMenu';
@@ -80,10 +78,8 @@ import {
   CommunityWorkspaceDialogs,
   type CommunityProfileView,
 } from './CommunityWorkspaceDialogs';
-import {
-  mergeChatMessages,
-  resolveCommunityChannelId,
-} from './communityWorkspaceHelpers';
+import { mergeChatMessages } from './communityWorkspaceHelpers';
+import { useCommunityChannelAccess } from './useCommunityChannelAccess';
 import { useCommunityChannelMessages } from './useCommunityChannelMessages';
 import { useCommunityChannelRealtime } from './useCommunityChannelRealtime';
 import { useCommunityKeyDialog } from './useCommunityKeyDialog';
@@ -180,135 +176,7 @@ interface CommunityWorkspaceProps {
   typingIdentityIds?: string[];
 }
 
-type ChannelThreadCacheEntry = {
-  storedAt: number;
-  threadsByChannelId: Record<string, CommunityChannelThreadSummary[]>;
-};
-
-const CHANNEL_THREAD_CACHE_TTL_MS = 15_000;
-const channelThreadCacheByCommunityId = new Map<
-  string,
-  ChannelThreadCacheEntry
->();
-
-function threadSummariesByChannelId(
-  channels: CommunityTextChannel[],
-): Record<string, CommunityChannelThreadSummary[]> {
-  return Object.fromEntries(
-    channels.map((channel) => [channel.id, channel.threads ?? []]),
-  );
-}
-
-function withThreadRootLabelKeys(
-  current: Set<string>,
-  keys: string[],
-): Set<string> {
-  let next: Set<string> | undefined;
-
-  for (const key of keys) {
-    if (current.has(key)) continue;
-
-    next ??= new Set(current);
-    next.add(key);
-  }
-
-  return next ?? current;
-}
-
-function communityEncryptionDetails({
-  channelEncryptionReady,
-  community,
-  communityIsPublic,
-  communityKey,
-  networkName,
-  selectedChannel,
-}: {
-  channelEncryptionReady: boolean;
-  community: Community;
-  communityIsPublic: boolean;
-  communityKey?: ConversationKeyEntry;
-  networkName: string;
-  selectedChannel?: CommunityTextChannel;
-}) {
-  return {
-    note: communityIsPublic
-      ? copy.encryption.publicCommunityNote
-      : channelEncryptionReady
-        ? copy.encryption.communityNote
-        : copy.encryption.missingNote,
-    rows: [
-      {
-        label: copy.encryption.scope,
-        value: selectedChannel
-          ? `${community.name} / #${selectedChannel.name}`
-          : community.name,
-      },
-      {
-        label: copy.encryption.network,
-        value: networkName,
-      },
-      {
-        label: copy.encryption.algorithm,
-        technical: true,
-        value: communityIsPublic
-          ? copy.encryption.plaintext
-          : (communityKey?.algorithm ?? copy.encryption.unknown),
-      },
-      {
-        label: copy.encryption.keyVersion,
-        technical: true,
-        value: communityKey ? `v${communityKey.version}` : '-',
-      },
-      {
-        label: copy.encryption.createdAt,
-        technical: true,
-        value: communityKey
-          ? new Intl.DateTimeFormat(undefined, {
-              day: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit',
-              month: 'short',
-              year: 'numeric',
-            }).format(new Date(communityKey.createdAt))
-          : '-',
-      },
-    ],
-    secrets: communityIsPublic
-      ? []
-      : [
-          {
-            label: copy.encryption.communityKey,
-            sensitive: true,
-            value: communityKey?.key,
-          },
-        ],
-    status: communityIsPublic
-      ? ('public' as const)
-      : channelEncryptionReady
-        ? ('ready' as const)
-        : ('missing' as const),
-    subtitle: selectedChannel
-      ? shortId(selectedChannel.id)
-      : shortId(community.id),
-    title: copy.encryption.communityTitle,
-  };
-}
-
-function cachedChannelThreadsFor(
-  communityId: string,
-): Record<string, CommunityChannelThreadSummary[]> | null {
-  const entry = channelThreadCacheByCommunityId.get(communityId);
-
-  if (!entry) return null;
-
-  if (Date.now() - entry.storedAt > CHANNEL_THREAD_CACHE_TTL_MS) {
-    channelThreadCacheByCommunityId.delete(communityId);
-
-    return null;
-  }
-
-  return entry.threadsByChannelId;
-}
+const communityChannelThreadCache = new CommunityChannelThreadCache();
 
 export function CommunityWorkspace({
   activeCall,
@@ -362,88 +230,25 @@ export function CommunityWorkspace({
   timelineFocusKey,
   typingIdentityIds = [],
 }: CommunityWorkspaceProps) {
-  const textChannels = useMemo(
-    () => CommunityChannels.text(community),
-    [community.channels, community.textChannels],
-  );
-  const voiceChannels = useMemo(
-    () => CommunityChannels.voice(community),
-    [community.channels, community.voiceChannels],
-  );
-  const channelTopologyKey = useMemo(
-    () =>
-      CommunityChannels.all(community)
-        .map((channel) => `${channel.type}:${channel.id}`)
-        .join('|'),
-    [community.channels, community.textChannels, community.voiceChannels],
-  );
-  const currentPermissions = useMemo(
-    () => CommunityAccessPolicy.permissionsFor(community, session.identity.id),
-    [community, session.identity.id],
-  );
-  const currentRoleIds = useMemo(
-    () =>
-      CommunityAccessPolicy.assignedRoleIdsFor(community, session.identity.id),
-    [community, session.identity.id],
-  );
-  const communityNotificationScope = useMemo(
-    () =>
-      ({
-        communityId: community.id,
-        type: 'community',
-      }) satisfies NotificationSettingScope,
-    [community.id],
-  );
-  const communityNotificationSetting = useMemo(
-    () =>
-      NotificationSettingsPolicy.resolve(
-        notificationSettingsByScopeKey,
-        communityNotificationScope,
-      ),
-    [communityNotificationScope, notificationSettingsByScopeKey],
-  );
-  const channelNotificationScope = useCallback(
-    (channelId: string): NotificationSettingScope => ({
-      channelId,
-      communityId: community.id,
-      type: 'community_channel',
-    }),
-    [community.id],
-  );
-  const channelNotificationSetting = useCallback(
-    (channel: { id: string }) =>
-      NotificationSettingsPolicy.resolve(
-        notificationSettingsByScopeKey,
-        channelNotificationScope(channel.id),
-      ),
-    [channelNotificationScope, notificationSettingsByScopeKey],
-  );
-  const accessibleTextChannels = useMemo(
-    () =>
-      textChannels.filter((channel) =>
-        CommunityAccessPolicy.canSeeChannel(
-          community,
-          channel,
-          session.identity.id,
-        ),
-      ),
-    [community, session.identity.id, textChannels],
-  );
-  const accessibleVoiceChannels = useMemo(
-    () =>
-      voiceChannels.filter((channel) =>
-        CommunityAccessPolicy.canSeeChannel(
-          community,
-          channel,
-          session.identity.id,
-        ),
-      ),
-    [community, session.identity.id, voiceChannels],
-  );
-  const resolvedChannelId = useMemo(
-    () => resolveCommunityChannelId(activeChannelId, accessibleTextChannels),
-    [accessibleTextChannels, activeChannelId],
-  );
+  const {
+    accessibleTextChannels,
+    accessibleVoiceChannels,
+    channelNotificationScope,
+    channelNotificationSetting,
+    channelTopologyKey,
+    communityNotificationScope,
+    communityNotificationSetting,
+    currentPermissions,
+    currentRoleIds,
+    resolvedChannelId,
+    textChannels,
+    voiceChannels,
+  } = useCommunityChannelAccess({
+    activeChannelId,
+    community,
+    currentIdentityId: session.identity.id,
+    notificationSettingsByScopeKey,
+  });
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const draftSyncTimersRef = useRef(new Map<string, number>());
   const [stickerPackPreview, setStickerPackPreview] =
@@ -472,7 +277,7 @@ export function CommunityWorkspace({
   );
   const [channelThreadsByChannelId, setChannelThreadsByChannelId] = useState<
     Record<string, CommunityChannelThreadSummary[]>
-  >(() => threadSummariesByChannelId(textChannels));
+  >(() => CommunityChannelThreadCache.fromChannels(textChannels));
   const [threadRootLabels, setThreadRootLabels] = useState<
     Record<string, string>
   >({});
@@ -533,10 +338,12 @@ export function CommunityWorkspace({
     unresolvedThreadRootLabelKeysRef.current.clear();
   }, [community.id]);
   useEffect(() => {
-    setChannelThreadsByChannelId(threadSummariesByChannelId(textChannels));
+    setChannelThreadsByChannelId(
+      CommunityChannelThreadCache.fromChannels(textChannels),
+    );
   }, [community.id, textChannels]);
   useEffect(() => {
-    const cached = cachedChannelThreadsFor(community.id);
+    const cached = communityChannelThreadCache.read(community.id);
 
     if (cached) {
       setChannelThreadsByChannelId(cached);
@@ -551,14 +358,11 @@ export function CommunityWorkspace({
           if (cancelled) return;
 
           onCommunityChannelsUpdated(community.id, channels);
-          const threadsByChannelId = threadSummariesByChannelId(
+          const threadsByChannelId = CommunityChannelThreadCache.fromChannels(
             channels.filter((channel) => channel.type === 'text'),
           );
 
-          channelThreadCacheByCommunityId.set(community.id, {
-            storedAt: Date.now(),
-            threadsByChannelId,
-          });
+          communityChannelThreadCache.write(community.id, threadsByChannelId);
           setChannelThreadsByChannelId(threadsByChannelId);
         })
         .catch(() => undefined);
@@ -663,7 +467,7 @@ export function CommunityWorkspace({
     if (hiddenKeys.length === 0) return;
 
     setHiddenThreadRootLabelKeys((current) =>
-      withThreadRootLabelKeys(current, hiddenKeys),
+      CommunityChannelThreadCache.addLabelKeys(current, hiddenKeys),
     );
   }, [channelThreadsByChannelId, messages, selectedChannelId]);
   const draft = selectedChannelId ? (drafts[selectedChannelId] ?? '') : '';
@@ -969,7 +773,7 @@ export function CommunityWorkspace({
 
           if (hiddenKeys.length > 0 && !cancelled) {
             setHiddenThreadRootLabelKeys((current) =>
-              withThreadRootLabelKeys(current, hiddenKeys),
+              CommunityChannelThreadCache.addLabelKeys(current, hiddenKeys),
             );
           }
 
@@ -1421,38 +1225,6 @@ export function CommunityWorkspace({
       cancelled = true;
     };
   }, [community.banner]);
-
-  const resolveMemberIdentities = useCallback(async () => {
-    const cachedIdentities = memberIdentitiesRef.current;
-    const entries = await Promise.all(
-      community.memberIds.map(async (identityId) => {
-        const cached =
-          identityId === session.identity.id
-            ? session.identity
-            : cachedIdentities[identityId];
-
-        if (cached) return [identityId, cached] as const;
-
-        try {
-          return [
-            identityId,
-            await applicationContainer.identities.get(
-              IdentityId.normalize(identityId),
-            ),
-          ] as const;
-        } catch {
-          return [identityId, undefined] as const;
-        }
-      }),
-    );
-    const nextIdentities: Record<string, IdentityResource> = {};
-
-    for (const [identityId, identity] of entries) {
-      if (identity) nextIdentities[identityId] = identity;
-    }
-
-    return nextIdentities;
-  }, [communityMemberIds, session.identity]);
 
   const handleStickerClick = (sticker: StickerMessageReference) => {
     setStickerPackPreview(sticker);
@@ -2046,7 +1818,7 @@ export function CommunityWorkspace({
         currentPermissions={currentPermissions}
         encryptionDetails={
           encryptionDetailsOpen
-            ? communityEncryptionDetails({
+            ? CommunityEncryptionDetails.create({
                 channelEncryptionReady,
                 community,
                 communityIsPublic,
