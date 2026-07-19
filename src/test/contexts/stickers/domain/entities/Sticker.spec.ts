@@ -1,13 +1,13 @@
 import { Timestamp } from '@haskou/value-objects';
 
 import { Sticker } from '../../../../../contexts/stickers/domain/entities/Sticker';
-import { StickerDefinition } from '../../../../../contexts/stickers/domain/StickerDefinition';
-import { StickerDimensions } from '../../../../../contexts/stickers/domain/StickerDimensions';
-import { StickerType } from '../../../../../contexts/stickers/domain/StickerType';
 import { StickerAssetExternalIdentifier } from '../../../../../contexts/stickers/domain/value-objects/StickerAssetExternalIdentifier';
 import { StickerByteSize } from '../../../../../contexts/stickers/domain/value-objects/StickerByteSize';
 import { StickerContentType } from '../../../../../contexts/stickers/domain/value-objects/StickerContentType';
+import { StickerDefinition } from '../../../../../contexts/stickers/domain/value-objects/StickerDefinition';
+import { StickerDimensions } from '../../../../../contexts/stickers/domain/value-objects/StickerDimensions';
 import { StickerId } from '../../../../../contexts/stickers/domain/value-objects/StickerId';
+import { StickerType } from '../../../../../contexts/stickers/domain/value-objects/StickerType';
 
 const definition = StickerDefinition.create(
   StickerAssetExternalIdentifier.fromString('asset-a'),

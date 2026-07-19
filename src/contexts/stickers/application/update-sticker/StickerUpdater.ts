@@ -2,7 +2,7 @@ import type { StickerPackRepository } from '../../domain/repositories/StickerPac
 import type { StickerPack } from '../../domain/StickerPack';
 
 import { Sticker } from '../../domain/entities/Sticker';
-import { StickerDefinition } from '../../domain/StickerDefinition';
+import { StickerDefinition } from '../../domain/value-objects/StickerDefinition';
 import { UpdateStickerMessage } from './messages/UpdateStickerMessage';
 
 export class StickerUpdater {

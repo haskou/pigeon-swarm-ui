@@ -1,8 +1,8 @@
 import { assert, type PrimitiveOf } from '@haskou/value-objects';
 
-import { InvalidPollScopeError } from './errors/InvalidPollScopeError';
-import { PollScopeIdentifier } from './value-objects/PollScopeIdentifier';
-import { PollScopeType } from './value-objects/PollScopeType';
+import { InvalidPollScopeError } from '../errors/InvalidPollScopeError';
+import { PollScopeIdentifier } from './PollScopeIdentifier';
+import { PollScopeType } from './PollScopeType';
 
 export class PollScope {
   public static communityChannel(

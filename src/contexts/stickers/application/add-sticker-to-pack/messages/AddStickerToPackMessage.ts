@@ -1,12 +1,12 @@
 import { Timestamp } from '@haskou/value-objects';
 
-import { StickerDimensions } from '../../../domain/StickerDimensions';
-import { StickerType } from '../../../domain/StickerType';
 import { StickerAssetExternalIdentifier } from '../../../domain/value-objects/StickerAssetExternalIdentifier';
 import { StickerByteSize } from '../../../domain/value-objects/StickerByteSize';
 import { StickerContentType } from '../../../domain/value-objects/StickerContentType';
+import { StickerDimensions } from '../../../domain/value-objects/StickerDimensions';
 import { StickerOwnerId } from '../../../domain/value-objects/StickerOwnerId';
 import { StickerPackId } from '../../../domain/value-objects/StickerPackId';
+import { StickerType } from '../../../domain/value-objects/StickerType';
 
 export class AddStickerToPackMessage {
   public constructor(
