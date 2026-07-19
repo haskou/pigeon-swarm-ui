@@ -93,6 +93,7 @@ import { useCallResourceReconciliation } from './useCallResourceReconciliation';
 import { useCallStartActions } from './useCallStartActions';
 import { useCommunitySelection } from './useCommunitySelection';
 import { useConversationMessageActions } from './useConversationMessageActions';
+import { useConversationDrafts } from './useConversationDrafts';
 import { useConversationPins } from './useConversationPins';
 import { useConversationThread } from './useConversationThread';
 import { useMessageViewport } from './useMessageViewport';
@@ -219,7 +220,6 @@ export function GlassWorkspace({
   const [realtimeEventLog, setRealtimeEventLog] = useState<
     RealtimeDomainEvent[]
   >([]);
-  const draftSyncTimersRef = useRef(new Map<string, number>());
   const [sendError, setSendError] = useState<string | null>(null);
   const [attachmentProgress, setAttachmentProgress] =
     useState<AttachmentProgress | null>(null);
@@ -424,6 +424,15 @@ export function GlassWorkspace({
     [activeConversationId, conversations],
   );
   const {
+    activeDraft: activeConversationDraft,
+    updateActiveDraft: updateActiveConversationDraft,
+  } = useConversationDrafts({
+    activeConversationId: activeConversation?.id ?? null,
+    drafts,
+    onDraftsChange: setDrafts,
+    session,
+  });
+  const {
     cancelEditing: cancelConversationThreadEdit,
     cancelReplying: cancelConversationThreadReply,
     edit: handleEditConversationThreadMessage,
@@ -477,10 +486,6 @@ export function GlassWorkspace({
         : NotificationSettingsPolicy.defaults,
     [activeConversationNotificationScope, notificationSettingsByScopeKey],
   );
-  const activeConversationDraft = activeConversation?.id
-    ? (drafts[activeConversation.id] ?? '')
-    : '';
-
   useEffect(() => {
     setConversationThread(null);
   }, [activeConversation?.id]);
@@ -543,71 +548,6 @@ export function GlassWorkspace({
 
     void preloadCommunityWorkspace();
   }, [workspaceMode]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    void applicationContainer.messages
-      .listDrafts(session)
-      .then((remoteDrafts) => {
-        if (cancelled) return;
-
-        setDrafts((current) => {
-          const next = { ...current };
-
-          for (const draft of remoteDrafts) {
-            if (next[draft.conversationId] === undefined) {
-              next[draft.conversationId] = draft.content;
-            }
-          }
-
-          return next;
-        });
-      })
-      .catch(() => undefined);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [session, setDrafts]);
-
-  const scheduleConversationDraftSync = useCallback(
-    (conversationId: string, value: string) => {
-      const currentTimer = draftSyncTimersRef.current.get(conversationId);
-
-      if (currentTimer) window.clearTimeout(currentTimer);
-
-      const timer = window.setTimeout(() => {
-        draftSyncTimersRef.current.delete(conversationId);
-
-        if (value.trim()) {
-          void applicationContainer.messages
-            .saveDraft(session, conversationId, value)
-            .catch(() => undefined);
-
-          return;
-        }
-
-        void applicationContainer.messages
-          .deleteDraft(session, conversationId)
-          .catch(() => undefined);
-      }, 700);
-
-      draftSyncTimersRef.current.set(conversationId, timer);
-    },
-    [session],
-  );
-
-  useEffect(
-    () => () => {
-      for (const timer of draftSyncTimersRef.current.values()) {
-        window.clearTimeout(timer);
-      }
-
-      draftSyncTimersRef.current.clear();
-    },
-    [],
-  );
 
   const visibleCommunityUnreadCountsById = useMemo(
     () =>
@@ -674,18 +614,6 @@ export function GlassWorkspace({
       }));
     },
     [],
-  );
-  const updateActiveConversationDraft = useCallback(
-    (value: string) => {
-      if (!activeConversation?.id) return;
-
-      scheduleConversationDraftSync(activeConversation.id, value);
-      setDrafts((current) => ({
-        ...current,
-        [activeConversation.id]: value,
-      }));
-    },
-    [activeConversation?.id, scheduleConversationDraftSync, setDrafts],
   );
   const {
     communitySettingFor: communityNotificationSettingFor,
