@@ -23,7 +23,7 @@ import {
 } from './conversationThreadState';
 
 type UseConversationThreadInput = {
-  activeConversation: ConversationResource | null;
+  activeConversation?: ConversationResource;
   closeMessageContextMenu: () => void;
   session: Session;
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;

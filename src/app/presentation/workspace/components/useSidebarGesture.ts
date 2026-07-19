@@ -1,9 +1,4 @@
-import {
-  type Dispatch,
-  type PointerEvent,
-  type SetStateAction,
-  useRef,
-} from 'react';
+import { type PointerEvent, useRef } from 'react';
 
 type SidebarGesture = {
   pointerId: number;
@@ -19,7 +14,7 @@ interface SidebarGestureHandlers {
 
 export function useSidebarGesture(
   sidebarOpen: boolean,
-  setSidebarOpen: Dispatch<SetStateAction<boolean>>,
+  openSidebar: () => void,
 ): SidebarGestureHandlers {
   const sidebarGestureRef = useRef<SidebarGesture | null>(null);
 
@@ -44,7 +39,7 @@ export function useSidebarGesture(
     const deltaY = Math.abs(event.clientY - gesture.startY);
 
     if (deltaX > 54 && deltaY < 42) {
-      setSidebarOpen(true);
+      openSidebar();
       sidebarGestureRef.current = null;
     }
 

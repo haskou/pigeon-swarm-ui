@@ -1,6 +1,16 @@
 import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
 
 export class CommunityList {
+  public static prepending(
+    communities: Community[],
+    community: Community,
+  ): Community[] {
+    return [
+      community,
+      ...communities.filter((candidate) => candidate.id !== community.id),
+    ];
+  }
+
   public static preservingCommunityVoicePresence(
     community: Community,
     currentCommunity: Community,
@@ -61,5 +71,22 @@ export class CommunityList {
     return uniqueCommunities.length === communities.length
       ? communities
       : uniqueCommunities;
+  }
+
+  public static updating(
+    communities: Community[],
+    communityId: string,
+    updater: (community: Community) => Community,
+  ): Community[] {
+    return communities.map((community) =>
+      community.id === communityId ? updater(community) : community,
+    );
+  }
+
+  public static without(
+    communities: Community[],
+    communityId: string,
+  ): Community[] {
+    return communities.filter((community) => community.id !== communityId);
   }
 }

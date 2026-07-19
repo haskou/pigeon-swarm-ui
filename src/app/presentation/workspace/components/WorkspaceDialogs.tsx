@@ -1,25 +1,17 @@
 import { lazy, Suspense, useEffect, useState, type ReactElement } from 'react';
 
-import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
-import type { NetworkSynchronizationStatus } from '../../../../contexts/networks/presentation/view-models/NetworkSynchronizationStatus';
-import type { Peer } from '../../../../contexts/networks/presentation/view-models/Peer';
-import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
-import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
-import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
+import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
 import type {
-  ChatMessage,
-  Community,
-  CommunityMembershipRequest,
-  ConversationResource,
-  IdentityPresence,
-  IdentityResource,
-  MessageAttachment,
-  NotificationScopeSetting,
-  NotificationScopeSettingInput,
-  NotificationResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
-import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
+  WorkspaceCreationDialogs,
+  WorkspaceDialogSections,
+  WorkspaceIncomingCallDialog,
+  WorkspaceInspectorDialog,
+  WorkspaceMessageActionDialogs,
+  WorkspaceNodeSettingsDialog,
+  WorkspaceNotificationSettingsDialog,
+  WorkspaceNotificationsDialog,
+  WorkspaceRealtimeEventsDialog,
+} from './WorkspaceDialogSections';
 
 import { MessageEditability } from '../../../../contexts/messages/presentation/view-models/MessageEditability';
 import { conversationSupportsThreads } from '../../../../contexts/conversations/presentation/view-models/conversationSupportsThreads';
@@ -28,11 +20,7 @@ import { SegmentedControl } from '../../../../shared/presentation/components/seg
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { Inspector } from './Inspector';
-import {
-  MessageContextMenu,
-  type MessageContextMenuState,
-} from './messageContextMenu';
-import type { NotificationScopeSettingsTarget } from '../../../../contexts/notifications/presentation/components/NotificationScopeSettingsDialog';
+import { MessageContextMenu } from './messageContextMenu';
 
 const CommunityDiscoveryDialog = lazy(() =>
   import('../../../../contexts/communities/presentation/components/CommunityDiscoveryDialog').then(
@@ -92,123 +80,37 @@ const RealtimeEventsDialog = lazy(() =>
   })),
 );
 
-interface WorkspaceDialogsProps {
-  activeConversation?: ConversationResource;
-  activeConversationPeerIdentityId?: string;
-  archiveNotification: (notificationId: string) => void;
-  communities: Community[];
-  communityAvatarUrls: Record<string, string>;
-  communityPreviews: Record<string, Community>;
-  conversations: ConversationResource[];
-  identityNames: Record<string, string>;
-  identityPictures: Record<string, string>;
-  identityProfiles: Record<string, IdentityResource>;
-  incomingCall: {
-    call: CallResource;
-    caller?: CallParticipant;
-    participants: CallParticipant[];
-    title: string;
-  } | null;
-  inspectorOpen: boolean;
-  isCreateCommunityOpen: boolean;
-  isCreateOpen: boolean;
-  membershipRequestAction: 'accept' | 'decline' | 'refresh' | null;
-  membershipRequestError: string | null;
-  membershipRequests: CommunityMembershipRequest[];
-  messageContextMenu: MessageContextMenuState | null;
-  messages: ChatMessage[];
-  node: (NodeInfo & { owner: null | string }) | null;
-  nodeNetworks: NodeNetwork[];
-  nodeSettingsOpen: boolean;
-  networkSynchronizationStatus: NetworkSynchronizationStatus | null;
-  notificationAction: 'accept' | 'archive' | 'decline' | 'refresh' | null;
-  notificationError: string | null;
-  notificationSettingsError: null | string;
-  notificationSettingsSetting: NotificationScopeSetting | null;
-  notificationSettingsTarget: NotificationScopeSettingsTarget | null;
-  notificationsOpen: boolean;
-  peersLoading: boolean;
-  peers: Peer[];
-  presenceByIdentityId: Record<string, IdentityPresence>;
-  rawMessage: ChatMessage | null;
-  realtimeEventLog: RealtimeDomainEvent[];
-  realtimeEventsOpen: boolean;
-  session: Session;
-  visibleNotifications: NotificationResource[];
-  onAcceptIncomingCall: () => void;
-  onAcceptNotification: (notification: NotificationResource) => void;
-  onCloseCreateCommunity: () => void;
-  onCloseCreateConversation: () => void;
-  onCloseInspector: () => void;
-  onCloseMessageContextMenu: () => void;
-  onCloseNodeSettings: () => void;
-  onCloseNotifications: () => void;
-  onCloseNotificationSettings: () => void;
-  onCloseRawMessage: () => void;
-  onCloseRealtimeEvents: () => void;
-  onCommunityCreated: (input: {
-    community: Community;
-    session: Session;
-  }) => void;
-  onCommunityJoinRequested: (request: CommunityMembershipRequest) => void;
-  onConversationCreated: (
-    nextSession: Session,
-    conversation: ConversationResource,
-  ) => void;
-  onGroupInviteOpen: () => void;
-  onOpenConversationWithIdentity?: (
-    identityId: string,
-    identity?: IdentityResource,
-    networkId?: string,
-  ) => Promise<void>;
-  onDeclineIncomingCall: () => void;
-  onDeclineMembershipRequest: (requestId: string) => void;
-  onAcceptMembershipRequest: (requestId: string) => void;
-  onDeclineNotification: (notificationId: string) => void;
-  onNotificationSettingReset: (
-    scope: NotificationScopeSettingsTarget['scope'],
-  ) => void;
-  onNotificationSettingSave: (setting: NotificationScopeSettingInput) => void;
-  onDeleteMessage: (message: ChatMessage) => void;
-  onDownloadAttachment: (attachment: MessageAttachment) => void;
-  onEditMessage: (message: ChatMessage) => void;
-  onNetworksUpdated: () => Promise<void>;
-  onCopyMessage: (message: ChatMessage) => void;
-  onOpenMessageThread: (message: ChatMessage) => void;
-  onPinMessage: (message: ChatMessage) => void;
-  onReplyToMessage: (message: ChatMessage) => void;
-  onUnpinMessage: (message: ChatMessage) => void;
-  pinnedMessageIds: ReadonlySet<string>;
-  onToggleReaction: (
-    message: ChatMessage,
-    emoji: string,
-    reacted: boolean,
-  ) => void;
-  onViewRawMessage: (message: ChatMessage) => void;
-}
-
-export function WorkspaceDialogs(props: WorkspaceDialogsProps): ReactElement {
+export function WorkspaceDialogs({
+  creation,
+  incomingCall,
+  inspector,
+  messageActions,
+  nodeSettings,
+  notificationSettings,
+  notifications,
+  realtimeEvents,
+}: WorkspaceDialogSections): ReactElement {
   const [communityEntryMode, setCommunityEntryMode] =
     useState<CommunityEntryMode>('discover');
 
   useEffect(() => {
-    if (props.isCreateCommunityOpen) setCommunityEntryMode('discover');
-  }, [props.isCreateCommunityOpen]);
+    if (creation.createCommunityOpen) setCommunityEntryMode('discover');
+  }, [creation.createCommunityOpen]);
 
   return (
     <>
-      <MobileInspectorDialog {...props} />
-      <MessageActionDialogs {...props} />
+      <MobileInspectorDialog {...inspector} />
+      <MessageActionDialogs {...messageActions} />
       <CreateDialogs
-        {...props}
+        {...creation}
         communityEntryMode={communityEntryMode}
         onCommunityEntryModeChange={setCommunityEntryMode}
       />
-      <WorkspaceNotificationDialog {...props} />
-      <NotificationSettingsOverlay {...props} />
-      <NodeSettingsOverlay {...props} />
-      <RealtimeEventsOverlay {...props} />
-      <IncomingCallOverlay {...props} />
+      <WorkspaceNotificationDialog {...notifications} />
+      <NotificationSettingsOverlay {...notificationSettings} />
+      <NodeSettingsOverlay {...nodeSettings} />
+      <RealtimeEventsOverlay {...realtimeEvents} />
+      <IncomingCallOverlay {...incomingCall} />
     </>
   );
 }
@@ -236,13 +138,13 @@ function CommunityEntryModeControl({
 }
 
 function MobileInspectorDialog(
-  props: WorkspaceDialogsProps,
+  props: WorkspaceInspectorDialog,
 ): ReactElement | null {
-  const { close, state } = useCloseTransition(props.onCloseInspector);
+  const { close, state } = useCloseTransition(props.onClose);
 
-  useCloseOnEscape(close, props.inspectorOpen);
+  useCloseOnEscape(close, props.open);
 
-  if (!props.inspectorOpen) return null;
+  if (!props.open) return null;
 
   return (
     <>
@@ -273,15 +175,15 @@ function MobileInspectorDialog(
 }
 
 function MessageActionDialogs(
-  props: WorkspaceDialogsProps,
+  props: WorkspaceMessageActionDialogs,
 ): ReactElement | null {
-  const contextMenuMessage = props.messageContextMenu?.message;
-  const contextMenuFromThread = props.messageContextMenu?.source === 'thread';
+  const contextMenuMessage = props.menu?.message;
+  const contextMenuFromThread = props.menu?.source === 'thread';
   const contextMenuMessagePinned = contextMenuMessage
     ? isPinnedMessage(contextMenuMessage, props.pinnedMessageIds)
     : false;
 
-  if (!props.messageContextMenu) {
+  if (!props.menu) {
     return props.rawMessage ? (
       <Suspense fallback={null}>
         <RawMessageDialog
@@ -296,17 +198,17 @@ function MessageActionDialogs(
     <>
       <MessageContextMenu
         currentIdentityId={props.session.identity.id}
-        menu={props.messageContextMenu}
-        onClose={props.onCloseMessageContextMenu}
+        menu={props.menu}
+        onClose={props.onCloseMenu}
         onCopy={
           contextMenuMessage?.content
-            ? () => props.onCopyMessage(contextMenuMessage)
+            ? () => props.onCopy(contextMenuMessage)
             : undefined
         }
         onDelete={
           contextMenuMessage?.kind !== 'poll' &&
           contextMenuMessage?.authorIdentityId === props.session.identity.id
-            ? () => props.onDeleteMessage(contextMenuMessage)
+            ? () => props.onDelete(contextMenuMessage)
             : undefined
         }
         onDownloadAttachment={props.onDownloadAttachment}
@@ -317,7 +219,7 @@ function MessageActionDialogs(
             contextMenuMessage,
             props.session.identity.id,
           )
-            ? () => props.onEditMessage(contextMenuMessage)
+            ? () => props.onEdit(contextMenuMessage)
             : undefined
         }
         onOpenThread={
@@ -325,7 +227,7 @@ function MessageActionDialogs(
           contextMenuMessage.kind !== 'poll' &&
           !contextMenuFromThread &&
           conversationSupportsThreads(props.activeConversation)
-            ? () => props.onOpenMessageThread(contextMenuMessage)
+            ? () => props.onOpenThread(contextMenuMessage)
             : undefined
         }
         onPin={
@@ -333,12 +235,12 @@ function MessageActionDialogs(
           contextMenuMessage.kind !== 'poll' &&
           !contextMenuFromThread &&
           !contextMenuMessagePinned
-            ? () => props.onPinMessage(contextMenuMessage)
+            ? () => props.onPin(contextMenuMessage)
             : undefined
         }
         onReply={
           contextMenuMessage && contextMenuMessage.kind !== 'poll'
-            ? () => props.onReplyToMessage(contextMenuMessage)
+            ? () => props.onReply(contextMenuMessage)
             : undefined
         }
         onUnpin={
@@ -346,13 +248,13 @@ function MessageActionDialogs(
           contextMenuMessage.kind !== 'poll' &&
           !contextMenuFromThread &&
           contextMenuMessagePinned
-            ? () => props.onUnpinMessage(contextMenuMessage)
+            ? () => props.onUnpin(contextMenuMessage)
             : undefined
         }
         pinned={contextMenuMessagePinned}
         onReactionToggle={props.onToggleReaction}
         onViewRaw={() => {
-          if (contextMenuMessage) props.onViewRawMessage(contextMenuMessage);
+          if (contextMenuMessage) props.onViewRaw(contextMenuMessage);
         }}
       />
       {props.rawMessage && (
@@ -377,26 +279,26 @@ function isPinnedMessage(
 }
 
 function CreateDialogs(
-  props: WorkspaceDialogsProps & {
+  props: WorkspaceCreationDialogs & {
     communityEntryMode: CommunityEntryMode;
     onCommunityEntryModeChange: (mode: CommunityEntryMode) => void;
   },
 ): ReactElement | null {
-  if (props.isCreateOpen) {
+  if (props.createConversationOpen) {
     return (
       <Suspense fallback={null}>
         <CreateConversationDialog
           conversations={props.conversations}
           nodeNetworks={props.nodeNetworks}
           session={props.session}
-          onClose={props.onCloseCreateConversation}
+          onClose={props.onCloseConversation}
           onCreated={props.onConversationCreated}
         />
       </Suspense>
     );
   }
 
-  if (!props.isCreateCommunityOpen) return null;
+  if (!props.createCommunityOpen) return null;
 
   const modeControl = (
     <CommunityEntryModeControl
@@ -412,7 +314,7 @@ function CreateDialogs(
           headerControl={modeControl}
           nodeNetworks={props.nodeNetworks}
           session={props.session}
-          onClose={props.onCloseCreateCommunity}
+          onClose={props.onCloseCommunity}
           onCreated={props.onCommunityCreated}
         />
       </Suspense>
@@ -424,7 +326,7 @@ function CreateDialogs(
       <CommunityDiscoveryDialog
         headerControl={modeControl}
         nodeNetworks={props.nodeNetworks}
-        onClose={props.onCloseCreateCommunity}
+        onClose={props.onCloseCommunity}
         onJoinRequested={props.onCommunityJoinRequested}
         session={props.session}
       />
@@ -433,72 +335,72 @@ function CreateDialogs(
 }
 
 function WorkspaceNotificationDialog(
-  props: WorkspaceDialogsProps,
+  props: WorkspaceNotificationsDialog,
 ): ReactElement | null {
-  if (!props.notificationsOpen) return null;
+  if (!props.open) return null;
 
   return (
     <Suspense fallback={null}>
       <NotificationsPanel
-        action={props.notificationAction}
+        action={props.action}
         communities={props.communities}
         communityAvatarUrls={props.communityAvatarUrls}
         communityPreviews={props.communityPreviews}
         conversations={props.conversations}
         currentIdentityId={props.session.identity.id}
-        error={props.notificationError}
+        error={props.error}
         identityNames={props.identityNames}
         identityPictures={props.identityPictures}
         identityProfiles={props.identityProfiles}
-        membershipAction={props.membershipRequestAction}
-        membershipError={props.membershipRequestError}
+        membershipAction={props.membershipAction}
+        membershipError={props.membershipError}
         membershipRequests={props.membershipRequests}
-        notifications={props.visibleNotifications}
+        notifications={props.notifications}
         nodeNetworks={props.nodeNetworks}
         onAcceptMembershipRequest={props.onAcceptMembershipRequest}
-        onAccept={props.onAcceptNotification}
-        onArchive={props.archiveNotification}
-        onClose={props.onCloseNotifications}
+        onAccept={props.onAccept}
+        onArchive={props.archive}
+        onClose={props.onClose}
         onDeclineMembershipRequest={props.onDeclineMembershipRequest}
-        onDecline={props.onDeclineNotification}
+        onDecline={props.onDecline}
       />
     </Suspense>
   );
 }
 
 function NotificationSettingsOverlay(
-  props: WorkspaceDialogsProps,
+  props: WorkspaceNotificationSettingsDialog,
 ): ReactElement | null {
-  if (!props.notificationSettingsTarget || !props.notificationSettingsSetting) {
+  if (!props.target || !props.setting) {
     return null;
   }
 
   return (
     <Suspense fallback={null}>
       <NotificationScopeSettingsDialog
-        error={props.notificationSettingsError}
-        onClose={props.onCloseNotificationSettings}
-        onReset={props.onNotificationSettingReset}
-        onSave={props.onNotificationSettingSave}
-        setting={props.notificationSettingsSetting}
-        target={props.notificationSettingsTarget}
+        error={props.error}
+        onClose={props.onClose}
+        onReset={props.onReset}
+        onSave={props.onSave}
+        setting={props.setting}
+        target={props.target}
       />
     </Suspense>
   );
 }
 
 function NodeSettingsOverlay(
-  props: WorkspaceDialogsProps,
+  props: WorkspaceNodeSettingsDialog,
 ): ReactElement | null {
-  if (!props.nodeSettingsOpen) return null;
+  if (!props.open) return null;
 
   return (
     <Suspense fallback={null}>
       <NodeSettingsDialog
         networkSynchronizationStatus={props.networkSynchronizationStatus}
-        networks={props.nodeNetworks}
+        networks={props.networks}
         node={props.node}
-        onClose={props.onCloseNodeSettings}
+        onClose={props.onClose}
         onNetworksUpdated={props.onNetworksUpdated}
         peersLoading={props.peersLoading}
         peers={props.peers}
@@ -509,22 +411,19 @@ function NodeSettingsOverlay(
 }
 
 function RealtimeEventsOverlay(
-  props: WorkspaceDialogsProps,
+  props: WorkspaceRealtimeEventsDialog,
 ): ReactElement | null {
-  if (!props.realtimeEventsOpen) return null;
+  if (!props.open) return null;
 
   return (
     <Suspense fallback={null}>
-      <RealtimeEventsDialog
-        events={props.realtimeEventLog}
-        onClose={props.onCloseRealtimeEvents}
-      />
+      <RealtimeEventsDialog events={props.events} onClose={props.onClose} />
     </Suspense>
   );
 }
 
 function IncomingCallOverlay(
-  props: WorkspaceDialogsProps,
+  props: WorkspaceIncomingCallDialog,
 ): ReactElement | null {
   if (!props.incomingCall) return null;
 
@@ -532,8 +431,8 @@ function IncomingCallOverlay(
     <Suspense fallback={null}>
       <IncomingCallDialog
         caller={props.incomingCall.caller}
-        onAccept={props.onAcceptIncomingCall}
-        onDecline={props.onDeclineIncomingCall}
+        onAccept={props.onAccept}
+        onDecline={props.onDecline}
         title={props.incomingCall.title}
       />
     </Suspense>
