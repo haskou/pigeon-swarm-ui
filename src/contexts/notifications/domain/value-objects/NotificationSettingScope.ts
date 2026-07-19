@@ -69,7 +69,15 @@ export class NotificationSettingScope {
   }
 
   public belongsTo(scope: NotificationSettingScope): boolean {
-    return this.key() === scope.key();
+    if (!this.type.isEqual(scope.type)) return false;
+
+    if (!this.firstIdentifier.isEqual(scope.firstIdentifier)) return false;
+
+    if (!this.secondIdentifier || !scope.secondIdentifier) {
+      return this.secondIdentifier === scope.secondIdentifier;
+    }
+
+    return this.secondIdentifier.isEqual(scope.secondIdentifier);
   }
 
   public communityParent(): NotificationSettingScope | undefined {

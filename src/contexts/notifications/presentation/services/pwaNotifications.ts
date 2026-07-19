@@ -11,7 +11,7 @@ import { ApplicationServerKeyDecoder } from '../../infrastructure/browser/Applic
 import { PushSubscriptionCompatibility } from '../../infrastructure/browser/PushSubscriptionCompatibility';
 import { PwaNotificationCapability } from '../../infrastructure/browser/PwaNotificationCapability';
 import { PwaNotificationPresenter } from '../../infrastructure/browser/PwaNotificationPresenter';
-import { PwaPushSubscriptionManager } from './PwaPushSubscriptionManager';
+import { PwaPushSubscriptionRegistrar } from './PwaPushSubscriptionRegistrar';
 
 export type { EnsurePwaPushSubscriptionResult } from '../../infrastructure/browser/EnsurePwaPushSubscriptionResult';
 export type { PwaNotificationPermission } from '../../infrastructure/browser/PwaNotificationPermission';
@@ -32,7 +32,7 @@ const backend: PwaPushSubscriptionBackend = {
       subscription,
     ),
 };
-const manager = new PwaPushSubscriptionManager(
+const manager = new PwaPushSubscriptionRegistrar(
   backend,
   capability,
   new ApplicationServerKeyDecoder(),

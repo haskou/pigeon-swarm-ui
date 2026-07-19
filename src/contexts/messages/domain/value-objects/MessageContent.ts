@@ -15,7 +15,7 @@ export class MessageContent extends StringValueObject {
   }
 
   public findFirstLinkPreviewUrl(): MessageLinkPreviewUrl | undefined {
-    const match = this.toString().match(urlPattern)?.[0];
+    const match = this.value.match(urlPattern)?.[0];
 
     if (!match) return undefined;
 
@@ -34,6 +34,6 @@ export class MessageContent extends StringValueObject {
   }
 
   public isBlank(): boolean {
-    return this.toString().trim().length === 0;
+    return this.value.trim().length === 0;
   }
 }
