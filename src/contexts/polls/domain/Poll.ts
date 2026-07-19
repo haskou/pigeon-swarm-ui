@@ -9,7 +9,7 @@ import { PollClosed } from './events/PollClosed';
 import { PollCreated } from './events/PollCreated';
 import { PollVoteCast } from './events/PollVoteCast';
 import { PollVoteRemoved } from './events/PollVoteRemoved';
-import { PollDefinition } from './PollDefinition';
+import { PollDefinition } from './value-objects/PollDefinition';
 import { PollId } from './value-objects/PollId';
 import { PollOptionId } from './value-objects/PollOptionId';
 import { PollStatus } from './value-objects/PollStatus';

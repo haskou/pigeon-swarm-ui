@@ -6,15 +6,15 @@ import { InvalidStickerIdError } from '../../../../contexts/stickers/domain/erro
 import { InvalidStickerOwnerIdError } from '../../../../contexts/stickers/domain/errors/InvalidStickerOwnerIdError';
 import { InvalidStickerPackIdError } from '../../../../contexts/stickers/domain/errors/InvalidStickerPackIdError';
 import { InvalidStickerPackNameError } from '../../../../contexts/stickers/domain/errors/InvalidStickerPackNameError';
-import { StickerDimensions } from '../../../../contexts/stickers/domain/StickerDimensions';
-import { StickerType } from '../../../../contexts/stickers/domain/StickerType';
 import { StickerAssetExternalIdentifier } from '../../../../contexts/stickers/domain/value-objects/StickerAssetExternalIdentifier';
 import { StickerByteSize } from '../../../../contexts/stickers/domain/value-objects/StickerByteSize';
 import { StickerContentType } from '../../../../contexts/stickers/domain/value-objects/StickerContentType';
+import { StickerDimensions } from '../../../../contexts/stickers/domain/value-objects/StickerDimensions';
 import { StickerId } from '../../../../contexts/stickers/domain/value-objects/StickerId';
 import { StickerOwnerId } from '../../../../contexts/stickers/domain/value-objects/StickerOwnerId';
 import { StickerPackId } from '../../../../contexts/stickers/domain/value-objects/StickerPackId';
 import { StickerPackName } from '../../../../contexts/stickers/domain/value-objects/StickerPackName';
+import { StickerType } from '../../../../contexts/stickers/domain/value-objects/StickerType';
 
 describe('Sticker value objects', () => {
   it('rejects invalid sticker values with cohesive errors', () => {

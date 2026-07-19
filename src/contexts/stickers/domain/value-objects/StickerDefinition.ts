@@ -1,10 +1,10 @@
 import type { PrimitiveOf } from '@haskou/value-objects';
 
+import { StickerAssetExternalIdentifier } from './StickerAssetExternalIdentifier';
+import { StickerByteSize } from './StickerByteSize';
+import { StickerContentType } from './StickerContentType';
 import { StickerDimensions } from './StickerDimensions';
 import { StickerType } from './StickerType';
-import { StickerAssetExternalIdentifier } from './value-objects/StickerAssetExternalIdentifier';
-import { StickerByteSize } from './value-objects/StickerByteSize';
-import { StickerContentType } from './value-objects/StickerContentType';
 
 export class StickerDefinition {
   public static create(

@@ -1,13 +1,13 @@
 import { assert, type PrimitiveOf } from '@haskou/value-objects';
 
-import { PollOption } from './entities/PollOption';
-import { PollOptionsCountError } from './errors/PollOptionsCountError';
+import { PollOption } from '../entities/PollOption';
+import { PollOptionsCountError } from '../errors/PollOptionsCountError';
+import { PollActorId } from './PollActorId';
+import { PollExpiration } from './PollExpiration';
+import { PollMultipleVotePermission } from './PollMultipleVotePermission';
+import { PollOptionId } from './PollOptionId';
+import { PollQuestion } from './PollQuestion';
 import { PollScope } from './PollScope';
-import { PollActorId } from './value-objects/PollActorId';
-import { PollExpiration } from './value-objects/PollExpiration';
-import { PollMultipleVotePermission } from './value-objects/PollMultipleVotePermission';
-import { PollOptionId } from './value-objects/PollOptionId';
-import { PollQuestion } from './value-objects/PollQuestion';
 
 export class PollDefinition {
   public static create(

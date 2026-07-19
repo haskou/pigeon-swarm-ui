@@ -30,7 +30,7 @@ import {
 } from '../../../../shared/presentation/hooks/useInstallPrompt';
 import { MutedNotificationsIcon } from '../../../../shared/presentation/components/MutedNotificationsIcon';
 
-interface RailProps {
+export interface RailProps {
   activeMessages?: boolean;
   className?: string;
   communities?: Community[];

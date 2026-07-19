@@ -1,6 +1,6 @@
 import { Timestamp, type PrimitiveOf } from '@haskou/value-objects';
 
-import { StickerDefinition } from '../StickerDefinition';
+import { StickerDefinition } from '../value-objects/StickerDefinition';
 import { StickerId } from '../value-objects/StickerId';
 
 export class Sticker {

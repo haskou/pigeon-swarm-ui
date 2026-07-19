@@ -1,7 +1,7 @@
 import type { StickerPackRepository } from '../../domain/repositories/StickerPackRepository';
 
 import { Sticker } from '../../domain/entities/Sticker';
-import { StickerDefinition } from '../../domain/StickerDefinition';
+import { StickerDefinition } from '../../domain/value-objects/StickerDefinition';
 import { AddStickerToPackMessage } from './messages/AddStickerToPackMessage';
 
 export class StickerAdder {

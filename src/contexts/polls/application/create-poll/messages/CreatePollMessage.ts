@@ -2,14 +2,14 @@ import { Timestamp, assert } from '@haskou/value-objects';
 
 import { PollOption } from '../../../domain/entities/PollOption';
 import { InvalidPollScopeError } from '../../../domain/errors/InvalidPollScopeError';
-import { PollDefinition } from '../../../domain/PollDefinition';
-import { PollScope } from '../../../domain/PollScope';
 import { PollActorId } from '../../../domain/value-objects/PollActorId';
+import { PollDefinition } from '../../../domain/value-objects/PollDefinition';
 import { PollExpiration } from '../../../domain/value-objects/PollExpiration';
 import { PollMultipleVotePermission } from '../../../domain/value-objects/PollMultipleVotePermission';
 import { PollOptionId } from '../../../domain/value-objects/PollOptionId';
 import { PollOptionText } from '../../../domain/value-objects/PollOptionText';
 import { PollQuestion } from '../../../domain/value-objects/PollQuestion';
+import { PollScope } from '../../../domain/value-objects/PollScope';
 import { PollScopeIdentifier } from '../../../domain/value-objects/PollScopeIdentifier';
 import { PollScopeType } from '../../../domain/value-objects/PollScopeType';
 

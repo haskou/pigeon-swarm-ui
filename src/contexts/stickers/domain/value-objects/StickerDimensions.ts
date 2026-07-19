@@ -1,6 +1,6 @@
 import { assert, type PrimitiveOf } from '@haskou/value-objects';
 
-import { InvalidStickerDimensionsError } from './errors/InvalidStickerDimensionsError';
+import { InvalidStickerDimensionsError } from '../errors/InvalidStickerDimensionsError';
 
 export class StickerDimensions {
   public static fromPrimitives(
