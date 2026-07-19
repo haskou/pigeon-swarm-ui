@@ -1,20 +1,13 @@
-import type { NodeNetwork } from '../../application/list-node-networks/NodeNetwork';
-import type { Peer } from '../../application/list-peers/ListPeers';
+import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { NodeInfo } from './NodeInfo';
 import type { NodePeersSnapshot } from './NodePeersSnapshot';
-
-import { API_SERVER_URL } from '../../../../app/API_SERVER_URL';
-import { ApiUrlBuilder } from '../../../../shared/infrastructure/http/ApiUrlBuilder';
-import { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
+import type { NetworkPeerResource } from './resources/NetworkPeerResource';
+import type { NetworkResource } from './resources/NetworkResource';
 
 export class NodeBootstrapApi {
   private readonly requestCache = new Map<string, Promise<unknown>>();
 
-  public constructor(
-    private readonly http = new HttpJsonClient(
-      new ApiUrlBuilder(API_SERVER_URL),
-    ),
-  ) {}
+  public constructor(private readonly http: HttpJsonClient) {}
 
   private async cachedRequest<T>(
     key: string,
@@ -41,11 +34,11 @@ export class NodeBootstrapApi {
     return { ...info, owner: info.owner ?? null };
   }
 
-  public async getNetworks(): Promise<NodeNetwork[]> {
+  public async getNetworks(): Promise<NetworkResource[]> {
     const result = await this.cachedRequest(
       'GET /node/networks/ anonymous',
       () =>
-        this.http.request<{ networks: NodeNetwork[] }>('/node/networks/', {
+        this.http.request<{ networks: NetworkResource[] }>('/node/networks/', {
           method: 'GET',
         }),
     );
@@ -53,7 +46,7 @@ export class NodeBootstrapApi {
     return result.networks;
   }
 
-  public async getPeers(): Promise<Peer[]> {
+  public async getPeers(): Promise<NetworkPeerResource[]> {
     return (await this.getPeerSnapshot()).peers;
   }
 

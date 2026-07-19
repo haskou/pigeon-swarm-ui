@@ -1,9 +1,18 @@
 import { useState } from 'react';
 
-import type { NodeRelayConfiguration } from '../../application/configure-node-relay/NodeRelayConfiguration';
+import type { NodeRelayConfigurationViewModel } from '../view-models/NodeRelayConfigurationViewModel';
 
-import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import {
+  hasRemoteAccessConfiguration,
+  needsPublicHost,
+} from './relay/nodeRelayConfigurationState';
+import { RelayChevronIcon } from './relay/RelayChevronIcon';
+import { RelayNumberField } from './relay/RelayNumberField';
+import { RelaySectionHeader } from './relay/RelaySectionHeader';
+import { RelaySwitchField } from './relay/RelaySwitchField';
+import { RelayTextField } from './relay/RelayTextField';
 
 export function NodeRelayConfigurationForm({
   className,
@@ -12,9 +21,9 @@ export function NodeRelayConfigurationForm({
   onChange,
 }: {
   className?: string;
-  configuration: NodeRelayConfiguration;
+  configuration: NodeRelayConfigurationViewModel;
   disabled?: boolean;
-  onChange: (configuration: NodeRelayConfiguration) => void;
+  onChange: (configuration: NodeRelayConfigurationViewModel) => void;
 }) {
   const requiresPublicHost = needsPublicHost(configuration);
   const [remoteAccessEnabled, setRemoteAccessEnabled] = useState(() =>
@@ -32,9 +41,9 @@ export function NodeRelayConfigurationForm({
       privateRelay: {
         ...configuration.privateRelay,
         enabled: false,
-        publicationEnabled: false,
         portEnd: undefined,
         portStart: undefined,
+        publicationEnabled: false,
       },
       publicHost: '',
       publicNetwork: { enabled: false },
@@ -48,7 +57,7 @@ export function NodeRelayConfigurationForm({
           title={copy.nodeSettings.publicAccessTitle}
           body={copy.nodeSettings.publicAccessBody}
         />
-        <SwitchField
+        <RelaySwitchField
           body={copy.nodeSettings.remoteAccessBody}
           checked={remoteAccessEnabled}
           disabled={disabled}
@@ -57,7 +66,7 @@ export function NodeRelayConfigurationForm({
         />
         {remoteAccessEnabled ? (
           <div className="grid gap-5 border-l-2 border-cyan-300/20 pl-4">
-            <TextField
+            <RelayTextField
               body={copy.nodeSettings.relayPublicHostBody}
               disabled={disabled}
               label={copy.nodeSettings.relayPublicHost}
@@ -76,7 +85,7 @@ export function NodeRelayConfigurationForm({
               </p>
             ) : null}
             <div className="grid gap-4 sm:grid-cols-2">
-              <NumberField
+              <RelayNumberField
                 body={copy.nodeSettings.callsRelayPortBody}
                 disabled={disabled}
                 label={copy.nodeSettings.callsRelayPort}
@@ -90,7 +99,7 @@ export function NodeRelayConfigurationForm({
                   })
                 }
               />
-              <NumberField
+              <RelayNumberField
                 body={copy.nodeSettings.publicNetworkPortBody}
                 disabled={disabled}
                 label={copy.nodeSettings.publicNetworkPort}
@@ -108,7 +117,7 @@ export function NodeRelayConfigurationForm({
                 }
               />
             </div>
-            <SwitchField
+            <RelaySwitchField
               body={copy.nodeSettings.privateRelayEnabledBody}
               checked={configuration.privateRelay.enabled}
               disabled={disabled}
@@ -127,7 +136,7 @@ export function NodeRelayConfigurationForm({
             {configuration.privateRelay.enabled ? (
               <div className="grid gap-3">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <NumberField
+                  <RelayNumberField
                     disabled={disabled}
                     label={copy.nodeSettings.privateRelayPortStart}
                     min={1}
@@ -143,7 +152,7 @@ export function NodeRelayConfigurationForm({
                       })
                     }
                   />
-                  <NumberField
+                  <RelayNumberField
                     disabled={disabled}
                     label={copy.nodeSettings.privateRelayPortEnd}
                     min={1}
@@ -175,7 +184,7 @@ export function NodeRelayConfigurationForm({
           body={copy.nodeSettings.privateRelayBody}
         />
         <div className="grid gap-4">
-          <SwitchField
+          <RelaySwitchField
             body={copy.nodeSettings.privateRelayDiscoverRecordsBody}
             checked={configuration.privateRelay.discoveryEnabled}
             disabled={disabled}
@@ -206,7 +215,7 @@ export function NodeRelayConfigurationForm({
                   {copy.nodeSettings.manualRelayMultiaddrsBody}
                 </p>
               </div>
-              <ChevronIcon />
+              <RelayChevronIcon />
             </summary>
             <div className="pt-3">
               <textarea
@@ -227,196 +236,5 @@ export function NodeRelayConfigurationForm({
         </div>
       </section>
     </div>
-  );
-}
-
-function hasRemoteAccessConfiguration(
-  configuration: NodeRelayConfiguration,
-): boolean {
-  return Boolean(
-    configuration.publicHost?.trim() ||
-    configuration.callsRelay.port ||
-    configuration.publicNetwork.enabled ||
-    configuration.privateRelay.enabled,
-  );
-}
-
-function RelaySectionHeader({ body, title }: { body: string; title: string }) {
-  return (
-    <div className="mb-3">
-      <div className="text-base font-black text-white/85">{title}</div>
-      <p className="mt-1 text-sm leading-6 text-white/50">{body}</p>
-    </div>
-  );
-}
-
-function NumberField({
-  body,
-  disabled,
-  label,
-  max,
-  min,
-  onChange,
-  value,
-}: {
-  body?: string;
-  disabled?: boolean;
-  label: string;
-  max: number;
-  min: number;
-  onChange: (value: number | undefined) => void;
-  value?: number;
-}) {
-  return (
-    <label className="flex h-full flex-col">
-      <span className="mb-1 block text-sm font-black text-white/70">
-        {label}
-      </span>
-      {body ? (
-        <span className="mb-2 block text-xs leading-5 text-white/40 sm:min-h-10">
-          {body}
-        </span>
-      ) : null}
-      <input
-        value={value ?? ''}
-        onChange={(event) => onChange(toOptionalPort(event.target.value))}
-        disabled={disabled}
-        min={min}
-        max={max}
-        type="number"
-        inputMode="numeric"
-        className="ui-field-control mt-auto px-4 py-3 text-sm placeholder:text-white/30"
-      />
-    </label>
-  );
-}
-
-function TextField({
-  body,
-  disabled,
-  label,
-  onChange,
-  placeholder,
-  value,
-}: {
-  body?: string;
-  disabled?: boolean;
-  label: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  value: string;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-sm font-black text-white/70">
-        {label}
-      </span>
-      {body ? (
-        <span className="mb-2 block max-w-2xl text-xs leading-5 text-white/40">
-          {body}
-        </span>
-      ) : null}
-      <input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        disabled={disabled}
-        type="text"
-        className="ui-field-control px-4 py-3 text-sm placeholder:text-white/30"
-        placeholder={placeholder}
-        autoComplete="off"
-      />
-    </label>
-  );
-}
-
-function SwitchField({
-  body,
-  checked,
-  disabled,
-  label,
-  onChange,
-}: {
-  body: string;
-  checked: boolean;
-  disabled?: boolean;
-  label: string;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <label className="flex cursor-pointer items-center justify-between gap-4 py-4 text-sm text-white/75">
-      <span className="min-w-0">
-        <span className="block font-black">{label}</span>
-        <span className="mt-1 block text-xs font-normal leading-5 text-white/40">
-          {body}
-        </span>
-      </span>
-      <input
-        type="checkbox"
-        role="switch"
-        checked={checked}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.checked)}
-        className="sr-only"
-      />
-      <span
-        aria-hidden="true"
-        className={cx(
-          'relative h-6 w-11 shrink-0 rounded-full border transition',
-          checked
-            ? 'border-cyan-200/35 bg-cyan-400/75'
-            : 'border-white/12 bg-white/10',
-          disabled && 'opacity-45',
-        )}
-      >
-        <span
-          className={cx(
-            'absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-white shadow-sm transition',
-            checked ? 'left-[1.3rem]' : 'left-0.5',
-          )}
-        />
-      </span>
-    </label>
-  );
-}
-
-function ChevronIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      fill="none"
-      className="h-5 w-5 shrink-0 text-white/40 transition group-open:rotate-180"
-    >
-      <path
-        d="m7 10 5 5 5-5"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-    </svg>
-  );
-}
-
-function toOptionalPort(value: string): number | undefined {
-  if (!value.trim()) return undefined;
-
-  const port = Number(value);
-
-  if (!Number.isInteger(port) || port < 1 || port > 65535) return undefined;
-
-  return port;
-}
-
-function needsPublicHost(configuration: NodeRelayConfiguration): boolean {
-  const publicHost = configuration.publicHost?.trim() ?? '';
-
-  if (publicHost) return false;
-
-  return (
-    configuration.privateRelay.enabled ||
-    configuration.callsRelay.port !== undefined ||
-    configuration.publicNetwork.enabled ||
-    configuration.publicNetwork.port !== undefined
   );
 }

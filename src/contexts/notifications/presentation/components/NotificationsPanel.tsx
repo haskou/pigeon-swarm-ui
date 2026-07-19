@@ -5,7 +5,7 @@ import type {
   IdentityResource,
   NotificationResource,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { NodeNetwork } from '../../../networks/application/list-node-networks/ListNodeNetworks';
+import type { NodeNetwork } from '../../../networks/presentation/view-models/NodeNetwork';
 import type {
   IdentityNames,
   IdentityPictures,

@@ -1,18 +1,12 @@
-import { PrivateKey, UUID } from '@haskou/value-objects';
-
-import type {
-  IpfsReplicationStatus,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
-import type { NodeRelayConfiguration } from '../../application/configure-node-relay/NodeRelayConfiguration';
-import type { NodeRelayPortCheckResource } from '../../application/configure-node-relay/NodeRelayPortCheckResource';
-import type { NodeRelayPortCheckTarget } from '../../application/configure-node-relay/NodeRelayPortCheckTarget';
-import type { NodeNetwork } from '../../application/list-node-networks/NodeNetwork';
-import type { Peer } from '../../application/list-peers/ListPeers';
 import type { NodeInfo } from './NodeInfo';
 import type { NodePeersSnapshot } from './NodePeersSnapshot';
+import type { IpfsReplicationStatusResource } from './resources/IpfsReplicationStatusResource';
+import type { NetworkPeerResource } from './resources/NetworkPeerResource';
+import type { NetworkResource } from './resources/NetworkResource';
+import type { NodeRelayConfigurationResource } from './resources/NodeRelayConfigurationResource';
 
 export class PigeonNodeApi {
   private readonly requestCache = new Map<string, Promise<unknown>>();
@@ -47,7 +41,9 @@ export class PigeonNodeApi {
     }
   }
 
-  private relayConfigurationPayload(configuration: NodeRelayConfiguration) {
+  private relayConfigurationPayload(
+    configuration: NodeRelayConfigurationResource,
+  ) {
     const publicHost = configuration.publicHost?.trim();
     const privateRelayEnabled = configuration.privateRelay.enabled;
     const publicNetworkPort = configuration.publicNetwork.port;
@@ -56,7 +52,7 @@ export class PigeonNodeApi {
       callsRelay: {
         port: configuration.callsRelay.port,
       },
-      manualRelayMultiaddrs: configuration.manualRelayMultiaddrs
+      manualRelayMultiaddrs: (configuration.manualRelayMultiaddrs ?? [])
         .map((value) => value.trim())
         .filter(Boolean),
       privateRelay: {
@@ -99,13 +95,13 @@ export class PigeonNodeApi {
     });
   }
 
-  public async getNetworks(session?: Session): Promise<NodeNetwork[]> {
+  public async getNetworks(session?: Session): Promise<NetworkResource[]> {
     const path = '/node/networks/';
     const result = await this.cachedRequest(
       `GET ${path} ${session?.identity.id ?? 'anonymous'}`,
       async () =>
         await this.http.request<{
-          networks: NodeNetwork[];
+          networks: NetworkResource[];
         }>(path, {
           headers: session
             ? await this.signer.headers(session, 'GET', path)
@@ -117,7 +113,7 @@ export class PigeonNodeApi {
     return result.networks;
   }
 
-  public async getPeers(): Promise<Peer[]> {
+  public async getPeers(): Promise<NetworkPeerResource[]> {
     return (await this.getPeerSnapshot()).peers;
   }
 
@@ -132,13 +128,12 @@ export class PigeonNodeApi {
     };
   }
 
-  public async createNetwork(name: string, session?: Session): Promise<void> {
+  public async createNetwork(
+    network: NetworkResource,
+    session?: Session,
+  ): Promise<void> {
     const path = '/node/networks/';
-    const body = {
-      id: UUID.generate().toString(),
-      key: PrivateKey.generate().toString(),
-      name,
-    };
+    const body = network;
 
     await this.http.request(path, {
       body: JSON.stringify(body),
@@ -162,37 +157,21 @@ export class PigeonNodeApi {
     this.invalidateNetworksCache();
   }
 
-  public async joinNetwork(
-    id: string,
-    name: string,
-    key: string,
-    session?: Session,
-  ): Promise<void> {
-    const path = '/node/networks/';
-    const body = { id, key, name };
-
-    await this.http.request(path, {
-      body: JSON.stringify(body),
-      headers: session
-        ? await this.signer.headers(session, 'POST', path, body)
-        : undefined,
-      method: 'POST',
-    });
-    this.invalidateNetworksCache();
-  }
-
   public async removeNetwork(
     networkId: string,
     session?: Session,
-  ): Promise<NodeNetwork[]> {
+  ): Promise<NetworkResource[]> {
     const path = `/node/networks/${encodeURIComponent(networkId)}/`;
     const body = {};
-    const result = await this.http.request<{ networks: NodeNetwork[] }>(path, {
-      headers: session
-        ? await this.signer.headers(session, 'DELETE', path, body)
-        : undefined,
-      method: 'DELETE',
-    });
+    const result = await this.http.request<{ networks: NetworkResource[] }>(
+      path,
+      {
+        headers: session
+          ? await this.signer.headers(session, 'DELETE', path, body)
+          : undefined,
+        method: 'DELETE',
+      },
+    );
 
     this.invalidateNetworksCache();
 
@@ -201,56 +180,43 @@ export class PigeonNodeApi {
 
   public async getIpfsReplicationStatus(
     session: Session,
-  ): Promise<IpfsReplicationStatus> {
+  ): Promise<IpfsReplicationStatusResource> {
     const path = '/ipfs/replication/status';
     const body = {};
 
-    return await this.http.request<IpfsReplicationStatus>(path, {
+    return await this.http.request<IpfsReplicationStatusResource>(path, {
       headers: await this.signer.headers(session, 'GET', path, body),
       method: 'GET',
     });
   }
 
   public async getRelayConfiguration(
-    session: Session,
-  ): Promise<NodeRelayConfiguration> {
+    session?: Session,
+  ): Promise<NodeRelayConfigurationResource> {
     const path = '/node/relay-configuration/';
     const body = {};
 
-    return await this.http.request<NodeRelayConfiguration>(path, {
-      headers: await this.signer.headers(session, 'GET', path, body),
+    return await this.http.request<NodeRelayConfigurationResource>(path, {
+      headers: session
+        ? await this.signer.headers(session, 'GET', path, body)
+        : undefined,
       method: 'GET',
     });
   }
 
   public async updateRelayConfiguration(
-    configuration: NodeRelayConfiguration,
+    configuration: NodeRelayConfigurationResource,
     session?: Session,
-  ): Promise<NodeRelayConfiguration> {
+  ): Promise<NodeRelayConfigurationResource> {
     const path = '/node/relay-configuration/';
     const body = this.relayConfigurationPayload(configuration);
 
-    return await this.http.request<NodeRelayConfiguration>(path, {
+    return await this.http.request<NodeRelayConfigurationResource>(path, {
       body: JSON.stringify(body),
       headers: session
         ? await this.signer.headers(session, 'PUT', path, body)
         : undefined,
       method: 'PUT',
-    });
-  }
-
-  public async checkRelayPorts(
-    publicHost: string,
-    checks: NodeRelayPortCheckTarget[],
-    session: Session,
-  ): Promise<NodeRelayPortCheckResource> {
-    const path = '/node/relay-configuration/reachability-check/';
-    const body = { checks, publicHost };
-
-    return await this.http.request<NodeRelayPortCheckResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
     });
   }
 }

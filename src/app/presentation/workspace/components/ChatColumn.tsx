@@ -14,7 +14,7 @@ import {
   useState,
 } from 'react';
 import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
-import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
+import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
 import type {
   AttachmentProgress,
   AttachmentUploadOptions,

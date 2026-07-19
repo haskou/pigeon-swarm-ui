@@ -1,4 +1,4 @@
-import type { Peer } from '../../../../../contexts/networks/application/list-peers/ListPeers';
+import type { Peer } from '../../../../../contexts/networks/presentation/view-models/Peer';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 
 import { NodeBootstrapApi } from '../../../../../contexts/networks/infrastructure/http/NodeBootstrapApi';

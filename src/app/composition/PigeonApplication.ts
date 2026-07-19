@@ -74,7 +74,24 @@ import { MessageMapper } from '../../contexts/messages/infrastructure/http/Messa
 import { MessageOperationContexts } from '../../contexts/messages/infrastructure/http/MessageOperationContexts';
 import { PigeonDraftRepository } from '../../contexts/messages/infrastructure/http/PigeonDraftRepository';
 import { PigeonMessageRepository } from '../../contexts/messages/infrastructure/http/PigeonMessageRepository';
-import { PigeonNetworksApplication } from '../../contexts/networks/application/PigeonNetworksApplication';
+import { NetworkNodeClaimer } from '../../contexts/networks/application/claim-network-node/NetworkNodeClaimer';
+import { NetworkCreator } from '../../contexts/networks/application/create-network/NetworkCreator';
+import { PublicNetworkCreator } from '../../contexts/networks/application/create-public-network/PublicNetworkCreator';
+import { NodeRelayConfigurationFinder } from '../../contexts/networks/application/find-node-relay-configuration/NodeRelayConfigurationFinder';
+import { NetworkJoiner } from '../../contexts/networks/application/join-network/NetworkJoiner';
+import { NodeNetworkRemover } from '../../contexts/networks/application/remove-node-network/NodeNetworkRemover';
+import { NetworkPeersSearcher } from '../../contexts/networks/application/search-network-peers/NetworkPeersSearcher';
+import { NodeNetworksSearcher } from '../../contexts/networks/application/search-node-networks/NodeNetworksSearcher';
+import { NodeRelayConfigurationUpdater } from '../../contexts/networks/application/update-node-relay-configuration/NodeRelayConfigurationUpdater';
+import { NetworkMapper } from '../../contexts/networks/infrastructure/http/mapping/NetworkMapper';
+import { NetworkNodeMapper } from '../../contexts/networks/infrastructure/http/mapping/NetworkNodeMapper';
+import { NetworkPeerMapper } from '../../contexts/networks/infrastructure/http/mapping/NetworkPeerMapper';
+import { NodeRelayConfigurationMapper } from '../../contexts/networks/infrastructure/http/mapping/NodeRelayConfigurationMapper';
+import { PigeonNetworkNodeRepository } from '../../contexts/networks/infrastructure/http/repositories/PigeonNetworkNodeRepository';
+import { PigeonNetworkPeerRepository } from '../../contexts/networks/infrastructure/http/repositories/PigeonNetworkPeerRepository';
+import { PigeonNetworkRepository } from '../../contexts/networks/infrastructure/http/repositories/PigeonNetworkRepository';
+import { PigeonNodeRelayConfigurationRepository } from '../../contexts/networks/infrastructure/http/repositories/PigeonNodeRelayConfigurationRepository';
+import { NodeRelayConfigurationViewModelMapper } from '../../contexts/networks/presentation/view-models/NodeRelayConfigurationViewModelMapper';
 import { PigeonNotificationsApplication } from '../../contexts/notifications/application/PigeonNotificationsApplication';
 import { PigeonConversationInvitationKeyDecryptor } from '../../contexts/notifications/infrastructure/crypto/PigeonConversationInvitationKeyDecryptor';
 import { PigeonPollsApplication } from '../../contexts/polls/application/PigeonPollsApplication';
@@ -95,6 +112,8 @@ import { PigeonMessageReactions } from './messages/PigeonMessageReactions';
 import { PigeonMessageReader } from './messages/PigeonMessageReader';
 import { PigeonMessagesFacade } from './messages/PigeonMessagesFacade';
 import { PigeonMessageWriter } from './messages/PigeonMessageWriter';
+import { PigeonNetworksFacade } from './networks/PigeonNetworksFacade';
+import { PigeonNodeFacade } from './networks/PigeonNodeFacade';
 import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonAttachmentsFacade } from './PigeonAttachmentsFacade';
 import { PigeonCallsFacade } from './PigeonCallsFacade';
@@ -114,7 +133,7 @@ export class PigeonApplication {
 
   public readonly messages: PigeonMessagesFacade;
 
-  public readonly networks: PigeonNetworksApplication;
+  public readonly networks: PigeonNetworksFacade;
 
   public readonly notifications: PigeonNotificationsApplication;
 
@@ -322,41 +341,44 @@ export class PigeonApplication {
       ),
       gateway.messagesGateway,
     );
-    this.networks = new PigeonNetworksApplication({
-      checkRelayPorts: gateway.node,
-      claimNode: gateway.node,
-      createNetwork: {
-        create: async (name) =>
-          await gateway.node.createNetwork(name.toString()),
-      },
-      createNetworkForNode: gateway.node,
-      createPublicNetwork: {
-        createPublic: async (session) =>
-          await gateway.node.createPublicNetwork(session),
-      },
-      getNodeInfo: gateway.node,
-      getRelayConfiguration: gateway.node,
-      getReplicationStatus: gateway.node,
-      joinNetwork: {
-        joinNetwork: async (id, name, key) =>
-          await gateway.node.joinNetwork(
-            id.toString(),
-            name.toString(),
-            key.toString(),
-          ),
-      },
-      joinNetworkForNode: gateway.node,
-      listNodeNetworks: {
-        getNodeNetworks: async (session) =>
-          await gateway.node.getNetworks(session),
-      },
-      listPeers: gateway.node,
-      removeNodeNetwork: {
-        remove: async (networkId, session) =>
-          await gateway.node.removeNetwork(networkId.toString(), session),
-      },
-      updateRelayConfiguration: gateway.node,
-    });
+    const networkRepository = new PigeonNetworkRepository(
+      gateway.node,
+      identityContexts,
+      new NetworkMapper(),
+    );
+    const nodeRelayConfigurationRepository =
+      new PigeonNodeRelayConfigurationRepository(
+        gateway.node,
+        identityContexts,
+        new NodeRelayConfigurationMapper(),
+      );
+    const networkNodeRepository = new PigeonNetworkNodeRepository(
+      gateway.node,
+      identityContexts,
+      new NetworkNodeMapper(),
+    );
+
+    const nodeFacade = new PigeonNodeFacade(
+      identityContexts,
+      new NetworkNodeClaimer(networkNodeRepository),
+      new PublicNetworkCreator(networkNodeRepository),
+      new NodeRelayConfigurationFinder(nodeRelayConfigurationRepository),
+      new NodeRelayConfigurationUpdater(nodeRelayConfigurationRepository),
+      new NodeRelayConfigurationViewModelMapper(),
+      gateway.node,
+    );
+
+    this.networks = new PigeonNetworksFacade(
+      identityContexts,
+      new NetworkCreator(networkRepository),
+      new NetworkJoiner(networkRepository),
+      new NodeNetworksSearcher(networkRepository),
+      new NodeNetworkRemover(networkRepository),
+      new NetworkPeersSearcher(
+        new PigeonNetworkPeerRepository(gateway.node, new NetworkPeerMapper()),
+      ),
+      nodeFacade,
+    );
     this.notifications = new PigeonNotificationsApplication({
       acceptInvitation: {
         keychainPublisher: gateway.identityGateway,

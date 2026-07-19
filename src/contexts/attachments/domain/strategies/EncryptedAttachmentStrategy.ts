@@ -39,4 +39,13 @@ export class EncryptedAttachmentStrategy implements PublicationStrategy {
   public isEncrypted(): boolean {
     return true;
   }
+
+  public toPrimitives(): { encrypted: true; networkId?: string } {
+    if (!this.hasEncryptionNetwork()) return { encrypted: true };
+
+    return {
+      encrypted: true,
+      networkId: this.networkId.toString(),
+    };
+  }
 }

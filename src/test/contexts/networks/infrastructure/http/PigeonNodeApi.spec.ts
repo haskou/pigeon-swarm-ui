@@ -1,10 +1,25 @@
-import type { Peer } from '../../../../../contexts/networks/application/list-peers/ListPeers';
+import type { NodeRelayConfigurationResource } from '../../../../../contexts/networks/infrastructure/http/resources/NodeRelayConfigurationResource';
+import type { Peer } from '../../../../../contexts/networks/presentation/view-models/Peer';
 import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
-import { defaultNodeRelayConfiguration } from '../../../../../contexts/networks/application/configure-node-relay/defaultNodeRelayConfiguration';
 import { PigeonNodeApi } from '../../../../../contexts/networks/infrastructure/http/PigeonNodeApi';
+
+function defaultNodeRelayConfiguration(): NodeRelayConfigurationResource {
+  return {
+    callsRelay: {},
+    manualRelayMultiaddrs: [],
+    privateRelay: {
+      discoveryEnabled: true,
+      enabled: false,
+      publicationEnabled: false,
+    },
+    publicNetwork: {
+      enabled: false,
+    },
+  };
+}
 
 describe(PigeonNodeApi.name, () => {
   it('loads node info fresh because ownership changes after claiming', async () => {
@@ -174,7 +189,18 @@ describe(PigeonNodeApi.name, () => {
   });
 
   it('omits public network settings when no public network port is configured', async () => {
-    const configuration = defaultNodeRelayConfiguration();
+    const configuration = {
+      callsRelay: {},
+      manualRelayMultiaddrs: [],
+      privateRelay: {
+        discoveryEnabled: true,
+        enabled: false,
+        publicationEnabled: false,
+      },
+      publicNetwork: {
+        enabled: false,
+      },
+    };
     const request = jest.fn().mockResolvedValueOnce(configuration);
     const signer = {
       headers: jest.fn().mockResolvedValue({ 'X-Signature': 'signature' }),
@@ -207,50 +233,5 @@ describe(PigeonNodeApi.name, () => {
       headers: { 'X-Signature': 'signature' },
       method: 'PUT',
     });
-  });
-
-  it('requests relay port reachability checks', async () => {
-    const checks = [
-      {
-        id: 'callsRelayTcp',
-        label: 'Calls relay',
-        port: 3478,
-        protocol: 'tcp' as const,
-      },
-    ];
-    const resource = {
-      checks: [{ ...checks[0], status: 'reachable' as const }],
-      publicHost: 'relay.example.com',
-    };
-    const request = jest.fn().mockResolvedValueOnce(resource);
-    const signer = {
-      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'signature' }),
-    } as unknown as RequestSigner;
-    const session = { identity: { id: 'identity-1' } } as unknown as Session;
-    const api = new PigeonNodeApi(
-      { request } as unknown as HttpJsonClient,
-      signer,
-    );
-
-    await expect(
-      api.checkRelayPorts('relay.example.com', checks, session),
-    ).resolves.toEqual(resource);
-
-    const body = { checks, publicHost: 'relay.example.com' };
-
-    expect(signer.headers).toHaveBeenCalledWith(
-      session,
-      'POST',
-      '/node/relay-configuration/reachability-check/',
-      body,
-    );
-    expect(request).toHaveBeenCalledWith(
-      '/node/relay-configuration/reachability-check/',
-      {
-        body: JSON.stringify(body),
-        headers: { 'X-Signature': 'signature' },
-        method: 'POST',
-      },
-    );
   });
 });

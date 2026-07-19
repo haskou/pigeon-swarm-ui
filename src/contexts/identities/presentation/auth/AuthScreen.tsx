@@ -4,8 +4,8 @@ import type {
   ConversationResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { NetworkSynchronizationStatus } from '../../../networks/application/find-network-synchronization/NetworkSynchronizationStatus';
-import type { NodeNetwork } from '../../../networks/application/list-node-networks/NodeNetwork';
+import type { NetworkSynchronizationStatus } from '../../../networks/presentation/view-models/NetworkSynchronizationStatus';
+import type { NodeNetwork } from '../../../networks/presentation/view-models/NodeNetwork';
 import type { LoginIdentityProgressStep } from '../../application/login-identity/LoginIdentityProgressStep';
 
 import { loadApplicationContainer } from '../../../../app/composition/loadApplicationContainer';

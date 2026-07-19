@@ -1,6 +1,6 @@
 import type { MouseEvent, ReactNode } from 'react';
 
-import type { NodeNetwork } from '../../../networks/application/list-node-networks/ListNodeNetworks';
+import type { NodeNetwork } from '../../../networks/presentation/view-models/NodeNetwork';
 import type { CallSession } from '../../../calls/presentation/view-models/CallSession';
 import type {
   Community,

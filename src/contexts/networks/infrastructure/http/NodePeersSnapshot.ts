@@ -1,5 +1,5 @@
-import type { NetworkSynchronizationStatus } from '../../application/find-network-synchronization/NetworkSynchronizationStatus';
-import type { Peer } from '../../application/list-peers/Peer';
+import type { NetworkPeerResource } from './resources/NetworkPeerResource';
+import type { NetworkSynchronizationResource } from './resources/NetworkSynchronizationResource';
 
 export type NodePeersSnapshot = {
   ipfsPeers: Array<{
@@ -10,6 +10,6 @@ export type NodePeersSnapshot = {
       type: string;
     }>;
   }>;
-  networkSynchronization: NetworkSynchronizationStatus | null;
-  peers: Peer[];
+  networkSynchronization: NetworkSynchronizationResource | null;
+  peers: NetworkPeerResource[];
 };

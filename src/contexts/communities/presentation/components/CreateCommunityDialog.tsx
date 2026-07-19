@@ -10,7 +10,7 @@ import {
   useState,
 } from 'react';
 
-import type { NodeNetwork } from '../../../networks/application/list-node-networks/ListNodeNetworks';
+import type { NodeNetwork } from '../../../networks/presentation/view-models/NodeNetwork';
 import type {
   Community,
   CommunityVisibility,

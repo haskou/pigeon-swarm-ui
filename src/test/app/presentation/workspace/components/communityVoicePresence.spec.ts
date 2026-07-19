@@ -6,6 +6,57 @@ import {
   communityVoiceChannelTopologyKey,
 } from '../../../../../app/presentation/workspace/components/communityVoicePresence';
 
+function communityResource(input: {
+  voiceChannels: Array<{
+    connectedIdentityIds?: string[];
+    id: string;
+    name: string;
+  }>;
+}): Community {
+  return {
+    autoJoinEnabled: false,
+    createdAt: 1770000000000,
+    description: 'Community',
+    discoverable: true,
+    id: 'community-1',
+    memberIds: [],
+    name: 'Community',
+    networkId: 'network-1',
+    ownerIdentityId: 'owner',
+    textChannels: [],
+    visibility: 'private',
+    voiceChannels: input.voiceChannels.map((channel) => ({
+      connectedIdentityIds: channel.connectedIdentityIds,
+      createdAt: 1770000000000,
+      id: channel.id,
+      name: channel.name,
+      type: 'voice',
+    })),
+  };
+}
+
+function communityCall(input: {
+  channelId: string;
+  participants: CallResource['participants'];
+}): CallResource {
+  return {
+    createdAt: 1770000000000,
+    creatorIdentityId: 'hasko',
+    id: `call-${input.channelId}`,
+    networkId: 'network-1',
+    participantIds: input.participants.map(
+      (participant) => participant.identityId,
+    ),
+    participants: input.participants,
+    scope: {
+      channelId: input.channelId,
+      communityId: 'community-1',
+      type: 'community_channel',
+    },
+    status: 'active',
+  };
+}
+
 describe('communityVoicePresence', () => {
   it('hydrates voice channel participants from active community calls', () => {
     const community = communityResource({
@@ -93,54 +144,3 @@ describe('communityVoicePresence', () => {
     );
   });
 });
-
-function communityResource(input: {
-  voiceChannels: Array<{
-    connectedIdentityIds?: string[];
-    id: string;
-    name: string;
-  }>;
-}): Community {
-  return {
-    autoJoinEnabled: false,
-    createdAt: 1770000000000,
-    description: 'Community',
-    discoverable: true,
-    id: 'community-1',
-    memberIds: [],
-    name: 'Community',
-    networkId: 'network-1',
-    ownerIdentityId: 'owner',
-    textChannels: [],
-    visibility: 'private',
-    voiceChannels: input.voiceChannels.map((channel) => ({
-      connectedIdentityIds: channel.connectedIdentityIds,
-      createdAt: 1770000000000,
-      id: channel.id,
-      name: channel.name,
-      type: 'voice',
-    })),
-  };
-}
-
-function communityCall(input: {
-  channelId: string;
-  participants: CallResource['participants'];
-}): CallResource {
-  return {
-    createdAt: 1770000000000,
-    creatorIdentityId: 'hasko',
-    id: `call-${input.channelId}`,
-    networkId: 'network-1',
-    participantIds: input.participants.map(
-      (participant) => participant.identityId,
-    ),
-    participants: input.participants,
-    scope: {
-      channelId: input.channelId,
-      communityId: 'community-1',
-      type: 'community_channel',
-    },
-    status: 'active',
-  };
-}

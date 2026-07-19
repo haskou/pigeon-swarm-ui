@@ -1,6 +1,7 @@
 import { CallMediaConnection } from '../../../../../contexts/calls/domain/entities/CallMediaConnection';
 import { CallParticipant } from '../../../../../contexts/calls/domain/entities/CallParticipant';
 import { CallSignalDelivery } from '../../../../../contexts/calls/domain/entities/CallSignalDelivery';
+import { CallConnectionRoute } from '../../../../../contexts/calls/domain/value-objects/CallConnectionRoute';
 
 describe('call entities hydration', () => {
   it('hydrates and serializes a participant with its media connections', () => {
@@ -57,6 +58,26 @@ describe('call entities hydration', () => {
       remoteCandidateType: 'relay',
       remoteIdentityId: 'identity-b',
       state: 'connected',
+      usesRelay: true,
+    });
+  });
+
+  it('keeps the media route as one cohesive value', () => {
+    const route = CallConnectionRoute.fromPrimitives({
+      localCandidateType: 'host',
+      protocol: 'udp',
+      relayProtocol: 'turn',
+      relayUrl: 'turn:relay.example.test',
+      remoteCandidateType: 'relay',
+      usesRelay: true,
+    });
+
+    expect(route.toPrimitives()).toEqual({
+      localCandidateType: 'host',
+      protocol: 'udp',
+      relayProtocol: 'turn',
+      relayUrl: 'turn:relay.example.test',
+      remoteCandidateType: 'relay',
       usesRelay: true,
     });
   });

@@ -1,18 +1,17 @@
 import { FormEvent, useState } from 'react';
 
-import { applicationContainer } from '../../../../app/composition/applicationContainer';
-import { Field } from '../../../identities/presentation/auth/Field';
-import type { NodeRelayConfiguration } from '../../application/configure-node-relay/NodeRelayConfiguration';
+import type { NodeRelayConfigurationViewModel } from '../view-models/NodeRelayConfigurationViewModel';
+import type { NetworkSetupMode } from './NetworkSetupMode';
 
-import { defaultNodeRelayConfiguration } from '../../application/configure-node-relay/defaultNodeRelayConfiguration';
-import { NetworkInviteCode } from '../../domain/NetworkInviteCode';
-import { NodeRelayConfigurationForm } from './NodeRelayConfigurationForm';
-import { cx } from '../../../../shared/presentation/cx';
+import { applicationContainer } from '../../../../app/composition/applicationContainer';
+import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
-import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
-
-type NetworkSetupMode = 'create' | 'join' | 'public';
+import { NetworkInviteCode } from '../../domain/NetworkInviteCode';
+import { defaultRelayConfiguration } from '../view-models/defaultRelayConfiguration';
+import { NetworkRelayConfigurationSection } from './NetworkRelayConfigurationSection';
+import { networkSetupBody, networkSetupSubmitLabel } from './networkSetupCopy';
+import { NetworkSetupFields } from './NetworkSetupFields';
 
 export function NetworkCreationScreen({
   nodeOwnerId,
@@ -26,7 +25,9 @@ export function NetworkCreationScreen({
   const [inviteCode, setInviteCode] = useState('');
   const [configureRelay, setConfigureRelay] = useState(false);
   const [relayConfiguration, setRelayConfiguration] =
-    useState<NodeRelayConfiguration>(() => defaultNodeRelayConfiguration());
+    useState<NodeRelayConfigurationViewModel>(() =>
+      defaultRelayConfiguration(),
+    );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const modeOptions = [
@@ -51,7 +52,7 @@ export function NetworkCreationScreen({
       if (mode === 'create') {
         await applicationContainer.networks.create(name);
       } else if (mode === 'join') {
-        const invite = NetworkInviteCode.decode(inviteCode);
+        const invite = NetworkInviteCode.decode(inviteCode).toPrimitives();
 
         await applicationContainer.networks.join(
           invite.id,
@@ -100,72 +101,27 @@ export function NetworkCreationScreen({
 
         <div className="mt-6 grid gap-4">
           <p className="px-1 text-sm leading-relaxed text-white/60">
-            {mode === 'create'
-              ? copy.network.createBody
-              : mode === 'join'
-                ? copy.network.joinBody
-                : copy.network.publicBody}
+            {networkSetupBody(mode)}
           </p>
 
-          {mode === 'create' ? (
-            <Field label={copy.network.nameLabel}>
-              <input
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                className="ui-field-control px-4 py-3 text-sm placeholder:text-white/30"
-                placeholder={copy.network.namePlaceholder}
-                autoComplete="name"
-                required
-              />
-            </Field>
-          ) : mode === 'join' ? (
-            <Field label={copy.network.inviteCodeLabel}>
-              <textarea
-                value={inviteCode}
-                onChange={(event) => setInviteCode(event.target.value)}
-                className="ui-field-control min-h-32 resize-none px-4 py-3 text-sm placeholder:text-white/30"
-                placeholder={copy.network.inviteCodePlaceholder}
-                autoComplete="off"
-                required
-              />
-            </Field>
-          ) : null}
+          <NetworkSetupFields
+            inviteCode={inviteCode}
+            mode={mode}
+            name={name}
+            onInviteCodeChange={setInviteCode}
+            onNameChange={setName}
+          />
         </div>
 
-        {canConfigureRelay && (
-          <div className="mt-5 border-y border-white/10">
-            <button
-              type="button"
-              className="flex w-full items-center justify-between gap-3 py-4 text-left text-sm font-black text-white/75 transition hover:text-white"
-              aria-expanded={configureRelay}
-              onClick={() => setConfigureRelay((current) => !current)}
-            >
-              <span>{copy.network.configureRelay}</span>
-              <span
-                aria-hidden="true"
-                className={cx(
-                  'grid h-8 w-8 place-items-center text-white/60 transition-transform',
-                  configureRelay && 'rotate-180',
-                )}
-              >
-                <ChevronDownIcon />
-              </span>
-            </button>
-            {configureRelay && (
-              <div className="border-t border-white/10 py-4">
-                <p className="mb-4 text-sm leading-6 text-white/50">
-                  {copy.network.configureRelayBody}
-                </p>
-                <NodeRelayConfigurationForm
-                  className="text-left"
-                  configuration={relayConfiguration}
-                  disabled={loading}
-                  onChange={setRelayConfiguration}
-                />
-              </div>
-            )}
-          </div>
-        )}
+        {canConfigureRelay ? (
+          <NetworkRelayConfigurationSection
+            configuration={relayConfiguration}
+            disabled={loading}
+            expanded={configureRelay}
+            onChange={setRelayConfiguration}
+            onToggle={() => setConfigureRelay((current) => !current)}
+          />
+        ) : null}
 
         {error && (
           <div className="ui-inline-notice mt-5 border-rose-300/25 bg-rose-500/15 text-sm text-rose-100">
@@ -177,29 +133,9 @@ export function NetworkCreationScreen({
           disabled={loading}
           className="ui-button ui-button-primary mt-6 w-full py-3"
         >
-          {loading
-            ? copy.network.loadingSubmit
-            : mode === 'create'
-              ? copy.network.createSubmit
-              : mode === 'join'
-                ? copy.network.joinSubmit
-                : copy.network.publicSubmit}
+          {networkSetupSubmitLabel(mode, loading)}
         </button>
       </form>
     </section>
-  );
-}
-
-function ChevronDownIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4">
-      <path
-        d="m7 10 5 5 5-5"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="2"
-      />
-    </svg>
   );
 }

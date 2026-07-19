@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import type { Peer } from '../../../../contexts/networks/application/list-peers/ListPeers';
+import type { Peer } from '../../../../contexts/networks/presentation/view-models/Peer';
 import type { IdentityResource } from '../../../../shared/domain/pigeonResources.types';
 
 import { IdentityMemberRow } from '../../../../contexts/identities/presentation/components/IdentityMemberListPanel';

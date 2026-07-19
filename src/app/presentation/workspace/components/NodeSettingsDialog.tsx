@@ -1,22 +1,21 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import type { NodeRelayConfiguration } from '../../../../contexts/networks/application/configure-node-relay/NodeRelayConfiguration';
-import type { NetworkSynchronizationStatus } from '../../../../contexts/networks/application/find-network-synchronization/NetworkSynchronizationStatus';
-import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
-import type { Peer } from '../../../../contexts/networks/application/list-peers/ListPeers';
+import type { NodeRelayConfigurationViewModel } from '../../../../contexts/networks/presentation/view-models/NodeRelayConfigurationViewModel';
 import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
+import type { IpfsReplicationStatus } from '../../../../contexts/networks/presentation/view-models/IpfsReplicationStatus';
+import type { NetworkSynchronizationStatus } from '../../../../contexts/networks/presentation/view-models/NetworkSynchronizationStatus';
+import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
+import type { Peer } from '../../../../contexts/networks/presentation/view-models/Peer';
 import type {
   IdentityResource,
-  IpfsReplicationStatus,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { IdentityMemberRow } from '../../../../contexts/identities/presentation/components/IdentityMemberListPanel';
 import { useIdentityPreview } from '../../../../contexts/identities/presentation/hooks/useIdentityPreview';
-import { defaultNodeRelayConfiguration } from '../../../../contexts/networks/application/configure-node-relay/defaultNodeRelayConfiguration';
-import { normalizeNodeRelayConfiguration } from '../../../../contexts/networks/application/configure-node-relay/normalizeNodeRelayConfiguration';
 import { NodeRelayConfigurationForm } from '../../../../contexts/networks/presentation/components/NodeRelayConfigurationForm';
+import { defaultRelayConfiguration } from '../../../../contexts/networks/presentation/view-models/defaultRelayConfiguration';
 import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
 import { SettingsNavigation } from '../../../../shared/presentation/components/SettingsNavigation';
 import { cx } from '../../../../shared/presentation/cx';
@@ -74,7 +73,9 @@ export function NodeSettingsDialog({
   const [replicationStatus, setReplicationStatus] =
     useState<IpfsReplicationStatus | null>(null);
   const [relayConfiguration, setRelayConfiguration] =
-    useState<NodeRelayConfiguration>(() => defaultNodeRelayConfiguration());
+    useState<NodeRelayConfigurationViewModel>(() =>
+      defaultRelayConfiguration(),
+    );
   const [relayConfigurationLoaded, setRelayConfigurationLoaded] =
     useState(false);
   const [relayError, setRelayError] = useState<string | null>(null);
@@ -133,7 +134,7 @@ export function NodeSettingsDialog({
 
   useEffect(() => {
     if (!isOwner) {
-      setRelayConfiguration(defaultNodeRelayConfiguration());
+      setRelayConfiguration(defaultRelayConfiguration());
       setRelayConfigurationLoaded(false);
       setRelayError(null);
       setRelayLoading(false);
@@ -152,7 +153,7 @@ export function NodeSettingsDialog({
           await applicationContainer.networks.getRelayConfiguration(session);
 
         if (!cancelled) {
-          setRelayConfiguration(normalizeNodeRelayConfiguration(configuration));
+          setRelayConfiguration(configuration);
           setRelayConfigurationLoaded(true);
         }
       } catch (caught) {
@@ -224,7 +225,7 @@ export function NodeSettingsDialog({
           session,
         );
 
-      setRelayConfiguration(normalizeNodeRelayConfiguration(saved));
+      setRelayConfiguration(saved);
       setRelayConfigurationLoaded(true);
       setNotice(copy.nodeSettings.relaySaveSuccess);
     } catch (caught) {
@@ -476,7 +477,7 @@ function NodeRuntimeSummary({
   relayConfiguration,
 }: {
   node: (NodeInfo & { owner: null | string }) | null;
-  relayConfiguration: NodeRelayConfiguration | null;
+  relayConfiguration: NodeRelayConfigurationViewModel | null;
 }) {
   return (
     <div className="py-2">
@@ -579,7 +580,7 @@ function relayStatusLabel(
 }
 
 function nodeRelayStatusLabel(
-  relayConfiguration: NodeRelayConfiguration | null,
+  relayConfiguration: NodeRelayConfigurationViewModel | null,
   relay:
     | {
         advertised: boolean;

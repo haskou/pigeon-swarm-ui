@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 
-import type { NetworkSynchronizationStatus } from '../../../networks/application/find-network-synchronization/NetworkSynchronizationStatus';
-import type { NodeNetwork } from '../../../networks/application/list-node-networks/NodeNetwork';
+import type { NetworkSynchronizationStatus } from '../../../networks/presentation/view-models/NetworkSynchronizationStatus';
+import type { NodeNetwork } from '../../../networks/presentation/view-models/NodeNetwork';
 
 import { cx } from '../../../../shared/presentation/cx';
 import { shortId } from '../../../../shared/presentation/formatting';

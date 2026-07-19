@@ -1,4 +1,6 @@
-import { DomainError, StringValueObject } from '@haskou/value-objects';
+import { StringValueObject } from '@haskou/value-objects';
+
+import { NetworkNameRequiredError } from '../errors/NetworkNameRequiredError';
 
 export class NetworkName extends StringValueObject {
   public static readonly MAX_LENGTH = 80;
@@ -7,7 +9,7 @@ export class NetworkName extends StringValueObject {
     const trimmedValue = value.trim();
 
     if (!trimmedValue) {
-      throw new DomainError('Network name is required.');
+      throw new NetworkNameRequiredError();
     }
 
     return new NetworkName(trimmedValue);

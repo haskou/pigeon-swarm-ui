@@ -11,8 +11,8 @@ import {
   useState,
 } from 'react';
 
-import type { NodeNetwork } from '../../../../contexts/networks/application/list-node-networks/ListNodeNetworks';
-import type { Peer } from '../../../../contexts/networks/application/list-peers/ListPeers';
+import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
+import type { Peer } from '../../../../contexts/networks/presentation/view-models/Peer';
 import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
 import type { CallMediaEncryptionUnavailableReason } from '../../../../contexts/calls/presentation/view-models/CallMediaEncryptionUnavailableReason';
 import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
@@ -37,10 +37,8 @@ import type {
   Session,
   StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
-import type {
-  NetworkSynchronizationStatus,
-  RealtimeDomainEvent,
-} from '../../../../shared/infrastructure/realtime/RealtimeGateway';
+import type { NetworkSynchronizationStatus } from '../../../../contexts/networks/presentation/view-models/NetworkSynchronizationStatus';
+import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 import type { PendingCommunityInviteLink } from '../../../../contexts/communities/presentation/view-models/communityInviteLink';
 import type { PreloadedConversationMessages } from '../PreloadedConversationMessages';
 import type { MessageContextMenuState } from './messageContextMenu';
@@ -60,7 +58,8 @@ import { ThreadMessageVisibility } from '../../../../contexts/messages/presentat
 import { MessageReactionUpdater } from '../../../../contexts/messages/presentation/view-models/MessageReactionUpdater';
 import { MessageCollectionDialog } from '../../../../contexts/messages/presentation/components/MessageCollectionDialog';
 import { MessageThreadPanel } from '../../../../contexts/messages/presentation/components/MessageThreadPanel';
-import { SharedNetworkSelection } from '../../../../contexts/networks/domain/SharedNetworkSelection';
+import { SharedNetworkSelectorDomainService } from '../../../../contexts/networks/domain/services/SharedNetworkSelectorDomainService';
+import { NetworkId } from '../../../../contexts/networks/domain/value-objects/NetworkId';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import {
   logCallDebug,
@@ -1867,18 +1866,24 @@ export function GlassWorkspace({
         return;
       }
 
-      const sharedNetworkId = SharedNetworkSelection.select(
-        session.identity.networks,
-        identity?.networks,
-        preferredNetworkId,
+      const sharedNetwork = new SharedNetworkSelectorDomainService().select(
+        session.identity.networks.map((networkId) =>
+          NetworkId.fromString(networkId),
+        ),
+        (identity?.networks ?? []).map((networkId) =>
+          NetworkId.fromString(networkId),
+        ),
+        NetworkId.fromOptional(preferredNetworkId),
       );
 
-      if (!sharedNetworkId) throw new Error(copy.dialog.noSharedNetwork);
+      if (!sharedNetwork.isAvailable()) {
+        throw new Error(copy.dialog.noSharedNetwork);
+      }
 
       const result = await applicationContainer.conversations.create(
         sessionRef.current,
         identityId,
-        sharedNetworkId,
+        sharedNetwork.toString(),
       );
       const nextSession = {
         ...sessionRef.current,
