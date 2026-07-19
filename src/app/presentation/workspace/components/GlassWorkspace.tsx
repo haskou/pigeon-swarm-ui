@@ -19,7 +19,6 @@ import type {
   AttachmentProgress,
   Community,
   ConversationResource,
-  NotificationSettingScope,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
@@ -28,37 +27,28 @@ import type { MessageContextMenuState } from './messageContextMenu';
 
 import { useRealtimeEvents } from '../../../../app/presentation/realtime/useRealtimeEvents';
 import { useAttachmentDownload } from '../../../../contexts/attachments/presentation/hooks/useAttachmentDownload';
-import { ConversationPeer } from '../../../../contexts/conversations/presentation/view-models/ConversationPeer';
-import { ConversationKeychain } from '../../../../contexts/identities/infrastructure/keychain/ConversationKeychain';
 import { useIdentityDirectory } from '../../../../contexts/identities/presentation/hooks/useIdentityDirectory';
-import {
-  identityDisplayName,
-  identityPrimaryDisplayName,
-} from '../../../../contexts/identities/presentation/view-models/identityDisplay';
 import { MessageCollectionDialog } from '../../../../contexts/messages/presentation/components/MessageCollectionDialog';
-import { MessageThreadPanel } from '../../../../contexts/messages/presentation/components/MessageThreadPanel';
 import { useUnreadMessages } from '../../../../contexts/messages/presentation/hooks/useUnreadMessages';
-import { MessageCollection } from '../../../../contexts/messages/presentation/view-models/MessageCollection';
 import { useNotificationScopeSettings } from '../../../../contexts/notifications/presentation/hooks/useNotificationScopeSettings';
 import { usePushNotificationRegistration } from '../../../../contexts/notifications/presentation/hooks/usePushNotificationRegistration';
 import { deletePwaPushSubscription } from '../../../../contexts/notifications/presentation/services/pwaNotifications';
 import { NotificationSettingsPolicy } from '../../../../contexts/notifications/presentation/view-models/NotificationSettingsPolicy';
-import { cx } from '../../../../shared/presentation/cx';
 import { copy } from '../../../../shared/presentation/i18n/copy';
-import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrowserIdle';
 import { playNotificationSound } from '../../../../shared/presentation/sounds';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import {
   useWorkspacePreferences,
   useWorkspacePreferenceState,
 } from '../useWorkspacePreferences';
-import { ChatColumn } from './ChatColumn';
 import { CommunityUnreadState } from './CommunityUnreadState';
 import { communityVoiceChannelTopologyKey } from './communityVoicePresence';
-import { CommunityWorkspaceStartupFallback } from './CommunityWorkspaceStartupFallback';
+import { CommunityWorkspaceContent } from './CommunityWorkspaceContent';
 import { type EditingMessage } from './conversationThreadState';
+import { MessagesWorkspaceContent } from './MessagesWorkspaceContent';
 import { PushNotificationPrompt } from './PushNotificationPrompt';
 import { Rail, type RailProps } from './Rail';
+import { useCommunityPanelAnimation } from './useCommunityPanelAnimation';
 import { useCommunitySelection } from './useCommunitySelection';
 import { useConversationDrafts } from './useConversationDrafts';
 import { useConversationMessageActions } from './useConversationMessageActions';
@@ -78,20 +68,12 @@ import { useWorkspaceRealtimeConversationEvents } from './useWorkspaceRealtimeCo
 import { useWorkspaceRealtimeEventRouter } from './useWorkspaceRealtimeEventRouter';
 import { useWorkspaceTransientUi } from './useWorkspaceTransientUi';
 import { useWorkspaceTyping } from './useWorkspaceTyping';
+import { WorkspaceDerivedState } from './WorkspaceDerivedState';
 import {
-  CommunityWorkspace,
-  Inspector,
-  InspectorStartupFallback,
   preloadCommunityWorkspace,
-  Sidebar,
-  SidebarStartupFallback,
   WorkspaceDialogs,
 } from './workspaceLazyComponents';
-import {
-  isPendingCommunityInvitationFor,
-  isPendingConversationInvitationFor,
-  stableUniqueKey,
-} from './workspaceNotificationState';
+import { stableUniqueKey } from './workspaceNotificationState';
 
 interface GlassWorkspaceProps {
   session: Session;
@@ -204,7 +186,6 @@ export function GlassWorkspace({
     () => communityVoiceChannelTopologyKey(communities),
     [communities],
   );
-  const initialRenderedCommunityIdRef = useRef<string | null>(null);
   const sessionRef = useRef(session);
   const suppressMessageLoadsUntilRef = useRef(0);
   const {
@@ -257,58 +238,45 @@ export function GlassWorkspace({
     openTransientSurface('realtime-events');
   }, [openTransientSurface]);
 
-  const activeConversation = useMemo(
-    () =>
-      conversations.find(
-        (conversation) => conversation.id === activeConversationId,
-      ) ?? conversations[0],
-    [activeConversationId, conversations],
+  const activeConversation = WorkspaceDerivedState.activeConversation(
+    conversations,
+    activeConversationId,
   );
   const {
     activeDraft: activeConversationDraft,
     updateActiveDraft: updateActiveConversationDraft,
   } = useConversationDrafts({
-    activeConversationId: activeConversation?.id ?? null,
+    activeConversationId: WorkspaceDerivedState.id(activeConversation),
     drafts,
     onDraftsChange: setDrafts,
     session,
   });
-  const activeConversationNotificationScope = useMemo(
-    () =>
-      activeConversation
-        ? ({
-            conversationId: activeConversation.id,
-            type: 'conversation',
-          } satisfies NotificationSettingScope)
-        : null,
-    [activeConversation],
-  );
-  const activeConversationNotificationSetting = useMemo(
-    () =>
-      activeConversationNotificationScope
-        ? NotificationSettingsPolicy.resolve(
-            notificationSettingsByScopeKey,
-            activeConversationNotificationScope,
-          )
-        : NotificationSettingsPolicy.defaults,
-    [activeConversationNotificationScope, notificationSettingsByScopeKey],
-  );
+  const activeConversationNotificationScope =
+    WorkspaceDerivedState.conversationNotificationScope(activeConversation);
+  const activeConversationNotificationSetting =
+    WorkspaceDerivedState.conversationNotificationSetting(
+      notificationSettingsByScopeKey,
+      activeConversationNotificationScope,
+    );
   const { activeCommunity, activeCommunityChannelId } = useCommunitySelection({
     activeCommunityId,
     communities,
     communityChannelById,
   });
 
-  if (!initialRenderedCommunityIdRef.current && activeCommunity?.id) {
-    initialRenderedCommunityIdRef.current = activeCommunity.id;
-  }
-  const animateCommunitySidePanelEntries =
-    !!activeCommunity?.id &&
-    activeCommunity.id !== initialRenderedCommunityIdRef.current;
+  const animateCommunitySidePanelEntries = useCommunityPanelAnimation(
+    WorkspaceDerivedState.id(activeCommunity),
+  );
 
   useWorkspacePreferences({
-    activeCommunityId: activeCommunity?.id ?? activeCommunityId,
-    activeConversationId: activeConversation?.id ?? activeConversationId,
+    activeCommunityId: WorkspaceDerivedState.selectedId(
+      activeCommunity,
+      activeCommunityId,
+    ),
+    activeConversationId: WorkspaceDerivedState.selectedId(
+      activeConversation,
+      activeConversationId,
+    ),
     communityChannelById,
     communityUnreadCountsById,
     drafts,
@@ -473,15 +441,14 @@ export function GlassWorkspace({
     setSession,
     setWorkspaceMode,
   });
-  const nodeUnclaimed = !node?.owner;
-  const activeConversationKey = activeConversation
-    ? ConversationKeychain.entry(
-        session.keychain,
-        session.identity.id,
-        activeConversation.id,
-      )
-    : undefined;
-  const activeConversationKeyId = activeConversationKey?.conversationId ?? null;
+  const nodeUnclaimed = WorkspaceDerivedState.nodeIsUnclaimed(node);
+  const activeConversationKey = WorkspaceDerivedState.conversationKey(
+    session,
+    activeConversation,
+  );
+  const activeConversationKeyId = WorkspaceDerivedState.conversationKeyId(
+    activeConversationKey,
+  );
   const refreshConversations = useCallback(async () => {
     const next = await applicationContainer.conversations.list(session);
 
@@ -489,24 +456,7 @@ export function GlassWorkspace({
 
     return next;
   }, [session, setConversations]);
-  const {
-    bottomRef,
-    handleScroll,
-    isScrolledNearBottom,
-    jumpToLatestMessages,
-    markConversationReadUntil,
-    messageCursor,
-    messages,
-    messagesRef,
-    messageState,
-    newMessageCount,
-    scrollerRef,
-    scrollMessagesToBottom,
-    setMessageLoadState,
-    setMessages,
-    setNewMessageCount,
-    updateMessageCursor,
-  } = useConversationTimeline({
+  const timeline = useConversationTimeline({
     activeConversation,
     activeConversationKey,
     clearUnreadMessages,
@@ -520,78 +470,55 @@ export function GlassWorkspace({
     workspaceMode,
   });
   const {
-    cancelEditing: cancelConversationThreadEdit,
-    cancelReplying: cancelConversationThreadReply,
-    edit: handleEditConversationThreadMessage,
-    open: openMessageThread,
-    remove: handleDeleteConversationThreadMessage,
-    send: sendConversationThreadMessage,
-    sendSticker: sendConversationThreadSticker,
-    setThread: setConversationThread,
-    startEditing: startEditingConversationThreadMessage,
-    startReplying: startReplyingToConversationThreadMessage,
-    thread: conversationThread,
-    updateDraft: updateConversationThreadDraft,
-  } = useConversationThread({
+    isScrolledNearBottom,
+    markConversationReadUntil,
+    messages,
+    messagesRef,
+    scrollerRef,
+    scrollMessagesToBottom,
+    setMessageLoadState,
+    setMessages,
+    setNewMessageCount,
+    updateMessageCursor,
+  } = timeline;
+  const conversationThreadController = useConversationThread({
     activeConversation,
     closeMessageContextMenu: () => setMessageContextMenu(null),
     session,
     setMessages,
   });
   const {
+    open: openMessageThread,
+    remove: handleDeleteConversationThreadMessage,
+    setThread: setConversationThread,
+    startEditing: startEditingConversationThreadMessage,
+    startReplying: startReplyingToConversationThreadMessage,
+  } = conversationThreadController;
+  const conversationPins = useConversationPins({
+    activeConversation,
+    closeMessageContextMenu: () => setMessageContextMenu(null),
+    onError: setSendError,
+    session,
+  });
+  const {
     collection: messageCollection,
-    open: openPinnedMessages,
     pin: pinMessage,
     pinnedMessageIds,
     setCollection: setMessageCollection,
     setPinnedMessageIds,
     unpin: unpinMessage,
     unpinFromCollection: unpinMessageFromDialog,
-  } = useConversationPins({
-    activeConversation,
-    closeMessageContextMenu: () => setMessageContextMenu(null),
-    onError: setSendError,
-    session,
-  });
+  } = conversationPins;
 
   useEffect(() => {
     setConversationThread(null);
   }, [activeConversation?.id, setConversationThread]);
 
-  useEffect(() => {
-    if (!activeConversation?.id) {
-      setPinnedMessageIds(new Set());
-
-      return;
-    }
-
-    let cancelled = false;
-
-    const cancelIdleWork = runWhenBrowserIdle(() => {
-      void applicationContainer.messages
-        .listPins(session, activeConversation.id)
-        .then((pins) => {
-          if (!cancelled) {
-            setPinnedMessageIds(new Set(pins.map((pin) => pin.messageId)));
-          }
-        })
-        .catch(() => {
-          if (!cancelled) setPinnedMessageIds(new Set());
-        });
-    });
-
-    return () => {
-      cancelled = true;
-      cancelIdleWork();
-    };
-  }, [activeConversation?.id, session, setPinnedMessageIds]);
-  const activeConversationPeerIdentityId = activeConversation
-    ? ConversationPeer.identityId(
-        activeConversation,
-        session.identity.id,
-        session.keychain,
-      )
-    : undefined;
+  const activeConversationPeerIdentityId =
+    WorkspaceDerivedState.conversationPeerIdentityId(
+      activeConversation,
+      session,
+    );
   const messageAuthorIdentityIdsKey = useMemo(
     () => stableUniqueKey(messages.map((message) => message.authorIdentityId)),
     [messages],
@@ -665,48 +592,28 @@ export function GlassWorkspace({
     setSession,
     showMessagesWorkspace,
   });
-  const activeConversationInvitation = useMemo(
-    () =>
-      activeConversation
-        ? (notificationList.find((notification) =>
-            isPendingConversationInvitationFor(
-              notification,
-              activeConversation.id,
-              session.identity.id,
-            ),
-          ) ?? null)
-        : null,
-    [activeConversation, notificationList, session.identity.id],
-  );
-  const activeConversationInvitationInviterName = activeConversationInvitation
-    ? identityPrimaryDisplayName(
-        identityDisplayName(
-          activeConversationInvitation.payload.inviterIdentityId,
-          identityNames,
-        ),
-      )
-    : undefined;
-  const activeCommunityInvitation = useMemo(
-    () =>
-      activeCommunity
-        ? (notificationList.find((notification) =>
-            isPendingCommunityInvitationFor(
-              notification,
-              activeCommunity.id,
-              session.identity.id,
-            ),
-          ) ?? null)
-        : null,
-    [activeCommunity, notificationList, session.identity.id],
-  );
-  const activeCommunityInvitationInviterName = activeCommunityInvitation
-    ? identityPrimaryDisplayName(
-        identityDisplayName(
-          activeCommunityInvitation.payload.inviterIdentityId,
-          identityNames,
-        ),
-      )
-    : undefined;
+  const activeConversationInvitation =
+    WorkspaceDerivedState.pendingConversationInvitation(
+      notificationList,
+      activeConversation,
+      session.identity.id,
+    );
+  const activeConversationInvitationInviterName =
+    WorkspaceDerivedState.invitationInviterName(
+      activeConversationInvitation,
+      identityNames,
+    );
+  const activeCommunityInvitation =
+    WorkspaceDerivedState.pendingCommunityInvitation(
+      notificationList,
+      activeCommunity,
+      session.identity.id,
+    );
+  const activeCommunityInvitationInviterName =
+    WorkspaceDerivedState.invitationInviterName(
+      activeCommunityInvitation,
+      identityNames,
+    );
   const {
     mergePresence,
     notificationsMutedByPresence,
@@ -723,26 +630,7 @@ export function GlassWorkspace({
 
     playNotificationSound();
   }, [notificationsMutedByPresence]);
-  const {
-    acceptIncomingCall,
-    activeCall,
-    declineIncomingCall,
-    handleRealtimeCallEvent,
-    incomingCall,
-    leaveActiveCall,
-    retryMicrophone,
-    setParticipantScreenShareVolume,
-    setParticipantVolume,
-    setScreenShareQuality,
-    startCommunityVoiceCall,
-    startConversationCall,
-    toggleCallMediaEncryption,
-    toggleCallNoiseCancellation,
-    toggleCamera,
-    toggleDeafen,
-    toggleMute,
-    toggleScreenShare,
-  } = useWorkspaceCalls({
+  const callControls = useWorkspaceCalls({
     activeCommunity,
     communities,
     communityVoiceTopologyKey,
@@ -756,6 +644,12 @@ export function GlassWorkspace({
     session,
     sessionRef,
   });
+  const {
+    acceptIncomingCall,
+    declineIncomingCall,
+    handleRealtimeCallEvent,
+    incomingCall,
+  } = callControls;
 
   useEffect(() => {
     if (!activeConversationId && conversations[0])
@@ -786,24 +680,7 @@ export function GlassWorkspace({
     setEditingMessage(null);
   }, [activeConversation?.id, workspaceMode]);
 
-  const {
-    cancelEdit: cancelMessageEdit,
-    cancelReply: cancelMessageReply,
-    closeMessageMenu,
-    copyMessageContent,
-    deleteMessage: handleDeleteMessage,
-    editMessage: handleEditMessage,
-    openMessageMenu: handleMessageMenuOpen,
-    openReplyReference: handleReplyReferenceClick,
-    openThreadMessageMenu,
-    retryMessage,
-    scrollToMessage,
-    sendMessage: handleSend,
-    sendSticker: handleSendSticker,
-    startEditing: startEditingMessage,
-    startReplying: startReplyingToMessage,
-    toggleReaction: handleToggleMessageReaction,
-  } = useConversationMessageActions({
+  const messageActions = useConversationMessageActions({
     activeConversation,
     activeConversationDraft,
     activeConversationKeyAvailable: Boolean(activeConversationKey),
@@ -826,6 +703,17 @@ export function GlassWorkspace({
     session,
     updateActiveConversationDraft,
   });
+  const {
+    cancelEdit: cancelMessageEdit,
+    cancelReply: cancelMessageReply,
+    closeMessageMenu,
+    copyMessageContent,
+    deleteMessage: handleDeleteMessage,
+    openReplyReference: handleReplyReferenceClick,
+    startEditing: startEditingMessage,
+    startReplying: startReplyingToMessage,
+    toggleReaction: handleToggleMessageReaction,
+  } = messageActions;
 
   const closeTransientUi = useCallback(() => {
     closeMessageMenu();
@@ -861,7 +749,7 @@ export function GlassWorkspace({
   });
   const handleRealtimeConversationEvent =
     useWorkspaceRealtimeConversationEvents({
-      activeConversationId: activeConversation?.id ?? null,
+      activeConversationId: WorkspaceDerivedState.id(activeConversation),
       activeConversationKeyId,
       clearUnreadMessages,
       conversations,
@@ -886,9 +774,10 @@ export function GlassWorkspace({
     });
   const handleRealtimeEvent = useWorkspaceRealtimeEventRouter({
     activeCommunityChannelId,
-    activeCommunityId: activeCommunity?.id ?? null,
-    activeCommunityNetworkId: activeCommunity?.networkId ?? null,
-    activeConversationNetworkId: activeConversation?.networkId ?? null,
+    activeCommunityId: WorkspaceDerivedState.id(activeCommunity),
+    activeCommunityNetworkId: WorkspaceDerivedState.networkId(activeCommunity),
+    activeConversationNetworkId:
+      WorkspaceDerivedState.networkId(activeConversation),
     communities,
     handleCallEvent: handleRealtimeCallEvent,
     handleCommunityDomainEvent: handleRealtimeCommunityEvent,
@@ -926,8 +815,8 @@ export function GlassWorkspace({
     sendConversationTyping,
   } = useWorkspaceTyping({
     activeCommunityChannelId,
-    activeCommunityId: activeCommunity?.id ?? null,
-    activeConversationId: activeConversation?.id ?? null,
+    activeCommunityId: WorkspaceDerivedState.id(activeCommunity),
+    activeConversationId: WorkspaceDerivedState.id(activeConversation),
     session,
   });
 
@@ -963,23 +852,34 @@ export function GlassWorkspace({
       startReplyingToMessage,
     ],
   );
-  const hasWorkspaceDialogOpen =
-    inspectorOpen ||
-    isCreateCommunityOpen ||
-    isCreateOpen ||
-    !!incomingCall ||
-    !!messageCollection ||
-    !!messageContextMenu ||
-    nodeSettingsOpen ||
-    !!notificationSettingsTarget ||
-    notificationsOpen ||
-    !!rawMessage ||
-    realtimeEventsOpen;
-  const showPushEnablePrompt =
-    pushPromptReady && pushPermission === 'default' && !pushPromptDismissed;
+  const hasWorkspaceDialogOpen = WorkspaceDerivedState.hasOpenDialog([
+    inspectorOpen,
+    isCreateCommunityOpen,
+    isCreateOpen,
+    Boolean(incomingCall),
+    Boolean(messageCollection),
+    Boolean(messageContextMenu),
+    nodeSettingsOpen,
+    Boolean(notificationSettingsTarget),
+    notificationsOpen,
+    Boolean(rawMessage),
+    realtimeEventsOpen,
+  ]);
+  const showPushEnablePrompt = WorkspaceDerivedState.pushPromptVisible(
+    pushPromptReady,
+    pushPermission,
+    pushPromptDismissed,
+  );
+  const activeCommunityUnreadCounts =
+    WorkspaceDerivedState.communityChannelUnreadCounts(
+      activeCommunity,
+      visibleCommunityUnreadCountsById,
+    );
   const railProps: RailProps = {
-    activeCommunityId:
-      workspaceMode === 'community' ? (activeCommunity?.id ?? null) : null,
+    activeCommunityId: WorkspaceDerivedState.railCommunityId(
+      workspaceMode,
+      activeCommunity,
+    ),
     activeMessages: workspaceMode === 'messages',
     communities,
     communityNotificationSetting: communityNotificationSettingFor,
@@ -1018,345 +918,144 @@ export function GlassWorkspace({
 
         {workspaceMode === 'messages' ? (
           <>
-            <div
-              className={cx(
-                'app-safe-area-drawer-until-lg app-safe-area-drawer-flush fixed inset-y-0 left-0 z-40 block w-[92vw] max-w-[430px] p-0 transition-transform duration-200 ease-out sm:w-[calc(86vw+82px)] sm:max-w-[442px] lg:static lg:block lg:w-auto lg:max-w-none lg:translate-x-0',
-                sidebarOpen
-                  ? 'translate-x-0'
-                  : 'pointer-events-none -translate-x-full lg:pointer-events-auto',
-              )}
-            >
-              <div className="grid h-full grid-cols-[82px_minmax(0,1fr)] gap-0 lg:block">
-                <Rail
-                  {...railProps}
-                  className="lg:hidden"
-                  onInspectorClick={() => openTransientSurface('inspector')}
-                />
-                <Suspense fallback={<SidebarStartupFallback />}>
-                  <Sidebar
-                    activeCall={activeCall}
-                    animationScopeKey={sidebarOpen ? 'open' : 'closed'}
-                    communities={communities}
-                    session={session}
-                    conversations={conversationsWithUnread}
-                    conversationNotificationSetting={
-                      conversationNotificationSettingFor
-                    }
-                    identityNames={identityNames}
-                    identityPictures={identityPictures}
-                    identityProfiles={identityProfiles}
-                    presenceByIdentityId={presenceByIdentityId}
-                    nodeNetworks={nodeNetworks}
-                    activeConversationId={activeConversation?.id ?? null}
-                    onSelect={(id) => {
-                      clearUnreadMessages(id);
-                      setNewMessageCount(0);
-                      setActiveConversationId(id);
-                      closeTransientSurface('sidebar');
-                    }}
-                    onConversationNotificationMuteToggle={
-                      toggleConversationNotificationMute
-                    }
-                    onConversationNotificationSettingsOpen={
-                      openConversationNotificationSettings
-                    }
-                    onCreate={() =>
-                      openTransientSurface('conversation-creation')
-                    }
-                    onCallEnd={leaveActiveCall}
-                    onCallParticipantVolumeChange={setParticipantVolume}
-                    onCallParticipantScreenShareVolumeChange={
-                      setParticipantScreenShareVolume
-                    }
-                    onCallScreenShareQualityChange={setScreenShareQuality}
-                    onCallToggleCamera={toggleCamera}
-                    onCallToggleDeafen={toggleDeafen}
-                    onCallToggleMediaEncryption={toggleCallMediaEncryption}
-                    onCallToggleMute={toggleMute}
-                    onCallToggleNoiseCancellation={toggleCallNoiseCancellation}
-                    onCallRetryMicrophone={retryMicrophone}
-                    onCallToggleScreenShare={toggleScreenShare}
-                    onLogout={logout}
-                    onSessionUpdated={(nextSession) => {
-                      setSession(nextSession);
-                      rememberIdentity(nextSession.identity);
-                    }}
-                    onPresenceChange={mergePresence}
-                    onPresenceStatusSelected={rememberPresencePreference}
-                  />
-                </Suspense>
-              </div>
-            </div>
-
-            <button
-              className={cx(
-                'fixed inset-0 z-30 bg-black/50 transition-opacity duration-200 lg:hidden',
-                sidebarOpen ? 'opacity-100' : 'pointer-events-none opacity-0',
-              )}
-              onClick={() => closeTransientSurface('sidebar')}
-              aria-label={copy.workspace.closeSidebar}
-            />
-
-            {conversationThread && activeConversation ? (
-              <MessageThreadPanel
-                attachmentEncryptionAvailable={Boolean(activeConversationKey)}
-                currentIdentityId={session.identity.id}
-                disabled={!activeConversationKey}
-                draft={conversationThread.draft}
-                editingMessage={
-                  conversationThread.editingMessage?.message ?? null
-                }
-                error={conversationThread.error}
-                identityNames={identityNames}
-                identityPictures={identityPictures}
-                messages={conversationThread.messages}
-                onCancelEdit={cancelConversationThreadEdit}
-                onCancelReply={cancelConversationThreadReply}
-                onClose={() => setConversationThread(null)}
-                onDraftChange={updateConversationThreadDraft}
-                onEdit={handleEditConversationThreadMessage}
-                onMessageMenuOpen={openThreadMessageMenu}
-                onRootMessageOpen={(message) => {
-                  setMessages((current) =>
-                    MessageCollection.merge(current, [message]),
-                  );
-                  setConversationThread(null);
-                  window.setTimeout(() => scrollToMessage(message.id), 0);
-                }}
-                onSend={sendConversationThreadMessage}
-                onStickerSend={sendConversationThreadSticker}
-                pinnedMessageIds={pinnedMessageIds}
-                replyTo={conversationThread.replyTarget}
-                replyToAuthorName={
-                  conversationThread.replyTarget
-                    ? identityDisplayName(
-                        conversationThread.replyTarget.authorIdentityId,
-                        identityNames,
-                      )
-                    : undefined
-                }
-                rootMessage={conversationThread.root}
-                session={session}
-                title={
-                  activeConversation.title ??
-                  activeConversation.name ??
-                  (activeConversationPeerIdentityId
-                    ? identityNames[activeConversationPeerIdentityId]
-                    : undefined) ??
-                  activeConversation.id
-                }
-              />
-            ) : (
-              <Suspense fallback={null}>
-                <ChatColumn
-                  session={session}
-                  activeConversation={activeConversation}
-                  conversationKey={activeConversationKey}
-                  draft={activeConversationDraft}
-                  editingMessage={editingMessage?.message ?? null}
-                  groupInviteRequest={groupInviteRequest}
-                  hasConversationKey={!!activeConversationKey}
-                  hasReachedMessageStart={!messageCursor}
-                  invitationAccepting={notificationAction === 'accept'}
-                  invitationError={notificationError}
-                  invitationInviterName={
-                    activeConversationInvitationInviterName
-                  }
-                  peerIdentityId={activeConversationPeerIdentityId}
-                  peerIdentity={
-                    activeConversationPeerIdentityId
-                      ? identityProfiles[activeConversationPeerIdentityId]
-                      : undefined
-                  }
-                  peerPicture={
-                    activeConversationPeerIdentityId
-                      ? identityPictures[activeConversationPeerIdentityId]
-                      : undefined
-                  }
-                  identityNames={identityNames}
-                  identityPictures={identityPictures}
-                  identityProfiles={identityProfiles}
-                  presenceByIdentityId={presenceByIdentityId}
-                  messages={messages}
-                  messageState={messageState}
-                  newMessageCount={newMessageCount}
-                  nodeNetworks={nodeNetworks}
-                  notificationSetting={activeConversationNotificationSetting}
-                  pinnedMessageIds={pinnedMessageIds}
-                  sendError={sendError}
-                  scrollerRef={scrollerRef}
-                  bottomRef={bottomRef}
-                  onScroll={handleScroll}
-                  onCancelEdit={cancelMessageEdit}
-                  onEditMessage={handleEditMessage}
-                  onSend={handleSend}
-                  onStickerSend={handleSendSticker}
-                  onConversationKeyImported={handleConversationKeyImported}
-                  onInvitationAccept={(notification) =>
-                    void acceptNotification(notification)
-                  }
-                  onDraftChange={updateActiveConversationDraft}
-                  onEscape={closeTransientUi}
-                  onJumpToLatest={jumpToLatestMessages}
-                  onMessageMenuOpen={handleMessageMenuOpen}
-                  onOpenMessageThread={(message) =>
-                    void openMessageThread(message)
-                  }
-                  onReactionToggle={(message, emoji, reacted) =>
-                    void handleToggleMessageReaction(message, emoji, reacted)
-                  }
-                  onReplyReferenceClick={(messageId) =>
-                    void handleReplyReferenceClick(messageId)
-                  }
-                  onOpenPins={() => void openPinnedMessages()}
-                  onOpenSidebar={() => openTransientSurface('sidebar')}
-                  onNotificationMuteToggle={toggleNotificationMute}
-                  onNotificationSettingsOpen={openNotificationSettings}
-                  onCreate={() => openTransientSurface('conversation-creation')}
-                  onOpenConversationWithIdentity={(identityId, identity) =>
-                    openOrCreateConversationWithIdentity(
-                      identityId,
-                      identity,
-                      activeConversation?.networkId,
-                    )
-                  }
-                  progress={attachmentProgress}
-                  realtimeStatus={realtimeStatus}
-                  realtimeEvent={conversationRealtimeEvent}
-                  onRealtimeEventsOpen={openRealtimeEvents}
-                  replyToMessage={replyTarget}
-                  onCancelReply={cancelMessageReply}
-                  onRetryMessage={retryMessage}
-                  onStartCall={startConversationCall}
-                  onTypingActive={sendConversationTyping}
-                  pendingInvitation={activeConversationInvitation}
-                  typingIdentityIds={conversationTypingIdentityIds}
-                />
-              </Suspense>
-            )}
-
-            <Suspense fallback={<InspectorStartupFallback />}>
-              <Inspector
-                className="hidden xl:block"
-                session={session}
-                activeConversation={activeConversation}
-                activeConversationPeerIdentityId={
-                  activeConversationPeerIdentityId
-                }
-                identityNames={identityNames}
-                identityPictures={identityPictures}
-                identityProfiles={identityProfiles}
-                nodeNetworks={nodeNetworks}
-                onGroupInviteOpen={() =>
-                  setGroupInviteRequest((request) => request + 1)
-                }
-                onOpenConversationWithIdentity={
-                  openOrCreateConversationWithIdentity
-                }
-                presenceByIdentityId={presenceByIdentityId}
-              />
-            </Suspense>
-          </>
-        ) : communitiesLoading && !activeCommunity ? (
-          <CommunityWorkspaceStartupFallback />
-        ) : activeCommunity ? (
-          <Suspense fallback={<CommunityWorkspaceStartupFallback />}>
-            <CommunityWorkspace
-              key={activeCommunity.id}
-              activeChannelId={activeCommunityChannelId}
-              animateSidePanelEntries={animateCommunitySidePanelEntries}
-              channelUnreadCounts={
-                visibleCommunityUnreadCountsById[activeCommunity.id] ?? {}
-              }
-              community={activeCommunity}
-              invitationAccepting={notificationAction === 'accept'}
-              invitationError={notificationError}
-              invitationInviterName={activeCommunityInvitationInviterName}
-              timelineFocusKey={`${workspaceMode}:${activeCommunity.id}:${
-                activeCommunityChannelId ?? ''
-              }`}
-              notificationSettingsByScopeKey={notificationSettingsByScopeKey}
-              mobileMembersOpen={communityMembersOpen}
-              mobileSidebarOpen={sidebarOpen}
-              mobileRail={
-                <Rail
-                  {...railProps}
-                  onInspectorClick={() => {
-                    closeTransientSurface('sidebar');
-                    openTransientSurface('community-members');
-                  }}
-                />
-              }
-              nodeNetworks={nodeNetworks}
-              activeCall={activeCall}
-              onCallEnd={leaveActiveCall}
-              onCallParticipantVolumeChange={setParticipantVolume}
-              onCallParticipantScreenShareVolumeChange={
-                setParticipantScreenShareVolume
-              }
-              onCallScreenShareQualityChange={setScreenShareQuality}
-              onCallToggleCamera={toggleCamera}
-              onCallToggleDeafen={toggleDeafen}
-              onCallToggleMediaEncryption={toggleCallMediaEncryption}
-              onCallToggleMute={toggleMute}
-              onCallToggleNoiseCancellation={toggleCallNoiseCancellation}
-              onCallRetryMicrophone={retryMicrophone}
-              onCallToggleScreenShare={toggleScreenShare}
-              realtimeEvent={communityRealtimeEvent}
-              presenceByIdentityId={presenceByIdentityId}
-              onChannelSelected={(channelId) =>
-                setCommunityChannelById((current) =>
-                  current[activeCommunity.id] === channelId
-                    ? current
-                    : {
-                        ...current,
-                        [activeCommunity.id]: channelId,
-                      },
-                )
-              }
-              onCommunityUpdated={updateCommunity}
-              onCommunityChannelsUpdated={updateCommunityChannels}
-              onInvitationAccept={(notification) =>
+            <MessagesWorkspaceContent
+              acceptInvitation={(notification) =>
                 void acceptNotification(notification)
               }
-              onCommunityLeft={removeCommunity}
-              onChannelViewed={(channelId) =>
-                clearCommunityChannelUnread(activeCommunity.id, channelId)
+              activeConversation={activeConversation}
+              activeConversationDraft={activeConversationDraft}
+              activeConversationKey={activeConversationKey}
+              activeConversationPeerIdentityId={
+                activeConversationPeerIdentityId
               }
+              attachmentProgress={attachmentProgress}
+              callControls={callControls}
+              closeTransientUi={closeTransientUi}
+              communities={communities}
+              conversationNotificationSetting={
+                activeConversationNotificationSetting
+              }
+              conversationNotificationSettingFor={
+                conversationNotificationSettingFor
+              }
+              conversationRealtimeEvent={conversationRealtimeEvent}
+              conversationTypingIdentityIds={conversationTypingIdentityIds}
+              conversationsWithUnread={conversationsWithUnread}
+              editingMessage={editingMessage}
+              groupInviteRequest={groupInviteRequest}
+              identityNames={identityNames}
+              identityPictures={identityPictures}
+              identityProfiles={identityProfiles}
+              invitationAccepting={notificationAction === 'accept'}
+              invitationError={notificationError}
+              invitationInviterName={activeConversationInvitationInviterName}
+              messageActions={messageActions}
+              nodeNetworks={nodeNetworks}
+              notificationMuteToggle={toggleNotificationMute}
+              notificationSettingsOpen={openNotificationSettings}
+              onConversationKeyImported={handleConversationKeyImported}
+              onConversationNotificationMuteToggle={
+                toggleConversationNotificationMute
+              }
+              onConversationNotificationSettingsOpen={
+                openConversationNotificationSettings
+              }
+              onConversationSelected={(conversationId) => {
+                clearUnreadMessages(conversationId);
+                setNewMessageCount(0);
+                setActiveConversationId(conversationId);
+              }}
+              onCreateConversation={() =>
+                openTransientSurface('conversation-creation')
+              }
+              onGroupInviteOpen={() =>
+                setGroupInviteRequest((request) => request + 1)
+              }
+              onInspectorOpen={() => openTransientSurface('inspector')}
               onLogout={logout}
-              onMobileSidebarClose={() => closeTransientSurface('sidebar')}
-              onMobileMembersClose={() =>
-                closeTransientSurface('community-members')
+              onOpenConversationWithIdentity={
+                openOrCreateConversationWithIdentity
               }
-              onNotificationMuteToggle={toggleNotificationMute}
-              onNotificationSettingsOpen={openNotificationSettings}
-              onOpenMobileSidebar={() => openTransientSurface('sidebar')}
-              onOpenConversationWithIdentity={(identityId, identity) =>
-                openOrCreateConversationWithIdentity(
-                  identityId,
-                  identity,
-                  activeCommunity.networkId,
-                )
-              }
+              onPresenceChange={mergePresence}
+              onPresenceStatusSelected={rememberPresencePreference}
+              onRealtimeEventsOpen={openRealtimeEvents}
               onSessionUpdated={(nextSession) => {
                 setSession(nextSession);
                 rememberIdentity(nextSession.identity);
               }}
-              onPresenceChange={mergePresence}
-              onPresenceStatusSelected={rememberPresencePreference}
-              onTypingActive={sendCommunityTyping}
+              onSidebarClose={() => closeTransientSurface('sidebar')}
+              onSidebarOpen={() => openTransientSurface('sidebar')}
+              pendingInvitation={activeConversationInvitation}
+              pins={conversationPins}
+              presenceByIdentityId={presenceByIdentityId}
+              railProps={railProps}
               realtimeStatus={realtimeStatus}
-              onRealtimeEventsOpen={openRealtimeEvents}
-              pendingInvitation={activeCommunityInvitation}
+              replyTarget={replyTarget}
+              sendConversationTyping={sendConversationTyping}
+              sendError={sendError}
               session={session}
-              typingIdentityIds={communityTypingIdentityIds}
-              onJoinVoiceChannel={startCommunityVoiceCall}
+              sidebarOpen={sidebarOpen}
+              thread={conversationThreadController}
+              timeline={timeline}
+              updateActiveDraft={updateActiveConversationDraft}
             />
-          </Suspense>
+          </>
         ) : (
-          <div className="glass-panel-strong col-span-3 flex h-full flex-col justify-center rounded-none p-4 text-center text-sm text-white/55">
-            {communitiesError?.message ?? copy.communities.empty}
-          </div>
+          <CommunityWorkspaceContent
+            activeChannelId={activeCommunityChannelId}
+            activeCommunity={activeCommunity}
+            animateSidePanelEntries={animateCommunitySidePanelEntries}
+            callControls={callControls}
+            channelUnreadCounts={activeCommunityUnreadCounts}
+            communityRealtimeEvent={communityRealtimeEvent}
+            communityTypingIdentityIds={communityTypingIdentityIds}
+            error={communitiesError}
+            invitationAccepting={notificationAction === 'accept'}
+            invitationError={notificationError}
+            invitationInviterName={activeCommunityInvitationInviterName}
+            loading={communitiesLoading}
+            membersOpen={communityMembersOpen}
+            nodeNetworks={nodeNetworks}
+            notificationSettingsByScopeKey={notificationSettingsByScopeKey}
+            onChannelSelected={(communityId, channelId) =>
+              setCommunityChannelById((current) =>
+                current[communityId] === channelId
+                  ? current
+                  : { ...current, [communityId]: channelId },
+              )
+            }
+            onChannelViewed={clearCommunityChannelUnread}
+            onCommunityChannelsUpdated={updateCommunityChannels}
+            onCommunityLeft={removeCommunity}
+            onCommunityUpdated={updateCommunity}
+            onInvitationAccept={(notification) =>
+              void acceptNotification(notification)
+            }
+            onLogout={logout}
+            onMembersClose={() => closeTransientSurface('community-members')}
+            onMembersOpen={() => openTransientSurface('community-members')}
+            onNotificationMuteToggle={toggleNotificationMute}
+            onNotificationSettingsOpen={openNotificationSettings}
+            onOpenConversationWithIdentity={
+              openOrCreateConversationWithIdentity
+            }
+            onPresenceChange={mergePresence}
+            onPresenceStatusSelected={rememberPresencePreference}
+            onRealtimeEventsOpen={openRealtimeEvents}
+            onSessionUpdated={(nextSession) => {
+              setSession(nextSession);
+              rememberIdentity(nextSession.identity);
+            }}
+            onSidebarClose={() => closeTransientSurface('sidebar')}
+            onSidebarOpen={() => openTransientSurface('sidebar')}
+            pendingInvitation={activeCommunityInvitation}
+            presenceByIdentityId={presenceByIdentityId}
+            railProps={railProps}
+            realtimeStatus={realtimeStatus}
+            sendCommunityTyping={sendCommunityTyping}
+            session={session}
+            sidebarOpen={sidebarOpen}
+          />
         )}
       </div>
 
@@ -1466,8 +1165,8 @@ export function GlassWorkspace({
               session,
             }}
             nodeSettings={{
-              networkSynchronizationStatus,
               networks: nodeNetworks,
+              networkSynchronizationStatus,
               node,
               onClose: () => closeTransientSurface('node-settings'),
               onNetworksUpdated: onNodeNetworksReload,

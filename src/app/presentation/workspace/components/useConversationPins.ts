@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import type {
   ChatMessage,
@@ -6,19 +6,44 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { applicationContainer } from '../../../composition/applicationContainer';
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrowserIdle';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import type { MessageCollectionState } from './conversationThreadState';
+import { applicationContainer } from '../../../composition/applicationContainer';
 
 type UseConversationPinsInput = {
-  activeConversation: ConversationResource | null;
+  activeConversation?: ConversationResource;
   closeMessageContextMenu: () => void;
   onError: (error: string | null) => void;
   session: Session;
 };
 
-export function useConversationPins(input: UseConversationPinsInput) {
+type UseConversationPinsResult = {
+  close: () => void;
+  collection: MessageCollectionState | null;
+  open: () => Promise<void>;
+  pin: (message: ChatMessage) => Promise<void>;
+  pinnedMessageIds: Set<string>;
+  setCollection: React.Dispatch<
+    React.SetStateAction<MessageCollectionState | null>
+  >;
+  setPinnedMessageIds: React.Dispatch<React.SetStateAction<Set<string>>>;
+  unpin: (message: ChatMessage) => Promise<void>;
+  unpinFromCollection: (message: ChatMessage) => Promise<void>;
+};
+
+function withoutMessage(current: Set<string>, messageId: string): Set<string> {
+  const next = new Set(current);
+
+  next.delete(messageId);
+
+  return next;
+}
+
+export function useConversationPins(
+  input: UseConversationPinsInput,
+): UseConversationPinsResult {
   const { activeConversation, closeMessageContextMenu, onError, session } =
     input;
   const [collection, setCollection] = useState<MessageCollectionState | null>(
@@ -27,6 +52,35 @@ export function useConversationPins(input: UseConversationPinsInput) {
   const [pinnedMessageIds, setPinnedMessageIds] = useState<Set<string>>(
     () => new Set(),
   );
+
+  useEffect(() => {
+    if (!activeConversation) {
+      setPinnedMessageIds(new Set());
+
+      return;
+    }
+
+    let cancelled = false;
+    const cancelIdleWork = runWhenBrowserIdle(async () => {
+      try {
+        const pins = await applicationContainer.messages.listPins(
+          session,
+          activeConversation.id,
+        );
+
+        if (!cancelled) {
+          setPinnedMessageIds(new Set(pins.map((pin) => pin.messageId)));
+        }
+      } catch {
+        if (!cancelled) setPinnedMessageIds(new Set());
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      cancelIdleWork();
+    };
+  }, [activeConversation, session]);
 
   const open = async () => {
     if (!activeConversation) return;
@@ -118,12 +172,4 @@ export function useConversationPins(input: UseConversationPinsInput) {
     unpin,
     unpinFromCollection,
   };
-}
-
-function withoutMessage(current: Set<string>, messageId: string): Set<string> {
-  const next = new Set(current);
-
-  next.delete(messageId);
-
-  return next;
 }
