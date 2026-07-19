@@ -1,7 +1,6 @@
 import {
   type Dispatch,
   type SetStateAction,
-  startTransition,
   Suspense,
   useCallback,
   useEffect,
@@ -21,7 +20,6 @@ import type {
   Community,
   CommunityChannel,
   CommunityMembershipRequest,
-  ConversationKeyEntry,
   ConversationResource,
   IdentityResource,
   NotificationSettingScope,
@@ -33,12 +31,9 @@ import type { MessageContextMenuState } from './messageContextMenu';
 
 import { useRealtimeEvents } from '../../../../app/presentation/realtime/useRealtimeEvents';
 import { useAttachmentDownload } from '../../../../contexts/attachments/presentation/hooks/useAttachmentDownload';
-import { SeenCommunityMembershipRequests } from '../../../../contexts/communities/infrastructure/storage/SeenCommunityMembershipRequests';
-import { useCommunityMembershipRequests } from '../../../../contexts/communities/presentation/hooks/useCommunityMembershipRequests';
 import { CommunityChannels } from '../../../../contexts/communities/presentation/view-models/CommunityChannels';
 import { CommunityList } from '../../../../contexts/communities/presentation/view-models/CommunityList';
 import { ConversationPeer } from '../../../../contexts/conversations/presentation/view-models/ConversationPeer';
-import { ConversationTimeline } from '../../../../contexts/conversations/presentation/view-models/ConversationTimeline';
 import { ConversationKeychain } from '../../../../contexts/identities/infrastructure/keychain/ConversationKeychain';
 import { useIdentityDirectory } from '../../../../contexts/identities/presentation/hooks/useIdentityDirectory';
 import {
@@ -49,10 +44,6 @@ import { MessageCollectionDialog } from '../../../../contexts/messages/presentat
 import { MessageThreadPanel } from '../../../../contexts/messages/presentation/components/MessageThreadPanel';
 import { useUnreadMessages } from '../../../../contexts/messages/presentation/hooks/useUnreadMessages';
 import { MessageCollection } from '../../../../contexts/messages/presentation/view-models/MessageCollection';
-import { SharedNetworkSelectorDomainService } from '../../../../contexts/networks/domain/services/SharedNetworkSelectorDomainService';
-import { NetworkId } from '../../../../contexts/networks/domain/value-objects/NetworkId';
-import { useNotificationCommunityPreviews } from '../../../../contexts/notifications/presentation/hooks/useNotificationCommunityPreviews';
-import { useNotifications } from '../../../../contexts/notifications/presentation/hooks/useNotifications';
 import { useNotificationScopeSettings } from '../../../../contexts/notifications/presentation/hooks/useNotificationScopeSettings';
 import { usePushNotificationRegistration } from '../../../../contexts/notifications/presentation/hooks/usePushNotificationRegistration';
 import { deletePwaPushSubscription } from '../../../../contexts/notifications/presentation/services/pwaNotifications';
@@ -68,6 +59,7 @@ import {
   useWorkspacePreferenceState,
 } from '../useWorkspacePreferences';
 import { ChatColumn } from './ChatColumn';
+import { CommunityUnreadState } from './CommunityUnreadState';
 import { communityVoiceChannelTopologyKey } from './communityVoicePresence';
 import { CommunityWorkspaceStartupFallback } from './CommunityWorkspaceStartupFallback';
 import { type EditingMessage } from './conversationThreadState';
@@ -78,17 +70,18 @@ import { useConversationDrafts } from './useConversationDrafts';
 import { useConversationMessageActions } from './useConversationMessageActions';
 import { useConversationPins } from './useConversationPins';
 import { useConversationThread } from './useConversationThread';
-import { useMessageViewport } from './useMessageViewport';
+import { useConversationTimeline } from './useConversationTimeline';
 import { usePendingCommunityInvite } from './usePendingCommunityInvite';
 import { useSidebarGesture } from './useSidebarGesture';
 import { useWorkspaceCalls } from './useWorkspaceCalls';
-import { useWorkspaceMessageHistory } from './useWorkspaceMessageHistory';
+import { useWorkspaceConversationNavigation } from './useWorkspaceConversationNavigation';
+import { useWorkspaceInbox } from './useWorkspaceInbox';
 import { useWorkspaceNotificationActions } from './useWorkspaceNotificationActions';
 import { useWorkspacePresence } from './useWorkspacePresence';
 import { useWorkspaceRealtimeCommunityEvents } from './useWorkspaceRealtimeCommunityEvents';
 import { useWorkspaceRealtimeConversationEvents } from './useWorkspaceRealtimeConversationEvents';
 import { useWorkspaceRealtimeEventRouter } from './useWorkspaceRealtimeEventRouter';
-import { useWorkspaceResumeSync } from './useWorkspaceResumeSync';
+import { useWorkspaceTransientUi } from './useWorkspaceTransientUi';
 import { useWorkspaceTyping } from './useWorkspaceTyping';
 import {
   CommunityWorkspace,
@@ -100,15 +93,11 @@ import {
   WorkspaceDialogs,
 } from './workspaceLazyComponents';
 import {
-  canActOnMembershipRequest,
   isPendingCommunityInvitationFor,
   isPendingConversationInvitationFor,
   stableUniqueKey,
 } from './workspaceNotificationState';
 
-const seenCommunityMembershipRequests = new SeenCommunityMembershipRequests();
-
-type LoadState = 'idle' | 'loading' | 'error';
 interface GlassWorkspaceProps {
   session: Session;
   setSession: (session: Session | null) => void;
@@ -165,26 +154,6 @@ export function GlassWorkspace({
     setWorkspaceMode,
     workspaceMode,
   } = useWorkspacePreferenceState(conversations, session);
-  const preloadedConversationMessagesRef = useRef(
-    preloadedConversationMessages,
-  );
-  const initialPreloadedMessages = preloadedConversationMessages
-    ? MessageCollection.merge([], preloadedConversationMessages.messages)
-    : [];
-  const loadedMessagesConversationIdRef = useRef<string | null>(
-    preloadedConversationMessages?.conversationId ?? null,
-  );
-  const [messages, setMessages] = useState<ChatMessage[]>(
-    () => initialPreloadedMessages,
-  );
-  const [messageCursor, setMessageCursor] = useState<string | null>(
-    preloadedConversationMessages?.nextCursor ?? null,
-  );
-  const [messageState, setMessageState] = useState<LoadState>(
-    preloadedConversationMessages ? 'idle' : 'loading',
-  );
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isCreateCommunityOpen, setIsCreateCommunityOpen] = useState(false);
   const [communityRealtimeEvent, setCommunityRealtimeEvent] =
     useState<RealtimeDomainEvent | null>(null);
   const [conversationRealtimeEvent, setConversationRealtimeEvent] =
@@ -192,7 +161,6 @@ export function GlassWorkspace({
   const [realtimeStatus, setRealtimeStatus] = useState<
     'connected' | 'reconnecting'
   >('reconnecting');
-  const [realtimeEventsOpen, setRealtimeEventsOpen] = useState(false);
   const [realtimeEventLog, setRealtimeEventLog] = useState<
     RealtimeDomainEvent[]
   >([]);
@@ -211,18 +179,23 @@ export function GlassWorkspace({
   const [editingMessage, setEditingMessage] = useState<EditingMessage | null>(
     null,
   );
-  const [newMessageCount, setNewMessageCount] = useState(0);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [inspectorOpen, setInspectorOpen] = useState(false);
   const [groupInviteRequest, setGroupInviteRequest] = useState(0);
-  const [communityMembersOpen, setCommunityMembersOpen] = useState(false);
-  const [nodeSettingsOpen, setNodeSettingsOpen] = useState(false);
   const [networkSynchronizationStatus, setNetworkSynchronizationStatus] =
     useState<NetworkSynchronizationStatus | null>(null);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [seenMembershipRequestIds, setSeenMembershipRequestIds] = useState<
-    string[]
-  >(() => seenCommunityMembershipRequests.get(session.identity.id));
+  const {
+    close: closeTransientSurface,
+    closeAll: closeAllTransientSurfaces,
+    isOpen: isTransientSurfaceOpen,
+    open: openTransientSurface,
+  } = useWorkspaceTransientUi();
+  const communityMembersOpen = isTransientSurfaceOpen('community-members');
+  const inspectorOpen = isTransientSurfaceOpen('inspector');
+  const isCreateCommunityOpen = isTransientSurfaceOpen('community-creation');
+  const isCreateOpen = isTransientSurfaceOpen('conversation-creation');
+  const nodeSettingsOpen = isTransientSurfaceOpen('node-settings');
+  const notificationsOpen = isTransientSurfaceOpen('notifications');
+  const realtimeEventsOpen = isTransientSurfaceOpen('realtime-events');
+  const sidebarOpen = isTransientSurfaceOpen('sidebar');
   const {
     dismissPrompt: dismissPushPrompt,
     enable: enablePushNotifications,
@@ -236,39 +209,14 @@ export function GlassWorkspace({
     () => communityVoiceChannelTopologyKey(communities),
     [communities],
   );
-  const clearNewMessageCount = useCallback(() => setNewMessageCount(0), []);
   const initialRenderedCommunityIdRef = useRef<string | null>(null);
-  const {
-    bottomRef,
-    isScrolledNearBottom,
-    jumpToLatestMessages,
-    keepMessageBottomUntilRef,
-    lastScrollTopRef,
-    messageScrollAnchorRef,
-    scrollerRef,
-    scrollMessagesToBottom,
-  } = useMessageViewport({
-    layoutKey: activeConversationId,
-    messageCount: messages.length,
-    messageState,
-    onJumpToLatest: clearNewMessageCount,
-  });
-  const messageCursorRef = useRef<string | null>(
-    preloadedConversationMessages?.nextCursor ?? null,
-  );
-  const messageAbortRef = useRef<AbortController | null>(null);
-  const messageRequestRef = useRef(0);
-  const messageStateRef = useRef<LoadState>(
-    preloadedConversationMessages ? 'idle' : 'loading',
-  );
-  const messagesRef = useRef<ChatMessage[]>(initialPreloadedMessages);
   const sessionRef = useRef(session);
   const suppressMessageLoadsUntilRef = useRef(0);
   const {
     clearSidebarGesture,
     handleWorkspacePointerDown,
     handleWorkspacePointerMove,
-  } = useSidebarGesture(sidebarOpen, setSidebarOpen);
+  } = useSidebarGesture(sidebarOpen, () => openTransientSurface('sidebar'));
   const {
     close: closeNotificationSettings,
     error: notificationSettingsError,
@@ -286,52 +234,33 @@ export function GlassWorkspace({
     sessionRef.current = session;
   }, [session]);
 
-  useEffect(() => {
-    setSeenMembershipRequestIds(
-      seenCommunityMembershipRequests.get(session.identity.id),
-    );
-  }, [session.identity.id]);
-
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
-
-  useEffect(() => {
-    messageStateRef.current = messageState;
-  }, [messageState]);
-
-  const setMessageLoadState = useCallback((state: LoadState) => {
-    messageStateRef.current = state;
-    setMessageState(state);
-  }, []);
-  const suppressMessageLoadsBriefly = useCallback(() => {
+  const suppressMessageLoadsBriefly = useCallback((): void => {
     suppressMessageLoadsUntilRef.current = Date.now() + 800;
   }, []);
 
   const openNotificationsPanel = useCallback(() => {
     suppressMessageLoadsBriefly();
     void enablePushNotifications();
-    setNotificationsOpen(true);
-  }, [enablePushNotifications, suppressMessageLoadsBriefly]);
+    openTransientSurface('notifications');
+  }, [
+    enablePushNotifications,
+    openTransientSurface,
+    suppressMessageLoadsBriefly,
+  ]);
 
   const closeNotificationsPanel = useCallback(() => {
     suppressMessageLoadsBriefly();
-    setNotificationsOpen(false);
-  }, [suppressMessageLoadsBriefly]);
+    closeTransientSurface('notifications');
+  }, [closeTransientSurface, suppressMessageLoadsBriefly]);
   const openNodeSettings = useCallback(() => {
-    setNodeSettingsOpen(true);
+    openTransientSurface('node-settings');
     void onPeersReload();
-  }, [onPeersReload]);
+  }, [onPeersReload, openTransientSurface]);
 
   const openRealtimeEvents = useCallback(() => {
     setRealtimeEventLog([]);
-    setRealtimeEventsOpen(true);
-  }, []);
-
-  const updateMessageCursor = useCallback((cursor: null | string) => {
-    messageCursorRef.current = cursor;
-    setMessageCursor(cursor);
-  }, []);
+    openTransientSurface('realtime-events');
+  }, [openTransientSurface]);
 
   const activeConversation = useMemo(
     () =>
@@ -347,40 +276,6 @@ export function GlassWorkspace({
     activeConversationId: activeConversation?.id ?? null,
     drafts,
     onDraftsChange: setDrafts,
-    session,
-  });
-  const {
-    cancelEditing: cancelConversationThreadEdit,
-    cancelReplying: cancelConversationThreadReply,
-    edit: handleEditConversationThreadMessage,
-    open: openMessageThread,
-    remove: handleDeleteConversationThreadMessage,
-    send: sendConversationThreadMessage,
-    sendSticker: sendConversationThreadSticker,
-    setThread: setConversationThread,
-    startEditing: startEditingConversationThreadMessage,
-    startReplying: startReplyingToConversationThreadMessage,
-    thread: conversationThread,
-    updateDraft: updateConversationThreadDraft,
-  } = useConversationThread({
-    activeConversation,
-    closeMessageContextMenu: () => setMessageContextMenu(null),
-    session,
-    setMessages,
-  });
-  const {
-    collection: messageCollection,
-    open: openPinnedMessages,
-    pin: pinMessage,
-    pinnedMessageIds,
-    setCollection: setMessageCollection,
-    setPinnedMessageIds,
-    unpin: unpinMessage,
-    unpinFromCollection: unpinMessageFromDialog,
-  } = useConversationPins({
-    activeConversation,
-    closeMessageContextMenu: () => setMessageContextMenu(null),
-    onError: setSendError,
     session,
   });
   const activeConversationNotificationScope = useMemo(
@@ -403,38 +298,6 @@ export function GlassWorkspace({
         : NotificationSettingsPolicy.defaults,
     [activeConversationNotificationScope, notificationSettingsByScopeKey],
   );
-  useEffect(() => {
-    setConversationThread(null);
-  }, [activeConversation?.id]);
-
-  useEffect(() => {
-    if (!activeConversation?.id) {
-      setPinnedMessageIds(new Set());
-
-      return;
-    }
-
-    let cancelled = false;
-
-    const cancelIdleWork = runWhenBrowserIdle(() => {
-      void applicationContainer.messages
-        .listPins(session, activeConversation.id)
-        .then((pins) => {
-          if (!cancelled) {
-            setPinnedMessageIds(new Set(pins.map((pin) => pin.messageId)));
-          }
-        })
-        .catch(() => {
-          if (!cancelled) setPinnedMessageIds(new Set());
-        });
-    });
-
-    return () => {
-      cancelled = true;
-      cancelIdleWork();
-    };
-  }, [activeConversation?.id, session]);
-
   const { activeCommunity, activeCommunityChannelId } = useCommunitySelection({
     activeCommunityId,
     communities,
@@ -468,67 +331,33 @@ export function GlassWorkspace({
 
   const visibleCommunityUnreadCountsById = useMemo(
     () =>
-      Object.fromEntries(
-        Object.entries(communityUnreadCountsById).map(
-          ([communityId, channelCounts]) => [
-            communityId,
-            Object.fromEntries(
-              Object.entries(channelCounts).filter(([channelId]) => {
-                const setting = NotificationSettingsPolicy.resolve(
-                  notificationSettingsByScopeKey,
-                  {
-                    channelId,
-                    communityId,
-                    type: 'community_channel',
-                  },
-                );
-
-                return !NotificationSettingsPolicy.isMuted(setting);
-              }),
-            ),
-          ],
-        ),
-      ) as Record<string, Record<string, number>>,
+      CommunityUnreadState.visibleCounts(
+        communityUnreadCountsById,
+        notificationSettingsByScopeKey,
+      ),
     [communityUnreadCountsById, notificationSettingsByScopeKey],
   );
   const communityUnreadCounts = useMemo(
-    () =>
-      Object.fromEntries(
-        Object.entries(visibleCommunityUnreadCountsById).map(
-          ([communityId, channels]) => [
-            communityId,
-            Object.values(channels).reduce((total, count) => total + count, 0),
-          ],
-        ),
-      ) as Record<string, number>,
+    () => CommunityUnreadState.totals(visibleCommunityUnreadCountsById),
     [visibleCommunityUnreadCountsById],
   );
   const clearCommunityChannelUnread = useCallback(
     (communityId: string, channelId: string) => {
-      setCommunityUnreadCountsById((current) => {
-        if (!current[communityId]?.[channelId]) return current;
-
-        const nextCommunity = { ...current[communityId] };
-
-        delete nextCommunity[channelId];
-
-        return {
-          ...current,
-          [communityId]: nextCommunity,
-        };
-      });
+      setCommunityUnreadCountsById((current) =>
+        CommunityUnreadState.withoutChannel(current, communityId, channelId),
+      );
     },
     [],
   );
   const markCommunityChannelUnread = useCallback(
     (communityId: string, channelId: string) => {
-      setCommunityUnreadCountsById((current) => ({
-        ...current,
-        [communityId]: {
-          ...(current[communityId] ?? {}),
-          [channelId]: (current[communityId]?.[channelId] ?? 0) + 1,
-        },
-      }));
+      setCommunityUnreadCountsById((current) =>
+        CommunityUnreadState.withIncrementedChannel(
+          current,
+          communityId,
+          channelId,
+        ),
+      );
     },
     [],
   );
@@ -603,78 +432,35 @@ export function GlassWorkspace({
     [setCommunities, setConversations, setSession],
   );
   const {
-    accept: acceptNotification,
-    action: notificationAction,
-    archive: archiveNotification,
-    decline: declineNotification,
-    error: notificationError,
-    list: notificationList,
-    markVisibleAsSeen: markVisibleNotificationsAsSeen,
-    refresh: refreshNotifications,
-    unreadCount: unreadNotificationCount,
-    visible: visibleNotifications,
-  } = useNotifications({
-    onAccepted: handleNotificationAccepted,
-    onAcceptedPanelClose: closeNotificationsPanel,
-    session,
-  });
-  const {
-    accept: acceptMembershipRequest,
-    action: membershipRequestAction,
-    decline: declineMembershipRequest,
-    error: membershipRequestError,
-    refresh: refreshMembershipRequests,
-    requests: membershipRequests,
-    setRequests: setMembershipRequests,
-  } = useCommunityMembershipRequests({
-    onCommunitiesReload,
-    session,
-  });
-  const actionableMembershipRequests = useMemo(
-    () =>
-      membershipRequests.filter((request) =>
-        canActOnMembershipRequest(request, communities, session.identity.id),
-      ),
-    [communities, membershipRequests, session.identity.id],
-  );
-  const unseenMembershipRequestCount = useMemo(
-    () =>
-      actionableMembershipRequests.filter(
-        (request) => !seenMembershipRequestIds.includes(request.id),
-      ).length,
-    [actionableMembershipRequests, seenMembershipRequestIds],
-  );
-  const inboxNotificationCount =
-    unreadNotificationCount + unseenMembershipRequestCount;
-  const markVisibleMembershipRequestsAsSeen = useCallback(() => {
-    const requestIds = actionableMembershipRequests.map(
-      (request) => request.id,
-    );
-
-    if (requestIds.length === 0) return;
-
-    setSeenMembershipRequestIds(
-      seenCommunityMembershipRequests.markSeen(session.identity.id, requestIds),
-    );
-  }, [actionableMembershipRequests, session.identity.id]);
-
-  useEffect(() => {
-    if (!notificationsOpen) return;
-
-    markVisibleNotificationsAsSeen();
-    markVisibleMembershipRequestsAsSeen();
-  }, [
-    markVisibleMembershipRequestsAsSeen,
-    markVisibleNotificationsAsSeen,
-    notificationsOpen,
-  ]);
-  const {
     communityAvatarUrls: notificationCommunityAvatarUrls,
     communityPreviews: notificationCommunityPreviews,
-  } = useNotificationCommunityPreviews({
+    membershipRequests: {
+      accept: acceptMembershipRequest,
+      action: membershipRequestAction,
+      decline: declineMembershipRequest,
+      error: membershipRequestError,
+      refresh: refreshMembershipRequests,
+      requests: membershipRequests,
+      setRequests: setMembershipRequests,
+    },
+    notificationCount: inboxNotificationCount,
+    notifications: {
+      accept: acceptNotification,
+      action: notificationAction,
+      archive: archiveNotification,
+      decline: declineNotification,
+      error: notificationError,
+      list: notificationList,
+      refresh: refreshNotifications,
+      visible: visibleNotifications,
+    },
+  } = useWorkspaceInbox({
     communities,
+    notificationsOpen,
+    onAccepted: handleNotificationAccepted,
+    onAcceptedPanelClose: closeNotificationsPanel,
+    onCommunitiesReload,
     session,
-    visibleNotifications,
   });
 
   const logout = () => {
@@ -701,27 +487,109 @@ export function GlassWorkspace({
       )
     : undefined;
   const activeConversationKeyId = activeConversationKey?.conversationId ?? null;
-  const { handleScroll } = useWorkspaceMessageHistory({
-    activeConversation,
-    activeConversationKey,
+  const refreshConversations = useCallback(async () => {
+    const next = await applicationContainer.conversations.list(session);
+
+    setConversations(next);
+
+    return next;
+  }, [session, setConversations]);
+  const {
+    bottomRef,
+    handleScroll,
     isScrolledNearBottom,
-    keepMessageBottomUntilRef,
-    lastScrollTopRef,
-    messageCursorRef,
-    messageRequestRef,
-    messageScrollAnchorRef,
+    jumpToLatestMessages,
+    markConversationReadUntil,
+    messageCursor,
+    messages,
     messagesRef,
-    messageStateRef,
+    messageState,
+    newMessageCount,
     scrollerRef,
-    sessionRef,
+    scrollMessagesToBottom,
     setMessageLoadState,
     setMessages,
     setNewMessageCount,
-    setSendError,
-    suppressMessageLoadsUntilRef,
     updateMessageCursor,
+  } = useConversationTimeline({
+    activeConversation,
+    activeConversationKey,
+    clearUnreadMessages,
+    onCommunitiesReload,
+    onConversationsChange: setConversations,
+    onErrorChange: setSendError,
+    preloadedConversationMessages,
+    refreshConversations,
+    sessionRef,
+    suppressMessageLoadsUntilRef,
     workspaceMode,
   });
+  const {
+    cancelEditing: cancelConversationThreadEdit,
+    cancelReplying: cancelConversationThreadReply,
+    edit: handleEditConversationThreadMessage,
+    open: openMessageThread,
+    remove: handleDeleteConversationThreadMessage,
+    send: sendConversationThreadMessage,
+    sendSticker: sendConversationThreadSticker,
+    setThread: setConversationThread,
+    startEditing: startEditingConversationThreadMessage,
+    startReplying: startReplyingToConversationThreadMessage,
+    thread: conversationThread,
+    updateDraft: updateConversationThreadDraft,
+  } = useConversationThread({
+    activeConversation,
+    closeMessageContextMenu: () => setMessageContextMenu(null),
+    session,
+    setMessages,
+  });
+  const {
+    collection: messageCollection,
+    open: openPinnedMessages,
+    pin: pinMessage,
+    pinnedMessageIds,
+    setCollection: setMessageCollection,
+    setPinnedMessageIds,
+    unpin: unpinMessage,
+    unpinFromCollection: unpinMessageFromDialog,
+  } = useConversationPins({
+    activeConversation,
+    closeMessageContextMenu: () => setMessageContextMenu(null),
+    onError: setSendError,
+    session,
+  });
+
+  useEffect(() => {
+    setConversationThread(null);
+  }, [activeConversation?.id, setConversationThread]);
+
+  useEffect(() => {
+    if (!activeConversation?.id) {
+      setPinnedMessageIds(new Set());
+
+      return;
+    }
+
+    let cancelled = false;
+
+    const cancelIdleWork = runWhenBrowserIdle(() => {
+      void applicationContainer.messages
+        .listPins(session, activeConversation.id)
+        .then((pins) => {
+          if (!cancelled) {
+            setPinnedMessageIds(new Set(pins.map((pin) => pin.messageId)));
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setPinnedMessageIds(new Set());
+        });
+    });
+
+    return () => {
+      cancelled = true;
+      cancelIdleWork();
+    };
+  }, [activeConversation?.id, session, setPinnedMessageIds]);
   const activeConversationPeerIdentityId = activeConversation
     ? ConversationPeer.identityId(
         activeConversation,
@@ -744,6 +612,35 @@ export function GlassWorkspace({
     messageAuthorIdentityIdsKey,
     notifications: notificationList,
     session,
+  });
+  const closeCommunityMembers = useCallback((): void => {
+    closeTransientSurface('community-members');
+  }, [closeTransientSurface]);
+  const closeConversationCreation = useCallback((): void => {
+    closeTransientSurface('conversation-creation');
+  }, [closeTransientSurface]);
+  const closeSidebar = useCallback((): void => {
+    closeTransientSurface('sidebar');
+  }, [closeTransientSurface]);
+  const showMessagesWorkspace = useCallback((): void => {
+    setWorkspaceMode('messages');
+  }, [setWorkspaceMode]);
+  const {
+    importConversationKey: handleConversationKeyImported,
+    openCreatedConversation: handleConversationCreated,
+    openOrCreateConversation: openOrCreateConversationWithIdentity,
+  } = useWorkspaceConversationNavigation({
+    closeCommunityMembers,
+    closeConversationCreation,
+    closeSidebar,
+    conversations,
+    rememberIdentity,
+    session,
+    sessionRef,
+    setActiveConversationId,
+    setConversations,
+    setSession,
+    showMessagesWorkspace,
   });
   const activeConversationInvitation = useMemo(
     () =>
@@ -852,14 +749,6 @@ export function GlassWorkspace({
     }
   }, [activeConversationId, conversations]);
 
-  const refreshConversations = useCallback(async () => {
-    const next = await applicationContainer.conversations.list(session);
-
-    setConversations(next);
-
-    return next;
-  }, [session, setConversations]);
-
   const refreshSession = useCallback(async () => {
     const result = await applicationContainer.session.refresh(session);
 
@@ -867,150 +756,12 @@ export function GlassWorkspace({
     setConversations(result.conversations);
   }, [session, setConversations, setSession]);
 
-  const markConversationReadUntil = useCallback(
-    (conversationId: string, loadedMessages: ChatMessage[]) => {
-      const lastMessage = MessageCollection.lastDelivered(loadedMessages);
-
-      if (!lastMessage) return;
-
-      clearUnreadMessages(conversationId);
-      setConversations((current) =>
-        current.map((conversation) =>
-          conversation.id === conversationId
-            ? { ...conversation, unreadCount: 0 }
-            : conversation,
-        ),
-      );
-      void applicationContainer.conversations
-        .markReadUntil(sessionRef.current, conversationId, lastMessage.id)
-        .catch(() => undefined);
-    },
-    [clearUnreadMessages, setConversations],
-  );
-
-  const loadActiveMessages = useCallback(
-    async (conversationId: string) => {
-      const requestId = messageRequestRef.current + 1;
-      const controller = new AbortController();
-
-      messageAbortRef.current?.abort();
-      messageAbortRef.current = controller;
-      messageRequestRef.current = requestId;
-      loadedMessagesConversationIdRef.current = null;
-      setMessages([]);
-      updateMessageCursor(null);
-      setMessageLoadState('loading');
-      setSendError(null);
-      try {
-        const result = await applicationContainer.messages.load(
-          sessionRef.current,
-          conversationId,
-          null,
-          { signal: controller.signal },
-        );
-
-        if (messageRequestRef.current !== requestId) return;
-
-        startTransition(() => {
-          setMessages(MessageCollection.merge([], result.messages));
-          updateMessageCursor(result.nextCursor ?? null);
-          setMessageLoadState('idle');
-          loadedMessagesConversationIdRef.current = conversationId;
-        });
-        markConversationReadUntil(conversationId, result.messages);
-        scrollMessagesToBottom('auto', true);
-      } catch (caught) {
-        if (messageRequestRef.current !== requestId) return;
-
-        if (controller.signal.aborted) return;
-
-        loadedMessagesConversationIdRef.current = null;
-        setMessages([]);
-        setMessageLoadState('error');
-        setSendError(
-          toUserErrorMessage(caught, copy.workspace.loadMessagesError),
-        );
-
-        return;
-      }
-
-      if (messageRequestRef.current !== requestId) return;
-
-      if (messageAbortRef.current === controller) {
-        messageAbortRef.current = null;
-      }
-    },
-    [
-      markConversationReadUntil,
-      scrollMessagesToBottom,
-      setMessageLoadState,
-      updateMessageCursor,
-    ],
-  );
-
   useEffect(() => {
-    if (workspaceMode !== 'messages') return;
+    if (workspaceMode !== 'messages' || !activeConversation?.id) return;
 
-    if (!activeConversation?.id) return;
     setReplyTarget(null);
     setEditingMessage(null);
-    setNewMessageCount(0);
-    lastScrollTopRef.current = 0;
-
-    if (!activeConversationKeyId) {
-      messageAbortRef.current?.abort();
-      messageAbortRef.current = null;
-      loadedMessagesConversationIdRef.current = null;
-      setMessages([]);
-      updateMessageCursor(null);
-      lastScrollTopRef.current = 0;
-      setMessageLoadState('idle');
-
-      return;
-    }
-
-    const preloaded = preloadedConversationMessagesRef.current;
-
-    if (preloaded?.conversationId === activeConversation.id) {
-      preloadedConversationMessagesRef.current = null;
-      loadedMessagesConversationIdRef.current = activeConversation.id;
-      setMessages(MessageCollection.merge([], preloaded.messages));
-      updateMessageCursor(preloaded.nextCursor ?? null);
-      setMessageLoadState('idle');
-      markConversationReadUntil(activeConversation.id, preloaded.messages);
-      scrollMessagesToBottom('auto', true);
-
-      return;
-    }
-
-    if (loadedMessagesConversationIdRef.current === activeConversation.id) {
-      setMessageLoadState('idle');
-      scrollMessagesToBottom('auto', true);
-
-      return;
-    }
-
-    void loadActiveMessages(activeConversation.id);
-  }, [
-    activeConversation?.id,
-    activeConversationKeyId,
-    loadActiveMessages,
-    markConversationReadUntil,
-    scrollMessagesToBottom,
-    setMessageLoadState,
-    updateMessageCursor,
-    workspaceMode,
-  ]);
-
-  useWorkspaceResumeSync({
-    activeConversationId: activeConversation?.id,
-    activeConversationKeyId,
-    loadActiveMessages,
-    loadedMessages: messagesRef,
-    onCommunitiesReload,
-    refreshConversations,
-    workspaceMode,
-  });
+  }, [activeConversation?.id, workspaceMode]);
 
   const {
     cancelEdit: cancelMessageEdit,
@@ -1058,17 +809,12 @@ export function GlassWorkspace({
     setRawMessage(null);
     cancelMessageReply();
     cancelMessageEdit();
-    setIsCreateOpen(false);
-    setIsCreateCommunityOpen(false);
     closeNotificationsPanel();
-    setNodeSettingsOpen(false);
-    setRealtimeEventsOpen(false);
-    setInspectorOpen(false);
-    setCommunityMembersOpen(false);
-    setSidebarOpen(false);
+    closeAllTransientSurfaces();
   }, [
     cancelMessageEdit,
     cancelMessageReply,
+    closeAllTransientSurfaces,
     closeMessageMenu,
     closeNotificationsPanel,
   ]);
@@ -1082,119 +828,6 @@ export function GlassWorkspace({
 
     return () => window.removeEventListener('keydown', handleEscape);
   }, [closeTransientUi]);
-
-  const handleConversationCreated = (
-    nextSession: Session,
-    conversation: ConversationResource,
-  ) => {
-    setSession(nextSession);
-    setConversations(
-      ConversationTimeline.sortByLatestMessage([
-        conversation,
-        ...conversations.filter((item) => item.id !== conversation.id),
-      ]),
-    );
-    setActiveConversationId(conversation.id);
-    setIsCreateOpen(false);
-    setSidebarOpen(false);
-  };
-
-  const openOrCreateConversationWithIdentity = useCallback(
-    async (
-      identityId: string,
-      identity?: IdentityResource,
-      preferredNetworkId?: string,
-    ) => {
-      if (identityId === session.identity.id) return;
-
-      const existingConversation = conversations.find(
-        (conversation) =>
-          ConversationPeer.identityId(
-            conversation,
-            session.identity.id,
-            session.keychain,
-          ) === identityId,
-      );
-
-      if (existingConversation) {
-        setWorkspaceMode('messages');
-        setActiveConversationId(existingConversation.id);
-        setSidebarOpen(false);
-        setCommunityMembersOpen(false);
-
-        return;
-      }
-
-      const sharedNetwork = new SharedNetworkSelectorDomainService().select(
-        session.identity.networks.map((networkId) =>
-          NetworkId.fromString(networkId),
-        ),
-        (identity?.networks ?? []).map((networkId) =>
-          NetworkId.fromString(networkId),
-        ),
-        NetworkId.fromOptional(preferredNetworkId),
-      );
-
-      if (!sharedNetwork.isAvailable()) {
-        throw new Error(copy.dialog.noSharedNetwork);
-      }
-
-      const result = await applicationContainer.conversations.create(
-        sessionRef.current,
-        identityId,
-        sharedNetwork.toString(),
-      );
-      const nextSession = {
-        ...sessionRef.current,
-        keychain: result.keychain,
-        keychainExternalIdentifier: result.keychainExternalIdentifier,
-      };
-
-      setSession(nextSession);
-
-      if (identity) rememberIdentity(identity);
-      setConversations((current) =>
-        ConversationTimeline.sortByLatestMessage([
-          result.conversation,
-          ...current.filter((item) => item.id !== result.conversation.id),
-        ]),
-      );
-      setWorkspaceMode('messages');
-      setActiveConversationId(result.conversation.id);
-      setSidebarOpen(false);
-      setCommunityMembersOpen(false);
-    },
-    [
-      conversations,
-      rememberIdentity,
-      session.identity.id,
-      session.identity.networks,
-      session.keychain,
-      setConversations,
-      setSession,
-    ],
-  );
-
-  const handleConversationKeyImported = async (
-    keyEntry: ConversationKeyEntry,
-  ) => {
-    const result = await applicationContainer.identities.publishKeychain(
-      session,
-      {
-        ...session.keychain,
-        conversations: {
-          ...session.keychain.conversations,
-          [keyEntry.conversationId]: keyEntry,
-        },
-      },
-    );
-
-    setSession({
-      ...session,
-      keychain: result.keychain,
-      keychainExternalIdentifier: result.keychainExternalIdentifier,
-    });
-  };
 
   const updateCommunityState = useCallback(
     (communityId: string, updater: (community: Community) => Community) => {
@@ -1339,7 +972,7 @@ export function GlassWorkspace({
         if (activeCommunityId === updatedCommunity.id) {
           setActiveCommunityId(null);
           setWorkspaceMode('messages');
-          setSidebarOpen(false);
+          closeTransientSurface('sidebar');
         }
       } catch (caught) {
         setSendError(toUserErrorMessage(caught, copy.communities.leaveError));
@@ -1351,7 +984,7 @@ export function GlassWorkspace({
       setActiveCommunityId,
       setCommunities,
       setSession,
-      setSidebarOpen,
+      closeTransientSurface,
       setWorkspaceMode,
     ],
   );
@@ -1381,15 +1014,15 @@ export function GlassWorkspace({
     onCommunityClick: (communityId) => {
       setActiveCommunityId(communityId);
       setWorkspaceMode('community');
-      setSidebarOpen(false);
+      closeTransientSurface('sidebar');
     },
     onCommunityLeave: leaveCommunityFromRail,
     onCommunityNotificationMuteToggle: toggleCommunityNotificationMute,
     onCommunityNotificationSettingsOpen: openCommunityNotificationSettings,
-    onCreateCommunityClick: () => setIsCreateCommunityOpen(true),
+    onCreateCommunityClick: () => openTransientSurface('community-creation'),
     onMessagesClick: () => {
       setWorkspaceMode('messages');
-      setSidebarOpen(false);
+      closeTransientSurface('sidebar');
     },
     onNotificationsClick: openNotificationsPanel,
     onSettingsClick: openNodeSettings,
@@ -1422,7 +1055,7 @@ export function GlassWorkspace({
                 <Rail
                   {...railProps}
                   className="lg:hidden"
-                  onInspectorClick={() => setInspectorOpen(true)}
+                  onInspectorClick={() => openTransientSurface('inspector')}
                 />
                 <Suspense fallback={<SidebarStartupFallback />}>
                   <Sidebar
@@ -1444,7 +1077,7 @@ export function GlassWorkspace({
                       clearUnreadMessages(id);
                       setNewMessageCount(0);
                       setActiveConversationId(id);
-                      setSidebarOpen(false);
+                      closeTransientSurface('sidebar');
                     }}
                     onConversationNotificationMuteToggle={
                       toggleConversationNotificationMute
@@ -1452,7 +1085,9 @@ export function GlassWorkspace({
                     onConversationNotificationSettingsOpen={
                       openConversationNotificationSettings
                     }
-                    onCreate={() => setIsCreateOpen(true)}
+                    onCreate={() =>
+                      openTransientSurface('conversation-creation')
+                    }
                     onCallEnd={leaveActiveCall}
                     onCallParticipantVolumeChange={setParticipantVolume}
                     onCallParticipantScreenShareVolumeChange={
@@ -1483,7 +1118,7 @@ export function GlassWorkspace({
                 'fixed inset-0 z-30 bg-black/50 transition-opacity duration-200 lg:hidden',
                 sidebarOpen ? 'opacity-100' : 'pointer-events-none opacity-0',
               )}
-              onClick={() => setSidebarOpen(false)}
+              onClick={() => closeTransientSurface('sidebar')}
               aria-label={copy.workspace.closeSidebar}
             />
 
@@ -1599,10 +1234,10 @@ export function GlassWorkspace({
                     void handleReplyReferenceClick(messageId)
                   }
                   onOpenPins={() => void openPinnedMessages()}
-                  onOpenSidebar={() => setSidebarOpen(true)}
+                  onOpenSidebar={() => openTransientSurface('sidebar')}
                   onNotificationMuteToggle={toggleNotificationMute}
                   onNotificationSettingsOpen={openNotificationSettings}
-                  onCreate={() => setIsCreateOpen(true)}
+                  onCreate={() => openTransientSurface('conversation-creation')}
                   onOpenConversationWithIdentity={(identityId, identity) =>
                     openOrCreateConversationWithIdentity(
                       identityId,
@@ -1672,8 +1307,8 @@ export function GlassWorkspace({
                 <Rail
                   {...railProps}
                   onInspectorClick={() => {
-                    setSidebarOpen(false);
-                    setCommunityMembersOpen(true);
+                    closeTransientSurface('sidebar');
+                    openTransientSurface('community-members');
                   }}
                 />
               }
@@ -1729,11 +1364,13 @@ export function GlassWorkspace({
                 clearCommunityChannelUnread(activeCommunity.id, channelId)
               }
               onLogout={logout}
-              onMobileSidebarClose={() => setSidebarOpen(false)}
-              onMobileMembersClose={() => setCommunityMembersOpen(false)}
+              onMobileSidebarClose={() => closeTransientSurface('sidebar')}
+              onMobileMembersClose={() =>
+                closeTransientSurface('community-members')
+              }
               onNotificationMuteToggle={toggleNotificationMute}
               onNotificationSettingsOpen={openNotificationSettings}
-              onOpenMobileSidebar={() => setSidebarOpen(true)}
+              onOpenMobileSidebar={() => openTransientSurface('sidebar')}
               onOpenConversationWithIdentity={(identityId, identity) =>
                 openOrCreateConversationWithIdentity(
                   identityId,
@@ -1844,21 +1481,27 @@ export function GlassWorkspace({
             onAcceptNotification={(notification) =>
               void acceptNotification(notification)
             }
-            onCloseCreateCommunity={() => setIsCreateCommunityOpen(false)}
-            onCloseCreateConversation={() => setIsCreateOpen(false)}
-            onCloseInspector={() => setInspectorOpen(false)}
+            onCloseCreateCommunity={() =>
+              closeTransientSurface('community-creation')
+            }
+            onCloseCreateConversation={() =>
+              closeTransientSurface('conversation-creation')
+            }
+            onCloseInspector={() => closeTransientSurface('inspector')}
             onCloseMessageContextMenu={closeMessageMenu}
-            onCloseNodeSettings={() => setNodeSettingsOpen(false)}
+            onCloseNodeSettings={() => closeTransientSurface('node-settings')}
             onCloseNotificationSettings={closeNotificationSettings}
             onCloseNotifications={closeNotificationsPanel}
             onCloseRawMessage={() => setRawMessage(null)}
-            onCloseRealtimeEvents={() => setRealtimeEventsOpen(false)}
+            onCloseRealtimeEvents={() =>
+              closeTransientSurface('realtime-events')
+            }
             onCommunityCreated={({ community, session: nextSession }) => {
               setSession(nextSession);
               setCommunities((current) => [community, ...current]);
               setActiveCommunityId(community.id);
               setWorkspaceMode('community');
-              setIsCreateCommunityOpen(false);
+              closeTransientSurface('community-creation');
             }}
             onCommunityJoinRequested={(request: CommunityMembershipRequest) => {
               setMembershipRequests((current) => [
@@ -1887,7 +1530,7 @@ export function GlassWorkspace({
                   );
               }
 
-              setIsCreateCommunityOpen(false);
+              closeTransientSurface('community-creation');
             }}
             onConversationCreated={handleConversationCreated}
             onGroupInviteOpen={() =>
