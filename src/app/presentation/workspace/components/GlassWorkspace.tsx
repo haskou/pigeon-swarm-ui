@@ -10,11 +10,6 @@ import {
   useState,
 } from 'react';
 
-import type { CallParticipantMediaConnectionResource as CallParticipantMediaConnection } from '../../../../contexts/calls/infrastructure/http/resources/CallParticipantMediaConnectionResource';
-import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
-import type { CallSignalType } from '../../../../contexts/calls/infrastructure/media/CallSignalType';
-import type { CallMediaEncryptionUnavailableReason } from '../../../../contexts/calls/presentation/view-models/CallMediaEncryptionUnavailableReason';
-import type { CallSession } from '../../../../contexts/calls/presentation/view-models/CallSession';
 import type { PendingCommunityInviteLink } from '../../../../contexts/communities/presentation/view-models/communityInviteLink';
 import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
 import type { NetworkSynchronizationStatus } from '../../../../contexts/networks/presentation/view-models/NetworkSynchronizationStatus';
@@ -38,12 +33,6 @@ import type { MessageContextMenuState } from './messageContextMenu';
 
 import { useRealtimeEvents } from '../../../../app/presentation/realtime/useRealtimeEvents';
 import { useAttachmentDownload } from '../../../../contexts/attachments/presentation/hooks/useAttachmentDownload';
-import {
-  logCallDebug,
-  logCallError,
-} from '../../../../contexts/calls/infrastructure/media/callDebugLogger';
-import { useCallMediaAccess } from '../../../../contexts/calls/presentation/hooks/useCallMediaAccess';
-import { useCallSession } from '../../../../contexts/calls/presentation/hooks/useCallSession';
 import { SeenCommunityMembershipRequests } from '../../../../contexts/communities/infrastructure/storage/SeenCommunityMembershipRequests';
 import { useCommunityMembershipRequests } from '../../../../contexts/communities/presentation/hooks/useCommunityMembershipRequests';
 import { CommunityChannels } from '../../../../contexts/communities/presentation/view-models/CommunityChannels';
@@ -79,31 +68,23 @@ import {
   useWorkspacePreferenceState,
 } from '../useWorkspacePreferences';
 import { ChatColumn } from './ChatColumn';
-import {
-  communitiesWithCallVoicePresence,
-  communityVoiceChannelTopologyKey,
-} from './communityVoicePresence';
+import { communityVoiceChannelTopologyKey } from './communityVoicePresence';
 import { CommunityWorkspaceStartupFallback } from './CommunityWorkspaceStartupFallback';
 import { type EditingMessage } from './conversationThreadState';
 import { PushNotificationPrompt } from './PushNotificationPrompt';
 import { Rail, type RailProps } from './Rail';
-import { resolveWorkspaceCallDetails } from './resolveWorkspaceCallDetails';
-import { useCallDeparture } from './useCallDeparture';
-import { useCallResourceReconciliation } from './useCallResourceReconciliation';
-import { useCallStartActions } from './useCallStartActions';
 import { useCommunitySelection } from './useCommunitySelection';
-import { useConversationMessageActions } from './useConversationMessageActions';
 import { useConversationDrafts } from './useConversationDrafts';
+import { useConversationMessageActions } from './useConversationMessageActions';
 import { useConversationPins } from './useConversationPins';
 import { useConversationThread } from './useConversationThread';
 import { useMessageViewport } from './useMessageViewport';
 import { usePendingCommunityInvite } from './usePendingCommunityInvite';
 import { useSidebarGesture } from './useSidebarGesture';
-import { useWorkspaceCallHeartbeat } from './useWorkspaceCallHeartbeat';
+import { useWorkspaceCalls } from './useWorkspaceCalls';
 import { useWorkspaceMessageHistory } from './useWorkspaceMessageHistory';
 import { useWorkspaceNotificationActions } from './useWorkspaceNotificationActions';
 import { useWorkspacePresence } from './useWorkspacePresence';
-import { useWorkspaceRealtimeCallEvents } from './useWorkspaceRealtimeCallEvents';
 import { useWorkspaceRealtimeCommunityEvents } from './useWorkspaceRealtimeCommunityEvents';
 import { useWorkspaceRealtimeConversationEvents } from './useWorkspaceRealtimeConversationEvents';
 import { useWorkspaceRealtimeEventRouter } from './useWorkspaceRealtimeEventRouter';
@@ -128,11 +109,6 @@ import {
 const seenCommunityMembershipRequests = new SeenCommunityMembershipRequests();
 
 type LoadState = 'idle' | 'loading' | 'error';
-type CallMediaEncryptionInput = {
-  mediaEncryptionEnabled: boolean;
-  mediaEncryptionKey?: string;
-  mediaEncryptionUnavailableReason?: CallMediaEncryptionUnavailableReason;
-};
 interface GlassWorkspaceProps {
   session: Session;
   setSession: (session: Session | null) => void;
@@ -286,45 +262,8 @@ export function GlassWorkspace({
     preloadedConversationMessages ? 'idle' : 'loading',
   );
   const messagesRef = useRef<ChatMessage[]>(initialPreloadedMessages);
-  const activeCallRef = useRef<CallSession | null>(null);
-  const callStartupSyncIdentityRef = useRef<string | null>(null);
-  const callListRequestRef = useRef<Promise<CallResource[]> | null>(null);
-  const reconcileCallResourceRef = useRef<(call: CallResource) => void>(
-    () => undefined,
-  );
   const sessionRef = useRef(session);
   const suppressMessageLoadsUntilRef = useRef(0);
-  const {
-    activeCall,
-    callMediaConnections,
-    endCall,
-    receiveSignal,
-    reconcileCall,
-    retryMicrophone,
-    setParticipantScreenShareVolume,
-    setParticipantVolume,
-    setScreenShareQuality,
-    startCall,
-    toggleCamera,
-    toggleDeafen,
-    toggleMediaEncryption,
-    toggleMute,
-    toggleNoiseCancellation,
-    toggleScreenShare,
-  } = useCallSession();
-  const {
-    mediaEncryptionEnabled: callMediaEncryptionEnabled,
-    noiseCancellationEnabled: callNoiseCancellationEnabled,
-    requestOptionalLocalAudio,
-    stopLocalAudio,
-    toggleCallMediaEncryption,
-    toggleCallNoiseCancellation,
-  } = useCallMediaAccess({
-    identityId: session.identity.id,
-    onError: setSendError,
-    toggleMediaEncryption,
-    toggleNoiseCancellation,
-  });
   const {
     clearSidebarGesture,
     handleWorkspacePointerDown,
@@ -344,30 +283,8 @@ export function GlassWorkspace({
   } = useNotificationScopeSettings({ session });
 
   useEffect(() => {
-    activeCallRef.current = activeCall;
-  }, [activeCall]);
-
-  useEffect(() => {
     sessionRef.current = session;
   }, [session]);
-
-  const listCallsForWorkspace = useCallback(() => {
-    const activeRequest = callListRequestRef.current;
-
-    if (activeRequest) return activeRequest;
-
-    const request = applicationContainer.calls
-      .list(sessionRef.current)
-      .finally(() => {
-        if (callListRequestRef.current === request) {
-          callListRequestRef.current = null;
-        }
-      });
-
-    callListRequestRef.current = request;
-
-    return request;
-  }, []);
 
   useEffect(() => {
     setSeenMembershipRequestIds(
@@ -886,262 +803,39 @@ export function GlassWorkspace({
 
     playNotificationSound();
   }, [notificationsMutedByPresence]);
-  const callDetailsForResource = useCallback(
-    (call: CallResource) =>
-      resolveWorkspaceCallDetails({
-        call,
-        communities,
-        conversations,
-        currentIdentity: session.identity,
-        fallbackLabels: {
-          noConversation: copy.chat.noConversation,
-          privateCommunity: copy.communities.privateCommunity,
-          voiceChannel: copy.calls.voiceChannel,
-        },
-        identityNames,
-        identityPictures,
-        identityProfiles,
-        keychain: session.keychain,
-      }),
-    [
-      communities,
-      conversations,
-      identityNames,
-      identityPictures,
-      identityProfiles,
-      session.identity,
-      session.keychain,
-    ],
-  );
-  const callMediaEncryptionForResource = useCallback(
-    (call: CallResource): CallMediaEncryptionInput => {
-      const scope = call.scope;
-      const disabled = (reason: CallMediaEncryptionUnavailableReason) => ({
-        mediaEncryptionEnabled: callMediaEncryptionEnabled,
-        mediaEncryptionUnavailableReason: reason,
-      });
-      const enabled = (entry: ConversationKeyEntry | undefined) =>
-        entry?.key
-          ? {
-              mediaEncryptionEnabled: callMediaEncryptionEnabled,
-              mediaEncryptionKey: entry.key,
-            }
-          : disabled('missing-key');
-
-      if (scope.type === 'community_channel') {
-        const community = communities.find(
-          (item) => item.id === scope.communityId,
-        );
-
-        if (community?.visibility === 'public') {
-          return disabled('public-community');
-        }
-
-        return enabled(session.keychain.conversations[scope.communityId]);
-      }
-
-      return enabled(
-        ConversationKeychain.entry(
-          session.keychain,
-          session.identity.id,
-          scope.conversationId,
-        ),
-      );
-    },
-    [
-      callMediaEncryptionEnabled,
-      communities,
-      session.identity.id,
-      session.keychain,
-    ],
-  );
-  const { incomingCall, reconcileCallResource, setIncomingCall } =
-    useCallResourceReconciliation({
-      activeCall,
-      callDetailsForResource,
-      currentIdentityId: session.identity.id,
-      endCall,
-      reconcileCall,
-      setCommunities,
-    });
-  const handleRealtimeCallEvent = useWorkspaceRealtimeCallEvents({
-    activeCallRef,
-    receiveSignal,
-    reconcileCallResource,
-    sessionRef,
-  });
-
-  useEffect(() => {
-    reconcileCallResourceRef.current = reconcileCallResource;
-  }, [reconcileCallResource]);
-
-  const {
-    cleanupJoinedCalls,
-    leaveActiveCall,
-    leaveCurrentCallForSwitch,
-    removeCurrentIdentityFromVoicePresence,
-  } = useCallDeparture({
-    activeCall,
-    callDetailsForResource,
-    endCall,
-    listCalls: listCallsForWorkspace,
-    onCommunitiesReload,
-    reconcileCallResource,
-    session,
-    setCommunities,
-  });
-
-  const callSignalSender = useCallback(
-    (callId: string) =>
-      async (
-        recipientIdentityId: string,
-        signalType: CallSignalType,
-        payload: Record<string, unknown>,
-      ) => {
-        logCallDebug('workspace:send-call-signal', {
-          callId,
-          recipientIdentityId,
-          signalType,
-        });
-        await applicationContainer.calls.sendSignal(
-          sessionRef.current,
-          callId,
-          {
-            payload,
-            recipientIdentityId,
-            signalType,
-          },
-        );
-      },
-    [],
-  );
-  const loadCallIceConfig = useCallback(async () => {
-    try {
-      return await applicationContainer.calls.getIceServers(sessionRef.current);
-    } catch (caught) {
-      logCallError('workspace:call:ice-config-unavailable', caught);
-
-      throw new Error(copy.calls.iceServersUnavailable);
-    }
-  }, []);
   const {
     acceptIncomingCall,
+    activeCall,
     declineIncomingCall,
-    isCallActionInProgress,
+    handleRealtimeCallEvent,
+    incomingCall,
+    leaveActiveCall,
+    retryMicrophone,
+    setParticipantScreenShareVolume,
+    setParticipantVolume,
+    setScreenShareQuality,
     startCommunityVoiceCall,
     startConversationCall,
-  } = useCallStartActions({
-    activeCall,
+    toggleCallMediaEncryption,
+    toggleCallNoiseCancellation,
+    toggleCamera,
+    toggleDeafen,
+    toggleMute,
+    toggleScreenShare,
+  } = useWorkspaceCalls({
     activeCommunity,
-    callDetailsForResource,
-    callMediaEncryptionForResource,
-    callNoiseCancellationEnabled,
-    callSignalSender,
-    cleanupJoinedCalls,
-    incomingCall,
-    leaveCurrentCallForSwitch,
-    loadCallIceConfig,
-    requestOptionalLocalAudio,
-    session,
-    setIncomingCall,
-    setSendError,
-    startCall,
-    stopLocalAudio,
-  });
-  const heartbeatActiveCall = useCallback(
-    async (
-      callId: string,
-      mediaConnections: CallParticipantMediaConnection[],
-    ) => {
-      await applicationContainer.calls.heartbeatParticipant(
-        sessionRef.current,
-        callId,
-        mediaConnections,
-      );
-    },
-    [],
-  );
-
-  useWorkspaceCallHeartbeat({
-    activeCall,
-    heartbeat: heartbeatActiveCall,
-    mediaConnections: callMediaConnections,
-  });
-
-  useEffect(() => {
-    if (!communityVoiceTopologyKey) return undefined;
-
-    let cancelled = false;
-
-    void listCallsForWorkspace()
-      .then((calls) => {
-        if (cancelled) return;
-
-        setCommunities((current) =>
-          communitiesWithCallVoicePresence(current, calls),
-        );
-      })
-      .catch(() => undefined);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [communityVoiceTopologyKey, listCallsForWorkspace, setCommunities]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const identityId = session.identity.id;
-
-    if (callStartupSyncIdentityRef.current === identityId) return undefined;
-
-    callStartupSyncIdentityRef.current = identityId;
-
-    void listCallsForWorkspace()
-      .then(async (calls) => {
-        if (cancelled) return;
-
-        const staleJoinedCalls = calls.filter(
-          (call) =>
-            call.status === 'active' &&
-            call.scope.type === 'community_channel' &&
-            call.participants.some(
-              (participant) =>
-                participant.identityId === identityId && participant.connected,
-            ),
-        );
-
-        if (
-          staleJoinedCalls.length > 0 &&
-          !activeCallRef.current &&
-          !isCallActionInProgress()
-        ) {
-          await Promise.all(
-            staleJoinedCalls.map((call) =>
-              applicationContainer.calls
-                .leave(sessionRef.current, call.id)
-                .catch(() => undefined),
-            ),
-          );
-          removeCurrentIdentityFromVoicePresence();
-          await onCommunitiesReload().catch(() => undefined);
-
-          return;
-        }
-
-        calls.forEach((call) => reconcileCallResourceRef.current(call));
-      })
-      .catch(() => undefined);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    listCallsForWorkspace,
-    isCallActionInProgress,
+    communities,
+    communityVoiceTopologyKey,
+    conversations,
+    identityNames,
+    identityPictures,
+    identityProfiles,
+    onCommunitiesChange: setCommunities,
     onCommunitiesReload,
-    removeCurrentIdentityFromVoicePresence,
-    session.identity.id,
-  ]);
+    onErrorChange: setSendError,
+    session,
+    sessionRef,
+  });
 
   useEffect(() => {
     if (!activeConversationId && conversations[0])
