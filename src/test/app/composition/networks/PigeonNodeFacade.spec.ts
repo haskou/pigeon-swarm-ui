@@ -113,9 +113,9 @@ describe(PigeonNodeFacade.name, () => {
     relayUpdater.update.mockResolvedValue(configuration);
     relayMapper.fromAggregate.mockReturnValue(viewModel);
 
-    await expect(
-      facade.updateRelayConfiguration(viewModel),
-    ).resolves.toBe(viewModel);
+    await expect(facade.updateRelayConfiguration(viewModel)).resolves.toBe(
+      viewModel,
+    );
 
     const message = relayUpdater.update.mock.calls[0]?.[0];
     expect(message?.getActorId().isAnonymous()).toBe(true);
