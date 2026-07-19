@@ -86,7 +86,7 @@ import {
 import { CommunityWorkspaceStartupFallback } from './CommunityWorkspaceStartupFallback';
 import { type EditingMessage } from './conversationThreadState';
 import { PushNotificationPrompt } from './PushNotificationPrompt';
-import { Rail } from './Rail';
+import { Rail, type RailProps } from './Rail';
 import { resolveWorkspaceCallDetails } from './resolveWorkspaceCallDetails';
 import { useCallDeparture } from './useCallDeparture';
 import { useCallResourceReconciliation } from './useCallResourceReconciliation';
@@ -1675,6 +1675,33 @@ export function GlassWorkspace({
     realtimeEventsOpen;
   const showPushEnablePrompt =
     pushPromptReady && pushPermission === 'default' && !pushPromptDismissed;
+  const railProps: RailProps = {
+    activeCommunityId:
+      workspaceMode === 'community' ? (activeCommunity?.id ?? null) : null,
+    activeMessages: workspaceMode === 'messages',
+    communities,
+    communityNotificationSetting: communityNotificationSettingFor,
+    communityUnreadCounts,
+    messageNotificationCount: unreadMessageCount,
+    notificationCount: inboxNotificationCount,
+    onCommunityClick: (communityId) => {
+      setActiveCommunityId(communityId);
+      setWorkspaceMode('community');
+      setSidebarOpen(false);
+    },
+    onCommunityLeave: leaveCommunityFromRail,
+    onCommunityNotificationMuteToggle: toggleCommunityNotificationMute,
+    onCommunityNotificationSettingsOpen: openCommunityNotificationSettings,
+    onCreateCommunityClick: () => setIsCreateCommunityOpen(true),
+    onMessagesClick: () => {
+      setWorkspaceMode('messages');
+      setSidebarOpen(false);
+    },
+    onNotificationsClick: openNotificationsPanel,
+    onSettingsClick: openNodeSettings,
+    peerCount: peers.length,
+    settingsAttention: nodeUnclaimed,
+  };
 
   return (
     <section
@@ -1685,36 +1712,7 @@ export function GlassWorkspace({
       onPointerUp={clearSidebarGesture}
     >
       <div className="app-workspace grid w-full grid-cols-1 gap-0 px-0 pb-0 lg:grid-cols-[82px_330px_minmax(0,1fr)] xl:grid-cols-[82px_330px_minmax(0,1fr)_320px]">
-        <Rail
-          className="hidden lg:flex"
-          activeMessages={workspaceMode === 'messages'}
-          activeCommunityId={
-            workspaceMode === 'community' ? activeCommunity?.id : null
-          }
-          communities={communities}
-          communityNotificationSetting={communityNotificationSettingFor}
-          communityUnreadCounts={communityUnreadCounts}
-          messageNotificationCount={unreadMessageCount}
-          notificationCount={inboxNotificationCount}
-          onCommunityClick={(communityId) => {
-            setActiveCommunityId(communityId);
-            setWorkspaceMode('community');
-            setSidebarOpen(false);
-          }}
-          onCommunityNotificationMuteToggle={toggleCommunityNotificationMute}
-          onCommunityNotificationSettingsOpen={
-            openCommunityNotificationSettings
-          }
-          onCommunityLeave={leaveCommunityFromRail}
-          onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
-          onMessagesClick={() => {
-            setWorkspaceMode('messages');
-            setSidebarOpen(false);
-          }}
-          onNotificationsClick={openNotificationsPanel}
-          onSettingsClick={openNodeSettings}
-          settingsAttention={nodeUnclaimed}
-        />
+        <Rail {...railProps} className="hidden lg:flex" />
 
         {workspaceMode === 'messages' ? (
           <>
@@ -1728,36 +1726,9 @@ export function GlassWorkspace({
             >
               <div className="grid h-full grid-cols-[82px_minmax(0,1fr)] gap-0 lg:block">
                 <Rail
+                  {...railProps}
                   className="lg:hidden"
-                  activeMessages
-                  activeCommunityId={null}
-                  communities={communities}
-                  communityNotificationSetting={communityNotificationSettingFor}
-                  communityUnreadCounts={communityUnreadCounts}
-                  messageNotificationCount={unreadMessageCount}
-                  notificationCount={inboxNotificationCount}
-                  onCommunityClick={(communityId) => {
-                    setActiveCommunityId(communityId);
-                    setWorkspaceMode('community');
-                    setSidebarOpen(false);
-                  }}
-                  onCommunityNotificationMuteToggle={
-                    toggleCommunityNotificationMute
-                  }
-                  onCommunityNotificationSettingsOpen={
-                    openCommunityNotificationSettings
-                  }
-                  onCommunityLeave={leaveCommunityFromRail}
-                  onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
-                  onMessagesClick={() => {
-                    setWorkspaceMode('messages');
-                    setSidebarOpen(false);
-                  }}
-                  onNotificationsClick={openNotificationsPanel}
-                  onSettingsClick={openNodeSettings}
                   onInspectorClick={() => setInspectorOpen(true)}
-                  peerCount={peers.length}
-                  settingsAttention={nodeUnclaimed}
                 />
                 <Suspense fallback={<SidebarStartupFallback />}>
                   <Sidebar
@@ -2005,37 +1976,11 @@ export function GlassWorkspace({
               mobileSidebarOpen={sidebarOpen}
               mobileRail={
                 <Rail
-                  activeCommunityId={activeCommunity.id}
-                  communities={communities}
-                  communityNotificationSetting={communityNotificationSettingFor}
-                  communityUnreadCounts={communityUnreadCounts}
-                  messageNotificationCount={unreadMessageCount}
-                  notificationCount={inboxNotificationCount}
-                  onCommunityClick={(communityId) => {
-                    setActiveCommunityId(communityId);
-                    setWorkspaceMode('community');
-                    setSidebarOpen(false);
-                  }}
-                  onCommunityNotificationMuteToggle={
-                    toggleCommunityNotificationMute
-                  }
-                  onCommunityNotificationSettingsOpen={
-                    openCommunityNotificationSettings
-                  }
-                  onCommunityLeave={leaveCommunityFromRail}
-                  onCreateCommunityClick={() => setIsCreateCommunityOpen(true)}
-                  onMessagesClick={() => {
-                    setWorkspaceMode('messages');
-                    setSidebarOpen(false);
-                  }}
-                  onNotificationsClick={openNotificationsPanel}
-                  onSettingsClick={openNodeSettings}
+                  {...railProps}
                   onInspectorClick={() => {
                     setSidebarOpen(false);
                     setCommunityMembersOpen(true);
                   }}
-                  peerCount={peers.length}
-                  settingsAttention={nodeUnclaimed}
                 />
               }
               nodeNetworks={nodeNetworks}
