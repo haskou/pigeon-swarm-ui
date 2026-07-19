@@ -60,7 +60,6 @@ import { MessageCollectionDialog } from '../../../../contexts/messages/presentat
 import { MessageThreadPanel } from '../../../../contexts/messages/presentation/components/MessageThreadPanel';
 import { useUnreadMessages } from '../../../../contexts/messages/presentation/hooks/useUnreadMessages';
 import { MessageCollection } from '../../../../contexts/messages/presentation/view-models/MessageCollection';
-import { MessageReactionUpdater } from '../../../../contexts/messages/presentation/view-models/MessageReactionUpdater';
 import { SharedNetworkSelectorDomainService } from '../../../../contexts/networks/domain/services/SharedNetworkSelectorDomainService';
 import { NetworkId } from '../../../../contexts/networks/domain/value-objects/NetworkId';
 import { useNotificationCommunityPreviews } from '../../../../contexts/notifications/presentation/hooks/useNotificationCommunityPreviews';
@@ -93,7 +92,7 @@ import { useCallDeparture } from './useCallDeparture';
 import { useCallResourceReconciliation } from './useCallResourceReconciliation';
 import { useCallStartActions } from './useCallStartActions';
 import { useCommunitySelection } from './useCommunitySelection';
-import { useConversationMessageDelivery } from './useConversationMessageDelivery';
+import { useConversationMessageActions } from './useConversationMessageActions';
 import { useConversationPins } from './useConversationPins';
 import { useConversationThread } from './useConversationThread';
 import { useMessageViewport } from './useMessageViewport';
@@ -688,21 +687,6 @@ export function GlassWorkspace({
     },
     [activeConversation?.id, scheduleConversationDraftSync, setDrafts],
   );
-  const cancelMessageEdit = useCallback(() => {
-    if (!activeConversation?.id) {
-      setEditingMessage(null);
-
-      return;
-    }
-
-    const previousDraft = editingMessage?.previousDraft ?? '';
-
-    setEditingMessage(null);
-    setDrafts((current) => ({
-      ...current,
-      [activeConversation.id]: previousDraft,
-    }));
-  }, [activeConversation?.id, editingMessage?.previousDraft, setDrafts]);
   const {
     communitySettingFor: communityNotificationSettingFor,
     conversationSettingFor: conversationNotificationSettingFor,
@@ -1261,21 +1245,6 @@ export function GlassWorkspace({
     setConversations(result.conversations);
   }, [session, setConversations, setSession]);
 
-  const closeTransientUi = useCallback(() => {
-    setMessageContextMenu(null);
-    setRawMessage(null);
-    setReplyTarget(null);
-    cancelMessageEdit();
-    setIsCreateOpen(false);
-    setIsCreateCommunityOpen(false);
-    closeNotificationsPanel();
-    setNodeSettingsOpen(false);
-    setRealtimeEventsOpen(false);
-    setInspectorOpen(false);
-    setCommunityMembersOpen(false);
-    setSidebarOpen(false);
-  }, [cancelMessageEdit, closeNotificationsPanel]);
-
   const markConversationReadUntil = useCallback(
     (conversationId: string, loadedMessages: ChatMessage[]) => {
       const lastMessage = MessageCollection.lastDelivered(loadedMessages);
@@ -1296,16 +1265,6 @@ export function GlassWorkspace({
     },
     [clearUnreadMessages, setConversations],
   );
-
-  useEffect(() => {
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') closeTransientUi();
-    };
-
-    window.addEventListener('keydown', handleEscape);
-
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [closeTransientUi]);
 
   const loadActiveMessages = useCallback(
     async (conversationId: string) => {
@@ -1432,204 +1391,75 @@ export function GlassWorkspace({
   });
 
   const {
+    cancelEdit: cancelMessageEdit,
+    cancelReply: cancelMessageReply,
+    closeMessageMenu,
+    copyMessageContent,
+    deleteMessage: handleDeleteMessage,
+    editMessage: handleEditMessage,
+    openMessageMenu: handleMessageMenuOpen,
+    openReplyReference: handleReplyReferenceClick,
+    openThreadMessageMenu,
     retryMessage,
+    scrollToMessage,
     sendMessage: handleSend,
     sendSticker: handleSendSticker,
-  } = useConversationMessageDelivery({
+    startEditing: startEditingMessage,
+    startReplying: startReplyingToMessage,
+    toggleReaction: handleToggleMessageReaction,
+  } = useConversationMessageActions({
     activeConversation,
+    activeConversationDraft,
+    activeConversationKeyAvailable: Boolean(activeConversationKey),
+    editingMessage,
+    messages,
     messagesRef,
     onAttachmentProgressChange: setAttachmentProgress,
     onConversationsChange: setConversations,
+    onDraftsChange: setDrafts,
+    onEditingMessageChange: setEditingMessage,
     onErrorChange: setSendError,
+    onMessageContextMenuChange: setMessageContextMenu,
+    onMessageCursorChange: updateMessageCursor,
+    onMessageLoadStateChange: setMessageLoadState,
     onMessagesChange: setMessages,
     onReplyTargetChange: setReplyTarget,
     replyTarget,
+    scrollerRef,
     scrollToBottom: scrollMessagesToBottom,
     session,
+    updateActiveConversationDraft,
   });
 
-  const handleMessageMenuOpen = (
-    message: ChatMessage,
-    x: number,
-    y: number,
-  ) => {
-    setMessageContextMenu({
-      message,
-      x,
-      y,
-    });
-  };
-  const copyMessageContent = (message: ChatMessage) => {
-    if (navigator.clipboard && message.content) {
-      void navigator.clipboard.writeText(message.content);
-    }
+  const closeTransientUi = useCallback(() => {
+    closeMessageMenu();
+    setRawMessage(null);
+    cancelMessageReply();
+    cancelMessageEdit();
+    setIsCreateOpen(false);
+    setIsCreateCommunityOpen(false);
+    closeNotificationsPanel();
+    setNodeSettingsOpen(false);
+    setRealtimeEventsOpen(false);
+    setInspectorOpen(false);
+    setCommunityMembersOpen(false);
+    setSidebarOpen(false);
+  }, [
+    cancelMessageEdit,
+    cancelMessageReply,
+    closeMessageMenu,
+    closeNotificationsPanel,
+  ]);
 
-    setMessageContextMenu(null);
-  };
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeTransientUi();
+    };
 
-  const scrollToMessage = (messageId: string) => {
-    requestAnimationFrame(() => {
-      const element = scrollerRef.current?.querySelector<HTMLElement>(
-        `[data-message-id="${CSS.escape(messageId)}"]`,
-      );
+    window.addEventListener('keydown', handleEscape);
 
-      if (!element) return;
-
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      const focusTarget =
-        element.querySelector<HTMLElement>('[data-message-bubble]') ?? element;
-
-      focusTarget.classList.add('message-focus-ring');
-      window.setTimeout(
-        () => focusTarget.classList.remove('message-focus-ring'),
-        1600,
-      );
-    });
-  };
-
-  const handleReplyReferenceClick = async (messageId: string) => {
-    if (messages.some((message) => message.id === messageId)) {
-      scrollToMessage(messageId);
-
-      return;
-    }
-
-    if (!activeConversation?.id || !activeConversationKey) return;
-
-    setSendError(null);
-    setMessageLoadState('loading');
-    try {
-      const result = await applicationContainer.messages.loadAround(
-        session,
-        activeConversation.id,
-        messageId,
-      );
-
-      setMessages((current) =>
-        MessageCollection.merge(current, result.messages),
-      );
-      updateMessageCursor(result.previousCursor ?? null);
-
-      if (result.messages.some((message) => message.id === messageId)) {
-        scrollToMessage(messageId);
-
-        return;
-      }
-
-      setSendError(copy.messages.replyTargetNotFound);
-    } catch (caught) {
-      setSendError(toUserErrorMessage(caught, copy.workspace.loadOlderError));
-    } finally {
-      setMessageLoadState('idle');
-    }
-  };
-
-  const handleDeleteMessage = async (message: ChatMessage) => {
-    if (!activeConversation?.id) return;
-
-    setMessageContextMenu(null);
-    setSendError(null);
-    try {
-      await applicationContainer.messages.delete(
-        session,
-        activeConversation.id,
-        message.id,
-      );
-      setMessages((current) =>
-        current.filter((item) => item.id !== message.id),
-      );
-    } catch (caught) {
-      setSendError(toUserErrorMessage(caught, copy.messages.deleteError));
-    }
-  };
-
-  const startEditingMessage = (message: ChatMessage) => {
-    if (!activeConversation?.id) return;
-
-    setMessageContextMenu(null);
-    setReplyTarget(null);
-    setEditingMessage({
-      message,
-      previousDraft: activeConversationDraft,
-    });
-    updateActiveConversationDraft(message.content);
-  };
-
-  const handleEditMessage = async (content: string) => {
-    if (!activeConversation?.id || !editingMessage) return;
-
-    setSendError(null);
-    try {
-      const editEvent = await applicationContainer.messages.edit(
-        session,
-        activeConversation.id,
-        editingMessage.message.id,
-        content,
-      );
-
-      setMessages((current) => MessageCollection.merge(current, [editEvent]));
-      setEditingMessage(null);
-      updateActiveConversationDraft('');
-    } catch (caught) {
-      setSendError(toUserErrorMessage(caught, copy.messages.editError));
-    }
-  };
-
-  const handleToggleMessageReaction = async (
-    message: ChatMessage,
-    emoji: string,
-    reacted: boolean,
-  ) => {
-    if (!activeConversation?.id) return;
-
-    const conversationId = activeConversation.id;
-
-    setSendError(null);
-    setMessages((current) =>
-      current.map((item) =>
-        item.id === message.id
-          ? MessageReactionUpdater.update(
-              item,
-              session.identity.id,
-              emoji,
-              reacted ? 'remove' : 'add',
-            )
-          : item,
-      ),
-    );
-
-    try {
-      if (reacted) {
-        await applicationContainer.messages.removeReactionFrom(
-          session,
-          conversationId,
-          message.id,
-          emoji,
-        );
-      } else {
-        await applicationContainer.messages.addReactionTo(
-          session,
-          conversationId,
-          message.id,
-          emoji,
-        );
-      }
-    } catch (caught) {
-      setSendError(toUserErrorMessage(caught, copy.messages.reactionError));
-      setMessages((current) =>
-        current.map((item) =>
-          item.id === message.id
-            ? MessageReactionUpdater.update(
-                item,
-                session.identity.id,
-                emoji,
-                reacted ? 'add' : 'remove',
-              )
-            : item,
-        ),
-      );
-    }
-  };
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [closeTransientUi]);
 
   const handleConversationCreated = (
     nextSession: Session,
@@ -2082,9 +1912,7 @@ export function GlassWorkspace({
                 onClose={() => setConversationThread(null)}
                 onDraftChange={updateConversationThreadDraft}
                 onEdit={handleEditConversationThreadMessage}
-                onMessageMenuOpen={(message, x, y) =>
-                  setMessageContextMenu({ message, source: 'thread', x, y })
-                }
+                onMessageMenuOpen={openThreadMessageMenu}
                 onRootMessageOpen={(message) => {
                   setMessages((current) =>
                     MessageCollection.merge(current, [message]),
@@ -2194,7 +2022,7 @@ export function GlassWorkspace({
                   realtimeEvent={conversationRealtimeEvent}
                   onRealtimeEventsOpen={openRealtimeEvents}
                   replyToMessage={replyTarget}
-                  onCancelReply={() => setReplyTarget(null)}
+                  onCancelReply={cancelMessageReply}
                   onRetryMessage={retryMessage}
                   onStartCall={startConversationCall}
                   onTypingActive={sendConversationTyping}
@@ -2452,7 +2280,7 @@ export function GlassWorkspace({
             onCloseCreateCommunity={() => setIsCreateCommunityOpen(false)}
             onCloseCreateConversation={() => setIsCreateOpen(false)}
             onCloseInspector={() => setInspectorOpen(false)}
-            onCloseMessageContextMenu={() => setMessageContextMenu(null)}
+            onCloseMessageContextMenu={closeMessageMenu}
             onCloseNodeSettings={() => setNodeSettingsOpen(false)}
             onCloseNotificationSettings={closeNotificationSettings}
             onCloseNotifications={closeNotificationsPanel}
@@ -2536,9 +2364,7 @@ export function GlassWorkspace({
                 return;
               }
 
-              setMessageContextMenu(null);
-              setEditingMessage(null);
-              setReplyTarget(message);
+              startReplyingToMessage(message);
             }}
             onNetworksUpdated={onNodeNetworksReload}
             onUnpinMessage={(message) => void unpinMessage(message)}
@@ -2548,7 +2374,7 @@ export function GlassWorkspace({
             }
             onViewRawMessage={(message) => {
               setRawMessage(message);
-              setMessageContextMenu(null);
+              closeMessageMenu();
             }}
           />
         </Suspense>
