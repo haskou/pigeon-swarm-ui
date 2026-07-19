@@ -36,6 +36,58 @@ class ValueObject<T> {
   }
 }
 
+type ComparableItem = {
+  isEqual(item: unknown): boolean;
+};
+
+class UniqueObjectArray<T extends ComparableItem> implements Iterable<T> {
+  public static fromArray<T extends ComparableItem>(
+    items: T[],
+  ): UniqueObjectArray<T> {
+    const collection = new UniqueObjectArray<T>();
+
+    items.forEach((item) => collection.push(item));
+
+    return collection;
+  }
+
+  private readonly items: T[] = [];
+
+  public includes(item: T): boolean {
+    return this.items.some((candidate) => candidate.isEqual(item));
+  }
+
+  public length(): number {
+    return this.items.length;
+  }
+
+  public push(item: T): boolean {
+    if (this.includes(item)) return false;
+
+    this.items.push(item);
+
+    return true;
+  }
+
+  public remove(item: T): boolean {
+    const index = this.items.findIndex((candidate) => candidate.isEqual(item));
+
+    if (index < 0) return false;
+
+    this.items.splice(index, 1);
+
+    return true;
+  }
+
+  public toArray(): T[] {
+    return [...this.items];
+  }
+
+  public [Symbol.iterator](): Iterator<T> {
+    return this.items[Symbol.iterator]();
+  }
+}
+
 class NumberValueObject {
   public constructor(private readonly value: number) {}
 
@@ -430,6 +482,7 @@ export {
   StringValueObject,
   SymmetricKey,
   Timestamp,
+  UniqueObjectArray,
   UUID,
   ValueObject,
   ValueNotInEnumError,

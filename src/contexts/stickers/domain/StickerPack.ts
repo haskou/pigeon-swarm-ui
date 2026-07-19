@@ -85,6 +85,10 @@ export class StickerPack extends AggregateRoot {
     return sticker;
   }
 
+  public isEqual(candidate: unknown): boolean {
+    return candidate instanceof StickerPack && this.id.isEqual(candidate.id);
+  }
+
   public getId(): StickerPackId {
     return this.id;
   }

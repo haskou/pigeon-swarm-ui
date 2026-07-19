@@ -11,6 +11,7 @@ import { StickerPack } from './StickerPack';
 import { StickerId } from './value-objects/StickerId';
 import { StickerOwnerId } from './value-objects/StickerOwnerId';
 import { StickerPackId } from './value-objects/StickerPackId';
+import { StickerPacks } from './value-objects/StickerPacks';
 
 export class StickerLibrary extends AggregateRoot {
   public static fromPrimitives(
@@ -20,7 +21,9 @@ export class StickerLibrary extends AggregateRoot {
       StickerOwnerId.fromString(primitives.ownerIdentityId),
       primitives.favoriteStickers.map(StickerUsage.fromPrimitives),
       primitives.recentStickers.map(StickerUsage.fromPrimitives),
-      primitives.savedPacks.map(StickerPack.fromPrimitives),
+      StickerPacks.fromArray(
+        primitives.savedPacks.map(StickerPack.fromPrimitives),
+      ),
     );
   }
 
@@ -28,7 +31,7 @@ export class StickerLibrary extends AggregateRoot {
     private readonly ownerIdentityId: StickerOwnerId,
     private favoriteStickers: StickerUsage[],
     private recentStickers: StickerUsage[],
-    private savedPacks: StickerPack[],
+    private readonly savedPacks: StickerPacks,
   ) {
     super();
   }
@@ -77,13 +80,9 @@ export class StickerLibrary extends AggregateRoot {
   }
 
   public save(pack: StickerPack, occurredAt: Timestamp): void {
+    if (!this.savedPacks.save(pack)) return;
+
     const packId = pack.getId();
-
-    if (this.savedPacks.some((candidate) => candidate.belongsTo(packId))) {
-      return;
-    }
-
-    this.savedPacks.push(pack);
     this.record(new StickerPackSaved(this.ownerIdentityId, packId, occurredAt));
   }
 
@@ -94,7 +93,7 @@ export class StickerLibrary extends AggregateRoot {
       ),
       ownerIdentityId: this.ownerIdentityId.toString(),
       recentStickers: this.recentStickers.map((usage) => usage.toPrimitives()),
-      savedPacks: this.savedPacks.map((pack) => pack.toPrimitives()),
+      savedPacks: this.savedPacks.toArray().map((pack) => pack.toPrimitives()),
     };
   }
 
@@ -121,11 +120,8 @@ export class StickerLibrary extends AggregateRoot {
   }
 
   public unsave(packId: StickerPackId, occurredAt: Timestamp): void {
-    const packs = this.savedPacks.filter((pack) => !pack.belongsTo(packId));
+    if (!this.savedPacks.unsave(packId)) return;
 
-    if (packs.length === this.savedPacks.length) return;
-
-    this.savedPacks = packs;
     this.record(
       new StickerPackUnsaved(this.ownerIdentityId, packId, occurredAt),
     );
