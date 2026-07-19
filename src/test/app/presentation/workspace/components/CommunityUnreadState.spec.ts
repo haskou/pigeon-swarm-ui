@@ -19,14 +19,14 @@ describe('CommunityUnreadState', () => {
           mobilePushEnabled: true,
           mutedUntil: null,
           notificationLevel: 'none',
-          suppressEveryoneAndHere: false,
-          suppressRoleMentions: false,
-          updatedAt: 1,
           scope: {
             channelId: 'muted',
             communityId: 'community',
             type: 'community_channel',
           },
+          suppressEveryoneAndHere: false,
+          suppressRoleMentions: false,
+          updatedAt: 1,
         },
       },
     );
