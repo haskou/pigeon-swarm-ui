@@ -18,8 +18,6 @@ import type {
   ChatMessage,
   AttachmentProgress,
   Community,
-  CommunityChannel,
-  CommunityMembershipRequest,
   ConversationResource,
   NotificationSettingScope,
   Session,
@@ -30,8 +28,6 @@ import type { MessageContextMenuState } from './messageContextMenu';
 
 import { useRealtimeEvents } from '../../../../app/presentation/realtime/useRealtimeEvents';
 import { useAttachmentDownload } from '../../../../contexts/attachments/presentation/hooks/useAttachmentDownload';
-import { CommunityChannels } from '../../../../contexts/communities/presentation/view-models/CommunityChannels';
-import { CommunityList } from '../../../../contexts/communities/presentation/view-models/CommunityList';
 import { ConversationPeer } from '../../../../contexts/conversations/presentation/view-models/ConversationPeer';
 import { ConversationKeychain } from '../../../../contexts/identities/infrastructure/keychain/ConversationKeychain';
 import { useIdentityDirectory } from '../../../../contexts/identities/presentation/hooks/useIdentityDirectory';
@@ -51,7 +47,6 @@ import { cx } from '../../../../shared/presentation/cx';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrowserIdle';
 import { playNotificationSound } from '../../../../shared/presentation/sounds';
-import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import {
   useWorkspacePreferences,
@@ -73,6 +68,7 @@ import { useConversationTimeline } from './useConversationTimeline';
 import { usePendingCommunityInvite } from './usePendingCommunityInvite';
 import { useSidebarGesture } from './useSidebarGesture';
 import { useWorkspaceCalls } from './useWorkspaceCalls';
+import { useWorkspaceCommunityActions } from './useWorkspaceCommunityActions';
 import { useWorkspaceConversationNavigation } from './useWorkspaceConversationNavigation';
 import { useWorkspaceInbox } from './useWorkspaceInbox';
 import { useWorkspaceNotificationActions } from './useWorkspaceNotificationActions';
@@ -615,6 +611,9 @@ export function GlassWorkspace({
   const closeCommunityMembers = useCallback((): void => {
     closeTransientSurface('community-members');
   }, [closeTransientSurface]);
+  const closeCommunityCreation = useCallback((): void => {
+    closeTransientSurface('community-creation');
+  }, [closeTransientSurface]);
   const closeConversationCreation = useCallback((): void => {
     closeTransientSurface('conversation-creation');
   }, [closeTransientSurface]);
@@ -624,6 +623,31 @@ export function GlassWorkspace({
   const showMessagesWorkspace = useCallback((): void => {
     setWorkspaceMode('messages');
   }, [setWorkspaceMode]);
+  const showCommunityWorkspace = useCallback((): void => {
+    setWorkspaceMode('community');
+  }, [setWorkspaceMode]);
+  const {
+    create: createCommunity,
+    joinRequested: handleCommunityJoinRequested,
+    leave: leaveCommunityFromRail,
+    remove: removeCommunity,
+    update: updateCommunity,
+    updateChannels: updateCommunityChannels,
+    updateState: updateCommunityState,
+  } = useWorkspaceCommunityActions({
+    activeCommunityId,
+    closeCommunityCreation,
+    closeSidebar,
+    session,
+    sessionRef,
+    setActiveCommunityId,
+    setCommunities,
+    setMembershipRequests,
+    setSendError,
+    setSession,
+    showCommunityWorkspace,
+    showMessagesWorkspace,
+  });
   const {
     importConversationKey: handleConversationKeyImported,
     openCreatedConversation: handleConversationCreated,
@@ -828,30 +852,6 @@ export function GlassWorkspace({
     return () => window.removeEventListener('keydown', handleEscape);
   }, [closeTransientUi]);
 
-  const updateCommunityState = useCallback(
-    (communityId: string, updater: (community: Community) => Community) => {
-      setCommunities((current) =>
-        current.map((community) =>
-          community.id === communityId ? updater(community) : community,
-        ),
-      );
-    },
-    [setCommunities],
-  );
-  const updateCommunityChannels = useCallback(
-    (communityId: string, channels: CommunityChannel[]): void => {
-      const splitChannels = CommunityChannels.split(channels);
-
-      setCommunities((current) =>
-        current.map((community) =>
-          community.id === communityId
-            ? { ...community, ...splitChannels }
-            : community,
-        ),
-      );
-    },
-    [setCommunities],
-  );
   const handleRealtimeCommunityEvent = useWorkspaceRealtimeCommunityEvents({
     onCommunitiesReload,
     refreshMembershipRequests,
@@ -947,81 +947,6 @@ export function GlassWorkspace({
     },
     onTyping: handleRealtimeTyping,
   });
-  const leaveCommunityFromRail = useCallback(
-    async (community: Community) => {
-      if (!window.confirm(copy.communities.leaveConfirm)) return;
-
-      try {
-        const result = await applicationContainer.communities.leave(
-          session,
-          community.id,
-        );
-        const updatedCommunity = result.community ?? community;
-
-        setSession({
-          ...session,
-          keychain: result.keychain,
-          keychainExternalIdentifier: result.keychainExternalIdentifier,
-        });
-
-        setCommunities((current) =>
-          current.filter((item) => item.id !== updatedCommunity.id),
-        );
-
-        if (activeCommunityId === updatedCommunity.id) {
-          setActiveCommunityId(null);
-          setWorkspaceMode('messages');
-          closeTransientSurface('sidebar');
-        }
-      } catch (caught) {
-        setSendError(toUserErrorMessage(caught, copy.communities.leaveError));
-      }
-    },
-    [
-      activeCommunityId,
-      session,
-      setActiveCommunityId,
-      setCommunities,
-      setSession,
-      closeTransientSurface,
-      setWorkspaceMode,
-    ],
-  );
-  const handleCommunityJoinRequested = useCallback(
-    (request: CommunityMembershipRequest): void => {
-      setMembershipRequests((current) => [
-        request,
-        ...current.filter((item) => item.id !== request.id),
-      ]);
-
-      if (request.status === 'accepted') {
-        void applicationContainer.communities
-          .get(sessionRef.current, request.communityId)
-          .then((community) => {
-            setCommunities((current) => [
-              community,
-              ...current.filter((item) => item.id !== community.id),
-            ]);
-            setActiveCommunityId(community.id);
-            setWorkspaceMode('community');
-          })
-          .catch((caught) =>
-            setSendError(
-              toUserErrorMessage(caught, copy.communities.membershipError),
-            ),
-          );
-      }
-
-      closeTransientSurface('community-creation');
-    },
-    [
-      closeTransientSurface,
-      setActiveCommunityId,
-      setCommunities,
-      setMembershipRequests,
-      setWorkspaceMode,
-    ],
-  );
   const handleDialogMessageReply = useCallback(
     (message: ChatMessage): void => {
       if (messageContextMenu?.source === 'thread') {
@@ -1389,27 +1314,12 @@ export function GlassWorkspace({
                       },
                 )
               }
-              onCommunityUpdated={(community) =>
-                setCommunities((current) =>
-                  current.map((item) =>
-                    item.id === community.id
-                      ? CommunityList.preservingCommunityVoicePresence(
-                          community,
-                          item,
-                        )
-                      : item,
-                  ),
-                )
-              }
+              onCommunityUpdated={updateCommunity}
               onCommunityChannelsUpdated={updateCommunityChannels}
               onInvitationAccept={(notification) =>
                 void acceptNotification(notification)
               }
-              onCommunityLeft={(community) =>
-                setCommunities((current) =>
-                  current.filter((item) => item.id !== community.id),
-                )
-              }
+              onCommunityLeft={removeCommunity}
               onChannelViewed={(channelId) =>
                 clearCommunityChannelUnread(activeCommunity.id, channelId)
               }
@@ -1499,13 +1409,7 @@ export function GlassWorkspace({
                 closeTransientSurface('community-creation'),
               onCloseConversation: () =>
                 closeTransientSurface('conversation-creation'),
-              onCommunityCreated: ({ community, session: nextSession }) => {
-                setSession(nextSession);
-                setCommunities((current) => [community, ...current]);
-                setActiveCommunityId(community.id);
-                setWorkspaceMode('community');
-                closeTransientSurface('community-creation');
-              },
+              onCommunityCreated: createCommunity,
               onCommunityJoinRequested: handleCommunityJoinRequested,
               onConversationCreated: handleConversationCreated,
               session,

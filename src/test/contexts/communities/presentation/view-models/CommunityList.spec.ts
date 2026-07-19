@@ -71,4 +71,22 @@ describe(CommunityList.name, () => {
       }),
     ]);
   });
+
+  it('updates, prepends, and removes communities without duplicating ids', () => {
+    const first = community({ id: 'community-1', name: 'First' });
+    const second = community({ id: 'community-2', name: 'Second' });
+    const replacement = community({ id: 'community-1', name: 'Replacement' });
+
+    const prepended = CommunityList.prepending([first, second], replacement);
+    const updated = CommunityList.updating(prepended, second.id, (current) => ({
+      ...current,
+      name: 'Updated',
+    }));
+
+    expect(updated.map(({ id, name }) => ({ id, name }))).toEqual([
+      { id: 'community-1', name: 'Replacement' },
+      { id: 'community-2', name: 'Updated' },
+    ]);
+    expect(CommunityList.without(updated, first.id)).toEqual([updated[1]]);
+  });
 });
