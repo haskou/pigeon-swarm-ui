@@ -7,14 +7,12 @@ import type { ScreenShareQualityPreset } from './ScreenShareQualityPreset';
 import { logCallDebug, logCallError, logCallWarning } from './callDebugLogger';
 import {
   hasAudioTrack,
-  isRemoteScreenShareAudioTrack,
-  isRemoteScreenShareTrack,
-  isScreenShareAudioTrack,
   isScreenShareTrack,
   replacementLocalTrack,
 } from './callMediaTrackClassification';
 import { CallPeerRecovery } from './CallPeerRecovery';
 import { CallPeerStatistics } from './CallPeerStatistics';
+import { CallScreenShareStreams } from './CallScreenShareStreams';
 import {
   descriptionPayload,
   type DescriptionSignalPayload,
@@ -60,17 +58,7 @@ export class CallPeerConnections {
 
   private readonly remoteStreams = new Map<string, MediaStream>();
 
-  private readonly remoteScreenStreams = new Map<string, MediaStream>();
-
-  private readonly remoteScreenStreamIds = new Map<string, Set<string>>();
-
-  private readonly remoteScreenTrackIds = new Map<string, Set<string>>();
-
-  private readonly remoteScreenAudioStreamIds = new Map<string, Set<string>>();
-
-  private readonly remoteScreenAudioTrackIds = new Map<string, Set<string>>();
-
-  private readonly localScreenStreams = new Map<string, MediaStream>();
+  private readonly screenShareStreams: CallScreenShareStreams;
 
   private localStream: MediaStream | null = null;
 
@@ -82,7 +70,9 @@ export class CallPeerConnections {
     return EncodedCallMediaCipher.isSupported();
   }
 
-  public constructor(private readonly remoteAudio: RemoteCallAudio) {}
+  public constructor(private readonly remoteAudio: RemoteCallAudio) {
+    this.screenShareStreams = new CallScreenShareStreams(remoteAudio);
+  }
 
   private async handleIceCandidateSignal(
     senderIdentityId: string,
@@ -142,7 +132,7 @@ export class CallPeerConnections {
     }
 
     this.rememberRemoteMediaEncryptionMetadata(senderIdentityId, payload);
-    this.rememberRemoteScreenShareMetadata(senderIdentityId, payload);
+    this.screenShareStreams.rememberRemoteMetadata(senderIdentityId, payload);
     await peer.setRemoteDescription(description);
     logCallDebug('peer-manager:handle-signal:remote-description-set', {
       screenStreamCount: payload.screenStreamIds?.length ?? 0,
@@ -174,10 +164,10 @@ export class CallPeerConnections {
       'answer',
       descriptionPayload(
         answer,
-        this.localScreenAudioTrackIds(),
-        this.localScreenAudioStreamIds(),
-        this.localScreenTrackIds(),
-        this.localScreenStreamIds(),
+        this.screenShareStreams.localAudioTrackIds(this.localStream),
+        this.screenShareStreams.localAudioStreamIds(this.localStream),
+        this.screenShareStreams.localVideoTrackIds(this.localStream),
+        this.screenShareStreams.localVideoStreamIds(this.localStream),
         this.localMediaEncryptionMetadata(senderIdentityId),
       ),
     );
@@ -361,73 +351,13 @@ export class CallPeerConnections {
       });
 
       this.configureLocalSender(
-        peer.addTrack(track, this.localTrackStream(track)),
+        peer.addTrack(
+          track,
+          this.screenShareStreams.localStreamFor(track, this.localStream),
+        ),
         peerIdentityId,
       );
     });
-  }
-
-  private localTrackStream(track: MediaStreamTrack): MediaStream {
-    if (isScreenShareTrack(track) || isScreenShareAudioTrack(track)) {
-      const currentStream = this.localScreenStreams.get(track.id);
-
-      if (currentStream) return currentStream;
-
-      const screenStream = new MediaStream([track]);
-
-      this.localScreenStreams.set(track.id, screenStream);
-
-      return screenStream;
-    }
-
-    return this.localStream ?? new MediaStream([track]);
-  }
-
-  private localScreenTrackIds(): string[] {
-    return (
-      this.localStream
-        ?.getVideoTracks()
-        .filter((track) => isScreenShareTrack(track))
-        .map((track) => track.id) ?? []
-    );
-  }
-
-  private localScreenAudioTrackIds(): string[] {
-    return (
-      this.localStream
-        ?.getAudioTracks()
-        .filter((track) => isScreenShareAudioTrack(track))
-        .map((track) => track.id) ?? []
-    );
-  }
-
-  private localScreenStreamIds(): string[] {
-    return this.localMediaStreamIdsFor(this.localScreenTrackIds());
-  }
-
-  private localScreenAudioStreamIds(): string[] {
-    return this.localMediaStreamIdsFor(this.localScreenAudioTrackIds());
-  }
-
-  private localMediaStreamIdsFor(trackIds: string[]): string[] {
-    const activeTrackIds = new Set(trackIds);
-    const streamIds: string[] = [];
-
-    for (const [trackId, stream] of this.localScreenStreams.entries()) {
-      if (!activeTrackIds.has(trackId)) continue;
-
-      streamIds.push(stream.id);
-    }
-
-    return streamIds;
-  }
-
-  private rememberRemoteScreenShareMetadata(
-    peerIdentityId: string,
-    payload: DescriptionSignalPayload,
-  ): void {
-    this.rememberRemoteScreenVideoMetadata(peerIdentityId, payload);
-    this.rememberRemoteScreenAudioMetadata(peerIdentityId, payload);
   }
 
   private rememberRemoteMediaEncryptionMetadata(
@@ -445,45 +375,6 @@ export class CallPeerConnections {
       mediaEncryption?.enabled ?? false,
     );
     this.syncPeerMediaEncryption(peerIdentityId);
-  }
-
-  private rememberRemoteScreenVideoMetadata(
-    peerIdentityId: string,
-    payload: DescriptionSignalPayload,
-  ): void {
-    this.remoteScreenTrackIds.set(
-      peerIdentityId,
-      new Set(payload.screenTrackIds ?? []),
-    );
-    this.remoteScreenStreamIds.set(
-      peerIdentityId,
-      new Set(payload.screenStreamIds ?? []),
-    );
-
-    if (!payload.screenTrackIds?.length && !payload.screenStreamIds?.length) {
-      this.remoteScreenStreams.delete(peerIdentityId);
-    }
-  }
-
-  private rememberRemoteScreenAudioMetadata(
-    peerIdentityId: string,
-    payload: DescriptionSignalPayload,
-  ): void {
-    this.remoteScreenAudioTrackIds.set(
-      peerIdentityId,
-      new Set(payload.screenAudioTrackIds ?? []),
-    );
-    this.remoteScreenAudioStreamIds.set(
-      peerIdentityId,
-      new Set(payload.screenAudioStreamIds ?? []),
-    );
-
-    if (
-      !payload.screenAudioTrackIds?.length &&
-      !payload.screenAudioStreamIds?.length
-    ) {
-      this.remoteAudio.removeScreen(peerIdentityId);
-    }
   }
 
   private configureNegotiationState(
@@ -518,9 +409,9 @@ export class CallPeerConnections {
     const [receivedStream] = event.streams;
     const stream = receivedStream ?? new MediaStream([event.track]);
 
-    if (this.handleRemoteScreenVideoTrack(peerIdentityId, event)) return;
-
-    if (this.handleRemoteScreenAudioTrack(peerIdentityId, event)) return;
+    if (this.screenShareStreams.handleRemoteTrack(peerIdentityId, event)) {
+      return;
+    }
 
     this.remoteStreams.set(peerIdentityId, stream);
 
@@ -531,69 +422,11 @@ export class CallPeerConnections {
     }
   }
 
-  private handleRemoteScreenVideoTrack(
-    peerIdentityId: string,
-    event: RTCTrackEvent,
-  ): boolean {
-    if (
-      !isRemoteScreenShareTrack(
-        event.track,
-        event.streams,
-        this.remoteScreenTrackIds.get(peerIdentityId) ?? new Set(),
-        this.remoteScreenStreamIds.get(peerIdentityId) ?? new Set(),
-      )
-    ) {
-      return false;
-    }
-
-    const screenStream = new MediaStream([event.track]);
-
-    this.remoteScreenStreams.set(peerIdentityId, screenStream);
-    event.track.addEventListener('ended', () => {
-      if (this.remoteScreenStreams.get(peerIdentityId) === screenStream) {
-        this.remoteScreenStreams.delete(peerIdentityId);
-      }
-    });
-    logCallDebug('peer-manager:screen-track-received', {
-      peerIdentityId,
-      trackId: event.track.id,
-    });
-
-    return true;
-  }
-
-  private handleRemoteScreenAudioTrack(
-    peerIdentityId: string,
-    event: RTCTrackEvent,
-  ): boolean {
-    if (
-      !isRemoteScreenShareAudioTrack(
-        event.track,
-        event.streams,
-        this.remoteScreenAudioTrackIds.get(peerIdentityId) ?? new Set(),
-        this.remoteScreenAudioStreamIds.get(peerIdentityId) ?? new Set(),
-      )
-    ) {
-      return false;
-    }
-
-    this.playRemoteScreenAudioTrack(peerIdentityId, event.track);
-
-    return true;
-  }
-
   private playRemoteAudioTrack(
     peerIdentityId: string,
     track: MediaStreamTrack,
   ): void {
     this.remoteAudio.playVoiceTrack(peerIdentityId, track);
-  }
-
-  private playRemoteScreenAudioTrack(
-    peerIdentityId: string,
-    track: MediaStreamTrack,
-  ): void {
-    this.remoteAudio.playScreenTrack(peerIdentityId, track);
   }
 
   private syncLocalTracks(): void {
@@ -676,7 +509,10 @@ export class CallPeerConnections {
     }
 
     this.configureLocalSender(
-      peer.addTrack(track, this.localTrackStream(track)),
+      peer.addTrack(
+        track,
+        this.screenShareStreams.localStreamFor(track, this.localStream),
+      ),
       peerIdentityId,
     );
   }
@@ -836,10 +672,10 @@ export class CallPeerConnections {
         'offer',
         descriptionPayload(
           offer,
-          this.localScreenAudioTrackIds(),
-          this.localScreenAudioStreamIds(),
-          this.localScreenTrackIds(),
-          this.localScreenStreamIds(),
+          this.screenShareStreams.localAudioTrackIds(this.localStream),
+          this.screenShareStreams.localAudioStreamIds(this.localStream),
+          this.screenShareStreams.localVideoTrackIds(this.localStream),
+          this.screenShareStreams.localVideoStreamIds(this.localStream),
           this.localMediaEncryptionMetadata(peerIdentityId),
         ),
       );
@@ -858,11 +694,7 @@ export class CallPeerConnections {
     this.peerNegotiationStates.delete(peerIdentityId);
     this.peerSignalSenders.delete(peerIdentityId);
     this.remoteStreams.delete(peerIdentityId);
-    this.remoteScreenStreams.delete(peerIdentityId);
-    this.remoteScreenStreamIds.delete(peerIdentityId);
-    this.remoteScreenTrackIds.delete(peerIdentityId);
-    this.remoteScreenAudioStreamIds.delete(peerIdentityId);
-    this.remoteScreenAudioTrackIds.delete(peerIdentityId);
+    this.screenShareStreams.forget(peerIdentityId);
     this.remoteAudio.removePeer(peerIdentityId);
   }
 
@@ -978,7 +810,7 @@ export class CallPeerConnections {
   }
 
   public remoteScreenMediaStreams(): Record<string, MediaStream> {
-    return Object.fromEntries(this.remoteScreenStreams.entries());
+    return this.screenShareStreams.streams();
   }
 
   public retainPeers(peerIdentityIds: Set<string>): void {
@@ -1057,10 +889,10 @@ export class CallPeerConnections {
         'offer',
         descriptionPayload(
           offer,
-          this.localScreenAudioTrackIds(),
-          this.localScreenAudioStreamIds(),
-          this.localScreenTrackIds(),
-          this.localScreenStreamIds(),
+          this.screenShareStreams.localAudioTrackIds(this.localStream),
+          this.screenShareStreams.localAudioStreamIds(this.localStream),
+          this.screenShareStreams.localVideoTrackIds(this.localStream),
+          this.screenShareStreams.localVideoStreamIds(this.localStream),
           this.localMediaEncryptionMetadata(peerIdentityId),
         ),
       );
@@ -1127,12 +959,7 @@ export class CallPeerConnections {
 
     this.remoteAudio.reset();
     this.remoteStreams.clear();
-    this.remoteScreenStreams.clear();
-    this.remoteScreenStreamIds.clear();
-    this.remoteScreenTrackIds.clear();
-    this.remoteScreenAudioStreamIds.clear();
-    this.remoteScreenAudioTrackIds.clear();
-    this.localScreenStreams.clear();
+    this.screenShareStreams.reset();
     this.statistics.reset();
     this.localStream = null;
     this.mediaEncryptionCipher = null;
