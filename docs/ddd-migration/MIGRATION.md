@@ -151,4 +151,12 @@ adapters into application services without containing context behavior.
 
 ## Next slices
 
-1. `POLL-001`: migrate poll lifecycle behind an aggregate and repository.
+1. `STICKER-001`: migrate sticker-pack lifecycle behind aggregate roots and
+   domain repositories.
+
+## Completed context slices
+
+- `POLL-001`: poll creation, lookup, voting, vote removal, and closure now pass
+  through the `Poll` aggregate and `PollRepository`. HTTP resources and browser
+  sessions remain outside domain/application, and the composition facade keeps
+  the existing UI contract.

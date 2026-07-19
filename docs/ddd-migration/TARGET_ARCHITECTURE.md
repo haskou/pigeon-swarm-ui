@@ -45,7 +45,7 @@ src/
 | calls | call lifecycle, participants, signaling, media state | presence persistence | identities, communities, conversations | WebRTC and signaling adapters |
 | notifications | notification settings, decisions, push subscriptions | message decryption | identities, conversations, communities | REST/push/browser adapters |
 | networks | node, network membership, relay and replication | community membership | identities, attachments | node/relay adapters |
-| polls | poll lifecycle and vote state | message storage | messages, communities | poll adapter port |
+| polls | poll lifecycle and vote state | message storage | messages, communities | poll repository and HTTP mapper |
 | stickers | sticker packs, sticker metadata and usage | media transport | attachments, messages | sticker adapter port |
 
 ## Aggregates and aggregate roots
@@ -61,6 +61,7 @@ src/
 | NotificationSetting | delivery policy for one scope | valid scope hierarchy, mute period and mention suppression | notification settings adapter | setting saved/reset |
 | PushSubscription | browser delivery endpoint and credentials | endpoint and both delivery credentials are required | push subscription adapter | subscription registered/removed |
 | Poll | options, votes and state | open/closed vote rules | poll adapter | created, voted, closed |
+| StickerPack | pack metadata, stickers and library lifecycle | binary media transport | sticker repository | created, updated, saved, removed |
 
 ## Application boundaries
 

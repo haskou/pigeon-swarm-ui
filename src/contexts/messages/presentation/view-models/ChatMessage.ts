@@ -3,7 +3,7 @@ import type {
   MessageAttachment,
 } from '../../../attachments/infrastructure/attachmentResources.types';
 import type { CommunityMessageMentionResource as CommunityMessageMention } from '../../../communities/infrastructure/http/resources/CommunityMessageMentionResource';
-import type { PollResource } from '../../../polls/domain/pollResources.types';
+import type { PollResource } from '../../../polls/infrastructure/http/resources/PollResource';
 import type { StickerMessageReference } from '../../../stickers/domain/stickerResources.types';
 import type { MessageLinkPreview } from '../../infrastructure/http/resources/MessageLinkPreview';
 import type { MessageReplyPreview } from '../../infrastructure/crypto/resources/MessageReplyPreview';

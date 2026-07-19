@@ -1,4 +1,6 @@
-import { DomainError, StringValueObject } from '@haskou/value-objects';
+import { StringValueObject, assert } from '@haskou/value-objects';
+
+import { InvalidPollVoterIdError } from '../errors/InvalidPollVoterIdError';
 
 export class PollVoterId extends StringValueObject {
   private static normalize(value: string): string {
@@ -17,9 +19,7 @@ export class PollVoterId extends StringValueObject {
   public static fromString(value: string): PollVoterId {
     const normalizedValue = PollVoterId.normalize(value);
 
-    if (!normalizedValue) {
-      throw new DomainError('Poll voter id is required.');
-    }
+    assert(normalizedValue.length > 0, new InvalidPollVoterIdError());
 
     return new PollVoterId(normalizedValue);
   }

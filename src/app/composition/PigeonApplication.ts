@@ -111,7 +111,14 @@ import { PigeonNotificationSettingRepository } from '../../contexts/notification
 import { PigeonPushNotificationServerRepository } from '../../contexts/notifications/infrastructure/http/PigeonPushNotificationServerRepository';
 import { PigeonPushSubscriptionRepository } from '../../contexts/notifications/infrastructure/http/PigeonPushSubscriptionRepository';
 import { PushSubscriptionMapper } from '../../contexts/notifications/infrastructure/http/PushSubscriptionMapper';
-import { PigeonPollsApplication } from '../../contexts/polls/application/PigeonPollsApplication';
+import { PollCloser } from '../../contexts/polls/application/close-poll/PollCloser';
+import { PollCreator } from '../../contexts/polls/application/create-poll/PollCreator';
+import { PollFinder } from '../../contexts/polls/application/find-poll/PollFinder';
+import { PollVoteRemover } from '../../contexts/polls/application/remove-poll-vote/PollVoteRemover';
+import { PollVoter } from '../../contexts/polls/application/vote-poll/PollVoter';
+import { PigeonPollRepository } from '../../contexts/polls/infrastructure/http/PigeonPollRepository';
+import { PollAccessContexts } from '../../contexts/polls/infrastructure/http/PollAccessContexts';
+import { PollMapper } from '../../contexts/polls/infrastructure/http/PollMapper';
 import { PigeonStickersApplication } from '../../contexts/stickers/application/PigeonStickersApplication';
 import { RealtimeGateway } from '../../shared/infrastructure/realtime/RealtimeGateway';
 import { CallSessionRegistrar } from './calls/CallSessionRegistrar';
@@ -137,6 +144,7 @@ import { PigeonAttachmentsFacade } from './PigeonAttachmentsFacade';
 import { PigeonCallsFacade } from './PigeonCallsFacade';
 import { PigeonCommunitiesFacade } from './PigeonCommunitiesFacade';
 import { PigeonRealtimeApplication } from './PigeonRealtimeApplication';
+import { PigeonPollsFacade } from './polls/PigeonPollsFacade';
 
 export class PigeonApplication {
   public readonly attachments: PigeonAttachmentsFacade;
@@ -155,7 +163,7 @@ export class PigeonApplication {
 
   public readonly notifications: PigeonNotificationsFacade;
 
-  public readonly polls: PigeonPollsApplication;
+  public readonly polls: PigeonPollsFacade;
 
   public readonly realtime: PigeonRealtimeApplication;
 
@@ -453,19 +461,19 @@ export class PigeonApplication {
         ),
       },
     );
-    this.polls = new PigeonPollsApplication({
-      closePoll: gateway.pollsGateway,
-      createPoll: gateway.pollsGateway,
-      getPoll: gateway.pollsGateway,
-      removePollVote: gateway.pollsGateway,
-      votePoll: {
-        vote: async (message) =>
-          await gateway.pollsGateway.votePoll(
-            message.getSession(),
-            message.getPollId().toString(),
-            message.getOptionIds().map((optionId) => optionId.toString()),
-          ),
-      },
+    const pollContexts = new PollAccessContexts();
+    const pollMapper = new PollMapper();
+    const pollRepository = new PigeonPollRepository(
+      gateway.pollsApi,
+      pollContexts,
+      pollMapper,
+    );
+    this.polls = new PigeonPollsFacade(pollContexts, pollMapper, {
+      closer: new PollCloser(pollRepository),
+      creator: new PollCreator(pollRepository),
+      finder: new PollFinder(pollRepository),
+      voter: new PollVoter(pollRepository),
+      voteRemover: new PollVoteRemover(pollRepository),
     });
     this.realtime = new PigeonRealtimeApplication(realtime);
     this.session = new PigeonSessionFacade(
