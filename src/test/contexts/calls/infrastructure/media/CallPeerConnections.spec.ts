@@ -783,6 +783,60 @@ describe(CallPeerConnections.name, () => {
     expect(sentSignals).toEqual([{ signalType: 'offer' }]);
   });
 
+  it('waits for the designated offerer before negotiating a new peer', async () => {
+    const peers: FakePeerConnection[] = [];
+    const sentSignals: Array<{ signalType: string }> = [];
+
+    installSessionDescriptionMock();
+    installPeerConnectionMock(peers);
+    const manager = callPeerConnectionManager();
+
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
+    manager.setLocalStream(
+      mediaStreamWithTracks([mediaTrack('microphone', 'audio')]),
+    );
+
+    await manager.ensurePeer(
+      'offerer-identity-id',
+      false,
+      (_recipient, signalType) => {
+        sentSignals.push({ signalType });
+
+        return Promise.resolve();
+      },
+    );
+
+    const [peer] = peers;
+    const negotiationNeeded = registeredPeerEventListener(
+      peer,
+      'negotiationneeded',
+    );
+
+    negotiationNeeded(new Event('negotiationneeded'));
+    await Promise.resolve();
+
+    expect(peer.createOffer).not.toHaveBeenCalled();
+    expect(sentSignals).toEqual([]);
+
+    await manager.handleSignal(
+      'offerer-identity-id',
+      'offer',
+      {
+        sdp: 'remote-offer-sdp',
+        type: 'offer',
+      },
+      (_recipient, signalType) => {
+        sentSignals.push({ signalType });
+
+        return Promise.resolve();
+      },
+      'waiting-identity-id',
+    );
+
+    expect(peer.remoteDescription).toMatchObject({ type: 'offer' });
+    expect(sentSignals).toEqual([{ signalType: 'answer' }]);
+  });
+
   it('adds screen sharing without replacing the microphone sender', async () => {
     const peers: FakePeerConnection[] = [];
 
