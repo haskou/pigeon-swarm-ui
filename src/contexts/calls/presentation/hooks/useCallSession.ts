@@ -823,9 +823,14 @@ export function useCallSession(): {
     currentIdentityId: string,
     sendSignal: SignalSender,
   ): Promise<void> {
-    const peerIdentityIds = call.call
-      ? signalingRemotePeerIdentityIds(call.call, currentIdentityId)
-      : [];
+    const callResource = call.call;
+
+    if (!callResource) return;
+
+    const peerIdentityIds = signalingRemotePeerIdentityIds(
+      callResource,
+      currentIdentityId,
+    );
 
     logCallDebug('session:connect-signal-ready-peers', {
       callId: call.id,
@@ -837,7 +842,11 @@ export function useCallSession(): {
       peerIdentityIds.map((peerIdentityId) =>
         peerManager.ensurePeer(
           peerIdentityId,
-          shouldCreateInitialOffer(currentIdentityId, peerIdentityId),
+          shouldCreateInitialOffer(
+            callResource,
+            currentIdentityId,
+            peerIdentityId,
+          ),
           sendSignal,
         ),
       ),

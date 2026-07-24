@@ -36,16 +36,33 @@ export function retainedRemotePeerIdentityIds(
 ): string[] {
   return call.participants
     .filter(
-      (participant) =>
-        participant.connected || participant.status === 'joined',
+      (participant) => participant.connected || participant.status === 'joined',
     )
     .filter((participant) => participant.identityId !== currentIdentityId)
     .map((participant) => participant.identityId);
 }
 
 export function shouldCreateInitialOffer(
+  call: CallResource,
   currentIdentityId: string,
   peerIdentityId: string,
 ): boolean {
+  const currentParticipant = call.participants.find(
+    (participant) => participant.identityId === currentIdentityId,
+  );
+  const peerParticipant = call.participants.find(
+    (participant) => participant.identityId === peerIdentityId,
+  );
+  const currentJoinedAt = currentParticipant?.joinedAt;
+  const peerJoinedAt = peerParticipant?.joinedAt;
+
+  if (
+    currentJoinedAt !== undefined &&
+    peerJoinedAt !== undefined &&
+    currentJoinedAt !== peerJoinedAt
+  ) {
+    return currentJoinedAt > peerJoinedAt;
+  }
+
   return currentIdentityId < peerIdentityId;
 }
