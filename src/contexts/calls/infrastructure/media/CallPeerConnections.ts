@@ -652,6 +652,14 @@ export class CallPeerConnections {
   ): Promise<void> {
     const state = this.peerNegotiationState(peerIdentityId);
 
+    if (state.polite && !peer.localDescription && !peer.remoteDescription) {
+      logCallDebug('peer-manager:renegotiation:initial-offer-deferred', {
+        peerIdentityId,
+      });
+
+      return;
+    }
+
     if (state.makingOffer || peer.signalingState !== 'stable') {
       logCallDebug('peer-manager:renegotiation:offer-skipped', {
         makingOffer: state.makingOffer,
