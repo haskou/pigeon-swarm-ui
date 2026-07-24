@@ -58,6 +58,10 @@ const stabilityDurationMs = Number(
   process.env.VOICE_STABILITY_DURATION_MS ?? 45_000,
 );
 const forceRelay = process.env.VOICE_STABILITY_FORCE_RELAY === 'true';
+const iceTransportPolicy = resolveIceTransportPolicy(
+  process.env.VOICE_STABILITY_ICE_TRANSPORT_POLICY,
+  forceRelay,
+);
 
 test('keeps two community voice participants connected', async ({}, testInfo) => {
   test.skip(
@@ -85,8 +89,11 @@ test('keeps two community voice participants connected', async ({}, testInfo) =>
   const realtimeEventsA = trackCallRealtimeEvents(pageA);
   const realtimeEventsB = trackCallRealtimeEvents(pageB);
 
-  if (forceRelay) {
-    await Promise.all([forceRelayTransport(pageA), forceRelayTransport(pageB)]);
+  if (iceTransportPolicy) {
+    await Promise.all([
+      overrideIceTransportPolicy(pageA, iceTransportPolicy),
+      overrideIceTransportPolicy(pageB, iceTransportPolicy),
+    ]);
   }
 
   try {
@@ -136,13 +143,27 @@ test('keeps two community voice participants connected', async ({}, testInfo) =>
   }
 });
 
-async function forceRelayTransport(page: Page): Promise<void> {
+function resolveIceTransportPolicy(
+  configuredPolicy: string | undefined,
+  forceRelayPolicy: boolean,
+): RTCIceTransportPolicy | undefined {
+  if (configuredPolicy === 'all' || configuredPolicy === 'relay') {
+    return configuredPolicy;
+  }
+
+  return forceRelayPolicy ? 'relay' : undefined;
+}
+
+async function overrideIceTransportPolicy(
+  page: Page,
+  policy: RTCIceTransportPolicy,
+): Promise<void> {
   await page.route('**/calls/ice-servers', async (route) => {
     const response = await route.fetch();
     const configuration = (await response.json()) as Record<string, unknown>;
 
     await route.fulfill({
-      json: { ...configuration, iceTransportPolicy: 'relay' },
+      json: { ...configuration, iceTransportPolicy: policy },
       response,
     });
   });
@@ -156,10 +177,7 @@ function trackPresenceResourceResponses(
   page.on('response', (response) => {
     const url = new URL(response.url()).pathname;
 
-    if (
-      url !== '/calls/' &&
-      !/^\/communities\/[^/]+\/channels$/.test(url)
-    ) {
+    if (url !== '/calls/' && !/^\/communities\/[^/]+\/channels$/.test(url)) {
       return;
     }
 
@@ -272,7 +290,9 @@ async function joinVoiceChannel(
     : firstVoiceChannelButton(page);
 
   await expect(voiceChannel.first()).toBeVisible({ timeout: 30_000 });
-  const channelName = (await voiceChannel.first().innerText()).trim();
+  const channelName =
+    expectedChannelName ??
+    (await voiceChannel.first().innerText()).replace(/\s+·\s+\d+$/, '').trim();
 
   await voiceChannel.first().click();
   await expect(page.getByTestId('compact-call-bar')).toBeVisible({
