@@ -168,8 +168,25 @@ describe('callPeerConnectionPlan', () => {
     expect(retainedRemotePeerIdentityIds(call, 'alice')).toEqual([]);
   });
 
-  it('chooses a stable initial offerer for both peers', () => {
-    expect(shouldCreateInitialOffer('alice', 'bob')).toBe(true);
-    expect(shouldCreateInitialOffer('bob', 'alice')).toBe(false);
+  it('makes the participant that joined later initiate the connection', () => {
+    const call = callResource({
+      currentIdentityId: 'alice',
+      remoteIdentityId: 'bob',
+    });
+
+    expect(shouldCreateInitialOffer(call, 'alice', 'bob')).toBe(false);
+    expect(shouldCreateInitialOffer(call, 'bob', 'alice')).toBe(true);
+  });
+
+  it('uses identity order to break equal join-time ties', () => {
+    const call = callResource({
+      currentIdentityId: 'alice',
+      remoteIdentityId: 'bob',
+    });
+
+    call.participants[1].joinedAt = call.participants[0].joinedAt;
+
+    expect(shouldCreateInitialOffer(call, 'alice', 'bob')).toBe(true);
+    expect(shouldCreateInitialOffer(call, 'bob', 'alice')).toBe(false);
   });
 });
