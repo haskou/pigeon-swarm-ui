@@ -2,22 +2,32 @@ import { logCallWarning } from './callDebugLogger';
 
 const disconnectedPeerRecoveryDelayMs = 3_000;
 const maximumPeerRecoveryDelayMs = 15_000;
+const checkingPeerRecoveryDelayMs = 15_000;
+const maximumPeerRecoveryAttempts = 3;
+const peerRestartOutcomeWaitMs = 15_000;
 
 export class CallPeerRecovery {
   private readonly attempts = new Map<string, number>();
 
-  private readonly pending = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly pending = new Map<
+    string,
+    { deadline: number; timeout: ReturnType<typeof setTimeout> }
+  >();
+
+  private readonly retryNotBefore = new Map<string, number>();
 
   private cancel(peerIdentityId: string): void {
     const timeout = this.pending.get(peerIdentityId);
 
     if (timeout === undefined) return;
 
-    clearTimeout(timeout);
+    clearTimeout(timeout.timeout);
     this.pending.delete(peerIdentityId);
   }
 
   private delay(peer: RTCPeerConnection, attempt: number): number | undefined {
+    if (attempt >= maximumPeerRecoveryAttempts) return undefined;
+
     if (
       peer.connectionState === 'failed' ||
       peer.iceConnectionState === 'failed'
@@ -33,6 +43,10 @@ export class CallPeerRecovery {
       peer.iceConnectionState === 'disconnected'
     ) {
       return disconnectedPeerRecoveryDelayMs;
+    }
+
+    if (peer.iceConnectionState === 'checking') {
+      return checkingPeerRecoveryDelayMs;
     }
 
     return undefined;
@@ -53,7 +67,12 @@ export class CallPeerRecovery {
     delay: number,
     isCurrent: () => boolean,
   ): void {
-    if (this.pending.has(peerIdentityId)) return;
+    const deadline = Date.now() + delay;
+    const pending = this.pending.get(peerIdentityId);
+
+    if (pending && pending.deadline <= deadline) return;
+
+    this.cancel(peerIdentityId);
 
     logCallWarning('peer-manager:ice-recovery:scheduled', {
       attempt: attempt + 1,
@@ -74,19 +93,26 @@ export class CallPeerRecovery {
       }
 
       this.attempts.set(peerIdentityId, attempt + 1);
+      this.retryNotBefore.set(
+        peerIdentityId,
+        Date.now() + peerRestartOutcomeWaitMs,
+      );
       logCallWarning('peer-manager:ice-recovery:restart', {
         attempt: attempt + 1,
         peerIdentityId,
       });
       peer.restartIce();
+      // Browsers may remain in checking without emitting another state event.
+      this.reconcile(peerIdentityId, peer, isCurrent);
     }, delay);
 
-    this.pending.set(peerIdentityId, timeout);
+    this.pending.set(peerIdentityId, { deadline, timeout });
   }
 
   public forget(peerIdentityId: string): void {
     this.cancel(peerIdentityId);
     this.attempts.delete(peerIdentityId);
+    this.retryNotBefore.delete(peerIdentityId);
   }
 
   public reconcile(
@@ -94,7 +120,9 @@ export class CallPeerRecovery {
     peer: RTCPeerConnection,
     isCurrent: () => boolean,
   ): void {
-    if (this.isHealthy(peer)) {
+    if (!isCurrent()) return;
+
+    if (peer.connectionState === 'closed' || this.isHealthy(peer)) {
       this.forget(peerIdentityId);
 
       return;
@@ -104,13 +132,24 @@ export class CallPeerRecovery {
     const delay = this.delay(peer, attempt);
 
     if (delay !== undefined) {
-      this.schedule(peerIdentityId, peer, attempt, delay, isCurrent);
+      const outcomeWait = Math.max(
+        0,
+        (this.retryNotBefore.get(peerIdentityId) ?? 0) - Date.now(),
+      );
+      this.schedule(
+        peerIdentityId,
+        peer,
+        attempt,
+        Math.max(delay, outcomeWait),
+        isCurrent,
+      );
     }
   }
 
   public reset(): void {
-    this.pending.forEach((timeout) => clearTimeout(timeout));
+    this.pending.forEach(({ timeout }) => clearTimeout(timeout));
     this.pending.clear();
     this.attempts.clear();
+    this.retryNotBefore.clear();
   }
 }
