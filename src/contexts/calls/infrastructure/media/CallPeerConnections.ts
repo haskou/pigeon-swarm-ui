@@ -37,7 +37,9 @@ export class CallPeerConnections {
 
   private readonly statistics = new CallPeerStatistics();
 
-  private readonly recovery = new CallPeerRecovery();
+  private readonly recovery = new CallPeerRecovery((peer, canRestart) =>
+    this.refreshAndRestartIce(peer, canRestart),
+  );
 
   private readonly peerSignalSenders = new Map<string, SignalSender>();
 
@@ -601,6 +603,27 @@ export class CallPeerConnections {
       this.mediaEncryptionEnabled &&
       (this.peerAcceptsEncryptedMedia.get(peerIdentityId) ?? false)
     );
+  }
+
+  private async refreshAndRestartIce(
+    peer: RTCPeerConnection,
+    canRestart: () => boolean,
+  ): Promise<void> {
+    if (!this.rtcConfigurationProvider) {
+      throw new Error('RTC configuration provider is unavailable.');
+    }
+
+    const configuration = await this.rtcConfigurationProvider();
+
+    if (!canRestart()) return;
+
+    // Rotate server credentials without changing the established transport
+    // policy or other immutable peer configuration.
+    peer.setConfiguration({
+      ...peer.getConfiguration(),
+      iceServers: configuration.iceServers,
+    });
+    peer.restartIce();
   }
 
   private peerConnectionConfiguration(
