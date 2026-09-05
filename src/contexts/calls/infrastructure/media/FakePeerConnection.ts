@@ -5,6 +5,8 @@ export type FakePeerConnection = Pick<
   | 'addTransceiver'
   | 'close'
   | 'getSenders'
+  | 'getConfiguration'
+  | 'setConfiguration'
   | 'removeTrack'
   | 'restartIce'
 > & {

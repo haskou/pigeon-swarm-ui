@@ -192,6 +192,7 @@ function createFakePeerConnection(): FakePeerConnection {
         type: 'offer',
       } as RTCSessionDescriptionInit);
     }),
+    getConfiguration: jest.fn(() => ({ iceTransportPolicy: 'relay' })),
     getSenders: jest.fn(() => senders),
     iceConnectionState: 'new',
     localDescription: null,
@@ -203,6 +204,7 @@ function createFakePeerConnection(): FakePeerConnection {
     }),
     restartIce: jest.fn(),
     senders,
+    setConfiguration: jest.fn(),
     setLocalDescription: jest.fn((description?: RTCSessionDescriptionInit) => {
       if (!description) return Promise.resolve();
 
@@ -384,14 +386,27 @@ describe(CallPeerConnections.name, () => {
     expect(configurations).toEqual([firstConfiguration, secondConfiguration]);
   });
 
-  it('restarts ICE when an established peer connection fails', async () => {
+  it('refreshes TURN credentials before restarting a failed peer without downgrading relay policy', async () => {
     jest.useFakeTimers();
     const peers: FakePeerConnection[] = [];
 
     installPeerConnectionMock(peers);
     const manager = callPeerConnectionManager();
 
-    manager.configure(() => Promise.resolve({ iceServers: [] }));
+    const provider = jest
+      .fn()
+      .mockResolvedValueOnce({ iceServers: [] })
+      .mockResolvedValue({
+        iceServers: [
+          {
+            credential: 'fresh-credential',
+            urls: 'turn:relay.example.test',
+            username: 'fresh-user',
+          },
+        ],
+        iceTransportPolicy: 'all',
+      });
+    manager.configure(provider);
     await manager.ensurePeer('peer-identity-id', false, () =>
       Promise.resolve(),
     );
@@ -405,9 +420,113 @@ describe(CallPeerConnections.name, () => {
     peer.connectionState = 'failed';
     peer.iceConnectionState = 'failed';
     connectionStateListener(new Event('connectionstatechange'));
-    jest.runOnlyPendingTimers();
+    await jest.advanceTimersByTimeAsync(0);
 
+    expect(provider).toHaveBeenCalledTimes(2);
+    expect(peer.setConfiguration).toHaveBeenCalledWith({
+      iceServers: [
+        {
+          credential: 'fresh-credential',
+          urls: 'turn:relay.example.test',
+          username: 'fresh-user',
+        },
+      ],
+      iceTransportPolicy: 'relay',
+    });
     expect(peer.restartIce).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['reset', 'healthy', 'timeout'])(
+    'discards late TURN credentials after %s',
+    async (reason) => {
+      jest.useFakeTimers();
+      const peers: FakePeerConnection[] = [];
+      installPeerConnectionMock(peers);
+      const manager = callPeerConnectionManager();
+      let resolveRefresh!: (configuration: RTCConfiguration) => void;
+      const provider = jest
+        .fn()
+        .mockResolvedValueOnce({ iceServers: [] })
+        .mockImplementation(
+          () =>
+            new Promise<RTCConfiguration>((resolve) => {
+              resolveRefresh = resolve;
+            }),
+        );
+      manager.configure(provider);
+      await manager.ensurePeer('peer-identity-id', false, async () => {});
+      const [peer] = peers;
+      const listener = registeredPeerEventListener(
+        peer,
+        'connectionstatechange',
+      );
+      peer.connectionState = 'failed';
+      peer.iceConnectionState = 'failed';
+      listener(new Event('connectionstatechange'));
+      await jest.advanceTimersByTimeAsync(0);
+      listener(new Event('connectionstatechange'));
+      expect(provider).toHaveBeenCalledTimes(2);
+      expect(peer.restartIce).not.toHaveBeenCalled();
+
+      if (reason === 'reset') manager.reset();
+
+      if (reason === 'healthy') {
+        peer.connectionState = 'connected';
+        peer.iceConnectionState = 'connected';
+        listener(new Event('connectionstatechange'));
+      }
+
+      if (reason === 'timeout') await jest.advanceTimersByTimeAsync(15_000);
+      resolveRefresh({
+        iceServers: [
+          { credential: 'late-secret', urls: 'turn:late.example.test' },
+        ],
+      });
+      await jest.advanceTimersByTimeAsync(0);
+
+      expect(peer.setConfiguration).not.toHaveBeenCalled();
+      expect(peer.restartIce).not.toHaveBeenCalled();
+      manager.reset();
+      expect(jest.getTimerCount()).toBe(0);
+    },
+  );
+
+  it('retries a failed credential refresh without restarting with stale credentials', async () => {
+    jest.useFakeTimers();
+    const peers: FakePeerConnection[] = [];
+    installPeerConnectionMock(peers);
+    const manager = callPeerConnectionManager();
+    const provider = jest
+      .fn()
+      .mockResolvedValueOnce({ iceServers: [] })
+      .mockRejectedValueOnce(
+        new Error('sensitive HTTP response must not be logged'),
+      )
+      .mockResolvedValue({ iceServers: [{ urls: 'turn:fresh.example.test' }] });
+    manager.configure(provider);
+    await manager.ensurePeer('peer-identity-id', false, async () => {});
+    const [peer] = peers;
+    peer.connectionState = 'failed';
+    peer.iceConnectionState = 'failed';
+    registeredPeerEventListener(
+      peer,
+      'connectionstatechange',
+    )(new Event('connectionstatechange'));
+    const warning = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await jest.advanceTimersByTimeAsync(0);
+      expect(peer.restartIce).not.toHaveBeenCalled();
+      expect(peer.setConfiguration).not.toHaveBeenCalled();
+      expect(JSON.stringify(warning.mock.calls)).not.toContain(
+        'sensitive HTTP response',
+      );
+      await jest.advanceTimersByTimeAsync(15_000);
+      expect(provider).toHaveBeenCalledTimes(3);
+      expect(peer.restartIce).toHaveBeenCalledTimes(1);
+    } finally {
+      warning.mockRestore();
+      manager.reset();
+    }
   });
 
   it('does not restart ICE when a transient disconnection recovers', async () => {
