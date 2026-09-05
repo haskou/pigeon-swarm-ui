@@ -1,5 +1,7 @@
 import type { PrimitiveOf } from '@haskou/value-objects';
 
+import { NullObject } from '@haskou/value-objects';
+
 import { NodeCapabilityStatus } from './NodeCapabilityStatus';
 import { NodeRelayPort } from './NodeRelayPort';
 
@@ -21,7 +23,9 @@ export class PublicNetworkConfiguration {
   public toPrimitives() {
     return {
       enabled: this.enabled.isEnabled(),
-      port: this.port.isConfigured() ? this.port.valueOf() : undefined,
+      port: !NullObject.isNullObject(this.port)
+        ? this.port.valueOf()
+        : undefined,
     };
   }
 }

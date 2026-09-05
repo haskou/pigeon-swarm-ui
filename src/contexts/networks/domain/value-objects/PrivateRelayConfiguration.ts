@@ -27,7 +27,8 @@ export class PrivateRelayConfiguration {
   ) {
     assert(
       !enabled.isEnabled() ||
-        (portStart.isConfigured() && portEnd.isConfigured()),
+        (!NullObject.isNullObject(portStart) &&
+          !NullObject.isNullObject(portEnd)),
       new NodeRelayPortRequiredError(),
     );
     assert(
@@ -42,8 +43,10 @@ export class PrivateRelayConfiguration {
     return {
       discoveryEnabled: this.discoveryEnabled.isEnabled(),
       enabled: this.enabled.isEnabled(),
-      portEnd: this.portEnd.isConfigured() ? this.portEnd.valueOf() : undefined,
-      portStart: this.portStart.isConfigured()
+      portEnd: !NullObject.isNullObject(this.portEnd)
+        ? this.portEnd.valueOf()
+        : undefined,
+      portStart: !NullObject.isNullObject(this.portStart)
         ? this.portStart.valueOf()
         : undefined,
       publicationEnabled: this.publicationEnabled.isEnabled(),

@@ -1,4 +1,4 @@
-import { SymmetricKey } from '@haskou/value-objects';
+import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
 import type { PasskeyPrfMasterKeyProtection } from './PasskeyPrfMasterKeyProtection';
 import type { PrfExtensionResults } from './PrfExtensionResults';

@@ -1,8 +1,5 @@
-import {
-  KeyPair,
-  StringValueObject,
-  SymmetricKey,
-} from '@haskou/value-objects';
+import { KeyPair, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import { StringValueObject } from '@haskou/value-objects';
 
 import type {
   IdentityResource,

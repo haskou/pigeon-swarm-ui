@@ -1,5 +1,6 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 
+import { NullObject } from '@haskou/value-objects';
 import { useCallback } from 'react';
 
 import type {
@@ -107,7 +108,7 @@ export function useWorkspaceConversationNavigation({
         preferredNetworkId,
       );
 
-      if (!sharedNetwork.isAvailable()) {
+      if (NullObject.isNullObject(sharedNetwork)) {
         throw new Error(copy.dialog.noSharedNetwork);
       }
 

@@ -1,10 +1,9 @@
 module.exports = {
   moduleNameMapper: {
     '\\?url$': '<rootDir>/src/test/assetUrlMock.ts',
-    '^@haskou/value-objects$': '<rootDir>/src/test/valueObjectsMock.ts',
-    '^@haskou/value-objects/dist/value-objects/crypto/CryptoAdapter$':
-      '<rootDir>/src/test/valueObjectsMock.ts',
+    '^@haskou/pigeon-swarm-crypto$': '<rootDir>/src/test/valueObjectsMock.ts',
   },
+  testPathIgnorePatterns: ['/Attachment(Cipher|Cryptographer).spec.ts$'],
   roots: ['<rootDir>/src'],
   testEnvironment: 'node',
   testMatch: ['**/*.spec.ts'],

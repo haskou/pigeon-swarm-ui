@@ -21,8 +21,4 @@ export class NodeRelayPort extends Integer {
   public constructor(value: number) {
     super(value);
   }
-
-  public isConfigured(): boolean {
-    return !NullObject.isNullObject(this);
-  }
 }

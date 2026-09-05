@@ -1,5 +1,7 @@
 import type { PrimitiveOf } from '@haskou/value-objects';
 
+import { NullObject } from '@haskou/value-objects';
+
 import { NodeRelayPort } from './NodeRelayPort';
 
 export class CallsRelayConfiguration {
@@ -15,7 +17,9 @@ export class CallsRelayConfiguration {
 
   public toPrimitives() {
     return {
-      port: this.port.isConfigured() ? this.port.valueOf() : undefined,
+      port: !NullObject.isNullObject(this.port)
+        ? this.port.valueOf()
+        : undefined,
     };
   }
 }

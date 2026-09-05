@@ -1,4 +1,5 @@
-import { KeyPair, SymmetricKey, Timestamp } from '@haskou/value-objects';
+import { KeyPair, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import { Timestamp } from '@haskou/value-objects';
 import { mock } from 'jest-mock-extended';
 
 import type { PigeonIdentityKeyProtectionGateway } from '../../../../../contexts/identities/infrastructure/crypto/PigeonIdentityKeyProtectionGateway';

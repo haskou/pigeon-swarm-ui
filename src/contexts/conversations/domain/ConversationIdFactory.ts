@@ -1,4 +1,5 @@
-import { SHA256Hash, ShortId } from '@haskou/value-objects';
+import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
+import { ShortId } from '@haskou/value-objects';
 
 import { ConversationId } from './value-objects/ConversationId';
 import { ConversationNetworkId } from './value-objects/ConversationNetworkId';

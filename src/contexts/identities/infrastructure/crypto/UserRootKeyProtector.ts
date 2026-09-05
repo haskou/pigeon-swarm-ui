@@ -3,9 +3,9 @@ import {
   KeyPair,
   PrivateKey,
   PublicKey,
-  StringValueObject,
   SymmetricKey,
-} from '@haskou/value-objects';
+} from '@haskou/pigeon-swarm-crypto';
+import { StringValueObject } from '@haskou/value-objects';
 import { Buffer } from 'buffer';
 
 import type { IdentityResource } from '../http/resources/IdentityResource';

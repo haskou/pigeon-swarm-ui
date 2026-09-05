@@ -1,4 +1,4 @@
-import { PublicKey, SymmetricKey } from '@haskou/value-objects';
+import { PublicKey, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
 import type {
   ConversationResource,

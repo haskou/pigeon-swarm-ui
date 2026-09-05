@@ -27,8 +27,4 @@ export class NetworkId extends StringValueObject {
   public constructor(value: string) {
     super(value);
   }
-
-  public isAvailable(): boolean {
-    return !NullObject.isNullObject(this);
-  }
 }

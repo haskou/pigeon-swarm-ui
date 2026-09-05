@@ -1,4 +1,4 @@
-import type { Signature } from '@haskou/value-objects';
+import type { Signature } from '@haskou/pigeon-swarm-crypto';
 
 import type { Session } from '../../domain/pigeonResources.types';
 

@@ -1,4 +1,4 @@
-import { EncryptedPayload } from '@haskou/value-objects';
+import { EncryptedPayload } from '@haskou/pigeon-swarm-crypto';
 
 import type {
   KeychainResource,
