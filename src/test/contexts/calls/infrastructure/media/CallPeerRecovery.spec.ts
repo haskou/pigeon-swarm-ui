@@ -131,4 +131,36 @@ describe('CallPeerRecovery', () => {
     expect(peer.restartIce).toHaveBeenCalledTimes(3);
     expect(jest.getTimerCount()).toBe(0);
   });
+
+  it('replaces a checking deadline with immediate recovery when ICE fails', () => {
+    jest.useFakeTimers();
+    const recovery = new CallPeerRecovery();
+    const peer = peerConnection('connecting', 'checking');
+    recovery.reconcile('peer-1', peer, () => true);
+    jest.advanceTimersByTime(1_000);
+    Object.assign(peer, {
+      connectionState: 'failed',
+      iceConnectionState: 'failed',
+    });
+    recovery.reconcile('peer-1', peer, () => true);
+    jest.advanceTimersByTime(0);
+
+    expect(peer.restartIce).toHaveBeenCalledTimes(1);
+    recovery.reset();
+  });
+
+  it('allows a restart time to negotiate before consuming the next attempt', () => {
+    jest.useFakeTimers();
+    const recovery = new CallPeerRecovery();
+    const peer = peerConnection('failed', 'failed');
+    recovery.reconcile('peer-1', peer, () => true);
+    jest.advanceTimersByTime(0);
+    expect(peer.restartIce).toHaveBeenCalledTimes(1);
+    recovery.reconcile('peer-1', peer, () => true);
+    jest.advanceTimersByTime(14_999);
+    expect(peer.restartIce).toHaveBeenCalledTimes(1);
+    jest.advanceTimersByTime(1);
+    expect(peer.restartIce).toHaveBeenCalledTimes(2);
+    recovery.reset();
+  });
 });
