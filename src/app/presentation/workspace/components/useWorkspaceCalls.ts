@@ -18,15 +18,13 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import {
-  logCallDebug,
-  logCallError,
-} from '../../../../contexts/calls/infrastructure/media/callDebugLogger';
+import { logCallDebug } from '../../../../contexts/calls/infrastructure/media/callDebugLogger';
 import { useCallMediaAccess } from '../../../../contexts/calls/presentation/hooks/useCallMediaAccess';
 import { useCallSession } from '../../../../contexts/calls/presentation/hooks/useCallSession';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { communitiesWithCallVoicePresence } from './communityVoicePresence';
+import { loadWorkspaceCallIceConfig } from './loadWorkspaceCallIceConfig';
 import { resolveWorkspaceCallDetails } from './resolveWorkspaceCallDetails';
 import { resolveWorkspaceCallMediaEncryption } from './resolveWorkspaceCallMediaEncryption';
 import { useCallDeparture } from './useCallDeparture';
@@ -250,15 +248,13 @@ export function useWorkspaceCalls({
       },
     [sessionRef],
   );
-  const loadCallIceConfig = useCallback(async () => {
-    try {
-      return await applicationContainer.calls.getIceServers(sessionRef.current);
-    } catch (caught) {
-      logCallError('workspace:call:ice-config-unavailable', caught);
-
-      throw new Error(copy.calls.iceServersUnavailable);
-    }
-  }, [sessionRef]);
+  const loadCallIceConfig = useCallback(
+    () =>
+      loadWorkspaceCallIceConfig(() =>
+        applicationContainer.calls.getIceServers(sessionRef.current),
+      ),
+    [sessionRef],
+  );
   const {
     acceptIncomingCall,
     declineIncomingCall,
