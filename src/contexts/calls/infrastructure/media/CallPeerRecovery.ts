@@ -2,6 +2,8 @@ import { logCallWarning } from './callDebugLogger';
 
 const disconnectedPeerRecoveryDelayMs = 3_000;
 const maximumPeerRecoveryDelayMs = 15_000;
+const checkingPeerRecoveryDelayMs = 15_000;
+const maximumPeerRecoveryAttempts = 3;
 
 export class CallPeerRecovery {
   private readonly attempts = new Map<string, number>();
@@ -18,6 +20,8 @@ export class CallPeerRecovery {
   }
 
   private delay(peer: RTCPeerConnection, attempt: number): number | undefined {
+    if (attempt >= maximumPeerRecoveryAttempts) return undefined;
+
     if (
       peer.connectionState === 'failed' ||
       peer.iceConnectionState === 'failed'
@@ -33,6 +37,10 @@ export class CallPeerRecovery {
       peer.iceConnectionState === 'disconnected'
     ) {
       return disconnectedPeerRecoveryDelayMs;
+    }
+
+    if (peer.iceConnectionState === 'checking') {
+      return checkingPeerRecoveryDelayMs;
     }
 
     return undefined;
@@ -79,6 +87,8 @@ export class CallPeerRecovery {
         peerIdentityId,
       });
       peer.restartIce();
+      // Browsers may remain in checking without emitting another state event.
+      this.reconcile(peerIdentityId, peer, isCurrent);
     }, delay);
 
     this.pending.set(peerIdentityId, timeout);
@@ -94,7 +104,9 @@ export class CallPeerRecovery {
     peer: RTCPeerConnection,
     isCurrent: () => boolean,
   ): void {
-    if (this.isHealthy(peer)) {
+    if (!isCurrent()) return;
+
+    if (peer.connectionState === 'closed' || this.isHealthy(peer)) {
       this.forget(peerIdentityId);
 
       return;
