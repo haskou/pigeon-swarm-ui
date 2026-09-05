@@ -4,7 +4,7 @@ import {
   EncryptedPayload,
   PublicKey,
   SymmetricKey,
-} from '@haskou/value-objects';
+} from '@haskou/pigeon-swarm-crypto';
 import { useCallback, useState } from 'react';
 
 import type {

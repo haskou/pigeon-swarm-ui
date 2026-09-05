@@ -1,4 +1,5 @@
-import { SymmetricKey, UUID } from '@haskou/value-objects';
+import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import { UUID } from '@haskou/value-objects';
 
 import type {
   ChatMessage,

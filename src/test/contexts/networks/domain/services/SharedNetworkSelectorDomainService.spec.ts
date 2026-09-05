@@ -1,3 +1,5 @@
+import { NullObject } from '@haskou/value-objects';
+
 import { SharedNetworkSelectorDomainService } from '../../../../../contexts/networks/domain/services/SharedNetworkSelectorDomainService';
 import { NetworkId } from '../../../../../contexts/networks/domain/value-objects/NetworkId';
 
@@ -37,13 +39,13 @@ describe(SharedNetworkSelectorDomainService.name, () => {
 
   it('reports absence when participants share no network', () => {
     expect(
-      selector
-        .select(
+      NullObject.isNullObject(
+        selector.select(
           [network('network-a')],
           [network('network-b')],
           NetworkId.fromOptional(),
-        )
-        .isAvailable(),
-    ).toBe(false);
+        ),
+      ),
+    ).toBe(true);
   });
 });

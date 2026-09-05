@@ -1,5 +1,9 @@
+import {
+  SymmetricEncryptedPayload,
+  SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
 import { UUID } from '@haskou/value-objects';
-import { CryptoAdapter } from '@haskou/value-objects/dist/value-objects/crypto/CryptoAdapter';
+import { Buffer } from 'buffer';
 
 import type { MessageAttachment } from '../../application/contracts/MessageAttachment';
 import type { AttachmentProgressHandler } from './AttachmentProgressHandler';
@@ -42,7 +46,7 @@ export class AttachmentCryptographer {
       throw new Error('Attachment is not encrypted.');
     }
 
-    const key = this.codec.base64ToBytes(attachment.encryption.key);
+    const key = SymmetricKey.fromBase64(attachment.encryption.key);
     const chunks = attachment.encryption.chunks ?? [
       { iv: attachment.encryption.iv, size: encryptedBytes.byteLength },
     ];
@@ -53,12 +57,18 @@ export class AttachmentCryptographer {
       const chunk = chunks[index];
       const encryptedChunk = encryptedBytes.slice(offset, offset + chunk.size);
       const encryptedChunkBytes = new Uint8Array(encryptedChunk);
-      const decrypted = CryptoAdapter.decryptAes256Gcm(
-        key,
-        this.codec.base64ToBytes(chunk.iv),
-        encryptedChunkBytes.subarray(0, -gcmTagBytes),
-        encryptedChunkBytes.subarray(-gcmTagBytes),
+      const payload = new SymmetricEncryptedPayload(
+        [
+          'v1',
+          'aes-256-gcm',
+          chunk.iv,
+          this.codec.bytesToBase64(
+            encryptedChunkBytes.subarray(0, -gcmTagBytes),
+          ),
+          this.codec.bytesToBase64(encryptedChunkBytes.subarray(-gcmTagBytes)),
+        ].join('.'),
       );
+      const decrypted = key.decrypt(payload, { aad: '' });
 
       decryptedParts.push(this.codec.bytesToArrayBuffer(decrypted));
       offset += chunk.size;
@@ -83,7 +93,7 @@ export class AttachmentCryptographer {
     bytes: ArrayBuffer,
     onProgress?: AttachmentProgressHandler,
   ): Extract<WorkerResponse, { type: 'encrypt-result' }> {
-    const key = CryptoAdapter.randomBytes(32);
+    const key = SymmetricKey.generate();
     const encryptedParts: ArrayBuffer[] = [];
     const chunks: { iv: string; size: number }[] = [];
     const totalChunks = Math.ceil(bytes.byteLength / chunkSize) || 1;
@@ -94,20 +104,16 @@ export class AttachmentCryptographer {
         offset,
         Math.min(offset + chunkSize, bytes.byteLength),
       );
-      const iv = CryptoAdapter.randomBytes(12);
-      const encrypted = CryptoAdapter.encryptAes256Gcm(
-        key,
-        iv,
-        new Uint8Array(chunk),
-      );
+      const encrypted = key.encrypt(Buffer.from(chunk), { aad: '' });
+      const [, , iv, ciphertext, tag] = encrypted.valueOf().split('.');
       const encryptedChunk = this.codec.concatBytes(
-        encrypted.cipherText,
-        encrypted.tag,
+        this.codec.base64ToBytes(ciphertext),
+        this.codec.base64ToBytes(tag),
       );
 
       encryptedParts.push(this.codec.bytesToArrayBuffer(encryptedChunk));
       chunks.push({
-        iv: this.codec.bytesToBase64(iv),
+        iv,
         size: encryptedChunk.byteLength,
       });
       this.reportProgress(
@@ -129,7 +135,7 @@ export class AttachmentCryptographer {
         chunks,
         chunkSize,
         iv: firstIv,
-        key: this.codec.bytesToBase64(key),
+        key: key.valueOf(),
       },
       id: UUID.generate().toString(),
       type: 'encrypt-result',

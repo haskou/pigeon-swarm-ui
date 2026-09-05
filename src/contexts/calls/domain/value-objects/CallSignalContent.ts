@@ -1,13 +1,15 @@
-import { ValueObject } from '@haskou/value-objects';
+import { JsonObject } from '../../../../shared/domain/serialization/JsonObject';
 
-export class CallSignalContent extends ValueObject<Record<string, unknown>> {
+export class CallSignalContent {
   public static fromPrimitives(
     value: Record<string, unknown>,
   ): CallSignalContent {
-    return new CallSignalContent(value);
+    return new CallSignalContent(JsonObject.fromPrimitives(value));
   }
 
-  private constructor(value: Record<string, unknown>) {
-    super(value);
+  private constructor(private readonly value: JsonObject) {}
+
+  public toPrimitives() {
+    return this.value.toPrimitives();
   }
 }

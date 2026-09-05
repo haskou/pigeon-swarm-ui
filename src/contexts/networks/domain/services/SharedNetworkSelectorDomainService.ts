@@ -13,7 +13,7 @@ export class SharedNetworkSelectorDomainService {
     preferredNetwork: NetworkId,
   ): NetworkId {
     if (
-      preferredNetwork.isAvailable() &&
+      !NullObject.isNullObject(preferredNetwork) &&
       this.includes(ownNetworks, preferredNetwork) &&
       (peerNetworks.length === 0 ||
         this.includes(peerNetworks, preferredNetwork))

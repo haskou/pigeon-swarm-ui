@@ -1,4 +1,4 @@
-import { KeyPair, SymmetricKey } from '@haskou/value-objects';
+import { KeyPair, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
 import type { IdentityIdFactory } from '../../domain/IdentityIdFactory';
 import type { IdentityId } from '../../domain/value-objects/IdentityId';

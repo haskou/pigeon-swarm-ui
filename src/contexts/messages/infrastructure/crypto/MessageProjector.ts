@@ -5,7 +5,7 @@ import type { PlainMessage } from './PlainMessage';
 
 export type { MessageProjectionCopy } from './MessageProjectionCopy';
 /* eslint-disable @typescript-eslint/no-use-before-define */
-import { EncryptedPayload, SymmetricKey } from '@haskou/value-objects';
+import { EncryptedPayload, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
 import type {
   ChatMessage,

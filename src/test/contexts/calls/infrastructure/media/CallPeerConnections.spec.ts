@@ -1,4 +1,4 @@
-import { SymmetricKey } from '@haskou/value-objects';
+import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
 import type { SignalSender } from '../../../../../contexts/calls/infrastructure/media/descriptionPayload';
 import type { FakePeerConnection } from '../../../../../contexts/calls/infrastructure/media/FakePeerConnection';

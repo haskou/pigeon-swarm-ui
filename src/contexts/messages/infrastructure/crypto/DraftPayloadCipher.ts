@@ -1,4 +1,4 @@
-import { EncryptedPayload } from '@haskou/value-objects';
+import { EncryptedPayload } from '@haskou/pigeon-swarm-crypto';
 
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { DraftPlainPayload } from './DraftPlainPayload';

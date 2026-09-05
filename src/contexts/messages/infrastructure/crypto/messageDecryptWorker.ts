@@ -1,4 +1,4 @@
-import { EncryptedPayload, SymmetricKey } from '@haskou/value-objects';
+import { EncryptedPayload, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
 import type {
   ChatMessage,

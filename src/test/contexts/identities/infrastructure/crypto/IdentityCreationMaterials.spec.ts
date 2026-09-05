@@ -1,4 +1,4 @@
-import { KeyPair, SymmetricKey } from '@haskou/value-objects';
+import { KeyPair, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 import { IdentityCreationMaterialNotFoundError } from '../../../../../contexts/identities/infrastructure/crypto/IdentityCreationMaterialNotFoundError';

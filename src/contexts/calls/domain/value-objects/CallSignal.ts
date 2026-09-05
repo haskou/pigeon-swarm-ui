@@ -6,7 +6,9 @@ import { CallSignalType } from './CallSignalType';
 
 export class CallSignal {
   public static fromPrimitives(
-    primitives: PrimitiveOf<CallSignal>,
+    primitives: Omit<PrimitiveOf<CallSignal>, 'payload'> & {
+      payload: Record<string, unknown>;
+    },
   ): CallSignal {
     return new CallSignal(
       CallIdentityId.fromString(primitives.recipientIdentityId),
@@ -23,7 +25,7 @@ export class CallSignal {
 
   public toPrimitives() {
     return {
-      payload: this.content.valueOf(),
+      payload: this.content.toPrimitives(),
       recipientIdentityId: this.recipientIdentityId.toString(),
       signalType: this.type.valueOf(),
     };

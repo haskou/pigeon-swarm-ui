@@ -1,9 +1,5 @@
-import {
-  EncryptedPayload,
-  PublicKey,
-  StringValueObject,
-  SymmetricKey,
-} from '@haskou/value-objects';
+import { EncryptedPayload, PublicKey, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import { StringValueObject } from '@haskou/value-objects';
 import { useCallback, useState } from 'react';
 
 import type {

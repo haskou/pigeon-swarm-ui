@@ -1,4 +1,4 @@
-import { SHA256Hash } from '@haskou/value-objects';
+import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 
 import type { Session } from '../../../../shared/domain/pigeonResources.types';

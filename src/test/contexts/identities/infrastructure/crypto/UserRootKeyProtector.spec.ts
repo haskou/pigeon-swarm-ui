@@ -1,4 +1,4 @@
-import { KeyPair, SymmetricKey } from '@haskou/value-objects';
+import { KeyPair, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
 import type { PasskeyPrfMasterKeyProtection } from '../../../../../contexts/identities/infrastructure/crypto/PasskeyPrfMasterKeyProtection';
 import type { IdentityResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
