@@ -53,8 +53,8 @@ export function useNotifications({
   const [archivedNotificationIds, setArchivedNotificationIds] = useState<
     string[]
   >(() => archivedNotifications.get(session.identity.id));
-  const [seenNotificationIds, setSeenNotificationIds] = useState<string[]>(
-    () => seenNotifications.get(session.identity.id),
+  const [seenNotificationIds, setSeenNotificationIds] = useState<string[]>(() =>
+    seenNotifications.get(session.identity.id),
   );
   const [action, setAction] = useState<NotificationAction | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +62,7 @@ export function useNotifications({
     new Map<string, NotificationResource>(),
   );
   const sessionRef = useRef(session);
+  const refreshRequestRef = useRef(0);
 
   useEffect(() => {
     sessionRef.current = session;
@@ -102,24 +103,29 @@ export function useNotifications({
 
   const refresh = useCallback(async () => {
     const currentSession = sessionRef.current;
+    const requestId = ++refreshRequestRef.current;
 
     setAction('refresh');
     setError(null);
     try {
+      const next =
+        await applicationContainer.notifications.list(currentSession);
+
+      if (requestId !== refreshRequestRef.current) return;
       setNotifications(
-        mergeNotificationOverrides(
-          await applicationContainer.notifications.list(currentSession),
-          notificationOverridesRef.current,
-        ),
+        mergeNotificationOverrides(next, notificationOverridesRef.current),
       );
       setArchivedNotificationIds(
         archivedNotifications.get(currentSession.identity.id),
       );
       setSeenNotificationIds(seenNotifications.get(currentSession.identity.id));
     } catch (caught) {
-      setError(toUserErrorMessage(caught, copy.notifications.error));
+      if (requestId === refreshRequestRef.current) {
+        setError(toUserErrorMessage(caught, copy.notifications.error));
+      }
+    } finally {
+      if (requestId === refreshRequestRef.current) setAction(null);
     }
-    setAction(null);
   }, []);
 
   useEffect(() => {
@@ -149,10 +155,11 @@ export function useNotifications({
       setError(null);
 
       try {
-        const result = await applicationContainer.notifications.acceptConversationInvitation(
-          currentSession,
-          notification,
-        );
+        const result =
+          await applicationContainer.notifications.acceptConversationInvitation(
+            currentSession,
+            notification,
+          );
         const nextSession = {
           ...currentSession,
           keychain: result.keychain,
