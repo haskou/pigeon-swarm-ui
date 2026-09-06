@@ -100,7 +100,7 @@ export function IndependentClient() {
       setChecking(false);
       return;
     }
-    if (selected && selected.url !== url) {
+    if (!selected || selected.url !== url) {
       try {
         await retireClientNodeNotifications();
       } catch {

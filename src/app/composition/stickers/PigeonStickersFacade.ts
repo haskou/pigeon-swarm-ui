@@ -79,6 +79,10 @@ export class PigeonStickersFacade {
     return this.stickers.toResource(sticker);
   }
 
+  public async loadAsset(assetCid: string, signal: AbortSignal): Promise<Blob> {
+    return await this.api.loadAsset(assetCid, signal);
+  }
+
   public assetUrl(assetCid: string): string {
     return this.apiUrl(`/ipfs/${encodeURIComponent(assetCid)}`);
   }

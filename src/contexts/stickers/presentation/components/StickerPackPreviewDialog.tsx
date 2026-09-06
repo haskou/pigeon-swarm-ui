@@ -8,12 +8,12 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
-import { copy } from '../../../../shared/presentation/i18n/copy';
-import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
-import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
-import { stickerAssetUrl } from './stickerPressPreview';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import { StickerImage } from './StickerImage';
 import {
   cachedGetMyStickers,
   cachedGetStickerPack,
@@ -135,8 +135,8 @@ export function StickerPackPreviewDialog({
                 className="mb-4 flex w-full justify-center border-y border-white/10 p-4 transition hover:bg-white/[0.04]"
                 title={copy.stickers.sendSticker}
               >
-                <img
-                  src={stickerAssetUrl(sticker.assetCid)}
+                <StickerImage
+                  assetCid={sticker.assetCid}
                   alt={copy.stickers.stickerAlt}
                   decoding="async"
                   className="max-h-48 max-w-full object-contain"
@@ -158,8 +158,8 @@ export function StickerPackPreviewDialog({
                       className="grid aspect-square place-items-center rounded-md bg-black/20 p-1 transition hover:bg-white/10"
                       title={copy.stickers.sendSticker}
                     >
-                      <img
-                        src={stickerAssetUrl(packSticker.assetCid)}
+                      <StickerImage
+                        assetCid={packSticker.assetCid}
                         alt={copy.stickers.stickerAlt}
                         decoding="async"
                         loading="lazy"

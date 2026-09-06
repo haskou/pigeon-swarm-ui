@@ -1,7 +1,8 @@
 import type { StickerResource } from '../../../../shared/domain/pigeonResources.types';
 
 import { cx } from '../../../../shared/presentation/cx';
-import { stickerAssetUrl, useStickerPressPreview } from './stickerPressPreview';
+import { StickerImage } from './StickerImage';
+import { useStickerPressPreview } from './useStickerPressPreview';
 
 export type StickerGridItem = {
   packId: string;
@@ -67,8 +68,8 @@ export function StickerShortcutBar({
             title={shortcut.label}
           >
             {shortcut.sticker ? (
-              <img
-                src={stickerAssetUrl(shortcut.sticker.assetCid)}
+              <StickerImage
+                assetCid={shortcut.sticker.assetCid}
                 alt=""
                 decoding="async"
                 loading="lazy"
@@ -201,8 +202,8 @@ function StickerGridButton({
         className="grid aspect-square w-full touch-none select-none place-items-center rounded-xl bg-white/5 p-1 transition hover:bg-white/10"
         {...pressPreviewHandlers}
       >
-        <img
-          src={stickerAssetUrl(sticker.assetCid)}
+        <StickerImage
+          assetCid={sticker.assetCid}
           alt="Sticker"
           decoding="async"
           loading="lazy"

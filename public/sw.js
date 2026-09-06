@@ -46,6 +46,7 @@ self.addEventListener('fetch', (event) => {
   const request = event.request;
 
   if (request.method !== 'GET') return;
+  if (request.cache === 'no-store' || request.cache === 'no-cache') return;
   if (request.headers.has('range')) return;
 
   const url = new URL(request.url);

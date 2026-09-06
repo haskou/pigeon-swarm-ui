@@ -32,6 +32,15 @@ export class PigeonStickersApi {
     )}`;
   }
 
+  public async loadAsset(assetCid: string, signal: AbortSignal): Promise<Blob> {
+    return await this.http.requestBlob(
+      `/ipfs/${encodeURIComponent(assetCid)}`,
+      {
+        signal,
+      },
+    );
+  }
+
   public async uploadAsset(
     session: Session,
     file: File,

@@ -8,9 +8,9 @@ import type {
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { cx } from '../../../../shared/presentation/cx';
 import { copy } from '../../../../shared/presentation/i18n/copy';
-import { StickerGrid, type StickerGridItem } from './stickerPickerParts';
-import { stickerAssetUrl } from './stickerPressPreview';
+import { StickerImage } from './StickerImage';
 import { invalidateStickerCaches } from './stickerLibraryCache';
+import { StickerGrid, type StickerGridItem } from './stickerPickerParts';
 import { prepareStickerFile } from './stickerUploadPreparation';
 
 export function MyPacksPanel({
@@ -149,7 +149,7 @@ export function SavedPacksPanel({
             favoriteIds={favoriteIds}
             items={favoriteItems}
             onFavoriteToggle={onFavoriteToggle}
-            onSend={async () => undefined}
+            onSend={() => Promise.resolve()}
           />
         </section>
       </div>
@@ -178,6 +178,7 @@ function ManagePackStickers({
   const uploadSticker = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
     event.target.value = '';
+
     if (files.length === 0) return;
 
     setUploadProgress({ current: 0, total: files.length });
@@ -228,8 +229,8 @@ function ManagePackStickers({
       <div className="grid grid-cols-5 gap-2 sm:grid-cols-8">
         {pack.stickers.map((sticker) => (
           <div key={sticker.id} className="group relative">
-            <img
-              src={stickerAssetUrl(sticker.assetCid)}
+            <StickerImage
+              assetCid={sticker.assetCid}
               alt={copy.stickers.stickerAlt}
               className="aspect-square w-full rounded-md bg-black/20 object-contain p-1"
             />
@@ -298,9 +299,9 @@ function PackRow({
       {pack.stickers.length > 0 && (
         <div className="mt-2 flex gap-1 overflow-hidden">
           {pack.stickers.slice(0, 8).map((sticker) => (
-            <img
+            <StickerImage
               key={sticker.id}
-              src={stickerAssetUrl(sticker.assetCid)}
+              assetCid={sticker.assetCid}
               alt=""
               className="h-9 w-9 rounded-lg object-contain"
             />

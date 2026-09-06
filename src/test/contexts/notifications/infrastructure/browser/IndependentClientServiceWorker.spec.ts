@@ -190,6 +190,24 @@ describe('combined client service worker compatibility', () => {
     expect(event.results).toEqual([worker.cachedResponse]);
   });
 
+  it.each(['no-store', 'no-cache'])(
+    'does not intercept %s API requests under a custom prefix',
+    async (cacheMode) => {
+      const worker = serviceWorker(false);
+      const event = await worker.dispatch('fetch', {
+        request: {
+          ...request('cors', '/backend/conversations/'),
+          cache: cacheMode,
+        },
+      });
+
+      expect(event.respondWith).not.toHaveBeenCalled();
+      expect(worker.caches.match).not.toHaveBeenCalled();
+      expect(worker.caches.open).not.toHaveBeenCalled();
+      expect(worker.fetch).not.toHaveBeenCalled();
+    },
+  );
+
   it('continues to serve cached assets before the network', async () => {
     const worker = serviceWorker(false);
     const event = await worker.dispatch('fetch', {
