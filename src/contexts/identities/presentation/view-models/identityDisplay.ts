@@ -53,7 +53,13 @@ export function identityBanner(identity: IdentityResource): string | null {
 export function profilePictureUrl(value: string): string | null {
   const picture = value.trim();
 
-  if (isIndependentClient() && !picture.startsWith('data:image/')) return null;
+  if (
+    isIndependentClient() &&
+    !/^data:image\/(?:png|jpeg|gif|webp|avif);base64,[a-z0-9+/]*={0,2}$/i.test(
+      picture,
+    )
+  )
+    return null;
 
   return isDirectProfilePictureUrl(picture) ? picture : null;
 }

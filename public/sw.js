@@ -163,13 +163,17 @@ self.addEventListener('push', (event) => {
 
 async function showPushNotification(payload) {
   await self.registration.showNotification(payload.title, {
-    badge: payload.badge || notificationBadge,
+    badge: independentClient
+      ? notificationBadge
+      : payload.badge || notificationBadge,
     body: payload.body,
     data: {
       ...payload.data,
       url: payload.url || '/',
     },
-    icon: payload.icon || '/favicon/android-chrome-192x192.png',
+    icon: independentClient
+      ? '/favicon/android-chrome-192x192.png'
+      : payload.icon || '/favicon/android-chrome-192x192.png',
     tag: payload.tag,
   });
 }

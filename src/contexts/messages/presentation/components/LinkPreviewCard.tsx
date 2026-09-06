@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 import type { MessageLinkPreview } from '../../../../shared/domain/pigeonResources.types';
 
+import { isIndependentClient } from '../../../../shared/infrastructure/client/isIndependentClient';
 import { cx } from '../../../../shared/presentation/cx';
 
 export function LinkPreviewCard({
@@ -15,16 +16,19 @@ export function LinkPreviewCard({
 }: MessageLinkPreview & { mine: boolean }) {
   const safePreviewUrl =
     safeLinkPreviewUrl(finalUrl) ?? safeLinkPreviewUrl(url);
-  const safeImageUrl = safeLinkPreviewUrl(image)?.toString() ?? null;
+  const safeImageUrl = isIndependentClient()
+    ? null
+    : (safeLinkPreviewUrl(image)?.toString() ?? null);
   const [imageVisible, setImageVisible] = useState(Boolean(safeImageUrl));
   const [imageLoaded, setImageLoaded] = useState(false);
   const displayUrl = safePreviewUrl
     ? displayLinkPreviewUrl(safePreviewUrl)
     : '';
   const hostname = safePreviewUrl ? safePreviewUrl.hostname : '';
-  const faviconUrl = safePreviewUrl
-    ? `${safePreviewUrl.origin}/favicon.ico`
-    : '';
+  const faviconUrl =
+    !isIndependentClient() && safePreviewUrl
+      ? `${safePreviewUrl.origin}/favicon.ico`
+      : '';
   const label = siteName?.trim() || hostname;
 
   useEffect(() => {

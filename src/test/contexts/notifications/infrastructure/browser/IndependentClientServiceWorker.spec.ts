@@ -27,6 +27,7 @@ function serviceWorker(independent = true) {
   };
   const fetch = jest.fn(() => Promise.reject(new Error('offline')));
   const skipWaiting = jest.fn(() => Promise.resolve(undefined));
+  const showNotification = jest.fn(() => Promise.resolve(undefined));
 
   runInNewContext(workerSource, {
     caches,
@@ -41,7 +42,10 @@ function serviceWorker(independent = true) {
         href: `${clientOrigin}/sw.js${independent ? '?independent=1' : ''}`,
         origin: clientOrigin,
       },
-      registration: { getNotifications: () => Promise.resolve([]) },
+      registration: {
+        getNotifications: () => Promise.resolve([]),
+        showNotification,
+      },
       skipWaiting,
     },
     URL,
@@ -70,6 +74,7 @@ function serviceWorker(independent = true) {
     clients,
     dispatch,
     fetch,
+    showNotification,
     skipWaiting,
   };
 }
@@ -84,6 +89,28 @@ function request(mode: string, path = '/') {
 }
 
 describe('independent client service worker', () => {
+  it('ignores backend-selected notification image URLs', async () => {
+    const worker = serviceWorker();
+
+    await worker.dispatch('push', {
+      data: {
+        json: () => ({
+          badge: '//remote.example/badge',
+          icon: 'https://backend.example/track',
+          title: 'Invitation',
+        }),
+      },
+    });
+
+    expect(worker.showNotification).toHaveBeenCalledWith(
+      'Invitation',
+      expect.objectContaining({
+        badge: '/favicon/notification-badge.png',
+        icon: '/favicon/android-chrome-192x192.png',
+      }),
+    );
+  });
+
   it('installs without caching executable resources or the app shell', async () => {
     const worker = serviceWorker();
 
@@ -156,6 +183,28 @@ describe('independent client service worker', () => {
 });
 
 describe('combined client service worker compatibility', () => {
+  it('preserves combined-mode custom notification images', async () => {
+    const worker = serviceWorker(false);
+
+    await worker.dispatch('push', {
+      data: {
+        json: () => ({
+          badge: '/custom-badge.png',
+          icon: 'https://backend.example/icon',
+          title: 'Invitation',
+        }),
+      },
+    });
+
+    expect(worker.showNotification).toHaveBeenCalledWith(
+      'Invitation',
+      expect.objectContaining({
+        badge: '/custom-badge.png',
+        icon: 'https://backend.example/icon',
+      }),
+    );
+  });
+
   it('continues to cache its app shell on install', async () => {
     const worker = serviceWorker(false);
 

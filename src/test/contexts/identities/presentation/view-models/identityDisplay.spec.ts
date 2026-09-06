@@ -33,6 +33,8 @@ describe('identity display helpers', () => {
     'http://localhost/avatar',
     '//tracker.example/avatar',
     '/avatar',
+    'data:image/png),url(https://tracker.example/avatar)',
+    'data:image/svg+xml,<svg/>',
   ])(
     'rejects external or path-based profile references in independent mode: %s',
     (url) => {
