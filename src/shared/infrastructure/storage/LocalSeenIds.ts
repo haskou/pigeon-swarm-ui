@@ -1,5 +1,6 @@
 import type { StoredSeenIds } from './StoredSeenIds';
 
+import { scopeClientStorageKey } from './ClientStorageScope';
 import {
   readJsonObjectFromLocalStorage,
   writeJsonToLocalStorage,
@@ -20,7 +21,7 @@ export class LocalSeenIds {
   }
 
   private storageKey(ownerId: string): string {
-    return `${this.storagePrefix}:${ownerId}`;
+    return scopeClientStorageKey(`${this.storagePrefix}:${ownerId}`);
   }
 
   private unique(ids: string[]): string[] {

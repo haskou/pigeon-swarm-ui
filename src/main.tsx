@@ -2,7 +2,10 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 
 import './index.css';
-import App from './app/app';
+import { isIndependentClient } from './shared/infrastructure/client/isIndependentClient';
+import { IndependentClient } from './app/presentation/client/IndependentClient';
+
+const App = React.lazy(() => import('./app/app'));
 
 function preventMobileZoom(): void {
   const preventDefault = (event: Event) => event.preventDefault();
@@ -28,11 +31,19 @@ preventMobileZoom();
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    {isIndependentClient() ? (
+      <IndependentClient />
+    ) : (
+      <React.Suspense>
+        <App />
+      </React.Suspense>
+    )}
   </React.StrictMode>,
 );
 
-const serviceWorkerPath = '/sw.js';
+const serviceWorkerPath = isIndependentClient()
+  ? '/sw.js?independent=1'
+  : '/sw.js';
 
 function isJavaScriptMimeType(contentType: string): boolean {
   return (

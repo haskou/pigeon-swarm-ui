@@ -215,3 +215,9 @@ This project may include or reference third-party assets. See [ATTRIBUTIONS.md](
 
 Pigeon Swarm is not affiliated with, endorsed by, or sponsored by Discord Inc, NEXON, NEXON Games, Yostar, or the Blue Archive team.
 Discord is a trademark of Discord Inc.
+
+## Independent client build
+
+Build with `VITE_INDEPENDENT_CLIENT=true yarn build` to choose a separate node before application bootstrap. The node must expose the compatible public `/client-contract` endpoint. `VITE_API_SERVER_URL` configures the existing combined build and is ignored by the independent client.
+
+The independent build must be served from a trusted client origin with the static server and security headers provided by [the deployment repository](https://github.com/haskou/pigeon-swarm/blob/main/docs/INDEPENDENT_CLIENT.md). That guide covers verified images, TLS, updates, rollback, node-scoped storage, and distributor trust. The service worker retains notifications but bypasses resource caching in this mode.

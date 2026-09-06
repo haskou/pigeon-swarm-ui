@@ -1,8 +1,10 @@
+import { scopeClientStorageKey } from '../../../../shared/infrastructure/storage/ClientStorageScope';
+
 export type SavedCredentials = {
   identityId: string;
 };
 
-const SAVED_CREDENTIALS_KEY = 'pigeon-swarm-credentials';
+const SAVED_CREDENTIALS_KEY = scopeClientStorageKey('pigeon-swarm-credentials');
 
 export function clearSavedCredentials(): void {
   localStorage.removeItem(SAVED_CREDENTIALS_KEY);

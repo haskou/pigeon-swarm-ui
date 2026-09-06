@@ -8,17 +8,20 @@ import type {
 import type { MessageDecryptCancelRequest } from './MessageDecryptCancelRequest';
 import type { MessageDecryptRequest } from './MessageDecryptRequest';
 import type { MessageDecryptResponse } from './MessageDecryptResponse';
-/* eslint-disable @typescript-eslint/no-use-before-define */
 import type { MessageReactionRecord } from './MessageReactionRecord';
+/* eslint-disable @typescript-eslint/no-use-before-define */
 import type { PlainMessage } from './PlainMessage';
 
+import { scopeClientStorageKey } from '../../../../shared/infrastructure/storage/ClientStorageScope';
 import { PollMessageProjection } from './PollMessageProjection';
 
 const cancelledRequestIds = new Set<number>();
 const projectedMessageCache = new Map<string, ChatMessage>();
 const projectedMessageCacheLimit = 500;
 const persistentProjectedMessageCacheLimit = 2000;
-const projectedMessageCacheDatabaseName = 'pigeon-message-projection-cache';
+const projectedMessageCacheDatabaseName = scopeClientStorageKey(
+  'pigeon-message-projection-cache',
+);
 const projectedMessageCacheDatabaseVersion = 3;
 const projectedMessageCacheStoreName = 'projectedMessages';
 const messageDecryptBatchSize = 8;

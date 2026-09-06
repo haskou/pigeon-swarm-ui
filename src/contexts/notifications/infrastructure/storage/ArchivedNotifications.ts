@@ -1,7 +1,9 @@
+import { scopeClientStorageKey } from '../../../../shared/infrastructure/storage/ClientStorageScope';
+
 const storagePrefix = 'pigeon-swarm:archived-notifications';
 
 function storageKey(identityId: string): string {
-  return `${storagePrefix}:${identityId}`;
+  return scopeClientStorageKey(`${storagePrefix}:${identityId}`);
 }
 
 export class ArchivedNotifications {

@@ -1,5 +1,7 @@
 import type { IdentityResource } from '../http/resources/IdentityResource';
 
+import { scopeClientStorageKey } from '../../../../shared/infrastructure/storage/ClientStorageScope';
+
 export type LocalPasskeyUnlockRecord = {
   createdAt: number;
   encryptedMasterKey: string;
@@ -9,7 +11,9 @@ export type LocalPasskeyUnlockRecord = {
   version: 1;
 };
 
-const LOCAL_PASSKEY_UNLOCKS_KEY = 'pigeon-swarm-passkey-unlocks';
+const LOCAL_PASSKEY_UNLOCKS_KEY = scopeClientStorageKey(
+  'pigeon-swarm-passkey-unlocks',
+);
 const LOCAL_PASSKEY_UNLOCK_VERSION = 1;
 
 function loadRecords(): Record<string, LocalPasskeyUnlockRecord> {

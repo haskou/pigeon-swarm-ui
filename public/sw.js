@@ -1,4 +1,5 @@
 const cacheVersion = 'pigeon-swarm-v1';
+const independentClient = new URL(self.location.href).searchParams.get('independent') === '1';
 const notificationBadge = '/favicon/notification-badge.png';
 const appShell = [
   '/',
@@ -12,6 +13,11 @@ const appShell = [
 ];
 
 self.addEventListener('install', (event) => {
+  if (independentClient) {
+    event.waitUntil(self.skipWaiting());
+    return;
+  }
+
   event.waitUntil(
     caches
       .open(cacheVersion)
@@ -27,7 +33,7 @@ self.addEventListener('activate', (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((key) => key !== cacheVersion)
+            .filter((key) => independentClient ? key.startsWith('pigeon-swarm-') : key !== cacheVersion)
             .map((key) => caches.delete(key)),
         ),
       )
@@ -36,6 +42,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  if (independentClient) return;
   const request = event.request;
 
   if (request.method !== 'GET') return;
@@ -105,7 +112,13 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
   const targetUrl = event.notification.data?.url || '/';
-  const url = new URL(targetUrl, self.location.origin).toString();
+  let url = self.location.origin + '/';
+
+  try {
+    const target = new URL(targetUrl, self.location.origin);
+
+    if (target.origin === self.location.origin && !target.username && !target.password) url = target.toString();
+  } catch {}
 
   event.waitUntil(
     Promise.all([closeVisibleNotifications(), openOrFocusClient(url)]),

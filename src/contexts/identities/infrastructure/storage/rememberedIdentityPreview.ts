@@ -1,10 +1,14 @@
+import { scopeClientStorageKey } from '../../../../shared/infrastructure/storage/ClientStorageScope';
+
 export type RememberedIdentityPreview = {
   identityId: string;
   name: string;
   pictureUrl?: null | string;
 };
 
-const REMEMBERED_IDENTITY_PREVIEW_KEY = 'pigeon-swarm-identity-preview';
+const REMEMBERED_IDENTITY_PREVIEW_KEY = scopeClientStorageKey(
+  'pigeon-swarm-identity-preview',
+);
 
 export function loadRememberedIdentityPreview(
   identityId: string,

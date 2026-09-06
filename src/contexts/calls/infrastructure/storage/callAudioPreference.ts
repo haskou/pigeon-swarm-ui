@@ -1,3 +1,4 @@
+import { scopeClientStorageKey } from '../../../../shared/infrastructure/storage/ClientStorageScope';
 import {
   readJsonObjectFromLocalStorage,
   writeJsonToLocalStorage,
@@ -9,7 +10,7 @@ type CallAudioPreference = {
 };
 
 const callAudioStorageKey = (identityId: string): string =>
-  `pigeon:callAudio:${identityId}`;
+  scopeClientStorageKey(`pigeon:callAudio:${identityId}`);
 
 function loadCallAudioPreference(identityId: string): CallAudioPreference {
   return readJsonObjectFromLocalStorage<CallAudioPreference>(

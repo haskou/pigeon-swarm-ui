@@ -1,5 +1,6 @@
 import type { ConversationResource } from '../../../../shared/domain/pigeonResources.types';
 
+import { scopeClientStorageKey } from '../../../../shared/infrastructure/storage/ClientStorageScope';
 import { readJsonObjectFromLocalStorage } from '../../../../shared/infrastructure/storage/jsonLocalStorage';
 
 export type ConversationDrafts = Record<string, string>;
@@ -15,13 +16,13 @@ export type WorkspacePreference = {
 export type CommunityUnreadCounts = Record<string, Record<string, number>>;
 
 export const lastConversationStorageKey = (identityId: string): string =>
-  `pigeon:lastConversation:${identityId}`;
+  scopeClientStorageKey(`pigeon:lastConversation:${identityId}`);
 export const draftsStorageKey = (identityId: string): string =>
-  `pigeon:conversationDrafts:${identityId}`;
+  scopeClientStorageKey(`pigeon:conversationDrafts:${identityId}`);
 export const workspaceStorageKey = (identityId: string): string =>
-  `pigeon:workspace:${identityId}`;
+  scopeClientStorageKey(`pigeon:workspace:${identityId}`);
 export const communityUnreadStorageKey = (identityId: string): string =>
-  `pigeon:communityUnread:${identityId}`;
+  scopeClientStorageKey(`pigeon:communityUnread:${identityId}`);
 
 export function initialConversationId(
   conversations: ConversationResource[],

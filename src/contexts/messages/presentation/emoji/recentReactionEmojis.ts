@@ -1,7 +1,9 @@
+import { scopeClientStorageKey } from '../../../../shared/infrastructure/storage/ClientStorageScope';
+
 const maxRecentReactionEmojis = 6;
 
 function storageKey(identityId: string): string {
-  return `pigeon:recent-reaction-emojis:${identityId}`;
+  return scopeClientStorageKey(`pigeon:recent-reaction-emojis:${identityId}`);
 }
 
 export function loadRecentReactionEmojis(identityId?: string): string[] {
