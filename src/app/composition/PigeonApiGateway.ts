@@ -128,7 +128,6 @@ export class PigeonApiGateway {
       http,
       signer,
       conversationMapper,
-      this.requestCache,
     );
     const privateFiles = new PigeonPrivateFilesClient(http, signer);
     const publicFiles = new PigeonPublicFilesClient(http, signer);
