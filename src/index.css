@@ -845,6 +845,10 @@ textarea:disabled,
 
 .inspector-panel {
   border-left-color: transparent;
+}
+
+.inspector-panel,
+.community-members-panel {
   background: rgb(31, 32, 55);
   backdrop-filter: none;
 }
