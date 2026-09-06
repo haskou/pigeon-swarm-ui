@@ -28,6 +28,10 @@ const originalRtpSender = Object.getOwnPropertyDescriptor(
   globalThis,
   'RTCRtpSender',
 );
+const originalIceCandidate = Object.getOwnPropertyDescriptor(
+  globalThis,
+  'RTCIceCandidate',
+);
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
 
 type RtcConfigurationWithEncodedInsertableStreams = RTCConfiguration & {
@@ -286,6 +290,7 @@ function installSessionDescriptionMock(): void {
 
 function restoreGlobalProperty(
   property:
+    | 'RTCIceCandidate'
     | 'MediaStream'
     | 'RTCPeerConnection'
     | 'RTCSessionDescription'
@@ -306,6 +311,7 @@ function restoreGlobalProperty(
 describe(CallPeerConnections.name, () => {
   afterEach(() => {
     jest.useRealTimers();
+    restoreGlobalProperty('RTCIceCandidate', originalIceCandidate);
     restoreGlobalProperty('MediaStream', originalMediaStream);
     restoreGlobalProperty('RTCPeerConnection', originalPeerConnection);
     restoreGlobalProperty('RTCSessionDescription', originalSessionDescription);
@@ -700,6 +706,112 @@ describe(CallPeerConnections.name, () => {
     expect(peer.remoteDescription?.sdp).toBe('current-call-answer');
     expect(peer.signalingState).toBe('stable');
   });
+
+  it.each([
+    { arrival: 'before', fragment: 'old' },
+    { arrival: 'after', fragment: 'old' },
+    { arrival: 'before', fragment: undefined },
+  ])(
+    'preserves current ICE candidates with stale ICE $arrival the ignored answer and fragment $fragment',
+    async ({ arrival, fragment }) => {
+      const peers: FakePeerConnection[] = [];
+      const manager = callPeerConnectionManager();
+      const sendSignal = jest.fn(() => Promise.resolve());
+      const stale = {
+        candidate: 'candidate:old',
+        sdpMid: '0',
+        usernameFragment: fragment,
+      };
+      const current = {
+        candidate: 'candidate:new',
+        sdpMid: '0',
+        usernameFragment: 'new',
+      };
+
+      installSessionDescriptionMock();
+      installPeerConnectionMock(peers);
+      Object.defineProperty(globalThis, 'RTCIceCandidate', {
+        configurable: true,
+        value: jest.fn((candidate: RTCIceCandidateInit) => candidate),
+      });
+      manager.configure(() => Promise.resolve({ iceServers: [] }));
+      await manager.ensurePeer('remote', true, sendSignal);
+      manager.reset();
+      manager.configure(() => Promise.resolve({ iceServers: [] }));
+      const deliverStale = async (): Promise<void> => {
+        await manager.handleSignal(
+          'remote',
+          'ice_candidate',
+          stale,
+          sendSignal,
+          'local',
+        );
+      };
+
+      if (arrival === 'before') await deliverStale();
+      await manager.handleSignal(
+        'remote',
+        'answer',
+        {
+          sdp: 'v=0\r\na=ice-ufrag:old\r\n',
+          type: 'answer',
+        },
+        sendSignal,
+        'local',
+      );
+
+      if (arrival === 'after') await deliverStale();
+      const peer = peers[1];
+
+      const addIceCandidate = jest
+        .spyOn(peer, 'addIceCandidate')
+        .mockImplementation((candidate) => {
+          if (candidate?.usernameFragment !== 'new') {
+            return Promise.reject(
+              new DOMException('ICE generation mismatch', 'OperationError'),
+            );
+          }
+
+          return Promise.resolve();
+        });
+      await manager.handleSignal(
+        'remote',
+        'ice_candidate',
+        current,
+        sendSignal,
+        'local',
+      );
+      await manager.ensurePeer('remote', true, sendSignal);
+      await expect(
+        manager.handleSignal(
+          'remote',
+          'answer',
+          {
+            sdp: 'v=0\r\na=ice-ufrag:new\r\n',
+            type: 'answer',
+          },
+          sendSignal,
+          'local',
+        ),
+      ).resolves.toBeUndefined();
+      expect(peer.addIceCandidate).toHaveBeenCalledTimes(fragment ? 1 : 2);
+      expect(peer.addIceCandidate).toHaveBeenLastCalledWith(current);
+      await expect(deliverStale()).resolves.toBeUndefined();
+      expect(peer.addIceCandidate).toHaveBeenCalledTimes(fragment ? 1 : 3);
+      addIceCandidate.mockRejectedValueOnce(
+        new DOMException('Peer closed', 'InvalidStateError'),
+      );
+      await expect(
+        manager.handleSignal(
+          'remote',
+          'ice_candidate',
+          current,
+          sendSignal,
+          'local',
+        ),
+      ).rejects.toMatchObject({ name: 'InvalidStateError' });
+    },
+  );
 
   it('configures encoded streams for encrypted local media senders', async () => {
     const peers: FakePeerConnection[] = [];

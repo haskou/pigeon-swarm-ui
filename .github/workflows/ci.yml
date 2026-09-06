@@ -37,6 +37,12 @@ jobs:
       - name: Test
         run: yarn test
 
+      - name: Install Chromium
+        run: yarn playwright install --with-deps chromium
+
+      - name: Verify stale ICE recovery in Chromium
+        run: yarn test:e2e e2e/stale-ice-candidates.spec.ts --project=desktop-chromium
+
       - name: Build
         run: yarn build
 
