@@ -14,7 +14,7 @@ import { ArchivedNotifications } from '../../infrastructure/storage/ArchivedNoti
 import { SeenNotifications } from '../../infrastructure/storage/SeenNotifications';
 import { mergeNotificationOverrides } from './mergeNotificationOverrides';
 
-type NotificationAction = 'accept' | 'archive' | 'decline' | 'refresh';
+type NotificationAction = 'accept' | 'archive' | 'decline';
 
 type UseNotificationsInput = {
   onAccepted: (next: {
@@ -105,7 +105,6 @@ export function useNotifications({
     const currentSession = sessionRef.current;
     const requestId = ++refreshRequestRef.current;
 
-    setAction('refresh');
     setError(null);
     try {
       const next =
@@ -123,8 +122,6 @@ export function useNotifications({
       if (requestId === refreshRequestRef.current) {
         setError(toUserErrorMessage(caught, copy.notifications.error));
       }
-    } finally {
-      if (requestId === refreshRequestRef.current) setAction(null);
     }
   }, []);
 
