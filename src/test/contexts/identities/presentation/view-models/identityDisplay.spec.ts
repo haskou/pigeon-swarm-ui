@@ -9,6 +9,14 @@ import {
   publicFileObjectUrl,
   identityName,
 } from '../../../../../contexts/identities/presentation/view-models/identityDisplay';
+import { isIndependentClient } from '../../../../../shared/infrastructure/client/isIndependentClient';
+
+jest.mock(
+  '../../../../../shared/infrastructure/client/isIndependentClient',
+  () => ({
+    isIndependentClient: jest.fn(() => false),
+  }),
+);
 
 const identity = {
   profile: {
@@ -18,6 +26,28 @@ const identity = {
 } as IdentityResource;
 
 describe('identity display helpers', () => {
+  afterEach(() => jest.mocked(isIndependentClient).mockReturnValue(false));
+
+  it.each([
+    'https://tracker.example/avatar',
+    'http://localhost/avatar',
+    '//tracker.example/avatar',
+    '/avatar',
+  ])(
+    'rejects external or path-based profile references in independent mode: %s',
+    (url) => {
+      jest.mocked(isIndependentClient).mockReturnValue(true);
+      expect(profilePictureUrl(url)).toBeNull();
+    },
+  );
+
+  it('retains embedded profile images in independent mode', () => {
+    jest.mocked(isIndependentClient).mockReturnValue(true);
+    expect(profilePictureUrl('data:image/png;base64,abc')).toBe(
+      'data:image/png;base64,abc',
+    );
+  });
+
   it('formats display names without appending handles', () => {
     expect(identityName(identity)).toBe('Ada');
   });

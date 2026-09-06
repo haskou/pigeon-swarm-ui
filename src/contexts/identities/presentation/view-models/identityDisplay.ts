@@ -1,5 +1,6 @@
 import type { IdentityResource } from '../../../../shared/domain/pigeonResources.types';
 
+import { isIndependentClient } from '../../../../shared/infrastructure/client/isIndependentClient';
 import { shortId } from '../../../../shared/presentation/formatting';
 import {
   isValidHandle as isValidCredentialHandle,
@@ -51,6 +52,8 @@ export function identityBanner(identity: IdentityResource): string | null {
 
 export function profilePictureUrl(value: string): string | null {
   const picture = value.trim();
+
+  if (isIndependentClient() && !picture.startsWith('data:image/')) return null;
 
   return isDirectProfilePictureUrl(picture) ? picture : null;
 }
