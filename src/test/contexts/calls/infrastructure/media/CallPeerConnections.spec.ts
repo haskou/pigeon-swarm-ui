@@ -659,6 +659,48 @@ describe(CallPeerConnections.name, () => {
     expect(peer.signalingState).toBe('stable');
   });
 
+  it('ignores a delayed answer after reset and negotiates the next call', async () => {
+    const peers: FakePeerConnection[] = [];
+    const manager = callPeerConnectionManager();
+    const sendSignal = jest.fn(() => Promise.resolve());
+
+    installSessionDescriptionMock();
+    installPeerConnectionMock(peers);
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
+    await manager.ensurePeer('remote', true, sendSignal);
+    manager.reset();
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
+
+    await manager.handleSignal(
+      'remote',
+      'answer',
+      {
+        sdp: 'previous-call-answer',
+        type: 'answer',
+      },
+      sendSignal,
+      'local',
+    );
+
+    const peer = peers[1];
+
+    expect(peer.remoteDescription).toBeNull();
+    expect(peer.signalingState).toBe('stable');
+    await manager.ensurePeer('remote', true, sendSignal);
+    await manager.handleSignal(
+      'remote',
+      'answer',
+      {
+        sdp: 'current-call-answer',
+        type: 'answer',
+      },
+      sendSignal,
+      'local',
+    );
+    expect(peer.remoteDescription?.sdp).toBe('current-call-answer');
+    expect(peer.signalingState).toBe('stable');
+  });
+
   it('configures encoded streams for encrypted local media senders', async () => {
     const peers: FakePeerConnection[] = [];
     const configurations: RtcConfigurationWithEncodedInsertableStreams[] = [];

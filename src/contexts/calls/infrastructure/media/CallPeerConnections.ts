@@ -183,6 +183,15 @@ export class CallPeerConnections {
   ): Promise<boolean> {
     const negotiationState = state;
 
+    if (
+      description.type === 'answer' &&
+      !['have-local-offer', 'have-remote-pranswer'].includes(
+        peer.signalingState,
+      )
+    ) {
+      return false;
+    }
+
     if (description.type !== 'offer') {
       negotiationState.ignoreOffer = false;
 
