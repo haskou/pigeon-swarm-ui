@@ -111,7 +111,10 @@ export function IndependentClient() {
     }
     try {
       await new ClientNodeSelection(window.localStorage).save(url);
-      window.location.assign('/' + window.location.hash);
+      const destination = new URL(window.location.href);
+
+      if (destination.pathname === '/connect') destination.pathname = '/';
+      window.location.assign(destination.href);
     } catch {
       setError(copy.storage);
       setChecking(false);
