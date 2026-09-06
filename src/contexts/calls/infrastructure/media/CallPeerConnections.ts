@@ -100,7 +100,7 @@ export class CallPeerConnections {
     }
 
     try {
-      await peer.addIceCandidate(new RTCIceCandidate(candidate));
+      await this.applyIceCandidate(peer, candidate);
     } catch (error) {
       if (state.ignoreOffer) return;
 
@@ -738,6 +738,34 @@ export class CallPeerConnections {
     this.remoteAudio.removePeer(peerIdentityId);
   }
 
+  private async applyIceCandidate(
+    peer: RTCPeerConnection,
+    candidate: RTCIceCandidateInit,
+  ): Promise<void> {
+    const iceCandidate = new RTCIceCandidate(candidate);
+    const remoteFragments = [
+      ...(peer.remoteDescription?.sdp ?? '').matchAll(
+        /^a=ice-ufrag:([^\r\n]+)$/gm,
+      ),
+    ].map((match) => match[1].trim());
+
+    if (
+      iceCandidate.usernameFragment &&
+      remoteFragments.length > 0 &&
+      !remoteFragments.includes(iceCandidate.usernameFragment)
+    )
+      return;
+
+    try {
+      await peer.addIceCandidate(iceCandidate);
+    } catch (error) {
+      if (!(error instanceof DOMException) || error.name !== 'OperationError') {
+        throw error;
+      }
+      logCallWarning('peer-manager:drop-incompatible-ice-candidate', {});
+    }
+  }
+
   private async flushIceCandidates(
     peerIdentityId: string,
     peer: RTCPeerConnection,
@@ -753,7 +781,7 @@ export class CallPeerConnections {
     });
 
     for (const candidate of candidates) {
-      await peer.addIceCandidate(new RTCIceCandidate(candidate));
+      await this.applyIceCandidate(peer, candidate);
     }
   }
 
