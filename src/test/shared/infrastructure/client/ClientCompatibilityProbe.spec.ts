@@ -68,4 +68,30 @@ describe('ClientCompatibilityProbe', () => {
       new ClientCompatibilityProbe().verify('https://node.example'),
     ).rejects.toMatchObject({ code: 'incompatible' });
   });
+  it('reports malformed JSON from a reachable node as an incompatible contract', async () => {
+    globalThis.fetch = jest.fn().mockResolvedValue(
+      new Response('{"protocol":', {
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    await expect(
+      new ClientCompatibilityProbe().verify('https://node.example'),
+    ).rejects.toMatchObject({ code: 'incompatible' });
+  });
+
+  it('keeps interrupted response streams classified as unreachable', async () => {
+    const body = new ReadableStream({
+      start(controller) {
+        controller.error(new Error('Connection reset'));
+      },
+    });
+    globalThis.fetch = jest
+      .fn()
+      .mockResolvedValue(
+        new Response(body, { headers: { 'Content-Type': 'application/json' } }),
+      );
+    await expect(
+      new ClientCompatibilityProbe().verify('https://node.example'),
+    ).rejects.toMatchObject({ code: 'unreachable' });
+  });
 });

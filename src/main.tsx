@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 
 import './index.css';
+import { ClientNodeSelection } from './shared/infrastructure/client/ClientNodeSelection';
 import { isIndependentClient } from './shared/infrastructure/client/isIndependentClient';
 import { IndependentClient } from './app/presentation/client/IndependentClient';
 
@@ -28,6 +29,15 @@ function preventMobileZoom(): void {
 }
 
 preventMobileZoom();
+
+if (isIndependentClient()) {
+  window.addEventListener('storage', (event) => {
+    if (event.storageArea !== window.localStorage) return;
+    if (event.key !== null && event.key !== ClientNodeSelection.storageKey)
+      return;
+    window.location.replace('/connect');
+  });
+}
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

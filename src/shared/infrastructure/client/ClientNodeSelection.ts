@@ -3,7 +3,7 @@ import type { SelectedClientNode } from './SelectedClientNode';
 import { ClientNodeEndpoint } from './ClientNodeEndpoint';
 
 export class ClientNodeSelection {
-  private static readonly key = 'pigeon-swarm-client-node-v1';
+  public static readonly storageKey = 'pigeon-swarm-client-node-v1';
 
   public constructor(private readonly storage: Storage) {}
 
@@ -22,7 +22,7 @@ export class ClientNodeSelection {
   public read(): SelectedClientNode | undefined {
     try {
       const value: unknown = JSON.parse(
-        this.storage.getItem(ClientNodeSelection.key) ?? 'null',
+        this.storage.getItem(ClientNodeSelection.storageKey) ?? 'null',
       );
 
       if (!this.isSelection(value)) return undefined;
@@ -46,7 +46,7 @@ export class ClientNodeSelection {
       byte.toString(16).padStart(2, '0'),
     ).join('');
     this.storage.setItem(
-      ClientNodeSelection.key,
+      ClientNodeSelection.storageKey,
       JSON.stringify({ scope, url }),
     );
   }

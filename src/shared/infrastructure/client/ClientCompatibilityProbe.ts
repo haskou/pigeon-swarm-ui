@@ -24,7 +24,11 @@ export class ClientCompatibilityProbe {
         result = await reader.read();
       }
 
-      return JSON.parse(text + decoder.decode()) as unknown;
+      try {
+        return JSON.parse(text + decoder.decode()) as unknown;
+      } catch {
+        throw new ClientConnectionError('incompatible');
+      }
     } finally {
       await reader.cancel();
     }

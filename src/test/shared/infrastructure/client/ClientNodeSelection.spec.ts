@@ -57,4 +57,41 @@ describe(ClientNodeSelection.name, () => {
     expect(selection.read()?.url).toBe('https://second.example');
     Reflect.deleteProperty(globalThis, 'window');
   });
+  it('passes a node partition to workers in a fragment, without sending it to the distributor', async () => {
+    jest.resetModules();
+    jest.doMock(
+      '../../../../shared/infrastructure/client/isIndependentClient',
+      () => ({ isIndependentClient: () => true }),
+    );
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: { localStorage: storage },
+    });
+    const selection = new ClientNodeSelection(storage);
+    await selection.save('https://node.example/api');
+    const { scopeClientWorkerUrl } =
+      await import('../../../../shared/infrastructure/storage/ClientStorageScope');
+    const url = scopeClientWorkerUrl(
+      new URL('https://client.example/assets/worker.js'),
+    );
+    expect(url.search).toBe('');
+    expect(new URLSearchParams(url.hash.slice(1)).get('pigeonNodeScope')).toBe(
+      selection.read()?.scope,
+    );
+    Reflect.deleteProperty(globalThis, 'window');
+    jest.resetModules();
+    Object.defineProperty(globalThis, 'location', {
+      configurable: true,
+      value: { href: url.href },
+    });
+    const { scopeClientStorageKey } =
+      await import('../../../../shared/infrastructure/storage/ClientStorageScope');
+    expect(scopeClientStorageKey('projection')).toBe(
+      `projection:${selection.read()?.scope}`,
+    );
+    Reflect.deleteProperty(globalThis, 'location');
+    jest.dontMock(
+      '../../../../shared/infrastructure/client/isIndependentClient',
+    );
+  });
 });

@@ -7,7 +7,9 @@ function getDocumentScope(): string {
   if (documentScope) return documentScope;
   const scope =
     typeof window === 'undefined'
-      ? new URL(globalThis.location.href).searchParams.get('pigeonNodeScope')
+      ? new URLSearchParams(
+          new URL(globalThis.location.href).hash.slice(1),
+        ).get('pigeonNodeScope')
       : clientNodeForDocument()?.scope;
 
   if (!scope || !/^[a-f0-9]{64}$/.test(scope))
@@ -25,7 +27,9 @@ export function scopeClientWorkerUrl(url: URL): URL {
   const scoped = new URL(url);
 
   if (isIndependentClient())
-    scoped.searchParams.set('pigeonNodeScope', getDocumentScope());
+    scoped.hash = new URLSearchParams({
+      pigeonNodeScope: getDocumentScope(),
+    }).toString();
 
   return scoped;
 }
