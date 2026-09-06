@@ -214,16 +214,6 @@ export function GlassWorkspace({
     suppressMessageLoadsUntilRef.current = Date.now() + 800;
   }, []);
 
-  const openNotificationsPanel = useCallback(() => {
-    suppressMessageLoadsBriefly();
-    void enablePushNotifications();
-    openTransientSurface('notifications');
-  }, [
-    enablePushNotifications,
-    openTransientSurface,
-    suppressMessageLoadsBriefly,
-  ]);
-
   const closeNotificationsPanel = useCallback(() => {
     suppressMessageLoadsBriefly();
     closeTransientSurface('notifications');
@@ -417,6 +407,7 @@ export function GlassWorkspace({
       refresh: refreshNotifications,
       visible: visibleNotifications,
     },
+    onOpen: refreshNotificationsOnOpen,
   } = useWorkspaceInbox({
     communities,
     notificationsOpen,
@@ -425,6 +416,18 @@ export function GlassWorkspace({
     onCommunitiesReload,
     session,
   });
+
+  const openNotificationsPanel = useCallback(() => {
+    suppressMessageLoadsBriefly();
+    void enablePushNotifications();
+    openTransientSurface('notifications');
+    refreshNotificationsOnOpen();
+  }, [
+    enablePushNotifications,
+    openTransientSurface,
+    refreshNotificationsOnOpen,
+    suppressMessageLoadsBriefly,
+  ]);
 
   const logout = () => {
     void deletePwaPushSubscription(session).catch(() => undefined);
