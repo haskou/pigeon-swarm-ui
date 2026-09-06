@@ -42,6 +42,7 @@ export type WorkspaceInboxController = {
   membershipRequests: MembershipRequestController;
   notificationCount: number;
   notifications: NotificationController;
+  onOpen: () => void;
 };
 
 const seenCommunityMembershipRequests = new SeenCommunityMembershipRequests();
@@ -62,6 +63,9 @@ export function useWorkspaceInbox({
     onAcceptedPanelClose,
     session,
   });
+  const onOpen = useCallback((): void => {
+    void notifications.refresh();
+  }, [notifications.refresh]);
   const membershipRequests = useMembershipRequests({
     onCommunitiesReload,
     session,
@@ -128,5 +132,6 @@ export function useWorkspaceInbox({
       unseenMembershipRequestCount,
     ),
     notifications,
+    onOpen,
   };
 }

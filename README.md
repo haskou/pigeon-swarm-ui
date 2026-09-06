@@ -215,3 +215,13 @@ This project may include or reference third-party assets. See [ATTRIBUTIONS.md](
 
 Pigeon Swarm is not affiliated with, endorsed by, or sponsored by Discord Inc, NEXON, NEXON Games, Yostar, or the Blue Archive team.
 Discord is a trademark of Discord Inc.
+
+## Independent client build
+
+Build with `VITE_INDEPENDENT_CLIENT=true yarn build` to choose a separate node before application bootstrap. `VITE_API_SERVER_URL` configures the existing combined build and is ignored by the independent client.
+
+The node must expose `GET <node-base>/client-contract`, including the selected API prefix (for example, `/api/client-contract`), with HTTP 200 and JSON `{ "protocol": "pigeon-swarm", "apiVersion": 1 }`. This public, non-cacheable discovery endpoint uses the node API’s CORS policy. The version identifies the breaking-major API contract, independently of the software release; an unsupported version prevents application startup. The authoritative [API contract](https://github.com/haskou/pigeon-swarm-node/blob/main/docs/api.md#client-compatibility-discovery), [endpoint schema](https://github.com/haskou/pigeon-swarm-node/blob/main/src/apps/apis/nodes-api/swagger.yaml), and [aggregate OpenAPI declaration](https://github.com/haskou/pigeon-swarm-node/blob/main/src/apps/apis/open-api.yaml) are maintained in the backend repository.
+
+The independent build must be served from a trusted client origin with the static server and security headers provided by [the deployment repository](https://github.com/haskou/pigeon-swarm/blob/main/docs/INDEPENDENT_CLIENT.md). That guide covers verified images, TLS, updates, rollback, node-scoped storage, and distributor trust. The service worker retains notifications but bypasses resource caching in this mode.
+
+Independent-client HTTP fetches omit ambient cookies and reject redirects. Native WebSocket connections still use browser-managed cookies eligible for the selected node; signed authentication does not change that browser behavior. Use an API hostname outside unrelated services’ cookie scopes, while recognizing that dedicated hosting does not guarantee an empty cookie jar. Credentialless realtime transport is tracked in [pigeon-swarm-node#291](https://github.com/haskou/pigeon-swarm-node/issues/291).

@@ -3,7 +3,7 @@ import type { MouseEvent, PointerEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import { applicationContainer } from '../../../../app/composition/applicationContainer';
+import { StickerImage } from './StickerImage';
 
 const STICKER_PREVIEW_DELAY_MS = 260;
 const STICKER_PREVIEW_SIZE = 336;
@@ -18,10 +18,6 @@ type StickerPressPreviewState = {
   assetCid: string;
   position: StickerPreviewPosition;
 };
-
-export function stickerAssetUrl(assetCid: string): string {
-  return applicationContainer.stickers.assetUrl(assetCid);
-}
 
 export function useStickerPressPreview(assetCid: string) {
   const timeoutRef = useRef<number | null>(null);
@@ -71,7 +67,6 @@ export function useStickerPressPreview(assetCid: string) {
 
   return {
     consumePreviewClick,
-    previewPortal: preview ? <StickerPressPreview preview={preview} /> : null,
     pressPreviewHandlers: {
       onContextMenu: (event: MouseEvent<HTMLElement>) => {
         if (previewTriggeredRef.current) {
@@ -83,6 +78,7 @@ export function useStickerPressPreview(assetCid: string) {
       onPointerLeave: closePreview,
       onPointerUp: closePreview,
     },
+    previewPortal: preview ? <StickerPressPreview preview={preview} /> : null,
   };
 }
 
@@ -97,8 +93,8 @@ function StickerPressPreview({
       style={{ left: preview.position.x, top: preview.position.y }}
       aria-hidden="true"
     >
-      <img
-        src={stickerAssetUrl(preview.assetCid)}
+      <StickerImage
+        assetCid={preview.assetCid}
         alt=""
         className="h-full w-full object-contain"
         draggable={false}

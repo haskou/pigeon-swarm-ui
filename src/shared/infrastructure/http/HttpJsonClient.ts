@@ -1,5 +1,6 @@
 import type { BlobRequestInit } from './BlobRequestInit';
 
+import { isIndependentClient } from '../client/isIndependentClient';
 import { ApiUrlBuilder } from './ApiUrlBuilder';
 import { HttpJsonError } from './HttpJsonError';
 
@@ -92,6 +93,9 @@ export class HttpJsonClient {
     const response = await fetch(this.urls.build(path), {
       ...init,
       cache: init.cache ?? 'no-store',
+      ...(isIndependentClient()
+        ? { credentials: 'omit' as const, redirect: 'error' as const }
+        : {}),
       headers: this.headers(init, 'application/json'),
     });
 
@@ -114,6 +118,9 @@ export class HttpJsonClient {
     const response = await fetch(this.urls.build(path), {
       ...requestInit,
       cache: requestInit.cache ?? 'no-store',
+      ...(isIndependentClient()
+        ? { credentials: 'omit' as const, redirect: 'error' as const }
+        : {}),
       headers: this.headers(requestInit, '*/*'),
     });
 

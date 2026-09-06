@@ -6,9 +6,9 @@ import type {
   StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
-import { stickerAssetUrl } from '../../../stickers/presentation/components/stickerPressPreview';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { StickerImage } from '../../../stickers/presentation/components/StickerImage';
 
 export function MessageReplyPreview({
   mine,
@@ -85,8 +85,8 @@ export function MessageReplyPreview({
           />
         )}
         {replySticker && (
-          <img
-            src={stickerAssetUrl(replySticker.assetCid)}
+          <StickerImage
+            assetCid={replySticker.assetCid}
             alt=""
             className="h-10 w-10 shrink-0 rounded-xl object-contain"
           />

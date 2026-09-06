@@ -39,3 +39,6 @@ jobs:
 
       - name: Build
         run: yarn build
+
+      - name: Build independent client
+        run: VITE_INDEPENDENT_CLIENT=true yarn build

@@ -21,13 +21,12 @@ export class PigeonNotificationsApi {
 
   public async list(session: Session): Promise<NotificationResource[]> {
     const path = '/notifications/?limit=30';
-    const result = await this.cachedRequest(
-      `GET ${path} ${session.identity.id}`,
-      async () =>
-        await this.http.request<{ results: NotificationResource[] }>(path, {
-          headers: await this.signer.headers(session, 'GET', path),
-          method: 'GET',
-        }),
+    const result = await this.http.request<{ results: NotificationResource[] }>(
+      path,
+      {
+        headers: await this.signer.headers(session, 'GET', path),
+        method: 'GET',
+      },
     );
 
     return result.results;

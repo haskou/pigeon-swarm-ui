@@ -5,10 +5,8 @@ import type {
 
 import { cx } from '../../../../shared/presentation/cx';
 import { copy } from '../../../../shared/presentation/i18n/copy';
-import {
-  stickerAssetUrl,
-  useStickerPressPreview,
-} from '../../../stickers/presentation/components/stickerPressPreview';
+import { StickerImage } from '../../../stickers/presentation/components/StickerImage';
+import { useStickerPressPreview } from '../../../stickers/presentation/components/useStickerPressPreview';
 
 export function MessageStickerContent({
   mine,
@@ -37,8 +35,8 @@ export function MessageStickerContent({
         title="View sticker pack"
         {...stickerPreview.pressPreviewHandlers}
       >
-        <img
-          src={stickerAssetUrl(sticker.assetCid)}
+        <StickerImage
+          assetCid={sticker.assetCid}
           alt="Sticker"
           decoding="async"
           loading="lazy"
@@ -103,7 +101,9 @@ function attachmentProgressLabel(
   phase: NonNullable<ChatMessage['attachmentProgress']>['phase'],
 ): string {
   if (phase === 'encrypt') return copy.composer.encryptingAttachment;
+
   if (phase === 'upload') return copy.composer.uploadingAttachment;
+
   if (phase === 'download') return copy.composer.downloadingAttachment;
 
   return copy.composer.decryptingAttachment;

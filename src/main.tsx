@@ -2,7 +2,11 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 
 import './index.css';
-import App from './app/app';
+import { IndependentClient } from './app/presentation/client/IndependentClient';
+import { ClientNodeSelection } from './shared/infrastructure/client/ClientNodeSelection';
+import { isIndependentClient } from './shared/infrastructure/client/isIndependentClient';
+
+const App = React.lazy(() => import('./app/app'));
 
 function preventMobileZoom(): void {
   const preventDefault = (event: Event) => event.preventDefault();
@@ -26,13 +30,40 @@ function preventMobileZoom(): void {
 
 preventMobileZoom();
 
+if (isIndependentClient()) {
+  window.addEventListener('storage', (event) => {
+    if (event.storageArea !== window.localStorage) return;
+
+    if (event.key !== null && event.key !== ClientNodeSelection.storageKey)
+      return;
+
+    if (window.location.pathname.startsWith('/invite/community/')) {
+      const destination = new URL(window.location.href);
+      destination.searchParams.set('choose-node', '1');
+      window.history.replaceState(null, '', destination.href);
+      window.location.reload();
+
+      return;
+    }
+    window.location.replace('/connect');
+  });
+}
+
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    {isIndependentClient() ? (
+      <IndependentClient />
+    ) : (
+      <React.Suspense>
+        <App />
+      </React.Suspense>
+    )}
   </React.StrictMode>,
 );
 
-const serviceWorkerPath = '/sw.js';
+const serviceWorkerPath = isIndependentClient()
+  ? '/sw.js?independent=1'
+  : '/sw.js';
 
 function isJavaScriptMimeType(contentType: string): boolean {
   return (

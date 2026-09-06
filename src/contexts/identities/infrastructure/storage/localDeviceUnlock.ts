@@ -2,7 +2,9 @@ import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { LocalDeviceUnlockPayload } from './LocalDeviceUnlockPayload';
 import type { LocalDeviceUnlockRecord } from './LocalDeviceUnlockRecord';
 
-const DB_NAME = 'pigeon-swarm-device-unlock';
+import { scopeClientStorageKey } from '../../../../shared/infrastructure/storage/ClientStorageScope';
+
+const DB_NAME = scopeClientStorageKey('pigeon-swarm-device-unlock');
 const STORE_NAME = 'sessions';
 const DB_VERSION = 1;
 const PAYLOAD_VERSION = 1;

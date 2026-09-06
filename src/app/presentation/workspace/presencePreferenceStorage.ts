@@ -1,9 +1,13 @@
 import type { SelectablePresenceStatus } from '../../../shared/domain/pigeonResources.types';
 
+import { scopeClientStorageKey } from '../../../shared/infrastructure/storage/ClientStorageScope';
+
 const presencePreferenceStoragePrefix = 'pigeon:presencePreference:';
 
 function presencePreferenceStorageKey(identityId: string): string {
-  return `${presencePreferenceStoragePrefix}${identityId}`;
+  return scopeClientStorageKey(
+    `${presencePreferenceStoragePrefix}${identityId}`,
+  );
 }
 
 export function readPresencePreference(
@@ -30,7 +34,7 @@ export function writePresencePreference(
       status,
     );
   } catch {
-    // Local storage is best-effort; the server still receives the explicit status.
+    // The server still receives the status if local storage fails.
   }
 }
 

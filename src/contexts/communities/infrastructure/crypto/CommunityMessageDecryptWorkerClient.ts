@@ -3,6 +3,9 @@ import type { CommunityMessageDecryptWorkerRequest } from './CommunityMessageDec
 import type { CommunityMessageDecryptWorkerResponse } from './CommunityMessageDecryptWorkerResponse';
 import type { PendingRequest } from './PendingRequest';
 
+import { scopeClientWorkerUrl } from '../../../../shared/infrastructure/storage/ClientStorageScope';
+import communityMessageDecryptWorkerUrl from './communityMessageDecryptWorker?worker&url';
+
 function abortError(): Error {
   const error = new Error('Community message decrypt aborted');
 
@@ -20,7 +23,9 @@ export class CommunityMessageDecryptWorkerClient {
 
   public constructor() {
     this.worker = new Worker(
-      new URL('./communityMessageDecryptWorker.ts', import.meta.url),
+      scopeClientWorkerUrl(
+        new URL(communityMessageDecryptWorkerUrl, import.meta.url),
+      ),
       {
         type: 'module',
       },

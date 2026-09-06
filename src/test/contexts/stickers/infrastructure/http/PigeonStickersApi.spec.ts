@@ -1,3 +1,5 @@
+import { mock } from 'jest-mock-extended';
+
 import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
@@ -6,6 +8,26 @@ import { PigeonPublicFilesClient } from '../../../../../contexts/attachments/inf
 import { PigeonStickersApi } from '../../../../../contexts/stickers/infrastructure/http/PigeonStickersApi';
 
 describe(PigeonStickersApi.name, () => {
+  it('loads sticker bytes through the protected blob client', async () => {
+    const http = mock<HttpJsonClient>();
+    const blob = new Blob(['image'], { type: 'image/png' });
+    const controller = new AbortController();
+    http.requestBlob.mockResolvedValue(blob);
+    const api = new PigeonStickersApi(
+      http,
+      mock<RequestSigner>(),
+      mock<PigeonPublicFilesClient>(),
+      { prepare: jest.fn() },
+    );
+
+    await expect(api.loadAsset('cid/value', controller.signal)).resolves.toBe(
+      blob,
+    );
+    expect(http.requestBlob).toHaveBeenCalledWith('/ipfs/cid%2Fvalue', {
+      signal: controller.signal,
+    });
+  });
+
   it('converts sticker images before uploading the public asset', async () => {
     const session = { identity: { id: 'identity-1' } } as Session;
     const sourceFile = new File(['png'], 'smile.png', { type: 'image/png' });

@@ -1,6 +1,6 @@
-/* eslint-disable @typescript-eslint/no-use-before-define */
 import { EncryptedPayload, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
+/* eslint-disable @typescript-eslint/no-use-before-define */
 import type {
   ChatMessage,
   ConversationKeyEntry,
@@ -14,14 +14,16 @@ import type { CommunityMessageDecryptRequest } from './communityMessageDecryptWo
 import type { CommunityMessageDecryptResponse } from './communityMessageDecryptWorker/CommunityMessageDecryptResponse';
 import type { MessageReactionRecord } from './communityMessageDecryptWorker/MessageReactionRecord';
 
+import { scopeClientStorageKey } from '../../../../shared/infrastructure/storage/ClientStorageScope';
 import { PollMessageProjection } from '../../../messages/infrastructure/crypto/PollMessageProjection';
 
 const cancelledRequestIds = new Set<number>();
 const projectedMessageCache = new Map<string, ChatMessage>();
 const projectedMessageCacheLimit = 500;
 const persistentProjectedMessageCacheLimit = 2000;
-const projectedMessageCacheDatabaseName =
-  'pigeon-community-message-projection-cache';
+const projectedMessageCacheDatabaseName = scopeClientStorageKey(
+  'pigeon-community-message-projection-cache',
+);
 const projectedMessageCacheDatabaseVersion = 3;
 const projectedMessageCacheStoreName = 'projectedMessages';
 const messageDecryptBatchSize = 8;

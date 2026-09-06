@@ -1,6 +1,7 @@
 import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
+
 import { copy } from '../../../../shared/presentation/i18n/copy';
-import { stickerAssetUrl } from '../../../stickers/presentation/components/stickerPressPreview';
+import { StickerImage } from '../../../stickers/presentation/components/StickerImage';
 
 interface ComposerContextBannerProps {
   editingMessage?: ChatMessage | null;
@@ -46,8 +47,8 @@ export function ComposerContextBanner({
     <div className="mb-3 flex items-start justify-between gap-3 rounded-2xl border border-fuchsia-300/25 bg-fuchsia-500/15 p-3 text-sm text-fuchsia-50">
       <div className="flex min-w-0 items-center gap-2">
         {replyTo.sticker && (
-          <img
-            src={stickerAssetUrl(replyTo.sticker.assetCid)}
+          <StickerImage
+            assetCid={replyTo.sticker.assetCid}
             alt=""
             className="h-10 w-10 shrink-0 rounded-xl object-contain"
           />

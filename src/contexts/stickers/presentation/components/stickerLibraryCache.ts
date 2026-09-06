@@ -5,7 +5,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
-import { stickerAssetUrl } from './stickerPressPreview';
+import { isIndependentClient } from '../../../../shared/infrastructure/client/isIndependentClient';
 
 const STICKER_CACHE_TTL_MS = 30_000;
 const STICKER_PRELOAD_LIMIT = 24;
@@ -94,6 +94,8 @@ export function preloadStickerAssets(
 }
 
 export function preloadStickerAsset(assetCid: string): void {
+  if (isIndependentClient()) return;
+
   if (
     preloadedStickerAssetCids.has(assetCid) ||
     pendingStickerAssetCids.has(assetCid)
@@ -134,5 +136,5 @@ function loadStickerAsset(assetCid: string): void {
   preloadedStickerAssetCids.add(assetCid);
   const image = new Image();
   image.decoding = 'async';
-  image.src = stickerAssetUrl(assetCid);
+  image.src = applicationContainer.stickers.assetUrl(assetCid);
 }

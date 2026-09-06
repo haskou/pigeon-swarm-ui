@@ -1,4 +1,6 @@
-const storageKey = 'pigeon-swarm-last-login-identity-v1';
+import { scopeClientStorageKey } from '../../../../shared/infrastructure/storage/ClientStorageScope';
+
+const storageKey = scopeClientStorageKey('pigeon-swarm-last-login-identity-v1');
 
 export function loadLastLoginIdentity(): string {
   try {
