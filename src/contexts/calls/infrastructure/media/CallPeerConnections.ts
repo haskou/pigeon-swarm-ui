@@ -116,6 +116,29 @@ export class CallPeerConnections {
     );
   }
 
+  private async sendCandidate(
+    peerIdentityId: string,
+    peer: RTCPeerConnection,
+    candidate: RTCIceCandidateInit,
+    sendSignal: SignalSender,
+  ): Promise<void> {
+    const fragment =
+      candidate.usernameFragment ??
+      peer.localDescription?.sdp?.match(/^a=ice-ufrag:([^\r\n]+)/m)?.[1];
+
+    await this.signalRetry.send(
+      () => sendSignal(peerIdentityId, 'ice_candidate', { ...candidate }),
+      () =>
+        this.peers.get(peerIdentityId) === peer &&
+        peer.connectionState !== 'closed' &&
+        (fragment
+          ? peer.localDescription?.sdp
+              ?.split(/\r?\n/)
+              .includes(`a=ice-ufrag:${fragment}`) === true
+          : !peer.localDescription?.sdp?.includes('a=ice-ufrag:')),
+    );
+  }
+
   private async handleIceCandidateSignal(
     senderIdentityId: string,
     peer: RTCPeerConnection,
@@ -351,8 +374,15 @@ export class CallPeerConnections {
         candidateType: event.candidate.type,
         peerIdentityId,
       });
-      void sendSignal(peerIdentityId, 'ice_candidate', {
-        ...event.candidate.toJSON(),
+      void this.sendCandidate(
+        peerIdentityId,
+        peer,
+        event.candidate.toJSON(),
+        sendSignal,
+      ).catch(() => {
+        logCallDebug('peer-manager:ice-candidate:send-failed', {
+          peerIdentityId,
+        });
       });
     });
     peer.addEventListener('negotiationneeded', () => {

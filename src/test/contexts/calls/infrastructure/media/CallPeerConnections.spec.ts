@@ -406,6 +406,63 @@ describe(CallPeerConnections.name, () => {
     expect(sendSignal).toHaveBeenCalledTimes(1);
   });
 
+  it.each([false, true])(
+    'retries a rejected candidate unless ICE restarts (restart=%s)',
+    async (restart) => {
+      jest.useFakeTimers();
+      const peers: FakePeerConnection[] = [];
+
+      installPeerConnectionMock(peers);
+      const manager = callPeerConnectionManager();
+      const sendSignal = jest
+        .fn<ReturnType<SignalSender>, Parameters<SignalSender>>()
+        .mockResolvedValue(undefined);
+
+      manager.configure(() => Promise.resolve({ iceServers: [] }));
+      await manager.ensurePeer('remote', true, sendSignal);
+      const peer = peers[0];
+      await peer.setLocalDescription({
+        sdp: 'v=0\r\na=ice-ufrag:original\r\n',
+        type: 'offer',
+      });
+      sendSignal.mockClear();
+      sendSignal.mockRejectedValueOnce(
+        new HttpJsonError(
+          409,
+          'Conflict',
+          '{"code":"CallParticipantNotFoundError"}',
+        ),
+      );
+      const candidate = {
+        candidate: 'candidate:relay',
+        sdpMid: '0',
+        usernameFragment: 'original',
+      };
+      const event = Object.assign(new Event('icecandidate'), {
+        candidate: { toJSON: () => candidate },
+      });
+      registeredPeerEventListener(peer, 'icecandidate')(event);
+      await jest.advanceTimersByTimeAsync(0);
+
+      if (restart)
+        await peer.setLocalDescription({
+          sdp: 'v=0\r\na=ice-ufrag:replacement\r\n',
+          type: 'offer',
+        });
+      await jest.advanceTimersByTimeAsync(500);
+
+      expect(sendSignal).toHaveBeenCalledTimes(restart ? 1 : 2);
+
+      if (!restart)
+        expect(sendSignal.mock.calls[1]).toEqual([
+          'remote',
+          'ice_candidate',
+          candidate,
+        ]);
+      manager.reset();
+    },
+  );
+
   it('replaces recaptured microphone tracks without removing the sender', async () => {
     const peers: FakePeerConnection[] = [];
 
