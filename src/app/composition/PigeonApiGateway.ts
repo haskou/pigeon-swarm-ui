@@ -39,7 +39,6 @@ import { PigeonIdentityWorkspaceSessionApi } from '../../contexts/identities/inf
 import { PigeonKeychainApi } from '../../contexts/identities/infrastructure/http/PigeonKeychainApi';
 import { PigeonPresenceApi } from '../../contexts/identities/infrastructure/http/PigeonPresenceApi';
 import { PigeonPresenceGateway } from '../../contexts/identities/infrastructure/http/PigeonPresenceGateway';
-import { ConversationKeychainRecovery } from '../../contexts/identities/infrastructure/keychain/ConversationKeychainRecovery';
 import { DraftPayloadCipher } from '../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
 import { MessageProjector } from '../../contexts/messages/infrastructure/crypto/MessageProjector';
 import { PigeonMessageProjection } from '../../contexts/messages/infrastructure/crypto/PigeonMessageProjection';
@@ -60,6 +59,7 @@ import { RequestCache } from '../../shared/infrastructure/http/RequestCache';
 import { RequestSigner } from '../../shared/infrastructure/http/RequestSigner';
 import { copy } from '../../shared/presentation/i18n/copy';
 import { API_SERVER_URL } from '../API_SERVER_URL';
+import { ConversationKeychainRecovery } from './identities/ConversationKeychainRecovery';
 
 export class PigeonApiGateway {
   private readonly requestCache = new RequestCache();

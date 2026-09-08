@@ -53,7 +53,6 @@ import { IdentityPresenceMapper } from '../../contexts/identities/infrastructure
 import { PigeonIdentityRepository } from '../../contexts/identities/infrastructure/http/PigeonIdentityRepository';
 import { PigeonIdentityUnlockRepository } from '../../contexts/identities/infrastructure/http/PigeonIdentityUnlockRepository';
 import { PigeonPresenceRepository } from '../../contexts/identities/infrastructure/http/PigeonPresenceRepository';
-import { ConversationKeychainRecovery } from '../../contexts/identities/infrastructure/keychain/ConversationKeychainRecovery';
 import { MessageReactionAdder } from '../../contexts/messages/application/add-message-reaction/MessageReactionAdder';
 import { ConversationDraftDeleter } from '../../contexts/messages/application/delete-conversation-draft/ConversationDraftDeleter';
 import { MessageDeleter } from '../../contexts/messages/application/delete-message/MessageDeleter';
@@ -145,6 +144,7 @@ import { PigeonCallSignaling } from './calls/PigeonCallSignaling';
 import { PigeonCallStarter } from './calls/PigeonCallStarter';
 import { PigeonCommunityManagement } from './communities/PigeonCommunityManagement';
 import { PigeonConversationsFacade } from './conversations/PigeonConversationsFacade';
+import { ConversationKeychainRecovery } from './identities/ConversationKeychainRecovery';
 import { PigeonIdentitiesFacade } from './identities/PigeonIdentitiesFacade';
 import { PigeonSessionFacade } from './identities/PigeonSessionFacade';
 import { PigeonConversationDrafts } from './messages/PigeonConversationDrafts';

@@ -6,8 +6,8 @@ import type {
   Session,
 } from '../../../../../shared/domain/pigeonResources.types';
 
+import { ConversationKeychainRecovery } from '../../../../../app/composition/identities/ConversationKeychainRecovery';
 import { ConversationIdFactory } from '../../../../../contexts/conversations/domain/ConversationIdFactory';
-import { ConversationKeychainRecovery } from '../../../../../contexts/identities/infrastructure/keychain/ConversationKeychainRecovery';
 
 const canonicalId = `one-to-one:${createHash('sha256').update('identity-B:identity-a:network-1').digest('hex')}`;
 const legacyId = `one-to-one:${createHash('sha256').update('identity-a:identity-B:network-1').digest('hex')}`;

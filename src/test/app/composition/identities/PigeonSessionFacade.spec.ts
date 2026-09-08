@@ -4,9 +4,9 @@ import type { PigeonIdentitiesFacade } from '../../../../app/composition/identit
 import type { PigeonIdentitiesGateway } from '../../../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 
+import { ConversationKeychainRecovery } from '../../../../app/composition/identities/ConversationKeychainRecovery';
 import { PigeonSessionFacade } from '../../../../app/composition/identities/PigeonSessionFacade';
 import { ConversationIdFactory } from '../../../../contexts/conversations/domain/ConversationIdFactory';
-import { ConversationKeychainRecovery } from '../../../../contexts/identities/infrastructure/keychain/ConversationKeychainRecovery';
 
 describe(PigeonSessionFacade.name, () => {
   it('recovers legacy keys when conversations arrive after the session was restored', () => {
