@@ -93,21 +93,20 @@ export class CallPeerConnections {
     const delivery = Symbol();
 
     this.descriptionDeliveries.set(peer, delivery);
-    const payload = descriptionPayload(
-      description,
-      this.screenShareStreams.localAudioTrackIds(this.localStream),
-      this.screenShareStreams.localAudioStreamIds(this.localStream),
-      this.screenShareStreams.localVideoTrackIds(this.localStream),
-      this.screenShareStreams.localVideoStreamIds(this.localStream),
-      this.localMediaEncryptionMetadata(peerIdentityId),
-    );
-
     await this.signalRetry.send(
       () =>
-        sendSignal(peerIdentityId, description.type as 'offer' | 'answer', {
-          ...payload,
-          sdp: peer.localDescription?.sdp ?? description.sdp,
-        }),
+        sendSignal(
+          peerIdentityId,
+          description.type as 'offer' | 'answer',
+          descriptionPayload(
+            peer.localDescription ?? description,
+            this.screenShareStreams.localAudioTrackIds(this.localStream),
+            this.screenShareStreams.localAudioStreamIds(this.localStream),
+            this.screenShareStreams.localVideoTrackIds(this.localStream),
+            this.screenShareStreams.localVideoStreamIds(this.localStream),
+            this.localMediaEncryptionMetadata(peerIdentityId),
+          ),
+        ),
       () =>
         this.peers.get(peerIdentityId) === peer &&
         peer.connectionState !== 'closed' &&

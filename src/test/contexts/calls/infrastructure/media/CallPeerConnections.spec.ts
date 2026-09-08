@@ -350,6 +350,43 @@ describe(CallPeerConnections.name, () => {
     manager.reset();
   });
 
+  it('refreshes encryption metadata when retrying a rejected offer', async () => {
+    jest.useFakeTimers();
+    const peers: FakePeerConnection[] = [];
+
+    installEncodedStreamSupport();
+    installPeerConnectionMock(peers);
+    const manager = callPeerConnectionManager();
+    const sendSignal = jest
+      .fn<ReturnType<SignalSender>, Parameters<SignalSender>>()
+      .mockRejectedValueOnce(
+        new HttpJsonError(
+          409,
+          'Conflict',
+          '{"code":"CallParticipantNotFoundError"}',
+        ),
+      )
+      .mockResolvedValue(undefined);
+
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
+    manager.configureMediaEncryption(SymmetricKey.generate().valueOf(), true);
+    const sending = manager.ensurePeer('remote', true, sendSignal);
+
+    await jest.advanceTimersByTimeAsync(0);
+    expect(sendSignal.mock.calls[0][2].mediaEncryption).toMatchObject({
+      acceptsEncrypted: true,
+    });
+    manager.setMediaEncryptionEnabled(false);
+    await jest.advanceTimersByTimeAsync(500);
+    await sending;
+    expect(sendSignal.mock.calls[1][2].mediaEncryption).toEqual({
+      acceptsEncrypted: false,
+      enabled: false,
+      version: 1,
+    });
+    manager.reset();
+  });
+
   it('includes gathered candidates when retrying a rejected offer', async () => {
     jest.useFakeTimers();
     const peers: FakePeerConnection[] = [];
