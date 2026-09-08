@@ -8,13 +8,18 @@ import type {
 import type { LoginIdentityProgressReporter } from '../../application/login-identity/LoginIdentityProgressReporter';
 import type { IdentityWorkspaceSource } from './IdentityWorkspaceSource';
 
+import { ConversationKeychainRecovery } from '../keychain/ConversationKeychainRecovery';
+
 const emptyKeychain: LocalKeychain = {
   conversations: {},
   version: 0,
 };
 
 export class PigeonIdentityWorkspaceSessionApi {
-  public constructor(private readonly workspace: IdentityWorkspaceSource) {}
+  public constructor(
+    private readonly workspace: IdentityWorkspaceSource,
+    private readonly keychainRecovery: ConversationKeychainRecovery,
+  ) {}
 
   private async listConversations(
     session: Session,
@@ -49,9 +54,11 @@ export class PigeonIdentityWorkspaceSessionApi {
 
     onProgress?.('loading-workspace');
 
+    const conversations = await conversationsPromise;
+
     return {
-      conversations: await conversationsPromise,
-      session: hydratedSession,
+      conversations,
+      session: this.keychainRecovery.recover(hydratedSession, conversations),
     };
   }
 
@@ -60,6 +67,9 @@ export class PigeonIdentityWorkspaceSessionApi {
     const hydratedSession = this.hydrateKeychain(session, keychainResource);
     const conversations = await this.listConversations(hydratedSession);
 
-    return { conversations, session: hydratedSession };
+    return {
+      conversations,
+      session: this.keychainRecovery.recover(hydratedSession, conversations),
+    };
   }
 }

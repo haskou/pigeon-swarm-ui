@@ -53,6 +53,7 @@ import { IdentityPresenceMapper } from '../../contexts/identities/infrastructure
 import { PigeonIdentityRepository } from '../../contexts/identities/infrastructure/http/PigeonIdentityRepository';
 import { PigeonIdentityUnlockRepository } from '../../contexts/identities/infrastructure/http/PigeonIdentityUnlockRepository';
 import { PigeonPresenceRepository } from '../../contexts/identities/infrastructure/http/PigeonPresenceRepository';
+import { ConversationKeychainRecovery } from '../../contexts/identities/infrastructure/keychain/ConversationKeychainRecovery';
 import { MessageReactionAdder } from '../../contexts/messages/application/add-message-reaction/MessageReactionAdder';
 import { ConversationDraftDeleter } from '../../contexts/messages/application/delete-conversation-draft/ConversationDraftDeleter';
 import { MessageDeleter } from '../../contexts/messages/application/delete-message/MessageDeleter';
@@ -496,6 +497,7 @@ export class PigeonApplication {
     this.session = new PigeonSessionFacade(
       gateway.identityGateway,
       this.identities,
+      new ConversationKeychainRecovery(new ConversationIdFactory()),
     );
     const stickerContexts = new StickerAccessContexts();
     const stickerMapper = new StickerMapper();

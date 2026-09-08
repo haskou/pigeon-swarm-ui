@@ -39,6 +39,7 @@ import { PigeonIdentityWorkspaceSessionApi } from '../../contexts/identities/inf
 import { PigeonKeychainApi } from '../../contexts/identities/infrastructure/http/PigeonKeychainApi';
 import { PigeonPresenceApi } from '../../contexts/identities/infrastructure/http/PigeonPresenceApi';
 import { PigeonPresenceGateway } from '../../contexts/identities/infrastructure/http/PigeonPresenceGateway';
+import { ConversationKeychainRecovery } from '../../contexts/identities/infrastructure/keychain/ConversationKeychainRecovery';
 import { DraftPayloadCipher } from '../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
 import { MessageProjector } from '../../contexts/messages/infrastructure/crypto/MessageProjector';
 import { PigeonMessageProjection } from '../../contexts/messages/infrastructure/crypto/PigeonMessageProjection';
@@ -192,13 +193,17 @@ export class PigeonApiGateway {
       identityResourceGateway,
       this.identityKeyProtection,
     );
-    const identityWorkspace = new PigeonIdentityWorkspaceSessionApi({
-      decryptKeychain: (session, keychain) =>
-        keychainApi.decrypt(session, keychain),
-      listConversations: async (session) =>
-        await conversationsApi.list(session),
-      loadKeychain: async (session) => await keychainApi.loadOptional(session),
-    });
+    const identityWorkspace = new PigeonIdentityWorkspaceSessionApi(
+      {
+        decryptKeychain: (session, keychain) =>
+          keychainApi.decrypt(session, keychain),
+        listConversations: async (session) =>
+          await conversationsApi.list(session),
+        loadKeychain: async (session) =>
+          await keychainApi.loadOptional(session),
+      },
+      new ConversationKeychainRecovery(conversationIds),
+    );
     const identityLogin = new PigeonIdentityLoginApi(
       identitySession,
       identityWorkspace,
