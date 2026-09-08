@@ -13,6 +13,7 @@ import {
 import { CallPeerRecovery } from './CallPeerRecovery';
 import { CallPeerStatistics } from './CallPeerStatistics';
 import { CallScreenShareStreams } from './CallScreenShareStreams';
+import { CallSignalRetry } from './CallSignalRetry';
 import {
   descriptionPayload,
   type DescriptionSignalPayload,
@@ -36,6 +37,13 @@ export class CallPeerConnections {
   private readonly peers = new Map<string, RTCPeerConnection>();
 
   private readonly statistics = new CallPeerStatistics();
+
+  private readonly signalRetry = new CallSignalRetry();
+
+  private readonly descriptionDeliveries = new WeakMap<
+    RTCPeerConnection,
+    symbol
+  >();
 
   private readonly recovery = new CallPeerRecovery((peer, canRestart) =>
     this.refreshAndRestartIce(peer, canRestart),
@@ -74,6 +82,38 @@ export class CallPeerConnections {
 
   public constructor(private readonly remoteAudio: RemoteCallAudio) {
     this.screenShareStreams = new CallScreenShareStreams(remoteAudio);
+  }
+
+  private async sendDescription(
+    peerIdentityId: string,
+    peer: RTCPeerConnection,
+    description: RTCSessionDescriptionInit,
+    sendSignal: SignalSender,
+  ): Promise<void> {
+    const delivery = Symbol();
+
+    this.descriptionDeliveries.set(peer, delivery);
+    const payload = descriptionPayload(
+      description,
+      this.screenShareStreams.localAudioTrackIds(this.localStream),
+      this.screenShareStreams.localAudioStreamIds(this.localStream),
+      this.screenShareStreams.localVideoTrackIds(this.localStream),
+      this.screenShareStreams.localVideoStreamIds(this.localStream),
+      this.localMediaEncryptionMetadata(peerIdentityId),
+    );
+
+    await this.signalRetry.send(
+      () =>
+        sendSignal(peerIdentityId, description.type as 'offer' | 'answer', {
+          ...payload,
+          sdp: peer.localDescription?.sdp ?? description.sdp,
+        }),
+      () =>
+        this.peers.get(peerIdentityId) === peer &&
+        peer.connectionState !== 'closed' &&
+        peer.localDescription?.type === description.type &&
+        this.descriptionDeliveries.get(peer) === delivery,
+    );
   }
 
   private async handleIceCandidateSignal(
@@ -161,18 +201,7 @@ export class CallPeerConnections {
     logCallDebug('peer-manager:handle-signal:send-answer', {
       senderIdentityId,
     });
-    await sendSignal(
-      senderIdentityId,
-      'answer',
-      descriptionPayload(
-        answer,
-        this.screenShareStreams.localAudioTrackIds(this.localStream),
-        this.screenShareStreams.localAudioStreamIds(this.localStream),
-        this.screenShareStreams.localVideoTrackIds(this.localStream),
-        this.screenShareStreams.localVideoStreamIds(this.localStream),
-        this.localMediaEncryptionMetadata(senderIdentityId),
-      ),
-    );
+    await this.sendDescription(senderIdentityId, peer, answer, sendSignal);
   }
 
   private async acceptRemoteDescription(
@@ -707,18 +736,7 @@ export class CallPeerConnections {
       const offer = await peer.createOffer();
 
       await peer.setLocalDescription(offer);
-      await sendSignal(
-        peerIdentityId,
-        'offer',
-        descriptionPayload(
-          offer,
-          this.screenShareStreams.localAudioTrackIds(this.localStream),
-          this.screenShareStreams.localAudioStreamIds(this.localStream),
-          this.screenShareStreams.localVideoTrackIds(this.localStream),
-          this.screenShareStreams.localVideoStreamIds(this.localStream),
-          this.localMediaEncryptionMetadata(peerIdentityId),
-        ),
-      );
+      await this.sendDescription(peerIdentityId, peer, offer, sendSignal);
     } finally {
       state.makingOffer = false;
     }
@@ -952,18 +970,7 @@ export class CallPeerConnections {
       logCallDebug('peer-manager:ensure-peer:send-offer', {
         peerIdentityId,
       });
-      await sendSignal(
-        peerIdentityId,
-        'offer',
-        descriptionPayload(
-          offer,
-          this.screenShareStreams.localAudioTrackIds(this.localStream),
-          this.screenShareStreams.localAudioStreamIds(this.localStream),
-          this.screenShareStreams.localVideoTrackIds(this.localStream),
-          this.screenShareStreams.localVideoStreamIds(this.localStream),
-          this.localMediaEncryptionMetadata(peerIdentityId),
-        ),
-      );
+      await this.sendDescription(peerIdentityId, peer, offer, sendSignal);
     } finally {
       state.makingOffer = false;
     }
