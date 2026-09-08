@@ -1,16 +1,17 @@
 import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
 
+import type { ConversationKeyRecovery } from '../../../contexts/identities/application/ports/ConversationKeyRecovery';
+import type { ConversationKeyEntry } from '../../../contexts/identities/infrastructure/keychain/ConversationKeyEntry';
 import type {
   ConversationResource,
   Session,
-} from '../../../../shared/domain/pigeonResources.types';
-import type { ConversationKeyEntry } from './ConversationKeyEntry';
+} from '../../../shared/domain/pigeonResources.types';
 
-import { ConversationIdFactory } from '../../../conversations/domain/ConversationIdFactory';
-import { ConversationNetworkId } from '../../../conversations/domain/value-objects/ConversationNetworkId';
-import { ConversationParticipantId } from '../../../conversations/domain/value-objects/ConversationParticipantId';
+import { ConversationIdFactory } from '../../../contexts/conversations/domain/ConversationIdFactory';
+import { ConversationNetworkId } from '../../../contexts/conversations/domain/value-objects/ConversationNetworkId';
+import { ConversationParticipantId } from '../../../contexts/conversations/domain/value-objects/ConversationParticipantId';
 
-export class ConversationKeychainRecovery {
+export class ConversationKeychainRecovery implements ConversationKeyRecovery {
   public constructor(private readonly ids: ConversationIdFactory) {}
 
   private matchesLegacyEntry(

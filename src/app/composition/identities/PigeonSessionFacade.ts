@@ -8,7 +8,7 @@ import type {
 import type { PigeonIdentitiesFacade } from './PigeonIdentitiesFacade';
 
 import { ConversationTimeline } from '../../../contexts/conversations/presentation/view-models/ConversationTimeline';
-import { ConversationKeychainRecovery } from '../../../contexts/identities/infrastructure/keychain/ConversationKeychainRecovery';
+import { ConversationKeychainRecovery } from './ConversationKeychainRecovery';
 
 export class PigeonSessionFacade {
   public constructor(

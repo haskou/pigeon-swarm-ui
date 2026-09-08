@@ -9,10 +9,10 @@ import type {
   Session,
 } from '../../../../../shared/domain/pigeonResources.types';
 
+import { ConversationKeychainRecovery } from '../../../../../app/composition/identities/ConversationKeychainRecovery';
 import { ConversationIdFactory } from '../../../../../contexts/conversations/domain/ConversationIdFactory';
 import { PigeonIdentityWorkspaceSessionApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityWorkspaceSessionApi';
 import { ConversationKeychain } from '../../../../../contexts/identities/infrastructure/keychain/ConversationKeychain';
-import { ConversationKeychainRecovery } from '../../../../../contexts/identities/infrastructure/keychain/ConversationKeychainRecovery';
 
 describe(PigeonIdentityWorkspaceSessionApi.name, () => {
   const session = {
