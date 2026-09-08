@@ -27,22 +27,44 @@ export class ConversationKeychainRecovery {
     );
   }
 
+  private peerOf(
+    conversation: ConversationResource,
+    owner: ConversationParticipantId,
+  ): ConversationParticipantId | undefined {
+    if (conversation.peerIdentityId) {
+      return ConversationParticipantId.fromString(conversation.peerIdentityId);
+    }
+
+    const participants = (
+      conversation.participantIdentityIds ??
+      conversation.participantIds ??
+      []
+    ).map((id) => ConversationParticipantId.fromString(id));
+
+    if (
+      participants.length !== 2 ||
+      !participants.some((id) => id.isEqual(owner))
+    )
+      return undefined;
+
+    return participants.find((id) => !id.isEqual(owner));
+  }
+
   private recoverEntry(
     session: Session,
     conversation: ConversationResource,
   ): ConversationKeyEntry | undefined {
     if (
       !conversation.networkId ||
-      !conversation.peerIdentityId ||
       conversation.type === 'group' ||
       session.keychain.conversations[conversation.id]
     )
       return undefined;
 
     const owner = ConversationParticipantId.fromString(session.identity.id);
-    const peer = ConversationParticipantId.fromString(
-      conversation.peerIdentityId,
-    );
+    const peer = this.peerOf(conversation, owner);
+
+    if (!peer) return undefined;
     const network = ConversationNetworkId.fromString(conversation.networkId);
 
     if (!this.ids.create(owner, peer, network).hasValue(conversation.id))

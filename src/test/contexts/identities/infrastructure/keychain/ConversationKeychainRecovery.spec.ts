@@ -36,6 +36,36 @@ function session(key: ConversationKeyEntry): Session {
 }
 
 describe(ConversationKeychainRecovery.name, () => {
+  it('recovers an API conversation that identifies the peer through its participants', () => {
+    const current = session(entry);
+    const resource = {
+      ...conversation,
+      participantIdentityIds: ['identity-a', 'identity-B'],
+      peerIdentityId: undefined,
+    };
+
+    expect(
+      recovery.recover(current, [resource]).keychain.conversations[canonicalId],
+    ).toEqual({ ...entry, conversationId: canonicalId });
+  });
+
+  it.each(
+    [[], ['identity-B'], ['identity-a', 'identity-B', 'identity-c']].map(
+      (participants) => ({ participants }),
+    ),
+  )(
+    'rejects ambiguous or foreign participants $participants',
+    ({ participants }) => {
+      const current = session(entry);
+      const resource = {
+        ...conversation,
+        participantIdentityIds: participants,
+        peerIdentityId: undefined,
+      };
+
+      expect(recovery.recover(current, [resource])).toBe(current);
+    },
+  );
   it.each([
     { ...conversation, networkId: 'network-2' },
     { ...conversation, peerIdentityId: 'identity-c' },
