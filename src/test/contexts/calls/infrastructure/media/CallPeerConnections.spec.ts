@@ -387,6 +387,49 @@ describe(CallPeerConnections.name, () => {
     manager.reset();
   });
 
+  it('delivers a pending answer before renegotiating media settings', async () => {
+    jest.useFakeTimers();
+    const peers: FakePeerConnection[] = [];
+
+    installSessionDescriptionMock();
+    installPeerConnectionMock(peers);
+    const manager = callPeerConnectionManager();
+    const sendSignal = jest
+      .fn<ReturnType<SignalSender>, Parameters<SignalSender>>()
+      .mockRejectedValueOnce(
+        new HttpJsonError(
+          409,
+          'Conflict',
+          '{"code":"CallParticipantNotFoundError"}',
+        ),
+      )
+      .mockResolvedValue(undefined);
+
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
+    await manager.ensurePeer('remote', false, sendSignal);
+    const answering = manager.handleSignal(
+      'remote',
+      'offer',
+      { sdp: 'offer', type: 'offer' },
+      sendSignal,
+      'local',
+    );
+
+    await jest.advanceTimersByTimeAsync(0);
+    expect(sendSignal.mock.calls.map((call) => call[1])).toEqual(['answer']);
+    manager.setMediaEncryptionEnabled(false);
+    await jest.advanceTimersByTimeAsync(0);
+    expect(peers[0].createOffer).not.toHaveBeenCalled();
+    await jest.advanceTimersByTimeAsync(500);
+    await answering;
+    expect(sendSignal.mock.calls.map((call) => call[1])).toEqual([
+      'answer',
+      'answer',
+      'offer',
+    ]);
+    manager.reset();
+  });
+
   it('includes gathered candidates when retrying a rejected offer', async () => {
     jest.useFakeTimers();
     const peers: FakePeerConnection[] = [];

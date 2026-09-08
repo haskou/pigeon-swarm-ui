@@ -45,6 +45,11 @@ export class CallPeerConnections {
     symbol
   >();
 
+  private readonly pendingAnswers = new WeakMap<
+    RTCPeerConnection,
+    Promise<void>
+  >();
+
   private readonly recovery = new CallPeerRecovery((peer, canRestart) =>
     this.refreshAndRestartIce(peer, canRestart),
   );
@@ -93,7 +98,7 @@ export class CallPeerConnections {
     const delivery = Symbol();
 
     this.descriptionDeliveries.set(peer, delivery);
-    await this.signalRetry.send(
+    const sending = this.signalRetry.send(
       () =>
         sendSignal(
           peerIdentityId,
@@ -113,6 +118,15 @@ export class CallPeerConnections {
         peer.localDescription?.type === description.type &&
         this.descriptionDeliveries.get(peer) === delivery,
     );
+
+    if (description.type === 'answer') this.pendingAnswers.set(peer, sending);
+
+    try {
+      await sending;
+    } finally {
+      if (this.pendingAnswers.get(peer) === sending)
+        this.pendingAnswers.delete(peer);
+    }
   }
 
   private async sendCandidate(
@@ -740,6 +754,14 @@ export class CallPeerConnections {
     peer: RTCPeerConnection,
     sendSignal: SignalSender,
   ): Promise<void> {
+    await this.pendingAnswers.get(peer);
+
+    if (
+      this.peers.get(peerIdentityId) !== peer ||
+      peer.connectionState === 'closed'
+    )
+      return;
+
     const state = this.peerNegotiationState(peerIdentityId);
 
     if (state.polite && !peer.localDescription && !peer.remoteDescription) {
