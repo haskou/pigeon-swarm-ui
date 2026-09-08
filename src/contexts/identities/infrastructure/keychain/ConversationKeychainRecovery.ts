@@ -38,6 +38,7 @@ export class ConversationKeychainRecovery {
     const participants = (
       conversation.participantIdentityIds ??
       conversation.participantIds ??
+      conversation.participants ??
       []
     ).map((id) => ConversationParticipantId.fromString(id));
 
