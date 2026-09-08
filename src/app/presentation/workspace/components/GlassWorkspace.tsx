@@ -210,6 +210,17 @@ export function GlassWorkspace({
     sessionRef.current = session;
   }, [session]);
 
+  useEffect(() => {
+    const recovered = applicationContainer.session.recoverConversationKeys(
+      session,
+      conversations,
+    );
+
+    if (recovered !== session) {
+      setSession(recovered);
+    }
+  }, [conversations, session, setSession]);
+
   const suppressMessageLoadsBriefly = useCallback((): void => {
     suppressMessageLoadsUntilRef.current = Date.now() + 800;
   }, []);

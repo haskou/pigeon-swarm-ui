@@ -59,6 +59,7 @@ import { RequestCache } from '../../shared/infrastructure/http/RequestCache';
 import { RequestSigner } from '../../shared/infrastructure/http/RequestSigner';
 import { copy } from '../../shared/presentation/i18n/copy';
 import { API_SERVER_URL } from '../API_SERVER_URL';
+import { ConversationKeychainRecovery } from './identities/ConversationKeychainRecovery';
 
 export class PigeonApiGateway {
   private readonly requestCache = new RequestCache();
@@ -192,13 +193,17 @@ export class PigeonApiGateway {
       identityResourceGateway,
       this.identityKeyProtection,
     );
-    const identityWorkspace = new PigeonIdentityWorkspaceSessionApi({
-      decryptKeychain: (session, keychain) =>
-        keychainApi.decrypt(session, keychain),
-      listConversations: async (session) =>
-        await conversationsApi.list(session),
-      loadKeychain: async (session) => await keychainApi.loadOptional(session),
-    });
+    const identityWorkspace = new PigeonIdentityWorkspaceSessionApi(
+      {
+        decryptKeychain: (session, keychain) =>
+          keychainApi.decrypt(session, keychain),
+        listConversations: async (session) =>
+          await conversationsApi.list(session),
+        loadKeychain: async (session) =>
+          await keychainApi.loadOptional(session),
+      },
+      new ConversationKeychainRecovery(conversationIds),
+    );
     const identityLogin = new PigeonIdentityLoginApi(
       identitySession,
       identityWorkspace,

@@ -30,7 +30,7 @@ export class ConversationParticipantId extends StringValueObject {
   public orderedWith(
     participantId: ConversationParticipantId,
   ): [ConversationParticipantId, ConversationParticipantId] {
-    return this.value.localeCompare(participantId.value) <= 0
+    return this.value <= participantId.value
       ? [this, participantId]
       : [participantId, this];
   }

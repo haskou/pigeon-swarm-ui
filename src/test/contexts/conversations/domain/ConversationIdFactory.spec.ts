@@ -8,6 +8,26 @@ const participant = ConversationParticipantId.fromString;
 const network = ConversationNetworkId.fromString;
 
 describe(ConversationIdFactory.name, () => {
+  it.each([
+    ['identity-a', 'identity-B', 'identity-B:identity-a'],
+    ['identity-+', 'identity-/', 'identity-+:identity-/'],
+    ['identity-z', 'identity-Z', 'identity-Z:identity-z'],
+  ])('matches backend ordering for %s and %s', (left, right, ordered) => {
+    const expected = `one-to-one:${createHash('sha256').update(`${ordered}:network-1`).digest('hex')}`;
+    const factory = new ConversationIdFactory();
+
+    expect(
+      factory
+        .create(participant(left), participant(right), network('network-1'))
+        .toString(),
+    ).toBe(expected);
+    expect(
+      factory
+        .create(participant(right), participant(left), network('network-1'))
+        .toString(),
+    ).toBe(expected);
+  });
+
   it('creates the same one-to-one id as the backend including network id', () => {
     const factory = new ConversationIdFactory();
     const networkId = 'network-1';
