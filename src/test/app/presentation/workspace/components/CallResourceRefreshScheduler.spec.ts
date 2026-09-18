@@ -18,6 +18,8 @@ async function flushPromises(): Promise<void> {
 }
 
 describe('CallResourceRefreshScheduler', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
   it('runs one trailing refresh after events arrive during an active load', async () => {
     const firstRefresh = deferredPromise();
     const trailingRefresh = deferredPromise();
@@ -39,6 +41,7 @@ describe('CallResourceRefreshScheduler', () => {
 
     firstRefresh.resolve();
     await flushPromises();
+    await jest.advanceTimersByTimeAsync(1000);
 
     expect(refresh).toHaveBeenCalledTimes(2);
     expect(refresh).toHaveBeenNthCalledWith(
@@ -65,6 +68,7 @@ describe('CallResourceRefreshScheduler', () => {
 
     firstRefresh.resolve();
     await flushPromises();
+    await jest.advanceTimersByTimeAsync(1000);
 
     expect(refresh).toHaveBeenCalledTimes(2);
     expect(refresh).toHaveBeenLastCalledWith('call-1', 'calls.v1.call.ended');

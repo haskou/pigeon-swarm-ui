@@ -47,22 +47,9 @@ export function shouldCreateInitialOffer(
   currentIdentityId: string,
   peerIdentityId: string,
 ): boolean {
-  const currentParticipant = call.participants.find(
-    (participant) => participant.identityId === currentIdentityId,
+  return (
+    call.participantIds.includes(currentIdentityId) &&
+    call.participantIds.includes(peerIdentityId) &&
+    currentIdentityId < peerIdentityId
   );
-  const peerParticipant = call.participants.find(
-    (participant) => participant.identityId === peerIdentityId,
-  );
-  const currentJoinedAt = currentParticipant?.joinedAt;
-  const peerJoinedAt = peerParticipant?.joinedAt;
-
-  if (
-    currentJoinedAt !== undefined &&
-    peerJoinedAt !== undefined &&
-    currentJoinedAt !== peerJoinedAt
-  ) {
-    return currentJoinedAt > peerJoinedAt;
-  }
-
-  return currentIdentityId < peerIdentityId;
 }

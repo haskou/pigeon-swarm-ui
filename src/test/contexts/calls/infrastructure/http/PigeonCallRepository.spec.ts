@@ -34,7 +34,7 @@ describe(PigeonCallRepository.name, () => {
     const api = {
       end: jest.fn().mockResolvedValue(undefined),
       get: jest.fn().mockResolvedValue(resource),
-      heartbeat: jest.fn().mockResolvedValue(resource),
+      heartbeat: jest.fn().mockResolvedValue(undefined),
       join: jest.fn().mockResolvedValue(resource),
       leave: jest.fn().mockResolvedValue(undefined),
       list: jest.fn().mockResolvedValue([resource]),
@@ -57,7 +57,7 @@ describe(PigeonCallRepository.name, () => {
       actorId,
     );
     await repository.join(call, actorId);
-    await repository.heartbeat(call, actorId, []);
+    await repository.heartbeat(call.getId(), actorId, []);
     await repository.leave(call, actorId);
     await repository.end(call, actorId);
 

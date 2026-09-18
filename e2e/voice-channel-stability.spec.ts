@@ -76,7 +76,10 @@ test('keeps two community voice participants connected', async ({}, testInfo) =>
     headless: true,
   });
   const contextA = await createCallContext(browser, baseURL);
-  const contextB = await createCallContext(browser, baseURL);
+  const contextB = await createCallContext(
+    browser,
+    process.env.VOICE_STABILITY_BASE_URL_B?.trim() || baseURL,
+  );
   const pageA = await contextA.newPage();
   const pageB = await contextB.newPage();
   const responsesA = trackCallResponses(pageA);
@@ -129,6 +132,20 @@ test('keeps two community voice participants connected', async ({}, testInfo) =>
     assertHeartbeatResponses(responsesB, stabilityDurationMs);
     assertStableCallTraffic(responsesA, realtimeEventsA, startedAt);
     assertStableCallTraffic(responsesB, realtimeEventsB, startedAt);
+
+    await test.step('remove departed participants without historical rows', async () => {
+      await leaveCall(pageB);
+      await expect(connectionQualityButtons(pageA)).toHaveCount(1, {
+        timeout: 30_000,
+      });
+      await expect(pageB.getByTestId('compact-call-bar')).toBeHidden();
+    });
+    await test.step('restore membership when the participant rejoins', async () => {
+      await joinVoiceChannel(pageB, selectedChannelName);
+      await expect(connectionQualityButtons(pageA)).toHaveCount(2, {
+        timeout: 30_000,
+      });
+    });
   } finally {
     await Promise.all([leaveCall(pageA), leaveCall(pageB)]);
     await Promise.all([contextA.close(), contextB.close()]);
@@ -154,12 +171,9 @@ function trackPresenceResourceResponses(
   const responses: PresenceResourceResponse[] = [];
 
   page.on('response', (response) => {
-    const url = new URL(response.url()).pathname;
+    const url = new URL(response.url()).pathname.replace(/^\/api(?=\/)/, '');
 
-    if (
-      url !== '/calls/' &&
-      !/^\/communities\/[^/]+\/channels$/.test(url)
-    ) {
+    if (url !== '/calls/' && !/^\/communities\/[^/]+\/channels$/.test(url)) {
       return;
     }
 
@@ -383,13 +397,17 @@ function trackCallResponses(page: Page): CallResponse[] {
   const responses: CallResponse[] = [];
 
   page.on('response', (response) => {
-    if (!response.url().includes('/calls/')) return;
+    if (
+      !response.url().includes('/calls/') &&
+      !/\/communities\/[^/]+\/channels$/.test(response.url())
+    )
+      return;
 
     responses.push({
       at: Date.now(),
       method: response.request().method(),
       status: response.status(),
-      url: new URL(response.url()).pathname,
+      url: new URL(response.url()).pathname.replace(/^\/api(?=\/)/, ''),
     });
   });
 
@@ -415,7 +433,7 @@ function assertStableCallTraffic(
   expect(
     callResourceReads.length,
     `Realtime call events: ${JSON.stringify(eventCounts(realtimeEvents))}`,
-  ).toBeLessThanOrEqual(2);
+  ).toBe(0);
   expect(communityChannelReads.length).toBeLessThanOrEqual(1);
 }
 
@@ -453,9 +471,7 @@ function assertHeartbeatResponses(
   const expectedMinimum = Math.max(2, Math.floor(durationMs / 4_000));
 
   expect(heartbeats.length).toBeGreaterThanOrEqual(expectedMinimum);
-  expect(heartbeats.every(({ status }) => status >= 200 && status < 300)).toBe(
-    true,
-  );
+  expect(heartbeats.every(({ status }) => status === 204)).toBe(true);
 }
 
 async function leaveCall(page: Page): Promise<void> {

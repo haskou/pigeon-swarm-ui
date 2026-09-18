@@ -1,4 +1,5 @@
 import { startCallHeartbeatLoop } from '../../../../../app/presentation/workspace/components/startCallHeartbeatLoop';
+import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 
 describe(startCallHeartbeatLoop.name, () => {
   beforeEach(() => jest.useFakeTimers());
@@ -56,6 +57,85 @@ describe(startCallHeartbeatLoop.name, () => {
 
     expect(heartbeat).toHaveBeenCalledTimes(1);
     stop();
+  });
+
+  it.each([401, 403, 404])(
+    'ends the local call and stops renewal after HTTP %s',
+    async (status) => {
+      const heartbeat = jest
+        .fn()
+        .mockRejectedValue(new HttpJsonError(status, 'Denied', ''));
+      const onAccessDenied = jest.fn();
+      startCallHeartbeatLoop({ callId: 'call-1', heartbeat, onAccessDenied });
+      await flushPromises();
+      await jest.advanceTimersByTimeAsync(10_000);
+      expect(onAccessDenied).toHaveBeenCalledWith('call-1');
+      expect(onAccessDenied).toHaveBeenCalledTimes(1);
+      expect(heartbeat).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('ends only the explicit hidden-call denial among conflict responses', async () => {
+    const onAccessDenied = jest.fn();
+    const heartbeat = jest
+      .fn()
+      .mockRejectedValueOnce(
+        new HttpJsonError(409, 'Conflict', '{"code":"OtherConflict"}'),
+      )
+      .mockRejectedValueOnce(
+        new HttpJsonError(
+          409,
+          'Conflict',
+          '{"code":"CallNotFoundError","message":"Call not found."}',
+        ),
+      );
+    startCallHeartbeatLoop({ callId: 'call-1', heartbeat, onAccessDenied });
+    await flushPromises();
+    expect(onAccessDenied).not.toHaveBeenCalled();
+    await jest.advanceTimersByTimeAsync(2000);
+    expect(onAccessDenied).toHaveBeenCalledWith('call-1');
+    await jest.advanceTimersByTimeAsync(10000);
+    expect(heartbeat).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([429, 500, 503])(
+    'keeps retrying temporary HTTP %s responses',
+    async (status) => {
+      const heartbeat = jest
+        .fn()
+        .mockRejectedValue(new HttpJsonError(status, 'Temporary failure', ''));
+      const onAccessDenied = jest.fn();
+      const stop = startCallHeartbeatLoop({
+        callId: 'call-1',
+        heartbeat,
+        onAccessDenied,
+      });
+      await flushPromises();
+      await jest.advanceTimersByTimeAsync(2000);
+      expect(heartbeat).toHaveBeenCalledTimes(2);
+      expect(onAccessDenied).not.toHaveBeenCalled();
+      stop();
+    },
+  );
+
+  it('ignores a denied response from a call whose heartbeat loop was stopped', async () => {
+    let rejectHeartbeat: (reason: Error) => void = () => undefined;
+    const heartbeat = jest.fn(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectHeartbeat = reject;
+        }),
+    );
+    const onAccessDenied = jest.fn();
+    const stop = startCallHeartbeatLoop({
+      callId: 'call-1',
+      heartbeat,
+      onAccessDenied,
+    });
+    stop();
+    rejectHeartbeat(new HttpJsonError(403, 'Denied', ''));
+    await flushPromises();
+    expect(onAccessDenied).not.toHaveBeenCalled();
   });
 
   it('continues retrying after consecutive heartbeat failures', async () => {

@@ -106,13 +106,13 @@ export class PigeonCallsApi {
     session: Session,
     callId: string,
     mediaConnections: CallParticipantMediaConnection[],
-  ): Promise<CallResource> {
+  ): Promise<void> {
     const path = `/calls/${encodeURIComponent(
       callId,
     )}/participants/me/heartbeat`;
     const body = { mediaConnections };
 
-    return await this.http.request<CallResource>(path, {
+    await this.http.request<void>(path, {
       body: JSON.stringify(body),
       headers: await this.signer.headers(session, 'POST', path, body),
       method: 'POST',

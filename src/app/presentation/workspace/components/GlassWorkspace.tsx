@@ -849,6 +849,7 @@ export function GlassWorkspace({
   useRealtimeEvents(session, {
     onConnected: () => {
       setRealtimeStatus('connected');
+      callControls.recoverRealtimeCalls();
       void refreshConversations().catch(() => undefined);
     },
     onDisconnected: () => {
