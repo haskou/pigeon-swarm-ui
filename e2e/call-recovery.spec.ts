@@ -154,7 +154,8 @@ for (const scenario of [
                 .stats.bob,
             { timeout: 5000 },
           )
-          .toMatchObject({ iceState: 'new', recoveryState: 'recovering' });
+          .toMatchObject({ iceState: 'new', recoveryState: 'idle' });
+        await expect(pages[0].getByRole('status')).toHaveCount(0);
         await expect(pages[0].getByRole('status')).toContainText(
           'Reconnecting',
           {

@@ -14,6 +14,26 @@ function peerConnection(
 describe('CallPeerRecovery', () => {
   afterEach(() => jest.useRealTimers());
 
+  it.each(['new', 'checking'] as const)(
+    'keeps initial %s negotiation distinct from an actual recovery attempt',
+    async (iceState) => {
+      jest.useFakeTimers();
+      const peer = peerConnection('new', iceState);
+      Object.assign(peer, {
+        localDescription: { type: 'offer' },
+        remoteDescription: { type: 'answer' },
+      });
+      const recovery = new CallPeerRecovery(() => Promise.resolve());
+      recovery.reconcile('peer', peer, () => true);
+      expect(recovery.stateFor('peer')).toBe('idle');
+      await jest.advanceTimersByTimeAsync(14_999);
+      expect(recovery.stateFor('peer')).toBe('idle');
+      await jest.advanceTimersByTimeAsync(1);
+      expect(recovery.stateFor('peer')).toBe('recovering');
+      recovery.reset();
+    },
+  );
+
   it('bounds a negotiated connection with no remote candidates, without retrying an unanswered offer', async () => {
     jest.useFakeTimers();
     const restart = jest.fn(() => Promise.resolve());

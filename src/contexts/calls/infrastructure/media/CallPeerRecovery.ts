@@ -223,8 +223,7 @@ export class CallPeerRecovery {
   public stateFor(peerIdentityId: string): CallPeerRecoveryState {
     if (this.exhausted.has(peerIdentityId)) return 'exhausted';
 
-    return this.pending.has(peerIdentityId) ||
-      this.inFlight.has(peerIdentityId) ||
+    return this.inFlight.has(peerIdentityId) ||
       this.attempts.has(peerIdentityId)
       ? 'recovering'
       : 'idle';
