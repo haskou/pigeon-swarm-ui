@@ -15,11 +15,15 @@ const identity =
 const remote = identity === 'alice' ? 'bob' : 'alice';
 const root = createRoot(document.getElementById('root')!);
 const nativePeers: RTCPeerConnection[] = [];
+const gatheredCandidates: RTCIceCandidateInit[] = [];
 const NativePeerConnection = window.RTCPeerConnection;
 window.RTCPeerConnection = class extends NativePeerConnection {
   constructor(configuration?: RTCConfiguration) {
     super(configuration);
     nativePeers.push(this);
+    this.addEventListener('icecandidate', (event) => {
+      if (event.candidate) gatheredCandidates.push(event.candidate.toJSON());
+    });
   }
 };
 const manager = new CallPeerConnections(
@@ -121,6 +125,30 @@ window.callRecoveryTest = {
   receive: async (type: CallSignalType, payload: Record<string, unknown>) =>
     manager.handleSignal(remote, type, payload, send, identity),
   restart: () => nativePeers.forEach((peer) => peer.restartIce()),
+  candidates: async () => {
+    const peer = nativePeers[0];
+    const fragment = peer.localDescription?.sdp.match(
+      /^a=ice-ufrag:([^\r\n]+)/m,
+    )?.[1];
+    const current = () =>
+      gatheredCandidates.filter(
+        (candidate) => candidate.usernameFragment === fragment,
+      );
+    if (peer.iceGatheringState !== 'complete' || !current().length)
+      await new Promise<void>((resolve) => {
+        const check = () => {
+          if (peer.iceGatheringState !== 'complete' || !current().length)
+            return;
+          peer.removeEventListener('icegatheringstatechange', check);
+          peer.removeEventListener('icecandidate', check);
+          resolve();
+        };
+        peer.addEventListener('icegatheringstatechange', check);
+        peer.addEventListener('icecandidate', check);
+        check();
+      });
+    return current();
+  },
   inspect: async () => ({
     stats: await manager.collectStats(),
     native: nativePeers.map((peer) => ({
@@ -159,6 +187,7 @@ declare global {
       }>;
       dispose: () => void;
       restart: () => void;
+      candidates: () => Promise<RTCIceCandidateInit[]>;
     };
   }
 }

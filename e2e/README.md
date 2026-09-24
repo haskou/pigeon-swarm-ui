@@ -42,8 +42,10 @@ and checks increasing inbound audio bytes in both directions. It also checks
 that connections and audio elements are not duplicated, leaving releases them,
 and the opt-in diagnostic download contains only redacted connection metrics.
 A separate scenario delivers simultaneous restart offers to both peers and
-checks that resolving the collision preserves bidirectional audio. The fixture
-suppresses development-server hot reload while the call is active.
+checks that resolving the collision preserves bidirectional audio. Candidates
+are deliberately delivered before the answer, whose SDP omits them, to verify
+that early candidates survive the collision. The fixture suppresses
+development-server hot reload while the call is active.
 
 Signaling delivery is controlled by the test. This is local direct-media
 coverage, not backend authorization, TURN, public NAT, or mobile-browser

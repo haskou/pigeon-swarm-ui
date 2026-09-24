@@ -158,15 +158,11 @@ export class CallPeerConnections {
     candidate: RTCIceCandidateInit,
     state: PeerNegotiationState,
   ): Promise<void> {
-    if (state.ignoreOffer) {
-      logCallDebug('peer-manager:handle-signal:drop-ignored-ice-candidate', {
-        senderIdentityId,
-      });
-
-      return;
-    }
-
-    if (!peer.remoteDescription) {
+    if (
+      state.ignoreOffer ||
+      peer.signalingState === 'have-local-offer' ||
+      !peer.remoteDescription
+    ) {
       logCallDebug('peer-manager:handle-signal:queue-ice-candidate', {
         senderIdentityId,
       });
@@ -903,6 +899,8 @@ export class CallPeerConnections {
     const candidates = this.pendingIceCandidates.get(peerIdentityId) ?? [];
 
     candidates.push(candidate);
+
+    if (candidates.length > 128) candidates.shift();
     this.pendingIceCandidates.set(peerIdentityId, candidates);
     logCallDebug('peer-manager:queue-ice-candidate', {
       candidateCount: candidates.length,

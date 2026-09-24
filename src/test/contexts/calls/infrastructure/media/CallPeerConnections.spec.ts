@@ -1057,6 +1057,100 @@ describe(CallPeerConnections.name, () => {
   });
 
   it.each([
+    { during: false, glare: false },
+    { during: false, glare: true },
+    { during: true, glare: true },
+  ])(
+    'keeps early answer candidates until their restart description arrives (glare=$glare, applying=$during)',
+    async ({ during, glare }) => {
+      const peers: FakePeerConnection[] = [];
+      installSessionDescriptionMock();
+      installPeerConnectionMock(peers);
+      Object.defineProperty(globalThis, 'RTCIceCandidate', {
+        configurable: true,
+        value: jest.fn((candidate: RTCIceCandidateInit) => candidate),
+      });
+      const manager = callPeerConnectionManager();
+      manager.configure(() => Promise.resolve({ iceServers: [] }));
+      const sendSignal = jest.fn().mockResolvedValue(undefined);
+      await manager.ensurePeer('bob', true, sendSignal);
+      await manager.handleSignal(
+        'bob',
+        'answer',
+        { sdp: 'v=0\r\na=ice-ufrag:old\r\n', type: 'answer' },
+        sendSignal,
+        'alice',
+      );
+      const peer = peers[0];
+      await peer.setLocalDescription({ sdp: 'restart-offer', type: 'offer' });
+
+      if (glare)
+        await manager.handleSignal(
+          'bob',
+          'offer',
+          { sdp: 'v=0\r\na=ice-ufrag:ignored\r\n', type: 'offer' },
+          sendSignal,
+          'alice',
+        );
+      const applyAnswer = () =>
+        manager.handleSignal(
+          'bob',
+          'answer',
+          { sdp: 'v=0\r\na=ice-ufrag:new\r\n', type: 'answer' },
+          sendSignal,
+          'alice',
+        );
+      let acceptingAnswer: Promise<void> | undefined;
+      let finishAnswer: (() => void) | undefined;
+
+      if (during) {
+        const original = jest
+          .mocked(peer.setRemoteDescription)
+          .getMockImplementation()!;
+        let started!: () => void;
+        const applying = new Promise<void>((resolve) => {
+          started = resolve;
+        });
+        jest
+          .mocked(peer.setRemoteDescription)
+          .mockImplementationOnce((description) => {
+            started();
+
+            return new Promise<void>((resolve) => {
+              finishAnswer = () => {
+                void original(description).then(resolve);
+              };
+            });
+          });
+        acceptingAnswer = applyAnswer();
+        await applying;
+      }
+      for (const fragment of ['old', 'ignored', 'new'])
+        await manager.handleSignal(
+          'bob',
+          'ice_candidate',
+          {
+            candidate: 'candidate:' + fragment,
+            sdpMid: '0',
+            usernameFragment: fragment,
+          },
+          sendSignal,
+          'alice',
+        );
+      expect(peer.addIceCandidate).not.toHaveBeenCalled();
+
+      finishAnswer?.();
+      await (acceptingAnswer ?? applyAnswer());
+
+      expect(peer.addIceCandidate).toHaveBeenCalledTimes(1);
+      expect(peer.addIceCandidate).toHaveBeenCalledWith(
+        expect.objectContaining({ usernameFragment: 'new' }),
+      );
+      manager.reset();
+    },
+  );
+
+  it.each([
     { arrival: 'before', fragment: 'old' },
     { arrival: 'after', fragment: 'old' },
     { arrival: 'before', fragment: undefined },

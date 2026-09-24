@@ -96,6 +96,28 @@ for (const scenario of [
               deliver(signal.index, signal.type, signal.payload);
             return;
           }
+          if (type === 'answer' && collisionSignals.length > 0) {
+            const candidates = await page.evaluate(() =>
+              window.callRecoveryTest.candidates(),
+            );
+            expect(candidates.length).toBeGreaterThan(0);
+            for (const candidate of candidates)
+              await pages[1 - index].evaluate(
+                (candidate) =>
+                  window.callRecoveryTest.receive('ice_candidate', {
+                    ...candidate,
+                  }),
+                candidate,
+              );
+            payload.sdp = String(payload.sdp)
+              .split('\r\n')
+              .filter(
+                (line) =>
+                  !line.startsWith('a=candidate:') &&
+                  line !== 'a=end-of-candidates',
+              )
+              .join('\r\n');
+          }
           deliver(index, type, payload);
         },
       );
