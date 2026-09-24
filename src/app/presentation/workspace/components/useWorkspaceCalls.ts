@@ -211,6 +211,9 @@ export function useWorkspaceCalls({
     useWorkspaceRealtimeCallEvents({
       activeCallRef,
       onRecoveredCalls: (calls, previousActiveCallId) => {
+        onCommunitiesChange((current) =>
+          communitiesWithCallVoicePresence(current, calls),
+        );
         if (
           previousActiveCallId &&
           activeCallRef.current?.id === previousActiveCallId &&
