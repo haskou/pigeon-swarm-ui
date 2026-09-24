@@ -141,8 +141,10 @@ export function useWorkspaceRealtimeCallEvents(
     callId: string,
     event: RealtimeDomainEvent,
   ): void => {
-    if (!snapshotsRef.current.isStale(event))
-      refreshCallResource(callId, event.type);
+    if (snapshotsRef.current.isStale(event)) return;
+
+    snapshotsRef.current.rememberPendingRevision(event);
+    refreshCallResource(callId, event.type);
   };
 
   const handleRealtimeCallEvent = useCallback(
