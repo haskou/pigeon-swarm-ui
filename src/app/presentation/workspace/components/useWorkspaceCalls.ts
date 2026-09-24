@@ -319,7 +319,10 @@ export function useWorkspaceCalls({
     activeCall,
     heartbeat: heartbeatActiveCall,
     onAccessDenied: (callId) => {
-      if (activeCallRef.current?.id === callId) endCall();
+      if (activeCallRef.current?.id !== callId) return;
+
+      endCall();
+      removeCurrentIdentityFromVoicePresence();
     },
     mediaConnections: callMediaConnections,
   });
