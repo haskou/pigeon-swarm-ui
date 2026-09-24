@@ -34,6 +34,7 @@ export type MessagesWorkspaceContentProps = {
     | 'activeCall'
     | 'leaveActiveCall'
     | 'retryMicrophone'
+    | 'retryConnection'
     | 'setParticipantScreenShareVolume'
     | 'setParticipantVolume'
     | 'setScreenShareQuality'

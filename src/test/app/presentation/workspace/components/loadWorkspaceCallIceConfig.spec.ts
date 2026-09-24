@@ -5,7 +5,7 @@ import { copy } from '../../../../../shared/presentation/i18n/copy';
 describe('loadWorkspaceCallIceConfig', () => {
   afterEach(() => jest.restoreAllMocks());
 
-  it('discards response bodies before logging or propagating credential failures', async () => {
+  it('discards credential response bodies without writing to the console', async () => {
     const log = jest
       .spyOn(console, 'error')
       .mockImplementation(() => undefined);
@@ -22,13 +22,7 @@ describe('loadWorkspaceCallIceConfig', () => {
       loadWorkspaceCallIceConfig(() => Promise.reject(responseError)),
     ).rejects.toThrow(copy.calls.iceServersUnavailable);
 
-    expect(log).toHaveBeenCalledWith(
-      '[pigeon:calls]',
-      'workspace:call:ice-config-unavailable',
-      {
-        error: new Error(copy.calls.iceServersUnavailable),
-      },
-    );
+    expect(log).not.toHaveBeenCalled();
     expect(JSON.stringify(log.mock.calls)).not.toContain('private-');
   });
 

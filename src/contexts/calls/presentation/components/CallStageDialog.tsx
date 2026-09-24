@@ -22,6 +22,7 @@ export function CallStageDialog({
   onToggleMediaEncryption,
   onToggleNoiseCancellation,
   onRetryMicrophone,
+  onRetryConnection,
   onToggleScreenShare,
   subtitle,
 }: {
@@ -47,6 +48,7 @@ export function CallStageDialog({
   onToggleMediaEncryption: () => void;
   onToggleNoiseCancellation: () => void;
   onRetryMicrophone: () => void;
+  onRetryConnection: () => void;
   onToggleScreenShare: () => void;
   subtitle: string;
 }) {
@@ -72,6 +74,7 @@ export function CallStageDialog({
           onClose={onClose}
           onDataToggle={onDataToggle}
           onRetryMicrophone={onRetryMicrophone}
+          onRetryConnection={onRetryConnection}
           subtitle={subtitle}
         />
         <CallStageBody

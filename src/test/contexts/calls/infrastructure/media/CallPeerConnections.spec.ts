@@ -543,6 +543,88 @@ describe(CallPeerConnections.name, () => {
     },
   );
 
+  it.each([false, true])(
+    'rebinds live audio after accepting a colliding offer (collision=%s)',
+    async (collision) => {
+      const peers: FakePeerConnection[] = [];
+      installPeerConnectionMock(peers);
+      const manager = callPeerConnectionManager();
+      installSessionDescriptionMock();
+      const audio = mediaTrack('microphone', 'audio');
+      const video = mediaTrack('camera', 'video');
+      audio.enabled = false;
+      manager.setLocalStream(mediaStreamWithTracks([audio, video]));
+      manager.configure(() => Promise.resolve({ iceServers: [] }));
+      const sendSignal = jest.fn().mockResolvedValue(undefined);
+      await manager.ensurePeer('alice', false, sendSignal);
+      const peer = peers[0];
+
+      if (collision)
+        await peer.setLocalDescription({ sdp: 'local-offer', type: 'offer' });
+
+      await manager.handleSignal(
+        'alice',
+        'offer',
+        { sdp: 'remote-offer', type: 'offer' },
+        sendSignal,
+        'bob',
+      );
+
+      expect(peer.getSenders()[0].replaceTrack).toHaveBeenCalledTimes(
+        collision ? 1 : 0,
+      );
+
+      if (collision)
+        expect(peer.getSenders()[0].replaceTrack).toHaveBeenCalledWith(audio);
+      expect(peer.getSenders()[1].replaceTrack).not.toHaveBeenCalled();
+      expect(audio.enabled).toBe(false);
+      expect(audio.stop).not.toHaveBeenCalled();
+      expect(sendSignal).toHaveBeenCalledWith(
+        'alice',
+        'answer',
+        expect.objectContaining({ type: 'answer' }),
+      );
+      manager.reset();
+    },
+  );
+
+  it('does not restore an old microphone while its replacement is pending during glare', async () => {
+    const peers: FakePeerConnection[] = [];
+    installPeerConnectionMock(peers);
+    installSessionDescriptionMock();
+    const manager = callPeerConnectionManager();
+    const original = mediaTrack('old-microphone', 'audio');
+    const replacement = mediaTrack('new-microphone', 'audio');
+    manager.setLocalStream(mediaStreamWithTracks([original]));
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
+    const sendSignal = jest.fn().mockResolvedValue(undefined);
+    await manager.ensurePeer('alice', false, sendSignal);
+    const peer = peers[0];
+    const sender = peer.getSenders()[0];
+    let finishReplacement!: () => void;
+    jest.mocked(sender.replaceTrack).mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finishReplacement = resolve;
+        }),
+    );
+    manager.setLocalStream(mediaStreamWithTracks([replacement]));
+    await peer.setLocalDescription({ sdp: 'local-offer', type: 'offer' });
+
+    await manager.handleSignal(
+      'alice',
+      'offer',
+      { sdp: 'remote-offer', type: 'offer' },
+      sendSignal,
+      'bob',
+    );
+
+    expect(sender.replaceTrack).toHaveBeenCalledTimes(1);
+    expect(sender.replaceTrack).toHaveBeenCalledWith(replacement);
+    finishReplacement();
+    manager.reset();
+  });
+
   it('replaces recaptured microphone tracks without removing the sender', async () => {
     const peers: FakePeerConnection[] = [];
 
@@ -663,6 +745,50 @@ describe(CallPeerConnections.name, () => {
       iceTransportPolicy: 'relay',
     });
     expect(peer.restartIce).toHaveBeenCalledTimes(1);
+  });
+
+  it('exposes exhausted recovery and retries only the failed connection with fresh credentials', async () => {
+    jest.useFakeTimers();
+    const peers: FakePeerConnection[] = [];
+    installPeerConnectionMock(peers);
+    const manager = callPeerConnectionManager();
+    const provider = jest.fn().mockResolvedValue({ iceServers: [] });
+    manager.configure(provider);
+    await manager.ensurePeer('failed-peer', false, () => Promise.resolve());
+    await manager.ensurePeer('healthy-peer', false, () => Promise.resolve());
+    peers.forEach((peer) =>
+      Object.assign(peer, { getStats: () => Promise.resolve(new Map()) }),
+    );
+    const [failed, healthy] = peers;
+    healthy.connectionState = 'connected';
+    healthy.iceConnectionState = 'completed';
+    failed.connectionState = 'failed';
+    failed.iceConnectionState = 'failed';
+    registeredPeerEventListener(
+      failed,
+      'connectionstatechange',
+    )(new Event('connectionstatechange'));
+    await jest.advanceTimersByTimeAsync(45_000);
+    expect((await manager.collectStats())['failed-peer'].recoveryState).toBe(
+      'exhausted',
+    );
+    expect((await manager.collectStats())['healthy-peer'].recoveryState).toBe(
+      'idle',
+    );
+    expect(failed.restartIce).toHaveBeenCalledTimes(3);
+    manager.retryConnections();
+    manager.retryConnections();
+    await jest.advanceTimersByTimeAsync(0);
+    expect(provider).toHaveBeenCalledTimes(6);
+    expect(failed.restartIce).toHaveBeenCalledTimes(4);
+    expect(healthy.restartIce).not.toHaveBeenCalled();
+    expect((await manager.collectStats())['failed-peer'].recoveryState).toBe(
+      'recovering',
+    );
+    manager.reset();
+    await jest.advanceTimersByTimeAsync(60_000);
+    expect(failed.restartIce).toHaveBeenCalledTimes(4);
+    expect(jest.getTimerCount()).toBe(0);
   });
 
   it.each(['reset', 'healthy', 'timeout'])(
@@ -929,6 +1055,100 @@ describe(CallPeerConnections.name, () => {
     expect(peer.remoteDescription?.sdp).toBe('current-call-answer');
     expect(peer.signalingState).toBe('stable');
   });
+
+  it.each([
+    { during: false, glare: false },
+    { during: false, glare: true },
+    { during: true, glare: true },
+  ])(
+    'keeps early answer candidates until their restart description arrives (glare=$glare, applying=$during)',
+    async ({ during, glare }) => {
+      const peers: FakePeerConnection[] = [];
+      installSessionDescriptionMock();
+      installPeerConnectionMock(peers);
+      Object.defineProperty(globalThis, 'RTCIceCandidate', {
+        configurable: true,
+        value: jest.fn((candidate: RTCIceCandidateInit) => candidate),
+      });
+      const manager = callPeerConnectionManager();
+      manager.configure(() => Promise.resolve({ iceServers: [] }));
+      const sendSignal = jest.fn().mockResolvedValue(undefined);
+      await manager.ensurePeer('bob', true, sendSignal);
+      await manager.handleSignal(
+        'bob',
+        'answer',
+        { sdp: 'v=0\r\na=ice-ufrag:old\r\n', type: 'answer' },
+        sendSignal,
+        'alice',
+      );
+      const peer = peers[0];
+      await peer.setLocalDescription({ sdp: 'restart-offer', type: 'offer' });
+
+      if (glare)
+        await manager.handleSignal(
+          'bob',
+          'offer',
+          { sdp: 'v=0\r\na=ice-ufrag:ignored\r\n', type: 'offer' },
+          sendSignal,
+          'alice',
+        );
+      const applyAnswer = () =>
+        manager.handleSignal(
+          'bob',
+          'answer',
+          { sdp: 'v=0\r\na=ice-ufrag:new\r\n', type: 'answer' },
+          sendSignal,
+          'alice',
+        );
+      let acceptingAnswer: Promise<void> | undefined;
+      let finishAnswer: (() => void) | undefined;
+
+      if (during) {
+        const original = jest
+          .mocked(peer.setRemoteDescription)
+          .getMockImplementation()!;
+        let started!: () => void;
+        const applying = new Promise<void>((resolve) => {
+          started = resolve;
+        });
+        jest
+          .mocked(peer.setRemoteDescription)
+          .mockImplementationOnce((description) => {
+            started();
+
+            return new Promise<void>((resolve) => {
+              finishAnswer = () => {
+                void original(description).then(resolve);
+              };
+            });
+          });
+        acceptingAnswer = applyAnswer();
+        await applying;
+      }
+      for (const fragment of ['old', 'ignored', 'new'])
+        await manager.handleSignal(
+          'bob',
+          'ice_candidate',
+          {
+            candidate: 'candidate:' + fragment,
+            sdpMid: '0',
+            usernameFragment: fragment,
+          },
+          sendSignal,
+          'alice',
+        );
+      expect(peer.addIceCandidate).not.toHaveBeenCalled();
+
+      finishAnswer?.();
+      await (acceptingAnswer ?? applyAnswer());
+
+      expect(peer.addIceCandidate).toHaveBeenCalledTimes(1);
+      expect(peer.addIceCandidate).toHaveBeenCalledWith(
+        expect.objectContaining({ usernameFragment: 'new' }),
+      );
+      manager.reset();
+    },
+  );
 
   it.each([
     { arrival: 'before', fragment: 'old' },

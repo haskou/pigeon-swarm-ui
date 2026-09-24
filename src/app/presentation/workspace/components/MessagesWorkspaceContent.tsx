@@ -81,6 +81,7 @@ export function MessagesWorkspaceContent(
               }
               onCallParticipantVolumeChange={callControls.setParticipantVolume}
               onCallRetryMicrophone={callControls.retryMicrophone}
+              onCallRetryConnection={callControls.retryConnection}
               onCallScreenShareQualityChange={
                 callControls.setScreenShareQuality
               }

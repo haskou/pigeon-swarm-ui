@@ -26,6 +26,7 @@ type CommunityWorkspaceContentProps = {
     | 'activeCall'
     | 'leaveActiveCall'
     | 'retryMicrophone'
+    | 'retryConnection'
     | 'setParticipantScreenShareVolume'
     | 'setParticipantVolume'
     | 'setScreenShareQuality'
@@ -176,6 +177,7 @@ export function CommunityWorkspaceContent({
         }
         onCallParticipantVolumeChange={callControls.setParticipantVolume}
         onCallRetryMicrophone={callControls.retryMicrophone}
+        onCallRetryConnection={callControls.retryConnection}
         onCallScreenShareQualityChange={callControls.setScreenShareQuality}
         onCallToggleCamera={callControls.toggleCamera}
         onCallToggleDeafen={callControls.toggleDeafen}

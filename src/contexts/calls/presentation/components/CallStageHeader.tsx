@@ -6,6 +6,7 @@ import { useTechnicalDetailsPreference } from '../../../../shared/presentation/p
 import { callSessionTitle } from './callSessionDisplay';
 import { SpeakerIcon } from './callIcons';
 import { MicrophoneBlockedNotice } from './MicrophoneBlockedNotice';
+import { CallRecoveryNotice } from './CallRecoveryNotice';
 
 export function CallStageHeader({
   call,
@@ -13,6 +14,7 @@ export function CallStageHeader({
   onClose,
   onDataToggle,
   onRetryMicrophone,
+  onRetryConnection,
   subtitle,
 }: {
   call: CallSession;
@@ -20,6 +22,7 @@ export function CallStageHeader({
   onClose: () => void;
   onDataToggle: () => void;
   onRetryMicrophone: () => void;
+  onRetryConnection: () => void;
   subtitle: string;
 }) {
   const [technicalDetailsVisible] = useTechnicalDetailsPreference();
@@ -62,6 +65,7 @@ export function CallStageHeader({
           onClick={onClose}
         />
       </div>
+      <CallRecoveryNotice call={call} onRetryConnection={onRetryConnection} />
       {!call.hasMicrophone && (
         <div className="mt-3">
           <MicrophoneBlockedNotice

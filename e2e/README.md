@@ -1,6 +1,7 @@
 # E2E tests
 
-These Playwright tests are on-demand only. They are not part of CI.
+The stale ICE candidate and call recovery tests run in CI. Other Playwright
+scenarios run on demand against a configured application backend.
 
 Run all device profiles:
 
@@ -27,6 +28,28 @@ no networks, provide a fallback network id:
 ```bash
 E2E_NETWORK_ID=<network-id> yarn test:e2e
 ```
+
+## Call recovery
+
+```bash
+yarn test:e2e e2e/call-recovery.spec.ts --project=desktop-chromium
+```
+
+This self-contained Vite fixture uses two separate Chromium browsers, the real
+call connection manager and native WebRTC audio tracks. It withholds candidate
+exchange until automatic recovery is exhausted, clicks the real retry control,
+and checks increasing inbound audio bytes in both directions. It also checks
+that connections and audio elements are not duplicated, leaving releases them,
+and the opt-in diagnostic download contains only redacted connection metrics.
+A separate scenario delivers simultaneous restart offers to both peers and
+checks that resolving the collision preserves bidirectional audio. Candidates
+are deliberately delivered before the answer, whose SDP omits them, to verify
+that early candidates survive the collision. The fixture suppresses
+development-server hot reload while the call is active.
+
+Signaling delivery is controlled by the test. This is local direct-media
+coverage, not backend authorization, TURN, public NAT, or mobile-browser
+validation. Cross-node relay coverage belongs to the wrapper integration suite.
 
 ## Visual audit
 

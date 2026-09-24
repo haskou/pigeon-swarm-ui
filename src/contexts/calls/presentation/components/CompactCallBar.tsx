@@ -15,6 +15,7 @@ import {
 import { VideoPreview } from './VideoPreview';
 import { callSessionTitle } from './callSessionDisplay';
 import { MicrophoneBlockedNotice } from './MicrophoneBlockedNotice';
+import { CallRecoveryNotice } from './CallRecoveryNotice';
 
 type CompactCallBarProps = {
   call: CallSession;
@@ -25,6 +26,7 @@ type CompactCallBarProps = {
   onToggleMute: () => void;
   onToggleNoiseCancellation: () => void;
   onRetryMicrophone: () => void;
+  onRetryConnection: () => void;
   onToggleScreenShare: () => void;
   screenParticipant?: CallSession['participants'][number];
   subtitle: string;
@@ -39,6 +41,7 @@ export const CompactCallBar = memo(function CompactCallBar({
   onToggleMute,
   onToggleNoiseCancellation,
   onRetryMicrophone,
+  onRetryConnection,
   onToggleScreenShare,
   screenParticipant,
   subtitle,
@@ -64,6 +67,7 @@ export const CompactCallBar = memo(function CompactCallBar({
           </div>
           <CompactCallTitle call={call} subtitle={subtitle} />
         </div>
+        <CallRecoveryNotice call={call} onRetryConnection={onRetryConnection} />
         {!call.hasMicrophone && (
           <MicrophoneBlockedNotice
             call={call}
@@ -107,6 +111,8 @@ function areCompactCallBarPropsEqual(
     previous.call.deafened === next.call.deafened &&
     previous.call.hasMicrophone === next.call.hasMicrophone &&
     previous.call.id === next.call.id &&
+    previous.call.participants === next.call.participants &&
+    previous.onRetryConnection === next.onRetryConnection &&
     previous.call.muted === next.call.muted &&
     previous.call.noiseCancellationEnabled ===
       next.call.noiseCancellationEnabled &&

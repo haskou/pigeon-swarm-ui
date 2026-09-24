@@ -102,6 +102,7 @@ export function useCallSession(): {
   toggleMediaEncryption: () => void;
   toggleNoiseCancellation: (enabled: boolean) => Promise<void>;
   retryMicrophone: () => Promise<void>;
+  retryConnection: () => void;
   toggleScreenShare: () => Promise<void>;
 } {
   const mediaManager = useMemo(() => new LocalCallMedia(), []);
@@ -550,6 +551,10 @@ export function useCallSession(): {
     });
   };
 
+  const retryConnection = useCallback(() => {
+    if (activeCallRef.current) peerManager.retryConnections();
+  }, [peerManager]);
+
   const retryMicrophone = async () => {
     const current = activeCallRef.current;
 
@@ -806,6 +811,7 @@ export function useCallSession(): {
     receiveSignal,
     reconcileCall,
     retryMicrophone,
+    retryConnection,
     setParticipantScreenShareVolume,
     setParticipantVolume,
     setScreenShareQuality,

@@ -133,6 +133,15 @@ export const es = {
   },
   calls: {
     answer: 'Responder',
+    connectionRecovering: 'Reconectando el audio de la llamada…',
+    connectionRecoveryExhausted:
+      'No se pudo reconectar el audio con uno o varios participantes. Comprueba tu conexión y reintenta, o sal y vuelve a entrar en la llamada.',
+    retryConnection: 'Reintentar conexión',
+    diagnosticsPrivacy:
+      'Registra métricas de conexión localmente durante un máximo de 5 minutos. Se excluyen nombres, identidades, direcciones, credenciales y mensajes. Cerrar este panel o detener el registro borra los datos. Exporta solo si quieres compartirlos.',
+    startDiagnostics: 'Iniciar diagnóstico',
+    stopDiagnostics: 'Detener y borrar',
+    exportDiagnostics: 'Exportar diagnóstico',
     callData: 'Datos de llamada',
     callMetricBitrate: 'Bitrate',
     callMetricCodec: 'Codec',

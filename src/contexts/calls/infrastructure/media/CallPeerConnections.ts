@@ -158,15 +158,11 @@ export class CallPeerConnections {
     candidate: RTCIceCandidateInit,
     state: PeerNegotiationState,
   ): Promise<void> {
-    if (state.ignoreOffer) {
-      logCallDebug('peer-manager:handle-signal:drop-ignored-ice-candidate', {
-        senderIdentityId,
-      });
-
-      return;
-    }
-
-    if (!peer.remoteDescription) {
+    if (
+      state.ignoreOffer ||
+      peer.signalingState === 'have-local-offer' ||
+      !peer.remoteDescription
+    ) {
       logCallDebug('peer-manager:handle-signal:queue-ice-candidate', {
         senderIdentityId,
       });
@@ -195,16 +191,12 @@ export class CallPeerConnections {
     sendSignal: SignalSender,
   ): Promise<void> {
     const description = new RTCSessionDescription(payload);
+    const offerCollision = this.isOfferCollision(description, state, peer);
     const wasSendingEncryptedMedia =
       this.outboundMediaEncryptionEnabled(senderIdentityId);
 
     if (
-      !(await this.acceptRemoteDescription(
-        senderIdentityId,
-        peer,
-        state,
-        description,
-      ))
+      !this.acceptRemoteDescription(senderIdentityId, peer, state, description)
     ) {
       return;
     }
@@ -234,18 +226,57 @@ export class CallPeerConnections {
     const answer = await peer.createAnswer();
 
     await peer.setLocalDescription(answer);
+
+    if (offerCollision) await this.rebindAudioSenders(senderIdentityId, peer);
     logCallDebug('peer-manager:handle-signal:send-answer', {
       senderIdentityId,
     });
     await this.sendDescription(senderIdentityId, peer, answer, sendSignal);
   }
 
-  private async acceptRemoteDescription(
+  private isOfferCollision(
+    description: RTCSessionDescriptionInit,
+    state: PeerNegotiationState,
+    peer: RTCPeerConnection,
+  ): boolean {
+    return (
+      description.type === 'offer' &&
+      (state.makingOffer || peer.signalingState !== 'stable')
+    );
+  }
+
+  private async rebindAudioSenders(
+    peerIdentityId: string,
+    peer: RTCPeerConnection,
+  ): Promise<void> {
+    if (
+      this.peers.get(peerIdentityId) !== peer ||
+      peer.connectionState === 'closed'
+    )
+      return;
+
+    await Promise.all(
+      peer.getSenders().map((sender) => {
+        const track = sender.track;
+
+        if (
+          track?.kind !== 'audio' ||
+          track.readyState !== 'live' ||
+          !this.localStream?.getTracks().includes(track)
+        )
+          return;
+
+        return sender.replaceTrack(track);
+      }),
+    );
+  }
+
+  private acceptRemoteDescription(
     senderIdentityId: string,
     peer: RTCPeerConnection,
     state: PeerNegotiationState,
     description: RTCSessionDescription,
-  ): Promise<boolean> {
+  ): boolean {
     const negotiationState = state;
 
     if (
@@ -263,8 +294,11 @@ export class CallPeerConnections {
       return true;
     }
 
-    const offerCollision =
-      negotiationState.makingOffer || peer.signalingState !== 'stable';
+    const offerCollision = this.isOfferCollision(
+      description,
+      negotiationState,
+      peer,
+    );
 
     negotiationState.ignoreOffer = !negotiationState.polite && offerCollision;
 
@@ -284,7 +318,6 @@ export class CallPeerConnections {
         senderIdentityId,
         signalingState: peer.signalingState,
       });
-      await peer.setLocalDescription({ type: 'rollback' });
     }
 
     return true;
@@ -373,6 +406,11 @@ export class CallPeerConnections {
         peerIdentityId,
         signalingState: peer.signalingState,
       });
+      this.recovery.reconcile(
+        peerIdentityId,
+        peer,
+        () => this.peers.get(peerIdentityId) === peer,
+      );
     });
     peer.addEventListener('icecandidate', (event) => {
       if (!event.candidate) {
@@ -861,6 +899,8 @@ export class CallPeerConnections {
     const candidates = this.pendingIceCandidates.get(peerIdentityId) ?? [];
 
     candidates.push(candidate);
+
+    if (candidates.length > 128) candidates.shift();
     this.pendingIceCandidates.set(peerIdentityId, candidates);
     logCallDebug('peer-manager:queue-ice-candidate', {
       candidateCount: candidates.length,
@@ -1094,7 +1134,27 @@ export class CallPeerConnections {
   }
 
   public async collectStats(): Promise<Record<string, PeerMediaStats>> {
-    return await this.statistics.collect(this.peers);
+    const stats = await this.statistics.collect(this.peers);
+
+    return Object.fromEntries(
+      Object.entries(stats).map(([identityId, stat]) => [
+        identityId,
+        {
+          ...stat,
+          recoveryState: this.recovery.stateFor(identityId),
+        },
+      ]),
+    );
+  }
+
+  public retryConnections(): void {
+    this.peers.forEach((peer, identityId) => {
+      this.recovery.retry(
+        identityId,
+        peer,
+        () => this.peers.get(identityId) === peer,
+      );
+    });
   }
 
   public mediaConnections(): ReturnType<CallPeerStatistics['connections']> {

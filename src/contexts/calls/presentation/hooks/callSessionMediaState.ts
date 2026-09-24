@@ -157,6 +157,7 @@ function remoteParticipantWithMediaState(
     mediaEncryptionActive: isMediaEncryptionActiveWith(participant.identityId),
     mediaStream,
     packetsLost: stat?.packetsLost,
+    recoveryState: stat?.recoveryState,
     screenSharing: hasVideoTrack(screenStream),
     screenStream,
     speaking: stat?.speaking ?? false,
@@ -245,6 +246,7 @@ export function callParticipantsMediaStateEqual(
         nextParticipant.mediaEncryptionActive &&
       currentParticipant.muted === nextParticipant.muted &&
       currentParticipant.packetsLost === nextParticipant.packetsLost &&
+      currentParticipant.recoveryState === nextParticipant.recoveryState &&
       currentParticipant.screenSharing === nextParticipant.screenSharing &&
       currentParticipant.screenStream === nextParticipant.screenStream &&
       currentParticipant.speaking === nextParticipant.speaking &&
