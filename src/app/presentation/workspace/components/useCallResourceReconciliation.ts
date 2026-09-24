@@ -6,24 +6,25 @@ import {
   type Dispatch,
   type SetStateAction,
 } from 'react';
-import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
+
 import type { CallParticipantStatus } from '../../../../contexts/calls/infrastructure/http/resources/CallParticipantStatus';
 import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
+import type { useCallSession } from '../../../../contexts/calls/presentation/hooks/useCallSession';
+import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
 import type { Community } from '../../../../shared/domain/pigeonResources.types';
 import type { WorkspaceCallDetails } from './resolveWorkspaceCallDetails';
-import type { useCallSession } from '../../../../contexts/calls/presentation/hooks/useCallSession';
 
 import {
   logCallDebug,
   logCallWarning,
 } from '../../../../contexts/calls/infrastructure/media/callDebugLogger';
+import { showPwaNotification } from '../../../../contexts/notifications/presentation/services/pwaNotifications';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import {
   playEndedCallSound,
   playIncomingCallSound,
   stopIncomingCallSound,
 } from '../../../../shared/presentation/sounds';
-import { showPwaNotification } from '../../../../contexts/notifications/presentation/services/pwaNotifications';
 
 type CallSessionController = ReturnType<typeof useCallSession>;
 
@@ -93,11 +94,11 @@ export function useCallResourceReconciliation({
         call.scope.type === 'community_channel' &&
         currentActiveCall?.id === call.id &&
         call.status === 'active' &&
-        call.participants.some(
-          (participant) =>
-            participant.identityId !== currentIdentityId &&
-            previousStatuses[participant.identityId] === 'joined' &&
-            participant.status === 'left',
+        Object.entries(previousStatuses).some(
+          ([identityId, status]) =>
+            identityId !== currentIdentityId &&
+            status === 'joined' &&
+            (!nextStatuses[identityId] || nextStatuses[identityId] === 'left'),
         );
 
       participantStatusesRef.current = {

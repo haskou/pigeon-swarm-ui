@@ -9,10 +9,10 @@ export interface CallRepository {
   end(call: Call, actorIdentityId: CallIdentityId): Promise<void>;
   find(callId: CallId, actorIdentityId: CallIdentityId): Promise<Call>;
   heartbeat(
-    call: Call,
+    callId: CallId,
     actorIdentityId: CallIdentityId,
     mediaConnections: CallMediaConnection[],
-  ): Promise<Call>;
+  ): Promise<void>;
   join(call: Call, actorIdentityId: CallIdentityId): Promise<Call>;
   leave(call: Call, actorIdentityId: CallIdentityId): Promise<void>;
   search(actorIdentityId: CallIdentityId): Promise<Call[]>;

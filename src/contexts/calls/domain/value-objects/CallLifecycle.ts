@@ -8,14 +8,16 @@ export class CallLifecycle {
   ): CallLifecycle {
     return new CallLifecycle(
       CallStatus.fromPrimitives(primitives.status),
-      new Timestamp(primitives.createdAt),
+      primitives.createdAt === undefined
+        ? undefined
+        : new Timestamp(primitives.createdAt),
       primitives.endedAt ? new Timestamp(primitives.endedAt) : undefined,
     );
   }
 
   private constructor(
     private readonly status: CallStatus,
-    private readonly createdAt: Timestamp,
+    private readonly createdAt: Timestamp | undefined,
     private readonly endedAt?: Timestamp,
   ) {}
 
@@ -33,11 +35,11 @@ export class CallLifecycle {
 
   public toPrimitives() {
     const primitives: {
-      createdAt: number;
+      createdAt?: number;
       endedAt?: number;
       status: ReturnType<CallStatus['valueOf']>;
     } = {
-      createdAt: this.createdAt.valueOf(),
+      ...(this.createdAt ? { createdAt: this.createdAt.valueOf() } : {}),
       status: this.status.valueOf(),
     };
 

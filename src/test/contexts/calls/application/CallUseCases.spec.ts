@@ -106,7 +106,25 @@ describe('call application use cases', () => {
     });
   });
 
-  it('mutates the aggregate before joining, leaving, ending, and heartbeating', async () => {
+  it('renews liveness without retrieving the participant roster', async () => {
+    calls.heartbeat.mockResolvedValue(undefined);
+    await new CallParticipantHeartbeater(calls).heartbeat(
+      new HeartbeatCallParticipantMessage({
+        actorIdentityId: 'identity-a',
+        callId: 'call-a',
+        mediaConnections: [],
+        occurredAt: 20,
+      }),
+    );
+    expect(calls.find).not.toHaveBeenCalled();
+    expect(calls.heartbeat).toHaveBeenCalledWith(
+      CallId.fromString('call-a'),
+      actorId,
+      [],
+    );
+  });
+
+  it('mutates the aggregate before joining, leaving, and ending', async () => {
     const joined = callFixture();
     calls.find.mockResolvedValueOnce(joined);
     calls.join.mockResolvedValue(joined);
@@ -116,19 +134,6 @@ describe('call application use cases', () => {
     expect(
       joined.hasParticipantStatus(actorId, CallParticipantStatus.JOINED),
     ).toBe(true);
-
-    const heartbeat = callFixture();
-    calls.find.mockResolvedValueOnce(heartbeat);
-    calls.heartbeat.mockResolvedValue(heartbeat);
-    await new CallParticipantHeartbeater(calls).heartbeat(
-      new HeartbeatCallParticipantMessage({
-        actorIdentityId: 'identity-a',
-        callId: 'call-a',
-        mediaConnections: [],
-        occurredAt: 20,
-      }),
-    );
-    expect(heartbeat.toPrimitives().participants[0]?.lastHeartbeatAt).toBe(20);
 
     const left = callFixture();
     calls.find.mockResolvedValueOnce(left);

@@ -73,8 +73,13 @@ type WorkspaceCalls = Pick<
   > &
   Pick<ReturnType<typeof useCallDeparture>, 'leaveActiveCall'> & {
     handleRealtimeCallEvent: (
-      event: Parameters<ReturnType<typeof useWorkspaceRealtimeCallEvents>>[0],
+      event: Parameters<
+        ReturnType<
+          typeof useWorkspaceRealtimeCallEvents
+        >['handleRealtimeCallEvent']
+      >[0],
     ) => void;
+    recoverRealtimeCalls: () => void;
     incomingCall: ReturnType<
       typeof useCallResourceReconciliation
     >['incomingCall'];
@@ -202,12 +207,29 @@ export function useWorkspaceCalls({
       reconcileCall,
       setCommunities: onCommunitiesChange,
     });
-  const handleRealtimeCallEvent = useWorkspaceRealtimeCallEvents({
-    activeCallRef,
-    receiveSignal,
-    reconcileCallResource,
-    sessionRef,
-  });
+  const { handleRealtimeCallEvent, recoverRealtimeCalls, loadCallSnapshots } =
+    useWorkspaceRealtimeCallEvents({
+      activeCallRef,
+      onRecoveredCalls: (calls, previousActiveCallId) => {
+        onCommunitiesChange((current) =>
+          communitiesWithCallVoicePresence(current, calls),
+        );
+        if (
+          previousActiveCallId &&
+          activeCallRef.current?.id === previousActiveCallId &&
+          !calls.some((call) => call.id === previousActiveCallId)
+        )
+          endCall();
+        setIncomingCall((current) =>
+          current && !calls.some((call) => call.id === current.call.id)
+            ? null
+            : current,
+        );
+      },
+      receiveSignal,
+      reconcileCallResource,
+      sessionRef,
+    });
 
   useEffect(() => {
     reconcileCallResourceRef.current = reconcileCallResource;
@@ -296,6 +318,12 @@ export function useWorkspaceCalls({
   useWorkspaceCallHeartbeat({
     activeCall,
     heartbeat: heartbeatActiveCall,
+    onAccessDenied: (callId) => {
+      if (activeCallRef.current?.id !== callId) return;
+
+      endCall();
+      removeCurrentIdentityFromVoicePresence();
+    },
     mediaConnections: callMediaConnections,
   });
 
@@ -304,9 +332,9 @@ export function useWorkspaceCalls({
 
     let cancelled = false;
 
-    void listCalls()
+    void loadCallSnapshots(listCalls)
       .then((calls) => {
-        if (!cancelled) {
+        if (!cancelled && calls) {
           onCommunitiesChange((current) =>
             communitiesWithCallVoicePresence(current, calls),
           );
@@ -317,7 +345,12 @@ export function useWorkspaceCalls({
     return () => {
       cancelled = true;
     };
-  }, [communityVoiceTopologyKey, listCalls, onCommunitiesChange]);
+  }, [
+    communityVoiceTopologyKey,
+    listCalls,
+    loadCallSnapshots,
+    onCommunitiesChange,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -327,9 +360,9 @@ export function useWorkspaceCalls({
 
     startupSyncIdentityRef.current = identityId;
 
-    void listCalls()
+    void loadCallSnapshots(listCalls)
       .then(async (calls) => {
-        if (cancelled) return;
+        if (cancelled || !calls) return;
 
         const staleJoinedCalls = calls.filter(
           (call) =>
@@ -369,6 +402,7 @@ export function useWorkspaceCalls({
   }, [
     isCallActionInProgress,
     listCalls,
+    loadCallSnapshots,
     onCommunitiesReload,
     removeCurrentIdentityFromVoicePresence,
     session.identity.id,
@@ -382,6 +416,7 @@ export function useWorkspaceCalls({
     handleRealtimeCallEvent,
     incomingCall,
     leaveActiveCall,
+    recoverRealtimeCalls,
     retryMicrophone,
     setParticipantScreenShareVolume,
     setParticipantVolume,

@@ -21,7 +21,9 @@ export class Call extends AggregateRoot {
   public static fromPrimitives(primitives: PrimitiveOf<Call>): Call {
     return new Call(
       CallId.fromString(primitives.id),
-      CallIdentityId.fromString(primitives.creatorIdentityId),
+      primitives.creatorIdentityId
+        ? CallIdentityId.fromString(primitives.creatorIdentityId)
+        : undefined,
       CallNetworkId.fromString(primitives.networkId),
       CallScope.fromPrimitives(primitives.scope),
       CallLifecycle.fromPrimitives(primitives),
@@ -33,7 +35,7 @@ export class Call extends AggregateRoot {
 
   private constructor(
     private readonly id: CallId,
-    private readonly creatorIdentityId: CallIdentityId,
+    private readonly creatorIdentityId: CallIdentityId | undefined,
     private readonly networkId: CallNetworkId,
     private readonly scope: CallScope,
     private lifecycle: CallLifecycle,
@@ -134,7 +136,9 @@ export class Call extends AggregateRoot {
 
     const primitives = {
       ...this.lifecycle.toPrimitives(),
-      creatorIdentityId: this.creatorIdentityId.toString(),
+      ...(this.creatorIdentityId
+        ? { creatorIdentityId: this.creatorIdentityId.toString() }
+        : {}),
       id: this.id.toString(),
       networkId: this.networkId.toString(),
       participantIds: participants.map((participant) => participant.identityId),

@@ -34,7 +34,7 @@ export class PigeonCallsFacade {
     session: Session,
     callId: string,
     mediaConnections: CallParticipantMediaConnectionResource[],
-  ): Promise<CallResource> {
+  ): Promise<void> {
     return await this.participation.heartbeat(
       session,
       callId,

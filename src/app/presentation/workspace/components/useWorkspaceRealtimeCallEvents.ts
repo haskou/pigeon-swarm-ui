@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
 import type { CallSignalType } from '../../../../contexts/calls/infrastructure/media/CallSignalType';
@@ -12,6 +12,8 @@ import {
   logCallError,
 } from '../../../../contexts/calls/infrastructure/media/callDebugLogger';
 import { CallSignalDeliveryTracker } from '../../../../contexts/calls/infrastructure/realtime/CallSignalDeliveryTracker';
+import { CallSnapshotRecovery } from '../../../../contexts/calls/infrastructure/realtime/CallSnapshotRecovery';
+import { LiveCallSnapshots } from '../../../../contexts/calls/infrastructure/realtime/LiveCallSnapshots';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { CallResourceRefreshScheduler } from './CallResourceRefreshScheduler';
 import {
@@ -25,6 +27,10 @@ import {
 
 type WorkspaceRealtimeCallEventsInput = {
   activeCallRef: { current: CallSession | null };
+  onRecoveredCalls: (
+    calls: CallResource[],
+    previousActiveCallId?: string,
+  ) => void;
   receiveSignal: (input: {
     callId: string;
     payload: Record<string, unknown>;
@@ -70,36 +76,44 @@ function receivedCallSignal(
 
 export function useWorkspaceRealtimeCallEvents(
   input: WorkspaceRealtimeCallEventsInput,
-): (event: RealtimeDomainEvent) => void {
-  const { activeCallRef, receiveSignal, reconcileCallResource, sessionRef } =
-    input;
+): {
+  handleRealtimeCallEvent: (event: RealtimeDomainEvent) => void;
+  recoverRealtimeCalls: () => void;
+  loadCallSnapshots: (
+    load: () => Promise<CallResource[]>,
+  ) => Promise<CallResource[] | undefined>;
+} {
+  const {
+    activeCallRef,
+    onRecoveredCalls,
+    receiveSignal,
+    reconcileCallResource,
+    sessionRef,
+  } = input;
+  const snapshotsRef = useRef(new LiveCallSnapshots());
+  const recoveryRef = useRef(new CallSnapshotRecovery());
+  useEffect(() => () => recoveryRef.current.reset(), []);
   const callSignalDeliveriesRef = useRef(new CallSignalDeliveryTracker());
 
   const loadCallResource = useCallback(
     async (callId: string, eventType: string): Promise<void> => {
-      try {
-        const call = await applicationContainer.calls.get(
-          sessionRef.current,
-          callId,
-        );
-        logCallDebug('workspace:realtime-call-event:resource-loaded', {
-          activeCallId: activeCallRef.current?.id,
-          callId: call.id,
-          participantStatuses: call.participants.map((participant) => ({
-            connected: participant.connected,
-            identityId: participant.identityId,
-            status: participant.status,
-          })),
-          status: call.status,
-        });
-        reconcileCallResource(call);
-      } catch (caught) {
-        logCallError(
-          'workspace:realtime-call-event:resource-load-failed',
-          caught,
-          { callId, eventType },
-        );
-      }
+      const revision = snapshotsRef.current.version(callId);
+      await recoveryRef.current.request(
+        callId,
+        () => applicationContainer.calls.get(sessionRef.current, callId),
+        (call) => {
+          if (revision === snapshotsRef.current.version(callId)) {
+            snapshotsRef.current.remember(call);
+            reconcileCallResource(call);
+          }
+        },
+        (caught) =>
+          logCallError(
+            'workspace:realtime-call-event:resource-load-failed',
+            caught,
+            { callId, eventType },
+          ),
+      );
     },
     [activeCallRef, reconcileCallResource, sessionRef],
   );
@@ -123,7 +137,17 @@ export function useWorkspaceRealtimeCallEvents(
     [],
   );
 
-  return useCallback(
+  const recoverMalformedSnapshot = (
+    callId: string,
+    event: RealtimeDomainEvent,
+  ): void => {
+    if (snapshotsRef.current.isStale(event)) return;
+
+    snapshotsRef.current.rememberPendingRevision(event);
+    refreshCallResource(callId, event.type);
+  };
+
+  const handleRealtimeCallEvent = useCallback(
     (event: RealtimeDomainEvent): void => {
       const eventCallId = callIdFromRealtimeEvent(event);
 
@@ -174,12 +198,55 @@ export function useWorkspaceRealtimeCallEvents(
 
       if (!eventCallId) return;
 
+      const snapshot = snapshotsRef.current.receive(event);
+
+      if (snapshot) {
+        reconcileCallResource(snapshot);
+
+        return;
+      }
+
+      if (event.attributes.liveCall !== undefined) {
+        recoverMalformedSnapshot(eventCallId, event);
+
+        return;
+      }
+
       if (!callResourceRefreshIsRequired(event)) {
         return;
       }
 
       refreshCallResource(eventCallId, event.type);
     },
-    [activeCallRef, receiveSignal, refreshCallResource, sessionRef],
+    [
+      activeCallRef,
+      receiveSignal,
+      reconcileCallResource,
+      refreshCallResource,
+      sessionRef,
+    ],
   );
+
+  const recoverRealtimeCalls = useCallback((): void => {
+    snapshotsRef.current.reset();
+    recoveryRef.current.reset();
+    const previousActiveCallId = activeCallRef.current?.id;
+    void recoveryRef.current.request(
+      'active-calls',
+      () => applicationContainer.calls.list(sessionRef.current),
+      (calls) => {
+        const recovered = snapshotsRef.current.recover(calls);
+        recovered.forEach(reconcileCallResource);
+        onRecoveredCalls(recovered, previousActiveCallId);
+      },
+      (caught) => logCallError('workspace:call-recovery-failed', caught),
+    );
+  }, [activeCallRef, onRecoveredCalls, reconcileCallResource, sessionRef]);
+
+  const loadCallSnapshots = useCallback(
+    (load: () => Promise<CallResource[]>) => snapshotsRef.current.load(load),
+    [],
+  );
+
+  return { handleRealtimeCallEvent, loadCallSnapshots, recoverRealtimeCalls };
 }

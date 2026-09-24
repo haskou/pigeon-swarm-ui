@@ -35,8 +35,8 @@ export class PigeonCallParticipation {
     session: Session,
     callId: string,
     mediaConnections: CallParticipantMediaConnectionResource[],
-  ): Promise<CallResource> {
-    const call = await this.heartbeater.heartbeat(
+  ): Promise<void> {
+    await this.heartbeater.heartbeat(
       new HeartbeatCallParticipantMessage({
         actorIdentityId: this.sessions.register(session),
         callId,
@@ -44,8 +44,6 @@ export class PigeonCallParticipation {
         occurredAt: Date.now(),
       }),
     );
-
-    return this.mapper.toResource(call);
   }
 
   public async join(session: Session, callId: string): Promise<CallResource> {

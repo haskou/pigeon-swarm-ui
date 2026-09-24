@@ -54,17 +54,15 @@ export class PigeonCallRepository implements CallRepository {
   }
 
   public async heartbeat(
-    call: Call,
+    callId: CallId,
     actorIdentityId: CallIdentityId,
     mediaConnections: CallMediaConnection[],
-  ): Promise<Call> {
-    const resource = await this.api.heartbeat(
+  ): Promise<void> {
+    await this.api.heartbeat(
       this.contexts.find(actorIdentityId),
-      call.getId().toString(),
+      callId.toString(),
       mediaConnections.map((connection) => connection.toPrimitives()),
     );
-
-    return this.mapper.fromResource(resource);
   }
 
   public async join(

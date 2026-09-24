@@ -79,3 +79,30 @@ Optional environment variables:
 
 Without credentials, the audit still captures the login screen and skips the
 authenticated states.
+
+## Live call presence
+
+`voice-channel-stability.spec.ts` uses two existing accounts in the same community
+and checks visible membership, received media tracks, and stable request traffic.
+Set `VOICE_STABILITY_USER_A`, `VOICE_STABILITY_PASSWORD_A`,
+`VOICE_STABILITY_USER_B`, and `VOICE_STABILITY_PASSWORD_B`. Optional
+`VOICE_STABILITY_COMMUNITY` and `VOICE_STABILITY_CHANNEL` select the call.
+For separate nodes, set `VOICE_STABILITY_BASE_URL_B` to the second UI URL; the
+first uses `E2E_BASE_URL`. Both UIs must target their respective nodes.
+
+The stable interval must contain no full call GET requests. Heartbeats continue
+and must return 204 without a participant roster. This verifies browser traffic
+and local media behavior; only an external-network run can validate NAT.
+
+Call lifecycle WebSocket events carry `attributes.callId`, `attributes.liveCall`,
+and `attributes.liveCallRevision`. The client applies the snapshot directly and
+ignores duplicate or lower revisions for that call. Revisions are scoped to the
+current socket connection and reset on connection acknowledgement. Reconnection
+loads the active-call list; failed recovery is retried at most twice with one- and
+two-second delays. Duplicate recovery requests coalesce, and reconnect cancels
+older response application. Malformed snapshots trigger bounded per-call recovery;
+older or duplicate revisions do not. Snapshots received during a recovery supersede
+the response. Older servers without snapshots use a coalesced fallback, limited
+to one call read per second. Community snapshots need no creator or creation time;
+participants need no join/leave times or remote media diagnostics. Offer initiation
+uses identity ordering, independent of historical join times.
