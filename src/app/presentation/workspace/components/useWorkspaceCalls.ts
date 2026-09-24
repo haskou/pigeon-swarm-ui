@@ -52,6 +52,7 @@ type WorkspaceCalls = Pick<
   ReturnType<typeof useCallSession>,
   | 'activeCall'
   | 'retryMicrophone'
+  | 'retryConnection'
   | 'setParticipantScreenShareVolume'
   | 'setParticipantVolume'
   | 'setScreenShareQuality'
@@ -112,6 +113,7 @@ export function useWorkspaceCalls({
     receiveSignal,
     reconcileCall,
     retryMicrophone,
+    retryConnection,
     setParticipantScreenShareVolume,
     setParticipantVolume,
     setScreenShareQuality,
@@ -418,6 +420,7 @@ export function useWorkspaceCalls({
     leaveActiveCall,
     recoverRealtimeCalls,
     retryMicrophone,
+    retryConnection,
     setParticipantScreenShareVolume,
     setParticipantVolume,
     setScreenShareQuality,

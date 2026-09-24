@@ -1,3 +1,5 @@
+import type { CallPeerRecoveryState } from './CallPeerRecoveryState';
+
 export type PeerMediaStats = {
   audioLevel?: number;
   bitrateKbps?: number;
@@ -10,6 +12,7 @@ export type PeerMediaStats = {
   latencyMs?: number;
   localCandidateType?: 'host' | 'prflx' | 'relay' | 'srflx';
   packetsLost?: number;
+  recoveryState?: CallPeerRecoveryState;
   protocol?: string;
   relayProtocol?: string;
   relayUrl?: string;

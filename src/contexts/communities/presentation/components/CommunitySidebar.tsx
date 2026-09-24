@@ -44,6 +44,7 @@ type CommunitySidebarProps = {
     volumePercent: number,
   ) => void;
   onCallRetryMicrophone?: () => void;
+  onCallRetryConnection?: () => void;
   onCallScreenShareQualityChange?: (
     quality: CallSession['screenShareQuality'],
   ) => void;
@@ -112,6 +113,7 @@ export function CommunitySidebar({
   onCallParticipantScreenShareVolumeChange,
   onCallParticipantVolumeChange,
   onCallRetryMicrophone,
+  onCallRetryConnection,
   onCallScreenShareQualityChange,
   onCallToggleCamera,
   onCallToggleDeafen,
@@ -256,6 +258,7 @@ export function CommunitySidebar({
               onCallToggleMediaEncryption={onCallToggleMediaEncryption}
               onCallToggleNoiseCancellation={onCallToggleNoiseCancellation}
               onCallRetryMicrophone={onCallRetryMicrophone}
+              onCallRetryConnection={onCallRetryConnection}
               onCallToggleScreenShare={onCallToggleScreenShare}
               onLogout={onLogout}
               onSessionUpdated={onSessionUpdated}

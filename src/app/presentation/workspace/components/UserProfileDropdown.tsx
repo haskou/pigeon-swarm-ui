@@ -66,6 +66,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
   onCallParticipantScreenShareVolumeChange,
   onCallParticipantVolumeChange,
   onCallRetryMicrophone,
+  onCallRetryConnection,
   onCallScreenShareQualityChange,
   onCallToggleCamera,
   onCallToggleDeafen,
@@ -111,6 +112,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
   onCallToggleMediaEncryption?: () => void;
   onCallToggleNoiseCancellation?: () => void;
   onCallRetryMicrophone?: () => void;
+  onCallRetryConnection?: () => void;
   onCallToggleScreenShare?: () => void;
 }) {
   const [profileOpen, setProfileOpen] = useState(false);
@@ -206,6 +208,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
         onCallToggleMediaEncryption &&
         onCallToggleNoiseCancellation &&
         onCallRetryMicrophone &&
+        onCallRetryConnection &&
         onCallToggleScreenShare && (
           <div className="absolute bottom-[calc(100%+.5rem)] left-0 right-0 z-30">
             <Suspense fallback={null}>
@@ -223,6 +226,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
                 onToggleMediaEncryption={onCallToggleMediaEncryption}
                 onToggleNoiseCancellation={onCallToggleNoiseCancellation}
                 onRetryMicrophone={onCallRetryMicrophone}
+                onRetryConnection={onCallRetryConnection}
                 onToggleScreenShare={onCallToggleScreenShare}
               />
             </Suspense>

@@ -114,6 +114,7 @@ export function CommunityWorkspace({
   onCallParticipantScreenShareVolumeChange,
   onCallParticipantVolumeChange,
   onCallRetryMicrophone,
+  onCallRetryConnection,
   onCallScreenShareQualityChange,
   onCallToggleCamera,
   onCallToggleDeafen,
@@ -1072,6 +1073,7 @@ export function CommunityWorkspace({
         onCallToggleMediaEncryption={onCallToggleMediaEncryption}
         onCallToggleNoiseCancellation={onCallToggleNoiseCancellation}
         onCallRetryMicrophone={onCallRetryMicrophone}
+        onCallRetryConnection={onCallRetryConnection}
         onCallToggleScreenShare={onCallToggleScreenShare}
         onChannelSearchChange={setChannelSearch}
         onManageOpen={() => setManageOpen(true)}

@@ -1,3 +1,5 @@
+import type { CallPeerRecoveryState } from './CallPeerRecoveryState';
+
 import { logCallWarning } from './callDebugLogger';
 
 const disconnectedPeerRecoveryDelayMs = 3_000;
@@ -8,6 +10,8 @@ const peerRestartOutcomeWaitMs = 15_000;
 const credentialRefreshTimeoutMs = 15_000;
 
 export class CallPeerRecovery {
+  private readonly exhausted = new Set<string>();
+
   private readonly inFlight = new Map<string, AbortController>();
 
   private readonly attempts = new Map<string, number>();
@@ -36,7 +40,7 @@ export class CallPeerRecovery {
   }
 
   private delay(peer: RTCPeerConnection, attempt: number): number | undefined {
-    if (attempt >= maximumPeerRecoveryAttempts) return undefined;
+    if (attempt >= maximumPeerRecoveryAttempts) return 0;
 
     if (
       peer.connectionState === 'failed' ||
@@ -55,11 +59,20 @@ export class CallPeerRecovery {
       return disconnectedPeerRecoveryDelayMs;
     }
 
-    if (peer.iceConnectionState === 'checking') {
+    if (this.isNegotiating(peer)) {
       return checkingPeerRecoveryDelayMs;
     }
 
     return undefined;
+  }
+
+  private isNegotiating(peer: RTCPeerConnection): boolean {
+    return (
+      peer.iceConnectionState === 'checking' ||
+      (peer.iceConnectionState === 'new' &&
+        Boolean(peer.localDescription) &&
+        Boolean(peer.remoteDescription))
+    );
   }
 
   private isHealthy(peer: RTCPeerConnection): boolean {
@@ -68,6 +81,10 @@ export class CallPeerRecovery {
       (peer.iceConnectionState === 'connected' ||
         peer.iceConnectionState === 'completed')
     );
+  }
+
+  private isFinished(peer: RTCPeerConnection): boolean {
+    return peer.connectionState === 'closed' || this.isHealthy(peer);
   }
 
   private schedule(
@@ -85,7 +102,7 @@ export class CallPeerRecovery {
     this.cancel(peerIdentityId);
 
     logCallWarning('peer-manager:ice-recovery:scheduled', {
-      attempt: attempt + 1,
+      attempt: Math.min(attempt + 1, maximumPeerRecoveryAttempts),
       connectionState: peer.connectionState,
       delay,
       iceConnectionState: peer.iceConnectionState,
@@ -99,6 +116,13 @@ export class CallPeerRecovery {
         peer.connectionState === 'closed' ||
         this.isHealthy(peer)
       ) {
+        return;
+      }
+
+      if (attempt >= maximumPeerRecoveryAttempts) {
+        this.exhausted.add(peerIdentityId);
+        logCallWarning('peer-manager:ice-recovery:exhausted');
+
         return;
       }
 
@@ -135,7 +159,6 @@ export class CallPeerRecovery {
     try {
       await Promise.race([this.restartIce(peer, canRestart), cancelled]);
     } catch {
-      // HTTP errors may contain credentials or response bodies.
       logCallWarning('peer-manager:ice-recovery:configuration-unavailable', {
         attempt: attempt + 1,
       });
@@ -159,6 +182,7 @@ export class CallPeerRecovery {
     this.inFlight.get(peerIdentityId)?.abort();
     this.inFlight.delete(peerIdentityId);
     this.attempts.delete(peerIdentityId);
+    this.exhausted.delete(peerIdentityId);
     this.retryNotBefore.delete(peerIdentityId);
   }
 
@@ -169,13 +193,14 @@ export class CallPeerRecovery {
   ): void {
     if (!isCurrent()) return;
 
-    if (peer.connectionState === 'closed' || this.isHealthy(peer)) {
+    if (this.isFinished(peer)) {
       this.forget(peerIdentityId);
 
       return;
     }
 
-    if (this.inFlight.has(peerIdentityId)) return;
+    if (this.inFlight.has(peerIdentityId) || this.exhausted.has(peerIdentityId))
+      return;
 
     const attempt = this.attempts.get(peerIdentityId) ?? 0;
     const delay = this.delay(peer, attempt);
@@ -195,12 +220,41 @@ export class CallPeerRecovery {
     }
   }
 
+  public stateFor(peerIdentityId: string): CallPeerRecoveryState {
+    if (this.exhausted.has(peerIdentityId)) return 'exhausted';
+
+    return this.pending.has(peerIdentityId) ||
+      this.inFlight.has(peerIdentityId) ||
+      this.attempts.has(peerIdentityId)
+      ? 'recovering'
+      : 'idle';
+  }
+
+  public retry(
+    peerIdentityId: string,
+    peer: RTCPeerConnection,
+    isCurrent: () => boolean,
+  ): void {
+    if (
+      !isCurrent() ||
+      !this.exhausted.has(peerIdentityId) ||
+      peer.connectionState === 'closed' ||
+      this.isHealthy(peer)
+    )
+      return;
+
+    this.forget(peerIdentityId);
+    logCallWarning('peer-manager:ice-recovery:manual-retry');
+    this.schedule(peerIdentityId, peer, 0, 0, isCurrent);
+  }
+
   public reset(): void {
     this.inFlight.forEach((controller) => controller.abort());
     this.inFlight.clear();
     this.pending.forEach(({ timeout }) => clearTimeout(timeout));
     this.pending.clear();
     this.attempts.clear();
+    this.exhausted.clear();
     this.retryNotBefore.clear();
   }
 }

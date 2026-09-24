@@ -131,6 +131,15 @@ export const en = {
   },
   calls: {
     answer: 'Answer',
+    connectionRecovering: 'Reconnecting call audio…',
+    connectionRecoveryExhausted:
+      'Audio could not reconnect with one or more participants. Check your connection and retry, or leave and rejoin the call.',
+    retryConnection: 'Retry connection',
+    diagnosticsPrivacy:
+      'Capture connection metrics locally for up to 5 minutes. Names, identities, addresses, credentials and message content are excluded. Closing this panel or stopping clears the capture. Export only if you want to share it.',
+    startDiagnostics: 'Start diagnostics',
+    stopDiagnostics: 'Stop and clear',
+    exportDiagnostics: 'Export diagnostics',
     callData: 'Call data',
     callMetricBitrate: 'Bitrate',
     callMetricCodec: 'Codec',

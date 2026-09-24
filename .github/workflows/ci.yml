@@ -43,6 +43,9 @@ jobs:
       - name: Verify stale ICE recovery in Chromium
         run: yarn test:e2e e2e/stale-ice-candidates.spec.ts --project=desktop-chromium
 
+      - name: Verify bounded recovery and real browser audio
+        run: yarn test:e2e e2e/call-recovery.spec.ts --project=desktop-chromium
+
       - name: Build
         run: yarn build
 
