@@ -51,9 +51,14 @@ export function ClearableSearchInput({
   );
 }
 
-function SearchIcon() {
+export function SearchIcon({ className = 'h-4 w-4' }: { className?: string }) {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      className={className}
+    >
       <path
         d="m20 20-4.4-4.4M17.5 10.75a6.75 6.75 0 1 1-13.5 0 6.75 6.75 0 0 1 13.5 0Z"
         stroke="currentColor"
