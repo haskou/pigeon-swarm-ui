@@ -86,7 +86,7 @@ export function CommunityHeader({
           type="button"
           onClick={onEncryptionDetailsOpen}
           className={cx(
-            'shrink-0 transition',
+            "relative shrink-0 transition after:absolute after:-inset-3 after:content-['']",
             channelPublic
               ? 'text-amber-300 hover:text-amber-100'
               : channelEncryptionReady

@@ -180,8 +180,8 @@ function ConversationLockState({
       onClick={onClick}
       className={
         hasConversationKey
-          ? 'inline-grid h-5 w-5 shrink-0 place-items-center text-emerald-300 transition hover:text-emerald-100'
-          : 'inline-grid h-5 w-5 shrink-0 place-items-center text-rose-300 transition hover:text-rose-100'
+          ? "relative inline-grid h-5 w-5 shrink-0 place-items-center text-emerald-300 transition after:absolute after:-inset-3 after:content-[''] hover:text-emerald-100"
+          : "relative inline-grid h-5 w-5 shrink-0 place-items-center text-rose-300 transition after:absolute after:-inset-3 after:content-[''] hover:text-rose-100"
       }
       title={tooltip}
       aria-label={tooltip}
