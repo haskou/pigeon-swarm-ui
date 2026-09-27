@@ -178,6 +178,10 @@ export function Rail({
         ? copy.auth.installAppPrompting
         : copy.auth.installAppInstructions;
 
+  const settingsLabel = settingsAttention
+    ? `${copy.nodeSettings.open} · ${copy.nodeSettings.unclaimed}`
+    : copy.nodeSettings.open;
+
   return (
     <aside
       className={cx(
@@ -273,7 +277,8 @@ export function Rail({
                   <MutedNotificationsIcon className="h-3 w-3" />
                 </span>
               )}
-              {canOpenCommunityMenu && communityMenu?.communityId === community.id ? (
+              {canOpenCommunityMenu &&
+              communityMenu?.communityId === community.id ? (
                 <CommunityRailMenu
                   communityName={community.name}
                   ignoreBackdropClicksUntil={
@@ -414,7 +419,8 @@ export function Rail({
           'relative grid h-12 w-12 place-items-center rounded-2xl bg-white/10 text-white/75 transition hover:bg-white/15',
           !onInspectorClick && 'mt-auto',
         )}
-        aria-label={copy.nodeSettings.open}
+        aria-label={settingsLabel}
+        title={settingsLabel}
       >
         <svg
           aria-hidden="true"

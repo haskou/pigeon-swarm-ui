@@ -139,7 +139,7 @@ export function NotificationScopeSettingsDialog({
                           : current.notificationLevel,
                     })
                   }
-                  className="ui-button min-h-10 px-2 text-center text-sm"
+                  className="ui-button min-h-10 whitespace-nowrap !px-1 text-center !text-xs sm:!px-2 sm:!text-sm"
                 >
                   {duration.label}
                 </button>

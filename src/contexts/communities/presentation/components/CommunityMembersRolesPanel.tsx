@@ -101,6 +101,7 @@ export function CommunityMembersRolesPanel({
                 <div className="flex items-center gap-2 p-1.5">
                   <div className="min-w-0 flex-1">
                     <IdentityMemberRow
+                      className="!max-w-none"
                       item={{
                         identity: memberIdentities[identityId],
                         identityId,
