@@ -126,15 +126,11 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
   const [presenceSaving, setPresenceSaving] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const closeProfile = useCallback(() => setProfileOpen(false), []);
-  const ownDisplayName = identityDisplayName(
-    session.identity.id,
-    identityNames,
-  );
   const ownProfileName =
     session.identity.profile.name.trim() ||
     (session.identity.profile.handle?.trim()
       ? `@${session.identity.profile.handle.trim()}`
-      : ownDisplayName);
+      : identityDisplayName(session.identity.id, identityNames));
   const ownProfileHandle = session.identity.profile.handle?.trim()
     ? `@${session.identity.profile.handle.trim()}`
     : shortId(session.identity.id);
@@ -240,7 +236,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
         data-testid="own-profile-menu-button"
       >
         <ProfileAvatar
-          label={ownDisplayName}
+          label={ownProfileName}
           picture={ownPicture}
           presence={presence}
           size="lg"
@@ -507,7 +503,7 @@ function ProfileAvatar({
           src={picture}
           alt=""
           className="h-full w-full object-cover"
-          fallback={label.slice(0, 1).toUpperCase() || 'P'}
+          fallback={profileInitial(label)}
         />
       </span>
       <PresenceStatusDot
@@ -554,4 +550,10 @@ function selectablePresenceStatus(
   if (!presence || presence.status === 'disconnected') return 'available';
 
   return presence.status;
+}
+
+function profileInitial(label: string): string {
+  const [initial] = Array.from(label.replace(/^@/, ''));
+
+  return initial?.toUpperCase() ?? 'P';
 }
