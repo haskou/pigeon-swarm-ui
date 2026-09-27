@@ -22,6 +22,7 @@ import type {
 import type { CommunityWorkspaceProps } from './CommunityWorkspaceProps';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
+import { SearchIcon } from '../../../../shared/presentation/components/ClearableSearchInput';
 import { shortId } from '../../../../shared/presentation/formatting';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { copy } from '../../../../shared/presentation/i18n/copy';
@@ -248,8 +249,7 @@ export function CommunityWorkspace({
     () =>
       textChannels.map((channel) => ({
         ...channel,
-        threads:
-          channelThreadsByChannelId[channel.id] ?? channel.threads ?? [],
+        threads: channelThreadsByChannelId[channel.id] ?? channel.threads ?? [],
       })),
     [channelThreadsByChannelId, textChannels],
   );
@@ -1180,11 +1180,17 @@ export function CommunityWorkspace({
         >
           {communityIsPublic ? (
             <button
-              className="rounded-2xl bg-white/10 px-3 py-2 text-sm font-black text-white/70 transition hover:bg-white/15"
+              aria-expanded={messageSearch.open}
+              aria-label={copy.communities.searchMessages}
+              className="grid h-11 w-11 place-items-center rounded-2xl bg-white/10 text-white/70 transition hover:bg-white/15 sm:flex sm:h-auto sm:w-auto sm:gap-2 sm:px-3 sm:py-2 sm:text-sm sm:font-black"
               onClick={() => messageSearch.setOpen(!messageSearch.open)}
+              title={copy.communities.searchMessages}
               type="button"
             >
-              {copy.communities.searchMessages}
+              <SearchIcon className="h-5 w-5 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">
+                {copy.communities.searchMessages}
+              </span>
             </button>
           ) : null}
         </CommunityHeader>
