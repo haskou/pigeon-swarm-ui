@@ -37,14 +37,28 @@ const memberIdentity =
   process.env.VISUAL_AUDIT_MEMBER_IDENTITY?.trim() ??
   process.env.VISUAL_AUDIT_CALL_USER_A?.trim();
 const language = process.env.VISUAL_AUDIT_LANGUAGE === 'en' ? 'en' : 'es';
+const technicalDetails = process.env.VISUAL_AUDIT_TECHNICAL_DETAILS === 'true';
 
 test.describe('visual audit', () => {
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript((selectedLanguage) => {
-      window.localStorage.setItem('pigeon-swarm-language-v2', selectedLanguage);
-      window.localStorage.setItem('pigeon-swarm-language-explicit-v3', 'true');
-      window.localStorage.removeItem('pigeon-swarm-credentials');
-    }, language);
+    await page.addInitScript(
+      ({ selectedLanguage, showTechnicalDetails }) => {
+        window.localStorage.setItem(
+          'pigeon-swarm-language-v2',
+          selectedLanguage,
+        );
+        window.localStorage.setItem(
+          'pigeon-swarm-language-explicit-v3',
+          'true',
+        );
+        window.localStorage.setItem(
+          'pigeon-swarm-technical-details-v1',
+          String(showTechnicalDetails),
+        );
+        window.localStorage.removeItem('pigeon-swarm-credentials');
+      },
+      { selectedLanguage: language, showTechnicalDetails: technicalDetails },
+    );
   });
 
   test('captures representative application states', async ({
@@ -131,7 +145,7 @@ test.describe('visual audit', () => {
     await closeOverlay(page);
 
     await openHeaderMenu(page);
-    await captureOptionalState({
+    await captureTechnicalState(captureOptionalState, {
       action: () =>
         clickFirstVisible(
           page.getByRole('button', { name: /Ver datos|View data/i }),
@@ -145,7 +159,7 @@ test.describe('visual audit', () => {
 
     if (isMobileViewport(page)) {
       await openHeaderMenu(page);
-      await captureOptionalState({
+      await captureTechnicalState(captureOptionalState, {
         action: () =>
           clickFirstVisible(
             page.getByRole('button', { name: /Ver eventos|View events/i }),
@@ -282,8 +296,17 @@ test.describe('visual audit', () => {
       outputDirectory: projectOutput,
       page,
     });
-    await captureDialogSection({
-      label: /Llavero|Keychain/i,
+    await captureTechnicalState(captureOptionalState, {
+      action: async () => {
+        await page
+          .getByRole('button', { name: /Seguridad|Security/i })
+          .first()
+          .click({ timeout: 5_000 });
+        await page
+          .getByText(/^(Llavero|Keychain)$/)
+          .first()
+          .scrollIntoViewIfNeeded({ timeout: 5_000 });
+      },
       metrics,
       name: '16c-profile-keychain',
       outputDirectory: projectOutput,
@@ -357,7 +380,7 @@ test.describe('visual audit', () => {
     await closeOverlay(page);
 
     await openHeaderMenu(page);
-    await captureOptionalState({
+    await captureTechnicalState(captureOptionalState, {
       action: () =>
         clickFirstVisible(
           page.getByRole('button', { name: /Ver datos|View data/i }),
@@ -450,7 +473,7 @@ test.describe('visual audit', () => {
       page,
     });
     await captureCommunityManagementSection({
-      label: /Canales|Channels/i,
+      label: /^Canales$|^Channels$/i,
       metrics,
       name: '26a-community-management-channels',
       outputDirectory: projectOutput,
@@ -528,7 +551,7 @@ test.describe('visual audit', () => {
       outputDirectory: projectOutput,
       page,
     });
-    await captureOptionalState({
+    await captureTechnicalState(captureOptionalState, {
       action: () =>
         clickFirstVisible(
           page.getByRole('button', { name: /Ver datos|View data/i }),
@@ -559,6 +582,23 @@ async function capture(
     caret: 'hide',
     path: path.join(outputDirectory, `${name}.png`),
     scale: 'css',
+  });
+}
+
+async function captureTechnicalState<Options extends { name: string }>(
+  captureState: (options: Options) => Promise<void>,
+  options: Options,
+): Promise<void> {
+  if (technicalDetails) {
+    await captureState(options);
+
+    return;
+  }
+
+  test.info().annotations.push({
+    description:
+      'Set VISUAL_AUDIT_TECHNICAL_DETAILS=true to capture states that require technical details.',
+    type: `${options.name}-skipped`,
   });
 }
 
@@ -751,7 +791,7 @@ async function clearAuditAttachments(page: Page): Promise<void> {
 async function openEncryptionDetails(page: Page): Promise<void> {
   await clickFirstVisible(
     page.getByRole('button', {
-      name: /cifrado|encryption|texto plano|plaintext/i,
+      name: /cifrado|encryption|texto plano|texto buscable|plaintext/i,
     }),
   );
 }
