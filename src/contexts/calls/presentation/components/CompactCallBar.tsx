@@ -55,7 +55,7 @@ export const CompactCallBar = memo(function CompactCallBar({
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') onOpenStage();
       }}
-      className="mb-2 cursor-pointer rounded-lg border border-white/10 bg-[#151722] p-2.5 shadow-xl shadow-black/35 transition hover:bg-[#191b29]"
+      className="@container mb-2 cursor-pointer rounded-lg border border-white/10 bg-[#151722] p-2.5 shadow-xl shadow-black/35 transition hover:bg-[#191b29]"
     >
       <div className="flex flex-col gap-2.5">
         {screenParticipant?.screenStream && (
@@ -75,7 +75,7 @@ export const CompactCallBar = memo(function CompactCallBar({
             onRetryMicrophone={onRetryMicrophone}
           />
         )}
-        <div className="flex flex-wrap items-center justify-center gap-1.5">
+        <div className="grid grid-cols-3 justify-items-center gap-1.5 @min-[16rem]:grid-cols-6">
           <CompactMediaControls
             call={call}
             onToggleCamera={onToggleCamera}
@@ -200,6 +200,7 @@ function CompactMediaControls({
   return (
     <>
       <CallButton
+        compact
         active={call.muted}
         blocked={!call.hasMicrophone}
         disabled={!call.hasMicrophone}
@@ -212,6 +213,7 @@ function CompactMediaControls({
         <MicrophoneIcon muted={call.muted || !call.hasMicrophone} />
       </CallButton>
       <CallButton
+        compact
         active={call.deafened}
         label={call.deafened ? copy.calls.undeafen : copy.calls.deafen}
         onClick={(event) => {
@@ -222,6 +224,7 @@ function CompactMediaControls({
         <HeadphonesIcon deafened={call.deafened} />
       </CallButton>
       <CallButton
+        compact
         active={call.cameraEnabled}
         label={
           call.cameraEnabled ? copy.calls.disableCamera : copy.calls.camera
@@ -234,6 +237,7 @@ function CompactMediaControls({
         <CameraIcon active={call.cameraEnabled} />
       </CallButton>
       <CallButton
+        compact
         active={call.screenSharing}
         label={
           call.screenSharing
@@ -248,6 +252,7 @@ function CompactMediaControls({
         <ScreenShareIcon active={call.screenSharing} />
       </CallButton>
       <CallButton
+        compact
         active={call.noiseCancellationEnabled}
         badge={copy.calls.noiseCancellationBadge}
         disabled={!call.hasMicrophone}
