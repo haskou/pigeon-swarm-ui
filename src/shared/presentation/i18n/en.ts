@@ -78,6 +78,8 @@ export const en = {
       'Recommended. Adds an extra security layer using this browser or device unlock.',
     passkeyPrfNotPersisted:
       'The identity was created, but the server did not save passkey protection.',
+    passkeyPrfRequestFailed:
+      'Device unlock was cancelled or did not respond in time. Try again.',
     passkeyPrfRequestFailedCreate:
       'Device unlock was cancelled or did not respond in time. Try again, or turn off "Protect with device unlock" to create the identity with password and recovery key.',
     passkeyPrfUnavailable:

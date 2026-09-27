@@ -1,5 +1,6 @@
 import { PasskeyPrfRequestFailedError } from '../../../../../contexts/identities/infrastructure/crypto/PasskeyPrfRequestFailedError';
 import { WebAuthnPrfKeyProtector } from '../../../../../contexts/identities/infrastructure/crypto/WebAuthnPrfKeyProtector';
+import { copy } from '../../../../../shared/presentation/i18n/copy';
 
 class FakePublicKeyCredential {
   public constructor(
@@ -306,14 +307,14 @@ describe(WebAuthnPrfKeyProtector.name, () => {
       .mockRejectedValue(new DOMException('Cancelled', 'NotAllowedError'));
     installWebAuthn({ create: jest.fn(), get });
     const protector = new WebAuthnPrfKeyProtector();
+    const unlock = protector.evaluateKey({
+      algorithm: 'webauthn-prf',
+      credentialId: 'AQIDBAUGBwgJCgsM',
+      salt: 'AQID',
+      version: 1,
+    });
 
-    await expect(
-      protector.evaluateKey({
-        algorithm: 'webauthn-prf',
-        credentialId: 'AQIDBAUGBwgJCgsM',
-        salt: 'AQID',
-        version: 1,
-      }),
-    ).rejects.toBeInstanceOf(PasskeyPrfRequestFailedError);
+    await expect(unlock).rejects.toBeInstanceOf(PasskeyPrfRequestFailedError);
+    await expect(unlock).rejects.toThrow(copy.auth.passkeyPrfRequestFailed);
   });
 });
