@@ -27,6 +27,7 @@ import {
 import { RecoveryKey } from '../../../../contexts/identities/domain/value-objects/RecoveryKey';
 import { WebAuthnPrfKeyProtector } from '../../../../contexts/identities/infrastructure/crypto/WebAuthnPrfKeyProtector';
 import { loadLocalPasskeyUnlock } from '../../../../contexts/identities/infrastructure/storage/localPasskeyUnlock';
+import { AuthSwitch } from '../../../../contexts/identities/presentation/auth/AuthSecurityControls';
 import {
   isValidPassword,
   passwordValidationChecks,
@@ -548,36 +549,29 @@ export function ProfileEditor({
                         </span>
                       )}
                     </div>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-                      <GlassSelect
-                        ariaLabel={copy.profile.availableNetwork}
-                        className="min-w-0"
-                        disabled={nodeNetworkOptions.length === 0}
-                        onChange={setNetworkToAdd}
-                        options={
-                          nodeNetworkOptions.length > 0
-                            ? nodeNetworkOptions
-                            : [
-                                {
-                                  disabled: true,
-                                  label: copy.profile.noAvailableNetworks,
-                                  value: '',
-                                },
-                              ]
-                        }
-                        value={networkToAdd}
-                      />
-                      <button
-                        type="button"
-                        onClick={addNetwork}
-                        disabled={
-                          !networkToAdd || nodeNetworkOptions.length === 0
-                        }
-                        className="ui-button"
-                      >
-                        {copy.profile.addNetwork}
-                      </button>
-                    </div>
+                    {nodeNetworkOptions.length > 0 ? (
+                      <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                        <GlassSelect
+                          ariaLabel={copy.profile.availableNetwork}
+                          className="min-w-0"
+                          onChange={setNetworkToAdd}
+                          options={nodeNetworkOptions}
+                          value={networkToAdd}
+                        />
+                        <button
+                          type="button"
+                          onClick={addNetwork}
+                          disabled={!networkToAdd}
+                          className="ui-button"
+                        >
+                          {copy.profile.addNetwork}
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-xs font-semibold text-white/45">
+                        {copy.profile.noAvailableNetworks}
+                      </p>
+                    )}
                   </section>
                 )}
                 {activeSection === 'security' && (
@@ -844,19 +838,8 @@ function ProfileSwitchButton({
             : 'text-white/75 hover:bg-white/[0.04]',
       )}
     >
-      <span
-        aria-hidden="true"
-        className={cx(
-          'mt-0.5 flex h-6 w-11 shrink-0 items-center rounded-full border border-white/10 transition-colors',
-          checked ? 'bg-cyan-400/25' : 'bg-black/25',
-        )}
-      >
-        <span
-          className={cx(
-            'h-4 w-4 rounded-full bg-white transition-transform',
-            checked ? 'translate-x-6' : 'translate-x-1',
-          )}
-        />
+      <span className="mt-0.5">
+        <AuthSwitch enabled={checked} />
       </span>
       <span className="min-w-0">
         <span className="block text-sm font-black text-white/80">{label}</span>
