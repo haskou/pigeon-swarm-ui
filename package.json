@@ -19,7 +19,7 @@
     "test:crypto": "jest --config jest.real-crypto.config.cjs --runInBand"
   },
   "dependencies": {
-    "@haskou/pigeon-swarm-crypto": "1.0.1",
+    "@haskou/pigeon-swarm-crypto": "3.0.0",
     "@haskou/value-objects": "7.0.0",
     "@sapphi-red/web-noise-suppressor": "^0.3.5",
     "@tailwindcss/vite": "^4.1.17",
