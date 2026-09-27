@@ -1,3 +1,4 @@
+import { PasskeyPrfRequestFailedError } from '../../../../../contexts/identities/infrastructure/crypto/PasskeyPrfRequestFailedError';
 import { WebAuthnPrfKeyProtector } from '../../../../../contexts/identities/infrastructure/crypto/WebAuthnPrfKeyProtector';
 
 class FakePublicKeyCredential {
@@ -271,5 +272,48 @@ describe(WebAuthnPrfKeyProtector.name, () => {
         version: 1,
       }),
     ).rejects.toThrow('WebAuthn PRF');
+  });
+
+  it('gives up on a passkey creation request that never settles', async () => {
+    const create = jest.fn(() => new Promise<Credential | null>(() => {}));
+    const setTimeoutSpy = jest
+      .spyOn(globalThis, 'setTimeout')
+      .mockImplementation((elapse: () => void) => {
+        elapse();
+
+        return 0 as unknown as ReturnType<typeof setTimeout>;
+      });
+    installWebAuthn({ create, get: jest.fn() });
+    const protector = new WebAuthnPrfKeyProtector();
+
+    await expect(
+      protector.createProtection({
+        displayName: 'Hasko',
+        identityId: 'identity-1',
+      }),
+    ).rejects.toBeInstanceOf(PasskeyPrfRequestFailedError);
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 60_000);
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        signal: expect.objectContaining({ aborted: true }),
+      }),
+    );
+  });
+
+  it('reports a cancelled passkey unlock as a failed passkey request', async () => {
+    const get = jest
+      .fn()
+      .mockRejectedValue(new DOMException('Cancelled', 'NotAllowedError'));
+    installWebAuthn({ create: jest.fn(), get });
+    const protector = new WebAuthnPrfKeyProtector();
+
+    await expect(
+      protector.evaluateKey({
+        algorithm: 'webauthn-prf',
+        credentialId: 'AQIDBAUGBwgJCgsM',
+        salt: 'AQID',
+        version: 1,
+      }),
+    ).rejects.toBeInstanceOf(PasskeyPrfRequestFailedError);
   });
 });

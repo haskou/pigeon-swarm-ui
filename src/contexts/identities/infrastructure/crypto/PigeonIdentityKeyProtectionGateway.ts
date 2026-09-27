@@ -14,6 +14,7 @@ import {
   clearLocalPasskeyUnlock,
   saveLocalPasskeyUnlock,
 } from '../storage/localPasskeyUnlock';
+import { PasskeyPrfRequestFailedError } from './PasskeyPrfRequestFailedError';
 import { UserRootKeyProtector } from './UserRootKeyProtector';
 
 export class PigeonIdentityKeyProtectionGateway {
@@ -115,16 +116,24 @@ export class PigeonIdentityKeyProtectionGateway {
     const recoveryKey = options.recoveryKey
       ? RecoveryKey.fromString(options.recoveryKey)
       : undefined;
-    const protectedMasterKey = await this.keys.protectMasterKey({
-      masterKey,
-      passkeyPrf: this.registrationPasskeyPrfMode({
-        displayName,
-        enabled: options.passkeyPrfEnabled,
-        identityId,
-      }),
-      password,
-      recoveryKey,
-    });
+    const protectedMasterKey = await this.keys
+      .protectMasterKey({
+        masterKey,
+        passkeyPrf: this.registrationPasskeyPrfMode({
+          displayName,
+          enabled: options.passkeyPrfEnabled,
+          identityId,
+        }),
+        password,
+        recoveryKey,
+      })
+      .catch((error: unknown) => {
+        if (error instanceof PasskeyPrfRequestFailedError) {
+          throw new Error(copy.auth.passkeyPrfRequestFailedCreate);
+        }
+
+        throw error;
+      });
 
     return {
       encryptedKeyPair: this.keys.protectIdentityKeyPair(keyPair, masterKey),

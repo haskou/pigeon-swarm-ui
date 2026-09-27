@@ -4,6 +4,8 @@ import type { PasskeyPrfMasterKeyProtection } from './PasskeyPrfMasterKeyProtect
 import type { PrfExtensionResults } from './PrfExtensionResults';
 import type { PublicKeyCredentialWithExtensionResults } from './PublicKeyCredentialWithExtensionResults';
 
+import { PasskeyPrfRequestFailedError } from './PasskeyPrfRequestFailedError';
+
 const passkeyPrfAlgorithm = 'webauthn-prf';
 const passkeyPrfVersion = 1;
 const challengeBytes = 32;
@@ -84,6 +86,38 @@ function decodeBase64Url(value: string): Uint8Array {
   return bytes;
 }
 
+function isCancelledRequest(error: unknown): boolean {
+  return (
+    error instanceof DOMException &&
+    (error.name === 'AbortError' || error.name === 'NotAllowedError')
+  );
+}
+
+// Some browsers never settle a WebAuthn request when no authenticator can
+// respond, so the request is aborted and abandoned once its timeout elapses.
+async function requestCredential(
+  request: (signal: AbortSignal) => Promise<Credential | null>,
+): Promise<Credential | null> {
+  const controller = new AbortController();
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<never>((_resolve, reject) => {
+    timeout = setTimeout(() => {
+      controller.abort();
+      reject(new PasskeyPrfRequestFailedError());
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([request(controller.signal), timedOut]);
+  } catch (error) {
+    if (isCancelledRequest(error)) throw new PasskeyPrfRequestFailedError();
+
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function firstPrfResult(
   credential: Credential | null,
 ): SymmetricKey | undefined {
@@ -162,36 +196,40 @@ export class WebAuthnPrfKeyProtector {
     identityId: string;
     salt: Uint8Array;
   }): Promise<PublicKeyCredentialWithExtensionResults> {
-    const credential = await navigator.credentials.create({
-      publicKey: {
-        attestation: 'none',
-        authenticatorSelection: {
-          residentKey: 'preferred',
-          userVerification: 'required',
-        },
-        challenge: toArrayBuffer(randomBytes(challengeBytes)),
-        extensions: {
-          prf: {
-            eval: {
-              first: toArrayBuffer(salt),
-            },
+    const userId = await userHandle(identityId);
+    const credential = await requestCredential((signal) =>
+      navigator.credentials.create({
+        publicKey: {
+          attestation: 'none',
+          authenticatorSelection: {
+            residentKey: 'preferred',
+            userVerification: 'required',
           },
-        } as AuthenticationExtensionsClientInputs,
-        pubKeyCredParams: [
-          { alg: -7, type: 'public-key' },
-          { alg: -257, type: 'public-key' },
-        ],
-        rp: {
-          name: relyingPartyName,
+          challenge: toArrayBuffer(randomBytes(challengeBytes)),
+          extensions: {
+            prf: {
+              eval: {
+                first: toArrayBuffer(salt),
+              },
+            },
+          } as AuthenticationExtensionsClientInputs,
+          pubKeyCredParams: [
+            { alg: -7, type: 'public-key' },
+            { alg: -257, type: 'public-key' },
+          ],
+          rp: {
+            name: relyingPartyName,
+          },
+          timeout: timeoutMs,
+          user: {
+            displayName,
+            id: userId,
+            name: identityId,
+          },
         },
-        timeout: timeoutMs,
-        user: {
-          displayName,
-          id: await userHandle(identityId),
-          name: identityId,
-        },
-      },
-    });
+        signal,
+      }),
+    );
 
     if (!isPublicKeyCredentialWithPrf(credential)) {
       throw new Error('Passkey PRF credential could not be created.');
@@ -237,28 +275,31 @@ export class WebAuthnPrfKeyProtector {
     this.ensureAvailable();
 
     const credentialIdBytes = decodeBase64Url(credentialId);
-    const credential = await navigator.credentials.get({
-      publicKey: {
-        allowCredentials: [
-          {
-            id: toArrayBuffer(credentialIdBytes),
-            type: 'public-key',
-          },
-        ],
-        challenge: toArrayBuffer(randomBytes(challengeBytes)),
-        extensions: {
-          prf: {
-            evalByCredential: {
-              [credentialId]: {
-                first: toArrayBuffer(salt),
+    const credential = await requestCredential((signal) =>
+      navigator.credentials.get({
+        publicKey: {
+          allowCredentials: [
+            {
+              id: toArrayBuffer(credentialIdBytes),
+              type: 'public-key',
+            },
+          ],
+          challenge: toArrayBuffer(randomBytes(challengeBytes)),
+          extensions: {
+            prf: {
+              evalByCredential: {
+                [credentialId]: {
+                  first: toArrayBuffer(salt),
+                },
               },
             },
-          },
-        } as AuthenticationExtensionsClientInputs,
-        timeout: timeoutMs,
-        userVerification: 'required',
-      },
-    });
+          } as AuthenticationExtensionsClientInputs,
+          timeout: timeoutMs,
+          userVerification: 'required',
+        },
+        signal,
+      }),
+    );
 
     const result = firstPrfResult(credential);
 

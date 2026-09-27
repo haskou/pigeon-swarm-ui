@@ -5,6 +5,7 @@ import type {
   Session,
 } from '../../../../../shared/domain/pigeonResources.types';
 
+import { PasskeyPrfRequestFailedError } from '../../../../../contexts/identities/infrastructure/crypto/PasskeyPrfRequestFailedError';
 import { PigeonIdentityKeyProtectionGateway } from '../../../../../contexts/identities/infrastructure/crypto/PigeonIdentityKeyProtectionGateway';
 import { UserRootKeyProtector } from '../../../../../contexts/identities/infrastructure/crypto/UserRootKeyProtector';
 import { copy } from '../../../../../shared/presentation/i18n/copy';
@@ -70,6 +71,25 @@ describe(PigeonIdentityKeyProtectionGateway.name, () => {
       identityId: 'identity-1',
       mode: 'create',
     });
+  });
+
+  it('explains how to continue when device unlock fails during registration', async () => {
+    const protector = protectorDouble();
+    const gateway = new PigeonIdentityKeyProtectionGateway(protector);
+    protector.protectMasterKey.mockRejectedValue(
+      new PasskeyPrfRequestFailedError(),
+    );
+
+    await expect(
+      gateway.protectNewIdentity({
+        displayName: 'Ada',
+        identityId: 'identity-1',
+        keyPair: await KeyPair.generate(),
+        masterKey: SymmetricKey.generate(),
+        options: { passkeyPrfEnabled: true },
+        password: 'password',
+      }),
+    ).rejects.toThrow(copy.auth.passkeyPrfRequestFailedCreate);
   });
 
   it('preserves profile passkey protection unless explicitly disabled', async () => {
