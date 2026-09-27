@@ -503,7 +503,7 @@ function ProfileAvatar({
           src={picture}
           alt=""
           className="h-full w-full object-cover"
-          fallback={label.replace(/^@/, '').slice(0, 1).toUpperCase() || 'P'}
+          fallback={profileInitial(label)}
         />
       </span>
       <PresenceStatusDot
@@ -550,4 +550,10 @@ function selectablePresenceStatus(
   if (!presence || presence.status === 'disconnected') return 'available';
 
   return presence.status;
+}
+
+function profileInitial(label: string): string {
+  const [initial] = Array.from(label.replace(/^@/, ''));
+
+  return initial?.toUpperCase() ?? 'P';
 }
