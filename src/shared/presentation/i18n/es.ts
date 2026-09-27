@@ -82,6 +82,10 @@ export const es = {
       'Recomendado. Añade una capa extra de seguridad usando el desbloqueo de este navegador o dispositivo.',
     passkeyPrfNotPersisted:
       'La identidad se ha creado, pero el servidor no ha guardado la protección con passkey.',
+    passkeyPrfRequestFailed:
+      'El desbloqueo del dispositivo se canceló o no respondió a tiempo. Inténtalo de nuevo.',
+    passkeyPrfRequestFailedCreate:
+      'El desbloqueo del dispositivo se canceló o no respondió a tiempo. Inténtalo de nuevo o desactiva «Proteger con desbloqueo del dispositivo» para crear la identidad con contraseña y clave de recuperación.',
     passkeyPrfUnavailable:
       'Este navegador o autenticador no ha devuelto soporte WebAuthn PRF para esta credencial. Las passkeys normales pueden estar disponibles, pero esta identidad necesita PRF para proteger claves locales.',
     passkeyPrfUnavailableCreate:
