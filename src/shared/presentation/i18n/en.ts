@@ -888,6 +888,8 @@ export const en = {
     ownerOnly:
       'Only the node owner can manage networks and share network codes.',
     ownerOnlyRelay: 'Only the node owner can change this configuration.',
+    ownerOnlyRelayUnclaimed:
+      'This node has no owner yet. Claim it to change its configuration.',
     peersTab: 'Peers ({count})',
     privateNetwork: 'Private network',
     privateRelayBody:

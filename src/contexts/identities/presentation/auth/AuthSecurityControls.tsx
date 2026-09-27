@@ -9,7 +9,7 @@ export function AuthSwitch({ enabled }: { enabled: boolean }): ReactElement {
       aria-hidden="true"
       className={cx(
         'flex h-6 w-11 shrink-0 items-center rounded-full border border-white/10 transition-colors',
-        enabled ? 'bg-cyan-400/25' : 'bg-black/25',
+        enabled ? 'bg-cyan-400/25' : 'bg-white/10',
       )}
     >
       <span

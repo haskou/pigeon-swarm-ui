@@ -799,6 +799,8 @@ export const es = {
     ownerOnly: 'Solo el propietario del nodo puede gestionar redes.',
     ownerOnlyRelay:
       'Solo el propietario del nodo puede cambiar esta configuración.',
+    ownerOnlyRelayUnclaimed:
+      'Este nodo todavía no tiene propietario. Reclámalo para cambiar su configuración.',
     peersTab: 'Pares ({count})',
     privateNetwork: 'Red privada',
     privateRelayBody:
