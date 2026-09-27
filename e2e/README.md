@@ -98,6 +98,10 @@ Optional environment variables:
 
 - `VISUAL_AUDIT_LANGUAGE`: `es` by default; accepts `en`.
 - `VISUAL_AUDIT_RECOVERY_KEY`: enables the recovery-key login path.
+- `VISUAL_AUDIT_TECHNICAL_DETAILS`: `true` turns on the technical details
+  preference so conversation/community data, realtime events, the keychain and
+  call technical data are captured. Otherwise those states are recorded as
+  skipped with that reason.
 - `VISUAL_AUDIT_OUTPUT_DIR`: overrides the default `visual-audit/` folder.
 
 Without credentials, the audit still captures the login screen and skips the

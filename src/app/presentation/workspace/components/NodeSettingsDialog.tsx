@@ -384,7 +384,21 @@ export function NodeSettingsDialog({
               )}
               {activeSection === 'relay' && (
                 <div className="grid content-start gap-3">
-                  {!isOwner ? (
+                  {!isOwner && !node?.owner ? (
+                    <div className="ui-inline-notice grid justify-items-start gap-3 text-sm text-white/55">
+                      {copy.nodeSettings.ownerOnlyRelayUnclaimed}
+                      <button
+                        type="button"
+                        onClick={() => void handleClaim()}
+                        disabled={claimLoading}
+                        className="ui-button ui-button-primary"
+                      >
+                        {claimLoading
+                          ? copy.nodeSettings.saving
+                          : copy.nodeSettings.claim}
+                      </button>
+                    </div>
+                  ) : !isOwner ? (
                     <div className="ui-inline-notice text-sm text-white/55">
                       {copy.nodeSettings.ownerOnlyRelay}
                     </div>
