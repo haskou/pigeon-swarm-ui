@@ -210,7 +210,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
         onCallRetryMicrophone &&
         onCallRetryConnection &&
         onCallToggleScreenShare && (
-          <div className="absolute bottom-[calc(100%+.5rem)] left-0 right-0 z-30">
+          <div className="relative z-30">
             <Suspense fallback={null}>
               <GlobalCallBar
                 call={activeCall}
