@@ -271,14 +271,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
       </button>
 
       {profileOpen && (
-        <div
-          className={cx(
-            'ui-dialog-surface absolute left-0 right-0 z-40 p-3',
-            activeCall
-              ? 'bottom-[calc(100%+5.75rem)]'
-              : 'bottom-[calc(100%+.5rem)]',
-          )}
-        >
+        <div className="ui-dialog-surface absolute bottom-[calc(100%+.5rem)] left-0 right-0 z-40 p-3">
           <div className="space-y-3 text-xs">
             <div>
               <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
