@@ -287,8 +287,8 @@ export function AuthScreen({
 
   return (
     <section className="app-screen relative z-10 grid h-[100dvh] min-h-[100dvh] items-start justify-center overflow-y-auto overscroll-contain px-4 py-7 sm:py-10 lg:place-items-center">
-      <div className="grid w-full max-w-6xl gap-6 lg:grid-cols-[1fr_480px] lg:items-center">
-        <div className="hidden lg:block">
+      <div className="grid w-full max-w-6xl gap-6 lg:grid-cols-[1fr_480px] lg:items-start">
+        <div className="hidden lg:sticky lg:top-0 lg:block">
           <div className="glass-panel-strong rounded-2xl p-8">
             <img
               src="/logo.png"
@@ -340,17 +340,6 @@ export function AuthScreen({
               </p>
             </div>
           </div>
-
-          <InstallAppAction
-            canShowButton={canShowInstallButton}
-            className="mb-5 lg:hidden"
-            disabled={installButtonDisabled}
-            help={installHelp}
-            label={installButtonLabel}
-            onClick={handleInstallApp}
-            ready={installState === 'ready'}
-            showHelp={showInstallHelp}
-          />
 
           <SegmentedControl
             value={mode}
@@ -565,6 +554,17 @@ export function AuthScreen({
               {copy.auth.loginSubmitHelp}
             </p>
           )}
+
+          <InstallAppAction
+            canShowButton={canShowInstallButton}
+            className="mt-5 lg:hidden"
+            disabled={installButtonDisabled}
+            help={installHelp}
+            label={installButtonLabel}
+            onClick={handleInstallApp}
+            ready={installState === 'ready'}
+            showHelp={showInstallHelp}
+          />
 
           <NodeLoginSummary
             availableNetworks={availableNetworks}
