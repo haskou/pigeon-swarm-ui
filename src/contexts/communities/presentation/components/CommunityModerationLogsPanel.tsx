@@ -123,7 +123,7 @@ function ModerationLogRow({
             className="grid gap-1 sm:grid-cols-[minmax(0,7rem)_minmax(0,1fr)] sm:gap-3"
             key={key}
           >
-            <span className="min-w-0 break-all">{prettify(key)}</span>
+            <span className="min-w-0 break-all">{detailKeyLabel(key)}</span>
             <span className="min-w-0 break-all font-semibold text-white/70 sm:text-right">
               {detailLabel(value, roles, channels, identityLookup)}
             </span>
@@ -181,7 +181,7 @@ function targetLabel(
     return identityLabel(log.target.id, identityLookup);
   }
 
-  return `${prettify(log.target.type)} ${shortId(log.target.id)}`;
+  return `${targetTypeLabel(log.target.type)} ${shortId(log.target.id)}`;
 }
 
 function identityLabel(
@@ -226,7 +226,7 @@ function detailLabel(
 
   if (value === undefined || value === null) return '—';
 
-  if (typeof value !== 'string') return String(value);
+  if (typeof value !== 'string') return valueLabel(String(value));
 
   return (
     roles.find((role) => role.id === value)?.name ??
@@ -234,7 +234,31 @@ function detailLabel(
     (identityLookup[value]
       ? identityLabel(value, identityLookup)
       : undefined) ??
-    permissionLabel(value)
+    valueLabel(value)
+  );
+}
+
+function detailKeyLabel(key: string): string {
+  return (
+    copy.communities.moderationDetails[
+      key as keyof typeof copy.communities.moderationDetails
+    ] ?? prettify(key)
+  );
+}
+
+function targetTypeLabel(type: string): string {
+  return (
+    copy.communities.moderationTargetTypes[
+      type as keyof typeof copy.communities.moderationTargetTypes
+    ] ?? prettify(type)
+  );
+}
+
+function valueLabel(value: string): string {
+  return (
+    copy.communities.moderationValues[
+      value as keyof typeof copy.communities.moderationValues
+    ] ?? permissionLabel(value)
   );
 }
 
