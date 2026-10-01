@@ -1,9 +1,17 @@
+import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+
 import type { DraftPayloadCipher } from '../../../../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
 import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
 import { PigeonCommunitiesApi } from '../../../../../contexts/communities/infrastructure/http/PigeonCommunitiesApi';
+
+type SentBody = {
+  createdAt?: number;
+  emoji?: string;
+  mutation: Record<string, unknown>;
+};
 
 describe(PigeonCommunitiesApi.name, () => {
   function sessionWithSigner(sign: jest.Mock): Session {
@@ -581,7 +589,8 @@ describe(PigeonCommunitiesApi.name, () => {
     );
   });
 
-  it('pins and unpins community channel messages without request bodies', async () => {
+  it('pins and unpins community channel messages with signed mutations', async () => {
+    const device = await KeyPair.generate();
     const http = {
       request: jest.fn().mockResolvedValue(undefined),
     } as unknown as HttpJsonClient;
@@ -589,6 +598,7 @@ describe(PigeonCommunitiesApi.name, () => {
       headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
     } as unknown as RequestSigner;
     const session = {
+      deviceCredentialKeyPair: device,
       identity: { id: 'identity-1' },
     } as unknown as Session;
     const api = new PigeonCommunitiesApi(
@@ -612,16 +622,75 @@ describe(PigeonCommunitiesApi.name, () => {
       'message-1',
     );
 
-    expect(signer.headers).toHaveBeenNthCalledWith(1, session, 'POST', path);
-    expect(signer.headers).toHaveBeenNthCalledWith(2, session, 'DELETE', path);
-    expect(http.request).toHaveBeenNthCalledWith(1, path, {
-      headers: { 'X-Identity-Id': 'identity-1' },
-      method: 'POST',
+    const [pin, unpin] = (http.request as jest.Mock).mock.calls.map(
+      ([, init]: [string, { body: string }]) =>
+        JSON.parse(init.body) as SentBody,
+    );
+
+    expect(http.request).toHaveBeenNthCalledWith(
+      1,
+      path,
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(http.request).toHaveBeenNthCalledWith(
+      2,
+      path,
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+    expect(pin.createdAt).toEqual(expect.any(Number));
+    expect(pin.mutation).toMatchObject({
+      kind: 'put',
+      predecessor: null,
+      recordId: 'community:community-1:channel-1:message-1',
+      sequence: 0,
+      store: 'pins',
+      version: 1,
     });
-    expect(http.request).toHaveBeenNthCalledWith(2, path, {
-      headers: { 'X-Identity-Id': 'identity-1' },
-      method: 'DELETE',
+    expect(unpin.mutation).toMatchObject({ kind: 'delete', store: 'pins' });
+    expect(unpin.createdAt).toBeUndefined();
+    expect(signer.headers).toHaveBeenNthCalledWith(
+      1,
+      session,
+      'POST',
+      path,
+      pin,
+    );
+  });
+
+  it('signs reaction mutations bound to author and emoji', async () => {
+    const device = await KeyPair.generate();
+    const http = {
+      request: jest.fn().mockResolvedValue(undefined),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({}),
+    } as unknown as RequestSigner;
+    const session = {
+      deviceCredentialKeyPair: device,
+      identity: { id: 'identity-1' },
+    } as unknown as Session;
+    const api = new PigeonCommunitiesApi(
+      http,
+      signer,
+      async (_key, loader) => await loader(),
+    );
+
+    await api.addChannelMessageReaction(session, 'c', 'ch', 'm', '👍');
+    await api.removeChannelMessageReaction(session, 'c', 'ch', 'm', '👍');
+
+    const [added, removed] = (http.request as jest.Mock).mock.calls.map(
+      ([, init]: [string, { body: string }]) =>
+        JSON.parse(init.body) as SentBody,
+    );
+
+    expect(added.emoji).toBe('👍');
+    expect(added.mutation).toMatchObject({
+      kind: 'put',
+      recordId: 'community_channel:c:ch:m:identity-1:👍',
+      store: 'reactions',
     });
+    expect(removed.mutation).toMatchObject({ kind: 'delete' });
+    expect(removed.createdAt).toBeUndefined();
   });
 
   it('stores community channel drafts as encrypted local payloads', async () => {
