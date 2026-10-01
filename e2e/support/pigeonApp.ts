@@ -70,6 +70,10 @@ export async function registerIdentity(
     .fill(identity.password);
 
   const fallbackNetworks = page.getByTestId('auth-networks-input');
+  await page
+    .getByTestId('auth-network-select')
+    .waitFor({ timeout: 10_000 })
+    .catch(() => undefined);
 
   if (await fallbackNetworks.isVisible().catch(() => false)) {
     const networkId = process.env.E2E_NETWORK_ID?.trim();

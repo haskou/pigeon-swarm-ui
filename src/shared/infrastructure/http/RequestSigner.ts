@@ -79,14 +79,6 @@ export class RequestSigner {
     const credential = IdentityId.normalize(
       session.deviceCredentialKeyPair.toPrimitives().publicKey,
     );
-    const devicePayload = JSON.stringify({
-      authorizationEpoch: session.authorizationEpoch.valueOf(),
-      authorizationRevision: session.authorizationRevision.valueOf(),
-      credential: session.deviceCredentialKeyPair.toPrimitives().publicKey,
-      domain: 'pigeon:http-device-authorization:v1',
-      identityId: IdentityId.normalize(session.identity.id),
-      request: JSON.parse(request.payload) as unknown,
-    });
 
     return {
       ...request.headers,
@@ -94,7 +86,7 @@ export class RequestSigner {
       'X-Device-Authorization-Revision': `${session.authorizationRevision.valueOf()}`,
       'X-Device-Credential': credential,
       'X-Device-Signature': session.deviceCredentialKeyPair
-        .sign(devicePayload)
+        .sign(request.payload)
         .toString(),
     };
   }

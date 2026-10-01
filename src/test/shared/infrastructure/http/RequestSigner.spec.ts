@@ -172,15 +172,9 @@ describe(RequestSigner.name, () => {
       'X-Timestamp': '123',
     });
     expect(identitySign).toHaveBeenCalledWith(expect.any(String));
-    expect(JSON.parse((deviceSign.mock.calls[0] as [string])[0])).toEqual({
-      authorizationEpoch: 'genesis',
-      authorizationRevision: 0,
-      credential:
-        '-----BEGIN PUBLIC KEY-----\ncredential\n-----END PUBLIC KEY-----\n',
-      domain: 'pigeon:http-device-authorization:v1',
-      identityId: 'identity-1',
-      request: JSON.parse((identitySign.mock.calls[0] as [string])[0]),
-    });
+    expect(deviceSign).toHaveBeenCalledWith(
+      (identitySign.mock.calls[0] as [string])[0],
+    );
   });
 
   it('binds recovery authority proof to the same canonical request', async () => {
