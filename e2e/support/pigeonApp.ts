@@ -59,7 +59,7 @@ export async function newIsolatedPage(browser: Browser): Promise<Page> {
 export async function registerIdentity(
   page: Page,
   identity: TestIdentity,
-): Promise<void> {
+): Promise<string> {
   await page.goto('/');
   await page.getByTestId('auth-mode-control').locator('button').nth(1).click();
   await page.getByTestId('auth-name-input').fill(identity.name);
@@ -83,12 +83,19 @@ export async function registerIdentity(
     await fallbackNetworks.fill(networkId);
   }
 
+  const recoveryKey = await page
+    .getByTestId('auth-recovery-key-output')
+    .inputValue();
+
+  await page.getByTestId('auth-recovery-key-confirm').click();
   await expect(page.getByTestId('auth-submit-button')).toBeEnabled({
     timeout: 30_000,
   });
   await page.getByTestId('auth-submit-button').click();
   await waitForWorkspace(page);
   await dismissPushPrompt(page);
+
+  return recoveryKey;
 }
 
 export async function createDirectConversation(
