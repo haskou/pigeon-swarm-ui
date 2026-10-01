@@ -1,9 +1,16 @@
+import { DeviceAuthorizationEpoch } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationEpoch';
+import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
 import { DeviceCredential } from '../../../../../contexts/identities/domain/value-objects/DeviceCredential';
 import { DeviceId } from '../../../../../contexts/identities/domain/value-objects/DeviceId';
 import { DeviceRootKeyEnvelope } from '../../../../../contexts/identities/domain/value-objects/DeviceRootKeyEnvelope';
 import { DeviceUnlockSecretHandle } from '../../../../../contexts/identities/domain/value-objects/DeviceUnlockSecretHandle';
 
 describe('device security value objects', () => {
+  it('represents the genesis authorization checkpoint', () => {
+    expect(DeviceAuthorizationEpoch.genesis().valueOf()).toBe('genesis');
+    expect(DeviceAuthorizationRevision.initial().valueOf()).toBe(0);
+    expect(() => DeviceAuthorizationRevision.fromNumber(-1)).toThrow();
+  });
   it('canonicalizes device identifiers and compares by value', () => {
     const deviceId = DeviceId.fromString(
       ' 550E8400-E29B-41D4-A716-446655440000 ',

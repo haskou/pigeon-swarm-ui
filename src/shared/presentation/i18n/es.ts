@@ -29,6 +29,14 @@ export const es = {
     changeIdentity: 'Cambiar identidad',
     createIdentity: 'Crear identidad',
     createIdentityShort: 'Crear',
+    devicePairingCompletionLabel: 'Finalización del dispositivo autorizado',
+    devicePairingError:
+      'El código de emparejamiento no es válido o ha caducado.',
+    devicePairingInvitationLabel: 'Invitación del dispositivo autorizado',
+    devicePairingPrepare: 'Preparar este dispositivo',
+    devicePairingRequestHelp:
+      'Escanea esta respuesta en el dispositivo autorizado, apruébala allí y después escanea aquí el código final.',
+    devicePairingRequestQr: 'Solicitud del dispositivo nuevo',
     fallbackNetworksLabel: 'Redes, separadas por comas',
     handleLabel: 'usuario',
     heroBody:
@@ -123,7 +131,7 @@ export const es = {
       'Guarda esta clave. La necesitarás para abrir tu identidad desde otro nodo o navegador.',
     recoveryKeyLabel: 'Clave de recuperación',
     recoveryKeyLoginHelp:
-      'Necesaria para identidades protegidas con clave de recuperación. No se guarda en este nodo.',
+      'Sustituye todos los dispositivos autorizados y reconstruye esta identidad en el dispositivo actual.',
     recoveryKeyRegenerate: 'Regenerar',
     recoveryKeySaved: 'He guardado mi clave de recuperación',
     recoveryKeyTitle: 'Clave de recuperación',
@@ -134,19 +142,11 @@ export const es = {
       'Guarda tu identidad y un sobre local de desbloqueo en este navegador.',
     title: 'Pigeon Swarm',
     unknownError: 'Error desconocido. Poético, pero poco útil.',
-    useRecoveryKey: 'Usar clave de recuperación',
+    useDevicePairing: 'Añadir este dispositivo usando otro',
+    useRecoveryKey: 'Recuperar en este dispositivo',
   },
   calls: {
     answer: 'Responder',
-    connectionRecovering: 'Reconectando el audio de la llamada…',
-    connectionRecoveryExhausted:
-      'No se pudo reconectar el audio con uno o varios participantes. Comprueba tu conexión y reintenta, o sal y vuelve a entrar en la llamada.',
-    retryConnection: 'Reintentar conexión',
-    diagnosticsPrivacy:
-      'Registra métricas de conexión localmente durante un máximo de 5 minutos. Se excluyen nombres, identidades, direcciones, credenciales y mensajes. Cerrar este panel o detener el registro borra los datos. Exporta solo si quieres compartirlos.',
-    startDiagnostics: 'Iniciar diagnóstico',
-    stopDiagnostics: 'Detener y borrar',
-    exportDiagnostics: 'Exportar diagnóstico',
     callData: 'Datos de llamada',
     callMetricBitrate: 'Bitrate',
     callMetricCodec: 'Codec',
@@ -167,11 +167,17 @@ export const es = {
     connectionQualityGood: 'Buena conexión',
     connectionQualityPoor: 'Mala conexión',
     connectionQualityWeak: 'Conexión débil',
+    connectionRecovering: 'Reconectando el audio de la llamada…',
+    connectionRecoveryExhausted:
+      'No se pudo reconectar el audio con uno o varios participantes. Comprueba tu conexión y reintenta, o sal y vuelve a entrar en la llamada.',
     deafen: 'Silenciar audio de llamada',
     decline: 'Rechazar',
     declined: 'Llamada rechazada',
+    diagnosticsPrivacy:
+      'Registra métricas de conexión localmente durante un máximo de 5 minutos. Se excluyen nombres, identidades, direcciones, credenciales y mensajes. Cerrar este panel o detener el registro borra los datos. Exporta solo si quieres compartirlos.',
     disableCamera: 'Detener cámara',
     ended: 'Llamada finalizada',
+    exportDiagnostics: 'Exportar diagnóstico',
     hideCallData: 'Ocultar datos',
     hideStreamDetails: 'Ocultar detalles',
     iceServersUnavailable: 'Las llamadas no están configuradas en este nodo.',
@@ -181,6 +187,15 @@ export const es = {
     leave: 'Salir',
     live: 'En directo',
     manyParticipants: 'participantes',
+    mediaEncryptionActive: 'E2EE activo',
+    mediaEncryptionDisabled: 'E2EE desactivado',
+    mediaEncryptionMissingKey: 'No hay clave para cifrar esta llamada.',
+    mediaEncryptionOff: 'Desactivar E2EE de llamada',
+    mediaEncryptionOn: 'Activar E2EE de llamada',
+    mediaEncryptionPublicCommunity:
+      'Las llamadas de comunidades públicas no usan E2EE.',
+    mediaEncryptionUnsupported:
+      'Este navegador no soporta cifrado E2EE de media.',
     microphoneAllow: 'Permitir micrófono',
     microphoneBlockedTitle: 'No se puede usar el micrófono',
     microphoneConstraint:
@@ -199,19 +214,6 @@ export const es = {
       'El permiso del micrófono no está disponible. Revisa permisos y HTTPS.',
     microphoneUnknown: 'No se pudo iniciar el micrófono.',
     microphoneUnsupported: 'Este navegador no expone captura de micrófono.',
-    mediaEncryptionActive: 'E2EE activo',
-    mediaEncryptionDisabled: 'E2EE desactivado',
-    mediaEncryptionMissingKey: 'No hay clave para cifrar esta llamada.',
-    mediaEncryptionOff: 'Desactivar E2EE de llamada',
-    mediaEncryptionOn: 'Activar E2EE de llamada',
-    participantMediaEncrypted:
-      'El contenido con este participante está cifrado de extremo a extremo.',
-    participantMediaNotEncrypted:
-      'El contenido con este participante no está cifrado de extremo a extremo.',
-    mediaEncryptionPublicCommunity:
-      'Las llamadas de comunidades públicas no usan E2EE.',
-    mediaEncryptionUnsupported:
-      'Este navegador no soporta cifrado E2EE de media.',
     missed: 'Llamada perdida',
     mute: 'Silenciar micrófono',
     muted: 'Silenciado',
@@ -221,11 +223,18 @@ export const es = {
     noiseCancellationOn: 'Activar cancelación de ruido',
     oneParticipant: 'participante',
     outgoingCallDirection: 'Saliente',
+    participantMediaEncrypted:
+      'El contenido con este participante está cifrado de extremo a extremo.',
+    participantMediaNotEncrypted:
+      'El contenido con este participante no está cifrado de extremo a extremo.',
+    retryConnection: 'Reintentar conexión',
     screen: 'Pantalla',
     screenShareQuality: 'Calidad del stream',
     screenShareVolume: 'Volumen de pantalla',
     shareScreen: 'Compartir pantalla con sonido',
     startCall: 'Iniciar llamada',
+    startDiagnostics: 'Iniciar diagnóstico',
+    stopDiagnostics: 'Detener y borrar',
     stopScreenShare: 'Dejar de compartir pantalla',
     streamAudio: 'Audio',
     streamAudioDisabled: 'No',
@@ -1196,6 +1205,19 @@ export const es = {
     currentPassword: 'Contraseña actual',
     currentPasswordForPasskeyHelp:
       'Se verifican la contraseña actual y la clave de recuperación antes de crear el desbloqueo local. No se guardan.',
+    devicePairingAction: 'Añadir otro dispositivo',
+    devicePairingAuthorize: 'Autorizar dispositivo',
+    devicePairingCompletionHelp:
+      'Escanea este último código en el dispositivo nuevo. Está cifrado para ese dispositivo y solo puede usarse una vez.',
+    devicePairingCompletionQr: 'Finalización cifrada del emparejamiento',
+    devicePairingError: 'No se ha podido emparejar el dispositivo.',
+    devicePairingHelp:
+      'Usa códigos QR autenticados y de corta duración. El dispositivo nuevo crea una credencial independiente y su propia envoltura de contraseña.',
+    devicePairingInvitationHelp:
+      'Escanea esta invitación en el dispositivo nuevo. Después escanea aquí su respuesta antes de que caduque.',
+    devicePairingInvitationQr: 'Invitación para emparejar dispositivo',
+    devicePairingRequestLabel: 'Solicitud del dispositivo nuevo',
+    devicePairingTitle: 'Añadir un dispositivo',
     discardChanges: 'Descartar',
     discardChangesBody: 'Hay cambios sin guardar. ¿Quieres descartarlos?',
     edit: 'Editar perfil',

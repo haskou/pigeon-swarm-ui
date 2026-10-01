@@ -269,6 +269,24 @@ class SymmetricKey extends StringValueObject {
   }
 }
 
+class UserRootKey extends StringValueObject {
+  public static fromBase64(value: string): UserRootKey {
+    return new UserRootKey(value);
+  }
+
+  public static generate(): UserRootKey {
+    return new UserRootKey(randomBytes(32).toString('base64'));
+  }
+
+  public getBuffer(): Buffer {
+    return Buffer.from(this.valueOf(), 'base64');
+  }
+
+  public toJSON(): never {
+    throw new Error('UserRootKey cannot be serialized.');
+  }
+}
+
 class Timestamp {
   private readonly value: number;
 
@@ -483,6 +501,7 @@ export {
   SymmetricKey,
   Timestamp,
   UniqueObjectArray,
+  UserRootKey,
   UUID,
   ValueObject,
   ValueNotInEnumError,

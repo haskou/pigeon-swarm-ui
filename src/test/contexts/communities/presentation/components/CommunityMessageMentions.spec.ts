@@ -41,25 +41,16 @@ const community = (overrides: Partial<Community> = {}): Community => ({
 
 const identities: Record<string, IdentityResource> = {
   'member-a': {
-    encryptedKeyPair: {
-      encryptedPrivateKey: 'encrypted-private-key',
-      publicKey: 'public-key',
-    },
-    encryptedMasterKey: 'encrypted-master-key',
+    authorizationRevision: 0,
+    deviceCredential: 'device-credential',
+    deviceCredentialCommitment: 'device-credential-commitment',
     id: 'member-a',
-    masterKeyDerivation: {
-      algorithm: 'scrypt',
-      N: 16_384,
-      p: 5,
-      r: 8,
-      salt: 'master-salt',
-      version: 1,
-    },
     networks: [],
     profile: {
       handle: 'hasko',
       name: 'Hasko',
     },
+    recoveryAuthority: 'recovery-authority',
     signature: 'signature',
     timestamp: 100,
     version: 1,

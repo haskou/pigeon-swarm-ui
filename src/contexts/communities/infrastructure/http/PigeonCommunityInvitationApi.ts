@@ -1,4 +1,4 @@
-import { PublicKey, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
 import type {
   Community,
@@ -16,6 +16,7 @@ import type { CommunityInviteLinkInput } from './CommunityInviteLinkInput';
 import type { PigeonCommunitiesApi } from './PigeonCommunitiesApi';
 
 import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
+import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { encryptCommunityInviteKey } from '../crypto/communityInviteKeyEnvelope';
 import { buildCommunityInviteLinkBody } from './buildCommunityInviteLinkBody';
 
@@ -158,7 +159,8 @@ export class PigeonCommunityInvitationApi {
     recipientIdentity: IdentityResource,
     recipientKeyEntry: ConversationKeyEntry & { peerIdentityId: string },
   ): string {
-    return PublicKey.fromPEM(recipientIdentity.encryptedKeyPair.publicKey)
+    return IdentityId.fromString(recipientIdentity.id)
+      .getPublicKey()
       .encrypt(JSON.stringify(recipientKeyEntry))
       .toString();
   }

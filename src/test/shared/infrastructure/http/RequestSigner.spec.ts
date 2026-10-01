@@ -26,6 +26,16 @@ function sessionWithSigner(
   identityId = 'identity-1',
 ): Session {
   return {
+    authorizationEpoch: { valueOf: () => 'genesis' },
+    authorizationRevision: { valueOf: () => 0 },
+    deviceCredentialKeyPair: {
+      sign: jest.fn().mockReturnValue({ toString: () => 'device-signature' }),
+      toPrimitives: () => ({
+        privateKey: 'private',
+        publicKey:
+          '-----BEGIN PUBLIC KEY-----\ncredential\n-----END PUBLIC KEY-----\n',
+      }),
+    },
     identity: { id: identityId },
     keyPair: { sign },
     password: 'secret',
@@ -115,6 +125,10 @@ describe(RequestSigner.name, () => {
     const session = sessionWithSigner(sign);
 
     await expect(signer.headers(session, 'GET', '/messages')).resolves.toEqual({
+      'X-Device-Authorization-Epoch': 'genesis',
+      'X-Device-Authorization-Revision': '0',
+      'X-Device-Credential': 'credential',
+      'X-Device-Signature': 'device-signature',
       'X-Identity-Id': 'identity-1',
       'X-Signature': 'signature',
       'X-Timestamp': '123',
@@ -126,6 +140,74 @@ describe(RequestSigner.name, () => {
       path: '/messages',
       timestamp: 123,
     });
+  });
+
+  it('binds an authorized device proof to the same canonical request', async () => {
+    const identitySign = jest
+      .fn()
+      .mockReturnValue({ toString: () => 'identity-signature' });
+    const deviceSign = jest
+      .fn()
+      .mockReturnValue({ toString: () => 'device-signature' });
+    const signer = new RequestSigner(() => 123);
+    const session = sessionWithSigner(identitySign) as Session;
+    session.deviceCredentialKeyPair = {
+      sign: deviceSign,
+      toPrimitives: () => ({
+        privateKey: 'private',
+        publicKey:
+          '-----BEGIN PUBLIC KEY-----\ncredential\n-----END PUBLIC KEY-----\n',
+      }),
+    } as unknown as Session['deviceCredentialKeyPair'];
+
+    await expect(
+      signer.headersWithDeviceProof(session, 'GET', '/identity-devices/id'),
+    ).resolves.toEqual({
+      'X-Device-Authorization-Epoch': 'genesis',
+      'X-Device-Authorization-Revision': '0',
+      'X-Device-Credential': 'credential',
+      'X-Device-Signature': 'device-signature',
+      'X-Identity-Id': 'identity-1',
+      'X-Signature': 'identity-signature',
+      'X-Timestamp': '123',
+    });
+    expect(identitySign).toHaveBeenCalledWith(expect.any(String));
+    expect(JSON.parse((deviceSign.mock.calls[0] as [string])[0])).toEqual({
+      authorizationEpoch: 'genesis',
+      authorizationRevision: 0,
+      credential:
+        '-----BEGIN PUBLIC KEY-----\ncredential\n-----END PUBLIC KEY-----\n',
+      domain: 'pigeon:http-device-authorization:v1',
+      identityId: 'identity-1',
+      request: JSON.parse((identitySign.mock.calls[0] as [string])[0]),
+    });
+  });
+
+  it('binds recovery authority proof to the same canonical request', async () => {
+    const identitySign = jest
+      .fn()
+      .mockReturnValue({ toString: () => 'identity-signature' });
+    const recoverySign = jest
+      .fn()
+      .mockReturnValue({ toString: () => 'recovery-signature' });
+    const signer = new RequestSigner(() => 123);
+    const session = sessionWithSigner(identitySign);
+    session.recoveryAuthorityKeyPair = {
+      sign: recoverySign,
+    } as unknown as Session['recoveryAuthorityKeyPair'];
+
+    await expect(
+      signer.headersWithRecoveryProof(session, 'GET', '/identity-devices/id'),
+    ).resolves.toEqual({
+      'X-Identity-Id': 'identity-1',
+      'X-Recovery-Signature': 'recovery-signature',
+      'X-Signature': 'identity-signature',
+      'X-Timestamp': '123',
+    });
+    expect(identitySign).toHaveBeenCalledWith(expect.any(String));
+    expect(recoverySign).toHaveBeenCalledWith(
+      (identitySign.mock.calls[0] as [string])[0],
+    );
   });
 
   it('signs only the URL pathname when passed an absolute URL', () => {

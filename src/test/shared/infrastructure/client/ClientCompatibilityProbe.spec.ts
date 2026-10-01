@@ -11,7 +11,7 @@ describe('ClientCompatibilityProbe', () => {
       .fn()
       .mockResolvedValue(
         new Response(
-          JSON.stringify({ apiVersion: 1, protocol: 'pigeon-swarm' }),
+          JSON.stringify({ apiVersion: 2, protocol: 'pigeon-swarm' }),
           { headers: { 'Content-Type': 'application/json' } },
         ),
       );
@@ -29,7 +29,7 @@ describe('ClientCompatibilityProbe', () => {
   });
 
   it.each([
-    { apiVersion: 2, protocol: 'pigeon-swarm' },
+    { apiVersion: 1, protocol: 'pigeon-swarm' },
     { apiVersion: 1, protocol: 'other' },
     {},
     { apiVersion: '1', protocol: 'pigeon-swarm' },

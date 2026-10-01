@@ -28,8 +28,8 @@ import { PigeonConversationCommandsApi } from '../../contexts/conversations/infr
 import { PigeonConversationsApi } from '../../contexts/conversations/infrastructure/http/PigeonConversationsApi';
 import { PigeonConversationsGateway } from '../../contexts/conversations/infrastructure/http/PigeonConversationsGateway';
 import { KeychainCipher } from '../../contexts/identities/infrastructure/crypto/KeychainCipher';
-import { PigeonIdentityKeyProtectionGateway } from '../../contexts/identities/infrastructure/crypto/PigeonIdentityKeyProtectionGateway';
 import { IdentitySignaturePayloadFactory } from '../../contexts/identities/infrastructure/http/IdentitySignaturePayloadFactory';
+import { PigeonDeviceAuthorizationApi } from '../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
 import { PigeonIdentitiesGateway } from '../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
 import { PigeonIdentityCommandsApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityCommandsApi';
 import { PigeonIdentityGateway } from '../../contexts/identities/infrastructure/http/PigeonIdentityGateway';
@@ -39,6 +39,7 @@ import { PigeonIdentityWorkspaceSessionApi } from '../../contexts/identities/inf
 import { PigeonKeychainApi } from '../../contexts/identities/infrastructure/http/PigeonKeychainApi';
 import { PigeonPresenceApi } from '../../contexts/identities/infrastructure/http/PigeonPresenceApi';
 import { PigeonPresenceGateway } from '../../contexts/identities/infrastructure/http/PigeonPresenceGateway';
+import { DeviceIdentityVault } from '../../contexts/identities/infrastructure/storage/DeviceIdentityVault';
 import { DraftPayloadCipher } from '../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
 import { MessageProjector } from '../../contexts/messages/infrastructure/crypto/MessageProjector';
 import { PigeonMessageProjection } from '../../contexts/messages/infrastructure/crypto/PigeonMessageProjection';
@@ -74,7 +75,7 @@ export class PigeonApiGateway {
 
   public readonly identityGateway: PigeonIdentitiesGateway;
 
-  public readonly identityKeyProtection: PigeonIdentityKeyProtectionGateway;
+  public readonly identityVault: DeviceIdentityVault;
 
   public readonly messageCommands: PigeonMessageCommandsApi;
 
@@ -175,13 +176,18 @@ export class PigeonApiGateway {
 
     const identityResourceGateway = new PigeonIdentityGateway(http);
 
-    this.identityKeyProtection = new PigeonIdentityKeyProtectionGateway();
+    this.identityVault = new DeviceIdentityVault();
     const identityCommands = new PigeonIdentityCommandsApi(
       http,
       signer,
       identityResourceGateway,
       new IdentitySignaturePayloadFactory(),
-      this.identityKeyProtection,
+      this.identityVault,
+    );
+    const deviceAuthorization = new PigeonDeviceAuthorizationApi(
+      http,
+      signer,
+      this.identityVault,
     );
     const keychainApi = new PigeonKeychainApi(
       http,
@@ -191,7 +197,8 @@ export class PigeonApiGateway {
     );
     const identitySession = new PigeonIdentitySessionApi(
       identityResourceGateway,
-      this.identityKeyProtection,
+      this.identityVault,
+      deviceAuthorization,
     );
     const identityWorkspace = new PigeonIdentityWorkspaceSessionApi(
       {
@@ -292,7 +299,7 @@ export class PigeonApiGateway {
       identityCommands,
       identityLogin,
       identityResourceGateway,
-      this.identityKeyProtection,
+      deviceAuthorization,
       keychainApi,
       this.presence,
     );

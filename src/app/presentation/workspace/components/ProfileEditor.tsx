@@ -24,14 +24,11 @@ import {
   IDENTITY_PROFILE_HANDLE_MAX_LENGTH,
   IDENTITY_PROFILE_NAME_MAX_LENGTH,
 } from '../../../../contexts/identities/domain/profile/IdentityProfileConstraints';
-import { RecoveryKey } from '../../../../contexts/identities/domain/value-objects/RecoveryKey';
-import { WebAuthnPrfKeyProtector } from '../../../../contexts/identities/infrastructure/crypto/WebAuthnPrfKeyProtector';
-import { loadLocalPasskeyUnlock } from '../../../../contexts/identities/infrastructure/storage/localPasskeyUnlock';
-import { AuthSwitch } from '../../../../contexts/identities/presentation/auth/AuthSecurityControls';
 import {
   isValidPassword,
   passwordValidationChecks,
 } from '../../../../contexts/identities/presentation/auth/credentialsValidation';
+import { AuthSwitch } from '../../../../contexts/identities/presentation/auth/AuthSecurityControls';
 import { PasswordRequirementProgress } from '../../../../contexts/identities/presentation/auth/PasswordRequirementProgress';
 import {
   isValidHandle,
@@ -52,6 +49,7 @@ import { useTechnicalDetailsPreference } from '../../../../shared/presentation/p
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { ProfileKeychainSection } from './ProfileKeychainSection';
+import { DevicePairingDialog } from './DevicePairingDialog';
 
 const ImageCropEditor = lazy(() =>
   import('../../../../shared/presentation/components/ImageCropEditor').then(
@@ -94,20 +92,9 @@ export function ProfileEditor({
   );
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordConfirmation, setNewPasswordConfirmation] = useState('');
-  const [passwordRecoveryKey, setPasswordRecoveryKey] = useState('');
-  const [currentPasswordForPasskey, setCurrentPasswordForPasskey] =
-    useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
   const [passwordSectionOpen, setPasswordSectionOpen] = useState(false);
-  const hasPasskeyPrf = !!session.identity.masterKeyDerivation.passkeyPrf;
-  const hasRecoveryKey = !!session.identity.masterKeyDerivation.recoveryKey;
-  const [passkeyPrfEnabled, setPasskeyPrfEnabled] = useState(hasPasskeyPrf);
-  const [initialLocalPasskeyPrfEnabled] = useState(
-    () => !!loadLocalPasskeyUnlock(session.identity.id),
-  );
-  const [localPasskeyPrfEnabled, setLocalPasskeyPrfEnabled] = useState(
-    initialLocalPasskeyPrfEnabled,
-  );
-  const [passkeyPrfAvailable, setPasskeyPrfAvailable] = useState(false);
+  const [devicePairingOpen, setDevicePairingOpen] = useState(false);
   const [activeSection, setActiveSection] =
     useState<ProfileEditorSection>('profile');
   const [technicalDetailsVisible, setTechnicalDetailsVisible] =
@@ -141,41 +128,11 @@ export function ProfileEditor({
   const passwordChecks = passwordValidationChecks(newPassword);
   const passwordsMatch =
     newPassword.length > 0 && newPassword === newPasswordConfirmation;
-  const passkeyPrfChanged = passkeyPrfEnabled !== hasPasskeyPrf;
-  const localPasskeyPrfChanged =
-    localPasskeyPrfEnabled !== initialLocalPasskeyPrfEnabled;
-  const deviceUnlockEnabled = passkeyPrfEnabled || localPasskeyPrfEnabled;
-  const hasSavedDeviceUnlock = hasPasskeyPrf || initialLocalPasskeyPrfEnabled;
-  const canEnableDeviceUnlock = passkeyPrfAvailable || hasSavedDeviceUnlock;
-  const shouldRefreshLocalPasskeyPrf =
-    localPasskeyPrfEnabled && wantsPasswordChange;
-  const shouldConfigureLocalPasskeyPrf =
-    localPasskeyPrfChanged || shouldRefreshLocalPasskeyPrf;
-  const needsCurrentPasswordForPasskey =
-    !wantsPasswordChange &&
-    (passkeyPrfChanged || (localPasskeyPrfChanged && localPasskeyPrfEnabled));
-  const needsRecoveryKeyForPasskey =
-    needsCurrentPasswordForPasskey && hasRecoveryKey;
   const canChangePassword =
     !wantsPasswordChange ||
     (isValidPassword(newPassword) &&
       passwordsMatch &&
-      (!hasRecoveryKey || RecoveryKey.isValid(passwordRecoveryKey)));
-  const canUpdatePasskeyPrf =
-    !passkeyPrfChanged ||
-    ((!passkeyPrfEnabled || passkeyPrfAvailable) &&
-      (wantsPasswordChange ||
-        (currentPasswordForPasskey.trim().length > 0 &&
-          (!needsRecoveryKeyForPasskey ||
-            RecoveryKey.isValid(passwordRecoveryKey)))));
-  const canUpdateLocalPasskeyPrf =
-    !shouldConfigureLocalPasskeyPrf ||
-    !localPasskeyPrfEnabled ||
-    (passkeyPrfAvailable &&
-      (wantsPasswordChange ||
-        (currentPasswordForPasskey.trim().length > 0 &&
-          (!needsRecoveryKeyForPasskey ||
-            RecoveryKey.isValid(passwordRecoveryKey)))));
+      currentPassword.trim().length > 0);
   const profileChanged =
     name.trim() !== session.identity.profile.name.trim() ||
     (normalizedHandle ?? '') !== (session.identity.profile.handle ?? '') ||
@@ -186,21 +143,14 @@ export function ProfileEditor({
     identityNetworkIds,
     session.identity.networks,
   );
-  const hasRemoteChanges =
-    profileChanged ||
-    mediaChanged ||
-    networksChanged ||
-    wantsPasswordChange ||
-    passkeyPrfChanged;
-  const hasChanges = hasRemoteChanges || localPasskeyPrfChanged;
+  const hasRemoteChanges = profileChanged || mediaChanged || networksChanged;
+  const hasChanges = hasRemoteChanges || wantsPasswordChange;
   const canSubmit =
     hasChanges &&
     name.trim().length > 0 &&
     identityNetworkIds.length > 0 &&
     (!normalizedHandle || isValidHandle(normalizedHandle)) &&
     canChangePassword &&
-    canUpdatePasskeyPrf &&
-    canUpdateLocalPasskeyPrf &&
     state !== 'loading';
   const nodeNetworkOptions = useMemo(
     () =>
@@ -213,22 +163,6 @@ export function ProfileEditor({
     () => new Map(nodeNetworks.map((network) => [network.id, network.name])),
     [nodeNetworks],
   );
-
-  useEffect(() => {
-    let mounted = true;
-
-    WebAuthnPrfKeyProtector.isPrfAvailable()
-      .then((available) => {
-        if (mounted) setPasskeyPrfAvailable(available);
-      })
-      .catch(() => {
-        if (mounted) setPasskeyPrfAvailable(false);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   const requestClose = () => {
     if (state === 'loading') return;
@@ -293,20 +227,6 @@ export function ProfileEditor({
     setIdentityNetworkIds((networkIds) => [...networkIds, networkToAdd]);
   };
 
-  const toggleDeviceUnlock = () => {
-    if (deviceUnlockEnabled) {
-      setPasskeyPrfEnabled(false);
-      setLocalPasskeyPrfEnabled(false);
-
-      return;
-    }
-
-    if (!canEnableDeviceUnlock) return;
-
-    setPasskeyPrfEnabled(passkeyPrfAvailable || hasPasskeyPrf);
-    setLocalPasskeyPrfEnabled(initialLocalPasskeyPrfEnabled);
-  };
-
   const handlePictureChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
 
@@ -359,28 +279,16 @@ export function ProfileEditor({
             networks: identityNetworkIds,
             picture: pictureCid,
           },
-          wantsPasswordChange ? newPassword : undefined,
-          {
-            currentPassword:
-              passkeyPrfChanged && !wantsPasswordChange
-                ? currentPasswordForPasskey
-                : undefined,
-            passkeyPrfEnabled: passkeyPrfChanged
-              ? passkeyPrfEnabled
-              : undefined,
-            recoveryKey: hasRecoveryKey ? passwordRecoveryKey : undefined,
-          },
+          undefined,
+          {},
         );
       }
 
-      if (shouldConfigureLocalPasskeyPrf) {
-        await applicationContainer.identities.configureLocalPasskeyUnlock(
-          { ...session, identity },
-          wantsPasswordChange ? newPassword : currentPasswordForPasskey,
-          localPasskeyPrfEnabled,
-          localPasskeyPrfEnabled && hasRecoveryKey
-            ? passwordRecoveryKey
-            : undefined,
+      if (wantsPasswordChange) {
+        await applicationContainer.identities.changePassword(
+          session,
+          currentPassword,
+          newPassword,
         );
       }
 
@@ -593,9 +501,7 @@ export function ProfileEditor({
                             {copy.profile.changePassword}
                           </span>
                           <span className="mt-1 block text-xs font-bold text-white/40">
-                            {hasRecoveryKey
-                              ? copy.profile.passwordChangeRequiresRecoveryKey
-                              : copy.profile.passwordChangePreservesPasskey}
+                            {copy.profile.newPasswordHelp}
                           </span>
                         </span>
                         <span
@@ -615,6 +521,13 @@ export function ProfileEditor({
                           </p>
                           <div className="mt-4 grid gap-3">
                             <ProfileInput
+                              label={copy.profile.currentPassword}
+                              value={currentPassword}
+                              onChange={setCurrentPassword}
+                              placeholder="••••••••••••"
+                              type="password"
+                            />
+                            <ProfileInput
                               label={copy.profile.newPassword}
                               value={newPassword}
                               onChange={setNewPassword}
@@ -628,25 +541,6 @@ export function ProfileEditor({
                               placeholder="••••••••••••"
                               type="password"
                             />
-                            {hasRecoveryKey && (
-                              <div className="ui-inline-notice border-amber-300/40 bg-amber-300/10">
-                                <div className="text-xs font-black text-amber-50">
-                                  {copy.profile.recoveryKeyRequiredTitle}
-                                </div>
-                                <p className="mt-1 text-xs leading-relaxed text-amber-50/70">
-                                  {copy.profile.recoveryKeyRequiredHelp}
-                                </p>
-                                <div className="mt-3">
-                                  <ProfileInput
-                                    label={copy.profile.recoveryKeyForPassword}
-                                    value={passwordRecoveryKey}
-                                    onChange={setPasswordRecoveryKey}
-                                    placeholder="psrk1..."
-                                    type="password"
-                                  />
-                                </div>
-                              </div>
-                            )}
                           </div>
                           <PasswordRequirementProgress
                             className="mt-4"
@@ -658,52 +552,17 @@ export function ProfileEditor({
                         </div>
                       )}
                       <div className="border-t border-white/[0.06] px-4 py-4">
-                        <div className="mb-3">
-                          <div className="text-sm font-black text-white/75">
-                            {copy.profile.localDeviceUnlockSection}
-                          </div>
-                          <p className="mt-1 text-xs leading-relaxed text-white/45">
-                            {copy.profile.localDeviceUnlockSectionHelp}
-                          </p>
-                        </div>
-                        <ProfileSwitchButton
-                          checked={deviceUnlockEnabled}
-                          disabled={
-                            !canEnableDeviceUnlock && !deviceUnlockEnabled
-                          }
-                          help={
-                            deviceUnlockEnabled
-                              ? copy.profile.localDeviceUnlockHelp
-                              : passkeyPrfAvailable
-                                ? copy.profile.localDeviceUnlockHelp
-                                : copy.profile.localDeviceUnlockUnavailable
-                          }
-                          label={copy.profile.localDeviceUnlock}
-                          onClick={toggleDeviceUnlock}
-                        />
-                        {needsCurrentPasswordForPasskey && (
-                          <div className="mt-4 grid gap-3">
-                            <ProfileInput
-                              label={copy.profile.currentPassword}
-                              value={currentPasswordForPasskey}
-                              onChange={setCurrentPasswordForPasskey}
-                              placeholder="••••••••••••"
-                              type="password"
-                            />
-                            {needsRecoveryKeyForPasskey && (
-                              <ProfileInput
-                                label={copy.profile.recoveryKeyForPassword}
-                                value={passwordRecoveryKey}
-                                onChange={setPasswordRecoveryKey}
-                                placeholder="psrk1..."
-                                type="password"
-                              />
-                            )}
-                            <p className="mt-2 text-xs leading-relaxed text-white/45">
-                              {copy.profile.currentPasswordForPasskeyHelp}
-                            </p>
-                          </div>
-                        )}
+                        <button
+                          className="ui-button w-full"
+                          data-testid="profile-pair-device"
+                          onClick={() => setDevicePairingOpen(true)}
+                          type="button"
+                        >
+                          {copy.profile.devicePairingAction}
+                        </button>
+                        <p className="mt-2 text-xs font-semibold leading-relaxed text-white/45">
+                          {copy.profile.devicePairingHelp}
+                        </p>
                       </div>
                       <div className="border-t border-white/[0.06] px-4 py-4">
                         <ProfileSwitchButton
@@ -775,6 +634,15 @@ export function ProfileEditor({
             }}
           />
         </Suspense>
+      )}
+      {devicePairingOpen && (
+        <DevicePairingDialog
+          onClose={() => setDevicePairingOpen(false)}
+          onSessionUpdated={(nextSession) =>
+            onUpdated(nextSession, { passwordChanged: false })
+          }
+          session={session}
+        />
       )}
     </div>,
     document.body,

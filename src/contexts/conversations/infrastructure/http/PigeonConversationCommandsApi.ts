@@ -1,4 +1,4 @@
-import { PublicKey, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
 import type {
   ConversationResource,
@@ -19,6 +19,7 @@ import type { ConversationMapper } from './ConversationMapper';
 import type { GroupConversationInput } from './GroupConversationInput';
 
 import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
+import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { ConversationNetworkId } from '../../domain/value-objects/ConversationNetworkId';
 import { ConversationParticipantId } from '../../domain/value-objects/ConversationParticipantId';
 
@@ -44,9 +45,8 @@ export class PigeonConversationCommandsApi {
       ...keyEntry,
       peerIdentityId: session.identity.id,
     };
-    const encryptedConversationKey = PublicKey.fromPEM(
-      peerIdentity.encryptedKeyPair.publicKey,
-    )
+    const encryptedConversationKey = IdentityId.fromString(peerIdentity.id)
+      .getPublicKey()
       .encrypt(JSON.stringify(recipientKeyEntry))
       .toString();
     const inviterSignature = await signSessionPayload(

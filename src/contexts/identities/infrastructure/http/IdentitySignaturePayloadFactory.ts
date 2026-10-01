@@ -27,7 +27,6 @@ function normalizeBiography(biography?: string): string | undefined {
 function profileFrom(
   input: IdentityUpdateProfileInput,
 ): IdentityResource['profile'] {
-  // Backend validates JSON.stringify order.
   /* eslint-disable perfectionist/sort-objects */
   return {
     banner: input.banner,
@@ -41,44 +40,39 @@ function profileFrom(
 
 export class IdentitySignaturePayloadFactory {
   public createInitial(input: {
-    encryptedKeyPair: IdentityResource['encryptedKeyPair'];
-    encryptedMasterKey: string;
+    deviceCredential: string;
+    deviceCredentialCommitment: string;
     id: string;
-    masterKeyDerivation: IdentityResource['masterKeyDerivation'];
     networks: string[];
     profile: IdentityUpdateProfileInput;
+    recoveryAuthority: string;
     timestamp: number;
   }): Omit<IdentityResource, 'signature'> {
     return {
-      encryptedKeyPair: input.encryptedKeyPair,
-      encryptedMasterKey: input.encryptedMasterKey,
+      authorizationRevision: 0,
+      deviceCredential: input.deviceCredential,
+      deviceCredentialCommitment: input.deviceCredentialCommitment,
       id: IdentityId.normalize(input.id),
-      masterKeyDerivation: input.masterKeyDerivation,
       networks: uniqueNetworks(input.networks),
       previousIdentityExternalIdentifier: undefined,
       profile: profileFrom(input.profile),
+      recoveryAuthority: input.recoveryAuthority,
       timestamp: input.timestamp,
       version: 1,
     };
   }
 
   public createUpdate(input: {
-    encryptedKeyPair?: IdentityResource['encryptedKeyPair'];
-    encryptedMasterKey?: string;
     identity: IdentityResource;
-    masterKeyDerivation?: IdentityResource['masterKeyDerivation'];
     previousIdentityExternalIdentifier?: string;
     profile: IdentityUpdateProfileInput;
     timestamp: number;
   }): Omit<IdentityResource, 'signature'> {
     return {
-      encryptedKeyPair:
-        input.encryptedKeyPair ?? input.identity.encryptedKeyPair,
-      encryptedMasterKey:
-        input.encryptedMasterKey ?? input.identity.encryptedMasterKey,
+      authorizationRevision: input.identity.authorizationRevision,
+      deviceCredential: input.identity.deviceCredential,
+      deviceCredentialCommitment: input.identity.deviceCredentialCommitment,
       id: IdentityId.normalize(input.identity.id),
-      masterKeyDerivation:
-        input.masterKeyDerivation ?? input.identity.masterKeyDerivation,
       networks: uniqueNetworks([
         ...input.identity.networks,
         ...(input.profile.networks ?? []),
@@ -86,6 +80,7 @@ export class IdentitySignaturePayloadFactory {
       previousIdentityExternalIdentifier:
         input.previousIdentityExternalIdentifier,
       profile: profileFrom(input.profile),
+      recoveryAuthority: input.identity.recoveryAuthority,
       timestamp: input.timestamp,
       version: input.identity.version + 1,
     };

@@ -66,16 +66,72 @@ export class RequestSigner {
     path: string,
     body?: unknown,
   ): Promise<Record<string, string>> {
-    const timestamp = this.clock();
-    const signature = await signSessionPayload(
-      session,
-      this.payload(method, path, timestamp, body),
+    return this.headersWithDeviceProof(session, method, path, body);
+  }
+
+  public async headersWithDeviceProof(
+    session: Session,
+    method: string,
+    path: string,
+    body?: unknown,
+  ): Promise<Record<string, string>> {
+    const request = await this.signedRequest(session, method, path, body);
+    const credential = IdentityId.normalize(
+      session.deviceCredentialKeyPair.toPrimitives().publicKey,
     );
+    const devicePayload = JSON.stringify({
+      authorizationEpoch: session.authorizationEpoch.valueOf(),
+      authorizationRevision: session.authorizationRevision.valueOf(),
+      credential: session.deviceCredentialKeyPair.toPrimitives().publicKey,
+      domain: 'pigeon:http-device-authorization:v1',
+      identityId: IdentityId.normalize(session.identity.id),
+      request: JSON.parse(request.payload) as unknown,
+    });
 
     return {
-      'X-Identity-Id': IdentityId.normalize(session.identity.id),
-      'X-Signature': signature.toString(),
-      'X-Timestamp': `${timestamp}`,
+      ...request.headers,
+      'X-Device-Authorization-Epoch': session.authorizationEpoch.valueOf(),
+      'X-Device-Authorization-Revision': `${session.authorizationRevision.valueOf()}`,
+      'X-Device-Credential': credential,
+      'X-Device-Signature': session.deviceCredentialKeyPair
+        .sign(devicePayload)
+        .toString(),
+    };
+  }
+
+  public async headersWithRecoveryProof(
+    session: Session,
+    method: string,
+    path: string,
+    body?: unknown,
+  ): Promise<Record<string, string>> {
+    const request = await this.signedRequest(session, method, path, body);
+
+    return {
+      ...request.headers,
+      'X-Recovery-Signature': session.recoveryAuthorityKeyPair
+        .sign(request.payload)
+        .toString(),
+    };
+  }
+
+  private async signedRequest(
+    session: Session,
+    method: string,
+    path: string,
+    body: unknown,
+  ): Promise<{ headers: Record<string, string>; payload: string }> {
+    const timestamp = this.clock();
+    const payload = this.payload(method, path, timestamp, body);
+    const signature = await signSessionPayload(session, payload);
+
+    return {
+      headers: {
+        'X-Identity-Id': IdentityId.normalize(session.identity.id),
+        'X-Signature': signature.toString(),
+        'X-Timestamp': `${timestamp}`,
+      },
+      payload,
     };
   }
 

@@ -55,13 +55,11 @@ describe(ProfileKeychainEntries.name, () => {
     });
 
     expect(entries.map((entry) => entry.key)).toEqual([
-      'master-key',
-      'private-key',
       'community-key',
       'conversation-key',
     ]);
-    expect(entries[2]?.title).toContain('Open source community');
-    expect(entries[3]?.title).toContain('Architecture chat');
-    expect(entries.slice(2).every((entry) => entry.sensitive)).toBe(true);
+    expect(entries[0]?.title).toContain('Open source community');
+    expect(entries[1]?.title).toContain('Architecture chat');
+    expect(entries.every((entry) => entry.sensitive)).toBe(true);
   });
 });

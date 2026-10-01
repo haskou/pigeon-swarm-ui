@@ -15,7 +15,7 @@ export class RegisterIdentity {
 
     protection.assertRegistrationReady();
     const identity = Identity.create(
-      await this.identityIdFactory.create(),
+      await this.identityIdFactory.create(protection.getRecoveryKey()),
       message.getProfile(),
       message.getNetworkMemberships(),
       message.getOccurredAt(),

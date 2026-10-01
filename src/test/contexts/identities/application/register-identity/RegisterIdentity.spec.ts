@@ -6,6 +6,7 @@ import type { IdentityRepository } from '../../../../../contexts/identities/doma
 import { RegisterIdentityMessage } from '../../../../../contexts/identities/application/register-identity/messages/RegisterIdentityMessage';
 import { RegisterIdentity } from '../../../../../contexts/identities/application/register-identity/RegisterIdentity';
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
+import { RecoveryKey } from '../../../../../contexts/identities/domain/value-objects/RecoveryKey';
 
 describe(RegisterIdentity.name, () => {
   it('creates the aggregate before asking the repository to persist it', async () => {
@@ -19,6 +20,7 @@ describe(RegisterIdentity.name, () => {
       Promise.resolve(identity),
     );
 
+    const recoveryKey = RecoveryKey.generate();
     const identity = await new RegisterIdentity(
       repository,
       identityIdFactory,
@@ -29,11 +31,15 @@ describe(RegisterIdentity.name, () => {
         networks: ['network-a'],
         occurredAt: 100,
         password: 'Correct-Horse-Battery-9!',
+        recoveryKey: recoveryKey.valueOf(),
       }),
     );
 
     expect(identity.belongsTo(IdentityId.fromString('identity-a'))).toBe(true);
     expect(identity.pullDomainEvents()).toHaveLength(1);
     expect(repository.create).toHaveBeenCalledWith(identity, expect.anything());
+    expect(identityIdFactory.create).toHaveBeenCalledWith(
+      expect.objectContaining({ valueOf: expect.any(Function) }),
+    );
   });
 });

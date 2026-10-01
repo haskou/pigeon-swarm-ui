@@ -1,4 +1,6 @@
-import { EncryptedPayload, PublicKey, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import type { Dispatch, SetStateAction } from 'react';
+
+import { EncryptedPayload, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { StringValueObject } from '@haskou/value-objects';
 import { useCallback, useState } from 'react';
 
@@ -10,6 +12,7 @@ import type {
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 
 type CommunityKeyDialogInput = {
   community: Community;
@@ -18,12 +21,26 @@ type CommunityKeyDialogInput = {
   session: Session;
 };
 
+type CommunityKeyDialog = {
+  close: () => void;
+  copyEncryptedKey: () => Promise<void>;
+  dialog: 'add' | 'copy' | null;
+  encryptedKey: string;
+  error: string | null;
+  importKey: () => Promise<void>;
+  input: string;
+  openAdd: () => void;
+  openCopy: () => void;
+  saving: boolean;
+  setInput: Dispatch<SetStateAction<string>>;
+};
+
 export function useCommunityKeyDialog({
   community,
   communityKey,
   onSessionUpdated,
   session,
-}: CommunityKeyDialogInput) {
+}: CommunityKeyDialogInput): CommunityKeyDialog {
   const [dialog, setDialog] = useState<'add' | 'copy' | null>(null);
   const [encryptedKey, setEncryptedKey] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -52,9 +69,8 @@ export function useCommunityKeyDialog({
     }
 
     try {
-      const encrypted = PublicKey.fromPEM(
-        session.identity.encryptedKeyPair.publicKey,
-      )
+      const encrypted = IdentityId.fromString(session.identity.id)
+        .getPublicKey()
         .encrypt(JSON.stringify(communityKey))
         .toString();
 
@@ -65,7 +81,7 @@ export function useCommunityKeyDialog({
     }
 
     setDialog('copy');
-  }, [communityKey, session.identity.encryptedKeyPair.publicKey]);
+  }, [communityKey, session.identity.id]);
 
   const importKey = useCallback(async () => {
     const encryptedPayload = input.trim();
@@ -101,14 +117,16 @@ export function useCommunityKeyDialog({
         peerIdentityId: parsed.peerIdentityId ?? session.identity.id,
         version: 2,
       };
-      const published =
-        await applicationContainer.identities.publishKeychain(session, {
-        ...session.keychain,
-        conversations: {
-          ...session.keychain.conversations,
-          [community.id]: keyEntry,
+      const published = await applicationContainer.identities.publishKeychain(
+        session,
+        {
+          ...session.keychain,
+          conversations: {
+            ...session.keychain.conversations,
+            [community.id]: keyEntry,
+          },
         },
-        });
+      );
 
       onSessionUpdated({
         ...session,

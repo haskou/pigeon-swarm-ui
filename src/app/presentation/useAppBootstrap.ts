@@ -2,11 +2,11 @@ import type { Dispatch, SetStateAction } from 'react';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import type { LoginIdentityProgressStep } from '../../contexts/identities/application/login-identity/LoginIdentityProgressStep';
 import type {
   ConversationResource,
   Session,
 } from '../../shared/domain/pigeonResources.types';
-import type { LoginIdentityProgressStep } from '../../contexts/identities/application/login-identity/LoginIdentityProgressStep';
 import type { PreloadedConversationMessages } from './workspace/PreloadedConversationMessages';
 
 import { useCommunities } from '../../contexts/communities/presentation/hooks/useCommunities';
@@ -16,14 +16,13 @@ import {
   type PendingCommunityInviteLink,
 } from '../../contexts/communities/presentation/view-models/communityInviteLink';
 import {
-  clearSavedCredentials,
-  loadSavedCredentials,
-} from '../../contexts/identities/infrastructure/storage/savedCredentials';
-import { clearLocalDeviceUnlock } from '../../contexts/identities/infrastructure/storage/localDeviceUnlock';
-import {
   loadRememberedIdentityPreview,
   type RememberedIdentityPreview,
 } from '../../contexts/identities/infrastructure/storage/rememberedIdentityPreview';
+import {
+  clearSavedCredentials,
+  loadSavedCredentials,
+} from '../../contexts/identities/infrastructure/storage/savedCredentials';
 import { useNodeNetworks } from '../../contexts/networks/presentation/hooks/useNodeNetworks';
 import { usePeers } from '../../contexts/networks/presentation/hooks/usePeers';
 import { loadApplicationContainer } from '../composition/loadApplicationContainer';
@@ -91,12 +90,11 @@ export function useAppBootstrap(): {
     (
       nextSession: Session,
       nextConversations: ConversationResource[],
-      nextPreloadedConversationMessages: PreloadedConversationMessages | null =
-        null,
+      nextPreloaded: PreloadedConversationMessages | null = null,
     ) => {
       setSession(nextSession);
       setConversations(nextConversations);
-      setPreloadedConversationMessages(nextPreloadedConversationMessages);
+      setPreloadedConversationMessages(nextPreloaded);
     },
     [],
   );
@@ -136,6 +134,7 @@ export function useAppBootstrap(): {
             result.session,
             result.conversations,
           );
+
         return { ...result, preloadedConversationMessages };
       })
       .then((result) => {
@@ -149,7 +148,6 @@ export function useAppBootstrap(): {
         restoreInFlightRef.current = false;
       })
       .catch(() => {
-        void clearLocalDeviceUnlock().catch(() => undefined);
         clearSavedCredentials();
         setRestoreProgressStep(null);
         setRestoreState('done');
@@ -165,7 +163,6 @@ export function useAppBootstrap(): {
   ]);
 
   const clearSession = useCallback(() => {
-    void clearLocalDeviceUnlock().catch(() => undefined);
     clearSavedCredentials();
     setSession(null);
     setPreloadedConversationMessages(null);

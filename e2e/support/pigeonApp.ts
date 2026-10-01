@@ -19,6 +19,7 @@ export async function loginIdentity(
   if (recoveryKey) {
     await page.getByTestId('auth-use-recovery-key-toggle').click();
     await page.getByTestId('auth-recovery-key-input').fill(recoveryKey);
+    await page.getByTestId('auth-password-confirmation-input').fill(password);
   }
 
   await page.getByTestId('auth-submit-button').click();

@@ -1,4 +1,5 @@
 import type { LoginIdentityProgressReporter } from '../../../contexts/identities/application/login-identity/LoginIdentityProgressReporter';
+import type { DevicePairingRequestDraft } from '../../../contexts/identities/domain/DevicePairingRequestDraft';
 import type { IdentityAccessContexts } from '../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
 import type { IdentityMapper } from '../../../contexts/identities/infrastructure/http/IdentityMapper';
 import type { IdentityPresenceMapper } from '../../../contexts/identities/infrastructure/http/IdentityPresenceMapper';
@@ -24,7 +25,9 @@ import { RestoreRememberedIdentityMessage } from '../../../contexts/identities/a
 import { SearchIdentityPresencesMessage } from '../../../contexts/identities/application/search-identity-presences/messages/SearchIdentityPresencesMessage';
 import { UpdateIdentityPresenceMessage } from '../../../contexts/identities/application/update-identity-presence/messages/UpdateIdentityPresenceMessage';
 import { UpdateIdentityProfileMessage } from '../../../contexts/identities/application/update-identity-profile/messages/UpdateIdentityProfileMessage';
+import { DevicePairingCode } from '../../../contexts/identities/domain/value-objects/DevicePairingCode';
 import { IdentityId } from '../../../contexts/identities/domain/value-objects/IdentityId';
+import { IdentityPassword } from '../../../contexts/identities/domain/value-objects/IdentityPassword';
 
 export class PigeonIdentitiesFacade {
   public constructor(
@@ -44,17 +47,46 @@ export class PigeonIdentitiesFacade {
     };
   }
 
-  public async configureLocalPasskeyUnlock(
+  public async changePassword(
     session: Session,
-    password: string,
-    enabled: boolean,
-    recoveryKey?: string,
+    currentPassword: string,
+    nextPassword: string,
   ): Promise<void> {
-    await this.gateway.configureLocalPasskeyUnlock(
-      session,
-      password,
-      enabled,
-      recoveryKey,
+    await this.gateway.changePassword(session, currentPassword, nextPassword);
+  }
+
+  public createDevicePairingInvitation(session: Session): DevicePairingCode {
+    return this.gateway.createDevicePairingInvitation(session);
+  }
+
+  public async createDevicePairingRequest(
+    invitationCode: DevicePairingCode,
+  ): Promise<DevicePairingRequestDraft> {
+    return await this.gateway.createDevicePairingRequest(invitationCode);
+  }
+
+  public async authorizeDevicePairing(
+    session: Session,
+    requestCode: DevicePairingCode,
+  ): Promise<{ completionCode: DevicePairingCode; session: Session }> {
+    return await this.gateway.authorizeDevicePairing(session, requestCode);
+  }
+
+  public async completeDevicePairing(
+    identityId: string,
+    password: string,
+    draft: DevicePairingRequestDraft,
+    completionCode: DevicePairingCode,
+    onProgress?: LoginIdentityProgressReporter,
+  ): Promise<LoginResult> {
+    return this.hydrateLoginResult(
+      await this.gateway.completeDevicePairing(
+        identityId,
+        IdentityPassword.fromString(password),
+        draft,
+        completionCode,
+        onProgress,
+      ),
     );
   }
 
@@ -133,6 +165,17 @@ export class PigeonIdentitiesFacade {
     return this.mapper.toResource(
       identity,
       await this.gateway.getIdentity(identityId),
+    );
+  }
+
+  public async recover(
+    identityId: string,
+    password: string,
+    recoveryKey: string,
+    onProgress?: LoginIdentityProgressReporter,
+  ): Promise<LoginResult> {
+    return this.hydrateLoginResult(
+      await this.gateway.recover(identityId, password, recoveryKey, onProgress),
     );
   }
 

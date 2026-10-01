@@ -8,39 +8,105 @@ import type {
   SelectablePresenceStatus,
 } from '../../../../shared/domain/pigeonResources.types';
 import type { LoginIdentityProgressReporter } from '../../application/login-identity/LoginIdentityProgressReporter';
+import type { DevicePairingRequestDraft } from '../../domain/DevicePairingRequestDraft';
 import type { Identity } from '../../domain/Identity';
 import type { IdentityMasterKeyProtection } from '../../domain/value-objects/IdentityMasterKeyProtection';
 import type { IdentityCreationMaterial } from '../crypto/IdentityCreationMaterial';
-import type { PigeonIdentityKeyProtectionGateway } from '../crypto/PigeonIdentityKeyProtectionGateway';
 import type { CreatedIdentityMaterial } from './CreatedIdentityMaterial';
 import type { IdentityUpdateProfileInput } from './IdentitySignaturePayloadFactory';
+import type { PigeonDeviceAuthorizationApi } from './PigeonDeviceAuthorizationApi';
 import type { PigeonIdentityCommandsApi } from './PigeonIdentityCommandsApi';
 import type { PigeonIdentityGateway } from './PigeonIdentityGateway';
 import type { PigeonIdentityLoginApi } from './PigeonIdentityLoginApi';
 import type { PigeonKeychainApi } from './PigeonKeychainApi';
 import type { PigeonPresenceGateway } from './PigeonPresenceGateway';
 
+import { DevicePairingCode } from '../../domain/value-objects/DevicePairingCode';
+import { IdentityPassword } from '../../domain/value-objects/IdentityPassword';
+import { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
+
 export class PigeonIdentitiesGateway {
   public constructor(
     private readonly identityCommands: PigeonIdentityCommandsApi,
     private readonly identityLogin: PigeonIdentityLoginApi,
     private readonly identityProfile: PigeonIdentityGateway,
-    private readonly keyProtection: PigeonIdentityKeyProtectionGateway,
+    private readonly deviceAuthorization: PigeonDeviceAuthorizationApi,
     private readonly keychain: PigeonKeychainApi,
     private readonly presence: PigeonPresenceGateway,
   ) {}
 
-  public async configureLocalPasskeyUnlock(
-    session: Session,
+  public async recover(
+    identityId: string,
     password: string,
-    enabled: boolean,
-    recoveryKey?: string,
-  ): Promise<void> {
-    await this.keyProtection.configureLocalPasskeyUnlock(
+    recoveryKey: string,
+    onProgress?: LoginIdentityProgressReporter,
+  ): Promise<LoginResult> {
+    onProgress?.('resolving-identity');
+    const identity = await this.identityProfile.get(identityId);
+    onProgress?.('decrypting-keys');
+    const session = await this.deviceAuthorization.recover(
+      identity,
+      RecoveryKey.fromString(recoveryKey),
+      IdentityPassword.fromString(password),
+    );
+
+    return await this.identityLogin.hydrate(session, onProgress);
+  }
+
+  public createDevicePairingInvitation(session: Session): DevicePairingCode {
+    return this.deviceAuthorization.invite(session).toCode();
+  }
+
+  public async createDevicePairingRequest(
+    invitationCode: DevicePairingCode,
+  ): Promise<DevicePairingRequestDraft> {
+    return await this.deviceAuthorization.requestPairing(invitationCode);
+  }
+
+  public async authorizeDevicePairing(
+    session: Session,
+    requestCode: DevicePairingCode,
+  ): Promise<{ completionCode: DevicePairingCode; session: Session }> {
+    const result = await this.deviceAuthorization.authorizePairing(
       session,
+      requestCode,
+    );
+
+    return {
+      completionCode: result.completion.toCode(),
+      session: result.session,
+    };
+  }
+
+  public async completeDevicePairing(
+    identityId: string,
+    password: IdentityPassword,
+    draft: DevicePairingRequestDraft,
+    completionCode: DevicePairingCode,
+    onProgress?: LoginIdentityProgressReporter,
+  ): Promise<LoginResult> {
+    onProgress?.('resolving-identity');
+    const identity = await this.identityProfile.get(identityId);
+    onProgress?.('decrypting-keys');
+    const session = await this.deviceAuthorization.completePairing(
+      identity,
       password,
-      enabled,
-      recoveryKey,
+      draft,
+      completionCode,
+    );
+
+    return await this.identityLogin.hydrate(session, onProgress);
+  }
+
+  public async changePassword(
+    session: Session,
+    currentPassword: string,
+    nextPassword: string,
+  ): Promise<void> {
+    await this.identityCommands.changePassword(
+      session,
+      currentPassword,
+      nextPassword,
     );
   }
 

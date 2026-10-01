@@ -66,22 +66,13 @@ function emptyKeychain(): LocalKeychain {
 
 function identity(id: string, name: string): IdentityResource {
   return {
-    encryptedKeyPair: {
-      encryptedPrivateKey: '',
-      publicKey: '',
-    },
-    encryptedMasterKey: '',
+    authorizationRevision: 0,
+    deviceCredential: 'device-credential',
+    deviceCredentialCommitment: 'device-credential-commitment',
     id,
-    masterKeyDerivation: {
-      algorithm: 'scrypt',
-      N: 16_384,
-      p: 5,
-      r: 8,
-      salt: '',
-      version: 1,
-    },
     networks: ['network-1'],
     profile: { name },
+    recoveryAuthority: 'recovery-authority',
     signature: '',
     timestamp: 1,
     version: 1,
