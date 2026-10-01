@@ -28,13 +28,17 @@ import type { CommunityChannelMessageInput } from './CommunityChannelMessageInpu
 import type { CommunityChannelMessageRequestBody } from './CommunityChannelMessageRequestBody';
 import type { CommunityChannelMessageSearchResult } from './CommunityChannelMessageSearchResult';
 
+import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
+import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 import { DraftPayloadCipher } from '../../../messages/infrastructure/crypto/DraftPayloadCipher';
 
 const startupReadCacheTtlMs = 1500;
 
 export class PigeonCommunitiesApi {
   private readonly draftPayloads: DraftPayloadCipher;
+
+  private readonly mutations = new PublicMutationSigner();
 
   public constructor(
     private readonly http: HttpJsonClient,
@@ -45,6 +49,62 @@ export class PigeonCommunitiesApi {
       undefined,
   ) {
     this.draftPayloads = draftPayloads ?? new DraftPayloadCipher();
+  }
+
+  private reactionIdentity(
+    session: Session,
+    communityId: string,
+    channelId: string,
+    messageId: string,
+    emoji: string,
+  ): Record<string, unknown> {
+    const authorIdentityId = this.mutations.authorOf(session);
+
+    return {
+      authorIdentityId,
+      channelId,
+      communityId,
+      emoji,
+      id: [
+        'community_channel',
+        communityId,
+        channelId,
+        messageId,
+        authorIdentityId,
+        emoji,
+      ].join(':'),
+      messageId,
+      scopeType: 'community_channel',
+    };
+  }
+
+  private async sendMutation(
+    session: Session,
+    method: 'DELETE' | 'POST',
+    path: string,
+    kind: 'delete' | 'put',
+    store: string,
+    payload: Record<string, unknown>,
+    fields: Record<string, unknown> = {},
+  ): Promise<void> {
+    await submitPublicMutation(
+      PublicMutationSigner.FIRST_POSITION,
+      (position) =>
+        this.mutations.sign(
+          session,
+          { kind, payload, recordId: String(payload.id), store },
+          position,
+        ),
+      async (mutation) => {
+        const body = { ...fields, mutation };
+
+        await this.http.request(path, {
+          body: JSON.stringify(body),
+          headers: await this.signer.headers(session, method, path, body),
+          method,
+        });
+      },
+    );
   }
 
   private async createEncryptedChannelMessageBody(
@@ -886,15 +946,24 @@ export class PigeonCommunitiesApi {
     channelId: string,
     messageId: string,
   ): Promise<void> {
-    const path = `/communities/${encodeURIComponent(
+    const path = communityChannelMessagePinPath(
       communityId,
-    )}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(
+      channelId,
       messageId,
-    )}/pin`;
+    );
+    const createdAt = Date.now();
+    const payload = {
+      channelId,
+      communityId,
+      createdAt,
+      id: `community:${communityId}:${channelId}:${messageId}`,
+      messageId,
+      pinnedByIdentityId: this.mutations.authorOf(session),
+      scopeType: 'community_channel',
+    };
 
-    await this.http.request(path, {
-      headers: await this.signer.headers(session, 'POST', path),
-      method: 'POST',
+    await this.sendMutation(session, 'POST', path, 'put', 'pins', payload, {
+      createdAt,
     });
   }
 
@@ -904,16 +973,22 @@ export class PigeonCommunitiesApi {
     channelId: string,
     messageId: string,
   ): Promise<void> {
-    const path = `/communities/${encodeURIComponent(
+    const path = communityChannelMessagePinPath(
       communityId,
-    )}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(
+      channelId,
       messageId,
-    )}/pin`;
+    );
+    const payload = {
+      channelId,
+      communityId,
+      id: `community:${communityId}:${channelId}:${messageId}`,
+      messageId,
+      pinnedByIdentityId: this.mutations.authorOf(session),
+      removed: true,
+      scopeType: 'community_channel',
+    };
 
-    await this.http.request(path, {
-      headers: await this.signer.headers(session, 'DELETE', path),
-      method: 'DELETE',
-    });
+    await this.sendMutation(session, 'DELETE', path, 'delete', 'pins', payload);
   }
 
   public async listDrafts(session: Session): Promise<CommunityChannelDraft[]> {
@@ -1117,18 +1192,26 @@ export class PigeonCommunitiesApi {
     messageId: string,
     emoji: string,
   ): Promise<void> {
-    const path = communityChannelMessageReactionsPath(
-      communityId,
-      channelId,
-      messageId,
-    );
-    const body = { emoji };
+    const createdAt = Date.now();
 
-    await this.http.request(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
+    await this.sendMutation(
+      session,
+      'POST',
+      communityChannelMessageReactionsPath(communityId, channelId, messageId),
+      'put',
+      'reactions',
+      {
+        ...this.reactionIdentity(
+          session,
+          communityId,
+          channelId,
+          messageId,
+          emoji,
+        ),
+        createdAt,
+      },
+      { createdAt, emoji },
+    );
   }
 
   public async removeChannelMessageReaction(
@@ -1138,19 +1221,37 @@ export class PigeonCommunitiesApi {
     messageId: string,
     emoji: string,
   ): Promise<void> {
-    const path = communityChannelMessageReactionsPath(
-      communityId,
-      channelId,
-      messageId,
+    await this.sendMutation(
+      session,
+      'DELETE',
+      communityChannelMessageReactionsPath(communityId, channelId, messageId),
+      'delete',
+      'reactions',
+      {
+        ...this.reactionIdentity(
+          session,
+          communityId,
+          channelId,
+          messageId,
+          emoji,
+        ),
+        removed: true,
+      },
+      { emoji },
     );
-    const body = { emoji };
-
-    await this.http.request(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'DELETE', path, body),
-      method: 'DELETE',
-    });
   }
+}
+
+function communityChannelMessagePinPath(
+  communityId: string,
+  channelId: string,
+  messageId: string,
+): string {
+  return `/communities/${encodeURIComponent(
+    communityId,
+  )}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(
+    messageId,
+  )}/pin`;
 }
 
 function communityChannelMessageReactionsPath(
