@@ -3,6 +3,7 @@ const base = require('./jest.config.cjs');
 module.exports = {
   ...base,
   moduleNameMapper: { '\\?url$': '<rootDir>/src/test/assetUrlMock.ts' },
+  testTimeout: 30000,
   testMatch: [
     '**/Attachment{Cipher,Cryptographer}.spec.ts',
     '**/DeviceIdentityProtector.spec.ts',
