@@ -7,6 +7,7 @@ import type {
 import type { NetworkSynchronizationStatus } from '../../../networks/presentation/view-models/NetworkSynchronizationStatus';
 import type { NodeNetwork } from '../../../networks/presentation/view-models/NodeNetwork';
 import type { LoginIdentityProgressStep } from '../../application/login-identity/LoginIdentityProgressStep';
+import type { DevicePairingRequestDraft } from '../../domain/DevicePairingRequestDraft';
 
 import { loadApplicationContainer } from '../../../../app/composition/loadApplicationContainer';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
@@ -14,11 +15,8 @@ import { cx } from '../../../../shared/presentation/cx';
 import { useInstallPrompt } from '../../../../shared/presentation/hooks/useInstallPrompt';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
-import { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
-import type { DevicePairingRequestDraft } from '../../domain/DevicePairingRequestDraft';
 import { DevicePairingCode } from '../../domain/value-objects/DevicePairingCode';
-import { DevicePairingCodeField } from '../device-pairing/DevicePairingCodeField';
-import { DevicePairingQrCode } from '../device-pairing/DevicePairingQrCode';
+import { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
 import {
   clearLastLoginIdentity,
   loadLastLoginIdentity,
@@ -29,6 +27,8 @@ import {
   loadSavedCredentials,
   saveCredentials,
 } from '../../infrastructure/storage/savedCredentials';
+import { DevicePairingCodeField } from '../device-pairing/DevicePairingCodeField';
+import { DevicePairingQrCode } from '../device-pairing/DevicePairingQrCode';
 import { useIdentityPreview } from '../hooks/useIdentityPreview';
 import { AuthFormFields } from './AuthFormFields';
 import {
@@ -89,6 +89,7 @@ export function AuthScreen({
   const [pairingCompletionCode, setPairingCompletionCode] = useState('');
   const [pairingDraft, setPairingDraft] =
     useState<DevicePairingRequestDraft | null>(null);
+  const [pairingVerificationCode, setPairingVerificationCode] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [state, setState] = useState<LoadState>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -268,6 +269,9 @@ export function AuthScreen({
           DevicePairingCode.fromString(pairingInvitationCode),
         );
 
+      setPairingVerificationCode(
+        await draft.getRequest().getVerificationCode(),
+      );
       setPairingDraft(draft);
       setIdentityId(
         draft.getRequest().getInvitation().getIdentityId().valueOf(),
@@ -492,6 +496,17 @@ export function AuthScreen({
                           code={pairingDraft.getRequest().toCode()}
                           label={copy.auth.devicePairingRequestQr}
                         />
+                        <div className="ui-inline-notice grid gap-1 text-center">
+                          <p className="text-xs text-white/60">
+                            {copy.auth.devicePairingVerificationHelp}
+                          </p>
+                          <p
+                            className="font-mono text-2xl tracking-widest"
+                            data-testid="auth-device-pairing-verification-code"
+                          >
+                            {pairingVerificationCode}
+                          </p>
+                        </div>
                         <DevicePairingCodeField
                           label={copy.auth.devicePairingCompletionLabel}
                           onChange={setPairingCompletionCode}

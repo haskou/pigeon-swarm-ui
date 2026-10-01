@@ -39,6 +39,21 @@ describe(DevicePairingRequest.name, () => {
     );
   });
 
+  it('derives the same verification code on both devices and a different one per request', async () => {
+    const source = await draft();
+    const other = await draft();
+    const decoded = DevicePairingRequest.fromCode(
+      source.getRequest().toCode(),
+      new Timestamp(1_100),
+    );
+
+    const code = await source.getRequest().getVerificationCode();
+
+    expect(code).toMatch(/^\d{5} \d{5}$/);
+    expect(await decoded.getVerificationCode()).toBe(code);
+    expect(await other.getRequest().getVerificationCode()).not.toBe(code);
+  });
+
   it('rejects a substituted transport key', async () => {
     const source = await draft();
     const resource = source.getRequest().toCode().decode() as Record<

@@ -27,7 +27,24 @@ export function DevicePairingDialog({
     useState<DevicePairingCode | null>(null);
   const [state, setState] = useState<'idle' | 'loading'>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [verificationCode, setVerificationCode] = useState<string | null>(null);
 
+  const review = async () => {
+    setState('loading');
+    setError(null);
+
+    try {
+      setVerificationCode(
+        await applicationContainer.identities.verifyDevicePairingRequest(
+          DevicePairingCode.fromString(requestCode),
+        ),
+      );
+    } catch (caught) {
+      setError(toUserErrorMessage(caught, copy.profile.devicePairingError));
+    } finally {
+      setState('idle');
+    }
+  };
   const authorize = async () => {
     setState('loading');
     setError(null);
@@ -67,16 +84,34 @@ export function DevicePairingDialog({
               />
               <DevicePairingCodeField
                 label={copy.profile.devicePairingRequestLabel}
-                onChange={setRequestCode}
+                onChange={(value) => {
+                  setRequestCode(value);
+                  setVerificationCode(null);
+                }}
                 value={requestCode}
               />
+              {verificationCode && (
+                <div className="ui-inline-notice grid gap-1 text-center">
+                  <p className="text-xs text-white/60">
+                    {copy.profile.devicePairingVerificationHelp}
+                  </p>
+                  <p
+                    className="font-mono text-2xl tracking-widest"
+                    data-testid="device-pairing-verification-code"
+                  >
+                    {verificationCode}
+                  </p>
+                </div>
+              )}
               <button
                 className="ui-button ui-button-primary"
                 disabled={!requestCode.trim() || state === 'loading'}
-                onClick={() => void authorize()}
+                onClick={() => void (verificationCode ? authorize() : review())}
                 type="button"
               >
-                {copy.profile.devicePairingAuthorize}
+                {verificationCode
+                  ? copy.profile.devicePairingAuthorize
+                  : copy.profile.devicePairingReview}
               </button>
             </>
           ) : (

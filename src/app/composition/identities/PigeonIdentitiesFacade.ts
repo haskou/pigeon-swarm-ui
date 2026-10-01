@@ -65,6 +65,12 @@ export class PigeonIdentitiesFacade {
     return await this.gateway.createDevicePairingRequest(invitationCode);
   }
 
+  public async verifyDevicePairingRequest(
+    requestCode: DevicePairingCode,
+  ): Promise<string> {
+    return await this.gateway.verifyDevicePairingRequest(requestCode);
+  }
+
   public async authorizeDevicePairing(
     session: Session,
     requestCode: DevicePairingCode,

@@ -13,6 +13,7 @@ import { PairingTransportPublicKey } from './value-objects/PairingTransportPubli
 
 const DOMAIN = 'pigeon:device-pairing:request:v1';
 const KIND = 'pigeon-device-pairing-request';
+const VERIFICATION_DOMAIN = 'pigeon:device-pairing:verification:v1';
 const MAX_FUTURE_SKEW_MS = 30_000;
 
 type RequestPayload = {
@@ -173,6 +174,27 @@ export class DevicePairingRequest {
           .isValidSignature(this.signingPayload(), this.signature),
       new Error('Invalid or expired device pairing request.'),
     );
+  }
+
+  public async getVerificationCode(): Promise<string> {
+    const digest = new Uint8Array(
+      await crypto.subtle.digest(
+        'SHA-256',
+        new TextEncoder().encode(
+          JSON.stringify({
+            domain: VERIFICATION_DOMAIN,
+            operationId: this.operationId.valueOf(),
+            pairingId: this.invitation.getPairingId().valueOf(),
+            targetCredential: this.proof.getCredential().valueOf(),
+            transportPublicKey: this.transportPublicKey.valueOf(),
+          }),
+        ),
+      ),
+    );
+    const value = new DataView(digest.buffer).getBigUint64(0) % 10n ** 10n;
+    const digits = value.toString().padStart(10, '0');
+
+    return `${digits.slice(0, 5)} ${digits.slice(5)}`;
   }
 
   public getInvitation(): DevicePairingInvitation {

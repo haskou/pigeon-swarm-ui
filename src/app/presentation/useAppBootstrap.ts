@@ -25,6 +25,7 @@ import {
 } from '../../contexts/identities/infrastructure/storage/savedCredentials';
 import { useNodeNetworks } from '../../contexts/networks/presentation/hooks/useNodeNetworks';
 import { usePeers } from '../../contexts/networks/presentation/hooks/usePeers';
+import { clearProjectedMessageCaches } from '../../shared/infrastructure/storage/clearProjectedMessageCaches';
 import { loadApplicationContainer } from '../composition/loadApplicationContainer';
 import {
   initialConversationId,
@@ -164,6 +165,7 @@ export function useAppBootstrap(): {
 
   const clearSession = useCallback(() => {
     clearSavedCredentials();
+    void clearProjectedMessageCaches();
     setSession(null);
     setPreloadedConversationMessages(null);
   }, []);

@@ -33,6 +33,8 @@ export const en = {
     devicePairingRequestHelp:
       'Scan this response on the authorized device, approve it there, then scan the final code here.',
     devicePairingRequestQr: 'New device pairing request',
+    devicePairingVerificationHelp:
+      'Show this code to the authorized device. It must be identical there before it authorizes this device.',
     fallbackNetworksLabel: 'Networks, comma-separated',
     handleLabel: 'username',
     heroBody:
@@ -1213,7 +1215,10 @@ export const en = {
       'Scan this invitation on the new device. Then scan its response here before the invitation expires.',
     devicePairingInvitationQr: 'Device pairing invitation',
     devicePairingRequestLabel: 'Request from the new device',
+    devicePairingReview: 'Review request',
     devicePairingTitle: 'Add a device',
+    devicePairingVerificationHelp:
+      'Confirm this code is identical on the new device before authorizing. If it differs, close this dialog.',
     discardChanges: 'Discard',
     discardChangesBody:
       'There are unsaved changes. Do you want to discard them?',

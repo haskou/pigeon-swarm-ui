@@ -70,6 +70,15 @@ export class PigeonDeviceAuthorizationApi {
     return await DevicePairingRequest.create(invitation, acceptedAt);
   }
 
+  public async verifyPairingRequest(
+    requestCode: DevicePairingCode,
+  ): Promise<string> {
+    return await DevicePairingRequest.fromCode(
+      requestCode,
+      new Timestamp(this.clock()),
+    ).getVerificationCode();
+  }
+
   public async authorizePairing(
     session: Session,
     requestCode: DevicePairingCode,

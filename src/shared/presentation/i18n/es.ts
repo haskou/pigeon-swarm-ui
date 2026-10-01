@@ -37,6 +37,8 @@ export const es = {
     devicePairingRequestHelp:
       'Escanea esta respuesta en el dispositivo autorizado, apruébala allí y después escanea aquí el código final.',
     devicePairingRequestQr: 'Solicitud del dispositivo nuevo',
+    devicePairingVerificationHelp:
+      'Muestra este código al dispositivo autorizado. Debe ser idéntico allí antes de que autorice este dispositivo.',
     fallbackNetworksLabel: 'Redes, separadas por comas',
     handleLabel: 'usuario',
     heroBody:
@@ -1217,7 +1219,10 @@ export const es = {
       'Escanea esta invitación en el dispositivo nuevo. Después escanea aquí su respuesta antes de que caduque.',
     devicePairingInvitationQr: 'Invitación para emparejar dispositivo',
     devicePairingRequestLabel: 'Solicitud del dispositivo nuevo',
+    devicePairingReview: 'Revisar solicitud',
     devicePairingTitle: 'Añadir un dispositivo',
+    devicePairingVerificationHelp:
+      'Confirma que este código es idéntico en el dispositivo nuevo antes de autorizar. Si difiere, cierra este diálogo.',
     discardChanges: 'Descartar',
     discardChangesBody: 'Hay cambios sin guardar. ¿Quieres descartarlos?',
     edit: 'Editar perfil',
