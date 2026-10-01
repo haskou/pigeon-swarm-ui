@@ -118,7 +118,8 @@ export class DeviceIdentityVault {
       nextPassword,
     );
 
-    await this.store.save(
+    await this.store.replaceProtection(
+      current,
       this.record(
         rewrapped,
         DeviceAuthorizationEpoch.fromString(current.authorizationEpoch),

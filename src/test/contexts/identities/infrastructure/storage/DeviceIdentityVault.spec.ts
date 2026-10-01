@@ -70,6 +70,26 @@ class MemoryStore implements DeviceIdentityVaultStore {
 
     return Promise.resolve();
   }
+
+  public replaceProtection(
+    expected: DeviceIdentityVaultRecord,
+    next: DeviceIdentityVaultRecord,
+  ): Promise<void> {
+    const record = this.records.get(expected.identityId);
+
+    if (
+      record?.authorizationEpoch !== expected.authorizationEpoch ||
+      record.authorizationRevision !== expected.authorizationRevision
+    ) {
+      return Promise.reject(
+        new Error('Local authorization checkpoint changed.'),
+      );
+    }
+
+    this.records.set(next.identityId, next);
+
+    return Promise.resolve();
+  }
 }
 
 describe(DeviceIdentityVault.name, () => {
@@ -109,6 +129,33 @@ describe(DeviceIdentityVault.name, () => {
     expect(restored.material.rootKey.isEqual(source.material.rootKey)).toBe(
       true,
     );
+  });
+
+  it('does not roll back a concurrent checkpoint advance while changing the password', async () => {
+    const store = new MemoryStore();
+    const source = await fixture();
+    const vault = new DeviceIdentityVault(store);
+    await vault.register({ ...source, password: 'old password' });
+    const find = store.find.bind(store);
+    store.find = async (identityId) => {
+      const record = await find(identityId);
+
+      await store.synchronizeAuthorization(
+        identityId,
+        DeviceAuthorizationRevision.initial(),
+        DeviceAuthorizationEpoch.genesis(),
+        DeviceAuthorizationRevision.fromNumber(3),
+      );
+
+      return record;
+    };
+
+    await expect(
+      vault.changePassword(source.identityId, 'old password', 'new password'),
+    ).rejects.toThrow('Local authorization checkpoint changed.');
+    expect(
+      store.records.get(source.identityId.valueOf())?.authorizationRevision,
+    ).toBe(3);
   });
 
   it('changes only the local envelope during an offline password change', async () => {

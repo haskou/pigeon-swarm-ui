@@ -18,4 +18,8 @@ export interface DeviceIdentityVaultStore {
   delete(identityId: IdentityId): Promise<void>;
   find(identityId: IdentityId): Promise<DeviceIdentityVaultRecord | undefined>;
   save(record: DeviceIdentityVaultRecord): Promise<void>;
+  replaceProtection(
+    expected: DeviceIdentityVaultRecord,
+    next: DeviceIdentityVaultRecord,
+  ): Promise<void>;
 }

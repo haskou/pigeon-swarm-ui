@@ -129,4 +129,42 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
   public async save(record: DeviceIdentityVaultRecord): Promise<void> {
     await this.request('readwrite', (store) => store.put(record));
   }
+
+  public async replaceProtection(
+    expected: DeviceIdentityVaultRecord,
+    next: DeviceIdentityVaultRecord,
+  ): Promise<void> {
+    const database = await this.open();
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const transaction = database.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.get(expected.identityId);
+
+        request.addEventListener('error', () => reject(request.error));
+        request.addEventListener('success', () => {
+          const record = request.result as
+            | DeviceIdentityVaultRecord
+            | undefined;
+
+          if (
+            record?.authorizationEpoch !== expected.authorizationEpoch ||
+            record.authorizationRevision !== expected.authorizationRevision
+          ) {
+            transaction.abort();
+            reject(new Error('Local authorization checkpoint changed.'));
+
+            return;
+          }
+
+          store.put(next);
+        });
+        transaction.addEventListener('complete', () => resolve());
+        transaction.addEventListener('error', () => reject(transaction.error));
+      });
+    } finally {
+      database.close();
+    }
+  }
 }
