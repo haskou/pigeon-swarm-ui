@@ -168,9 +168,14 @@ offline or unclaimed.
 
 The frontend is responsible for:
 
-* generating identity keypairs;
-* deriving and using encrypted private keys locally;
-* keeping passwords local;
+* generating separate stable identity, recovery-authority and per-device keys;
+* wrapping the local root key with the password and a random, non-exportable
+  device factor stored in IndexedDB;
+* keeping passwords, root-key envelopes and private keys out of published
+  identity, IPFS and OrbitDB state;
+* changing passwords by rewrapping local material without rotating identity keys;
+* enrolling devices through short-lived, mutually authenticated QR transfers;
+* replacing every enrolled device from the offline recovery kit;
 * signing HTTP and WebSocket authentication payloads;
 * signing domain payloads for identities, messages, deletions and keychains;
 * encrypting keychains before publication;
@@ -220,7 +225,7 @@ Discord is a trademark of Discord Inc.
 
 Build with `VITE_INDEPENDENT_CLIENT=true yarn build` to choose a separate node before application bootstrap. `VITE_API_SERVER_URL` configures the existing combined build and is ignored by the independent client.
 
-The node must expose `GET <node-base>/client-contract`, including the selected API prefix (for example, `/api/client-contract`), with HTTP 200 and JSON `{ "protocol": "pigeon-swarm", "apiVersion": 1 }`. This public, non-cacheable discovery endpoint uses the node API’s CORS policy. The version identifies the breaking-major API contract, independently of the software release; an unsupported version prevents application startup. The authoritative [API contract](https://github.com/haskou/pigeon-swarm-node/blob/main/docs/api.md#client-compatibility-discovery), [endpoint schema](https://github.com/haskou/pigeon-swarm-node/blob/main/src/apps/apis/nodes-api/swagger.yaml), and [aggregate OpenAPI declaration](https://github.com/haskou/pigeon-swarm-node/blob/main/src/apps/apis/open-api.yaml) are maintained in the backend repository.
+The node must expose `GET <node-base>/client-contract`, including the selected API prefix (for example, `/api/client-contract`), with HTTP 200 and JSON `{ "protocol": "pigeon-swarm", "apiVersion": 2 }`. This public, non-cacheable discovery endpoint uses the node API’s CORS policy. The version identifies the breaking-major API contract, independently of the software release; an unsupported version prevents application startup. The authoritative [API contract](https://github.com/haskou/pigeon-swarm-node/blob/main/docs/api.md#client-compatibility-discovery), [endpoint schema](https://github.com/haskou/pigeon-swarm-node/blob/main/src/apps/apis/nodes-api/swagger.yaml), and [aggregate OpenAPI declaration](https://github.com/haskou/pigeon-swarm-node/blob/main/src/apps/apis/open-api.yaml) are maintained in the backend repository.
 
 The independent build must be served from a trusted client origin with the static server and security headers provided by [the deployment repository](https://github.com/haskou/pigeon-swarm/blob/main/docs/INDEPENDENT_CLIENT.md). That guide covers verified images, TLS, updates, rollback, node-scoped storage, and distributor trust. The service worker retains notifications but bypasses resource caching in this mode.
 

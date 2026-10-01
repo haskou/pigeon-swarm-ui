@@ -7,6 +7,7 @@ import type {
 import type { NetworkSynchronizationStatus } from '../../../networks/presentation/view-models/NetworkSynchronizationStatus';
 import type { NodeNetwork } from '../../../networks/presentation/view-models/NodeNetwork';
 import type { LoginIdentityProgressStep } from '../../application/login-identity/LoginIdentityProgressStep';
+import type { DevicePairingRequestDraft } from '../../domain/DevicePairingRequestDraft';
 
 import { loadApplicationContainer } from '../../../../app/composition/loadApplicationContainer';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
@@ -14,22 +15,20 @@ import { cx } from '../../../../shared/presentation/cx';
 import { useInstallPrompt } from '../../../../shared/presentation/hooks/useInstallPrompt';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import { DevicePairingCode } from '../../domain/value-objects/DevicePairingCode';
 import { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
-import { WebAuthnPrfKeyProtector } from '../../infrastructure/crypto/WebAuthnPrfKeyProtector';
 import {
   clearLastLoginIdentity,
   loadLastLoginIdentity,
   saveLastLoginIdentity,
 } from '../../infrastructure/storage/lastLoginIdentity';
 import {
-  clearLocalDeviceUnlock,
-  saveLocalDeviceUnlock,
-} from '../../infrastructure/storage/localDeviceUnlock';
-import {
   clearSavedCredentials,
   loadSavedCredentials,
   saveCredentials,
 } from '../../infrastructure/storage/savedCredentials';
+import { DevicePairingCodeField } from '../device-pairing/DevicePairingCodeField';
+import { DevicePairingQrCode } from '../device-pairing/DevicePairingQrCode';
 import { useIdentityPreview } from '../hooks/useIdentityPreview';
 import { AuthFormFields } from './AuthFormFields';
 import {
@@ -38,12 +37,9 @@ import {
   normalizeIdentityLogin,
   registrationNetworks,
 } from './authFormRules';
+import { AuthSwitch, RecoveryKeyPanel } from './AuthSecurityControls';
 import {
-  AuthSwitch,
-  PasskeyPrfUnavailableNotice,
-  RecoveryKeyPanel,
-} from './AuthSecurityControls';
-import {
+  isValidPassword,
   normalizeHandleInput,
   passwordValidationChecks,
 } from './credentialsValidation';
@@ -53,7 +49,6 @@ import { NodeLoginSummary } from './NodeLoginSummary';
 import { PasswordRequirementProgress } from './PasswordRequirementProgress';
 
 type LoadState = 'idle' | 'loading' | 'error';
-type PasskeyPrfSupportState = 'available' | 'checking' | 'unavailable';
 
 interface AuthScreenProps {
   availableNetworks: NodeNetwork[];
@@ -89,10 +84,13 @@ export function AuthScreen({
   const [recoveryKeyConfirmed, setRecoveryKeyConfirmed] = useState(false);
   const [loginRecoveryKey, setLoginRecoveryKey] = useState('');
   const [useRecoveryKey, setUseRecoveryKey] = useState(false);
+  const [useDevicePairing, setUseDevicePairing] = useState(false);
+  const [pairingInvitationCode, setPairingInvitationCode] = useState('');
+  const [pairingCompletionCode, setPairingCompletionCode] = useState('');
+  const [pairingDraft, setPairingDraft] =
+    useState<DevicePairingRequestDraft | null>(null);
+  const [pairingVerificationCode, setPairingVerificationCode] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
-  const [passkeyPrfEnabled, setPasskeyPrfEnabled] = useState(true);
-  const [passkeyPrfSupport, setPasskeyPrfSupport] =
-    useState<PasskeyPrfSupportState>('checking');
   const [state, setState] = useState<LoadState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [loginProgressStep, setLoginProgressStep] =
@@ -141,25 +139,7 @@ export function AuthScreen({
     return () => window.clearTimeout(timeout);
   }, [identityId, mode]);
 
-  useEffect(() => {
-    let mounted = true;
-
-    WebAuthnPrfKeyProtector.isPrfAvailable()
-      .then((available) => {
-        if (mounted) {
-          setPasskeyPrfSupport(available ? 'available' : 'unavailable');
-        }
-      })
-      .catch(() => {
-        if (mounted) setPasskeyPrfSupport('unavailable');
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const canSubmit =
+  const ordinaryCanSubmit =
     canSubmitAuthForm({
       availableNetworkCount: availableNetworks.length,
       handle,
@@ -174,13 +154,22 @@ export function AuthScreen({
       !useRecoveryKey ||
       RecoveryKey.isValid(loginRecoveryKey)) &&
     (mode === 'login' || recoveryKeyConfirmed);
-  const passkeyPrfAvailable = passkeyPrfSupport === 'available';
-  const passkeyPrfUnavailable = passkeyPrfSupport === 'unavailable';
   const passwordChecks = passwordValidationChecks(password);
   const passwordRequirementChecks = {
     ...passwordChecks,
     match: password.length > 0 && password === passwordConfirmation,
   };
+  const localDevicePasswordValid =
+    isValidPassword(password) && password === passwordConfirmation;
+  const canSubmit = useDevicePairing
+    ? Boolean(
+        pairingDraft &&
+        pairingCompletionCode.trim() &&
+        localDevicePasswordValid,
+      )
+    : useRecoveryKey
+      ? ordinaryCanSubmit && localDevicePasswordValid
+      : ordinaryCanSubmit;
   const canShowInstallButton = installState !== 'installed';
   const installButtonDisabled =
     installState === 'checking' || installState === 'prompting';
@@ -212,12 +201,26 @@ export function AuthScreen({
       const applicationContainer = await loadApplicationContainer();
       const result =
         mode === 'login'
-          ? await applicationContainer.identities.login(
-              normalizeIdentityLogin(identityId),
-              password,
-              setLoginProgressStep,
-              useRecoveryKey ? loginRecoveryKey.trim() || undefined : undefined,
-            )
+          ? useDevicePairing && pairingDraft
+            ? await applicationContainer.identities.completeDevicePairing(
+                normalizeIdentityLogin(identityId),
+                password,
+                pairingDraft,
+                DevicePairingCode.fromString(pairingCompletionCode),
+                setLoginProgressStep,
+              )
+            : useRecoveryKey
+              ? await applicationContainer.identities.recover(
+                  normalizeIdentityLogin(identityId),
+                  password,
+                  loginRecoveryKey.trim(),
+                  setLoginProgressStep,
+                )
+              : await applicationContainer.identities.login(
+                  normalizeIdentityLogin(identityId),
+                  password,
+                  setLoginProgressStep,
+                )
           : await applicationContainer.identities.register(
               name,
               password,
@@ -228,7 +231,6 @@ export function AuthScreen({
               }),
               handle.trim() ? normalizeHandleInput(handle) : undefined,
               {
-                passkeyPrfEnabled: passkeyPrfEnabled && passkeyPrfAvailable,
                 recoveryKey,
               },
             );
@@ -236,13 +238,11 @@ export function AuthScreen({
       saveLastLoginIdentity(result.session.identity.id);
 
       if (rememberMe) {
-        await saveLocalDeviceUnlock(result.session).catch(() => undefined);
         saveCredentials({
           identityId: result.session.identity.id,
         });
       } else {
         clearSavedCredentials();
-        await clearLocalDeviceUnlock(result.session.identity.id);
       }
 
       onAuthenticated(result.session, result.conversations);
@@ -256,6 +256,31 @@ export function AuthScreen({
 
     setLoginProgressStep(null);
     setState('idle');
+  };
+
+  const prepareDevicePairing = async () => {
+    setState('loading');
+    setError(null);
+
+    try {
+      const applicationContainer = await loadApplicationContainer();
+      const draft =
+        await applicationContainer.identities.createDevicePairingRequest(
+          DevicePairingCode.fromString(pairingInvitationCode),
+        );
+
+      setPairingVerificationCode(
+        await draft.getRequest().getVerificationCode(),
+      );
+      setPairingDraft(draft);
+      setIdentityId(
+        draft.getRequest().getInvitation().getIdentityId().valueOf(),
+      );
+    } catch (caught) {
+      setError(toUserErrorMessage(caught, copy.auth.devicePairingError));
+    } finally {
+      setState('idle');
+    }
   };
 
   const handleModeChange = (nextMode: AuthMode) => {
@@ -395,7 +420,10 @@ export function AuthScreen({
                 <button
                   type="button"
                   aria-pressed={useRecoveryKey}
-                  onClick={() => setUseRecoveryKey((enabled) => !enabled)}
+                  onClick={() => {
+                    setUseRecoveryKey((enabled) => !enabled);
+                    setUseDevicePairing(false);
+                  }}
                   className="flex w-full items-center gap-3 py-2 text-left text-sm font-bold text-white/65 transition hover:text-white/80"
                   data-testid="auth-use-recovery-key-toggle"
                 >
@@ -425,9 +453,72 @@ export function AuthScreen({
                     </Field>
                   </div>
                 )}
+                <button
+                  type="button"
+                  aria-pressed={useDevicePairing}
+                  onClick={() => {
+                    setUseDevicePairing((enabled) => !enabled);
+                    setUseRecoveryKey(false);
+                  }}
+                  className="mt-1 flex w-full items-center gap-3 py-2 text-left text-sm font-bold text-white/65 transition hover:text-white/80"
+                  data-testid="auth-use-device-pairing-toggle"
+                >
+                  <AuthSwitch enabled={useDevicePairing} />
+                  <span>{copy.auth.useDevicePairing}</span>
+                </button>
+                {useDevicePairing && (
+                  <div className="mt-3 grid gap-4">
+                    <DevicePairingCodeField
+                      label={copy.auth.devicePairingInvitationLabel}
+                      onChange={(value) => {
+                        setPairingInvitationCode(value);
+                        setPairingDraft(null);
+                      }}
+                      value={pairingInvitationCode}
+                    />
+                    {!pairingDraft ? (
+                      <button
+                        className="ui-button"
+                        disabled={
+                          !pairingInvitationCode.trim() || state === 'loading'
+                        }
+                        onClick={() => void prepareDevicePairing()}
+                        type="button"
+                      >
+                        {copy.auth.devicePairingPrepare}
+                      </button>
+                    ) : (
+                      <>
+                        <p className="text-xs leading-relaxed text-white/45">
+                          {copy.auth.devicePairingRequestHelp}
+                        </p>
+                        <DevicePairingQrCode
+                          code={pairingDraft.getRequest().toCode()}
+                          label={copy.auth.devicePairingRequestQr}
+                        />
+                        <div className="ui-inline-notice grid gap-1 text-center">
+                          <p className="text-xs text-white/60">
+                            {copy.auth.devicePairingVerificationHelp}
+                          </p>
+                          <p
+                            className="font-mono text-2xl tracking-widest"
+                            data-testid="auth-device-pairing-verification-code"
+                          >
+                            {pairingVerificationCode}
+                          </p>
+                        </div>
+                        <DevicePairingCodeField
+                          label={copy.auth.devicePairingCompletionLabel}
+                          onChange={setPairingCompletionCode}
+                          value={pairingCompletionCode}
+                        />
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             )}
-            {mode === 'create' && (
+            {(mode === 'create' || useRecoveryKey || useDevicePairing) && (
               <>
                 <Field label={copy.auth.passwordConfirmLabel}>
                   <input
@@ -445,65 +536,20 @@ export function AuthScreen({
                 <PasswordRequirementProgress
                   checks={passwordRequirementChecks}
                 />
-                <RecoveryKeyPanel
-                  recoveryKey={recoveryKey}
-                  confirmed={recoveryKeyConfirmed}
-                  onConfirmedChange={setRecoveryKeyConfirmed}
-                  onRegenerate={() => {
-                    setRecoveryKey(RecoveryKey.generate().valueOf());
-                    setRecoveryKeyConfirmed(false);
-                  }}
-                />
-                <button
-                  type="button"
-                  aria-pressed={passkeyPrfEnabled}
-                  disabled={!passkeyPrfAvailable}
-                  data-testid="auth-passkey-prf-toggle"
-                  onClick={() =>
-                    passkeyPrfAvailable &&
-                    setPasskeyPrfEnabled((enabled) => !enabled)
-                  }
-                  className={cx(
-                    'flex w-full items-start gap-3 px-1 py-2 text-left transition',
-                    passkeyPrfAvailable
-                      ? passkeyPrfEnabled
-                        ? 'text-white'
-                        : 'text-white/75 hover:bg-white/[0.04]'
-                      : 'cursor-not-allowed opacity-55',
-                  )}
-                >
-                  <AuthSwitch
-                    enabled={passkeyPrfEnabled && passkeyPrfAvailable}
+                {mode === 'create' && (
+                  <RecoveryKeyPanel
+                    recoveryKey={recoveryKey}
+                    confirmed={recoveryKeyConfirmed}
+                    onConfirmedChange={setRecoveryKeyConfirmed}
+                    onRegenerate={() => {
+                      setRecoveryKey(RecoveryKey.generate().valueOf());
+                      setRecoveryKeyConfirmed(false);
+                    }}
                   />
-                  <span className="min-w-0">
-                    <span className="block text-sm font-black text-white/80">
-                      {copy.auth.passkeyPrf}
-                    </span>
-                    <span className="mt-1 block text-xs leading-snug text-white/45">
-                      {passkeyPrfSupport === 'checking'
-                        ? copy.auth.passkeyPrfChecking
-                        : passkeyPrfAvailable
-                          ? copy.auth.passkeyPrfHelp
-                          : copy.auth.passkeyPrfUnavailable}
-                    </span>
-                  </span>
-                </button>
-                {passkeyPrfUnavailable && (
-                  <PasskeyPrfUnavailableNotice>
-                    {copy.auth.passkeyPrfUnavailableCreate}
-                  </PasskeyPrfUnavailableNotice>
                 )}
               </>
             )}
           </div>
-
-          {mode === 'login' && passkeyPrfUnavailable && (
-            <div className="mt-4">
-              <PasskeyPrfUnavailableNotice>
-                {copy.auth.passkeyPrfUnavailableLogin}
-              </PasskeyPrfUnavailableNotice>
-            </div>
-          )}
 
           <div className="mt-6 flex items-center gap-3 px-1 py-2">
             <button

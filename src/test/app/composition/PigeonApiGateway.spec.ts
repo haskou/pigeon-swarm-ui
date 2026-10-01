@@ -12,7 +12,7 @@ describe(PigeonApiGateway.name, () => {
       conversationsGateway: expect.any(Object),
       filesGateway: expect.any(Object),
       identityGateway: expect.any(Object),
-      identityKeyProtection: expect.any(Object),
+      identityVault: expect.any(Object),
       messageCommands: expect.any(Object),
       messagesApi: expect.any(Object),
       messagesGateway: expect.any(Object),

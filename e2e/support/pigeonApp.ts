@@ -19,6 +19,7 @@ export async function loginIdentity(
   if (recoveryKey) {
     await page.getByTestId('auth-use-recovery-key-toggle').click();
     await page.getByTestId('auth-recovery-key-input').fill(recoveryKey);
+    await page.getByTestId('auth-password-confirmation-input').fill(password);
   }
 
   await page.getByTestId('auth-submit-button').click();
@@ -58,7 +59,7 @@ export async function newIsolatedPage(browser: Browser): Promise<Page> {
 export async function registerIdentity(
   page: Page,
   identity: TestIdentity,
-): Promise<void> {
+): Promise<string> {
   await page.goto('/');
   await page.getByTestId('auth-mode-control').locator('button').nth(1).click();
   await page.getByTestId('auth-name-input').fill(identity.name);
@@ -69,6 +70,10 @@ export async function registerIdentity(
     .fill(identity.password);
 
   const fallbackNetworks = page.getByTestId('auth-networks-input');
+  await page
+    .getByTestId('auth-network-select')
+    .waitFor({ timeout: 10_000 })
+    .catch(() => undefined);
 
   if (await fallbackNetworks.isVisible().catch(() => false)) {
     const networkId = process.env.E2E_NETWORK_ID?.trim();
@@ -82,12 +87,19 @@ export async function registerIdentity(
     await fallbackNetworks.fill(networkId);
   }
 
+  const recoveryKey = await page
+    .getByTestId('auth-recovery-key-output')
+    .inputValue();
+
+  await page.getByTestId('auth-recovery-key-confirm').click();
   await expect(page.getByTestId('auth-submit-button')).toBeEnabled({
     timeout: 30_000,
   });
   await page.getByTestId('auth-submit-button').click();
   await waitForWorkspace(page);
   await dismissPushPrompt(page);
+
+  return recoveryKey;
 }
 
 export async function createDirectConversation(

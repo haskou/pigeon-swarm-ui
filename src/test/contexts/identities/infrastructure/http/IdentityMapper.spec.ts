@@ -4,20 +4,10 @@ import { IdentityMapper } from '../../../../../contexts/identities/infrastructur
 
 function resource(): IdentityResource {
   return {
-    encryptedKeyPair: {
-      encryptedPrivateKey: 'encrypted-private-key',
-      publicKey: 'public-key',
-    },
-    encryptedMasterKey: 'encrypted-master-key',
+    authorizationRevision: 0,
+    deviceCredential: 'device-credential',
+    deviceCredentialCommitment: 'device-credential-commitment',
     id: 'identity-a',
-    masterKeyDerivation: {
-      algorithm: 'scrypt',
-      N: 262_144,
-      p: 1,
-      r: 8,
-      salt: 'salt',
-      version: 1,
-    },
     networks: ['network-a'],
     profile: {
       banner: 'banner-cid',
@@ -26,6 +16,7 @@ function resource(): IdentityResource {
       name: 'Ada',
       picture: 'picture-cid',
     },
+    recoveryAuthority: 'recovery-authority',
     signature: 'signature',
     timestamp: 100,
     version: 1,

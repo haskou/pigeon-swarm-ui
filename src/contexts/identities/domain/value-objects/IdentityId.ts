@@ -1,3 +1,4 @@
+import { PublicKey } from '@haskou/pigeon-swarm-crypto';
 import { StringValueObject } from '@haskou/value-objects';
 
 export class IdentityId extends StringValueObject {
@@ -18,5 +19,11 @@ export class IdentityId extends StringValueObject {
 
   private constructor(value: string) {
     super(IdentityId.normalize(value));
+  }
+
+  public getPublicKey(): PublicKey {
+    return PublicKey.fromPEM(
+      `-----BEGIN PUBLIC KEY-----\n${this.valueOf()}\n-----END PUBLIC KEY-----\n`,
+    );
   }
 }

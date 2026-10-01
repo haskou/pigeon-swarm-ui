@@ -1,4 +1,10 @@
-import { KeyPair, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import {
+  KeyPair,
+  SHA256Hash,
+  SymmetricKey,
+  UserRootKey,
+} from '@haskou/pigeon-swarm-crypto';
+import { StringValueObject } from '@haskou/value-objects';
 
 import type {
   IdentityResource,
@@ -10,7 +16,7 @@ import type { RequestSigner } from '../../../../shared/infrastructure/http/Reque
 import type { Identity } from '../../domain/Identity';
 import type { IdentityMasterKeyProtection } from '../../domain/value-objects/IdentityMasterKeyProtection';
 import type { IdentityCreationMaterial } from '../crypto/IdentityCreationMaterial';
-import type { PigeonIdentityKeyProtectionGateway } from '../crypto/PigeonIdentityKeyProtectionGateway';
+import type { DeviceIdentityVault } from '../storage/DeviceIdentityVault';
 import type { CreatedIdentityMaterial } from './CreatedIdentityMaterial';
 import type { IdentityUpdateProfileInput } from './IdentitySignaturePayloadFactory';
 import type { IdentitySignaturePayloadFactory } from './IdentitySignaturePayloadFactory';
@@ -19,7 +25,8 @@ import type { PigeonIdentityGateway } from './PigeonIdentityGateway';
 import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
-import { clearLocalPasskeyUnlock } from '../storage/localPasskeyUnlock';
+import { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
+import { RecoveryIdentityMaterial } from '../crypto/RecoveryIdentityMaterial';
 
 const emptyKeychain: LocalKeychain = {
   conversations: {},
@@ -32,8 +39,26 @@ export class PigeonIdentityCommandsApi {
     private readonly signer: RequestSigner,
     private readonly identities: PigeonIdentityGateway,
     private readonly signatures: IdentitySignaturePayloadFactory,
-    private readonly keyProtection: PigeonIdentityKeyProtectionGateway,
+    private readonly vault: DeviceIdentityVault,
   ) {}
+
+  private credentialCommitment(keyPair: KeyPair): string {
+    return SHA256Hash.from(
+      new StringValueObject(keyPair.toPrimitives().publicKey),
+    ).valueOf();
+  }
+
+  public async changePassword(
+    session: Session,
+    currentPassword: string,
+    nextPassword: string,
+  ): Promise<void> {
+    await this.vault.changePassword(
+      IdentityId.fromString(session.identity.id),
+      currentPassword,
+      nextPassword,
+    );
+  }
 
   public async create(
     name: string,
@@ -42,25 +67,33 @@ export class PigeonIdentityCommandsApi {
     handle?: string,
     options: { passkeyPrfEnabled?: boolean; recoveryKey?: string } = {},
   ): Promise<CreatedIdentityMaterial> {
-    const keyPair = await KeyPair.generate();
-    const masterKey = SymmetricKey.generate();
+    const recoveryKey = RecoveryKey.fromString(options.recoveryKey ?? '');
+    const recovered = await RecoveryIdentityMaterial.derive(recoveryKey);
+    const keyPair = recovered.identityKeyPair;
+    const deviceCredentialKeyPair = await KeyPair.generate();
+    const recoveryAuthorityKeyPair = recovered.recoveryAuthorityKeyPair;
+    const rootKey = recovered.rootKey;
+    const masterKey = SymmetricKey.fromBuffer(rootKey.getBuffer());
     const identityId = IdentityId.normalize(keyPair.toPrimitives().publicKey);
-    const { encryptedKeyPair, encryptedMasterKey, masterKeyDerivation } =
-      await this.keyProtection.protectNewIdentity({
-        displayName: name,
-        identityId,
-        keyPair,
-        masterKey,
-        options,
-        password,
-      });
+    const vaultSession = await this.vault.register({
+      identityId: IdentityId.fromString(identityId),
+      material: {
+        deviceCredentialKeyPair,
+        identityKeyPair: keyPair,
+        recoveryAuthorityKeyPair,
+        rootKey,
+      },
+      password,
+    });
     const unsigned = this.signatures.createInitial({
-      encryptedKeyPair,
-      encryptedMasterKey,
+      deviceCredential: deviceCredentialKeyPair.toPrimitives().publicKey,
+      deviceCredentialCommitment: this.credentialCommitment(
+        deviceCredentialKeyPair,
+      ),
       id: identityId,
-      masterKeyDerivation,
       networks,
       profile: { handle, name },
+      recoveryAuthority: recoveryAuthorityKeyPair.toPrimitives().publicKey,
       timestamp: Date.now(),
     });
     const body = {
@@ -68,19 +101,40 @@ export class PigeonIdentityCommandsApi {
       signature: keyPair.sign(JSON.stringify(unsigned)).toString(),
     };
     const signingSession = {
+      authorizationEpoch: vaultSession.authorizationEpoch,
+      authorizationRevision: vaultSession.authorizationRevision,
+      deviceCredentialKeyPair,
+      deviceId: vaultSession.deviceId,
       identity: body,
       keychain: emptyKeychain,
       keyPair,
       masterKey,
+      recoveryAuthorityKeyPair,
     } as Session;
     const path = '/identities/';
-    const identity = await this.http.request<IdentityResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(signingSession, 'POST', path, body),
-      method: 'POST',
-    });
+    let identity: IdentityResource;
 
-    return { identity, keyPair, masterKey };
+    try {
+      identity = await this.http.request<IdentityResource>(path, {
+        body: JSON.stringify(body),
+        headers: await this.signer.headers(signingSession, 'POST', path, body),
+        method: 'POST',
+      });
+    } catch (error) {
+      await this.vault.delete(IdentityId.fromString(identityId));
+      throw error;
+    }
+
+    return {
+      authorizationEpoch: vaultSession.authorizationEpoch,
+      authorizationRevision: vaultSession.authorizationRevision,
+      deviceCredentialKeyPair,
+      deviceId: vaultSession.deviceId,
+      identity,
+      keyPair,
+      masterKey,
+      recoveryAuthorityKeyPair,
+    };
   }
 
   public async createIdentity(
@@ -90,22 +144,28 @@ export class PigeonIdentityCommandsApi {
   ): Promise<CreatedIdentityMaterial> {
     const primitives = identity.toPrimitives();
     const options = protection.toPrimitives();
-    const { encryptedKeyPair, encryptedMasterKey, masterKeyDerivation } =
-      await this.keyProtection.protectNewIdentity({
-        displayName: primitives.profile.name,
-        identityId: primitives.id,
-        keyPair: material.keyPair,
-        masterKey: material.masterKey,
-        options,
-        password: options.password,
-      });
+    const rootKey = UserRootKey.fromBase64(material.masterKey.valueOf());
+    const recoveryAuthorityKeyPair = material.recoveryAuthorityKeyPair;
+    const vaultSession = await this.vault.register({
+      identityId: IdentityId.fromString(primitives.id),
+      material: {
+        deviceCredentialKeyPair: material.deviceCredentialKeyPair,
+        identityKeyPair: material.keyPair,
+        recoveryAuthorityKeyPair,
+        rootKey,
+      },
+      password: options.password,
+    });
     const unsigned = this.signatures.createInitial({
-      encryptedKeyPair,
-      encryptedMasterKey,
+      deviceCredential:
+        material.deviceCredentialKeyPair.toPrimitives().publicKey,
+      deviceCredentialCommitment: this.credentialCommitment(
+        material.deviceCredentialKeyPair,
+      ),
       id: primitives.id,
-      masterKeyDerivation,
       networks: primitives.networkIds,
       profile: primitives.profile,
+      recoveryAuthority: recoveryAuthorityKeyPair.toPrimitives().publicKey,
       timestamp: primitives.createdAt,
     });
     const body = {
@@ -113,10 +173,15 @@ export class PigeonIdentityCommandsApi {
       signature: material.keyPair.sign(JSON.stringify(unsigned)).toString(),
     };
     const signingSession = {
+      authorizationEpoch: vaultSession.authorizationEpoch,
+      authorizationRevision: vaultSession.authorizationRevision,
+      deviceCredentialKeyPair: material.deviceCredentialKeyPair,
+      deviceId: vaultSession.deviceId,
       identity: body,
       keychain: emptyKeychain,
       keyPair: material.keyPair,
       masterKey: material.masterKey,
+      recoveryAuthorityKeyPair,
     } as Session;
     const path = '/identities/';
     const persistedIdentity = await this.http.request<IdentityResource>(path, {
@@ -126,9 +191,14 @@ export class PigeonIdentityCommandsApi {
     });
 
     return {
+      authorizationEpoch: vaultSession.authorizationEpoch,
+      authorizationRevision: vaultSession.authorizationRevision,
+      deviceCredentialKeyPair: material.deviceCredentialKeyPair,
+      deviceId: vaultSession.deviceId,
       identity: persistedIdentity,
       keyPair: material.keyPair,
       masterKey: material.masterKey,
+      recoveryAuthorityKeyPair,
     };
   }
 
@@ -154,20 +224,16 @@ export class PigeonIdentityCommandsApi {
       throw new Error(copy.profile.missingIdentityExternalIdentifier);
     }
 
-    const masterKeyEncryption =
-      await this.keyProtection.protectProfileMasterKey({
-        currentIdentity,
-        identityId,
+    if (newPassword) {
+      await this.vault.changePassword(
+        IdentityId.fromString(identityId),
+        options.currentPassword ?? '',
         newPassword,
-        options,
-        profile,
-        session,
-      });
+      );
+    }
     const path = `/identities/${encodeURIComponent(identityId)}`;
     const unsigned = this.signatures.createUpdate({
-      encryptedMasterKey: masterKeyEncryption?.encryptedMasterKey,
       identity: currentIdentity,
-      masterKeyDerivation: masterKeyEncryption?.masterKeyDerivation,
       previousIdentityExternalIdentifier,
       profile,
       timestamp: Date.now(),
@@ -185,10 +251,6 @@ export class PigeonIdentityCommandsApi {
     });
 
     this.identities.remember(updatedIdentity);
-
-    if (options.passkeyPrfEnabled === false) {
-      clearLocalPasskeyUnlock(identityId);
-    }
 
     return updatedIdentity;
   }

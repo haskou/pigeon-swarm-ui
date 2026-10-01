@@ -41,7 +41,7 @@ export class ClientCompatibilityProbe {
       'protocol' in value &&
       value.protocol === 'pigeon-swarm' &&
       'apiVersion' in value &&
-      value.apiVersion === 1
+      value.apiVersion === 2
     );
   }
 

@@ -1,5 +1,6 @@
 import { KeyPair, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
+import type { DeviceIdentityVault } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVault';
 import type {
   IdentityResource,
   Session,
@@ -7,29 +8,24 @@ import type {
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
-import { PigeonIdentityKeyProtectionGateway } from '../../../../../contexts/identities/infrastructure/crypto/PigeonIdentityKeyProtectionGateway';
+import { DeviceAuthorizationEpoch } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationEpoch';
+import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
+import { DeviceId } from '../../../../../contexts/identities/domain/value-objects/DeviceId';
+import { DeviceUnlockSecretHandle } from '../../../../../contexts/identities/domain/value-objects/DeviceUnlockSecretHandle';
+import { RecoveryKey } from '../../../../../contexts/identities/domain/value-objects/RecoveryKey';
 import { IdentitySignaturePayloadFactory } from '../../../../../contexts/identities/infrastructure/http/IdentitySignaturePayloadFactory';
 import { PigeonIdentityCommandsApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityCommandsApi';
 import { PigeonIdentityGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityGateway';
 
 function identity(overrides: Partial<IdentityResource> = {}): IdentityResource {
   return {
-    encryptedKeyPair: {
-      encryptedPrivateKey: 'encrypted-private-key',
-      publicKey: 'public-key',
-    },
-    encryptedMasterKey: 'encrypted-master-key',
+    authorizationRevision: 0,
+    deviceCredential: 'device-credential',
+    deviceCredentialCommitment: 'device-credential-commitment',
     id: 'public-key',
-    masterKeyDerivation: {
-      algorithm: 'scrypt',
-      N: 2 ** 18,
-      p: 1,
-      r: 8,
-      salt: 'salt',
-      version: 1,
-    },
     networks: ['network-1'],
     profile: { name: 'Ada' },
+    recoveryAuthority: 'recovery-authority',
     signature: 'signature',
     timestamp: 1,
     version: 1,
@@ -46,35 +42,47 @@ describe(PigeonIdentityCommandsApi.name, () => {
     const signer = {
       headers: jest.fn().mockResolvedValue({ 'X-Signature': 'signed' }),
     } as unknown as RequestSigner;
-    const keyProtection = {
-      protectNewIdentity: jest.fn().mockResolvedValue({
-        encryptedKeyPair: {
-          encryptedPrivateKey: 'encrypted-private-key',
-          publicKey: expect.any(String),
-        },
-        encryptedMasterKey: 'encrypted-master-key',
-        masterKeyDerivation: createdIdentity.masterKeyDerivation,
-      }),
-    } as unknown as PigeonIdentityKeyProtectionGateway;
+    const vault = {
+      delete: jest.fn(),
+      register: jest.fn().mockImplementation(({ material }) =>
+        Promise.resolve({
+          authorizationEpoch: DeviceAuthorizationEpoch.genesis(),
+          authorizationRevision: DeviceAuthorizationRevision.initial(),
+          deviceId: DeviceId.generate(),
+          material,
+          secretHandle: DeviceUnlockSecretHandle.generate(),
+        }),
+      ),
+    } as unknown as DeviceIdentityVault;
     const commands = new PigeonIdentityCommandsApi(
       http,
       signer,
       new PigeonIdentityGateway(http),
       new IdentitySignaturePayloadFactory(),
-      keyProtection,
+      vault,
     );
 
     await expect(
-      commands.create('Ada', 'password', ['network-1'], '@ada'),
-    ).resolves.toEqual({
+      commands.create('Ada', 'password', ['network-1'], '@ada', {
+        recoveryKey: RecoveryKey.generate().valueOf(),
+      }),
+    ).resolves.toMatchObject({
+      authorizationEpoch: expect.any(Object),
+      authorizationRevision: expect.any(Object),
+      deviceCredentialKeyPair: expect.any(KeyPair),
+      deviceId: expect.any(Object),
       identity: createdIdentity,
       keyPair: expect.any(KeyPair),
       masterKey: expect.any(SymmetricKey),
+      recoveryAuthorityKeyPair: expect.any(KeyPair),
     });
 
     expect(http.request).toHaveBeenCalledWith(
       '/identities/',
-      expect.objectContaining({ method: 'POST' }),
+      expect.objectContaining({
+        body: expect.not.stringContaining('encryptedMasterKey'),
+        method: 'POST',
+      }),
     );
     expect(signer.headers).toHaveBeenCalledWith(
       expect.objectContaining({ keyPair: expect.any(KeyPair) }),
@@ -103,9 +111,7 @@ describe(PigeonIdentityCommandsApi.name, () => {
       get: jest.fn().mockResolvedValue(currentIdentity),
       remember: jest.fn(),
     } as unknown as PigeonIdentityGateway;
-    const keyProtection = {
-      protectProfileMasterKey: jest.fn().mockResolvedValue(undefined),
-    } as unknown as PigeonIdentityKeyProtectionGateway;
+    const vault = {} as DeviceIdentityVault;
     const keyPair = await KeyPair.generate();
     const session = {
       identity: currentIdentity,
@@ -118,7 +124,7 @@ describe(PigeonIdentityCommandsApi.name, () => {
       signer,
       identities,
       new IdentitySignaturePayloadFactory(),
-      keyProtection,
+      vault,
     );
 
     await expect(

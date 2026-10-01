@@ -2,16 +2,19 @@ import { KeyPair, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 import { mock } from 'jest-mock-extended';
 
-import type { PigeonIdentityKeyProtectionGateway } from '../../../../../contexts/identities/infrastructure/crypto/PigeonIdentityKeyProtectionGateway';
 import type { PigeonIdentitiesGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
 import type { IdentityResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 
 import { Identity } from '../../../../../contexts/identities/domain/Identity';
 import { IdentityProfile } from '../../../../../contexts/identities/domain/profile/IdentityProfile';
+import { DeviceAuthorizationEpoch } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationEpoch';
+import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
+import { DeviceId } from '../../../../../contexts/identities/domain/value-objects/DeviceId';
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 import { IdentityMasterKeyProtection } from '../../../../../contexts/identities/domain/value-objects/IdentityMasterKeyProtection';
 import { IdentityNetworkMemberships } from '../../../../../contexts/identities/domain/value-objects/IdentityNetworkMemberships';
+import { RecoveryKey } from '../../../../../contexts/identities/domain/value-objects/RecoveryKey';
 import { IdentityCreationMaterials } from '../../../../../contexts/identities/infrastructure/crypto/IdentityCreationMaterials';
 import { IdentityAccessContexts } from '../../../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
 import { IdentityMapper } from '../../../../../contexts/identities/infrastructure/http/IdentityMapper';
@@ -19,22 +22,13 @@ import { PigeonIdentityRepository } from '../../../../../contexts/identities/inf
 
 function resource(name = 'Ada'): IdentityResource {
   return {
-    encryptedKeyPair: {
-      encryptedPrivateKey: 'encrypted-private-key',
-      publicKey: 'public-key',
-    },
-    encryptedMasterKey: 'encrypted-master-key',
+    authorizationRevision: 0,
+    deviceCredential: 'device-credential',
+    deviceCredentialCommitment: 'device-credential-commitment',
     id: 'identity-a',
-    masterKeyDerivation: {
-      algorithm: 'scrypt',
-      N: 262_144,
-      p: 1,
-      r: 8,
-      salt: 'salt',
-      version: 1,
-    },
     networks: ['network-a'],
     profile: { name },
+    recoveryAuthority: 'recovery-authority',
     signature: 'signature',
     timestamp: 100,
     version: 1,
@@ -46,8 +40,9 @@ describe(PigeonIdentityRepository.name, () => {
     const gateway = mock<PigeonIdentitiesGateway>();
     const contexts = new IdentityAccessContexts();
     const materials = new IdentityCreationMaterials();
-    const keyProtection = mock<PigeonIdentityKeyProtectionGateway>();
     const keyPair = await KeyPair.generate();
+    const deviceCredentialKeyPair = await KeyPair.generate();
+    const recoveryAuthorityKeyPair = await KeyPair.generate();
     const identityId = IdentityId.fromString(keyPair.toPrimitives().publicKey);
     const masterKey = SymmetricKey.generate();
     const identity = Identity.create(
@@ -65,18 +60,28 @@ describe(PigeonIdentityRepository.name, () => {
     const protection = IdentityMasterKeyProtection.fromPrimitives({
       passkeyPrfEnabled: false,
       password: 'Correct-Horse-Battery-9!',
-      recoveryKey: undefined,
+      recoveryKey: RecoveryKey.generate().valueOf(),
     });
     const persistedResource = {
       ...resource(),
       id: identityId.toString(),
     };
 
-    materials.register(identityId, { keyPair, masterKey });
+    materials.register(identityId, {
+      deviceCredentialKeyPair,
+      keyPair,
+      masterKey,
+      recoveryAuthorityKeyPair,
+    });
     gateway.createIdentityAggregate.mockResolvedValue({
+      authorizationEpoch: DeviceAuthorizationEpoch.genesis(),
+      authorizationRevision: DeviceAuthorizationRevision.initial(),
+      deviceCredentialKeyPair,
+      deviceId: DeviceId.generate(),
       identity: persistedResource,
       keyPair,
       masterKey,
+      recoveryAuthorityKeyPair,
     });
 
     const persisted = await new PigeonIdentityRepository(
@@ -84,7 +89,6 @@ describe(PigeonIdentityRepository.name, () => {
       contexts,
       new IdentityMapper(),
       materials,
-      keyProtection,
     ).create(identity, protection);
 
     expect(persisted.belongsTo(identityId)).toBe(true);
@@ -103,7 +107,6 @@ describe(PigeonIdentityRepository.name, () => {
       new IdentityAccessContexts(),
       new IdentityMapper(),
       mock<IdentityCreationMaterials>(),
-      mock<PigeonIdentityKeyProtectionGateway>(),
     );
 
     gateway.getIdentity.mockResolvedValue(resource());
@@ -122,7 +125,6 @@ describe(PigeonIdentityRepository.name, () => {
       contexts,
       mapper,
       mock<IdentityCreationMaterials>(),
-      mock<PigeonIdentityKeyProtectionGateway>(),
     );
     const session = { identity: resource() } as Session;
     const identity = mapper.fromResource(resource());

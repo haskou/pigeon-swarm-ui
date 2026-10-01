@@ -1,4 +1,4 @@
-import type { PigeonIdentityKeyProtectionGateway } from '../../../../../contexts/identities/infrastructure/crypto/PigeonIdentityKeyProtectionGateway';
+import type { PigeonDeviceAuthorizationApi } from '../../../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
 import type { PigeonIdentityCommandsApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityCommandsApi';
 import type { PigeonIdentityGateway as IdentityProfileGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityGateway';
 import type { PigeonIdentityLoginApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityLoginApi';
@@ -14,22 +14,13 @@ import { PigeonIdentitiesGateway } from '../../../../../contexts/identities/infr
 
 function identity(): IdentityResource {
   return {
-    encryptedKeyPair: {
-      encryptedPrivateKey: 'encrypted-private-key',
-      publicKey: 'public-key',
-    },
-    encryptedMasterKey: 'encrypted-master-key',
+    authorizationRevision: 0,
+    deviceCredential: 'device-credential',
+    deviceCredentialCommitment: 'device-credential-commitment',
     id: 'identity-1',
-    masterKeyDerivation: {
-      algorithm: 'scrypt',
-      N: 16_384,
-      p: 1,
-      r: 8,
-      salt: 'salt',
-      version: 1,
-    },
     networks: [],
     profile: { name: 'Identity' },
+    recoveryAuthority: 'recovery-authority',
     signature: 'signature',
     timestamp: 1,
     version: 1,
@@ -46,18 +37,18 @@ function gatewayDouble(): {
   const profile = {
     get: jest.fn(),
   } as jest.Mocked<Pick<IdentityProfileGateway, 'get'>>;
-  const protection = {} as PigeonIdentityKeyProtectionGateway;
   const keychain = {
     publishKeychain: jest.fn(),
   } as jest.Mocked<Pick<PigeonKeychainApi, 'publishKeychain'>>;
   const presence = {} as PigeonPresenceGateway;
+  const deviceAuthorization = {} as PigeonDeviceAuthorizationApi;
 
   return {
     gateway: new PigeonIdentitiesGateway(
       commands,
       login,
       profile as unknown as IdentityProfileGateway,
-      protection,
+      deviceAuthorization,
       keychain as unknown as PigeonKeychainApi,
       presence,
     ),

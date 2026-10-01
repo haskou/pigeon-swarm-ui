@@ -1,3 +1,5 @@
+import { assert } from '@haskou/value-objects';
+
 import { IdentityPassword } from './IdentityPassword';
 import { RecoveryKey } from './RecoveryKey';
 
@@ -22,6 +24,13 @@ export class IdentityMasterKeyProtection {
 
   public assertRegistrationReady(): void {
     this.password.assertStrong();
+    assert(this.recoveryKey, new Error('A recovery kit is required.'));
+  }
+
+  public getRecoveryKey(): RecoveryKey {
+    assert(this.recoveryKey, new Error('A recovery kit is required.'));
+
+    return this.recoveryKey;
   }
 
   public toPrimitives() {

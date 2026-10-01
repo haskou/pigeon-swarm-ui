@@ -9,7 +9,12 @@ describe(IdentityCreationMaterials.name, () => {
     const materials = new IdentityCreationMaterials();
     const keyPair = await KeyPair.generate();
     const identityId = IdentityId.fromString(keyPair.toPrimitives().publicKey);
-    const material = { keyPair, masterKey: SymmetricKey.generate() };
+    const material = {
+      deviceCredentialKeyPair: await KeyPair.generate(),
+      keyPair,
+      masterKey: SymmetricKey.generate(),
+      recoveryAuthorityKeyPair: await KeyPair.generate(),
+    };
 
     materials.register(identityId, material);
 

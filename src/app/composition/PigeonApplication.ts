@@ -299,7 +299,6 @@ export class PigeonApplication {
       identityContexts,
       identityMapper,
       identityCreationMaterials,
-      gateway.identityKeyProtection,
     );
     const identityUnlockRepository = new PigeonIdentityUnlockRepository(
       gateway.identityGateway,

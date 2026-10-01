@@ -130,28 +130,6 @@ export class ProfileKeychainEntries {
     session: Session;
   }): ProfileKeychainDisplayEntry[] {
     return [
-      {
-        algorithm: copy.profile.identityKeys,
-        id: 'identity-master-key',
-        key: input.session.identity.encryptedMasterKey,
-        subtitle: ProfileKeychainEntries.identityName(
-          input.session.identity.id,
-          input.identityProfiles,
-          input.identityNames,
-        ),
-        title: copy.profile.encryptedMasterKey,
-      },
-      {
-        algorithm: copy.profile.identityKeys,
-        id: 'identity-private-key',
-        key: input.session.identity.encryptedKeyPair.encryptedPrivateKey,
-        subtitle: ProfileKeychainEntries.identityName(
-          input.session.identity.id,
-          input.identityProfiles,
-          input.identityNames,
-        ),
-        title: copy.profile.encryptedPrivateKey,
-      },
       ...Object.entries(input.session.keychain.conversations).map(
         ([entryId, entry]) =>
           ProfileKeychainEntries.conversationEntry({

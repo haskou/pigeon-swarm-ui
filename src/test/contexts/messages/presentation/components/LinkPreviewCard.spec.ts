@@ -18,8 +18,8 @@ describe(LinkPreviewCard.name, () => {
       jest.mocked(isIndependentClient).mockReturnValue(independent);
       const html = renderToStaticMarkup(
         createElement(LinkPreviewCard, {
-          image: 'https://tracker.example/image.png',
           finalUrl: 'https://example.org/article',
+          image: 'https://tracker.example/image.png',
           mine: false,
           title: 'Article title',
           url: 'https://example.org/article',

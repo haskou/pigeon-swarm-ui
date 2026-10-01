@@ -5,37 +5,28 @@ import { IdentitySignaturePayloadFactory } from '../../../../../contexts/identit
 describe(IdentitySignaturePayloadFactory.name, () => {
   it('builds the canonical initial identity payload', () => {
     const payload = new IdentitySignaturePayloadFactory().createInitial({
-      encryptedKeyPair: {
-        encryptedPrivateKey: 'encrypted',
-        publicKey: 'public',
-      },
-      encryptedMasterKey: 'encrypted-master-key',
+      deviceCredential: 'device-credential',
+      deviceCredentialCommitment: 'device-commitment',
       id: '-----BEGIN PUBLIC KEY-----\nidentity-1\n-----END PUBLIC KEY-----',
-      masterKeyDerivation: {
-        algorithm: 'scrypt',
-        N: 16_384,
-        p: 5,
-        r: 8,
-        salt: 'master-salt',
-        version: 1,
-      },
       networks: ['network-1', 'network-1'],
       profile: {
         biography: undefined,
         handle: ' @Ada ',
         name: 'Ada',
       },
+      recoveryAuthority: 'recovery-authority',
       timestamp: 1,
     });
 
     expect(Object.keys(payload)).toEqual([
-      'encryptedKeyPair',
-      'encryptedMasterKey',
+      'authorizationRevision',
+      'deviceCredential',
+      'deviceCredentialCommitment',
       'id',
-      'masterKeyDerivation',
       'networks',
       'previousIdentityExternalIdentifier',
       'profile',
+      'recoveryAuthority',
       'timestamp',
       'version',
     ]);
@@ -43,20 +34,10 @@ describe(IdentitySignaturePayloadFactory.name, () => {
       'previousIdentityExternalIdentifier',
     );
     expect(payload).toEqual({
-      encryptedKeyPair: {
-        encryptedPrivateKey: 'encrypted',
-        publicKey: 'public',
-      },
-      encryptedMasterKey: 'encrypted-master-key',
+      authorizationRevision: 0,
+      deviceCredential: 'device-credential',
+      deviceCredentialCommitment: 'device-commitment',
       id: 'identity-1',
-      masterKeyDerivation: {
-        algorithm: 'scrypt',
-        N: 16_384,
-        p: 5,
-        r: 8,
-        salt: 'master-salt',
-        version: 1,
-      },
       networks: ['network-1'],
       previousIdentityExternalIdentifier: undefined,
       profile: {
@@ -66,6 +47,7 @@ describe(IdentitySignaturePayloadFactory.name, () => {
         name: 'Ada',
         picture: undefined,
       },
+      recoveryAuthority: 'recovery-authority',
       timestamp: 1,
       version: 1,
     });
@@ -73,22 +55,13 @@ describe(IdentitySignaturePayloadFactory.name, () => {
 
   it('builds the canonical identity update payload', () => {
     const identity = {
-      encryptedKeyPair: {
-        encryptedPrivateKey: 'encrypted',
-        publicKey: 'public',
-      },
-      encryptedMasterKey: 'encrypted-master-key',
+      authorizationRevision: 4,
+      deviceCredential: 'device-credential',
+      deviceCredentialCommitment: 'device-commitment',
       id: '-----BEGIN PUBLIC KEY-----\nidentity-1\n-----END PUBLIC KEY-----',
-      masterKeyDerivation: {
-        algorithm: 'scrypt',
-        N: 16_384,
-        p: 5,
-        r: 8,
-        salt: 'master-salt',
-        version: 1,
-      },
       networks: ['network-1'],
       profile: { name: 'Ada' },
+      recoveryAuthority: 'recovery-authority',
       signature: 'signature',
       timestamp: 1,
       version: 1,
@@ -109,21 +82,22 @@ describe(IdentitySignaturePayloadFactory.name, () => {
     });
 
     expect(Object.keys(payload)).toEqual([
-      'encryptedKeyPair',
-      'encryptedMasterKey',
+      'authorizationRevision',
+      'deviceCredential',
+      'deviceCredentialCommitment',
       'id',
-      'masterKeyDerivation',
       'networks',
       'previousIdentityExternalIdentifier',
       'profile',
+      'recoveryAuthority',
       'timestamp',
       'version',
     ]);
     expect(payload).toEqual({
-      encryptedKeyPair: identity.encryptedKeyPair,
-      encryptedMasterKey: identity.encryptedMasterKey,
+      authorizationRevision: 4,
+      deviceCredential: 'device-credential',
+      deviceCredentialCommitment: 'device-commitment',
       id: 'identity-1',
-      masterKeyDerivation: identity.masterKeyDerivation,
       networks: ['network-1', 'network-2'],
       previousIdentityExternalIdentifier: 'cid-1',
       profile: {
@@ -133,6 +107,7 @@ describe(IdentitySignaturePayloadFactory.name, () => {
         name: 'Ada Updated',
         picture: undefined,
       },
+      recoveryAuthority: 'recovery-authority',
       timestamp: 2,
       version: 2,
     });

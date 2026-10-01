@@ -1,10 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-import {
-  EncryptedPayload,
-  PublicKey,
-  SymmetricKey,
-} from '@haskou/pigeon-swarm-crypto';
+import { EncryptedPayload, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { useCallback, useState } from 'react';
 
 import type {
@@ -14,6 +10,7 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
+import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 
 export interface ConversationKeyDialogController {
@@ -95,9 +92,8 @@ export function useConversationKeyDialog({
         conversationId: conversation.id,
         peerIdentityId: session.identity.id,
       };
-      const encrypted = PublicKey.fromPEM(
-        peerIdentity.encryptedKeyPair.publicKey,
-      )
+      const encrypted = IdentityId.fromString(peerIdentity.id)
+        .getPublicKey()
         .encrypt(JSON.stringify(recipientKeyEntry))
         .toString();
 

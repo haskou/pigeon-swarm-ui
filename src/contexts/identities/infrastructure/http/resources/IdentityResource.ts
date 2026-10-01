@@ -1,28 +1,9 @@
-import type { PasskeyPrfMasterKeyProtection } from '../../crypto/PasskeyPrfMasterKeyProtection';
-
 export type IdentityResource = {
-  encryptedKeyPair: {
-    encryptedPrivateKey: string;
-    publicKey: string;
-  };
-  encryptedMasterKey: string;
+  authorizationRevision: number;
+  deviceCredential: string;
+  deviceCredentialCommitment: string;
   id: string;
   identityExternalIdentifier?: string | null;
-  masterKeyDerivation: {
-    N: number;
-    algorithm: 'scrypt';
-    p: number;
-    passkeyPrf?: PasskeyPrfMasterKeyProtection;
-    r: number;
-    recoveryKey?: {
-      algorithm: 'pigeon-recovery-key';
-      encryptedMasterKey: string;
-      mode: 'password-recovery' | 'recovery-key';
-      version: 1;
-    };
-    salt: string;
-    version: 1;
-  };
   networks: string[];
   previousIdentityExternalIdentifier?: string | null;
   profile: {
@@ -32,6 +13,7 @@ export type IdentityResource = {
     name: string;
     picture?: string | null;
   };
+  recoveryAuthority: string;
   signature: string;
   timestamp: number;
   version: number;

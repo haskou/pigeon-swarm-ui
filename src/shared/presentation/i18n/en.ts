@@ -26,6 +26,15 @@ export const en = {
     changeIdentity: 'Change identity',
     createIdentity: 'Create identity',
     createIdentityShort: 'Create',
+    devicePairingCompletionLabel: 'Completion from the authorized device',
+    devicePairingError: 'The device pairing code is invalid or expired.',
+    devicePairingInvitationLabel: 'Invitation from the authorized device',
+    devicePairingPrepare: 'Prepare this device',
+    devicePairingRequestHelp:
+      'Scan this response on the authorized device, approve it there, then scan the final code here.',
+    devicePairingRequestQr: 'New device pairing request',
+    devicePairingVerificationHelp:
+      'Show this code to the authorized device. It must be identical there before it authorizes this device.',
     fallbackNetworksLabel: 'Networks, comma-separated',
     handleLabel: 'username',
     heroBody:
@@ -119,7 +128,7 @@ export const en = {
       'Save this key. You will need it to open your identity from another node or browser.',
     recoveryKeyLabel: 'Recovery key',
     recoveryKeyLoginHelp:
-      'Required for identities protected with a recovery key. It is not stored on this node.',
+      'Replaces every previously authorized device and rebuilds this identity on the current device.',
     recoveryKeyRegenerate: 'Regenerate',
     recoveryKeySaved: 'I saved my recovery key',
     recoveryKeyTitle: 'Recovery key',
@@ -129,19 +138,11 @@ export const en = {
       'Stores your identity and a local device unlock envelope in this browser.',
     title: 'Pigeon Swarm',
     unknownError: 'Unknown error. Poetic, but not useful.',
-    useRecoveryKey: 'Use recovery key',
+    useDevicePairing: 'Add this device using another device',
+    useRecoveryKey: 'Recover on this device',
   },
   calls: {
     answer: 'Answer',
-    connectionRecovering: 'Reconnecting call audio…',
-    connectionRecoveryExhausted:
-      'Audio could not reconnect with one or more participants. Check your connection and retry, or leave and rejoin the call.',
-    retryConnection: 'Retry connection',
-    diagnosticsPrivacy:
-      'Capture connection metrics locally for up to 5 minutes. Names, identities, addresses, credentials and message content are excluded. Closing this panel or stopping clears the capture. Export only if you want to share it.',
-    startDiagnostics: 'Start diagnostics',
-    stopDiagnostics: 'Stop and clear',
-    exportDiagnostics: 'Export diagnostics',
     callData: 'Call data',
     callMetricBitrate: 'Bitrate',
     callMetricCodec: 'Codec',
@@ -162,11 +163,17 @@ export const en = {
     connectionQualityGood: 'Good connection',
     connectionQualityPoor: 'Poor connection',
     connectionQualityWeak: 'Weak connection',
+    connectionRecovering: 'Reconnecting call audio…',
+    connectionRecoveryExhausted:
+      'Audio could not reconnect with one or more participants. Check your connection and retry, or leave and rejoin the call.',
     deafen: 'Silence call audio',
     decline: 'Decline',
     declined: 'Call declined',
+    diagnosticsPrivacy:
+      'Capture connection metrics locally for up to 5 minutes. Names, identities, addresses, credentials and message content are excluded. Closing this panel or stopping clears the capture. Export only if you want to share it.',
     disableCamera: 'Stop camera',
     ended: 'Call ended',
+    exportDiagnostics: 'Export diagnostics',
     hideCallData: 'Hide call data',
     hideStreamDetails: 'Hide details',
     iceServersUnavailable: 'Calls are not configured on this node.',
@@ -176,6 +183,13 @@ export const en = {
     leave: 'Leave call',
     live: 'Live',
     manyParticipants: 'participants',
+    mediaEncryptionActive: 'E2EE active',
+    mediaEncryptionDisabled: 'E2EE disabled',
+    mediaEncryptionMissingKey: 'No key is available to encrypt this call.',
+    mediaEncryptionOff: 'Turn off call E2EE',
+    mediaEncryptionOn: 'Turn on call E2EE',
+    mediaEncryptionPublicCommunity: 'Public community calls do not use E2EE.',
+    mediaEncryptionUnsupported: 'This browser does not support media E2EE.',
     microphoneAllow: 'Allow microphone',
     microphoneBlockedTitle: 'Cannot use microphone',
     microphoneConstraint:
@@ -194,17 +208,6 @@ export const en = {
       'Microphone permission is unavailable. Check browser permissions and HTTPS.',
     microphoneUnknown: 'The microphone could not be started.',
     microphoneUnsupported: 'This browser does not expose microphone capture.',
-    mediaEncryptionActive: 'E2EE active',
-    mediaEncryptionDisabled: 'E2EE disabled',
-    mediaEncryptionMissingKey: 'No key is available to encrypt this call.',
-    mediaEncryptionOff: 'Turn off call E2EE',
-    mediaEncryptionOn: 'Turn on call E2EE',
-    participantMediaEncrypted:
-      'Media with this participant is end-to-end encrypted.',
-    participantMediaNotEncrypted:
-      'Media with this participant is not end-to-end encrypted.',
-    mediaEncryptionPublicCommunity: 'Public community calls do not use E2EE.',
-    mediaEncryptionUnsupported: 'This browser does not support media E2EE.',
     missed: 'Missed call',
     mute: 'Mute microphone',
     muted: 'Muted',
@@ -214,11 +217,18 @@ export const en = {
     noiseCancellationOn: 'Turn on noise cancellation',
     oneParticipant: 'participant',
     outgoingCallDirection: 'Outgoing',
+    participantMediaEncrypted:
+      'Media with this participant is end-to-end encrypted.',
+    participantMediaNotEncrypted:
+      'Media with this participant is not end-to-end encrypted.',
+    retryConnection: 'Retry connection',
     screen: 'Screen',
     screenShareQuality: 'Stream quality',
     screenShareVolume: 'Screen volume',
     shareScreen: 'Share screen with sound',
     startCall: 'Start call',
+    startDiagnostics: 'Start diagnostics',
+    stopDiagnostics: 'Stop and clear',
     stopScreenShare: 'Stop sharing screen',
     streamAudio: 'Audio',
     streamAudioDisabled: 'No',
@@ -1193,6 +1203,22 @@ export const en = {
     currentPassword: 'Current password',
     currentPasswordForPasskeyHelp:
       'The current password and recovery key are verified before creating local unlock. They are not saved.',
+    devicePairingAction: 'Add another device',
+    devicePairingAuthorize: 'Authorize device',
+    devicePairingCompletionHelp:
+      'Scan this final code on the new device. It is encrypted for that device and can be used only once.',
+    devicePairingCompletionQr: 'Encrypted device pairing completion',
+    devicePairingError: 'The device could not be paired.',
+    devicePairingHelp:
+      'Uses short-lived authenticated QR codes. The new device creates an independent credential and local password envelope.',
+    devicePairingInvitationHelp:
+      'Scan this invitation on the new device. Then scan its response here before the invitation expires.',
+    devicePairingInvitationQr: 'Device pairing invitation',
+    devicePairingRequestLabel: 'Request from the new device',
+    devicePairingReview: 'Review request',
+    devicePairingTitle: 'Add a device',
+    devicePairingVerificationHelp:
+      'Confirm this code is identical on the new device before authorizing. If it differs, close this dialog.',
     discardChanges: 'Discard',
     discardChangesBody:
       'There are unsaved changes. Do you want to discard them?',

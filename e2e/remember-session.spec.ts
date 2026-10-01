@@ -7,7 +7,7 @@ import {
   type TestIdentity,
 } from './support/pigeonApp';
 
-test('restores a remembered session after reloading the app', async ({
+test('unlocks a remembered local device with its password after reload', async ({
   browser,
 }, testInfo) => {
   const token = testRunToken(testInfo.project.name);
@@ -21,10 +21,11 @@ test('restores a remembered session after reloading the app', async ({
   try {
     await registerIdentity(page, identity);
     await page.reload();
-    await waitForWorkspace(page);
 
-    await expect(page.getByTestId('auth-submit-button')).toHaveCount(0);
-    await expect(page.getByTestId('auth-password-input')).toHaveCount(0);
+    await expect(page.getByTestId('auth-identity-input')).not.toHaveValue('');
+    await page.getByTestId('auth-password-input').fill(identity.password);
+    await page.getByTestId('auth-submit-button').click();
+    await waitForWorkspace(page);
   } finally {
     await page.context().close();
   }
