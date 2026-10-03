@@ -8,10 +8,15 @@ export class StickerPacks {
     return new StickerPacks(UniqueObjectArray.fromArray(packs));
   }
 
-  private constructor(private readonly packs: UniqueObjectArray<StickerPack>) {}
+  private constructor(private packs: UniqueObjectArray<StickerPack>) {}
 
   public save(pack: StickerPack): boolean {
-    return this.packs.push(pack);
+    const updated = this.packs.push(pack);
+    const saved = updated.length > this.packs.length;
+
+    this.packs = updated;
+
+    return saved;
   }
 
   public toArray(): StickerPack[] {
@@ -23,6 +28,12 @@ export class StickerPacks {
       .toArray()
       .find((candidate) => candidate.belongsTo(packId));
 
-    return pack ? this.packs.remove(pack) : false;
+    if (!pack) {
+      return false;
+    }
+
+    this.packs = this.packs.remove(pack);
+
+    return true;
   }
 }
