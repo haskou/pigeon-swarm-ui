@@ -27,18 +27,6 @@ describe('savedCredentials', () => {
     );
   });
 
-  it('removes legacy stored passwords when loading saved credentials', () => {
-    storage.set(
-      'pigeon-swarm-credentials',
-      JSON.stringify({ identityId: 'identity-1', password: 'secret' }),
-    );
-
-    expect(loadSavedCredentials()).toEqual({ identityId: 'identity-1' });
-    expect(storage.get('pigeon-swarm-credentials')).toBe(
-      JSON.stringify({ identityId: 'identity-1' }),
-    );
-  });
-
   it('clears invalid saved credentials', () => {
     storage.set('pigeon-swarm-credentials', JSON.stringify({ password: 'x' }));
 

@@ -2,11 +2,6 @@ export type AppLanguage = 'en' | 'es';
 
 const storageKey = 'pigeon-swarm-language-v2';
 const explicitStorageKey = 'pigeon-swarm-language-explicit-v3';
-const staleStorageKeys = [
-  'pigeon-swarm-language',
-  'pigeon-swarm-language-explicit-v1',
-  'pigeon-swarm-language-explicit-v2',
-];
 const fallbackLanguage: AppLanguage = 'es';
 
 export const languageOptions: Array<{ label: string; value: AppLanguage }> = [
@@ -24,8 +19,6 @@ export function getInitialLanguage(): AppLanguage {
     return storedLanguage;
   }
 
-  clearStaleLanguagePreferences();
-
   return fallbackLanguage;
 }
 
@@ -40,10 +33,4 @@ export function saveLanguage(language: string): AppLanguage {
 
 function isAppLanguage(language: string | null): language is AppLanguage {
   return languageOptions.some((option) => option.value === language);
-}
-
-function clearStaleLanguagePreferences() {
-  for (const key of [storageKey, ...staleStorageKeys]) {
-    window.localStorage.removeItem(key);
-  }
 }
