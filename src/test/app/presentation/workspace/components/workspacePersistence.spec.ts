@@ -2,7 +2,6 @@ import {
   draftsStorageKey,
   encryptedDraftsStorageValue,
   loadEncryptedDraftPayloads,
-  loadLegacyPlainDrafts,
 } from '../../../../../app/presentation/workspace/components/workspacePersistence';
 
 describe('workspacePersistence draft storage', () => {
@@ -24,19 +23,16 @@ describe('workspacePersistence draft storage', () => {
     storage.clear();
   });
 
-  it('loads legacy plaintext drafts so they can be migrated', () => {
+  it('ignores plaintext draft maps', () => {
     storage.set(
       draftsStorageKey('identity-1'),
       JSON.stringify({ conversationId: 'plain draft' }),
     );
 
-    expect(loadLegacyPlainDrafts('identity-1')).toEqual({
-      conversationId: 'plain draft',
-    });
     expect(loadEncryptedDraftPayloads('identity-1')).toEqual({});
   });
 
-  it('keeps encrypted draft envelopes separate from legacy plaintext', () => {
+  it('loads encrypted draft envelopes without exposing plaintext', () => {
     storage.set(
       draftsStorageKey('identity-1'),
       JSON.stringify(
@@ -46,7 +42,6 @@ describe('workspacePersistence draft storage', () => {
       ),
     );
 
-    expect(loadLegacyPlainDrafts('identity-1')).toEqual({});
     expect(loadEncryptedDraftPayloads('identity-1')).toEqual({
       conversationId: 'encrypted-draft',
     });

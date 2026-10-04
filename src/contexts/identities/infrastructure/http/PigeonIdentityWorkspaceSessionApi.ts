@@ -6,7 +6,6 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 import type { LoginIdentityProgressReporter } from '../../application/login-identity/LoginIdentityProgressReporter';
-import type { ConversationKeyRecovery } from '../../application/ports/ConversationKeyRecovery';
 import type { IdentityWorkspaceSource } from './IdentityWorkspaceSource';
 
 const emptyKeychain: LocalKeychain = {
@@ -15,10 +14,7 @@ const emptyKeychain: LocalKeychain = {
 };
 
 export class PigeonIdentityWorkspaceSessionApi {
-  public constructor(
-    private readonly workspace: IdentityWorkspaceSource,
-    private readonly keychainRecovery: ConversationKeyRecovery,
-  ) {}
+  public constructor(private readonly workspace: IdentityWorkspaceSource) {}
 
   private async listConversations(
     session: Session,
@@ -57,7 +53,7 @@ export class PigeonIdentityWorkspaceSessionApi {
 
     return {
       conversations,
-      session: this.keychainRecovery.recover(hydratedSession, conversations),
+      session: hydratedSession,
     };
   }
 
@@ -68,7 +64,7 @@ export class PigeonIdentityWorkspaceSessionApi {
 
     return {
       conversations,
-      session: this.keychainRecovery.recover(hydratedSession, conversations),
+      session: hydratedSession,
     };
   }
 }

@@ -16,30 +16,11 @@ describe('i18n language selection', () => {
     Reflect.deleteProperty(globalThis, 'window');
   });
 
-  it('defaults to Spanish with only a legacy saved preference', () => {
-    const storage = fakeStorage([['pigeon-swarm-language', 'en']]);
-    defineWindow(storage);
-
-    expect(getInitialLanguage()).toBe('es');
-  });
-
   it('defaults to Spanish with an unconfirmed current saved preference', () => {
     const storage = fakeStorage([['pigeon-swarm-language-v2', 'en']]);
     defineWindow(storage);
 
     expect(getInitialLanguage()).toBe('es');
-  });
-
-  it('defaults to Spanish with a stale explicit preference marker', () => {
-    const storage = fakeStorage([
-      ['pigeon-swarm-language-v2', 'en'],
-      ['pigeon-swarm-language-explicit-v2', 'true'],
-    ]);
-    defineWindow(storage);
-
-    expect(getInitialLanguage()).toBe('es');
-    expect(storage.getItem('pigeon-swarm-language-v2')).toBeNull();
-    expect(storage.getItem('pigeon-swarm-language-explicit-v2')).toBeNull();
   });
 
   it('uses the current saved preference when explicitly selected', () => {

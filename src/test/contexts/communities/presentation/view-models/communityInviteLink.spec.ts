@@ -84,9 +84,9 @@ describe('community invite links', () => {
     expect(parseCommunityInviteUrl()).toBeNull();
   });
 
-  it('ignores legacy invite links with embedded key entries', () => {
+  it('ignores invite links with embedded key entries', () => {
     installLocation(
-      'https://pigeon.example/?communityInvite=legacy-token#communityKey=eyJjb252ZXJzYXRpb25JZCI6ImNvbW11bml0eS0xIiwiY3JlYXRlZEF0IjoxNzcsInBlZXJJZGVudGl0eUlkIjoiIiwicHJpdmF0ZUtleSI6InByaXZhdGUiLCJwdWJsaWNLZXkiOiJwdWJsaWMifQ',
+      'https://pigeon.example/?communityInvite=embedded-key-token#communityKey=eyJjb252ZXJzYXRpb25JZCI6ImNvbW11bml0eS0xIiwiY3JlYXRlZEF0IjoxNzcsInBlZXJJZGVudGl0eUlkIjoiIiwicHJpdmF0ZUtleSI6InByaXZhdGUiLCJwdWJsaWNLZXkiOiJwdWJsaWMifQ',
     );
 
     expect(parseCommunityInviteUrl()).toBeNull();

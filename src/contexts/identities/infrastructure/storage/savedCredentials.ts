@@ -28,10 +28,6 @@ export function loadSavedCredentials(): SavedCredentials | null {
       return null;
     }
 
-    if ('password' in parsed) {
-      saveCredentials({ identityId: parsed.identityId });
-    }
-
     return {
       identityId: parsed.identityId,
     };

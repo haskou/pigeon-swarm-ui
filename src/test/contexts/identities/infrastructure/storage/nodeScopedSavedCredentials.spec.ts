@@ -47,13 +47,13 @@ describe('node-scoped remembered credentials', () => {
   });
 
   it('does not inherit or delete combined-client credentials', async () => {
-    const legacy = JSON.stringify({ identityId: 'legacy-identity' });
+    const combined = JSON.stringify({ identityId: 'combined-identity' });
 
-    values.set('pigeon-swarm-credentials', legacy);
+    values.set('pigeon-swarm-credentials', combined);
     const node = await credentialsForNode('first');
 
     expect(node.loadSavedCredentials()).toBeNull();
     node.clearSavedCredentials();
-    expect(values.get('pigeon-swarm-credentials')).toBe(legacy);
+    expect(values.get('pigeon-swarm-credentials')).toBe(combined);
   });
 });

@@ -18,7 +18,6 @@ import { applicationContainer } from '../../../composition/applicationContainer'
 import { CallResourceRefreshScheduler } from './CallResourceRefreshScheduler';
 import {
   callIdFromRealtimeEvent,
-  callResourceRefreshIsRequired,
   callSignalTypeAttribute,
   numberAttribute,
   recordAttribute,
@@ -208,15 +207,7 @@ export function useWorkspaceRealtimeCallEvents(
 
       if (event.attributes.liveCall !== undefined) {
         recoverMalformedSnapshot(eventCallId, event);
-
-        return;
       }
-
-      if (!callResourceRefreshIsRequired(event)) {
-        return;
-      }
-
-      refreshCallResource(eventCallId, event.type);
     },
     [
       activeCallRef,

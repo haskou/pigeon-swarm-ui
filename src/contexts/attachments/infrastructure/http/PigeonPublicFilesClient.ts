@@ -1,5 +1,3 @@
-import { Buffer } from 'buffer';
-
 import type {
   PublicFileContent,
   PublicFileUpload,
@@ -7,7 +5,6 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
-import type { LegacyPublicFileContent } from './LegacyPublicFileContent';
 
 export class PigeonPublicFilesClient {
   public constructor(
@@ -15,32 +12,13 @@ export class PigeonPublicFilesClient {
     private readonly signer: Pick<RequestSigner, 'headers'>,
   ) {}
 
-  private async content(cid: string, blob: Blob): Promise<PublicFileContent> {
-    if (blob.type.includes('json')) {
-      return this.legacyContent(await blob.text());
-    }
-
+  private content(cid: string, blob: Blob): PublicFileContent {
     return {
       blob,
       cid,
       contentType: blob.type || 'application/octet-stream',
       filename: cid,
       size: blob.size,
-    };
-  }
-
-  private legacyContent(payload: string): PublicFileContent {
-    const content = JSON.parse(payload) as LegacyPublicFileContent;
-    const bytes = Uint8Array.from(Buffer.from(content.data, 'base64'));
-
-    return {
-      blob: new Blob([bytes], { type: content.contentType }),
-      cid: content.cid,
-      contentType: content.contentType,
-      filename: content.filename,
-      size: content.size,
-      uploadedAt: content.uploadedAt,
-      uploadedByIdentityId: content.uploadedByIdentityId,
     };
   }
 
@@ -63,7 +41,7 @@ export class PigeonPublicFilesClient {
       },
     );
 
-    return await this.content(cid, blob);
+    return this.content(cid, blob);
   }
 
   public async upload(
