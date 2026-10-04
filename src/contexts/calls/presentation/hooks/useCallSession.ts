@@ -3,13 +3,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CallIceServerResource as CallIceServerConfig } from '../../infrastructure/http/resources/CallIceServerResource';
 import type { CallParticipantMediaConnectionResource as CallParticipantMediaConnection } from '../../infrastructure/http/resources/CallParticipantMediaConnectionResource';
 import type { CallResource } from '../../infrastructure/http/resources/CallResource';
-import type { PeerMediaStats } from '../../infrastructure/media/CallPeerConnections';
-import type { CallSignalType } from '../../infrastructure/media/CallSignalType';
 import type { ScreenShareQualityPreset } from '../../infrastructure/media/ScreenShareQualityPreset';
 import type { CallMediaEncryptionUnavailableReason } from '../view-models/CallMediaEncryptionUnavailableReason';
 import type { CallMicrophoneErrorCode } from '../view-models/CallMicrophoneErrorCode';
 import type { CallParticipant } from '../view-models/CallParticipant';
 import type { CallSession } from '../view-models/CallSession';
+import type {
+  CallSignalSender as SignalSender,
+  ReceivedCallSignal as ReceivedSignal,
+} from './CallSignalDispatcher';
 
 import { BrowserRemoteAudioElementHost } from '../../infrastructure/media/BrowserRemoteAudioElementHost';
 import {
@@ -20,35 +22,17 @@ import {
 import { CallPeerConnections } from '../../infrastructure/media/CallPeerConnections';
 import { LocalCallMedia } from '../../infrastructure/media/LocalCallMedia';
 import { RemoteCallAudio } from '../../infrastructure/media/RemoteCallAudio';
-import {
-  retainedRemotePeerIdentityIds,
-  signalingRemotePeerIdentityIds,
-  shouldCreateInitialOffer,
-} from './callPeerConnectionPlan';
+import { retainedRemotePeerIdentityIds } from './callPeerConnectionPlan';
 import {
   callMediaEncryptionState,
-  callParticipantsMediaStateEqual,
   callSessionForJoinedPeerConnection,
-  localMediaFlagsChanged,
-  localMediaSession,
-  participantsWithMediaState,
   reconciledCallStatus,
 } from './callSessionMediaState';
+import { CallSignalDispatcher } from './CallSignalDispatcher';
 import { classifyCallMicrophoneError } from './classifyCallMicrophoneError';
 import { reconciledCallParticipants } from './reconciledCallParticipants';
-
-type SignalSender = (
-  recipientIdentityId: string,
-  signalType: CallSignalType,
-  payload: Record<string, unknown>,
-) => Promise<void>;
-
-type ReceivedSignal = {
-  callId: string;
-  payload: Record<string, unknown>;
-  senderIdentityId: string;
-  signalType: CallSignalType;
-};
+import { useCallMediaControls } from './useCallMediaControls';
+import { useCallStatsRefresh } from './useCallStatsRefresh';
 
 type StartCallInput = {
   call?: CallResource;
@@ -115,95 +99,32 @@ export function useCallSession(): {
   );
   const [activeCall, setActiveCall] = useState<CallSession | null>(null);
   const activeCallRef = useRef<CallSession | null>(null);
-  const currentIdentityIdRef = useRef<string | null>(null);
-  const pendingSignalsRef = useRef(new Map<string, ReceivedSignal[]>());
-  const sendSignalRef = useRef<SignalSender | null>(null);
-  const startingCallIdRef = useRef<string | null>(null);
+  const signals = useMemo(
+    () =>
+      new CallSignalDispatcher(peerManager, () => activeCallRef.current?.id),
+    [peerManager],
+  );
   const callMediaConnections = useCallback(
     () => peerManager.mediaConnections(),
     [peerManager],
   );
+  const mediaControls = useCallMediaControls({
+    activeCallRef,
+    mediaManager,
+    peerManager,
+    setActiveCall,
+  });
 
   useEffect(() => {
     activeCallRef.current = activeCall;
   }, [activeCall]);
 
-  useEffect(() => {
-    if (!activeCall) return undefined;
-
-    let cancelled = false;
-    let refreshInFlight = false;
-
-    const refreshStats = async () => {
-      if (refreshInFlight) return;
-
-      refreshInFlight = true;
-      const stats = await peerManager
-        .collectStats()
-        .catch((): Record<string, PeerMediaStats> => ({}));
-      const remoteStreams = peerManager.remoteMediaStreams();
-      const remoteScreenStreams = peerManager.remoteScreenMediaStreams();
-      const localAudioLevel = mediaManager.localAudioLevel();
-      const screenStream = mediaManager.screenPreviewStream();
-
-      refreshInFlight = false;
-
-      if (cancelled) return;
-
-      setActiveCall((current) => {
-        if (!current) return current;
-
-        const nextParticipants = participantsWithMediaState(
-          current,
-          stats,
-          remoteStreams,
-          remoteScreenStreams,
-          localAudioLevel,
-          (identityId) => peerManager.isMediaEncryptionActiveWith(identityId),
-          screenStream,
-        );
-        const nextCameraEnabled = mediaManager.hasCamera();
-        const nextLocalPreviewStream = mediaManager.previewStream();
-        const nextScreenSharing = mediaManager.hasScreenShare();
-
-        if (
-          localMediaFlagsChanged(current, nextCameraEnabled, nextScreenSharing)
-        ) {
-          peerManager.setLocalStream(nextLocalPreviewStream ?? null);
-        }
-
-        if (
-          current.cameraEnabled === nextCameraEnabled &&
-          current.localPreviewStream === nextLocalPreviewStream &&
-          current.screenSharing === nextScreenSharing &&
-          callParticipantsMediaStateEqual(
-            current.participants,
-            nextParticipants,
-          )
-        ) {
-          return current;
-        }
-
-        return {
-          ...current,
-          cameraEnabled: nextCameraEnabled,
-          localPreviewStream: nextLocalPreviewStream,
-          participants: nextParticipants,
-          screenSharing: nextScreenSharing,
-        };
-      });
-    };
-
-    void refreshStats();
-    const interval = window.setInterval(() => {
-      void refreshStats();
-    }, 500);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [activeCall?.id, peerManager]);
+  useCallStatsRefresh({
+    activeCallId: activeCall?.id,
+    mediaManager,
+    peerManager,
+    setActiveCall,
+  });
 
   useEffect(
     () => () => {
@@ -223,8 +144,7 @@ export function useCallSession(): {
       kind: input.kind,
       participantCount: input.participants.length,
     });
-    currentIdentityIdRef.current = input.currentIdentityId;
-    sendSignalRef.current = input.onSignal;
+    signals.begin(input.currentIdentityId, input.onSignal, input.id);
     const mediaEncryption = callMediaEncryptionState({
       enabled: input.mediaEncryptionEnabled,
       key: input.mediaEncryptionKey,
@@ -258,7 +178,6 @@ export function useCallSession(): {
 
     setActiveCall(nextCall);
     activeCallRef.current = nextCall;
-    startingCallIdRef.current = nextCall.id;
     logCallDebug('session:start-call:active-call-created', {
       callId: nextCall.id,
       hasMicrophone: nextCall.hasMicrophone,
@@ -319,14 +238,14 @@ export function useCallSession(): {
           ? { ...current, localPreviewStream: stream ?? undefined }
           : current,
       );
-      startingCallIdRef.current = null;
-      await flushPendingSignals(nextCall.id, input.onSignal);
-      await connectSignalReadyPeers(
+      signals.markStarted();
+      await signals.flushPending(nextCall.id, input.onSignal);
+      await signals.connectSignalReadyPeers(
         nextCall,
         input.currentIdentityId,
         input.onSignal,
       );
-      await flushPendingSignals(nextCall.id, input.onSignal);
+      await signals.flushPending(nextCall.id, input.onSignal);
       setActiveCall((current) =>
         current?.id === nextCall.id ? { ...current, status: 'live' } : current,
       );
@@ -339,11 +258,7 @@ export function useCallSession(): {
       });
       mediaManager.stop();
       peerManager.reset();
-      pendingSignalsRef.current.delete(nextCall.id);
-
-      if (startingCallIdRef.current === nextCall.id) {
-        startingCallIdRef.current = null;
-      }
+      signals.discardPending(nextCall.id);
       setActiveCall((current) =>
         current?.id === nextCall.id
           ? {
@@ -365,10 +280,7 @@ export function useCallSession(): {
     });
     mediaManager.stop();
     peerManager.reset();
-    currentIdentityIdRef.current = null;
-    pendingSignalsRef.current.clear();
-    sendSignalRef.current = null;
-    startingCallIdRef.current = null;
+    signals.reset();
     setActiveCall(null);
   };
 
@@ -398,8 +310,8 @@ export function useCallSession(): {
         };
       });
 
-      const currentIdentityId = currentIdentityIdRef.current;
-      const sendSignal = sendSignalRef.current;
+      const currentIdentityId = signals.currentIdentityId;
+      const sendSignal = signals.sendSignal;
 
       if (currentIdentityId) {
         peerManager.retainPeers(
@@ -411,7 +323,7 @@ export function useCallSession(): {
         return;
       }
 
-      void connectSignalReadyPeers(
+      void signals.connectSignalReadyPeers(
         callSessionForJoinedPeerConnection(
           call,
           currentIdentityId,
@@ -423,386 +335,14 @@ export function useCallSession(): {
         sendSignal,
       );
     },
-    [peerManager],
+    [peerManager, signals],
   );
 
-  const receiveSignal = async (input: ReceivedSignal) => {
-    logCallDebug('session:receive-signal', {
-      activeCallId: activeCallRef.current?.id,
-      callId: input.callId,
-      senderIdentityId: input.senderIdentityId,
-      signalType: input.signalType,
-      startingCallId: startingCallIdRef.current,
-    });
-    const sendSignal = sendSignalRef.current;
-    const activeCallId = activeCallRef.current?.id;
-
-    if (activeCallId && activeCallId !== input.callId) {
-      logCallWarning('session:receive-signal:ignored-other-call', {
-        activeCallId,
-        callId: input.callId,
-      });
-
-      return;
-    }
-
-    if (!sendSignal || startingCallIdRef.current === input.callId) {
-      logCallDebug('session:receive-signal:queued', {
-        callId: input.callId,
-        hasSignalSender: Boolean(sendSignal),
-        signalType: input.signalType,
-      });
-      queuePendingSignal(input);
-
-      return;
-    }
-
-    await peerManager.handleSignal(
-      input.senderIdentityId,
-      input.signalType,
-      input.payload,
-      sendSignal,
-      currentIdentityIdRef.current ?? undefined,
-    );
-  };
-
-  const toggleMute = () => {
-    setActiveCall((current) => {
-      if (!current) {
-        logCallWarning('session:toggle-mute:ignored-no-active-call');
-
-        return current;
-      }
-
-      if (!current.hasMicrophone) {
-        logCallWarning('session:toggle-mute:ignored-no-microphone', {
-          callId: current.id,
-          status: current.status,
-        });
-
-        return current;
-      }
-
-      const muted = !current.muted;
-
-      logCallDebug('session:toggle-mute', {
-        callId: current.id,
-        muted,
-      });
-      mediaManager.setMicrophoneMuted(muted);
-
-      return {
-        ...current,
-        muted,
-        participants: current.participants.map((participant, index) =>
-          index === 0
-            ? { ...participant, muted, speaking: false }
-            : participant,
-        ),
-      };
-    });
-  };
-
-  const toggleDeafen = () => {
-    setActiveCall((current) => {
-      if (!current) {
-        logCallWarning('session:toggle-deafen:ignored-no-active-call');
-
-        return current;
-      }
-
-      const deafened = !current.deafened;
-
-      logCallDebug('session:toggle-deafen', {
-        callId: current.id,
-        deafened,
-      });
-      peerManager.setDeafened(deafened);
-
-      return {
-        ...current,
-        deafened,
-        participants: current.participants.map((participant) =>
-          participant.identityId === current.currentIdentityId
-            ? { ...participant, deafened }
-            : participant,
-        ),
-      };
-    });
-  };
-
-  const toggleMediaEncryption = () => {
-    setActiveCall((current) => {
-      if (!current || !current.mediaEncryption.available) return current;
-
-      const enabled = !current.mediaEncryption.enabled;
-
-      peerManager.setMediaEncryptionEnabled(enabled);
-
-      return {
-        ...current,
-        mediaEncryption: {
-          ...current.mediaEncryption,
-          active: enabled,
-          enabled,
-          reason: enabled ? undefined : 'disabled',
-        },
-      };
-    });
-  };
+  const receiveSignal = (input: ReceivedSignal) => signals.receive(input);
 
   const retryConnection = useCallback(() => {
     if (activeCallRef.current) peerManager.retryConnections();
   }, [peerManager]);
-
-  const retryMicrophone = async () => {
-    const current = activeCallRef.current;
-
-    if (!current) return;
-
-    try {
-      const stream = await mediaManager.startAudio({
-        noiseCancellationEnabled: current.noiseCancellationEnabled,
-      });
-
-      peerManager.setLocalStream(stream);
-      setActiveCall((active) =>
-        active?.id === current.id
-          ? {
-              ...active,
-              hasMicrophone: true,
-              localPreviewStream: stream,
-              microphoneError: undefined,
-              muted: false,
-              participants: active.participants.map((participant) =>
-                participant.identityId === active.currentIdentityId
-                  ? { ...participant, mediaStream: stream, muted: false }
-                  : participant,
-              ),
-              status:
-                active.status === 'permission-denied' ? 'live' : active.status,
-            }
-          : active,
-      );
-    } catch (error) {
-      setActiveCall((active) =>
-        active?.id === current.id
-          ? {
-              ...active,
-              hasMicrophone: false,
-              microphoneError: classifyCallMicrophoneError(error),
-              muted: true,
-            }
-          : active,
-      );
-    }
-  };
-
-  const toggleNoiseCancellation = async (enabled: boolean) => {
-    const current = activeCallRef.current;
-
-    if (!current) {
-      logCallWarning(
-        'session:toggle-noise-cancellation:ignored-no-active-call',
-      );
-
-      return;
-    }
-
-    if (!current.hasMicrophone) {
-      logCallWarning(
-        'session:toggle-noise-cancellation:ignored-no-microphone',
-        {
-          callId: current.id,
-          status: current.status,
-        },
-      );
-      setActiveCall((active) =>
-        active?.id === current.id
-          ? { ...active, noiseCancellationEnabled: enabled }
-          : active,
-      );
-
-      return;
-    }
-
-    try {
-      const stream = await mediaManager.setNoiseCancellationEnabled(enabled);
-
-      peerManager.setLocalStream(stream);
-      setActiveCall((active) =>
-        active?.id === current.id
-          ? localMediaSession(active, {
-              cameraEnabled: mediaManager.hasCamera(),
-              localPreviewStream: stream ?? undefined,
-              noiseCancellationEnabled: enabled,
-              screenShareAudioEnabled: active.screenShareAudioEnabled,
-              screenShareQuality: active.screenShareQuality,
-              screenSharing: mediaManager.hasScreenShare(),
-              screenStream: mediaManager.screenPreviewStream(),
-            })
-          : active,
-      );
-    } catch (error) {
-      logCallError('session:toggle-noise-cancellation:failed', error, {
-        callId: current.id,
-        enabled,
-      });
-
-      throw error;
-    }
-  };
-
-  const toggleCamera = async () => {
-    const current = activeCallRef.current;
-
-    if (!current) {
-      logCallWarning('session:toggle-camera:ignored-no-active-call');
-
-      return;
-    }
-
-    try {
-      const cameraEnabled = !current.cameraEnabled;
-      const stream = cameraEnabled
-        ? await mediaManager.enableCamera()
-        : mediaManager.disableCamera();
-
-      peerManager.setLocalStream(stream);
-      setActiveCall((active) =>
-        active?.id === current.id
-          ? localMediaSession(active, {
-              cameraEnabled,
-              localPreviewStream: stream ?? undefined,
-              noiseCancellationEnabled: active.noiseCancellationEnabled,
-              screenShareAudioEnabled: active.screenShareAudioEnabled,
-              screenShareQuality: active.screenShareQuality,
-              screenSharing: mediaManager.hasScreenShare(),
-              screenStream: mediaManager.screenPreviewStream(),
-            })
-          : active,
-      );
-    } catch (error) {
-      logCallError('session:toggle-camera:failed', error, {
-        callId: current.id,
-      });
-    }
-  };
-
-  const toggleScreenShare = async () => {
-    const current = activeCallRef.current;
-
-    if (!current) {
-      logCallWarning('session:toggle-screen-share:ignored-no-active-call');
-
-      return;
-    }
-
-    try {
-      const screenSharing = !current.screenSharing;
-      const stream = screenSharing
-        ? await mediaManager.enableScreenShare({
-            audioEnabled: true,
-            quality: current.screenShareQuality,
-          })
-        : mediaManager.disableScreenShare();
-
-      peerManager.setLocalStream(stream);
-      setActiveCall((active) =>
-        active?.id === current.id
-          ? localMediaSession(active, {
-              cameraEnabled: mediaManager.hasCamera(),
-              localPreviewStream: stream ?? undefined,
-              noiseCancellationEnabled: active.noiseCancellationEnabled,
-              screenShareAudioEnabled: true,
-              screenShareQuality: active.screenShareQuality,
-              screenSharing,
-              screenStream: mediaManager.screenPreviewStream(),
-            })
-          : active,
-      );
-    } catch (error) {
-      logCallError('session:toggle-screen-share:failed', error, {
-        callId: current.id,
-      });
-    }
-  };
-
-  const setParticipantVolume = (identityId: string, volumePercent: number) => {
-    peerManager.setPeerVolume(identityId, volumePercent);
-    setActiveCall((current) => {
-      if (!current) return current;
-
-      return {
-        ...current,
-        participantVolumes: {
-          ...current.participantVolumes,
-          [identityId]: volumePercent,
-        },
-      };
-    });
-  };
-
-  const setParticipantScreenShareVolume = (
-    identityId: string,
-    volumePercent: number,
-  ) => {
-    const current = activeCallRef.current;
-
-    if (current?.currentIdentityId === identityId) {
-      mediaManager.setScreenShareAudioVolume(volumePercent);
-    } else {
-      peerManager.setPeerScreenShareVolume(identityId, volumePercent);
-    }
-
-    setActiveCall((current) => {
-      if (!current) return current;
-
-      return {
-        ...current,
-        screenShareVolumes: {
-          ...current.screenShareVolumes,
-          [identityId]: volumePercent,
-        },
-      };
-    });
-  };
-
-  const setScreenShareQuality = async (quality: ScreenShareQualityPreset) => {
-    const current = activeCallRef.current;
-
-    if (!current) return;
-
-    peerManager.setScreenShareQuality(quality);
-
-    try {
-      const stream = await mediaManager.setScreenShareQuality(quality);
-
-      setActiveCall((active) =>
-        active?.id === current.id
-          ? localMediaSession(active, {
-              cameraEnabled: mediaManager.hasCamera(),
-              localPreviewStream: stream ?? undefined,
-              noiseCancellationEnabled: active.noiseCancellationEnabled,
-              screenShareAudioEnabled: active.screenShareAudioEnabled,
-              screenShareQuality: quality,
-              screenSharing: mediaManager.hasScreenShare(),
-              screenStream: mediaManager.screenPreviewStream(),
-            })
-          : active,
-      );
-    } catch (error) {
-      logCallError('session:screen-share-quality:failed', error, {
-        callId: current.id,
-        quality,
-      });
-      setActiveCall((active) =>
-        active?.id === current.id
-          ? { ...active, screenShareQuality: quality }
-          : active,
-      );
-    }
-  };
 
   return {
     activeCall,
@@ -810,89 +350,8 @@ export function useCallSession(): {
     endCall,
     receiveSignal,
     reconcileCall,
-    retryMicrophone,
     retryConnection,
-    setParticipantScreenShareVolume,
-    setParticipantVolume,
-    setScreenShareQuality,
     startCall,
-    toggleCamera,
-    toggleDeafen,
-    toggleMediaEncryption,
-    toggleMute,
-    toggleNoiseCancellation,
-    toggleScreenShare,
+    ...mediaControls,
   };
-
-  async function connectSignalReadyPeers(
-    call: CallSession,
-    currentIdentityId: string,
-    sendSignal: SignalSender,
-  ): Promise<void> {
-    const callResource = call.call;
-
-    if (!callResource) return;
-
-    const peerIdentityIds = signalingRemotePeerIdentityIds(
-      callResource,
-      currentIdentityId,
-    );
-
-    logCallDebug('session:connect-signal-ready-peers', {
-      callId: call.id,
-      currentIdentityId,
-      participantCount: call.participants.length,
-      signalingParticipantCount: peerIdentityIds.length,
-    });
-    await Promise.all(
-      peerIdentityIds.map((peerIdentityId) =>
-        peerManager.ensurePeer(
-          peerIdentityId,
-          shouldCreateInitialOffer(
-            callResource,
-            currentIdentityId,
-            peerIdentityId,
-          ),
-          sendSignal,
-        ),
-      ),
-    );
-  }
-
-  async function flushPendingSignals(
-    callId: string,
-    sendSignal: SignalSender,
-  ): Promise<void> {
-    const signals = pendingSignalsRef.current.get(callId);
-
-    if (!signals?.length) return;
-
-    pendingSignalsRef.current.delete(callId);
-    logCallDebug('session:flush-pending-signals', {
-      callId,
-      signalCount: signals.length,
-    });
-
-    for (const signal of signals) {
-      await peerManager.handleSignal(
-        signal.senderIdentityId,
-        signal.signalType,
-        signal.payload,
-        sendSignal,
-        currentIdentityIdRef.current ?? undefined,
-      );
-    }
-  }
-
-  function queuePendingSignal(signal: ReceivedSignal): void {
-    const signals = pendingSignalsRef.current.get(signal.callId) ?? [];
-
-    signals.push(signal);
-    pendingSignalsRef.current.set(signal.callId, signals.slice(-100));
-    logCallDebug('session:queue-pending-signal', {
-      callId: signal.callId,
-      queuedCount: signals.length,
-      signalType: signal.signalType,
-    });
-  }
 }
