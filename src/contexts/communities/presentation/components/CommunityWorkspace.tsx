@@ -1,101 +1,56 @@
-import {
-  type MouseEvent,
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { MessageContextMenuState } from '../../../../app/presentation/workspace/components/messageContextMenu';
 import type {
-  CommunityChannelThreadSummary,
-  CommunityVoiceChannel,
   ChatMessage,
-  IdentityResource,
-  MessageResource,
-  PollResource,
   StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
 import type { CommunityWorkspaceProps } from './CommunityWorkspaceProps';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
-import { SearchIcon } from '../../../../shared/presentation/components/ClearableSearchInput';
 import { shortId } from '../../../../shared/presentation/formatting';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
-import { copy } from '../../../../shared/presentation/i18n/copy';
-import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrowserIdle';
-import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
-import {
-  profileAnchorFromTarget,
-  type ProfilePopoverAnchor,
-} from '../../../identities/presentation/view-models/profilePopoverAnchor';
-import { Composer } from '../../../messages/presentation/components/Composer';
-import { MessageCollectionDialog } from '../../../messages/presentation/components/MessageCollectionDialog';
-import { MessageThreadPanel } from '../../../messages/presentation/components/MessageThreadPanel';
-import { TypingIndicator } from '../../../messages/presentation/components/TypingIndicator';
+import { profileAnchorFromTarget } from '../../../identities/presentation/view-models/profilePopoverAnchor';
 import { NotificationSettingsPolicy } from '../../../notifications/presentation/view-models/NotificationSettingsPolicy';
-import { CommunityMessageDecryptWorkerClient } from '../../infrastructure/crypto/CommunityMessageDecryptWorkerClient';
-import { CommunityChannelThreadCache } from '../view-models/CommunityChannelThreadCache';
+import { CommunityChannelEncryption } from '../view-models/CommunityChannelEncryption';
 import { CommunityEncryptionDetails } from '../view-models/CommunityEncryptionDetails';
-import { CommunityHeader } from './CommunityHeader';
-import { CommunityHeaderActionsMenu } from './CommunityHeaderActionsMenu';
-import { memberDisplayName, memberPrimaryName } from './communityMemberNames';
+import { CommunityConversation } from './CommunityConversation';
+import { memberDisplayName } from './communityMemberNames';
 import { CommunityMembersPanel } from './communityMembersPanel';
-import { CommunityMentionPanel } from './communityMentionPanel';
 import { communityMessageIdentityIds } from './communityMessageIdentityIds';
-import {
-  CommunityMessageSearchPanel,
-  type CommunityMessageSearchResultItem,
-} from './CommunityMessageSearchPanel';
-import { CommunityMessageTimeline } from './CommunityMessageTimeline';
+import { communityMessageMenuActions } from './communityMessageMenuActions';
+import { CommunityMessageSearchPanel } from './CommunityMessageSearchPanel';
+import { CommunityNoChannelSelected } from './CommunityNoChannelSelected';
+import { CommunityPinnedMessagesDialog } from './CommunityPinnedMessagesDialog';
 import { CommunitySidebar } from './CommunitySidebar';
-import {
-  type CommunityThreadState,
-  hiddenCommunityThreadSummaryKeysFromMessages,
-  isThreadRootMessage,
-  threadTitleFromMessage,
-  visibleCommunityThreadSummaries,
-} from './communityThreadState';
-import {
-  CommunityWorkspaceDialogs,
-  type CommunityProfileView,
-} from './CommunityWorkspaceDialogs';
+import { type CommunityThreadState } from './communityThreadState';
+import { CommunityThreadPane } from './CommunityThreadPane';
+import { CommunityWorkspaceDialogs } from './CommunityWorkspaceDialogs';
+import { CommunityWorkspaceHeader } from './CommunityWorkspaceHeader';
 import { mergeChatMessages } from './communityWorkspaceHelpers';
 import { useCommunityChannelAccess } from './useCommunityChannelAccess';
 import { useCommunityChannelMessages } from './useCommunityChannelMessages';
+import { useCommunityChannelPolls } from './useCommunityChannelPolls';
 import { useCommunityChannelRealtime } from './useCommunityChannelRealtime';
+import { useCommunityChannelThreads } from './useCommunityChannelThreads';
 import { useCommunityDrafts } from './useCommunityDrafts';
 import { useCommunityKeyDialog } from './useCommunityKeyDialog';
+import { useCommunityLeave } from './useCommunityLeave';
 import { useCommunityMembers } from './useCommunityMembers';
 import { useCommunityMentions } from './useCommunityMentions';
 import { useCommunityMessageComposer } from './useCommunityMessageComposer';
+import { useCommunityMessageFocus } from './useCommunityMessageFocus';
+import { useCommunityMessageProjection } from './useCommunityMessageProjection';
 import { useCommunityMessageSearch } from './useCommunityMessageSearch';
 import { useCommunityPinnedMessages } from './useCommunityPinnedMessages';
 import { useCommunityPollWorkflow } from './useCommunityPollWorkflow';
+import { useCommunityProfileViewer } from './useCommunityProfileViewer';
+import { useCommunityRefresh } from './useCommunityRefresh';
 import { useCommunityThreadActions } from './useCommunityThreadActions';
+import { useCommunityThreadLabels } from './useCommunityThreadLabels';
 import { useCommunityThreadNavigation } from './useCommunityThreadNavigation';
-import { useCommunityThreadRootLabels } from './useCommunityThreadRootLabels';
+import { useCommunityVisibleChannels } from './useCommunityVisibleChannels';
 import { useCommunityVisualAssets } from './useCommunityVisualAssets';
-
-const CreatePollDialog = lazy(() =>
-  import('../../../polls/presentation/components/CreatePollDialog').then(
-    (module) => ({
-      default: module.CreatePollDialog,
-    }),
-  ),
-);
-const StickerPackPreviewDialog = lazy(() =>
-  import('../../../stickers/presentation/components/StickerPackPreviewDialog').then(
-    (module) => ({
-      default: module.StickerPackPreviewDialog,
-    }),
-  ),
-);
-
-const communityChannelThreadCache = new CommunityChannelThreadCache();
 
 export function CommunityWorkspace({
   activeCall,
@@ -177,38 +132,18 @@ export function CommunityWorkspace({
   const [communityDataOpen, setCommunityDataOpen] = useState(false);
   const [encryptionDetailsOpen, setEncryptionDetailsOpen] = useState(false);
   const [communityMenuOpen, setCommunityMenuOpen] = useState(false);
-  const [communityLeaveError, setCommunityLeaveError] = useState<string | null>(
-    null,
-  );
-  const [communityLeaving, setCommunityLeaving] = useState(false);
   const [channelSearch, setChannelSearch] = useState('');
   const [manageOpen, setManageOpen] = useState(false);
   const [memberOpen, setMemberOpen] = useState(false);
   const [messageContextMenu, setMessageContextMenu] =
     useState<MessageContextMenuState | null>(null);
-  const [profileViewer, setProfileViewer] =
-    useState<CommunityProfileView | null>(null);
   const [rawMessage, setRawMessage] = useState<ChatMessage | null>(null);
   const [threadPanel, setThreadPanel] = useState<CommunityThreadState | null>(
     null,
   );
-  const [channelThreadsByChannelId, setChannelThreadsByChannelId] = useState<
-    Record<string, CommunityChannelThreadSummary[]>
-  >(() => CommunityChannelThreadCache.fromChannels(textChannels));
-  const [polls, setPolls] = useState<PollResource[]>([]);
   const [pollDialogOpen, setPollDialogOpen] = useState(false);
 
   useCloseOnEscape(onMobileSidebarClose, mobileSidebarOpen);
-  const memberIdentitiesRef = useRef<Record<string, IdentityResource>>({});
-  const onCommunityUpdatedRef = useRef(onCommunityUpdated);
-  const communityMessageDecryptWorkerRef =
-    useRef<CommunityMessageDecryptWorkerClient | null>(null);
-  const pendingSearchResultRef =
-    useRef<CommunityMessageSearchResultItem | null>(null);
-  const pendingFocusedMessageRef = useRef<{
-    channelId: string;
-    message: ChatMessage;
-  } | null>(null);
   const communityKey = session.keychain.conversations[community.id];
   const {
     close: closeCommunityKeyDialog,
@@ -229,145 +164,13 @@ export function CommunityWorkspace({
     session,
   });
   const communityIsPublic = community.visibility === 'public';
-  const projectChannelMessages = useCallback(
-    async (channelId: string, rawMessages: MessageResource[]) => {
-      communityMessageDecryptWorkerRef.current ??=
-        new CommunityMessageDecryptWorkerClient();
-
-      return await communityMessageDecryptWorkerRef.current.decrypt({
-        channelId,
-        communityId: community.id,
-        communityKey,
-        copy: copy.messages,
-        currentIdentityId: session.identity.id,
-        messages: rawMessages,
-      });
-    },
-    [community.id, communityKey, session.identity.id],
-  );
-  const textChannelsWithThreadSummaries = useMemo(
-    () =>
-      textChannels.map((channel) => ({
-        ...channel,
-        threads: channelThreadsByChannelId[channel.id] ?? channel.threads ?? [],
-      })),
-    [channelThreadsByChannelId, textChannels],
-  );
-  const {
-    add: addThreadRootLabels,
-    hiddenKeys: hiddenThreadRootLabelKeys,
-    hide: hideThreadRootLabels,
-    labels: threadRootLabels,
-    reveal: revealThreadRootLabel,
-  } = useCommunityThreadRootLabels({
-    channels: textChannelsWithThreadSummaries,
-    communityId: community.id,
-    projectMessages: projectChannelMessages,
-    session,
-  });
-  const textChannelsWithThreads = useMemo(
-    () =>
-      textChannelsWithThreadSummaries.map((channel) => ({
-        ...channel,
-        threads: visibleCommunityThreadSummaries({
-          channelId: channel.id,
-          hiddenThreadRootLabelKeys,
-          threads: channel.threads ?? [],
-        }),
-      })),
-    [hiddenThreadRootLabelKeys, textChannelsWithThreadSummaries],
-  );
-  useEffect(() => {
-    setChannelThreadsByChannelId(
-      CommunityChannelThreadCache.fromChannels(textChannels),
-    );
-  }, [community.id, textChannels]);
-  useEffect(() => {
-    const cached = communityChannelThreadCache.read(community.id);
-
-    if (cached) {
-      setChannelThreadsByChannelId(cached);
-    }
-
-    let cancelled = false;
-
-    const cancelIdleWork = runWhenBrowserIdle(() => {
-      void applicationContainer.communities
-        .listChannels(session, community.id)
-        .then((channels) => {
-          if (cancelled) return;
-
-          onCommunityChannelsUpdated(community.id, channels);
-          const threadsByChannelId = CommunityChannelThreadCache.fromChannels(
-            channels.filter((channel) => channel.type === 'text'),
-          );
-
-          communityChannelThreadCache.write(community.id, threadsByChannelId);
-          setChannelThreadsByChannelId(threadsByChannelId);
-        })
-        .catch(() => undefined);
+  const { loadChannelMessages, projectChannelMessage, projectChannelMessages } =
+    useCommunityMessageProjection({
+      communityId: community.id,
+      communityKey,
+      session,
     });
-
-    return () => {
-      cancelled = true;
-      cancelIdleWork();
-    };
-  }, [channelTopologyKey, community.id, onCommunityChannelsUpdated, session]);
-  const projectChannelMessage = useCallback(
-    async (
-      channelId: string,
-      rawMessage: MessageResource,
-    ): Promise<ChatMessage> => {
-      const [projected] = await projectChannelMessages(channelId, [rawMessage]);
-
-      return projected;
-    },
-    [projectChannelMessages],
-  );
-  const loadChannelMessages = useCallback(
-    async (
-      channelId: string,
-      beforeMessageId?: string,
-      options: { limit?: number } = {},
-    ) => {
-      const result = await applicationContainer.communities.listChannelMessages(
-        session,
-        community.id,
-        channelId,
-        { beforeMessageId, limit: options.limit },
-      );
-      const loadedMessages = await projectChannelMessages(
-        channelId,
-        result.messages,
-      );
-
-      return {
-        cursor: result.nextBeforeMessageId ?? null,
-        loadedMessages,
-      };
-    },
-    [community.id, projectChannelMessages, session],
-  );
-  const {
-    bottomRef,
-    handleChannelSelected,
-    handleMessagesScroll,
-    incrementNewChannelMessageCount,
-    isAwayFromBottom,
-    isScrolledNearBottom,
-    jumpToLatest,
-    messageCursor,
-    messages,
-    messageState,
-    newChannelMessageCount,
-    resetNewChannelMessageCount,
-    scrollChannelToBottom,
-    scrollerRef,
-    selectedChannelId,
-    setMessages,
-    setSelectedChannelId,
-    visibleMessages,
-  } = useCommunityChannelMessages({
+  const channelMessages = useCommunityChannelMessages({
     loadChannelMessages,
     onChannelSelected,
     onChannelViewed,
@@ -375,28 +178,36 @@ export function CommunityWorkspace({
     resolvedChannelId,
     timelineFocusKey,
   });
-  useEffect(() => {
-    if (!selectedChannelId) return;
-
-    const channelThreads = channelThreadsByChannelId[selectedChannelId] ?? [];
-
-    if (channelThreads.length === 0) return;
-
-    const hiddenKeys = hiddenCommunityThreadSummaryKeysFromMessages({
-      channelId: selectedChannelId,
-      messages,
-      threads: channelThreads,
-    });
-
-    if (hiddenKeys.length === 0) return;
-
-    hideThreadRootLabels(hiddenKeys);
-  }, [
-    channelThreadsByChannelId,
-    hideThreadRootLabels,
+  const {
+    handleChannelSelected,
+    incrementNewChannelMessageCount,
+    isScrolledNearBottom,
     messages,
+    messageState,
+    resetNewChannelMessageCount,
+    scrollChannelToBottom,
+    scrollerRef,
     selectedChannelId,
-  ]);
+    setMessages,
+    setSelectedChannelId,
+    visibleMessages,
+  } = channelMessages;
+  const {
+    addThreadRootLabels,
+    channelThreadsByChannelId,
+    textChannelsWithThreads,
+    threadRootLabels,
+    upsertChannelThreadSummary,
+  } = useCommunityChannelThreads({
+    channelTopologyKey,
+    communityId: community.id,
+    messages,
+    onCommunityChannelsUpdated,
+    projectChannelMessages,
+    selectedChannelId,
+    session,
+    textChannels,
+  });
   const { draft, setDraft: setSelectedChannelDraft } = useCommunityDrafts({
     communityId: community.id,
     selectedChannelId,
@@ -435,17 +246,9 @@ export function CommunityWorkspace({
     setCommunityMenuOpen(false);
     void openPinnedMessages();
   }, [openPinnedMessages]);
-  const selectedChannelPolls = useMemo(
-    () =>
-      selectedChannelId
-        ? polls.filter(
-            (poll) =>
-              poll.scope.type === 'community_channel' &&
-              poll.scope.communityId === community.id &&
-              poll.scope.channelId === selectedChannelId,
-          )
-        : [],
-    [community.id, polls, selectedChannelId],
+  const { selectedChannelPolls, upsertPoll } = useCommunityChannelPolls(
+    community.id,
+    selectedChannelId,
   );
   const channelNameFor = useCallback(
     (channelId: string) =>
@@ -453,58 +256,17 @@ export function CommunityWorkspace({
         ?.name ?? shortId(channelId),
     [textChannelsWithThreads],
   );
-  const scrollToChannelMessage = useCallback(
-    (messageId: string) => {
-      const scroll = (attempt = 0) => {
-        const element = scrollerRef.current?.querySelector<HTMLElement>(
-          `[data-message-id="${CSS.escape(messageId)}"]`,
-        );
-
-        if (!element) {
-          if (attempt < 8) {
-            window.setTimeout(() => scroll(attempt + 1), 60);
-          }
-
-          return;
-        }
-
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        const focusTarget =
-          element.querySelector<HTMLElement>('[data-message-bubble]') ??
-          element;
-
-        focusTarget.classList.add('message-focus-ring');
-        window.setTimeout(
-          () => focusTarget.classList.remove('message-focus-ring'),
-          1600,
-        );
-      };
-
-      requestAnimationFrame(() => scroll());
-    },
-    [scrollerRef],
-  );
-  const handleSearchResultClick = useCallback(
-    (result: CommunityMessageSearchResultItem) => {
-      pendingSearchResultRef.current = result;
-
-      if (result.channelId !== selectedChannelId) {
-        handleChannelSelected(result.channelId);
-
-        return;
-      }
-
-      setMessages((current) => mergeChatMessages(current, [result.message]));
-      scrollToChannelMessage(result.message.id);
-      pendingSearchResultRef.current = null;
-    },
-    [
-      handleChannelSelected,
-      scrollToChannelMessage,
-      selectedChannelId,
-      setMessages,
-    ],
-  );
+  const {
+    handleSearchResultClick,
+    queueFocusedMessage,
+    scrollToChannelMessage,
+  } = useCommunityMessageFocus({
+    handleChannelSelected,
+    messageState,
+    scrollerRef,
+    selectedChannelId,
+    setMessages,
+  });
   const messageSearch = useCommunityMessageSearch({
     channelNameFor,
     communityId: community.id,
@@ -514,26 +276,6 @@ export function CommunityWorkspace({
     selectedChannelId,
     session,
   });
-  const upsertChannelThreadSummary = useCallback(
-    (channelId: string, summary: CommunityChannelThreadSummary) => {
-      revealThreadRootLabel(channelId, summary.rootMessageId);
-      setChannelThreadsByChannelId((current) => {
-        const currentThreads = current[channelId] ?? [];
-        const nextThreads = [
-          summary,
-          ...currentThreads.filter(
-            (thread) => thread.rootMessageId !== summary.rootMessageId,
-          ),
-        ].sort((left, right) => right.lastReplyAt - left.lastReplyAt);
-
-        return {
-          ...current,
-          [channelId]: nextThreads,
-        };
-      });
-    },
-    [revealThreadRootLabel],
-  );
   const {
     open: openMessageThread,
     openFromSummary: openMessageThreadFromSummary,
@@ -554,55 +296,16 @@ export function CommunityWorkspace({
     activeCall.communityId === community.id
       ? (activeCall.channelId ?? null)
       : null;
-  const visibleTextChannels = useMemo(() => {
-    const query = channelSearch.trim().toLowerCase();
-    const accessibleChannels = accessibleTextChannels
-      .map(
-        (channel) =>
-          textChannelsWithThreads.find((item) => item.id === channel.id) ??
-          channel,
-      )
-      .filter(
-        (channel) =>
-          channel.id === selectedChannelId ||
-          !NotificationSettingsPolicy.shouldHide(
-            channelNotificationSetting(channel),
-          ),
-      );
-
-    if (!query) return accessibleChannels;
-
-    return accessibleChannels.filter((channel) =>
-      channel.name.toLowerCase().includes(query),
-    );
-  }, [
-    accessibleTextChannels,
-    channelNotificationSetting,
-    channelSearch,
-    selectedChannelId,
-    textChannelsWithThreads,
-  ]);
-  const visibleVoiceChannels = useMemo(() => {
-    const query = channelSearch.trim().toLowerCase();
-    const accessibleChannels = accessibleVoiceChannels.filter(
-      (channel) =>
-        channel.id === activeVoiceChannelId ||
-        !NotificationSettingsPolicy.shouldHide(
-          channelNotificationSetting(channel),
-        ),
-    );
-
-    if (!query) return accessibleChannels;
-
-    return accessibleChannels.filter((channel) =>
-      channel.name.toLowerCase().includes(query),
-    );
-  }, [
-    accessibleVoiceChannels,
-    activeVoiceChannelId,
-    channelNotificationSetting,
-    channelSearch,
-  ]);
+  const { visibleTextChannels, visibleVoiceChannels } =
+    useCommunityVisibleChannels({
+      accessibleTextChannels,
+      accessibleVoiceChannels,
+      activeVoiceChannelId,
+      channelNotificationSetting,
+      channelSearch,
+      selectedChannelId,
+      textChannelsWithThreads,
+    });
   const historicalIdentityIds = useMemo(
     () =>
       communityMessageIdentityIds({
@@ -649,63 +352,15 @@ export function CommunityWorkspace({
       ),
     [memberIdentities],
   );
-  useEffect(() => {
-    const knownRootLabels: Record<string, string> = {};
-    const rememberRootLabel = (message: ChatMessage) => {
-      if (!isThreadRootMessage(message)) return;
-
-      knownRootLabels[message.id] = threadTitleFromMessage(message);
-    };
-
-    for (const message of messages) {
-      rememberRootLabel(message);
-    }
-
-    if (threadPanel) {
-      rememberRootLabel(threadPanel.root);
-    }
-
-    for (const message of messageCollection?.messages ?? []) {
-      rememberRootLabel(message);
-    }
-
-    for (const result of messageSearch.results) {
-      rememberRootLabel(result.message);
-    }
-
-    const entries = Object.entries(knownRootLabels);
-
-    if (entries.length === 0) return;
-
-    addThreadRootLabels(knownRootLabels);
-  }, [
+  const threadLabelByRootMessageId = useCommunityThreadLabels({
     addThreadRootLabels,
-    messageCollection?.messages,
-    messageSearch.results,
+    collectionMessages: messageCollection?.messages,
     messages,
+    searchResults: messageSearch.results,
     threadPanel,
-  ]);
-  const threadLabelByRootMessageId = useMemo(() => {
-    const labels: Record<string, string> = { ...threadRootLabels };
-
-    for (const message of messages) {
-      if (isThreadRootMessage(message)) {
-        labels[message.id] = threadTitleFromMessage(message);
-      }
-    }
-
-    if (threadPanel) {
-      labels[threadPanel.root.id] = threadTitleFromMessage(threadPanel.root);
-    }
-
-    return labels;
-  }, [messages, threadPanel, threadRootLabels]);
-  const {
-    autocomplete: autocompleteMention,
-    insert: insertMention,
-    suggestions: mentionSuggestions,
-    tokens: mentionTokens,
-  } = useCommunityMentions({
+    threadRootLabels,
+  });
+  const mentions = useCommunityMentions({
     community,
     draft,
     identities: memberIdentities,
@@ -714,158 +369,44 @@ export function CommunityWorkspace({
     selectedChannel,
     setDraft: setSelectedChannelDraft,
   });
-  const channelEncryptionReady =
-    !!selectedChannel &&
-    (communityIsPublic ||
-      (!!communityKey &&
-        communityMemberIds.every(
-          (identityId) =>
-            identityId === session.identity.id || memberIdentities[identityId],
-        )));
-
-  useEffect(
-    () => () => {
-      communityMessageDecryptWorkerRef.current?.terminate();
-      communityMessageDecryptWorkerRef.current = null;
-    },
-    [],
-  );
-
-  useEffect(() => {
-    memberIdentitiesRef.current = memberIdentities;
-  }, [memberIdentities]);
-
-  useEffect(() => {
-    onCommunityUpdatedRef.current = onCommunityUpdated;
-  }, [onCommunityUpdated]);
-
-  useEffect(() => {
-    const pending = pendingSearchResultRef.current;
-
-    if (pending) {
-      if (
-        selectedChannelId !== pending.channelId ||
-        messageState === 'loading'
-      ) {
-        return;
-      }
-
-      setMessages((current) => mergeChatMessages(current, [pending.message]));
-      scrollToChannelMessage(pending.message.id);
-      pendingSearchResultRef.current = null;
-    }
-
-    const pendingFocusedMessage = pendingFocusedMessageRef.current;
-
-    if (!pendingFocusedMessage) return;
-
-    if (
-      selectedChannelId !== pendingFocusedMessage.channelId ||
-      messageState === 'loading'
-    ) {
-      return;
-    }
-
-    setMessages((current) =>
-      mergeChatMessages(current, [pendingFocusedMessage.message]),
-    );
-    scrollToChannelMessage(pendingFocusedMessage.message.id);
-    pendingFocusedMessageRef.current = null;
-  }, [messageState, scrollToChannelMessage, selectedChannelId, setMessages]);
-
-  const channelEncryptionTooltip = communityIsPublic
-    ? copy.chat.publicChannel
-    : channelEncryptionReady
-      ? copy.chat.e2eReady
-      : copy.chat.e2eMissing;
-  const missingCommunityKey =
-    !communityIsPublic &&
-    !communityKey &&
-    (!owner ||
-      (visibleMessages.length > 0 &&
-        visibleMessages.every((message) => message.encrypted)));
-
-  const openMemberProfile = useCallback(
-    (member: CommunityProfileView, anchor?: ProfilePopoverAnchor) =>
-      setProfileViewer({ ...member, anchor }),
-    [],
-  );
+  const channelEncryptionReady = CommunityChannelEncryption.ready({
+    communityIsPublic,
+    communityKey,
+    communityMemberIds,
+    currentIdentityId: session.identity.id,
+    memberIdentities,
+    selectedChannel,
+  });
+  const channelEncryptionTooltip = CommunityChannelEncryption.tooltip({
+    communityIsPublic,
+    ready: channelEncryptionReady,
+  });
+  const missingCommunityKey = CommunityChannelEncryption.missingCommunityKey({
+    communityIsPublic,
+    communityKey,
+    owner,
+    visibleMessages,
+  });
+  const profiles = useCommunityProfileViewer({
+    memberIdentities,
+    memberPictures,
+    session,
+  });
   const joinVoiceChannel = useCallback(
-    (channel: CommunityVoiceChannel) => {
+    (channel: Parameters<NonNullable<typeof onJoinVoiceChannel>>[0]) => {
       if (!currentPermissions.has('connect_voice')) return;
 
       onJoinVoiceChannel?.(channel);
     },
     [currentPermissions, onJoinVoiceChannel],
   );
-  const openVoiceParticipantProfile = useCallback(
-    (
-      participant: {
-        identityId: string;
-        picture?: null | string;
-      },
-      event: MouseEvent<HTMLButtonElement>,
-    ) =>
-      openMemberProfile(
-        {
-          identity:
-            participant.identityId === session.identity.id
-              ? session.identity
-              : memberIdentities[participant.identityId],
-          identityId: participant.identityId,
-          pictureUrl: participant.picture ?? null,
-        },
-        profileAnchorFromTarget(event.currentTarget),
-      ),
-    [memberIdentities, openMemberProfile, session.identity],
-  );
-  const openMessageAuthorProfile = (
-    message: ChatMessage,
-    anchor?: ProfilePopoverAnchor,
-  ) => {
-    const identityId = message.authorIdentityId;
-
-    openMemberProfile(
-      {
-        identity:
-          identityId === session.identity.id
-            ? session.identity
-            : memberIdentities[identityId],
-        identityId,
-        pictureUrl: memberPictures[identityId] ?? null,
-      },
-      anchor,
-    );
-  };
-  const leaveCommunity = async () => {
-    if (communityLeaving) return;
-
-    if (!window.confirm(copy.communities.leaveConfirm)) return;
-
-    setCommunityLeaving(true);
-    setCommunityLeaveError(null);
-
-    try {
-      const result = await applicationContainer.communities.leave(
-        session,
-        community.id,
-      );
-
-      onSessionUpdated({
-        ...session,
-        keychain: result.keychain,
-        keychainExternalIdentifier: result.keychainExternalIdentifier,
-      });
-      setCommunityMenuOpen(false);
-      onCommunityLeft(result.community ?? community);
-    } catch (caught) {
-      setCommunityLeaveError(
-        toUserErrorMessage(caught, copy.communities.leaveError),
-      );
-    } finally {
-      setCommunityLeaving(false);
-    }
-  };
+  const communityLeave = useCommunityLeave({
+    community,
+    onBeforeLeft: () => setCommunityMenuOpen(false),
+    onCommunityLeft,
+    onSessionUpdated,
+    session,
+  });
   const communityData = useMemo(
     () => ({
       frontendDerived: {
@@ -908,39 +449,15 @@ export function CommunityWorkspace({
     selectedChannelId,
   ]);
 
-  useEffect(() => {
-    let cancelled = false;
+  useCommunityRefresh(community, onCommunityUpdated, session);
 
-    void applicationContainer.communities
-      .get(session, community.id)
-      .then((freshCommunity) => {
-        if (!cancelled) onCommunityUpdatedRef.current(freshCommunity);
-      })
-      .catch(() => undefined);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [community.id, session]);
-
-  const handleStickerClick = (sticker: StickerMessageReference) => {
-    setStickerPackPreview(sticker);
-  };
-  const upsertPoll = useCallback((poll: PollResource) => {
-    setPolls((current) =>
-      [...current.filter((item) => item.id !== poll.id), poll].sort(
-        (left, right) => left.createdAt - right.createdAt,
-      ),
-    );
-  }, []);
-  const { closePoll, handleCreatePoll, removePollVote, votePoll } =
-    useCommunityPollWorkflow({
-      communityId: community.id,
-      scrollToBottom: scrollChannelToBottom,
-      selectedChannelId: selectedChannel?.id ?? null,
-      session,
-      upsertPoll,
-    });
+  const pollWorkflow = useCommunityPollWorkflow({
+    communityId: community.id,
+    scrollToBottom: scrollChannelToBottom,
+    selectedChannelId: selectedChannel?.id ?? null,
+    session,
+    upsertPoll,
+  });
   const messageComposer = useCommunityMessageComposer({
     community,
     currentPermissions,
@@ -959,20 +476,7 @@ export function CommunityWorkspace({
     setDraft: setSelectedChannelDraft,
     setMessages,
   });
-  const {
-    applyRealtimeDeletion: handleRealtimeMessageDeleted,
-    applyRealtimeEdit: handleRealtimeMessageEdited,
-    cancelEditing: cancelThreadMessageEdit,
-    cancelReplying: cancelThreadMessageReply,
-    deleteMessage: deleteThreadMessage,
-    editMessage: editThreadMessage,
-    receiveRealtimeMessage: handleRealtimeThreadMessage,
-    sendMessage: sendThreadMessage,
-    sendSticker: sendThreadSticker,
-    startEditing: startEditingThreadMessage,
-    startReplying: startReplyingToThreadMessage,
-    updateDraft: updateThreadDraft,
-  } = useCommunityThreadActions({
+  const threadActions = useCommunityThreadActions({
     channelThreadsByChannelId,
     messageComposer,
     selectedChannelId,
@@ -1025,9 +529,9 @@ export function CommunityWorkspace({
     isScrolledNearBottom,
     loadChannelMessages,
     onChannelViewed,
-    onMessageDeleted: handleRealtimeMessageDeleted,
-    onMessageEdited: handleRealtimeMessageEdited,
-    onThreadMessageReceived: handleRealtimeThreadMessage,
+    onMessageDeleted: threadActions.applyRealtimeDeletion,
+    onMessageEdited: threadActions.applyRealtimeEdit,
+    onThreadMessageReceived: threadActions.receiveRealtimeMessage,
     projectChannelMessage,
     realtimeEvent,
     resetNewChannelMessageCount,
@@ -1095,7 +599,7 @@ export function CommunityWorkspace({
           void openMessageThreadFromSummary(channel.id, thread)
         }
         onVoiceChannelJoin={joinVoiceChannel}
-        onVoiceParticipantClick={openVoiceParticipantProfile}
+        onVoiceParticipantClick={profiles.openVoiceParticipantProfile}
         onLogout={onLogout}
         onSessionUpdated={onSessionUpdated}
         ownIdentityPictures={ownIdentityPictures}
@@ -1114,86 +618,63 @@ export function CommunityWorkspace({
       />
 
       <section className="app-safe-area-panel glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none">
-        <CommunityHeader
+        <CommunityWorkspaceHeader
           avatarUrl={avatarUrl}
+          canAddMember={
+            !!selectedChannel &&
+            (owner || currentPermissions.has('create_invites'))
+          }
           channelEncryptionReady={channelEncryptionReady}
           channelEncryptionTooltip={channelEncryptionTooltip}
-          channelPublic={communityIsPublic}
           community={community}
-          communityLeaveError={communityLeaveError}
+          communityIsPublic={communityIsPublic}
+          communityLeaveError={communityLeave.error}
+          communityLeaving={communityLeave.leaving}
           communityMenuOpen={communityMenuOpen}
-          menuContent={
-            <CommunityHeaderActionsMenu
-              communityLeaving={communityLeaving}
-              hasCommunityKey={!!communityKey}
-              notificationSetting={communityNotificationSetting}
-              showCommunityKeyAction={!communityIsPublic}
-              onAddMember={
-                selectedChannel &&
-                (owner || currentPermissions.has('create_invites'))
-                  ? () => setMemberOpen(true)
-                  : undefined
-              }
-              onClose={() => setCommunityMenuOpen(false)}
-              onCommunityDataOpen={() => {
-                setCommunityDataOpen(true);
-                setCommunityMenuOpen(false);
-              }}
-              onCommunityKeyOpen={() => {
-                if (communityKey) {
-                  openCopyCommunityKeyDialog();
-                } else {
-                  openAddCommunityKeyDialog();
-                }
-
-                setCommunityMenuOpen(false);
-              }}
-              onLeaveCommunity={() => void leaveCommunity()}
-              onNotificationMuteToggle={() =>
-                onNotificationMuteToggle(communityNotificationScope)
-              }
-              onNotificationSettingsOpen={() =>
-                onNotificationSettingsOpen({
-                  scope: communityNotificationScope,
-                  subtitle: networkName,
-                  title: community.name,
-                })
-              }
-              onOpenPins={selectedChannel ? showPinnedMessages : undefined}
-              onRealtimeEventsOpen={onRealtimeEventsOpen}
-              open={communityMenuOpen}
-            />
-          }
+          communityNotificationSetting={communityNotificationSetting}
+          hasCommunityKey={!!communityKey}
+          messageSearchOpen={messageSearch.open}
           networkName={networkName}
+          onAddMember={() => setMemberOpen(true)}
+          onCommunityDataOpen={() => {
+            setCommunityDataOpen(true);
+            setCommunityMenuOpen(false);
+          }}
+          onCommunityKeyOpen={() => {
+            if (communityKey) {
+              openCopyCommunityKeyDialog();
+            } else {
+              openAddCommunityKeyDialog();
+            }
+
+            setCommunityMenuOpen(false);
+          }}
+          onCommunityMenuClose={() => setCommunityMenuOpen(false)}
           onCommunityMenuToggle={() =>
             setCommunityMenuOpen((isOpen) => !isOpen)
           }
           onEncryptionDetailsOpen={() => setEncryptionDetailsOpen(true)}
-          onOpenAvatar={
-            avatarUrl ? communityVisualAssets.openAvatarViewer : undefined
+          onLeaveCommunity={() => void communityLeave.leave()}
+          onMessageSearchToggle={() =>
+            messageSearch.setOpen(!messageSearch.open)
           }
+          onNotificationMuteToggle={() =>
+            onNotificationMuteToggle(communityNotificationScope)
+          }
+          onNotificationSettingsOpen={() =>
+            onNotificationSettingsOpen({
+              scope: communityNotificationScope,
+              subtitle: networkName,
+              title: community.name,
+            })
+          }
+          onOpenAvatar={communityVisualAssets.openAvatarViewer}
           onOpenMobileSidebar={onOpenMobileSidebar}
           onPinsOpen={showPinnedMessages}
           onRealtimeEventsOpen={onRealtimeEventsOpen}
           realtimeStatus={realtimeStatus}
           selectedChannel={selectedChannel}
-        >
-          {communityIsPublic ? (
-            <button
-              aria-expanded={messageSearch.open}
-              aria-label={copy.communities.searchMessages}
-              className="grid h-11 w-11 place-items-center rounded-2xl bg-white/10 text-white/70 transition hover:bg-white/15 sm:flex sm:h-auto sm:w-auto sm:gap-2 sm:px-3 sm:py-2 sm:text-sm sm:font-black"
-              onClick={() => messageSearch.setOpen(!messageSearch.open)}
-              title={copy.communities.searchMessages}
-              type="button"
-            >
-              <SearchIcon className="h-5 w-5 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">
-                {copy.communities.searchMessages}
-              </span>
-            </button>
-          ) : null}
-        </CommunityHeader>
+        />
 
         {communityIsPublic && messageSearch.open ? (
           <CommunityMessageSearchPanel
@@ -1213,40 +694,22 @@ export function CommunityWorkspace({
         ) : null}
 
         {threadPanel ? (
-          <MessageThreadPanel
-            attachmentEncryptionAvailable={
-              !communityIsPublic && Boolean(communityKey)
-            }
-            currentIdentityId={session.identity.id}
-            disabled={
-              threadPanel.state === 'loading' ||
-              messageState === 'loading' ||
-              (!communityIsPublic && !communityKey) ||
-              !currentPermissions.has('send_messages')
-            }
-            draft={threadPanel.draft}
-            editingMessage={threadPanel.editingMessage?.message ?? null}
-            embedded
-            error={threadPanel.error}
+          <CommunityThreadPane
+            channelName={channelNameFor(threadPanel.channelId)}
+            communityIsPublic={communityIsPublic}
+            currentPermissions={currentPermissions}
+            hasCommunityKey={Boolean(communityKey)}
             identityNames={communityIdentityNames}
-            identityPictures={memberPictures}
-            messages={threadPanel.messages}
-            onCancelEdit={cancelThreadMessageEdit}
-            onCancelReply={cancelThreadMessageReply}
-            onAuthorProfileOpen={(message, target) =>
-              openMessageAuthorProfile(message, profileAnchorFromTarget(target))
-            }
+            memberIdentities={memberIdentities}
+            memberPictures={memberPictures}
+            messagesLoading={messageState === 'loading'}
+            onAuthorProfileOpen={profiles.openMessageAuthorProfile}
             onClose={() => setThreadPanel(null)}
-            onDraftChange={updateThreadDraft}
-            onEdit={editThreadMessage}
             onMessageMenuOpen={(message, x, y) =>
               setMessageContextMenu({ message, source: 'thread', x, y })
             }
             onRootMessageOpen={(message) => {
-              pendingFocusedMessageRef.current = {
-                channelId: threadPanel.channelId,
-                message,
-              };
+              queueFocusedMessage(threadPanel.channelId, message);
               setMessages((current) => mergeChatMessages(current, [message]));
               handleChannelSelected(threadPanel.channelId);
               setThreadPanel(null);
@@ -1258,198 +721,53 @@ export function CommunityWorkspace({
                 window.setTimeout(() => scrollToChannelMessage(message.id), 0);
               }
             }}
-            onSend={sendThreadMessage}
-            onStickerSend={
-              currentPermissions.has('send_stickers')
-                ? sendThreadSticker
-                : undefined
-            }
             pinnedMessageIds={pinnedMessageIds}
-            replyTo={threadPanel.replyTarget}
-            replyToAuthorName={
-              threadPanel.replyTarget
-                ? memberDisplayName(
-                    memberIdentities[threadPanel.replyTarget.authorIdentityId],
-                    threadPanel.replyTarget.authorIdentityId,
-                  )
-                : undefined
-            }
-            rootMessage={threadPanel.root}
             session={session}
-            title={`# ${channelNameFor(threadPanel.channelId)}`}
+            threadActions={threadActions}
+            threadPanel={threadPanel}
           />
         ) : !selectedChannel ? (
-          <div className="grid flex-1 place-items-center p-6 text-center">
-            <div className="max-w-md">
-              <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-white/10 text-3xl font-black">
-                #
-              </div>
-              <h2 className="mt-5 text-2xl font-black">
-                {copy.communities.noChannelSelected}
-              </h2>
-              <p className="mt-3 text-sm leading-6 text-white/55">
-                {copy.communities.noChannelSelectedBody}
-              </p>
-            </div>
-          </div>
+          <CommunityNoChannelSelected />
         ) : (
-          <>
-            <CommunityMessageTimeline
-              bottomRef={bottomRef}
-              isAwayFromBottom={isAwayFromBottom}
-              loadAttachmentPreview={messageComposer.loadAttachmentPreview}
-              memberIdentities={memberIdentities}
-              memberPictures={memberPictures}
-              messageCursor={messageCursor}
-              messageState={messageState}
-              missingCommunityKey={missingCommunityKey}
-              invitationAccepting={invitationAccepting}
-              invitationError={invitationError}
-              invitationInviterName={invitationInviterName}
-              newChannelMessageCount={newChannelMessageCount}
-              onAddCommunityKey={() => {
-                openAddCommunityKeyDialog();
-              }}
-              onInvitationAccept={onInvitationAccept}
-              onAttachmentOpen={(attachment) =>
-                void messageComposer.openAttachment(attachment)
-              }
-              onAuthorProfileOpen={(message, target) =>
-                openMessageAuthorProfile(
-                  message,
-                  profileAnchorFromTarget(target),
-                )
-              }
-              onIdentityProfileOpen={(identityId, target) =>
-                openMemberProfile(
-                  {
-                    identity:
-                      identityId === session.identity.id
-                        ? session.identity
-                        : memberIdentities[identityId],
-                    identityId,
-                    pictureUrl: memberPictures[identityId] ?? null,
-                  },
-                  profileAnchorFromTarget(target),
-                )
-              }
-              onJumpToLatest={jumpToLatest}
-              onMessageMenuOpen={(message, x, y) =>
-                setMessageContextMenu({ message, x, y })
-              }
-              onOpenThread={(message) => void openMessageThread(message)}
-              onReactionToggle={(message, emoji, reacted) =>
-                void messageComposer.handleToggleChannelMessageReaction(
-                  message,
-                  emoji,
-                  reacted,
-                )
-              }
-              onReplyReferenceClick={messageComposer.handleReplyReferenceClick}
-              onRetryMessage={messageComposer.retryChannelMessage}
-              canClosePolls={currentPermissions.has('create_polls')}
-              channelThreadSummaries={selectedChannel.threads ?? []}
-              onPollClose={closePoll}
-              onPollRemoveVote={removePollVote}
-              onPollVote={votePoll}
-              onScroll={handleMessagesScroll}
-              onStickerClick={handleStickerClick}
-              currentRoleIds={currentRoleIds}
-              reactionAuthorNames={reactionAuthorNames}
-              pendingInvitation={pendingInvitation}
-              polls={selectedChannelPolls}
-              pinnedMessageIds={pinnedMessageIds}
-              scrollerRef={scrollerRef}
-              session={session}
-              visibleMessages={visibleMessages}
-            />
-            {typingIdentityIds.length > 0 && (
-              <TypingIndicator
-                getIdentityName={(identityId) =>
-                  memberPrimaryName(memberIdentities[identityId], identityId)
-                }
-                identityIds={typingIdentityIds}
-              />
-            )}
-            <Composer
-              attachmentEncryptionAvailable={
-                !communityIsPublic && Boolean(communityKey)
-              }
-              disabled={
-                messageState === 'loading' ||
-                (!communityIsPublic && !communityKey) ||
-                !currentPermissions.has('send_messages')
-              }
-              defaultEncryptAttachments={!communityIsPublic}
-              draft={draft}
-              editingMessage={messageComposer.editingMessage}
-              error={messageComposer.error}
-              focusKey={`${selectedChannelId ?? 'no-channel'}:${
-                messageComposer.editingMessage?.id ?? 'send'
-              }`}
-              onCancelEdit={messageComposer.cancelEditingChannelMessage}
-              onCancelReply={messageComposer.clearReplyTarget}
-              onDraftChange={messageComposer.handleDraftChange}
-              onEdit={messageComposer.handleEditChannelMessage}
-              onEscape={
-                messageComposer.editingMessage
-                  ? messageComposer.cancelEditingChannelMessage
-                  : () => undefined
-              }
-              onSend={messageComposer.handleSendChannelMessage}
-              onStickerSend={
-                currentPermissions.has('send_stickers')
-                  ? messageComposer.handleSendChannelSticker
-                  : undefined
-              }
-              mentionHelper={
-                mentionSuggestions.length > 0 ? (
-                  <CommunityMentionPanel
-                    onSelect={insertMention}
-                    suggestions={mentionSuggestions}
-                  />
-                ) : null
-              }
-              mentionTokens={mentionTokens}
-              onMentionAutocomplete={autocompleteMention}
-              onPollCreate={
-                currentPermissions.has('create_polls')
-                  ? () => setPollDialogOpen(true)
-                  : undefined
-              }
-              progress={messageComposer.attachmentProgress}
-              replyTo={messageComposer.replyTarget}
-              replyToAuthorName={
-                messageComposer.replyTarget
-                  ? memberDisplayName(
-                      memberIdentities[
-                        messageComposer.replyTarget.authorIdentityId
-                      ],
-                      messageComposer.replyTarget.authorIdentityId,
-                    )
-                  : undefined
-              }
-              session={session}
-            />
-            {stickerPackPreview && (
-              <Suspense fallback={null}>
-                <StickerPackPreviewDialog
-                  onClose={() => setStickerPackPreview(null)}
-                  onStickerSend={messageComposer.handleSendChannelSticker}
-                  session={session}
-                  sticker={stickerPackPreview}
-                />
-              </Suspense>
-            )}
-            {pollDialogOpen && (
-              <Suspense fallback={null}>
-                <CreatePollDialog
-                  onClose={() => setPollDialogOpen(false)}
-                  onSubmit={handleCreatePoll}
-                />
-              </Suspense>
-            )}
-          </>
+          <CommunityConversation
+            channelMessages={channelMessages}
+            communityIsPublic={communityIsPublic}
+            currentPermissions={currentPermissions}
+            currentRoleIds={currentRoleIds}
+            draft={draft}
+            hasCommunityKey={Boolean(communityKey)}
+            invitationAccepting={invitationAccepting}
+            invitationError={invitationError}
+            invitationInviterName={invitationInviterName}
+            memberIdentities={memberIdentities}
+            memberPictures={memberPictures}
+            mentions={mentions}
+            messageComposer={messageComposer}
+            missingCommunityKey={missingCommunityKey}
+            onAddCommunityKey={() => {
+              openAddCommunityKeyDialog();
+            }}
+            onInvitationAccept={onInvitationAccept}
+            onMessageMenuOpen={(message, x, y) =>
+              setMessageContextMenu({ message, x, y })
+            }
+            onOpenThread={(message) => void openMessageThread(message)}
+            onPollDialogClose={() => setPollDialogOpen(false)}
+            onPollDialogOpen={() => setPollDialogOpen(true)}
+            onStickerClick={setStickerPackPreview}
+            onStickerPreviewClose={() => setStickerPackPreview(null)}
+            pendingInvitation={pendingInvitation}
+            pinnedMessageIds={pinnedMessageIds}
+            pollDialogOpen={pollDialogOpen}
+            pollWorkflow={pollWorkflow}
+            polls={selectedChannelPolls}
+            profiles={profiles}
+            reactionAuthorNames={reactionAuthorNames}
+            selectedChannel={selectedChannel}
+            session={session}
+            stickerPackPreview={stickerPackPreview}
+            typingIdentityIds={typingIdentityIds}
+          />
         )}
       </section>
 
@@ -1465,7 +783,7 @@ export function CommunityWorkspace({
         onAddMember={() => setMemberOpen(true)}
         onCloseMobile={onMobileMembersClose}
         onMemberClick={(member, event) =>
-          openMemberProfile(
+          profiles.openMemberProfile(
             member,
             profileAnchorFromTarget(event.currentTarget),
           )
@@ -1475,39 +793,32 @@ export function CommunityWorkspace({
       />
 
       {messageCollection ? (
-        <MessageCollectionDialog
-          actions={
-            canManageMessages
-              ? [
-                  {
-                    label: copy.messages.unpin,
-                    onClick: (message) => void unpinMessageFromDialog(message),
-                    tone: 'danger',
-                  },
-                ]
-              : []
-          }
-          description={copy.messages.pinnedMessagesBody}
-          emptyLabel={
-            messageCollection.state === 'loading'
-              ? copy.app.loading
-              : (messageCollection.error ?? copy.messages.emptyPins)
-          }
+        <CommunityPinnedMessagesDialog
+          canManageMessages={canManageMessages}
+          collection={messageCollection}
           identityNames={communityIdentityNames}
           identityPictures={memberPictures}
-          messages={messageCollection.messages}
           onClose={closePinnedMessages}
           onMessageOpen={(message) => {
             closePinnedMessages();
             setMessages((current) => mergeChatMessages(current, [message]));
             scrollToChannelMessage(message.id);
           }}
-          subtitle={messageCollection.error}
-          title={copy.messages.pinnedMessages}
+          onUnpin={unpinMessageFromDialog}
         />
       ) : null}
 
       <CommunityWorkspaceDialogs
+        {...communityMessageMenuActions({
+          messageComposer,
+          messageContextMenu,
+          openMessageThread,
+          pinMessage,
+          setMessageContextMenu,
+          setRawMessage,
+          threadActions,
+          unpinMessage,
+        })}
         avatarUrl={avatarUrl}
         avatarViewerOpen={avatarViewerOpen}
         bannerUrl={bannerUrl}
@@ -1546,55 +857,18 @@ export function CommunityWorkspace({
         onCloseManage={() => setManageOpen(false)}
         onCloseMember={() => setMemberOpen(false)}
         onCloseMessageContextMenu={() => setMessageContextMenu(null)}
-        onCloseProfile={() => setProfileViewer(null)}
+        onCloseProfile={profiles.close}
         onCloseRawMessage={() => setRawMessage(null)}
         onCommunityKeyCopy={() => void copyCommunityKey()}
         onCommunityKeyImport={() => void importCommunityKey()}
         onCommunityKeyInputChange={setCommunityKeyInput}
         onCommunityUpdated={onCommunityUpdated}
-        onDeleteMessage={(message) =>
-          void (messageContextMenu?.source === 'thread'
-            ? deleteThreadMessage(message)
-            : messageComposer.handleDeleteChannelMessage(message))
-        }
-        onDownloadAttachment={(attachment) =>
-          void messageComposer.openAttachment(attachment)
-        }
-        onEditMessage={(message) =>
-          messageContextMenu?.source === 'thread'
-            ? startEditingThreadMessage(message)
-            : messageComposer.startEditingChannelMessage(message)
-        }
         onOpenConversationWithIdentity={onOpenConversationWithIdentity}
-        onOpenMessageThread={(message) => void openMessageThread(message)}
-        onPinMessage={(message) => void pinMessage(message)}
-        onReplyToMessage={(message) => {
-          if (messageContextMenu?.source === 'thread') {
-            startReplyingToThreadMessage(message);
-
-            return;
-          }
-
-          setMessageContextMenu(null);
-          messageComposer.startReplyToMessage(message);
-        }}
         onSessionUpdated={onSessionUpdated}
-        onToggleReaction={(message, emoji, reacted) =>
-          void messageComposer.handleToggleChannelMessageReaction(
-            message,
-            emoji,
-            reacted,
-          )
-        }
-        onViewRawMessage={(message) => {
-          setRawMessage(message);
-          setMessageContextMenu(null);
-        }}
-        onUnpinMessage={(message) => void unpinMessage(message)}
         owner={owner}
         presenceByIdentityId={presenceByIdentityId}
         pinnedMessageIds={pinnedMessageIds}
-        profileViewer={profileViewer}
+        profileViewer={profiles.profileViewer}
         rawMessage={rawMessage}
         session={session}
       />
