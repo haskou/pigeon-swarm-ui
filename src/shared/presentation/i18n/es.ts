@@ -29,14 +29,31 @@ export const es = {
     changeIdentity: 'Cambiar identidad',
     createIdentity: 'Crear identidad',
     createIdentityShort: 'Crear',
-    devicePairingCompletionLabel: 'Finalización del dispositivo autorizado',
+    devicePairingCompletionLabel: 'Código final de tu otro dispositivo',
+    devicePairingCompletionPlaceholder:
+      'Pega aquí el código final, o escanea su QR',
     devicePairingError:
       'El código de emparejamiento no es válido o ha caducado.',
-    devicePairingInvitationLabel: 'Invitación del dispositivo autorizado',
+    devicePairingIntro:
+      'Necesitas otro dispositivo donde ya hayas iniciado sesión, y tener los dos abiertos a la vez. Sigue los pasos en orden.',
+    devicePairingInvitationLabel: 'Código de invitación de tu otro dispositivo',
+    devicePairingInvitationPlaceholder:
+      'Pega el código de invitación, o escanea su QR',
     devicePairingPrepare: 'Preparar este dispositivo',
     devicePairingRequestHelp:
-      'Escanea esta respuesta en el dispositivo autorizado, apruébala allí y después escanea aquí el código final.',
+      'En tu otro dispositivo, en la caja «Solicitud del dispositivo nuevo», escanea este QR o pega este código.',
+    devicePairingRequestLabel: 'Código de solicitud de este dispositivo',
     devicePairingRequestQr: 'Solicitud del dispositivo nuevo',
+    devicePairingStep1Help:
+      'En el dispositivo donde ya has entrado, abre Perfil y elige Añadir otro dispositivo. Te muestra un QR y un código: escanea el QR aquí o pega el código.',
+    devicePairingStep1Title: 'Consigue la invitación en tu otro dispositivo',
+    devicePairingStep2Title: 'Enseña este dispositivo al otro',
+    devicePairingStep3Help:
+      'Cuando revises y autorices este dispositivo allí, te mostrará un QR y un código final. Escanéalo o pega el código aquí.',
+    devicePairingStep3Title: 'Introduce el código final',
+    devicePairingStep4Help:
+      'Elige la contraseña de este dispositivo en los campos de arriba y pulsa «Descifrar y entrar».',
+    devicePairingStep4Title: 'Elige una contraseña y entra',
     devicePairingVerificationHelp:
       'Muestra este código al dispositivo autorizado. Debe ser idéntico allí antes de que autorice este dispositivo.',
     fallbackNetworksLabel: 'Redes, separadas por comas',
@@ -63,6 +80,15 @@ export const es = {
     invalidLogin: 'El usuario o la contraseña no son correctos.',
     loadingSubmit: 'Derivando claves y llamando a la API...',
     login: 'Iniciar sesión',
+    loginMethodDevice: 'Dispositivo nuevo',
+    loginMethodDeviceHelp:
+      'Usa este móvil u ordenador por primera vez, aprobándolo desde otro dispositivo donde ya hayas entrado.',
+    loginMethodPassword: 'Contraseña',
+    loginMethodPasswordHelp:
+      'Entra con tu contraseña en un dispositivo que ya has usado.',
+    loginMethodRecovery: 'Clave de recuperación',
+    loginMethodRecoveryHelp:
+      'Has perdido el acceso a tus dispositivos. Usa la clave de recuperación que guardaste al crear tu identidad.',
     loginProgress: {
       confirmingPasskey: 'Confirmando passkey...',
       decryptingKeys: 'Descifrando claves...',
@@ -106,6 +132,7 @@ export const es = {
       'Este navegador o autenticador no ha devuelto soporte WebAuthn PRF para esta credencial. Las passkeys normales pueden estar disponibles, pero esta identidad necesita PRF para proteger claves locales.',
     passwordConfirmLabel: 'Repite la contraseña',
     passwordLabel: 'Contraseña',
+    passwordNewDeviceLabel: 'Contraseña nueva para este dispositivo',
     passwordRequirementItems: {
       lowercase: 'Minúscula',
       match: 'Las contraseñas coinciden',
@@ -133,7 +160,8 @@ export const es = {
       'Guarda esta clave. La necesitarás para abrir tu identidad desde otro nodo o navegador.',
     recoveryKeyLabel: 'Clave de recuperación',
     recoveryKeyLoginHelp:
-      'Sustituye todos los dispositivos autorizados y reconstruye esta identidad en el dispositivo actual.',
+      'Pega la clave de recuperación que guardaste al crear tu identidad (empieza por psrk1). Los dispositivos que usabas antes dejarán de funcionar.',
+    recoveryKeyPlaceholder: 'psrk1...',
     recoveryKeyRegenerate: 'Regenerar',
     recoveryKeySaved: 'He guardado mi clave de recuperación',
     recoveryKeyTitle: 'Clave de recuperación',
@@ -144,8 +172,6 @@ export const es = {
       'Guarda tu identidad y un sobre local de desbloqueo en este navegador.',
     title: 'Pigeon Swarm',
     unknownError: 'Error desconocido. Poético, pero poco útil.',
-    useDevicePairing: 'Añadir este dispositivo usando otro',
-    useRecoveryKey: 'Recuperar en este dispositivo',
   },
   calls: {
     answer: 'Responder',
@@ -638,6 +664,14 @@ export const es = {
   date: {
     today: 'Hoy',
     yesterday: 'Ayer',
+  },
+  devicePairing: {
+    copied: 'Copiado',
+    copyCode: 'Copiar código',
+    paste: 'Pegar',
+    pasteFailed: 'No se pudo leer el portapapeles. Pega el código a mano.',
+    scanFailed: 'No se pudo abrir la cámara. Pega el código.',
+    scanQr: 'Escanear QR',
   },
   dialog: {
     addParticipant: 'Añadir',
@@ -1209,16 +1243,22 @@ export const es = {
       'Se verifican la contraseña actual y la clave de recuperación antes de crear el desbloqueo local. No se guardan.',
     devicePairingAction: 'Añadir otro dispositivo',
     devicePairingAuthorize: 'Autorizar dispositivo',
+    devicePairingCompletionCodeLabel:
+      'Código final (úsalo si el dispositivo nuevo no puede escanear)',
     devicePairingCompletionHelp:
-      'Escanea este último código en el dispositivo nuevo. Está cifrado para ese dispositivo y solo puede usarse una vez.',
+      'Escanea este QR final en el dispositivo nuevo, o copia el código y pégalo allí. Está cifrado para ese dispositivo y solo funciona una vez.',
     devicePairingCompletionQr: 'Finalización cifrada del emparejamiento',
     devicePairingError: 'No se ha podido emparejar el dispositivo.',
     devicePairingHelp:
       'Usa códigos QR autenticados y de corta duración. El dispositivo nuevo crea una credencial independiente y su propia envoltura de contraseña.',
+    devicePairingInvitationCodeLabel:
+      'Código de invitación (úsalo si el dispositivo nuevo no puede escanear)',
     devicePairingInvitationHelp:
-      'Escanea esta invitación en el dispositivo nuevo. Después escanea aquí su respuesta antes de que caduque.',
+      'En el dispositivo nuevo ve a Iniciar sesión y elige Dispositivo nuevo. Escanea este QR allí, o pega el código de abajo. El dispositivo nuevo mostrará su propia solicitud: pégala o escanéala en la caja que hay bajo este QR.',
     devicePairingInvitationQr: 'Invitación para emparejar dispositivo',
     devicePairingRequestLabel: 'Solicitud del dispositivo nuevo',
+    devicePairingRequestPlaceholder:
+      'Pega el código de solicitud del dispositivo nuevo, o escanea su QR',
     devicePairingReview: 'Revisar solicitud',
     devicePairingTitle: 'Añadir un dispositivo',
     devicePairingVerificationHelp:

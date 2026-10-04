@@ -26,13 +26,30 @@ export const en = {
     changeIdentity: 'Change identity',
     createIdentity: 'Create identity',
     createIdentityShort: 'Create',
-    devicePairingCompletionLabel: 'Completion from the authorized device',
+    devicePairingCompletionLabel: 'Final code from your other device',
+    devicePairingCompletionPlaceholder:
+      'Paste the final code here, or scan its QR',
     devicePairingError: 'The device pairing code is invalid or expired.',
-    devicePairingInvitationLabel: 'Invitation from the authorized device',
+    devicePairingIntro:
+      'You need another device where you are already signed in, and both devices open at the same time. Follow the steps in order.',
+    devicePairingInvitationLabel: 'Invitation code from your other device',
+    devicePairingInvitationPlaceholder:
+      'Paste the invitation code, or scan its QR',
     devicePairingPrepare: 'Prepare this device',
     devicePairingRequestHelp:
-      'Scan this response on the authorized device, approve it there, then scan the final code here.',
+      "On your other device, in the 'Request from the new device' box, scan this QR or paste this code.",
+    devicePairingRequestLabel: "This device's request code",
     devicePairingRequestQr: 'New device pairing request',
+    devicePairingStep1Help:
+      'On the device where you are signed in, open Profile and choose Add another device. It shows a QR and a code: scan the QR here or paste the code.',
+    devicePairingStep1Title: 'Get the invitation from your other device',
+    devicePairingStep2Title: 'Show this device to the other one',
+    devicePairingStep3Help:
+      'After you review and authorize this device there, it shows a final QR and code. Scan it or paste the code here.',
+    devicePairingStep3Title: 'Enter the final code',
+    devicePairingStep4Help:
+      "Choose the password for this device in the fields above, then press 'Decrypt and enter'.",
+    devicePairingStep4Title: 'Set a password and enter',
     devicePairingVerificationHelp:
       'Show this code to the authorized device. It must be identical there before it authorizes this device.',
     fallbackNetworksLabel: 'Networks, comma-separated',
@@ -58,6 +75,15 @@ export const en = {
     invalidLogin: 'The username or password is incorrect.',
     loadingSubmit: 'Deriving keys and calling the API...',
     login: 'Login',
+    loginMethodDevice: 'New device',
+    loginMethodDeviceHelp:
+      'Use this phone or computer for the first time, approving it from another device where you are signed in.',
+    loginMethodPassword: 'Password',
+    loginMethodPasswordHelp:
+      'Sign in with your password on a device you already used.',
+    loginMethodRecovery: 'Recovery key',
+    loginMethodRecoveryHelp:
+      'You lost access to your devices. Use the recovery key you saved when you created your identity.',
     loginProgress: {
       confirmingPasskey: 'Confirming passkey...',
       decryptingKeys: 'Decrypting keys...',
@@ -101,6 +127,7 @@ export const en = {
       'This browser or authenticator did not return WebAuthn PRF support for this credential. Normal passkeys may be available, but this identity needs PRF to protect local keys.',
     passwordConfirmLabel: 'Repeat password',
     passwordLabel: 'Password',
+    passwordNewDeviceLabel: 'New password for this device',
     passwordRequirementItems: {
       lowercase: 'Lowercase',
       match: 'Passwords match',
@@ -128,7 +155,8 @@ export const en = {
       'Save this key. You will need it to open your identity from another node or browser.',
     recoveryKeyLabel: 'Recovery key',
     recoveryKeyLoginHelp:
-      'Replaces every previously authorized device and rebuilds this identity on the current device.',
+      'Paste the recovery key you saved when you created your identity (it starts with psrk1). Devices you used before will stop working.',
+    recoveryKeyPlaceholder: 'psrk1...',
     recoveryKeyRegenerate: 'Regenerate',
     recoveryKeySaved: 'I saved my recovery key',
     recoveryKeyTitle: 'Recovery key',
@@ -138,8 +166,6 @@ export const en = {
       'Stores your identity and a local device unlock envelope in this browser.',
     title: 'Pigeon Swarm',
     unknownError: 'Unknown error. Poetic, but not useful.',
-    useDevicePairing: 'Add this device using another device',
-    useRecoveryKey: 'Recover on this device',
   },
   calls: {
     answer: 'Answer',
@@ -630,6 +656,14 @@ export const en = {
   date: {
     today: 'Today',
     yesterday: 'Yesterday',
+  },
+  devicePairing: {
+    copied: 'Copied',
+    copyCode: 'Copy code',
+    paste: 'Paste',
+    pasteFailed: 'Could not read the clipboard. Paste the code manually.',
+    scanFailed: 'Could not open the camera. Paste the code instead.',
+    scanQr: 'Scan QR',
   },
   dialog: {
     addParticipant: 'Add',
@@ -1205,16 +1239,22 @@ export const en = {
       'The current password and recovery key are verified before creating local unlock. They are not saved.',
     devicePairingAction: 'Add another device',
     devicePairingAuthorize: 'Authorize device',
+    devicePairingCompletionCodeLabel:
+      'Final code (use it if the new device cannot scan)',
     devicePairingCompletionHelp:
-      'Scan this final code on the new device. It is encrypted for that device and can be used only once.',
+      'Scan this final QR on the new device, or copy the code and paste it there. It is encrypted for that device and works only once.',
     devicePairingCompletionQr: 'Encrypted device pairing completion',
     devicePairingError: 'The device could not be paired.',
     devicePairingHelp:
       'Uses short-lived authenticated QR codes. The new device creates an independent credential and local password envelope.',
+    devicePairingInvitationCodeLabel:
+      'Invitation code (use it if the new device cannot scan)',
     devicePairingInvitationHelp:
-      'Scan this invitation on the new device. Then scan its response here before the invitation expires.',
+      'On the new device, go to Login and choose New device. Scan this QR there, or paste the code below. The new device will then show its own request: paste or scan it in the box under this QR.',
     devicePairingInvitationQr: 'Device pairing invitation',
     devicePairingRequestLabel: 'Request from the new device',
+    devicePairingRequestPlaceholder:
+      'Paste the new device request code, or scan its QR',
     devicePairingReview: 'Review request',
     devicePairingTitle: 'Add a device',
     devicePairingVerificationHelp:
