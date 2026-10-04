@@ -19,7 +19,6 @@ import {
   initialConversationId,
   lastConversationStorageKey,
   loadEncryptedDraftPayloads,
-  loadLegacyPlainDrafts,
   loadCommunityUnreadCounts,
   loadWorkspacePreference,
   type WorkspacePreference,
@@ -125,16 +124,14 @@ export function useWorkspacePreferenceState(
     useState<CommunityUnreadCounts>(() =>
       loadCommunityUnreadCounts(identityId),
     );
-  const [drafts, setDrafts] = useState<ConversationDrafts>(() =>
-    loadLegacyPlainDrafts(identityId),
-  );
+  const [drafts, setDrafts] = useState<ConversationDrafts>({});
   const [draftsHydrated, setDraftsHydrated] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
     setDraftsHydrated(false);
-    setDrafts(loadLegacyPlainDrafts(identityId));
+    setDrafts({});
     setCommunityUnreadCountsById(loadCommunityUnreadCounts(identityId));
     setWorkspacePreference(loadWorkspacePreference(identityId));
 

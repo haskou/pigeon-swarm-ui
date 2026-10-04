@@ -46,21 +46,6 @@ export function encryptedDraftsStorageValue(
   };
 }
 
-export function loadLegacyPlainDrafts(identityId: string): ConversationDrafts {
-  const stored = readJsonObjectFromLocalStorage<Record<string, unknown>>(
-    draftsStorageKey(identityId),
-    {},
-  );
-
-  if (isEncryptedConversationDrafts(stored)) return {};
-
-  return Object.fromEntries(
-    Object.entries(stored).filter(
-      (entry): entry is [string, string] => typeof entry[1] === 'string',
-    ),
-  );
-}
-
 export function loadEncryptedDraftPayloads(
   identityId: string,
 ): Record<string, string> {
