@@ -144,7 +144,6 @@ import { PigeonCallSignaling } from './calls/PigeonCallSignaling';
 import { PigeonCallStarter } from './calls/PigeonCallStarter';
 import { PigeonCommunityManagement } from './communities/PigeonCommunityManagement';
 import { PigeonConversationsFacade } from './conversations/PigeonConversationsFacade';
-import { ConversationKeychainRecovery } from './identities/ConversationKeychainRecovery';
 import { PigeonIdentitiesFacade } from './identities/PigeonIdentitiesFacade';
 import { PigeonSessionFacade } from './identities/PigeonSessionFacade';
 import { PigeonConversationDrafts } from './messages/PigeonConversationDrafts';
@@ -496,7 +495,6 @@ export class PigeonApplication {
     this.session = new PigeonSessionFacade(
       gateway.identityGateway,
       this.identities,
-      new ConversationKeychainRecovery(new ConversationIdFactory()),
     );
     const stickerContexts = new StickerAccessContexts();
     const stickerMapper = new StickerMapper();
