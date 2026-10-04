@@ -1,4 +1,7 @@
-import type { CommunityTextChannel } from '../../../../../shared/domain/pigeonResources.types';
+import type {
+  CommunityChannelThreadSummary,
+  CommunityTextChannel,
+} from '../../../../../shared/domain/pigeonResources.types';
 
 import { CommunityChannelThreadCache } from '../../../../../contexts/communities/presentation/view-models/CommunityChannelThreadCache';
 
@@ -39,5 +42,39 @@ describe('CommunityChannelThreadCache', () => {
         'thread-b',
       ]),
     ).toEqual(new Set(['thread-a', 'thread-b']));
+  });
+
+  it('upserts a summary replacing its root and ordering by latest reply', () => {
+    const summary = (rootMessageId: string, lastReplyAt: number) =>
+      ({ lastReplyAt, rootMessageId }) as CommunityChannelThreadSummary;
+    const current = {
+      'channel-a': [summary('old', 10), summary('replaced', 5)],
+      'channel-b': [summary('other', 1)],
+    };
+
+    const next = CommunityChannelThreadCache.upsertSummary(
+      current,
+      'channel-a',
+      summary('replaced', 20),
+    );
+
+    expect(next['channel-a'].map((thread) => thread.rootMessageId)).toEqual([
+      'replaced',
+      'old',
+    ]);
+    expect(next['channel-b']).toBe(current['channel-b']);
+    expect(current['channel-a']).toHaveLength(2);
+  });
+
+  it('creates the channel entry when upserting into an unknown channel', () => {
+    const summary = { lastReplyAt: 1, rootMessageId: 'root' };
+
+    expect(
+      CommunityChannelThreadCache.upsertSummary(
+        {},
+        'channel-a',
+        summary as CommunityChannelThreadSummary,
+      ),
+    ).toEqual({ 'channel-a': [summary] });
   });
 });
