@@ -39,6 +39,25 @@ export class CommunityChannelThreadCache {
     );
   }
 
+  public static upsertSummary(
+    current: ChannelThreadsById,
+    channelId: string,
+    summary: CommunityChannelThreadSummary,
+  ): ChannelThreadsById {
+    const currentThreads = current[channelId] ?? [];
+    const nextThreads = [
+      summary,
+      ...currentThreads.filter(
+        (thread) => thread.rootMessageId !== summary.rootMessageId,
+      ),
+    ].sort((left, right) => right.lastReplyAt - left.lastReplyAt);
+
+    return {
+      ...current,
+      [channelId]: nextThreads,
+    };
+  }
+
   public read(communityId: string): ChannelThreadsById | null {
     const entry = this.entries.get(communityId);
 
