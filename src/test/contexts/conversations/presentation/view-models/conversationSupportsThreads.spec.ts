@@ -7,7 +7,7 @@ describe(conversationSupportsThreads.name, () => {
     ).toBe(true);
   });
 
-  it('recognizes legacy group ids without an explicit type', () => {
+  it('recognizes group-prefixed ids without an explicit type', () => {
     expect(conversationSupportsThreads({ id: 'group:conversation-1' })).toBe(
       true,
     );
@@ -22,7 +22,7 @@ describe(conversationSupportsThreads.name, () => {
     ).toBe(false);
   });
 
-  it('trusts an explicit one-to-one type over a legacy group-shaped id', () => {
+  it('trusts an explicit one-to-one type over a group-shaped id', () => {
     expect(
       conversationSupportsThreads({
         id: 'group:conversation-1',
@@ -41,7 +41,7 @@ describe(conversationSupportsThreads.name, () => {
     expect(
       conversationSupportsThreads({
         conversationId: 'one-to-one:conversation-1',
-        id: 'group:legacy-id',
+        id: 'group:conversation-2',
         type: 'group',
       }),
     ).toBe(false);

@@ -129,7 +129,6 @@ loads the active-call list; failed recovery is retried at most twice with one- a
 two-second delays. Duplicate recovery requests coalesce, and reconnect cancels
 older response application. Malformed snapshots trigger bounded per-call recovery;
 older or duplicate revisions do not. Snapshots received during a recovery supersede
-the response. Older servers without snapshots use a coalesced fallback, limited
-to one call read per second. Community snapshots need no creator or creation time;
+the response. Community snapshots need no creator or creation time;
 participants need no join/leave times or remote media diagnostics. Offer initiation
 uses identity ordering, independent of historical join times.

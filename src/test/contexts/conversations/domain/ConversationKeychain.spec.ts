@@ -66,7 +66,7 @@ describe(ConversationKeychain.name, () => {
     ).toBe(keychain.conversations['local-key-id']);
   });
 
-  it('does not infer legacy conversation ids without an exact key', () => {
+  it('does not infer conversation ids without an exact key', () => {
     expect(
       ConversationKeychain.entry(
         keychain,
