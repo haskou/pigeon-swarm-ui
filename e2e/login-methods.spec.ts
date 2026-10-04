@@ -75,7 +75,6 @@ test('signs in on a new device with the recovery key', async ({
 test('adds a new device by pairing it with a signed-in device', async ({
   browser,
 }, testInfo) => {
-  test.setTimeout(600_000);
   const identity = newIdentity(testInfo.project.name, 'pair');
   const authorized = await newIsolatedPage(browser);
   const fresh = await newIsolatedPage(browser);
