@@ -24,11 +24,11 @@ import {
   IDENTITY_PROFILE_HANDLE_MAX_LENGTH,
   IDENTITY_PROFILE_NAME_MAX_LENGTH,
 } from '../../../../contexts/identities/domain/profile/IdentityProfileConstraints';
+import { AuthSwitch } from '../../../../contexts/identities/presentation/auth/AuthSecurityControls';
 import {
   isValidPassword,
   passwordValidationChecks,
 } from '../../../../contexts/identities/presentation/auth/credentialsValidation';
-import { AuthSwitch } from '../../../../contexts/identities/presentation/auth/AuthSecurityControls';
 import { PasswordRequirementProgress } from '../../../../contexts/identities/presentation/auth/PasswordRequirementProgress';
 import {
   isValidHandle,
@@ -48,8 +48,8 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
-import { ProfileKeychainSection } from './ProfileKeychainSection';
 import { DevicePairingDialog } from './DevicePairingDialog';
+import { ProfileKeychainSection } from './ProfileKeychainSection';
 
 const ImageCropEditor = lazy(() =>
   import('../../../../shared/presentation/components/ImageCropEditor').then(
@@ -95,6 +95,7 @@ export function ProfileEditor({
   const [currentPassword, setCurrentPassword] = useState('');
   const [passwordSectionOpen, setPasswordSectionOpen] = useState(false);
   const [devicePairingOpen, setDevicePairingOpen] = useState(false);
+  const [pairedSession, setPairedSession] = useState<Session | null>(null);
   const [activeSection, setActiveSection] =
     useState<ProfileEditorSection>('profile');
   const [technicalDetailsVisible, setTechnicalDetailsVisible] =
@@ -637,10 +638,14 @@ export function ProfileEditor({
       )}
       {devicePairingOpen && (
         <DevicePairingDialog
-          onClose={() => setDevicePairingOpen(false)}
-          onSessionUpdated={(nextSession) =>
-            onUpdated(nextSession, { passwordChanged: false })
-          }
+          onClose={() => {
+            setDevicePairingOpen(false);
+
+            if (pairedSession) {
+              onUpdated(pairedSession, { passwordChanged: false });
+            }
+          }}
+          onSessionUpdated={setPairedSession}
           session={session}
         />
       )}

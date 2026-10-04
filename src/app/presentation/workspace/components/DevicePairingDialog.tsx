@@ -4,6 +4,7 @@ import type { Session } from '../../../../shared/domain/pigeonResources.types';
 
 import { DevicePairingCode } from '../../../../contexts/identities/domain/value-objects/DevicePairingCode';
 import { DevicePairingCodeField } from '../../../../contexts/identities/presentation/device-pairing/DevicePairingCodeField';
+import { DevicePairingCodeOutput } from '../../../../contexts/identities/presentation/device-pairing/DevicePairingCodeOutput';
 import { DevicePairingQrCode } from '../../../../contexts/identities/presentation/device-pairing/DevicePairingQrCode';
 import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
 import { copy } from '../../../../shared/presentation/i18n/copy';
@@ -82,8 +83,15 @@ export function DevicePairingDialog({
                 code={invitation}
                 label={copy.profile.devicePairingInvitationQr}
               />
+              <DevicePairingCodeOutput
+                label={copy.profile.devicePairingInvitationCodeLabel}
+                testId="device-pairing-invitation-output"
+                value={invitation.valueOf()}
+              />
               <DevicePairingCodeField
                 label={copy.profile.devicePairingRequestLabel}
+                placeholder={copy.profile.devicePairingRequestPlaceholder}
+                testId="device-pairing-request-input"
                 onChange={(value) => {
                   setRequestCode(value);
                   setVerificationCode(null);
@@ -105,6 +113,7 @@ export function DevicePairingDialog({
               )}
               <button
                 className="ui-button ui-button-primary"
+                data-testid="device-pairing-submit"
                 disabled={!requestCode.trim() || state === 'loading'}
                 onClick={() => void (verificationCode ? authorize() : review())}
                 type="button"
@@ -123,9 +132,9 @@ export function DevicePairingDialog({
                 code={completionCode}
                 label={copy.profile.devicePairingCompletionQr}
               />
-              <textarea
-                className="ui-field-control min-h-24 resize-y px-3 py-2 font-mono text-xs"
-                readOnly
+              <DevicePairingCodeOutput
+                label={copy.profile.devicePairingCompletionCodeLabel}
+                testId="device-pairing-completion-output"
                 value={completionCode.valueOf()}
               />
             </>

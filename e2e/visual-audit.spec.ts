@@ -89,7 +89,10 @@ test.describe('visual audit', () => {
     await page.getByTestId('auth-password-input').fill(password);
 
     if (recoveryKey) {
-      await page.getByTestId('auth-use-recovery-key-toggle').click();
+      await page
+        .getByTestId('auth-login-method-control')
+        .getByRole('button', { name: 'Recovery key' })
+        .click();
       await page.getByTestId('auth-recovery-key-input').fill(recoveryKey);
       await page.getByTestId('auth-password-confirmation-input').fill(password);
     }

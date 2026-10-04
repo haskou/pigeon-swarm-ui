@@ -27,8 +27,6 @@ import {
   loadSavedCredentials,
   saveCredentials,
 } from '../../infrastructure/storage/savedCredentials';
-import { DevicePairingCodeField } from '../device-pairing/DevicePairingCodeField';
-import { DevicePairingQrCode } from '../device-pairing/DevicePairingQrCode';
 import { useIdentityPreview } from '../hooks/useIdentityPreview';
 import { AuthFormFields } from './AuthFormFields';
 import {
@@ -45,6 +43,7 @@ import {
 } from './credentialsValidation';
 import { Field } from './Field';
 import { LoginIdentityPreview } from './LoginIdentityPreview';
+import { type LoginMethod, LoginMethodPanel } from './LoginMethodPanel';
 import { NodeLoginSummary } from './NodeLoginSummary';
 import { PasswordRequirementProgress } from './PasswordRequirementProgress';
 
@@ -83,8 +82,7 @@ export function AuthScreen({
   );
   const [recoveryKeyConfirmed, setRecoveryKeyConfirmed] = useState(false);
   const [loginRecoveryKey, setLoginRecoveryKey] = useState('');
-  const [useRecoveryKey, setUseRecoveryKey] = useState(false);
-  const [useDevicePairing, setUseDevicePairing] = useState(false);
+  const [loginMethod, setLoginMethod] = useState<LoginMethod>('password');
   const [pairingInvitationCode, setPairingInvitationCode] = useState('');
   const [pairingCompletionCode, setPairingCompletionCode] = useState('');
   const [pairingDraft, setPairingDraft] =
@@ -98,6 +96,18 @@ export function AuthScreen({
   const [showInstallHelp, setShowInstallHelp] = useState(false);
   const { installState, requestInstall } = useInstallPrompt();
   const [selectedNetwork, setSelectedNetwork] = useState('');
+  const useRecoveryKey = mode === 'login' && loginMethod === 'recovery';
+  const useDevicePairing = mode === 'login' && loginMethod === 'device';
+  const loginMethodOptions = [
+    { label: copy.auth.loginMethodPassword, value: 'password' },
+    { label: copy.auth.loginMethodDevice, value: 'device' },
+    { label: copy.auth.loginMethodRecovery, value: 'recovery' },
+  ] satisfies Array<{ label: string; value: LoginMethod }>;
+  const loginMethodHelp = {
+    device: copy.auth.loginMethodDeviceHelp,
+    password: copy.auth.loginMethodPasswordHelp,
+    recovery: copy.auth.loginMethodRecoveryHelp,
+  } satisfies Record<LoginMethod, string>;
   const modeOptions = [
     { label: copy.auth.login, value: 'login' },
     { label: copy.auth.createIdentityShort, value: 'create' },
@@ -402,7 +412,29 @@ export function AuthScreen({
               />
             ) : null}
 
-            <Field label={copy.auth.passwordLabel}>
+            {mode === 'login' && (
+              <div className="grid gap-2">
+                <SegmentedControl
+                  columns={3}
+                  dense
+                  value={loginMethod}
+                  onChange={setLoginMethod}
+                  options={loginMethodOptions}
+                  data-testid="auth-login-method-control"
+                />
+                <p className="px-1 text-xs leading-relaxed text-white/50">
+                  {loginMethodHelp[loginMethod]}
+                </p>
+              </div>
+            )}
+
+            <Field
+              label={
+                useRecoveryKey || useDevicePairing
+                  ? copy.auth.passwordNewDeviceLabel
+                  : copy.auth.passwordLabel
+              }
+            >
               <input
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
@@ -416,107 +448,24 @@ export function AuthScreen({
               />
             </Field>
             {mode === 'login' && (
-              <div className="px-1 py-1">
-                <button
-                  type="button"
-                  aria-pressed={useRecoveryKey}
-                  onClick={() => {
-                    setUseRecoveryKey((enabled) => !enabled);
-                    setUseDevicePairing(false);
+              <>
+                <LoginMethodPanel
+                  completionCode={pairingCompletionCode}
+                  draft={pairingDraft}
+                  invitationCode={pairingInvitationCode}
+                  loading={state === 'loading'}
+                  method={loginMethod}
+                  onCompletionCodeChange={setPairingCompletionCode}
+                  onInvitationCodeChange={(value) => {
+                    setPairingInvitationCode(value);
+                    setPairingDraft(null);
                   }}
-                  className="flex w-full items-center gap-3 py-2 text-left text-sm font-bold text-white/65 transition hover:text-white/80"
-                  data-testid="auth-use-recovery-key-toggle"
-                >
-                  <AuthSwitch enabled={useRecoveryKey} />
-                  <span>{copy.auth.useRecoveryKey}</span>
-                </button>
-                {useRecoveryKey && (
-                  <div className="mt-3">
-                    <Field label={copy.auth.recoveryKeyLabel}>
-                      <input
-                        value={loginRecoveryKey}
-                        onChange={(event) =>
-                          setLoginRecoveryKey(event.target.value)
-                        }
-                        className="ui-field-control px-4 py-3 text-sm placeholder:text-white/30"
-                        placeholder="psrk1..."
-                        type="password"
-                        autoComplete="off"
-                        autoCapitalize="none"
-                        autoCorrect="off"
-                        spellCheck={false}
-                        data-testid="auth-recovery-key-input"
-                      />
-                      <p className="mt-2 text-xs leading-relaxed text-white/40">
-                        {copy.auth.recoveryKeyLoginHelp}
-                      </p>
-                    </Field>
-                  </div>
-                )}
-                <button
-                  type="button"
-                  aria-pressed={useDevicePairing}
-                  onClick={() => {
-                    setUseDevicePairing((enabled) => !enabled);
-                    setUseRecoveryKey(false);
-                  }}
-                  className="mt-1 flex w-full items-center gap-3 py-2 text-left text-sm font-bold text-white/65 transition hover:text-white/80"
-                  data-testid="auth-use-device-pairing-toggle"
-                >
-                  <AuthSwitch enabled={useDevicePairing} />
-                  <span>{copy.auth.useDevicePairing}</span>
-                </button>
-                {useDevicePairing && (
-                  <div className="mt-3 grid gap-4">
-                    <DevicePairingCodeField
-                      label={copy.auth.devicePairingInvitationLabel}
-                      onChange={(value) => {
-                        setPairingInvitationCode(value);
-                        setPairingDraft(null);
-                      }}
-                      value={pairingInvitationCode}
-                    />
-                    {!pairingDraft ? (
-                      <button
-                        className="ui-button"
-                        disabled={
-                          !pairingInvitationCode.trim() || state === 'loading'
-                        }
-                        onClick={() => void prepareDevicePairing()}
-                        type="button"
-                      >
-                        {copy.auth.devicePairingPrepare}
-                      </button>
-                    ) : (
-                      <>
-                        <p className="text-xs leading-relaxed text-white/45">
-                          {copy.auth.devicePairingRequestHelp}
-                        </p>
-                        <DevicePairingQrCode
-                          code={pairingDraft.getRequest().toCode()}
-                          label={copy.auth.devicePairingRequestQr}
-                        />
-                        <div className="ui-inline-notice grid gap-1 text-center">
-                          <p className="text-xs text-white/60">
-                            {copy.auth.devicePairingVerificationHelp}
-                          </p>
-                          <p
-                            className="font-mono text-2xl tracking-widest"
-                            data-testid="auth-device-pairing-verification-code"
-                          >
-                            {pairingVerificationCode}
-                          </p>
-                        </div>
-                        <DevicePairingCodeField
-                          label={copy.auth.devicePairingCompletionLabel}
-                          onChange={setPairingCompletionCode}
-                          value={pairingCompletionCode}
-                        />
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
+                  onPrepare={() => void prepareDevicePairing()}
+                  onRecoveryKeyChange={setLoginRecoveryKey}
+                  recoveryKey={loginRecoveryKey}
+                  verificationCode={pairingVerificationCode}
+                />
+              </>
             )}
             {(mode === 'create' || useRecoveryKey || useDevicePairing) && (
               <>
