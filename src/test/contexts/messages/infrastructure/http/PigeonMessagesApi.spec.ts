@@ -1,3 +1,5 @@
+import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+
 import type { MessageProjectionPort } from '../../../../../contexts/messages/infrastructure/crypto/MessageProjectionPort';
 import type {
   ChatMessage,
@@ -65,24 +67,116 @@ describe(PigeonMessagesApi.name, () => {
     );
   });
 
-  it('updates a reaction through the signed message endpoint', async () => {
-    const request = jest.fn().mockResolvedValue(undefined);
-    const headers = jest.fn().mockResolvedValue({ signature: 'signature' });
-    const api = new PigeonMessagesApi(
-      httpClient(request),
-      signer(headers),
-      new RequestCache(),
-      projection(jest.fn()),
-    );
+  describe('signed mutations', () => {
+    type Sent = {
+      createdAt?: number;
+      emoji?: string;
+      mutation: Record<string, unknown>;
+    };
 
-    await api.addMessageReaction(session, 'conversation-1', 'message-1', '👍');
+    async function setup(): Promise<{
+      api: PigeonMessagesApi;
+      request: jest.Mock;
+      sent: () => Sent[];
+      signed: Session;
+    }> {
+      const request = jest.fn().mockResolvedValue(undefined);
+      const headers = jest.fn().mockResolvedValue({ signature: 'signature' });
+      const signed = {
+        deviceCredentialKeyPair: await KeyPair.generate(),
+        identity: { id: 'identity-1' },
+      } as unknown as Session;
+      const api = new PigeonMessagesApi(
+        httpClient(request),
+        signer(headers),
+        new RequestCache(),
+        projection(jest.fn()),
+      );
 
-    expect(request).toHaveBeenCalledWith(
-      '/conversations/conversation-1/messages/message-1/reactions',
-      expect.objectContaining({
-        body: JSON.stringify({ emoji: '👍' }),
-        method: 'POST',
-      }),
-    );
+      return {
+        api,
+        request,
+        sent: () =>
+          request.mock.calls.map(
+            ([, init]: [string, { body: string }]) =>
+              JSON.parse(init.body) as Sent,
+          ),
+        signed,
+      };
+    }
+
+    it('pins and unpins conversation messages', async () => {
+      const { api, request, sent, signed } = await setup();
+      const path = '/conversations/conversation-1/messages/message-1/pin';
+
+      await api.pinMessage(signed, 'conversation-1', 'message-1');
+      await api.unpinMessage(signed, 'conversation-1', 'message-1');
+
+      const [pin, unpin] = sent();
+
+      expect(request).toHaveBeenNthCalledWith(
+        1,
+        path,
+        expect.objectContaining({ method: 'POST' }),
+      );
+      expect(request).toHaveBeenNthCalledWith(
+        2,
+        path,
+        expect.objectContaining({ method: 'DELETE' }),
+      );
+      expect(pin.createdAt).toEqual(expect.any(Number));
+      expect(pin.mutation).toMatchObject({
+        kind: 'put',
+        predecessor: null,
+        recordId: 'conversation:conversation-1:message-1',
+        sequence: 0,
+        store: 'pins',
+        version: 1,
+      });
+      expect(unpin.mutation).toMatchObject({
+        kind: 'delete',
+        recordId: 'conversation:conversation-1:message-1',
+        store: 'pins',
+      });
+    });
+
+    it('adds and removes conversation message reactions', async () => {
+      const { api, request, sent, signed } = await setup();
+      const path = '/conversations/conversation-1/messages/message-1/reactions';
+      const recordId = 'conversation:conversation-1:message-1:identity-1:👍';
+
+      await api.addMessageReaction(signed, 'conversation-1', 'message-1', '👍');
+      await api.removeMessageReaction(
+        signed,
+        'conversation-1',
+        'message-1',
+        '👍',
+      );
+
+      const [add, remove] = sent();
+
+      expect(request).toHaveBeenNthCalledWith(
+        1,
+        path,
+        expect.objectContaining({ method: 'POST' }),
+      );
+      expect(request).toHaveBeenNthCalledWith(
+        2,
+        path,
+        expect.objectContaining({ method: 'DELETE' }),
+      );
+      expect(add).toMatchObject({ createdAt: expect.any(Number), emoji: '👍' });
+      expect(add.mutation).toMatchObject({
+        kind: 'put',
+        recordId,
+        store: 'reactions',
+      });
+      expect(remove.emoji).toBe('👍');
+      expect(remove.mutation).toMatchObject({
+        kind: 'delete',
+        recordId,
+        store: 'reactions',
+      });
+    });
   });
 });

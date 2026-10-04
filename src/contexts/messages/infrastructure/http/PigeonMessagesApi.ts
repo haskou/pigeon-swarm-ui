@@ -15,6 +15,8 @@ import type { ConversationDraftResource } from './ConversationDraftResource';
 import type { MessageLoadOptions } from './MessageLoadOptions';
 import type { ConversationDraftProjection } from './resources/ConversationDraftProjection';
 
+import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
+import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 import { DraftPayloadCipher } from '../crypto/DraftPayloadCipher';
 import { PigeonLinkPreviewsApi } from './PigeonLinkPreviewsApi';
 
@@ -24,6 +26,8 @@ export class PigeonMessagesApi {
   private readonly draftPayloads: DraftPayloadCipher;
 
   private readonly linkPreviews: PigeonLinkPreviewsApi;
+
+  private readonly mutations = new PublicMutationSigner();
 
   public constructor(
     private readonly http: HttpJsonClient,
@@ -37,21 +41,67 @@ export class PigeonMessagesApi {
     this.linkPreviews = linkPreviews;
   }
 
-  private async updateReaction(
+  private async sendMutation(
+    session: Session,
+    method: 'DELETE' | 'POST',
+    path: string,
+    kind: 'delete' | 'put',
+    store: 'pins' | 'reactions',
+    payload: Record<string, unknown>,
+    fields: Record<string, unknown> = {},
+  ): Promise<void> {
+    await submitPublicMutation(
+      PublicMutationSigner.FIRST_POSITION,
+      (position) =>
+        this.mutations.sign(
+          session,
+          { kind, payload, recordId: String(payload.id), store },
+          position,
+        ),
+      async (mutation) => {
+        const body = { ...fields, mutation };
+
+        await this.http.request(path, {
+          body: JSON.stringify(body),
+          headers: await this.signer.headers(session, method, path, body),
+          method,
+        });
+      },
+    );
+  }
+
+  private pinRecord(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+  ): Record<string, unknown> {
+    return {
+      conversationId,
+      id: `conversation:${conversationId}:${messageId}`,
+      messageId,
+      pinnedByIdentityId: this.mutations.authorOf(session),
+      scopeType: 'conversation',
+    };
+  }
+
+  private reactionRecord(
     session: Session,
     conversationId: string,
     messageId: string,
     emoji: string,
-    method: 'DELETE' | 'POST',
-  ): Promise<void> {
-    const path = `${this.messagePath(conversationId, messageId)}/reactions`;
-    const body = { emoji };
+  ): Record<string, unknown> {
+    const authorId = this.mutations.authorOf(session);
 
-    await this.http.request(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, method, path, body),
-      method,
-    });
+    return {
+      authorId,
+      conversationId,
+      emoji,
+      id: ['conversation', conversationId, messageId, authorId, emoji].join(
+        ':',
+      ),
+      messageId,
+      scopeType: 'conversation',
+    };
   }
 
   private invalidatePins(session: Session, conversationId: string): void {
@@ -239,10 +289,17 @@ export class PigeonMessagesApi {
   ): Promise<void> {
     const path = `${this.messagePath(conversationId, messageId)}/pin`;
 
-    await this.http.request(path, {
-      headers: await this.signer.headers(session, 'POST', path),
-      method: 'POST',
-    });
+    const createdAt = Date.now();
+
+    await this.sendMutation(
+      session,
+      'POST',
+      path,
+      'put',
+      'pins',
+      { ...this.pinRecord(session, conversationId, messageId), createdAt },
+      { createdAt },
+    );
     this.invalidatePins(session, conversationId);
   }
 
@@ -253,9 +310,9 @@ export class PigeonMessagesApi {
   ): Promise<void> {
     const path = `${this.messagePath(conversationId, messageId)}/pin`;
 
-    await this.http.request(path, {
-      headers: await this.signer.headers(session, 'DELETE', path),
-      method: 'DELETE',
+    await this.sendMutation(session, 'DELETE', path, 'delete', 'pins', {
+      ...this.pinRecord(session, conversationId, messageId),
+      removed: true,
     });
     this.invalidatePins(session, conversationId);
   }
@@ -328,12 +385,19 @@ export class PigeonMessagesApi {
     messageId: string,
     emoji: string,
   ): Promise<void> {
-    await this.updateReaction(
+    const createdAt = Date.now();
+
+    await this.sendMutation(
       session,
-      conversationId,
-      messageId,
-      emoji,
       'POST',
+      `${this.messagePath(conversationId, messageId)}/reactions`,
+      'put',
+      'reactions',
+      {
+        ...this.reactionRecord(session, conversationId, messageId, emoji),
+        createdAt,
+      },
+      { createdAt, emoji },
     );
   }
 
@@ -343,12 +407,17 @@ export class PigeonMessagesApi {
     messageId: string,
     emoji: string,
   ): Promise<void> {
-    await this.updateReaction(
+    await this.sendMutation(
       session,
-      conversationId,
-      messageId,
-      emoji,
       'DELETE',
+      `${this.messagePath(conversationId, messageId)}/reactions`,
+      'delete',
+      'reactions',
+      {
+        ...this.reactionRecord(session, conversationId, messageId, emoji),
+        removed: true,
+      },
+      { emoji },
     );
   }
 }
