@@ -24,11 +24,9 @@ function conversation(
   return Conversation.fromPrimitives({
     id,
     latestMessageAt,
-    latestMessagePreview: undefined,
     name: type === 'group' ? 'Friends' : undefined,
     networkId: 'network-a',
     participantIds: ['identity-a', 'identity-b'],
-    peerIdentityId: undefined,
     type,
     unreadCount,
   });

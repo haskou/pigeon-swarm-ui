@@ -45,7 +45,6 @@ function validEvent(
     participants: participantIds.map((identityId) => ({
       connected: true,
       identityId,
-      mediaConnections: [],
       status: 'joined',
     })),
     scope: {

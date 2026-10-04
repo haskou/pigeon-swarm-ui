@@ -6,7 +6,6 @@ import type { CallParticipantLeft } from './events/CallParticipantLeft';
 import type { CallParticipantMissed } from './events/CallParticipantMissed';
 
 import { AggregateRoot } from '../../../shared/domain/AggregateRoot';
-import { CallMediaConnection } from './entities/CallMediaConnection';
 import { CallParticipant } from './entities/CallParticipant';
 import { CallCannotBeJoinedError } from './errors/CallCannotBeJoinedError';
 import { CallParticipantNotFoundError } from './errors/CallParticipantNotFoundError';
@@ -79,15 +78,8 @@ export class Call extends AggregateRoot {
     return this.id;
   }
 
-  public heartbeatParticipant(
-    identityId: CallIdentityId,
-    at: Timestamp,
-    mediaConnections: CallMediaConnection[],
-  ): void {
-    const participant = this.participant(identityId);
-
-    participant.heartbeat(at);
-    participant.updateMediaConnections(mediaConnections);
+  public heartbeatParticipant(identityId: CallIdentityId, at: Timestamp): void {
+    this.participant(identityId).heartbeat(at);
   }
 
   public isActive(): boolean {

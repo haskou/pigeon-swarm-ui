@@ -69,7 +69,6 @@ export class PigeonConversationRepository implements ConversationRepository {
       ReturnType<PigeonConversationsGateway['createConversation']>
     >,
     actorIdentityId: ConversationParticipantId,
-    peerIdentityId?: ConversationParticipantId,
   ): Conversation {
     this.updateContext(
       actorIdentityId,
@@ -77,10 +76,7 @@ export class PigeonConversationRepository implements ConversationRepository {
       result.keychainExternalIdentifier,
     );
 
-    return this.mapper.fromPrimitives(
-      result.conversation,
-      peerIdentityId?.toString(),
-    );
+    return this.mapper.fromPrimitives(result.conversation);
   }
 
   public async create(
@@ -97,7 +93,7 @@ export class PigeonConversationRepository implements ConversationRepository {
           {
             name: resource.name ?? '',
             networkId: resource.networkId,
-            participantIds: resource.participantIds ?? [],
+            participantIds: resource.participantIds,
           },
         ),
         actorIdentityId,
@@ -113,7 +109,6 @@ export class PigeonConversationRepository implements ConversationRepository {
         resource.networkId,
       ),
       actorIdentityId,
-      peerIdentityId,
     );
   }
 

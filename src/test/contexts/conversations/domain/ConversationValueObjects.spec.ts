@@ -10,7 +10,6 @@ import { GroupConversationNameRequiredError } from '../../../../contexts/convers
 import { ConversationId } from '../../../../contexts/conversations/domain/value-objects/ConversationId';
 import { ConversationName } from '../../../../contexts/conversations/domain/value-objects/ConversationName';
 import { ConversationParticipantId } from '../../../../contexts/conversations/domain/value-objects/ConversationParticipantId';
-import { ConversationPreview } from '../../../../contexts/conversations/domain/value-objects/ConversationPreview';
 import { ConversationType } from '../../../../contexts/conversations/domain/value-objects/ConversationType';
 import { ConversationUnreadCount } from '../../../../contexts/conversations/domain/value-objects/ConversationUnreadCount';
 
@@ -49,10 +48,9 @@ describe('conversation value objects', () => {
     ).toThrow(ConversationParticipantNotFoundError);
   });
 
-  it('keeps the current preview when activity has no new preview', () => {
+  it('records only newer activity', () => {
     const activity = ConversationActivity.fromPrimitives({
       latestMessageAt: 100,
-      latestMessagePreview: 'hello',
       unreadCount: 1,
     });
 
@@ -60,14 +58,8 @@ describe('conversation value objects', () => {
 
     expect(activity.toPrimitives()).toEqual({
       latestMessageAt: 200,
-      latestMessagePreview: 'hello',
       unreadCount: 1,
     });
-    expect(
-      activity.record(
-        new Timestamp(150),
-        ConversationPreview.fromOptional('old'),
-      ),
-    ).toBe(false);
+    expect(activity.record(new Timestamp(150))).toBe(false);
   });
 });

@@ -17,14 +17,12 @@ export class PigeonCallsApi {
 
   public async list(session: Session): Promise<CallResource[]> {
     const path = '/calls/';
-    const result = await this.http.request<
-      { calls?: CallResource[] } | CallResource[]
-    >(path, {
+    const result = await this.http.request<{ calls: CallResource[] }>(path, {
       headers: await this.signer.headers(session, 'GET', path),
       method: 'GET',
     });
 
-    return Array.isArray(result) ? result : (result.calls ?? []);
+    return result.calls;
   }
 
   public async get(session: Session, callId: string): Promise<CallResource> {

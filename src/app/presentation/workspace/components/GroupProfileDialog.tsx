@@ -51,7 +51,7 @@ export function GroupProfileDialog({
 
   useCloseOnEscape(close);
 
-  const groupName = conversation.name ?? conversation.title ?? conversation.id;
+  const groupName = conversation.name ?? conversation.id;
   const networkName = networkId
     ? (nodeNetworks.find((network) => network.id === networkId)?.name ??
       shortId(networkId))

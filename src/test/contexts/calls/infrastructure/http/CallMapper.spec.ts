@@ -14,16 +14,6 @@ const resource: CallResource = {
       identityId: 'identity-a',
       joinedAt: 110,
       lastHeartbeatAt: 120,
-      mediaConnections: [
-        {
-          localCandidateType: 'host',
-          protocol: 'udp',
-          remoteCandidateType: 'relay',
-          remoteIdentityId: 'identity-b',
-          state: 'connected',
-          usesRelay: true,
-        },
-      ],
       status: 'joined',
     },
   ],

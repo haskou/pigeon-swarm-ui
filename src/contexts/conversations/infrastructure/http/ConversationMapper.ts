@@ -1,79 +1,64 @@
 import type { PrimitiveOf } from '@haskou/value-objects';
 
-import type { ConversationListEnvelope } from './ConversationListEnvelope';
 import type { ConversationResource } from './ConversationResource';
 
 import { Conversation } from '../../domain/Conversation';
 
-function conversationPeerId(
-  input: ConversationResource,
-  id: string,
-  fallbackPeer: string | undefined,
-): string | undefined {
-  if (input.type === 'group' || id.startsWith('group:')) return undefined;
+const CONVERSATION_TYPES = ['group', 'one-to-one'];
 
-  return input.peerIdentityId ?? fallbackPeer;
+const INVALID_RULES: [string, (value: unknown) => boolean][] = [
+  ['id', (value) => typeof value === 'string' && value !== ''],
+  ['networkId', (value) => typeof value === 'string'],
+  [
+    'participantIds',
+    (value) =>
+      Array.isArray(value) && value.every((id) => typeof id === 'string'),
+  ],
+  ['type', (value) => CONVERSATION_TYPES.includes(value as string)],
+  ['unreadCount', (value) => typeof value === 'number'],
+];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 export class ConversationMapper {
   public list(value: unknown): ConversationResource[] {
-    if (Array.isArray(value)) {
-      return value.map((item) => this.normalize(item as ConversationResource));
+    if (!isRecord(value) || !Array.isArray(value.conversations)) {
+      throw new TypeError(
+        'Conversations response requires a conversations list.',
+      );
     }
 
-    const envelope = value as ConversationListEnvelope;
-    const list =
-      envelope.conversations ?? envelope.items ?? envelope.data ?? [];
-
-    return list.map((item) => this.normalize(item));
+    return value.conversations.map((item) => this.resource(item));
   }
 
-  public normalize(
-    input: ConversationResource,
-    fallbackPeer?: string,
-  ): ConversationResource {
-    const id = input.id?.trim() || input.conversationId?.trim();
+  public resource(value: unknown): ConversationResource {
+    if (!isRecord(value)) {
+      throw new TypeError('Conversation resource must be an object.');
+    }
 
-    if (!id) throw new TypeError('Conversation resource id is required.');
+    const { name } = value;
+    const invalid = INVALID_RULES.find(
+      ([field, valid]) => !valid(value[field]),
+    );
 
-    return {
-      ...input,
-      conversationId: input.conversationId ?? id,
-      id,
-      participantIdentityIds:
-        input.participantIdentityIds ?? input.participantIds,
-      peerIdentityId: conversationPeerId(input, id, fallbackPeer),
-      title: input.title ?? input.name,
-    };
+    if (invalid) {
+      throw new TypeError(`Conversation resource ${invalid[0]} is invalid.`);
+    }
+
+    if (name !== undefined && typeof name !== 'string') {
+      throw new TypeError('Conversation resource name must be a string.');
+    }
+
+    return value as ConversationResource;
   }
 
-  public fromPrimitives(
-    resource: ConversationResource,
-    fallbackPeer?: string,
-  ): Conversation {
-    const normalized = this.normalize(resource, fallbackPeer);
-    const type =
-      normalized.type ??
-      (normalized.id.startsWith('group:') ? 'group' : 'one-to-one');
-
+  public fromPrimitives(resource: ConversationResource): Conversation {
     return Conversation.fromPrimitives({
-      id: normalized.id,
-      latestMessageAt: normalized.latestMessageAt,
-      latestMessagePreview: normalized.latestMessagePreview,
-      name: normalized.title,
-      networkId: normalized.networkId,
-      participantIds:
-        normalized.participantIdentityIds ??
-        normalized.participantIds ??
-        normalized.participants ??
-        [],
-      peerIdentityId: conversationPeerId(
-        normalized,
-        normalized.id,
-        fallbackPeer,
-      ),
-      type,
-      unreadCount: normalized.unreadCount ?? 0,
+      ...resource,
+      latestMessageAt: resource.latestMessageAt,
+      name: resource.name,
     });
   }
 
@@ -81,16 +66,11 @@ export class ConversationMapper {
     const primitives: PrimitiveOf<Conversation> = conversation.toPrimitives();
 
     return {
-      conversationId: primitives.id,
       id: primitives.id,
       latestMessageAt: primitives.latestMessageAt,
-      latestMessagePreview: primitives.latestMessagePreview,
       name: primitives.name,
       networkId: primitives.networkId,
-      participantIdentityIds: primitives.participantIds,
       participantIds: primitives.participantIds,
-      peerIdentityId: primitives.peerIdentityId,
-      title: primitives.name,
       type: primitives.type,
       unreadCount: primitives.unreadCount,
     };

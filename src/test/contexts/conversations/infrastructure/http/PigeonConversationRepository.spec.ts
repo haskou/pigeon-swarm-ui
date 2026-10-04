@@ -38,6 +38,7 @@ describe(PigeonConversationRepository.name, () => {
         networkId: 'network-a',
         participantIds: ['identity-a', 'identity-b'],
         type: 'one-to-one',
+        unreadCount: 0,
       },
       keychain: { conversations: {}, version: 2 },
       keychainExternalIdentifier: 'keychain-b',
@@ -47,11 +48,9 @@ describe(PigeonConversationRepository.name, () => {
       Conversation.fromPrimitives({
         id: 'one-to-one:a',
         latestMessageAt: 0,
-        latestMessagePreview: undefined,
         name: undefined,
         networkId: 'network-a',
         participantIds: ['identity-a', 'identity-b'],
-        peerIdentityId: 'identity-b',
         type: 'one-to-one',
         unreadCount: 0,
       }),
@@ -72,6 +71,7 @@ describe(PigeonConversationRepository.name, () => {
         networkId: 'network-a',
         participantIds: ['identity-a', 'identity-b'],
         type: 'one-to-one',
+        unreadCount: 0,
       },
     ]);
 

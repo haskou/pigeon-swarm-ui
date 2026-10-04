@@ -155,7 +155,7 @@ export class PigeonConversationCommandsApi {
       type: 'one-to-one',
     };
     const path = '/conversations';
-    const created = await this.http.request<ConversationResource>(path, {
+    const created = await this.http.request<unknown>(path, {
       body: JSON.stringify(body),
       headers: await this.signer.headers(
         {
@@ -171,7 +171,7 @@ export class PigeonConversationCommandsApi {
     });
     this.requestCache.invalidateForSession('/conversations/?limit=30', session);
 
-    return this.conversations.normalize(created, peerIdentityId);
+    return this.conversations.resource(created);
   }
 
   private async postGroupConversation(
@@ -191,14 +191,14 @@ export class PigeonConversationCommandsApi {
       type: 'group',
     };
     const path = '/conversations';
-    const created = await this.http.request<ConversationResource>(path, {
+    const created = await this.http.request<unknown>(path, {
       body: JSON.stringify(body),
       headers: await this.signer.headers(session, 'POST', path, body),
       method: 'POST',
     });
     this.requestCache.invalidateForSession('/conversations/?limit=30', session);
 
-    return this.conversations.normalize(created);
+    return this.conversations.resource(created);
   }
 
   public async create(

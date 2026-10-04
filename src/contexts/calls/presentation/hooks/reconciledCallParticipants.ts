@@ -29,7 +29,6 @@ export function reconciledCallParticipants(
       connected: resource?.connected ?? current?.connected,
       identity: participant.identity ?? current?.identity,
       lastHeartbeatAt: resource?.lastHeartbeatAt ?? current?.lastHeartbeatAt,
-      mediaConnections: resource?.mediaConnections ?? current?.mediaConnections,
       name: participant.name,
       picture: participant.picture,
       status: resource?.status ?? current?.status ?? participant.status,

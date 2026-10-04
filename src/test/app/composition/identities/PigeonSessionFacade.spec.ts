@@ -14,8 +14,22 @@ describe(PigeonSessionFacade.name, () => {
 
     gateway.refreshSession.mockResolvedValue({
       conversations: [
-        { id: 'older', latestMessageAt: 1, networkId: 'network-a' },
-        { id: 'newer', latestMessageAt: 2, networkId: 'network-a' },
+        {
+          id: 'older',
+          latestMessageAt: 1,
+          networkId: 'network-a',
+          participantIds: ['identity-a'],
+          type: 'one-to-one',
+          unreadCount: 0,
+        },
+        {
+          id: 'newer',
+          latestMessageAt: 2,
+          networkId: 'network-a',
+          participantIds: ['identity-a'],
+          type: 'one-to-one',
+          unreadCount: 0,
+        },
       ],
       session,
     });

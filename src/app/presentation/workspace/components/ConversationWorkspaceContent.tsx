@@ -26,7 +26,6 @@ function ConversationThreadContent({
   activeThread: NonNullable<ReturnType<typeof useConversationThread>['thread']>;
 }): ReactElement {
   const title =
-    activeConversation.title ??
     activeConversation.name ??
     (activeConversationPeerIdentityId
       ? identityNames[activeConversationPeerIdentityId]

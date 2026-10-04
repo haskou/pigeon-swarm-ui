@@ -17,7 +17,6 @@ function event(
         participants: members.map((identityId) => ({
           connected: true,
           identityId,
-          mediaConnections: [],
           status: 'joined',
         })),
         scope: {

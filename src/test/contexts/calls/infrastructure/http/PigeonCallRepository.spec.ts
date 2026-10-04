@@ -20,7 +20,6 @@ const resource: CallResource = {
     {
       connected: true,
       identityId: 'identity-a',
-      mediaConnections: [],
       status: 'joined',
     },
   ],

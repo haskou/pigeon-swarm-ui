@@ -102,7 +102,7 @@ export function resolveWorkspaceCallDetails({
     (peerIdentityId ? identityNames[peerIdentityId] : undefined) ||
     fallbackLabels.noConversation;
   const groupTitle =
-    conversation?.name ?? conversation?.title ?? fallbackLabels.noConversation;
+    conversation?.name ?? fallbackLabels.noConversation;
   const kind = conversation?.type === 'group' ? 'group' : 'one-to-one';
 
   return {

@@ -104,10 +104,7 @@ export function useIdentityDirectory({
       );
 
       if (isResolvableIdentityId(peerIdentityId)) ids.add(peerIdentityId);
-      conversation.participantIdentityIds?.forEach((identityId) =>
-        isResolvableIdentityId(identityId) ? ids.add(identityId) : undefined,
-      );
-      conversation.participantIds?.forEach((identityId) =>
+      conversation.participantIds.forEach((identityId) =>
         isResolvableIdentityId(identityId) ? ids.add(identityId) : undefined,
       );
     });

@@ -4,7 +4,6 @@ import { CallIdentityId } from '../value-objects/CallIdentityId';
 import { CallParticipantConnectionStatus } from '../value-objects/CallParticipantConnectionStatus';
 import { CallParticipantStatus } from '../value-objects/CallParticipantStatus';
 import { CallParticipantTimeline } from '../value-objects/CallParticipantTimeline';
-import { CallMediaConnection } from './CallMediaConnection';
 
 export class CallParticipant {
   public static fromPrimitives(
@@ -16,9 +15,6 @@ export class CallParticipant {
       primitives.connected
         ? CallParticipantConnectionStatus.CONNECTED
         : CallParticipantConnectionStatus.DISCONNECTED,
-      primitives.mediaConnections.map((connection) =>
-        CallMediaConnection.fromPrimitives(connection),
-      ),
       CallParticipantTimeline.fromPrimitives(primitives),
     );
   }
@@ -27,7 +23,6 @@ export class CallParticipant {
     private readonly identityId: CallIdentityId,
     private status: CallParticipantStatus,
     private connectionStatus: CallParticipantConnectionStatus,
-    private mediaConnections: CallMediaConnection[],
     private timeline: CallParticipantTimeline,
   ) {}
 
@@ -61,18 +56,11 @@ export class CallParticipant {
     this.timeline = this.timeline.heartbeat(at);
   }
 
-  public updateMediaConnections(mediaConnections: CallMediaConnection[]): void {
-    this.mediaConnections = [...mediaConnections];
-  }
-
   public toPrimitives() {
     const primitives = {
       ...this.timeline.toPrimitives(),
       connected: this.connectionStatus.isConnected(),
       identityId: this.identityId.toString(),
-      mediaConnections: this.mediaConnections.map((connection) =>
-        connection.toPrimitives(),
-      ),
       status: this.status.valueOf(),
     };
 

@@ -53,13 +53,15 @@ describe(PigeonCommunitiesApi.name, () => {
     });
   });
 
-  it('uses the last returned timeline item as fallback pagination cursor', async () => {
+  it('returns the pagination cursor sent by the node', async () => {
     const messages = [
       { id: 'message-2', type: 'sent' },
       { id: 'poll-1', pollId: 'poll-1', type: 'poll' },
     ];
     const http = {
-      request: jest.fn().mockResolvedValue({ messages }),
+      request: jest
+        .fn()
+        .mockResolvedValue({ messages, nextBeforeMessageId: 'message-2' }),
     } as unknown as HttpJsonClient;
     const signer = {
       headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
@@ -79,14 +81,14 @@ describe(PigeonCommunitiesApi.name, () => {
       }),
     ).resolves.toEqual({
       messages,
-      nextBeforeMessageId: 'poll-1',
+      nextBeforeMessageId: 'message-2',
     });
   });
 
-  it('does not derive a fallback cursor from a partial channel message page', async () => {
+  it('has no cursor when the node sends none', async () => {
     const messages = [{ id: 'message-1', type: 'sent' }];
     const http = {
-      request: jest.fn().mockResolvedValue(messages),
+      request: jest.fn().mockResolvedValue({ messages }),
     } as unknown as HttpJsonClient;
     const signer = {
       headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),

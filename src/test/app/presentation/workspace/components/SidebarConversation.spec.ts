@@ -13,6 +13,7 @@ const directConversation: ConversationResource = {
   networkId: 'network-a',
   participantIds: ['identity-a', 'identity-b'],
   type: 'one-to-one',
+  unreadCount: 0,
 };
 
 describe(SidebarConversation.name, () => {

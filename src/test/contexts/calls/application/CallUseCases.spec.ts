@@ -39,7 +39,6 @@ const callFixture = (): Call =>
       {
         connected: false,
         identityId: 'identity-a',
-        mediaConnections: [],
         status: 'ringing',
       },
     ],

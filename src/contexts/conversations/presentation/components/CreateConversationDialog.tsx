@@ -164,8 +164,8 @@ export function CreateConversationDialog({
 
     setLookupState('loading');
     const timeout = window.setTimeout(() => {
-      void applicationContainer
-        .identities.get(trimmed)
+      void applicationContainer.identities
+        .get(trimmed)
         .then((identity) => {
           if (cancelled) return;
 
@@ -210,8 +210,8 @@ export function CreateConversationDialog({
 
     setGroupIdentityLookupState('loading');
     const timeout = window.setTimeout(() => {
-      void applicationContainer
-        .identities.get(identityLookup)
+      void applicationContainer.identities
+        .get(identityLookup)
         .then((identity) => {
           if (cancelled) return;
 
@@ -749,9 +749,8 @@ async function loadDialogIdentityPicture(
   if (!pictureCid) return null;
 
   try {
-    const content = await applicationContainer.attachments.getPublicFile(
-      pictureCid,
-    );
+    const content =
+      await applicationContainer.attachments.getPublicFile(pictureCid);
 
     return publicFileObjectUrl(content);
   } catch {

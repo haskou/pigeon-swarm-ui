@@ -586,17 +586,14 @@ export class PigeonCommunitiesApi {
     communityId: string,
   ): Promise<CommunityRoleResource[]> {
     const path = `/communities/${encodeURIComponent(communityId)}/roles`;
-    const result = await this.http.request<
-      | {
-          roles?: CommunityRoleResource[];
-        }
-      | CommunityRoleResource[]
-    >(path, {
+    const result = await this.http.request<{
+      roles: CommunityRoleResource[];
+    }>(path, {
       headers: await this.signer.headers(session, 'GET', path),
       method: 'GET',
     });
 
-    return Array.isArray(result) ? result : (result.roles ?? []);
+    return result.roles;
   }
 
   public async createRole(
@@ -865,26 +862,19 @@ export class PigeonCommunitiesApi {
     const result = await this.cachedRequest(
       `GET ${path} ${session.identity.id}`,
       async () =>
-        await this.http.request<
-          | MessageResource[]
-          | {
-              messages?: MessageResource[];
-              nextBeforeMessageId?: null | string;
-            }
-        >(path, {
+        await this.http.request<{
+          messages: MessageResource[];
+          nextBeforeMessageId?: string;
+        }>(path, {
           headers: await this.signer.headers(session, 'GET', path),
           method: 'GET',
         }),
       { ttlMs: startupReadCacheTtlMs },
     );
-    const messages = Array.isArray(result) ? result : (result.messages ?? []);
-    const responseLimit = options.limit ?? 50;
 
     return {
-      messages,
-      nextBeforeMessageId: Array.isArray(result)
-        ? nextBeforeMessageIdFromTimeline(messages, responseLimit)
-        : responseNextBeforeMessageId(result, messages, responseLimit),
+      messages: result.messages,
+      nextBeforeMessageId: result.nextBeforeMessageId ?? null,
     };
   }
 
@@ -1264,25 +1254,4 @@ function communityChannelMessageReactionsPath(
   )}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(
     messageId,
   )}/reactions`;
-}
-
-function responseNextBeforeMessageId(
-  result: { nextBeforeMessageId?: null | string },
-  messages: MessageResource[],
-  limit: number,
-): null | string {
-  if (Object.prototype.hasOwnProperty.call(result, 'nextBeforeMessageId')) {
-    return result.nextBeforeMessageId ?? null;
-  }
-
-  return nextBeforeMessageIdFromTimeline(messages, limit);
-}
-
-function nextBeforeMessageIdFromTimeline(
-  messages: MessageResource[],
-  limit: number,
-): null | string {
-  if (messages.length < limit) return null;
-
-  return messages[messages.length - 1]?.id ?? null;
 }

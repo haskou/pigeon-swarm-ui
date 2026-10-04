@@ -246,11 +246,11 @@ export class ChatConversationPresentation {
     peerIdentityId: string | undefined,
     identityNames: IdentityNames,
   ): string | undefined {
-    if (this.isGroup) return conversation?.name ?? conversation?.title;
+    if (this.isGroup) return conversation?.name;
 
     return peerIdentityId
       ? identityDisplayName(peerIdentityId, identityNames)
-      : conversation?.title;
+      : undefined;
   }
 
   private resolveNetworkName(nodeNetworks: NodeNetwork[]): string {
@@ -265,12 +265,7 @@ export class ChatConversationPresentation {
   private resolveParticipantIds(conversation?: ConversationResource): string[] {
     if (!conversation) return [];
 
-    return (
-      conversation.participantIdentityIds ??
-      conversation.participantIds ??
-      conversation.participants ??
-      []
-    );
+    return conversation.participantIds;
   }
 
   private resolveTitle(
@@ -286,7 +281,7 @@ export class ChatConversationPresentation {
       peerIdentity?.profile.name.trim() ||
       (peerIdentity?.profile.handle?.trim()
         ? `@${peerIdentity.profile.handle.trim()}`
-        : (fallbackName ?? conversation?.title))
+        : fallbackName)
     );
   }
 }
