@@ -55,11 +55,9 @@ export class ConversationParticipants {
 
   public peerOf(
     participantId: ConversationParticipantId,
-    explicitPeerIdentityId?: ConversationParticipantId,
   ): ConversationParticipantId | undefined {
-    return (
-      explicitPeerIdentityId ??
-      this.participants.find((candidate) => candidate.isNotEqual(participantId))
+    return this.participants.find((candidate) =>
+      candidate.isNotEqual(participantId),
     );
   }
 

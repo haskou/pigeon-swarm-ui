@@ -10,7 +10,6 @@ import { ConversationMetadata } from './value-objects/ConversationMetadata';
 import { ConversationName } from './value-objects/ConversationName';
 import { ConversationNetworkId } from './value-objects/ConversationNetworkId';
 import { ConversationParticipantId } from './value-objects/ConversationParticipantId';
-import { ConversationPreview } from './value-objects/ConversationPreview';
 import { ConversationType } from './value-objects/ConversationType';
 
 export class Conversation extends AggregateRoot {
@@ -21,13 +20,11 @@ export class Conversation extends AggregateRoot {
     name: ConversationName,
     participantIds: ConversationParticipantId[],
     occurredAt: Timestamp,
-    peerIdentityId?: ConversationParticipantId,
   ): Conversation {
     const conversation = new Conversation(
       ConversationMetadata.create(id, networkId, type, name),
       ConversationParticipants.create(participantIds),
       ConversationActivity.empty(),
-      peerIdentityId,
     );
 
     conversation.record(
@@ -53,12 +50,8 @@ export class Conversation extends AggregateRoot {
       ConversationParticipants.fromPrimitives(primitives.participantIds),
       ConversationActivity.fromPrimitives({
         latestMessageAt: primitives.latestMessageAt,
-        latestMessagePreview: primitives.latestMessagePreview,
         unreadCount: primitives.unreadCount,
       }),
-      primitives.peerIdentityId
-        ? ConversationParticipantId.fromString(primitives.peerIdentityId)
-        : undefined,
     );
   }
 
@@ -66,7 +59,6 @@ export class Conversation extends AggregateRoot {
     private readonly metadata: ConversationMetadata,
     private readonly participants: ConversationParticipants,
     private readonly activity: ConversationActivity,
-    private readonly explicitPeerIdentityId?: ConversationParticipantId,
   ) {
     super();
   }
@@ -110,21 +102,14 @@ export class Conversation extends AggregateRoot {
 
   public peerOf(
     participantId: ConversationParticipantId,
-    fallbackPeerIdentityId?: ConversationParticipantId,
   ): ConversationParticipantId | undefined {
     if (this.metadata.isGroup()) return undefined;
 
-    return (
-      this.participants.peerOf(participantId, this.explicitPeerIdentityId) ??
-      fallbackPeerIdentityId
-    );
+    return this.participants.peerOf(participantId);
   }
 
-  public recordActivity(
-    occurredAt: Timestamp,
-    preview?: ConversationPreview,
-  ): void {
-    if (!this.activity.record(occurredAt, preview)) return;
+  public recordActivity(occurredAt: Timestamp): void {
+    if (!this.activity.record(occurredAt)) return;
     this.record(
       this.metadata.identifyEvent(
         ConversationEventType.ACTIVITY_RECORDED,
@@ -138,7 +123,6 @@ export class Conversation extends AggregateRoot {
       ...this.metadata.toPrimitives(),
       ...this.activity.toPrimitives(),
       participantIds: this.participants.toPrimitives(),
-      peerIdentityId: this.explicitPeerIdentityId?.toString(),
     };
   }
 }

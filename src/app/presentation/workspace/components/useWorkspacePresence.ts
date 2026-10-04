@@ -70,10 +70,7 @@ export function useWorkspacePresence({
               session.identity.id,
               session.keychain,
             ),
-            ...(conversation.participantIdentityIds ??
-              conversation.participantIds ??
-              conversation.participants ??
-              []),
+            ...conversation.participantIds,
           ]),
           ...communities.flatMap((community) => community.memberIds),
           ...messageAuthorIdentityIdsKey.split('\u0000'),

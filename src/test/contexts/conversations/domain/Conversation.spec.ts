@@ -3,7 +3,6 @@ import { Timestamp } from '@haskou/value-objects';
 import { Conversation } from '../../../../contexts/conversations/domain/Conversation';
 import { DirectConversationInvitationNotAllowedError } from '../../../../contexts/conversations/domain/errors/DirectConversationInvitationNotAllowedError';
 import { ConversationParticipantId } from '../../../../contexts/conversations/domain/value-objects/ConversationParticipantId';
-import { ConversationPreview } from '../../../../contexts/conversations/domain/value-objects/ConversationPreview';
 
 function conversation(
   latestMessageAt = 100,
@@ -13,11 +12,9 @@ function conversation(
   return Conversation.fromPrimitives({
     id: type === 'group' ? 'group:a' : 'one-to-one:a',
     latestMessageAt,
-    latestMessagePreview: 'hello',
     name: type === 'group' ? 'Friends' : undefined,
     networkId: 'network-a',
     participantIds: ['identity-a', 'identity-b'],
-    peerIdentityId: undefined,
     type,
     unreadCount,
   });
@@ -37,16 +34,10 @@ describe(Conversation.name, () => {
   it('records only newer activity', () => {
     const aggregate = conversation();
 
-    aggregate.recordActivity(
-      new Timestamp(50),
-      ConversationPreview.fromOptional('old'),
-    );
+    aggregate.recordActivity(new Timestamp(50));
     expect(aggregate.isMoreRecentThan(conversation(110))).toBe(false);
 
-    aggregate.recordActivity(
-      new Timestamp(150),
-      ConversationPreview.fromOptional('new'),
-    );
+    aggregate.recordActivity(new Timestamp(150));
     expect(aggregate.isMoreRecentThan(conversation(110))).toBe(true);
     expect(aggregate.pullDomainEvents()).toHaveLength(1);
   });

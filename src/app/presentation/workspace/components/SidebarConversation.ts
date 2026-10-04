@@ -56,18 +56,11 @@ export class SidebarConversation {
   }
 
   private isGroup(): boolean {
-    return (
-      this.resource.type === 'group' || this.resource.id.startsWith('group:')
-    );
+    return this.resource.type === 'group';
   }
 
   private participantCount(): number {
-    return (
-      this.resource.participantIdentityIds ??
-      this.resource.participantIds ??
-      this.resource.participants ??
-      []
-    ).length;
+    return this.resource.participantIds.length;
   }
 
   private resolveHandle(
@@ -114,7 +107,7 @@ export class SidebarConversation {
     identityProfiles: Record<string, IdentityResource>,
   ): string {
     if (this.isGroup()) {
-      return this.resource.name ?? this.resource.title ?? this.resource.id;
+      return this.resource.name ?? this.resource.id;
     }
 
     const peerProfile = this.peerIdentityId

@@ -19,13 +19,11 @@ const activeCall = (): Call =>
       {
         connected: true,
         identityId: 'identity-a',
-        mediaConnections: [],
         status: 'joined',
       },
       {
         connected: false,
         identityId: 'identity-b',
-        mediaConnections: [],
         status: 'ringing',
       },
     ],
@@ -65,7 +63,7 @@ describe(Call.name, () => {
   it('updates participant presence through the aggregate', () => {
     const call = activeCall();
 
-    call.heartbeatParticipant(identityA, new Timestamp(400), []);
+    call.heartbeatParticipant(identityA, new Timestamp(400));
     call.leaveParticipant(identityA, new Timestamp(500));
 
     const participant = call

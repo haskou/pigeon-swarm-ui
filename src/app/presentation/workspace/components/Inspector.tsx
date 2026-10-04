@@ -177,13 +177,8 @@ function conversationParticipantIds({
   if (!conversation) return [];
 
   const ids = isGroup(conversation)
-    ? (conversation.participantIdentityIds ??
-      conversation.participantIds ??
-      conversation.participants ??
-      [])
-    : [currentIdentityId, peerIdentityId ?? conversation.peerIdentityId].filter(
-        Boolean,
-      );
+    ? conversation.participantIds
+    : [currentIdentityId, peerIdentityId].filter(Boolean);
 
   return [...new Set(ids)].filter(
     (identityId): identityId is string => typeof identityId === 'string',
@@ -191,8 +186,5 @@ function conversationParticipantIds({
 }
 
 function isGroup(conversation?: ConversationResource): boolean {
-  return Boolean(
-    conversation &&
-    (conversation.type === 'group' || conversation.id.startsWith('group:')),
-  );
+  return conversation?.type === 'group';
 }

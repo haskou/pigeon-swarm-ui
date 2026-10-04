@@ -344,22 +344,7 @@ No hacer:
 
 ## Migracion
 
-No hay requisito de compatibilidad legacy.
-
-Opciones:
-
-1. Corte limpio:
-   - nuevas identidades usan recovery key obligatoria.
-   - identidades antiguas deben recrearse o pasar por migracion manual tras unlock exitoso.
-
-2. Migracion manual:
-   - usuario desbloquea identidad antigua una ultima vez.
-   - frontend genera `UserRootKey` nueva si falta.
-   - reenvuelve private key y keychain bajo el nuevo modelo.
-   - genera recovery key.
-   - publica identidad actualizada.
-
-La opcion 1 es mas simple. La opcion 2 reduce perdida de usuarios existentes, pero debe tratarse como flujo separado y testeado.
+Corte limpio: no existen identidades anteriores que migrar. Toda identidad nueva usa recovery key obligatoria.
 
 ## Tests
 

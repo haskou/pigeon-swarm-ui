@@ -3,14 +3,11 @@ import { conversationSupportsThreads } from '../../../../../contexts/conversatio
 describe(conversationSupportsThreads.name, () => {
   it('allows threads for group conversations', () => {
     expect(
-      conversationSupportsThreads({ id: 'conversation-1', type: 'group' }),
+      conversationSupportsThreads({
+        id: 'group:conversation-1',
+        type: 'group',
+      }),
     ).toBe(true);
-  });
-
-  it('recognizes group-prefixed ids without an explicit type', () => {
-    expect(conversationSupportsThreads({ id: 'group:conversation-1' })).toBe(
-      true,
-    );
   });
 
   it('rejects threads for one-to-one conversations', () => {
@@ -22,27 +19,11 @@ describe(conversationSupportsThreads.name, () => {
     ).toBe(false);
   });
 
-  it('trusts an explicit one-to-one type over a group-shaped id', () => {
+  it('trusts the type over a group-shaped id', () => {
     expect(
       conversationSupportsThreads({
         id: 'group:conversation-1',
         type: 'one-to-one',
-      }),
-    ).toBe(false);
-  });
-
-  it('rejects a one-to-one identifier even when the type is missing', () => {
-    expect(
-      conversationSupportsThreads({ id: 'one-to-one:conversation-1' }),
-    ).toBe(false);
-  });
-
-  it('rejects a one-to-one conversation id even when the type is group', () => {
-    expect(
-      conversationSupportsThreads({
-        conversationId: 'one-to-one:conversation-1',
-        id: 'group:conversation-2',
-        type: 'group',
       }),
     ).toBe(false);
   });

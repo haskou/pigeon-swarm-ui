@@ -1,12 +1,18 @@
 import { ConversationTimeline } from '../../../../../contexts/conversations/presentation/view-models/ConversationTimeline';
 
+const base = {
+  participantIds: ['identity-a'],
+  type: 'one-to-one' as const,
+  unreadCount: 0,
+};
+
 describe('conversation ordering', () => {
   it('orders conversations with the newest latest message first', () => {
     expect(
       ConversationTimeline.sortByLatestMessage([
-        { id: 'old', latestMessageAt: 10, networkId: 'net' },
-        { id: 'new', latestMessageAt: 30, networkId: 'net' },
-        { id: 'empty', networkId: 'net' },
+        { ...base, id: 'old', latestMessageAt: 10, networkId: 'net' },
+        { ...base, id: 'new', latestMessageAt: 30, networkId: 'net' },
+        { ...base, id: 'empty', networkId: 'net' },
       ]).map((conversation) => conversation.id),
     ).toEqual(['new', 'old', 'empty']);
   });
@@ -15,8 +21,8 @@ describe('conversation ordering', () => {
     expect(
       ConversationTimeline.bumpActivity(
         [
-          { id: 'first', latestMessageAt: 50, networkId: 'net' },
-          { id: 'second', latestMessageAt: 20, networkId: 'net' },
+          { ...base, id: 'first', latestMessageAt: 50, networkId: 'net' },
+          { ...base, id: 'second', latestMessageAt: 20, networkId: 'net' },
         ],
         'second',
         80,

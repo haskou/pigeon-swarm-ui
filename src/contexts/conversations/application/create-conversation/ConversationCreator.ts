@@ -29,7 +29,6 @@ export class ConversationCreator {
       ConversationName.fromOptional(),
       [actorIdentityId, peerIdentityId],
       message.getOccurredAt(),
-      peerIdentityId,
     );
 
     return await this.conversationRepository.create(

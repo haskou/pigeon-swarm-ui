@@ -1,15 +1,11 @@
 export type ConversationResource = {
   id: string;
-  conversationId?: string;
+  /** Derived locally from loaded messages; the node never sends it. */
   latestMessageAt?: number;
-  latestMessagePreview?: string;
+  /** Standalone groups only. */
   name?: string;
   networkId: string;
-  participantIdentityIds?: string[];
-  participantIds?: string[];
-  participants?: string[];
-  peerIdentityId?: string;
-  title?: string;
-  type?: 'group' | 'one-to-one';
-  unreadCount?: number;
+  participantIds: string[];
+  type: 'group' | 'one-to-one';
+  unreadCount: number;
 };

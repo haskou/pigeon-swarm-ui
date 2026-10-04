@@ -38,14 +38,13 @@ export class PigeonPresenceApi {
       query.append('identityIds', identityId);
     }
 
-    const result = await this.http.request<
-      IdentityPresence[] | { presences: IdentityPresence[] }
-    >(`${path}?${query.toString()}`, {
-      headers: await this.signer.headers(session, 'GET', path, body),
-      method: 'GET',
-    });
-
-    return Array.isArray(result) ? result : result.presences;
+    return await this.http.request<IdentityPresence[]>(
+      `${path}?${query.toString()}`,
+      {
+        headers: await this.signer.headers(session, 'GET', path, body),
+        method: 'GET',
+      },
+    );
   }
 
   public async update(

@@ -36,7 +36,11 @@ describe(ConversationPeer.name, () => {
 
     expect(
       ConversationPeer.identityId(
-        { id: 'conversation-1' } as ConversationResource,
+        {
+          id: 'conversation-1',
+          participantIds: ['identity-1'],
+          type: 'one-to-one',
+        } as ConversationResource,
         'identity-1',
         keychain,
       ),

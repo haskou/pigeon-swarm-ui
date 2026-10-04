@@ -68,7 +68,7 @@ export function conversationNotificationPreview(
   if (conversation.type === 'group') {
     return {
       body: messageNotificationBody({}),
-      title: conversation.name ?? conversation.title ?? copy.chat.groupMessage,
+      title: conversation.name ?? copy.chat.groupMessage,
     };
   }
 

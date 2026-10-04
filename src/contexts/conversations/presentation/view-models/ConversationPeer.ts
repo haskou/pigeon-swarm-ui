@@ -21,18 +21,9 @@ export class ConversationPeer {
     currentIdentityId: string,
     keychain?: LocalKeychain,
   ): string | undefined {
-    if (conversation.type === 'group' || conversation.id.startsWith('group:')) {
-      return undefined;
-    }
+    if (conversation.type === 'group') return undefined;
 
-    if (conversation.peerIdentityId) return conversation.peerIdentityId;
-
-    const participantIds =
-      conversation.participantIdentityIds ??
-      conversation.participantIds ??
-      conversation.participants ??
-      [];
-    const peerIdentityId = participantIds.find(
+    const peerIdentityId = conversation.participantIds.find(
       (identityId) => identityId !== currentIdentityId,
     );
 

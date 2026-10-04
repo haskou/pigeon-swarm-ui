@@ -1,14 +1,12 @@
 import { Timestamp, type PrimitiveOf } from '@haskou/value-objects';
 
 import { ConversationLatestMessageAt } from '../value-objects/ConversationLatestMessageAt';
-import { ConversationPreview } from '../value-objects/ConversationPreview';
 import { ConversationUnreadCount } from '../value-objects/ConversationUnreadCount';
 
 export class ConversationActivity {
   public static empty(): ConversationActivity {
     return new ConversationActivity(
       ConversationLatestMessageAt.empty(),
-      ConversationPreview.fromOptional(),
       ConversationUnreadCount.fromNumber(0),
     );
   }
@@ -18,14 +16,12 @@ export class ConversationActivity {
   ): ConversationActivity {
     return new ConversationActivity(
       ConversationLatestMessageAt.fromOptional(primitives.latestMessageAt),
-      ConversationPreview.fromOptional(primitives.latestMessagePreview),
       ConversationUnreadCount.fromNumber(primitives.unreadCount),
     );
   }
 
   private constructor(
     private readonly latestMessageAt: ConversationLatestMessageAt,
-    private latestMessagePreview: ConversationPreview,
     private unreadCount: ConversationUnreadCount,
   ) {}
 
@@ -41,20 +37,13 @@ export class ConversationActivity {
     return true;
   }
 
-  public record(occurredAt: Timestamp, preview?: ConversationPreview): boolean {
-    if (!this.latestMessageAt.record(occurredAt)) return false;
-
-    if (preview) this.latestMessagePreview = preview;
-
-    return true;
+  public record(occurredAt: Timestamp): boolean {
+    return this.latestMessageAt.record(occurredAt);
   }
 
   public toPrimitives() {
     return {
       latestMessageAt: this.latestMessageAt.toPrimitives(),
-      latestMessagePreview: this.latestMessagePreview.isPresent()
-        ? this.latestMessagePreview.toString()
-        : undefined,
       unreadCount: this.unreadCount.valueOf(),
     };
   }

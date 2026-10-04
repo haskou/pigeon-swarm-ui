@@ -26,14 +26,12 @@ function callResource({
         connected: true,
         identityId: currentIdentityId,
         joinedAt: 1_780_000_000_000,
-        mediaConnections: [],
         status: 'joined',
       },
       {
         connected: true,
         identityId: remoteIdentityId,
         joinedAt: 1_780_000_000_001,
-        mediaConnections: [],
         status: 'joined',
       },
     ],
@@ -76,19 +74,16 @@ describe('callPeerConnectionPlan', () => {
       {
         connected: false,
         identityId: 'carol',
-        mediaConnections: [],
         status: 'ringing',
       },
       {
         connected: false,
         identityId: 'den',
-        mediaConnections: [],
         status: 'left',
       },
       {
         connected: false,
         identityId: 'eve',
-        mediaConnections: [],
         status: 'joined',
       },
     );
@@ -106,25 +101,21 @@ describe('callPeerConnectionPlan', () => {
       {
         connected: false,
         identityId: 'carol',
-        mediaConnections: [],
         status: 'ringing',
       },
       {
         connected: false,
         identityId: 'den',
-        mediaConnections: [],
         status: 'left',
       },
       {
         connected: false,
         identityId: 'eve',
-        mediaConnections: [],
         status: 'declined',
       },
       {
         connected: false,
         identityId: 'frank',
-        mediaConnections: [],
         status: 'missed',
       },
     );

@@ -56,9 +56,9 @@ describe(ChatConversationPresentation.name, () => {
       id: 'one-to-one:a',
       networkId: 'network-a',
       participantIds: ['identity-a', 'identity-b'],
-      title: 'Ada (@ada)',
       type: 'one-to-one',
-    } as ConversationResource;
+      unreadCount: 0,
+    } satisfies ConversationResource;
     const conversationKey = {
       algorithm: 'aes-256-gcm',
       conversationId: conversation.id,

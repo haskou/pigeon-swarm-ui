@@ -48,16 +48,13 @@ function startOfDay(date: Date): Date {
 
 export function conversationTitle(conversation: {
   name?: string;
-  title?: string;
-  peerIdentityId?: string;
-  participantIdentityIds?: string[];
+  participantIds: string[];
   id: string;
 }): string {
   return (
     conversation.name ??
-    conversation.title ??
-    conversation.peerIdentityId ??
-    conversation.participantIdentityIds?.join(' ↔ ') ??
-    conversation.id
+    (conversation.participantIds.length > 0
+      ? conversation.participantIds.join(' ↔ ')
+      : conversation.id)
   );
 }

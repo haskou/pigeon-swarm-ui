@@ -8,7 +8,6 @@ import type {
 import type { ProfileKeychainDisplayEntry } from './ProfileKeychainDisplayEntry';
 
 import {
-  conversationTitle,
   shortId,
 } from '../../../../shared/presentation/formatting';
 import { copy } from '../../../../shared/presentation/i18n/copy';
@@ -68,28 +67,8 @@ export class ProfileKeychainEntries {
     );
     const title =
       conversation?.name ??
-      conversation?.title ??
       peerIdentity?.profile.name?.trim() ??
-      (conversation
-        ? conversationTitle({
-            ...conversation,
-            participantIdentityIds: conversation.participantIdentityIds?.map(
-              (identityId) =>
-                ProfileKeychainEntries.identityName(
-                  identityId,
-                  input.identityProfiles,
-                  input.identityNames,
-                ),
-            ),
-            peerIdentityId: conversation.peerIdentityId
-              ? ProfileKeychainEntries.identityName(
-                  conversation.peerIdentityId,
-                  input.identityProfiles,
-                  input.identityNames,
-                )
-              : undefined,
-          })
-        : shortId(input.entry.conversationId));
+      (conversation ? peerName : shortId(input.entry.conversationId));
 
     return {
       algorithm: input.entry.algorithm,

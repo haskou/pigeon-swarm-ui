@@ -4,21 +4,12 @@ import { CallSignalDelivery } from '../../../../../contexts/calls/domain/entitie
 import { CallConnectionRoute } from '../../../../../contexts/calls/domain/value-objects/CallConnectionRoute';
 
 describe('call entities hydration', () => {
-  it('hydrates and serializes a participant with its media connections', () => {
+  it('hydrates and serializes a participant', () => {
     const participant = CallParticipant.fromPrimitives({
       connected: true,
       identityId: 'identity-a',
       joinedAt: 100,
       lastHeartbeatAt: 200,
-      mediaConnections: [
-        {
-          localCandidateType: 'relay',
-          protocol: 'udp',
-          remoteIdentityId: 'identity-b',
-          state: 'connected',
-          usesRelay: true,
-        },
-      ],
       status: 'joined',
     });
 
@@ -27,15 +18,6 @@ describe('call entities hydration', () => {
       identityId: 'identity-a',
       joinedAt: 100,
       lastHeartbeatAt: 200,
-      mediaConnections: [
-        {
-          localCandidateType: 'relay',
-          protocol: 'udp',
-          remoteIdentityId: 'identity-b',
-          state: 'connected',
-          usesRelay: true,
-        },
-      ],
       status: 'joined',
     });
   });

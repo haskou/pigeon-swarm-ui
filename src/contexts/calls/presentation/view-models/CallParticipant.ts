@@ -1,6 +1,5 @@
 import type { CallPeerRecoveryState } from '../../infrastructure/media/CallPeerRecoveryState';
 import type { IdentityResource } from '../../../../shared/domain/pigeonResources.types';
-import type { CallParticipantMediaConnectionResource } from '../../infrastructure/http/resources/CallParticipantMediaConnectionResource';
 
 export type CallParticipant = {
   audioLevel?: number;
@@ -17,7 +16,6 @@ export type CallParticipant = {
   lastHeartbeatAt?: number;
   latencyMs?: number;
   mediaEncryptionActive?: boolean;
-  mediaConnections?: CallParticipantMediaConnectionResource[];
   mediaStream?: MediaStream;
   muted: boolean;
   name: string;

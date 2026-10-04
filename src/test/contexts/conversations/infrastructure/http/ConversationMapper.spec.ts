@@ -1,59 +1,48 @@
 import { ConversationMapper } from '../../../../../contexts/conversations/infrastructure/http/ConversationMapper';
 
+const group = {
+  id: 'group:a',
+  name: 'Friends',
+  networkId: 'network-a',
+  participantIds: ['identity-a', 'identity-b'],
+  type: 'group',
+  unreadCount: 2,
+};
+
 describe(ConversationMapper.name, () => {
-  it('normalizes envelope responses and preserves server IDs', () => {
-    const mapper = new ConversationMapper();
-    const conversations = mapper.list({
-      items: [
-        {
-          id: 'conversation-1',
-          networkId: 'network-1',
-          participantIds: ['left', 'right'],
-        },
-      ],
-    });
-
-    expect(conversations).toEqual([
-      {
-        conversationId: 'conversation-1',
-        id: 'conversation-1',
-        networkId: 'network-1',
-        participantIdentityIds: ['left', 'right'],
-        participantIds: ['left', 'right'],
-        peerIdentityId: undefined,
-      },
-    ]);
-  });
-
-  it('uses the fallback peer when the API omits peerIdentityId', () => {
+  it('parses the conversations list response', () => {
     const mapper = new ConversationMapper();
 
     expect(
-      mapper.normalize(
-        { conversationId: 'conversation-2', id: '', networkId: 'network-1' },
-        'peer-1',
-      ).peerIdentityId,
-    ).toBe('peer-1');
+      mapper.list({ conversations: [group], nextBeforeConversationId: 'x' }),
+    ).toEqual([group]);
+  });
+
+  it.each([
+    ['a bare array', [group]],
+    ['an items envelope', { items: [group] }],
+    ['a data envelope', { data: [group] }],
+  ])('rejects %s as a list response', (_name, response) => {
+    expect(() => new ConversationMapper().list(response)).toThrow(TypeError);
+  });
+
+  it('rejects a conversation without participantIds', () => {
+    const invalid = { ...group, participantIds: undefined };
+
+    expect(() => new ConversationMapper().resource(invalid)).toThrow(TypeError);
   });
 
   it('maps resources to the aggregate and back at the HTTP boundary', () => {
     const mapper = new ConversationMapper();
     const conversation = mapper.fromPrimitives({
-      id: 'group:a',
+      ...group,
       latestMessageAt: 100,
-      name: 'Friends',
-      networkId: 'network-a',
-      participantIds: ['identity-a', 'identity-b'],
       type: 'group',
-      unreadCount: 2,
     });
 
-    expect(mapper.toResource(conversation)).toMatchObject({
-      id: 'group:a',
-      participantIdentityIds: ['identity-a', 'identity-b'],
-      title: 'Friends',
-      type: 'group',
-      unreadCount: 2,
+    expect(mapper.toResource(conversation)).toEqual({
+      ...group,
+      latestMessageAt: 100,
     });
   });
 
@@ -61,15 +50,8 @@ describe(ConversationMapper.name, () => {
     const mapper = new ConversationMapper();
 
     expect(
-      mapper.toResource(
-        mapper.fromPrimitives({
-          id: 'group:empty',
-          name: 'Empty group',
-          networkId: 'network-a',
-          participantIds: ['identity-a', 'identity-b'],
-          type: 'group',
-        }),
-      ).latestMessageAt,
+      mapper.toResource(mapper.fromPrimitives({ ...group, type: 'group' }))
+        .latestMessageAt,
     ).toBeUndefined();
   });
 });

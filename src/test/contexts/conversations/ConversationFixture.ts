@@ -10,11 +10,9 @@ export function conversationFixture(
   return Conversation.fromPrimitives({
     id: type === 'group' ? 'group:a' : 'one-to-one:a',
     latestMessageAt: 100,
-    latestMessagePreview: 'hello',
     name: type === 'group' ? 'Friends' : undefined,
     networkId: 'network-a',
     participantIds: ['identity-a', 'identity-b'],
-    peerIdentityId: undefined,
     type,
     unreadCount: 1,
     ...overrides,

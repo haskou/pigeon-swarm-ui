@@ -189,19 +189,15 @@ export class MessageProjector {
     messages: MessageResource[];
     nextCursor?: null | string;
   } {
-    if (Array.isArray(value)) {
-      return { messages: value as MessageResource[] };
+    const envelope = value as Partial<MessageListEnvelope> | null;
+
+    if (!Array.isArray(envelope?.messages)) {
+      throw new TypeError('Messages response requires a messages list.');
     }
 
-    const envelope = value as MessageListEnvelope;
-
     return {
-      messages: envelope.messages ?? envelope.items ?? envelope.data ?? [],
-      nextCursor:
-        envelope.nextCursor ??
-        envelope.cursor ??
-        envelope.nextBeforeMessageId ??
-        null,
+      messages: envelope.messages,
+      nextCursor: envelope.nextBeforeMessageId ?? null,
     };
   }
 

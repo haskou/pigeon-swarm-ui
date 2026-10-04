@@ -72,19 +72,16 @@ describe('communityVoicePresence', () => {
           {
             connected: true,
             identityId: 'denis',
-            mediaConnections: [],
             status: 'joined',
           },
           {
             connected: true,
             identityId: 'hasko',
-            mediaConnections: [],
             status: 'joined',
           },
           {
             connected: false,
             identityId: 'old-user',
-            mediaConnections: [],
             status: 'left',
           },
         ],
@@ -118,7 +115,6 @@ describe('communityVoicePresence', () => {
           {
             connected: true,
             identityId: 'denis',
-            mediaConnections: [],
             status: 'joined',
           },
         ],

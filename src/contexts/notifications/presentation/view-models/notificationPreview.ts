@@ -65,10 +65,7 @@ function groupConversationInvitationPreview(
 
   return {
     subtitle: shortId(notification.payload.conversationId),
-    title:
-      conversation?.name ??
-      conversation?.title ??
-      copy.notifications.groupInvitationTitle,
+    title: conversation?.name ?? copy.notifications.groupInvitationTitle,
   };
 }
 
