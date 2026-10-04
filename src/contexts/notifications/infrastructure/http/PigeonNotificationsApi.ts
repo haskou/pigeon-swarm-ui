@@ -10,14 +10,68 @@ import type { HttpJsonClient } from '../../../../shared/infrastructure/http/Http
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { CachedGetRequest } from './CachedGetRequest';
 
+import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
+import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
+
 const startupReadCacheTtlMs = 1500;
 
 export class PigeonNotificationsApi {
+  private readonly mutations = new PublicMutationSigner();
+
   public constructor(
     private readonly http: HttpJsonClient,
     private readonly signer: RequestSigner,
     private readonly cachedRequest: CachedGetRequest,
   ) {}
+
+  private scopeKey(scope: NotificationSettingScope): string {
+    if (scope.type === 'conversation') {
+      return `${scope.type}:${scope.conversationId}`;
+    }
+
+    if (scope.type === 'community_channel') {
+      return `${scope.type}:${scope.communityId}:${scope.channelId}`;
+    }
+
+    return `${scope.type}:${scope.communityId}`;
+  }
+
+  private async sendMutation(
+    session: Session,
+    method: 'DELETE' | 'PUT',
+    kind: 'delete' | 'put',
+    payload: Record<string, unknown>,
+    fields: Record<string, unknown>,
+  ): Promise<NotificationScopeSetting | undefined> {
+    const path = '/notification-settings/scopes';
+    let response: NotificationScopeSetting | undefined;
+
+    await submitPublicMutation(
+      PublicMutationSigner.FIRST_POSITION,
+      (position) =>
+        this.mutations.sign(
+          session,
+          {
+            kind,
+            payload,
+            recordId: String(payload.id),
+            store: 'notificationSettings',
+          },
+          position,
+        ),
+      async (mutation) => {
+        const body = { ...fields, mutation };
+
+        response = await this.http.request<NotificationScopeSetting>(path, {
+          body: JSON.stringify(body),
+          headers: await this.signer.headers(session, method, path, body),
+          method,
+        });
+      },
+    );
+
+    return response;
+  }
 
   public async list(session: Session): Promise<NotificationResource[]> {
     const path = '/notifications/?limit=30';
@@ -53,28 +107,53 @@ export class PigeonNotificationsApi {
     session: Session,
     setting: NotificationScopeSettingInput,
   ): Promise<NotificationScopeSetting> {
-    const path = '/notification-settings/scopes';
-    const body = setting;
-
-    return await this.http.request<NotificationScopeSetting>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'PUT', path, body),
-      method: 'PUT',
+    const identityId = this.mutations.authorOf(session);
+    const scopeKey = this.scopeKey(setting.scope);
+    const updatedAt = Date.now();
+    const payload = {
+      hideMutedChannels: setting.hideMutedChannels ?? false,
+      id: `${identityId}:${scopeKey}`,
+      identityId,
+      mobilePushEnabled: setting.mobilePushEnabled ?? true,
+      ...(setting.mutedUntil === undefined
+        ? {}
+        : { mutedUntil: setting.mutedUntil }),
+      notificationLevel: setting.notificationLevel,
+      scope: setting.scope,
+      scopeKey,
+      scopeType: 'notification_settings',
+      suppressEveryoneAndHere: setting.suppressEveryoneAndHere ?? false,
+      suppressRoleMentions: setting.suppressRoleMentions ?? false,
+      updatedAt,
+    };
+    const response = await this.sendMutation(session, 'PUT', 'put', payload, {
+      ...setting,
+      updatedAt,
     });
+
+    return response as NotificationScopeSetting;
   }
 
   public async resetSetting(
     session: Session,
     scope: NotificationSettingScope,
   ): Promise<void> {
-    const path = '/notification-settings/scopes';
-    const body = { scope };
+    const identityId = this.mutations.authorOf(session);
+    const scopeKey = this.scopeKey(scope);
 
-    await this.http.request<void>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'DELETE', path, body),
-      method: 'DELETE',
-    });
+    await this.sendMutation(
+      session,
+      'DELETE',
+      'delete',
+      {
+        id: `${identityId}:${scopeKey}`,
+        identityId,
+        removed: true,
+        scopeKey,
+        scopeType: 'notification_settings',
+      },
+      { scope },
+    );
   }
 
   public async update(
