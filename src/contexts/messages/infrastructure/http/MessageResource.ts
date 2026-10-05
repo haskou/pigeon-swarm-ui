@@ -36,7 +36,6 @@ export type MessageResource = {
   reactions?: MessageReaction[];
   replyToMessageId?: string;
   scope?: PollScope;
-  signature?: string;
   status?: 'closed' | 'open';
   targetMessageId?: string;
   timestamp?: number;

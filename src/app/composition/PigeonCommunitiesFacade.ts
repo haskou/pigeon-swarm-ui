@@ -609,12 +609,14 @@ export class PigeonCommunitiesFacade {
     communityId: string,
     channelId: string,
     messageId: string,
+    authorIdentityId: string,
   ): Promise<void> {
     await this.channelMessages.deleteCommunityChannelMessage(
       session,
       communityId,
       channelId,
       messageId,
+      authorIdentityId,
     );
   }
 

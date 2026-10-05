@@ -76,13 +76,71 @@ export class PigeonPollsApi {
       ...scope,
     };
 
+    const timelineMutation = await this.mutations.sign(
+      session,
+      {
+        kind: 'put',
+        payload: this.timelineRecord(session, input),
+        recordId: this.timelineRecordId(session, input),
+        store: 'messages',
+      },
+      PublicMutationSigner.FIRST_POSITION,
+    );
+
     return await this.submit(
       session,
       'POST',
       '/polls/',
       { kind: 'put', payload },
-      input,
+      { ...input, timelineMutation },
     );
+  }
+
+  private timelineRecordId(session: Session, input: CreatePollRequest): string {
+    return input.scopeType === 'community_channel'
+      ? [
+          'community',
+          input.communityId,
+          input.channelId,
+          input.pollId,
+          this.mutations.authorOf(session),
+        ].join(':')
+      : input.pollId;
+  }
+
+  /** Message-timeline record that makes the poll appear in its scope. */
+  private timelineRecord(
+    session: Session,
+    input: CreatePollRequest,
+  ): Record<string, unknown> {
+    const authorId = this.mutations.authorOf(session);
+    const id = this.timelineRecordId(session, input);
+
+    if (input.scopeType === 'community_channel') {
+      return {
+        authorIdentityId: authorId,
+        channelId: input.channelId,
+        communityId: input.communityId,
+        createdAt: input.createdAt,
+        id,
+        mentions: [],
+        messageId: input.pollId,
+        pollId: input.pollId,
+        scopeType: 'community_channel',
+        type: 'poll',
+      };
+    }
+
+    return {
+      authorId,
+      conversationId: input.conversationId,
+      createdAt: input.createdAt,
+      id,
+      pollId: input.pollId,
+      previousMessageIds: [],
+      scopeType: 'conversation',
+      type: 'poll',
+    };
   }
 
   public async get(session: Session, pollId: string): Promise<PollResource> {

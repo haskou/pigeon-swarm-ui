@@ -105,4 +105,26 @@ describe(PigeonPollsApi.name, () => {
     expect(body.pollId).toBe('poll-a');
     expect(body.mutation).toMatchObject({ kind: 'put', recordId: 'poll-a' });
   });
+
+  it('signs a messages-store timeline record alongside the poll', async () => {
+    const { api, http, session } = await setup();
+
+    await api.create(session, {
+      allowsMultipleVotes: false,
+      channelId: 'channel-a',
+      communityId: 'community-a',
+      createdAt: 100,
+      expiresAt: null,
+      options: [{ id: 'option-a', text: 'A' }],
+      pollId: 'poll-a',
+      question: 'Choose?',
+      scopeType: 'community_channel',
+    });
+
+    expect(sentBody(http).timelineMutation).toMatchObject({
+      kind: 'put',
+      recordId: `community:community-a:channel-a:poll-a:${session.identity.id}`,
+      store: 'messages',
+    });
+  });
 });

@@ -26,19 +26,19 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
-import { PendingMessageAttachments } from '../../../attachments/presentation/view-models/PendingMessageAttachments';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { isBrowserPreviewImage } from '../../../../shared/presentation/isBrowserPreviewImage';
+import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { useAttachmentDownload } from '../../../attachments/presentation/hooks/useAttachmentDownload';
+import { PendingMessageAttachments } from '../../../attachments/presentation/view-models/PendingMessageAttachments';
 import { MessageContent } from '../../../messages/domain/value-objects/MessageContent';
 import { MessageReactionUpdater } from '../../../messages/presentation/view-models/MessageReactionUpdater';
-import { isBrowserPreviewImage } from '../../../../shared/presentation/isBrowserPreviewImage';
-import { copy } from '../../../../shared/presentation/i18n/copy';
-import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import {
   encryptCommunityChannelPayload,
   serializeCommunityChannelPayload,
 } from '../../infrastructure/crypto/communityChannelPayloadCipher';
-import { mergeChatMessages } from './communityWorkspaceHelpers';
 import { CommunityMessageMentions } from './CommunityMessageMentions';
+import { mergeChatMessages } from './communityWorkspaceHelpers';
 
 type CommunityPendingSend = {
   attachmentUpload: AttachmentUploadOptions;
@@ -253,6 +253,7 @@ export function useCommunityMessageComposer({
       {
         ...messagePayload,
         mentions,
+        original: { createdAt: message.timestamp, replyToMessageId },
         timestamp,
       },
     );
@@ -317,6 +318,7 @@ export function useCommunityMessageComposer({
       community.id,
       channelId,
       message.id,
+      message.authorIdentityId,
     );
 
     return true;
@@ -436,6 +438,7 @@ export function useCommunityMessageComposer({
 
       return next;
     });
+
     if (renderInChannel) {
       setMessages((current) => [
         ...current,
@@ -507,13 +510,13 @@ export function useCommunityMessageComposer({
           channelId: payload.channelId,
           communityId: community.id,
           content: payload.content,
+          eventType,
           linkPreview,
           mentions: payload.mentions,
           replyPreview,
           replyToMessageId: payload.replyTarget?.id,
           sticker: payload.sticker,
           threadRootMessageId: payload.threadRootMessageId,
-          eventType,
           timestamp,
         };
         const messagePayload = communityIsPublic
@@ -559,6 +562,7 @@ export function useCommunityMessageComposer({
       } catch (caught) {
         setError(toUserErrorMessage(caught, copy.communities.messageError));
         setFailedSends((current) => ({ ...current, [optimisticId]: payload }));
+
         if (renderInChannel) {
           setMessages((current) =>
             current.map((message) =>
@@ -604,8 +608,8 @@ export function useCommunityMessageComposer({
       channelId,
       content,
       mentions: selectedChannel ? mentionsForContent(content) : [],
-      replyPreviewTarget: options.replyPreviewTarget,
       renderInChannel: options.renderInChannel,
+      replyPreviewTarget: options.replyPreviewTarget,
       replyTarget: message,
       threadRootMessageId: options.threadRootMessageId,
     });
@@ -630,8 +634,8 @@ export function useCommunityMessageComposer({
       channelId,
       content: '',
       mentions: [],
-      replyPreviewTarget: options.replyPreviewTarget,
       renderInChannel: options.renderInChannel,
+      replyPreviewTarget: options.replyPreviewTarget,
       replyTarget: message,
       sticker,
       threadRootMessageId: options.threadRootMessageId,
@@ -710,7 +714,7 @@ async function createLinkPreviewForContent(session: Session, content: string) {
 
   if (!url) return undefined;
 
-  return await applicationContainer
-    .messages.createLinkPreview(session, url.toString())
+  return await applicationContainer.messages
+    .createLinkPreview(session, url.toString())
     .catch(() => undefined);
 }
