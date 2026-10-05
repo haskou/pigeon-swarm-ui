@@ -23,10 +23,6 @@ export class StickerPackMapper {
     });
   }
 
-  public toCreateInput(pack: StickerPack): { name: string } {
-    return { name: pack.toPrimitives().name };
-  }
-
   public toResource(pack: StickerPack): StickerPackResource {
     const primitives: PrimitiveOf<StickerPack> = pack.toPrimitives();
 

@@ -24,7 +24,11 @@ export class PigeonStickerLibraryRepository
 
   private async persist(event: DomainEvent, session: Session): Promise<void> {
     if (event instanceof StickerPackSaved) {
-      await this.api.savePack(session, event.packId.toString());
+      await this.api.savePack(
+        session,
+        event.packId.toString(),
+        event.occurredAt,
+      );
     }
 
     if (event instanceof StickerPackUnsaved) {
@@ -36,6 +40,7 @@ export class PigeonStickerLibraryRepository
         session,
         event.packId.toString(),
         event.stickerId.toString(),
+        event.occurredAt,
       );
     }
 
@@ -52,6 +57,7 @@ export class PigeonStickerLibraryRepository
         session,
         event.packId.toString(),
         event.stickerId.toString(),
+        event.occurredAt,
       );
     }
   }
