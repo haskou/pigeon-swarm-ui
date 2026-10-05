@@ -229,7 +229,10 @@ describe(PigeonCommunitiesApi.name, () => {
         'author-2',
       );
 
-      expect(Object.keys(sent())).toEqual(['mutation']);
+      expect(Object.keys(sent()).sort()).toEqual(['moderationLog', 'mutation']);
+      expect(sent().moderationLog).toMatchObject({
+        mutation: { sequence: 0, store: 'moderationLogs' },
+      });
       expect(sent().mutation).toMatchObject({
         kind: 'delete',
         recordId: 'community:community-1:channel-1:message-1:author-2',
@@ -630,6 +633,7 @@ describe(PigeonCommunitiesApi.name, () => {
     } as unknown as RequestSigner;
     const invalidateCachedRequest = jest.fn();
     const session = {
+      deviceCredentialKeyPair: await KeyPair.generate(),
       identity: { id: 'identity-1' },
     } as unknown as Session;
     const api = new PigeonCommunitiesApi(
@@ -647,5 +651,93 @@ describe(PigeonCommunitiesApi.name, () => {
     expect(invalidateCachedRequest).toHaveBeenCalledWith(
       'GET /communities/community-1 identity-1',
     );
+  });
+
+  describe('moderation logs', () => {
+    async function setup(response: unknown = {}) {
+      const http = {
+        request: jest.fn().mockResolvedValue(response),
+      } as unknown as HttpJsonClient;
+      const session = {
+        deviceCredentialKeyPair: await KeyPair.generate(),
+        identity: { id: 'identity-1' },
+      } as unknown as Session;
+      const api = new PigeonCommunitiesApi(
+        http,
+        {
+          headers: jest.fn().mockResolvedValue({}),
+        } as unknown as RequestSigner,
+        async (_key, loader) => await loader(),
+      );
+      const lastBody = () => {
+        const calls = (http.request as jest.Mock).mock.calls as [
+          string,
+          { body: string },
+        ][];
+
+        return JSON.parse(calls[calls.length - 1][1].body) as {
+          moderationLog: {
+            createdAt: number;
+            mutation: Record<string, unknown>;
+          };
+        };
+      };
+
+      return { api, http, lastBody, session };
+    }
+
+    it('signs a log for every moderation route with a bodyless-DELETE body', async () => {
+      const { api, http, lastBody, session } = await setup({
+        channels: [{ id: 'channel-1', type: 'voice' }],
+      });
+
+      await api.updateRole(session, 'community-1', 'role-1', {
+        name: 'Mod',
+        permissions: [],
+      });
+      expect(lastBody().moderationLog.mutation).toMatchObject({
+        kind: 'put',
+        predecessor: null,
+        sequence: 0,
+        store: 'moderationLogs',
+      });
+      await api.deleteRole(session, 'community-1', 'role-1');
+      expect(lastBody().moderationLog.mutation.store).toBe('moderationLogs');
+      await api.unbanMember(session, 'community-1', 'member-1');
+      expect(lastBody().moderationLog.mutation.store).toBe('moderationLogs');
+      await api.banMember(session, 'community-1', 'member-1');
+      expect(lastBody()).toMatchObject({ identityId: 'member-1' });
+      await api.update(session, 'community-1', { name: 'New' });
+      expect(lastBody()).toMatchObject({ name: 'New' });
+      await api.renameChannel(session, 'community-1', 'channel-1', 'x');
+      await api.updateChannelPermissions(session, 'community-1', 'channel-1', [
+        'role-1',
+      ]);
+      await api.deleteChannel(session, 'community-1', 'channel-1');
+      expect(lastBody().moderationLog.mutation.store).toBe('moderationLogs');
+      expect(
+        (http.request as jest.Mock).mock.calls.filter(
+          ([, init]: [string, { method?: string; body?: string }]) =>
+            init.method === 'DELETE' && !init.body,
+        ),
+      ).toHaveLength(0);
+    });
+
+    it('derives the log id and the created entity id from the same createdAt', async () => {
+      const { api, lastBody, session } = await setup({});
+
+      await api.createRole(session, 'community-1', {
+        name: 'Mod',
+        permissions: [],
+      });
+      const first = lastBody().moderationLog;
+
+      await api.createTextChannel(session, 'community-1', 'general');
+      const second = lastBody().moderationLog;
+
+      expect(first.mutation.recordId).toMatch(/^[0-9a-f]{24}$/);
+      expect(second.mutation.recordId).toMatch(/^[0-9a-f]{24}$/);
+      expect(first.mutation.recordId).not.toBe(second.mutation.recordId);
+    });
   });
 });
