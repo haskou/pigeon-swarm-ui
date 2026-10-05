@@ -3,6 +3,7 @@ import { type PrimitiveOf } from '@haskou/value-objects';
 import type { Poll } from '../../domain/Poll';
 import type { CreatePollRequest } from './resources/CreatePollRequest';
 import type { PollResource } from './resources/PollResource';
+import type { PollScopeFields } from './resources/PollScopeFields';
 import type { PollScopeResource } from './resources/PollScopeResource';
 
 import { Poll as PollAggregate } from '../../domain/Poll';
@@ -49,13 +50,26 @@ export class PollMapper {
     return poll;
   }
 
+  public toScopeFields(poll: Poll): PollScopeFields {
+    const { scope } = poll.toPrimitives().definition;
+
+    return scope.type === 'community_channel'
+      ? {
+          channelId: scope.secondIdentifier ?? '',
+          communityId: scope.firstIdentifier,
+        }
+      : { conversationId: scope.firstIdentifier };
+  }
+
   public toCreateRequest(poll: Poll): CreatePollRequest {
     const primitives: PrimitiveOf<Poll> = poll.toPrimitives();
     const definition = primitives.definition;
     const common = {
       allowsMultipleVotes: definition.allowsMultipleVotes,
+      createdAt: primitives.createdAt,
       expiresAt: definition.expiresAt,
       options: definition.options,
+      pollId: primitives.id,
       question: definition.question,
     };
 

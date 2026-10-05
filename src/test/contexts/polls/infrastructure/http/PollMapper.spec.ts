@@ -27,11 +27,13 @@ describe(PollMapper.name, () => {
       allowsMultipleVotes: false,
       channelId: 'channel-a',
       communityId: 'community-a',
+      createdAt: 100,
       expiresAt: null,
       options: [
         { id: 'option-a', text: 'A' },
         { id: 'option-b', text: 'B' },
       ],
+      pollId: 'poll-a',
       question: 'Choose?',
       scopeType: 'community_channel',
     });

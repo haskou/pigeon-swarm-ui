@@ -44,6 +44,12 @@ describe(PigeonPollRepository.name, () => {
       PollActorId.fromString('identity-b'),
     );
 
-    expect(api.vote).toHaveBeenCalledWith(session, 'poll-a', ['option-a']);
+    expect(api.vote).toHaveBeenCalledWith(
+      session,
+      'poll-a',
+      { conversationId: 'conversation-a' },
+      ['option-a'],
+      200,
+    );
   });
 });
