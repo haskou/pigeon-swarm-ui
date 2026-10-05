@@ -7,13 +7,6 @@ type FakeMessageElement = {
   getBoundingClientRect: () => DOMRect;
 };
 
-type FakeScroller = {
-  getBoundingClientRect: () => DOMRect;
-  querySelectorAll: () => FakeMessageElement[];
-  scrollHeight: number;
-  scrollTop: number;
-};
-
 function rect(top: number, bottom: number): DOMRect {
   return {
     bottom,
@@ -44,7 +37,12 @@ function scrollerWithRect(
   scrollHeight: number,
   scrollTop: number,
   elements: FakeMessageElement[] = [],
-): FakeScroller {
+): {
+  getBoundingClientRect: () => DOMRect;
+  querySelectorAll: () => FakeMessageElement[];
+  scrollHeight: number;
+  scrollTop: number;
+} {
   return {
     getBoundingClientRect: () => rect(top, top + 400),
     querySelectorAll: () => elements,

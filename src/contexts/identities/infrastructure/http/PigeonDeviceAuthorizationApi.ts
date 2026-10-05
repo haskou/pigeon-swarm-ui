@@ -11,16 +11,14 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+import type { DeviceAuthorizationCheckpointResource } from '../../domain/DeviceAuthorizationCheckpointResource';
 import type { DeviceAuthorizationTransition } from '../../domain/DeviceAuthorizationTransition';
 import type { DevicePairingRequestDraft } from '../../domain/DevicePairingRequestDraft';
 import type { IdentityPassword } from '../../domain/value-objects/IdentityPassword';
 import type { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
 import type { DeviceIdentityVault } from '../storage/DeviceIdentityVault';
 
-import {
-  DeviceAuthorizationCheckpoint,
-  type DeviceAuthorizationCheckpointResource,
-} from '../../domain/DeviceAuthorizationCheckpoint';
+import { DeviceAuthorizationCheckpoint } from '../../domain/DeviceAuthorizationCheckpoint';
 import { DeviceAuthorizationTransition as AuthorizationTransition } from '../../domain/DeviceAuthorizationTransition';
 import { DevicePairingCompletion } from '../../domain/DevicePairingCompletion';
 import { DevicePairingInvitation } from '../../domain/DevicePairingInvitation';
@@ -44,6 +42,63 @@ export class PigeonDeviceAuthorizationApi {
     private readonly vault: DeviceIdentityVault,
     private readonly clock: () => number = () => Date.now(),
   ) {}
+
+  private checkpointPath(identityId: IdentityId): string {
+    return `/identity-devices/${encodeURIComponent(identityId.valueOf())}`;
+  }
+
+  private async findRecoveryCheckpoint(
+    session: Session,
+  ): Promise<DeviceAuthorizationCheckpoint> {
+    const identityId = IdentityId.fromString(session.identity.id);
+    const path = this.checkpointPath(identityId);
+
+    return await this.requestCheckpoint(
+      identityId,
+      path,
+      await this.signer.headersWithRecoveryProof(session, 'GET', path),
+    );
+  }
+
+  private async requestCheckpoint(
+    identityId: IdentityId,
+    path: string,
+    headers: Record<string, string>,
+  ): Promise<DeviceAuthorizationCheckpoint> {
+    const resource =
+      await this.http.request<DeviceAuthorizationCheckpointResource>(path, {
+        headers,
+        method: 'GET',
+      });
+
+    return DeviceAuthorizationCheckpoint.fromResource(resource, identityId);
+  }
+
+  private async submit(
+    session: Session,
+    transition: DeviceAuthorizationTransition,
+  ): Promise<DeviceAuthorizationCheckpoint> {
+    const body = transition.toPrimitives();
+    const path = '/identity-devices/transitions';
+    const resource =
+      await this.http.request<DeviceAuthorizationCheckpointResource>(path, {
+        body: JSON.stringify(body),
+        headers: await this.signer.headers(session, 'POST', path, body),
+        method: 'POST',
+      });
+    const checkpoint = DeviceAuthorizationCheckpoint.fromResource(
+      resource,
+      transition.getIdentityId(),
+    );
+
+    assert(
+      checkpoint.getEpoch().isEqual(transition.getResultEpoch()) &&
+        checkpoint.getRevision().isEqual(transition.getResultRevision()),
+      new Error('Unexpected device authorization checkpoint.'),
+    );
+
+    return checkpoint;
+  }
 
   public invite(session: Session): DevicePairingInvitation {
     const now = this.clock();
@@ -204,37 +259,6 @@ export class PigeonDeviceAuthorizationApi {
     );
   }
 
-  private checkpointPath(identityId: IdentityId): string {
-    return `/identity-devices/${encodeURIComponent(identityId.valueOf())}`;
-  }
-
-  private async findRecoveryCheckpoint(
-    session: Session,
-  ): Promise<DeviceAuthorizationCheckpoint> {
-    const identityId = IdentityId.fromString(session.identity.id);
-    const path = this.checkpointPath(identityId);
-
-    return await this.requestCheckpoint(
-      identityId,
-      path,
-      await this.signer.headersWithRecoveryProof(session, 'GET', path),
-    );
-  }
-
-  private async requestCheckpoint(
-    identityId: IdentityId,
-    path: string,
-    headers: Record<string, string>,
-  ): Promise<DeviceAuthorizationCheckpoint> {
-    const resource =
-      await this.http.request<DeviceAuthorizationCheckpointResource>(path, {
-        headers,
-        method: 'GET',
-      });
-
-    return DeviceAuthorizationCheckpoint.fromResource(resource, identityId);
-  }
-
   public async synchronize(session: Session): Promise<Session> {
     const checkpoint = await this.find(session);
 
@@ -325,31 +349,5 @@ export class PigeonDeviceAuthorizationApi {
       authorizationRevision: vaultSession.authorizationRevision,
       deviceId: vaultSession.deviceId,
     };
-  }
-
-  private async submit(
-    session: Session,
-    transition: DeviceAuthorizationTransition,
-  ): Promise<DeviceAuthorizationCheckpoint> {
-    const body = transition.toPrimitives();
-    const path = '/identity-devices/transitions';
-    const resource =
-      await this.http.request<DeviceAuthorizationCheckpointResource>(path, {
-        body: JSON.stringify(body),
-        headers: await this.signer.headers(session, 'POST', path, body),
-        method: 'POST',
-      });
-    const checkpoint = DeviceAuthorizationCheckpoint.fromResource(
-      resource,
-      transition.getIdentityId(),
-    );
-
-    assert(
-      checkpoint.getEpoch().isEqual(transition.getResultEpoch()) &&
-        checkpoint.getRevision().isEqual(transition.getResultRevision()),
-      new Error('Unexpected device authorization checkpoint.'),
-    );
-
-    return checkpoint;
   }
 }

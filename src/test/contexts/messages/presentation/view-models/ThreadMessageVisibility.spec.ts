@@ -2,6 +2,38 @@ import type { ChatMessage } from '../../../../../shared/domain/pigeonResources.t
 
 import { ThreadMessageVisibility } from '../../../../../contexts/messages/presentation/view-models/ThreadMessageVisibility';
 
+function chatMessage(input: {
+  id: string;
+  replyPreviewMessageId?: string;
+  replyToMessageId?: string;
+  threadRootMessageId?: string;
+}): ChatMessage {
+  return {
+    attachments: [],
+    authorIdentityId: 'identity-id',
+    content: input.id,
+    encrypted: false,
+    id: input.id,
+    mine: false,
+    raw: {
+      id: input.id,
+      replyToMessageId: input.replyToMessageId,
+      type: 'sent',
+    },
+    reactions: [],
+    replyPreview: input.replyPreviewMessageId
+      ? {
+          authorIdentityId: 'identity-id',
+          content: 'Root',
+          messageId: input.replyPreviewMessageId,
+        }
+      : undefined,
+    replyToMessageId: input.replyToMessageId,
+    threadRootMessageId: input.threadRootMessageId,
+    timestamp: 1,
+  };
+}
+
 describe(ThreadMessageVisibility.name, () => {
   it('keeps marked thread messages in the thread panel', () => {
     const message = chatMessage({
@@ -70,35 +102,3 @@ describe(ThreadMessageVisibility.name, () => {
     );
   });
 });
-
-function chatMessage(input: {
-  id: string;
-  replyPreviewMessageId?: string;
-  replyToMessageId?: string;
-  threadRootMessageId?: string;
-}): ChatMessage {
-  return {
-    attachments: [],
-    authorIdentityId: 'identity-id',
-    content: input.id,
-    encrypted: false,
-    id: input.id,
-    mine: false,
-    raw: {
-      id: input.id,
-      replyToMessageId: input.replyToMessageId,
-      type: 'sent',
-    },
-    reactions: [],
-    replyPreview: input.replyPreviewMessageId
-      ? {
-          authorIdentityId: 'identity-id',
-          content: 'Root',
-          messageId: input.replyPreviewMessageId,
-        }
-      : undefined,
-    replyToMessageId: input.replyToMessageId,
-    threadRootMessageId: input.threadRootMessageId,
-    timestamp: 1,
-  };
-}

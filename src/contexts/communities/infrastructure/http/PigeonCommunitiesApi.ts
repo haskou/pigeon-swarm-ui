@@ -50,11 +50,8 @@ const present = <T extends Record<string, unknown>>(value: T): Partial<T> =>
 
 export class PigeonCommunitiesApi {
   private readonly draftPayloads: DraftPayloadCipher;
-
   private readonly moderationLogs = new CommunityModerationLogSigner();
-
   private readonly mutations = new PublicMutationSigner();
-
   private readonly operations = new CommunityOperationSigner();
 
   public constructor(
@@ -78,19 +75,6 @@ export class PigeonCommunitiesApi {
       .replace(/\+/g, '-')
       .replace(/\//g, '_')
       .replace(/=+$/, '');
-  }
-
-  public async frontier(
-    session: Session,
-    communityId: string,
-  ): Promise<string[]> {
-    const path = `/communities/${encodeURIComponent(communityId)}/frontier`;
-    const result = await this.http.request<{ frontier: string[] }>(path, {
-      headers: await this.signer.headers(session, 'GET', path),
-      method: 'GET',
-    });
-
-    return result.frontier;
   }
 
   /** Signs an operation on top of the frontier the node holds right now. */
@@ -437,6 +421,19 @@ export class PigeonCommunitiesApi {
     );
 
     return response as unknown as MessageResource;
+  }
+
+  public async frontier(
+    session: Session,
+    communityId: string,
+  ): Promise<string[]> {
+    const path = `/communities/${encodeURIComponent(communityId)}/frontier`;
+    const result = await this.http.request<{ frontier: string[] }>(path, {
+      headers: await this.signer.headers(session, 'GET', path),
+      method: 'GET',
+    });
+
+    return result.frontier;
   }
 
   public async list(session: Session): Promise<Community[]> {

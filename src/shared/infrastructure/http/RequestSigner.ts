@@ -60,6 +60,26 @@ export class RequestSigner {
     return JSON.stringify(body);
   }
 
+  private async signedRequest(
+    session: Session,
+    method: string,
+    path: string,
+    body: unknown,
+  ): Promise<{ headers: Record<string, string>; payload: string }> {
+    const timestamp = this.clock();
+    const payload = this.payload(method, path, timestamp, body);
+    const signature = await signSessionPayload(session, payload);
+
+    return {
+      headers: {
+        'X-Identity-Id': IdentityId.normalize(session.identity.id),
+        'X-Signature': signature.toString(),
+        'X-Timestamp': `${timestamp}`,
+      },
+      payload,
+    };
+  }
+
   public async headers(
     session: Session,
     method: string,
@@ -104,26 +124,6 @@ export class RequestSigner {
       'X-Recovery-Signature': session.recoveryAuthorityKeyPair
         .sign(request.payload)
         .toString(),
-    };
-  }
-
-  private async signedRequest(
-    session: Session,
-    method: string,
-    path: string,
-    body: unknown,
-  ): Promise<{ headers: Record<string, string>; payload: string }> {
-    const timestamp = this.clock();
-    const payload = this.payload(method, path, timestamp, body);
-    const signature = await signSessionPayload(session, payload);
-
-    return {
-      headers: {
-        'X-Identity-Id': IdentityId.normalize(session.identity.id),
-        'X-Signature': signature.toString(),
-        'X-Timestamp': `${timestamp}`,
-      },
-      payload,
     };
   }
 

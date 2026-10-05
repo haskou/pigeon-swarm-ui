@@ -1,5 +1,4 @@
 import {
-  EncryptedPayload,
   KeyPair,
   ProtectedUserRootKey,
   SymmetricKey,
@@ -13,45 +12,17 @@ import {
 } from '@haskou/value-objects';
 
 import type { DeviceId } from '../../domain/value-objects/DeviceId';
-import type { DeviceRootKeyEnvelope } from '../../domain/value-objects/DeviceRootKeyEnvelope';
 import type { DeviceUnlockSecretHandle } from '../../domain/value-objects/DeviceUnlockSecretHandle';
 import type { IdentityId } from '../../domain/value-objects/IdentityId';
+import type { DeviceIdentityKeyMaterial } from './DeviceIdentityKeyMaterial';
+import type { ProtectDeviceIdentityInput } from './ProtectDeviceIdentityInput';
+import type { ProtectedDeviceIdentity } from './ProtectedDeviceIdentity';
+import type { SerializedDeviceIdentityKeyMaterial } from './SerializedDeviceIdentityKeyMaterial';
 
 import { DeviceRootKeyEnvelope as RootKeyEnvelope } from '../../domain/value-objects/DeviceRootKeyEnvelope';
 
 const FACTOR_KEY_BITS = 256;
 const MATERIAL_VERSION = 1;
-
-export type DeviceIdentityKeyMaterial = {
-  deviceCredentialKeyPair: KeyPair;
-  identityKeyPair: KeyPair;
-  recoveryAuthorityKeyPair: KeyPair;
-  rootKey: UserRootKey;
-};
-
-type SerializedDeviceIdentityKeyMaterial = {
-  deviceCredentialKeyPair: ReturnType<KeyPair['toPrimitives']>;
-  identityKeyPair: ReturnType<KeyPair['toPrimitives']>;
-  recoveryAuthorityKeyPair: ReturnType<KeyPair['toPrimitives']>;
-  version: 1;
-};
-
-export type ProtectedDeviceIdentity = {
-  deviceId: DeviceId;
-  encryptedMaterial: EncryptedPayload;
-  envelope: DeviceRootKeyEnvelope;
-  factorKey: CryptoKey;
-  identityId: IdentityId;
-  secretHandle: DeviceUnlockSecretHandle;
-};
-
-export type ProtectDeviceIdentityInput = {
-  deviceId: DeviceId;
-  identityId: IdentityId;
-  material: DeviceIdentityKeyMaterial;
-  password: string;
-  secretHandle: DeviceUnlockSecretHandle;
-};
 
 export class DeviceIdentityProtector {
   private context(protectedIdentity: {

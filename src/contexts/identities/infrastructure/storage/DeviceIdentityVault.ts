@@ -1,11 +1,10 @@
 import { EncryptedPayload } from '@haskou/pigeon-swarm-crypto';
 import { assert } from '@haskou/value-objects';
 
-import type {
-  DeviceIdentityKeyMaterial,
-  ProtectedDeviceIdentity,
-} from '../crypto/DeviceIdentityProtector';
+import type { DeviceIdentityKeyMaterial } from '../crypto/DeviceIdentityKeyMaterial';
+import type { ProtectedDeviceIdentity } from '../crypto/ProtectedDeviceIdentity';
 import type { DeviceIdentityVaultRecord } from './DeviceIdentityVaultRecord';
+import type { DeviceIdentityVaultSession } from './DeviceIdentityVaultSession';
 import type { DeviceIdentityVaultStore } from './DeviceIdentityVaultStore';
 
 import { DeviceAuthorizationEpoch } from '../../domain/value-objects/DeviceAuthorizationEpoch';
@@ -17,14 +16,6 @@ import { IdentityId } from '../../domain/value-objects/IdentityId';
 import { DeviceIdentityProtector } from '../crypto/DeviceIdentityProtector';
 import { IndexedDbDeviceIdentityVaultStore } from './IndexedDbDeviceIdentityVaultStore';
 
-export type DeviceIdentityVaultSession = {
-  authorizationEpoch: DeviceAuthorizationEpoch;
-  authorizationRevision: DeviceAuthorizationRevision;
-  deviceId: DeviceId;
-  material: DeviceIdentityKeyMaterial;
-  secretHandle: DeviceUnlockSecretHandle;
-};
-
 export class DeviceIdentityVault {
   private readonly protector: DeviceIdentityProtector;
   private readonly store: DeviceIdentityVaultStore;
@@ -35,28 +26,6 @@ export class DeviceIdentityVault {
   ) {
     this.store = store ?? new IndexedDbDeviceIdentityVaultStore();
     this.protector = protector ?? new DeviceIdentityProtector();
-  }
-
-  public async advanceAuthorization(
-    identityId: IdentityId,
-    previousRevision: DeviceAuthorizationRevision,
-    epoch: DeviceAuthorizationEpoch,
-  ): Promise<void> {
-    await this.store.advanceAuthorization(identityId, previousRevision, epoch);
-  }
-
-  public async synchronizeAuthorization(
-    identityId: IdentityId,
-    localRevision: DeviceAuthorizationRevision,
-    epoch: DeviceAuthorizationEpoch,
-    revision: DeviceAuthorizationRevision,
-  ): Promise<void> {
-    await this.store.synchronizeAuthorization(
-      identityId,
-      localRevision,
-      epoch,
-      revision,
-    );
   }
 
   private protectedIdentity(
@@ -104,6 +73,28 @@ export class DeviceIdentityVault {
     );
 
     return record;
+  }
+
+  public async advanceAuthorization(
+    identityId: IdentityId,
+    previousRevision: DeviceAuthorizationRevision,
+    epoch: DeviceAuthorizationEpoch,
+  ): Promise<void> {
+    await this.store.advanceAuthorization(identityId, previousRevision, epoch);
+  }
+
+  public async synchronizeAuthorization(
+    identityId: IdentityId,
+    localRevision: DeviceAuthorizationRevision,
+    epoch: DeviceAuthorizationEpoch,
+    revision: DeviceAuthorizationRevision,
+  ): Promise<void> {
+    await this.store.synchronizeAuthorization(
+      identityId,
+      localRevision,
+      epoch,
+      revision,
+    );
   }
 
   public async changePassword(

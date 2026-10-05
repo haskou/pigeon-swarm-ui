@@ -12,7 +12,6 @@ import { screenShareEncodingParameters } from './ScreenShareQuality';
 
 export class CallLocalTracks {
   private localStream: MediaStream | null = null;
-
   private screenShareQuality: ScreenShareQualityPreset = 'auto';
 
   public constructor(
@@ -20,92 +19,6 @@ export class CallLocalTracks {
     private readonly screenShareStreams: CallScreenShareStreams,
     private readonly encryption: CallMediaEncryption,
   ) {}
-
-  public get stream(): MediaStream | null {
-    return this.localStream;
-  }
-
-  public addToPeer(peer: RTCPeerConnection, peerIdentityId: string): void {
-    this.localStream?.getTracks().forEach((track) => {
-      logCallDebug('peer-manager:create-peer:add-local-track', {
-        enabled: track.enabled,
-        kind: track.kind,
-        peerIdentityId,
-        readyState: track.readyState,
-      });
-
-      this.configureSender(
-        peer.addTrack(
-          track,
-          this.screenShareStreams.localStreamFor(track, this.localStream),
-        ),
-        peerIdentityId,
-      );
-    });
-  }
-
-  public async rebindAudioSenders(
-    peerIdentityId: string,
-    peer: RTCPeerConnection,
-  ): Promise<void> {
-    if (
-      this.peerFor(peerIdentityId) !== peer ||
-      peer.connectionState === 'closed'
-    )
-      return;
-
-    await Promise.all(
-      peer.getSenders().map((sender) => {
-        const track = sender.track;
-
-        if (
-          track?.kind !== 'audio' ||
-          track.readyState !== 'live' ||
-          !this.localStream?.getTracks().includes(track)
-        )
-          return;
-
-        return sender.replaceTrack(track);
-      }),
-    );
-  }
-
-  public reset(): void {
-    this.localStream = null;
-  }
-
-  public setScreenShareQuality(
-    quality: ScreenShareQualityPreset,
-    peers: Map<string, RTCPeerConnection>,
-  ): void {
-    this.screenShareQuality = quality;
-
-    for (const [peerIdentityId, peer] of peers.entries()) {
-      peer
-        .getSenders()
-        .forEach((sender) => this.configureSender(sender, peerIdentityId));
-    }
-  }
-
-  public setStream(
-    stream: MediaStream | null,
-    peers: Map<string, RTCPeerConnection>,
-  ): void {
-    this.localStream = stream;
-    logCallDebug('peer-manager:set-local-stream', {
-      hasStream: Boolean(stream),
-      tracks:
-        stream?.getTracks().map((track) => ({
-          enabled: track.enabled,
-          id: track.id,
-          kind: track.kind,
-          label: track.label,
-          muted: track.muted,
-          readyState: track.readyState,
-        })) ?? [],
-    });
-    this.syncPeers(peers);
-  }
 
   private addMissingTrack(
     peerIdentityId: string,
@@ -240,5 +153,91 @@ export class CallLocalTracks {
           kind: replacement.kind,
         });
       });
+  }
+
+  public get stream(): MediaStream | null {
+    return this.localStream;
+  }
+
+  public addToPeer(peer: RTCPeerConnection, peerIdentityId: string): void {
+    this.localStream?.getTracks().forEach((track) => {
+      logCallDebug('peer-manager:create-peer:add-local-track', {
+        enabled: track.enabled,
+        kind: track.kind,
+        peerIdentityId,
+        readyState: track.readyState,
+      });
+
+      this.configureSender(
+        peer.addTrack(
+          track,
+          this.screenShareStreams.localStreamFor(track, this.localStream),
+        ),
+        peerIdentityId,
+      );
+    });
+  }
+
+  public async rebindAudioSenders(
+    peerIdentityId: string,
+    peer: RTCPeerConnection,
+  ): Promise<void> {
+    if (
+      this.peerFor(peerIdentityId) !== peer ||
+      peer.connectionState === 'closed'
+    )
+      return;
+
+    await Promise.all(
+      peer.getSenders().map((sender) => {
+        const track = sender.track;
+
+        if (
+          track?.kind !== 'audio' ||
+          track.readyState !== 'live' ||
+          !this.localStream?.getTracks().includes(track)
+        )
+          return;
+
+        return sender.replaceTrack(track);
+      }),
+    );
+  }
+
+  public reset(): void {
+    this.localStream = null;
+  }
+
+  public setScreenShareQuality(
+    quality: ScreenShareQualityPreset,
+    peers: Map<string, RTCPeerConnection>,
+  ): void {
+    this.screenShareQuality = quality;
+
+    for (const [peerIdentityId, peer] of peers.entries()) {
+      peer
+        .getSenders()
+        .forEach((sender) => this.configureSender(sender, peerIdentityId));
+    }
+  }
+
+  public setStream(
+    stream: MediaStream | null,
+    peers: Map<string, RTCPeerConnection>,
+  ): void {
+    this.localStream = stream;
+    logCallDebug('peer-manager:set-local-stream', {
+      hasStream: Boolean(stream),
+      tracks:
+        stream?.getTracks().map((track) => ({
+          enabled: track.enabled,
+          id: track.id,
+          kind: track.kind,
+          label: track.label,
+          muted: track.muted,
+          readyState: track.readyState,
+        })) ?? [],
+    });
+    this.syncPeers(peers);
   }
 }

@@ -3,6 +3,30 @@ import {
   saveLanguage,
 } from '../../../../shared/presentation/i18n/language';
 
+function defineWindow(localStorage: Storage) {
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    value: {
+      localStorage,
+    },
+  });
+}
+
+function fakeStorage(entries: Array<[string, string]> = []): Storage {
+  const values = new Map(entries);
+
+  return {
+    clear: jest.fn(() => values.clear()),
+    getItem: jest.fn((key: string) => values.get(key) ?? null),
+    key: jest.fn((index: number) => Array.from(values.keys())[index] ?? null),
+    get length() {
+      return values.size;
+    },
+    removeItem: jest.fn((key: string) => values.delete(key)),
+    setItem: jest.fn((key: string, value: string) => values.set(key, value)),
+  } as Storage;
+}
+
 describe('i18n language selection', () => {
   const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
 
@@ -82,27 +106,3 @@ describe('i18n language selection', () => {
     expect(copy.stickers.search).toBe('Buscar');
   });
 });
-
-function defineWindow(localStorage: Storage) {
-  Object.defineProperty(globalThis, 'window', {
-    configurable: true,
-    value: {
-      localStorage,
-    },
-  });
-}
-
-function fakeStorage(entries: Array<[string, string]> = []): Storage {
-  const values = new Map(entries);
-
-  return {
-    clear: jest.fn(() => values.clear()),
-    getItem: jest.fn((key: string) => values.get(key) ?? null),
-    key: jest.fn((index: number) => Array.from(values.keys())[index] ?? null),
-    get length() {
-      return values.size;
-    },
-    removeItem: jest.fn((key: string) => values.delete(key)),
-    setItem: jest.fn((key: string, value: string) => values.set(key, value)),
-  } as Storage;
-}

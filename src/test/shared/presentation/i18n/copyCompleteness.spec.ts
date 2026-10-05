@@ -1,15 +1,9 @@
 import { en } from '../../../../shared/presentation/i18n/en';
 import { es } from '../../../../shared/presentation/i18n/es';
 
-describe('i18n copy completeness', () => {
-  it('translates every English copy entry to Spanish', () => {
-    expect(missingPaths(en, es)).toEqual([]);
-  });
-
-  it('does not keep Spanish entries without an English source', () => {
-    expect(missingPaths(es, en)).toEqual([]);
-  });
-});
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
 function missingPaths(
   source: Record<string, unknown>,
@@ -32,6 +26,12 @@ function missingPaths(
   });
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
+describe('i18n copy completeness', () => {
+  it('translates every English copy entry to Spanish', () => {
+    expect(missingPaths(en, es)).toEqual([]);
+  });
+
+  it('does not keep Spanish entries without an English source', () => {
+    expect(missingPaths(es, en)).toEqual([]);
+  });
+});

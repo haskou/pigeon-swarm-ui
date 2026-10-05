@@ -2,6 +2,24 @@ import type { NotificationResource } from '../../../../../shared/domain/pigeonRe
 
 import { notificationPreview } from '../../../../../contexts/notifications/presentation/view-models/notificationPreview';
 
+function conversationInvitation(): NotificationResource {
+  return {
+    createdAt: '1',
+    id: 'notification-1',
+    payload: {
+      conversationId: 'conversation-1',
+      encryptedConversationKey: 'encrypted-key',
+      inviterIdentityId: 'identity-1',
+      inviterSignature: 'signature',
+      recipientIdentityId: 'identity-2',
+    },
+    recipientIdentityId: 'identity-2',
+    state: 'pending',
+    status: 'unread',
+    type: 'conversation_invitation',
+  };
+}
+
 describe(notificationPreview.name, () => {
   it('marks identity previews as loading while the identity is unresolved', () => {
     expect(
@@ -36,21 +54,3 @@ describe(notificationPreview.name, () => {
     });
   });
 });
-
-function conversationInvitation(): NotificationResource {
-  return {
-    createdAt: '1',
-    id: 'notification-1',
-    payload: {
-      conversationId: 'conversation-1',
-      encryptedConversationKey: 'encrypted-key',
-      inviterIdentityId: 'identity-1',
-      inviterSignature: 'signature',
-      recipientIdentityId: 'identity-2',
-    },
-    recipientIdentityId: 'identity-2',
-    state: 'pending',
-    status: 'unread',
-    type: 'conversation_invitation',
-  };
-}

@@ -1,6 +1,9 @@
 import { KeyPair, SHA256Hash, Signature } from '@haskou/pigeon-swarm-crypto';
 import { StringValueObject, Timestamp, assert } from '@haskou/value-objects';
 
+import type { DeviceAuthorizationOperation } from './DeviceAuthorizationOperation';
+import type { DeviceAuthorizationTransitionResource } from './DeviceAuthorizationTransitionResource';
+import type { DeviceAuthorizationUnsignedPayload } from './DeviceAuthorizationUnsignedPayload';
 import type { DeviceAuthorizationOperationId } from './value-objects/DeviceAuthorizationOperationId';
 import type { PairingId } from './value-objects/PairingId';
 
@@ -13,30 +16,101 @@ import { IdentityId } from './value-objects/IdentityId';
 const PROOF_DOMAIN = 'pigeon:device-authorization:proof-of-possession:v2';
 const SIGNATURE_DOMAIN = 'pigeon:device-authorization:transition:v3';
 
-type Operation = 'enroll' | 'recover' | 'revoke';
-
-export type DeviceAuthorizationUnsignedPayload = {
-  authorCredential?: string;
-  authorizedAt?: number;
-  epoch: string;
-  identityId: string;
-  operation: Operation;
-  operationId: string;
-  pairingExpiration?: number;
-  pairingId?: string;
-  previousRevision: number;
-  revision: number;
-  targetCredential: string;
-  targetCredentialCommitment: string;
-};
-
-export type DeviceAuthorizationTransitionResource =
-  DeviceAuthorizationUnsignedPayload & {
-    proofOfPossession?: string;
-    signature: string;
-  };
-
 export class DeviceAuthorizationTransition {
+  private static sign(input: {
+    author: KeyPair;
+    authorCredential?: string;
+    authorizedAt?: Timestamp;
+    epoch: DeviceAuthorizationEpoch;
+    identityId: IdentityId;
+    operation: DeviceAuthorizationOperation;
+    operationId: DeviceAuthorizationOperationId;
+    pairingExpiration?: Timestamp;
+    pairingId?: PairingId;
+    previousRevision: DeviceAuthorizationRevision;
+    proofOfPossession?: Signature;
+    target?: KeyPair;
+    targetCredential?: DeviceCredential;
+    targetProofRequired: boolean;
+  }): DeviceAuthorizationTransition {
+    const targetCredential =
+      input.targetCredential?.valueOf() ??
+      input.target?.toPrimitives().publicKey;
+    assert(targetCredential, new Error('A target credential is required.'));
+    const unsigned = this.unsigned({
+      authorCredential:
+        input.operation === 'recover'
+          ? undefined
+          : (input.authorCredential ?? input.author.toPrimitives().publicKey),
+      authorizedAt: input.authorizedAt?.valueOf(),
+      epoch: input.epoch.valueOf(),
+      identityId: input.identityId.valueOf(),
+      operation: input.operation,
+      operationId: input.operationId.valueOf(),
+      pairingExpiration: input.pairingExpiration?.valueOf(),
+      pairingId: input.pairingId?.valueOf(),
+      previousRevision: input.previousRevision.valueOf(),
+      targetCredential,
+    });
+    const target = input.target;
+
+    let proofOfPossession = input.proofOfPossession?.valueOf();
+
+    if (input.targetProofRequired && !proofOfPossession) {
+      assert(target, new Error('A target key pair is required.'));
+      proofOfPossession = target
+        .sign(JSON.stringify({ domain: PROOF_DOMAIN, transition: unsigned }))
+        .valueOf();
+    }
+    const signature = input.author
+      .sign(
+        JSON.stringify({
+          domain: SIGNATURE_DOMAIN,
+          proofOfPossession,
+          transition: unsigned,
+        }),
+      )
+      .valueOf();
+
+    return new DeviceAuthorizationTransition(
+      input.epoch,
+      input.operationId,
+      unsigned,
+      proofOfPossession,
+      signature,
+    );
+  }
+
+  private static unsigned(input: {
+    authorCredential?: string;
+    authorizedAt?: number;
+    epoch: string;
+    identityId: string;
+    operation: DeviceAuthorizationOperation;
+    operationId: string;
+    pairingExpiration?: number;
+    pairingId?: string;
+    previousRevision: number;
+    targetCredential: string;
+  }): DeviceAuthorizationUnsignedPayload {
+    return {
+      authorCredential: input.authorCredential,
+      authorizedAt: input.authorizedAt,
+      epoch: input.epoch,
+      identityId: input.identityId,
+      operation: input.operation,
+      operationId: input.operationId,
+      pairingExpiration: input.pairingExpiration,
+      pairingId: input.pairingId,
+      previousRevision: input.previousRevision,
+      revision: input.previousRevision + 1,
+      targetCredential: input.targetCredential,
+      targetCredentialCommitment: SHA256Hash.from(
+        new StringValueObject(input.targetCredential),
+      ).valueOf(),
+    };
+  }
+
   public static isValidEnrollmentProof(input: {
     authorCredential: DeviceCredential;
     authorizedAt: Timestamp;
@@ -198,100 +272,6 @@ export class DeviceAuthorizationTransition {
       targetCredential: input.targetCredential,
       targetProofRequired: false,
     });
-  }
-
-  private static sign(input: {
-    author: KeyPair;
-    authorCredential?: string;
-    authorizedAt?: Timestamp;
-    epoch: DeviceAuthorizationEpoch;
-    identityId: IdentityId;
-    operation: Operation;
-    operationId: DeviceAuthorizationOperationId;
-    pairingExpiration?: Timestamp;
-    pairingId?: PairingId;
-    previousRevision: DeviceAuthorizationRevision;
-    proofOfPossession?: Signature;
-    target?: KeyPair;
-    targetCredential?: DeviceCredential;
-    targetProofRequired: boolean;
-  }): DeviceAuthorizationTransition {
-    const targetCredential =
-      input.targetCredential?.valueOf() ??
-      input.target?.toPrimitives().publicKey;
-    assert(targetCredential, new Error('A target credential is required.'));
-    const unsigned = this.unsigned({
-      authorCredential:
-        input.operation === 'recover'
-          ? undefined
-          : (input.authorCredential ?? input.author.toPrimitives().publicKey),
-      authorizedAt: input.authorizedAt?.valueOf(),
-      epoch: input.epoch.valueOf(),
-      identityId: input.identityId.valueOf(),
-      operation: input.operation,
-      operationId: input.operationId.valueOf(),
-      pairingExpiration: input.pairingExpiration?.valueOf(),
-      pairingId: input.pairingId?.valueOf(),
-      previousRevision: input.previousRevision.valueOf(),
-      targetCredential,
-    });
-    const target = input.target;
-
-    let proofOfPossession = input.proofOfPossession?.valueOf();
-
-    if (input.targetProofRequired && !proofOfPossession) {
-      assert(target, new Error('A target key pair is required.'));
-      proofOfPossession = target
-        .sign(JSON.stringify({ domain: PROOF_DOMAIN, transition: unsigned }))
-        .valueOf();
-    }
-    const signature = input.author
-      .sign(
-        JSON.stringify({
-          domain: SIGNATURE_DOMAIN,
-          proofOfPossession,
-          transition: unsigned,
-        }),
-      )
-      .valueOf();
-
-    return new DeviceAuthorizationTransition(
-      input.epoch,
-      input.operationId,
-      unsigned,
-      proofOfPossession,
-      signature,
-    );
-  }
-
-  private static unsigned(input: {
-    authorCredential?: string;
-    authorizedAt?: number;
-    epoch: string;
-    identityId: string;
-    operation: Operation;
-    operationId: string;
-    pairingExpiration?: number;
-    pairingId?: string;
-    previousRevision: number;
-    targetCredential: string;
-  }): DeviceAuthorizationUnsignedPayload {
-    return {
-      authorCredential: input.authorCredential,
-      authorizedAt: input.authorizedAt,
-      epoch: input.epoch,
-      identityId: input.identityId,
-      operation: input.operation,
-      operationId: input.operationId,
-      pairingExpiration: input.pairingExpiration,
-      pairingId: input.pairingId,
-      previousRevision: input.previousRevision,
-      revision: input.previousRevision + 1,
-      targetCredential: input.targetCredential,
-      targetCredentialCommitment: SHA256Hash.from(
-        new StringValueObject(input.targetCredential),
-      ).valueOf(),
-    };
   }
 
   private constructor(

@@ -54,48 +54,6 @@ export class PigeonPollsApi {
     return response as PollResource;
   }
 
-  public async create(
-    session: Session,
-    input: CreatePollRequest,
-  ): Promise<PollResource> {
-    const scope =
-      input.scopeType === 'community_channel'
-        ? { channelId: input.channelId, communityId: input.communityId }
-        : { conversationId: input.conversationId };
-    const payload = {
-      allowsMultipleVotes: input.allowsMultipleVotes,
-      createdAt: input.createdAt,
-      creatorIdentityId: this.mutations.authorOf(session),
-      ...(input.expiresAt === null || input.expiresAt === undefined
-        ? {}
-        : { expiresAt: input.expiresAt }),
-      id: input.pollId,
-      options: input.options.map(({ id, text }) => ({ id, text })),
-      question: input.question,
-      scopeType: 'poll',
-      ...scope,
-    };
-
-    const timelineMutation = await this.mutations.sign(
-      session,
-      {
-        kind: 'put',
-        payload: this.timelineRecord(session, input),
-        recordId: this.timelineRecordId(session, input),
-        store: 'messages',
-      },
-      PublicMutationSigner.FIRST_POSITION,
-    );
-
-    return await this.submit(
-      session,
-      'POST',
-      '/polls/',
-      { kind: 'put', payload },
-      { ...input, timelineMutation },
-    );
-  }
-
   private timelineRecordId(session: Session, input: CreatePollRequest): string {
     return input.scopeType === 'community_channel'
       ? [
@@ -141,6 +99,48 @@ export class PigeonPollsApi {
       scopeType: 'conversation',
       type: 'poll',
     };
+  }
+
+  public async create(
+    session: Session,
+    input: CreatePollRequest,
+  ): Promise<PollResource> {
+    const scope =
+      input.scopeType === 'community_channel'
+        ? { channelId: input.channelId, communityId: input.communityId }
+        : { conversationId: input.conversationId };
+    const payload = {
+      allowsMultipleVotes: input.allowsMultipleVotes,
+      createdAt: input.createdAt,
+      creatorIdentityId: this.mutations.authorOf(session),
+      ...(input.expiresAt === null || input.expiresAt === undefined
+        ? {}
+        : { expiresAt: input.expiresAt }),
+      id: input.pollId,
+      options: input.options.map(({ id, text }) => ({ id, text })),
+      question: input.question,
+      scopeType: 'poll',
+      ...scope,
+    };
+
+    const timelineMutation = await this.mutations.sign(
+      session,
+      {
+        kind: 'put',
+        payload: this.timelineRecord(session, input),
+        recordId: this.timelineRecordId(session, input),
+        store: 'messages',
+      },
+      PublicMutationSigner.FIRST_POSITION,
+    );
+
+    return await this.submit(
+      session,
+      'POST',
+      '/polls/',
+      { kind: 'put', payload },
+      { ...input, timelineMutation },
+    );
   }
 
   public async get(session: Session, pollId: string): Promise<PollResource> {

@@ -1,14 +1,10 @@
 import { assert } from '@haskou/value-objects';
 
+import type { DeviceAuthorizationCheckpointResource } from './DeviceAuthorizationCheckpointResource';
+
 import { DeviceAuthorizationEpoch } from './value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationRevision } from './value-objects/DeviceAuthorizationRevision';
 import { IdentityId } from './value-objects/IdentityId';
-
-export type DeviceAuthorizationCheckpointResource = {
-  epoch: string;
-  identityId: string;
-  revision: number;
-};
 
 export class DeviceAuthorizationCheckpoint {
   public static fromResource(

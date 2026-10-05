@@ -2,6 +2,39 @@ import type { ChatMessage } from '../../../../../shared/domain/pigeonResources.t
 
 import { MessageTimelineEntries } from '../../../../../contexts/messages/presentation/view-models/MessageTimelineEntries';
 
+function chatMessage(input: {
+  content: string;
+  id: string;
+  rawReplyToMessageId?: string;
+  replyPreviewMessageId?: string;
+  threadRootMessageId?: string;
+  timestamp: number;
+}): ChatMessage {
+  return {
+    attachments: [],
+    authorIdentityId: 'identity-id',
+    content: input.content,
+    encrypted: false,
+    id: input.id,
+    mine: false,
+    raw: {
+      id: input.id,
+      replyToMessageId: input.rawReplyToMessageId,
+      type: 'sent',
+    },
+    reactions: [],
+    replyPreview: input.replyPreviewMessageId
+      ? {
+          authorIdentityId: 'identity-id',
+          content: 'Reply parent',
+          messageId: input.replyPreviewMessageId,
+        }
+      : undefined,
+    threadRootMessageId: input.threadRootMessageId,
+    timestamp: input.timestamp,
+  };
+}
+
 describe(MessageTimelineEntries.name, () => {
   it('keeps visible replies in the root timeline', () => {
     const root = chatMessage({
@@ -228,36 +261,3 @@ describe(MessageTimelineEntries.name, () => {
     });
   });
 });
-
-function chatMessage(input: {
-  content: string;
-  id: string;
-  rawReplyToMessageId?: string;
-  replyPreviewMessageId?: string;
-  threadRootMessageId?: string;
-  timestamp: number;
-}): ChatMessage {
-  return {
-    attachments: [],
-    authorIdentityId: 'identity-id',
-    content: input.content,
-    encrypted: false,
-    id: input.id,
-    mine: false,
-    raw: {
-      id: input.id,
-      replyToMessageId: input.rawReplyToMessageId,
-      type: 'sent',
-    },
-    reactions: [],
-    replyPreview: input.replyPreviewMessageId
-      ? {
-          authorIdentityId: 'identity-id',
-          content: 'Reply parent',
-          messageId: input.replyPreviewMessageId,
-        }
-      : undefined,
-    threadRootMessageId: input.threadRootMessageId,
-    timestamp: input.timestamp,
-  };
-}

@@ -1,6 +1,9 @@
 import { KeyPair, Signature } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp, assert } from '@haskou/value-objects';
 
+import type { DevicePairingInvitationPayload } from './DevicePairingInvitationPayload';
+import type { DevicePairingInvitationResource } from './DevicePairingInvitationResource';
+
 import { DevicePairingResource } from './DevicePairingResource';
 import { DeviceAuthorizationEpoch } from './value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationRevision } from './value-objects/DeviceAuthorizationRevision';
@@ -12,22 +15,27 @@ import { PairingId } from './value-objects/PairingId';
 const DOMAIN = 'pigeon:device-pairing:invitation:v1';
 const KIND = 'pigeon-device-pairing-invitation';
 
-type InvitationPayload = {
-  authorCredential: string;
-  epoch: string;
-  expiresAt: number;
-  identityId: string;
-  pairingId: string;
-  revision: number;
-  version: 1;
-};
-
-type InvitationResource = InvitationPayload & {
-  kind: typeof KIND;
-  signature: string;
-};
-
 export class DevicePairingInvitation {
+  private static resource(value: unknown): DevicePairingInvitationResource {
+    const resource = DevicePairingResource.fromUnknown(
+      value,
+      'Invalid device pairing invitation.',
+    );
+    resource.assertProtocol(KIND, 1);
+
+    return {
+      authorCredential: resource.getString('authorCredential'),
+      epoch: resource.getString('epoch'),
+      expiresAt: resource.getNumber('expiresAt'),
+      identityId: resource.getString('identityId'),
+      kind: KIND,
+      pairingId: resource.getString('pairingId'),
+      revision: resource.getNumber('revision'),
+      signature: resource.getString('signature'),
+      version: 1,
+    };
+  }
+
   public static create(input: {
     author: KeyPair;
     epoch: DeviceAuthorizationEpoch;
@@ -36,7 +44,7 @@ export class DevicePairingInvitation {
     pairingId: PairingId;
     revision: DeviceAuthorizationRevision;
   }): DevicePairingInvitation {
-    const payload: InvitationPayload = {
+    const payload: DevicePairingInvitationPayload = {
       authorCredential: input.author.toPrimitives().publicKey,
       epoch: input.epoch.valueOf(),
       expiresAt: input.expiresAt.valueOf(),
@@ -79,26 +87,6 @@ export class DevicePairingInvitation {
     return invitation;
   }
 
-  private static resource(value: unknown): InvitationResource {
-    const resource = DevicePairingResource.fromUnknown(
-      value,
-      'Invalid device pairing invitation.',
-    );
-    resource.assertProtocol(KIND, 1);
-
-    return {
-      authorCredential: resource.getString('authorCredential'),
-      epoch: resource.getString('epoch'),
-      expiresAt: resource.getNumber('expiresAt'),
-      identityId: resource.getString('identityId'),
-      kind: KIND,
-      pairingId: resource.getString('pairingId'),
-      revision: resource.getNumber('revision'),
-      signature: resource.getString('signature'),
-      version: 1,
-    };
-  }
-
   private constructor(
     private readonly authorCredential: DeviceCredential,
     private readonly epoch: DeviceAuthorizationEpoch,
@@ -109,7 +97,7 @@ export class DevicePairingInvitation {
     private readonly signature: Signature,
   ) {}
 
-  private payload(): InvitationPayload {
+  private payload(): DevicePairingInvitationPayload {
     return {
       authorCredential: this.authorCredential.valueOf(),
       epoch: this.epoch.valueOf(),
