@@ -596,8 +596,13 @@ export class PigeonCommunitiesApi {
     }) as { description?: string; name?: string };
     const createdAt = Date.now();
     const current = await this.get(session, communityId);
-    const body = {
+    const merged = {
       ...fields,
+      description: fields.description ?? current.description,
+      name: fields.name ?? current.name,
+    };
+    const body = {
+      ...merged,
       moderationLog: this.moderationLogs.sign(session, {
         action: 'community_updated',
         communityId,
@@ -610,11 +615,7 @@ export class PigeonCommunitiesApi {
         communityId,
         current.networkId,
         'community_updated',
-        {
-          ...fields,
-          description: fields.description ?? current.description,
-          name: fields.name ?? current.name,
-        },
+        merged,
         createdAt,
       ),
     };
