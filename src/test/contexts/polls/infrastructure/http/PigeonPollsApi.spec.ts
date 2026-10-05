@@ -1,4 +1,5 @@
-import { mock } from 'jest-mock-extended';
+import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import { mock, type MockProxy } from 'jest-mock-extended';
 
 import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
@@ -7,28 +8,101 @@ import type { RequestSigner } from '../../../../../shared/infrastructure/http/Re
 import { PigeonPollsApi } from '../../../../../contexts/polls/infrastructure/http/PigeonPollsApi';
 import { pollResourceFixture } from '../../pollResourceFixture';
 
-describe(PigeonPollsApi.name, () => {
-  it('signs the exact poll vote request', async () => {
-    const http = mock<HttpJsonClient>();
-    const signer = mock<RequestSigner>();
-    const session = {
-      identity: { id: 'identity-a' },
-    } as unknown as Session;
-    const body = { optionIds: ['option-a'] };
-    signer.headers.mockResolvedValue({});
-    http.request.mockResolvedValue(pollResourceFixture());
+async function setup() {
+  const http = mock<HttpJsonClient>();
+  const signer = mock<RequestSigner>();
+  const session = {
+    deviceCredentialKeyPair: await KeyPair.generate(),
+    identity: { id: 'identity-a' },
+  } as unknown as Session;
+  signer.headers.mockResolvedValue({});
+  http.request.mockResolvedValue(pollResourceFixture());
 
-    await new PigeonPollsApi(http, signer).vote(
+  return { api: new PigeonPollsApi(http, signer), http, session, signer };
+}
+
+function sentBody(http: MockProxy<HttpJsonClient>) {
+  const [, init] = http.request.mock.calls[0];
+
+  return JSON.parse(init?.body as string) as {
+    mutation: {
+      kind: string;
+      recordId: string;
+      sequence: number;
+      store: string;
+    };
+  } & Record<string, unknown>;
+}
+
+describe(PigeonPollsApi.name, () => {
+  it('signs a vote as a put of the voter ballot record', async () => {
+    const { api, http, session, signer } = await setup();
+
+    await api.vote(
       session,
       'poll/a',
-      body.optionIds,
+      { conversationId: 'conversation-a' },
+      ['option-a'],
+      200,
     );
 
+    const body = sentBody(http);
+    expect(body).toMatchObject({ createdAt: 200, optionIds: ['option-a'] });
+    expect(body.mutation).toMatchObject({
+      kind: 'put',
+      recordId: 'poll-vote:poll/a:identity-a',
+      sequence: 0,
+      store: 'polls',
+    });
     expect(signer.headers).toHaveBeenCalledWith(
       session,
       'POST',
       '/polls/poll%2Fa/votes',
       body,
     );
+  });
+
+  it('signs vote removal as a delete tombstone', async () => {
+    const { api, http, session } = await setup();
+
+    await api.removeVote(session, 'poll-a');
+
+    expect(http.request.mock.calls[0][1]?.method).toBe('DELETE');
+    expect(sentBody(http).mutation).toMatchObject({
+      kind: 'delete',
+      recordId: 'poll-vote:poll-a:identity-a',
+    });
+  });
+
+  it('signs close as a put of the close record', async () => {
+    const { api, http, session } = await setup();
+
+    await api.close(session, 'poll-a', { conversationId: 'c' }, 300);
+
+    const body = sentBody(http);
+    expect(body.createdAt).toBe(300);
+    expect(body.mutation).toMatchObject({
+      kind: 'put',
+      recordId: 'poll-close:poll-a',
+    });
+  });
+
+  it('signs creation with the client-chosen poll id as record id', async () => {
+    const { api, http, session } = await setup();
+
+    await api.create(session, {
+      allowsMultipleVotes: false,
+      conversationId: 'conversation-a',
+      createdAt: 100,
+      expiresAt: null,
+      options: [{ id: 'option-a', text: 'A' }],
+      pollId: 'poll-a',
+      question: 'Choose?',
+      scopeType: 'group_conversation',
+    });
+
+    const body = sentBody(http);
+    expect(body.pollId).toBe('poll-a');
+    expect(body.mutation).toMatchObject({ kind: 'put', recordId: 'poll-a' });
   });
 });

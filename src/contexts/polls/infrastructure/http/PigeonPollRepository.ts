@@ -22,6 +22,8 @@ export class PigeonPollRepository implements PollRepository {
     const resource = await this.api.close(
       this.contexts.find(actorId),
       primitives.id,
+      this.mapper.toScopeFields(poll),
+      Date.now(),
     );
 
     return this.mapper.fromResource(resource);
@@ -64,7 +66,9 @@ export class PigeonPollRepository implements PollRepository {
       await this.api.vote(
         this.contexts.find(actorId),
         primitives.id,
+        this.mapper.toScopeFields(poll),
         vote.optionIds,
+        vote.createdAt,
       ),
     );
   }
