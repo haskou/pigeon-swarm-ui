@@ -41,7 +41,9 @@ export class PigeonStickerPackRepository implements StickerPackRepository {
       await this.api.addSticker(
         this.contexts.find(actorId),
         event.aggregateId,
+        event.stickerId.toString(),
         this.stickers.toInput(pack.findSticker(event.stickerId)),
+        event.occurredAt,
       ),
     );
   }
@@ -50,10 +52,12 @@ export class PigeonStickerPackRepository implements StickerPackRepository {
     pack: StickerPack,
     actorId: StickerOwnerId,
   ): Promise<StickerPack> {
-    const resource = await this.api.createPack(
-      this.contexts.find(actorId),
-      this.packs.toCreateInput(pack),
-    );
+    const primitives = pack.toPrimitives();
+    const resource = await this.api.createPack(this.contexts.find(actorId), {
+      createdAt: primitives.createdAt!,
+      name: primitives.name,
+      packId: primitives.id,
+    });
     pack.pullDomainEvents();
 
     return this.packs.fromResource(resource);
@@ -74,7 +78,7 @@ export class PigeonStickerPackRepository implements StickerPackRepository {
         await this.api.updatePack(
           this.contexts.find(actorId),
           event.aggregateId,
-          this.packs.toCreateInput(pack),
+          { name: pack.toPrimitives().name, updatedAt: event.occurredAt },
         );
       }
 
@@ -84,6 +88,7 @@ export class PigeonStickerPackRepository implements StickerPackRepository {
           event.aggregateId,
           event.stickerId.toString(),
           this.stickers.toInput(pack.findSticker(event.stickerId)),
+          event.occurredAt,
         );
       }
 
@@ -92,6 +97,7 @@ export class PigeonStickerPackRepository implements StickerPackRepository {
           this.contexts.find(actorId),
           event.aggregateId,
           event.stickerId.toString(),
+          event.occurredAt,
         );
       }
     }
