@@ -32,6 +32,7 @@ import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/P
 import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 import { DraftPayloadCipher } from '../../../messages/infrastructure/crypto/DraftPayloadCipher';
+import { deriveMembershipRequestId } from './deriveCommunityRecordId';
 
 const startupReadCacheTtlMs = 1500;
 
@@ -49,6 +50,90 @@ export class PigeonCommunitiesApi {
       undefined,
   ) {
     this.draftPayloads = draftPayloads ?? new DraftPayloadCipher();
+  }
+
+  private membershipRequestRecord(
+    request: Pick<
+      CommunityMembershipRequest,
+      | 'communityId'
+      | 'creatorIdentityId'
+      | 'id'
+      | 'identityId'
+      | 'status'
+      | 'type'
+    > & { createdAt: number | string; updatedAt: number | string },
+  ): Record<string, unknown> {
+    return {
+      communityId: request.communityId,
+      createdAt: Number(request.createdAt),
+      creatorIdentityId: request.creatorIdentityId,
+      id: request.id,
+      identityId: request.identityId,
+      scopeType: 'community_membership_request',
+      status: request.status,
+      type: request.type,
+      updatedAt: Number(request.updatedAt),
+    };
+  }
+
+  private async sendMembershipRequest<T>(
+    session: Session,
+    method: 'PATCH' | 'POST',
+    path: string,
+    record: Record<string, unknown>,
+    fields: Record<string, unknown> = {},
+    accepted?: { record: Record<string, unknown>; updatedAt: number },
+  ): Promise<T> {
+    let response: T | undefined;
+    let acceptance: Record<string, unknown> = {};
+
+    await submitPublicMutation(
+      PublicMutationSigner.FIRST_POSITION,
+      (position) => {
+        const mutation = this.mutations.sign(
+          session,
+          {
+            kind: 'put',
+            payload: record,
+            recordId: String(record.id),
+            store: 'requests',
+          },
+          position,
+        );
+
+        if (accepted) {
+          acceptance = {
+            acceptedAt: accepted.updatedAt,
+            acceptedMutation: this.mutations.sign(
+              session,
+              {
+                kind: 'put',
+                payload: accepted.record,
+                recordId: String(record.id),
+                store: 'requests',
+              },
+              {
+                predecessor: this.mutations.digestOf(mutation),
+                sequence: mutation.sequence + 1,
+              },
+            ),
+          };
+        }
+
+        return mutation;
+      },
+      async (mutation) => {
+        const body = { ...fields, ...acceptance, mutation };
+
+        response = await this.http.request<T>(path, {
+          body: JSON.stringify(body),
+          headers: await this.signer.headers(session, method, path, body),
+          method,
+        });
+      },
+    );
+
+    return response as T;
   }
 
   private reactionIdentity(
@@ -447,13 +532,32 @@ export class PigeonCommunitiesApi {
     identityId: string,
   ): Promise<CommunityMembershipRequest> {
     const path = `/communities/${encodeURIComponent(communityId)}/members`;
-    const body = { identityId };
-
-    return await this.http.request<CommunityMembershipRequest>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
+    const creatorIdentityId = this.mutations.authorOf(session);
+    const createdAt = Date.now();
+    const record = this.membershipRequestRecord({
+      communityId,
+      createdAt,
+      creatorIdentityId,
+      id: deriveMembershipRequestId(
+        communityId,
+        'invitation',
+        creatorIdentityId,
+        identityId,
+        createdAt,
+      ),
+      identityId,
+      status: 'pending',
+      type: 'invitation',
+      updatedAt: createdAt,
     });
+
+    return await this.sendMembershipRequest<CommunityMembershipRequest>(
+      session,
+      'POST',
+      path,
+      record,
+      { createdAt, identityId },
+    );
   }
 
   public async banMember(
@@ -508,13 +612,45 @@ export class PigeonCommunitiesApi {
     const path = `/communities/${encodeURIComponent(
       communityId,
     )}/join-requests`;
-    const body = {};
+    const identityId = this.mutations.authorOf(session);
+    const createdAt = Date.now();
+    const base = {
+      communityId,
+      createdAt,
+      creatorIdentityId: identityId,
+      id: deriveMembershipRequestId(
+        communityId,
+        'request',
+        identityId,
+        identityId,
+        createdAt,
+      ),
+      identityId,
+      type: 'request' as const,
+    };
+    const acceptedAt = createdAt + 1;
 
-    return await this.http.request<CommunityMembershipRequest>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
+    // Auto-join communities require the requester's own acceptance proof; the
+    // node ignores it for communities that review requests manually.
+    return await this.sendMembershipRequest<CommunityMembershipRequest>(
+      session,
+      'POST',
+      path,
+      this.membershipRequestRecord({
+        ...base,
+        status: 'pending',
+        updatedAt: createdAt,
+      }),
+      { createdAt },
+      {
+        record: this.membershipRequestRecord({
+          ...base,
+          status: 'accepted',
+          updatedAt: acceptedAt,
+        }),
+        updatedAt: acceptedAt,
+      },
+    );
   }
 
   public async listMembershipRequests(
@@ -547,13 +683,21 @@ export class PigeonCommunitiesApi {
     const path = `/communities/membership-requests/${encodeURIComponent(
       requestId,
     )}`;
-    const body = { status };
+    const current = (await this.listMembershipRequests(session)).find(
+      (request) => request.id === requestId,
+    );
 
-    return await this.http.request<CommunityMembershipRequest>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'PATCH', path, body),
-      method: 'PATCH',
-    });
+    if (!current) throw new Error('Membership request not found.');
+
+    const updatedAt = Math.max(Date.now(), Number(current.updatedAt) + 1);
+
+    return await this.sendMembershipRequest<CommunityMembershipRequest>(
+      session,
+      'PATCH',
+      path,
+      this.membershipRequestRecord({ ...current, status, updatedAt }),
+      { status, updatedAt },
+    );
   }
 
   public async leave(

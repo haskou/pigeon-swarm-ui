@@ -1,4 +1,5 @@
 import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import { Buffer } from 'buffer';
 
 import type {
   Community,
@@ -12,16 +13,22 @@ import type { HttpJsonClient } from '../../../../shared/infrastructure/http/Http
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { PigeonIdentityGateway } from '../../../identities/infrastructure/http/PigeonIdentityGateway';
 import type { PigeonKeychainApi } from '../../../identities/infrastructure/http/PigeonKeychainApi';
+import type { EncryptedCommunityKey } from '../crypto/communityInviteKeyEnvelope';
 import type { CommunityInviteLinkInput } from './CommunityInviteLinkInput';
 import type { PigeonCommunitiesApi } from './PigeonCommunitiesApi';
 
+import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
+import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { encryptCommunityInviteKey } from '../crypto/communityInviteKeyEnvelope';
 import { buildCommunityInviteLinkBody } from './buildCommunityInviteLinkBody';
+import { deriveInviteToken } from './deriveCommunityRecordId';
 
 export class PigeonCommunityInvitationApi {
   private readonly notificationPath = '/notifications/';
+
+  private readonly mutations = new PublicMutationSigner();
 
   public constructor(
     private readonly http: HttpJsonClient,
@@ -100,14 +107,72 @@ export class PigeonCommunityInvitationApi {
 
   private async postInviteLink(
     session: Session,
+    communityId: string,
     path: string,
-    body: ReturnType<typeof buildCommunityInviteLinkBody>,
+    input: CommunityInviteLinkInput,
+    encryptedCommunityKey?: EncryptedCommunityKey,
   ): Promise<CommunityInviteLinkResource> {
-    return await this.http.request<CommunityInviteLinkResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
+    const creatorIdentityId = this.mutations.authorOf(session);
+    const nonce = this.createNonce();
+    const createdAt = Date.now();
+    const token = deriveInviteToken(communityId, creatorIdentityId, nonce);
+    const optional = buildCommunityInviteLinkBody(input, encryptedCommunityKey);
+    const record = {
+      communityId,
+      createdAt,
+      creatorIdentityId,
+      id: token,
+      maxUses: input.maxUses ?? 1,
+      nonce,
+      scopeType: 'community_invite',
+      token,
+      ...(optional.expiresAt !== undefined
+        ? { expiresAt: optional.expiresAt }
+        : {}),
+      ...(optional.encryptedCommunityKey
+        ? { encryptedCommunityKey: optional.encryptedCommunityKey }
+        : {}),
+    };
+    let response: CommunityInviteLinkResource | undefined;
+
+    await submitPublicMutation(
+      PublicMutationSigner.FIRST_POSITION,
+      (position) =>
+        this.mutations.sign(
+          session,
+          { kind: 'put', payload: record, recordId: token, store: 'requests' },
+          position,
+        ),
+      async (mutation) => {
+        const body = {
+          createdAt,
+          mutation,
+          nonce,
+          ...optional,
+          ...(input.maxUses === undefined ? {} : { maxUses: input.maxUses }),
+        };
+
+        response = await this.http.request<CommunityInviteLinkResource>(path, {
+          body: JSON.stringify(body),
+          headers: await this.signer.headers(session, 'POST', path, body),
+          method: 'POST',
+        });
+      },
+    );
+
+    return response as CommunityInviteLinkResource;
+  }
+
+  private createNonce(): string {
+    const bytes = new Uint8Array(24);
+
+    crypto.getRandomValues(bytes);
+
+    return Buffer.from(bytes)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
   }
 
   private async sendCommunityInvitation(
@@ -258,8 +323,9 @@ export class PigeonCommunityInvitationApi {
     ) {
       const invite = await this.postInviteLink(
         session,
+        communityId,
         path,
-        buildCommunityInviteLinkBody(input),
+        input,
       );
 
       return {
@@ -277,8 +343,10 @@ export class PigeonCommunityInvitationApi {
     const encryptedKey = await encryptCommunityInviteKey(published.keyEntry);
     const invite = await this.postInviteLink(
       session,
+      communityId,
       path,
-      buildCommunityInviteLinkBody(input, encryptedKey.encryptedCommunityKey),
+      input,
+      encryptedKey.encryptedCommunityKey,
     );
 
     return {
@@ -305,13 +373,45 @@ export class PigeonCommunityInvitationApi {
     const path = `/communities/invites/${encodeURIComponent(
       inviteToken,
     )}/accept`;
-    const body = {};
+    const invite = await this.getInviteLink(inviteToken);
+    const token = invite.token ?? invite.inviteToken ?? inviteToken;
+    const identityId = this.mutations.authorOf(session);
+    const usedAt = Date.now();
+    const record = {
+      communityId: invite.communityId,
+      id: `invite-use:${token}:${identityId}`,
+      identityId,
+      scopeType: 'community_invite_use',
+      token,
+      usedAt,
+    };
+    let community: Community | undefined;
 
-    return await this.http.request<Community>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
+    await submitPublicMutation(
+      PublicMutationSigner.FIRST_POSITION,
+      (position) =>
+        this.mutations.sign(
+          session,
+          {
+            kind: 'put',
+            payload: record,
+            recordId: record.id,
+            store: 'requests',
+          },
+          position,
+        ),
+      async (mutation) => {
+        const body = { mutation, usedAt };
+
+        community = await this.http.request<Community>(path, {
+          body: JSON.stringify(body),
+          headers: await this.signer.headers(session, 'POST', path, body),
+          method: 'POST',
+        });
+      },
+    );
+
+    return community as Community;
   }
 
   public async acceptInviteLinkWithKey(

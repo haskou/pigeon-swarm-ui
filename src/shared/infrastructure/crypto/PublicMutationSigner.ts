@@ -43,6 +43,11 @@ export class PublicMutationSigner {
     return this.base64Url(bytes);
   }
 
+  /** Digest a successor commits to as its predecessor. */
+  public digestOf(mutation: SignedPublicMutation): string {
+    return this.digest(canonicalJson({ ...mutation }));
+  }
+
   /** Identity that the node records as the author of the mutation. */
   public authorOf(session: Session): string {
     return IdentityId.normalize(session.identity.id);
