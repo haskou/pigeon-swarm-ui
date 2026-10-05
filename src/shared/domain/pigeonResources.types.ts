@@ -41,7 +41,6 @@ export type { MessagePinResource } from '../../contexts/messages/infrastructure/
 export type { MessageReaction } from '../../contexts/messages/infrastructure/http/MessageReaction';
 export type { MessageReplyPreview } from '../../contexts/messages/infrastructure/crypto/resources/MessageReplyPreview';
 export type { MessageResource } from '../../contexts/messages/infrastructure/http/MessageResource';
-export type { MessageSignaturePayload } from '../../contexts/messages/infrastructure/http/signing/MessageSignaturePayload';
 export type { SendMessageOptions } from '../../contexts/messages/infrastructure/http/resources/SendMessageOptions';
 export type { ChatMessage } from '../../contexts/messages/presentation/view-models/ChatMessage';
 export type { MessagePin } from '../../contexts/messages/presentation/view-models/MessagePin';
