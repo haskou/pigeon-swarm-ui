@@ -26,16 +26,23 @@ import type { CachedRequestInvalidator } from './CachedRequestInvalidator';
 import type { CommunityChannelMessageEditInput } from './CommunityChannelMessageEditInput';
 import type { CommunityChannelMessageInput } from './CommunityChannelMessageInput';
 import type { CommunityChannelMessageSearchResult } from './CommunityChannelMessageSearchResult';
+import type { CommunityModerationLogBody } from './CommunityModerationLogBody';
 
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 import { DraftPayloadCipher } from '../../../messages/infrastructure/crypto/DraftPayloadCipher';
-import { deriveMembershipRequestId } from './deriveCommunityRecordId';
+import { CommunityModerationLogSigner } from './CommunityModerationLogSigner';
+import {
+  deriveCommunityEntityId,
+  deriveMembershipRequestId,
+} from './deriveCommunityRecordId';
 
 const startupReadCacheTtlMs = 1500;
 
 export class PigeonCommunitiesApi {
   private readonly draftPayloads: DraftPayloadCipher;
+
+  private readonly moderationLogs = new CommunityModerationLogSigner();
 
   private readonly mutations = new PublicMutationSigner();
 
@@ -158,6 +165,34 @@ export class PigeonCommunitiesApi {
       ].join(':'),
       messageId,
       scopeType: 'community_channel',
+    };
+  }
+
+  private channelCreationBody(
+    session: Session,
+    communityId: string,
+    name: string,
+    type: 'text' | 'voice',
+  ): { moderationLog: CommunityModerationLogBody; name: string } {
+    const createdAt = Date.now();
+
+    return {
+      moderationLog: this.moderationLogs.sign(session, {
+        action: 'channel_created',
+        communityId,
+        createdAt,
+        details: { name, type },
+        target: {
+          id: deriveCommunityEntityId(
+            'channel',
+            communityId,
+            this.mutations.authorOf(session),
+            createdAt,
+          ),
+          type: 'channel',
+        },
+      }),
+      name,
     };
   }
 
@@ -443,7 +478,7 @@ export class PigeonCommunitiesApi {
     },
   ): Promise<Community> {
     const path = `/communities/${encodeURIComponent(communityId)}`;
-    const body = {
+    const fields = {
       ...(input.autoJoinEnabled !== undefined
         ? { autoJoinEnabled: input.autoJoinEnabled }
         : {}),
@@ -456,6 +491,16 @@ export class PigeonCommunitiesApi {
         ? { discoverable: input.discoverable }
         : {}),
       ...(input.name !== undefined ? { name: input.name } : {}),
+    };
+    const body = {
+      ...fields,
+      moderationLog: this.moderationLogs.sign(session, {
+        action: 'community_updated',
+        communityId,
+        createdAt: Date.now(),
+        details: fields,
+        target: { id: communityId, type: 'community' },
+      }),
     };
 
     return await this.http.request<Community>(path, {
@@ -495,7 +540,17 @@ export class PigeonCommunitiesApi {
       'POST',
       path,
       record,
-      { createdAt, identityId },
+      {
+        createdAt,
+        identityId,
+        moderationLog: this.moderationLogs.sign(session, {
+          action: 'invitation_created',
+          communityId,
+          createdAt,
+          details: { identityId },
+          target: { id: record.id as string, type: 'membership_request' },
+        }),
+      },
     );
   }
 
@@ -505,7 +560,16 @@ export class PigeonCommunitiesApi {
     identityId: string,
   ): Promise<Community> {
     const path = `/communities/${encodeURIComponent(communityId)}/bans`;
-    const body = { identityId };
+    const body = {
+      identityId,
+      moderationLog: this.moderationLogs.sign(session, {
+        action: 'member_banned',
+        communityId,
+        createdAt: Date.now(),
+        details: {},
+        target: { id: identityId, type: 'member' },
+      }),
+    };
 
     return await this.http.request<Community>(path, {
       body: JSON.stringify(body),
@@ -522,9 +586,19 @@ export class PigeonCommunitiesApi {
     const path = `/communities/${encodeURIComponent(
       communityId,
     )}/bans/${encodeURIComponent(identityId)}`;
+    const body = {
+      moderationLog: this.moderationLogs.sign(session, {
+        action: 'member_unbanned',
+        communityId,
+        createdAt: Date.now(),
+        details: {},
+        target: { id: identityId, type: 'member' },
+      }),
+    };
 
     return await this.http.request<Community>(path, {
-      headers: await this.signer.headers(session, 'DELETE', path),
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'DELETE', path, body),
       method: 'DELETE',
     });
   }
@@ -635,7 +709,20 @@ export class PigeonCommunitiesApi {
       'PATCH',
       path,
       this.membershipRequestRecord({ ...current, status, updatedAt }),
-      { status, updatedAt },
+      {
+        moderationLog: this.moderationLogs.sign(session, {
+          action:
+            status === 'accepted'
+              ? 'membership_request_accepted'
+              : 'membership_request_declined',
+          communityId: current.communityId,
+          createdAt: Date.now(),
+          details: { identityId: current.identityId, type: current.type },
+          target: { id: requestId, type: 'membership_request' },
+        }),
+        status,
+        updatedAt,
+      },
     );
   }
 
@@ -685,7 +772,23 @@ export class PigeonCommunitiesApi {
     input: { name: string; permissions: CommunityPermission[] },
   ): Promise<CommunityRoleResource> {
     const path = `/communities/${encodeURIComponent(communityId)}/roles`;
+    const createdAt = Date.now();
     const body = {
+      moderationLog: this.moderationLogs.sign(session, {
+        action: 'role_created',
+        communityId,
+        createdAt,
+        details: { name: input.name, permissions: input.permissions },
+        target: {
+          id: deriveCommunityEntityId(
+            'role',
+            communityId,
+            this.mutations.authorOf(session),
+            createdAt,
+          ),
+          type: 'role',
+        },
+      }),
       name: input.name,
       permissions: input.permissions,
     };
@@ -707,6 +810,13 @@ export class PigeonCommunitiesApi {
       communityId,
     )}/roles/${encodeURIComponent(roleId)}`;
     const body = {
+      moderationLog: this.moderationLogs.sign(session, {
+        action: 'role_updated',
+        communityId,
+        createdAt: Date.now(),
+        details: { name: input.name, permissions: input.permissions },
+        target: { id: roleId, type: 'role' },
+      }),
       name: input.name,
       permissions: input.permissions,
     };
@@ -727,8 +837,19 @@ export class PigeonCommunitiesApi {
       communityId,
     )}/roles/${encodeURIComponent(roleId)}`;
 
+    const body = {
+      moderationLog: this.moderationLogs.sign(session, {
+        action: 'role_deleted',
+        communityId,
+        createdAt: Date.now(),
+        details: {},
+        target: { id: roleId, type: 'role' },
+      }),
+    };
+
     await this.http.request(path, {
-      headers: await this.signer.headers(session, 'DELETE', path),
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'DELETE', path, body),
       method: 'DELETE',
     });
   }
@@ -742,7 +863,16 @@ export class PigeonCommunitiesApi {
     const path = `/communities/${encodeURIComponent(
       communityId,
     )}/members/${encodeURIComponent(identityId)}/roles`;
-    const body = { roleIds };
+    const body = {
+      moderationLog: this.moderationLogs.sign(session, {
+        action: 'member_roles_updated',
+        communityId,
+        createdAt: Date.now(),
+        details: { roleIds },
+        target: { id: identityId, type: 'member' },
+      }),
+      roleIds,
+    };
 
     const community = await this.http.request<Community>(path, {
       body: JSON.stringify(body),
@@ -763,7 +893,7 @@ export class PigeonCommunitiesApi {
     const path = `/communities/${encodeURIComponent(
       communityId,
     )}/channels/text`;
-    const body = { name };
+    const body = this.channelCreationBody(session, communityId, name, 'text');
 
     const channel = await this.http.request<CommunityTextChannel>(path, {
       body: JSON.stringify(body),
@@ -784,7 +914,7 @@ export class PigeonCommunitiesApi {
     const path = `/communities/${encodeURIComponent(
       communityId,
     )}/channels/voice`;
-    const body = { name };
+    const body = this.channelCreationBody(session, communityId, name, 'voice');
 
     const channel = await this.http.request<CommunityVoiceChannel>(path, {
       body: JSON.stringify(body),
@@ -826,7 +956,16 @@ export class PigeonCommunitiesApi {
     const path = `/communities/${encodeURIComponent(
       communityId,
     )}/channels/${encodeURIComponent(channelId)}`;
-    const body = { name };
+    const body = {
+      moderationLog: this.moderationLogs.sign(session, {
+        action: 'channel_renamed',
+        communityId,
+        createdAt: Date.now(),
+        details: { name },
+        target: { id: channelId, type: 'channel' },
+      }),
+      name,
+    };
 
     const channel = await this.http.request<CommunityChannel>(path, {
       body: JSON.stringify(body),
@@ -847,9 +986,26 @@ export class PigeonCommunitiesApi {
     const path = `/communities/${encodeURIComponent(
       communityId,
     )}/channels/${encodeURIComponent(channelId)}`;
+    const channels = await this.listChannels(session, communityId);
+    const channelType = channels.find(
+      (channel) => channel.id === channelId,
+    )?.type;
+
+    if (!channelType) throw new Error('Community channel not found.');
+
+    const body = {
+      moderationLog: this.moderationLogs.sign(session, {
+        action: 'channel_deleted',
+        communityId,
+        createdAt: Date.now(),
+        details: { type: channelType },
+        target: { id: channelId, type: 'channel' },
+      }),
+    };
 
     const community = await this.http.request<Community>(path, {
-      headers: await this.signer.headers(session, 'DELETE', path),
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'DELETE', path, body),
       method: 'DELETE',
     });
 
@@ -867,7 +1023,16 @@ export class PigeonCommunitiesApi {
     const path = `/communities/${encodeURIComponent(
       communityId,
     )}/channels/${encodeURIComponent(channelId)}/permissions`;
-    const body = { visibleRoleIds };
+    const body = {
+      moderationLog: this.moderationLogs.sign(session, {
+        action: 'channel_permissions_updated',
+        communityId,
+        createdAt: Date.now(),
+        details: { visibleRoleIds },
+        target: { id: channelId, type: 'channel' },
+      }),
+      visibleRoleIds,
+    };
 
     const channel = await this.http.request<CommunityChannel>(path, {
       body: JSON.stringify(body),
@@ -1202,12 +1367,22 @@ export class PigeonCommunitiesApi {
       scopeType: 'community_channel',
     };
 
+    const createdAt = Date.now();
+
     await this.sendChannelMessageMutation(
       session,
       'DELETE',
       path,
       { kind: 'delete', payload },
-      {},
+      {
+        moderationLog: this.moderationLogs.sign(session, {
+          action: 'message_deleted',
+          communityId,
+          createdAt,
+          details: { channelId, targetMessageAuthorId: authorIdentityId },
+          target: { id: messageId, type: 'message' },
+        }),
+      },
     );
   }
 

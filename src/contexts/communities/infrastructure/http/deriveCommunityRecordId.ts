@@ -39,3 +39,40 @@ export function deriveInviteToken(
     .replace(/\//g, '_')
     .replace(/=+$/, '');
 }
+
+/** First 24 hex chars of sha256 over a moderation log entry identity tuple. */
+export function deriveModerationLogId(
+  communityId: string,
+  actorIdentityId: string,
+  action: string,
+  targetType: string,
+  targetId: string,
+  createdAt: number,
+): string {
+  return SHA256Hash.from(
+    JSON.stringify([
+      communityId,
+      actorIdentityId,
+      action,
+      targetType,
+      targetId,
+      createdAt,
+    ]),
+  )
+    .toString()
+    .slice(0, 24);
+}
+
+/** First 24 hex chars of sha256 over a channel or role creation tuple. */
+export function deriveCommunityEntityId(
+  kind: 'channel' | 'role',
+  communityId: string,
+  creatorIdentityId: string,
+  createdAt: number,
+): string {
+  return SHA256Hash.from(
+    JSON.stringify([kind, communityId, creatorIdentityId, createdAt]),
+  )
+    .toString()
+    .slice(0, 24);
+}

@@ -23,10 +23,13 @@ import { submitPublicMutation } from '../../../../shared/infrastructure/http/sub
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { encryptCommunityInviteKey } from '../crypto/communityInviteKeyEnvelope';
 import { buildCommunityInviteLinkBody } from './buildCommunityInviteLinkBody';
+import { CommunityModerationLogSigner } from './CommunityModerationLogSigner';
 import { deriveInviteToken } from './deriveCommunityRecordId';
 
 export class PigeonCommunityInvitationApi {
   private readonly notificationPath = '/notifications/';
+
+  private readonly moderationLogs = new CommunityModerationLogSigner();
 
   private readonly mutations = new PublicMutationSigner();
 
@@ -146,6 +149,19 @@ export class PigeonCommunityInvitationApi {
       async (mutation) => {
         const body = {
           createdAt,
+          moderationLog: this.moderationLogs.sign(session, {
+            action: 'invite_link_created',
+            communityId,
+            createdAt,
+            details: {
+              encryptedCommunityKeyStored: Boolean(
+                optional.encryptedCommunityKey,
+              ),
+              expiresAt: optional.expiresAt || undefined,
+              maxUses: input.maxUses || undefined,
+            },
+            target: { id: token, type: 'invite' },
+          }),
           mutation,
           nonce,
           ...optional,
