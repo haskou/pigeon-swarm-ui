@@ -15,11 +15,11 @@ import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { MessageAttachmentPublisher } from './MessageAttachmentPublisher';
 import type { MessageCommandIdentity } from './resources/MessageCommandIdentity';
 
-import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
+import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
+import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
 import { MessageContent } from '../../domain/value-objects/MessageContent';
 import { PigeonMessagesApi } from './PigeonMessagesApi';
-import { MessageSignaturePayloadFactory } from './signing/MessageSignaturePayloadFactory';
 
 export class PigeonMessageCommandsApi {
   public constructor(
@@ -28,8 +28,46 @@ export class PigeonMessageCommandsApi {
     private readonly messages: PigeonMessagesApi,
     private readonly projection: MessageProjectionPort,
     private readonly attachments: MessageAttachmentPublisher,
-    private readonly signatures: MessageSignaturePayloadFactory,
+    private readonly mutations: PublicMutationSigner,
   ) {}
+
+  private async submit<T>(
+    session: Session,
+    method: 'DELETE' | 'POST' | 'PUT',
+    path: string,
+    input: {
+      fields: Record<string, unknown>;
+      record: Record<string, unknown> & { id: string };
+    },
+  ): Promise<T> {
+    let response: T | undefined;
+
+    await submitPublicMutation(
+      PublicMutationSigner.FIRST_POSITION,
+      (position) =>
+        this.mutations.sign(
+          session,
+          {
+            kind: 'put',
+            payload: input.record,
+            recordId: input.record.id,
+            store: 'messages',
+          },
+          position,
+        ),
+      async (mutation) => {
+        const body = { ...input.fields, mutation };
+
+        response = await this.http.request<T>(path, {
+          body: JSON.stringify(body),
+          headers: await this.signer.headers(session, method, path, body),
+          method,
+        });
+      },
+    );
+
+    return response as T;
+  }
 
   private async linkPreviewForContent(session: Session, content: string) {
     const url = MessageContent.fromString(content).findFirstLinkPreviewUrl();
@@ -130,35 +168,28 @@ export class PigeonMessageCommandsApi {
     const id =
       commandIdentity?.id ??
       `${conversationId}:${timestamp}:${UUID.generate().toString()}`;
-    const signature = await signSessionPayload(
-      session,
-      JSON.stringify(
-        this.signatures.createSent({
-          authorId: session.identity.id,
-          conversationId,
-          createdAt: timestamp,
-          encryptedPayload,
-          id,
-          previousMessageIds,
-          replyToMessageId,
-        }),
-      ),
-    );
-    const body = {
-      createdAt: timestamp,
-      encryptedPayload,
-      id,
-      previousMessageIds,
-      ...(replyToMessageId ? { replyToMessageId } : {}),
-      signature: signature.toString(),
-    };
     const path = `/conversations/${encodeURIComponent(
       conversationId,
     )}/messages`;
-    const created = await this.http.request<MessageResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
+    const created = await this.submit<MessageResource>(session, 'POST', path, {
+      fields: {
+        createdAt: timestamp,
+        encryptedPayload,
+        id,
+        previousMessageIds,
+        ...(replyToMessageId ? { replyToMessageId } : {}),
+      },
+      record: {
+        authorId: this.mutations.authorOf(session),
+        conversationId,
+        createdAt: timestamp,
+        encryptedPayload,
+        id,
+        previousMessageIds,
+        replyToMessageId: replyToMessageId || undefined,
+        scopeType: 'conversation',
+        type: 'sent',
+      },
     });
 
     return await this.projection.decrypt(session, conversationId, created);
@@ -196,35 +227,27 @@ export class PigeonMessageCommandsApi {
     });
     const id = `${conversationId}:${timestamp}:${UUID.generate().toString()}:edited`;
     const previousMessageIds = [messageId];
-    const signature = await signSessionPayload(
-      session,
-      JSON.stringify(
-        this.signatures.createEdited({
-          authorId: session.identity.id,
-          conversationId,
-          createdAt: timestamp,
-          encryptedPayload,
-          id,
-          targetMessageId: messageId,
-        }),
-      ),
-    );
-    /* eslint-disable perfectionist/sort-objects */
-    const body = {
-      id,
-      createdAt: timestamp,
-      encryptedPayload,
-      previousMessageIds,
-      signature: signature.toString(),
-    };
-    /* eslint-enable perfectionist/sort-objects */
     const path = `/conversations/${encodeURIComponent(
       conversationId,
     )}/messages/${encodeURIComponent(messageId)}`;
-    const edited = await this.http.request<MessageResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'PUT', path, body),
-      method: 'PUT',
+    const edited = await this.submit<MessageResource>(session, 'PUT', path, {
+      fields: {
+        createdAt: timestamp,
+        encryptedPayload,
+        id,
+        previousMessageIds,
+      },
+      record: {
+        authorId: this.mutations.authorOf(session),
+        conversationId,
+        createdAt: timestamp,
+        encryptedPayload,
+        id,
+        previousMessageIds,
+        scopeType: 'conversation',
+        targetMessageId: messageId,
+        type: 'edited',
+      },
     });
 
     return await this.projection.decrypt(session, conversationId, edited);
@@ -238,27 +261,22 @@ export class PigeonMessageCommandsApi {
   ): Promise<void> {
     const createdAt = commandIdentity?.createdAt ?? Date.now();
     const id = `${conversationId}:${createdAt}:${UUID.generate().toString()}:deleted`;
-    const signature = await signSessionPayload(
-      session,
-      JSON.stringify(
-        this.signatures.createDeleted({
-          authorId: session.identity.id,
-          conversationId,
-          createdAt,
-          id,
-          targetMessageId: messageId,
-        }),
-      ),
-    );
-    const body = { createdAt, id, signature: signature.toString() };
     const path = `/conversations/${encodeURIComponent(
       conversationId,
     )}/messages/${encodeURIComponent(messageId)}`;
 
-    await this.http.request(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'DELETE', path, body),
-      method: 'DELETE',
+    await this.submit<void>(session, 'DELETE', path, {
+      fields: { createdAt, id },
+      record: {
+        authorId: this.mutations.authorOf(session),
+        conversationId,
+        createdAt,
+        id,
+        previousMessageIds: [messageId],
+        scopeType: 'conversation',
+        targetMessageId: messageId,
+        type: 'deleted',
+      },
     });
   }
 }

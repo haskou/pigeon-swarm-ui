@@ -512,12 +512,14 @@ export class PigeonCommunitiesGateway {
     communityId: string,
     channelId: string,
     messageId: string,
+    authorIdentityId: string,
   ): Promise<void> {
     await this.communities.deleteChannelMessage(
       session,
       communityId,
       channelId,
       messageId,
+      authorIdentityId,
     );
   }
 

@@ -46,7 +46,6 @@ import { PigeonMessageProjection } from '../../contexts/messages/infrastructure/
 import { PigeonMessageCommandsApi } from '../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
 import { PigeonMessagesApi } from '../../contexts/messages/infrastructure/http/PigeonMessagesApi';
 import { PigeonMessagesGateway } from '../../contexts/messages/infrastructure/http/PigeonMessagesGateway';
-import { MessageSignaturePayloadFactory } from '../../contexts/messages/infrastructure/http/signing/MessageSignaturePayloadFactory';
 import { PigeonNodeApi } from '../../contexts/networks/infrastructure/http/PigeonNodeApi';
 import { PigeonNotificationsApi } from '../../contexts/notifications/infrastructure/http/PigeonNotificationsApi';
 import { PigeonNotificationsGateway } from '../../contexts/notifications/infrastructure/http/PigeonNotificationsGateway';
@@ -54,6 +53,7 @@ import { PigeonPushApi } from '../../contexts/notifications/infrastructure/http/
 import { PigeonPushGateway } from '../../contexts/notifications/infrastructure/http/PigeonPushGateway';
 import { PigeonPollsApi } from '../../contexts/polls/infrastructure/http/PigeonPollsApi';
 import { PigeonStickersApi } from '../../contexts/stickers/infrastructure/http/PigeonStickersApi';
+import { PublicMutationSigner } from '../../shared/infrastructure/crypto/PublicMutationSigner';
 import { ApiUrlBuilder } from '../../shared/infrastructure/http/ApiUrlBuilder';
 import { HttpJsonClient } from '../../shared/infrastructure/http/HttpJsonClient';
 import { RequestCache } from '../../shared/infrastructure/http/RequestCache';
@@ -254,7 +254,7 @@ export class PigeonApiGateway {
       this.messagesApi,
       messageProjection,
       this.filesGateway,
-      new MessageSignaturePayloadFactory(),
+      new PublicMutationSigner(),
     );
     this.messagesGateway = new PigeonMessagesGateway(
       this.messagesApi,

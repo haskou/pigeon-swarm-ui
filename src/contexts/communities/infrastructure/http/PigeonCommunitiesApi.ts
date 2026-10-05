@@ -25,11 +25,9 @@ import type { CachedRequestInvalidator } from './CachedRequestInvalidator';
 /* eslint-disable @typescript-eslint/no-use-before-define */
 import type { CommunityChannelMessageEditInput } from './CommunityChannelMessageEditInput';
 import type { CommunityChannelMessageInput } from './CommunityChannelMessageInput';
-import type { CommunityChannelMessageRequestBody } from './CommunityChannelMessageRequestBody';
 import type { CommunityChannelMessageSearchResult } from './CommunityChannelMessageSearchResult';
 
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
-import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 import { DraftPayloadCipher } from '../../../messages/infrastructure/crypto/DraftPayloadCipher';
 import { deriveMembershipRequestId } from './deriveCommunityRecordId';
@@ -192,48 +190,6 @@ export class PigeonCommunitiesApi {
     );
   }
 
-  private async createEncryptedChannelMessageBody(
-    session: Session,
-    input: {
-      channelId: string;
-      communityId: string;
-      createdAt: number;
-      encryptedPayload: string;
-      id: string;
-      mentions: CommunityMessageMention[];
-      replyToMessageId?: string;
-    },
-  ): Promise<CommunityChannelMessageRequestBody> {
-    const signaturePayload = {
-      authorIdentityId: session.identity.id,
-      channelId: input.channelId,
-      communityId: input.communityId,
-      createdAt: input.createdAt,
-      encryptedPayload: input.encryptedPayload,
-      id: input.id,
-      mentions: input.mentions,
-      ...(input.replyToMessageId
-        ? { replyToMessageId: input.replyToMessageId }
-        : {}),
-      type: 'sent',
-    };
-    const signature = await signSessionPayload(
-      session,
-      JSON.stringify(signaturePayload),
-    );
-
-    return {
-      createdAt: input.createdAt,
-      encryptedPayload: input.encryptedPayload,
-      id: input.id,
-      mentions: input.mentions,
-      ...(input.replyToMessageId
-        ? { replyToMessageId: input.replyToMessageId }
-        : {}),
-      signature: signature.toString(),
-    };
-  }
-
   private channelListCacheKey(session: Session, communityId: string): string {
     return `GET /communities/${encodeURIComponent(communityId)}/channels ${
       session.identity.id
@@ -267,118 +223,101 @@ export class PigeonCommunitiesApi {
     );
   }
 
-  private async createPlaintextChannelMessageBody(
-    session: Session,
-    input: {
-      channelId: string;
-      communityId: string;
-      createdAt: number;
-      id: string;
-      mentions: CommunityMessageMention[];
-      plaintextPayload: string;
-      replyToMessageId?: string;
-    },
-  ): Promise<CommunityChannelMessageRequestBody> {
-    const signaturePayload = {
-      authorIdentityId: session.identity.id,
+  private channelMessagePath(
+    communityId: string,
+    channelId: string,
+    messageId: string,
+  ): string {
+    return `/communities/${encodeURIComponent(
+      communityId,
+    )}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(
+      messageId,
+    )}`;
+  }
+
+  private channelMessageRecordId(
+    communityId: string,
+    channelId: string,
+    messageId: string,
+    authorIdentityId: string,
+  ): string {
+    return [
+      'community',
+      communityId,
+      channelId,
+      messageId,
+      authorIdentityId,
+    ].join(':');
+  }
+
+  /** Stored record of a sent or edited channel message, minus its proof. */
+  private channelMessageRecord(input: {
+    authorIdentityId: string;
+    channelId: string;
+    communityId: string;
+    createdAt: number;
+    editedAt?: number;
+    encryptedPayload?: string;
+    mentions: CommunityMessageMention[];
+    messageId: string;
+    plaintextPayload?: string;
+    replyToMessageId?: string;
+  }): Record<string, unknown> {
+    return {
+      authorIdentityId: input.authorIdentityId,
       channelId: input.channelId,
       communityId: input.communityId,
       createdAt: input.createdAt,
-      id: input.id,
+      editedAt: input.editedAt,
+      encryptedPayload: input.encryptedPayload,
+      id: this.channelMessageRecordId(
+        input.communityId,
+        input.channelId,
+        input.messageId,
+        input.authorIdentityId,
+      ),
       mentions: input.mentions,
+      messageId: input.messageId,
       plaintextPayload: input.plaintextPayload,
-      ...(input.replyToMessageId
-        ? { replyToMessageId: input.replyToMessageId }
-        : {}),
+      replyToMessageId: input.replyToMessageId,
+      scopeType: 'community_channel',
       type: 'sent',
     };
-    const signature = await signSessionPayload(
-      session,
-      JSON.stringify(signaturePayload),
-    );
-
-    return {
-      createdAt: input.createdAt,
-      id: input.id,
-      mentions: input.mentions,
-      plaintextPayload: input.plaintextPayload,
-      ...(input.replyToMessageId
-        ? { replyToMessageId: input.replyToMessageId }
-        : {}),
-      signature: signature.toString(),
-    };
   }
 
-  private async editEncryptedChannelMessageBody(
+  private async sendChannelMessageMutation(
     session: Session,
-    input: {
-      channelId: string;
-      communityId: string;
-      createdAt: number;
-      encryptedPayload: string;
-      id: string;
-      mentions: CommunityMessageMention[];
-    },
-  ): Promise<CommunityChannelMessageRequestBody> {
-    const signaturePayload = {
-      authorIdentityId: session.identity.id,
-      channelId: input.channelId,
-      communityId: input.communityId,
-      createdAt: input.createdAt,
-      encryptedPayload: input.encryptedPayload,
-      id: input.id,
-      mentions: input.mentions,
-      type: 'edited',
-    };
-    const signature = await signSessionPayload(
-      session,
-      JSON.stringify(signaturePayload),
+    method: 'DELETE' | 'POST' | 'PUT',
+    path: string,
+    intent: { kind: 'delete' | 'put'; payload: Record<string, unknown> },
+    fields: Record<string, unknown>,
+  ): Promise<MessageResource> {
+    let response: MessageResource | undefined;
+
+    await submitPublicMutation(
+      PublicMutationSigner.FIRST_POSITION,
+      (position) =>
+        this.mutations.sign(
+          session,
+          {
+            ...intent,
+            recordId: String(intent.payload.id),
+            store: 'messages',
+          },
+          position,
+        ),
+      async (mutation) => {
+        const body = { ...fields, mutation };
+
+        response = await this.http.request<MessageResource>(path, {
+          body: JSON.stringify(body),
+          headers: await this.signer.headers(session, method, path, body),
+          method,
+        });
+      },
     );
 
-    /* eslint-disable perfectionist/sort-objects */
-    return {
-      createdAt: input.createdAt,
-      encryptedPayload: input.encryptedPayload,
-      signature: signature.toString(),
-      mentions: input.mentions,
-    };
-    /* eslint-enable perfectionist/sort-objects */
-  }
-
-  private async editPlaintextChannelMessageBody(
-    session: Session,
-    input: {
-      channelId: string;
-      communityId: string;
-      createdAt: number;
-      id: string;
-      mentions: CommunityMessageMention[];
-      plaintextPayload: string;
-    },
-  ): Promise<CommunityChannelMessageRequestBody> {
-    const signaturePayload = {
-      authorIdentityId: session.identity.id,
-      channelId: input.channelId,
-      communityId: input.communityId,
-      createdAt: input.createdAt,
-      id: input.id,
-      mentions: input.mentions,
-      plaintextPayload: input.plaintextPayload,
-      type: 'edited',
-    };
-    const signature = await signSessionPayload(
-      session,
-      JSON.stringify(signaturePayload),
-    );
-
-    /* eslint-disable perfectionist/sort-objects */
-    return {
-      createdAt: input.createdAt,
-      plaintextPayload: input.plaintextPayload,
-      signature: signature.toString(),
-      mentions: input.mentions,
-    };
-    /* eslint-enable perfectionist/sort-objects */
+    return response as unknown as MessageResource;
   }
 
   public async list(session: Session): Promise<Community[]> {
@@ -955,32 +894,32 @@ export class PigeonCommunitiesApi {
     const path = `/communities/${encodeURIComponent(
       communityId,
     )}/channels/${encodeURIComponent(channelId)}/messages`;
-    const body =
-      input.plaintextPayload !== undefined
-        ? await this.createPlaintextChannelMessageBody(session, {
-            channelId,
-            communityId,
-            createdAt,
-            id,
-            mentions,
-            plaintextPayload: input.plaintextPayload,
-            replyToMessageId: input.replyToMessageId,
-          })
-        : await this.createEncryptedChannelMessageBody(session, {
-            channelId,
-            communityId,
-            createdAt,
-            encryptedPayload: input.encryptedPayload,
-            id,
-            mentions,
-            replyToMessageId: input.replyToMessageId,
-          });
-
-    return await this.http.request<MessageResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
+    const payload = this.channelMessageRecord({
+      authorIdentityId: this.mutations.authorOf(session),
+      channelId,
+      communityId,
+      createdAt,
+      encryptedPayload: input.encryptedPayload,
+      mentions,
+      messageId: id,
+      plaintextPayload: input.plaintextPayload,
+      replyToMessageId: input.replyToMessageId,
     });
+
+    return await this.sendChannelMessageMutation(
+      session,
+      'POST',
+      path,
+      { kind: 'put', payload },
+      {
+        createdAt,
+        encryptedPayload: input.encryptedPayload,
+        id,
+        mentions,
+        plaintextPayload: input.plaintextPayload,
+        replyToMessageId: input.replyToMessageId,
+      },
+    );
   }
 
   public async listChannelMessages(
@@ -1245,38 +1184,31 @@ export class PigeonCommunitiesApi {
     communityId: string,
     channelId: string,
     messageId: string,
+    authorIdentityId: string,
   ): Promise<void> {
-    const createdAt = Date.now();
-    const id = `${communityId}:${channelId}:${createdAt}:${UUID.generate().toString()}:deleted`;
-    const signaturePayload = {
-      actorIdentityId: session.identity.id,
+    const path = this.channelMessagePath(communityId, channelId, messageId);
+    const payload = {
+      authorIdentityId,
       channelId,
       communityId,
-      createdAt,
-      id,
-      targetMessageId: messageId,
-      type: 'deleted',
-    };
-    const signature = await signSessionPayload(
-      session,
-      JSON.stringify(signaturePayload),
-    );
-    const body = {
-      createdAt,
-      id,
-      signature: signature.toString(),
-    };
-    const path = `/communities/${encodeURIComponent(
-      communityId,
-    )}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(
+      id: this.channelMessageRecordId(
+        communityId,
+        channelId,
+        messageId,
+        authorIdentityId,
+      ),
       messageId,
-    )}`;
+      removed: true,
+      scopeType: 'community_channel',
+    };
 
-    await this.http.request(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'DELETE', path, body),
-      method: 'DELETE',
-    });
+    await this.sendChannelMessageMutation(
+      session,
+      'DELETE',
+      path,
+      { kind: 'delete', payload },
+      {},
+    );
   }
 
   public async editChannelMessage(
@@ -1286,37 +1218,34 @@ export class PigeonCommunitiesApi {
     messageId: string,
     input: CommunityChannelMessageEditInput,
   ): Promise<MessageResource> {
-    const createdAt = input.timestamp ?? Date.now();
+    const editedAt = input.timestamp ?? Date.now();
     const mentions = input.mentions ?? [];
-    const path = `/communities/${encodeURIComponent(
+    const path = this.channelMessagePath(communityId, channelId, messageId);
+    const payload = this.channelMessageRecord({
+      authorIdentityId: this.mutations.authorOf(session),
+      channelId,
       communityId,
-    )}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(
+      createdAt: input.original.createdAt,
+      editedAt,
+      encryptedPayload: input.encryptedPayload,
+      mentions,
       messageId,
-    )}`;
-    const body =
-      input.plaintextPayload !== undefined
-        ? await this.editPlaintextChannelMessageBody(session, {
-            channelId,
-            communityId,
-            createdAt,
-            id: messageId,
-            mentions,
-            plaintextPayload: input.plaintextPayload,
-          })
-        : await this.editEncryptedChannelMessageBody(session, {
-            channelId,
-            communityId,
-            createdAt,
-            encryptedPayload: input.encryptedPayload,
-            id: messageId,
-            mentions,
-          });
-
-    return await this.http.request<MessageResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'PUT', path, body),
-      method: 'PUT',
+      plaintextPayload: input.plaintextPayload,
+      replyToMessageId: input.original.replyToMessageId,
     });
+
+    return await this.sendChannelMessageMutation(
+      session,
+      'PUT',
+      path,
+      { kind: 'put', payload },
+      {
+        createdAt: editedAt,
+        encryptedPayload: input.encryptedPayload,
+        mentions,
+        plaintextPayload: input.plaintextPayload,
+      },
+    );
   }
 
   public async addChannelMessageReaction(
