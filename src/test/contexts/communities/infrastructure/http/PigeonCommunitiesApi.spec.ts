@@ -695,6 +695,96 @@ describe(PigeonCommunitiesApi.name, () => {
     expect(removed.createdAt).toBeUndefined();
   });
 
+  it('chains the auto-join acceptance proof after the join request', async () => {
+    const device = await KeyPair.generate();
+    const http = {
+      request: jest.fn().mockResolvedValue({}),
+    } as unknown as HttpJsonClient;
+    const session = {
+      deviceCredentialKeyPair: device,
+      identity: { id: 'identity-1' },
+    } as unknown as Session;
+    const api = new PigeonCommunitiesApi(
+      http,
+      { headers: jest.fn().mockResolvedValue({}) } as unknown as RequestSigner,
+      async (_key, loader) => await loader(),
+    );
+
+    await api.createJoinRequest(session, 'community-1');
+
+    const body = JSON.parse(
+      (
+        (http.request as jest.Mock).mock.calls[0] as [string, { body: string }]
+      )[1].body,
+    ) as {
+      acceptedAt: number;
+      acceptedMutation: Record<string, unknown>;
+      createdAt: number;
+      mutation: Record<string, unknown>;
+    };
+
+    expect(body.acceptedAt).toBeGreaterThan(body.createdAt);
+    expect(body.mutation).toMatchObject({ predecessor: null, sequence: 0 });
+    expect(body.acceptedMutation).toMatchObject({
+      predecessor: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/),
+      recordId: body.mutation.recordId,
+      sequence: 1,
+      store: 'requests',
+    });
+  });
+
+  it('signs membership invitations and resolutions as request records', async () => {
+    const device = await KeyPair.generate();
+    const request = {
+      communityId: 'community-1',
+      createdAt: 10,
+      creatorIdentityId: 'identity-2',
+      id: 'a'.repeat(24),
+      identityId: 'identity-1',
+      status: 'pending',
+      type: 'invitation',
+      updatedAt: 10,
+    };
+    const http = {
+      request: jest
+        .fn()
+        .mockResolvedValueOnce({ requests: [request] })
+        .mockResolvedValue({}),
+    } as unknown as HttpJsonClient;
+    const session = {
+      deviceCredentialKeyPair: device,
+      identity: { id: 'identity-1' },
+    } as unknown as Session;
+    const api = new PigeonCommunitiesApi(
+      http,
+      { headers: jest.fn().mockResolvedValue({}) } as unknown as RequestSigner,
+      async (_key, loader) => await loader(),
+    );
+
+    await api.updateMembershipRequest(session, request.id, 'accepted');
+    await api.inviteMember(session, 'community-1', 'identity-3');
+
+    const [patch, invite] = (http.request as jest.Mock).mock.calls
+      .slice(1)
+      .map(
+        ([, init]: [string, { body: string }]) =>
+          JSON.parse(init.body) as Record<string, unknown>,
+      );
+
+    expect(patch).toMatchObject({
+      mutation: { recordId: request.id, store: 'requests' },
+      status: 'accepted',
+      updatedAt: expect.any(Number),
+    });
+    expect(invite).toMatchObject({
+      identityId: 'identity-3',
+      mutation: {
+        recordId: expect.stringMatching(/^[0-9a-f]{24}$/),
+        sequence: 0,
+      },
+    });
+  });
+
   it('stores community channel drafts as encrypted local payloads', async () => {
     const response = {
       channelId: 'channel-1',
