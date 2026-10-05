@@ -13,6 +13,7 @@ module.exports = {
     '/DevicePairingRequest.spec.ts$',
     '/DevicePairingCompletion.spec.ts$',
     '/PigeonDeviceAuthorizationApi.spec.ts$',
+    '/CommunityOperationSigner.spec.ts$',
   ],
   roots: ['<rootDir>/src'],
   testEnvironment: 'node',

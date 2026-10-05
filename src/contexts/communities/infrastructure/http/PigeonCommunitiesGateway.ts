@@ -153,10 +153,12 @@ export class PigeonCommunitiesGateway {
   public async createCommunityJoinRequest(
     session: Session,
     communityId: string,
+    networkId: string,
   ): Promise<CommunityMembershipRequest> {
     const request = await this.communities.createJoinRequest(
       session,
       communityId,
+      networkId,
     );
 
     this.requestCache.invalidateForSession(

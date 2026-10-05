@@ -21,7 +21,7 @@ describe(PigeonCommunityInvitationApi.name, () => {
     const api = new PigeonCommunityInvitationApi(
       {} as HttpJsonClient,
       {} as RequestSigner,
-      { get, inviteMember },
+      { frontier: jest.fn(), get, inviteMember },
       {} as never,
       {} as never,
     );
@@ -82,7 +82,11 @@ describe(PigeonCommunityInvitationApi.name, () => {
     const http = {
       request: jest
         .fn()
-        .mockResolvedValueOnce({ communityId: 'community-1', token: 'tok' })
+        .mockResolvedValueOnce({
+          communityId: 'community-1',
+          networkId: 'network-1',
+          token: 'tok',
+        })
         .mockResolvedValueOnce({ id: 'community-1' }),
     } as unknown as HttpJsonClient;
     const session = {
@@ -92,7 +96,7 @@ describe(PigeonCommunityInvitationApi.name, () => {
     const api = new PigeonCommunityInvitationApi(
       http,
       { headers: jest.fn().mockResolvedValue({}) } as unknown as RequestSigner,
-      {} as never,
+      { frontier: jest.fn().mockResolvedValue(['c'.repeat(43)]) } as never,
       {} as never,
       {} as never,
     );
@@ -103,7 +107,17 @@ describe(PigeonCommunityInvitationApi.name, () => {
       (
         (http.request as jest.Mock).mock.calls[1] as [string, { body: string }]
       )[1].body,
-    ) as { mutation: Record<string, unknown>; usedAt: number };
+    ) as {
+      mutation: Record<string, unknown>;
+      operation: { parents: string[]; mutation: Record<string, unknown> };
+      usedAt: number;
+    };
+
+    expect(body.operation.parents).toEqual(['c'.repeat(43)]);
+    expect(body.operation.mutation).toMatchObject({
+      sequence: 0,
+      store: 'communityOperations',
+    });
 
     expect(body.usedAt).toEqual(expect.any(Number));
     expect(body.mutation).toMatchObject({

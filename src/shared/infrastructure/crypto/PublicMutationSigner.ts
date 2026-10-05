@@ -43,6 +43,11 @@ export class PublicMutationSigner {
     return this.base64Url(bytes);
   }
 
+  /** base64url sha256 of the canonical JSON of a value. */
+  public digestOfValue(value: unknown): string {
+    return this.digest(canonicalJson(value));
+  }
+
   /** Digest a successor commits to as its predecessor. */
   public digestOf(mutation: SignedPublicMutation): string {
     return this.digest(canonicalJson({ ...mutation }));

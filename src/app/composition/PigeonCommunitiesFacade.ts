@@ -211,10 +211,12 @@ export class PigeonCommunitiesFacade {
   public async createJoinRequest(
     session: Session,
     communityId: string,
+    networkId: string,
   ): Promise<CommunityMembershipRequest> {
     return await this.membershipRequests.createCommunityJoinRequest(
       session,
       communityId,
+      networkId,
     );
   }
 

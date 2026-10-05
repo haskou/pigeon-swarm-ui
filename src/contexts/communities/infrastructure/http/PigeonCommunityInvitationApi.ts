@@ -24,6 +24,7 @@ import { IdentityId } from '../../../identities/domain/value-objects/IdentityId'
 import { encryptCommunityInviteKey } from '../crypto/communityInviteKeyEnvelope';
 import { buildCommunityInviteLinkBody } from './buildCommunityInviteLinkBody';
 import { CommunityModerationLogSigner } from './CommunityModerationLogSigner';
+import { CommunityOperationSigner } from './CommunityOperationSigner';
 import { deriveInviteToken } from './deriveCommunityRecordId';
 
 export class PigeonCommunityInvitationApi {
@@ -33,12 +34,14 @@ export class PigeonCommunityInvitationApi {
 
   private readonly mutations = new PublicMutationSigner();
 
+  private readonly operations = new CommunityOperationSigner();
+
   public constructor(
     private readonly http: HttpJsonClient,
     private readonly signer: RequestSigner,
     private readonly communities: Pick<
       PigeonCommunitiesApi,
-      'get' | 'inviteMember'
+      'frontier' | 'get' | 'inviteMember'
     >,
     private readonly identities: Pick<PigeonIdentityGateway, 'get'>,
     private readonly keychains: Pick<PigeonKeychainApi, 'publishKeychain'>,
@@ -393,6 +396,16 @@ export class PigeonCommunityInvitationApi {
     const token = invite.token ?? invite.inviteToken ?? inviteToken;
     const identityId = this.mutations.authorOf(session);
     const usedAt = Date.now();
+    const communityId = invite.communityId as string;
+    const networkId = invite.networkId as string;
+    const operation = this.operations.sign(session, {
+      action: 'member_joined',
+      args: { identityId, method: 'invite_link', reference: token },
+      communityId,
+      createdAt: usedAt,
+      networkId,
+      parents: await this.communities.frontier(session, communityId),
+    });
     const record = {
       communityId: invite.communityId,
       id: `invite-use:${token}:${identityId}`,
@@ -417,7 +430,7 @@ export class PigeonCommunityInvitationApi {
           position,
         ),
       async (mutation) => {
-        const body = { mutation, usedAt };
+        const body = { mutation, operation, usedAt };
 
         community = await this.http.request<Community>(path, {
           body: JSON.stringify(body),

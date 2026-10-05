@@ -1,6 +1,8 @@
 import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 
+import { canonicalJson } from '../../../../shared/infrastructure/crypto/canonicalJson';
+
 /** First 24 hex chars of sha256 over the request identity tuple. */
 export function deriveMembershipRequestId(
   communityId: string,
@@ -75,4 +77,22 @@ export function deriveCommunityEntityId(
   )
     .toString()
     .slice(0, 24);
+}
+
+/** base64url sha256 of the canonical owner tuple a community id commits to. */
+export function deriveCommunityId(
+  networkId: string,
+  ownerIdentityId: string,
+  nonce: string,
+): string {
+  return Buffer.from(
+    SHA256Hash.from(
+      canonicalJson({ networkId, nonce, ownerIdentityId }),
+    ).toString(),
+    'hex',
+  )
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 }

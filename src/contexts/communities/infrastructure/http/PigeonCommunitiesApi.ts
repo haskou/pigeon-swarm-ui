@@ -1,4 +1,5 @@
 import { UUID } from '@haskou/value-objects';
+import { Buffer } from 'buffer';
 
 import type {
   Community,
@@ -27,17 +28,25 @@ import type { CommunityChannelMessageEditInput } from './CommunityChannelMessage
 import type { CommunityChannelMessageInput } from './CommunityChannelMessageInput';
 import type { CommunityChannelMessageSearchResult } from './CommunityChannelMessageSearchResult';
 import type { CommunityModerationLogBody } from './CommunityModerationLogBody';
+import type { CommunityOperationBody } from './CommunityOperationBody';
 
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 import { DraftPayloadCipher } from '../../../messages/infrastructure/crypto/DraftPayloadCipher';
 import { CommunityModerationLogSigner } from './CommunityModerationLogSigner';
+import { CommunityOperationSigner } from './CommunityOperationSigner';
 import {
   deriveCommunityEntityId,
+  deriveCommunityId,
   deriveMembershipRequestId,
 } from './deriveCommunityRecordId';
 
 const startupReadCacheTtlMs = 1500;
+
+const present = <T extends Record<string, unknown>>(value: T): Partial<T> =>
+  Object.fromEntries(
+    Object.entries(value).filter(([, field]) => field !== undefined),
+  ) as Partial<T>;
 
 export class PigeonCommunitiesApi {
   private readonly draftPayloads: DraftPayloadCipher;
@@ -45,6 +54,8 @@ export class PigeonCommunitiesApi {
   private readonly moderationLogs = new CommunityModerationLogSigner();
 
   private readonly mutations = new PublicMutationSigner();
+
+  private readonly operations = new CommunityOperationSigner();
 
   public constructor(
     private readonly http: HttpJsonClient,
@@ -55,6 +66,70 @@ export class PigeonCommunitiesApi {
       undefined,
   ) {
     this.draftPayloads = draftPayloads ?? new DraftPayloadCipher();
+  }
+
+  private randomNonce(): string {
+    const bytes = new Uint8Array(16);
+
+    crypto.getRandomValues(bytes);
+
+    return Buffer.from(bytes)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+  }
+
+  public async frontier(
+    session: Session,
+    communityId: string,
+  ): Promise<string[]> {
+    const path = `/communities/${encodeURIComponent(communityId)}/frontier`;
+    const result = await this.http.request<{ frontier: string[] }>(path, {
+      headers: await this.signer.headers(session, 'GET', path),
+      method: 'GET',
+    });
+
+    return result.frontier;
+  }
+
+  /** Signs an operation on top of the frontier the node holds right now. */
+  private async signOperation(
+    session: Session,
+    communityId: string,
+    networkId: string,
+    action: string,
+    args: Record<string, unknown>,
+    createdAt: number,
+  ): Promise<CommunityOperationBody> {
+    return this.operations.sign(session, {
+      action,
+      args,
+      communityId,
+      createdAt,
+      networkId,
+      parents: await this.frontier(session, communityId),
+    });
+  }
+
+  /** Same as signOperation for members, who can read the community network. */
+  private async signMemberOperation(
+    session: Session,
+    communityId: string,
+    action: string,
+    args: Record<string, unknown>,
+    createdAt: number,
+  ): Promise<CommunityOperationBody> {
+    const { networkId } = await this.get(session, communityId);
+
+    return await this.signOperation(
+      session,
+      communityId,
+      networkId,
+      action,
+      args,
+      createdAt,
+    );
   }
 
   private membershipRequestRecord(
@@ -168,13 +243,23 @@ export class PigeonCommunitiesApi {
     };
   }
 
-  private channelCreationBody(
+  private async channelCreationBody(
     session: Session,
     communityId: string,
     name: string,
     type: 'text' | 'voice',
-  ): { moderationLog: CommunityModerationLogBody; name: string } {
+  ): Promise<{
+    moderationLog: CommunityModerationLogBody;
+    name: string;
+    operation: CommunityOperationBody;
+  }> {
     const createdAt = Date.now();
+    const channelId = deriveCommunityEntityId(
+      'channel',
+      communityId,
+      this.mutations.authorOf(session),
+      createdAt,
+    );
 
     return {
       moderationLog: this.moderationLogs.sign(session, {
@@ -182,17 +267,16 @@ export class PigeonCommunitiesApi {
         communityId,
         createdAt,
         details: { name, type },
-        target: {
-          id: deriveCommunityEntityId(
-            'channel',
-            communityId,
-            this.mutations.authorOf(session),
-            createdAt,
-          ),
-          type: 'channel',
-        },
+        target: { id: channelId, type: 'channel' },
       }),
       name,
+      operation: await this.signMemberOperation(
+        session,
+        communityId,
+        'channel_created',
+        { channelId, name, type },
+        createdAt,
+      ),
     };
   }
 
@@ -443,19 +527,43 @@ export class PigeonCommunitiesApi {
     },
   ): Promise<Community> {
     const path = '/communities/';
+    const ownerIdentityId = this.mutations.authorOf(session);
+    const nonce = this.randomNonce();
+    const communityId = deriveCommunityId(
+      input.networkId,
+      ownerIdentityId,
+      nonce,
+    );
+    const operation = this.operations.sign(session, {
+      action: 'community_created',
+      args: {
+        ...present({ avatar: input.avatar || undefined }),
+        ...present({ banner: input.banner || undefined }),
+        autoJoinEnabled: input.autoJoinEnabled ?? false,
+        description: input.description,
+        discoverable: input.discoverable ?? true,
+        name: input.name,
+        nonce,
+        visibility: input.visibility ?? 'private',
+      },
+      communityId,
+      createdAt: Date.now(),
+      networkId: input.networkId,
+      parents: [],
+    });
     const body = {
-      ...(input.autoJoinEnabled !== undefined
-        ? { autoJoinEnabled: input.autoJoinEnabled }
-        : {}),
-      ...(input.avatar ? { avatar: input.avatar } : {}),
-      ...(input.banner ? { banner: input.banner } : {}),
+      ...present({
+        autoJoinEnabled: input.autoJoinEnabled,
+        avatar: input.avatar || undefined,
+        banner: input.banner || undefined,
+        discoverable: input.discoverable,
+        visibility: input.visibility,
+      }),
       description: input.description,
-      ...(input.discoverable !== undefined
-        ? { discoverable: input.discoverable }
-        : {}),
       name: input.name,
       networkId: input.networkId,
-      ...(input.visibility ? { visibility: input.visibility } : {}),
+      nonce,
+      operation,
     };
 
     return await this.http.request<Community>(path, {
@@ -478,29 +586,38 @@ export class PigeonCommunitiesApi {
     },
   ): Promise<Community> {
     const path = `/communities/${encodeURIComponent(communityId)}`;
-    const fields = {
-      ...(input.autoJoinEnabled !== undefined
-        ? { autoJoinEnabled: input.autoJoinEnabled }
-        : {}),
-      ...(input.avatar ? { avatar: input.avatar } : {}),
-      ...(input.banner ? { banner: input.banner } : {}),
-      ...(input.description !== undefined
-        ? { description: input.description }
-        : {}),
-      ...(input.discoverable !== undefined
-        ? { discoverable: input.discoverable }
-        : {}),
-      ...(input.name !== undefined ? { name: input.name } : {}),
+    const fields = present({
+      autoJoinEnabled: input.autoJoinEnabled,
+      avatar: input.avatar || undefined,
+      banner: input.banner || undefined,
+      description: input.description,
+      discoverable: input.discoverable,
+      name: input.name,
+    }) as { description?: string; name?: string };
+    const createdAt = Date.now();
+    const current = await this.get(session, communityId);
+    const merged = {
+      ...fields,
+      description: fields.description ?? current.description,
+      name: fields.name ?? current.name,
     };
     const body = {
-      ...fields,
+      ...merged,
       moderationLog: this.moderationLogs.sign(session, {
         action: 'community_updated',
         communityId,
-        createdAt: Date.now(),
+        createdAt,
         details: fields,
         target: { id: communityId, type: 'community' },
       }),
+      operation: await this.signOperation(
+        session,
+        communityId,
+        current.networkId,
+        'community_updated',
+        merged,
+        createdAt,
+      ),
     };
 
     return await this.http.request<Community>(path, {
@@ -560,15 +677,23 @@ export class PigeonCommunitiesApi {
     identityId: string,
   ): Promise<Community> {
     const path = `/communities/${encodeURIComponent(communityId)}/bans`;
+    const createdAt = Date.now();
     const body = {
       identityId,
       moderationLog: this.moderationLogs.sign(session, {
         action: 'member_banned',
         communityId,
-        createdAt: Date.now(),
+        createdAt,
         details: {},
         target: { id: identityId, type: 'member' },
       }),
+      operation: await this.signMemberOperation(
+        session,
+        communityId,
+        'member_banned',
+        { identityId },
+        createdAt,
+      ),
     };
 
     return await this.http.request<Community>(path, {
@@ -586,14 +711,22 @@ export class PigeonCommunitiesApi {
     const path = `/communities/${encodeURIComponent(
       communityId,
     )}/bans/${encodeURIComponent(identityId)}`;
+    const createdAt = Date.now();
     const body = {
       moderationLog: this.moderationLogs.sign(session, {
         action: 'member_unbanned',
         communityId,
-        createdAt: Date.now(),
+        createdAt,
         details: {},
         target: { id: identityId, type: 'member' },
       }),
+      operation: await this.signMemberOperation(
+        session,
+        communityId,
+        'member_unbanned',
+        { identityId },
+        createdAt,
+      ),
     };
 
     return await this.http.request<Community>(path, {
@@ -611,9 +744,19 @@ export class PigeonCommunitiesApi {
     const path = `/communities/${encodeURIComponent(
       communityId,
     )}/members/${encodeURIComponent(identityId)}/kick`;
+    const body = {
+      operation: await this.signMemberOperation(
+        session,
+        communityId,
+        'member_kicked',
+        { identityId },
+        Date.now(),
+      ),
+    };
 
     return await this.http.request<Community>(path, {
-      headers: await this.signer.headers(session, 'DELETE', path),
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'DELETE', path, body),
       method: 'DELETE',
     });
   }
@@ -621,6 +764,7 @@ export class PigeonCommunitiesApi {
   public async createJoinRequest(
     session: Session,
     communityId: string,
+    networkId: string,
   ): Promise<CommunityMembershipRequest> {
     const path = `/communities/${encodeURIComponent(
       communityId,
@@ -654,7 +798,17 @@ export class PigeonCommunitiesApi {
         status: 'pending',
         updatedAt: createdAt,
       }),
-      { createdAt },
+      {
+        createdAt,
+        operation: await this.signOperation(
+          session,
+          communityId,
+          networkId,
+          'member_joined',
+          { identityId, method: 'automatic' },
+          acceptedAt,
+        ),
+      },
       {
         record: this.membershipRequestRecord({
           ...base,
@@ -703,6 +857,20 @@ export class PigeonCommunitiesApi {
     if (!current) throw new Error('Membership request not found.');
 
     const updatedAt = Math.max(Date.now(), Number(current.updatedAt) + 1);
+    const operation =
+      status === 'accepted'
+        ? await this.signMemberOperation(
+            session,
+            current.communityId,
+            'member_joined',
+            {
+              identityId: current.identityId,
+              method: current.type === 'request' ? 'approval' : 'invitation',
+              reference: requestId,
+            },
+            updatedAt,
+          )
+        : undefined;
 
     return await this.sendMembershipRequest<CommunityMembershipRequest>(
       session,
@@ -720,6 +888,7 @@ export class PigeonCommunitiesApi {
           details: { identityId: current.identityId, type: current.type },
           target: { id: requestId, type: 'membership_request' },
         }),
+        ...(operation ? { operation } : {}),
         status,
         updatedAt,
       },
@@ -731,9 +900,19 @@ export class PigeonCommunitiesApi {
     communityId: string,
   ): Promise<Community> {
     const path = `/communities/${encodeURIComponent(communityId)}/members/me`;
+    const body = {
+      operation: await this.signMemberOperation(
+        session,
+        communityId,
+        'member_left',
+        { identityId: this.mutations.authorOf(session) },
+        Date.now(),
+      ),
+    };
 
     return await this.http.request<Community>(path, {
-      headers: await this.signer.headers(session, 'DELETE', path),
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'DELETE', path, body),
       method: 'DELETE',
     });
   }
@@ -773,23 +952,28 @@ export class PigeonCommunitiesApi {
   ): Promise<CommunityRoleResource> {
     const path = `/communities/${encodeURIComponent(communityId)}/roles`;
     const createdAt = Date.now();
+    const roleId = deriveCommunityEntityId(
+      'role',
+      communityId,
+      this.mutations.authorOf(session),
+      createdAt,
+    );
     const body = {
       moderationLog: this.moderationLogs.sign(session, {
         action: 'role_created',
         communityId,
         createdAt,
         details: { name: input.name, permissions: input.permissions },
-        target: {
-          id: deriveCommunityEntityId(
-            'role',
-            communityId,
-            this.mutations.authorOf(session),
-            createdAt,
-          ),
-          type: 'role',
-        },
+        target: { id: roleId, type: 'role' },
       }),
       name: input.name,
+      operation: await this.signMemberOperation(
+        session,
+        communityId,
+        'role_created',
+        { name: input.name, permissions: input.permissions, roleId },
+        createdAt,
+      ),
       permissions: input.permissions,
     };
 
@@ -809,15 +993,23 @@ export class PigeonCommunitiesApi {
     const path = `/communities/${encodeURIComponent(
       communityId,
     )}/roles/${encodeURIComponent(roleId)}`;
+    const createdAt = Date.now();
     const body = {
       moderationLog: this.moderationLogs.sign(session, {
         action: 'role_updated',
         communityId,
-        createdAt: Date.now(),
+        createdAt,
         details: { name: input.name, permissions: input.permissions },
         target: { id: roleId, type: 'role' },
       }),
       name: input.name,
+      operation: await this.signMemberOperation(
+        session,
+        communityId,
+        'role_updated',
+        { name: input.name, permissions: input.permissions, roleId },
+        createdAt,
+      ),
       permissions: input.permissions,
     };
 
@@ -837,14 +1029,22 @@ export class PigeonCommunitiesApi {
       communityId,
     )}/roles/${encodeURIComponent(roleId)}`;
 
+    const createdAt = Date.now();
     const body = {
       moderationLog: this.moderationLogs.sign(session, {
         action: 'role_deleted',
         communityId,
-        createdAt: Date.now(),
+        createdAt,
         details: {},
         target: { id: roleId, type: 'role' },
       }),
+      operation: await this.signMemberOperation(
+        session,
+        communityId,
+        'role_deleted',
+        { roleId },
+        createdAt,
+      ),
     };
 
     await this.http.request(path, {
@@ -863,14 +1063,22 @@ export class PigeonCommunitiesApi {
     const path = `/communities/${encodeURIComponent(
       communityId,
     )}/members/${encodeURIComponent(identityId)}/roles`;
+    const createdAt = Date.now();
     const body = {
       moderationLog: this.moderationLogs.sign(session, {
         action: 'member_roles_updated',
         communityId,
-        createdAt: Date.now(),
+        createdAt,
         details: { roleIds },
         target: { id: identityId, type: 'member' },
       }),
+      operation: await this.signMemberOperation(
+        session,
+        communityId,
+        'member_roles_updated',
+        { identityId, roleIds },
+        createdAt,
+      ),
       roleIds,
     };
 
@@ -893,7 +1101,12 @@ export class PigeonCommunitiesApi {
     const path = `/communities/${encodeURIComponent(
       communityId,
     )}/channels/text`;
-    const body = this.channelCreationBody(session, communityId, name, 'text');
+    const body = await this.channelCreationBody(
+      session,
+      communityId,
+      name,
+      'text',
+    );
 
     const channel = await this.http.request<CommunityTextChannel>(path, {
       body: JSON.stringify(body),
@@ -914,7 +1127,12 @@ export class PigeonCommunitiesApi {
     const path = `/communities/${encodeURIComponent(
       communityId,
     )}/channels/voice`;
-    const body = this.channelCreationBody(session, communityId, name, 'voice');
+    const body = await this.channelCreationBody(
+      session,
+      communityId,
+      name,
+      'voice',
+    );
 
     const channel = await this.http.request<CommunityVoiceChannel>(path, {
       body: JSON.stringify(body),
@@ -956,15 +1174,23 @@ export class PigeonCommunitiesApi {
     const path = `/communities/${encodeURIComponent(
       communityId,
     )}/channels/${encodeURIComponent(channelId)}`;
+    const createdAt = Date.now();
     const body = {
       moderationLog: this.moderationLogs.sign(session, {
         action: 'channel_renamed',
         communityId,
-        createdAt: Date.now(),
+        createdAt,
         details: { name },
         target: { id: channelId, type: 'channel' },
       }),
       name,
+      operation: await this.signMemberOperation(
+        session,
+        communityId,
+        'channel_renamed',
+        { channelId, name },
+        createdAt,
+      ),
     };
 
     const channel = await this.http.request<CommunityChannel>(path, {
@@ -993,14 +1219,22 @@ export class PigeonCommunitiesApi {
 
     if (!channelType) throw new Error('Community channel not found.');
 
+    const createdAt = Date.now();
     const body = {
       moderationLog: this.moderationLogs.sign(session, {
         action: 'channel_deleted',
         communityId,
-        createdAt: Date.now(),
+        createdAt,
         details: { type: channelType },
         target: { id: channelId, type: 'channel' },
       }),
+      operation: await this.signMemberOperation(
+        session,
+        communityId,
+        'channel_deleted',
+        { channelId },
+        createdAt,
+      ),
     };
 
     const community = await this.http.request<Community>(path, {
@@ -1023,14 +1257,22 @@ export class PigeonCommunitiesApi {
     const path = `/communities/${encodeURIComponent(
       communityId,
     )}/channels/${encodeURIComponent(channelId)}/permissions`;
+    const createdAt = Date.now();
     const body = {
       moderationLog: this.moderationLogs.sign(session, {
         action: 'channel_permissions_updated',
         communityId,
-        createdAt: Date.now(),
+        createdAt,
         details: { visibleRoleIds },
         target: { id: channelId, type: 'channel' },
       }),
+      operation: await this.signMemberOperation(
+        session,
+        communityId,
+        'channel_permissions_updated',
+        { channelId, visibleRoleIds },
+        createdAt,
+      ),
       visibleRoleIds,
     };
 

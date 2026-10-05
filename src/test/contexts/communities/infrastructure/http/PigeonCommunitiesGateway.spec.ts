@@ -91,7 +91,11 @@ describe(PigeonCommunitiesGateway.name, () => {
     } as const;
     communities.createJoinRequest.mockResolvedValue(request);
 
-    await gateway.createCommunityJoinRequest(session(), 'community-1');
+    await gateway.createCommunityJoinRequest(
+      session(),
+      'community-1',
+      'network-1',
+    );
 
     expect(requestCache.invalidateForSession).toHaveBeenCalledWith(
       '/communities/membership-requests',

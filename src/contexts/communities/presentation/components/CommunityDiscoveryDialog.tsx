@@ -111,6 +111,7 @@ export function CommunityDiscoveryDialog({
       const request = await applicationContainer.communities.createJoinRequest(
         session,
         community.id,
+        community.networkId,
       );
 
       setCommunities((current) =>
