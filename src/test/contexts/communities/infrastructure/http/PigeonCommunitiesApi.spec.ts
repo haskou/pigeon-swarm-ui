@@ -479,7 +479,9 @@ describe(PigeonCommunitiesApi.name, () => {
   it('chains the auto-join acceptance proof after the join request', async () => {
     const device = await KeyPair.generate();
     const http = {
-      request: jest.fn().mockResolvedValue({}),
+      request: jest.fn((path: string) =>
+        path.endsWith('/frontier') ? { frontier: [] } : {},
+      ),
     } as unknown as HttpJsonClient;
     const session = {
       deviceCredentialKeyPair: device,
@@ -491,18 +493,35 @@ describe(PigeonCommunitiesApi.name, () => {
       async (_key, loader) => await loader(),
     );
 
-    await api.createJoinRequest(session, 'community-1');
+    await api.createJoinRequest(session, 'community-1', 'network-1');
 
     const body = JSON.parse(
       (
-        (http.request as jest.Mock).mock.calls[0] as [string, { body: string }]
+        (http.request as jest.Mock).mock.calls[1] as [string, { body: string }]
       )[1].body,
     ) as {
       acceptedAt: number;
       acceptedMutation: Record<string, unknown>;
       createdAt: number;
       mutation: Record<string, unknown>;
+      operation: {
+        createdAt: number;
+        parents: string[];
+        mutation: Record<string, unknown>;
+      };
     };
+
+    expect(body.operation).toMatchObject({
+      createdAt: body.acceptedAt,
+      mutation: {
+        recordId: expect.stringMatching(
+          /^community:community-1:op:[A-Za-z0-9_-]{43}$/,
+        ),
+        sequence: 0,
+        store: 'communityOperations',
+      },
+      parents: [],
+    });
 
     expect(body.acceptedAt).toBeGreaterThan(body.createdAt);
     expect(body.mutation).toMatchObject({ predecessor: null, sequence: 0 });
@@ -527,10 +546,18 @@ describe(PigeonCommunitiesApi.name, () => {
       updatedAt: 10,
     };
     const http = {
-      request: jest
-        .fn()
-        .mockResolvedValueOnce({ requests: [request] })
-        .mockResolvedValue({}),
+      request: jest.fn((path: string) => {
+        if (path.endsWith('/frontier')) return { frontier: [] };
+
+        if (path === '/communities/community-1')
+          return { networkId: 'network-1' };
+
+        if (path === '/communities/membership-requests') {
+          return { requests: [request] };
+        }
+
+        return {};
+      }),
     } as unknown as HttpJsonClient;
     const session = {
       deviceCredentialKeyPair: device,
@@ -546,7 +573,12 @@ describe(PigeonCommunitiesApi.name, () => {
     await api.inviteMember(session, 'community-1', 'identity-3');
 
     const [patch, invite] = (http.request as jest.Mock).mock.calls
-      .slice(1)
+      .filter(([path]: [string]) => !path.endsWith('/frontier'))
+      .filter(
+        ([path]: [string]) =>
+          path !== '/communities/membership-requests' &&
+          path !== '/communities/community-1',
+      )
       .map(
         ([, init]: [string, { body: string }]) =>
           JSON.parse(init.body) as Record<string, unknown>,
@@ -626,7 +658,9 @@ describe(PigeonCommunitiesApi.name, () => {
   it('invalidates the community detail cache after assigning member roles', async () => {
     const community = { id: 'community-1' };
     const http = {
-      request: jest.fn().mockResolvedValue(community),
+      request: jest.fn((path: string) =>
+        path.endsWith('/frontier') ? { frontier: [] } : community,
+      ),
     } as unknown as HttpJsonClient;
     const signer = {
       headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
@@ -656,7 +690,19 @@ describe(PigeonCommunitiesApi.name, () => {
   describe('moderation logs', () => {
     async function setup(response: unknown = {}) {
       const http = {
-        request: jest.fn().mockResolvedValue(response),
+        request: jest.fn((path: string, init?: { method?: string }) => {
+          if (path.endsWith('/frontier')) return { frontier: ['b'.repeat(43)] };
+
+          if (path === '/communities/community-1' && init?.method === 'GET') {
+            return {
+              description: 'About',
+              name: 'Community',
+              networkId: 'network-1',
+            };
+          }
+
+          return response;
+        }),
       } as unknown as HttpJsonClient;
       const session = {
         deviceCredentialKeyPair: await KeyPair.generate(),
@@ -676,6 +722,11 @@ describe(PigeonCommunitiesApi.name, () => {
         ][];
 
         return JSON.parse(calls[calls.length - 1][1].body) as {
+          operation: {
+            createdAt: number;
+            parents: string[];
+            mutation: Record<string, unknown>;
+          };
           moderationLog: {
             createdAt: number;
             mutation: Record<string, unknown>;
@@ -718,9 +769,37 @@ describe(PigeonCommunitiesApi.name, () => {
       expect(
         (http.request as jest.Mock).mock.calls.filter(
           ([, init]: [string, { method?: string; body?: string }]) =>
-            init.method === 'DELETE' && !init.body,
+            init?.method === 'DELETE' && !init.body,
         ),
       ).toHaveLength(0);
+    });
+
+    it('signs a community operation on the frontier for every mutation route', async () => {
+      const { api, lastBody, session } = await setup({
+        channels: [{ id: 'channel-1', type: 'text' }],
+      });
+      const parent = 'b'.repeat(43);
+
+      await api.banMember(session, 'community-1', 'member-1');
+      expect(lastBody().operation).toMatchObject({
+        mutation: {
+          kind: 'put',
+          predecessor: null,
+          sequence: 0,
+          store: 'communityOperations',
+        },
+        parents: [parent],
+      });
+      await api.kickMember(session, 'community-1', 'member-1');
+      expect(Object.keys(lastBody())).toEqual(['operation']);
+      await api.leave(session, 'community-1');
+      expect(Object.keys(lastBody())).toEqual(['operation']);
+      await api.deleteChannel(session, 'community-1', 'channel-1');
+      await api.createVoiceChannel(session, 'community-1', 'voice');
+      await api.deleteRole(session, 'community-1', 'role-1');
+      await api.assignMemberRoles(session, 'community-1', 'member-1', ['r']);
+      await api.update(session, 'community-1', { name: 'New' });
+      expect(lastBody().operation.mutation.store).toBe('communityOperations');
     });
 
     it('derives the log id and the created entity id from the same createdAt', async () => {

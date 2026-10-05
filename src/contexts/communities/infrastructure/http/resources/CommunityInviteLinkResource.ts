@@ -12,6 +12,7 @@ export type CommunityInviteLinkResource = {
   expiresAt?: number | null;
   inviteToken?: string;
   maxUses?: number;
+  networkId?: string;
   status?: string;
   token?: string;
   uses?: number;
