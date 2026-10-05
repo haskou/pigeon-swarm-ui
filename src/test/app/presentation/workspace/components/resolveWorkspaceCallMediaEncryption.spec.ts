@@ -6,6 +6,73 @@ import type {
 
 import { resolveWorkspaceCallMediaEncryption } from '../../../../../app/presentation/workspace/components/resolveWorkspaceCallMediaEncryption';
 
+function community(visibility: Community['visibility']): Community {
+  return {
+    autoJoinEnabled: false,
+    createdAt: 1,
+    description: '',
+    discoverable: true,
+    id: 'community-1',
+    memberIds: [],
+    name: 'Community',
+    networkId: 'network-1',
+    ownerIdentityId: 'identity-1',
+    textChannels: [],
+    visibility,
+    voiceChannels: [],
+  };
+}
+
+function call(scope: CallResource['scope']): CallResource {
+  return {
+    createdAt: 1,
+    creatorIdentityId: 'identity-1',
+    id: 'call-1',
+    networkId: 'network-1',
+    participantIds: ['identity-1'],
+    participants: [],
+    scope,
+    status: 'active',
+  };
+}
+
+function communityCall(): CallResource {
+  return call({
+    channelId: 'voice-1',
+    communityId: 'community-1',
+    type: 'community_channel',
+  });
+}
+
+function conversationCall(): CallResource {
+  return call({ conversationId: 'conversation-1', type: 'conversation' });
+}
+
+function emptyKeychain(): LocalKeychain {
+  return { conversations: {}, version: 2 };
+}
+
+function keychainWith(
+  id: string,
+  kind: 'community' | 'conversation',
+  key: string,
+): LocalKeychain {
+  return {
+    conversations: {
+      [id]: {
+        algorithm: 'aes-256-gcm',
+        conversationId: id,
+        createdAt: 1,
+        key,
+        kind,
+        peerIdentityId: '',
+        version: 2,
+      },
+    },
+    version: 2,
+  };
+}
+
 describe('resolveWorkspaceCallMediaEncryption', () => {
   it('disables media encryption for public communities', () => {
     expect(
@@ -52,70 +119,3 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
     });
   });
 });
-
-function community(visibility: Community['visibility']): Community {
-  return {
-    autoJoinEnabled: false,
-    createdAt: 1,
-    description: '',
-    discoverable: true,
-    id: 'community-1',
-    memberIds: [],
-    name: 'Community',
-    networkId: 'network-1',
-    ownerIdentityId: 'identity-1',
-    textChannels: [],
-    visibility,
-    voiceChannels: [],
-  };
-}
-
-function communityCall(): CallResource {
-  return call({
-    channelId: 'voice-1',
-    communityId: 'community-1',
-    type: 'community_channel',
-  });
-}
-
-function conversationCall(): CallResource {
-  return call({ conversationId: 'conversation-1', type: 'conversation' });
-}
-
-function call(scope: CallResource['scope']): CallResource {
-  return {
-    createdAt: 1,
-    creatorIdentityId: 'identity-1',
-    id: 'call-1',
-    networkId: 'network-1',
-    participantIds: ['identity-1'],
-    participants: [],
-    scope,
-    status: 'active',
-  };
-}
-
-function emptyKeychain(): LocalKeychain {
-  return { conversations: {}, version: 2 };
-}
-
-function keychainWith(
-  id: string,
-  kind: 'community' | 'conversation',
-  key: string,
-): LocalKeychain {
-  return {
-    conversations: {
-      [id]: {
-        algorithm: 'aes-256-gcm',
-        conversationId: id,
-        createdAt: 1,
-        key,
-        kind,
-        peerIdentityId: '',
-        version: 2,
-      },
-    },
-    version: 2,
-  };
-}

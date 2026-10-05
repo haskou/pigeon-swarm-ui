@@ -7,6 +7,9 @@ import {
 import { assert } from '@haskou/value-objects';
 
 import type { DeviceAuthorizationCheckpoint } from './DeviceAuthorizationCheckpoint';
+import type { DevicePairingCompletionMaterialResource } from './DevicePairingCompletionMaterialResource';
+import type { DevicePairingCompletionPayload } from './DevicePairingCompletionPayload';
+import type { DevicePairingCompletionResource } from './DevicePairingCompletionResource';
 
 import { DevicePairingMaterial } from './DevicePairingMaterial';
 import { DevicePairingRequest } from './DevicePairingRequest';
@@ -22,92 +25,17 @@ import { PairingId } from './value-objects/PairingId';
 const DOMAIN = 'pigeon:device-pairing:completion:v1';
 const KIND = 'pigeon-device-pairing-completion';
 
-type MaterialResource = {
-  identityKeyPair: ReturnType<KeyPair['toPrimitives']>;
-  recoveryAuthorityKeyPair: ReturnType<KeyPair['toPrimitives']>;
-  rootKey: string;
-  version: 1;
-};
-
-type CompletionPayload = {
-  authorCredential: string;
-  encryptedMaterial: string;
-  epoch: string;
-  identityId: string;
-  operationId: string;
-  pairingId: string;
-  revision: number;
-  version: 1;
-};
-
-type CompletionResource = CompletionPayload & {
-  kind: typeof KIND;
-  signature: string;
-};
-
 export class DevicePairingCompletion {
-  public static create(input: {
-    author: KeyPair;
-    checkpoint: DeviceAuthorizationCheckpoint;
-    identityKeyPair: KeyPair;
-    recoveryAuthorityKeyPair: KeyPair;
-    request: DevicePairingRequest;
-    rootKey: UserRootKey;
-  }): DevicePairingCompletion {
-    const encryptedMaterial = input.request
-      .getTransportPublicKey()
-      .getPublicKey()
-      .encrypt(
-        JSON.stringify({
-          identityKeyPair: input.identityKeyPair.toPrimitives(),
-          recoveryAuthorityKeyPair:
-            input.recoveryAuthorityKeyPair.toPrimitives(),
-          rootKey: input.rootKey.valueOf(),
-          version: 1,
-        } satisfies MaterialResource),
-      );
-    const invitation = input.request.getInvitation();
-    const payload: CompletionPayload = {
-      authorCredential: invitation.getAuthorCredential().valueOf(),
-      encryptedMaterial: encryptedMaterial.valueOf(),
-      epoch: input.checkpoint.getEpoch().valueOf(),
-      identityId: input.checkpoint.getIdentityId().valueOf(),
-      operationId: input.request.getOperationId().valueOf(),
-      pairingId: invitation.getPairingId().valueOf(),
-      revision: input.checkpoint.getRevision().valueOf(),
-      version: 1,
-    };
+  private readonly authorCredential: DeviceCredential;
+  private readonly encryptedMaterial: EncryptedPayload;
+  private readonly epoch: DeviceAuthorizationEpoch;
+  private readonly identityId: IdentityId;
+  private readonly operationId: DeviceAuthorizationOperationId;
+  private readonly pairingId: PairingId;
+  private readonly revision: DeviceAuthorizationRevision;
+  private readonly signature: Signature;
 
-    return new DevicePairingCompletion(
-      DeviceCredential.fromString(payload.authorCredential),
-      new EncryptedPayload(payload.encryptedMaterial),
-      input.checkpoint.getEpoch(),
-      input.checkpoint.getIdentityId(),
-      input.request.getOperationId(),
-      invitation.getPairingId(),
-      input.checkpoint.getRevision(),
-      input.author.sign(
-        JSON.stringify({ completion: payload, domain: DOMAIN }),
-      ),
-    );
-  }
-
-  public static fromCode(code: DevicePairingCode): DevicePairingCompletion {
-    const resource = this.resource(code.decode());
-
-    return new DevicePairingCompletion(
-      DeviceCredential.fromString(resource.authorCredential),
-      new EncryptedPayload(resource.encryptedMaterial),
-      DeviceAuthorizationEpoch.fromString(resource.epoch),
-      IdentityId.fromString(resource.identityId),
-      DeviceAuthorizationOperationId.fromString(resource.operationId),
-      PairingId.fromString(resource.pairingId),
-      DeviceAuthorizationRevision.fromNumber(resource.revision),
-      new Signature(resource.signature),
-    );
-  }
-
-  private static resource(value: unknown): CompletionResource {
+  private static resource(value: unknown): DevicePairingCompletionResource {
     const resource = DevicePairingResource.fromUnknown(
       value,
       'Invalid device pairing completion.',
@@ -128,18 +56,90 @@ export class DevicePairingCompletion {
     };
   }
 
-  private constructor(
-    private readonly authorCredential: DeviceCredential,
-    private readonly encryptedMaterial: EncryptedPayload,
-    private readonly epoch: DeviceAuthorizationEpoch,
-    private readonly identityId: IdentityId,
-    private readonly operationId: DeviceAuthorizationOperationId,
-    private readonly pairingId: PairingId,
-    private readonly revision: DeviceAuthorizationRevision,
-    private readonly signature: Signature,
-  ) {}
+  public static create(input: {
+    author: KeyPair;
+    checkpoint: DeviceAuthorizationCheckpoint;
+    identityKeyPair: KeyPair;
+    recoveryAuthorityKeyPair: KeyPair;
+    request: DevicePairingRequest;
+    rootKey: UserRootKey;
+  }): DevicePairingCompletion {
+    const encryptedMaterial = input.request
+      .getTransportPublicKey()
+      .getPublicKey()
+      .encrypt(
+        JSON.stringify({
+          identityKeyPair: input.identityKeyPair.toPrimitives(),
+          recoveryAuthorityKeyPair:
+            input.recoveryAuthorityKeyPair.toPrimitives(),
+          rootKey: input.rootKey.valueOf(),
+          version: 1,
+        } satisfies DevicePairingCompletionMaterialResource),
+      );
+    const invitation = input.request.getInvitation();
+    const payload: DevicePairingCompletionPayload = {
+      authorCredential: invitation.getAuthorCredential().valueOf(),
+      encryptedMaterial: encryptedMaterial.valueOf(),
+      epoch: input.checkpoint.getEpoch().valueOf(),
+      identityId: input.checkpoint.getIdentityId().valueOf(),
+      operationId: input.request.getOperationId().valueOf(),
+      pairingId: invitation.getPairingId().valueOf(),
+      revision: input.checkpoint.getRevision().valueOf(),
+      version: 1,
+    };
 
-  private payload(): CompletionPayload {
+    return new DevicePairingCompletion({
+      authorCredential: DeviceCredential.fromString(payload.authorCredential),
+      encryptedMaterial: new EncryptedPayload(payload.encryptedMaterial),
+      epoch: input.checkpoint.getEpoch(),
+      identityId: input.checkpoint.getIdentityId(),
+      operationId: input.request.getOperationId(),
+      pairingId: invitation.getPairingId(),
+      revision: input.checkpoint.getRevision(),
+      signature: input.author.sign(
+        JSON.stringify({ completion: payload, domain: DOMAIN }),
+      ),
+    });
+  }
+
+  public static fromCode(code: DevicePairingCode): DevicePairingCompletion {
+    const resource = this.resource(code.decode());
+
+    return new DevicePairingCompletion({
+      authorCredential: DeviceCredential.fromString(resource.authorCredential),
+      encryptedMaterial: new EncryptedPayload(resource.encryptedMaterial),
+      epoch: DeviceAuthorizationEpoch.fromString(resource.epoch),
+      identityId: IdentityId.fromString(resource.identityId),
+      operationId: DeviceAuthorizationOperationId.fromString(
+        resource.operationId,
+      ),
+      pairingId: PairingId.fromString(resource.pairingId),
+      revision: DeviceAuthorizationRevision.fromNumber(resource.revision),
+      signature: new Signature(resource.signature),
+    });
+  }
+
+  private constructor(state: {
+    authorCredential: DeviceCredential;
+    encryptedMaterial: EncryptedPayload;
+    epoch: DeviceAuthorizationEpoch;
+    identityId: IdentityId;
+    operationId: DeviceAuthorizationOperationId;
+    pairingId: PairingId;
+    revision: DeviceAuthorizationRevision;
+    signature: Signature;
+  }) {
+    this.authorCredential = state.authorCredential;
+    this.encryptedMaterial = state.encryptedMaterial;
+    this.epoch = state.epoch;
+    this.identityId = state.identityId;
+    this.operationId = state.operationId;
+    this.pairingId = state.pairingId;
+    this.revision = state.revision;
+    this.signature = state.signature;
+  }
+
+  private payload(): DevicePairingCompletionPayload {
     return {
       authorCredential: this.authorCredential.valueOf(),
       encryptedMaterial: this.encryptedMaterial.valueOf(),

@@ -1,6 +1,9 @@
 import { KeyPair, Signature } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp, assert } from '@haskou/value-objects';
 
+import type { DevicePairingRequestPayload } from './DevicePairingRequestPayload';
+import type { DevicePairingRequestResource } from './DevicePairingRequestResource';
+
 import { DeviceAuthorizationEnrollmentProof } from './DeviceAuthorizationEnrollmentProof';
 import { DeviceAuthorizationTransition } from './DeviceAuthorizationTransition';
 import { DevicePairingInvitation } from './DevicePairingInvitation';
@@ -16,22 +19,27 @@ const KIND = 'pigeon-device-pairing-request';
 const VERIFICATION_DOMAIN = 'pigeon:device-pairing:verification:v1';
 const MAX_FUTURE_SKEW_MS = 30_000;
 
-type RequestPayload = {
-  authorizedAt: number;
-  invitation: string;
-  operationId: string;
-  proofOfPossession: string;
-  targetCredential: string;
-  transportPublicKey: string;
-  version: 1;
-};
-
-type RequestResource = RequestPayload & {
-  kind: typeof KIND;
-  signature: string;
-};
-
 export class DevicePairingRequest {
+  private static resource(value: unknown): DevicePairingRequestResource {
+    const resource = DevicePairingResource.fromUnknown(
+      value,
+      'Invalid device pairing request.',
+    );
+    resource.assertProtocol(KIND, 1);
+
+    return {
+      authorizedAt: resource.getNumber('authorizedAt'),
+      invitation: resource.getString('invitation'),
+      kind: KIND,
+      operationId: resource.getString('operationId'),
+      proofOfPossession: resource.getString('proofOfPossession'),
+      signature: resource.getString('signature'),
+      targetCredential: resource.getString('targetCredential'),
+      transportPublicKey: resource.getString('transportPublicKey'),
+      version: 1,
+    };
+  }
+
   public static async create(
     invitation: DevicePairingInvitation,
     authorizedAt: Timestamp,
@@ -93,26 +101,6 @@ export class DevicePairingRequest {
     return request;
   }
 
-  private static resource(value: unknown): RequestResource {
-    const resource = DevicePairingResource.fromUnknown(
-      value,
-      'Invalid device pairing request.',
-    );
-    resource.assertProtocol(KIND, 1);
-
-    return {
-      authorizedAt: resource.getNumber('authorizedAt'),
-      invitation: resource.getString('invitation'),
-      kind: KIND,
-      operationId: resource.getString('operationId'),
-      proofOfPossession: resource.getString('proofOfPossession'),
-      signature: resource.getString('signature'),
-      targetCredential: resource.getString('targetCredential'),
-      transportPublicKey: resource.getString('transportPublicKey'),
-      version: 1,
-    };
-  }
-
   private constructor(
     private readonly authorizedAt: Timestamp,
     private readonly invitation: DevicePairingInvitation,
@@ -122,7 +110,7 @@ export class DevicePairingRequest {
     private readonly signature: Signature | undefined,
   ) {}
 
-  private payload(): RequestPayload {
+  private payload(): DevicePairingRequestPayload {
     return {
       authorizedAt: this.authorizedAt.valueOf(),
       invitation: this.invitation.toCode().valueOf(),

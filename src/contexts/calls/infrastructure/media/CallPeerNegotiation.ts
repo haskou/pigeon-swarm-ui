@@ -35,6 +35,113 @@ export class CallPeerNegotiation {
     private readonly iceCandidates: CallIceCandidates,
   ) {}
 
+  private acceptRemoteDescription(
+    senderIdentityId: string,
+    peer: RTCPeerConnection,
+    state: PeerNegotiationState,
+    description: RTCSessionDescription,
+  ): boolean {
+    const negotiationState = state;
+
+    if (
+      description.type === 'answer' &&
+      !['have-local-offer', 'have-remote-pranswer'].includes(
+        peer.signalingState,
+      )
+    ) {
+      return false;
+    }
+
+    if (description.type !== 'offer') {
+      negotiationState.ignoreOffer = false;
+
+      return true;
+    }
+
+    const offerCollision = this.isOfferCollision(
+      description,
+      negotiationState,
+      peer,
+    );
+
+    negotiationState.ignoreOffer = !negotiationState.polite && offerCollision;
+
+    if (negotiationState.ignoreOffer) {
+      logCallWarning('peer-manager:handle-signal:ignored-glare-offer', {
+        senderIdentityId,
+        signalingState: peer.signalingState,
+      });
+
+      return false;
+    }
+
+    negotiationState.ignoreOffer = false;
+
+    if (offerCollision) {
+      logCallDebug('peer-manager:handle-signal:rollback-glare-offer', {
+        senderIdentityId,
+        signalingState: peer.signalingState,
+      });
+    }
+
+    return true;
+  }
+
+  private isOfferCollision(
+    description: RTCSessionDescriptionInit,
+    state: PeerNegotiationState,
+    peer: RTCPeerConnection,
+  ): boolean {
+    return (
+      description.type === 'offer' &&
+      (state.makingOffer || peer.signalingState !== 'stable')
+    );
+  }
+
+  private async sendDescription(
+    peerIdentityId: string,
+    peer: RTCPeerConnection,
+    description: RTCSessionDescriptionInit,
+    sendSignal: SignalSender,
+  ): Promise<void> {
+    const delivery = Symbol();
+
+    this.descriptionDeliveries.set(peer, delivery);
+    const sending = this.signalRetry.send(
+      () =>
+        sendSignal(
+          peerIdentityId,
+          description.type as 'offer' | 'answer',
+          descriptionPayload(
+            peer.localDescription ?? description,
+            this.screenShareStreams.localAudioTrackIds(this.localTracks.stream),
+            this.screenShareStreams.localAudioStreamIds(
+              this.localTracks.stream,
+            ),
+            this.screenShareStreams.localVideoTrackIds(this.localTracks.stream),
+            this.screenShareStreams.localVideoStreamIds(
+              this.localTracks.stream,
+            ),
+            this.encryption.localMetadata(peerIdentityId),
+          ),
+        ),
+      () =>
+        this.peerFor(peerIdentityId) === peer &&
+        peer.connectionState !== 'closed' &&
+        peer.localDescription?.type === description.type &&
+        this.descriptionDeliveries.get(peer) === delivery,
+    );
+
+    if (description.type === 'answer') this.pendingAnswers.set(peer, sending);
+
+    try {
+      await sending;
+    } finally {
+      if (this.pendingAnswers.get(peer) === sending)
+        this.pendingAnswers.delete(peer);
+    }
+  }
+
   public configureState(peerIdentityId: string, polite: boolean): void {
     const current = this.state(peerIdentityId);
 
@@ -197,112 +304,5 @@ export class CallPeerNegotiation {
     this.states.set(peerIdentityId, state);
 
     return state;
-  }
-
-  private acceptRemoteDescription(
-    senderIdentityId: string,
-    peer: RTCPeerConnection,
-    state: PeerNegotiationState,
-    description: RTCSessionDescription,
-  ): boolean {
-    const negotiationState = state;
-
-    if (
-      description.type === 'answer' &&
-      !['have-local-offer', 'have-remote-pranswer'].includes(
-        peer.signalingState,
-      )
-    ) {
-      return false;
-    }
-
-    if (description.type !== 'offer') {
-      negotiationState.ignoreOffer = false;
-
-      return true;
-    }
-
-    const offerCollision = this.isOfferCollision(
-      description,
-      negotiationState,
-      peer,
-    );
-
-    negotiationState.ignoreOffer = !negotiationState.polite && offerCollision;
-
-    if (negotiationState.ignoreOffer) {
-      logCallWarning('peer-manager:handle-signal:ignored-glare-offer', {
-        senderIdentityId,
-        signalingState: peer.signalingState,
-      });
-
-      return false;
-    }
-
-    negotiationState.ignoreOffer = false;
-
-    if (offerCollision) {
-      logCallDebug('peer-manager:handle-signal:rollback-glare-offer', {
-        senderIdentityId,
-        signalingState: peer.signalingState,
-      });
-    }
-
-    return true;
-  }
-
-  private isOfferCollision(
-    description: RTCSessionDescriptionInit,
-    state: PeerNegotiationState,
-    peer: RTCPeerConnection,
-  ): boolean {
-    return (
-      description.type === 'offer' &&
-      (state.makingOffer || peer.signalingState !== 'stable')
-    );
-  }
-
-  private async sendDescription(
-    peerIdentityId: string,
-    peer: RTCPeerConnection,
-    description: RTCSessionDescriptionInit,
-    sendSignal: SignalSender,
-  ): Promise<void> {
-    const delivery = Symbol();
-
-    this.descriptionDeliveries.set(peer, delivery);
-    const sending = this.signalRetry.send(
-      () =>
-        sendSignal(
-          peerIdentityId,
-          description.type as 'offer' | 'answer',
-          descriptionPayload(
-            peer.localDescription ?? description,
-            this.screenShareStreams.localAudioTrackIds(this.localTracks.stream),
-            this.screenShareStreams.localAudioStreamIds(
-              this.localTracks.stream,
-            ),
-            this.screenShareStreams.localVideoTrackIds(this.localTracks.stream),
-            this.screenShareStreams.localVideoStreamIds(
-              this.localTracks.stream,
-            ),
-            this.encryption.localMetadata(peerIdentityId),
-          ),
-        ),
-      () =>
-        this.peerFor(peerIdentityId) === peer &&
-        peer.connectionState !== 'closed' &&
-        peer.localDescription?.type === description.type &&
-        this.descriptionDeliveries.get(peer) === delivery,
-    );
-
-    if (description.type === 'answer') this.pendingAnswers.set(peer, sending);
-
-    try {
-      await sending;
-    } finally {
-      if (this.pendingAnswers.get(peer) === sending)
-        this.pendingAnswers.delete(peer);
-    }
   }
 }

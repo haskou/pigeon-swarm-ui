@@ -1,6 +1,11 @@
 import { startCallHeartbeatLoop } from '../../../../../app/presentation/workspace/components/startCallHeartbeatLoop';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 
+async function flushPromises(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 describe(startCallHeartbeatLoop.name, () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
@@ -161,8 +166,3 @@ describe(startCallHeartbeatLoop.name, () => {
     expect(heartbeat).toHaveBeenCalledTimes(4);
   });
 });
-
-async function flushPromises(): Promise<void> {
-  await Promise.resolve();
-  await Promise.resolve();
-}

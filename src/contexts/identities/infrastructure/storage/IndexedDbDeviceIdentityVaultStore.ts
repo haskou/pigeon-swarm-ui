@@ -27,6 +27,26 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
     });
   }
 
+  private async request<T>(
+    mode: IDBTransactionMode,
+    callback: (store: IDBObjectStore) => IDBRequest<T>,
+  ): Promise<T> {
+    const database = await this.open();
+
+    try {
+      return await new Promise((resolve, reject) => {
+        const transaction = database.transaction(STORE_NAME, mode);
+        const request = callback(transaction.objectStore(STORE_NAME));
+
+        request.addEventListener('error', () => reject(request.error));
+        request.addEventListener('success', () => resolve(request.result));
+        transaction.addEventListener('error', () => reject(transaction.error));
+      });
+    } finally {
+      database.close();
+    }
+  }
+
   public async advanceAuthorization(
     identityId: IdentityId,
     previousRevision: DeviceAuthorizationRevision,
@@ -81,26 +101,6 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
           } satisfies DeviceIdentityVaultRecord);
         });
         transaction.addEventListener('complete', () => resolve());
-        transaction.addEventListener('error', () => reject(transaction.error));
-      });
-    } finally {
-      database.close();
-    }
-  }
-
-  private async request<T>(
-    mode: IDBTransactionMode,
-    callback: (store: IDBObjectStore) => IDBRequest<T>,
-  ): Promise<T> {
-    const database = await this.open();
-
-    try {
-      return await new Promise((resolve, reject) => {
-        const transaction = database.transaction(STORE_NAME, mode);
-        const request = callback(transaction.objectStore(STORE_NAME));
-
-        request.addEventListener('error', () => reject(request.error));
-        request.addEventListener('success', () => resolve(request.result));
         transaction.addEventListener('error', () => reject(transaction.error));
       });
     } finally {

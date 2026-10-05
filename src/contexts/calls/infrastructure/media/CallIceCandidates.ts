@@ -15,6 +15,47 @@ export class CallIceCandidates {
     private readonly signalRetry: CallSignalRetry,
   ) {}
 
+  private async apply(
+    peer: RTCPeerConnection,
+    candidate: RTCIceCandidateInit,
+  ): Promise<void> {
+    const iceCandidate = new RTCIceCandidate(candidate);
+    const remoteFragments = [
+      ...(peer.remoteDescription?.sdp ?? '').matchAll(
+        /^a=ice-ufrag:([^\r\n]+)$/gm,
+      ),
+    ].map((match) => match[1].trim());
+
+    if (
+      iceCandidate.usernameFragment &&
+      remoteFragments.length > 0 &&
+      !remoteFragments.includes(iceCandidate.usernameFragment)
+    )
+      return;
+
+    try {
+      await peer.addIceCandidate(iceCandidate);
+    } catch (error) {
+      if (!(error instanceof DOMException) || error.name !== 'OperationError') {
+        throw error;
+      }
+      logCallWarning('peer-manager:drop-incompatible-ice-candidate', {});
+    }
+  }
+
+  private queue(peerIdentityId: string, candidate: RTCIceCandidateInit): void {
+    const candidates = this.pending.get(peerIdentityId) ?? [];
+
+    candidates.push(candidate);
+
+    if (candidates.length > MAX_PENDING_CANDIDATES) candidates.shift();
+    this.pending.set(peerIdentityId, candidates);
+    logCallDebug('peer-manager:queue-ice-candidate', {
+      candidateCount: candidates.length,
+      peerIdentityId,
+    });
+  }
+
   public async flush(
     peerIdentityId: string,
     peer: RTCPeerConnection,
@@ -94,46 +135,5 @@ export class CallIceCandidates {
               .includes(`a=ice-ufrag:${fragment}`) === true
           : !peer.localDescription?.sdp?.includes('a=ice-ufrag:')),
     );
-  }
-
-  private async apply(
-    peer: RTCPeerConnection,
-    candidate: RTCIceCandidateInit,
-  ): Promise<void> {
-    const iceCandidate = new RTCIceCandidate(candidate);
-    const remoteFragments = [
-      ...(peer.remoteDescription?.sdp ?? '').matchAll(
-        /^a=ice-ufrag:([^\r\n]+)$/gm,
-      ),
-    ].map((match) => match[1].trim());
-
-    if (
-      iceCandidate.usernameFragment &&
-      remoteFragments.length > 0 &&
-      !remoteFragments.includes(iceCandidate.usernameFragment)
-    )
-      return;
-
-    try {
-      await peer.addIceCandidate(iceCandidate);
-    } catch (error) {
-      if (!(error instanceof DOMException) || error.name !== 'OperationError') {
-        throw error;
-      }
-      logCallWarning('peer-manager:drop-incompatible-ice-candidate', {});
-    }
-  }
-
-  private queue(peerIdentityId: string, candidate: RTCIceCandidateInit): void {
-    const candidates = this.pending.get(peerIdentityId) ?? [];
-
-    candidates.push(candidate);
-
-    if (candidates.length > MAX_PENDING_CANDIDATES) candidates.shift();
-    this.pending.set(peerIdentityId, candidates);
-    logCallDebug('peer-manager:queue-ice-candidate', {
-      candidateCount: candidates.length,
-      peerIdentityId,
-    });
   }
 }

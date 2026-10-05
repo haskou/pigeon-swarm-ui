@@ -1,25 +1,17 @@
 export class CallSnapshotRecovery {
   private generation = 0;
-
   private readonly pending = new Map<string, Promise<void>>();
-
   private readonly delays = new Set<() => void>();
-
-  public reset(): void {
-    this.generation += 1;
-    for (const cancel of this.delays) cancel();
-    this.delays.clear();
-    this.pending.clear();
-  }
 
   private delay(milliseconds: number): Promise<void> {
     return new Promise((resolve) => {
+      const timer: { id?: ReturnType<typeof setTimeout> } = {};
       const complete = (): void => {
-        clearTimeout(timer);
+        clearTimeout(timer.id);
         this.delays.delete(complete);
         resolve();
       };
-      const timer = setTimeout(complete, milliseconds);
+      timer.id = setTimeout(complete, milliseconds);
       this.delays.add(complete);
     });
   }
@@ -47,6 +39,13 @@ export class CallSnapshotRecovery {
       await this.delay((attempt + 1) * 1000);
       await this.run(generation, load, apply, failed, attempt + 1);
     }
+  }
+
+  public reset(): void {
+    this.generation += 1;
+    for (const cancel of this.delays) cancel();
+    this.delays.clear();
+    this.pending.clear();
   }
 
   public request<T>(
