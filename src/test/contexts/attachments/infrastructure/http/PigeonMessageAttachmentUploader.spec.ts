@@ -52,8 +52,12 @@ function messageUploader(
     'prepare'
   > = new MessageAttachmentThumbnailPreparer(),
 ): PigeonMessageAttachmentUploader {
-  const privateFiles = new PigeonPrivateFilesClient(http, requestSigner);
-  const publicFiles = new PigeonPublicFilesClient(http, requestSigner);
+  const privateFiles = new PigeonPrivateFilesClient(http, requestSigner, {
+    register: jest.fn(),
+  });
+  const publicFiles = new PigeonPublicFilesClient(http, requestSigner, {
+    register: jest.fn(),
+  });
   const blobs = new PigeonAttachmentBlobUploader(
     new PigeonDirectAttachmentUploader(privateFiles, publicFiles),
     new PigeonChunkedAttachmentUploader(privateFiles, publicFiles),
@@ -68,7 +72,9 @@ function messageUploader(
 }
 
 describe(PigeonMessageAttachmentUploader.name, () => {
-  const session = { identity: { id: 'identity-1' } } as Session;
+  const session = {
+    identity: { id: 'identity-1', networks: [] },
+  } as unknown as Session;
 
   it('publishes small attachments publicly when small encryption is disabled', async () => {
     const file = new File(['hello'], 'hello.txt', { type: 'text/plain' });

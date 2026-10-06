@@ -13,7 +13,11 @@ describe(PigeonPrivateFilesClient.name, () => {
       size: 3,
     };
     const http = { request: jest.fn().mockResolvedValue(content) };
-    const client = new PigeonPrivateFilesClient(http, { headers: jest.fn() });
+    const client = new PigeonPrivateFilesClient(
+      http,
+      { headers: jest.fn() },
+      { register: jest.fn() },
+    );
 
     await expect(client.fetch('external/id')).resolves.toBe(content);
     expect(http.request).toHaveBeenCalledWith('/ipfs/external%2Fid');
@@ -33,7 +37,8 @@ describe(PigeonPrivateFilesClient.name, () => {
     const signer = {
       headers: jest.fn().mockResolvedValue({ 'X-Signature': 'signature' }),
     };
-    const client = new PigeonPrivateFilesClient(http, signer);
+    const replication = { register: jest.fn().mockResolvedValue(undefined) };
+    const client = new PigeonPrivateFilesClient(http, signer, replication);
 
     await expect(
       client.upload(session, 'private/network', bytes, 'attachment.bin'),
@@ -48,5 +53,11 @@ describe(PigeonPrivateFilesClient.name, () => {
       '/ipfs/private%2Fnetwork',
       expect.objectContaining({ body: bytes, method: 'POST' }),
     );
+    expect(replication.register).toHaveBeenCalledWith(session, {
+      cid: 'external-1',
+      context: 'ipfs_private_upload',
+      networkId: 'private/network',
+      sizeBytes: 3,
+    });
   });
 });
