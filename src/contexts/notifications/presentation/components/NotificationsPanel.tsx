@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import type {
   Community,
   CommunityMembershipRequest,
@@ -5,21 +7,19 @@ import type {
   IdentityResource,
   NotificationResource,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { NodeNetwork } from '../../../networks/presentation/view-models/NodeNetwork';
 import type {
   IdentityNames,
   IdentityPictures,
 } from '../../../identities/presentation/view-models/identityDisplay';
+import type { NodeNetwork } from '../../../networks/presentation/view-models/NodeNetwork';
 import type { NotificationAction } from './NotificationAction';
 
-import { useState } from 'react';
-
+import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { copy } from '../../../../shared/presentation/i18n/copy';
-import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
-import { identityDisplayName } from '../../../identities/presentation/view-models/identityDisplay';
 import { UserProfileDialog } from '../../../identities/presentation/components/UserProfileDialog';
+import { identityDisplayName } from '../../../identities/presentation/view-models/identityDisplay';
 import { MembershipRequestCard } from './MembershipRequestCard';
 import { NotificationCard } from './NotificationCard';
 
@@ -61,8 +61,8 @@ export function NotificationsPanel({
   membershipAction,
   membershipError,
   membershipRequests,
-  notifications,
   nodeNetworks,
+  notifications,
   onAccept,
   onAcceptMembershipRequest,
   onArchive,

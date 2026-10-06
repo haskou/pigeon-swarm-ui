@@ -46,8 +46,8 @@ export function useNotificationCommunityPreviews({
 
     void Promise.all(
       [...new Set(communityIds)].map((communityId) =>
-        applicationContainer
-          .communities.get(session, communityId)
+        applicationContainer.communities
+          .get(session, communityId)
           .then((community) => [communityId, community] as const)
           .catch(() => null),
       ),

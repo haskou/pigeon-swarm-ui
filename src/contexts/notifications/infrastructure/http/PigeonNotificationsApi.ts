@@ -12,11 +12,14 @@ import type { CachedGetRequest } from './CachedGetRequest';
 
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
+import { NotificationMutationSigner } from './NotificationMutationSigner';
 
 const startupReadCacheTtlMs = 1500;
 
 export class PigeonNotificationsApi {
   private readonly mutations = new PublicMutationSigner();
+
+  private readonly notificationMutations = new NotificationMutationSigner();
 
   public constructor(
     private readonly http: HttpJsonClient,
@@ -162,7 +165,14 @@ export class PigeonNotificationsApi {
     state: string,
   ): Promise<NotificationResource> {
     const path = `/notifications/${encodeURIComponent(notificationId)}`;
-    const body = { state };
+    const body = {
+      mutation: this.notificationMutations.state(
+        session,
+        notificationId,
+        state as 'accepted' | 'declined',
+      ),
+      state,
+    };
 
     return await this.http.request<NotificationResource>(path, {
       body: JSON.stringify(body),

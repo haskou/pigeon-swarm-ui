@@ -2,6 +2,6 @@ export type ConversationInvitationPayload = {
   conversationId: string;
   encryptedConversationKey: string;
   inviterIdentityId: string;
-  inviterSignature: string;
+  nonce: string;
   recipientIdentityId: string;
 };

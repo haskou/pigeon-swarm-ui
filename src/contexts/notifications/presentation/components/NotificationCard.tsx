@@ -8,10 +8,7 @@ import type {
 import type { NotificationAction } from './NotificationAction';
 
 import { cx } from '../../../../shared/presentation/cx';
-import {
-  formatTime,
-  shortId,
-} from '../../../../shared/presentation/formatting';
+import { shortId } from '../../../../shared/presentation/formatting';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
 import { IdentityMemberRow } from '../../../identities/presentation/components/IdentityMemberListPanel';
@@ -260,12 +257,6 @@ export function NotificationCard({
             </span>
           </div>
         ) : null}
-        <div className="mt-2 flex items-center justify-between gap-3">
-          <span>{copy.notifications.createdAt}</span>
-          <span className="font-semibold text-white/70">
-            {formatTime(notification.createdAt)}
-          </span>
-        </div>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">

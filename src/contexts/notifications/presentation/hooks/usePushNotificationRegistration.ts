@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrowserIdle';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
-import { copy } from '../../../../shared/presentation/i18n/copy';
 import {
   currentPwaNotificationPermission,
   ensurePwaPushSubscription,
