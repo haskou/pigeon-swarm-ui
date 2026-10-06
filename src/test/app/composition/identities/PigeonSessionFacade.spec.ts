@@ -15,6 +15,7 @@ describe(PigeonSessionFacade.name, () => {
     gateway.refreshSession.mockResolvedValue({
       conversations: [
         {
+          adminIds: [],
           id: 'older',
           latestMessageAt: 1,
           networkId: 'network-a',
@@ -23,6 +24,7 @@ describe(PigeonSessionFacade.name, () => {
           unreadCount: 0,
         },
         {
+          adminIds: [],
           id: 'newer',
           latestMessageAt: 2,
           networkId: 'network-a',

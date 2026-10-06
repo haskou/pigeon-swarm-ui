@@ -152,6 +152,7 @@ describe(resolveWorkspaceCallDetails.name, () => {
         communities: [],
         conversations: [
           {
+            adminIds: [],
             id: 'conversation-1',
             name: 'Study group',
             networkId: 'network-1',

@@ -56,6 +56,7 @@ export interface ChatColumnProps {
   onEditMessage: (content: string) => Promise<void>;
   onStickerSend: (sticker: StickerMessageReference) => Promise<void>;
   onConversationKeyImported: (keyEntry: ConversationKeyEntry) => Promise<void>;
+  onConversationsChanged: () => Promise<unknown>;
   onInvitationAccept?: (
     notification: ConversationInvitationNotificationResource,
   ) => void;

@@ -24,9 +24,7 @@ export class ConversationParticipants {
     );
   }
 
-  private constructor(
-    private readonly participants: ConversationParticipantId[],
-  ) {}
+  private constructor(private participants: ConversationParticipantId[]) {}
 
   public add(participantId: ConversationParticipantId): void {
     this.assertExcludes(participantId);
@@ -57,6 +55,13 @@ export class ConversationParticipants {
     participantId: ConversationParticipantId,
   ): ConversationParticipantId | undefined {
     return this.participants.find((candidate) =>
+      candidate.isNotEqual(participantId),
+    );
+  }
+
+  public remove(participantId: ConversationParticipantId): void {
+    this.assertIncludes(participantId);
+    this.participants = this.participants.filter((candidate) =>
       candidate.isNotEqual(participantId),
     );
   }

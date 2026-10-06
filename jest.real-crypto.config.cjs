@@ -15,6 +15,7 @@ module.exports = {
     '**/DevicePairingCompletion.spec.ts',
     '**/PigeonDeviceAuthorizationApi.spec.ts',
     '**/CommunityOperationSigner.spec.ts',
+    '**/ConversationOperationSigner.spec.ts',
   ],
   testPathIgnorePatterns: [],
   transform: {

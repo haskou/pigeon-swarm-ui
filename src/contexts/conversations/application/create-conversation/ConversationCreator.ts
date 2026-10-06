@@ -28,6 +28,7 @@ export class ConversationCreator {
       ConversationType.ONE_TO_ONE,
       ConversationName.fromOptional(),
       [actorIdentityId, peerIdentityId],
+      actorIdentityId,
       message.getOccurredAt(),
     );
 

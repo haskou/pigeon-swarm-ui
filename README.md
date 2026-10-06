@@ -94,6 +94,11 @@ The UI uses `@haskou/value-objects` for cryptographic value objects and signing
 primitives where possible. Private keys, passwords, decrypted keychains and
 decrypted conversation/community keys are not sent to the node.
 
+Conversation creation and group roster changes (add, remove, leave, promote and
+demote admin) are signed by the active device credential as conversation
+operations over the node's current frontier. Group ids are derived client-side
+from a creator-chosen nonce, and the node only verifies and replicates them.
+
 ## Backend Contract
 
 The UI expects a `pigeon-swarm-node` instance running locally at:

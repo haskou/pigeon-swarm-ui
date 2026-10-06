@@ -9,6 +9,7 @@ import { SidebarConversation } from '../../../../../app/presentation/workspace/c
 import { sessionFixture } from '../../../../contexts/conversations/ConversationFixture';
 
 const directConversation: ConversationResource = {
+  adminIds: [],
   id: 'one-to-one:a',
   networkId: 'network-a',
   participantIds: ['identity-a', 'identity-b'],

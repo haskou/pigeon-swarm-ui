@@ -24,6 +24,7 @@ import { PigeonCommunitiesGateway } from '../../contexts/communities/infrastruct
 import { PigeonCommunityInvitationApi } from '../../contexts/communities/infrastructure/http/PigeonCommunityInvitationApi';
 import { ConversationIdFactory } from '../../contexts/conversations/domain/ConversationIdFactory';
 import { ConversationMapper } from '../../contexts/conversations/infrastructure/http/ConversationMapper';
+import { ConversationOperationSigner } from '../../contexts/conversations/infrastructure/http/ConversationOperationSigner';
 import { PigeonConversationCommandsApi } from '../../contexts/conversations/infrastructure/http/PigeonConversationCommandsApi';
 import { PigeonConversationsApi } from '../../contexts/conversations/infrastructure/http/PigeonConversationsApi';
 import { PigeonConversationsGateway } from '../../contexts/conversations/infrastructure/http/PigeonConversationsGateway';
@@ -218,6 +219,7 @@ export class PigeonApiGateway {
       identityResourceGateway,
       keychainApi,
       this.requestCache,
+      new ConversationOperationSigner(),
     );
 
     this.conversationsGateway = new PigeonConversationsGateway(

@@ -13,6 +13,7 @@ import {
 } from '../../../../contexts/identities/presentation/view-models/profilePopoverAnchor';
 import { InvitationKeyPrompt } from '../../../../contexts/notifications/presentation/components/InvitationKeyPrompt';
 import { useDesktopInputFocus } from '../../../../shared/presentation/components/useDesktopInputFocus';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import { ChatColumnContent } from './ChatColumnContent';
 import { ChatColumnDialogs } from './ChatColumnDialogs';
 import { ChatConversationHeader } from './ChatConversationHeader';
@@ -21,6 +22,10 @@ import { ConversationActionsMenu } from './ConversationActionsMenu';
 import { useConversationKeyDialog } from './useConversationKeyDialog';
 import { useConversationPolls } from './useConversationPolls';
 import { useGroupInvitationDialog } from './useGroupInvitationDialog';
+import {
+  groupRosterPermissions,
+  useGroupRosterActions,
+} from './useGroupRosterActions';
 
 function withCurrentIdentityName(
   identityNames: Record<string, string>,
@@ -99,6 +104,7 @@ export function ChatColumn({
   onCancelEdit,
   onCancelReply,
   onConversationKeyImported,
+  onConversationsChanged,
   onCreate,
   onDraftChange,
   onEditMessage,
@@ -200,9 +206,19 @@ export function ChatColumn({
   const groupInvitationDialog = useGroupInvitationDialog({
     conversation: activeConversation,
     enabled: isGroupConversation,
+    onInvited: onConversationsChanged,
     request: groupInviteRequest,
     session,
   });
+  const groupRoster = useGroupRosterActions({
+    conversation: activeConversation,
+    onRosterChanged: onConversationsChanged,
+    session,
+  });
+  const rosterPermissions = useMemo(
+    () => groupRosterPermissions(activeConversation, session.identity.id),
+    [activeConversation, session.identity.id],
+  );
   const conversationPolls = useConversationPolls({
     conversation: activeConversation,
     realtimeEvent,
@@ -348,6 +364,15 @@ export function ChatColumn({
             onGroupInviteOpen={() => {
               groupInvitationDialog.show();
             }}
+            onGroupLeave={
+              rosterPermissions.canLeave
+                ? () => {
+                    if (!window.confirm(copy.chat.leaveGroupConfirm)) return;
+
+                    void groupRoster.leave();
+                  }
+                : undefined
+            }
             onNotificationMuteToggle={() =>
               onNotificationMuteToggle(notificationSetting.scope)
             }
@@ -420,6 +445,7 @@ export function ChatColumn({
         encryptionDetailsOpen={encryptionDetailsOpen}
         groupInvitationDialog={groupInvitationDialog}
         groupParticipants={groupParticipants}
+        groupRoster={groupRoster}
         groupProfileOpen={groupProfileOpen}
         networkId={conversationNetworkId}
         nodeNetworks={nodeNetworks}

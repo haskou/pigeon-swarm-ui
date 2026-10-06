@@ -8,8 +8,12 @@ import type { ConversationUseCases } from './ConversationUseCases';
 
 import { CreateConversationMessage } from '../../../contexts/conversations/application/create-conversation/messages/CreateConversationMessage';
 import { CreateGroupConversationMessage } from '../../../contexts/conversations/application/create-group-conversation/messages/CreateGroupConversationMessage';
+import { DemoteConversationAdminMessage } from '../../../contexts/conversations/application/demote-conversation-admin/messages/DemoteConversationAdminMessage';
 import { InviteConversationParticipantMessage } from '../../../contexts/conversations/application/invite-to-group-conversation/messages/InviteConversationParticipantMessage';
+import { LeaveConversationMessage } from '../../../contexts/conversations/application/leave-conversation/messages/LeaveConversationMessage';
 import { MarkConversationReadUntilMessage } from '../../../contexts/conversations/application/mark-conversation-read-until/messages/MarkConversationReadUntilMessage';
+import { PromoteConversationAdminMessage } from '../../../contexts/conversations/application/promote-conversation-admin/messages/PromoteConversationAdminMessage';
+import { RemoveConversationParticipantMessage } from '../../../contexts/conversations/application/remove-conversation-participant/messages/RemoveConversationParticipantMessage';
 import { SearchConversationsMessage } from '../../../contexts/conversations/application/search-conversations/messages/SearchConversationsMessage';
 import { ConversationParticipantId } from '../../../contexts/conversations/domain/value-objects/ConversationParticipantId';
 import { ConversationAccessContexts } from '../../../contexts/conversations/infrastructure/http/ConversationAccessContexts';
@@ -96,17 +100,51 @@ export class PigeonConversationsFacade {
     return this.creationResult(actorIdentityId, conversation);
   }
 
+  public async demoteAdmin(
+    session: Session,
+    conversationId: string,
+    identityId: string,
+  ): Promise<ConversationResource> {
+    return this.mapper.toResource(
+      await this.useCases.adminDemoter.demote(
+        new DemoteConversationAdminMessage(
+          conversationId,
+          identityId,
+          this.actor(session),
+          Date.now(),
+        ),
+      ),
+    );
+  }
+
   public async inviteToGroup(
     session: Session,
     conversationId: string,
     recipientIdentityId: string,
-  ): Promise<void> {
-    await this.useCases.participantInviter.invite(
-      new InviteConversationParticipantMessage(
-        conversationId,
-        recipientIdentityId,
-        this.actor(session),
-        Date.now(),
+  ): Promise<ConversationResource> {
+    return this.mapper.toResource(
+      await this.useCases.participantInviter.invite(
+        new InviteConversationParticipantMessage(
+          conversationId,
+          recipientIdentityId,
+          this.actor(session),
+          Date.now(),
+        ),
+      ),
+    );
+  }
+
+  public async leave(
+    session: Session,
+    conversationId: string,
+  ): Promise<ConversationResource> {
+    return this.mapper.toResource(
+      await this.useCases.leaver.leave(
+        new LeaveConversationMessage(
+          conversationId,
+          this.actor(session),
+          Date.now(),
+        ),
       ),
     );
   }
@@ -132,6 +170,40 @@ export class PigeonConversationsFacade {
         messageId,
         this.actor(session),
         Date.now(),
+      ),
+    );
+  }
+
+  public async promoteAdmin(
+    session: Session,
+    conversationId: string,
+    identityId: string,
+  ): Promise<ConversationResource> {
+    return this.mapper.toResource(
+      await this.useCases.adminPromoter.promote(
+        new PromoteConversationAdminMessage(
+          conversationId,
+          identityId,
+          this.actor(session),
+          Date.now(),
+        ),
+      ),
+    );
+  }
+
+  public async removeParticipant(
+    session: Session,
+    conversationId: string,
+    identityId: string,
+  ): Promise<ConversationResource> {
+    return this.mapper.toResource(
+      await this.useCases.participantRemover.remove(
+        new RemoveConversationParticipantMessage(
+          conversationId,
+          identityId,
+          this.actor(session),
+          Date.now(),
+        ),
       ),
     );
   }

@@ -290,6 +290,7 @@ export const en = {
     addPrivateKeyRequired: 'Paste an encrypted key package first.',
     addPrivateKeySaving: 'Updating keychain...',
     addPrivateKeyTitle: 'Add conversation key',
+    adminLabel: 'Admin',
     conversationDataTitle: 'Conversation data',
     conversationMenu: 'Open conversation menu',
     copyPrivateKey: 'Share private key',
@@ -301,6 +302,8 @@ export const en = {
     copyPrivateKeyUnavailable:
       'The peer identity is not loaded, so the key cannot be encrypted yet.',
     createConversation: 'New conversation',
+    creatorLabel: 'Creator',
+    demoteAdmin: 'Remove admin',
     directMessage: 'Direct message',
     e2eMissing: 'End-to-end encryption key is missing for this conversation.',
     e2eReady: 'End-to-end encryption is active for this conversation.',
@@ -315,6 +318,8 @@ export const en = {
     inviteGroupBody:
       'Send an encrypted group key invitation to another identity.',
     jumpToLatest: 'Jump to latest',
+    leaveGroup: 'Leave group',
+    leaveGroupConfirm: 'Leave this group?',
     loadingEvents: 'Loading events...',
     menu: 'Open sidebar',
     newMessage: 'New message',
@@ -322,6 +327,7 @@ export const en = {
     noConversation: 'No conversation',
     noConversationHint: 'Create a conversation to start',
     noMoreMessages: 'No more messages',
+    promoteAdmin: 'Make admin',
     publicChannel: 'Public channel messages are searchable plaintext.',
     realtimeConnected: 'Connected',
     realtimeEventsEmpty:
@@ -329,6 +335,9 @@ export const en = {
     realtimeEventsEyebrow: 'WebSocket',
     realtimeEventsTitle: 'WebSocket events',
     realtimeReconnecting: 'Reconnecting',
+    removeMember: 'Remove',
+    removeMemberConfirm: 'Remove this member from the group?',
+    rosterError: 'The group membership could not be updated.',
     sendInvite: 'Send invite',
     sentAlbum: 'Sent an album',
     sentFile: 'Sent a file',

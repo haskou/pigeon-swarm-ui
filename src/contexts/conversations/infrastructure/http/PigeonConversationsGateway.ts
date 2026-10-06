@@ -3,6 +3,7 @@ import type {
   LocalKeychain,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationTarget } from './ConversationTarget';
 import type { GroupConversationInput } from './GroupConversationInput';
 
 import { PigeonConversationCommandsApi } from './PigeonConversationCommandsApi';
@@ -37,17 +38,50 @@ export class PigeonConversationsGateway {
     return await this.commands.createGroup(session, input);
   }
 
-  public async inviteToGroupConversation(
+  public async addGroupMember(
+    session: Session,
+    target: ConversationTarget,
+    recipientIdentityId: string,
+  ): Promise<ConversationResource> {
+    return await this.commands.addMember(session, target, recipientIdentityId);
+  }
+
+  public async demoteGroupAdmin(
+    session: Session,
+    target: ConversationTarget,
+    identityId: string,
+  ): Promise<ConversationResource> {
+    return await this.commands.demoteAdmin(session, target, identityId);
+  }
+
+  public async leaveGroupConversation(
+    session: Session,
+    target: ConversationTarget,
+  ): Promise<ConversationResource> {
+    return await this.commands.leave(session, target);
+  }
+
+  public async promoteGroupAdmin(
+    session: Session,
+    target: ConversationTarget,
+    identityId: string,
+  ): Promise<ConversationResource> {
+    return await this.commands.promoteAdmin(session, target, identityId);
+  }
+
+  public async removeGroupMember(
+    session: Session,
+    target: ConversationTarget,
+    identityId: string,
+  ): Promise<ConversationResource> {
+    return await this.commands.removeMember(session, target, identityId);
+  }
+
+  public async conversationFrontier(
     session: Session,
     conversationId: string,
-    recipientIdentityId: string,
-  ): Promise<void> {
-    await this.commands.invite(
-      session,
-      conversationId,
-      recipientIdentityId,
-      'group_conversation_invitation',
-    );
+  ): Promise<string[]> {
+    return await this.commands.frontier(session, conversationId);
   }
 
   public async listConversations(

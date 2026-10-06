@@ -13,7 +13,17 @@ function session(): Session {
 
 function conversationsDouble(): {
   commands: jest.Mocked<
-    Pick<PigeonConversationCommandsApi, 'create' | 'createGroup' | 'invite'>
+    Pick<
+      PigeonConversationCommandsApi,
+      | 'addMember'
+      | 'create'
+      | 'createGroup'
+      | 'demoteAdmin'
+      | 'frontier'
+      | 'leave'
+      | 'promoteAdmin'
+      | 'removeMember'
+    >
   >;
   gateway: PigeonConversationsGateway;
   conversations: jest.Mocked<
@@ -25,11 +35,26 @@ function conversationsDouble(): {
     markReadUntil: jest.fn(),
   } as jest.Mocked<Pick<PigeonConversationsApi, 'list' | 'markReadUntil'>>;
   const commands = {
+    addMember: jest.fn(),
     create: jest.fn(),
     createGroup: jest.fn(),
-    invite: jest.fn(),
+    demoteAdmin: jest.fn(),
+    frontier: jest.fn(),
+    leave: jest.fn(),
+    promoteAdmin: jest.fn(),
+    removeMember: jest.fn(),
   } as jest.Mocked<
-    Pick<PigeonConversationCommandsApi, 'create' | 'createGroup' | 'invite'>
+    Pick<
+      PigeonConversationCommandsApi,
+      | 'addMember'
+      | 'create'
+      | 'createGroup'
+      | 'demoteAdmin'
+      | 'frontier'
+      | 'leave'
+      | 'promoteAdmin'
+      | 'removeMember'
+    >
   >;
 
   return {
@@ -62,16 +87,52 @@ describe(PigeonConversationsGateway.name, () => {
     );
   });
 
-  it('uses the group invitation contract when inviting a member', async () => {
+  it('delegates group creation with the client nonce', async () => {
     const { commands, gateway } = conversationsDouble();
+    const input = {
+      name: 'Friends',
+      networkId: 'network-1',
+      nonce: 'nonce-1',
+      participantIds: ['identity-2'],
+    };
 
-    await gateway.inviteToGroupConversation(session(), 'group-1', 'identity-2');
+    await gateway.createGroupConversation(session(), input);
 
-    expect(commands.invite).toHaveBeenCalledWith(
+    expect(commands.createGroup).toHaveBeenCalledWith(session(), input);
+  });
+
+  it('delegates every roster operation to the signed command API', async () => {
+    const { commands, gateway } = conversationsDouble();
+    const target = { id: 'group:1', networkId: 'network-1' };
+
+    await gateway.addGroupMember(session(), target, 'identity-2');
+    await gateway.removeGroupMember(session(), target, 'identity-2');
+    await gateway.leaveGroupConversation(session(), target);
+    await gateway.promoteGroupAdmin(session(), target, 'identity-2');
+    await gateway.demoteGroupAdmin(session(), target, 'identity-2');
+    await gateway.conversationFrontier(session(), 'group:1');
+
+    expect(commands.addMember).toHaveBeenCalledWith(
       session(),
-      'group-1',
+      target,
       'identity-2',
-      'group_conversation_invitation',
     );
+    expect(commands.removeMember).toHaveBeenCalledWith(
+      session(),
+      target,
+      'identity-2',
+    );
+    expect(commands.leave).toHaveBeenCalledWith(session(), target);
+    expect(commands.promoteAdmin).toHaveBeenCalledWith(
+      session(),
+      target,
+      'identity-2',
+    );
+    expect(commands.demoteAdmin).toHaveBeenCalledWith(
+      session(),
+      target,
+      'identity-2',
+    );
+    expect(commands.frontier).toHaveBeenCalledWith(session(), 'group:1');
   });
 });

@@ -99,6 +99,7 @@ function ConversationChatContent({
   notificationMuteToggle,
   notificationSettingsOpen,
   onConversationKeyImported,
+  onConversationsChanged,
   onCreateConversation,
   onOpenConversationWithIdentity,
   onRealtimeEventsOpen,
@@ -147,6 +148,7 @@ function ConversationChatContent({
         onCancelEdit={messageActions.cancelEdit}
         onCancelReply={messageActions.cancelReply}
         onConversationKeyImported={onConversationKeyImported}
+        onConversationsChanged={onConversationsChanged}
         onCreate={onCreateConversation}
         onDraftChange={updateActiveDraft}
         onEditMessage={messageActions.editMessage}

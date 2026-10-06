@@ -20,6 +20,7 @@ const message = (overrides: Partial<ChatMessage> = {}): ChatMessage => ({
 const conversation = (
   overrides: Partial<ConversationResource> = {},
 ): ConversationResource => ({
+  adminIds: [],
   id: 'conversation-1',
   latestMessageAt: 100,
   networkId: 'network-1',

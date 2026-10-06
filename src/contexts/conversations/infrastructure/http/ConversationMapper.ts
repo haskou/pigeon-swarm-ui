@@ -7,6 +7,12 @@ import { Conversation } from '../../domain/Conversation';
 const CONVERSATION_TYPES = ['group', 'one-to-one'];
 
 const INVALID_RULES: [string, (value: unknown) => boolean][] = [
+  [
+    'adminIds',
+    (value) =>
+      Array.isArray(value) && value.every((id) => typeof id === 'string'),
+  ],
+  ['creatorId', (value) => value === undefined || typeof value === 'string'],
   ['id', (value) => typeof value === 'string' && value !== ''],
   ['networkId', (value) => typeof value === 'string'],
   [
@@ -57,6 +63,7 @@ export class ConversationMapper {
   public fromPrimitives(resource: ConversationResource): Conversation {
     return Conversation.fromPrimitives({
       ...resource,
+      creatorId: resource.creatorId,
       latestMessageAt: resource.latestMessageAt,
       name: resource.name,
     });
@@ -66,6 +73,8 @@ export class ConversationMapper {
     const primitives: PrimitiveOf<Conversation> = conversation.toPrimitives();
 
     return {
+      adminIds: primitives.adminIds,
+      creatorId: primitives.creatorId,
       id: primitives.id,
       latestMessageAt: primitives.latestMessageAt,
       name: primitives.name,

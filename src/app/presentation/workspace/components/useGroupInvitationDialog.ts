@@ -25,11 +25,13 @@ export interface GroupInvitationDialogController {
 export function useGroupInvitationDialog({
   conversation,
   enabled,
+  onInvited,
   request,
   session,
 }: {
   conversation?: ConversationResource;
   enabled: boolean;
+  onInvited: () => Promise<unknown>;
   request: number;
   session: Session;
 }): GroupInvitationDialogController {
@@ -66,6 +68,7 @@ export function useGroupInvitationDialog({
           conversation.id,
           recipientIdentityId,
         );
+        await onInvited();
         setInput('');
         setOpen(false);
       } catch (caught) {
@@ -76,7 +79,7 @@ export function useGroupInvitationDialog({
         setLoading(false);
       }
     },
-    [conversation, input, loading, session],
+    [conversation, input, loading, onInvited, session],
   );
 
   return {

@@ -53,6 +53,7 @@ describe(ChatConversationPresentation.name, () => {
 
   it('projects direct conversation encryption details', () => {
     const conversation = {
+      adminIds: [],
       id: 'one-to-one:a',
       networkId: 'network-a',
       participantIds: ['identity-a', 'identity-b'],

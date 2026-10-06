@@ -1,3 +1,4 @@
+import type { Conversation } from '../../domain/Conversation';
 import type { ConversationRepository } from '../../domain/repositories/ConversationRepository';
 
 import { InviteConversationParticipantMessage } from './messages/InviteConversationParticipantMessage';
@@ -9,15 +10,20 @@ export class ConversationParticipantInviter {
 
   public async invite(
     message: InviteConversationParticipantMessage,
-  ): Promise<void> {
+  ): Promise<Conversation> {
     const conversation = await this.conversationRepository.find(
       message.getConversationId(),
       message.getActorIdentityId(),
     );
     const recipientIdentityId = message.getRecipientIdentityId();
 
-    conversation.invite(recipientIdentityId, message.getOccurredAt());
-    await this.conversationRepository.invite(
+    conversation.invite(
+      recipientIdentityId,
+      message.getActorIdentityId(),
+      message.getOccurredAt(),
+    );
+
+    return await this.conversationRepository.invite(
       conversation,
       recipientIdentityId,
       message.getActorIdentityId(),

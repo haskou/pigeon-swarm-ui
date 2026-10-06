@@ -1,6 +1,7 @@
 import { ConversationTimeline } from '../../../../../contexts/conversations/presentation/view-models/ConversationTimeline';
 
 const base = {
+  adminIds: [],
   participantIds: ['identity-a'],
   type: 'one-to-one' as const,
   unreadCount: 0,

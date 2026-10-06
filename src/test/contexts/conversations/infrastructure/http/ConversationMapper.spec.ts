@@ -1,6 +1,7 @@
 import { ConversationMapper } from '../../../../../contexts/conversations/infrastructure/http/ConversationMapper';
 
 const group = {
+  adminIds: [],
   id: 'group:a',
   name: 'Friends',
   networkId: 'network-a',

@@ -8,6 +8,8 @@ export function conversationFixture(
   const type = overrides.type ?? 'one-to-one';
 
   return Conversation.fromPrimitives({
+    adminIds: [],
+    creatorId: 'identity-a',
     id: type === 'group' ? 'group:a' : 'one-to-one:a',
     latestMessageAt: 100,
     name: type === 'group' ? 'Friends' : undefined,
