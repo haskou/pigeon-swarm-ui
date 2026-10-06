@@ -8,7 +8,9 @@ export class ConversationParticipantRemover {
     private readonly conversationRepository: ConversationRepository,
   ) {}
 
-  public async remove(message: RemoveConversationParticipantMessage): Promise<Conversation> {
+  public async remove(
+    message: RemoveConversationParticipantMessage,
+  ): Promise<Conversation> {
     const conversation = await this.conversationRepository.find(
       message.getConversationId(),
       message.getActorIdentityId(),

@@ -8,16 +8,16 @@ import { GroupConversationCreator } from '../../../../contexts/conversations/app
 import { CreateGroupConversationMessage } from '../../../../contexts/conversations/application/create-group-conversation/messages/CreateGroupConversationMessage';
 import { ConversationAdminDemoter } from '../../../../contexts/conversations/application/demote-conversation-admin/ConversationAdminDemoter';
 import { DemoteConversationAdminMessage } from '../../../../contexts/conversations/application/demote-conversation-admin/messages/DemoteConversationAdminMessage';
+import { ConversationParticipantInviter } from '../../../../contexts/conversations/application/invite-to-group-conversation/ConversationParticipantInviter';
+import { InviteConversationParticipantMessage } from '../../../../contexts/conversations/application/invite-to-group-conversation/messages/InviteConversationParticipantMessage';
 import { ConversationLeaver } from '../../../../contexts/conversations/application/leave-conversation/ConversationLeaver';
 import { LeaveConversationMessage } from '../../../../contexts/conversations/application/leave-conversation/messages/LeaveConversationMessage';
+import { ConversationReadMarker } from '../../../../contexts/conversations/application/mark-conversation-read-until/ConversationReadMarker';
+import { MarkConversationReadUntilMessage } from '../../../../contexts/conversations/application/mark-conversation-read-until/messages/MarkConversationReadUntilMessage';
 import { ConversationAdminPromoter } from '../../../../contexts/conversations/application/promote-conversation-admin/ConversationAdminPromoter';
 import { PromoteConversationAdminMessage } from '../../../../contexts/conversations/application/promote-conversation-admin/messages/PromoteConversationAdminMessage';
 import { ConversationParticipantRemover } from '../../../../contexts/conversations/application/remove-conversation-participant/ConversationParticipantRemover';
 import { RemoveConversationParticipantMessage } from '../../../../contexts/conversations/application/remove-conversation-participant/messages/RemoveConversationParticipantMessage';
-import { ConversationParticipantInviter } from '../../../../contexts/conversations/application/invite-to-group-conversation/ConversationParticipantInviter';
-import { InviteConversationParticipantMessage } from '../../../../contexts/conversations/application/invite-to-group-conversation/messages/InviteConversationParticipantMessage';
-import { ConversationReadMarker } from '../../../../contexts/conversations/application/mark-conversation-read-until/ConversationReadMarker';
-import { MarkConversationReadUntilMessage } from '../../../../contexts/conversations/application/mark-conversation-read-until/messages/MarkConversationReadUntilMessage';
 import { ConversationsSearcher } from '../../../../contexts/conversations/application/search-conversations/ConversationsSearcher';
 import { SearchConversationsMessage } from '../../../../contexts/conversations/application/search-conversations/messages/SearchConversationsMessage';
 import { Conversation } from '../../../../contexts/conversations/domain/Conversation';
@@ -30,12 +30,12 @@ function conversation(
   unreadCount = 0,
 ): Conversation {
   return Conversation.fromPrimitives({
+    adminIds: [],
+    creatorId: 'identity-a',
     id,
     latestMessageAt,
     name: type === 'group' ? 'Friends' : undefined,
     networkId: 'network-a',
-    adminIds: [],
-    creatorId: 'identity-a',
     participantIds: ['identity-a', 'identity-b'],
     type,
     unreadCount,

@@ -23,8 +23,8 @@ import { PigeonCommunitiesApi } from '../../contexts/communities/infrastructure/
 import { PigeonCommunitiesGateway } from '../../contexts/communities/infrastructure/http/PigeonCommunitiesGateway';
 import { PigeonCommunityInvitationApi } from '../../contexts/communities/infrastructure/http/PigeonCommunityInvitationApi';
 import { ConversationIdFactory } from '../../contexts/conversations/domain/ConversationIdFactory';
-import { ConversationOperationSigner } from '../../contexts/conversations/infrastructure/http/ConversationOperationSigner';
 import { ConversationMapper } from '../../contexts/conversations/infrastructure/http/ConversationMapper';
+import { ConversationOperationSigner } from '../../contexts/conversations/infrastructure/http/ConversationOperationSigner';
 import { PigeonConversationCommandsApi } from '../../contexts/conversations/infrastructure/http/PigeonConversationCommandsApi';
 import { PigeonConversationsApi } from '../../contexts/conversations/infrastructure/http/PigeonConversationsApi';
 import { PigeonConversationsGateway } from '../../contexts/conversations/infrastructure/http/PigeonConversationsGateway';

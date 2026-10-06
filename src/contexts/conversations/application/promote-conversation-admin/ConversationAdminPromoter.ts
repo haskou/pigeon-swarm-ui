@@ -8,7 +8,9 @@ export class ConversationAdminPromoter {
     private readonly conversationRepository: ConversationRepository,
   ) {}
 
-  public async promote(message: PromoteConversationAdminMessage): Promise<Conversation> {
+  public async promote(
+    message: PromoteConversationAdminMessage,
+  ): Promise<Conversation> {
     const conversation = await this.conversationRepository.find(
       message.getConversationId(),
       message.getActorIdentityId(),

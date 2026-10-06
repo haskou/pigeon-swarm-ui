@@ -34,9 +34,9 @@ describe(PigeonConversationRepository.name, () => {
   it('creates a direct conversation and keeps the published keychain', async () => {
     gateway.createConversation.mockResolvedValue({
       conversation: {
+        adminIds: [],
         id: 'one-to-one:a',
         networkId: 'network-a',
-        adminIds: [],
         participantIds: ['identity-a', 'identity-b'],
         type: 'one-to-one',
         unreadCount: 0,
@@ -47,12 +47,12 @@ describe(PigeonConversationRepository.name, () => {
 
     await repository.create(
       Conversation.fromPrimitives({
+        adminIds: [],
+        creatorId: 'identity-a',
         id: 'one-to-one:a',
         latestMessageAt: 0,
         name: undefined,
         networkId: 'network-a',
-        adminIds: [],
-        creatorId: 'identity-a',
         participantIds: ['identity-a', 'identity-b'],
         type: 'one-to-one',
         unreadCount: 0,
@@ -69,10 +69,10 @@ describe(PigeonConversationRepository.name, () => {
   it('searches and maps conversations without reloading known activity', async () => {
     gateway.listConversations.mockResolvedValue([
       {
+        adminIds: [],
         id: 'one-to-one:a',
         latestMessageAt: 100,
         networkId: 'network-a',
-        adminIds: [],
         participantIds: ['identity-a', 'identity-b'],
         type: 'one-to-one',
         unreadCount: 0,

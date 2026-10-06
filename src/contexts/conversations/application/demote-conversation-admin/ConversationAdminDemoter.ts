@@ -8,7 +8,9 @@ export class ConversationAdminDemoter {
     private readonly conversationRepository: ConversationRepository,
   ) {}
 
-  public async demote(message: DemoteConversationAdminMessage): Promise<Conversation> {
+  public async demote(
+    message: DemoteConversationAdminMessage,
+  ): Promise<Conversation> {
     const conversation = await this.conversationRepository.find(
       message.getConversationId(),
       message.getActorIdentityId(),

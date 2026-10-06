@@ -179,8 +179,16 @@ describe(Conversation.name, () => {
         false,
       );
 
-      group.promote(member('identity-c'), member('identity-a'), new Timestamp(1));
-      group.demote(member('identity-b'), member('identity-a'), new Timestamp(2));
+      group.promote(
+        member('identity-c'),
+        member('identity-a'),
+        new Timestamp(1),
+      );
+      group.demote(
+        member('identity-b'),
+        member('identity-a'),
+        new Timestamp(2),
+      );
 
       expect(group.toPrimitives().adminIds).toEqual(['identity-c']);
     });

@@ -19,11 +19,7 @@ export class GroupConversationCreator {
     const networkId = message.getNetworkId();
     const nonce = ConversationGroupNonce.generate();
     const conversation = Conversation.create(
-      this.conversationIdFactory.createGroup(
-        actorIdentityId,
-        networkId,
-        nonce,
-      ),
+      this.conversationIdFactory.createGroup(actorIdentityId, networkId, nonce),
       networkId,
       ConversationType.GROUP,
       message.getName(),

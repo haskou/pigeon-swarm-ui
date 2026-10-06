@@ -1,10 +1,10 @@
 import { mock, type MockProxy } from 'jest-mock-extended';
 
+import type { ConversationOperationBody } from '../../../../../contexts/conversations/infrastructure/http/ConversationOperationBody';
 import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestCache } from '../../../../../shared/infrastructure/http/RequestCache';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
-import type { ConversationOperationBody } from '../../../../../contexts/conversations/infrastructure/http/ConversationOperationBody';
 
 import { ConversationIdFactory } from '../../../../../contexts/conversations/domain/ConversationIdFactory';
 import { ConversationMapper } from '../../../../../contexts/conversations/infrastructure/http/ConversationMapper';
@@ -44,8 +44,10 @@ describe(PigeonConversationCommandsApi.name, () => {
     requestSigner = mock<RequestSigner>();
     requestSigner.headers.mockResolvedValue({ 'x-signature': 'sig' });
     operations.sign.mockReturnValue(operation);
-    http.request.mockImplementation(async (path: string) =>
-      path.endsWith('/frontier') ? { frontier: ['parent-1'] } : resource,
+    http.request.mockImplementation((path: string) =>
+      Promise.resolve(
+        path.endsWith('/frontier') ? { frontier: ['parent-1'] } : resource,
+      ),
     );
     api = new PigeonConversationCommandsApi(
       http,
@@ -60,9 +62,9 @@ describe(PigeonConversationCommandsApi.name, () => {
   });
 
   it('rejects invitations when the conversation key is not available', async () => {
-    await expect(
-      api.addMember(session, target, 'identity-2'),
-    ).rejects.toThrow('Conversation key is required.');
+    await expect(api.addMember(session, target, 'identity-2')).rejects.toThrow(
+      'Conversation key is required.',
+    );
     expect(http.request).not.toHaveBeenCalled();
   });
 
@@ -110,29 +112,32 @@ describe(PigeonConversationCommandsApi.name, () => {
       '/conversations/group%3Aabc/admins/identity-2',
       (): Promise<unknown> => api.demoteAdmin(session, target, 'identity-2'),
     ],
-  ])('%s with a signed operation on the current frontier', async (_name, action, args, method, path, run) => {
-    await expect(run()).resolves.toEqual(resource);
+  ])(
+    '%s with a signed operation on the current frontier',
+    async (_name, action, args, method, path, run) => {
+      await expect(run()).resolves.toEqual(resource);
 
-    expect(operations.sign).toHaveBeenCalledWith(
-      session,
-      expect.objectContaining({
-        action,
-        args,
-        conversationId: 'group:abc',
-        networkId: 'network-1',
-        parents: ['parent-1'],
-      }),
-    );
-    expect(http.request).toHaveBeenLastCalledWith(path, {
-      body: JSON.stringify({ operation }),
-      headers: { 'x-signature': 'sig' },
-      method,
-    });
-    expect(requestSigner.headers).toHaveBeenLastCalledWith(
-      session,
-      method,
-      path,
-      { operation },
-    );
-  });
+      expect(operations.sign).toHaveBeenCalledWith(
+        session,
+        expect.objectContaining({
+          action,
+          args,
+          conversationId: 'group:abc',
+          networkId: 'network-1',
+          parents: ['parent-1'],
+        }),
+      );
+      expect(http.request).toHaveBeenLastCalledWith(path, {
+        body: JSON.stringify({ operation }),
+        headers: { 'x-signature': 'sig' },
+        method,
+      });
+      expect(requestSigner.headers).toHaveBeenLastCalledWith(
+        session,
+        method,
+        path,
+        { operation },
+      );
+    },
+  );
 });

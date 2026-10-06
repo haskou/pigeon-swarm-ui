@@ -4,7 +4,6 @@ import { ConversationIdFactory } from '../../../../contexts/conversations/domain
 import { ConversationGroupNonce } from '../../../../contexts/conversations/domain/value-objects/ConversationGroupNonce';
 import { ConversationNetworkId } from '../../../../contexts/conversations/domain/value-objects/ConversationNetworkId';
 import { ConversationParticipantId } from '../../../../contexts/conversations/domain/value-objects/ConversationParticipantId';
-
 import vectors from '../../../fixtures/conversation-operation-vectors.json';
 
 const participant = ConversationParticipantId.fromString;

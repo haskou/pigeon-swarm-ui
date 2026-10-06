@@ -12,10 +12,7 @@ const INVALID_RULES: [string, (value: unknown) => boolean][] = [
     (value) =>
       Array.isArray(value) && value.every((id) => typeof id === 'string'),
   ],
-  [
-    'creatorId',
-    (value) => value === undefined || typeof value === 'string',
-  ],
+  ['creatorId', (value) => value === undefined || typeof value === 'string'],
   ['id', (value) => typeof value === 'string' && value !== ''],
   ['networkId', (value) => typeof value === 'string'],
   [

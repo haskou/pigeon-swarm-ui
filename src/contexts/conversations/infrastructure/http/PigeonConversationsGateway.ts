@@ -43,11 +43,7 @@ export class PigeonConversationsGateway {
     target: ConversationTarget,
     recipientIdentityId: string,
   ): Promise<ConversationResource> {
-    return await this.commands.addMember(
-      session,
-      target,
-      recipientIdentityId,
-    );
+    return await this.commands.addMember(session, target, recipientIdentityId);
   }
 
   public async demoteGroupAdmin(
