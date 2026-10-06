@@ -27,6 +27,10 @@ import { CommunityRoleUpdater } from '../../contexts/communities/application/upd
 import { CommunityAccessContexts } from '../../contexts/communities/infrastructure/http/CommunityAccessContexts';
 import { CommunityMapper } from '../../contexts/communities/infrastructure/http/CommunityMapper';
 import { PigeonCommunityRepository } from '../../contexts/communities/infrastructure/http/PigeonCommunityRepository';
+import { ConversationAdminDemoter } from '../../contexts/conversations/application/demote-conversation-admin/ConversationAdminDemoter';
+import { ConversationLeaver } from '../../contexts/conversations/application/leave-conversation/ConversationLeaver';
+import { ConversationAdminPromoter } from '../../contexts/conversations/application/promote-conversation-admin/ConversationAdminPromoter';
+import { ConversationParticipantRemover } from '../../contexts/conversations/application/remove-conversation-participant/ConversationParticipantRemover';
 import { ConversationCreator } from '../../contexts/conversations/application/create-conversation/ConversationCreator';
 import { GroupConversationCreator } from '../../contexts/conversations/application/create-group-conversation/GroupConversationCreator';
 import { ConversationParticipantInviter } from '../../contexts/conversations/application/invite-to-group-conversation/ConversationParticipantInviter';
@@ -271,6 +275,8 @@ export class PigeonApplication {
       conversationContexts,
       conversationMapper,
       {
+        adminDemoter: new ConversationAdminDemoter(conversationRepository),
+        adminPromoter: new ConversationAdminPromoter(conversationRepository),
         creator: new ConversationCreator(
           conversationRepository,
           new ConversationIdFactory(),
@@ -279,7 +285,11 @@ export class PigeonApplication {
           conversationRepository,
           new ConversationIdFactory(),
         ),
+        leaver: new ConversationLeaver(conversationRepository),
         participantInviter: new ConversationParticipantInviter(
+          conversationRepository,
+        ),
+        participantRemover: new ConversationParticipantRemover(
           conversationRepository,
         ),
         readMarker: new ConversationReadMarker(conversationRepository),

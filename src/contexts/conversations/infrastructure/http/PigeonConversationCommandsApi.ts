@@ -16,10 +16,14 @@ import type { ConversationIdentityReader } from './ConversationIdentityReader';
 import type { ConversationInvitationType } from './ConversationInvitationType';
 import type { ConversationKeychainPublisher } from './ConversationKeychainPublisher';
 import type { ConversationMapper } from './ConversationMapper';
+import type { ConversationOperationBody } from './ConversationOperationBody';
+import type { ConversationOperationSigner } from './ConversationOperationSigner';
+import type { ConversationTarget } from './ConversationTarget';
 import type { GroupConversationInput } from './GroupConversationInput';
 
 import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
+import { ConversationGroupNonce } from '../../domain/value-objects/ConversationGroupNonce';
 import { ConversationNetworkId } from '../../domain/value-objects/ConversationNetworkId';
 import { ConversationParticipantId } from '../../domain/value-objects/ConversationParticipantId';
 
@@ -32,6 +36,7 @@ export class PigeonConversationCommandsApi {
     private readonly identities: ConversationIdentityReader,
     private readonly keychains: ConversationKeychainPublisher,
     private readonly requestCache: RequestCache,
+    private readonly operations: ConversationOperationSigner,
   ) {}
 
   private async createInvitation(
@@ -141,19 +146,12 @@ export class PigeonConversationCommandsApi {
 
   private async postConversation(
     session: Session,
-    peerIdentityId: string,
     published: {
       keychain: LocalKeychain;
       keychainExternalIdentifier: string;
     },
-    networkId: string,
+    body: Record<string, unknown>,
   ): Promise<ConversationResource> {
-    const body = {
-      keychainExternalIdentifier: published.keychainExternalIdentifier,
-      networkId,
-      participantIds: [session.identity.id, peerIdentityId].sort(),
-      type: 'one-to-one',
-    };
     const path = '/conversations';
     const created = await this.http.request<unknown>(path, {
       body: JSON.stringify(body),
@@ -174,31 +172,60 @@ export class PigeonConversationCommandsApi {
     return this.conversations.resource(created);
   }
 
-  private async postGroupConversation(
+  /** Signs an operation on top of the frontier the node holds right now. */
+  private async signOperation(
     session: Session,
-    input: {
-      keychainExternalIdentifier: null | string;
-      name: string;
-      networkId: string;
-      participantIds: string[];
+    target: ConversationTarget,
+    action: string,
+    args: Record<string, unknown>,
+  ): Promise<ConversationOperationBody> {
+    return this.operations.sign(session, {
+      action,
+      args,
+      conversationId: target.id,
+      createdAt: Date.now(),
+      networkId: target.networkId,
+      parents: await this.frontier(session, target.id),
+    });
+  }
+
+  private async sendRosterChange(
+    session: Session,
+    target: ConversationTarget,
+    change: {
+      action: string;
+      args: Record<string, unknown>;
+      body?: Record<string, unknown>;
+      method: 'DELETE' | 'POST' | 'PUT';
+      path: string;
     },
   ): Promise<ConversationResource> {
     const body = {
-      keychainExternalIdentifier: input.keychainExternalIdentifier,
-      name: input.name,
-      networkId: input.networkId,
-      participantIds: input.participantIds,
-      type: 'group',
+      ...change.body,
+      operation: await this.signOperation(
+        session,
+        target,
+        change.action,
+        change.args,
+      ),
     };
-    const path = '/conversations';
-    const created = await this.http.request<unknown>(path, {
+    const updated = await this.http.request<unknown>(change.path, {
       body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
+      headers: await this.signer.headers(
+        session,
+        change.method,
+        change.path,
+        body,
+      ),
+      method: change.method,
     });
     this.requestCache.invalidateForSession('/conversations/?limit=30', session);
 
-    return this.conversations.resource(created);
+    return this.conversations.resource(updated);
+  }
+
+  private memberPath(conversationId: string, suffix: string): string {
+    return `/conversations/${encodeURIComponent(conversationId)}/${suffix}`;
   }
 
   public async create(
@@ -220,12 +247,23 @@ export class PigeonConversationCommandsApi {
       session,
       this.withConversationKey(session.keychain, keyEntry),
     );
-    const conversation = await this.postConversation(
-      session,
-      peerIdentity.id,
-      published,
+    const conversation = await this.postConversation(session, published, {
+      keychainExternalIdentifier: published.keychainExternalIdentifier,
       networkId,
-    );
+      operation: this.operations.sign(session, {
+        action: 'conversation_created',
+        args: {
+          participantIds: [session.identity.id, peerIdentity.id].sort(),
+          type: 'one-to-one',
+        },
+        conversationId: keyEntry.conversationId,
+        createdAt: Date.now(),
+        networkId,
+        parents: [],
+      }),
+      participantIds: [session.identity.id, peerIdentity.id].sort(),
+      type: 'one-to-one',
+    });
     const serverKeyEntry = { ...keyEntry, conversationId: conversation.id };
 
     await this.createInvitation(session, peerIdentity, serverKeyEntry);
@@ -253,17 +291,35 @@ export class PigeonConversationCommandsApi {
       .filter(Boolean)
       .filter((id, index, values) => values.indexOf(id) === index)
       .sort();
-    const conversation = await this.postGroupConversation(session, {
-      keychainExternalIdentifier: session.keychainExternalIdentifier ?? null,
-      name: input.name.trim(),
-      networkId: input.networkId,
-      participantIds,
-    });
-    const keyEntry = this.createGroupConversationKeyEntry(conversation.id);
+    const name = input.name.trim();
+    const conversationId = this.ids
+      .createGroup(
+        ConversationParticipantId.fromString(session.identity.id),
+        ConversationNetworkId.fromString(input.networkId),
+        ConversationGroupNonce.fromString(input.nonce),
+      )
+      .toString();
+    const keyEntry = this.createGroupConversationKeyEntry(conversationId);
     const published = await this.keychains.publishKeychain(
       session,
       this.withConversationKey(session.keychain, keyEntry),
     );
+    const conversation = await this.postConversation(session, published, {
+      keychainExternalIdentifier: published.keychainExternalIdentifier,
+      name,
+      networkId: input.networkId,
+      nonce: input.nonce,
+      operation: this.operations.sign(session, {
+        action: 'conversation_created',
+        args: { name, nonce: input.nonce, participantIds, type: 'group' },
+        conversationId,
+        createdAt: Date.now(),
+        networkId: input.networkId,
+        parents: [],
+      }),
+      participantIds,
+      type: 'group',
+    });
     const invitedIdentities = await Promise.all(
       participantIds
         .filter((identityId) => identityId !== session.identity.id)
@@ -288,25 +344,107 @@ export class PigeonConversationCommandsApi {
     };
   }
 
-  public async invite(
+  /** Signs `member_added`, then hands the new member the conversation key. */
+  public async addMember(
     session: Session,
-    conversationId: string,
+    target: ConversationTarget,
     recipientIdentityId: string,
-    invitationType: ConversationInvitationType = 'conversation_invitation',
-  ): Promise<void> {
-    const keyEntry = session.keychain.conversations[conversationId];
+  ): Promise<ConversationResource> {
+    const keyEntry = session.keychain.conversations[target.id];
 
     if (!keyEntry) throw new Error('Conversation key is required.');
 
     const recipientIdentity = await this.identities.get(
       recipientIdentityId.trim(),
     );
+    const conversation = await this.sendRosterChange(session, target, {
+      action: 'member_added',
+      args: { identityId: recipientIdentity.id },
+      body: { identityId: recipientIdentity.id },
+      method: 'POST',
+      path: this.memberPath(target.id, 'members'),
+    });
 
     await this.createInvitation(
       session,
       recipientIdentity,
       keyEntry,
-      invitationType,
+      'group_conversation_invitation',
     );
+
+    return conversation;
+  }
+
+  public async demoteAdmin(
+    session: Session,
+    target: ConversationTarget,
+    identityId: string,
+  ): Promise<ConversationResource> {
+    return await this.sendRosterChange(session, target, {
+      action: 'admin_demoted',
+      args: { identityId },
+      method: 'DELETE',
+      path: this.memberPath(
+        target.id,
+        `admins/${encodeURIComponent(identityId)}`,
+      ),
+    });
+  }
+
+  public async frontier(
+    session: Session,
+    conversationId: string,
+  ): Promise<string[]> {
+    const path = this.memberPath(conversationId, 'frontier');
+    const result = await this.http.request<{ frontier: string[] }>(path, {
+      headers: await this.signer.headers(session, 'GET', path),
+      method: 'GET',
+    });
+
+    return result.frontier;
+  }
+
+  public async leave(
+    session: Session,
+    target: ConversationTarget,
+  ): Promise<ConversationResource> {
+    return await this.sendRosterChange(session, target, {
+      action: 'member_left',
+      args: {},
+      method: 'DELETE',
+      path: this.memberPath(target.id, 'members/me'),
+    });
+  }
+
+  public async promoteAdmin(
+    session: Session,
+    target: ConversationTarget,
+    identityId: string,
+  ): Promise<ConversationResource> {
+    return await this.sendRosterChange(session, target, {
+      action: 'admin_promoted',
+      args: { identityId },
+      method: 'PUT',
+      path: this.memberPath(
+        target.id,
+        `admins/${encodeURIComponent(identityId)}`,
+      ),
+    });
+  }
+
+  public async removeMember(
+    session: Session,
+    target: ConversationTarget,
+    identityId: string,
+  ): Promise<ConversationResource> {
+    return await this.sendRosterChange(session, target, {
+      action: 'member_removed',
+      args: { identityId },
+      method: 'DELETE',
+      path: this.memberPath(
+        target.id,
+        `members/${encodeURIComponent(identityId)}`,
+      ),
+    });
   }
 }

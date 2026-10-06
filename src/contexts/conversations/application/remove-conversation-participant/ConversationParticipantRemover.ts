@@ -1,31 +1,28 @@
 import type { Conversation } from '../../domain/Conversation';
 import type { ConversationRepository } from '../../domain/repositories/ConversationRepository';
 
-import { InviteConversationParticipantMessage } from './messages/InviteConversationParticipantMessage';
+import { RemoveConversationParticipantMessage } from './messages/RemoveConversationParticipantMessage';
 
-export class ConversationParticipantInviter {
+export class ConversationParticipantRemover {
   public constructor(
     private readonly conversationRepository: ConversationRepository,
   ) {}
 
-  public async invite(
-    message: InviteConversationParticipantMessage,
-  ): Promise<Conversation> {
+  public async remove(message: RemoveConversationParticipantMessage): Promise<Conversation> {
     const conversation = await this.conversationRepository.find(
       message.getConversationId(),
       message.getActorIdentityId(),
     );
-    const recipientIdentityId = message.getRecipientIdentityId();
 
-    conversation.invite(
-      recipientIdentityId,
+    conversation.removeParticipant(
+      message.getTargetIdentityId(),
       message.getActorIdentityId(),
       message.getOccurredAt(),
     );
 
-    return await this.conversationRepository.invite(
+    return await this.conversationRepository.removeParticipant(
       conversation,
-      recipientIdentityId,
+      message.getTargetIdentityId(),
       message.getActorIdentityId(),
     );
   }

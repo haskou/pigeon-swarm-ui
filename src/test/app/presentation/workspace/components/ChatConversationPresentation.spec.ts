@@ -55,6 +55,7 @@ describe(ChatConversationPresentation.name, () => {
     const conversation = {
       id: 'one-to-one:a',
       networkId: 'network-a',
+      adminIds: [],
       participantIds: ['identity-a', 'identity-b'],
       type: 'one-to-one',
       unreadCount: 0,

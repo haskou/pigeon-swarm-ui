@@ -11,6 +11,7 @@ import { sessionFixture } from '../../../../contexts/conversations/ConversationF
 const directConversation: ConversationResource = {
   id: 'one-to-one:a',
   networkId: 'network-a',
+  adminIds: [],
   participantIds: ['identity-a', 'identity-b'],
   type: 'one-to-one',
   unreadCount: 0,

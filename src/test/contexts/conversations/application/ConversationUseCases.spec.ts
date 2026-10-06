@@ -6,6 +6,14 @@ import { ConversationCreator } from '../../../../contexts/conversations/applicat
 import { CreateConversationMessage } from '../../../../contexts/conversations/application/create-conversation/messages/CreateConversationMessage';
 import { GroupConversationCreator } from '../../../../contexts/conversations/application/create-group-conversation/GroupConversationCreator';
 import { CreateGroupConversationMessage } from '../../../../contexts/conversations/application/create-group-conversation/messages/CreateGroupConversationMessage';
+import { ConversationAdminDemoter } from '../../../../contexts/conversations/application/demote-conversation-admin/ConversationAdminDemoter';
+import { DemoteConversationAdminMessage } from '../../../../contexts/conversations/application/demote-conversation-admin/messages/DemoteConversationAdminMessage';
+import { ConversationLeaver } from '../../../../contexts/conversations/application/leave-conversation/ConversationLeaver';
+import { LeaveConversationMessage } from '../../../../contexts/conversations/application/leave-conversation/messages/LeaveConversationMessage';
+import { ConversationAdminPromoter } from '../../../../contexts/conversations/application/promote-conversation-admin/ConversationAdminPromoter';
+import { PromoteConversationAdminMessage } from '../../../../contexts/conversations/application/promote-conversation-admin/messages/PromoteConversationAdminMessage';
+import { ConversationParticipantRemover } from '../../../../contexts/conversations/application/remove-conversation-participant/ConversationParticipantRemover';
+import { RemoveConversationParticipantMessage } from '../../../../contexts/conversations/application/remove-conversation-participant/messages/RemoveConversationParticipantMessage';
 import { ConversationParticipantInviter } from '../../../../contexts/conversations/application/invite-to-group-conversation/ConversationParticipantInviter';
 import { InviteConversationParticipantMessage } from '../../../../contexts/conversations/application/invite-to-group-conversation/messages/InviteConversationParticipantMessage';
 import { ConversationReadMarker } from '../../../../contexts/conversations/application/mark-conversation-read-until/ConversationReadMarker';
@@ -26,6 +34,8 @@ function conversation(
     latestMessageAt,
     name: type === 'group' ? 'Friends' : undefined,
     networkId: 'network-a',
+    adminIds: [],
+    creatorId: 'identity-a',
     participantIds: ['identity-a', 'identity-b'],
     type,
     unreadCount,
@@ -69,7 +79,7 @@ describe('conversation use cases', () => {
   it('creates a group conversation through its repository', async () => {
     const created = conversation('group:a', 0, 'group');
 
-    conversationRepository.create.mockResolvedValue(created);
+    conversationRepository.createGroup.mockResolvedValue(created);
 
     await expect(
       new GroupConversationCreator(
@@ -86,9 +96,88 @@ describe('conversation use cases', () => {
       ),
     ).resolves.toBe(created);
 
-    expect(conversationRepository.create.mock.calls[0]?.[0]).toBeInstanceOf(
-      Conversation,
+    const aggregate = conversationRepository.createGroup.mock.calls[0]?.[0];
+    const nonce = conversationRepository.createGroup.mock.calls[0]?.[1];
+
+    expect(aggregate).toBeInstanceOf(Conversation);
+    expect(aggregate?.toPrimitives()).toEqual(
+      expect.objectContaining({
+        adminIds: [],
+        creatorId: 'identity-a',
+        id: expect.stringMatching(/^group:[\w-]{43}$/),
+        participantIds: ['identity-a', 'identity-b'],
+      }),
     );
+    expect(nonce?.toString()).toMatch(/^[\w-]{22}$/);
+  });
+
+  it('removes a participant through the aggregate', async () => {
+    const group = conversation('group:a', 0, 'group');
+    const removed = conversation('group:a', 0, 'group');
+
+    conversationRepository.find.mockResolvedValue(group);
+    conversationRepository.removeParticipant.mockResolvedValue(removed);
+
+    await expect(
+      new ConversationParticipantRemover(conversationRepository).remove(
+        new RemoveConversationParticipantMessage(
+          'group:a',
+          'identity-b',
+          'identity-a',
+          200,
+        ),
+      ),
+    ).resolves.toBe(removed);
+    expect(group.pullDomainEvents()).toEqual([
+      expect.objectContaining({ type: 'ConversationParticipantRemoved' }),
+    ]);
+  });
+
+  it('promotes and demotes an admin through the aggregate', async () => {
+    const group = conversation('group:a', 0, 'group');
+
+    conversationRepository.find.mockResolvedValue(group);
+    conversationRepository.promoteAdmin.mockResolvedValue(group);
+    conversationRepository.demoteAdmin.mockResolvedValue(group);
+
+    await new ConversationAdminPromoter(conversationRepository).promote(
+      new PromoteConversationAdminMessage(
+        'group:a',
+        'identity-b',
+        'identity-a',
+        200,
+      ),
+    );
+    await new ConversationAdminDemoter(conversationRepository).demote(
+      new DemoteConversationAdminMessage(
+        'group:a',
+        'identity-b',
+        'identity-a',
+        300,
+      ),
+    );
+
+    expect(group.pullDomainEvents()).toEqual([
+      expect.objectContaining({ type: 'ConversationAdminPromoted' }),
+      expect.objectContaining({ type: 'ConversationAdminDemoted' }),
+    ]);
+  });
+
+  it('leaves a group through the aggregate', async () => {
+    const group = conversation('group:a', 0, 'group');
+    const left = conversation('group:a', 0, 'group');
+
+    conversationRepository.find.mockResolvedValue(group);
+    conversationRepository.leave.mockResolvedValue(left);
+
+    await expect(
+      new ConversationLeaver(conversationRepository).leave(
+        new LeaveConversationMessage('group:a', 'identity-b', 200),
+      ),
+    ).resolves.toBe(left);
+    expect(group.pullDomainEvents()).toEqual([
+      expect.objectContaining({ type: 'ConversationParticipantLeft' }),
+    ]);
   });
 
   it('invites a participant through the aggregate', async () => {

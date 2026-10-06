@@ -23,6 +23,7 @@ const conversation = (
   id: 'conversation-1',
   latestMessageAt: 100,
   networkId: 'network-1',
+  adminIds: [],
   participantIds: ['identity-1'],
   type: 'one-to-one',
   unreadCount: 0,
