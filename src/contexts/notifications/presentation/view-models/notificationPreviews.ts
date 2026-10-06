@@ -44,7 +44,9 @@ export function communityNotificationPreview(
     body,
     title: community
       ? `${community.name}${channel ? ` #${channel.name}` : ''}`
-      : (author ? `${author} · ${location}` : location),
+      : author
+        ? `${author} · ${location}`
+        : location,
   };
 }
 

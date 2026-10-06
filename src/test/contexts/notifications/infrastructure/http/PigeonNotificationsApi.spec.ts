@@ -138,5 +138,25 @@ describe(PigeonNotificationsApi.name, () => {
         store: 'notificationSettings',
       });
     });
+
+    it('signs the recipient state record when updating a notification', async () => {
+      const { api, http, signed } = await build();
+
+      await api.update(signed, 'invitation:abc', 'accepted');
+
+      const [path, init] = http.request.mock.calls[0];
+      const body = JSON.parse(String(init?.body));
+
+      expect(path).toBe('/notifications/invitation%3Aabc');
+      expect(init?.method).toBe('PATCH');
+      expect(body.state).toBe('accepted');
+      expect(body.mutation).toMatchObject({
+        kind: 'put',
+        predecessor: null,
+        recordId: 'notification-state:invitation:abc:accepted',
+        sequence: 0,
+        store: 'notifications',
+      });
+    });
   });
 });

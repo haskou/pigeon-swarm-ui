@@ -20,13 +20,12 @@ describe(PigeonNotificationRepository.name, () => {
     contexts.register(session);
     const mapper = new NotificationMapper();
     const resource = {
-      createdAt: '2026-01-01T00:00:00.000Z',
       id: 'notification-1',
       payload: {
         conversationId: 'conversation-1',
         encryptedConversationKey: 'encrypted-key',
         inviterIdentityId: 'identity-2',
-        inviterSignature: 'signature',
+        nonce: 'nonce-0123456789abcdef',
         recipientIdentityId: 'identity-1',
       },
       recipientIdentityId: 'identity-1',

@@ -4,13 +4,12 @@ import { notificationPreview } from '../../../../../contexts/notifications/prese
 
 function conversationInvitation(): NotificationResource {
   return {
-    createdAt: '1',
     id: 'notification-1',
     payload: {
       conversationId: 'conversation-1',
       encryptedConversationKey: 'encrypted-key',
       inviterIdentityId: 'identity-1',
-      inviterSignature: 'signature',
+      nonce: 'nonce-0123456789abcdef',
       recipientIdentityId: 'identity-2',
     },
     recipientIdentityId: 'identity-2',

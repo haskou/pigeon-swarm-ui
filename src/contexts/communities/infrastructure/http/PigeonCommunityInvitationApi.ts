@@ -18,9 +18,9 @@ import type { CommunityInviteLinkInput } from './CommunityInviteLinkInput';
 import type { PigeonCommunitiesApi } from './PigeonCommunitiesApi';
 
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
-import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
+import { NotificationMutationSigner } from '../../../notifications/infrastructure/http/NotificationMutationSigner';
 import { encryptCommunityInviteKey } from '../crypto/communityInviteKeyEnvelope';
 import { buildCommunityInviteLinkBody } from './buildCommunityInviteLinkBody';
 import { CommunityModerationLogSigner } from './CommunityModerationLogSigner';
@@ -209,21 +209,19 @@ export class PigeonCommunityInvitationApi {
       recipientKeyEntry,
     );
 
-    const inviterSignature = await signSessionPayload(
-      session,
-      JSON.stringify({
-        communityId: keyEntry.conversationId,
-        encryptedCommunityKey,
-        inviterIdentityId: session.identity.id,
-        recipientIdentityId: recipientIdentity.id,
-      }),
-    );
+    const invitation = new NotificationMutationSigner().invitation(session, {
+      encryptedKey: encryptedCommunityKey,
+      recipientIdentityId: recipientIdentity.id,
+      subjectId: keyEntry.conversationId,
+      type: 'community_invitation',
+    });
     const body = {
       communityId: keyEntry.conversationId,
       encryptedCommunityKey,
-      inviterIdentityId: session.identity.id,
-      inviterSignature: inviterSignature.toString(),
-      recipientIdentityId: recipientIdentity.id,
+      inviterIdentityId: invitation.inviterIdentityId,
+      mutation: invitation.mutation,
+      nonce: invitation.nonce,
+      recipientIdentityId: invitation.recipientIdentityId,
       type: 'community_invitation',
     };
 

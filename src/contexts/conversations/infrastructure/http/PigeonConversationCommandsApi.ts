@@ -21,13 +21,15 @@ import type { ConversationOperationSigner } from './ConversationOperationSigner'
 import type { ConversationTarget } from './ConversationTarget';
 import type { GroupConversationInput } from './GroupConversationInput';
 
-import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
+import { NotificationMutationSigner } from '../../../notifications/infrastructure/http/NotificationMutationSigner';
 import { ConversationGroupNonce } from '../../domain/value-objects/ConversationGroupNonce';
 import { ConversationNetworkId } from '../../domain/value-objects/ConversationNetworkId';
 import { ConversationParticipantId } from '../../domain/value-objects/ConversationParticipantId';
 
 export class PigeonConversationCommandsApi {
+  private readonly invitations = new NotificationMutationSigner();
+
   public constructor(
     private readonly http: HttpJsonClient,
     private readonly signer: RequestSigner,
@@ -54,21 +56,19 @@ export class PigeonConversationCommandsApi {
       .getPublicKey()
       .encrypt(JSON.stringify(recipientKeyEntry))
       .toString();
-    const inviterSignature = await signSessionPayload(
-      session,
-      JSON.stringify({
-        conversationId: keyEntry.conversationId,
-        encryptedConversationKey,
-        inviterIdentityId: session.identity.id,
-        recipientIdentityId: peerIdentity.id,
-      }),
-    );
+    const invitation = this.invitations.invitation(session, {
+      encryptedKey: encryptedConversationKey,
+      recipientIdentityId: peerIdentity.id,
+      subjectId: keyEntry.conversationId,
+      type: invitationType,
+    });
     const body = {
       conversationId: keyEntry.conversationId,
       encryptedConversationKey,
-      inviterIdentityId: session.identity.id,
-      inviterSignature: inviterSignature.toString(),
-      recipientIdentityId: peerIdentity.id,
+      inviterIdentityId: invitation.inviterIdentityId,
+      mutation: invitation.mutation,
+      nonce: invitation.nonce,
+      recipientIdentityId: invitation.recipientIdentityId,
       type: invitationType,
     };
 

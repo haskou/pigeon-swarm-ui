@@ -9,13 +9,12 @@ import { WorkspaceDerivedState } from '../../../../../app/presentation/workspace
 
 function conversationInvite(): ConversationInvitationNotificationResource {
   return {
-    createdAt: '2026-07-19T00:00:00.000Z',
     id: 'notification-conversation',
     payload: {
       conversationId: 'conversation-a',
       encryptedConversationKey: 'encrypted-key',
       inviterIdentityId: 'identity-b',
-      inviterSignature: 'signature',
+      nonce: 'nonce-0123456789abcdef',
       recipientIdentityId: 'identity-a',
     },
     recipientIdentityId: 'identity-a',
@@ -27,13 +26,12 @@ function conversationInvite(): ConversationInvitationNotificationResource {
 
 function communityInvite(): CommunityInvitationNotificationResource {
   return {
-    createdAt: '2026-07-19T00:00:00.000Z',
     id: 'notification-community',
     payload: {
       communityId: 'community-a',
       encryptedCommunityKey: 'encrypted-key',
       inviterIdentityId: 'identity-b',
-      inviterSignature: 'signature',
+      nonce: 'nonce-0123456789abcdef',
       recipientIdentityId: 'identity-a',
     },
     recipientIdentityId: 'identity-a',
