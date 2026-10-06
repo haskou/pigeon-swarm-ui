@@ -971,6 +971,7 @@ export function GlassWorkspace({
               notificationMuteToggle={toggleNotificationMute}
               notificationSettingsOpen={openNotificationSettings}
               onConversationKeyImported={handleConversationKeyImported}
+              onConversationsChanged={refreshConversations}
               onConversationNotificationMuteToggle={
                 toggleConversationNotificationMute
               }

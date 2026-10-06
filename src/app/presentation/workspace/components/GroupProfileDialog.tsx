@@ -17,6 +17,10 @@ import {
   IdentityMemberListPanel,
   type IdentityMemberListItem,
 } from '../../../../contexts/identities/presentation/components/IdentityMemberListPanel';
+import {
+  groupRosterPermissions,
+  type GroupRosterActionsController,
+} from './useGroupRosterActions';
 
 type GroupParticipant = {
   identity?: IdentityResource;
@@ -27,6 +31,7 @@ type GroupParticipant = {
 
 interface GroupProfileDialogProps {
   conversation: ConversationResource;
+  currentIdentityId: string;
   networkId?: string;
   nodeNetworks: NodeNetwork[];
   onClose: () => void;
@@ -36,20 +41,26 @@ interface GroupProfileDialogProps {
   ) => void;
   participants: GroupParticipant[];
   presenceByIdentityId?: Record<string, IdentityPresence>;
+  roster: GroupRosterActionsController;
 }
 
 export function GroupProfileDialog({
   conversation,
+  currentIdentityId,
   networkId,
   nodeNetworks,
   onClose,
   onIdentityClick,
   participants,
   presenceByIdentityId = {},
+  roster,
 }: GroupProfileDialogProps) {
   const { close, state } = useCloseTransition(onClose);
 
   useCloseOnEscape(close);
+
+  const permissions = groupRosterPermissions(conversation, currentIdentityId);
+  const adminIds = conversation.adminIds;
 
   const groupName = conversation.name ?? conversation.id;
   const networkName = networkId
@@ -114,11 +125,47 @@ export function GroupProfileDialog({
                 identity: participant.identity,
                 identityId: participant.identityId,
                 name: participant.name,
+                owner: participant.identityId === conversation.creatorId,
                 pictureUrl: participant.picture ?? null,
                 presence: presenceByIdentityId[participant.identityId],
               }) satisfies IdentityMemberListItem,
           )}
           listClassName="max-h-[45vh] flex-none"
+          ownerLabel={copy.chat.creatorLabel}
+          rowActions={(item) => (
+            <div className="flex flex-wrap items-center gap-2 px-1 pt-1">
+              {adminIds.includes(item.identityId) && (
+                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[0.65rem] font-black uppercase tracking-wider text-white/60">
+                  {copy.chat.adminLabel}
+                </span>
+              )}
+              {permissions.canPromote(item.identityId) && (
+                <RosterButton
+                  disabled={roster.pending}
+                  label={copy.chat.promoteAdmin}
+                  onClick={() => void roster.promoteAdmin(item.identityId)}
+                />
+              )}
+              {permissions.canDemote(item.identityId) && (
+                <RosterButton
+                  disabled={roster.pending}
+                  label={copy.chat.demoteAdmin}
+                  onClick={() => void roster.demoteAdmin(item.identityId)}
+                />
+              )}
+              {permissions.canRemove(item.identityId) && (
+                <RosterButton
+                  disabled={roster.pending}
+                  label={copy.chat.removeMember}
+                  onClick={() => {
+                    if (!window.confirm(copy.chat.removeMemberConfirm)) return;
+
+                    void roster.removeParticipant(item.identityId);
+                  }}
+                />
+              )}
+            </div>
+          )}
           onItemClick={(participant, event) =>
             onIdentityClick(
               {
@@ -131,8 +178,34 @@ export function GroupProfileDialog({
             )
           }
         />
+        {roster.error && (
+          <p className="mt-3 text-xs font-semibold text-rose-300" role="alert">
+            {roster.error}
+          </p>
+        )}
       </section>
     </div>,
     document.body,
+  );
+}
+
+function RosterButton({
+  disabled,
+  label,
+  onClick,
+}: {
+  disabled: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="rounded-full bg-white/10 px-3 py-1 text-xs font-black text-white/80 transition hover:bg-white/15 disabled:opacity-50"
+    >
+      {label}
+    </button>
   );
 }

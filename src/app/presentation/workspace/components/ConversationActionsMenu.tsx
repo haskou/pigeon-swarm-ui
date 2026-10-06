@@ -26,6 +26,7 @@ interface ConversationActionsMenuProps {
   onNotificationSettingsOpen: () => void;
   onNotificationMuteToggle: () => void;
   onGroupInviteOpen: () => void;
+  onGroupLeave?: () => void;
   onOpenPins: () => void;
   onRealtimeEventsOpen?: () => void;
   onStartCall?: (input: {
@@ -49,6 +50,7 @@ export function ConversationActionsMenu({
   onConversationDataOpen,
   onConversationKeyOpen,
   onGroupInviteOpen,
+  onGroupLeave,
   onNotificationMuteToggle,
   onNotificationSettingsOpen,
   onOpenPins,
@@ -164,6 +166,16 @@ export function ConversationActionsMenu({
             label={copy.chat.invite}
             onClick={() => {
               onGroupInviteOpen();
+              close();
+            }}
+          />
+        ) : null}
+        {isGroupConversation && onGroupLeave ? (
+          <ConversationHeaderMenuAction
+            icon={<LeaveMenuIcon />}
+            label={copy.chat.leaveGroup}
+            onClick={() => {
+              onGroupLeave();
               close();
             }}
           />
@@ -310,6 +322,25 @@ function InviteMenuIcon() {
     >
       <path
         d="M8.5 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM4 19a4.5 4.5 0 0 1 9 0M16.5 7.5v6M13.5 10.5h6"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function LeaveMenuIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      className="h-4 w-4 shrink-0 text-white/55"
+    >
+      <path
+        d="M10 5H6.5A1.5 1.5 0 0 0 5 6.5v11A1.5 1.5 0 0 0 6.5 19H10M15 8l4 4-4 4M19 12H9.5"
         stroke="currentColor"
         strokeLinecap="round"
         strokeLinejoin="round"

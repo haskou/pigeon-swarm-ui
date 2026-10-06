@@ -40,6 +40,7 @@ export function IdentityMemberListPanel({
   listClassName,
   onItemClick,
   ownerLabel,
+  rowActions,
   title,
 }: {
   action?: {
@@ -57,6 +58,7 @@ export function IdentityMemberListPanel({
     event: MouseEvent<HTMLButtonElement>,
   ) => void;
   ownerLabel?: string;
+  rowActions?: (item: IdentityMemberListItem) => ReactNode;
   title?: string;
 }) {
   return (
@@ -91,6 +93,7 @@ export function IdentityMemberListPanel({
               onClick={(event) => onItemClick(item, event)}
               ownerLabel={ownerLabel}
             />
+            {rowActions?.(item)}
           </div>
         ))}
         {items.length === 0 && emptyLabel && (

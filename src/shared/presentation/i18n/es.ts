@@ -298,6 +298,7 @@ export const es = {
     addPrivateKeyRequired: 'Pega primero un paquete de clave cifrada.',
     addPrivateKeySaving: 'Actualizando llavero...',
     addPrivateKeyTitle: 'Añadir clave de conversación',
+    adminLabel: 'Administrador',
     conversationDataTitle: 'Datos de conversación',
     conversationMenu: 'Abrir menú de conversación',
     copyPrivateKey: 'Compartir clave privada',
@@ -309,6 +310,8 @@ export const es = {
     copyPrivateKeyUnavailable:
       'La identidad del otro participante no se ha cargado, así que aún no se puede cifrar la clave.',
     createConversation: 'Nueva conversación',
+    creatorLabel: 'Creador',
+    demoteAdmin: 'Quitar administrador',
     directMessage: 'Mensaje directo',
     e2eMissing: 'Falta la clave de cifrado para esta conversación.',
     e2eReady: 'El cifrado extremo a extremo está activo.',
@@ -322,6 +325,8 @@ export const es = {
     inviteGroupBody:
       'Envía a otra identidad una invitación con la clave cifrada del grupo.',
     jumpToLatest: 'Ir al último',
+    leaveGroup: 'Salir del grupo',
+    leaveGroupConfirm: '¿Salir de este grupo?',
     loadingEvents: 'Cargando eventos...',
     menu: 'Abrir barra lateral',
     newMessage: 'Nuevo mensaje',
@@ -329,6 +334,7 @@ export const es = {
     noConversation: 'Sin conversación',
     noConversationHint: 'Crea una conversación para empezar',
     noMoreMessages: 'No hay más mensajes',
+    promoteAdmin: 'Hacer administrador',
     publicChannel: 'Los mensajes de canales públicos son texto buscable.',
     realtimeConnected: 'Conectado',
     realtimeEventsEmpty:
@@ -336,6 +342,9 @@ export const es = {
     realtimeEventsEyebrow: 'WebSocket',
     realtimeEventsTitle: 'Eventos WebSocket',
     realtimeReconnecting: 'Reconectando',
+    removeMember: 'Expulsar',
+    removeMemberConfirm: '¿Expulsar a este miembro del grupo?',
+    rosterError: 'No se pudo actualizar la pertenencia al grupo.',
     sendInvite: 'Enviar invitación',
     sentAlbum: 'Ha enviado un álbum',
     sentFile: 'Ha enviado un archivo',

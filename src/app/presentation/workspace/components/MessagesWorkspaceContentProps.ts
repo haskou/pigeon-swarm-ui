@@ -74,6 +74,9 @@ export type MessagesWorkspaceContentProps = {
   onConversationKeyImported: Parameters<
     typeof ChatColumn
   >[0]['onConversationKeyImported'];
+  onConversationsChanged: Parameters<
+    typeof ChatColumn
+  >[0]['onConversationsChanged'];
   onConversationNotificationMuteToggle: Parameters<
     typeof Sidebar
   >[0]['onConversationNotificationMuteToggle'];

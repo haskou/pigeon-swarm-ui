@@ -13,6 +13,7 @@ import type { ChatConversationPresentation } from './ChatConversationPresentatio
 import type { ChatProfileViewer } from './ChatProfileViewer';
 import type { ConversationKeyDialogController } from './useConversationKeyDialog';
 import type { GroupInvitationDialogController } from './useGroupInvitationDialog';
+import type { GroupRosterActionsController } from './useGroupRosterActions';
 
 import { memberPrimaryName } from '../../../../contexts/communities/presentation/components/communityMemberNames';
 import { profileAnchorFromTarget } from '../../../../contexts/identities/presentation/view-models/profilePopoverAnchor';
@@ -61,6 +62,7 @@ export interface ChatColumnDialogsProps {
   groupInvitationDialog: GroupInvitationDialogController;
   groupParticipants: ChatConversationPresentation['groupParticipants'];
   groupProfileOpen: boolean;
+  groupRoster: GroupRosterActionsController;
   networkId?: string;
   nodeNetworks: NodeNetwork[];
   onConversationDataClose: () => void;
@@ -164,6 +166,7 @@ function ProfileDialogs({
   activeConversation,
   groupParticipants,
   groupProfileOpen,
+  groupRoster,
   networkId,
   nodeNetworks,
   onGroupProfileClose,
@@ -177,6 +180,7 @@ function ProfileDialogs({
   | 'activeConversation'
   | 'groupParticipants'
   | 'groupProfileOpen'
+  | 'groupRoster'
   | 'networkId'
   | 'nodeNetworks'
   | 'onGroupProfileClose'
@@ -216,6 +220,7 @@ function ProfileDialogs({
         <Suspense fallback={null}>
           <GroupProfileDialog
             conversation={activeConversation}
+            currentIdentityId={session.identity.id}
             networkId={networkId}
             nodeNetworks={nodeNetworks}
             onClose={onGroupProfileClose}
@@ -235,6 +240,7 @@ function ProfileDialogs({
               });
             }}
             participants={groupParticipants}
+            roster={groupRoster}
             presenceByIdentityId={presenceByIdentityId}
           />
         </Suspense>
@@ -254,6 +260,7 @@ export function ChatColumnDialogs({
   groupInvitationDialog,
   groupParticipants,
   groupProfileOpen,
+  groupRoster,
   networkId,
   nodeNetworks,
   onConversationDataClose,
@@ -285,6 +292,7 @@ export function ChatColumnDialogs({
         activeConversation={activeConversation}
         groupParticipants={groupParticipants}
         groupProfileOpen={groupProfileOpen}
+        groupRoster={groupRoster}
         networkId={networkId}
         nodeNetworks={nodeNetworks}
         onGroupProfileClose={onGroupProfileClose}
