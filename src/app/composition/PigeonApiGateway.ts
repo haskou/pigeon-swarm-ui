@@ -10,6 +10,7 @@ import { PigeonAttachmentDownloader } from '../../contexts/attachments/infrastru
 import { PigeonAttachmentPreviewCreator } from '../../contexts/attachments/infrastructure/http/PigeonAttachmentPreviewCreator';
 import { PigeonAttachmentRepository } from '../../contexts/attachments/infrastructure/http/PigeonAttachmentRepository';
 import { PigeonChunkedAttachmentUploader } from '../../contexts/attachments/infrastructure/http/PigeonChunkedAttachmentUploader';
+import { PigeonContentReplicationClient } from '../../contexts/attachments/infrastructure/http/PigeonContentReplicationClient';
 import { PigeonDirectAttachmentUploader } from '../../contexts/attachments/infrastructure/http/PigeonDirectAttachmentUploader';
 import { PigeonFilesGateway } from '../../contexts/attachments/infrastructure/http/PigeonFilesGateway';
 import { PigeonMessageAttachmentUploader } from '../../contexts/attachments/infrastructure/http/PigeonMessageAttachmentUploader';
@@ -131,8 +132,17 @@ export class PigeonApiGateway {
       signer,
       conversationMapper,
     );
-    const privateFiles = new PigeonPrivateFilesClient(http, signer);
-    const publicFiles = new PigeonPublicFilesClient(http, signer);
+    const contentReplication = new PigeonContentReplicationClient(http, signer);
+    const privateFiles = new PigeonPrivateFilesClient(
+      http,
+      signer,
+      contentReplication,
+    );
+    const publicFiles = new PigeonPublicFilesClient(
+      http,
+      signer,
+      contentReplication,
+    );
     const attachmentDownloader = new PigeonAttachmentDownloader(
       privateFiles,
       publicFiles,

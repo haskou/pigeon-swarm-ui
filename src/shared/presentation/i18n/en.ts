@@ -1052,7 +1052,6 @@ export const en = {
     replicationError: 'Local data status could not be loaded.',
     replicationLoading: 'Loading...',
     replicationRefresh: 'Refresh',
-    replicationReleasable: 'Can be released',
     replicationResponsible: 'Assigned to this node',
     replicationTotalSize: 'Space used',
     saving: 'Saving...',

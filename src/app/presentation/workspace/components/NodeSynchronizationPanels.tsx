@@ -112,10 +112,6 @@ export function ReplicationStatusPanel({
           label={copy.nodeSettings.replicationResponsible}
           value={String(summary?.localResponsibleCount ?? 0)}
         />
-        <NodeDetailRow
-          label={copy.nodeSettings.replicationReleasable}
-          value={String(summary?.releasableCount ?? 0)}
-        />
       </div>
 
       {error ? (

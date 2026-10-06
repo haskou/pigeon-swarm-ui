@@ -24,7 +24,11 @@ describe(PigeonPublicFilesClient.name, () => {
       ),
     };
     const progress = jest.fn();
-    const client = new PigeonPublicFilesClient(http, { headers: jest.fn() });
+    const client = new PigeonPublicFilesClient(
+      http,
+      { headers: jest.fn() },
+      { register: jest.fn() },
+    );
 
     await expect(client.fetch('external/id', progress)).resolves.toMatchObject({
       blob,
@@ -42,7 +46,7 @@ describe(PigeonPublicFilesClient.name, () => {
 
   it('signs public uploads using the public attachment path', async () => {
     const bytes = new Uint8Array([1, 2, 3]).buffer;
-    const session = {} as Session;
+    const session = { identity: { networks: ['n1', 'n2'] } } as Session;
     const upload = {
       cid: 'external-1',
       contentType: 'image/webp',
@@ -56,7 +60,8 @@ describe(PigeonPublicFilesClient.name, () => {
     const signer = {
       headers: jest.fn().mockResolvedValue({ 'X-Signature': 'signature' }),
     };
-    const client = new PigeonPublicFilesClient(http, signer);
+    const replication = { register: jest.fn().mockResolvedValue(undefined) };
+    const client = new PigeonPublicFilesClient(http, signer, replication);
 
     await expect(
       client.upload(session, bytes, 'photo.webp', 'image/webp'),
@@ -71,5 +76,12 @@ describe(PigeonPublicFilesClient.name, () => {
       '/ipfs/public',
       expect.objectContaining({ body: bytes, method: 'POST' }),
     );
+    expect(replication.register).toHaveBeenCalledTimes(2);
+    expect(replication.register).toHaveBeenCalledWith(session, {
+      cid: 'external-1',
+      context: 'ipfs_public_upload',
+      networkId: 'n2',
+      sizeBytes: 3,
+    });
   });
 });

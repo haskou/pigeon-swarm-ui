@@ -1056,7 +1056,6 @@ export const es = {
     replicationError: 'No se pudo cargar el estado de los datos locales.',
     replicationLoading: 'Cargando...',
     replicationRefresh: 'Actualizar',
-    replicationReleasable: 'Se pueden liberar',
     replicationResponsible: 'Asignados a este nodo',
     replicationTotalSize: 'Espacio usado',
     saving: 'Guardando...',

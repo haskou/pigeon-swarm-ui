@@ -5,11 +5,16 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+import type { PigeonContentReplicationClient } from './PigeonContentReplicationClient';
 
 export class PigeonPublicFilesClient {
   public constructor(
     private readonly http: Pick<HttpJsonClient, 'request' | 'requestBlob'>,
     private readonly signer: Pick<RequestSigner, 'headers'>,
+    private readonly replication: Pick<
+      PigeonContentReplicationClient,
+      'register'
+    >,
   ) {}
 
   private content(cid: string, blob: Blob): PublicFileContent {
@@ -52,7 +57,7 @@ export class PigeonPublicFilesClient {
   ): Promise<PublicFileUpload> {
     const path = '/ipfs/public';
 
-    return await this.http.request<PublicFileUpload>(path, {
+    const upload = await this.http.request<PublicFileUpload>(path, {
       body: bytes,
       headers: {
         ...(await this.signer.headers(session, 'POST', path, bytes)),
@@ -61,5 +66,16 @@ export class PigeonPublicFilesClient {
       },
       method: 'POST',
     });
+
+    for (const networkId of session.identity.networks) {
+      await this.replication.register(session, {
+        cid: upload.cid,
+        context: 'ipfs_public_upload',
+        networkId,
+        sizeBytes: bytes.byteLength,
+      });
+    }
+
+    return upload;
   }
 }
