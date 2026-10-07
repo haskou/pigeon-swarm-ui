@@ -51,6 +51,19 @@ Signaling delivery is controlled by the test. This is local direct-media
 coverage, not backend authorization, TURN, public NAT, or mobile-browser
 validation. Cross-node relay coverage belongs to the wrapper integration suite.
 
+## Call page departure
+
+`call-page-departure.spec.ts` registers two identities on a real node, rings the
+second one from a direct conversation and navigates its page away while the call
+is still ringing. The page departure must send a signed decline, and the caller
+must see the call as declined. The node derives `declined` for a ringing
+participant, so a `left` proof for it is never recorded. Run it against a node
+that has a network, with `E2E_NETWORK_ID` when the node lists none:
+
+```bash
+yarn test:e2e e2e/call-page-departure.spec.ts --project=desktop-chromium
+```
+
 ## Visual audit
 
 The visual audit captures the login and the main authenticated UI states on

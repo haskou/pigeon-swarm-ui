@@ -5,17 +5,20 @@ import {
   type Dispatch,
   type SetStateAction,
 } from 'react';
+
 import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
 import type { useCallSession } from '../../../../contexts/calls/presentation/hooks/useCallSession';
 import type {
   Community,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
-
-import { applicationContainer } from '../../../composition/applicationContainer';
-import { playEndedCallSound } from '../../../../shared/presentation/sounds';
-import { callDepartureAction } from './callDepartureAction';
 import type { WorkspaceCallDetails } from './resolveWorkspaceCallDetails';
+import type { IncomingWorkspaceCall } from './useCallResourceReconciliation';
+
+import { playEndedCallSound } from '../../../../shared/presentation/sounds';
+import { applicationContainer } from '../../../composition/applicationContainer';
+import { callDepartureAction } from './callDepartureAction';
+import { resolvePageDeparture } from './resolvePageDeparture';
 
 type CallSessionController = ReturnType<typeof useCallSession>;
 
@@ -23,6 +26,7 @@ type CallDepartureInput = {
   activeCall: CallSessionController['activeCall'];
   callDetailsForResource: (call: CallResource) => WorkspaceCallDetails;
   endCall: CallSessionController['endCall'];
+  incomingCall: IncomingWorkspaceCall | null;
   listCalls: () => Promise<CallResource[]>;
   onCommunitiesReload: () => Promise<void>;
   reconcileCallResource: (call: CallResource) => void;
@@ -34,6 +38,7 @@ export function useCallDeparture({
   activeCall,
   callDetailsForResource,
   endCall,
+  incomingCall,
   listCalls,
   onCommunitiesReload,
   reconcileCallResource,
@@ -45,35 +50,30 @@ export function useCallDeparture({
   leaveCurrentCallForSwitch: () => Promise<void>;
   removeCurrentIdentityFromVoicePresence: () => void;
 } {
-  const pageDepartureRef = useRef({
-    callId: activeCall?.id,
-    kind: activeCall?.kind,
-    session,
+  const departure = resolvePageDeparture({
+    activeCall,
+    currentIdentityId: session.identity.id,
+    incomingCall,
   });
-  pageDepartureRef.current = {
-    callId: activeCall?.id,
-    kind: activeCall?.kind,
-    session,
-  };
+  const pageDepartureRef = useRef({ departure, session });
+  pageDepartureRef.current = { departure, session };
 
   useEffect(() => {
     let departureRequested = false;
     const leaveCallOnPageDeparture = (): void => {
-      const {
-        callId,
-        kind,
-        session: currentSession,
-      } = pageDepartureRef.current;
+      const { departure: pending, session: currentSession } =
+        pageDepartureRef.current;
 
-      if (!callId || departureRequested) return;
+      if (!pending || departureRequested) return;
 
       departureRequested = true;
       const request =
-        callDepartureAction(kind) === 'end'
-          ? applicationContainer.calls.end(currentSession, callId)
+        pending.action === 'end'
+          ? applicationContainer.calls.end(currentSession, pending.callId)
           : applicationContainer.calls.leaveOnPageDeparture(
               currentSession,
-              callId,
+              pending.callId,
+              pending.declined,
             );
 
       void request.catch(() => undefined);
@@ -89,7 +89,7 @@ export function useCallDeparture({
       );
       globalThis.removeEventListener?.('pagehide', leaveCallOnPageDeparture);
     };
-  }, [activeCall?.id, activeCall?.kind]);
+  }, [departure?.callId]);
 
   const removeCurrentIdentityFromVoicePresence = useCallback(() => {
     setCommunities((current) =>

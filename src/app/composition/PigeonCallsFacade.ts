@@ -53,8 +53,9 @@ export class PigeonCallsFacade {
   public async leaveOnPageDeparture(
     session: Session,
     callId: string,
+    declined: boolean,
   ): Promise<void> {
-    await this.participation.leaveOnPageDeparture(session, callId);
+    await this.participation.leaveOnPageDeparture(session, callId, declined);
   }
 
   public async list(session: Session): Promise<CallResource[]> {
