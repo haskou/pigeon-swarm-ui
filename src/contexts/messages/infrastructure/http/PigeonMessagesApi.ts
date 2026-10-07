@@ -27,13 +27,12 @@ export class PigeonMessagesApi {
 
   private readonly linkPreviews: PigeonLinkPreviewsApi;
 
-  private readonly mutations = new PublicMutationSigner();
-
   public constructor(
     private readonly http: HttpJsonClient,
     private readonly signer: RequestSigner,
     private readonly requestCache: RequestCache,
     private readonly projection: MessageProjectionPort,
+    private readonly mutations: PublicMutationSigner,
     draftPayloads = new DraftPayloadCipher(),
     linkPreviews = new PigeonLinkPreviewsApi(http, signer),
   ) {

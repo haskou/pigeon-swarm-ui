@@ -8,6 +8,7 @@ import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/H
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
 import { PigeonCommunityInvitationApi } from '../../../../../contexts/communities/infrastructure/http/PigeonCommunityInvitationApi';
+import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
 describe(PigeonCommunityInvitationApi.name, () => {
   it('invites into a public community without publishing a key', async () => {
@@ -24,6 +25,7 @@ describe(PigeonCommunityInvitationApi.name, () => {
       { frontier: jest.fn(), get, inviteMember },
       {} as never,
       {} as never,
+      publicMutationSignerAt(),
     );
 
     await expect(
@@ -56,6 +58,7 @@ describe(PigeonCommunityInvitationApi.name, () => {
       { get: jest.fn().mockResolvedValue({ visibility: 'public' }) } as never,
       {} as never,
       {} as never,
+      publicMutationSignerAt(),
     );
 
     await api.createInviteLink(session, 'community-1', { maxUses: 3 });
@@ -99,6 +102,7 @@ describe(PigeonCommunityInvitationApi.name, () => {
       { frontier: jest.fn().mockResolvedValue(['c'.repeat(43)]) } as never,
       {} as never,
       {} as never,
+      publicMutationSignerAt(),
     );
 
     await api.acceptInviteLink(session, 'tok');

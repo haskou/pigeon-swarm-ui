@@ -9,6 +9,7 @@ import type { RequestSigner } from '../../../../../shared/infrastructure/http/Re
 import { PigeonPublicFilesClient } from '../../../../../contexts/attachments/infrastructure/http/PigeonPublicFilesClient';
 import { PigeonStickersApi } from '../../../../../contexts/stickers/infrastructure/http/PigeonStickersApi';
 import { canonicalJson } from '../../../../../shared/infrastructure/crypto/canonicalJson';
+import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
 describe(PigeonStickersApi.name, () => {
   it('loads sticker bytes through the protected blob client', async () => {
@@ -19,6 +20,7 @@ describe(PigeonStickersApi.name, () => {
     const api = new PigeonStickersApi(
       http,
       mock<RequestSigner>(),
+      publicMutationSignerAt(),
       mock<PigeonPublicFilesClient>(),
       { prepare: jest.fn() },
     );
@@ -49,6 +51,7 @@ describe(PigeonStickersApi.name, () => {
     const api = new PigeonStickersApi(
       {} as HttpJsonClient,
       {} as RequestSigner,
+      publicMutationSignerAt(),
       publicFiles,
       publicImageUploadPreparer,
     );
@@ -117,6 +120,7 @@ describe(PigeonStickersApi.name, () => {
         {
           headers: jest.fn().mockResolvedValue({ signature: 's' }),
         } as unknown as RequestSigner,
+        publicMutationSignerAt(),
         mock<PigeonPublicFilesClient>(),
         { prepare: jest.fn() },
       );

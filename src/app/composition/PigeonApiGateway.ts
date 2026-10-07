@@ -31,6 +31,7 @@ import { PigeonConversationCommandsApi } from '../../contexts/conversations/infr
 import { PigeonConversationsApi } from '../../contexts/conversations/infrastructure/http/PigeonConversationsApi';
 import { PigeonConversationsGateway } from '../../contexts/conversations/infrastructure/http/PigeonConversationsGateway';
 import { KeychainCipher } from '../../contexts/identities/infrastructure/crypto/KeychainCipher';
+import { DeviceAuthorizationRevisionSource } from '../../contexts/identities/infrastructure/http/DeviceAuthorizationRevisionSource';
 import { IdentitySignaturePayloadFactory } from '../../contexts/identities/infrastructure/http/IdentitySignaturePayloadFactory';
 import { PigeonDeviceAuthorizationApi } from '../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
 import { PigeonIdentitiesGateway } from '../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
@@ -115,6 +116,15 @@ export class PigeonApiGateway {
     conversationIds: ConversationIdFactory = new ConversationIdFactory(),
     attachmentCipher: AttachmentCipher = AttachmentCipher.inCurrentThread(),
   ) {
+    this.identityVault = new DeviceIdentityVault();
+    const deviceAuthorization = new PigeonDeviceAuthorizationApi(
+      http,
+      signer,
+      this.identityVault,
+    );
+    const mutations = new PublicMutationSigner(
+      new DeviceAuthorizationRevisionSource(deviceAuthorization),
+    );
     const communitiesApi = new PigeonCommunitiesApi(
       http,
       signer,
@@ -123,6 +133,7 @@ export class PigeonApiGateway {
         loader: () => Promise<T>,
         options?: RequestCacheOptions,
       ) => this.requestCache.load(key, loader, options),
+      mutations,
       new DraftPayloadCipher(),
       (key: string) => this.requestCache.invalidate(key),
     );
@@ -131,22 +142,31 @@ export class PigeonApiGateway {
       signer,
       conversationMapper,
     );
-    this.calls = new PigeonCallsApi(http, signer, new CallEventSigner(), {
-      communityNetworkId: async (session, communityId) =>
-        (await communitiesApi.get(session, communityId)).networkId,
-      conversation: async (session, conversationId) => {
-        const conversation = (await conversationsApi.list(session)).find(
-          (candidate) => candidate.id === conversationId,
-        );
+    this.calls = new PigeonCallsApi(
+      http,
+      signer,
+      new CallEventSigner(mutations),
+      {
+        communityNetworkId: async (session, communityId) =>
+          (await communitiesApi.get(session, communityId)).networkId,
+        conversation: async (session, conversationId) => {
+          const conversation = (await conversationsApi.list(session)).find(
+            (candidate) => candidate.id === conversationId,
+          );
 
-        if (!conversation) {
-          throw new Error(`Conversation ${conversationId} is not available`);
-        }
+          if (!conversation) {
+            throw new Error(`Conversation ${conversationId} is not available`);
+          }
 
-        return conversation;
+          return conversation;
+        },
       },
-    });
-    const contentReplication = new PigeonContentReplicationClient(http, signer);
+    );
+    const contentReplication = new PigeonContentReplicationClient(
+      http,
+      signer,
+      mutations,
+    );
     const privateFiles = new PigeonPrivateFilesClient(
       http,
       signer,
@@ -200,17 +220,11 @@ export class PigeonApiGateway {
 
     const identityResourceGateway = new PigeonIdentityGateway(http);
 
-    this.identityVault = new DeviceIdentityVault();
     const identityCommands = new PigeonIdentityCommandsApi(
       http,
       signer,
       identityResourceGateway,
       new IdentitySignaturePayloadFactory(),
-      this.identityVault,
-    );
-    const deviceAuthorization = new PigeonDeviceAuthorizationApi(
-      http,
-      signer,
       this.identityVault,
     );
     const keychainApi = new PigeonKeychainApi(
@@ -243,7 +257,8 @@ export class PigeonApiGateway {
       identityResourceGateway,
       keychainApi,
       this.requestCache,
-      new ConversationOperationSigner(),
+      new ConversationOperationSigner(mutations),
+      mutations,
     );
 
     this.conversationsGateway = new PigeonConversationsGateway(
@@ -258,6 +273,7 @@ export class PigeonApiGateway {
         communitiesApi,
         identityResourceGateway,
         keychainApi,
+        mutations,
       ),
       this.requestCache,
       this.filesGateway,
@@ -273,6 +289,7 @@ export class PigeonApiGateway {
       signer,
       this.requestCache,
       messageProjection,
+      mutations,
     );
     this.messageCommands = new PigeonMessageCommandsApi(
       http,
@@ -280,7 +297,7 @@ export class PigeonApiGateway {
       this.messagesApi,
       messageProjection,
       this.filesGateway,
-      new PublicMutationSigner(),
+      mutations,
     );
     this.messagesGateway = new PigeonMessagesGateway(
       this.messagesApi,
@@ -296,6 +313,7 @@ export class PigeonApiGateway {
           loader: () => Promise<T>,
           options?: RequestCacheOptions,
         ) => this.requestCache.load(key, loader, options),
+        mutations,
       ),
       (session) =>
         this.requestCache.invalidateForSession(
@@ -309,10 +327,11 @@ export class PigeonApiGateway {
       new PigeonPresenceApi(http, signer),
       this.requestCache,
     );
-    this.pollsApi = new PigeonPollsApi(http, signer);
+    this.pollsApi = new PigeonPollsApi(http, signer, mutations);
     this.stickersApi = new PigeonStickersApi(
       http,
       signer,
+      mutations,
       publicFiles,
       new PublicImageUploadPreparer(),
     );

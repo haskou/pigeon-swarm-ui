@@ -17,11 +17,10 @@ export type ContentReplicationContext =
 export class PigeonContentReplicationClient {
   private static readonly MAX_SIZE_BYTES = 52_428_800;
 
-  private readonly mutations = new PublicMutationSigner();
-
   public constructor(
     private readonly http: Pick<HttpJsonClient, 'request'>,
     private readonly signer: Pick<RequestSigner, 'headers'>,
+    private readonly mutations: PublicMutationSigner,
   ) {}
 
   private async send(

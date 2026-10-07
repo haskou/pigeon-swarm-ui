@@ -4,12 +4,12 @@ import type { Session } from '../../../../../shared/domain/pigeonResources.types
 
 import { NotificationMutationSigner } from '../../../../../contexts/notifications/infrastructure/http/NotificationMutationSigner';
 import { canonicalJson } from '../../../../../shared/infrastructure/crypto/canonicalJson';
-import { PublicMutationSigner } from '../../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import vectors from '../../../../fixtures/notification-vectors.json';
+import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
 describe(NotificationMutationSigner.name, () => {
-  const signer = new NotificationMutationSigner();
-  const mutations = new PublicMutationSigner();
+  const mutations = publicMutationSignerAt();
+  const signer = new NotificationMutationSigner(mutations);
 
   async function session(): Promise<Session> {
     const device = await KeyPair.generate();
@@ -51,7 +51,7 @@ describe(NotificationMutationSigner.name, () => {
   it('signs an invitation whose digest and id match the payload it commits to', async () => {
     const inviter = await session();
     const recipient = await session();
-    const signed = signer.invitation(inviter, {
+    const signed = await signer.invitation(inviter, {
       encryptedKey: 'key',
       recipientIdentityId: recipient.identity.id,
       subjectId: 'group:g',
@@ -83,7 +83,7 @@ describe(NotificationMutationSigner.name, () => {
   it('signs a per-state record that matches the state vector shape', async () => {
     const recipient = await session();
     const vector = vectors.cases.find(({ name }) => name === 'state_accepted');
-    const mutation = signer.state(
+    const mutation = await signer.state(
       recipient,
       vector?.derived.payload.notificationId as string,
       'accepted',

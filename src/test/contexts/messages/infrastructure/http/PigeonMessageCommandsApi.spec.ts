@@ -9,6 +9,7 @@ import type { RequestSigner } from '../../../../../shared/infrastructure/http/Re
 import { PigeonMessageCommandsApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
 import { PigeonMessagesApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessagesApi';
 import { PublicMutationSigner } from '../../../../../shared/infrastructure/crypto/PublicMutationSigner';
+import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
 describe(PigeonMessageCommandsApi.name, () => {
   const session = {
@@ -49,7 +50,7 @@ describe(PigeonMessageCommandsApi.name, () => {
       {} as PigeonMessagesApi,
       {} as MessageProjectionPort,
       {} as MessageAttachmentPublisher,
-      new PublicMutationSigner(),
+      publicMutationSignerAt(),
     );
     const signed = {
       deviceCredentialKeyPair: await KeyPair.generate(),

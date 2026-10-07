@@ -34,18 +34,21 @@ function currentPosition(error: unknown): PublicMutationPosition | undefined {
 /**
  * Submits a signed mutation. A node that already stores a stronger mutation of
  * the record answers with its current position; the intent is then signed
- * again as that mutation's successor so that it supersedes it causally.
+ * again as that mutation's successor so that it supersedes it causally; the
+ * authorization revision is read again for every signature.
  */
 export async function submitPublicMutation(
   initial: PublicMutationPosition,
-  sign: (position: PublicMutationPosition) => SignedPublicMutation,
+  sign: (
+    position: PublicMutationPosition,
+  ) => Promise<SignedPublicMutation> | SignedPublicMutation,
   send: (mutation: SignedPublicMutation) => Promise<void>,
 ): Promise<void> {
   let position = initial;
 
   for (let attempt = 1; ; attempt += 1) {
     try {
-      await send(sign(position));
+      await send(await sign(position));
 
       return;
     } catch (error) {

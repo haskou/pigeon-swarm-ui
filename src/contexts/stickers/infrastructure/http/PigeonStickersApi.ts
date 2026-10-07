@@ -13,11 +13,10 @@ import { submitPublicMutation } from '../../../../shared/infrastructure/http/sub
 import { PublicImageUploadPreparer } from '../../../attachments/infrastructure/media/PublicImageUploadPreparer';
 
 export class PigeonStickersApi {
-  private readonly mutations = new PublicMutationSigner();
-
   public constructor(
     private readonly http: HttpJsonClient,
     private readonly signer: RequestSigner,
+    private readonly mutations: PublicMutationSigner,
     private readonly publicFiles: PigeonPublicFilesClient,
     private readonly publicImageUploadPreparer: Pick<
       PublicImageUploadPreparer,
@@ -241,7 +240,7 @@ export class PigeonStickersApi {
   ): Promise<StickerPackResource> {
     const path = '/stickers/packs';
     const saved = this.libraryRecord(session, 'saved', input.packId);
-    const savedPackMutation = this.mutations.sign(
+    const savedPackMutation = await this.mutations.sign(
       session,
       {
         kind: 'put',

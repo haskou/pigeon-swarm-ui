@@ -111,7 +111,7 @@ export class PigeonCallsApi {
       conversationId,
     );
     const nonce = this.events.nonce();
-    const start = this.events.start(session, {
+    const start = await this.events.start(session, {
       networkId: conversation.networkId,
       nonce,
       participantIds: conversation.participantIds,
@@ -144,7 +144,7 @@ export class PigeonCallsApi {
       communityId,
       channelId,
     );
-    const start = this.events.start(session, {
+    const start = await this.events.start(session, {
       networkId,
       nonce,
       participantIds: [],
@@ -245,7 +245,7 @@ export class PigeonCallsApi {
     at: number,
   ): Promise<void> {
     const path = `/calls/${encodeURIComponent(callId)}`;
-    const body = { at, mutation: this.events.end(session, callId, at) };
+    const body = { at, mutation: await this.events.end(session, callId, at) };
 
     await this.http.request(path, {
       body: JSON.stringify(body),

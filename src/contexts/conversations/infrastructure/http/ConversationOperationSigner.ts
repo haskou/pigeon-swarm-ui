@@ -10,12 +10,12 @@ import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/P
  * rebuild it from the operation alone.
  */
 export class ConversationOperationSigner {
-  private readonly mutations = new PublicMutationSigner();
+  public constructor(private readonly mutations: PublicMutationSigner) {}
 
-  public sign(
+  public async sign(
     session: Session,
     input: ConversationOperationInput,
-  ): ConversationOperationBody {
+  ): Promise<ConversationOperationBody> {
     const parents = [...input.parents].sort();
     const body = {
       action: input.action,
@@ -28,7 +28,7 @@ export class ConversationOperationSigner {
       scopeType: 'conversation_operation',
     };
     const recordId = `conversation:${input.conversationId}:op:${this.mutations.digestOfValue(body)}`;
-    const mutation = this.mutations.sign(
+    const mutation = await this.mutations.sign(
       session,
       {
         kind: 'put',

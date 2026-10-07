@@ -30,11 +30,11 @@ import { deriveInviteToken } from './deriveCommunityRecordId';
 export class PigeonCommunityInvitationApi {
   private readonly notificationPath = '/notifications/';
 
-  private readonly moderationLogs = new CommunityModerationLogSigner();
+  private readonly moderationLogs: CommunityModerationLogSigner;
 
-  private readonly mutations = new PublicMutationSigner();
+  private readonly notifications: NotificationMutationSigner;
 
-  private readonly operations = new CommunityOperationSigner();
+  private readonly operations: CommunityOperationSigner;
 
   public constructor(
     private readonly http: HttpJsonClient,
@@ -45,7 +45,12 @@ export class PigeonCommunityInvitationApi {
     >,
     private readonly identities: Pick<PigeonIdentityGateway, 'get'>,
     private readonly keychains: Pick<PigeonKeychainApi, 'publishKeychain'>,
-  ) {}
+    private readonly mutations: PublicMutationSigner,
+  ) {
+    this.moderationLogs = new CommunityModerationLogSigner(mutations);
+    this.notifications = new NotificationMutationSigner(mutations);
+    this.operations = new CommunityOperationSigner(mutations);
+  }
 
   private createKeyEntry(communityId: string): ConversationKeyEntry {
     return {
@@ -152,7 +157,7 @@ export class PigeonCommunityInvitationApi {
       async (mutation) => {
         const body = {
           createdAt,
-          moderationLog: this.moderationLogs.sign(session, {
+          moderationLog: await this.moderationLogs.sign(session, {
             action: 'invite_link_created',
             communityId,
             createdAt,
@@ -209,7 +214,7 @@ export class PigeonCommunityInvitationApi {
       recipientKeyEntry,
     );
 
-    const invitation = new NotificationMutationSigner().invitation(session, {
+    const invitation = await this.notifications.invitation(session, {
       encryptedKey: encryptedCommunityKey,
       recipientIdentityId: recipientIdentity.id,
       subjectId: keyEntry.conversationId,
@@ -396,7 +401,7 @@ export class PigeonCommunityInvitationApi {
     const usedAt = Date.now();
     const communityId = invite.communityId as string;
     const networkId = invite.networkId as string;
-    const operation = this.operations.sign(session, {
+    const operation = await this.operations.sign(session, {
       action: 'member_joined',
       args: { identityId, method: 'invite_link', reference: token },
       communityId,

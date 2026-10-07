@@ -50,19 +50,21 @@ const present = <T extends Record<string, unknown>>(value: T): Partial<T> =>
 
 export class PigeonCommunitiesApi {
   private readonly draftPayloads: DraftPayloadCipher;
-  private readonly moderationLogs = new CommunityModerationLogSigner();
-  private readonly mutations = new PublicMutationSigner();
-  private readonly operations = new CommunityOperationSigner();
+  private readonly moderationLogs: CommunityModerationLogSigner;
+  private readonly operations: CommunityOperationSigner;
 
   public constructor(
     private readonly http: HttpJsonClient,
     private readonly signer: RequestSigner,
     private readonly cachedRequest: CachedRequest,
+    private readonly mutations: PublicMutationSigner,
     draftPayloads?: DraftPayloadCipher,
     private readonly invalidateCachedRequest: CachedRequestInvalidator = () =>
       undefined,
   ) {
     this.draftPayloads = draftPayloads ?? new DraftPayloadCipher();
+    this.moderationLogs = new CommunityModerationLogSigner(mutations);
+    this.operations = new CommunityOperationSigner(mutations);
   }
 
   private randomNonce(): string {
@@ -86,7 +88,7 @@ export class PigeonCommunitiesApi {
     args: Record<string, unknown>,
     createdAt: number,
   ): Promise<CommunityOperationBody> {
-    return this.operations.sign(session, {
+    return await this.operations.sign(session, {
       action,
       args,
       communityId,
@@ -153,8 +155,8 @@ export class PigeonCommunitiesApi {
 
     await submitPublicMutation(
       PublicMutationSigner.FIRST_POSITION,
-      (position) => {
-        const mutation = this.mutations.sign(
+      async (position) => {
+        const mutation = await this.mutations.sign(
           session,
           {
             kind: 'put',
@@ -168,7 +170,7 @@ export class PigeonCommunitiesApi {
         if (accepted) {
           acceptance = {
             acceptedAt: accepted.updatedAt,
-            acceptedMutation: this.mutations.sign(
+            acceptedMutation: await this.mutations.sign(
               session,
               {
                 kind: 'put',
@@ -246,7 +248,7 @@ export class PigeonCommunitiesApi {
     );
 
     return {
-      moderationLog: this.moderationLogs.sign(session, {
+      moderationLog: await this.moderationLogs.sign(session, {
         action: 'channel_created',
         communityId,
         createdAt,
@@ -531,7 +533,7 @@ export class PigeonCommunitiesApi {
       ownerIdentityId,
       nonce,
     );
-    const operation = this.operations.sign(session, {
+    const operation = await this.operations.sign(session, {
       action: 'community_created',
       args: {
         ...present({ avatar: input.avatar || undefined }),
@@ -600,7 +602,7 @@ export class PigeonCommunitiesApi {
     };
     const body = {
       ...merged,
-      moderationLog: this.moderationLogs.sign(session, {
+      moderationLog: await this.moderationLogs.sign(session, {
         action: 'community_updated',
         communityId,
         createdAt,
@@ -657,7 +659,7 @@ export class PigeonCommunitiesApi {
       {
         createdAt,
         identityId,
-        moderationLog: this.moderationLogs.sign(session, {
+        moderationLog: await this.moderationLogs.sign(session, {
           action: 'invitation_created',
           communityId,
           createdAt,
@@ -677,7 +679,7 @@ export class PigeonCommunitiesApi {
     const createdAt = Date.now();
     const body = {
       identityId,
-      moderationLog: this.moderationLogs.sign(session, {
+      moderationLog: await this.moderationLogs.sign(session, {
         action: 'member_banned',
         communityId,
         createdAt,
@@ -710,7 +712,7 @@ export class PigeonCommunitiesApi {
     )}/bans/${encodeURIComponent(identityId)}`;
     const createdAt = Date.now();
     const body = {
-      moderationLog: this.moderationLogs.sign(session, {
+      moderationLog: await this.moderationLogs.sign(session, {
         action: 'member_unbanned',
         communityId,
         createdAt,
@@ -875,7 +877,7 @@ export class PigeonCommunitiesApi {
       path,
       this.membershipRequestRecord({ ...current, status, updatedAt }),
       {
-        moderationLog: this.moderationLogs.sign(session, {
+        moderationLog: await this.moderationLogs.sign(session, {
           action:
             status === 'accepted'
               ? 'membership_request_accepted'
@@ -956,7 +958,7 @@ export class PigeonCommunitiesApi {
       createdAt,
     );
     const body = {
-      moderationLog: this.moderationLogs.sign(session, {
+      moderationLog: await this.moderationLogs.sign(session, {
         action: 'role_created',
         communityId,
         createdAt,
@@ -992,7 +994,7 @@ export class PigeonCommunitiesApi {
     )}/roles/${encodeURIComponent(roleId)}`;
     const createdAt = Date.now();
     const body = {
-      moderationLog: this.moderationLogs.sign(session, {
+      moderationLog: await this.moderationLogs.sign(session, {
         action: 'role_updated',
         communityId,
         createdAt,
@@ -1028,7 +1030,7 @@ export class PigeonCommunitiesApi {
 
     const createdAt = Date.now();
     const body = {
-      moderationLog: this.moderationLogs.sign(session, {
+      moderationLog: await this.moderationLogs.sign(session, {
         action: 'role_deleted',
         communityId,
         createdAt,
@@ -1062,7 +1064,7 @@ export class PigeonCommunitiesApi {
     )}/members/${encodeURIComponent(identityId)}/roles`;
     const createdAt = Date.now();
     const body = {
-      moderationLog: this.moderationLogs.sign(session, {
+      moderationLog: await this.moderationLogs.sign(session, {
         action: 'member_roles_updated',
         communityId,
         createdAt,
@@ -1173,7 +1175,7 @@ export class PigeonCommunitiesApi {
     )}/channels/${encodeURIComponent(channelId)}`;
     const createdAt = Date.now();
     const body = {
-      moderationLog: this.moderationLogs.sign(session, {
+      moderationLog: await this.moderationLogs.sign(session, {
         action: 'channel_renamed',
         communityId,
         createdAt,
@@ -1218,7 +1220,7 @@ export class PigeonCommunitiesApi {
 
     const createdAt = Date.now();
     const body = {
-      moderationLog: this.moderationLogs.sign(session, {
+      moderationLog: await this.moderationLogs.sign(session, {
         action: 'channel_deleted',
         communityId,
         createdAt,
@@ -1256,7 +1258,7 @@ export class PigeonCommunitiesApi {
     )}/channels/${encodeURIComponent(channelId)}/permissions`;
     const createdAt = Date.now();
     const body = {
-      moderationLog: this.moderationLogs.sign(session, {
+      moderationLog: await this.moderationLogs.sign(session, {
         action: 'channel_permissions_updated',
         communityId,
         createdAt,
@@ -1614,7 +1616,7 @@ export class PigeonCommunitiesApi {
       path,
       { kind: 'delete', payload },
       {
-        moderationLog: this.moderationLogs.sign(session, {
+        moderationLog: await this.moderationLogs.sign(session, {
           action: 'message_deleted',
           communityId,
           createdAt,

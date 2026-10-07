@@ -34,6 +34,36 @@ describe(submitPublicMutation.name, () => {
     expect(send).toHaveBeenCalledTimes(2);
   });
 
+  it('signs again on every attempt, so an asynchronous signer observes a newer authorization revision', async () => {
+    let revision = 3;
+    const signAsync = jest.fn((position) =>
+      Promise.resolve({
+        ...position,
+        authorizationRevision: revision,
+      } as unknown as SignedPublicMutation),
+    );
+    const send = jest
+      .fn()
+      .mockImplementationOnce(() => {
+        revision = 4;
+
+        return Promise.reject(stale(0));
+      })
+      .mockResolvedValueOnce(undefined);
+
+    await submitPublicMutation(
+      { predecessor: null, sequence: 0 },
+      signAsync,
+      send,
+    );
+
+    expect(
+      (send.mock.calls as [{ authorizationRevision: number }][]).map(
+        ([mutation]) => mutation.authorizationRevision,
+      ),
+    ).toEqual([3, 4]);
+  });
+
   it('does not retry other conflicts and bounds the retries', async () => {
     const other = new HttpJsonError(
       409,
