@@ -51,6 +51,22 @@ describe(toUserErrorMessage.name, () => {
     );
   });
 
+  it('translates identity publication rate limit errors', () => {
+    const error = new HttpJsonError(
+      429,
+      'Too Many Requests',
+      JSON.stringify({
+        code: 429040,
+        httpStatus: 429,
+        message: 'Identity publication rate limit exceeded.',
+      }),
+    );
+
+    expect(toUserErrorMessage(error, 'fallback')).toBe(
+      copy.errors.backend[429040],
+    );
+  });
+
   it('falls back to readable HTTP status messages instead of raw JSON', () => {
     const error = new HttpJsonError(
       422,
