@@ -8,7 +8,6 @@ import type {
   NotificationResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestCache } from '../../../../shared/infrastructure/http/RequestCache';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
@@ -21,6 +20,7 @@ import type { ConversationOperationBody } from './ConversationOperationBody';
 import type { ConversationOperationSigner } from './ConversationOperationSigner';
 import type { ConversationTarget } from './ConversationTarget';
 import type { GroupConversationInput } from './GroupConversationInput';
+import type { PigeonConversationCommandsApiDependencies } from './PigeonConversationCommandsApiDependencies';
 
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { NotificationMutationSigner } from '../../../notifications/infrastructure/http/NotificationMutationSigner';
@@ -31,18 +31,25 @@ import { ConversationParticipantId } from '../../domain/value-objects/Conversati
 export class PigeonConversationCommandsApi {
   private readonly invitations: NotificationMutationSigner;
 
-  public constructor(
-    private readonly http: HttpJsonClient,
-    private readonly signer: RequestSigner,
-    private readonly conversations: ConversationMapper,
-    private readonly ids: ConversationIdFactory,
-    private readonly identities: ConversationIdentityReader,
-    private readonly keychains: ConversationKeychainPublisher,
-    private readonly requestCache: RequestCache,
-    private readonly operations: ConversationOperationSigner,
-    mutations: PublicMutationSigner,
-  ) {
-    this.invitations = new NotificationMutationSigner(mutations);
+  private readonly http: HttpJsonClient;
+  private readonly signer: RequestSigner;
+  private readonly conversations: ConversationMapper;
+  private readonly ids: ConversationIdFactory;
+  private readonly identities: ConversationIdentityReader;
+  private readonly keychains: ConversationKeychainPublisher;
+  private readonly requestCache: RequestCache;
+  private readonly operations: ConversationOperationSigner;
+
+  public constructor(dependencies: PigeonConversationCommandsApiDependencies) {
+    this.http = dependencies.http;
+    this.signer = dependencies.signer;
+    this.conversations = dependencies.conversations;
+    this.ids = dependencies.ids;
+    this.identities = dependencies.identities;
+    this.keychains = dependencies.keychains;
+    this.requestCache = dependencies.requestCache;
+    this.operations = dependencies.operations;
+    this.invitations = new NotificationMutationSigner(dependencies.mutations);
   }
 
   private async createInvitation(
