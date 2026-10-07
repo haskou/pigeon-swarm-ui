@@ -1,3 +1,5 @@
+import type { Timestamp } from '@haskou/value-objects';
+
 import type { Call } from '../../domain/Call';
 import type { CallMediaConnection } from '../../domain/entities/CallMediaConnection';
 import type { CallRepository } from '../../domain/repositories/CallRepository';
@@ -19,6 +21,7 @@ export class PigeonCallRepository implements CallRepository {
   public async create(
     scope: CallScope,
     actorIdentityId: CallIdentityId,
+    startedAt: Timestamp,
   ): Promise<Call> {
     const session = this.contexts.find(actorIdentityId);
     const primitives = scope.toPrimitives();
@@ -28,16 +31,26 @@ export class PigeonCallRepository implements CallRepository {
             session,
             primitives.communityId,
             primitives.channelId,
+            startedAt.valueOf(),
           )
-        : await this.api.startConversation(session, primitives.conversationId);
+        : await this.api.startConversation(
+            session,
+            primitives.conversationId,
+            startedAt.valueOf(),
+          );
 
     return this.mapper.fromResource(resource);
   }
 
-  public async end(call: Call, actorIdentityId: CallIdentityId): Promise<void> {
+  public async end(
+    call: Call,
+    actorIdentityId: CallIdentityId,
+    endedAt: Timestamp,
+  ): Promise<void> {
     await this.api.end(
       this.contexts.find(actorIdentityId),
       call.getId().toString(),
+      endedAt.valueOf(),
     );
   }
 
@@ -68,10 +81,12 @@ export class PigeonCallRepository implements CallRepository {
   public async join(
     call: Call,
     actorIdentityId: CallIdentityId,
+    joinedAt: Timestamp,
   ): Promise<Call> {
     const resource = await this.api.join(
       this.contexts.find(actorIdentityId),
       call.getId().toString(),
+      joinedAt.valueOf(),
     );
 
     return this.mapper.fromResource(resource);
@@ -80,10 +95,14 @@ export class PigeonCallRepository implements CallRepository {
   public async leave(
     call: Call,
     actorIdentityId: CallIdentityId,
+    leftAt: Timestamp,
+    declined: boolean,
   ): Promise<void> {
     await this.api.leave(
       this.contexts.find(actorIdentityId),
       call.getId().toString(),
+      leftAt.valueOf(),
+      declined,
     );
   }
 

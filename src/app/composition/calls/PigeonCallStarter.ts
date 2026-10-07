@@ -26,6 +26,7 @@ export class PigeonCallStarter {
         communityId,
         channelId,
         this.sessions.register(session),
+        Date.now(),
       ),
     );
 
@@ -40,6 +41,7 @@ export class PigeonCallStarter {
       new StartConversationCallMessage(
         conversationId,
         this.sessions.register(session),
+        Date.now(),
       ),
     );
 

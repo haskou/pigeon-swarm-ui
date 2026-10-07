@@ -1,19 +1,77 @@
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { SignedPublicMutation } from '../../../../shared/infrastructure/crypto/SignedPublicMutation';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { CallSignalPayload } from '../media/CallSignalPayload';
+import type { CallParticipantState } from './CallEventSigner';
+import type { CallScopeLookup } from './CallScopeLookup';
 import type { CallIceServerResource as CallIceServerConfig } from './resources/CallIceServerResource';
 import type { CallParticipantMediaConnectionResource as CallParticipantMediaConnection } from './resources/CallParticipantMediaConnectionResource';
 import type { CallResource } from './resources/CallResource';
 import type { CallSignalDeliveryResource as CallSignalDelivery } from './resources/CallSignalDeliveryResource';
 
+import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
+import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
+import { CallEventSigner } from './CallEventSigner';
 import { CallSignalRequestBody } from './CallSignalRequestBody';
 
 export class PigeonCallsApi {
   public constructor(
     private readonly http: HttpJsonClient,
     private readonly signer: RequestSigner,
+    private readonly events: CallEventSigner,
+    private readonly scopes: CallScopeLookup,
   ) {}
+
+  private async nextSessionEpoch(
+    session: Session,
+    communityId: string,
+    channelId: string,
+  ): Promise<number> {
+    const live = await this.list(session);
+    const epochs = live
+      .filter(
+        (call) =>
+          call.scope.type === 'community_channel' &&
+          call.scope.communityId === communityId &&
+          call.scope.channelId === channelId,
+      )
+      // The node serves the epoch of community calls; the UI domain ignores it.
+      .map((call) => (call as { sessionEpoch?: number }).sessionEpoch ?? 0);
+
+    return Math.max(0, ...epochs) + 1;
+  }
+
+  private async post(
+    session: Session,
+    path: string,
+    body: Record<string, unknown>,
+  ): Promise<CallResource> {
+    return await this.http.request<CallResource>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
+  }
+
+  /**
+   * One participant record per call and identity: a stale position answered by
+   * the node is re-signed as the successor of what it already stores.
+   */
+  private async submitParticipant(
+    session: Session,
+    callId: string,
+    state: CallParticipantState,
+    at: number,
+    send: (mutation: SignedPublicMutation) => Promise<void>,
+  ): Promise<void> {
+    await submitPublicMutation(
+      PublicMutationSigner.FIRST_POSITION,
+      (position) =>
+        this.events.participant(session, callId, state, at, position),
+      send,
+    );
+  }
 
   public async list(session: Session): Promise<CallResource[]> {
     const path = '/calls/';
@@ -46,17 +104,27 @@ export class PigeonCallsApi {
   public async startConversation(
     session: Session,
     conversationId: string,
+    startedAt: number,
   ): Promise<CallResource> {
-    const path = '/calls/';
-    const body = {
+    const conversation = await this.scopes.conversation(
+      session,
       conversationId,
-      scopeType: 'conversation',
-    };
+    );
+    const nonce = this.events.nonce();
+    const start = this.events.start(session, {
+      networkId: conversation.networkId,
+      nonce,
+      participantIds: conversation.participantIds,
+      scope: { conversationId, type: 'conversation' },
+      startedAt,
+    });
 
-    return await this.http.request<CallResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
+    return await this.post(session, '/calls/', {
+      conversationId,
+      mutation: start.mutation,
+      nonce,
+      scopeType: 'conversation',
+      startedAt,
     });
   }
 
@@ -64,40 +132,94 @@ export class PigeonCallsApi {
     session: Session,
     communityId: string,
     channelId: string,
+    startedAt: number,
   ): Promise<CallResource> {
-    const path = '/calls/';
-    const body = {
+    const networkId = await this.scopes.communityNetworkId(
+      session,
+      communityId,
+    );
+    const nonce = this.events.nonce();
+    const sessionEpoch = await this.nextSessionEpoch(
+      session,
+      communityId,
+      channelId,
+    );
+    const start = this.events.start(session, {
+      networkId,
+      nonce,
+      participantIds: [],
+      scope: { channelId, communityId, type: 'community_channel' },
+      sessionEpoch,
+      startedAt,
+    });
+    const call = await this.post(session, '/calls/', {
       channelId,
       communityId,
+      mutation: start.mutation,
+      nonce,
       scopeType: 'community_channel',
-    };
-
-    return await this.http.request<CallResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
+      sessionEpoch,
+      startedAt,
     });
+
+    // The node answers with the channel's live call and stores no start when
+    // one exists; this client then joins it with a signed participant state.
+    return call.id === start.callId
+      ? call
+      : await this.join(session, call.id, startedAt);
   }
 
-  public async join(session: Session, callId: string): Promise<CallResource> {
+  public async join(
+    session: Session,
+    callId: string,
+    at: number,
+  ): Promise<CallResource> {
     const path = `/calls/${encodeURIComponent(callId)}/participants`;
-    const body = {};
+    let call: CallResource | undefined;
 
-    return await this.http.request<CallResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
+    await this.submitParticipant(
+      session,
+      callId,
+      'joined',
+      at,
+      async (mutation) => {
+        const body = { at, mutation };
+
+        call = await this.http.request<CallResource>(path, {
+          body: JSON.stringify(body),
+          headers: await this.signer.headers(session, 'POST', path, body),
+          method: 'POST',
+        });
+      },
+    );
+
+    return call as CallResource;
   }
 
-  public async leave(session: Session, callId: string): Promise<void> {
+  public async leave(
+    session: Session,
+    callId: string,
+    at: number,
+    declined: boolean,
+  ): Promise<void> {
     const path = `/calls/${encodeURIComponent(callId)}/participants/me`;
 
-    await this.http.request(path, {
-      headers: await this.signer.headers(session, 'DELETE', path),
-      keepalive: true,
-      method: 'DELETE',
-    });
+    await this.submitParticipant(
+      session,
+      callId,
+      declined ? 'declined' : 'left',
+      at,
+      async (mutation) => {
+        const body = { at, mutation };
+
+        await this.http.request(path, {
+          body: JSON.stringify(body),
+          headers: await this.signer.headers(session, 'DELETE', path, body),
+          keepalive: true,
+          method: 'DELETE',
+        });
+      },
+    );
   }
 
   public async heartbeat(
@@ -117,11 +239,17 @@ export class PigeonCallsApi {
     });
   }
 
-  public async end(session: Session, callId: string): Promise<void> {
+  public async end(
+    session: Session,
+    callId: string,
+    at: number,
+  ): Promise<void> {
     const path = `/calls/${encodeURIComponent(callId)}`;
+    const body = { at, mutation: this.events.end(session, callId, at) };
 
     await this.http.request(path, {
-      headers: await this.signer.headers(session, 'DELETE', path),
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'DELETE', path, body),
       method: 'DELETE',
     });
   }

@@ -1,3 +1,5 @@
+import { Timestamp } from '@haskou/value-objects';
+
 import type { CallRepository } from '../../../../contexts/calls/domain/repositories/CallRepository';
 import type { CallSignalRepository } from '../../../../contexts/calls/domain/repositories/CallSignalRepository';
 
@@ -84,16 +86,19 @@ describe('call application use cases', () => {
     calls.create.mockResolvedValue(call);
 
     await new ConversationCallStarter(calls).start(
-      new StartConversationCallMessage('conversation-a', 'identity-a'),
+      new StartConversationCallMessage('conversation-a', 'identity-a', 7),
     );
     await new CommunityChannelCallStarter(calls).start(
       new StartCommunityChannelCallMessage(
         'community-a',
         'channel-a',
         'identity-a',
+        8,
       ),
     );
 
+    expect(calls.create.mock.calls[0]?.[2].valueOf()).toBe(7);
+    expect(calls.create.mock.calls[1]?.[2].valueOf()).toBe(8);
     expect(calls.create.mock.calls[0]?.[0].toPrimitives()).toEqual({
       conversationId: 'conversation-a',
       type: 'conversation',
@@ -140,6 +145,17 @@ describe('call application use cases', () => {
       new LeaveCallMessage('call-a', 'identity-a', 30),
     );
     expect(left.toPrimitives().participants[0]?.status).toBe('left');
+    // Leaving while still ringing is signed as a decline.
+    expect(calls.leave.mock.calls[0]?.[3]).toBe(true);
+
+    const joinedLeaver = callFixture();
+    joinedLeaver.joinParticipant(actorId, new Timestamp(20));
+    calls.find.mockResolvedValueOnce(joinedLeaver);
+    await new CallLeaver(calls).leave(
+      new LeaveCallMessage('call-a', 'identity-a', 30),
+    );
+    expect(calls.leave.mock.calls[1]?.[2].valueOf()).toBe(30);
+    expect(calls.leave.mock.calls[1]?.[3]).toBe(false);
 
     const ended = callFixture();
     calls.find.mockResolvedValueOnce(ended);

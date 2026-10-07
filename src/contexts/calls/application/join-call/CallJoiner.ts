@@ -15,6 +15,10 @@ export class CallJoiner {
 
     call.joinParticipant(actorIdentityId, message.getOccurredAt());
 
-    return await this.callRepository.join(call, actorIdentityId);
+    return await this.callRepository.join(
+      call,
+      actorIdentityId,
+      message.getOccurredAt(),
+    );
   }
 }

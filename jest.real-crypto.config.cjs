@@ -16,6 +16,7 @@ module.exports = {
     '**/PigeonDeviceAuthorizationApi.spec.ts',
     '**/CommunityOperationSigner.spec.ts',
     '**/ConversationOperationSigner.spec.ts',
+    '**/CallEventSigner.spec.ts',
   ],
   testPathIgnorePatterns: [],
   transform: {

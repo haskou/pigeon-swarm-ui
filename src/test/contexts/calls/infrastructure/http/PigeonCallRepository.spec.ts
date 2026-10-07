@@ -1,3 +1,5 @@
+import { Timestamp } from '@haskou/value-objects';
+
 import type { PigeonCallsApi } from '../../../../../contexts/calls/infrastructure/http/PigeonCallsApi';
 import type { CallResource } from '../../../../../contexts/calls/infrastructure/http/resources/CallResource';
 import type { Session } from '../../../../../shared/domain/pigeonResources.types';
@@ -54,17 +56,22 @@ describe(PigeonCallRepository.name, () => {
     await repository.create(
       CallScope.conversation(CallScopeIdentifier.fromString('conversation-a')),
       actorId,
+      new Timestamp(10),
     );
-    await repository.join(call, actorId);
+    await repository.join(call, actorId, new Timestamp(11));
     await repository.heartbeat(call.getId(), actorId, []);
-    await repository.leave(call, actorId);
-    await repository.end(call, actorId);
+    await repository.leave(call, actorId, new Timestamp(12), true);
+    await repository.end(call, actorId, new Timestamp(13));
 
     expect(api.get).toHaveBeenCalledWith(session, 'call-a');
     expect(api.startConversation).toHaveBeenCalledWith(
       session,
       'conversation-a',
+      10,
     );
+    expect(api.join).toHaveBeenCalledWith(session, 'call-a', 11);
+    expect(api.leave).toHaveBeenCalledWith(session, 'call-a', 12, true);
+    expect(api.end).toHaveBeenCalledWith(session, 'call-a', 13);
     expect(api.heartbeat).toHaveBeenCalledWith(session, 'call-a', []);
   });
 
@@ -87,12 +94,14 @@ describe(PigeonCallRepository.name, () => {
         CallScopeIdentifier.fromString('channel-a'),
       ),
       CallIdentityId.fromString('identity-a'),
+      new Timestamp(10),
     );
 
     expect(api.startCommunityChannel).toHaveBeenCalledWith(
       session,
       'community-a',
       'channel-a',
+      10,
     );
   });
 });

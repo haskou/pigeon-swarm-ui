@@ -1,5 +1,6 @@
 import type { CallRepository } from '../../domain/repositories/CallRepository';
 
+import { CallParticipantStatus } from '../../domain/value-objects/CallParticipantStatus';
 import { LeaveCallMessage } from './messages/LeaveCallMessage';
 
 export class CallLeaver {
@@ -12,7 +13,18 @@ export class CallLeaver {
       actorIdentityId,
     );
 
+    // A leave while still ringing is signed as a decline.
+    const declined = call.hasParticipantStatus(
+      actorIdentityId,
+      CallParticipantStatus.RINGING,
+    );
+
     call.leaveParticipant(actorIdentityId, message.getOccurredAt());
-    await this.callRepository.leave(call, actorIdentityId);
+    await this.callRepository.leave(
+      call,
+      actorIdentityId,
+      message.getOccurredAt(),
+      declined,
+    );
   }
 }

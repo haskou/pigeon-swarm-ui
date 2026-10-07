@@ -10,6 +10,7 @@ export class CommunityChannelCallStarter {
     return await this.callRepository.create(
       message.getScope(),
       message.getActorIdentityId(),
+      message.getStartedAt(),
     );
   }
 }
