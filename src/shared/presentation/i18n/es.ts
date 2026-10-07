@@ -764,6 +764,8 @@ export const es = {
         'Solo el propietario del nodo puede hacer eso.',
       CommunityMemberBannedError: 'Estás vetado de esa comunidad.',
       CommunityMemberNotFoundError: 'No eres miembro de esa comunidad.',
+      CommunityOperationLimitExceededError:
+        'Ese cambio es demasiado grande o has usado todas las acciones que se te permiten en esta comunidad.',
       CommunityOwnerCannotLeaveError:
         'El propietario de la comunidad no puede abandonarla.',
       ConversationMustHaveTwoDifferentParticipantsError:

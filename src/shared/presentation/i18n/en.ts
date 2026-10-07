@@ -754,6 +754,8 @@ export const en = {
         'Only the node owner can do that.',
       CommunityMemberBannedError: 'You are banned from that community.',
       CommunityMemberNotFoundError: 'You are not a member of that community.',
+      CommunityOperationLimitExceededError:
+        'That change is too large, or you have used all the actions allowed to you in this community.',
       CommunityOwnerCannotLeaveError:
         'The community owner cannot leave the community.',
       ConversationMustHaveTwoDifferentParticipantsError:

@@ -82,6 +82,24 @@ describe(toUserErrorMessage.name, () => {
     );
   });
 
+  it('translates the community operation limit error instead of the generic fallback', () => {
+    const error = new HttpJsonError(
+      409,
+      'Conflict',
+      JSON.stringify({
+        code: 'CommunityOperationLimitExceededError',
+        message: 'Community operation limit exceeded',
+      }),
+    );
+
+    const message = toUserErrorMessage(error, 'fallback');
+
+    expect(message).not.toBe('fallback');
+    expect(message).toBe(
+      copy.errors.backend.CommunityOperationLimitExceededError,
+    );
+  });
+
   it('falls back to readable HTTP status messages instead of raw JSON', () => {
     const error = new HttpJsonError(
       422,
