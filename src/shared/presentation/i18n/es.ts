@@ -478,6 +478,7 @@ export const es = {
       invitation_created: 'Invitación creada',
       invite_link_created: 'Enlace de invitación creado',
       member_banned: 'Miembro baneado',
+      member_kicked: 'Miembro expulsado',
       member_roles_updated: 'Roles del miembro actualizados',
       member_unbanned: 'Miembro desbaneado',
       membership_request_accepted: 'Solicitud aceptada',

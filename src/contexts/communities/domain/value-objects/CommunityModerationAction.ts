@@ -9,6 +9,7 @@ const values = [
   'invitation_created',
   'invite_link_created',
   'member_banned',
+  'member_kicked',
   'member_roles_updated',
   'member_unbanned',
   'membership_request_accepted',
