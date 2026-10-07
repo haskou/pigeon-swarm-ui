@@ -64,6 +64,6 @@ export class PigeonCallParticipation {
     session: Session,
     callId: string,
   ): Promise<void> {
-    await this.api.leave(session, callId);
+    await this.api.leave(session, callId, Date.now(), false);
   }
 }

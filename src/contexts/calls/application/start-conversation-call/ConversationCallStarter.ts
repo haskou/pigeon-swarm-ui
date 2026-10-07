@@ -10,6 +10,7 @@ export class ConversationCallStarter {
     return await this.callRepository.create(
       message.getScope(),
       message.getActorIdentityId(),
+      message.getStartedAt(),
     );
   }
 }

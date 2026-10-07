@@ -19,6 +19,7 @@ import { PigeonPublicFilesClient } from '../../contexts/attachments/infrastructu
 import { PigeonPublicFileUploader } from '../../contexts/attachments/infrastructure/http/PigeonPublicFileUploader';
 import { MessageAttachmentThumbnailPreparer } from '../../contexts/attachments/infrastructure/media/MessageAttachmentThumbnailPreparer';
 import { PublicImageUploadPreparer } from '../../contexts/attachments/infrastructure/media/PublicImageUploadPreparer';
+import { CallEventSigner } from '../../contexts/calls/infrastructure/http/CallEventSigner';
 import { PigeonCallsApi } from '../../contexts/calls/infrastructure/http/PigeonCallsApi';
 import { PigeonCommunitiesApi } from '../../contexts/communities/infrastructure/http/PigeonCommunitiesApi';
 import { PigeonCommunitiesGateway } from '../../contexts/communities/infrastructure/http/PigeonCommunitiesGateway';
@@ -114,8 +115,6 @@ export class PigeonApiGateway {
     conversationIds: ConversationIdFactory = new ConversationIdFactory(),
     attachmentCipher: AttachmentCipher = AttachmentCipher.inCurrentThread(),
   ) {
-    this.calls = new PigeonCallsApi(http, signer);
-
     const communitiesApi = new PigeonCommunitiesApi(
       http,
       signer,
@@ -132,6 +131,21 @@ export class PigeonApiGateway {
       signer,
       conversationMapper,
     );
+    this.calls = new PigeonCallsApi(http, signer, new CallEventSigner(), {
+      communityNetworkId: async (session, communityId) =>
+        (await communitiesApi.get(session, communityId)).networkId,
+      conversation: async (session, conversationId) => {
+        const conversation = (await conversationsApi.list(session)).find(
+          (candidate) => candidate.id === conversationId,
+        );
+
+        if (!conversation) {
+          throw new Error(`Conversation ${conversationId} is not available`);
+        }
+
+        return conversation;
+      },
+    });
     const contentReplication = new PigeonContentReplicationClient(http, signer);
     const privateFiles = new PigeonPrivateFilesClient(
       http,

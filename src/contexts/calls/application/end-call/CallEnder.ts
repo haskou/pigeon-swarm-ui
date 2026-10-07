@@ -13,6 +13,10 @@ export class CallEnder {
     );
 
     call.end(message.getOccurredAt());
-    await this.callRepository.end(call, actorIdentityId);
+    await this.callRepository.end(
+      call,
+      actorIdentityId,
+      message.getOccurredAt(),
+    );
   }
 }
