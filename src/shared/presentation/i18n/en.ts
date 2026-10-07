@@ -471,6 +471,7 @@ export const en = {
       invitation_created: 'Invitation created',
       invite_link_created: 'Invite link created',
       member_banned: 'Member banned',
+      member_kicked: 'Member kicked',
       member_roles_updated: 'Member roles updated',
       member_unbanned: 'Member unbanned',
       membership_request_accepted: 'Membership request accepted',

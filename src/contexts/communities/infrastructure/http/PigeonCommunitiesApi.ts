@@ -743,13 +743,21 @@ export class PigeonCommunitiesApi {
     const path = `/communities/${encodeURIComponent(
       communityId,
     )}/members/${encodeURIComponent(identityId)}/kick`;
+    const createdAt = Date.now();
     const body = {
+      moderationLog: await this.moderationLogs.sign(session, {
+        action: 'member_kicked',
+        communityId,
+        createdAt,
+        details: {},
+        target: { id: identityId, type: 'member' },
+      }),
       operation: await this.signMemberOperation(
         session,
         communityId,
         'member_kicked',
         { identityId },
-        Date.now(),
+        createdAt,
       ),
     };
 

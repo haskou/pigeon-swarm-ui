@@ -5,6 +5,7 @@ import type { Session } from '../../../../../shared/domain/pigeonResources.types
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
+import { deriveModerationLogId } from '../../../../../contexts/communities/infrastructure/http/deriveCommunityRecordId';
 import { PigeonCommunitiesApi } from '../../../../../contexts/communities/infrastructure/http/PigeonCommunitiesApi';
 import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
@@ -806,7 +807,10 @@ describe(PigeonCommunitiesApi.name, () => {
         parents: [parent],
       });
       await api.kickMember(session, 'community-1', 'member-1');
-      expect(Object.keys(lastBody())).toEqual(['operation']);
+      expect(Object.keys(lastBody()).sort()).toEqual([
+        'moderationLog',
+        'operation',
+      ]);
       await api.leave(session, 'community-1');
       expect(Object.keys(lastBody())).toEqual(['operation']);
       await api.deleteChannel(session, 'community-1', 'channel-1');
@@ -815,6 +819,37 @@ describe(PigeonCommunitiesApi.name, () => {
       await api.assignMemberRoles(session, 'community-1', 'member-1', ['r']);
       await api.update(session, 'community-1', { name: 'New' });
       expect(lastBody().operation.mutation.store).toBe('communityOperations');
+    });
+
+    it('signs a member_kicked log for the kicked identity with the kick operation timestamp', async () => {
+      const { api, http, lastBody, session } = await setup({});
+
+      await api.kickMember(session, 'community-1', 'member-1');
+
+      const calls = (http.request as jest.Mock).mock.calls as [
+        string,
+        { method: string },
+      ][];
+      const [path, init] = calls[calls.length - 1];
+      const { moderationLog, operation } = lastBody();
+
+      expect(path).toBe('/communities/community-1/members/member-1/kick');
+      expect(init.method).toBe('DELETE');
+      expect(moderationLog.mutation).toMatchObject({
+        kind: 'put',
+        predecessor: null,
+        recordId: deriveModerationLogId(
+          'community-1',
+          'identity-1',
+          'member_kicked',
+          'member',
+          'member-1',
+          moderationLog.createdAt,
+        ),
+        sequence: 0,
+        store: 'moderationLogs',
+      });
+      expect(operation.createdAt).toBe(moderationLog.createdAt);
     });
 
     it('derives the log id and the created entity id from the same createdAt', async () => {
