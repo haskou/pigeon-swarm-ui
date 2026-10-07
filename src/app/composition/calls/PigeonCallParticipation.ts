@@ -63,7 +63,8 @@ export class PigeonCallParticipation {
   public async leaveOnPageDeparture(
     session: Session,
     callId: string,
+    declined: boolean,
   ): Promise<void> {
-    await this.api.leave(session, callId, Date.now(), false);
+    await this.api.leave(session, callId, Date.now(), declined);
   }
 }

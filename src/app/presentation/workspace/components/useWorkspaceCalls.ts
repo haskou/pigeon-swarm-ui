@@ -246,6 +246,7 @@ export function useWorkspaceCalls({
     activeCall,
     callDetailsForResource,
     endCall,
+    incomingCall,
     listCalls,
     onCommunitiesReload,
     reconcileCallResource,
