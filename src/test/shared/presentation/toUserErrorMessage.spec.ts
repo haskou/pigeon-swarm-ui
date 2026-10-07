@@ -67,6 +67,21 @@ describe(toUserErrorMessage.name, () => {
     );
   });
 
+  it('translates the banned member error', () => {
+    const error = new HttpJsonError(
+      409,
+      'Conflict',
+      JSON.stringify({
+        code: 'CommunityMemberBannedError',
+        message: 'Identity is banned from this community',
+      }),
+    );
+
+    expect(toUserErrorMessage(error, 'fallback')).toBe(
+      copy.errors.backend.CommunityMemberBannedError,
+    );
+  });
+
   it('falls back to readable HTTP status messages instead of raw JSON', () => {
     const error = new HttpJsonError(
       422,

@@ -751,6 +751,7 @@ export const en = {
         'Only the notification inviter can do that.',
       AuthenticatedIdentityIsNotNodeOwnerError:
         'Only the node owner can do that.',
+      CommunityMemberBannedError: 'You are banned from that community.',
       CommunityMemberNotFoundError: 'You are not a member of that community.',
       CommunityOwnerCannotLeaveError:
         'The community owner cannot leave the community.',

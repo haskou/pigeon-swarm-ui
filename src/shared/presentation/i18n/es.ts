@@ -761,6 +761,7 @@ export const es = {
         'Solo quien envió la notificación puede hacer eso.',
       AuthenticatedIdentityIsNotNodeOwnerError:
         'Solo el propietario del nodo puede hacer eso.',
+      CommunityMemberBannedError: 'Estás vetado de esa comunidad.',
       CommunityMemberNotFoundError: 'No eres miembro de esa comunidad.',
       CommunityOwnerCannotLeaveError:
         'El propietario de la comunidad no puede abandonarla.',
