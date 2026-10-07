@@ -249,17 +249,17 @@ export class PigeonApiGateway {
       identitySession,
       identityWorkspace,
     );
-    const conversationCommands = new PigeonConversationCommandsApi(
+    const conversationCommands = new PigeonConversationCommandsApi({
+      conversations: conversationMapper,
       http,
-      signer,
-      conversationMapper,
-      conversationIds,
-      identityResourceGateway,
-      keychainApi,
-      this.requestCache,
-      new ConversationOperationSigner(mutations),
+      identities: identityResourceGateway,
+      ids: conversationIds,
+      keychains: keychainApi,
       mutations,
-    );
+      operations: new ConversationOperationSigner(mutations),
+      requestCache: this.requestCache,
+      signer,
+    });
 
     this.conversationsGateway = new PigeonConversationsGateway(
       conversationsApi,

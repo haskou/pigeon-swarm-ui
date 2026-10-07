@@ -50,17 +50,17 @@ describe(PigeonConversationCommandsApi.name, () => {
         path.endsWith('/frontier') ? { frontier: ['parent-1'] } : resource,
       ),
     );
-    api = new PigeonConversationCommandsApi(
+    api = new PigeonConversationCommandsApi({
+      conversations: new ConversationMapper(),
       http,
-      requestSigner,
-      new ConversationMapper(),
-      new ConversationIdFactory(),
-      { get: jest.fn() },
-      { publishKeychain: jest.fn() },
-      mock<RequestCache>(),
+      identities: { get: jest.fn() },
+      ids: new ConversationIdFactory(),
+      keychains: { publishKeychain: jest.fn() },
+      mutations: publicMutationSignerAt(),
       operations,
-      publicMutationSignerAt(),
-    );
+      requestCache: mock<RequestCache>(),
+      signer: requestSigner,
+    });
   });
 
   it('rejects invitations when the conversation key is not available', async () => {
