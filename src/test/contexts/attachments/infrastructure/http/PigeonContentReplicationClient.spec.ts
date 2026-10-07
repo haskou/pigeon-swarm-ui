@@ -3,8 +3,8 @@ import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 
 import { PigeonContentReplicationClient } from '../../../../../contexts/attachments/infrastructure/http/PigeonContentReplicationClient';
-import { PublicMutationSigner } from '../../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import vectors from '../../../../fixtures/content-replication-vectors.json';
+import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
 describe(PigeonContentReplicationClient.name, () => {
   async function fixture() {
@@ -21,7 +21,11 @@ describe(PigeonContentReplicationClient.name, () => {
     };
 
     return {
-      client: new PigeonContentReplicationClient(http, signer),
+      client: new PigeonContentReplicationClient(
+        http,
+        signer,
+        publicMutationSignerAt(),
+      ),
       http,
       session,
       signer,
@@ -61,7 +65,7 @@ describe(PigeonContentReplicationClient.name, () => {
       store: 'contentReplication',
     });
     expect(body.mutation.payloadDigest).toBe(
-      new PublicMutationSigner().digestOfValue(vector?.payload),
+      publicMutationSignerAt().digestOfValue(vector?.payload),
     );
     expect(body.mutation.payloadDigest).toBe(vector?.proofBody.payloadDigest);
   });

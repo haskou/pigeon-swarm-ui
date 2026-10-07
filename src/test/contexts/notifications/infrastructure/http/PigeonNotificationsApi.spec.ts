@@ -10,6 +10,7 @@ import type { RequestSigner } from '../../../../../shared/infrastructure/http/Re
 
 import { PigeonNotificationsApi } from '../../../../../contexts/notifications/infrastructure/http/PigeonNotificationsApi';
 import { RequestCache } from '../../../../../shared/infrastructure/http/RequestCache';
+import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
 describe(PigeonNotificationsApi.name, () => {
   const session = { identity: { id: 'recipient' } } as Session;
@@ -22,6 +23,7 @@ describe(PigeonNotificationsApi.name, () => {
       http,
       signer,
       cache.load.bind(cache),
+      publicMutationSignerAt(),
     );
     let resolveOld!: (value: { results: NotificationResource[] }) => void;
     const oldResponse = new Promise<{ results: NotificationResource[] }>(
@@ -60,6 +62,7 @@ describe(PigeonNotificationsApi.name, () => {
       http,
       signer,
       cache.load.bind(cache),
+      publicMutationSignerAt(),
     );
     http.request.mockResolvedValue({ scopes: [] });
 
@@ -77,6 +80,7 @@ describe(PigeonNotificationsApi.name, () => {
         http,
         signer,
         cache.load.bind(cache),
+        publicMutationSignerAt(),
       );
       const signed = {
         deviceCredentialKeyPair: await KeyPair.generate(),

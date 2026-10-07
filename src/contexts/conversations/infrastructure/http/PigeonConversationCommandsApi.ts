@@ -8,6 +8,7 @@ import type {
   NotificationResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestCache } from '../../../../shared/infrastructure/http/RequestCache';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
@@ -28,7 +29,7 @@ import { ConversationNetworkId } from '../../domain/value-objects/ConversationNe
 import { ConversationParticipantId } from '../../domain/value-objects/ConversationParticipantId';
 
 export class PigeonConversationCommandsApi {
-  private readonly invitations = new NotificationMutationSigner();
+  private readonly invitations: NotificationMutationSigner;
 
   public constructor(
     private readonly http: HttpJsonClient,
@@ -39,7 +40,10 @@ export class PigeonConversationCommandsApi {
     private readonly keychains: ConversationKeychainPublisher,
     private readonly requestCache: RequestCache,
     private readonly operations: ConversationOperationSigner,
-  ) {}
+    mutations: PublicMutationSigner,
+  ) {
+    this.invitations = new NotificationMutationSigner(mutations);
+  }
 
   private async createInvitation(
     session: Session,
@@ -56,7 +60,7 @@ export class PigeonConversationCommandsApi {
       .getPublicKey()
       .encrypt(JSON.stringify(recipientKeyEntry))
       .toString();
-    const invitation = this.invitations.invitation(session, {
+    const invitation = await this.invitations.invitation(session, {
       encryptedKey: encryptedConversationKey,
       recipientIdentityId: peerIdentity.id,
       subjectId: keyEntry.conversationId,
@@ -179,7 +183,7 @@ export class PigeonConversationCommandsApi {
     action: string,
     args: Record<string, unknown>,
   ): Promise<ConversationOperationBody> {
-    return this.operations.sign(session, {
+    return await this.operations.sign(session, {
       action,
       args,
       conversationId: target.id,
@@ -250,7 +254,7 @@ export class PigeonConversationCommandsApi {
     const conversation = await this.postConversation(session, published, {
       keychainExternalIdentifier: published.keychainExternalIdentifier,
       networkId,
-      operation: this.operations.sign(session, {
+      operation: await this.operations.sign(session, {
         action: 'conversation_created',
         args: {
           participantIds: [session.identity.id, peerIdentity.id].sort(),
@@ -309,7 +313,7 @@ export class PigeonConversationCommandsApi {
       name,
       networkId: input.networkId,
       nonce: input.nonce,
-      operation: this.operations.sign(session, {
+      operation: await this.operations.sign(session, {
         action: 'conversation_created',
         args: { name, nonce: input.nonce, participantIds, type: 'group' },
         conversationId,

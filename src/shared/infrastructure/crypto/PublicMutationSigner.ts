@@ -2,6 +2,7 @@ import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 
 import type { Session } from '../../domain/pigeonResources.types';
+import type { AuthorizationRevisionSource } from './AuthorizationRevisionSource';
 import type { PublicMutationIntent } from './PublicMutationIntent';
 import type { PublicMutationPosition } from './PublicMutationPosition';
 import type { SignedPublicMutation } from './SignedPublicMutation';
@@ -14,12 +15,14 @@ import { canonicalJson } from './canonicalJson';
  * The node holds no user private keys, so it only verifies and replicates it.
  */
 export class PublicMutationSigner {
-  private static readonly DOMAIN = 'pigeon:public-mutation:v1\n';
+  private static readonly DOMAIN = 'pigeon:public-mutation:v2\n';
 
   public static readonly FIRST_POSITION: PublicMutationPosition = {
     predecessor: null,
     sequence: 0,
   };
+
+  public constructor(private readonly revisions: AuthorizationRevisionSource) {}
 
   private base64Url(bytes: Uint8Array): string {
     return Buffer.from(bytes)
@@ -58,13 +61,14 @@ export class PublicMutationSigner {
     return IdentityId.normalize(session.identity.id);
   }
 
-  public sign(
+  public async sign(
     session: Session,
     intent: PublicMutationIntent,
     position: PublicMutationPosition,
-  ): SignedPublicMutation {
+  ): Promise<SignedPublicMutation> {
     const body = {
       author: {
+        authorizationRevision: await this.revisions.current(session),
         deviceCredential: IdentityId.normalize(
           session.deviceCredentialKeyPair.toPrimitives().publicKey,
         ),
@@ -77,7 +81,7 @@ export class PublicMutationSigner {
       recordId: intent.recordId,
       sequence: position.sequence,
       store: intent.store,
-      version: 1 as const,
+      version: 2 as const,
     };
     const signature = session.deviceCredentialKeyPair
       .sign(`${PublicMutationSigner.DOMAIN}${canonicalJson(body)}`)

@@ -10,6 +10,7 @@ import { ConversationIdFactory } from '../../../../../contexts/conversations/dom
 import { ConversationMapper } from '../../../../../contexts/conversations/infrastructure/http/ConversationMapper';
 import { ConversationOperationSigner } from '../../../../../contexts/conversations/infrastructure/http/ConversationOperationSigner';
 import { PigeonConversationCommandsApi } from '../../../../../contexts/conversations/infrastructure/http/PigeonConversationCommandsApi';
+import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
 const target = { id: 'group:abc', networkId: 'network-1' };
 const operation = {
@@ -43,7 +44,7 @@ describe(PigeonConversationCommandsApi.name, () => {
     operations = mock<ConversationOperationSigner>();
     requestSigner = mock<RequestSigner>();
     requestSigner.headers.mockResolvedValue({ 'x-signature': 'sig' });
-    operations.sign.mockReturnValue(operation);
+    operations.sign.mockResolvedValue(operation);
     http.request.mockImplementation((path: string) =>
       Promise.resolve(
         path.endsWith('/frontier') ? { frontier: ['parent-1'] } : resource,
@@ -58,6 +59,7 @@ describe(PigeonConversationCommandsApi.name, () => {
       { publishKeychain: jest.fn() },
       mock<RequestCache>(),
       operations,
+      publicMutationSignerAt(),
     );
   });
 

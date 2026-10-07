@@ -5,6 +5,7 @@ import type { RequestSigner } from '../../../../../shared/infrastructure/http/Re
 import { CallEventSigner } from '../../../../../contexts/calls/infrastructure/http/CallEventSigner';
 import { PigeonCallsApi } from '../../../../../contexts/calls/infrastructure/http/PigeonCallsApi';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
+import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
 const session = { identity: { id: 'identity-a' } } as Session;
 const mutation = { signature: 'sig' } as never;
@@ -16,7 +17,7 @@ function build(responses: unknown[]) {
     if (response instanceof Error) request.mockRejectedValueOnce(response);
     else request.mockResolvedValueOnce(response);
   });
-  const events = new CallEventSigner();
+  const events = new CallEventSigner(publicMutationSignerAt());
   const signer = {
     headers: jest.fn().mockResolvedValue({}),
   } as unknown as RequestSigner;
@@ -49,7 +50,7 @@ describe(PigeonCallsApi.name, () => {
 
   it('sends a signed conversation start with sorted participants', async () => {
     const { api, events, request } = build([{ id: 'call-a' }]);
-    const start = jest.spyOn(events, 'start').mockReturnValue({
+    const start = jest.spyOn(events, 'start').mockResolvedValue({
       callId: 'call-a',
       mutation,
     });
@@ -90,10 +91,10 @@ describe(PigeonCallsApi.name, () => {
       { id: 'call-live' },
     ]);
 
-    jest.spyOn(events, 'start').mockReturnValue({ callId: 'mine', mutation });
+    jest.spyOn(events, 'start').mockResolvedValue({ callId: 'mine', mutation });
     const participant = jest
       .spyOn(events, 'participant')
-      .mockReturnValue(mutation);
+      .mockResolvedValue(mutation);
 
     await api.startCommunityChannel(session, 'community-a', 'channel-a', 9);
 
@@ -116,9 +117,9 @@ describe(PigeonCallsApi.name, () => {
     const { api, events, request } = build([undefined, undefined, undefined]);
     const participant = jest
       .spyOn(events, 'participant')
-      .mockReturnValue(mutation);
+      .mockResolvedValue(mutation);
 
-    jest.spyOn(events, 'end').mockReturnValue(mutation);
+    jest.spyOn(events, 'end').mockResolvedValue(mutation);
     await api.leave(session, 'call-a', 6, true);
     await api.leave(session, 'call-a', 7, false);
     await api.end(session, 'call-a', 8);
@@ -144,7 +145,7 @@ describe(PigeonCallsApi.name, () => {
     const { api, events, request } = build([stale, undefined]);
     const participant = jest
       .spyOn(events, 'participant')
-      .mockReturnValue(mutation);
+      .mockResolvedValue(mutation);
 
     await api.leave(session, 'call-a', 6, false);
 

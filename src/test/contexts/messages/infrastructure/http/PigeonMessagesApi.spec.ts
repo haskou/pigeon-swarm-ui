@@ -11,6 +11,7 @@ import type { RequestSigner } from '../../../../../shared/infrastructure/http/Re
 
 import { PigeonMessagesApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessagesApi';
 import { RequestCache } from '../../../../../shared/infrastructure/http/RequestCache';
+import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
 function httpClient(request: jest.Mock): HttpJsonClient {
   return {
@@ -44,6 +45,7 @@ describe(PigeonMessagesApi.name, () => {
       signer(headers),
       new RequestCache(),
       projection(decryptMany),
+      publicMutationSignerAt(),
     );
 
     await expect(
@@ -91,6 +93,7 @@ describe(PigeonMessagesApi.name, () => {
         signer(headers),
         new RequestCache(),
         projection(jest.fn()),
+        publicMutationSignerAt(),
       );
 
       return {
@@ -131,7 +134,7 @@ describe(PigeonMessagesApi.name, () => {
         recordId: 'conversation:conversation-1:message-1',
         sequence: 0,
         store: 'pins',
-        version: 1,
+        version: 2,
       });
       expect(unpin.mutation).toMatchObject({
         kind: 'delete',

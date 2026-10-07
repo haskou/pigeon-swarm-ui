@@ -6,6 +6,7 @@ import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/H
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
 import { PigeonPollsApi } from '../../../../../contexts/polls/infrastructure/http/PigeonPollsApi';
+import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 import { pollResourceFixture } from '../../pollResourceFixture';
 
 async function setup() {
@@ -18,7 +19,12 @@ async function setup() {
   signer.headers.mockResolvedValue({});
   http.request.mockResolvedValue(pollResourceFixture());
 
-  return { api: new PigeonPollsApi(http, signer), http, session, signer };
+  return {
+    api: new PigeonPollsApi(http, signer, publicMutationSignerAt()),
+    http,
+    session,
+    signer,
+  };
 }
 
 function sentBody(http: MockProxy<HttpJsonClient>) {

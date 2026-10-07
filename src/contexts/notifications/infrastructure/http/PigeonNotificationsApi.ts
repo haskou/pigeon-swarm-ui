@@ -17,15 +17,16 @@ import { NotificationMutationSigner } from './NotificationMutationSigner';
 const startupReadCacheTtlMs = 1500;
 
 export class PigeonNotificationsApi {
-  private readonly mutations = new PublicMutationSigner();
-
-  private readonly notificationMutations = new NotificationMutationSigner();
+  private readonly notificationMutations: NotificationMutationSigner;
 
   public constructor(
     private readonly http: HttpJsonClient,
     private readonly signer: RequestSigner,
     private readonly cachedRequest: CachedGetRequest,
-  ) {}
+    private readonly mutations: PublicMutationSigner,
+  ) {
+    this.notificationMutations = new NotificationMutationSigner(mutations);
+  }
 
   private scopeKey(scope: NotificationSettingScope): string {
     if (scope.type === 'conversation') {
@@ -166,7 +167,7 @@ export class PigeonNotificationsApi {
   ): Promise<NotificationResource> {
     const path = `/notifications/${encodeURIComponent(notificationId)}`;
     const body = {
-      mutation: this.notificationMutations.state(
+      mutation: await this.notificationMutations.state(
         session,
         notificationId,
         state as 'accepted' | 'declined',

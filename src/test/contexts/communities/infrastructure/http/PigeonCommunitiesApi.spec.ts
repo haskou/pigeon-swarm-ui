@@ -6,6 +6,7 @@ import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/H
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
 import { PigeonCommunitiesApi } from '../../../../../contexts/communities/infrastructure/http/PigeonCommunitiesApi';
+import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
 type SentBody = {
   createdAt?: number;
@@ -35,6 +36,7 @@ describe(PigeonCommunitiesApi.name, () => {
       http,
       signer,
       async (_key, loader) => await loader(),
+      publicMutationSignerAt(),
     );
 
     await expect(
@@ -65,6 +67,7 @@ describe(PigeonCommunitiesApi.name, () => {
       http,
       signer,
       async (_key, loader) => await loader(),
+      publicMutationSignerAt(),
     );
 
     await expect(
@@ -92,6 +95,7 @@ describe(PigeonCommunitiesApi.name, () => {
       http,
       signer,
       async (_key, loader) => await loader(),
+      publicMutationSignerAt(),
     );
 
     await expect(
@@ -124,6 +128,7 @@ describe(PigeonCommunitiesApi.name, () => {
         http,
         signer,
         async (_key, loader) => await loader(),
+        publicMutationSignerAt(),
       );
       const sent = () =>
         JSON.parse(
@@ -260,6 +265,7 @@ describe(PigeonCommunitiesApi.name, () => {
       http,
       signer,
       async (_key, loader) => await loader(),
+      publicMutationSignerAt(),
     );
 
     await expect(
@@ -301,6 +307,7 @@ describe(PigeonCommunitiesApi.name, () => {
       http,
       signer,
       async (_key, loader) => await loader(),
+      publicMutationSignerAt(),
     );
 
     await expect(
@@ -344,6 +351,7 @@ describe(PigeonCommunitiesApi.name, () => {
       http,
       signer,
       async (_key, loader) => await loader(),
+      publicMutationSignerAt(),
     );
 
     await expect(
@@ -388,6 +396,7 @@ describe(PigeonCommunitiesApi.name, () => {
       http,
       signer,
       async (_key, loader) => await loader(),
+      publicMutationSignerAt(),
     );
     const path =
       '/communities/community-1/channels/channel-1/messages/message-1/pin';
@@ -427,7 +436,7 @@ describe(PigeonCommunitiesApi.name, () => {
       recordId: 'community:community-1:channel-1:message-1',
       sequence: 0,
       store: 'pins',
-      version: 1,
+      version: 2,
     });
     expect(unpin.mutation).toMatchObject({ kind: 'delete', store: 'pins' });
     expect(unpin.createdAt).toBeUndefined();
@@ -456,6 +465,7 @@ describe(PigeonCommunitiesApi.name, () => {
       http,
       signer,
       async (_key, loader) => await loader(),
+      publicMutationSignerAt(),
     );
 
     await api.addChannelMessageReaction(session, 'c', 'ch', 'm', '👍');
@@ -491,6 +501,7 @@ describe(PigeonCommunitiesApi.name, () => {
       http,
       { headers: jest.fn().mockResolvedValue({}) } as unknown as RequestSigner,
       async (_key, loader) => await loader(),
+      publicMutationSignerAt(),
     );
 
     await api.createJoinRequest(session, 'community-1', 'network-1');
@@ -567,6 +578,7 @@ describe(PigeonCommunitiesApi.name, () => {
       http,
       { headers: jest.fn().mockResolvedValue({}) } as unknown as RequestSigner,
       async (_key, loader) => await loader(),
+      publicMutationSignerAt(),
     );
 
     await api.updateMembershipRequest(session, request.id, 'accepted');
@@ -621,6 +633,7 @@ describe(PigeonCommunitiesApi.name, () => {
       http,
       signer,
       async (_key, loader) => await loader(),
+      publicMutationSignerAt(),
       draftPayloads,
     );
     const body = {
@@ -674,6 +687,7 @@ describe(PigeonCommunitiesApi.name, () => {
       http,
       signer,
       async (_key, loader) => await loader(),
+      publicMutationSignerAt(),
       undefined,
       invalidateCachedRequest,
     );
@@ -714,6 +728,7 @@ describe(PigeonCommunitiesApi.name, () => {
           headers: jest.fn().mockResolvedValue({}),
         } as unknown as RequestSigner,
         async (_key, loader) => await loader(),
+        publicMutationSignerAt(),
       );
       const lastBody = () => {
         const calls = (http.request as jest.Mock).mock.calls as [

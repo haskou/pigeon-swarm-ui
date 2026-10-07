@@ -9,11 +9,10 @@ import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/P
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 
 export class PigeonPollsApi {
-  private readonly mutations = new PublicMutationSigner();
-
   public constructor(
     private readonly http: HttpJsonClient,
     private readonly signer: RequestSigner,
+    private readonly mutations: PublicMutationSigner,
   ) {}
 
   private async submit(

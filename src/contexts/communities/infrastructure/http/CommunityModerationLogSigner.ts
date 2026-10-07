@@ -7,12 +7,12 @@ import { deriveModerationLogId } from './deriveCommunityRecordId';
 
 /** Signs the `moderationLogs` put that accompanies a moderation action. */
 export class CommunityModerationLogSigner {
-  private readonly mutations = new PublicMutationSigner();
+  public constructor(private readonly mutations: PublicMutationSigner) {}
 
-  public sign(
+  public async sign(
     session: Session,
     input: CommunityModerationLogInput,
-  ): CommunityModerationLogBody {
+  ): Promise<CommunityModerationLogBody> {
     const actorIdentityId = this.mutations.authorOf(session);
     const id = deriveModerationLogId(
       input.communityId,
@@ -25,7 +25,7 @@ export class CommunityModerationLogSigner {
     const details = Object.fromEntries(
       Object.entries(input.details).filter(([, value]) => value !== undefined),
     );
-    const mutation = this.mutations.sign(
+    const mutation = await this.mutations.sign(
       session,
       {
         kind: 'put',

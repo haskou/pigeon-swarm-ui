@@ -32,15 +32,15 @@ export interface SignedCallStart {
  * ender. Byte-exact contract: node docs/api.md, "Signed call events".
  */
 export class CallEventSigner {
-  private readonly mutations = new PublicMutationSigner();
+  public constructor(private readonly mutations: PublicMutationSigner) {}
 
-  private sign(
+  private async sign(
     session: Session,
     recordId: string,
     payload: Record<string, unknown>,
     position: PublicMutationPosition,
-  ): SignedPublicMutation {
-    return this.mutations.sign(
+  ): Promise<SignedPublicMutation> {
+    return await this.mutations.sign(
       session,
       { kind: 'put', payload, recordId, store: 'calls' },
       position,
@@ -80,7 +80,10 @@ export class CallEventSigner {
     ].join('-');
   }
 
-  public start(session: Session, input: CallStartInput): SignedCallStart {
+  public async start(
+    session: Session,
+    input: CallStartInput,
+  ): Promise<SignedCallStart> {
     const creatorIdentityId = this.mutations.authorOf(session);
     const callId = this.callId(creatorIdentityId, input.nonce);
     const conversation = input.scope.type === 'conversation';
@@ -102,7 +105,7 @@ export class CallEventSigner {
 
     return {
       callId,
-      mutation: this.sign(
+      mutation: await this.sign(
         session,
         id,
         payload,
@@ -111,17 +114,17 @@ export class CallEventSigner {
     };
   }
 
-  public participant(
+  public async participant(
     session: Session,
     callId: string,
     state: CallParticipantState,
     at: number,
     position: PublicMutationPosition,
-  ): SignedPublicMutation {
+  ): Promise<SignedPublicMutation> {
     const identityId = this.mutations.authorOf(session);
     const id = `call-participant:${callId}:${identityId}`;
 
-    return this.sign(
+    return await this.sign(
       session,
       id,
       {
@@ -136,14 +139,14 @@ export class CallEventSigner {
     );
   }
 
-  public end(
+  public async end(
     session: Session,
     callId: string,
     at: number,
-  ): SignedPublicMutation {
+  ): Promise<SignedPublicMutation> {
     const id = `call-end:${callId}`;
 
-    return this.sign(
+    return await this.sign(
       session,
       id,
       {

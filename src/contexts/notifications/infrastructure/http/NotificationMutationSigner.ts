@@ -26,7 +26,7 @@ export interface SignedNotificationInvitation {
  * contract: node docs/api.md, "Notification HTTP API".
  */
 export class NotificationMutationSigner {
-  private readonly mutations = new PublicMutationSigner();
+  public constructor(private readonly mutations: PublicMutationSigner) {}
 
   private nonce(): string {
     const bytes = new Uint8Array(16);
@@ -54,7 +54,7 @@ export class NotificationMutationSigner {
     ).toString()}`;
   }
 
-  public invitation(
+  public async invitation(
     session: Session,
     input: {
       encryptedKey: string;
@@ -62,7 +62,7 @@ export class NotificationMutationSigner {
       subjectId: string;
       type: NotificationInvitationType;
     },
-  ): SignedNotificationInvitation {
+  ): Promise<SignedNotificationInvitation> {
     const inviterIdentityId = this.mutations.authorOf(session);
     const recipientIdentityId = IdentityId.normalize(input.recipientIdentityId);
     const nonce = this.nonce();
@@ -72,7 +72,7 @@ export class NotificationMutationSigner {
       input.subjectId,
       nonce,
     );
-    const mutation = this.mutations.sign(
+    const mutation = await this.mutations.sign(
       session,
       {
         kind: 'put',
@@ -101,11 +101,11 @@ export class NotificationMutationSigner {
     };
   }
 
-  public state(
+  public async state(
     session: Session,
     notificationId: string,
     state: 'accepted' | 'declined',
-  ): SignedPublicMutation {
+  ): Promise<SignedPublicMutation> {
     const payload = {
       id: `notification-state:${notificationId}:${state}`,
       notificationId,
@@ -115,7 +115,7 @@ export class NotificationMutationSigner {
       state,
     };
 
-    return this.mutations.sign(
+    return await this.mutations.sign(
       session,
       { kind: 'put', payload, recordId: payload.id, store: 'notifications' },
       PublicMutationSigner.FIRST_POSITION,

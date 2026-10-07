@@ -1,5 +1,9 @@
 export interface SignedPublicMutation {
-  author: { deviceCredential: string; identityId: string };
+  author: {
+    authorizationRevision: number;
+    deviceCredential: string;
+    identityId: string;
+  };
   kind: 'delete' | 'put';
   operationId: string;
   payloadDigest: string;
@@ -8,5 +12,5 @@ export interface SignedPublicMutation {
   sequence: number;
   signature: string;
   store: string;
-  version: 1;
+  version: 2;
 }
