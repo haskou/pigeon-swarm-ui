@@ -29,6 +29,7 @@ import { CommunityInvitationsPanel } from './CommunityInvitationsPanel';
 import { CommunityMembersRolesPanel } from './CommunityMembersRolesPanel';
 import { CommunityModerationLogsPanel } from './CommunityModerationLogsPanel';
 import { CommunityRolesPanel } from './CommunityRolesPanel';
+import { communityReferencedIdentityIds } from './communityReferencedIdentityIds';
 import {
   CommunitySettingsNavigation,
   type CommunitySettingsSection,
@@ -322,13 +323,11 @@ export function ManageCommunityDialog({
 
   useEffect(() => {
     const knownIdentityIds = new Set(Object.keys(memberIdentities));
-    const requestIdentityIds = membershipRequests.flatMap((request) => [
-      request.creatorIdentityId,
-      request.identityId,
-    ]);
-    const missingIdentityIds = [...new Set(requestIdentityIds)].filter(
-      (identityId) => !knownIdentityIds.has(identityId),
-    );
+    const missingIdentityIds = communityReferencedIdentityIds({
+      bannedMemberIds: community.bannedMemberIds,
+      membershipRequests,
+      moderationLogs,
+    }).filter((identityId) => !knownIdentityIds.has(identityId));
 
     if (missingIdentityIds.length === 0) return;
 
@@ -353,9 +352,13 @@ export function ManageCommunityDialog({
       if (cancelled) return;
 
       setMemberIdentities((current) => {
+        const resolved = entries.filter(([, identity]) => identity);
+
+        if (resolved.length === 0) return current;
+
         const next = { ...current };
 
-        for (const [identityId, identity] of entries) {
+        for (const [identityId, identity] of resolved) {
           if (identity) next[identityId] = identity;
         }
 
@@ -366,7 +369,13 @@ export function ManageCommunityDialog({
     return () => {
       cancelled = true;
     };
-  }, [memberIdentities, membershipRequests, session.identity]);
+  }, [
+    community.bannedMemberIds,
+    memberIdentities,
+    membershipRequests,
+    moderationLogs,
+    session.identity,
+  ]);
 
   useEffect(() => {
     const role = roles.find((candidate) => candidate.id === selectedRoleId);
@@ -1135,6 +1144,7 @@ export function ManageCommunityDialog({
               {activeSection === 'banned-members' && (
                 <CommunityBannedMembersPanel
                   bannedMemberIds={community.bannedMemberIds ?? []}
+                  identityLookup={memberIdentities}
                   onUnban={(identityId) => void unbanMember(identityId)}
                   state={state}
                 />

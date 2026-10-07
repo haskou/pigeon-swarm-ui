@@ -1,12 +1,18 @@
+import type { IdentityResource } from '../../../../shared/domain/pigeonResources.types';
+
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { shortId } from '../../../../shared/presentation/formatting';
+import { IdentityMemberRow } from '../../../identities/presentation/components/IdentityMemberListPanel';
+import { identityPicture } from '../../../identities/presentation/view-models/identityDisplay';
 
 export function CommunityBannedMembersPanel({
   bannedMemberIds,
+  identityLookup,
   onUnban,
   state,
 }: {
   bannedMemberIds: string[];
+  identityLookup: Record<string, IdentityResource>;
   onUnban: (identityId: string) => void;
   state: 'idle' | 'loading';
 }) {
@@ -21,24 +27,37 @@ export function CommunityBannedMembersPanel({
         </div>
       ) : (
         <div className="space-y-2">
-          {bannedMemberIds.map((identityId) => (
-            <div
-              key={identityId}
-              className="flex items-center justify-between gap-3 rounded-2xl bg-white/8 p-3"
-            >
-              <span className="min-w-0 truncate text-sm font-black text-white">
-                {shortId(identityId)}
-              </span>
-              <button
-                type="button"
-                onClick={() => onUnban(identityId)}
-                disabled={state === 'loading'}
-                className="rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45"
+          {bannedMemberIds.map((identityId) => {
+            const identity = identityLookup[identityId];
+
+            return (
+              <div
+                key={identityId}
+                className="flex items-center justify-between gap-3 rounded-2xl bg-white/8 p-3"
               >
-                {copy.communities.unbanMember}
-              </button>
-            </div>
-          ))}
+                <div className="min-w-0 flex-1">
+                  <IdentityMemberRow
+                    className="!max-w-none"
+                    interactive={false}
+                    item={{
+                      identity,
+                      identityId,
+                      name: identity ? undefined : shortId(identityId),
+                      pictureUrl: identity ? identityPicture(identity) : null,
+                    }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onUnban(identityId)}
+                  disabled={state === 'loading'}
+                  className="rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {copy.communities.unbanMember}
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
