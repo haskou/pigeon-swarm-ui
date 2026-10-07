@@ -753,6 +753,8 @@ export const es = {
       403010: 'Solo el propietario del nodo puede hacer eso.',
       403020: 'Solo quien envió la notificación puede hacer eso.',
       422030: 'El archivo es demasiado grande para el nodo.',
+      429040:
+        'Demasiadas actualizaciones de perfil en poco tiempo. Espera un minuto e inténtalo de nuevo.',
       503020:
         'El nodo está sincronizando, espera unos minutos e inténtalo de nuevo.',
       AuthenticatedIdentityIsNotInviterError:
