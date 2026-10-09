@@ -196,6 +196,23 @@ describe('MlsCommunityEngine', () => {
     );
   });
 
+  it('admits a member who joined the roster after the group was created', async () => {
+    roster = new Set(['alice']);
+    const alice = engineFor('alice');
+    const bob = engineFor('bob');
+
+    await alice.engine.createGroup(COMMUNITY);
+    roster = new Set(['alice', 'bob']);
+    await bob.engine.publishKeyPackages(COMMUNITY);
+    await expect(alice.engine.reconcile(COMMUNITY)).resolves.toBe(true);
+    await bob.engine.sync(COMMUNITY);
+    const ciphertext = await alice.engine.encrypt(COMMUNITY, 'late joiner');
+
+    await expect(bob.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
+      'late joiner',
+    );
+  });
+
   it('gives a joiner a welcome only the recipient can use', async () => {
     const { alice } = await admitBob();
     const carol = engineFor('carol');

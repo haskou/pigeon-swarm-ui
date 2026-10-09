@@ -56,6 +56,7 @@ const pickNewestPerDevice = (
 export class MlsCommunityEngine {
   private readonly groups = new Map<string, MlsGroup>();
   private readonly queues = new Map<string, Promise<unknown>>();
+  private readonly rosters = new Map<string, ReadonlySet<string>>();
 
   public constructor(
     private readonly owner: MlsLeafOwner,
@@ -70,9 +71,13 @@ export class MlsCommunityEngine {
       if (await this.load(groupId)) {
         throw new MlsRejectedError('Group already exists on this device');
       }
-      const roster = await this.rosterFor(groupId)();
+      await this.currentRoster(groupId);
       const [key] = await this.makeKeyPackages(1, false);
-      const group = await MlsGroup.create(groupId, key, (id) => roster.has(id));
+      const group = await MlsGroup.create(
+        groupId,
+        key,
+        this.policyFor(groupId),
+      );
 
       await this.remember(group);
     });
@@ -111,6 +116,8 @@ export class MlsCommunityEngine {
     return this.exclusive(groupId, async () => {
       const communityId = this.communityOf(groupId);
       let group = await this.load(groupId);
+
+      await this.currentRoster(groupId);
 
       if (!group) group = await this.joinFromWelcome(groupId, communityId);
 
@@ -221,7 +228,7 @@ export class MlsCommunityEngine {
 
     if (!(await this.hasGroup(groupId))) return true;
 
-    const roster = await this.rosterFor(groupId)();
+    const roster = await this.currentRoster(groupId);
     const inGroup = await this.identities(groupId);
     const stale = inGroup.filter((identity) => !roster.has(identity));
 
@@ -325,7 +332,7 @@ export class MlsCommunityEngine {
     );
 
     if (mine.length === 0) return undefined;
-    const roster = await this.rosterFor(groupId)();
+    await this.currentRoster(groupId);
     const keys = await this.storedBundles();
 
     for (const record of mine.sort((a, b) => b.createdAt - a.createdAt)) {
@@ -335,7 +342,7 @@ export class MlsCommunityEngine {
             groupId,
             bundle,
             fromBase64(record.payload),
-            (identity) => roster.has(identity),
+            this.policyFor(groupId),
           );
 
           await this.store.deleteKeyPackage(id);
@@ -382,6 +389,19 @@ export class MlsCommunityEngine {
     }));
   }
 
+  /** Reads the roster again; groups judge credentials against the latest. */
+  private async currentRoster(groupId: string): Promise<ReadonlySet<string>> {
+    const roster = await this.rosterFor(groupId)();
+
+    this.rosters.set(groupId, roster);
+
+    return roster;
+  }
+
+  private policyFor(groupId: string): (identityId: string) => boolean {
+    return (identityId) => this.rosters.get(groupId)?.has(identityId) ?? false;
+  }
+
   private async load(groupId: string): Promise<MlsGroup | undefined> {
     const cached = this.groups.get(groupId);
 
@@ -389,11 +409,11 @@ export class MlsCommunityEngine {
     const bytes = await this.store.loadGroup(groupId);
 
     if (!bytes) return undefined;
-    const roster = await this.rosterFor(groupId)();
+    await this.currentRoster(groupId);
     const group = MlsGroup.restore(
       groupId,
       this.owner,
-      (id) => roster.has(id),
+      this.policyFor(groupId),
       bytes,
     );
 
