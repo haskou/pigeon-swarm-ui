@@ -59,6 +59,8 @@ export class PigeonCommunitiesFacade {
 
   private readonly media: PigeonCommunitiesGateway;
 
+  private readonly mls: PigeonMlsFacade;
+
   private readonly management: PigeonCommunityManagement;
 
   private readonly moderationLogs: PigeonCommunitiesGateway;
@@ -91,11 +93,25 @@ export class PigeonCommunitiesFacade {
     this.keychain = identities;
     this.leaveCommunityUseCase = new LeaveCommunity(communities, identities);
     this.media = communities;
+    this.mls = mls;
     this.management = management;
     this.members = communities;
     this.membershipRequests = communities;
     this.moderationLogs = communities;
     this.roles = communities;
+  }
+
+  /**
+   * Rotates the group keys right away. Failing here must not undo the
+   * moderation, since any online member reconciles the group on its next sync.
+   */
+  private async removeFromGroup(
+    session: Session,
+    communityId: string,
+  ): Promise<void> {
+    await this.mls
+      .synchronize(session, communityId, { force: true })
+      .catch(() => false);
   }
 
   private async resolvePublicImageCid(
@@ -185,7 +201,15 @@ export class PigeonCommunitiesFacade {
     communityId: string,
     identityId: string,
   ): Promise<Community> {
-    return await this.management.banMember(session, communityId, identityId);
+    const community = await this.management.banMember(
+      session,
+      communityId,
+      identityId,
+    );
+
+    await this.removeFromGroup(session, communityId);
+
+    return community;
   }
 
   public async unbanMember(
@@ -201,7 +225,15 @@ export class PigeonCommunitiesFacade {
     communityId: string,
     identityId: string,
   ): Promise<Community> {
-    return await this.management.kickMember(session, communityId, identityId);
+    const community = await this.management.kickMember(
+      session,
+      communityId,
+      identityId,
+    );
+
+    await this.removeFromGroup(session, communityId);
+
+    return community;
   }
 
   public async createJoinRequest(

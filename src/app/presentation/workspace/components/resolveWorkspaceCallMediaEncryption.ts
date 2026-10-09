@@ -18,17 +18,19 @@ type WorkspaceCallMediaEncryptionInput = {
   call: CallResource;
   communities: Community[];
   currentIdentityId: string;
+  communityCallKey: (communityId: string, callId: string) => Promise<string>;
   enabled: boolean;
   keychain: LocalKeychain;
 };
 
-export function resolveWorkspaceCallMediaEncryption({
+export async function resolveWorkspaceCallMediaEncryption({
   call,
   communities,
+  communityCallKey,
   currentIdentityId,
   enabled,
   keychain,
-}: WorkspaceCallMediaEncryptionInput): WorkspaceCallMediaEncryption {
+}: WorkspaceCallMediaEncryptionInput): Promise<WorkspaceCallMediaEncryption> {
   const unavailable = (reason: CallMediaEncryptionUnavailableReason) => ({
     mediaEncryptionEnabled: enabled,
     mediaEncryptionUnavailableReason: reason,
@@ -46,7 +48,14 @@ export function resolveWorkspaceCallMediaEncryption({
       return unavailable('public-community');
     }
 
-    return available(keychain.conversations[communityId]);
+    try {
+      return {
+        mediaEncryptionEnabled: enabled,
+        mediaEncryptionKey: await communityCallKey(communityId, call.id),
+      };
+    } catch {
+      return unavailable('missing-key');
+    }
   }
 
   return available(

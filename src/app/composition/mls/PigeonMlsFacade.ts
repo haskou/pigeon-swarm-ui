@@ -1,3 +1,5 @@
+import { Buffer } from 'buffer';
+
 import type { PigeonCommunitiesGateway } from '../../../contexts/communities/infrastructure/http/PigeonCommunitiesGateway';
 import type { PigeonMlsRecordsApi } from '../../../contexts/communities/infrastructure/http/PigeonMlsRecordsApi';
 import type {
@@ -96,11 +98,16 @@ export class PigeonMlsFacade {
   public async synchronize(
     session: Session,
     groupId: string,
+    options: { force?: boolean } = {},
   ): Promise<boolean> {
     const key = `${session.identity.id}/${groupId}`;
     const recent = this.synchronizations.get(key);
 
-    if (recent && Date.now() - recent.at < synchronizeIntervalMs) {
+    if (
+      recent &&
+      !options.force &&
+      Date.now() - recent.at < synchronizeIntervalMs
+    ) {
       return await recent.result;
     }
 
@@ -188,5 +195,20 @@ export class PigeonMlsFacade {
     context: string,
   ): Promise<Uint8Array> {
     return await this.engineFor(session).exportSecret(groupId, label, context);
+  }
+
+  public async callMediaKey(
+    session: Session,
+    groupId: string,
+    callId: string,
+  ): Promise<string> {
+    const secret = await this.exportSecret(
+      session,
+      groupId,
+      'pigeon/call-media/v1',
+      callId,
+    );
+
+    return Buffer.from(secret).toString('base64');
   }
 }

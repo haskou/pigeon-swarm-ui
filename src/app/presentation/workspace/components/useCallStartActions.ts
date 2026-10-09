@@ -51,7 +51,7 @@ type CallStartActionsInput = {
   ) => WorkspaceCallDetails;
   callMediaEncryptionForResource: (
     call: Parameters<CallController['reconcileCall']>[0],
-  ) => CallMediaEncryptionInput;
+  ) => Promise<CallMediaEncryptionInput>;
   callNoiseCancellationEnabled: boolean;
   callSignalSender: (callId: string) => SignalSender;
   cleanupJoinedCalls: (exceptCallId?: string) => Promise<void>;
@@ -167,7 +167,7 @@ export function useCallStartActions({
             })),
           });
           const details = callDetailsForResource(call);
-          const mediaEncryption = callMediaEncryptionForResource(call);
+          const mediaEncryption = await callMediaEncryptionForResource(call);
 
           await startCall({
             ...details,
@@ -285,7 +285,7 @@ export function useCallStartActions({
         });
         const currentIdentityId = sessionRef.current.identity.id;
         const details = callDetailsForResource(call);
-        const mediaEncryption = callMediaEncryptionForResource(call);
+        const mediaEncryption = await callMediaEncryptionForResource(call);
 
         logCallDebug('workspace:community-voice:start-local-session', {
           callId: call.id,
@@ -417,7 +417,7 @@ export function useCallStartActions({
         })),
       });
       const details = callDetailsForResource(call);
-      const mediaEncryption = callMediaEncryptionForResource(call);
+      const mediaEncryption = await callMediaEncryptionForResource(call);
 
       await startCall({
         ...details,

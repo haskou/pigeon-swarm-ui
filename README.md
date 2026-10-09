@@ -59,7 +59,10 @@ a tiny distributed hostage negotiation.
 
 * Local identity registration and login by identity id or handle.
 * Profile editing with handle, name, biography, avatar and banner CIDs.
-* Client-owned encrypted keychains for conversations and communities.
+* Client-owned encrypted keychains for conversations.
+* Private communities encrypted with MLS (RFC 9420) groups, one leaf per
+  device, rekeyed when members leave or are removed. See
+  [MLS group encryption](./docs/mls-group-encryption.md).
 * One-to-one and group conversations with encrypted messages, replies,
   attachments, deletion tombstones and unread state.
 * Public and private communities with members, text channels, encrypted channel

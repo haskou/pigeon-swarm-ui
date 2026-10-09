@@ -52,68 +52,69 @@ function emptyKeychain(): LocalKeychain {
   return { conversations: {}, version: 2 };
 }
 
-function keychainWith(
-  id: string,
-  kind: 'community' | 'conversation',
-  key: string,
-): LocalKeychain {
-  return {
-    conversations: {
-      [id]: {
-        algorithm: 'aes-256-gcm',
-        conversationId: id,
-        createdAt: 1,
-        key,
-        kind,
-        peerIdentityId: '',
-        version: 2,
-      },
-    },
-    version: 2,
-  };
-}
-
 describe('resolveWorkspaceCallMediaEncryption', () => {
-  it('disables media encryption for public communities', () => {
-    expect(
+  it('disables media encryption for public communities', async () => {
+    await expect(
       resolveWorkspaceCallMediaEncryption({
         call: communityCall(),
         communities: [community('public')],
+        communityCallKey: jest.fn(),
         currentIdentityId: 'identity-1',
         enabled: true,
         keychain: emptyKeychain(),
       }),
-    ).toEqual({
+    ).resolves.toEqual({
       mediaEncryptionEnabled: true,
       mediaEncryptionUnavailableReason: 'public-community',
     });
   });
 
-  it('uses the private community key', () => {
-    expect(
+  it('derives private community keys from the group, scoped to the call', async () => {
+    const communityCallKey = jest.fn().mockResolvedValue('derived-key');
+
+    await expect(
       resolveWorkspaceCallMediaEncryption({
         call: communityCall(),
         communities: [community('private')],
+        communityCallKey,
         currentIdentityId: 'identity-1',
         enabled: true,
-        keychain: keychainWith('community-1', 'community', 'secret-key'),
+        keychain: emptyKeychain(),
       }),
-    ).toEqual({
+    ).resolves.toEqual({
       mediaEncryptionEnabled: true,
-      mediaEncryptionKey: 'secret-key',
+      mediaEncryptionKey: 'derived-key',
+    });
+    expect(communityCallKey).toHaveBeenCalledWith('community-1', 'call-1');
+  });
+
+  it('reports a missing key when this device is not in the group', async () => {
+    await expect(
+      resolveWorkspaceCallMediaEncryption({
+        call: communityCall(),
+        communities: [community('private')],
+        communityCallKey: jest.fn().mockRejectedValue(new Error('no group')),
+        currentIdentityId: 'identity-1',
+        enabled: true,
+        keychain: emptyKeychain(),
+      }),
+    ).resolves.toEqual({
+      mediaEncryptionEnabled: true,
+      mediaEncryptionUnavailableReason: 'missing-key',
     });
   });
 
-  it('reports a missing conversation key', () => {
-    expect(
+  it('reports a missing conversation key', async () => {
+    await expect(
       resolveWorkspaceCallMediaEncryption({
         call: conversationCall(),
         communities: [],
+        communityCallKey: jest.fn(),
         currentIdentityId: 'identity-1',
         enabled: false,
         keychain: emptyKeychain(),
       }),
-    ).toEqual({
+    ).resolves.toEqual({
       mediaEncryptionEnabled: false,
       mediaEncryptionUnavailableReason: 'missing-key',
     });

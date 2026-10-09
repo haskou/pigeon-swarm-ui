@@ -190,10 +190,16 @@ export function useWorkspaceCalls({
   );
 
   const callMediaEncryptionForResource = useCallback(
-    (call: CallResource) =>
-      resolveWorkspaceCallMediaEncryption({
+    async (call: CallResource) =>
+      await resolveWorkspaceCallMediaEncryption({
         call,
         communities,
+        communityCallKey: async (communityId, callId) =>
+          await applicationContainer.mls.callMediaKey(
+            session,
+            communityId,
+            callId,
+          ),
         currentIdentityId: session.identity.id,
         enabled: mediaEncryptionEnabled,
         keychain: session.keychain,

@@ -19,7 +19,7 @@ Use MLS (RFC 9420) through `ts-mls` with the cipher suite
 | Scope                                | Group                                           |
 | ------------------------------------ | ----------------------------------------------- |
 | Community text, polls, reactions     | one group, `groupId = communityId`              |
-| Role-restricted channel              | one extra group, `groupId = communityId:channelId` |
+| Role-restricted channel (not yet)    | planned: `groupId = communityId:channelId`      |
 | Call media, attachments              | MLS exporter of the owning group (below)        |
 | Direct and group conversations       | out of scope here, tracked by the same issue    |
 
@@ -53,7 +53,7 @@ shape for every group, `communities-api`:
 
 ```
 POST /communities/{communityId}/mls/records
-GET  /communities/{communityId}/mls/records?groupId=&kind=&afterEpoch=&limit=
+GET  /communities/{communityId}/mls/records?groupId=&kind=&afterEpoch=
 { id, groupId, kind: 'key_package' | 'commit' | 'welcome',
   epoch?, recipientIdentityId?, payload (base64), createdAt, mutation }
 ```
@@ -63,6 +63,7 @@ GET  /communities/{communityId}/mls/records?groupId=&kind=&afterEpoch=&limit=
   publishes a fresh one whenever it has fewer than 4 unused.
 - `commit`: author must be a member; for a channel group, able to see the
   channel. `epoch` is the epoch the commit applies to.
+  `afterEpoch` is strict: it returns records with `epoch > afterEpoch`.
 - `welcome`: author must be a member; only the recipient (and the author) can
   read it.
 - Reads return only what the caller may see: community members get key packages
@@ -100,7 +101,11 @@ messages from earlier epochs. The UI shows that fact when the history is missing
 Sharing earlier history is a separate, explicit feature and is not implied by
 joining.
 
-### Channel groups
+### Channel groups (not implemented)
+
+Restricted channels currently share the community group, exactly as they shared
+the old community key: the node API hides them, the cryptography does not.
+The design below is the intended follow-up.
 
 Granting a role access to a restricted channel adds that role's members to the
 channel group; removing the grant or the role from a member removes the leaf.
@@ -129,3 +134,19 @@ and attachments, and a missing group is an error, not a fallback.
   design is not audited either. The issue stays open until a specialist review.
 - Concurrent commits depend on the lowest-id rule and on clients retaining the
   previous epoch state. Lost records are repaired by fetching, not guessed.
+- MLS client state (leaf private keys, epoch secrets) is stored unencrypted in
+  the device's IndexedDB, like the other local key material. XSS or a stolen
+  profile exposes it. Only the last 8 epochs of secrets are retained
+  (`retainKeysForEpochs`), so older ciphertext this device has not decrypted
+  yet becomes unreadable.
+- The roster, not MLS, is authoritative. Clients refuse to add identities that
+  are not on the roster, but a malicious member could still publish a commit
+  that removes others; clients do not yet reject removals of rostered members.
+- `authorIdentityId` inside a message payload is asserted by the sender. MLS
+  authenticates the sender's leaf, and the UI does not yet display that proof.
+- Call media keys are derived once, when the call starts. A group epoch change
+  during a call (member join or leave) does not rekey it. Devices that derive
+  the key in different epochs cannot decrypt each other's media.
+- A community created before this change has no group. Its owner sees
+  "awaiting group access" and must recreate the community; nothing bootstraps
+  a group automatically, so two owner devices cannot fork one.
