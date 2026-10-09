@@ -31,6 +31,7 @@ import type { CommunityModerationLogBody } from './CommunityModerationLogBody';
 import type { CommunityOperationBody } from './CommunityOperationBody';
 
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
+import { ScopeFrontierReader } from '../../../../shared/infrastructure/http/ScopeFrontierReader';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 import { DraftPayloadCipher } from '../../../messages/infrastructure/crypto/DraftPayloadCipher';
 import { CommunityModerationLogSigner } from './CommunityModerationLogSigner';
@@ -61,9 +62,13 @@ export class PigeonCommunitiesApi {
     draftPayloads?: DraftPayloadCipher,
     private readonly invalidateCachedRequest: CachedRequestInvalidator = () =>
       undefined,
+    private readonly frontiers = new ScopeFrontierReader(http, signer),
   ) {
     this.draftPayloads = draftPayloads ?? new DraftPayloadCipher();
-    this.moderationLogs = new CommunityModerationLogSigner(mutations);
+    this.moderationLogs = new CommunityModerationLogSigner(
+      mutations,
+      frontiers,
+    );
     this.operations = new CommunityOperationSigner(mutations);
   }
 
@@ -174,6 +179,7 @@ export class PigeonCommunitiesApi {
   ): Promise<T> {
     let response: T | undefined;
     let acceptance: Record<string, unknown> = {};
+    const frontier = await this.frontiers.ofPayload(session, record);
 
     await submitPublicMutation(
       PublicMutationSigner.FIRST_POSITION,
@@ -181,6 +187,7 @@ export class PigeonCommunitiesApi {
         const mutation = await this.mutations.sign(
           session,
           {
+            frontier,
             kind: 'put',
             payload: record,
             recordId: String(record.id),
@@ -195,6 +202,7 @@ export class PigeonCommunitiesApi {
             acceptedMutation: await this.mutations.sign(
               session,
               {
+                frontier,
                 kind: 'put',
                 payload: accepted.record,
                 recordId: String(record.id),
@@ -297,12 +305,14 @@ export class PigeonCommunitiesApi {
     payload: Record<string, unknown>,
     fields: Record<string, unknown> = {},
   ): Promise<void> {
+    const frontier = await this.frontiers.ofPayload(session, payload);
+
     await submitPublicMutation(
       PublicMutationSigner.FIRST_POSITION,
       (position) =>
         this.mutations.sign(
           session,
-          { kind, payload, recordId: String(payload.id), store },
+          { frontier, kind, payload, recordId: String(payload.id), store },
           position,
         ),
       async (mutation) => {
@@ -420,6 +430,7 @@ export class PigeonCommunitiesApi {
     fields: Record<string, unknown>,
   ): Promise<MessageResource> {
     let response: MessageResource | undefined;
+    const frontier = await this.frontiers.ofPayload(session, intent.payload);
 
     await submitPublicMutation(
       PublicMutationSigner.FIRST_POSITION,
@@ -428,6 +439,7 @@ export class PigeonCommunitiesApi {
           session,
           {
             ...intent,
+            frontier,
             recordId: String(intent.payload.id),
             store: 'messages',
           },

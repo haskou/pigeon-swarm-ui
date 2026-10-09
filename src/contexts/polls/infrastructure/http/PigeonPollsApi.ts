@@ -6,6 +6,7 @@ import type { PollResource } from './resources/PollResource';
 import type { PollScopeFields } from './resources/PollScopeFields';
 
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
+import { ScopeFrontierReader } from '../../../../shared/infrastructure/http/ScopeFrontierReader';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 
 export class PigeonPollsApi {
@@ -13,12 +14,14 @@ export class PigeonPollsApi {
     private readonly http: HttpJsonClient,
     private readonly signer: RequestSigner,
     private readonly mutations: PublicMutationSigner,
+    private readonly frontiers = new ScopeFrontierReader(http, signer),
   ) {}
 
   private async submit(
     session: Session,
     method: 'DELETE' | 'POST',
     path: string,
+    scope: PollScopeFields,
     intent: {
       kind: 'delete' | 'put';
       payload: Record<string, unknown>;
@@ -26,6 +29,7 @@ export class PigeonPollsApi {
     fields: Record<string, unknown> = {},
   ): Promise<PollResource> {
     let response: PollResource | undefined;
+    const frontier = await this.frontierOf(session, scope);
 
     await submitPublicMutation(
       PublicMutationSigner.FIRST_POSITION,
@@ -34,6 +38,7 @@ export class PigeonPollsApi {
           session,
           {
             ...intent,
+            frontier,
             recordId: String(intent.payload.id),
             store: 'polls',
           },
@@ -51,6 +56,15 @@ export class PigeonPollsApi {
     );
 
     return response as PollResource;
+  }
+
+  private async frontierOf(
+    session: Session,
+    scope: PollScopeFields,
+  ): Promise<string[]> {
+    return 'conversationId' in scope
+      ? await this.frontiers.conversation(session, scope.conversationId)
+      : await this.frontiers.community(session, scope.communityId);
   }
 
   private timelineRecordId(session: Session, input: CreatePollRequest): string {
@@ -125,6 +139,7 @@ export class PigeonPollsApi {
     const timelineMutation = await this.mutations.sign(
       session,
       {
+        frontier: await this.frontierOf(session, scope),
         kind: 'put',
         payload: this.timelineRecord(session, input),
         recordId: this.timelineRecordId(session, input),
@@ -137,6 +152,7 @@ export class PigeonPollsApi {
       session,
       'POST',
       '/polls/',
+      scope,
       { kind: 'put', payload },
       { ...input, timelineMutation },
     );
@@ -173,6 +189,7 @@ export class PigeonPollsApi {
       session,
       'POST',
       `/polls/${encodeURIComponent(pollId)}/votes`,
+      scope,
       { kind: 'put', payload },
       { createdAt, optionIds },
     );
@@ -181,6 +198,7 @@ export class PigeonPollsApi {
   public async removeVote(
     session: Session,
     pollId: string,
+    scope: PollScopeFields,
   ): Promise<PollResource> {
     const voterIdentityId = this.mutations.authorOf(session);
     const payload = {
@@ -195,6 +213,7 @@ export class PigeonPollsApi {
       session,
       'DELETE',
       `/polls/${encodeURIComponent(pollId)}/votes/me`,
+      scope,
       { kind: 'delete', payload },
     );
   }
@@ -218,6 +237,7 @@ export class PigeonPollsApi {
       session,
       'POST',
       `/polls/${encodeURIComponent(pollId)}/close`,
+      scope,
       { kind: 'put', payload },
       { createdAt },
     );

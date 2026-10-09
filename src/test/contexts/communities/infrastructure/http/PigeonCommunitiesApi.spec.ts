@@ -7,6 +7,7 @@ import type { RequestSigner } from '../../../../../shared/infrastructure/http/Re
 
 import { deriveModerationLogId } from '../../../../../contexts/communities/infrastructure/http/deriveCommunityRecordId';
 import { PigeonCommunitiesApi } from '../../../../../contexts/communities/infrastructure/http/PigeonCommunitiesApi';
+import { ScopeFrontierReader } from '../../../../../shared/infrastructure/http/ScopeFrontierReader';
 import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
 type SentBody = {
@@ -14,6 +15,15 @@ type SentBody = {
   emoji?: string;
   mutation: Record<string, unknown>;
 };
+
+beforeEach(() => {
+  jest
+    .spyOn(ScopeFrontierReader.prototype, 'community')
+    .mockResolvedValue(['F'.repeat(43)]);
+  jest
+    .spyOn(ScopeFrontierReader.prototype, 'conversation')
+    .mockResolvedValue(['F'.repeat(43)]);
+});
 
 describe(PigeonCommunitiesApi.name, () => {
   it('uses the backend cursor when listing community channel messages', async () => {

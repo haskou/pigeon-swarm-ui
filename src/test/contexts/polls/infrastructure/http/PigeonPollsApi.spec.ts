@@ -6,6 +6,7 @@ import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/H
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
 import { PigeonPollsApi } from '../../../../../contexts/polls/infrastructure/http/PigeonPollsApi';
+import { ScopeFrontierReader } from '../../../../../shared/infrastructure/http/ScopeFrontierReader';
 import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 import { pollResourceFixture } from '../../pollResourceFixture';
 
@@ -40,6 +41,15 @@ function sentBody(http: MockProxy<HttpJsonClient>) {
   } & Record<string, unknown>;
 }
 
+beforeEach(() => {
+  jest
+    .spyOn(ScopeFrontierReader.prototype, 'community')
+    .mockResolvedValue(['F'.repeat(43)]);
+  jest
+    .spyOn(ScopeFrontierReader.prototype, 'conversation')
+    .mockResolvedValue(['F'.repeat(43)]);
+});
+
 describe(PigeonPollsApi.name, () => {
   it('signs a vote as a put of the voter ballot record', async () => {
     const { api, http, session, signer } = await setup();
@@ -71,12 +81,17 @@ describe(PigeonPollsApi.name, () => {
   it('signs vote removal as a delete tombstone', async () => {
     const { api, http, session } = await setup();
 
-    await api.removeVote(session, 'poll-a');
+    await api.removeVote(session, 'poll-a', {
+      conversationId: 'conversation-a',
+    });
 
     expect(http.request.mock.calls[0][1]?.method).toBe('DELETE');
     expect(sentBody(http).mutation).toMatchObject({
       kind: 'delete',
       recordId: 'poll-vote:poll-a:identity-a',
+    });
+    expect(sentBody(http).mutation).toMatchObject({
+      frontier: ['F'.repeat(43)],
     });
   });
 

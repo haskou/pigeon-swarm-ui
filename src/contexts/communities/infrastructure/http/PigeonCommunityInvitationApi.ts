@@ -11,6 +11,7 @@ import type { CommunityInviteLinkInput } from './CommunityInviteLinkInput';
 import type { PigeonCommunitiesApi } from './PigeonCommunitiesApi';
 
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
+import { ScopeFrontierReader } from '../../../../shared/infrastructure/http/ScopeFrontierReader';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 import { NotificationMutationSigner } from '../../../notifications/infrastructure/http/NotificationMutationSigner';
 import { buildCommunityInviteLinkBody } from './buildCommunityInviteLinkBody';
@@ -35,8 +36,12 @@ export class PigeonCommunityInvitationApi {
       'frontier' | 'get' | 'inviteMember'
     >,
     private readonly mutations: PublicMutationSigner,
+    private readonly frontiers = new ScopeFrontierReader(http, signer),
   ) {
-    this.moderationLogs = new CommunityModerationLogSigner(mutations);
+    this.moderationLogs = new CommunityModerationLogSigner(
+      mutations,
+      frontiers,
+    );
     this.notifications = new NotificationMutationSigner(mutations);
     this.operations = new CommunityOperationSigner(mutations);
   }
@@ -66,13 +71,20 @@ export class PigeonCommunityInvitationApi {
         : {}),
     };
     let response: CommunityInviteLinkResource | undefined;
+    const frontier = await this.frontiers.community(session, communityId);
 
     await submitPublicMutation(
       PublicMutationSigner.FIRST_POSITION,
       (position) =>
         this.mutations.sign(
           session,
-          { kind: 'put', payload: record, recordId: token, store: 'requests' },
+          {
+            frontier,
+            kind: 'put',
+            payload: record,
+            recordId: token,
+            store: 'requests',
+          },
           position,
         ),
       async (mutation) => {
@@ -228,6 +240,7 @@ export class PigeonCommunityInvitationApi {
       usedAt,
     };
     let community: Community | undefined;
+    const frontier = await this.frontiers.community(session, communityId);
 
     await submitPublicMutation(
       PublicMutationSigner.FIRST_POSITION,
@@ -235,6 +248,7 @@ export class PigeonCommunityInvitationApi {
         this.mutations.sign(
           session,
           {
+            frontier,
             kind: 'put',
             payload: record,
             recordId: record.id,

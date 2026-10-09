@@ -1,4 +1,5 @@
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { ScopeFrontierReader } from '../../../../shared/infrastructure/http/ScopeFrontierReader';
 import type { CommunityModerationLogBody } from './CommunityModerationLogBody';
 import type { CommunityModerationLogInput } from './CommunityModerationLogInput';
 
@@ -7,7 +8,10 @@ import { deriveModerationLogId } from './deriveCommunityRecordId';
 
 /** Signs the `moderationLogs` put that accompanies a moderation action. */
 export class CommunityModerationLogSigner {
-  public constructor(private readonly mutations: PublicMutationSigner) {}
+  public constructor(
+    private readonly mutations: PublicMutationSigner,
+    private readonly frontiers: Pick<ScopeFrontierReader, 'community'>,
+  ) {}
 
   public async sign(
     session: Session,
@@ -28,6 +32,7 @@ export class CommunityModerationLogSigner {
     const mutation = await this.mutations.sign(
       session,
       {
+        frontier: await this.frontiers.community(session, input.communityId),
         kind: 'put',
         payload: {
           action: input.action,

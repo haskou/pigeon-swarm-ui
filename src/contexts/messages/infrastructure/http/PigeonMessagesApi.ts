@@ -16,6 +16,7 @@ import type { MessageLoadOptions } from './MessageLoadOptions';
 import type { ConversationDraftProjection } from './resources/ConversationDraftProjection';
 
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
+import { ScopeFrontierReader } from '../../../../shared/infrastructure/http/ScopeFrontierReader';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 import { DraftPayloadCipher } from '../crypto/DraftPayloadCipher';
 import { PigeonLinkPreviewsApi } from './PigeonLinkPreviewsApi';
@@ -33,6 +34,7 @@ export class PigeonMessagesApi {
     private readonly requestCache: RequestCache,
     private readonly projection: MessageProjectionPort,
     private readonly mutations: PublicMutationSigner,
+    private readonly frontiers = new ScopeFrontierReader(http, signer),
     draftPayloads = new DraftPayloadCipher(),
     linkPreviews = new PigeonLinkPreviewsApi(http, signer),
   ) {
@@ -49,12 +51,14 @@ export class PigeonMessagesApi {
     payload: Record<string, unknown>,
     fields: Record<string, unknown> = {},
   ): Promise<void> {
+    const frontier = await this.frontiers.ofPayload(session, payload);
+
     await submitPublicMutation(
       PublicMutationSigner.FIRST_POSITION,
       (position) =>
         this.mutations.sign(
           session,
-          { kind, payload, recordId: String(payload.id), store },
+          { frontier, kind, payload, recordId: String(payload.id), store },
           position,
         ),
       async (mutation) => {

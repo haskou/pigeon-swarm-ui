@@ -9,7 +9,17 @@ import type { RequestSigner } from '../../../../../shared/infrastructure/http/Re
 import { PigeonMessageCommandsApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
 import { PigeonMessagesApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessagesApi';
 import { PublicMutationSigner } from '../../../../../shared/infrastructure/crypto/PublicMutationSigner';
+import { ScopeFrontierReader } from '../../../../../shared/infrastructure/http/ScopeFrontierReader';
 import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
+
+beforeEach(() => {
+  jest
+    .spyOn(ScopeFrontierReader.prototype, 'community')
+    .mockResolvedValue(['F'.repeat(43)]);
+  jest
+    .spyOn(ScopeFrontierReader.prototype, 'conversation')
+    .mockResolvedValue(['F'.repeat(43)]);
+});
 
 describe(PigeonMessageCommandsApi.name, () => {
   const session = {

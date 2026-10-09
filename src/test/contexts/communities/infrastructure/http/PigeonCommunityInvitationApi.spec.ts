@@ -8,7 +8,17 @@ import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/H
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
 import { PigeonCommunityInvitationApi } from '../../../../../contexts/communities/infrastructure/http/PigeonCommunityInvitationApi';
+import { ScopeFrontierReader } from '../../../../../shared/infrastructure/http/ScopeFrontierReader';
 import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
+
+beforeEach(() => {
+  jest
+    .spyOn(ScopeFrontierReader.prototype, 'community')
+    .mockResolvedValue(['F'.repeat(43)]);
+  jest
+    .spyOn(ScopeFrontierReader.prototype, 'conversation')
+    .mockResolvedValue(['F'.repeat(43)]);
+});
 
 describe(PigeonCommunityInvitationApi.name, () => {
   it('invites into a public community without notifying', async () => {
