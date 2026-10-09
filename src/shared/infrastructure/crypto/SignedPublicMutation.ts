@@ -4,6 +4,7 @@ export interface SignedPublicMutation {
     deviceCredential: string;
     identityId: string;
   };
+  frontier?: string[];
   kind: 'delete' | 'put';
   operationId: string;
   payloadDigest: string;
