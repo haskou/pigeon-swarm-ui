@@ -79,6 +79,21 @@ export class PigeonCommunitiesApi {
       .replace(/=+$/, '');
   }
 
+  private async readFrontier(
+    session: Session,
+    communityId: string,
+  ): Promise<{ frontier: string[]; networkId: string }> {
+    const path = `/communities/${encodeURIComponent(communityId)}/frontier`;
+
+    return await this.http.request<{ frontier: string[]; networkId: string }>(
+      path,
+      {
+        headers: await this.signer.headers(session, 'GET', path),
+        method: 'GET',
+      },
+    );
+  }
+
   /** Signs an operation on top of the frontier the node holds right now. */
   private async signOperation(
     session: Session,
@@ -98,7 +113,11 @@ export class PigeonCommunitiesApi {
     });
   }
 
-  /** Same as signOperation for members, who can read the community network. */
+  /**
+   * Signs an operation of an identity that may not be a member yet (an
+   * invitee accepting), so the network comes from the frontier, which any
+   * authenticated identity can read, not from the member-only community.
+   */
   private async signMemberOperation(
     session: Session,
     communityId: string,
@@ -106,16 +125,19 @@ export class PigeonCommunitiesApi {
     args: Record<string, unknown>,
     createdAt: number,
   ): Promise<CommunityOperationBody> {
-    const { networkId } = await this.get(session, communityId);
-
-    return await this.signOperation(
+    const { frontier, networkId } = await this.readFrontier(
       session,
       communityId,
-      networkId,
+    );
+
+    return await this.operations.sign(session, {
       action,
       args,
+      communityId,
       createdAt,
-    );
+      networkId,
+      parents: frontier,
+    });
   }
 
   private membershipRequestRecord(
@@ -429,13 +451,7 @@ export class PigeonCommunitiesApi {
     session: Session,
     communityId: string,
   ): Promise<string[]> {
-    const path = `/communities/${encodeURIComponent(communityId)}/frontier`;
-    const result = await this.http.request<{ frontier: string[] }>(path, {
-      headers: await this.signer.headers(session, 'GET', path),
-      method: 'GET',
-    });
-
-    return result.frontier;
+    return (await this.readFrontier(session, communityId)).frontier;
   }
 
   public async list(session: Session): Promise<Community[]> {
