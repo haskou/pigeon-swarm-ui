@@ -18,10 +18,11 @@ module.exports = {
     '**/ConversationOperationSigner.spec.ts',
     '**/CallEventSigner.spec.ts',
     '**/MlsGroup.spec.ts',
+    '**/MlsCommunityEngine.spec.ts',
   ],
   testPathIgnorePatterns: [],
   transform: {
     '^.+\\.[tj]s$': ['ts-jest', { tsconfig: 'tsconfig.real-crypto.json' }],
   },
-  transformIgnorePatterns: ['/node_modules/(?!@noble/|ts-mls/)'],
+  transformIgnorePatterns: ['/node_modules/(?!@noble/|ts-mls/|@haskou/pigeon-swarm-crypto/)'],
 };

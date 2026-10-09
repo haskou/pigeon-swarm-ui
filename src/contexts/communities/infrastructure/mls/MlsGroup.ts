@@ -157,6 +157,25 @@ const decodeKeyPackage = (bytes: Uint8Array): KeyPackage => {
   return decoded.keyPackage;
 };
 
+/** Rebuilds a stored key package from its public bytes and private part. */
+export const restoreMlsKeyPackage = (
+  publicBytes: Uint8Array,
+  privatePackage: PrivateKeyPackage,
+): MlsKeyPackageBundle => {
+  const publicPackage = decodeKeyPackage(publicBytes);
+
+  return {
+    owner: ownerOfKeyPackage(publicPackage),
+    privatePackage,
+    publicBytes,
+    publicPackage,
+  };
+};
+
+/** The identity and device a published key package belongs to. */
+export const mlsKeyPackageOwner = (publicBytes: Uint8Array): MlsLeafOwner =>
+  ownerOfKeyPackage(decodeKeyPackage(publicBytes));
+
 const ownerOfKeyPackage = (keyPackage: KeyPackage): MlsLeafOwner => {
   const credential = keyPackage.leafNode.credential;
 
