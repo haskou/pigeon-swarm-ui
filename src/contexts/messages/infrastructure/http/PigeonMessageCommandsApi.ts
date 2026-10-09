@@ -16,6 +16,7 @@ import type { MessageAttachmentPublisher } from './MessageAttachmentPublisher';
 import type { MessageCommandIdentity } from './resources/MessageCommandIdentity';
 
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
+import { ScopeFrontierReader } from '../../../../shared/infrastructure/http/ScopeFrontierReader';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
 import { MessageContent } from '../../domain/value-objects/MessageContent';
@@ -29,6 +30,7 @@ export class PigeonMessageCommandsApi {
     private readonly projection: MessageProjectionPort,
     private readonly attachments: MessageAttachmentPublisher,
     private readonly mutations: PublicMutationSigner,
+    private readonly frontiers = new ScopeFrontierReader(http, signer),
   ) {}
 
   private async submit<T>(
@@ -41,6 +43,7 @@ export class PigeonMessageCommandsApi {
     },
   ): Promise<T> {
     let response: T | undefined;
+    const frontier = await this.frontiers.ofPayload(session, input.record);
 
     await submitPublicMutation(
       PublicMutationSigner.FIRST_POSITION,
@@ -48,6 +51,7 @@ export class PigeonMessageCommandsApi {
         this.mutations.sign(
           session,
           {
+            frontier,
             kind: 'put',
             payload: input.record,
             recordId: input.record.id,

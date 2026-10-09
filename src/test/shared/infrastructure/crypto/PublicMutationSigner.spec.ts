@@ -50,6 +50,36 @@ describe(PublicMutationSigner.name, () => {
     ).toBe(signature);
   });
 
+  it('signs the scope frontier into the body and omits it when absent', async () => {
+    const device = await KeyPair.generate();
+    const session = {
+      deviceCredentialKeyPair: device,
+      identity: { id: 'identity-1' },
+    } as unknown as Session;
+    const signer = new PublicMutationSigner({
+      current: () => Promise.resolve(1),
+    });
+    const intent = {
+      kind: 'put' as const,
+      payload: { id: 'r' },
+      recordId: 'r',
+      store: 'pins' as const,
+    };
+    const frontier = ['f'.repeat(43)];
+    const first = PublicMutationSigner.FIRST_POSITION;
+    const scoped = await signer.sign(session, { ...intent, frontier }, first);
+    const plain = await signer.sign(session, intent, first);
+    const { signature, ...body } = scoped;
+
+    expect(scoped.frontier).toEqual(frontier);
+    expect(plain).not.toHaveProperty('frontier');
+    expect(
+      device
+        .sign(`pigeon:public-mutation:v2\n${canonicalJson(body)}`)
+        .toString(),
+    ).toBe(signature);
+  });
+
   it('asks the revision source for the signing session on every signature', async () => {
     const device = await KeyPair.generate();
     const session = {

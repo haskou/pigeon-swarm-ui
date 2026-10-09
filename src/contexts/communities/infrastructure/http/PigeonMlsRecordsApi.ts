@@ -7,6 +7,7 @@ import type { MlsRecordResource } from './resources/MlsRecordResource';
 import type { MlsRecordsResource } from './resources/MlsRecordsResource';
 
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
+import { ScopeFrontierReader } from '../../../../shared/infrastructure/http/ScopeFrontierReader';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 import { deriveMlsRecordId } from './deriveMlsRecordId';
 
@@ -19,6 +20,7 @@ export class PigeonMlsRecordsApi {
     private readonly http: HttpJsonClient,
     private readonly signer: RequestSigner,
     private readonly mutations: PublicMutationSigner,
+    private readonly frontiers = new ScopeFrontierReader(http, signer),
   ) {}
 
   public async list(
@@ -65,6 +67,7 @@ export class PigeonMlsRecordsApi {
       scopeType: 'community_mls',
     };
     let stored: MlsRecordResource | undefined;
+    const frontier = await this.frontiers.community(session, communityId);
 
     await submitPublicMutation(
       PublicMutationSigner.FIRST_POSITION,
@@ -72,6 +75,7 @@ export class PigeonMlsRecordsApi {
         this.mutations.sign(
           session,
           {
+            frontier,
             kind: 'put',
             payload: document,
             recordId: document.id,

@@ -49,6 +49,7 @@ export class PigeonPollRepository implements PollRepository {
     const resource = await this.api.removeVote(
       this.contexts.find(actorId),
       primitives.id,
+      this.mapper.toScopeFields(poll),
     );
 
     return this.mapper.fromResource(resource);

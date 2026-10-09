@@ -74,6 +74,7 @@ export class PublicMutationSigner {
         ),
         identityId: this.authorOf(session),
       },
+      ...(intent.frontier ? { frontier: intent.frontier } : {}),
       kind: intent.kind,
       operationId: this.operationId(),
       payloadDigest: this.digest(canonicalJson(intent.payload)),
