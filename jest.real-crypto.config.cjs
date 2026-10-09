@@ -17,10 +17,11 @@ module.exports = {
     '**/CommunityOperationSigner.spec.ts',
     '**/ConversationOperationSigner.spec.ts',
     '**/CallEventSigner.spec.ts',
+    '**/MlsGroup.spec.ts',
   ],
   testPathIgnorePatterns: [],
   transform: {
     '^.+\\.[tj]s$': ['ts-jest', { tsconfig: 'tsconfig.real-crypto.json' }],
   },
-  transformIgnorePatterns: ['/node_modules/(?!@noble/)'],
+  transformIgnorePatterns: ['/node_modules/(?!@noble/|ts-mls/)'],
 };
