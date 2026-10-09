@@ -64,6 +64,17 @@ that has a network, with `E2E_NETWORK_ID` when the node lists none:
 yarn test:e2e e2e/call-page-departure.spec.ts --project=desktop-chromium
 ```
 
+`community-mls-kick.spec.ts` registers two identities on a real node, creates
+a private community, invites the second one, exchanges messages in both
+directions through the MLS group and then removes the member. A message sent
+after the removal must never show in the removed member's page. It needs a node
+that runs the `GET /communities/{id}/frontier` response with `networkId` and
+takes several minutes on a development node:
+
+```bash
+yarn test:e2e e2e/community-mls-kick.spec.ts --project=desktop-chromium
+```
+
 ## Visual audit
 
 The visual audit captures the login and the main authenticated UI states on
