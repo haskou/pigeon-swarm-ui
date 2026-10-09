@@ -11,8 +11,6 @@ import type {
   CommunityRoleResource,
   CommunityTextChannel,
   CommunityVoiceChannel,
-  ConversationKeyEntry,
-  LocalKeychain,
   MessageResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
@@ -194,18 +192,12 @@ export class PigeonCommunitiesGateway {
     );
 
     if (status === 'accepted' && request.type === 'request') {
-      const hasCommunityKey = Boolean(
-        session.keychain.conversations[request.communityId],
+      const community = await this.communities.get(
+        session,
+        request.communityId,
       );
 
-      if (!hasCommunityKey) {
-        const community = await this.communities.get(
-          session,
-          request.communityId,
-        );
-
-        if (community.visibility === 'public') return request;
-      }
+      if (community.visibility === 'public') return request;
 
       await this.invitations.notifyMember(
         session,
@@ -577,10 +569,7 @@ export class PigeonCommunitiesGateway {
     session: Session,
     communityId: string,
     recipientIdentityId: string,
-  ): Promise<{
-    keychain: LocalKeychain;
-    keychainExternalIdentifier: null | string;
-  }> {
+  ): Promise<void> {
     return await this.invitations.create(
       session,
       communityId,
@@ -592,13 +581,7 @@ export class PigeonCommunitiesGateway {
     session: Session,
     communityId: string,
     input: CommunityInviteLinkInput = {},
-  ): Promise<{
-    invite: CommunityInviteLinkResource;
-    inviteSecret?: string;
-    keyEntry?: ConversationKeyEntry;
-    keychain: LocalKeychain;
-    keychainExternalIdentifier: null | string;
-  }> {
+  ): Promise<CommunityInviteLinkResource> {
     return await this.invitations.createInviteLink(session, communityId, input);
   }
 
@@ -613,21 +596,5 @@ export class PigeonCommunitiesGateway {
     inviteToken: string,
   ): Promise<Community> {
     return await this.invitations.acceptInviteLink(session, inviteToken);
-  }
-
-  public async acceptCommunityInviteLinkWithKey(
-    session: Session,
-    inviteToken: string,
-    keyEntry: ConversationKeyEntry,
-  ): Promise<{
-    community: Community;
-    keychain: LocalKeychain;
-    keychainExternalIdentifier: string;
-  }> {
-    return await this.invitations.acceptInviteLinkWithKey(
-      session,
-      inviteToken,
-      keyEntry,
-    );
   }
 }

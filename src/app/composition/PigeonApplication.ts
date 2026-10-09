@@ -156,6 +156,7 @@ import { PigeonMessageReactions } from './messages/PigeonMessageReactions';
 import { PigeonMessageReader } from './messages/PigeonMessageReader';
 import { PigeonMessagesFacade } from './messages/PigeonMessagesFacade';
 import { PigeonMessageWriter } from './messages/PigeonMessageWriter';
+import { PigeonMlsFacade } from './mls/PigeonMlsFacade';
 import { PigeonNetworksFacade } from './networks/PigeonNetworksFacade';
 import { PigeonNodeFacade } from './networks/PigeonNodeFacade';
 import { PigeonNotificationsFacade } from './notifications/PigeonNotificationsFacade';
@@ -175,6 +176,8 @@ export class PigeonApplication {
   public readonly communities: PigeonCommunitiesFacade;
 
   public readonly conversations: PigeonConversationsFacade;
+
+  public readonly mls: PigeonMlsFacade;
 
   public readonly identities: PigeonIdentitiesFacade;
 
@@ -235,6 +238,10 @@ export class PigeonApplication {
         ),
       ),
     );
+    this.mls = new PigeonMlsFacade(
+      gateway.mlsRecords,
+      gateway.communityGateway,
+    );
     const communityContexts = new CommunityAccessContexts();
     const communityMapper = new CommunityMapper();
     const communityRepository = new PigeonCommunityRepository(
@@ -245,6 +252,7 @@ export class PigeonApplication {
     this.communities = new PigeonCommunitiesFacade(
       gateway.communityGateway,
       gateway.identityGateway,
+      this.mls,
       new PigeonCommunityManagement(communityContexts, communityMapper, {
         assigner: new CommunityMemberRolesAssigner(communityRepository),
         banner: new CommunityMemberBanner(communityRepository),

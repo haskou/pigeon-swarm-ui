@@ -22,14 +22,12 @@ type AddMemberMode = 'identity' | 'link';
 type AddCommunityMemberDialogProps = {
   communityId: string;
   onClose: () => void;
-  onSessionUpdated: (session: Session) => void;
   session: Session;
 };
 
 export function AddCommunityMemberDialog({
   communityId,
   onClose,
-  onSessionUpdated,
   session,
 }: AddCommunityMemberDialogProps) {
   useCloseOnEscape(onClose);
@@ -103,22 +101,11 @@ export function AddCommunityMemberDialog({
     setState('loading');
     setError(null);
     try {
-      const result = await applicationContainer.communities.createInvitation(
+      await applicationContainer.communities.createInvitation(
         session,
         communityId,
         identityId,
       );
-
-      if (
-        result.keychain !== session.keychain ||
-        result.keychainExternalIdentifier !== session.keychainExternalIdentifier
-      ) {
-        onSessionUpdated({
-          ...session,
-          keychain: result.keychain,
-          keychainExternalIdentifier: result.keychainExternalIdentifier,
-        });
-      }
 
       onClose();
     } catch (caught) {
@@ -134,29 +121,15 @@ export function AddCommunityMemberDialog({
     setLinkState('loading');
     setError(null);
     try {
-      const result = await applicationContainer.communities.createInviteLink(
+      const invite = await applicationContainer.communities.createInviteLink(
         session,
         communityId,
       );
-      const token = result.invite.inviteToken ?? result.invite.token;
+      const token = invite.inviteToken ?? invite.token;
 
       if (!token) throw new Error(copy.communities.linkError);
 
-      const link = createCommunityInviteUrl({
-        inviteSecret: result.inviteSecret,
-        token,
-      });
-
-      if (
-        result.keychain !== session.keychain ||
-        result.keychainExternalIdentifier !== session.keychainExternalIdentifier
-      ) {
-        onSessionUpdated({
-          ...session,
-          keychain: result.keychain,
-          keychainExternalIdentifier: result.keychainExternalIdentifier,
-        });
-      }
+      const link = createCommunityInviteUrl({ token });
 
       setInviteLink(link);
 

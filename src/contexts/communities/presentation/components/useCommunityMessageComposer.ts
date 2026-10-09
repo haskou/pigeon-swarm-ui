@@ -34,9 +34,8 @@ import { PendingMessageAttachments } from '../../../attachments/presentation/vie
 import { MessageContent } from '../../../messages/domain/value-objects/MessageContent';
 import { MessageReactionUpdater } from '../../../messages/presentation/view-models/MessageReactionUpdater';
 import {
-  encryptCommunityChannelPayload,
   serializeCommunityChannelPayload,
-} from '../../infrastructure/crypto/communityChannelPayloadCipher';
+} from '../../infrastructure/crypto/serializeCommunityChannelPayload';
 import { CommunityMessageMentions } from './CommunityMessageMentions';
 import { mergeChatMessages } from './communityWorkspaceHelpers';
 
@@ -240,10 +239,11 @@ export function useCommunityMessageComposer({
     const messagePayload = communityIsPublic
       ? { plaintextPayload: serializeCommunityChannelPayload(payloadInput) }
       : {
-          encryptedPayload: await encryptCommunityChannelPayload({
-            ...payloadInput,
-            communityKey: session.keychain.conversations[community.id],
-          }),
+          encryptedPayload: await applicationContainer.mls.encrypt(
+            session,
+            community.id,
+            serializeCommunityChannelPayload(payloadInput),
+          ),
         };
     const edited = await applicationContainer.communities.editChannelMessage(
       session,
@@ -522,10 +522,11 @@ export function useCommunityMessageComposer({
         const messagePayload = communityIsPublic
           ? { plaintextPayload: serializeCommunityChannelPayload(payloadInput) }
           : {
-              encryptedPayload: await encryptCommunityChannelPayload({
-                ...payloadInput,
-                communityKey: session.keychain.conversations[community.id],
-              }),
+              encryptedPayload: await applicationContainer.mls.encrypt(
+            session,
+            community.id,
+            serializeCommunityChannelPayload(payloadInput),
+          ),
             };
         const created =
           await applicationContainer.communities.createChannelMessage(

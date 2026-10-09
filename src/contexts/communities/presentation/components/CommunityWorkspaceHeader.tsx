@@ -19,12 +19,10 @@ type CommunityWorkspaceHeaderProps = {
   communityLeaving: boolean;
   communityMenuOpen: boolean;
   communityNotificationSetting: NotificationScopeSetting;
-  hasCommunityKey: boolean;
   messageSearchOpen: boolean;
   networkName: string;
   onAddMember: () => void;
   onCommunityDataOpen: () => void;
-  onCommunityKeyOpen: () => void;
   onCommunityMenuClose: () => void;
   onCommunityMenuToggle: () => void;
   onEncryptionDetailsOpen: () => void;
@@ -51,12 +49,10 @@ export function CommunityWorkspaceHeader({
   communityLeaving,
   communityMenuOpen,
   communityNotificationSetting,
-  hasCommunityKey,
   messageSearchOpen,
   networkName,
   onAddMember,
   onCommunityDataOpen,
-  onCommunityKeyOpen,
   onCommunityMenuClose,
   onCommunityMenuToggle,
   onEncryptionDetailsOpen,
@@ -83,13 +79,10 @@ export function CommunityWorkspaceHeader({
       menuContent={
         <CommunityHeaderActionsMenu
           communityLeaving={communityLeaving}
-          hasCommunityKey={hasCommunityKey}
           notificationSetting={communityNotificationSetting}
-          showCommunityKeyAction={!communityIsPublic}
           onAddMember={canAddMember ? onAddMember : undefined}
           onClose={onCommunityMenuClose}
           onCommunityDataOpen={onCommunityDataOpen}
-          onCommunityKeyOpen={onCommunityKeyOpen}
           onLeaveCommunity={onLeaveCommunity}
           onNotificationMuteToggle={onNotificationMuteToggle}
           onNotificationSettingsOpen={onNotificationSettingsOpen}

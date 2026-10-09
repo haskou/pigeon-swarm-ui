@@ -441,7 +441,6 @@ export function GlassWorkspace({
     setActiveCommunityId,
     setCommunities,
     setSendError,
-    setSession,
     setWorkspaceMode,
   });
   const nodeUnclaimed = WorkspaceDerivedState.nodeIsUnclaimed(node);

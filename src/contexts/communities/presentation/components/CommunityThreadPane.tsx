@@ -18,7 +18,7 @@ type CommunityThreadPaneProps = {
   channelName: string;
   communityIsPublic: boolean;
   currentPermissions: Set<CommunityPermission>;
-  hasCommunityKey: boolean;
+  encryptionAvailable: boolean;
   identityNames: Record<string, string>;
   memberIdentities: Record<string, IdentityResource>;
   memberPictures: Record<string, string>;
@@ -40,7 +40,7 @@ export function CommunityThreadPane({
   channelName,
   communityIsPublic,
   currentPermissions,
-  hasCommunityKey,
+  encryptionAvailable,
   identityNames,
   memberIdentities,
   memberPictures,
@@ -56,12 +56,12 @@ export function CommunityThreadPane({
 }: CommunityThreadPaneProps) {
   return (
     <MessageThreadPanel
-      attachmentEncryptionAvailable={!communityIsPublic && hasCommunityKey}
+      attachmentEncryptionAvailable={!communityIsPublic && encryptionAvailable}
       currentIdentityId={session.identity.id}
       disabled={
         threadPanel.state === 'loading' ||
         messagesLoading ||
-        (!communityIsPublic && !hasCommunityKey) ||
+        (!communityIsPublic && !encryptionAvailable) ||
         !currentPermissions.has('send_messages')
       }
       draft={threadPanel.draft}

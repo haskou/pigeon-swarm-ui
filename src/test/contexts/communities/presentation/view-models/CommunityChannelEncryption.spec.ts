@@ -8,10 +8,9 @@ const channel = { id: 'channel' } as CommunityTextChannel;
 describe('CommunityChannelEncryption', () => {
   describe('ready', () => {
     const base = {
-      communityIsPublic: false,
-      communityKey: {},
       communityMemberIds: ['me', 'other'],
       currentIdentityId: 'me',
+      encryptionState: 'ready' as const,
       memberIdentities: { other: {} },
       selectedChannel: channel,
     };
@@ -20,26 +19,35 @@ describe('CommunityChannelEncryption', () => {
       expect(
         CommunityChannelEncryption.ready({
           ...base,
-          communityIsPublic: true,
+          encryptionState: 'public',
           selectedChannel: undefined,
         }),
       ).toBe(false);
     });
 
-    it('is ready for public communities without a key', () => {
+    it('is ready for public communities without any group', () => {
       expect(
         CommunityChannelEncryption.ready({
           ...base,
-          communityIsPublic: true,
-          communityKey: undefined,
+          encryptionState: 'public',
+          memberIdentities: {},
         }),
       ).toBe(true);
     });
 
-    it('needs the key and every other member identity when private', () => {
+    it('needs this device in the group and every other member identity', () => {
       expect(CommunityChannelEncryption.ready(base)).toBe(true);
       expect(
-        CommunityChannelEncryption.ready({ ...base, communityKey: undefined }),
+        CommunityChannelEncryption.ready({
+          ...base,
+          encryptionState: 'pending',
+        }),
+      ).toBe(false);
+      expect(
+        CommunityChannelEncryption.ready({
+          ...base,
+          encryptionState: 'checking',
+        }),
       ).toBe(false);
       expect(
         CommunityChannelEncryption.ready({ ...base, memberIdentities: {} }),
@@ -51,73 +59,39 @@ describe('CommunityChannelEncryption', () => {
     it('describes public, ready and missing states', () => {
       expect(
         CommunityChannelEncryption.tooltip({
-          communityIsPublic: true,
+          encryptionState: 'public',
           ready: false,
         }),
       ).toBe(copy.chat.publicChannel);
       expect(
         CommunityChannelEncryption.tooltip({
-          communityIsPublic: false,
+          encryptionState: 'ready',
           ready: true,
         }),
       ).toBe(copy.chat.e2eReady);
       expect(
         CommunityChannelEncryption.tooltip({
-          communityIsPublic: false,
+          encryptionState: 'pending',
           ready: false,
         }),
       ).toBe(copy.chat.e2eMissing);
     });
   });
 
-  describe('missingCommunityKey', () => {
-    const base = {
-      communityIsPublic: false,
-      communityKey: undefined,
-      owner: true,
-      visibleMessages: [] as { encrypted?: boolean }[],
-    };
-
-    it('is never missing for public communities or when the key exists', () => {
-      expect(
-        CommunityChannelEncryption.missingCommunityKey({
-          ...base,
-          communityIsPublic: true,
-          owner: false,
-        }),
-      ).toBe(false);
-      expect(
-        CommunityChannelEncryption.missingCommunityKey({
-          ...base,
-          communityKey: {},
-          owner: false,
-        }),
-      ).toBe(false);
-    });
-
-    it('is missing for non-owners without a key', () => {
-      expect(
-        CommunityChannelEncryption.missingCommunityKey({
-          ...base,
-          owner: false,
-        }),
-      ).toBe(true);
-    });
-
-    it('is missing for owners only when every visible message is encrypted', () => {
-      expect(CommunityChannelEncryption.missingCommunityKey(base)).toBe(false);
-      expect(
-        CommunityChannelEncryption.missingCommunityKey({
-          ...base,
-          visibleMessages: [{ encrypted: true }, { encrypted: true }],
-        }),
-      ).toBe(true);
-      expect(
-        CommunityChannelEncryption.missingCommunityKey({
-          ...base,
-          visibleMessages: [{ encrypted: true }, { encrypted: false }],
-        }),
-      ).toBe(false);
+  describe('awaitingGroupAccess', () => {
+    it('only reports a device the group has not admitted yet', () => {
+      expect(CommunityChannelEncryption.awaitingGroupAccess('pending')).toBe(
+        true,
+      );
+      expect(CommunityChannelEncryption.awaitingGroupAccess('checking')).toBe(
+        false,
+      );
+      expect(CommunityChannelEncryption.awaitingGroupAccess('ready')).toBe(
+        false,
+      );
+      expect(CommunityChannelEncryption.awaitingGroupAccess('public')).toBe(
+        false,
+      );
     });
   });
 });

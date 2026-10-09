@@ -44,7 +44,7 @@ type CommunityConversationProps = {
   currentPermissions: Set<CommunityPermission>;
   currentRoleIds: ReadonlySet<string>;
   draft: string;
-  hasCommunityKey: boolean;
+  encryptionAvailable: boolean;
   invitationAccepting: boolean;
   invitationError?: null | string;
   invitationInviterName?: string;
@@ -52,8 +52,7 @@ type CommunityConversationProps = {
   memberPictures: Record<string, string>;
   mentions: ReturnType<typeof useCommunityMentions>;
   messageComposer: ReturnType<typeof useCommunityMessageComposer>;
-  missingCommunityKey: boolean;
-  onAddCommunityKey: () => void;
+  awaitingGroupAccess: boolean;
   onInvitationAccept?: (
     notification: CommunityInvitationNotificationResource,
   ) => void;
@@ -82,7 +81,7 @@ export function CommunityConversation({
   currentPermissions,
   currentRoleIds,
   draft,
-  hasCommunityKey,
+  encryptionAvailable,
   invitationAccepting,
   invitationError,
   invitationInviterName,
@@ -90,8 +89,7 @@ export function CommunityConversation({
   memberPictures,
   mentions,
   messageComposer,
-  missingCommunityKey,
-  onAddCommunityKey,
+  awaitingGroupAccess,
   onInvitationAccept,
   onMessageMenuOpen,
   onOpenThread,
@@ -134,12 +132,11 @@ export function CommunityConversation({
         memberPictures={memberPictures}
         messageCursor={messageCursor}
         messageState={messageState}
-        missingCommunityKey={missingCommunityKey}
+        awaitingGroupAccess={awaitingGroupAccess}
         invitationAccepting={invitationAccepting}
         invitationError={invitationError}
         invitationInviterName={invitationInviterName}
         newChannelMessageCount={newChannelMessageCount}
-        onAddCommunityKey={onAddCommunityKey}
         onInvitationAccept={onInvitationAccept}
         onAttachmentOpen={(attachment) =>
           void messageComposer.openAttachment(attachment)
@@ -188,10 +185,10 @@ export function CommunityConversation({
         />
       )}
       <Composer
-        attachmentEncryptionAvailable={!communityIsPublic && hasCommunityKey}
+        attachmentEncryptionAvailable={!communityIsPublic && encryptionAvailable}
         disabled={
           messageState === 'loading' ||
-          (!communityIsPublic && !hasCommunityKey) ||
+          (!communityIsPublic && !encryptionAvailable) ||
           !currentPermissions.has('send_messages')
         }
         defaultEncryptAttachments={!communityIsPublic}

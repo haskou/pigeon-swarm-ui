@@ -16,6 +16,7 @@ module.exports = {
     '/CommunityOperationSigner.spec.ts$',
     '/ConversationOperationSigner.spec.ts$',
     '/CallEventSigner.spec.ts$',
+    '/Mls(Group|CommunityEngine).spec.ts$',
   ],
   roots: ['<rootDir>/src'],
   testEnvironment: 'node',

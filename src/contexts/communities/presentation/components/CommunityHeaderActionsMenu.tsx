@@ -10,14 +10,11 @@ import { NotificationScopeMenuActions } from '../../../notifications/presentatio
 
 type CommunityHeaderActionsMenuProps = {
   communityLeaving: boolean;
-  hasCommunityKey: boolean;
   notificationSetting: NotificationScopeSetting;
   open: boolean;
-  showCommunityKeyAction?: boolean;
   onClose: () => void;
   onAddMember?: () => void;
   onCommunityDataOpen: () => void;
-  onCommunityKeyOpen: () => void;
   onLeaveCommunity: () => void;
   onNotificationSettingsOpen: () => void;
   onNotificationMuteToggle: () => void;
@@ -27,19 +24,16 @@ type CommunityHeaderActionsMenuProps = {
 
 export function CommunityHeaderActionsMenu({
   communityLeaving,
-  hasCommunityKey,
   notificationSetting,
   onAddMember,
   onClose,
   onCommunityDataOpen,
-  onCommunityKeyOpen,
   onLeaveCommunity,
   onNotificationMuteToggle,
   onNotificationSettingsOpen,
   onOpenPins,
   onRealtimeEventsOpen,
   open,
-  showCommunityKeyAction = true,
 }: CommunityHeaderActionsMenuProps): ReactNode {
   const { close, state } = useCloseTransition(onClose);
   const [technicalDetailsVisible] = useTechnicalDetailsPreference();
@@ -126,17 +120,6 @@ export function CommunityHeaderActionsMenu({
             icon={<DataMenuIcon />}
             label={copy.chat.viewData}
             onClick={onCommunityDataOpen}
-          />
-        ) : null}
-        {showCommunityKeyAction ? (
-          <CommunityHeaderMenuAction
-            icon={<KeyMenuIcon />}
-            label={
-              hasCommunityKey
-                ? copy.chat.copyPrivateKey
-                : copy.chat.addPrivateKey
-            }
-            onClick={onCommunityKeyOpen}
           />
         ) : null}
         <CommunityHeaderMenuAction
@@ -258,31 +241,6 @@ function RealtimeEventsMenuIcon() {
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth="1.8"
-      />
-    </svg>
-  );
-}
-
-function KeyMenuIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      fill="none"
-      className="h-4 w-4 shrink-0 text-white/55"
-    >
-      <path
-        d="M14.5 9.5a4.5 4.5 0 1 1-2.1-3.8l5.4 5.4 1.9-.1.2 2.2 2.1.2v2.4h-2.7l-1.8-1.8-1.8 1.8-2.2-2.2"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-      <path
-        d="M7.5 10.5h.01"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeWidth="2.4"
       />
     </svg>
   );

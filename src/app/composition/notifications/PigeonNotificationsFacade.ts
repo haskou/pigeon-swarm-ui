@@ -56,15 +56,16 @@ export class PigeonNotificationsFacade {
     keychainExternalIdentifier: string;
     notification: NotificationResource;
   }> {
-    if (notification.type === 'missed_call') {
-      throw new Error('Missed call notifications cannot be accepted.');
+    if (
+      notification.type === 'missed_call' ||
+      notification.type === 'community_invitation'
+    ) {
+      throw new Error('Only conversation invitations carry a key to accept.');
     }
 
     const recipientIdentityId = this.actor(session);
     const encryptedInvitationKey =
-      notification.type === 'community_invitation'
-        ? notification.payload.encryptedCommunityKey
-        : notification.payload.encryptedConversationKey;
+      notification.payload.encryptedConversationKey;
     const accepted = await this.useCases.invitationAcceptor.accept(
       new AcceptConversationInvitationMessage(
         notification.id,

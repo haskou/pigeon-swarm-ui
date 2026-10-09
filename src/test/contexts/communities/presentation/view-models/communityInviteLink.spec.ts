@@ -52,16 +52,11 @@ describe('community invite links', () => {
     restoreGlobalProperty('window', originalWindow);
   });
 
-  it('creates short invite links with the key secret in the URL fragment', () => {
+  it('creates short invite links without any key material', () => {
     installLocation('https://pigeon.example/messages?old=1#stale');
 
-    expect(
-      createCommunityInviteUrl({
-        inviteSecret: 'secret_123',
-        token: 'invite/token',
-      }),
-    ).toBe(
-      'https://pigeon.example/invite/community/invite%2Ftoken#k=secret_123',
+    expect(createCommunityInviteUrl({ token: 'invite/token' })).toBe(
+      'https://pigeon.example/invite/community/invite%2Ftoken',
     );
   });
 
@@ -70,10 +65,7 @@ describe('community invite links', () => {
       'https://pigeon.example/invite/community/invite-token#k=secret_123',
     );
 
-    expect(parseCommunityInviteUrl()).toEqual({
-      inviteSecret: 'secret_123',
-      token: 'invite-token',
-    });
+    expect(parseCommunityInviteUrl()).toEqual({ token: 'invite-token' });
   });
 
   it('ignores short invite links with malformed path encoding', () => {

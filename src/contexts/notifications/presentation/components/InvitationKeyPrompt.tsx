@@ -38,7 +38,9 @@ export function InvitationKeyPrompt({
           </div>
         </div>
         <p className="mt-4 leading-6 text-white/70">
-          {copy.notifications.inviteKeyBody}
+          {kind === 'community'
+            ? copy.notifications.communityInviteBody
+            : copy.notifications.inviteKeyBody}
         </p>
         {error ? (
           <div className="mt-4 rounded-2xl border border-rose-300/20 bg-rose-500/10 px-4 py-3 text-sm font-bold text-rose-100">

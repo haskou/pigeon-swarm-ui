@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef } from 'react';
 
 import type {
   ChatMessage,
-  ConversationKeyEntry,
   MessageResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
@@ -13,7 +12,6 @@ import { CommunityMessageDecryptWorkerClient } from '../../infrastructure/crypto
 
 type UseCommunityMessageProjectionInput = {
   communityId: string;
-  communityKey?: ConversationKeyEntry;
   session: Session;
 };
 
@@ -35,7 +33,6 @@ type UseCommunityMessageProjectionResult = {
 
 export function useCommunityMessageProjection({
   communityId,
-  communityKey,
   session,
 }: UseCommunityMessageProjectionInput): UseCommunityMessageProjectionResult {
   const decryptWorkerRef = useRef<CommunityMessageDecryptWorkerClient | null>(
@@ -45,16 +42,21 @@ export function useCommunityMessageProjection({
     async (channelId: string, rawMessages: MessageResource[]) => {
       decryptWorkerRef.current ??= new CommunityMessageDecryptWorkerClient();
 
+      const opened = await applicationContainer.mls.openMessages(
+        session,
+        communityId,
+        rawMessages,
+      );
+
       return await decryptWorkerRef.current.decrypt({
         channelId,
         communityId,
-        communityKey,
         copy: copy.messages,
         currentIdentityId: session.identity.id,
-        messages: rawMessages,
+        messages: opened,
       });
     },
-    [communityId, communityKey, session.identity.id],
+    [communityId, session],
   );
   const projectChannelMessage = useCallback(
     async (

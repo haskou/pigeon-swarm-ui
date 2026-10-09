@@ -153,15 +153,26 @@ export function useNotifications({
 
       try {
         const result =
-          await applicationContainer.notifications.acceptConversationInvitation(
-            currentSession,
-            notification,
-          );
-        const nextSession = {
-          ...currentSession,
-          keychain: result.keychain,
-          keychainExternalIdentifier: result.keychainExternalIdentifier,
-        };
+          notification.type === 'community_invitation'
+            ? {
+                notification: await applicationContainer.notifications.update(
+                  currentSession,
+                  notification.id,
+                  'accepted',
+                ),
+              }
+            : await applicationContainer.notifications.acceptConversationInvitation(
+                currentSession,
+                notification,
+              );
+        const nextSession =
+          'keychain' in result
+            ? {
+                ...currentSession,
+                keychain: result.keychain,
+                keychainExternalIdentifier: result.keychainExternalIdentifier,
+              }
+            : currentSession;
         const conversations =
           notification.type === 'community_invitation'
             ? undefined

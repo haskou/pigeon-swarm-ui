@@ -441,10 +441,8 @@ export const en = {
     linkCopied: 'Invite link copied',
     linkError: 'The invite link could not be created.',
     linkHelp:
-      'Creates a one-use link. The community key is stored in the URL fragment and is not sent to the server.',
+      'Creates a one-use link. An online member adds your device to the encrypted group after you join.',
     linkInvite: 'Invite by link',
-    linkKeyMissing:
-      'This invite link is missing the community key. Ask for a fresh link before joining.',
     loadError: 'Communities could not be loaded.',
     loadMoreModerationLogs: 'Load more',
     manage: 'Manage community',
@@ -489,7 +487,6 @@ export const en = {
       channelId: 'Channel',
       description: 'Description',
       discoverable: 'Discoverable',
-      encryptedCommunityKeyStored: 'Encrypted community key stored',
       expiresAt: 'Expires',
       identityId: 'Identity',
       maxUses: 'Maximum uses',
@@ -712,9 +709,9 @@ export const en = {
   },
   encryption: {
     algorithm: 'Algorithm',
-    communityKey: 'Community key',
+    mlsCiphersuite: 'MLS · X25519 / AES-128-GCM / Ed25519',
     communityNote:
-      'Community channel messages use this symmetric key from your keychain.',
+      'Community messages are encrypted end to end with MLS (RFC 9420). Members who join later cannot read earlier messages, and removed members cannot read new ones.',
     communityTitle: 'Community encryption',
     conversationNote:
       'Conversation messages use this symmetric key from your keychain.',
@@ -875,8 +872,8 @@ export const en = {
     editing: 'Editing message',
     emptyPins: 'No pinned messages yet.',
     emptyThread: 'This thread has no replies yet.',
-    missingCommunityKey:
-      'This community key is missing from the keychain, so channel messages cannot be decrypted.',
+    awaitingGroupAccess:
+      'This device is not in the encrypted group yet. An online member will add it shortly; you will read messages sent from that moment on.',
     missingConversationKey:
       'This conversation key is missing from the keychain.',
     missingKey:
@@ -1120,6 +1117,8 @@ export const en = {
     invitationTitle: 'Conversation invitation',
     invitedBy: 'Invited by',
     inviteKeyAction: 'Add key and continue',
+    communityInviteBody:
+      'Accepting adds you to the community. An online member then adds this device to the encrypted group; you will read messages sent from that moment on.',
     inviteKeyBody:
       'This invitation includes a key encrypted for your identity. Accepting it adds the key to your keychain so you can read and send messages.',
     inviteKeyInvitedBy: 'Invited by',

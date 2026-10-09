@@ -13,14 +13,12 @@ import type {
   CommunityRoleResource,
   CommunityTextChannel,
   CommunityVoiceChannel,
-  ConversationKeyEntry,
-  LocalKeychain,
   MessageResource,
   Session,
 } from '../../shared/domain/pigeonResources.types';
 import type { CreateCommunityInput } from './communities/create-community/CreateCommunityInput';
-import type { CreateCommunityResult } from './communities/create-community/CreateCommunityResult';
 import type { LeaveCommunityResult } from './communities/create-community/LeaveCommunityResult';
+import type { PigeonMlsFacade } from './mls/PigeonMlsFacade';
 
 import { PigeonCommunitiesGateway } from '../../contexts/communities/infrastructure/http/PigeonCommunitiesGateway';
 import { PigeonIdentitiesGateway } from '../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
@@ -51,8 +49,6 @@ export class PigeonCommunitiesFacade {
 
   private readonly communityInviteLinkAcceptor: PigeonCommunitiesGateway;
 
-  private readonly inviteWithKey: PigeonCommunitiesGateway;
-
   private readonly communityInviteLinkCreator: PigeonCommunitiesGateway;
 
   private readonly communityInviteLinkGetter: PigeonCommunitiesGateway;
@@ -62,6 +58,8 @@ export class PigeonCommunitiesFacade {
   private readonly leaveCommunityUseCase: LeaveCommunity;
 
   private readonly media: PigeonCommunitiesGateway;
+
+  private readonly mls: PigeonMlsFacade;
 
   private readonly management: PigeonCommunityManagement;
 
@@ -76,6 +74,7 @@ export class PigeonCommunitiesFacade {
   public constructor(
     communities: PigeonCommunitiesGateway,
     identities: PigeonIdentitiesGateway,
+    mls: PigeonMlsFacade,
     management: PigeonCommunityManagement,
   ) {
     this.channelDrafts = communities;
@@ -83,23 +82,36 @@ export class PigeonCommunitiesFacade {
     this.channelPins = communities;
     this.channels = communities;
     this.channelReads = communities;
-    this.createCommunityUseCase = new CreateCommunity(communities, identities);
+    this.createCommunityUseCase = new CreateCommunity(communities, mls);
     this.communityDiscoverer = communities;
     this.communityGetter = communities;
     this.communityUpdater = communities;
     this.communityInvitationCreator = communities;
     this.communityInviteLinkAcceptor = communities;
-    this.inviteWithKey = communities;
     this.communityInviteLinkCreator = communities;
     this.communityInviteLinkGetter = communities;
     this.keychain = identities;
     this.leaveCommunityUseCase = new LeaveCommunity(communities, identities);
     this.media = communities;
+    this.mls = mls;
     this.management = management;
     this.members = communities;
     this.membershipRequests = communities;
     this.moderationLogs = communities;
     this.roles = communities;
+  }
+
+  /**
+   * Rotates the group keys right away. Failing here must not undo the
+   * moderation, since any online member reconciles the group on its next sync.
+   */
+  private async removeFromGroup(
+    session: Session,
+    communityId: string,
+  ): Promise<void> {
+    await this.mls
+      .synchronize(session, communityId, { force: true })
+      .catch(() => false);
   }
 
   private async resolvePublicImageCid(
@@ -143,7 +155,7 @@ export class PigeonCommunitiesFacade {
   public async create(
     session: Session,
     input: CreateCommunityInput,
-  ): Promise<CreateCommunityResult> {
+  ): Promise<Community> {
     return await this.createCommunityUseCase.create(session, input);
   }
 
@@ -189,7 +201,15 @@ export class PigeonCommunitiesFacade {
     communityId: string,
     identityId: string,
   ): Promise<Community> {
-    return await this.management.banMember(session, communityId, identityId);
+    const community = await this.management.banMember(
+      session,
+      communityId,
+      identityId,
+    );
+
+    await this.removeFromGroup(session, communityId);
+
+    return community;
   }
 
   public async unbanMember(
@@ -205,7 +225,15 @@ export class PigeonCommunitiesFacade {
     communityId: string,
     identityId: string,
   ): Promise<Community> {
-    return await this.management.kickMember(session, communityId, identityId);
+    const community = await this.management.kickMember(
+      session,
+      communityId,
+      identityId,
+    );
+
+    await this.removeFromGroup(session, communityId);
+
+    return community;
   }
 
   public async createJoinRequest(
@@ -254,10 +282,7 @@ export class PigeonCommunitiesFacade {
     session: Session,
     communityId: string,
     recipientIdentityId: string,
-  ): Promise<{
-    keychain: LocalKeychain;
-    keychainExternalIdentifier: null | string;
-  }> {
+  ): Promise<void> {
     return await this.communityInvitationCreator.createCommunityInvitation(
       session,
       communityId,
@@ -269,13 +294,7 @@ export class PigeonCommunitiesFacade {
     session: Session,
     communityId: string,
     input: { expiresAt?: number; maxUses?: number } = {},
-  ): Promise<{
-    invite: CommunityInviteLinkResource;
-    inviteSecret?: string;
-    keyEntry?: ConversationKeyEntry;
-    keychain: LocalKeychain;
-    keychainExternalIdentifier: null | string;
-  }> {
+  ): Promise<CommunityInviteLinkResource> {
     return await this.communityInviteLinkCreator.createCommunityInviteLink(
       session,
       communityId,
@@ -298,22 +317,6 @@ export class PigeonCommunitiesFacade {
     return await this.communityInviteLinkAcceptor.acceptCommunityInviteLink(
       session,
       inviteToken,
-    );
-  }
-
-  public async acceptInviteLinkWithKey(
-    session: Session,
-    inviteToken: string,
-    keyEntry: ConversationKeyEntry,
-  ): Promise<{
-    community: Community;
-    keychain: LocalKeychain;
-    keychainExternalIdentifier: string;
-  }> {
-    return await this.inviteWithKey.acceptCommunityInviteLinkWithKey(
-      session,
-      inviteToken,
-      keyEntry,
     );
   }
 

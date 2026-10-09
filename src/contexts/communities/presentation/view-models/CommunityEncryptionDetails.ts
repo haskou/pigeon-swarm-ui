@@ -2,7 +2,6 @@ import type { EncryptionDetails } from '../../../../app/presentation/workspace/c
 import type {
   Community,
   CommunityTextChannel,
-  ConversationKeyEntry,
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { shortId } from '../../../../shared/presentation/formatting';
@@ -12,7 +11,6 @@ type CommunityEncryptionDetailsInput = {
   channelEncryptionReady: boolean;
   community: Community;
   communityIsPublic: boolean;
-  communityKey?: ConversationKeyEntry;
   networkName: string;
   selectedChannel?: CommunityTextChannel;
 };
@@ -22,7 +20,6 @@ export class CommunityEncryptionDetails {
     channelEncryptionReady,
     community,
     communityIsPublic,
-    communityKey,
     networkName,
     selectedChannel,
   }: CommunityEncryptionDetailsInput): EncryptionDetails {
@@ -44,28 +41,10 @@ export class CommunityEncryptionDetails {
           technical: true,
           value: communityIsPublic
             ? copy.encryption.plaintext
-            : (communityKey?.algorithm ?? copy.encryption.unknown),
-        },
-        {
-          label: copy.encryption.keyVersion,
-          technical: true,
-          value: communityKey ? `v${communityKey.version}` : '-',
-        },
-        {
-          label: copy.encryption.createdAt,
-          technical: true,
-          value: CommunityEncryptionDetails.createdAt(communityKey),
+            : copy.encryption.mlsCiphersuite,
         },
       ],
-      secrets: communityIsPublic
-        ? []
-        : [
-            {
-              label: copy.encryption.communityKey,
-              sensitive: true,
-              value: communityKey?.key,
-            },
-          ],
+      secrets: [],
       status: CommunityEncryptionDetails.status(
         communityIsPublic,
         channelEncryptionReady,
@@ -73,18 +52,6 @@ export class CommunityEncryptionDetails {
       subtitle: shortId(selectedChannel?.id ?? community.id),
       title: copy.encryption.communityTitle,
     };
-  }
-
-  private static createdAt(key?: ConversationKeyEntry): string {
-    if (!key) return '-';
-
-    return new Intl.DateTimeFormat(undefined, {
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    }).format(new Date(key.createdAt));
   }
 
   private static note(

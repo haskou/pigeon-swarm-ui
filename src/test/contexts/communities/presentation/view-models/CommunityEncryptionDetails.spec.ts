@@ -20,7 +20,7 @@ describe('CommunityEncryptionDetails', () => {
     expect(details.secrets).toEqual([]);
   });
 
-  it('marks private communities without a usable key as missing', () => {
+  it('marks private communities this device cannot read as missing', () => {
     const details = CommunityEncryptionDetails.create({
       channelEncryptionReady: false,
       community,
@@ -29,7 +29,6 @@ describe('CommunityEncryptionDetails', () => {
     });
 
     expect(details.status).toBe('missing');
-    expect(details.secrets).toHaveLength(1);
-    expect(details.secrets[0]?.value).toBeUndefined();
+    expect(details.secrets).toEqual([]);
   });
 });

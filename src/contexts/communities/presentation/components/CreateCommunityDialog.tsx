@@ -193,14 +193,7 @@ export function CreateCommunityDialog({
         visibility,
       });
 
-      onCreated({
-        community: created.community,
-        session: {
-          ...session,
-          keychain: created.keychain,
-          keychainExternalIdentifier: created.keychainExternalIdentifier,
-        },
-      });
+      onCreated({ community: created, session });
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.communities.createError));
     }

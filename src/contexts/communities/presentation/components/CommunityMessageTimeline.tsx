@@ -48,12 +48,11 @@ interface CommunityMessageTimelineProps {
   memberPictures: Record<string, string>;
   messageCursor: null | string;
   messageState: LoadState;
-  missingCommunityKey: boolean;
+  awaitingGroupAccess: boolean;
   invitationAccepting?: boolean;
   invitationError?: null | string;
   invitationInviterName?: string;
   newChannelMessageCount: number;
-  onAddCommunityKey: () => void;
   onInvitationAccept?: (
     notification: CommunityInvitationNotificationResource,
   ) => void;
@@ -95,12 +94,11 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
   memberPictures,
   messageCursor,
   messageState,
-  missingCommunityKey,
+  awaitingGroupAccess,
   invitationAccepting = false,
   invitationError,
   invitationInviterName,
   newChannelMessageCount,
-  onAddCommunityKey,
   onInvitationAccept,
   onAttachmentOpen,
   onAuthorProfileOpen,
@@ -143,14 +141,13 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
     [channelThreadSummaries, polls, visibleMessages],
   );
   const invitationPrompt =
-    missingCommunityKey && pendingInvitation && onInvitationAccept ? (
+    awaitingGroupAccess && pendingInvitation && onInvitationAccept ? (
       <InvitationKeyPrompt
         accepting={invitationAccepting}
         error={invitationError}
         inviterName={invitationInviterName}
         kind="community"
         onAccept={() => onInvitationAccept(pendingInvitation)}
-        onManualImport={onAddCommunityKey}
       />
     ) : null;
 
@@ -176,31 +173,24 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                 <span className="h-px flex-1 bg-white/[0.07]" />
               </div>
             )}
-          {missingCommunityKey && (
+          {awaitingGroupAccess && (
             <>
               {invitationPrompt ?? (
                 <div className="grid min-h-[28vh] place-items-center">
-                  <div className="w-full max-w-md rounded-2xl border border-rose-300/20 bg-rose-500/10 p-5 text-center text-sm text-rose-100">
-                    <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/15">
+                  <div className="w-full max-w-md rounded-2xl border border-amber-300/20 bg-amber-500/10 p-5 text-center text-sm text-amber-100">
+                    <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-amber-500/15">
                       <LockIcon locked={false} />
                     </div>
                     <div className="font-black">{copy.chat.e2eMissing}</div>
-                    <div className="mt-2 text-rose-100/65">
-                      {copy.messages.missingCommunityKey}
+                    <div className="mt-2 text-amber-100/65">
+                      {copy.messages.awaitingGroupAccess}
                     </div>
-                    <button
-                      type="button"
-                      onClick={onAddCommunityKey}
-                      className="mt-4 rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-cyan-100"
-                    >
-                      {copy.chat.addPrivateKey}
-                    </button>
                   </div>
                 </div>
               )}
             </>
           )}
-          {!missingCommunityKey &&
+          {!awaitingGroupAccess &&
             timelineEntries.map((entry, index) => {
               const enterOrder = timelineEntries.length - index - 1;
 

@@ -1,41 +1,23 @@
 export type PendingCommunityInviteLink = {
-  inviteSecret?: string;
   token: string;
 };
 
-const inviteSecretFragmentParam = 'k';
 const communityInvitePathPattern = /^\/invite\/community\/([^/]+)\/?$/;
 
-export function createCommunityInviteUrl(input: {
-  inviteSecret?: string;
-  token: string;
-}): string {
+export function createCommunityInviteUrl(input: { token: string }): string {
   const url = new URL(window.location.href);
 
   url.pathname = `/invite/community/${encodeURIComponent(input.token)}`;
   url.search = '';
-  url.hash = input.inviteSecret
-    ? `${inviteSecretFragmentParam}=${input.inviteSecret}`
-    : '';
+  url.hash = '';
 
   return url.toString();
 }
 
 export function parseCommunityInviteUrl(): PendingCommunityInviteLink | null {
-  const url = new URL(window.location.href);
-  const token = communityInvitePathToken(url);
+  const token = communityInvitePathToken(new URL(window.location.href));
 
-  if (!token) return null;
-
-  const fragment = window.location.hash.replace(/^#/, '');
-  const inviteSecret = new URLSearchParams(fragment)
-    .get(inviteSecretFragmentParam)
-    ?.trim();
-
-  return {
-    ...(inviteSecret ? { inviteSecret } : {}),
-    token,
-  };
+  return token ? { token } : null;
 }
 
 export function clearCommunityInviteUrl(): void {
