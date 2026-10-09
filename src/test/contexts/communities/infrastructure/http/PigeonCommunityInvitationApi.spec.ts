@@ -11,7 +11,7 @@ import { PigeonCommunityInvitationApi } from '../../../../../contexts/communitie
 import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
 describe(PigeonCommunityInvitationApi.name, () => {
-  it('invites into a public community without publishing a key', async () => {
+  it('invites into a public community without notifying', async () => {
     const community = { visibility: 'public' } as Community;
     const get = jest.fn().mockResolvedValue(community);
     const inviteMember = jest.fn();
@@ -23,23 +23,49 @@ describe(PigeonCommunityInvitationApi.name, () => {
       {} as HttpJsonClient,
       {} as RequestSigner,
       { frontier: jest.fn(), get, inviteMember },
-      {} as never,
-      {} as never,
       publicMutationSignerAt(),
     );
 
     await expect(
       api.create(session, 'community-1', ' identity-2 '),
-    ).resolves.toEqual({
-      keychain: session.keychain,
-      keychainExternalIdentifier: null,
-    });
+    ).resolves.toBeUndefined();
     expect(get).toHaveBeenCalledWith(session, 'community-1');
     expect(inviteMember).toHaveBeenCalledWith(
       session,
       'community-1',
       'identity-2',
     );
+  });
+
+  it('notifies invitees of private communities without key material', async () => {
+    const device = await KeyPair.generate();
+    const request = jest.fn().mockResolvedValue({});
+    const session = {
+      deviceCredentialKeyPair: device,
+      identity: { id: 'identity-1' },
+      keychain: { conversations: {}, version: 1 },
+    } as unknown as Session;
+    const api = new PigeonCommunityInvitationApi(
+      { request } as unknown as HttpJsonClient,
+      { headers: jest.fn().mockResolvedValue({}) } as unknown as RequestSigner,
+      {
+        frontier: jest.fn(),
+        get: jest.fn().mockResolvedValue({ visibility: 'private' }),
+        inviteMember: jest.fn(),
+      },
+      publicMutationSignerAt(),
+    );
+
+    await api.create(session, 'community-1', 'identity-2');
+
+    const sent = (request.mock.calls[0] as [string, { body: string }])[1].body;
+
+    expect(sent).not.toMatch(/ncryptedCommunityKey|ncryptedKey/);
+    expect(JSON.parse(sent)).toMatchObject({
+      communityId: 'community-1',
+      recipientIdentityId: 'identity-2',
+      type: 'community_invitation',
+    });
   });
 
   it('signs invite links with the derived token as record id', async () => {
@@ -56,8 +82,6 @@ describe(PigeonCommunityInvitationApi.name, () => {
       http,
       { headers: jest.fn().mockResolvedValue({}) } as unknown as RequestSigner,
       { get: jest.fn().mockResolvedValue({ visibility: 'public' }) } as never,
-      {} as never,
-      {} as never,
       publicMutationSignerAt(),
     );
 
@@ -100,8 +124,6 @@ describe(PigeonCommunityInvitationApi.name, () => {
       http,
       { headers: jest.fn().mockResolvedValue({}) } as unknown as RequestSigner,
       { frontier: jest.fn().mockResolvedValue(['c'.repeat(43)]) } as never,
-      {} as never,
-      {} as never,
       publicMutationSignerAt(),
     );
 

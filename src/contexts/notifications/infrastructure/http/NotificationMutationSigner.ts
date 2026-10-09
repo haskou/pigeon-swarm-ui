@@ -57,7 +57,7 @@ export class NotificationMutationSigner {
   public async invitation(
     session: Session,
     input: {
-      encryptedKey: string;
+      encryptedKey?: string;
       recipientIdentityId: string;
       subjectId: string;
       type: NotificationInvitationType;
@@ -77,7 +77,9 @@ export class NotificationMutationSigner {
       {
         kind: 'put',
         payload: {
-          encryptedKey: input.encryptedKey,
+          ...(input.encryptedKey === undefined
+            ? {}
+            : { encryptedKey: input.encryptedKey }),
           id: notificationId,
           inviterIdentityId,
           nonce,

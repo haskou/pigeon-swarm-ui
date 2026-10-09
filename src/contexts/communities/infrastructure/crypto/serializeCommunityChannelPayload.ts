@@ -2,7 +2,6 @@ import type { CommunityChannelPayloadInput } from './CommunityChannelPayloadInpu
 
 export type { CommunityChannelPlainPayload } from './CommunityChannelPlainPayload';
 export type { CommunityChannelPayloadInput } from './CommunityChannelPayloadInput';
-import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
 function communityChannelPayloadType(
   input: CommunityChannelPayloadInput,
@@ -36,18 +35,4 @@ export function serializeCommunityChannelPayload(
     timestamp: input.timestamp,
     type: communityChannelPayloadType(input),
   });
-}
-
-export function encryptCommunityChannelPayload(
-  input: CommunityChannelPayloadInput,
-): string {
-  if (!input.communityKey) {
-    throw new Error('Community key is required to encrypt channel messages.');
-  }
-
-  const plaintext = serializeCommunityChannelPayload(input);
-
-  return SymmetricKey.fromBase64(input.communityKey.key)
-    .encrypt(plaintext)
-    .toString();
 }

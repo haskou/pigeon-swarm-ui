@@ -448,10 +448,8 @@ export const es = {
     linkCopied: 'Enlace de invitación copiado',
     linkError: 'No se pudo crear el enlace de invitación.',
     linkHelp:
-      'Crea un enlace de un solo uso. La clave de la comunidad se guarda en el fragmento de la URL y no se envía al servidor.',
+      'Crea un enlace de un solo uso. Un miembro conectado añade tu dispositivo al grupo cifrado después de que te unas.',
     linkInvite: 'Invitar por enlace',
-    linkKeyMissing:
-      'A este enlace de invitación le falta la clave de comunidad. Pide un enlace nuevo antes de unirte.',
     loadError: 'No se pudieron cargar las comunidades.',
     loadMoreModerationLogs: 'Cargar más',
     manage: 'Gestionar comunidad',
@@ -496,7 +494,6 @@ export const es = {
       channelId: 'Canal',
       description: 'Descripción',
       discoverable: 'Visible en Descubrir',
-      encryptedCommunityKeyStored: 'Clave de comunidad cifrada guardada',
       expiresAt: 'Caduca',
       identityId: 'Identidad',
       maxUses: 'Usos máximos',
@@ -720,9 +717,9 @@ export const es = {
   },
   encryption: {
     algorithm: 'Algoritmo',
-    communityKey: 'Clave de comunidad',
+    mlsCiphersuite: 'MLS · X25519 / AES-128-GCM / Ed25519',
     communityNote:
-      'Los mensajes del canal usan esta clave simétrica de tu llavero.',
+      'Los mensajes de la comunidad van cifrados de extremo a extremo con MLS (RFC 9420). Quien se une después no lee los mensajes anteriores y quien es expulsado no lee los nuevos.',
     communityTitle: 'Cifrado de comunidad',
     conversationNote:
       'Los mensajes de la conversación usan esta clave simétrica de tu llavero.',
@@ -881,8 +878,8 @@ export const es = {
     editing: 'Editando mensaje',
     emptyPins: 'No hay mensajes fijados.',
     emptyThread: 'Este hilo aún no tiene respuestas.',
-    missingCommunityKey:
-      'Falta la clave de comunidad en el llavero, así que los mensajes no pueden descifrarse.',
+    awaitingGroupAccess:
+      'Este dispositivo aún no está en el grupo cifrado. Un miembro conectado lo añadirá en breve; leerás los mensajes enviados desde ese momento.',
     missingConversationKey: 'Falta la clave de esta conversación.',
     missingKey: '[cifrado] Falta la clave de esta conversación.',
     openMenu: 'Abrir menú del mensaje',
@@ -1124,6 +1121,8 @@ export const es = {
     invitationTitle: 'Invitación de conversación',
     invitedBy: 'Invitado por',
     inviteKeyAction: 'Añadir clave y continuar',
+    communityInviteBody:
+      'Al aceptar te unes a la comunidad. Un miembro conectado añadirá después este dispositivo al grupo cifrado; leerás los mensajes enviados desde ese momento.',
     inviteKeyBody:
       'La invitación incluye una clave cifrada para tu identidad. Al aceptarla se añadirá la clave a tu llavero y podrás leer y enviar mensajes.',
     inviteKeyInvitedBy: 'Invitado por',

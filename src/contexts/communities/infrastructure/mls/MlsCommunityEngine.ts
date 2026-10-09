@@ -210,7 +210,32 @@ export class MlsCommunityEngine {
     });
   }
 
-  /** Identities holding a leaf, for reconciliation against the roster. */
+  /**
+   * Makes the group follow the signed roster: removes leaves whose identity
+   * left, was kicked or banned, and admits roster members that published a key
+   * package. Safe to run on every member; duplicates resolve by commit id.
+   * Returns false once this device is no longer in the group.
+   */
+  public async reconcile(groupId: string): Promise<boolean> {
+    if (!(await this.sync(groupId))) return false;
+
+    if (!(await this.hasGroup(groupId))) return true;
+
+    const roster = await this.rosterFor(groupId)();
+    const inGroup = await this.identities(groupId);
+    const stale = inGroup.filter((identity) => !roster.has(identity));
+
+    if (stale.length > 0) await this.remove(groupId, stale);
+    const missing = [...roster].filter(
+      (identity) => !inGroup.includes(identity),
+    );
+
+    if (missing.length > 0) await this.admit(groupId, missing);
+
+    return this.sync(groupId);
+  }
+
+  /** Identities holding a leaf. */
   public async identities(groupId: string): Promise<string[]> {
     return this.exclusive(groupId, async () =>
       (await this.requireGroup(groupId)).identities(),

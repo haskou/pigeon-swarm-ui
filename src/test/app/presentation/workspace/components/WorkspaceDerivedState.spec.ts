@@ -29,7 +29,6 @@ function communityInvite(): CommunityInvitationNotificationResource {
     id: 'notification-community',
     payload: {
       communityId: 'community-a',
-      encryptedCommunityKey: 'encrypted-key',
       inviterIdentityId: 'identity-b',
       nonce: 'nonce-0123456789abcdef',
       recipientIdentityId: 'identity-a',

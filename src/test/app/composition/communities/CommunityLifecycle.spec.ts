@@ -1,3 +1,4 @@
+import type { PigeonMlsFacade } from '../../../../app/composition/mls/PigeonMlsFacade';
 import type {
   Community,
   LocalKeychain,
@@ -55,6 +56,12 @@ function identitiesGateway(): jest.Mocked<PigeonIdentitiesGateway> {
   return gateway;
 }
 
+function mlsFacade(): jest.Mocked<PigeonMlsFacade> {
+  return {
+    createGroup: jest.fn().mockResolvedValue(undefined),
+  } as unknown as jest.Mocked<PigeonMlsFacade>;
+}
+
 function keychain(): LocalKeychain {
   return {
     conversations: {
@@ -81,26 +88,37 @@ function session(): Session {
 }
 
 describe('community lifecycle workflows', () => {
-  it('creates private communities and publishes their symmetric key', async () => {
+  it('starts the encrypted group of private communities only', async () => {
     const communities = communitiesGateway();
-    const identities = identitiesGateway();
+    const mls = mlsFacade();
+    const input = {
+      channels: [],
+      description: 'Community',
+      name: 'Community',
+      networkId: 'network-1',
+    };
 
-    const result = await new CreateCommunity(communities, identities).create(
-      session(),
-      {
-        channels: [],
-        description: 'Community',
-        name: 'Community',
-        networkId: 'network-1',
-        visibility: 'private',
-      },
+    await new CreateCommunity(communities, mls).create(session(), {
+      ...input,
+      visibility: 'private',
+    });
+
+    expect(mls.createGroup).toHaveBeenCalledWith(
+      expect.anything(),
+      'community-1',
     );
 
-    expect(identities.publishKeychain).toHaveBeenCalledTimes(1);
-    expect(result.keychain.conversations['community-1']).toMatchObject({
-      kind: 'community',
-      version: 2,
+    communities.createCommunity.mockResolvedValue({
+      ...community(),
+      visibility: 'public',
     });
+    mls.createGroup.mockClear();
+    await new CreateCommunity(communities, mls).create(session(), {
+      ...input,
+      visibility: 'public',
+    });
+
+    expect(mls.createGroup).not.toHaveBeenCalled();
   });
 
   it('removes the community key after leaving', async () => {

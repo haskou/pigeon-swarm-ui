@@ -1,9 +1,6 @@
-import { EncryptedPayload, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
-
 /* eslint-disable @typescript-eslint/no-use-before-define */
 import type {
   ChatMessage,
-  ConversationKeyEntry,
   MessageReaction,
   MessageResource,
 } from '../../../../shared/domain/pigeonResources.types';
@@ -94,17 +91,13 @@ async function projectMessage(
       message,
       message.plaintextPayload,
     );
-  } else if (!message.encryptedPayload) {
-    projectedMessage = encryptedError(base, message, request.copy.missingKey);
-  } else if (!request.communityKey) {
-    projectedMessage = encryptedError(base, message, request.copy.missingKey);
   } else {
-    projectedMessage = await decryptMessage(
-      request,
+    projectedMessage = encryptedError(
       base,
       message,
-      message.encryptedPayload,
-      request.communityKey,
+      message.encryptedPayload
+        ? request.copy.decryptFailed
+        : request.copy.missingKey,
     );
   }
 
@@ -141,44 +134,6 @@ function plaintextMessage(
     threadRootMessageId: threadRootMessageIdFromPayload(payload, base),
     timestamp: communityChannelMessageTimestamp(base, payload, isEdited),
   };
-}
-
-async function decryptMessage(
-  request: CommunityMessageDecryptRequest,
-  base: Omit<ChatMessage, 'content' | 'encrypted'>,
-  message: MessageResource,
-  encryptedPayload: string,
-  communityKey: ConversationKeyEntry,
-): Promise<ChatMessage> {
-  try {
-    const payload = await decryptCommunityChannelPayload(
-      encryptedPayload,
-      communityKey,
-    );
-    const authorIdentityId = payload.authorIdentityId ?? base.authorIdentityId;
-    const isEdited = isEditedCommunityChannelMessage(payload, message);
-
-    return {
-      ...base,
-      attachments: payload.attachments ?? [],
-      authorIdentityId,
-      content: communityChannelMessageContent(payload),
-      edited: base.edited || isEdited,
-      editedAt: communityChannelMessageEditedAt(base, payload, isEdited),
-      encrypted: false,
-      linkPreview: payload.linkPreview,
-      mentions: payload.mentions ?? message.mentions,
-      mine: authorIdentityId === request.currentIdentityId,
-      raw: message,
-      replyPreview: payload.reply,
-      replyToMessageId: payload.replyToMessageId ?? base.replyToMessageId,
-      sticker: payload.sticker,
-      threadRootMessageId: threadRootMessageIdFromPayload(payload, base),
-      timestamp: communityChannelMessageTimestamp(base, payload, isEdited),
-    };
-  } catch {
-    return encryptedError(base, message, request.copy.decryptFailed);
-  }
 }
 
 function threadRootMessageIdFromPayload(
@@ -254,17 +209,6 @@ function parseCommunityChannelPlainPayload(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function decryptCommunityChannelPayload(
-  encryptedPayload: string,
-  communityKey: ConversationKeyEntry,
-): CommunityChannelPlainPayload {
-  const decrypted = SymmetricKey.fromBase64(communityKey.key).decrypt(
-    new EncryptedPayload(encryptedPayload),
-  );
-
-  return JSON.parse(decrypted.toString()) as CommunityChannelPlainPayload;
 }
 
 function baseMessage(
@@ -395,7 +339,6 @@ function projectedMessageCacheKey(
     request.currentIdentityId,
     request.communityId,
     request.channelId,
-    request.communityKey?.conversationId ?? 'no-key',
     firstCachePart(message.id, message.messageId),
     firstCachePart(
       message.encryptedPayload,

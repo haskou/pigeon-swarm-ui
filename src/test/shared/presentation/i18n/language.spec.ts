@@ -77,9 +77,6 @@ describe('i18n language selection', () => {
     expect(copy.communities.addMemberCreateInviteLink).toBe(
       'Crear enlace de invitación',
     );
-    expect(copy.communities.linkHelp).toBe(
-      'Crea un enlace de un solo uso. La clave de la comunidad se guarda en el fragmento de la URL y no se envía al servidor.',
-    );
   });
 
   it('uses Spanish profile password helper copy by default', async () => {

@@ -29,12 +29,12 @@ import { CommunityWorkspaceDialogs } from './CommunityWorkspaceDialogs';
 import { CommunityWorkspaceHeader } from './CommunityWorkspaceHeader';
 import { mergeChatMessages } from './communityWorkspaceHelpers';
 import { useCommunityChannelAccess } from './useCommunityChannelAccess';
+import { useCommunityEncryption } from './useCommunityEncryption';
 import { useCommunityChannelMessages } from './useCommunityChannelMessages';
 import { useCommunityChannelPolls } from './useCommunityChannelPolls';
 import { useCommunityChannelRealtime } from './useCommunityChannelRealtime';
 import { useCommunityChannelThreads } from './useCommunityChannelThreads';
 import { useCommunityDrafts } from './useCommunityDrafts';
-import { useCommunityKeyDialog } from './useCommunityKeyDialog';
 import { useCommunityLeave } from './useCommunityLeave';
 import { useCommunityMembers } from './useCommunityMembers';
 import { useCommunityMentions } from './useCommunityMentions';
@@ -144,30 +144,16 @@ export function CommunityWorkspace({
   const [pollDialogOpen, setPollDialogOpen] = useState(false);
 
   useCloseOnEscape(onMobileSidebarClose, mobileSidebarOpen);
-  const communityKey = session.keychain.conversations[community.id];
-  const {
-    close: closeCommunityKeyDialog,
-    copyEncryptedKey: copyCommunityKey,
-    dialog: communityKeyDialog,
-    encryptedKey: communityKeyEncrypted,
-    error: communityKeyError,
-    importKey: importCommunityKey,
-    input: communityKeyInput,
-    openAdd: openAddCommunityKeyDialog,
-    openCopy: openCopyCommunityKeyDialog,
-    saving: communityKeySaving,
-    setInput: setCommunityKeyInput,
-  } = useCommunityKeyDialog({
-    community,
-    communityKey,
-    onSessionUpdated,
+  const communityIsPublic = community.visibility === 'public';
+  const encryptionState = useCommunityEncryption({
+    communityId: community.id,
+    isPublic: communityIsPublic,
+    memberKey: community.memberIds.join(','),
     session,
   });
-  const communityIsPublic = community.visibility === 'public';
   const { loadChannelMessages, projectChannelMessage, projectChannelMessages } =
     useCommunityMessageProjection({
       communityId: community.id,
-      communityKey,
       session,
     });
   const channelMessages = useCommunityChannelMessages({
@@ -370,23 +356,17 @@ export function CommunityWorkspace({
     setDraft: setSelectedChannelDraft,
   });
   const channelEncryptionReady = CommunityChannelEncryption.ready({
-    communityIsPublic,
-    communityKey,
     communityMemberIds,
     currentIdentityId: session.identity.id,
+    encryptionState,
     memberIdentities,
     selectedChannel,
   });
   const channelEncryptionTooltip = CommunityChannelEncryption.tooltip({
-    communityIsPublic,
+    encryptionState,
     ready: channelEncryptionReady,
   });
-  const missingCommunityKey = CommunityChannelEncryption.missingCommunityKey({
-    communityIsPublic,
-    communityKey,
-    owner,
-    visibleMessages,
-  });
+  const awaitingGroupAccess = CommunityChannelEncryption.awaitingGroupAccess(encryptionState);
   const profiles = useCommunityProfileViewer({
     memberIdentities,
     memberPictures,
@@ -546,6 +526,7 @@ export function CommunityWorkspace({
   return (
     <>
       <CommunitySidebar
+        onSessionUpdated={onSessionUpdated}
         activeCall={activeCall}
         activeVoiceChannelId={activeVoiceChannelId}
         animateEntries={animateSidePanelEntries}
@@ -601,7 +582,6 @@ export function CommunityWorkspace({
         onVoiceChannelJoin={joinVoiceChannel}
         onVoiceParticipantClick={profiles.openVoiceParticipantProfile}
         onLogout={onLogout}
-        onSessionUpdated={onSessionUpdated}
         ownIdentityPictures={ownIdentityPictures}
         presence={presenceByIdentityId[session.identity.id]}
         selectedChannelId={selectedChannelId}
@@ -632,21 +612,11 @@ export function CommunityWorkspace({
           communityLeaving={communityLeave.leaving}
           communityMenuOpen={communityMenuOpen}
           communityNotificationSetting={communityNotificationSetting}
-          hasCommunityKey={!!communityKey}
           messageSearchOpen={messageSearch.open}
           networkName={networkName}
           onAddMember={() => setMemberOpen(true)}
           onCommunityDataOpen={() => {
             setCommunityDataOpen(true);
-            setCommunityMenuOpen(false);
-          }}
-          onCommunityKeyOpen={() => {
-            if (communityKey) {
-              openCopyCommunityKeyDialog();
-            } else {
-              openAddCommunityKeyDialog();
-            }
-
             setCommunityMenuOpen(false);
           }}
           onCommunityMenuClose={() => setCommunityMenuOpen(false)}
@@ -698,7 +668,7 @@ export function CommunityWorkspace({
             channelName={channelNameFor(threadPanel.channelId)}
             communityIsPublic={communityIsPublic}
             currentPermissions={currentPermissions}
-            hasCommunityKey={Boolean(communityKey)}
+            encryptionAvailable={encryptionState === 'ready'}
             identityNames={communityIdentityNames}
             memberIdentities={memberIdentities}
             memberPictures={memberPictures}
@@ -735,7 +705,7 @@ export function CommunityWorkspace({
             currentPermissions={currentPermissions}
             currentRoleIds={currentRoleIds}
             draft={draft}
-            hasCommunityKey={Boolean(communityKey)}
+            encryptionAvailable={encryptionState === 'ready'}
             invitationAccepting={invitationAccepting}
             invitationError={invitationError}
             invitationInviterName={invitationInviterName}
@@ -743,10 +713,7 @@ export function CommunityWorkspace({
             memberPictures={memberPictures}
             mentions={mentions}
             messageComposer={messageComposer}
-            missingCommunityKey={missingCommunityKey}
-            onAddCommunityKey={() => {
-              openAddCommunityKeyDialog();
-            }}
+            awaitingGroupAccess={awaitingGroupAccess}
             onInvitationAccept={onInvitationAccept}
             onMessageMenuOpen={(message, x, y) =>
               setMessageContextMenu({ message, x, y })
@@ -826,11 +793,6 @@ export function CommunityWorkspace({
         community={community}
         communityData={communityData}
         communityDataOpen={communityDataOpen}
-        communityKeyDialog={communityKeyDialog}
-        communityKeyEncrypted={communityKeyEncrypted}
-        communityKeyError={communityKeyError}
-        communityKeyInput={communityKeyInput}
-        communityKeySaving={communityKeySaving}
         currentIdentityId={session.identity.id}
         currentPermissions={currentPermissions}
         encryptionDetails={
@@ -839,7 +801,6 @@ export function CommunityWorkspace({
                 channelEncryptionReady,
                 community,
                 communityIsPublic,
-                communityKey,
                 networkName,
                 selectedChannel,
               })
@@ -853,18 +814,13 @@ export function CommunityWorkspace({
         onCloseBannerViewer={communityVisualAssets.closeBannerViewer}
         onCloseCommunityData={() => setCommunityDataOpen(false)}
         onCloseEncryptionDetails={() => setEncryptionDetailsOpen(false)}
-        onCloseCommunityKey={closeCommunityKeyDialog}
         onCloseManage={() => setManageOpen(false)}
         onCloseMember={() => setMemberOpen(false)}
         onCloseMessageContextMenu={() => setMessageContextMenu(null)}
         onCloseProfile={profiles.close}
         onCloseRawMessage={() => setRawMessage(null)}
-        onCommunityKeyCopy={() => void copyCommunityKey()}
-        onCommunityKeyImport={() => void importCommunityKey()}
-        onCommunityKeyInputChange={setCommunityKeyInput}
         onCommunityUpdated={onCommunityUpdated}
         onOpenConversationWithIdentity={onOpenConversationWithIdentity}
-        onSessionUpdated={onSessionUpdated}
         owner={owner}
         presenceByIdentityId={presenceByIdentityId}
         pinnedMessageIds={pinnedMessageIds}

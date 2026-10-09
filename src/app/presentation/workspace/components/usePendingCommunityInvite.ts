@@ -3,13 +3,10 @@ import { type Dispatch, type SetStateAction, useEffect, useRef } from 'react';
 import type { PendingCommunityInviteLink } from '../../../../contexts/communities/presentation/view-models/communityInviteLink';
 import type {
   Community,
-  CommunityInviteLinkResource,
-  ConversationKeyEntry,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../composition/applicationContainer';
-import { decryptCommunityInviteKey } from '../../../../contexts/communities/infrastructure/crypto/communityInviteKeyEnvelope';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 
@@ -20,7 +17,6 @@ export function usePendingCommunityInvite({
   setActiveCommunityId,
   setCommunities,
   setSendError,
-  setSession,
   setWorkspaceMode,
 }: {
   onPendingCommunityInviteHandled?: () => void;
@@ -29,7 +25,6 @@ export function usePendingCommunityInvite({
   setActiveCommunityId: (communityId: string) => void;
   setCommunities: Dispatch<SetStateAction<Community[]>>;
   setSendError: (error: string | null) => void;
-  setSession: (session: Session | null) => void;
   setWorkspaceMode: (mode: 'community' | 'messages') => void;
 }) {
   const pendingCommunityInviteRef = useRef<string | null>(null);
@@ -49,43 +44,11 @@ export function usePendingCommunityInvite({
     pendingCommunityInviteRef.current = pendingCommunityInvite.token;
     setSendError(null);
     void (async () => {
-      const invite = await applicationContainer.communities.getInviteLink(
-        pendingCommunityInvite.token,
-      );
-      const keyEntry = await communityInviteKeyEntry(
-        invite,
-        pendingCommunityInvite.inviteSecret,
-      );
-
-      if (!keyEntry && invite.encryptedCommunityKey) {
-        throw new Error(copy.communities.linkKeyMissing);
-      }
-
-      let nextSession = sessionRef.current;
-      let acceptedCommunity: Community;
-
-      if (keyEntry) {
-        const accepted =
-          await applicationContainer.communities.acceptInviteLinkWithKey(
-            nextSession,
-            pendingCommunityInvite.token,
-            keyEntry,
-          );
-
-        acceptedCommunity = accepted.community;
-        nextSession = {
-          ...nextSession,
-          keychain: accepted.keychain,
-          keychainExternalIdentifier: accepted.keychainExternalIdentifier,
-        };
-      } else {
-        acceptedCommunity = await applicationContainer.communities.acceptInviteLink(
-          nextSession,
+      const acceptedCommunity =
+        await applicationContainer.communities.acceptInviteLink(
+          sessionRef.current,
           pendingCommunityInvite.token,
         );
-      }
-
-      setSession(nextSession);
 
       setCommunities((current) => [
         acceptedCommunity,
@@ -104,21 +67,6 @@ export function usePendingCommunityInvite({
     setActiveCommunityId,
     setCommunities,
     setSendError,
-    setSession,
-    setWorkspaceMode,
+      setWorkspaceMode,
   ]);
-}
-
-async function communityInviteKeyEntry(
-  invite: CommunityInviteLinkResource,
-  inviteSecret?: string,
-): Promise<ConversationKeyEntry | undefined> {
-  if (!inviteSecret) return undefined;
-
-  if (!invite.encryptedCommunityKey) return undefined;
-
-  return await decryptCommunityInviteKey(
-    invite.encryptedCommunityKey,
-    inviteSecret,
-  );
 }

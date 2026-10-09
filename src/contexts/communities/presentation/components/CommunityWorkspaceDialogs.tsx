@@ -31,13 +31,6 @@ const ConversationDataDialog = lazy(() =>
     }),
   ),
 );
-const ConversationKeyDialog = lazy(() =>
-  import('../../../../app/presentation/workspace/components/ConversationKeyDialog').then(
-    (module) => ({
-      default: module.ConversationKeyDialog,
-    }),
-  ),
-);
 const EncryptionDetailsDialog = lazy(() =>
   import('../../../../app/presentation/workspace/components/EncryptionDetailsDialog').then(
     (module) => ({
@@ -91,11 +84,6 @@ type CommunityWorkspaceDialogsProps = {
   community: Community;
   communityData: unknown;
   communityDataOpen: boolean;
-  communityKeyDialog: 'add' | 'copy' | null;
-  communityKeyEncrypted: string;
-  communityKeyError: string | null;
-  communityKeyInput: string;
-  communityKeySaving: boolean;
   encryptionDetails: EncryptionDetails | null;
   currentIdentityId: string;
   currentPermissions: Set<CommunityPermission>;
@@ -113,15 +101,11 @@ type CommunityWorkspaceDialogsProps = {
   onCloseBannerViewer: () => void;
   onCloseCommunityData: () => void;
   onCloseEncryptionDetails: () => void;
-  onCloseCommunityKey: () => void;
   onCloseManage: () => void;
   onCloseMember: () => void;
   onCloseMessageContextMenu: () => void;
   onCloseProfile: () => void;
   onCloseRawMessage: () => void;
-  onCommunityKeyCopy: () => void;
-  onCommunityKeyImport: () => void;
-  onCommunityKeyInputChange: (value: string) => void;
   onCommunityUpdated: (community: Community) => void;
   onDeleteMessage: (message: ChatMessage) => void;
   onDownloadAttachment: (attachment: MessageAttachment) => void;
@@ -134,7 +118,6 @@ type CommunityWorkspaceDialogsProps = {
   onPinMessage: (message: ChatMessage) => void;
   onReplyToMessage: (message: ChatMessage) => void;
   onUnpinMessage: (message: ChatMessage) => void;
-  onSessionUpdated: (session: Session) => void;
   onToggleReaction: (
     message: ChatMessage,
     emoji: string,
@@ -151,11 +134,6 @@ export function CommunityWorkspaceDialogs({
   community,
   communityData,
   communityDataOpen,
-  communityKeyDialog,
-  communityKeyEncrypted,
-  communityKeyError,
-  communityKeyInput,
-  communityKeySaving,
   encryptionDetails,
   currentIdentityId,
   currentPermissions,
@@ -173,15 +151,11 @@ export function CommunityWorkspaceDialogs({
   onCloseBannerViewer,
   onCloseCommunityData,
   onCloseEncryptionDetails,
-  onCloseCommunityKey,
   onCloseManage,
   onCloseMember,
   onCloseMessageContextMenu,
   onCloseProfile,
   onCloseRawMessage,
-  onCommunityKeyCopy,
-  onCommunityKeyImport,
-  onCommunityKeyInputChange,
   onCommunityUpdated,
   onDeleteMessage,
   onDownloadAttachment,
@@ -190,7 +164,6 @@ export function CommunityWorkspaceDialogs({
   onOpenMessageThread,
   onPinMessage,
   onReplyToMessage,
-  onSessionUpdated,
   onToggleReaction,
   onUnpinMessage,
   onViewRawMessage,
@@ -240,7 +213,6 @@ export function CommunityWorkspaceDialogs({
         <AddCommunityMemberDialog
           communityId={community.id}
           onClose={onCloseMember}
-          onSessionUpdated={onSessionUpdated}
           session={session}
         />
       )}
@@ -339,19 +311,6 @@ export function CommunityWorkspaceDialogs({
           data={communityData}
           onClose={onCloseCommunityData}
           title={copy.communities.communityDataTitle}
-        />
-      )}
-      {communityKeyDialog && (
-        <ConversationKeyDialog
-          encryptedConversationKey={communityKeyEncrypted}
-          error={communityKeyError}
-          input={communityKeyInput}
-          mode={communityKeyDialog}
-          onClose={onCloseCommunityKey}
-          onCopy={onCommunityKeyCopy}
-          onImport={onCommunityKeyImport}
-          onInputChange={onCommunityKeyInputChange}
-          saving={communityKeySaving}
         />
       )}
       {encryptionDetails && (

@@ -173,6 +173,29 @@ describe('MlsCommunityEngine', () => {
     await expect(bob.engine.decrypt(COMMUNITY, secret)).rejects.toThrow();
   });
 
+  it('follows the roster: admits joiners and removes those who left', async () => {
+    const { alice, bob } = await admitBob();
+    const carol = engineFor('carol');
+
+    await carol.engine.publishKeyPackages(COMMUNITY);
+    roster.add('carol');
+    await expect(bob.engine.reconcile(COMMUNITY)).resolves.toBe(true);
+    await carol.engine.sync(COMMUNITY);
+    await alice.engine.sync(COMMUNITY);
+    const first = await alice.engine.encrypt(COMMUNITY, 'hello carol');
+
+    await expect(carol.engine.decrypt(COMMUNITY, first)).resolves.toBe(
+      'hello carol',
+    );
+
+    roster.delete('bob');
+    await expect(alice.engine.reconcile(COMMUNITY)).resolves.toBe(true);
+    await expect(bob.engine.reconcile(COMMUNITY)).resolves.toBe(false);
+    await expect(alice.engine.identities(COMMUNITY)).resolves.not.toContain(
+      'bob',
+    );
+  });
+
   it('gives a joiner a welcome only the recipient can use', async () => {
     const { alice } = await admitBob();
     const carol = engineFor('carol');

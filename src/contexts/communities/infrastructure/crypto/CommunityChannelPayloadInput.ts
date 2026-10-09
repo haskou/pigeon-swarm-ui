@@ -1,5 +1,4 @@
 import type {
-  ConversationKeyEntry,
   CommunityMessageMention,
   MessageAttachment,
   MessageLinkPreview,
@@ -11,7 +10,6 @@ export type CommunityChannelPayloadInput = {
   attachments: MessageAttachment[];
   authorIdentityId: string;
   channelId: string;
-  communityKey?: ConversationKeyEntry;
   communityId: string;
   content: string;
   eventType?:

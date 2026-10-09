@@ -1,27 +1,18 @@
-import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 
 import type {
   Community,
   CommunityInviteLinkResource,
-  ConversationKeyEntry,
-  IdentityResource,
-  LocalKeychain,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
-import type { PigeonIdentityGateway } from '../../../identities/infrastructure/http/PigeonIdentityGateway';
-import type { PigeonKeychainApi } from '../../../identities/infrastructure/http/PigeonKeychainApi';
-import type { EncryptedCommunityKey } from '../crypto/communityInviteKeyEnvelope';
 import type { CommunityInviteLinkInput } from './CommunityInviteLinkInput';
 import type { PigeonCommunitiesApi } from './PigeonCommunitiesApi';
 
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
-import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { NotificationMutationSigner } from '../../../notifications/infrastructure/http/NotificationMutationSigner';
-import { encryptCommunityInviteKey } from '../crypto/communityInviteKeyEnvelope';
 import { buildCommunityInviteLinkBody } from './buildCommunityInviteLinkBody';
 import { CommunityModerationLogSigner } from './CommunityModerationLogSigner';
 import { CommunityOperationSigner } from './CommunityOperationSigner';
@@ -43,8 +34,6 @@ export class PigeonCommunityInvitationApi {
       PigeonCommunitiesApi,
       'frontier' | 'get' | 'inviteMember'
     >,
-    private readonly identities: Pick<PigeonIdentityGateway, 'get'>,
-    private readonly keychains: Pick<PigeonKeychainApi, 'publishKeychain'>,
     private readonly mutations: PublicMutationSigner,
   ) {
     this.moderationLogs = new CommunityModerationLogSigner(mutations);
@@ -52,82 +41,17 @@ export class PigeonCommunityInvitationApi {
     this.operations = new CommunityOperationSigner(mutations);
   }
 
-  private createKeyEntry(communityId: string): ConversationKeyEntry {
-    return {
-      algorithm: 'aes-256-gcm',
-      conversationId: communityId,
-      createdAt: Date.now(),
-      key: SymmetricKey.generate().valueOf(),
-      kind: 'conversation',
-      peerIdentityId: '',
-      version: 2,
-    };
-  }
-
-  private withConversationKey(
-    keychain: LocalKeychain,
-    keyEntry: ConversationKeyEntry,
-  ): LocalKeychain {
-    return {
-      conversations: {
-        ...keychain.conversations,
-        [keyEntry.conversationId]: keyEntry,
-      },
-      version: keychain.version + 1,
-    };
-  }
-
-  private async isPublicCommunityWithoutKey(
-    session: Session,
-    communityId: string,
-    existingKeyEntry?: ConversationKeyEntry,
-  ): Promise<boolean> {
-    if (existingKeyEntry) return false;
-
-    const community = await this.communities.get(session, communityId);
-
-    return community.visibility === 'public';
-  }
-
-  private async publishCommunityKeyIfNeeded(
-    session: Session,
-    communityId: string,
-    existingKeyEntry?: ConversationKeyEntry,
-  ): Promise<{
-    keyEntry: ConversationKeyEntry;
-    keychain: LocalKeychain;
-    keychainExternalIdentifier: string;
-  }> {
-    const keyEntry = existingKeyEntry ?? this.createKeyEntry(communityId);
-
-    if (existingKeyEntry && session.keychainExternalIdentifier) {
-      return {
-        keychain: session.keychain,
-        keychainExternalIdentifier: session.keychainExternalIdentifier,
-        keyEntry,
-      };
-    }
-
-    const published = await this.keychains.publishKeychain(
-      session,
-      this.withConversationKey(session.keychain, keyEntry),
-    );
-
-    return { keyEntry, ...published };
-  }
-
   private async postInviteLink(
     session: Session,
     communityId: string,
     path: string,
     input: CommunityInviteLinkInput,
-    encryptedCommunityKey?: EncryptedCommunityKey,
   ): Promise<CommunityInviteLinkResource> {
     const creatorIdentityId = this.mutations.authorOf(session);
     const nonce = this.createNonce();
     const createdAt = Date.now();
     const token = deriveInviteToken(communityId, creatorIdentityId, nonce);
-    const optional = buildCommunityInviteLinkBody(input, encryptedCommunityKey);
+    const optional = buildCommunityInviteLinkBody(input);
     const record = {
       communityId,
       createdAt,
@@ -139,9 +63,6 @@ export class PigeonCommunityInvitationApi {
       token,
       ...(optional.expiresAt !== undefined
         ? { expiresAt: optional.expiresAt }
-        : {}),
-      ...(optional.encryptedCommunityKey
-        ? { encryptedCommunityKey: optional.encryptedCommunityKey }
         : {}),
     };
     let response: CommunityInviteLinkResource | undefined;
@@ -162,9 +83,6 @@ export class PigeonCommunityInvitationApi {
             communityId,
             createdAt,
             details: {
-              encryptedCommunityKeyStored: Boolean(
-                optional.encryptedCommunityKey,
-              ),
               expiresAt: optional.expiresAt || undefined,
               maxUses: input.maxUses || undefined,
             },
@@ -201,28 +119,16 @@ export class PigeonCommunityInvitationApi {
 
   private async sendCommunityInvitation(
     session: Session,
-    keyEntry: ConversationKeyEntry,
+    communityId: string,
     recipientIdentityId: string,
   ): Promise<void> {
-    const recipientIdentity = await this.identities.get(recipientIdentityId);
-    const recipientKeyEntry = {
-      ...keyEntry,
-      peerIdentityId: session.identity.id,
-    };
-    const encryptedCommunityKey = this.encryptCommunityKey(
-      recipientIdentity,
-      recipientKeyEntry,
-    );
-
     const invitation = await this.notifications.invitation(session, {
-      encryptedKey: encryptedCommunityKey,
-      recipientIdentityId: recipientIdentity.id,
-      subjectId: keyEntry.conversationId,
+      recipientIdentityId,
+      subjectId: communityId,
       type: 'community_invitation',
     });
     const body = {
-      communityId: keyEntry.conversationId,
-      encryptedCommunityKey,
+      communityId,
       inviterIdentityId: invitation.inviterIdentityId,
       mutation: invitation.mutation,
       nonce: invitation.nonce,
@@ -242,72 +148,24 @@ export class PigeonCommunityInvitationApi {
     });
   }
 
-  private encryptCommunityKey(
-    recipientIdentity: IdentityResource,
-    recipientKeyEntry: ConversationKeyEntry & { peerIdentityId: string },
-  ): string {
-    return IdentityId.fromString(recipientIdentity.id)
-      .getPublicKey()
-      .encrypt(JSON.stringify(recipientKeyEntry))
-      .toString();
+  private async isPublic(session: Session, communityId: string) {
+    return (
+      (await this.communities.get(session, communityId)).visibility === 'public'
+    );
   }
 
   public async create(
     session: Session,
     communityId: string,
     recipientIdentityId: string,
-  ): Promise<{
-    keychain: LocalKeychain;
-    keychainExternalIdentifier: null | string;
-  }> {
-    const normalizedRecipientIdentityId = recipientIdentityId.trim();
-    const existingKeyEntry = session.keychain.conversations[communityId];
+  ): Promise<void> {
+    const recipient = recipientIdentityId.trim();
 
-    if (
-      await this.isPublicCommunityWithoutKey(
-        session,
-        communityId,
-        existingKeyEntry,
-      )
-    ) {
-      await this.communities.inviteMember(
-        session,
-        communityId,
-        normalizedRecipientIdentityId,
-      );
+    await this.communities.inviteMember(session, communityId, recipient);
 
-      return {
-        keychain: session.keychain,
-        keychainExternalIdentifier: session.keychainExternalIdentifier ?? null,
-      };
-    }
+    if (await this.isPublic(session, communityId)) return;
 
-    const published = await this.publishCommunityKeyIfNeeded(
-      session,
-      communityId,
-      existingKeyEntry,
-    );
-    const invitationSession = {
-      ...session,
-      keychain: published.keychain,
-      keychainExternalIdentifier: published.keychainExternalIdentifier,
-    };
-
-    await this.communities.inviteMember(
-      invitationSession,
-      communityId,
-      normalizedRecipientIdentityId,
-    );
-    await this.sendCommunityInvitation(
-      invitationSession,
-      published.keyEntry,
-      normalizedRecipientIdentityId,
-    );
-
-    return {
-      keychain: published.keychain,
-      keychainExternalIdentifier: published.keychainExternalIdentifier,
-    };
+    await this.sendCommunityInvitation(session, communityId, recipient);
   }
 
   public async notifyMember(
@@ -315,69 +173,21 @@ export class PigeonCommunityInvitationApi {
     communityId: string,
     recipientIdentityId: string,
   ): Promise<void> {
-    const keyEntry = session.keychain.conversations[communityId];
-
-    if (!keyEntry) throw new Error('Community key is required.');
-
-    await this.sendCommunityInvitation(session, keyEntry, recipientIdentityId);
+    await this.sendCommunityInvitation(
+      session,
+      communityId,
+      recipientIdentityId,
+    );
   }
 
   public async createInviteLink(
     session: Session,
     communityId: string,
     input: CommunityInviteLinkInput = {},
-  ): Promise<{
-    invite: CommunityInviteLinkResource;
-    inviteSecret?: string;
-    keyEntry?: ConversationKeyEntry;
-    keychain: LocalKeychain;
-    keychainExternalIdentifier: null | string;
-  }> {
+  ): Promise<CommunityInviteLinkResource> {
     const path = `/communities/${encodeURIComponent(communityId)}/invites`;
-    const existingKeyEntry = session.keychain.conversations[communityId];
 
-    if (
-      await this.isPublicCommunityWithoutKey(
-        session,
-        communityId,
-        existingKeyEntry,
-      )
-    ) {
-      const invite = await this.postInviteLink(
-        session,
-        communityId,
-        path,
-        input,
-      );
-
-      return {
-        invite,
-        keychain: session.keychain,
-        keychainExternalIdentifier: session.keychainExternalIdentifier ?? null,
-      };
-    }
-
-    const published = await this.publishCommunityKeyIfNeeded(
-      session,
-      communityId,
-      existingKeyEntry,
-    );
-    const encryptedKey = await encryptCommunityInviteKey(published.keyEntry);
-    const invite = await this.postInviteLink(
-      session,
-      communityId,
-      path,
-      input,
-      encryptedKey.encryptedCommunityKey,
-    );
-
-    return {
-      invite,
-      inviteSecret: encryptedKey.secret,
-      keychain: published.keychain,
-      keychainExternalIdentifier: published.keychainExternalIdentifier,
-      keyEntry: published.keyEntry,
-    };
+    return await this.postInviteLink(session, communityId, path, input);
   }
 
   public async getInviteLink(
@@ -444,34 +254,5 @@ export class PigeonCommunityInvitationApi {
     );
 
     return community as Community;
-  }
-
-  public async acceptInviteLinkWithKey(
-    session: Session,
-    inviteToken: string,
-    keyEntry: ConversationKeyEntry,
-  ): Promise<{
-    community: Community;
-    keychain: LocalKeychain;
-    keychainExternalIdentifier: string;
-  }> {
-    const published = await this.keychains.publishKeychain(
-      session,
-      this.withConversationKey(session.keychain, keyEntry),
-    );
-    const community = await this.acceptInviteLink(
-      {
-        ...session,
-        keychain: published.keychain,
-        keychainExternalIdentifier: published.keychainExternalIdentifier,
-      },
-      inviteToken,
-    );
-
-    return {
-      community,
-      keychain: published.keychain,
-      keychainExternalIdentifier: published.keychainExternalIdentifier,
-    };
   }
 }
