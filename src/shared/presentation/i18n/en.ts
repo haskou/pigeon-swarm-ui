@@ -85,7 +85,6 @@ export const en = {
     loginMethodRecoveryHelp:
       'You lost access to your devices. Use the recovery key you saved when you created your identity.',
     loginProgress: {
-      confirmingPasskey: 'Confirming passkey...',
       decryptingKeys: 'Decrypting keys...',
       loadingKeychain: 'Loading keychain...',
       loadingWorkspace: 'Opening workspace...',
@@ -107,24 +106,6 @@ export const en = {
     nodePeersLoading: 'Searching...',
     nodePeersOne: '1 peer',
     nodeSummaryTitle: 'Local node',
-    passkeyPrf: 'Protect with device unlock',
-    passkeyPrfChecking: 'Checking whether this browser supports it...',
-    passkeyPrfHelp:
-      'Recommended. Adds an extra security layer using this browser or device unlock.',
-    passkeyPrfNotPersisted:
-      'The identity was created, but the server did not save passkey protection.',
-    passkeyPrfRequestFailed:
-      'Device unlock was cancelled or did not respond in time. Try again.',
-    passkeyPrfRequestFailedCreate:
-      'Device unlock was cancelled or did not respond in time. Try again, or turn off "Protect with device unlock" to create the identity with password and recovery key.',
-    passkeyPrfUnavailable:
-      'This browser or authenticator did not return WebAuthn PRF support for this credential. Normal passkeys may be available, but this identity needs PRF to protect local keys.',
-    passkeyPrfUnavailableCreate:
-      'This browser or authenticator did not return WebAuthn PRF support for this credential. You can create the identity with password and recovery key.',
-    passkeyPrfUnavailableLogin:
-      'This browser or authenticator did not return WebAuthn PRF support for this credential. If your identity uses PRF, use the browser, domain and authenticator where it was created.',
-    passkeyPrfUnlockFailed:
-      'This browser or authenticator did not return WebAuthn PRF support for this credential. Normal passkeys may be available, but this identity needs PRF to protect local keys.',
     passwordConfirmLabel: 'Repeat password',
     passwordLabel: 'Password',
     passwordNewDeviceLabel: 'New password for this device',
@@ -1248,8 +1229,6 @@ export const en = {
     copySensitiveKeyConfirm:
       'This key can decrypt private content. If you copy it unencrypted, anyone or any application with clipboard access could read it. Are you sure you want to continue?',
     currentPassword: 'Current password',
-    currentPasswordForPasskeyHelp:
-      'The current password and recovery key are verified before creating local unlock. They are not saved.',
     deviceCompromiseFromLabel: 'Distrust it since revision',
     deviceCompromiseHelp:
       'Everything this device signed from that revision on is rejected, even if it was authorized then. Use 1 to distrust it completely. Revision {revision} is the latest.',
@@ -1294,6 +1273,11 @@ export const en = {
     edit: 'Edit profile',
     encryptedMasterKey: 'Encrypted master key',
     encryptedPrivateKey: 'Encrypted private key',
+    forgetDevice: 'Log out and forget this device',
+    forgetDeviceConfirm:
+      'This removes the local unlock for this identity from this browser and signs you out. Signing in here again needs your recovery key or a device pairing from a signed-in device. This device stays authorized until you revoke it under Manage devices.',
+    forgetDeviceFailed:
+      'The local unlock could not be removed. You are still signed in.',
     handle: 'Username',
     hoverToEdit: 'Hover and click the image to edit it.',
     identityId: 'Identity ID',
@@ -1305,14 +1289,6 @@ export const en = {
     keychainTab: 'Keychain',
     keychainVersion: 'Keychain',
     language: 'Language',
-    localDeviceUnlock: 'Use device unlock',
-    localDeviceUnlockHelp:
-      'Optional. Creates a local unlock for this browser using your password and passkey. It does not change your password or recovery key.',
-    localDeviceUnlockSection: 'Local unlock',
-    localDeviceUnlockSectionHelp:
-      'This only affects this browser or device. Portable access still uses password and recovery key.',
-    localDeviceUnlockUnavailable:
-      'This browser or authenticator cannot create a local WebAuthn PRF unlock.',
     logout: 'Log out',
     missingIdentityExternalIdentifier:
       'The API did not provide the current identity reference required to publish profile updates.',
@@ -1331,16 +1307,6 @@ export const en = {
     openBanner: 'Open profile banner',
     openConversation: 'Open direct message',
     openPicture: 'Open profile picture',
-    passkeyPrf: 'Protect with passkey PRF',
-    passkeyPrfActive: 'Passkey PRF enabled',
-    passkeyPrfHelp:
-      'Wrap the password-derived key with a passkey before it unlocks your master key.',
-    passkeyPrfPreserved:
-      'This identity already uses passkey PRF and it will be preserved.',
-    passkeyPrfUnavailable:
-      'This browser or authenticator did not return WebAuthn PRF support for this credential.',
-    passwordChangePreservesPasskey:
-      'Keeps the current identity protection method.',
     passwordChangeRequiresRecoveryKey: 'Requires your current recovery key.',
     passwordRequirements: {
       lowercase: 'Lowercase',

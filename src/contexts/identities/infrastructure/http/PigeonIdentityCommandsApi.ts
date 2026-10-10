@@ -65,7 +65,7 @@ export class PigeonIdentityCommandsApi {
     password: string,
     networks: string[],
     handle?: string,
-    options: { passkeyPrfEnabled?: boolean; recoveryKey?: string } = {},
+    options: { recoveryKey?: string } = {},
   ): Promise<CreatedIdentityMaterial> {
     const recoveryKey = RecoveryKey.fromString(options.recoveryKey ?? '');
     const recovered = await RecoveryIdentityMaterial.derive(recoveryKey);
@@ -208,7 +208,6 @@ export class PigeonIdentityCommandsApi {
     newPassword: string | undefined,
     options: {
       currentPassword?: string;
-      passkeyPrfEnabled?: boolean;
       recoveryKey?: string;
     },
   ): Promise<IdentityResource> {

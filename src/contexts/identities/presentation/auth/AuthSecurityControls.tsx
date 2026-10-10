@@ -22,21 +22,6 @@ export function AuthSwitch({ enabled }: { enabled: boolean }): ReactElement {
   );
 }
 
-export function PasskeyPrfUnavailableNotice({
-  children,
-}: {
-  children: string;
-}): ReactElement {
-  return (
-    <div
-      data-testid="auth-passkey-prf-warning"
-      className="rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-xs leading-snug text-amber-50/80"
-    >
-      {children}
-    </div>
-  );
-}
-
 export function RecoveryKeyPanel({
   confirmed,
   onConfirmedChange,

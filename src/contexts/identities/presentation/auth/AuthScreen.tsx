@@ -630,8 +630,6 @@ function isIosBrowser(): boolean {
 
 function loginProgressLabel(step: LoginIdentityProgressStep): string {
   switch (step) {
-    case 'confirming-passkey':
-      return copy.auth.loginProgress.confirmingPasskey;
     case 'decrypting-keys':
       return copy.auth.loginProgress.decryptingKeys;
     case 'loading-keychain':

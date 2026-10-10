@@ -90,7 +90,6 @@ export const es = {
     loginMethodRecoveryHelp:
       'Has perdido el acceso a tus dispositivos. Usa la clave de recuperación que guardaste al crear tu identidad.',
     loginProgress: {
-      confirmingPasskey: 'Confirmando passkey...',
       decryptingKeys: 'Descifrando claves...',
       loadingKeychain: 'Cargando llavero...',
       loadingWorkspace: 'Abriendo workspace...',
@@ -112,24 +111,6 @@ export const es = {
     nodePeersLoading: 'Buscando...',
     nodePeersOne: '1 par',
     nodeSummaryTitle: 'Nodo local',
-    passkeyPrf: 'Proteger con desbloqueo del dispositivo',
-    passkeyPrfChecking: 'Comprobando si este navegador lo permite...',
-    passkeyPrfHelp:
-      'Recomendado. Añade una capa extra de seguridad usando el desbloqueo de este navegador o dispositivo.',
-    passkeyPrfNotPersisted:
-      'La identidad se ha creado, pero el servidor no ha guardado la protección con passkey.',
-    passkeyPrfRequestFailed:
-      'El desbloqueo del dispositivo se canceló o no respondió a tiempo. Inténtalo de nuevo.',
-    passkeyPrfRequestFailedCreate:
-      'El desbloqueo del dispositivo se canceló o no respondió a tiempo. Inténtalo de nuevo o desactiva «Proteger con desbloqueo del dispositivo» para crear la identidad con contraseña y clave de recuperación.',
-    passkeyPrfUnavailable:
-      'Este navegador o autenticador no ha devuelto soporte WebAuthn PRF para esta credencial. Las passkeys normales pueden estar disponibles, pero esta identidad necesita PRF para proteger claves locales.',
-    passkeyPrfUnavailableCreate:
-      'Este navegador o autenticador no ha devuelto soporte WebAuthn PRF para esta credencial. Puedes crear la identidad con contraseña y clave de recuperación.',
-    passkeyPrfUnavailableLogin:
-      'Este navegador o autenticador no ha devuelto soporte WebAuthn PRF para esta credencial. Si tu identidad usa PRF, necesitas el navegador, dominio y autenticador donde se creó.',
-    passkeyPrfUnlockFailed:
-      'Este navegador o autenticador no ha devuelto soporte WebAuthn PRF para esta credencial. Las passkeys normales pueden estar disponibles, pero esta identidad necesita PRF para proteger claves locales.',
     passwordConfirmLabel: 'Repite la contraseña',
     passwordLabel: 'Contraseña',
     passwordNewDeviceLabel: 'Contraseña nueva para este dispositivo',
@@ -1252,8 +1233,6 @@ export const es = {
     copySensitiveKeyConfirm:
       'Esta clave permite descifrar contenido privado. Si la copias sin cifrar, cualquier persona o aplicación con acceso al portapapeles podría leerla. ¿Seguro que quieres continuar?',
     currentPassword: 'Contraseña actual',
-    currentPasswordForPasskeyHelp:
-      'Se verifican la contraseña actual y la clave de recuperación antes de crear el desbloqueo local. No se guardan.',
     deviceCompromiseFromLabel: 'Desconfiar desde la revisión',
     deviceCompromiseHelp:
       'Se rechaza todo lo que este dispositivo firmó desde esa revisión, aunque entonces estuviera autorizado. Usa 1 para desconfiar por completo. La revisión {revision} es la última.',
@@ -1297,6 +1276,11 @@ export const es = {
     edit: 'Editar perfil',
     encryptedMasterKey: 'Clave maestra cifrada',
     encryptedPrivateKey: 'Clave privada cifrada',
+    forgetDevice: 'Cerrar sesión y olvidar este dispositivo',
+    forgetDeviceConfirm:
+      'Esto elimina el desbloqueo local de esta identidad en este navegador y cierra tu sesión. Para volver a entrar aquí necesitarás tu clave de recuperación o vincular el dispositivo desde otro donde ya tengas sesión. Este dispositivo seguirá autorizado hasta que lo revoques en Gestionar dispositivos.',
+    forgetDeviceFailed:
+      'No se pudo eliminar el desbloqueo local. Sigues con la sesión iniciada.',
     handle: 'Usuario',
     hoverToEdit: 'Pasa el ratón y haz clic en la imagen para editarla.',
     identityId: 'ID de identidad',
@@ -1308,14 +1292,6 @@ export const es = {
     keychainTab: 'Llavero',
     keychainVersion: 'Llavero',
     language: 'Idioma',
-    localDeviceUnlock: 'Usar desbloqueo del dispositivo',
-    localDeviceUnlockHelp:
-      'Opcional. Crea un desbloqueo local para este navegador usando contraseña y passkey. No cambia tu contraseña ni tu clave de recuperación.',
-    localDeviceUnlockSection: 'Desbloqueo local',
-    localDeviceUnlockSectionHelp:
-      'Esto solo afecta a este navegador o dispositivo. El acceso portable seguirá usando contraseña y clave de recuperación.',
-    localDeviceUnlockUnavailable:
-      'Este navegador o autenticador no permite crear desbloqueo local con WebAuthn PRF.',
     logout: 'Cerrar sesión',
     missingIdentityExternalIdentifier:
       'La API no ha devuelto la referencia de la identidad actual necesaria para publicar cambios de perfil.',
@@ -1334,15 +1310,6 @@ export const es = {
     openBanner: 'Abrir banner de perfil',
     openConversation: 'Abrir mensaje directo',
     openPicture: 'Abrir imagen de perfil',
-    passkeyPrf: 'Proteger con passkey PRF',
-    passkeyPrfActive: 'Passkey PRF activo',
-    passkeyPrfHelp:
-      'Envuelve la clave derivada de contraseña con una passkey antes de abrir tu master key.',
-    passkeyPrfPreserved: 'Esta identidad ya usa passkey PRF y se conservará.',
-    passkeyPrfUnavailable:
-      'Este navegador o autenticador no ha devuelto soporte WebAuthn PRF para esta credencial.',
-    passwordChangePreservesPasskey:
-      'Mantiene la protección actual de la identidad.',
     passwordChangeRequiresRecoveryKey:
       'Requiere tu clave de recuperación actual.',
     passwordRequirements: {

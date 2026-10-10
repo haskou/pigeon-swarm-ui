@@ -20,6 +20,7 @@ import type { IdentityUseCases } from './IdentityUseCases';
 import { ConversationTimeline } from '../../../contexts/conversations/presentation/view-models/ConversationTimeline';
 import { FindIdentityPresenceMessage } from '../../../contexts/identities/application/find-identity-presence/messages/FindIdentityPresenceMessage';
 import { FindIdentityMessage } from '../../../contexts/identities/application/find-identity/messages/FindIdentityMessage';
+import { ForgetDeviceUnlockMessage } from '../../../contexts/identities/application/forget-device-unlock/messages/ForgetDeviceUnlockMessage';
 import { LoginIdentityMessage } from '../../../contexts/identities/application/login-identity/messages/LoginIdentityMessage';
 import { RefreshIdentityMessage } from '../../../contexts/identities/application/refresh-identity/messages/RefreshIdentityMessage';
 import { RegisterIdentityMessage } from '../../../contexts/identities/application/register-identity/messages/RegisterIdentityMessage';
@@ -204,7 +205,7 @@ export class PigeonIdentitiesFacade {
     password: string,
     networks: string[],
     handle?: string,
-    options: { passkeyPrfEnabled?: boolean; recoveryKey?: string } = {},
+    options: { recoveryKey?: string } = {},
   ): Promise<LoginResult> {
     const identity = await this.useCases.register.register(
       new RegisterIdentityMessage({
@@ -212,7 +213,6 @@ export class PigeonIdentitiesFacade {
         name,
         networks,
         occurredAt: Date.now(),
-        passkeyPrfEnabled: options.passkeyPrfEnabled,
         password,
         recoveryKey: options.recoveryKey,
       }),
@@ -241,6 +241,12 @@ export class PigeonIdentitiesFacade {
     );
   }
 
+  public async forgetDeviceUnlock(identityId: string): Promise<void> {
+    await this.useCases.deviceUnlockForgetter.forget(
+      new ForgetDeviceUnlockMessage(identityId),
+    );
+  }
+
   public async updatePresence(
     session: Session,
     status: SelectablePresenceStatus,
@@ -264,7 +270,6 @@ export class PigeonIdentitiesFacade {
     newPassword?: string,
     options: {
       currentPassword?: string;
-      passkeyPrfEnabled?: boolean;
       recoveryKey?: string;
     } = {},
   ): Promise<IdentityResource> {

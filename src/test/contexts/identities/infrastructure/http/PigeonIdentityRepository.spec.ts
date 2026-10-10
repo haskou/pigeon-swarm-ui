@@ -59,7 +59,6 @@ describe(PigeonIdentityRepository.name, () => {
       new Timestamp(100),
     );
     const protection = IdentityMasterKeyProtection.fromPrimitives({
-      passkeyPrfEnabled: false,
       password: 'Correct-Horse-Battery-9!',
       recoveryKey: RecoveryKey.generate().valueOf(),
     });
@@ -130,7 +129,7 @@ describe(PigeonIdentityRepository.name, () => {
     const session = { identity: resource() } as Session;
     const identity = mapper.fromResource(resource());
 
-    contexts.register(session, 'new-password', { passkeyPrfEnabled: true });
+    contexts.register(session, 'new-password', { recoveryKey: 'recovery' });
     gateway.updateIdentityProfile.mockResolvedValue(resource('Ada Lovelace'));
 
     await repository.update(identity, IdentityId.fromString('identity-a'));
@@ -139,7 +138,7 @@ describe(PigeonIdentityRepository.name, () => {
       session,
       expect.objectContaining({ name: 'Ada' }),
       'new-password',
-      { passkeyPrfEnabled: true },
+      { recoveryKey: 'recovery' },
     );
   });
 });
