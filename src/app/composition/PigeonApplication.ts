@@ -46,7 +46,6 @@ import { DeviceUnlockForgetter } from '../../contexts/identities/application/for
 import { LoginIdentity } from '../../contexts/identities/application/login-identity/LoginIdentity';
 import { IdentityRefresher } from '../../contexts/identities/application/refresh-identity/IdentityRefresher';
 import { RegisterIdentity } from '../../contexts/identities/application/register-identity/RegisterIdentity';
-import { RememberedIdentityRestorer } from '../../contexts/identities/application/restore-remembered-identity/RememberedIdentityRestorer';
 import { IdentityPresencesSearcher } from '../../contexts/identities/application/search-identity-presences/IdentityPresencesSearcher';
 import { IdentityPresenceUpdater } from '../../contexts/identities/application/update-identity-presence/IdentityPresenceUpdater';
 import { IdentityProfileUpdater } from '../../contexts/identities/application/update-identity-profile/IdentityProfileUpdater';
@@ -350,9 +349,6 @@ export class PigeonApplication {
         profileUpdater: new IdentityProfileUpdater(identityRepository),
         refresher: new IdentityRefresher(identityRepository),
         register: new RegisterIdentity(identityRepository, identityIdFactory),
-        rememberedIdentityRestorer: new RememberedIdentityRestorer(
-          identityUnlockRepository,
-        ),
       },
     );
     const messageMapper = new MessageMapper();

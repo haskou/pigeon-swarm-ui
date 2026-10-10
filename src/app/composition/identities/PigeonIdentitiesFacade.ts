@@ -24,7 +24,6 @@ import { ForgetDeviceUnlockMessage } from '../../../contexts/identities/applicat
 import { LoginIdentityMessage } from '../../../contexts/identities/application/login-identity/messages/LoginIdentityMessage';
 import { RefreshIdentityMessage } from '../../../contexts/identities/application/refresh-identity/messages/RefreshIdentityMessage';
 import { RegisterIdentityMessage } from '../../../contexts/identities/application/register-identity/messages/RegisterIdentityMessage';
-import { RestoreRememberedIdentityMessage } from '../../../contexts/identities/application/restore-remembered-identity/messages/RestoreRememberedIdentityMessage';
 import { SearchIdentityPresencesMessage } from '../../../contexts/identities/application/search-identity-presences/messages/SearchIdentityPresencesMessage';
 import { UpdateIdentityPresenceMessage } from '../../../contexts/identities/application/update-identity-presence/messages/UpdateIdentityPresenceMessage';
 import { UpdateIdentityProfileMessage } from '../../../contexts/identities/application/update-identity-profile/messages/UpdateIdentityProfileMessage';
@@ -152,12 +151,10 @@ export class PigeonIdentitiesFacade {
     identityId: string,
     password: string,
     onProgress?: LoginIdentityProgressReporter,
-    recoveryKey?: string,
   ): Promise<LoginResult> {
     const message = new LoginIdentityMessage({
       identityId,
       password,
-      recoveryKey,
     });
 
     this.contexts.registerProgress(identityId, onProgress);
@@ -221,23 +218,6 @@ export class PigeonIdentitiesFacade {
 
     return this.hydrateLoginResult(
       await this.gateway.hydrateSession(this.contexts.find(identityId).session),
-    );
-  }
-
-  public async restoreRemembered(
-    identityId: string,
-    onProgress?: LoginIdentityProgressReporter,
-  ): Promise<LoginResult> {
-    const message = new RestoreRememberedIdentityMessage(identityId);
-
-    this.contexts.registerProgress(identityId, onProgress);
-    await this.useCases.rememberedIdentityRestorer.restore(message);
-
-    return this.hydrateLoginResult(
-      await this.gateway.hydrateSession(
-        this.contexts.find(message.getIdentityId()).session,
-        onProgress,
-      ),
     );
   }
 

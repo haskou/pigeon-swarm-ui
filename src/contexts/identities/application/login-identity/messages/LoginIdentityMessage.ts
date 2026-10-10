@@ -6,7 +6,6 @@ export class LoginIdentityMessage {
     private readonly input: {
       identityId: string;
       password: string;
-      recoveryKey?: string;
     },
   ) {}
 
@@ -17,7 +16,6 @@ export class LoginIdentityMessage {
   public getProtection(): IdentityMasterKeyProtection {
     return IdentityMasterKeyProtection.fromPrimitives({
       password: this.input.password,
-      recoveryKey: this.input.recoveryKey,
     });
   }
 }

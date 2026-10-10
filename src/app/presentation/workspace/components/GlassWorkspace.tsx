@@ -22,7 +22,6 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
-import type { PreloadedConversationMessages } from '../PreloadedConversationMessages';
 import type { MessageContextMenuState } from './messageContextMenu';
 
 import { useRealtimeEvents } from '../../../../app/presentation/realtime/useRealtimeEvents';
@@ -91,7 +90,6 @@ interface GlassWorkspaceProps {
   pendingCommunityInvite?: PendingCommunityInviteLink | null;
   peersLoading: boolean;
   peers: Peer[];
-  preloadedConversationMessages: PreloadedConversationMessages | null;
   setCommunities: Dispatch<SetStateAction<Community[]>>;
   setConversations: Dispatch<SetStateAction<ConversationResource[]>>;
 }
@@ -110,7 +108,6 @@ export function GlassWorkspace({
   peers,
   peersLoading,
   pendingCommunityInvite,
-  preloadedConversationMessages,
   session,
   setCommunities,
   setConversations,
@@ -477,7 +474,6 @@ export function GlassWorkspace({
     onCommunitiesReload,
     onConversationsChange: setConversations,
     onErrorChange: setSendError,
-    preloadedConversationMessages,
     refreshConversations,
     sessionRef,
     suppressMessageLoadsUntilRef,

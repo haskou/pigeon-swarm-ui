@@ -4,9 +4,10 @@ import { IdentityPassword } from './IdentityPassword';
 import { RecoveryKey } from './RecoveryKey';
 
 export class IdentityMasterKeyProtection {
-  public static fromPrimitives(
-    primitives: PrimitiveOf<IdentityMasterKeyProtection>,
-  ): IdentityMasterKeyProtection {
+  public static fromPrimitives(primitives: {
+    password: string;
+    recoveryKey?: string | undefined;
+  }): IdentityMasterKeyProtection {
     return new IdentityMasterKeyProtection(
       IdentityPassword.fromString(primitives.password),
       primitives.recoveryKey
@@ -38,4 +39,3 @@ export class IdentityMasterKeyProtection {
     };
   }
 }
-import type { PrimitiveOf } from '@haskou/value-objects';

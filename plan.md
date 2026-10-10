@@ -8,7 +8,7 @@ El resultado esperado es:
 
 - La password deriva una `PasswordKEK` con scrypt fuerte.
 - La recovery key portable aporta un segundo factor criptografico independiente del dominio.
-- La passkey/WebAuthn PRF queda como atajo local opcional por dispositivo/origen, no como unico mecanismo portable.
+- La passkey/WebAuthn PRF no forma parte del diseno: su codigo se elimino en #241 y reintroducirla es una decision de producto (ver Pendientes de decision).
 - La `UserRootKey`/`MasterKey` es la unica raiz que desbloquea la private identity key, keychain y claves internas del usuario.
 - Cambiar password solo reenvuelve la `UserRootKey`/`MasterKey`.
 - Cambiar password no cambia la identity key pair ni claves de chats/comunidades.
@@ -18,7 +18,6 @@ El resultado esperado es:
 Archivos principales detectados:
 
 - `src/contexts/identities/infrastructure/crypto/UserRootKeyProtector.ts`
-- `src/contexts/identities/infrastructure/crypto/WebAuthnPrfKeyProtector.ts`
 - `src/contexts/identities/infrastructure/crypto/KeychainCipher.ts`
 - `src/app/composition/PigeonApiGateway.ts`
 - `src/shared/presentation/i18n/es.ts`
@@ -27,14 +26,13 @@ Archivos principales detectados:
 Responsabilidades actuales:
 
 - `UserRootKeyProtector` protege/desbloquea la master key y cifra/descifra la identity key pair usando la master key.
-- `WebAuthnPrfKeyProtector` gestiona deteccion y evaluacion WebAuthn PRF.
 - `KeychainCipher` cifra y descifra keychains usando `session.masterKey`.
 
 ## Decisiones de diseno
 
-1. No usar passkey PRF como recovery portable.
+1. Sin passkey PRF en el diseno.
 
-   WebAuthn esta ligado al RP ID/origen. Una passkey creada para `localhost` no sirve como secreto portable para otro dominio o IP local. Por tanto, PRF sirve para desbloqueo local comodo, no para recuperar identidad entre nodos P2P arbitrarios.
+   WebAuthn esta ligado al RP ID/origen. Una passkey creada para `localhost` no sirve como secreto portable para otro dominio o IP local, asi que PRF nunca podria ser el recovery entre nodos P2P. Su codigo se elimino en #241 porque ninguna identidad la creo.
 
 2. Introducir recovery key portable.
 
@@ -71,13 +69,7 @@ Responsabilidades actuales:
 
    `FinalKEK` cifra la `UserRootKey`/`MasterKey`.
 
-4. Passkey PRF como envelope local adicional.
-
-   Una vez desbloqueada la `UserRootKey`/`MasterKey`, se puede crear un envelope local con WebAuthn PRF para no pedir recovery key en ese navegador/dispositivo.
-
-   Ese envelope es local y reemplazable. No debe ser el unico recovery global.
-
-5. Password-only solo como modo portable/debilitado explicito.
+4. Password-only solo como modo portable/debilitado explicito.
 
    Puede existir solo si se decide mantener un modo menos seguro. Debe estar marcado en datos y UI como portable/debilitado. No debe activarse por fallback silencioso.
 
@@ -104,10 +96,7 @@ type IdentityResource = {
 
 type MasterKeyEnvelopeResource = {
   id: string;
-  type:
-    | 'password_recovery'
-    | 'local_webauthn_prf'
-    | 'password_only_portable';
+  type: 'password_recovery' | 'password_only_portable';
   encryptedMasterKey: string;
   derivation: Record<string, unknown>;
   createdAt: number;
@@ -123,7 +112,7 @@ Si se quiere minimizar el cambio inicial de backend, se puede mantener temporalm
 - `encryptedMasterKey`
 - `masterKeyDerivation`
 
-Pero entonces solo habria un envelope remoto. Para soportar recovery + passkey local limpiamente, `masterKeyEnvelopes[]` es la estructura correcta.
+Pero entonces solo habria un envelope remoto. Para soportar mas de un metodo de unlock, `masterKeyEnvelopes[]` es la estructura correcta.
 
 ### Frontend
 
@@ -135,7 +124,6 @@ Crear Value Objects o clases cohesivas para evitar strings magicos:
 - `MasterKeyEnvelopeType`
 - `PasswordKeyDerivationProfile`
 - `UserRootKey`
-- `PasskeyPrfEnvelope`
 
 No extraer primitivas para comparar o decidir reglas. Las conversiones a primitivos quedan en mappers/DTOs.
 
@@ -160,8 +148,7 @@ No extraer primitivas para comparar o decidir reglas. Las conversiones a primiti
 8. `FinalKEK` cifra `UserRootKey`/`MasterKey`.
 9. `UserRootKey`/`MasterKey` cifra la private identity key existente.
 10. Frontend muestra recovery key al usuario y exige confirmacion antes de finalizar.
-11. Si WebAuthn PRF esta disponible, se puede crear envelope local opcional para este dispositivo.
-12. Frontend publica la identidad firmada.
+11. Frontend publica la identidad firmada.
 
 ### Login en un dispositivo nuevo
 
@@ -178,19 +165,6 @@ No extraer primitivas para comparar o decidir reglas. Las conversiones a primiti
 7. `FinalKEK` descifra `UserRootKey`/`MasterKey`.
 8. `UserRootKey`/`MasterKey` descifra private identity key y keychain.
 9. Frontend abre workspace.
-10. Frontend ofrece crear passkey/local unlock para este navegador.
-
-### Login en dispositivo ya registrado con passkey PRF local
-
-1. Usuario introduce identidad/handler y password.
-2. Frontend descarga identidad.
-3. Frontend detecta envelope local de WebAuthn PRF para esa identidad y origen.
-4. Frontend evalua `navigator.credentials.get(...)` con `extensions.prf.evalByCredential`.
-5. Si `getClientExtensionResults().prf.results.first` existe, deriva `PasskeyKEK`.
-6. Frontend combina `PasswordKEK || PasskeyKEK` segun el envelope local.
-7. Descifra `UserRootKey`/`MasterKey`.
-8. Si PRF falla y la identidad requiere PRF/local envelope, no caer a password-only.
-9. Ofrecer usar recovery key como metodo alternativo.
 
 ### Cambiar password
 
@@ -209,15 +183,6 @@ Precondicion: la `UserRootKey`/`MasterKey` ya esta desbloqueada en la sesion.
 9. No tocar claves de chats ni comunidades.
 10. Cerrar sesion o forzar unlock limpio despues de cambiar password.
 
-### Activar passkey PRF en un dispositivo
-
-1. Requiere sesion ya desbloqueada.
-2. Crear credencial WebAuthn con `extensions.prf`.
-3. Validar `credential.getClientExtensionResults().prf.enabled === true`.
-4. Evaluar PRF y derivar envelope local.
-5. Guardar solo metadata y `encryptedMasterKey` local.
-6. No guardar PRF output, `PasskeyKEK`, `FinalKEK` ni master key en claro.
-
 ## Backend: cambios necesarios
 
 1. Persistir nuevos campos opacos en identidad:
@@ -232,7 +197,6 @@ Precondicion: la `UserRootKey`/`MasterKey` ya esta desbloqueada en la sesion.
 4. No interpretar ni descifrar:
 
    - recovery metadata
-   - WebAuthn metadata
    - encrypted master keys
    - encrypted key pairs
 
@@ -240,7 +204,7 @@ Precondicion: la `UserRootKey`/`MasterKey` ya esta desbloqueada en la sesion.
 
 6. Validar integridad contractual del keychain sin interpretar criptografia.
 
-   Backend debe seguir tratando el keychain como un blob opaco cifrado por frontend. No debe descifrarlo ni validar si puede abrirse con password, recovery key, passkey o master key.
+   Backend debe seguir tratando el keychain como un blob opaco cifrado por frontend. No debe descifrarlo ni validar si puede abrirse con password, recovery key o master key.
 
    Si se publica o actualiza un keychain, backend debe validar:
 
@@ -255,8 +219,7 @@ Precondicion: la `UserRootKey`/`MasterKey` ya esta desbloqueada en la sesion.
 
    - `UserRootKey`/`MasterKey`.
    - recovery key.
-   - WebAuthn PRF output.
-   - `PasswordKEK`, `PasskeyKEK` o `FinalKEK`.
+   - `PasswordKEK` o `FinalKEK`.
    - claves simetricas de chats/comunidades.
    - contenido descifrado del keychain.
 
@@ -272,20 +235,17 @@ Precondicion: la `UserRootKey`/`MasterKey` ya esta desbloqueada en la sesion.
 2. Actualizar creacion de identidad para generar y mostrar recovery key.
 3. Actualizar login para elegir metodo de unlock segun envelopes disponibles.
 4. Actualizar cambio de password para reenvolver master key sin password vieja.
-5. Actualizar passkey PRF para ser envelope local, no requisito portable global.
-6. Eliminar cualquier camino donde password sola descifre private identity key.
-7. Eliminar cualquier almacenamiento de:
+5. Eliminar cualquier camino donde password sola descifre private identity key.
+6. Eliminar cualquier almacenamiento de:
 
    - password
    - `PasswordKEK`
-   - `PasskeyKEK`
    - `FinalKEK`
-   - PRF output
    - master key en claro
 
-8. Mantener `session.masterKey` solo en memoria durante la sesion activa.
-9. Limpiar secretos en logout, error de unlock y retorno al login.
-10. Actualizar textos ES/EN.
+7. Mantener `session.masterKey` solo en memoria durante la sesion activa.
+8. Limpiar secretos en logout, error de unlock y retorno al login.
+9. Actualizar textos ES/EN.
 
 ## UX requerida
 
@@ -299,25 +259,19 @@ Precondicion: la `UserRootKey`/`MasterKey` ya esta desbloqueada en la sesion.
 
 - Obligar a confirmar que se ha guardado.
 - Ofrecer descarga/QR/copia.
-- Explicar que passkey/desbloqueo del dispositivo solo sirve en este navegador/dispositivo.
 
 ### Login
 
-- Si existe passkey local: permitir desbloqueo con password + passkey.
-- Si no existe passkey local: pedir password + recovery key.
-- Si PRF falla: mostrar error especifico y ofrecer recovery key.
-- No mostrar "password incorrecta" cuando el problema real sea PRF/no secure context.
+- Pedir password + recovery key.
 
 ### Ajustes de seguridad
 
 - Mostrar estado:
 
   - Recovery key configurada.
-  - Desbloqueo local con passkey activo/inactivo.
   - Modo portable/debilitado si existe password-only.
 
 - Permitir regenerar recovery key solo con sesion desbloqueada.
-- Permitir revocar passkey local.
 
 ## Seguridad: prohibiciones
 
@@ -325,9 +279,7 @@ No guardar:
 
 - password
 - `PasswordKEK`
-- `PasskeyKEK`
 - `FinalKEK`
-- `passkeyPrfOutput`
 - `encryptedPasswordKey`
 - `passwordKey`
 - `UserRootKey`/`MasterKey` en claro
@@ -336,7 +288,7 @@ No guardar:
 
 No hacer:
 
-- fallback silencioso a password-only si una identidad requiere recovery/passkey.
+- fallback silencioso a password-only si una identidad requiere recovery key.
 - regenerar identity key pair durante migracion.
 - cambiar public key/identityId.
 - cambiar claves simetricas de comunidades al cambiar password.
@@ -366,18 +318,13 @@ Corte limpio: no existen identidades anteriores que migrar. Toda identidad nueva
 
 - Crear identidad con recovery key.
 - Login en dispositivo nuevo con password + recovery key.
-- Activar passkey local despues de login.
-- Login posterior con password + passkey local.
-- Fallo PRF no cae a password-only.
 - Logout limpia secretos.
 - Cambio de password reenvuelve master key y vuelve al login.
 
 ### E2E
 
 - Registro muestra recovery key y exige confirmacion.
-- Login sin passkey pide recovery key.
-- Login con passkey local no pide recovery key.
-- En contexto no seguro, passkey aparece bloqueada con mensaje correcto.
+- Login pide password + recovery key.
 - Recovery key permite entrar desde otro origen/nodo.
 
 ## Orden de implementacion recomendado
@@ -388,18 +335,16 @@ Corte limpio: no existen identidades anteriores que migrar. Toda identidad nueva
 4. Reenvolver private identity key bajo `UserRootKey`/`MasterKey`.
 5. Actualizar registro y login.
 6. Actualizar cambio de password.
-7. Convertir passkey PRF en envelope local opcional.
-8. Actualizar UI/UX de recovery y seguridad.
-9. Anadir tests unitarios.
-10. Anadir tests de integracion/e2e.
-11. Ejecutar `yarn lint`, `yarn typecheck` y tests relevantes.
+7. Actualizar UI/UX de recovery y seguridad.
+8. Anadir tests unitarios.
+9. Anadir tests de integracion/e2e.
+10. Ejecutar `yarn lint`, `yarn typecheck` y tests relevantes.
 
 ## Riesgos
 
 - Si se conserva cualquier envelope password-only activo, el objetivo de resistencia a ataque offline queda roto.
 - Si se cambia identity key pair, se rompe lectura de mensajes cifrados para la public key anterior.
-- Si passkey se trata como recovery portable, fallara entre dominios/nodos.
-- Si se guarda el PRF output o una KEK derivada, se convierte en un secreto reutilizable robable.
+- Si se guarda una KEK derivada, se convierte en un secreto reutilizable robable.
 - Si backend no firma los nuevos campos, un atacante podria manipular metadata/envelopes.
 
 ## Pendientes de decision
@@ -414,3 +359,4 @@ Corte limpio: no existen identidades anteriores que migrar. Toda identidad nueva
 
 3. Decidir si se permite modo password-only portable/debilitado.
 4. Decidir si identidades existentes se migran o se fuerza corte limpio.
+5. Decidir si se reintroduce passkey PRF como desbloqueo local. Su codigo se elimino en #241 y no forma parte de este plan.

@@ -7,7 +7,6 @@ describe(ConversationTimelineLoadPlan.name, () => {
     activeConversationId: 'conversation',
     activeConversationKeyAvailable: true,
     loadedConversationId: null,
-    preloadedConversationId: null,
     workspaceMode: 'messages' as const,
   };
 
@@ -24,15 +23,6 @@ describe(ConversationTimelineLoadPlan.name, () => {
         workspaceMode: 'community',
       }),
     ).toBe('clear');
-  });
-
-  it('uses preloaded messages before requesting the active conversation', () => {
-    expect(
-      ConversationTimelineLoadPlan.decide({
-        ...activeContext,
-        preloadedConversationId: 'conversation',
-      }),
-    ).toBe('use-preloaded');
   });
 
   it('preserves an already loaded conversation and loads a different one', () => {

@@ -21,15 +21,14 @@ describe(PigeonIdentityLoginApi.name, () => {
     } as unknown as PigeonIdentityWorkspaceSessionApi;
     const login = new PigeonIdentityLoginApi(sessionApi, workspace);
 
-    await expect(
-      login.login('identity-1', 'password', progress, 'recovery-key'),
-    ).resolves.toBe(result);
+    await expect(login.login('identity-1', 'password', progress)).resolves.toBe(
+      result,
+    );
 
     expect(sessionApi.unlock).toHaveBeenCalledWith(
       'identity-1',
       'password',
       progress,
-      'recovery-key',
     );
     expect(workspace.hydrate).toHaveBeenCalledWith(session, progress);
   });

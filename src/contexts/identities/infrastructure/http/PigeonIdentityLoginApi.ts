@@ -17,14 +17,8 @@ export class PigeonIdentityLoginApi {
     identityId: string,
     password: string,
     onProgress?: LoginIdentityProgressReporter,
-    recoveryKey?: string,
   ): Promise<LoginResult> {
-    const session = await this.session.unlock(
-      identityId,
-      password,
-      onProgress,
-      recoveryKey,
-    );
+    const session = await this.session.unlock(identityId, password, onProgress);
 
     return await this.workspace.hydrate(session, onProgress);
   }
@@ -36,40 +30,15 @@ export class PigeonIdentityLoginApi {
     return await this.workspace.hydrate(session, onProgress);
   }
 
-  public async restore(
-    identityId: string,
-    onProgress?: LoginIdentityProgressReporter,
-  ): Promise<Session> {
-    return await this.session.restoreRemembered(identityId, onProgress);
-  }
-
   public async unlock(
     identityId: string,
     password: string,
     onProgress?: LoginIdentityProgressReporter,
-    recoveryKey?: string,
   ): Promise<Session> {
-    return await this.session.unlock(
-      identityId,
-      password,
-      onProgress,
-      recoveryKey,
-    );
+    return await this.session.unlock(identityId, password, onProgress);
   }
 
   public async refreshSession(session: Session): Promise<LoginResult> {
     return await this.workspace.refresh(session);
-  }
-
-  public async restoreRememberedSession(
-    identityId: string,
-    onProgress?: LoginIdentityProgressReporter,
-  ): Promise<LoginResult> {
-    const session = await this.session.restoreRemembered(
-      identityId,
-      onProgress,
-    );
-
-    return await this.workspace.hydrate(session, onProgress);
   }
 }

@@ -20,17 +20,6 @@ export class PigeonIdentityUnlockRepository implements IdentityUnlockRepository 
     await this.vault.delete(identityId);
   }
 
-  public async restore(identityId: IdentityId): Promise<Identity> {
-    const session = await this.gateway.restoreSession(
-      identityId.toString(),
-      this.contexts.reportProgress(identityId),
-    );
-
-    this.contexts.register(session);
-
-    return this.mapper.fromResource(session.identity);
-  }
-
   public async unlock(
     identityId: IdentityId,
     protection: IdentityMasterKeyProtection,
@@ -40,7 +29,6 @@ export class PigeonIdentityUnlockRepository implements IdentityUnlockRepository 
       identityId.toString(),
       factors.password,
       this.contexts.reportProgress(identityId),
-      factors.recoveryKey,
     );
 
     this.contexts.register(session);

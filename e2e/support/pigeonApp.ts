@@ -37,11 +37,6 @@ export async function newIsolatedPage(browser: Browser): Promise<Page> {
     window.localStorage.setItem('pigeon-swarm-language-v2', 'en');
     window.localStorage.setItem('pigeon-swarm-language-explicit-v3', 'true');
 
-    if (!window.sessionStorage.getItem('pigeon-swarm-e2e-storage-cleaned')) {
-      window.localStorage.removeItem('pigeon-swarm-credentials');
-      window.sessionStorage.setItem('pigeon-swarm-e2e-storage-cleaned', 'true');
-    }
-
     const publicKeyCredential = window.PublicKeyCredential as
       | (typeof PublicKeyCredential & {
           getClientCapabilities?: () => Promise<Record<string, boolean>>;

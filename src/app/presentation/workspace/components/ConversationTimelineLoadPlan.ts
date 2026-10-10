@@ -1,14 +1,9 @@
-export type ConversationTimelineLoadAction =
-  | 'clear'
-  | 'load'
-  | 'preserve'
-  | 'use-preloaded';
+export type ConversationTimelineLoadAction = 'clear' | 'load' | 'preserve';
 
 type ConversationTimelineLoadContext = {
   activeConversationId?: string;
   activeConversationKeyAvailable: boolean;
   loadedConversationId: null | string;
-  preloadedConversationId: null | string;
   workspaceMode: 'community' | 'messages';
 };
 
@@ -22,10 +17,6 @@ export class ConversationTimelineLoadPlan {
       !context.activeConversationKeyAvailable
     ) {
       return 'clear';
-    }
-
-    if (context.preloadedConversationId === context.activeConversationId) {
-      return 'use-preloaded';
     }
 
     if (context.loadedConversationId === context.activeConversationId) {

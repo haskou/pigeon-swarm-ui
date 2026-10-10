@@ -30,7 +30,6 @@ describe(PigeonIdentityUnlockRepository.name, () => {
       IdentityId.fromString('identity-a'),
       IdentityMasterKeyProtection.fromPrimitives({
         password: 'Correct-Horse-Battery-9!',
-        recoveryKey: undefined,
       }),
     );
 

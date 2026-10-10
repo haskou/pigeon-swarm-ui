@@ -9,7 +9,3 @@ export function loadGlassWorkspaceModule(): Promise<
 
   return glassWorkspaceModulePromise;
 }
-
-export async function preloadGlassWorkspaceModule(): Promise<void> {
-  await loadGlassWorkspaceModule();
-}

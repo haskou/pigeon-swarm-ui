@@ -45,18 +45,4 @@ describe(PigeonSessionFacade.name, () => {
       'older',
     ]);
   });
-
-  it('delegates remembered identity restoration to the identity facade', async () => {
-    const gateway = mock<PigeonIdentitiesGateway>();
-    const identities = mock<PigeonIdentitiesFacade>();
-    const expected = { conversations: [], session: {} as Session };
-
-    identities.restoreRemembered.mockResolvedValue(expected);
-
-    await expect(
-      new PigeonSessionFacade(gateway, identities).restoreRemembered(
-        'identity-a',
-      ),
-    ).resolves.toBe(expected);
-  });
 });
