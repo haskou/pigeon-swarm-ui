@@ -2,7 +2,7 @@ import { KeyPair, SHA256Hash, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { StringValueObject } from '@haskou/value-objects';
 
 import type { PigeonDeviceAuthorizationApi } from '../../../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
-import type { DeviceIdentityVault } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVault';
+import type { DeviceIdentityVaultStore } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVaultStore';
 import type {
   IdentityResource,
   Session,
@@ -14,6 +14,8 @@ import { DeviceId } from '../../../../../contexts/identities/domain/value-object
 import { DeviceUnlockSecretHandle } from '../../../../../contexts/identities/domain/value-objects/DeviceUnlockSecretHandle';
 import { PigeonIdentityGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityGateway';
 import { PigeonIdentitySessionApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentitySessionApi';
+import { DeviceIdentityVault } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVault';
+import { copy } from '../../../../../shared/presentation/i18n/copy';
 
 function identity(id: string): IdentityResource {
   return {
@@ -123,5 +125,46 @@ describe(PigeonIdentitySessionApi.name, () => {
         'password',
       ),
     ).rejects.toThrow();
+  });
+
+  it('explains a missing local device key instead of reporting a wrong password', async () => {
+    const keyPair = await KeyPair.generate();
+    const currentIdentity = identity(keyPair.toPrimitives().publicKey);
+    const identities = {
+      get: jest.fn().mockResolvedValue(currentIdentity),
+    } as unknown as PigeonIdentityGateway;
+    const store = {
+      find: jest.fn().mockResolvedValue(undefined),
+    } as unknown as DeviceIdentityVaultStore;
+    const sessionApi = new PigeonIdentitySessionApi(
+      identities,
+      new DeviceIdentityVault(store),
+      { synchronize: jest.fn() } as unknown as PigeonDeviceAuthorizationApi,
+    );
+
+    const unlock = sessionApi.unlock(currentIdentity.id, 'password');
+
+    await expect(unlock).rejects.toThrow(copy.auth.localDeviceMissing);
+    await expect(unlock).rejects.not.toThrow(copy.auth.invalidLogin);
+  });
+
+  it('keeps the generic message when the local device key cannot be opened', async () => {
+    const keyPair = await KeyPair.generate();
+    const currentIdentity = identity(keyPair.toPrimitives().publicKey);
+    const identities = {
+      get: jest.fn().mockResolvedValue(currentIdentity),
+    } as unknown as PigeonIdentityGateway;
+    const vault = {
+      unlock: jest.fn().mockRejectedValue(new Error('Wrong password.')),
+    } as unknown as DeviceIdentityVault;
+
+    await expect(
+      new PigeonIdentitySessionApi(identities, vault, {
+        synchronize: jest.fn(),
+      } as unknown as PigeonDeviceAuthorizationApi).unlock(
+        currentIdentity.id,
+        'wrong password',
+      ),
+    ).rejects.toThrow(copy.auth.invalidLogin);
   });
 });

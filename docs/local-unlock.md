@@ -71,6 +71,12 @@ The action does not revoke this device's server-side authorization. Revoke it
 under "Manage devices" if it must stop working. Signing in here again needs the
 recovery key or a device pairing from a signed-in device.
 
+Password sign-in on this browser then explains that the browser no longer has
+the sign-in key for the identity and points to the recovery key or "New
+device". It does not show the generic "username or password is incorrect"
+message. A wrong password on a browser that still has the local unlock keeps
+the generic message.
+
 ## Transition from the previous local format
 
 Earlier builds stored a local unlock in IndexedDB database

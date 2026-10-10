@@ -74,6 +74,8 @@ export const en = {
     installAppReadyHelp: 'Your browser is ready to install Pigeon Swarm.',
     invalidLogin: 'The username or password is incorrect.',
     loadingSubmit: 'Deriving keys and calling the API...',
+    localDeviceMissing:
+      'This browser no longer has the sign-in key for this identity. Sign in with your recovery key, or choose "New device" and approve it from a device where you are signed in.',
     login: 'Login',
     loginMethodDevice: 'New device',
     loginMethodDeviceHelp:

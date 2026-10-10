@@ -79,6 +79,8 @@ export const es = {
     installAppReadyHelp: 'Tu navegador está listo para instalar Pigeon Swarm.',
     invalidLogin: 'El usuario o la contraseña no son correctos.',
     loadingSubmit: 'Derivando claves y llamando a la API...',
+    localDeviceMissing:
+      'Este navegador ya no tiene la clave de acceso de esta identidad. Usa tu clave de recuperación o elige "Dispositivo nuevo" y apruébalo desde un dispositivo donde tengas la sesión iniciada.',
     login: 'Iniciar sesión',
     loginMethodDevice: 'Dispositivo nuevo',
     loginMethodDeviceHelp:
