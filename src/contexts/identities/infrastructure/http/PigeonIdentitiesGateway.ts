@@ -139,7 +139,7 @@ export class PigeonIdentitiesGateway {
     password: string,
     networks: string[],
     handle?: string,
-    options: { passkeyPrfEnabled?: boolean; recoveryKey?: string } = {},
+    options: { recoveryKey?: string } = {},
   ): Promise<IdentityResource> {
     return (
       await this.identityCommands.create(
@@ -280,7 +280,6 @@ export class PigeonIdentitiesGateway {
     newPassword?: string,
     options: {
       currentPassword?: string;
-      passkeyPrfEnabled?: boolean;
       recoveryKey?: string;
     } = {},
   ): Promise<IdentityResource> {

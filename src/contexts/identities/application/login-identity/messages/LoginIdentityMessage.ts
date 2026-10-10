@@ -16,7 +16,6 @@ export class LoginIdentityMessage {
 
   public getProtection(): IdentityMasterKeyProtection {
     return IdentityMasterKeyProtection.fromPrimitives({
-      passkeyPrfEnabled: false,
       password: this.input.password,
       recoveryKey: this.input.recoveryKey,
     });

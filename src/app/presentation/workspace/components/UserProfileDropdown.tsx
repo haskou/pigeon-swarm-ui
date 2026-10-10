@@ -18,6 +18,8 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
+import { clearRememberedIdentityPreview } from '../../../../contexts/identities/infrastructure/storage/rememberedIdentityPreview';
+import { clearSavedCredentials } from '../../../../contexts/identities/infrastructure/storage/savedCredentials';
 import { PresenceStatusDot } from '../../../../contexts/identities/presentation/components/presenceStatusDot';
 import {
   identityDisplayName,
@@ -124,6 +126,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
     useState<SelectablePresenceStatus>(selectablePresenceStatus(presence));
   const [presenceError, setPresenceError] = useState<string | null>(null);
   const [presenceSaving, setPresenceSaving] = useState(false);
+  const [forgetError, setForgetError] = useState<string | null>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const closeProfile = useCallback(() => setProfileOpen(false), []);
   const ownProfileName =
@@ -183,6 +186,25 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
     } finally {
       setPresenceSaving(false);
     }
+  };
+
+  const forgetDeviceAndLogOut = async () => {
+    if (!window.confirm(copy.profile.forgetDeviceConfirm)) return;
+
+    setForgetError(null);
+    try {
+      await applicationContainer.identities.forgetDeviceUnlock(
+        session.identity.id,
+      );
+    } catch {
+      setForgetError(copy.profile.forgetDeviceFailed);
+
+      return;
+    }
+
+    clearSavedCredentials();
+    clearRememberedIdentityPreview();
+    onLogout();
   };
 
   useCloseOnOutsidePointerDown({
@@ -371,6 +393,21 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
           >
             {copy.profile.logout}
           </button>
+
+          <button
+            type="button"
+            onClick={() => void forgetDeviceAndLogOut()}
+            className="ui-button ui-button-danger mt-2 w-full"
+            data-testid="forget-device-button"
+          >
+            {copy.profile.forgetDevice}
+          </button>
+
+          {forgetError && (
+            <p className="ui-inline-notice border-rose-300/50 bg-rose-500/10 text-rose-100">
+              {forgetError}
+            </p>
+          )}
         </div>
       )}
 

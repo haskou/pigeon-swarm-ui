@@ -1,6 +1,7 @@
 import { mock } from 'jest-mock-extended';
 
 import type { PigeonIdentitiesGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
+import type { DeviceIdentityVault } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVault';
 import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
@@ -24,10 +25,10 @@ describe(PigeonIdentityUnlockRepository.name, () => {
       gateway,
       contexts,
       new IdentityMapper(),
+      mock<DeviceIdentityVault>(),
     ).unlock(
       IdentityId.fromString('identity-a'),
       IdentityMasterKeyProtection.fromPrimitives({
-        passkeyPrfEnabled: false,
         password: 'Correct-Horse-Battery-9!',
         recoveryKey: undefined,
       }),
@@ -36,6 +37,23 @@ describe(PigeonIdentityUnlockRepository.name, () => {
     expect(identity.belongsTo(IdentityId.fromString('identity-a'))).toBe(true);
     expect(contexts.find(IdentityId.fromString('identity-a')).session).toBe(
       session,
+    );
+  });
+
+  it('forgets the device unlock record of the identity', async () => {
+    const vault = mock<DeviceIdentityVault>();
+
+    vault.delete.mockResolvedValue(undefined);
+
+    await new PigeonIdentityUnlockRepository(
+      mock<PigeonIdentitiesGateway>(),
+      new IdentityAccessContexts(),
+      new IdentityMapper(),
+      vault,
+    ).forget(IdentityId.fromString('identity-a'));
+
+    expect(vault.delete).toHaveBeenCalledWith(
+      IdentityId.fromString('identity-a'),
     );
   });
 });

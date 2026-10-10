@@ -12,7 +12,6 @@ export class RegisterIdentityMessage {
       networks: string[];
       occurredAt: number;
       password: string;
-      passkeyPrfEnabled?: boolean;
       recoveryKey?: string;
     },
   ) {}
@@ -37,7 +36,6 @@ export class RegisterIdentityMessage {
 
   public getProtection(): IdentityMasterKeyProtection {
     return IdentityMasterKeyProtection.fromPrimitives({
-      passkeyPrfEnabled: this.input.passkeyPrfEnabled ?? false,
       password: this.input.password,
       recoveryKey: this.input.recoveryKey,
     });

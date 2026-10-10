@@ -232,8 +232,6 @@ function restoreLoadingLabel(step: LoginIdentityProgressStep | null): string {
   if (!step) return copy.app.loading;
 
   switch (step) {
-    case 'confirming-passkey':
-      return copy.auth.loginProgress.confirmingPasskey;
     case 'decrypting-keys':
       return copy.auth.loginProgress.decryptingKeys;
     case 'loading-keychain':

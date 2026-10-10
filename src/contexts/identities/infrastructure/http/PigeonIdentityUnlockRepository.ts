@@ -2,6 +2,7 @@ import type { Identity } from '../../domain/Identity';
 import type { IdentityUnlockRepository } from '../../domain/repositories/IdentityUnlockRepository';
 import type { IdentityId } from '../../domain/value-objects/IdentityId';
 import type { IdentityMasterKeyProtection } from '../../domain/value-objects/IdentityMasterKeyProtection';
+import type { DeviceIdentityVault } from '../storage/DeviceIdentityVault';
 import type { IdentityAccessContexts } from './IdentityAccessContexts';
 import type { IdentityMapper } from './IdentityMapper';
 import type { PigeonIdentitiesGateway } from './PigeonIdentitiesGateway';
@@ -12,7 +13,12 @@ export class PigeonIdentityUnlockRepository implements IdentityUnlockRepository 
     private readonly gateway: PigeonIdentitiesGateway,
     private readonly contexts: IdentityAccessContexts,
     private readonly mapper: IdentityMapper,
+    private readonly vault: DeviceIdentityVault,
   ) {}
+
+  public async forget(identityId: IdentityId): Promise<void> {
+    await this.vault.delete(identityId);
+  }
 
   public async restore(identityId: IdentityId): Promise<Identity> {
     const session = await this.gateway.restoreSession(

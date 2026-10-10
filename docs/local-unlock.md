@@ -9,6 +9,9 @@ removes, and what each choice does and does not protect against.
 There is one local unlock mode today: the device vault, which always requires
 the password. The client has no automatic-unlock mode.
 
+Passkey PRF is not a local unlock mode. Its code was removed because no
+identity was created with it. Wiring it back is a product decision.
+
 | Local state                                                              | Holds                                                                                                                     | Unlock requires                                                                             |
 | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | Device vault (IndexedDB `pigeon-swarm-device-vault`, store `identities`) | Identity material encrypted under a root key, a scrypt-protected root-key envelope, and a non-extractable HMAC factor key | Password (`DeviceIdentityVault.unlock`) plus the device-bound factor key                    |
@@ -53,6 +56,25 @@ It keeps, on purpose:
 This document does not claim that logout stops every background task or that
 JavaScript memory is cleared. Neither is verified.
 
+### Log out and forget this device
+
+The profile menu has a second action, "Log out and forget this device". It
+asks for confirmation first. Then it:
+
+1. deletes the device vault record for the identity (IndexedDB
+   `pigeon-swarm-device-vault`) through `DeviceUnlockForgetter`, which calls
+   `IdentityUnlockRepository.forget`;
+2. removes the remember-me record (`pigeon-swarm-credentials`) and the identity
+   preview (`pigeon-swarm-identity-preview`);
+3. runs the logout described above.
+
+If step 1 fails, the user stays signed in and sees an inline error. Nothing
+else is removed in that case.
+
+The action does not revoke this device's server-side authorization. Revoke it
+under "Manage devices" if it must stop working. Signing in here again needs the
+recovery key or a device pairing from a signed-in device.
+
 ## Transition from the previous local format
 
 Earlier builds stored a local unlock in IndexedDB database
@@ -86,19 +108,19 @@ Covered by `deleteLegacyLocalDeviceUnlockStore.spec.ts`.
   The URL keeps `identityId` and `timestamp`. Reviewed logging call sites do not
   log keys, decrypted payloads, or topics.
 
+## Tests
+
+`DeviceIdentityVault.spec.ts` and `DeviceIdentityProtector.spec.ts` run in
+`yarn test:crypto` (`jest.real-crypto.config.cjs`), which `yarn test` runs after
+the main jest suite. The main jest config excludes them because its
+`@haskou/pigeon-swarm-crypto` mock does not implement the device factor.
+
 ## Not in this change
 
 - **Session-only versus remembered-device split.** It overlaps branch
   `security/session-only-auth` in the primary checkout.
-- **Passkey PRF.** `WebAuthnPrfKeyProtector` has no production callers, and no
-  identity is created with PRF. The `localDeviceUnlock*` copy and
-  `PasskeyPrfUnavailableNotice` describe that unused feature. Wiring or removing
-  it is a product decision.
-- **Deleting the device vault on logout** as an option.
 - **User-presence check** before unlock.
 - **Content Security Policy.** The node URL is user-configurable, so a policy
   needs a browser smoke test first.
 - **Logout stops background work.** Needs verification.
 - **Diagnostic export and crash reports.** Not reviewed.
-- **Vault tests.** `DeviceIdentityVault.spec.ts` and
-  `DeviceIdentityProtector.spec.ts` are excluded in `jest.config.cjs`.

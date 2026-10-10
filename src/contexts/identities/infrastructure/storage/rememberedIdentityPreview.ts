@@ -51,3 +51,7 @@ export function saveRememberedIdentityPreview(
     JSON.stringify(preview),
   );
 }
+
+export function clearRememberedIdentityPreview(): void {
+  localStorage.removeItem(REMEMBERED_IDENTITY_PREVIEW_KEY);
+}

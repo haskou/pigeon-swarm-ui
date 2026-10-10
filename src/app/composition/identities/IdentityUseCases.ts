@@ -1,5 +1,6 @@
 import type { IdentityPresenceFinder } from '../../../contexts/identities/application/find-identity-presence/IdentityPresenceFinder';
 import type { IdentityFinder } from '../../../contexts/identities/application/find-identity/IdentityFinder';
+import type { DeviceUnlockForgetter } from '../../../contexts/identities/application/forget-device-unlock/DeviceUnlockForgetter';
 import type { LoginIdentity } from '../../../contexts/identities/application/login-identity/LoginIdentity';
 import type { IdentityRefresher } from '../../../contexts/identities/application/refresh-identity/IdentityRefresher';
 import type { RegisterIdentity } from '../../../contexts/identities/application/register-identity/RegisterIdentity';
@@ -9,6 +10,7 @@ import type { IdentityPresenceUpdater } from '../../../contexts/identities/appli
 import type { IdentityProfileUpdater } from '../../../contexts/identities/application/update-identity-profile/IdentityProfileUpdater';
 
 export type IdentityUseCases = {
+  deviceUnlockForgetter: DeviceUnlockForgetter;
   finder: IdentityFinder;
   login: LoginIdentity;
   presenceFinder: IdentityPresenceFinder;

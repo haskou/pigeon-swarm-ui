@@ -12,14 +12,12 @@ export class IdentityMasterKeyProtection {
       primitives.recoveryKey
         ? RecoveryKey.fromString(primitives.recoveryKey)
         : undefined,
-      primitives.passkeyPrfEnabled,
     );
   }
 
   private constructor(
     private readonly password: IdentityPassword,
     private readonly recoveryKey?: RecoveryKey,
-    private readonly passkeyPrfEnabled = false,
   ) {}
 
   public assertRegistrationReady(): void {
@@ -35,7 +33,6 @@ export class IdentityMasterKeyProtection {
 
   public toPrimitives() {
     return {
-      passkeyPrfEnabled: this.passkeyPrfEnabled,
       password: this.password.toString(),
       recoveryKey: this.recoveryKey?.toString(),
     };

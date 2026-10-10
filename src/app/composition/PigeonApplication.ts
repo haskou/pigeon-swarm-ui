@@ -42,6 +42,7 @@ import { ConversationMapper } from '../../contexts/conversations/infrastructure/
 import { PigeonConversationRepository } from '../../contexts/conversations/infrastructure/http/PigeonConversationRepository';
 import { IdentityPresenceFinder } from '../../contexts/identities/application/find-identity-presence/IdentityPresenceFinder';
 import { IdentityFinder } from '../../contexts/identities/application/find-identity/IdentityFinder';
+import { DeviceUnlockForgetter } from '../../contexts/identities/application/forget-device-unlock/DeviceUnlockForgetter';
 import { LoginIdentity } from '../../contexts/identities/application/login-identity/LoginIdentity';
 import { IdentityRefresher } from '../../contexts/identities/application/refresh-identity/IdentityRefresher';
 import { RegisterIdentity } from '../../contexts/identities/application/register-identity/RegisterIdentity';
@@ -321,6 +322,7 @@ export class PigeonApplication {
       gateway.identityGateway,
       identityContexts,
       identityMapper,
+      gateway.identityVault,
     );
     const identityPresenceRepository = new PigeonPresenceRepository(
       gateway.presence,
@@ -333,6 +335,9 @@ export class PigeonApplication {
       identityMapper,
       identityPresenceMapper,
       {
+        deviceUnlockForgetter: new DeviceUnlockForgetter(
+          identityUnlockRepository,
+        ),
         finder: new IdentityFinder(identityRepository),
         login: new LoginIdentity(identityUnlockRepository),
         presenceFinder: new IdentityPresenceFinder(identityPresenceRepository),
