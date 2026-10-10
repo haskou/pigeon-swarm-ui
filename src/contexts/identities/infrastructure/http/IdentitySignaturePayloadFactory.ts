@@ -7,6 +7,7 @@ import { ProfileBiography } from '../../domain/profile/ProfileBiography';
 import { ProfileHandle } from '../../domain/profile/ProfileHandle';
 import { ProfileName } from '../../domain/profile/ProfileName';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
+import { IdentityAdmissionProof } from '../crypto/IdentityAdmissionProof';
 
 function uniqueNetworks(networks: string[]): string[] {
   return [...new Set(networks.filter(Boolean))];
@@ -39,7 +40,22 @@ function profileFrom(
 }
 
 export class IdentitySignaturePayloadFactory {
-  public createInitial(input: {
+  /** Reuses the proof unless the networks changed; joining needs new work. */
+  private async admissionNonceFor(
+    id: string,
+    networks: string[],
+    current: IdentityResource,
+  ): Promise<string> {
+    const unchanged =
+      networks.length === current.networks.length &&
+      networks.every((network) => current.networks.includes(network));
+
+    return unchanged
+      ? current.admissionNonce
+      : await IdentityAdmissionProof.mine(id, networks);
+  }
+
+  public async createInitial(input: {
     deviceCredential: string;
     deviceCredentialCommitment: string;
     id: string;
@@ -47,13 +63,17 @@ export class IdentitySignaturePayloadFactory {
     profile: IdentityUpdateProfileInput;
     recoveryAuthority: string;
     timestamp: number;
-  }): Omit<IdentityResource, 'signature'> {
+  }): Promise<Omit<IdentityResource, 'signature'>> {
+    const id = IdentityId.normalize(input.id);
+    const networks = uniqueNetworks(input.networks);
+
     return {
+      admissionNonce: await IdentityAdmissionProof.mine(id, networks),
       authorizationRevision: 0,
       deviceCredential: input.deviceCredential,
       deviceCredentialCommitment: input.deviceCredentialCommitment,
-      id: IdentityId.normalize(input.id),
-      networks: uniqueNetworks(input.networks),
+      id,
+      networks,
       previousIdentityExternalIdentifier: undefined,
       profile: profileFrom(input.profile),
       recoveryAuthority: input.recoveryAuthority,
@@ -62,21 +82,29 @@ export class IdentitySignaturePayloadFactory {
     };
   }
 
-  public createUpdate(input: {
+  public async createUpdate(input: {
     identity: IdentityResource;
     previousIdentityExternalIdentifier?: string;
     profile: IdentityUpdateProfileInput;
     timestamp: number;
-  }): Omit<IdentityResource, 'signature'> {
+  }): Promise<Omit<IdentityResource, 'signature'>> {
+    const id = IdentityId.normalize(input.identity.id);
+    const networks = uniqueNetworks([
+      ...input.identity.networks,
+      ...(input.profile.networks ?? []),
+    ]);
+
     return {
+      admissionNonce: await this.admissionNonceFor(
+        id,
+        networks,
+        input.identity,
+      ),
       authorizationRevision: input.identity.authorizationRevision,
       deviceCredential: input.identity.deviceCredential,
       deviceCredentialCommitment: input.identity.deviceCredentialCommitment,
-      id: IdentityId.normalize(input.identity.id),
-      networks: uniqueNetworks([
-        ...input.identity.networks,
-        ...(input.profile.networks ?? []),
-      ]),
+      id,
+      networks,
       previousIdentityExternalIdentifier:
         input.previousIdentityExternalIdentifier,
       profile: profileFrom(input.profile),

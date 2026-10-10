@@ -85,7 +85,7 @@ export class PigeonIdentityCommandsApi {
       },
       password,
     });
-    const unsigned = this.signatures.createInitial({
+    const unsigned = await this.signatures.createInitial({
       deviceCredential: deviceCredentialKeyPair.toPrimitives().publicKey,
       deviceCredentialCommitment: this.credentialCommitment(
         deviceCredentialKeyPair,
@@ -156,7 +156,7 @@ export class PigeonIdentityCommandsApi {
       },
       password: options.password,
     });
-    const unsigned = this.signatures.createInitial({
+    const unsigned = await this.signatures.createInitial({
       deviceCredential:
         material.deviceCredentialKeyPair.toPrimitives().publicKey,
       deviceCredentialCommitment: this.credentialCommitment(
@@ -232,7 +232,7 @@ export class PigeonIdentityCommandsApi {
       );
     }
     const path = `/identities/${encodeURIComponent(identityId)}`;
-    const unsigned = this.signatures.createUpdate({
+    const unsigned = await this.signatures.createUpdate({
       identity: currentIdentity,
       previousIdentityExternalIdentifier,
       profile,

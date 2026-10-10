@@ -22,6 +22,7 @@ import { PigeonIdentityRepository } from '../../../../../contexts/identities/inf
 
 function resource(name = 'Ada'): IdentityResource {
   return {
+    admissionNonce: '0',
     authorizationRevision: 0,
     deviceCredential: 'device-credential',
     deviceCredentialCommitment: 'device-credential-commitment',

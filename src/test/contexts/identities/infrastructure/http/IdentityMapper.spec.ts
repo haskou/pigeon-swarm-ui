@@ -4,6 +4,7 @@ import { IdentityMapper } from '../../../../../contexts/identities/infrastructur
 
 function resource(): IdentityResource {
   return {
+    admissionNonce: '0',
     authorizationRevision: 0,
     deviceCredential: 'device-credential',
     deviceCredentialCommitment: 'device-credential-commitment',

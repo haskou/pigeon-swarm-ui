@@ -2,6 +2,7 @@ import type { IdentityResource } from '../../../../../contexts/identities/infras
 
 export function identityResource(name = 'Ada'): IdentityResource {
   return {
+    admissionNonce: '0',
     authorizationRevision: 0,
     deviceCredential: 'device-credential',
     deviceCredentialCommitment: 'device-credential-commitment',

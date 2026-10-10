@@ -194,6 +194,7 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
     } as unknown as DeviceIdentityVault;
     const api = new PigeonDeviceAuthorizationApi(http, signer, vault);
     const identity = {
+      admissionNonce: '0',
       authorizationRevision: 0,
       deviceCredential: 'retired-device',
       deviceCredentialCommitment: 'retired-commitment',
@@ -238,6 +239,7 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
   it('pairs a new device through authenticated single-use transfer', async () => {
     const { identityId, session } = await fixture();
     const identity = {
+      admissionNonce: '0',
       authorizationRevision: 0,
       deviceCredential:
         session.deviceCredentialKeyPair.toPrimitives().publicKey,

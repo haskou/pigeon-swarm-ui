@@ -14,6 +14,7 @@ import { PigeonIdentitiesGateway } from '../../../../../contexts/identities/infr
 
 function identity(): IdentityResource {
   return {
+    admissionNonce: '0',
     authorizationRevision: 0,
     deviceCredential: 'device-credential',
     deviceCredentialCommitment: 'device-credential-commitment',
