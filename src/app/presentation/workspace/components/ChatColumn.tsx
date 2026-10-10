@@ -6,6 +6,8 @@ import type { ChatMessage } from '../../../../shared/domain/pigeonResources.type
 import type { ChatColumnProps } from './ChatColumnProps';
 import type { ChatProfileViewer } from './ChatProfileViewer';
 
+import { ContactVerificationDialog } from '../../../../contexts/identities/presentation/components/ContactVerificationDialog';
+import { useContactVerification } from '../../../../contexts/identities/presentation/hooks/useContactVerification';
 import { identityDisplayName } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
 import {
   profileAnchorFromTarget,
@@ -148,6 +150,7 @@ export function ChatColumn({
   const [conversationMenuOpen, setConversationMenuOpen] = useState(false);
   const [conversationDataOpen, setConversationDataOpen] = useState(false);
   const [encryptionDetailsOpen, setEncryptionDetailsOpen] = useState(false);
+  const [contactVerificationOpen, setContactVerificationOpen] = useState(false);
   const reactionAuthorNames = useMemo(
     () =>
       withCurrentIdentityName(
@@ -203,6 +206,13 @@ export function ChatColumn({
     ],
   );
   const isGroupConversation = conversationPresentation.isGroup;
+  const canVerifyPeer =
+    !!activeConversation && !isGroupConversation && !!peerIdentityId;
+  const contactVerification = useContactVerification({
+    localIdentityId: session.identity.id,
+    peerHandle: peerIdentity?.profile.handle,
+    peerIdentityId: canVerifyPeer ? peerIdentityId : undefined,
+  });
   const groupInvitationDialog = useGroupInvitationDialog({
     conversation: activeConversation,
     enabled: isGroupConversation,
@@ -336,10 +346,14 @@ export function ChatColumn({
         onOpenSidebar={onOpenSidebar}
         onPinsOpen={onOpenPins}
         onRealtimeEventsOpen={onRealtimeEventsOpen}
+        onVerificationOpen={
+          canVerifyPeer ? () => setContactVerificationOpen(true) : undefined
+        }
         peerPicture={peerPicture}
         peerPresence={
           peerIdentityId ? presenceByIdentityId[peerIdentityId] : undefined
         }
+        peerVerified={contactVerification.verified}
         realtimeStatus={realtimeStatus}
       >
         {conversationMenuOpen && activeConversation && (
@@ -386,6 +400,9 @@ export function ChatColumn({
             onOpenPins={onOpenPins}
             onRealtimeEventsOpen={onRealtimeEventsOpen}
             onStartCall={onStartCall}
+            onVerificationOpen={
+              canVerifyPeer ? () => setContactVerificationOpen(true) : undefined
+            }
           />
         )}
       </ChatConversationHeader>
@@ -458,6 +475,15 @@ export function ChatColumn({
         session={session}
         setProfileViewer={setProfileViewer}
       />
+      {contactVerificationOpen && canVerifyPeer && peerIdentityId && (
+        <ContactVerificationDialog
+          localIdentityId={session.identity.id}
+          name={activeConversationName ?? peerIdentityId}
+          onClose={() => setContactVerificationOpen(false)}
+          peerIdentityId={peerIdentityId}
+          verification={contactVerification}
+        />
+      )}
     </section>
   );
 }

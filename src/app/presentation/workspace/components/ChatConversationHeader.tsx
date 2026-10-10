@@ -9,6 +9,7 @@ import type {
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { FallbackImage } from '../../../../shared/presentation/components/FallbackImage';
 import { PresenceStatusDot } from '../../../../contexts/identities/presentation/components/presenceStatusDot';
+import { VerifiedIcon } from '../../../../contexts/identities/presentation/components/VerifiedIcon';
 import { LockIcon } from './LockIcon';
 import { WorkspaceHeader } from './WorkspaceHeader';
 
@@ -24,12 +25,14 @@ interface ChatConversationHeaderProps {
   isGroupConversation: boolean;
   onConversationOpen: (event?: MouseEvent<HTMLElement>) => void;
   onEncryptionDetailsOpen?: () => void;
+  onVerificationOpen?: () => void;
   onMenuToggle: () => void;
   onOpenSidebar: () => void;
   onPinsOpen?: () => void;
   onRealtimeEventsOpen?: () => void;
   peerPicture?: string;
   peerPresence?: IdentityPresence;
+  peerVerified?: boolean;
   menuOpen: boolean;
   realtimeStatus: 'connected' | 'reconnecting';
 }
@@ -51,8 +54,10 @@ export function ChatConversationHeader({
   onOpenSidebar,
   onPinsOpen,
   onRealtimeEventsOpen,
+  onVerificationOpen,
   peerPicture,
   peerPresence,
+  peerVerified,
   realtimeStatus,
 }: ChatConversationHeaderProps) {
   const e2eTooltip = hasConversationKey
@@ -92,11 +97,16 @@ export function ChatConversationHeader({
       }
       lock={
         activeConversation ? (
-          <ConversationLockState
-            hasConversationKey={hasConversationKey}
-            onClick={onEncryptionDetailsOpen}
-            tooltip={e2eTooltip}
-          />
+          <>
+            <ConversationLockState
+              hasConversationKey={hasConversationKey}
+              onClick={onEncryptionDetailsOpen}
+              tooltip={e2eTooltip}
+            />
+            {peerVerified && onVerificationOpen ? (
+              <VerifiedContactBadge onClick={onVerificationOpen} />
+            ) : null}
+          </>
         ) : null
       }
       menuContent={children}
@@ -187,6 +197,21 @@ function ConversationLockState({
       aria-label={tooltip}
     >
       <LockIcon locked={hasConversationKey} />
+    </button>
+  );
+}
+
+function VerifiedContactBadge({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-300/25 bg-emerald-300/10 px-2 py-0.5 text-xs font-bold text-emerald-100 transition hover:bg-emerald-300/15"
+      title={copy.contacts.verifiedContact}
+      aria-label={copy.contacts.verifiedContact}
+    >
+      <VerifiedIcon className="h-3.5 w-3.5 shrink-0" />
+      <span>{copy.contacts.verified}</span>
     </button>
   );
 }
