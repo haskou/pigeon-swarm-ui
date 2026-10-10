@@ -12,6 +12,25 @@ function storageKey(localIdentityId: string): string {
   return scopeClientStorageKey(`${storagePrefix}:${localIdentityId}`);
 }
 
+function nonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value ? value : undefined;
+}
+
+function parseContactPin(entry: unknown): ContactPins[string] | null {
+  if (typeof entry !== 'object' || entry === null) return null;
+
+  const { handle, verifiedAt } = entry as Record<string, unknown>;
+  const pin: ContactPins[string] = {};
+  const parsedHandle = nonEmptyString(handle);
+  const parsedVerifiedAt = nonEmptyString(verifiedAt);
+
+  if (parsedHandle) pin.handle = parsedHandle;
+
+  if (parsedVerifiedAt) pin.verifiedAt = parsedVerifiedAt;
+
+  return parsedHandle || parsedVerifiedAt ? pin : null;
+}
+
 function parseContactPins(value: unknown): ContactPins {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return {};
@@ -20,25 +39,17 @@ function parseContactPins(value: unknown): ContactPins {
   const pins: ContactPins = {};
 
   for (const [identityId, entry] of Object.entries(value)) {
-    if (typeof entry !== 'object' || entry === null) continue;
+    const pin = parseContactPin(entry);
 
-    const { handle, verifiedAt } = entry as Record<string, unknown>;
-    const pin: ContactPins[string] = {};
-
-    if (typeof handle === 'string' && handle) pin.handle = handle;
-    if (typeof verifiedAt === 'string' && verifiedAt) {
-      pin.verifiedAt = verifiedAt;
-    }
-
-    if (pin.handle || pin.verifiedAt) pins[identityId] = pin;
+    if (pin) pins[identityId] = pin;
   }
 
   return pins;
 }
 
 /**
- * Stores contact pins per local identity on this device only. Reads never throw:
- * unreadable data is treated as "no contacts remembered".
+ * Stores contact pins per local identity on this device only. Reads never
+ * throw: unreadable data is treated as "no contacts remembered".
  */
 export class ContactPinStore {
   public load(localIdentityId: string): ContactPins {
