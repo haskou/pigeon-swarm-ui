@@ -142,9 +142,6 @@ export const en = {
     recoveryKeySaved: 'I saved my recovery key',
     recoveryKeyTitle: 'Recovery key',
     recoveryKeyUnlockFailed: 'The password or recovery key is incorrect.',
-    rememberMe: 'Stay signed in',
-    rememberMeHelp:
-      'Stores your identity and a local device unlock envelope in this browser.',
     title: 'Pigeon Swarm',
     unknownError: 'Unknown error. Poetic, but not useful.',
   },

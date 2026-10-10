@@ -148,9 +148,6 @@ export const es = {
     recoveryKeyTitle: 'Clave de recuperación',
     recoveryKeyUnlockFailed:
       'La contraseña o la clave de recuperación no son correctas.',
-    rememberMe: 'Mantener sesión iniciada',
-    rememberMeHelp:
-      'Guarda tu identidad y un sobre local de desbloqueo en este navegador.',
     title: 'Pigeon Swarm',
     unknownError: 'Error desconocido. Poético, pero poco útil.',
   },

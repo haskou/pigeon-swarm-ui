@@ -95,9 +95,7 @@ export class PigeonIdentitySessionApi {
     identityId: string,
     password: string,
     onProgress?: LoginIdentityProgressReporter,
-    recoveryKey?: string,
   ): Promise<Session> {
-    void recoveryKey;
     onProgress?.('resolving-identity');
     const identity = await this.identities.get(identityId.trim());
     onProgress?.('decrypting-keys');
@@ -118,15 +116,5 @@ export class PigeonIdentitySessionApi {
     return await this.deviceAuthorization.synchronize(
       this.createSession(identity, vaultSession),
     );
-  }
-
-  public restoreRemembered(
-    identityId: string,
-    onProgress?: LoginIdentityProgressReporter,
-  ): Promise<Session> {
-    void identityId;
-    void onProgress;
-
-    return Promise.reject(new Error(copy.auth.invalidLogin));
   }
 }

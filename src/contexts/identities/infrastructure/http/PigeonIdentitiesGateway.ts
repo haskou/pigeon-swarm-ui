@@ -211,14 +211,8 @@ export class PigeonIdentitiesGateway {
     identityId: string,
     password: string,
     onProgress?: LoginIdentityProgressReporter,
-    recoveryKey?: string,
   ): Promise<LoginResult> {
-    return await this.identityLogin.login(
-      identityId,
-      password,
-      onProgress,
-      recoveryKey,
-    );
+    return await this.identityLogin.login(identityId, password, onProgress);
   }
 
   public async hydrateSession(
@@ -228,25 +222,12 @@ export class PigeonIdentitiesGateway {
     return await this.identityLogin.hydrate(session, onProgress);
   }
 
-  public async restoreSession(
-    identityId: string,
-    onProgress?: LoginIdentityProgressReporter,
-  ): Promise<Session> {
-    return await this.identityLogin.restore(identityId, onProgress);
-  }
-
   public async unlockSession(
     identityId: string,
     password: string,
     onProgress?: LoginIdentityProgressReporter,
-    recoveryKey?: string,
   ): Promise<Session> {
-    return await this.identityLogin.unlock(
-      identityId,
-      password,
-      onProgress,
-      recoveryKey,
-    );
+    return await this.identityLogin.unlock(identityId, password, onProgress);
   }
 
   public async publishKeychain(
@@ -262,16 +243,6 @@ export class PigeonIdentitiesGateway {
 
   public async refreshSession(session: Session): Promise<LoginResult> {
     return await this.identityLogin.refreshSession(session);
-  }
-
-  public async restoreRememberedSession(
-    identityId: string,
-    onProgress?: LoginIdentityProgressReporter,
-  ): Promise<LoginResult> {
-    return await this.identityLogin.restoreRememberedSession(
-      identityId,
-      onProgress,
-    );
   }
 
   public async updateIdentityProfile(

@@ -55,7 +55,6 @@ test.describe('visual audit', () => {
           'pigeon-swarm-technical-details-v1',
           String(showTechnicalDetails),
         );
-        window.localStorage.removeItem('pigeon-swarm-credentials');
       },
       { selectedLanguage: language, showTechnicalDetails: technicalDetails },
     );

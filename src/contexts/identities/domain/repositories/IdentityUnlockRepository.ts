@@ -4,7 +4,6 @@ import type { IdentityMasterKeyProtection } from '../value-objects/IdentityMaste
 
 export interface IdentityUnlockRepository {
   forget(identityId: IdentityId): Promise<void>;
-  restore(identityId: IdentityId): Promise<Identity>;
   unlock(
     identityId: IdentityId,
     protection: IdentityMasterKeyProtection,

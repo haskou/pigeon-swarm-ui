@@ -14,7 +14,6 @@ import type {
   ConversationResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { PreloadedConversationMessages } from '../PreloadedConversationMessages';
 
 import { MessageCollection } from '../../../../contexts/messages/presentation/view-models/MessageCollection';
 import { copy } from '../../../../shared/presentation/i18n/copy';
@@ -34,7 +33,6 @@ type UseConversationTimelineInput = {
   onCommunitiesReload: () => Promise<void>;
   onConversationsChange: Dispatch<SetStateAction<ConversationResource[]>>;
   onErrorChange: (error: null | string) => void;
-  preloadedConversationMessages: null | PreloadedConversationMessages;
   refreshConversations: () => Promise<ConversationResource[]>;
   sessionRef: MutableRefObject<Session>;
   suppressMessageLoadsUntilRef: MutableRefObject<number>;
@@ -65,26 +63,6 @@ export type ConversationTimelineController = {
   updateMessageCursor: (cursor: null | string) => void;
 };
 
-function initialMessages(
-  preloaded: null | PreloadedConversationMessages,
-): ChatMessage[] {
-  if (!preloaded) return [];
-
-  return MessageCollection.merge([], preloaded.messages);
-}
-
-function initialMessageCursor(
-  preloaded: null | PreloadedConversationMessages,
-): null | string {
-  return preloaded?.nextCursor ?? null;
-}
-
-function initialMessageState(
-  preloaded: null | PreloadedConversationMessages,
-): ConversationMessageLoadState {
-  return preloaded ? 'idle' : 'loading';
-}
-
 export function useConversationTimeline({
   activeConversation,
   activeConversationKey,
@@ -92,7 +70,6 @@ export function useConversationTimeline({
   onCommunitiesReload,
   onConversationsChange,
   onErrorChange,
-  preloadedConversationMessages,
   refreshConversations,
   sessionRef,
   suppressMessageLoadsUntilRef,
@@ -100,35 +77,17 @@ export function useConversationTimeline({
 }: UseConversationTimelineInput): ConversationTimelineController {
   const activeConversationId = activeConversation?.id;
   const activeConversationKeyAvailable = activeConversationKey !== undefined;
-  const preloadedConversationMessagesRef = useRef(
-    preloadedConversationMessages,
-  );
-  const initiallyLoadedMessages = initialMessages(
-    preloadedConversationMessages,
-  );
-  const loadedConversationIdRef = useRef<null | string>(
-    preloadedConversationMessages?.conversationId ?? null,
-  );
-  const [messages, setMessages] = useState<ChatMessage[]>(
-    () => initiallyLoadedMessages,
-  );
-  const [messageCursor, setMessageCursor] = useState<null | string>(
-    initialMessageCursor(preloadedConversationMessages),
-  );
+  const loadedConversationIdRef = useRef<null | string>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messageCursor, setMessageCursor] = useState<null | string>(null);
   const [messageState, setMessageState] =
-    useState<ConversationMessageLoadState>(
-      initialMessageState(preloadedConversationMessages),
-    );
+    useState<ConversationMessageLoadState>('loading');
   const [newMessageCount, setNewMessageCount] = useState(0);
-  const messageCursorRef = useRef<null | string>(
-    initialMessageCursor(preloadedConversationMessages),
-  );
+  const messageCursorRef = useRef<null | string>(null);
   const messageAbortRef = useRef<AbortController | null>(null);
   const messageRequestRef = useRef(0);
-  const messageStateRef = useRef<ConversationMessageLoadState>(
-    initialMessageState(preloadedConversationMessages),
-  );
-  const messagesRef = useRef<ChatMessage[]>(initiallyLoadedMessages);
+  const messageStateRef = useRef<ConversationMessageLoadState>('loading');
+  const messagesRef = useRef<ChatMessage[]>([]);
   const clearNewMessageCount = useCallback((): void => {
     setNewMessageCount(0);
   }, []);
@@ -281,25 +240,6 @@ export function useConversationTimeline({
     updateMessageCursor(null);
     setMessageLoadState('idle');
   }, [setMessageLoadState, updateMessageCursor]);
-  const usePreloadedTimeline = useCallback((): void => {
-    const preloaded = preloadedConversationMessagesRef.current;
-
-    if (!preloaded || !activeConversationId) return;
-
-    preloadedConversationMessagesRef.current = null;
-    loadedConversationIdRef.current = activeConversationId;
-    setMessages(MessageCollection.merge([], preloaded.messages));
-    updateMessageCursor(preloaded.nextCursor ?? null);
-    setMessageLoadState('idle');
-    markConversationReadUntil(activeConversationId, preloaded.messages);
-    scrollMessagesToBottom('auto', true);
-  }, [
-    activeConversationId,
-    markConversationReadUntil,
-    scrollMessagesToBottom,
-    setMessageLoadState,
-    updateMessageCursor,
-  ]);
   const preserveTimeline = useCallback((): void => {
     setMessageLoadState('idle');
     scrollMessagesToBottom('auto', true);
@@ -315,8 +255,6 @@ export function useConversationTimeline({
       activeConversationId,
       activeConversationKeyAvailable,
       loadedConversationId: loadedConversationIdRef.current,
-      preloadedConversationId:
-        preloadedConversationMessagesRef.current?.conversationId ?? null,
       workspaceMode,
     });
 
@@ -333,9 +271,6 @@ export function useConversationTimeline({
       case 'preserve':
         preserveTimeline();
         break;
-      case 'use-preloaded':
-        usePreloadedTimeline();
-        break;
     }
   }, [
     activeConversationId,
@@ -343,7 +278,6 @@ export function useConversationTimeline({
     clearTimeline,
     preserveTimeline,
     requestTimeline,
-    usePreloadedTimeline,
     workspaceMode,
   ]);
 

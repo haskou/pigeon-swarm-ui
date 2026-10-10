@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from 'react';
+
 import type { CallSession } from '../../../../contexts/calls/presentation/view-models/CallSession';
 import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
 import type {
@@ -18,8 +19,7 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { clearRememberedIdentityPreview } from '../../../../contexts/identities/infrastructure/storage/rememberedIdentityPreview';
-import { clearSavedCredentials } from '../../../../contexts/identities/infrastructure/storage/savedCredentials';
+import { deleteLegacyRememberedIdentityStorage } from '../../../../contexts/identities/infrastructure/storage/deleteLegacyRememberedIdentityStorage';
 import { PresenceStatusDot } from '../../../../contexts/identities/presentation/components/presenceStatusDot';
 import {
   identityDisplayName,
@@ -56,33 +56,7 @@ const ProfileEditor = lazy(() =>
   })),
 );
 
-export const UserProfileDropdown = memo(function UserProfileDropdown({
-  activeCall,
-  communities = [],
-  conversations = [],
-  identityNames = {},
-  identityPictures = {},
-  identityProfiles = {},
-  nodeNetworks,
-  onCallEnd,
-  onCallParticipantScreenShareVolumeChange,
-  onCallParticipantVolumeChange,
-  onCallRetryMicrophone,
-  onCallRetryConnection,
-  onCallScreenShareQualityChange,
-  onCallToggleCamera,
-  onCallToggleDeafen,
-  onCallToggleMute,
-  onCallToggleMediaEncryption,
-  onCallToggleNoiseCancellation,
-  onCallToggleScreenShare,
-  onLogout,
-  onPresenceChange,
-  onPresenceStatusSelected,
-  onSessionUpdated,
-  presence,
-  session,
-}: {
+type UserProfileDropdownProps = {
   communities?: Community[];
   conversations?: ConversationResource[];
   identityNames?: IdentityNames;
@@ -116,46 +90,332 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
   onCallRetryMicrophone?: () => void;
   onCallRetryConnection?: () => void;
   onCallToggleScreenShare?: () => void;
+};
+
+function requireAll<T extends Record<string, unknown>>(values: T) {
+  const entries = Object.entries(values);
+
+  if (entries.some(([, value]) => !value)) return null;
+
+  return Object.fromEntries(entries) as {
+    [K in keyof T]-?: NonNullable<T[K]>;
+  };
+}
+
+function ProfileCallBar({
+  activeCall,
+  onCallEnd,
+  onCallParticipantScreenShareVolumeChange,
+  onCallParticipantVolumeChange,
+  onCallRetryConnection,
+  onCallRetryMicrophone,
+  onCallScreenShareQualityChange,
+  onCallToggleCamera,
+  onCallToggleDeafen,
+  onCallToggleMediaEncryption,
+  onCallToggleMute,
+  onCallToggleNoiseCancellation,
+  onCallToggleScreenShare,
+}: Pick<
+  UserProfileDropdownProps,
+  | 'activeCall'
+  | 'onCallEnd'
+  | 'onCallParticipantScreenShareVolumeChange'
+  | 'onCallParticipantVolumeChange'
+  | 'onCallRetryConnection'
+  | 'onCallRetryMicrophone'
+  | 'onCallScreenShareQualityChange'
+  | 'onCallToggleCamera'
+  | 'onCallToggleDeafen'
+  | 'onCallToggleMediaEncryption'
+  | 'onCallToggleMute'
+  | 'onCallToggleNoiseCancellation'
+  | 'onCallToggleScreenShare'
+>) {
+  const handlers = requireAll({
+    onEnd: onCallEnd,
+    onParticipantScreenShareVolumeChange:
+      onCallParticipantScreenShareVolumeChange,
+    onParticipantVolumeChange: onCallParticipantVolumeChange,
+    onRetryConnection: onCallRetryConnection,
+    onRetryMicrophone: onCallRetryMicrophone,
+    onScreenShareQualityChange: onCallScreenShareQualityChange,
+    onToggleCamera: onCallToggleCamera,
+    onToggleDeafen: onCallToggleDeafen,
+    onToggleMediaEncryption: onCallToggleMediaEncryption,
+    onToggleMute: onCallToggleMute,
+    onToggleNoiseCancellation: onCallToggleNoiseCancellation,
+    onToggleScreenShare: onCallToggleScreenShare,
+  });
+
+  if (!activeCall || !handlers) return null;
+
+  return (
+    <div className="relative z-30">
+      <Suspense fallback={null}>
+        <GlobalCallBar call={activeCall} {...handlers} />
+      </Suspense>
+    </div>
+  );
+}
+
+function ownProfileView(
+  session: Session,
+  identityNames: IdentityNames,
+  identityPictures: IdentityPictures,
+) {
+  const { identity } = session;
+  const handle = identity.profile.handle?.trim();
+
+  return {
+    handle: handle ? `@${handle}` : shortId(identity.id),
+    name:
+      identity.profile.name.trim() ||
+      (handle ? `@${handle}` : identityDisplayName(identity.id, identityNames)),
+    picture: identityPictures[identity.id] ?? identityPicture(identity),
+  };
+}
+
+function ProfileMenuButton({
+  handle,
+  isOpen,
+  name,
+  onToggle,
+  picture,
+  presence,
+}: {
+  handle: string;
+  isOpen: boolean;
+  name: string;
+  onToggle: () => void;
+  picture?: string | null;
+  presence?: IdentityPresence;
 }) {
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [technicalDetailsVisible] = useTechnicalDetailsPreference();
-  const [profileEditorOpen, setProfileEditorOpen] = useState(false);
-  const [identityCopied, setIdentityCopied] = useState(false);
-  const [language, setLanguage] = useState<AppLanguage>(getInitialLanguage);
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="flex w-full items-center gap-3 rounded-lg bg-white/[0.07] p-3 text-left transition hover:bg-white/10"
+      aria-expanded={isOpen}
+      data-testid="own-profile-menu-button"
+    >
+      <ProfileAvatar
+        label={name}
+        picture={picture}
+        presence={presence}
+        size="lg"
+      />
+      <div className="min-w-0 flex-1">
+        <div className="truncate font-black">{name}</div>
+        <div className="truncate text-xs text-white/50">{handle}</div>
+      </div>
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 20 20"
+        fill="none"
+        className={cx(
+          'h-5 w-5 shrink-0 text-white/45 transition-transform',
+          isOpen && 'rotate-180',
+        )}
+      >
+        <path
+          d="M5 8l5 5 5-5"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.8"
+        />
+      </svg>
+    </button>
+  );
+}
+
+function ProfileTechnicalDetails({
+  copied,
+  onCopyIdentityId,
+  session,
+  visible,
+}: {
+  copied: boolean;
+  onCopyIdentityId: () => void;
+  session: Session;
+  visible: boolean;
+}) {
+  if (!visible) return null;
+
+  return (
+    <>
+      <div>
+        <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
+          {copy.profile.identityId}
+        </div>
+        <div className="ui-list-row py-2">
+          <span className="min-w-0 flex-1 truncate text-white/70">
+            {session.identity.id}
+          </span>
+          <button
+            type="button"
+            onClick={onCopyIdentityId}
+            className="ui-button min-h-0 shrink-0 px-2.5 py-1.5 text-xs"
+          >
+            {copied ? copy.profile.copied : copy.profile.copy}
+          </button>
+        </div>
+      </div>
+      <div>
+        <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
+          {copy.profile.versions}
+        </div>
+        <div className="divide-y divide-white/[0.07] border-y border-white/[0.07]">
+          <ProfileVersionRow
+            href={
+              session.identity.identityExternalIdentifier
+                ? ipfsUrl(session.identity.identityExternalIdentifier)
+                : undefined
+            }
+            label={copy.profile.identityVersion}
+            value={formatProfileVersion(session.identity.version)}
+            detail={formatProfileVersionDate(session.identity.timestamp)}
+          />
+          <ProfileVersionRow
+            href={
+              session.keychainExternalIdentifier
+                ? ipfsUrl(session.keychainExternalIdentifier)
+                : undefined
+            }
+            label={copy.profile.keychainVersion}
+            value={formatProfileVersion(session.keychain.version)}
+            detail={formatProfileVersionDate(session.keychain.timestamp)}
+          />
+        </div>
+      </div>
+    </>
+  );
+}
+
+function ProfileMenuPanel({
+  forgetError,
+  identityCopied,
+  language,
+  onChangeLanguage,
+  onCopyIdentityId,
+  onEditProfile,
+  onForgetDevice,
+  onLogout,
+  onPresenceStatusChange,
+  presenceError,
+  presenceSaving,
+  presenceStatus,
+  session,
+  technicalDetailsVisible,
+}: {
+  forgetError: string | null;
+  identityCopied: boolean;
+  language: AppLanguage;
+  onChangeLanguage: (nextLanguage: string) => void;
+  onCopyIdentityId: () => void;
+  onEditProfile: () => void;
+  onForgetDevice: () => void;
+  onLogout: () => void;
+  onPresenceStatusChange: (nextStatus: string) => Promise<void>;
+  presenceError: string | null;
+  presenceSaving: boolean;
+  presenceStatus: SelectablePresenceStatus;
+  session: Session;
+  technicalDetailsVisible: boolean;
+}) {
+  return (
+    <div className="ui-dialog-surface absolute bottom-[calc(100%+.5rem)] left-0 right-0 z-40 p-3">
+      <div className="space-y-3 text-xs">
+        <div>
+          <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
+            {copy.presence.status}
+          </div>
+          <GlassSelect
+            ariaLabel={copy.presence.selectStatus}
+            disabled={presenceSaving}
+            onChange={(value) => void onPresenceStatusChange(value)}
+            options={presenceStatusOptions()}
+            value={presenceStatus}
+          />
+        </div>
+
+        {presenceError && (
+          <p className="ui-inline-notice border-rose-300/50 bg-rose-500/10 text-rose-100">
+            {presenceError}
+          </p>
+        )}
+
+        <ProfileTechnicalDetails
+          copied={identityCopied}
+          onCopyIdentityId={onCopyIdentityId}
+          session={session}
+          visible={technicalDetailsVisible}
+        />
+
+        <div>
+          <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
+            {copy.profile.language}
+          </div>
+          <GlassSelect
+            ariaLabel={copy.profile.language}
+            onChange={onChangeLanguage}
+            options={languageOptions}
+            value={language}
+          />
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={onEditProfile}
+        className="ui-button mt-4 w-full"
+        data-testid="edit-profile-button"
+      >
+        {copy.profile.edit}
+      </button>
+
+      <button
+        type="button"
+        onClick={onLogout}
+        className="ui-button ui-button-danger mt-2 w-full"
+      >
+        {copy.profile.logout}
+      </button>
+
+      <button
+        type="button"
+        onClick={onForgetDevice}
+        className="ui-button ui-button-danger mt-2 w-full"
+        data-testid="forget-device-button"
+      >
+        {copy.profile.forgetDevice}
+      </button>
+
+      {forgetError && (
+        <p className="ui-inline-notice border-rose-300/50 bg-rose-500/10 text-rose-100">
+          {forgetError}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function usePresenceStatusControl({
+  onPresenceChange,
+  onPresenceStatusSelected,
+  presence,
+  session,
+}: {
+  onPresenceChange?: (presence: IdentityPresence) => void;
+  onPresenceStatusSelected?: (status: SelectablePresenceStatus) => void;
+  presence?: IdentityPresence;
+  session: Session;
+}) {
   const [presenceStatus, setPresenceStatus] =
     useState<SelectablePresenceStatus>(selectablePresenceStatus(presence));
   const [presenceError, setPresenceError] = useState<string | null>(null);
   const [presenceSaving, setPresenceSaving] = useState(false);
-  const [forgetError, setForgetError] = useState<string | null>(null);
-  const profileRef = useRef<HTMLDivElement>(null);
-  const closeProfile = useCallback(() => setProfileOpen(false), []);
-  const ownProfileName =
-    session.identity.profile.name.trim() ||
-    (session.identity.profile.handle?.trim()
-      ? `@${session.identity.profile.handle.trim()}`
-      : identityDisplayName(session.identity.id, identityNames));
-  const ownProfileHandle = session.identity.profile.handle?.trim()
-    ? `@${session.identity.profile.handle.trim()}`
-    : shortId(session.identity.id);
-  const ownPicture =
-    identityPictures[session.identity.id] ?? identityPicture(session.identity);
-
-  const copyIdentityId = async () => {
-    if (navigator.clipboard) {
-      await navigator.clipboard.writeText(session.identity.id);
-    }
-
-    setIdentityCopied(true);
-    window.setTimeout(() => setIdentityCopied(false), 1800);
-  };
-
-  const changeLanguage = (nextLanguage: string) => {
-    const savedLanguage = saveLanguage(nextLanguage);
-
-    setLanguage(savedLanguage);
-
-    if (savedLanguage !== language) window.location.reload();
-  };
 
   useEffect(() => {
     if (!presence) return;
@@ -188,6 +448,23 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
     }
   };
 
+  return {
+    presenceError,
+    presenceSaving,
+    presenceStatus,
+    updatePresenceStatus,
+  };
+}
+
+function useForgetDeviceAndLogOut({
+  onLogout,
+  session,
+}: {
+  onLogout: () => void;
+  session: Session;
+}) {
+  const [forgetError, setForgetError] = useState<string | null>(null);
+
   const forgetDeviceAndLogOut = async () => {
     if (!window.confirm(copy.profile.forgetDeviceConfirm)) return;
 
@@ -202,9 +479,71 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
       return;
     }
 
-    clearSavedCredentials();
-    clearRememberedIdentityPreview();
+    deleteLegacyRememberedIdentityStorage();
     onLogout();
+  };
+
+  return { forgetDeviceAndLogOut, forgetError };
+}
+
+export const UserProfileDropdown = memo(function UserProfileDropdown({
+  activeCall,
+  communities = [],
+  conversations = [],
+  identityNames = {},
+  identityPictures = {},
+  identityProfiles = {},
+  nodeNetworks,
+  onCallEnd,
+  onCallParticipantScreenShareVolumeChange,
+  onCallParticipantVolumeChange,
+  onCallRetryConnection,
+  onCallRetryMicrophone,
+  onCallScreenShareQualityChange,
+  onCallToggleCamera,
+  onCallToggleDeafen,
+  onCallToggleMediaEncryption,
+  onCallToggleMute,
+  onCallToggleNoiseCancellation,
+  onCallToggleScreenShare,
+  onLogout,
+  onPresenceChange,
+  onPresenceStatusSelected,
+  onSessionUpdated,
+  presence,
+  session,
+}: UserProfileDropdownProps) {
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [technicalDetailsVisible] = useTechnicalDetailsPreference();
+  const [profileEditorOpen, setProfileEditorOpen] = useState(false);
+  const [identityCopied, setIdentityCopied] = useState(false);
+  const [language, setLanguage] = useState<AppLanguage>(getInitialLanguage);
+  const presenceControl = usePresenceStatusControl({
+    onPresenceChange,
+    onPresenceStatusSelected,
+    presence,
+    session,
+  });
+  const forgetControl = useForgetDeviceAndLogOut({ onLogout, session });
+  const profileRef = useRef<HTMLDivElement>(null);
+  const closeProfile = useCallback(() => setProfileOpen(false), []);
+  const ownProfile = ownProfileView(session, identityNames, identityPictures);
+
+  const copyIdentityId = async () => {
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(session.identity.id);
+    }
+
+    setIdentityCopied(true);
+    window.setTimeout(() => setIdentityCopied(false), 1800);
+  };
+
+  const changeLanguage = (nextLanguage: string) => {
+    const savedLanguage = saveLanguage(nextLanguage);
+
+    setLanguage(savedLanguage);
+
+    if (savedLanguage !== language) window.location.reload();
   };
 
   useCloseOnOutsidePointerDown({
@@ -215,200 +554,49 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
 
   return (
     <div ref={profileRef} className="relative mt-4 shrink-0">
-      {activeCall &&
-        onCallEnd &&
-        onCallParticipantScreenShareVolumeChange &&
-        onCallParticipantVolumeChange &&
-        onCallScreenShareQualityChange &&
-        onCallToggleCamera &&
-        onCallToggleDeafen &&
-        onCallToggleMute &&
-        onCallToggleMediaEncryption &&
-        onCallToggleNoiseCancellation &&
-        onCallRetryMicrophone &&
-        onCallRetryConnection &&
-        onCallToggleScreenShare && (
-          <div className="relative z-30">
-            <Suspense fallback={null}>
-              <GlobalCallBar
-                call={activeCall}
-                onEnd={onCallEnd}
-                onParticipantScreenShareVolumeChange={
-                  onCallParticipantScreenShareVolumeChange
-                }
-                onParticipantVolumeChange={onCallParticipantVolumeChange}
-                onScreenShareQualityChange={onCallScreenShareQualityChange}
-                onToggleCamera={onCallToggleCamera}
-                onToggleDeafen={onCallToggleDeafen}
-                onToggleMute={onCallToggleMute}
-                onToggleMediaEncryption={onCallToggleMediaEncryption}
-                onToggleNoiseCancellation={onCallToggleNoiseCancellation}
-                onRetryMicrophone={onCallRetryMicrophone}
-                onRetryConnection={onCallRetryConnection}
-                onToggleScreenShare={onCallToggleScreenShare}
-              />
-            </Suspense>
-          </div>
-        )}
-      <button
-        type="button"
-        onClick={() => setProfileOpen((isOpen) => !isOpen)}
-        className="flex w-full items-center gap-3 rounded-lg bg-white/[0.07] p-3 text-left transition hover:bg-white/10"
-        aria-expanded={profileOpen}
-        data-testid="own-profile-menu-button"
-      >
-        <ProfileAvatar
-          label={ownProfileName}
-          picture={ownPicture}
-          presence={presence}
-          size="lg"
-        />
-        <div className="min-w-0 flex-1">
-          <div className="truncate font-black">{ownProfileName}</div>
-          <div className="truncate text-xs text-white/50">
-            {ownProfileHandle}
-          </div>
-        </div>
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 20 20"
-          fill="none"
-          className={cx(
-            'h-5 w-5 shrink-0 text-white/45 transition-transform',
-            profileOpen && 'rotate-180',
-          )}
-        >
-          <path
-            d="M5 8l5 5 5-5"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.8"
-          />
-        </svg>
-      </button>
+      <ProfileCallBar
+        activeCall={activeCall}
+        onCallEnd={onCallEnd}
+        onCallParticipantScreenShareVolumeChange={
+          onCallParticipantScreenShareVolumeChange
+        }
+        onCallParticipantVolumeChange={onCallParticipantVolumeChange}
+        onCallRetryConnection={onCallRetryConnection}
+        onCallRetryMicrophone={onCallRetryMicrophone}
+        onCallScreenShareQualityChange={onCallScreenShareQualityChange}
+        onCallToggleCamera={onCallToggleCamera}
+        onCallToggleDeafen={onCallToggleDeafen}
+        onCallToggleMediaEncryption={onCallToggleMediaEncryption}
+        onCallToggleMute={onCallToggleMute}
+        onCallToggleNoiseCancellation={onCallToggleNoiseCancellation}
+        onCallToggleScreenShare={onCallToggleScreenShare}
+      />
+      <ProfileMenuButton
+        handle={ownProfile.handle}
+        isOpen={profileOpen}
+        name={ownProfile.name}
+        onToggle={() => setProfileOpen((isOpen) => !isOpen)}
+        picture={ownProfile.picture}
+        presence={presence}
+      />
 
       {profileOpen && (
-        <div className="ui-dialog-surface absolute bottom-[calc(100%+.5rem)] left-0 right-0 z-40 p-3">
-          <div className="space-y-3 text-xs">
-            <div>
-              <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
-                {copy.presence.status}
-              </div>
-              <GlassSelect
-                ariaLabel={copy.presence.selectStatus}
-                disabled={presenceSaving}
-                onChange={(value) => void updatePresenceStatus(value)}
-                options={presenceStatusOptions()}
-                value={presenceStatus}
-              />
-            </div>
-
-            {presenceError && (
-              <p className="ui-inline-notice border-rose-300/50 bg-rose-500/10 text-rose-100">
-                {presenceError}
-              </p>
-            )}
-
-            {technicalDetailsVisible ? (
-              <div>
-                <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
-                  {copy.profile.identityId}
-                </div>
-                <div className="ui-list-row py-2">
-                  <span className="min-w-0 flex-1 truncate text-white/70">
-                    {session.identity.id}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={copyIdentityId}
-                    className="ui-button min-h-0 shrink-0 px-2.5 py-1.5 text-xs"
-                  >
-                    {identityCopied ? copy.profile.copied : copy.profile.copy}
-                  </button>
-                </div>
-              </div>
-            ) : null}
-
-            {technicalDetailsVisible ? (
-              <div>
-                <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
-                  {copy.profile.versions}
-                </div>
-                <div className="divide-y divide-white/[0.07] border-y border-white/[0.07]">
-                  <ProfileVersionRow
-                    href={
-                      session.identity.identityExternalIdentifier
-                        ? ipfsUrl(session.identity.identityExternalIdentifier)
-                        : undefined
-                    }
-                    label={copy.profile.identityVersion}
-                    value={formatProfileVersion(session.identity.version)}
-                    detail={formatProfileVersionDate(
-                      session.identity.timestamp,
-                    )}
-                  />
-                  <ProfileVersionRow
-                    href={
-                      session.keychainExternalIdentifier
-                        ? ipfsUrl(session.keychainExternalIdentifier)
-                        : undefined
-                    }
-                    label={copy.profile.keychainVersion}
-                    value={formatProfileVersion(session.keychain.version)}
-                    detail={formatProfileVersionDate(
-                      session.keychain.timestamp,
-                    )}
-                  />
-                </div>
-              </div>
-            ) : null}
-
-            <div>
-              <div className="mb-1 font-black uppercase tracking-[0.16em] text-white/35">
-                {copy.profile.language}
-              </div>
-              <GlassSelect
-                ariaLabel={copy.profile.language}
-                onChange={changeLanguage}
-                options={languageOptions}
-                value={language}
-              />
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setProfileEditorOpen(true)}
-            className="ui-button mt-4 w-full"
-            data-testid="edit-profile-button"
-          >
-            {copy.profile.edit}
-          </button>
-
-          <button
-            type="button"
-            onClick={onLogout}
-            className="ui-button ui-button-danger mt-2 w-full"
-          >
-            {copy.profile.logout}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => void forgetDeviceAndLogOut()}
-            className="ui-button ui-button-danger mt-2 w-full"
-            data-testid="forget-device-button"
-          >
-            {copy.profile.forgetDevice}
-          </button>
-
-          {forgetError && (
-            <p className="ui-inline-notice border-rose-300/50 bg-rose-500/10 text-rose-100">
-              {forgetError}
-            </p>
-          )}
-        </div>
+        <ProfileMenuPanel
+          forgetError={forgetControl.forgetError}
+          identityCopied={identityCopied}
+          language={language}
+          onChangeLanguage={changeLanguage}
+          onCopyIdentityId={copyIdentityId}
+          onEditProfile={() => setProfileEditorOpen(true)}
+          onForgetDevice={() => void forgetControl.forgetDeviceAndLogOut()}
+          onLogout={onLogout}
+          onPresenceStatusChange={presenceControl.updatePresenceStatus}
+          presenceError={presenceControl.presenceError}
+          presenceSaving={presenceControl.presenceSaving}
+          presenceStatus={presenceControl.presenceStatus}
+          session={session}
+          technicalDetailsVisible={technicalDetailsVisible}
+        />
       )}
 
       {profileEditorOpen && (
@@ -416,7 +604,7 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
           <ProfileEditor
             communities={communities}
             conversations={conversations}
-            currentPicture={ownPicture}
+            currentPicture={ownProfile.picture}
             identityNames={identityNames}
             identityProfiles={identityProfiles}
             nodeNetworks={nodeNetworks}

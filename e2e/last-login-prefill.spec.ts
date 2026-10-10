@@ -7,13 +7,13 @@ import {
   type TestIdentity,
 } from './support/pigeonApp';
 
-test('unlocks a remembered local device with its password after reload', async ({
+test('prefills the last login identity after reload and still requires the password', async ({
   browser,
 }, testInfo) => {
   const token = testRunToken(testInfo.project.name);
   const identity: TestIdentity = {
-    handle: `remember${token}`,
-    name: `Remember ${token}`,
+    handle: `prefill${token}`,
+    name: `Prefill ${token}`,
     password: `P455uruD3su!${token}`,
   };
   const page = await newIsolatedPage(browser);

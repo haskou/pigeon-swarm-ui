@@ -199,7 +199,6 @@ async function createCallContext(
   await context.addInitScript(() => {
     window.localStorage.setItem('pigeon-swarm-language-v2', 'en');
     window.localStorage.setItem('pigeon-swarm-language-explicit-v3', 'true');
-    window.localStorage.removeItem('pigeon-swarm-credentials');
 
     const nativePeerConnection = window.RTCPeerConnection;
     const snapshots: PeerConnectionSnapshot[] = [];

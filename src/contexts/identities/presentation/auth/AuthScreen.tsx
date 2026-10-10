@@ -22,11 +22,6 @@ import {
   loadLastLoginIdentity,
   saveLastLoginIdentity,
 } from '../../infrastructure/storage/lastLoginIdentity';
-import {
-  clearSavedCredentials,
-  loadSavedCredentials,
-  saveCredentials,
-} from '../../infrastructure/storage/savedCredentials';
 import { useIdentityPreview } from '../hooks/useIdentityPreview';
 import { AuthFormFields } from './AuthFormFields';
 import {
@@ -35,7 +30,7 @@ import {
   normalizeIdentityLogin,
   registrationNetworks,
 } from './authFormRules';
-import { AuthSwitch, RecoveryKeyPanel } from './AuthSecurityControls';
+import { RecoveryKeyPanel } from './AuthSecurityControls';
 import {
   isValidPassword,
   normalizeHandleInput,
@@ -88,7 +83,6 @@ export function AuthScreen({
   const [pairingDraft, setPairingDraft] =
     useState<DevicePairingRequestDraft | null>(null);
   const [pairingVerificationCode, setPairingVerificationCode] = useState('');
-  const [rememberMe, setRememberMe] = useState(true);
   const [state, setState] = useState<LoadState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [loginProgressStep, setLoginProgressStep] =
@@ -121,15 +115,6 @@ export function AuthScreen({
       setSelectedNetwork(availableNetworks[0].id);
     }
   }, [availableNetworks, selectedNetwork]);
-
-  useEffect(() => {
-    const savedCredentials = loadSavedCredentials();
-
-    if (savedCredentials) {
-      setIdentityId(savedCredentials.identityId);
-      setRememberMe(true);
-    }
-  }, []);
 
   useEffect(() => {
     const lookup = normalizeIdentityLogin(identityId);
@@ -246,14 +231,6 @@ export function AuthScreen({
             );
 
       saveLastLoginIdentity(result.session.identity.id);
-
-      if (rememberMe) {
-        saveCredentials({
-          identityId: result.session.identity.id,
-        });
-      } else {
-        clearSavedCredentials();
-      }
 
       onAuthenticated(result.session, result.conversations);
     } catch (caught) {
@@ -404,7 +381,6 @@ export function AuthScreen({
               <LoginIdentityPreview
                 onClear={() => {
                   clearLastLoginIdentity();
-                  clearSavedCredentials();
                   setIdentityId('');
                   setIdentityPreviewLookup('');
                 }}
@@ -498,26 +474,6 @@ export function AuthScreen({
                 )}
               </>
             )}
-          </div>
-
-          <div className="mt-6 flex items-center gap-3 px-1 py-2">
-            <button
-              type="button"
-              id="remember-me"
-              aria-pressed={rememberMe}
-              onClick={() => setRememberMe(!rememberMe)}
-              className="shrink-0 focus:outline-none"
-            >
-              <AuthSwitch enabled={rememberMe} />
-            </button>
-            <label
-              htmlFor="remember-me"
-              className="block min-w-0 cursor-pointer text-sm text-white/60"
-            >
-              <span className="block font-bold text-white/70">
-                {copy.auth.rememberMe}
-              </span>
-            </label>
           </div>
 
           {error && (

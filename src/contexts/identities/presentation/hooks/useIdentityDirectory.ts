@@ -11,7 +11,6 @@ import type {
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { ConversationPeer } from '../../../conversations/presentation/view-models/ConversationPeer';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
-import { saveRememberedIdentityPreview } from '../../infrastructure/storage/rememberedIdentityPreview';
 import {
   identityName,
   identityPicture,
@@ -223,9 +222,6 @@ export function useIdentityDirectory({
 
   useEffect(() => {
     rememberIdentity(session.identity);
-    void rememberSessionIdentityPreview(session.identity).catch(
-      () => undefined,
-    );
   }, [rememberIdentity, session.identity]);
 
   useEffect(() => {
@@ -330,52 +326,4 @@ async function loadIdentityPicture(
   );
 
   return publicFileObjectUrl(content);
-}
-
-async function rememberSessionIdentityPreview(
-  identity: IdentityResource,
-): Promise<void> {
-  const pictureUrl = await loadRememberedIdentityPicture(identity);
-
-  saveRememberedIdentityPreview({
-    identityId: identity.id,
-    name: identityName(identity) ?? identity.id,
-    pictureUrl,
-  });
-}
-
-async function loadRememberedIdentityPicture(
-  identity: IdentityResource,
-): Promise<string | null> {
-  const directPicture = identityPicture(identity);
-
-  if (directPicture) return directPicture;
-
-  const pictureCid = identity.profile.picture?.trim();
-
-  if (!pictureCid) return null;
-
-  const content = await applicationContainer.attachments.getPublicFile(
-    pictureCid,
-  );
-
-  return await blobToDataUrl(content.blob);
-}
-
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.addEventListener('error', () => reject(reader.error));
-    reader.addEventListener('load', () => {
-      if (typeof reader.result === 'string') {
-        resolve(reader.result);
-
-        return;
-      }
-
-      reject(new Error('Could not read identity picture preview.'));
-    });
-    reader.readAsDataURL(blob);
-  });
 }
