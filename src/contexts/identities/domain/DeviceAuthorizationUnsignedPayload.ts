@@ -3,6 +3,7 @@ import type { DeviceAuthorizationOperation } from './DeviceAuthorizationOperatio
 export type DeviceAuthorizationUnsignedPayload = {
   authorCredential?: string;
   authorizedAt?: number;
+  compromisedSince?: number;
   epoch: string;
   identityId: string;
   operation: DeviceAuthorizationOperation;

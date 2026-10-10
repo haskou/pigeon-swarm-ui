@@ -10,6 +10,7 @@ import { DeviceAuthorizationTransition } from '../../../../../contexts/identitie
 import { DeviceAuthorizationEpoch } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationOperationId } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationOperationId';
 import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
+import { DeviceCredential } from '../../../../../contexts/identities/domain/value-objects/DeviceCredential';
 import { DeviceId } from '../../../../../contexts/identities/domain/value-objects/DeviceId';
 import { DevicePairingCode } from '../../../../../contexts/identities/domain/value-objects/DevicePairingCode';
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
@@ -335,5 +336,106 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
         DevicePairingCode.fromString(authorized.completion.toCode().valueOf()),
       ),
     ).rejects.toThrow('already used');
+  });
+
+  describe('device management', () => {
+    async function managed(
+      responses: Array<(identityId: IdentityId) => unknown>,
+    ) {
+      const { identityId, session } = await fixture();
+      const http = { request: jest.fn() } as unknown as HttpJsonClient;
+
+      for (const response of responses) {
+        (http.request as jest.Mock).mockResolvedValueOnce(response(identityId));
+      }
+      const signer = {
+        headers: jest.fn().mockResolvedValue({ 'X-Signature': 'signed' }),
+        headersWithDeviceProof: jest.fn().mockResolvedValue({}),
+      } as unknown as RequestSigner;
+      const vault = {
+        advanceAuthorization: jest.fn(),
+      } as unknown as DeviceIdentityVault;
+
+      return {
+        api: new PigeonDeviceAuthorizationApi(http, signer, vault),
+        http: http.request as jest.Mock,
+        identityId,
+        session: {
+          ...session,
+          authorizationRevision: DeviceAuthorizationRevision.fromNumber(3),
+        } as Session,
+      };
+    }
+    const checkpoint = (revision: number) => (identityId: IdentityId) => ({
+      epoch: 'genesis',
+      identityId: identityId.valueOf(),
+      revision,
+    });
+
+    it('lists the owner devices as credentials', async () => {
+      const other = await KeyPair.generate();
+      const { api, http, session } = await managed([
+        (identityId: IdentityId) => ({
+          credentials: [
+            IdentityId.fromString(other.toPrimitives().publicKey).valueOf(),
+          ],
+          epoch: 'genesis',
+          identityId: identityId.valueOf(),
+          revision: 3,
+        }),
+      ]);
+
+      const devices = await api.findDevices(session);
+
+      expect(http.mock.calls[0][0]).toMatch(/\/devices$/);
+      expect(devices.map((device) => device.valueOf())).toEqual([
+        other.toPrimitives().publicKey,
+      ]);
+    });
+
+    it('submits a revocation carrying the compromise revision', async () => {
+      const target = await KeyPair.generate();
+      const { api, http, session } = await managed([
+        checkpoint(3),
+        checkpoint(4),
+      ]);
+
+      const next = await api.revokeDevice(
+        session,
+        DeviceCredential.fromString(target.toPrimitives().publicKey),
+        DeviceAuthorizationRevision.fromNumber(1),
+      );
+      const body = JSON.parse(http.mock.calls[1][1].body);
+
+      expect(body).toMatchObject({
+        compromisedSince: 1,
+        operation: 'revoke',
+        previousRevision: 3,
+        targetCredential: target.toPrimitives().publicKey,
+      });
+      expect(next.authorizationRevision.valueOf()).toBe(4);
+    });
+
+    it('refuses to revoke itself or a frontier in the future', async () => {
+      const target = await KeyPair.generate();
+      const { api, http, session } = await managed([checkpoint(3)]);
+
+      await expect(
+        api.revokeDevice(
+          session,
+          DeviceCredential.fromString(
+            session.deviceCredentialKeyPair.toPrimitives().publicKey,
+          ),
+        ),
+      ).rejects.toThrow('cannot revoke itself');
+      await expect(
+        api.revokeDevice(
+          session,
+          DeviceCredential.fromString(target.toPrimitives().publicKey),
+          DeviceAuthorizationRevision.fromNumber(9),
+        ),
+      ).rejects.toThrow('in the future');
+      expect(http).toHaveBeenCalledTimes(1);
+    });
   });
 });

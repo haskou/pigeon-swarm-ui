@@ -48,6 +48,7 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
+import { DeviceManagementDialog } from './DeviceManagementDialog';
 import { DevicePairingDialog } from './DevicePairingDialog';
 import { ProfileKeychainSection } from './ProfileKeychainSection';
 
@@ -95,6 +96,7 @@ export function ProfileEditor({
   const [currentPassword, setCurrentPassword] = useState('');
   const [passwordSectionOpen, setPasswordSectionOpen] = useState(false);
   const [devicePairingOpen, setDevicePairingOpen] = useState(false);
+  const [deviceManagementOpen, setDeviceManagementOpen] = useState(false);
   const [pairedSession, setPairedSession] = useState<Session | null>(null);
   const [activeSection, setActiveSection] =
     useState<ProfileEditorSection>('profile');
@@ -561,6 +563,14 @@ export function ProfileEditor({
                         >
                           {copy.profile.devicePairingAction}
                         </button>
+                        <button
+                          className="ui-button mt-2 w-full"
+                          data-testid="profile-manage-devices"
+                          onClick={() => setDeviceManagementOpen(true)}
+                          type="button"
+                        >
+                          {copy.profile.deviceManageAction}
+                        </button>
                         <p className="mt-2 text-xs font-semibold leading-relaxed text-white/45">
                           {copy.profile.devicePairingHelp}
                         </p>
@@ -635,6 +645,19 @@ export function ProfileEditor({
             }}
           />
         </Suspense>
+      )}
+      {deviceManagementOpen && (
+        <DeviceManagementDialog
+          onClose={() => {
+            setDeviceManagementOpen(false);
+
+            if (pairedSession) {
+              onUpdated(pairedSession, { passwordChanged: false });
+            }
+          }}
+          onSessionUpdated={setPairedSession}
+          session={pairedSession ?? session}
+        />
       )}
       {devicePairingOpen && (
         <DevicePairingDialog

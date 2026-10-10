@@ -709,7 +709,6 @@ export const en = {
   },
   encryption: {
     algorithm: 'Algorithm',
-    mlsCiphersuite: 'MLS · X25519 / AES-128-GCM / Ed25519',
     communityNote:
       'Community messages are encrypted end to end with MLS (RFC 9420). Members who join later cannot read earlier messages, and removed members cannot read new ones.',
     communityTitle: 'Community encryption',
@@ -723,6 +722,7 @@ export const en = {
     missing: 'Encryption key missing',
     missingNote:
       'The key is not available in your keychain, so encrypted content cannot be decrypted here.',
+    mlsCiphersuite: 'MLS · X25519 / AES-128-GCM / Ed25519',
     network: 'Network',
     peerIdentity: 'Peer identity',
     plaintext: 'Plaintext',
@@ -859,6 +859,8 @@ export const en = {
   },
   messages: {
     addReaction: 'Add reaction',
+    awaitingGroupAccess:
+      'This device is not in the encrypted group yet. An online member will add it shortly; you will read messages sent from that moment on.',
     cancelEdit: 'Cancel edit',
     cancelReply: 'Cancel reply',
     copy: 'Copy text',
@@ -872,8 +874,6 @@ export const en = {
     editing: 'Editing message',
     emptyPins: 'No pinned messages yet.',
     emptyThread: 'This thread has no replies yet.',
-    awaitingGroupAccess:
-      'This device is not in the encrypted group yet. An online member will add it shortly; you will read messages sent from that moment on.',
     missingConversationKey:
       'This conversation key is missing from the keychain.',
     missingKey:
@@ -1089,6 +1089,8 @@ export const en = {
     close: 'Close notifications',
     community: 'Community',
     communityInvitationTitle: 'Community invitation',
+    communityInviteBody:
+      'Accepting adds you to the community. An online member then adds this device to the encrypted group; you will read messages sent from that moment on.',
     communityInviteKeyTitle: 'You were invited to this community',
     communityJoinRequestTitle: 'Join request',
     communityMembershipInvitationTitle: 'Community membership invitation',
@@ -1117,8 +1119,6 @@ export const en = {
     invitationTitle: 'Conversation invitation',
     invitedBy: 'Invited by',
     inviteKeyAction: 'Add key and continue',
-    communityInviteBody:
-      'Accepting adds you to the community. An online member then adds this device to the encrypted group; you will read messages sent from that moment on.',
     inviteKeyBody:
       'This invitation includes a key encrypted for your identity. Accepting it adds the key to your keychain so you can read and send messages.',
     inviteKeyInvitedBy: 'Invited by',
@@ -1250,6 +1250,16 @@ export const en = {
     currentPassword: 'Current password',
     currentPasswordForPasskeyHelp:
       'The current password and recovery key are verified before creating local unlock. They are not saved.',
+    deviceCompromiseFromLabel: 'Distrust it since revision',
+    deviceCompromiseHelp:
+      'Everything this device signed from that revision on is rejected, even if it was authorized then. Use 1 to distrust it completely. Revision {revision} is the latest.',
+    deviceCurrent: 'This device',
+    deviceListEmpty: 'No other devices are authorized.',
+    deviceListError: 'The device list could not be loaded.',
+    deviceManageAction: 'Manage devices',
+    deviceManageHelp:
+      'Lists the devices that can act as you. Revoking stops it from signing anything new; it does not delete data already stored on it or copies other people retained.',
+    deviceManageTitle: 'Your devices',
     devicePairingAction: 'Add another device',
     devicePairingAuthorize: 'Authorize device',
     devicePairingCompletionCodeLabel:
@@ -1272,6 +1282,12 @@ export const en = {
     devicePairingTitle: 'Add a device',
     devicePairingVerificationHelp:
       'Confirm this code is identical on the new device before authorizing. If it differs, close this dialog.',
+    deviceRetire: 'Retire',
+    deviceRetireConfirm:
+      'This device stops being authorized as soon as the revocation is accepted. Its earlier activity stays valid.',
+    deviceRevokeCompromised: 'Revoke as compromised',
+    deviceRevokeConfirm: 'Confirm revocation',
+    deviceRevokeError: 'The device could not be revoked.',
     discardChanges: 'Discard',
     discardChangesBody:
       'There are unsaved changes. Do you want to discard them?',

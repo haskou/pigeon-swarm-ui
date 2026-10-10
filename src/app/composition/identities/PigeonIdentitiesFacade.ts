@@ -1,5 +1,7 @@
 import type { LoginIdentityProgressReporter } from '../../../contexts/identities/application/login-identity/LoginIdentityProgressReporter';
 import type { DevicePairingRequestDraft } from '../../../contexts/identities/domain/DevicePairingRequestDraft';
+import type { DeviceAuthorizationRevision } from '../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
+import type { DeviceCredential } from '../../../contexts/identities/domain/value-objects/DeviceCredential';
 import type { IdentityAccessContexts } from '../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
 import type { IdentityMapper } from '../../../contexts/identities/infrastructure/http/IdentityMapper';
 import type { IdentityPresenceMapper } from '../../../contexts/identities/infrastructure/http/IdentityPresenceMapper';
@@ -76,6 +78,18 @@ export class PigeonIdentitiesFacade {
     requestCode: DevicePairingCode,
   ): Promise<{ completionCode: DevicePairingCode; session: Session }> {
     return await this.gateway.authorizeDevicePairing(session, requestCode);
+  }
+
+  public async listDevices(session: Session): Promise<DeviceCredential[]> {
+    return await this.gateway.listDevices(session);
+  }
+
+  public async revokeDevice(
+    session: Session,
+    target: DeviceCredential,
+    compromisedSince?: DeviceAuthorizationRevision,
+  ): Promise<Session> {
+    return await this.gateway.revokeDevice(session, target, compromisedSince);
   }
 
   public async completeDevicePairing(
