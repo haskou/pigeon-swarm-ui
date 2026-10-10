@@ -41,6 +41,7 @@ const community = (overrides: Partial<Community> = {}): Community => ({
 
 const identities: Record<string, IdentityResource> = {
   'member-a': {
+    admissionNonce: '0',
     authorizationRevision: 0,
     deviceCredential: 'device-credential',
     deviceCredentialCommitment: 'device-credential-commitment',

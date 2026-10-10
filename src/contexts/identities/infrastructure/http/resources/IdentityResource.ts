@@ -1,4 +1,5 @@
 export type IdentityResource = {
+  admissionNonce: string;
   authorizationRevision: number;
   deviceCredential: string;
   deviceCredentialCommitment: string;

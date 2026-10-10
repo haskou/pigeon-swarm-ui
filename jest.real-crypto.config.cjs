@@ -19,6 +19,10 @@ module.exports = {
     '**/CallEventSigner.spec.ts',
     '**/MlsGroup.spec.ts',
     '**/MlsCommunityEngine.spec.ts',
+    '**/IdentityAdmissionProof.spec.ts',
+    '**/PigeonApiGateway.spec.ts',
+    '**/PigeonIdentityCommandsApi.spec.ts',
+    '**/IdentitySignaturePayloadFactory.spec.ts',
   ],
   testPathIgnorePatterns: [],
   transform: {

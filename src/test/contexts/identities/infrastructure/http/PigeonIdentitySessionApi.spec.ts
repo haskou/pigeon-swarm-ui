@@ -17,6 +17,7 @@ import { PigeonIdentitySessionApi } from '../../../../../contexts/identities/inf
 
 function identity(id: string): IdentityResource {
   return {
+    admissionNonce: '0',
     authorizationRevision: 0,
     deviceCredential: 'device-credential',
     deviceCredentialCommitment: 'device-commitment',

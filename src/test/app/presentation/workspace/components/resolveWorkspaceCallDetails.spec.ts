@@ -64,6 +64,7 @@ function emptyKeychain(): LocalKeychain {
 
 function identity(id: string, name: string): IdentityResource {
   return {
+    admissionNonce: '0',
     authorizationRevision: 0,
     deviceCredential: 'device-credential',
     deviceCredentialCommitment: 'device-credential-commitment',

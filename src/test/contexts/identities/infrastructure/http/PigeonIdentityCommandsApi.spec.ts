@@ -19,6 +19,7 @@ import { PigeonIdentityGateway } from '../../../../../contexts/identities/infras
 
 function identity(overrides: Partial<IdentityResource> = {}): IdentityResource {
   return {
+    admissionNonce: '0',
     authorizationRevision: 0,
     deviceCredential: 'device-credential',
     deviceCredentialCommitment: 'device-credential-commitment',
