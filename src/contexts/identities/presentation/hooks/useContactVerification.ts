@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
+import { contactPinStore } from '../../../../app/composition/applicationContainer';
 import { SafetyNumber } from '../../infrastructure/crypto/SafetyNumber';
-import { contactPinStore } from '../view-models/contactPins';
 
 export type ContactVerification = {
   markVerified: () => boolean;

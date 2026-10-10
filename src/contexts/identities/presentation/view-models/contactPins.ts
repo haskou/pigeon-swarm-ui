@@ -1,10 +1,8 @@
 import type { IdentityResource } from '../../../../shared/domain/pigeonResources.types';
 import type { ContactKeyCheck } from '../../domain/ContactPins';
 
+import { contactPinStore } from '../../../../app/composition/applicationContainer';
 import { checkContactKey } from '../../domain/ContactPins';
-import { ContactPinStore } from '../../infrastructure/storage/ContactPinStore';
-
-export const contactPinStore = new ContactPinStore();
 
 export function checkIdentityContact(
   localIdentityId: string,
