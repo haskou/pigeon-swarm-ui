@@ -636,6 +636,32 @@ export const es = {
     retry: 'Reintentar conexión',
     title: 'Sin conexión con el servidor',
   },
+  contacts: {
+    changedAcknowledge:
+      'Entiendo que este nombre de usuario ahora pertenece a otra identidad.',
+    changedBody:
+      'El nombre de usuario {handle} ahora corresponde a una identidad distinta de la que tenías antes. Puede ser una cuenta nueva o alguien pudo haberse apropiado del nombre.',
+    changedTitle: 'Este nombre de usuario ahora apunta a otra identidad',
+    changedUnverified:
+      'No habías verificado el contacto anterior, así que puedes continuar.',
+    changedVerified:
+      'Habías verificado el contacto anterior. Compara los números de seguridad con esta persona antes de continuar.',
+    markVerified: 'Marcar como verificado',
+    removeVerification: 'Quitar verificación',
+    safetyNumber: 'Número de seguridad',
+    saveError: 'La verificación no se pudo guardar en este navegador.',
+    unverifiedStatus:
+      'No verificado. Los mensajes siguen cifrados de extremo a extremo, pero aún no has confirmado quién es.',
+    verified: 'Verificado',
+    verifiedContact: 'Contacto verificado',
+    verifiedStatus: 'Confirmaste que los números de seguridad coinciden.',
+    verifyAction: 'Verificar',
+    verifyBody:
+      'Compara estos números con {name} en una llamada de confianza o en persona. Si los doce grupos coinciden en ambos dispositivos, marca este contacto como verificado.',
+    verifyHelp:
+      'Los números salen de ambas identidades, así que solo coinciden si ambos ven las mismas claves. Un nombre o usuario igual no cuenta.',
+    verifyTitle: 'Verificar contacto',
+  },
   dataViewer: {
     additional: 'Datos adicionales',
     array: 'Array ({count})',
