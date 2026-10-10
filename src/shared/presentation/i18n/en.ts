@@ -166,10 +166,13 @@ export const en = {
     connectionQualityDisconnected: 'Disconnected',
     connectionQualityGood: 'Good connection',
     connectionQualityPoor: 'Poor connection',
+    connectionConnecting: 'Connecting call audio…',
     connectionQualityWeak: 'Weak connection',
     connectionRecovering: 'Reconnecting call audio…',
     connectionRecoveryExhausted:
       'Audio could not reconnect with one or more participants. Check your connection and retry, or leave and rejoin the call.',
+    connectionRelayed:
+      'Audio is relayed through a server, which can add a little delay.',
     deafen: 'Silence call audio',
     decline: 'Decline',
     declined: 'Call declined',
@@ -198,10 +201,12 @@ export const en = {
     microphoneBlockedTitle: 'Cannot use microphone',
     microphoneConstraint:
       'The requested audio configuration is not compatible with this device.',
-    microphoneDenied: 'The browser has not granted microphone permission.',
+    microphoneDenied:
+      'The browser has not granted microphone permission. Allow it, and the call uses your microphone automatically.',
     microphoneHelp: 'Open help',
     microphoneInUse: 'The microphone is busy in another app or browser tab.',
-    microphoneMissingDevice: 'No microphone device was found.',
+    microphoneMissingDevice:
+      'No microphone was found. Connect one, and the call uses it automatically if microphone access is allowed.',
     microphoneNotSecure:
       'Microphone access requires HTTPS or an installed app context.',
     microphoneRetry: 'Retry',

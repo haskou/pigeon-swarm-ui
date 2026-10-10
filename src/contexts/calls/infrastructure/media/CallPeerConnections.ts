@@ -419,6 +419,16 @@ export class CallPeerConnections {
     });
   }
 
+  public recoverAfterDisruption(): void {
+    this.peers.forEach((peer, identityId) => {
+      this.recovery.disrupt(
+        identityId,
+        peer,
+        () => this.peers.get(identityId) === peer,
+      );
+    });
+  }
+
   public setDeafened(deafened: boolean): void {
     this.remoteAudio.setDeafened(deafened);
   }

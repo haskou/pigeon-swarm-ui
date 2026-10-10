@@ -6,7 +6,7 @@ import { useTechnicalDetailsPreference } from '../../../../shared/presentation/p
 import { callSessionTitle } from './callSessionDisplay';
 import { SpeakerIcon } from './callIcons';
 import { MicrophoneBlockedNotice } from './MicrophoneBlockedNotice';
-import { CallRecoveryNotice } from './CallRecoveryNotice';
+import { CallConnectionNotice } from './CallConnectionNotice';
 
 export function CallStageHeader({
   call,
@@ -65,7 +65,7 @@ export function CallStageHeader({
           onClick={onClose}
         />
       </div>
-      <CallRecoveryNotice call={call} onRetryConnection={onRetryConnection} />
+      <CallConnectionNotice call={call} onRetryConnection={onRetryConnection} />
       {!call.hasMicrophone && (
         <div className="mt-3">
           <MicrophoneBlockedNotice
