@@ -15,6 +15,7 @@ import { DeviceUnlockSecretHandle } from '../../domain/value-objects/DeviceUnloc
 import { IdentityId } from '../../domain/value-objects/IdentityId';
 import { DeviceIdentityProtector } from '../crypto/DeviceIdentityProtector';
 import { IndexedDbDeviceIdentityVaultStore } from './IndexedDbDeviceIdentityVaultStore';
+import { LocalDeviceIdentityNotFoundError } from './LocalDeviceIdentityNotFoundError';
 
 export class DeviceIdentityVault {
   private readonly protector: DeviceIdentityProtector;
@@ -67,10 +68,7 @@ export class DeviceIdentityVault {
   ): Promise<DeviceIdentityVaultRecord> {
     const record = await this.store.find(identityId);
 
-    assert(
-      record?.version === 2,
-      new Error('Local device identity not found.'),
-    );
+    assert(record?.version === 2, new LocalDeviceIdentityNotFoundError());
 
     return record;
   }

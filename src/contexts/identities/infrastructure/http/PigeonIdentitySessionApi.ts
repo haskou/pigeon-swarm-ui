@@ -13,6 +13,7 @@ import type { PigeonIdentityGateway } from './PigeonIdentityGateway';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
+import { LocalDeviceIdentityNotFoundError } from '../storage/LocalDeviceIdentityNotFoundError';
 
 const emptyKeychain: LocalKeychain = {
   conversations: {},
@@ -109,7 +110,11 @@ export class PigeonIdentitySessionApi {
       );
       this.validateKeyPair(identity, vaultSession.material.identityKeyPair);
       this.validateAuthorization(identity, vaultSession);
-    } catch {
+    } catch (error) {
+      if (error instanceof LocalDeviceIdentityNotFoundError) {
+        throw new Error(copy.auth.localDeviceMissing);
+      }
+
       throw new Error(copy.auth.invalidLogin);
     }
 
