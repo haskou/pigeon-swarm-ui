@@ -37,7 +37,9 @@ test('shows the three login choices with instructions for each box', async ({
     await expect(
       page.getByTestId('auth-device-pairing-invitation-input'),
     ).toHaveAttribute('placeholder', /invitation code/);
-    await expect(page.getByTestId('auth-device-pairing-prepare')).toBeDisabled();
+    await expect(
+      page.getByTestId('auth-device-pairing-prepare'),
+    ).toBeDisabled();
     await expect(
       page.getByTestId('auth-device-pairing-completion-input'),
     ).toBeHidden();
@@ -135,6 +137,25 @@ test('adds a new device by pairing it with a signed-in device', async ({
       .fill(identity.password);
     await fresh.getByTestId('auth-submit-button').click();
     await waitForWorkspace(fresh);
+
+    await authorized
+      .getByRole('button', { name: 'Close dialog' })
+      .last()
+      .click();
+    await openSidebar(authorized);
+    await authorized
+      .locator('[data-testid="own-profile-menu-button"]:visible')
+      .first()
+      .click();
+    await authorized.getByTestId('edit-profile-button').click();
+    await authorized.getByRole('button', { name: 'Security' }).click();
+    await authorized.getByTestId('profile-manage-devices').click();
+    await expect(authorized.getByTestId('device-row')).toHaveCount(2);
+    await authorized.getByTestId('device-revoke-open').click();
+    await authorized.getByTestId('device-mode-compromised').click();
+    await authorized.getByTestId('device-compromise-since').fill('1');
+    await authorized.getByTestId('device-revoke-confirm').click();
+    await expect(authorized.getByTestId('device-row')).toHaveCount(1);
   } finally {
     await authorized.context().close();
     await fresh.context().close();
@@ -149,9 +170,10 @@ async function chooseMethod(page: Page, name: string): Promise<void> {
 }
 
 function newIdentity(projectName: string, prefix: string): TestIdentity {
-  const token = `${projectName.replace(/[^a-z0-9]/gi, '').slice(0, 4)}${Date.now()
-    .toString(36)
-    .slice(-6)}${Math.random().toString(36).slice(2, 6)}`.toLowerCase();
+  const token =
+    `${projectName.replace(/[^a-z0-9]/gi, '').slice(0, 4)}${Date.now()
+      .toString(36)
+      .slice(-6)}${Math.random().toString(36).slice(2, 6)}`.toLowerCase();
 
   return {
     handle: `${prefix}${token}`,

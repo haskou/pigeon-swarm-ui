@@ -717,7 +717,6 @@ export const es = {
   },
   encryption: {
     algorithm: 'Algoritmo',
-    mlsCiphersuite: 'MLS · X25519 / AES-128-GCM / Ed25519',
     communityNote:
       'Los mensajes de la comunidad van cifrados de extremo a extremo con MLS (RFC 9420). Quien se une después no lee los mensajes anteriores y quien es expulsado no lee los nuevos.',
     communityTitle: 'Cifrado de comunidad',
@@ -731,6 +730,7 @@ export const es = {
     missing: 'Falta la clave de cifrado',
     missingNote:
       'La clave no está disponible en tu llavero, así que este contenido cifrado no se puede descifrar aquí.',
+    mlsCiphersuite: 'MLS · X25519 / AES-128-GCM / Ed25519',
     network: 'Red',
     peerIdentity: 'Identidad remota',
     plaintext: 'Texto plano',
@@ -865,6 +865,8 @@ export const es = {
   },
   messages: {
     addReaction: 'Añadir reacción',
+    awaitingGroupAccess:
+      'Este dispositivo aún no está en el grupo cifrado. Un miembro conectado lo añadirá en breve; leerás los mensajes enviados desde ese momento.',
     cancelEdit: 'Cancelar edición',
     cancelReply: 'Cancelar respuesta',
     copy: 'Copiar texto',
@@ -878,8 +880,6 @@ export const es = {
     editing: 'Editando mensaje',
     emptyPins: 'No hay mensajes fijados.',
     emptyThread: 'Este hilo aún no tiene respuestas.',
-    awaitingGroupAccess:
-      'Este dispositivo aún no está en el grupo cifrado. Un miembro conectado lo añadirá en breve; leerás los mensajes enviados desde ese momento.',
     missingConversationKey: 'Falta la clave de esta conversación.',
     missingKey: '[cifrado] Falta la clave de esta conversación.',
     openMenu: 'Abrir menú del mensaje',
@@ -1093,6 +1093,8 @@ export const es = {
     close: 'Cerrar notificaciones',
     community: 'Comunidad',
     communityInvitationTitle: 'Invitación de comunidad',
+    communityInviteBody:
+      'Al aceptar te unes a la comunidad. Un miembro conectado añadirá después este dispositivo al grupo cifrado; leerás los mensajes enviados desde ese momento.',
     communityInviteKeyTitle: 'Te han invitado a esta comunidad',
     communityJoinRequestTitle: 'Solicitud de unión',
     communityMembershipInvitationTitle: 'Invitación de membresía',
@@ -1121,8 +1123,6 @@ export const es = {
     invitationTitle: 'Invitación de conversación',
     invitedBy: 'Invitado por',
     inviteKeyAction: 'Añadir clave y continuar',
-    communityInviteBody:
-      'Al aceptar te unes a la comunidad. Un miembro conectado añadirá después este dispositivo al grupo cifrado; leerás los mensajes enviados desde ese momento.',
     inviteKeyBody:
       'La invitación incluye una clave cifrada para tu identidad. Al aceptarla se añadirá la clave a tu llavero y podrás leer y enviar mensajes.',
     inviteKeyInvitedBy: 'Invitado por',
@@ -1254,6 +1254,16 @@ export const es = {
     currentPassword: 'Contraseña actual',
     currentPasswordForPasskeyHelp:
       'Se verifican la contraseña actual y la clave de recuperación antes de crear el desbloqueo local. No se guardan.',
+    deviceCompromiseFromLabel: 'Desconfiar desde la revisión',
+    deviceCompromiseHelp:
+      'Se rechaza todo lo que este dispositivo firmó desde esa revisión, aunque entonces estuviera autorizado. Usa 1 para desconfiar por completo. La revisión {revision} es la última.',
+    deviceCurrent: 'Este dispositivo',
+    deviceListEmpty: 'No hay otros dispositivos autorizados.',
+    deviceListError: 'No se pudo cargar la lista de dispositivos.',
+    deviceManageAction: 'Gestionar dispositivos',
+    deviceManageHelp:
+      'Muestra los dispositivos que pueden actuar como tú. Revocar impide que firme nada nuevo; no borra los datos ya guardados en él ni las copias que otras personas hayan conservado.',
+    deviceManageTitle: 'Tus dispositivos',
     devicePairingAction: 'Añadir otro dispositivo',
     devicePairingAuthorize: 'Autorizar dispositivo',
     devicePairingCompletionCodeLabel:
@@ -1276,6 +1286,12 @@ export const es = {
     devicePairingTitle: 'Añadir un dispositivo',
     devicePairingVerificationHelp:
       'Confirma que este código es idéntico en el dispositivo nuevo antes de autorizar. Si difiere, cierra este diálogo.',
+    deviceRetire: 'Retirar',
+    deviceRetireConfirm:
+      'Este dispositivo deja de estar autorizado en cuanto se acepte la revocación. Su actividad anterior sigue siendo válida.',
+    deviceRevokeCompromised: 'Revocar como comprometido',
+    deviceRevokeConfirm: 'Confirmar revocación',
+    deviceRevokeError: 'No se pudo revocar el dispositivo.',
     discardChanges: 'Descartar',
     discardChangesBody: 'Hay cambios sin guardar. ¿Quieres descartarlos?',
     edit: 'Editar perfil',

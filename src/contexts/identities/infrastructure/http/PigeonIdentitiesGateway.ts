@@ -10,6 +10,8 @@ import type {
 import type { LoginIdentityProgressReporter } from '../../application/login-identity/LoginIdentityProgressReporter';
 import type { DevicePairingRequestDraft } from '../../domain/DevicePairingRequestDraft';
 import type { Identity } from '../../domain/Identity';
+import type { DeviceAuthorizationRevision } from '../../domain/value-objects/DeviceAuthorizationRevision';
+import type { DeviceCredential } from '../../domain/value-objects/DeviceCredential';
 import type { IdentityMasterKeyProtection } from '../../domain/value-objects/IdentityMasterKeyProtection';
 import type { IdentityCreationMaterial } from '../crypto/IdentityCreationMaterial';
 import type { CreatedIdentityMaterial } from './CreatedIdentityMaterial';
@@ -82,6 +84,22 @@ export class PigeonIdentitiesGateway {
       completionCode: result.completion.toCode(),
       session: result.session,
     };
+  }
+
+  public async listDevices(session: Session): Promise<DeviceCredential[]> {
+    return await this.deviceAuthorization.findDevices(session);
+  }
+
+  public async revokeDevice(
+    session: Session,
+    target: DeviceCredential,
+    compromisedSince?: DeviceAuthorizationRevision,
+  ): Promise<Session> {
+    return await this.deviceAuthorization.revokeDevice(
+      session,
+      target,
+      compromisedSince,
+    );
   }
 
   public async completeDevicePairing(

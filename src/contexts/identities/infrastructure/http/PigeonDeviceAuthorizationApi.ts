@@ -13,6 +13,7 @@ import type { HttpJsonClient } from '../../../../shared/infrastructure/http/Http
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { DeviceAuthorizationCheckpointResource } from '../../domain/DeviceAuthorizationCheckpointResource';
 import type { DeviceAuthorizationTransition } from '../../domain/DeviceAuthorizationTransition';
+import type { DeviceCatalogResource } from '../../domain/DeviceCatalogResource';
 import type { DevicePairingRequestDraft } from '../../domain/DevicePairingRequestDraft';
 import type { IdentityPassword } from '../../domain/value-objects/IdentityPassword';
 import type { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
@@ -26,6 +27,7 @@ import { DevicePairingRequest } from '../../domain/DevicePairingRequest';
 import { DeviceAuthorizationEpoch } from '../../domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationOperationId } from '../../domain/value-objects/DeviceAuthorizationOperationId';
 import { DeviceAuthorizationRevision } from '../../domain/value-objects/DeviceAuthorizationRevision';
+import { DeviceCredential } from '../../domain/value-objects/DeviceCredential';
 import { DeviceId } from '../../domain/value-objects/DeviceId';
 import { DevicePairingCode } from '../../domain/value-objects/DevicePairingCode';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
@@ -257,6 +259,63 @@ export class PigeonDeviceAuthorizationApi {
       path,
       await this.signer.headersWithDeviceProof(session, 'GET', path),
     );
+  }
+
+  public async findDevices(session: Session): Promise<DeviceCredential[]> {
+    const identityId = IdentityId.fromString(session.identity.id);
+    const path = `${this.checkpointPath(identityId)}/devices`;
+    const resource = await this.http.request<DeviceCatalogResource>(path, {
+      headers: await this.signer.headersWithDeviceProof(session, 'GET', path),
+      method: 'GET',
+    });
+
+    assert(
+      IdentityId.fromString(resource.identityId).isEqual(identityId),
+      new Error('Device catalog identity does not match.'),
+    );
+
+    return resource.credentials.map((credential) =>
+      DeviceCredential.fromPublicKey(
+        IdentityId.fromString(credential).getPublicKey(),
+      ),
+    );
+  }
+
+  public async revokeDevice(
+    session: Session,
+    target: DeviceCredential,
+    compromisedSince?: DeviceAuthorizationRevision,
+  ): Promise<Session> {
+    assert(
+      target.valueOf() !==
+        session.deviceCredentialKeyPair.toPrimitives().publicKey,
+      new Error('A device cannot revoke itself.'),
+    );
+    const current = await this.find(session);
+
+    assert(
+      !compromisedSince ||
+        !compromisedSince.isGreaterThan(current.getRevision()),
+      new Error('The compromise revision is in the future.'),
+    );
+    const checkpoint = await this.apply(
+      session,
+      AuthorizationTransition.revocation({
+        author: session.deviceCredentialKeyPair,
+        compromisedSince,
+        epoch: current.getEpoch(),
+        identityId: current.getIdentityId(),
+        operationId: DeviceAuthorizationOperationId.generate(),
+        previousRevision: current.getRevision(),
+        targetCredential: target,
+      }),
+    );
+
+    return {
+      ...session,
+      authorizationEpoch: checkpoint.getEpoch(),
+      authorizationRevision: checkpoint.getRevision(),
+    };
   }
 
   public async synchronize(session: Session): Promise<Session> {

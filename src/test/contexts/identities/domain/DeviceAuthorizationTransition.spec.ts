@@ -5,6 +5,7 @@ import { DeviceAuthorizationTransition } from '../../../../contexts/identities/d
 import { DeviceAuthorizationEpoch } from '../../../../contexts/identities/domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationOperationId } from '../../../../contexts/identities/domain/value-objects/DeviceAuthorizationOperationId';
 import { DeviceAuthorizationRevision } from '../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
+import { DeviceCredential } from '../../../../contexts/identities/domain/value-objects/DeviceCredential';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { PairingId } from '../../../../contexts/identities/domain/value-objects/PairingId';
 
@@ -30,6 +31,7 @@ describe(DeviceAuthorizationTransition.name, () => {
     expect(Object.keys(unsigned)).toEqual([
       'authorCredential',
       'authorizedAt',
+      'compromisedSince',
       'epoch',
       'identityId',
       'operation',
@@ -76,5 +78,58 @@ describe(DeviceAuthorizationTransition.name, () => {
     });
 
     expect(transition.getResultEpoch().valueOf()).toBe(operationId.valueOf());
+  });
+
+  it('covers the compromise revision with the author signature', async () => {
+    const author = await KeyPair.generate();
+    const identity = await KeyPair.generate();
+    const target = await KeyPair.generate();
+    const make = (compromisedSince?: number) =>
+      DeviceAuthorizationTransition.revocation({
+        author,
+        compromisedSince:
+          compromisedSince === undefined
+            ? undefined
+            : DeviceAuthorizationRevision.fromNumber(compromisedSince),
+        epoch: DeviceAuthorizationEpoch.genesis(),
+        identityId: IdentityId.fromString(identity.toPrimitives().publicKey),
+        operationId: DeviceAuthorizationOperationId.generate(),
+        previousRevision: DeviceAuthorizationRevision.fromNumber(4),
+        targetCredential: DeviceCredential.fromString(
+          target.toPrimitives().publicKey,
+        ),
+      });
+    const transition = make(2);
+    const body = transition.toPrimitives();
+
+    expect(body.compromisedSince).toBe(2);
+    expect(
+      IdentityId.fromString(author.toPrimitives().publicKey)
+        .getPublicKey()
+        .isValidSignature(
+          JSON.stringify({
+            domain: 'pigeon:device-authorization:transition:v3',
+            proofOfPossession: undefined,
+            transition: transition.getUnsignedPayload(),
+          }),
+          new Signature(body.signature),
+        ),
+    ).toBe(true);
+    expect(
+      IdentityId.fromString(author.toPrimitives().publicKey)
+        .getPublicKey()
+        .isValidSignature(
+          JSON.stringify({
+            domain: 'pigeon:device-authorization:transition:v3',
+            proofOfPossession: undefined,
+            transition: {
+              ...transition.getUnsignedPayload(),
+              compromisedSince: 1,
+            },
+          }),
+          new Signature(body.signature),
+        ),
+    ).toBe(false);
+    expect(make().toPrimitives().compromisedSince).toBeUndefined();
   });
 });

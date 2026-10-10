@@ -21,6 +21,7 @@ export class DeviceAuthorizationTransition {
     author: KeyPair;
     authorCredential?: string;
     authorizedAt?: Timestamp;
+    compromisedSince?: DeviceAuthorizationRevision;
     epoch: DeviceAuthorizationEpoch;
     identityId: IdentityId;
     operation: DeviceAuthorizationOperation;
@@ -43,6 +44,7 @@ export class DeviceAuthorizationTransition {
           ? undefined
           : (input.authorCredential ?? input.author.toPrimitives().publicKey),
       authorizedAt: input.authorizedAt?.valueOf(),
+      compromisedSince: input.compromisedSince?.valueOf(),
       epoch: input.epoch.valueOf(),
       identityId: input.identityId.valueOf(),
       operation: input.operation,
@@ -84,6 +86,7 @@ export class DeviceAuthorizationTransition {
   private static unsigned(input: {
     authorCredential?: string;
     authorizedAt?: number;
+    compromisedSince?: number;
     epoch: string;
     identityId: string;
     operation: DeviceAuthorizationOperation;
@@ -96,6 +99,7 @@ export class DeviceAuthorizationTransition {
     return {
       authorCredential: input.authorCredential,
       authorizedAt: input.authorizedAt,
+      compromisedSince: input.compromisedSince,
       epoch: input.epoch,
       identityId: input.identityId,
       operation: input.operation,
@@ -255,6 +259,7 @@ export class DeviceAuthorizationTransition {
 
   public static revocation(input: {
     author: KeyPair;
+    compromisedSince?: DeviceAuthorizationRevision;
     epoch: DeviceAuthorizationEpoch;
     identityId: IdentityId;
     operationId: DeviceAuthorizationOperationId;
@@ -264,6 +269,7 @@ export class DeviceAuthorizationTransition {
     return this.sign({
       author: input.author,
       authorCredential: input.author.toPrimitives().publicKey,
+      compromisedSince: input.compromisedSince,
       epoch: input.epoch,
       identityId: input.identityId,
       operation: 'revoke',
