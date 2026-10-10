@@ -142,6 +142,13 @@ test('adds a new device by pairing it with a signed-in device', async ({
       .getByRole('button', { name: 'Close dialog' })
       .last()
       .click();
+    await openSidebar(authorized);
+    await authorized
+      .locator('[data-testid="own-profile-menu-button"]:visible')
+      .first()
+      .click();
+    await authorized.getByTestId('edit-profile-button').click();
+    await authorized.getByRole('button', { name: 'Security' }).click();
     await authorized.getByTestId('profile-manage-devices').click();
     await expect(authorized.getByTestId('device-row')).toHaveCount(2);
     await authorized.getByTestId('device-revoke-open').click();
