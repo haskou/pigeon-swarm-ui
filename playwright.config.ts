@@ -20,6 +20,14 @@ export default defineConfig({
       },
     },
     {
+      name: 'desktop-firefox',
+      use: { ...devices['Desktop Firefox'] },
+    },
+    {
+      name: 'desktop-webkit',
+      use: { ...devices['Desktop Safari'] },
+    },
+    {
       name: 'tablet-chromium',
       use: {
         ...devices['iPad Pro 11'],
