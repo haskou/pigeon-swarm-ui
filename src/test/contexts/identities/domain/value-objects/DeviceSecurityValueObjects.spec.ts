@@ -61,6 +61,34 @@ describe('device security value objects', () => {
     expect(() => JSON.stringify(envelope)).toThrow();
   });
 
+  it('rejects protected-root envelopes whose KDF parameters differ from the pinned header', () => {
+    const serialized = [
+      'v1',
+      'scrypt',
+      'N262144',
+      'r8',
+      'p1',
+      'hkdf-sha256',
+      'aes-256-gcm',
+      Buffer.alloc(16).toString('base64'),
+      Buffer.alloc(12).toString('base64'),
+      Buffer.alloc(16).toString('base64'),
+      Buffer.alloc(32).toString('base64'),
+    ].join('.');
+
+    expect(() =>
+      DeviceRootKeyEnvelope.fromString(
+        serialized.replace('N262144', 'N1048576'),
+      ),
+    ).toThrow();
+    expect(() =>
+      DeviceRootKeyEnvelope.fromString(serialized.replace('.r8.', '.r16.')),
+    ).toThrow();
+    expect(() =>
+      DeviceRootKeyEnvelope.fromString(serialized.replace('.p1.', '.p2.')),
+    ).toThrow();
+  });
+
   it('uses an opaque canonical handle for the non-exportable key record', () => {
     const handle = DeviceUnlockSecretHandle.fromString(
       ' 550E8400-E29B-41D4-A716-446655440001 ',

@@ -15,6 +15,7 @@ import {
   parseCommunityInviteUrl,
   type PendingCommunityInviteLink,
 } from '../../contexts/communities/presentation/view-models/communityInviteLink';
+import { deleteLegacyLocalDeviceUnlockStore } from '../../contexts/identities/infrastructure/storage/deleteLegacyLocalDeviceUnlockStore';
 import {
   loadRememberedIdentityPreview,
   type RememberedIdentityPreview,
@@ -99,6 +100,10 @@ export function useAppBootstrap(): {
     },
     [],
   );
+
+  useEffect(() => {
+    void deleteLegacyLocalDeviceUnlockStore();
+  }, []);
 
   useEffect(() => {
     if (nodeNetworks.loading || nodeNetworks.error || session) return;
