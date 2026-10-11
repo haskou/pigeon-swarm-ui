@@ -12,9 +12,33 @@ import type { KeychainCipher, KeychainHead } from '../crypto/KeychainCipher';
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 
 const remoteKeychainCacheTtlMs = 1500;
+// A keychain this session already knows about can be briefly unreadable right
+// after it was written. Such reads are retried on this schedule (about 10s in
+// total) before being reported missing.
+const keychainLagRetryDelaysMs = [250, 500, 1000, 2000, 3000, 3000];
 
 function keychainPath(session: Session): string {
   return `/keychains/${encodeURIComponent(session.identity.id)}`;
+}
+
+function waitBeforeRetry(delayMs: number, signal?: AbortSignal): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason);
+
+      return;
+    }
+
+    const timer = setTimeout(resolve, delayMs);
+    signal?.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timer);
+        reject(signal?.reason);
+      },
+      { once: true },
+    );
+  });
 }
 
 export class PigeonKeychainApi {
@@ -45,8 +69,9 @@ export class PigeonKeychainApi {
   private async readPublishHead(
     session: Session,
   ): Promise<KeychainHead | undefined> {
-    const resource = await this.undefinedWhenMissing(
+    const resource = await this.readWithReplicationLag(
       async () => await this.fetchRemote(session),
+      session,
     );
 
     if (!resource) {
@@ -86,6 +111,31 @@ export class PigeonKeychainApi {
     }
   }
 
+  private async readWithReplicationLag<T>(
+    read: () => Promise<T>,
+    session: Session,
+    signal?: AbortSignal,
+  ): Promise<T | undefined> {
+    // Only a session that already holds a keychain pointer knows a keychain
+    // exists. Sessions without one (login, registration) read once and are
+    // never delayed.
+    const expected = Boolean(session.keychainExternalIdentifier);
+
+    for (let attempt = 0; ; attempt++) {
+      const value = await this.undefinedWhenMissing(read);
+
+      if (
+        value !== undefined ||
+        !expected ||
+        attempt >= keychainLagRetryDelaysMs.length
+      ) {
+        return value;
+      }
+
+      await waitBeforeRetry(keychainLagRetryDelaysMs[attempt], signal);
+    }
+  }
+
   public decrypt(session: Session, keychain: KeychainResource): LocalKeychain {
     return this.cipher.decrypt(session, keychain);
   }
@@ -100,9 +150,12 @@ export class PigeonKeychainApi {
 
   public async loadOptional(
     session: Session,
+    options: { signal?: AbortSignal } = {},
   ): Promise<KeychainResource | undefined> {
-    return await this.undefinedWhenMissing(
+    return await this.readWithReplicationLag(
       async () => await this.load(session),
+      session,
+      options.signal,
     );
   }
 
