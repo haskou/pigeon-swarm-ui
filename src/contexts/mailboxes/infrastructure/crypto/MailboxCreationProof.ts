@@ -4,12 +4,13 @@ import { sha256 } from '@noble/hashes/sha2.js';
  * Hashcash proof the node requires to create a mailbox. Mirrors the node's
  * `MailboxCreationProof`: SHA-256 over the colon-joined fields
  * `pigeon-mailbox-creation:v1`, `mailboxId`, `postTokenHash`,
- * `readTokenHash` and `nonce` must start with 16 zero bits. Binding the id
- * and both capability hashes stops a proof solved for one mailbox from
- * being replayed for another.
+ * `readTokenHash` and `nonce` must start with `difficultyBits` zero bits.
+ * The node names the difficulty it requires in a 400 response; callers
+ * re-mine at that value. Binding the id and both capability hashes stops a
+ * proof solved for one mailbox from being replayed for another.
  */
 export class MailboxCreationProof {
-  public static readonly DIFFICULTY_BITS = 16;
+  public static readonly DEFAULT_DIFFICULTY_BITS = 16;
   public static readonly MAX_NONCE_LENGTH = 64;
   private static readonly DOMAIN = 'pigeon-mailbox-creation:v1';
 
@@ -48,6 +49,7 @@ export class MailboxCreationProof {
     postTokenHash: string,
     readTokenHash: string,
     nonce: string,
+    difficultyBits = MailboxCreationProof.DEFAULT_DIFFICULTY_BITS,
   ): boolean {
     if (
       nonce.length === 0 ||
@@ -67,10 +69,7 @@ export class MailboxCreationProof {
       ),
     );
 
-    return (
-      MailboxCreationProof.leadingZeroBits(digest) >=
-      MailboxCreationProof.DIFFICULTY_BITS
-    );
+    return MailboxCreationProof.leadingZeroBits(digest) >= difficultyBits;
   }
 
   /**
@@ -82,6 +81,7 @@ export class MailboxCreationProof {
     mailboxId: string,
     postTokenHash: string,
     readTokenHash: string,
+    difficultyBits = MailboxCreationProof.DEFAULT_DIFFICULTY_BITS,
   ): string {
     for (let counter = 0; ; counter += 1) {
       const nonce = counter.toString();
@@ -92,6 +92,7 @@ export class MailboxCreationProof {
           postTokenHash,
           readTokenHash,
           nonce,
+          difficultyBits,
         )
       ) {
         return nonce;

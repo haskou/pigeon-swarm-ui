@@ -154,7 +154,12 @@ describe(MailboxCreationProof.name, () => {
       ),
     ).toBe(true);
     expect(
-      MailboxCreationProof.isValid(mailboxId, postTokenHash, readTokenHash, nonce),
+      MailboxCreationProof.isValid(
+        mailboxId,
+        postTokenHash,
+        readTokenHash,
+        nonce,
+      ),
     ).toBe(true);
   });
 

@@ -28,11 +28,11 @@ describe(MailboxCreationWorkerClient.name, () => {
     const mined = client.mine('mailbox', 'post-hash', 'read-hash', 17);
 
     expect(worker.postMessage).toHaveBeenCalledWith({
+      difficultyBits: 17,
       id: 0,
       mailboxId: 'mailbox',
       postTokenHash: 'post-hash',
       readTokenHash: 'read-hash',
-      difficultyBits: 17,
     });
 
     worker.respond({ creationNonce: '42', id: 0 });

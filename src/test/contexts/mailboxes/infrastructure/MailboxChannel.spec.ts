@@ -39,7 +39,7 @@ describe(MailboxChannel.name, () => {
         ),
     );
 
-    return { channel: new MailboxChannel(client, mine), client };
+    return { channel: new MailboxChannel(client, mine), client, mine };
   };
 
   it('creates the inbox with capability hashes and a valid creation proof', async () => {

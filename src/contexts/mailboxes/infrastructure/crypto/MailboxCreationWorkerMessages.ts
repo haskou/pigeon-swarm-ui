@@ -3,6 +3,7 @@ export type MailboxCreationWorkerRequest = {
   mailboxId: string;
   postTokenHash: string;
   readTokenHash: string;
+  difficultyBits: number;
 };
 
 export type MailboxCreationWorkerResponse = {
