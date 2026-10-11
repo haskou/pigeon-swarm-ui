@@ -14,6 +14,7 @@ import { PigeonContentReplicationClient } from '../../contexts/attachments/infra
 import { PigeonDirectAttachmentUploader } from '../../contexts/attachments/infrastructure/http/PigeonDirectAttachmentUploader';
 import { PigeonFilesGateway } from '../../contexts/attachments/infrastructure/http/PigeonFilesGateway';
 import { PigeonMessageAttachmentUploader } from '../../contexts/attachments/infrastructure/http/PigeonMessageAttachmentUploader';
+import { PigeonPrivateBlobClient } from '../../contexts/attachments/infrastructure/http/PigeonPrivateBlobClient';
 import { PigeonPrivateFilesClient } from '../../contexts/attachments/infrastructure/http/PigeonPrivateFilesClient';
 import { PigeonPublicFilesClient } from '../../contexts/attachments/infrastructure/http/PigeonPublicFilesClient';
 import { PigeonPublicFileUploader } from '../../contexts/attachments/infrastructure/http/PigeonPublicFileUploader';
@@ -172,11 +173,8 @@ export class PigeonApiGateway {
       signer,
       mutations,
     );
-    const privateFiles = new PigeonPrivateFilesClient(
-      http,
-      signer,
-      contentReplication,
-    );
+    const privateFiles = new PigeonPrivateFilesClient(http);
+    const privateBlobs = new PigeonPrivateBlobClient(http, signer);
     const publicFiles = new PigeonPublicFilesClient(
       http,
       signer,
@@ -185,13 +183,14 @@ export class PigeonApiGateway {
     const attachmentDownloader = new PigeonAttachmentDownloader(
       privateFiles,
       publicFiles,
+      privateBlobs,
       attachmentCipher,
       new AttachmentBinaryCodec(),
     );
     const attachmentPublicationContexts = new AttachmentPublicationContexts();
     const attachmentBlobUploader = new PigeonAttachmentBlobUploader(
-      new PigeonDirectAttachmentUploader(privateFiles, publicFiles),
-      new PigeonChunkedAttachmentUploader(privateFiles, publicFiles),
+      new PigeonDirectAttachmentUploader(privateBlobs, publicFiles),
+      new PigeonChunkedAttachmentUploader(privateBlobs, publicFiles),
     );
     const attachmentRepository = new PigeonAttachmentRepository(
       attachmentDownloader,
@@ -213,7 +212,6 @@ export class PigeonApiGateway {
     );
     this.filesGateway = new PigeonFilesGateway(
       attachmentDownloader,
-      privateFiles,
       new PigeonPublicFileUploader(
         publicFiles,
         new PublicImageUploadPreparer(),

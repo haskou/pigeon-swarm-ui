@@ -58,7 +58,6 @@ describe(AttachmentWorkerDispatcher.name, () => {
         file: new File(['content'], 'file.txt'),
         id: 'request',
         type: 'encrypt',
-        uploadFilename: 'upload.bin',
       }),
     ).rejects.toThrow('Attachment workers are not available');
   });

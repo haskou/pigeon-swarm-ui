@@ -1,8 +1,7 @@
-import type { MessageAttachment } from '../../application/contracts/MessageAttachment';
+import type { PrivateBlobReference } from '../../application/contracts/PrivateBlobReservation';
 
 export type EncryptedAttachmentUpload = {
-  chunks?: MessageAttachment['chunks'];
-  cid: string;
+  blobs: PrivateBlobReference[];
   size: number;
-  type?: MessageAttachment['type'];
+  type?: 'chunked_file';
 };

@@ -4,7 +4,6 @@ export type WorkerRequest =
   | {
       file: File;
       id: string;
-      uploadFilename: string;
       type: 'encrypt';
     }
   | {

@@ -2,37 +2,74 @@ import type { Session } from '../../../../../shared/domain/pigeonResources.types
 
 import { PigeonChunkedAttachmentUploader } from '../../../../../contexts/attachments/infrastructure/http/PigeonChunkedAttachmentUploader';
 
+const mebibyte = 1024 * 1024;
+
 describe(PigeonChunkedAttachmentUploader.name, () => {
   const session = { identity: { id: 'identity-1' } } as Session;
+  const reservation = (blobId: string) => ({
+    blobId,
+    downloadToken: 'd'.repeat(43),
+    expiresAt: 10,
+    uploadToken: 'u'.repeat(43),
+  });
 
-  it('uploads encrypted content as verifiable chunks', async () => {
-    const privateFiles = {
-      upload: jest.fn().mockResolvedValue({ cid: 'private-1', size: 4 }),
+  it('stores each encrypted part in its own private blob, in order', async () => {
+    const privateBlobs = {
+      reserve: jest
+        .fn()
+        .mockResolvedValueOnce(reservation('blob-1'))
+        .mockResolvedValueOnce(reservation('blob-2')),
+      upload: jest.fn().mockResolvedValue(undefined),
     };
-    const uploader = new PigeonChunkedAttachmentUploader(privateFiles, {
+    const uploader = new PigeonChunkedAttachmentUploader(privateBlobs, {
       upload: jest.fn(),
     });
 
-    const result = await uploader.uploadEncrypted(session, 'network-1', {
-      encryptedBytes: new Uint8Array([1, 2, 3, 4]).buffer,
+    const result = await uploader.uploadEncrypted(session, {
+      encryptedBytes: new ArrayBuffer(8 * mebibyte + 1),
       metadata: {
         contentType: 'text/plain',
         filename: 'file.txt',
-        size: 4,
+        size: 8 * mebibyte + 1,
       },
-      uploadFilename: 'encrypted.bin',
     });
 
-    expect(result).toEqual(
-      expect.objectContaining({
-        cid: 'private-1',
-        type: 'chunked_file',
-      }),
+    expect(privateBlobs.reserve).toHaveBeenNthCalledWith(
+      1,
+      session,
+      8 * mebibyte,
     );
-    expect(result.chunks?.[0]).toEqual(
-      expect.objectContaining({ cid: 'private-1', index: 0, size: 4 }),
+    expect(privateBlobs.reserve).toHaveBeenNthCalledWith(2, session, 1);
+    expect(result).toEqual({
+      blobs: [
+        {
+          blobId: 'blob-1',
+          downloadToken: 'd'.repeat(43),
+          expiresAt: 10,
+          index: 0,
+          size: 8 * mebibyte,
+        },
+        {
+          blobId: 'blob-2',
+          downloadToken: 'd'.repeat(43),
+          expiresAt: 10,
+          index: 1,
+          size: 1,
+        },
+      ],
+      size: 8 * mebibyte + 1,
+      type: 'chunked_file',
+    });
+    expect(privateBlobs.upload).toHaveBeenNthCalledWith(
+      1,
+      reservation('blob-1'),
+      expect.any(ArrayBuffer),
     );
-    expect(result.chunks?.[0].sha256).toHaveLength(64);
+    expect(privateBlobs.upload).toHaveBeenNthCalledWith(
+      2,
+      reservation('blob-2'),
+      expect.any(ArrayBuffer),
+    );
   });
 
   it('uploads public files as verifiable chunks', async () => {
@@ -46,7 +83,7 @@ describe(PigeonChunkedAttachmentUploader.name, () => {
       }),
     };
     const uploader = new PigeonChunkedAttachmentUploader(
-      { upload: jest.fn() },
+      { reserve: jest.fn(), upload: jest.fn() },
       publicFiles,
     );
 

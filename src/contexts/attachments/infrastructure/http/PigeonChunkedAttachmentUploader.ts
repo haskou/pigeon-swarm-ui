@@ -4,10 +4,11 @@ import { Buffer } from 'buffer';
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { AttachmentProgress } from '../../application/contracts/AttachmentProgress';
 import type { MessageAttachment } from '../../application/contracts/MessageAttachment';
+import type { PrivateBlobReference } from '../../application/contracts/PrivateBlobReservation';
 import type { PendingMessageAttachment } from '../crypto/resources/PendingMessageAttachment';
 import type { EncryptedAttachmentUpload } from './EncryptedAttachmentUpload';
 
-import { PigeonPrivateFilesClient } from './PigeonPrivateFilesClient';
+import { PigeonPrivateBlobClient } from './PigeonPrivateBlobClient';
 import { PigeonPublicFilesClient } from './PigeonPublicFilesClient';
 import { reportAttachmentUploadProgress } from './reportAttachmentUploadProgress';
 
@@ -16,7 +17,10 @@ const uploadChunkPauseMs = 35;
 
 export class PigeonChunkedAttachmentUploader {
   public constructor(
-    private readonly privateFiles: Pick<PigeonPrivateFilesClient, 'upload'>,
+    private readonly privateBlobs: Pick<
+      PigeonPrivateBlobClient,
+      'reserve' | 'upload'
+    >,
     private readonly publicFiles: Pick<PigeonPublicFilesClient, 'upload'>,
   ) {}
 
@@ -32,33 +36,31 @@ export class PigeonChunkedAttachmentUploader {
 
   public async uploadEncrypted(
     session: Session,
-    networkId: string,
     pending: PendingMessageAttachment,
     onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<EncryptedAttachmentUpload> {
-    const chunks: NonNullable<MessageAttachment['chunks']> = [];
-    const totalChunks = Math.ceil(
-      pending.encryptedBytes.byteLength / uploadChunkBytes,
-    );
+    const blobs: PrivateBlobReference[] = [];
+    const size = pending.encryptedBytes.byteLength;
+    const totalChunks = Math.ceil(size / uploadChunkBytes);
 
     for (let index = 0; index < totalChunks; index += 1) {
       const offset = index * uploadChunkBytes;
       const chunk = pending.encryptedBytes.slice(
         offset,
-        Math.min(offset + uploadChunkBytes, pending.encryptedBytes.byteLength),
+        Math.min(offset + uploadChunkBytes, size),
       );
-      const upload = await this.privateFiles.upload(
+      const reservation = await this.privateBlobs.reserve(
         session,
-        networkId,
-        chunk,
-        `${pending.uploadFilename}.part-${String(index).padStart(4, '0')}`,
+        chunk.byteLength,
       );
+      await this.privateBlobs.upload(reservation, chunk);
 
-      chunks.push({
-        cid: upload.cid,
+      blobs.push({
+        blobId: reservation.blobId,
+        downloadToken: reservation.downloadToken,
+        expiresAt: reservation.expiresAt,
         index,
-        sha256: this.sha256(chunk),
-        size: upload.size,
+        size: chunk.byteLength,
       });
       reportAttachmentUploadProgress(
         onProgress,
@@ -68,12 +70,7 @@ export class PigeonChunkedAttachmentUploader {
       await this.yieldToBrowser();
     }
 
-    return {
-      chunks,
-      cid: chunks[0]?.cid ?? '',
-      size: pending.encryptedBytes.byteLength,
-      type: 'chunked_file',
-    };
+    return { blobs, size, type: 'chunked_file' };
   }
 
   public async uploadPublic(

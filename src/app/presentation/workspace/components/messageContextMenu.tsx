@@ -129,7 +129,9 @@ export function MessageContextMenu({
     onReactionToggle?.(menu.message, emoji, reacted);
     close();
   };
-  const shareAttachmentLink = async (attachment: MessageAttachment) => {
+  const shareAttachmentLink = async (
+    attachment: MessageAttachment & { cid: string },
+  ) => {
     const url = ipfsUrl(attachment.cid);
 
     if (navigator.clipboard) await navigator.clipboard.writeText(url);
@@ -477,8 +479,11 @@ function isDownloadableAttachment(attachment: MessageAttachment): boolean {
   );
 }
 
-function isShareableIpfsAttachment(attachment: MessageAttachment): boolean {
+function isShareableIpfsAttachment(
+  attachment: MessageAttachment,
+): attachment is MessageAttachment & { cid: string } {
   return (
+    typeof attachment.cid === 'string' &&
     isDownloadableAttachment(attachment) &&
     isPublicUnencryptedAttachment(attachment)
   );

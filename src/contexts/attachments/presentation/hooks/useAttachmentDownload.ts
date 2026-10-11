@@ -5,16 +5,19 @@ import type {
   MessageAttachment,
 } from '../../../../shared/domain/pigeonResources.types';
 
+import { attachmentDownloadErrorMessage } from '../view-models/attachmentDownloadErrorMessage';
 import { attachmentObjectUrl } from '../view-models/attachmentObjectUrl';
 
 interface UseAttachmentDownloadInput {
   errorMessage: string;
+  unavailableMessage: string;
   onErrorChange: (message: string | null) => void;
   onProgressChange: (progress: AttachmentProgress | null) => void;
 }
 
 export function useAttachmentDownload({
   errorMessage,
+  unavailableMessage,
   onErrorChange,
   onProgressChange,
 }: UseAttachmentDownloadInput) {
@@ -44,12 +47,23 @@ export function useAttachmentDownload({
         link.download = attachment.filename;
         link.click();
         window.setTimeout(() => URL.revokeObjectURL(url), 0);
-      } catch {
+      } catch (error) {
         onProgressChange(null);
-        onErrorChange(errorMessage);
+        onErrorChange(
+          attachmentDownloadErrorMessage(error, {
+            errorMessage,
+            unavailableMessage,
+          }),
+        );
       }
     },
-    [errorMessage, loadAttachmentPreview, onErrorChange, onProgressChange],
+    [
+      errorMessage,
+      loadAttachmentPreview,
+      onErrorChange,
+      onProgressChange,
+      unavailableMessage,
+    ],
   );
 
   return { loadAttachmentPreview, openAttachment };

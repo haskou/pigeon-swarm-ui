@@ -1,6 +1,5 @@
 import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 
-import { AttachmentNetworkId } from '../../../../../contexts/attachments/domain/value-objects/AttachmentNetworkId';
 import { PigeonAttachmentPreviewCreator } from '../../../../../contexts/attachments/infrastructure/http/PigeonAttachmentPreviewCreator';
 
 describe(PigeonAttachmentPreviewCreator.name, () => {
@@ -18,31 +17,32 @@ describe(PigeonAttachmentPreviewCreator.name, () => {
         filename: 'photo.thumbnail.webp',
         size: thumbnail.size,
       },
-      uploadFilename: 'encrypted-preview.bin',
+    };
+    const previewBlob = {
+      blobId: 'preview-blob',
+      downloadToken: 'preview-download-token-1',
+      expiresAt: 1,
+      index: 0,
+      size: 3,
     };
     const cipher = { encrypt: jest.fn().mockResolvedValue(pending) };
     const blobs = {
       uploadEncrypted: jest
         .fn()
-        .mockResolvedValue({ cid: 'preview-1', size: 3 }),
+        .mockResolvedValue({ blobs: [previewBlob], size: 3 }),
       uploadPublic: jest.fn(),
     };
     const creator = new PigeonAttachmentPreviewCreator(cipher, blobs, {
       prepare: jest.fn().mockResolvedValue(thumbnail),
     });
 
-    await expect(
-      creator.createEncrypted(
-        session,
-        AttachmentNetworkId.fromString('network-1'),
-        source,
-      ),
-    ).resolves.toEqual({
+    await expect(creator.createEncrypted(session, source)).resolves.toEqual({
       ...pending.metadata,
-      cid: 'preview-1',
+      blobs: [previewBlob],
       encrypted: true,
       encryptedSize: 3,
     });
+    expect(blobs.uploadEncrypted).toHaveBeenCalledWith(session, pending);
   });
 
   it('omits an unavailable public preview without failing publication', async () => {

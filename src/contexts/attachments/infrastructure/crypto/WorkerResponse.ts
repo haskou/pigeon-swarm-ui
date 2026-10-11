@@ -14,7 +14,6 @@ export type WorkerResponse =
       encryption: MessageAttachmentEncryption;
       id: string;
       type: 'encrypt-result';
-      uploadFilename: string;
     }
   | {
       bytes: ArrayBuffer;

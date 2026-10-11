@@ -4,32 +4,43 @@ import type { MessageAttachment } from '../../application/contracts/MessageAttac
 import type { PendingMessageAttachment } from '../crypto/resources/PendingMessageAttachment';
 import type { EncryptedAttachmentUpload } from './EncryptedAttachmentUpload';
 
-import { PigeonPrivateFilesClient } from './PigeonPrivateFilesClient';
+import { PigeonPrivateBlobClient } from './PigeonPrivateBlobClient';
 import { PigeonPublicFilesClient } from './PigeonPublicFilesClient';
 import { reportAttachmentUploadProgress } from './reportAttachmentUploadProgress';
 
 export class PigeonDirectAttachmentUploader {
   public constructor(
-    private readonly privateFiles: Pick<PigeonPrivateFilesClient, 'upload'>,
+    private readonly privateBlobs: Pick<
+      PigeonPrivateBlobClient,
+      'reserve' | 'upload'
+    >,
     private readonly publicFiles: Pick<PigeonPublicFilesClient, 'upload'>,
   ) {}
 
   public async uploadEncrypted(
     session: Session,
-    networkId: string,
     pending: PendingMessageAttachment,
     onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<EncryptedAttachmentUpload> {
+    const size = pending.encryptedBytes.byteLength;
+
     reportAttachmentUploadProgress(onProgress, pending.metadata.filename, 0);
-    const upload = await this.privateFiles.upload(
-      session,
-      networkId,
-      pending.encryptedBytes,
-      pending.uploadFilename,
-    );
+    const reservation = await this.privateBlobs.reserve(session, size);
+    await this.privateBlobs.upload(reservation, pending.encryptedBytes);
     reportAttachmentUploadProgress(onProgress, pending.metadata.filename, 100);
 
-    return { cid: upload.cid, size: upload.size };
+    return {
+      blobs: [
+        {
+          blobId: reservation.blobId,
+          downloadToken: reservation.downloadToken,
+          expiresAt: reservation.expiresAt,
+          index: 0,
+          size,
+        },
+      ],
+      size,
+    };
   }
 
   public async uploadPublic(

@@ -32,17 +32,14 @@ export class PigeonAttachmentRepository implements AttachmentRepository {
       publisherExternalIdentifier,
     );
     const resource = attachment.isEncrypted()
-      ? await this.uploader.publishEncrypted(
-          session,
-          file,
-          attachment.getEncryptionNetworkId(),
-          onProgress,
-        )
+      ? await this.uploader.publishEncrypted(session, file, onProgress)
       : await this.uploader.publishPublic(session, file, onProgress);
 
     this.contexts.complete(sourceExternalIdentifier, resource);
 
-    return AttachmentExternalIdentifier.fromString(resource.cid);
+    return AttachmentExternalIdentifier.fromString(
+      resource.cid ?? resource.blobs?.[0]?.blobId ?? '',
+    );
   }
 
   public async find(

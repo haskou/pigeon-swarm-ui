@@ -112,6 +112,7 @@ export function useCommunityMessageComposer({
 
   const { loadAttachmentPreview, openAttachment } = useAttachmentDownload({
     errorMessage: copy.composer.attachmentDownloadError,
+    unavailableMessage: copy.attachments.loadFailed,
     onErrorChange: setError,
     onProgressChange: setAttachmentProgress,
   });

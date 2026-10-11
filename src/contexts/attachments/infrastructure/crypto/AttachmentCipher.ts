@@ -71,7 +71,6 @@ export class AttachmentCipher {
           file,
           id: UUID.generate().toString(),
           type: 'encrypt',
-          uploadFilename: `${UUID.generate().toString()}.bin`,
         },
         onProgress,
       )
@@ -91,7 +90,6 @@ export class AttachmentCipher {
         filename: file.name || 'attachment',
         size: file.size,
       },
-      uploadFilename: result.uploadFilename,
     };
   }
 

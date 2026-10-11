@@ -17,6 +17,7 @@ export const es = {
     downloadImageWithSize: 'Descargar imagen ({size})',
     downloadVideoWithSize: 'Descargar video ({size})',
     file: 'Archivo',
+    loadFailed: 'No se pudo cargar este adjunto.',
     nextImage: 'Siguiente imagen',
     openImage: 'Abrir imagen',
     previewVideo: 'Previsualizar video',

@@ -3,7 +3,6 @@ import type {
   MessageAttachment,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { AttachmentNetworkId } from '../../domain/value-objects/AttachmentNetworkId';
 
 import { AttachmentCipher } from '../crypto/AttachmentCipher';
 import { PublicImageUploadPreparer } from '../media/PublicImageUploadPreparer';
@@ -31,18 +30,12 @@ export class PigeonMessageAttachmentUploader {
   public async publishEncrypted(
     session: Session,
     file: File,
-    networkId: AttachmentNetworkId,
     onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<MessageAttachment> {
-    const preview = await this.previews.createEncrypted(
-      session,
-      networkId,
-      file,
-    );
+    const preview = await this.previews.createEncrypted(session, file);
     const pending = await this.cipher.encrypt(file, onProgress);
     const upload = await this.blobs.uploadEncrypted(
       session,
-      networkId.toString(),
       pending,
       onProgress,
     );
@@ -50,9 +43,8 @@ export class PigeonMessageAttachmentUploader {
     return this.withPreview(
       {
         ...pending.metadata,
-        cid: upload.cid,
+        blobs: upload.blobs,
         encrypted: true,
-        ...(upload.chunks ? { chunks: upload.chunks } : {}),
         encryptedSize: upload.size,
         ...(upload.type ? { type: upload.type } : {}),
       },

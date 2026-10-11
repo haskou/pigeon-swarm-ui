@@ -6,15 +6,13 @@ import { AttachmentPublicationContexts } from '../../../../../contexts/attachmen
 import { PigeonFilesGateway } from '../../../../../contexts/attachments/infrastructure/http/PigeonFilesGateway';
 
 describe(PigeonFilesGateway.name, () => {
-  function publishedAttachment(encrypted: boolean): Attachment {
+  function publishedAttachment(): Attachment {
     return Attachment.fromPrimitives({
       contentType: 'text/plain',
       externalIdentifier: 'external-1',
       filename: 'notes.txt',
       id: 'external-1',
-      publication: encrypted
-        ? { encrypted: true, networkId: 'network-1' }
-        : { encrypted: false },
+      publication: { encrypted: false },
       size: 5,
       status: 'published',
     });
@@ -36,12 +34,7 @@ describe(PigeonFilesGateway.name, () => {
         return Promise.resolve(message.getAttachment());
       });
     const gateway = new PigeonFilesGateway(
-      {
-        download: jest.fn(),
-        findPrivate: jest.fn(),
-        findPublic: jest.fn(),
-      },
-      { upload: jest.fn() },
+      { download: jest.fn(), findPublic: jest.fn() },
       { upload: jest.fn() },
       { publish },
       { find: jest.fn() },
@@ -59,22 +52,16 @@ describe(PigeonFilesGateway.name, () => {
     expect(publish).toHaveBeenCalledTimes(1);
   });
 
-  it('delegates public, private, and download compatibility operations', async () => {
+  it('delegates download and public file operations', async () => {
     const blob = new Blob(['content']);
-    const privateContent = { encryptedData: 'AQID' };
     const publicContent = { blob };
     const downloader = {
       download: jest.fn().mockResolvedValue(blob),
-      findPrivate: jest.fn().mockResolvedValue(privateContent),
       findPublic: jest.fn().mockResolvedValue(publicContent),
     };
-    const find = jest
-      .fn()
-      .mockResolvedValueOnce(publishedAttachment(true))
-      .mockResolvedValueOnce(publishedAttachment(false));
+    const find = jest.fn().mockResolvedValueOnce(publishedAttachment());
     const gateway = new PigeonFilesGateway(
       downloader,
-      { upload: jest.fn() },
       { upload: jest.fn() },
       { publish: jest.fn() },
       { find },
@@ -82,21 +69,17 @@ describe(PigeonFilesGateway.name, () => {
     );
 
     await expect(
-      gateway.downloadAttachment({
+      gateway.download({
         cid: 'external-1',
         contentType: 'text/plain',
         filename: 'notes.txt',
         size: 5,
       }),
     ).resolves.toBe(blob);
-    await expect(gateway.getPrivateFile('private-1')).resolves.toBe(
-      privateContent,
-    );
     await expect(gateway.getPublicFile('public-1')).resolves.toBe(
       publicContent,
     );
-    expect(find).toHaveBeenCalledTimes(2);
-    expect(downloader.findPrivate).toHaveBeenCalledWith('external-1');
+    expect(find).toHaveBeenCalledTimes(1);
     expect(downloader.findPublic).toHaveBeenCalledWith('external-1');
   });
 });

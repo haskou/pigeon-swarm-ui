@@ -189,7 +189,7 @@ function isImageAttachment(attachment: MessageAttachment): boolean {
 function isMessageAttachment(value: unknown): value is MessageAttachment {
   return (
     isRecord(value) &&
-    typeof value.cid === 'string' &&
+    (typeof value.cid === 'string' || Array.isArray(value.blobs)) &&
     typeof value.contentType === 'string' &&
     typeof value.filename === 'string' &&
     typeof value.size === 'number'
