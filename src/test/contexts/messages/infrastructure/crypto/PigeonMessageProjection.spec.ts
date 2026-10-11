@@ -1,10 +1,28 @@
-import { describe, expect, it } from '@jest/globals';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
+import { mock, type MockProxy } from 'jest-mock-extended';
+import { setImmediate as flushImmediate } from 'node:timers/promises';
 
-import type { MessageResource } from '../../../../../shared/domain/pigeonResources.types';
+import type {
+  MessageResource,
+  Session,
+} from '../../../../../shared/domain/pigeonResources.types';
 
+import { createMessageDecryptWorker } from '../../../../../contexts/messages/infrastructure/crypto/createMessageDecryptWorker';
 import { MessageProjector } from '../../../../../contexts/messages/infrastructure/crypto/MessageProjector';
 import { PigeonMessageProjection } from '../../../../../contexts/messages/infrastructure/crypto/PigeonMessageProjection';
 import { sessionFixture } from '../../../conversations/ConversationFixture';
+
+jest.mock(
+  '../../../../../contexts/messages/infrastructure/crypto/createMessageDecryptWorker',
+  () => ({ createMessageDecryptWorker: jest.fn() }),
+);
 
 const projectionCopy = {
   decryptFailed: 'decrypt failed',
@@ -63,5 +81,130 @@ describe(PigeonMessageProjection.name, () => {
     );
 
     expect(projected).toMatchObject({ content: 'hello', id: 'message-a' });
+  });
+
+  describe('worker lifecycle', () => {
+    const originalWorker = Object.getOwnPropertyDescriptor(
+      globalThis,
+      'Worker',
+    );
+
+    beforeEach(() => {
+      Object.defineProperty(globalThis, 'Worker', {
+        configurable: true,
+        value: class WorkerAvailable {},
+      });
+    });
+
+    afterEach(() => {
+      jest.mocked(createMessageDecryptWorker).mockReset();
+
+      if (originalWorker) {
+        Object.defineProperty(globalThis, 'Worker', originalWorker);
+      } else {
+        Reflect.deleteProperty(globalThis, 'Worker');
+      }
+    });
+
+    function respondingWorker(): MockProxy<Worker> {
+      const worker = mock<Worker>();
+
+      worker.postMessage.mockImplementation((request: unknown) => {
+        const { requestId } = request as { requestId: number };
+
+        worker.onmessage?.({
+          data: { messages: [], requestId, type: 'success' },
+        } as MessageEvent);
+      });
+
+      return worker;
+    }
+
+    const sentMessage = {
+      authorIdentityId: 'identity-b',
+      content: 'hello',
+      createdAt: 1,
+      id: 'message-a',
+      type: 'sent' as const,
+    };
+
+    it('terminates the decrypt worker on dispose and starts a fresh one afterwards', async () => {
+      const worker = respondingWorker();
+
+      jest.mocked(createMessageDecryptWorker).mockReturnValue(worker);
+      const projection = new PigeonMessageProjection(
+        new MessageProjector(projectionCopy),
+        projectionCopy,
+      );
+
+      await projection.decryptMany(sessionFixture(), 'conversation-a', [
+        sentMessage,
+      ]);
+      projection.dispose();
+
+      expect(worker.terminate).toHaveBeenCalledTimes(1);
+
+      await projection.decryptMany(sessionFixture(), 'conversation-a', [
+        sentMessage,
+      ]);
+
+      expect(createMessageDecryptWorker).toHaveBeenCalledTimes(2);
+    });
+
+    it('sends the conversation key to the worker as symmetricKey', async () => {
+      const worker = respondingWorker();
+
+      jest.mocked(createMessageDecryptWorker).mockReturnValue(worker);
+      const projection = new PigeonMessageProjection(
+        new MessageProjector(projectionCopy),
+        projectionCopy,
+      );
+      const session: Session = {
+        ...sessionFixture(),
+        keychain: {
+          conversations: {
+            'conversation-a': {
+              algorithm: 'aes-256-gcm',
+              conversationId: 'conversation-a',
+              createdAt: 1,
+              key: 'key-a',
+              kind: 'conversation',
+              peerIdentityId: 'identity-b',
+              version: 2,
+            },
+          },
+          version: 1,
+        },
+      };
+
+      await projection.decryptMany(session, 'conversation-a', [
+        { ...sentMessage, encryptedPayload: 'payload' },
+      ]);
+
+      expect(worker.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ symmetricKey: 'key-a' }),
+      );
+    });
+
+    it('rejects decrypts still in flight when disposed', async () => {
+      const worker = mock<Worker>();
+
+      jest.mocked(createMessageDecryptWorker).mockReturnValue(worker);
+      const projection = new PigeonMessageProjection(
+        new MessageProjector(projectionCopy),
+        projectionCopy,
+      );
+      const pending = projection.decryptMany(
+        sessionFixture(),
+        'conversation-a',
+        [sentMessage],
+      );
+      await flushImmediate();
+      projection.dispose();
+
+      await expect(pending).rejects.toThrow(
+        'Message decrypt worker was terminated',
+      );
+    });
   });
 });

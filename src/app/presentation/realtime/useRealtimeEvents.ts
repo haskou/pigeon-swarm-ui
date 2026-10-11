@@ -93,6 +93,12 @@ function unsubscribeRealtime(
   subscription.handlersRef.current.onDisconnected?.();
 
   if (connection.subscribers.size > 0) return;
+  if (
+    realtimeConnections.get(realtimeConnectionKey(connection.session)) !==
+    connection
+  ) {
+    return;
+  }
 
   if (connection.reconnectTimer !== undefined) {
     window.clearTimeout(connection.reconnectTimer);
@@ -224,6 +230,26 @@ function notifySubscribers(
 
 function realtimeConnectionKey(session: Session): string {
   return session.identity.id;
+}
+
+export function closeAllRealtimeConnections(): void {
+  realtimeConnections.forEach((connection) => {
+    if (connection.closeTimer !== undefined) {
+      window.clearTimeout(connection.closeTimer);
+    }
+
+    if (connection.reconnectTimer !== undefined) {
+      window.clearTimeout(connection.reconnectTimer);
+    }
+
+    connection.closeTimer = undefined;
+    connection.reconnectTimer = undefined;
+    connection.subscribers.clear();
+    connection.socket?.close();
+    connection.socket = null;
+    connection.connectPromise = null;
+  });
+  realtimeConnections.clear();
 }
 
 export function sendRealtimeTyping(

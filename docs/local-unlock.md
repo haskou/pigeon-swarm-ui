@@ -29,8 +29,9 @@ session before they are stored.
   key. Identity IDs and workspace preferences are not encrypted.
 - **Same-origin script (for example injected content).** A script running in
   the page can call unlock if it knows the password, and can use the factor key
-  while the page is alive. The factor key cannot be exported. The client has no
-  Content Security Policy yet, so this is not mitigated.
+  while the page is alive. The factor key cannot be exported. The production
+  build sends a Content Security Policy that blocks inline and eval scripts
+  (see below). A script from an allowed origin is not stopped.
 - **A compromised device or browser session.** Not protected. Unlock has no
   user-presence step.
 
@@ -49,8 +50,12 @@ It keeps, on purpose:
 - the last-login identity ID, workspace preferences, and
   community unread counts.
 
-This document does not claim that logout stops every background task or that
-JavaScript memory is cleared. Neither is verified.
+Logout also closes realtime sockets and terminates the message decrypt worker.
+In-flight decrypts reject; a new worker starts on the next decrypt. Removing a
+push subscription always unsubscribes in the browser, even if the backend
+delete fails.
+
+This document does not claim that JavaScript memory is cleared.
 
 ### Log out and forget this device
 
@@ -112,9 +117,18 @@ longer writes them. Covered by `deleteLegacyRememberedIdentityStorage.spec.ts`.
   `v1.scrypt.N262144.r8.p1.hkdf-sha256.aes-256-gcm`. Other scrypt cost, block
   size, or parallelism values are rejected. Covered by
   `DeviceSecurityValueObjects.spec.ts`.
-- **Logs.** The realtime gateway logs connection URLs with `signature` removed.
-  The URL keeps `identityId` and `timestamp`. Reviewed logging call sites do not
-  log keys, decrypted payloads, or topics.
+- **Logs.** Reviewed logging call sites do not log keys, decrypted payloads, or
+  topics. The realtime gateway constructor's signed-URL log was fixed in
+  PR #246, which is on `main`.
+- **Content Security Policy.** The production build injects a
+  `Content-Security-Policy` meta tag (policy in
+  `src/shared/infrastructure/security/contentSecurityPolicy.ts`, applied in
+  `vite.config.ts`). Scripts come only from the app origin and
+  `'wasm-unsafe-eval'`. Inline scripts and `eval` are blocked. Styles allow
+  `'unsafe-inline'`. Objects, base URIs, and frames are blocked. The dev server
+  sends no policy. `frame-ancestors` is ignored in a meta tag, so clickjacking
+  protection must come from the hosting server's response header. Covered by
+  `contentSecurityPolicy.spec.ts`.
 
 ## Tests
 
@@ -128,7 +142,5 @@ the main jest suite. The main jest config excludes them because its
 - **Session-only versus remembered-device split.** It overlaps branch
   `security/session-only-auth` in the primary checkout.
 - **User-presence check** before unlock.
-- **Content Security Policy.** The node URL is user-configurable, so a policy
-  needs a browser smoke test first.
-- **Logout stops background work.** Needs verification.
+- **Attachment cipher worker on logout.** Not terminated yet.
 - **Diagnostic export and crash reports.** Not reviewed.
