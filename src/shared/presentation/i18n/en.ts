@@ -633,6 +633,32 @@ export const en = {
     retry: 'Retry connection',
     title: 'No connection with the server',
   },
+  contacts: {
+    changedAcknowledge:
+      'I understand this username now belongs to a different identity.',
+    changedBody:
+      'The username {handle} now resolves to a different identity than the one you talked to before. It may be a new account, or someone else may have taken the name.',
+    changedTitle: 'This username now points to a different identity',
+    changedUnverified:
+      'You had not verified the earlier contact, so you can still continue.',
+    changedVerified:
+      'You had verified the earlier contact. Compare safety numbers with this person before you continue.',
+    markVerified: 'Mark as verified',
+    removeVerification: 'Remove verification',
+    safetyNumber: 'Safety number',
+    saveError: 'The verification could not be saved in this browser.',
+    unverifiedStatus:
+      'Not verified. Messages stay end-to-end encrypted, but you have not confirmed who this is.',
+    verified: 'Verified',
+    verifiedContact: 'Verified contact',
+    verifiedStatus: 'You confirmed that the safety numbers match.',
+    verifyAction: 'Verify',
+    verifyBody:
+      'Compare these numbers with {name} on a call you trust or in person. If all twelve groups match on both devices, mark this contact as verified.',
+    verifyHelp:
+      'The numbers come from both identities, so they only match when you both see the same keys. A matching name or username does not count.',
+    verifyTitle: 'Verify contact',
+  },
   dataViewer: {
     additional: 'Additional data',
     array: 'Array ({count})',

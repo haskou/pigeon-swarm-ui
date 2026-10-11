@@ -5,6 +5,7 @@ import type {
   NotificationScopeSetting,
 } from '../../../../shared/domain/pigeonResources.types';
 
+import { VerifiedIcon } from '../../../../contexts/identities/presentation/components/VerifiedIcon';
 import { NotificationScopeMenuActions } from '../../../../contexts/notifications/presentation/components/NotificationScopeMenuActions';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
@@ -29,6 +30,7 @@ interface ConversationActionsMenuProps {
   onGroupLeave?: () => void;
   onOpenPins: () => void;
   onRealtimeEventsOpen?: () => void;
+  onVerificationOpen?: () => void;
   onStartCall?: (input: {
     conversationId: string;
     kind: 'group' | 'one-to-one';
@@ -55,6 +57,7 @@ export function ConversationActionsMenu({
   onNotificationSettingsOpen,
   onOpenPins,
   onRealtimeEventsOpen,
+  onVerificationOpen,
   onStartCall,
 }: ConversationActionsMenuProps) {
   const { close, state } = useCloseTransition(onClose);
@@ -100,6 +103,16 @@ export function ConversationActionsMenu({
                   activeConversationName ??
                   activeConversation.id,
               });
+              close();
+            }}
+          />
+        ) : null}
+        {onVerificationOpen ? (
+          <ConversationHeaderMenuAction
+            icon={<VerifiedIcon className="h-4 w-4 shrink-0 text-white/55" />}
+            label={copy.contacts.verifyAction}
+            onClick={() => {
+              onVerificationOpen();
               close();
             }}
           />

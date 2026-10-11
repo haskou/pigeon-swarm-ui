@@ -6,6 +6,7 @@ import type {
   IdentityResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { ContactKeyCheck } from '../../../identities/domain/ContactPins';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { Field } from '../../../identities/presentation/auth/Field';
@@ -23,7 +24,13 @@ import { SegmentedControl } from '../../../../shared/presentation/components/seg
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { IdentityMemberRow } from '../../../identities/presentation/components/IdentityMemberListPanel';
+import { ContactChangeNotice } from '../../../identities/presentation/components/ContactChangeNotice';
 import { ConversationPeer } from '../view-models/ConversationPeer';
+import { contactKeyBlocked } from '../../../identities/presentation/view-models/contactKeyNotice';
+import {
+  checkIdentityContact,
+  rememberIdentityContact,
+} from '../../../identities/presentation/view-models/contactPins';
 
 type LoadState = 'idle' | 'loading' | 'error';
 type IdentityLookupState =
@@ -77,6 +84,12 @@ export function CreateConversationDialog({
   const [groupNetworkId, setGroupNetworkId] = useState('');
   const [state, setState] = useState<LoadState>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [peerContact, setPeerContact] = useState<ContactKeyCheck | null>(null);
+  const [peerContactAcknowledged, setPeerContactAcknowledged] = useState(false);
+  const [groupIdentityContact, setGroupIdentityContact] =
+    useState<ContactKeyCheck | null>(null);
+  const [groupIdentityAcknowledged, setGroupIdentityAcknowledged] =
+    useState(false);
   const sharedNetworkIds = useMemo(() => {
     if (!peerIdentity) return [];
 
@@ -128,7 +141,8 @@ export function CreateConversationDialog({
     !!peerIdentity &&
     !!selectedNetworkId &&
     !existingDirectConversation &&
-    state !== 'loading';
+    state !== 'loading' &&
+    !contactKeyBlocked(peerContact, peerContactAcknowledged);
   const canSubmitGroup =
     groupName.trim().length > 0 &&
     groupParticipants.length > 0 &&
@@ -147,6 +161,8 @@ export function CreateConversationDialog({
     setPeerIdentity(null);
     setPeerPictureUrl(null);
     setSelectedNetworkId('');
+    setPeerContact(null);
+    setPeerContactAcknowledged(false);
 
     if (!trimmed) {
       setLookupState('idle');
@@ -175,6 +191,8 @@ export function CreateConversationDialog({
 
           setPeerIdentity(identity);
           setSelectedNetworkId(sharedNetworks[0] ?? '');
+          setPeerContact(checkIdentityContact(session.identity.id, identity));
+          setPeerContactAcknowledged(false);
           setLookupState('ready');
 
           void loadDialogIdentityPicture(identity).then((picture) => {
@@ -192,13 +210,15 @@ export function CreateConversationDialog({
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [peerIdentityId, session.identity.networks]);
+  }, [peerIdentityId, session.identity.id, session.identity.networks]);
 
   useEffect(() => {
     const identityLookup = normalizeIdentityLookup(groupIdentityInput);
 
     setError(null);
     setGroupIdentityPreview(null);
+    setGroupIdentityContact(null);
+    setGroupIdentityAcknowledged(false);
 
     if (!identityLookup) {
       setGroupIdentityLookupState('idle');
@@ -217,6 +237,10 @@ export function CreateConversationDialog({
 
           setGroupIdentityLookupState('ready');
           setGroupIdentityPreview({ identity, pictureUrl: null });
+          setGroupIdentityContact(
+            checkIdentityContact(session.identity.id, identity),
+          );
+          setGroupIdentityAcknowledged(false);
           void loadDialogIdentityPicture(identity).then((pictureUrl) => {
             if (!cancelled) {
               setGroupIdentityPreview({ identity, pictureUrl });
@@ -232,7 +256,7 @@ export function CreateConversationDialog({
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [groupIdentityInput]);
+  }, [groupIdentityInput, session.identity.id]);
 
   useEffect(() => {
     if (groupNetworkId && groupSharedNetworkIds.includes(groupNetworkId)) {
@@ -262,6 +286,9 @@ export function CreateConversationDialog({
             ),
           },
         );
+        for (const { identity } of groupParticipants) {
+          rememberIdentityContact(session.identity.id, identity);
+        }
         onCreated(
           {
             ...session,
@@ -313,6 +340,7 @@ export function CreateConversationDialog({
         identityLookup,
         selectedNetworkId,
       );
+      rememberIdentityContact(session.identity.id, peerIdentity);
       onCreated(
         {
           ...session,
@@ -335,6 +363,10 @@ export function CreateConversationDialog({
     const identity = groupIdentityPreview?.identity;
 
     if (!identity) return;
+
+    if (contactKeyBlocked(groupIdentityContact, groupIdentityAcknowledged)) {
+      return;
+    }
 
     if (
       identity.id === session.identity.id ||
@@ -419,6 +451,16 @@ export function CreateConversationDialog({
                   />
                   <IdentityLookupStatus status={remoteIdentityStatus} />
                 </Field>
+                {peerIdentity && (
+                  <ContactChangeNotice
+                    acknowledged={peerContactAcknowledged}
+                    check={peerContact}
+                    handle={
+                      peerIdentity.profile.handle ?? shortId(peerIdentity.id)
+                    }
+                    onAcknowledgedChange={setPeerContactAcknowledged}
+                  />
+                )}
                 <Field label={copy.dialog.sharedNetwork}>
                   <GlassSelect
                     ariaLabel={copy.dialog.selectSwarm}
@@ -493,7 +535,14 @@ export function CreateConversationDialog({
                   <button
                     type="button"
                     onClick={() => void addGroupParticipant()}
-                    disabled={!groupIdentityInput.trim() || state === 'loading'}
+                    disabled={
+                      !groupIdentityInput.trim() ||
+                      state === 'loading' ||
+                      contactKeyBlocked(
+                        groupIdentityContact,
+                        groupIdentityAcknowledged,
+                      )
+                    }
                     className="ui-button"
                   >
                     {copy.dialog.addParticipant}
@@ -510,6 +559,17 @@ export function CreateConversationDialog({
                   identity={groupIdentityPreview.identity}
                   name={identityPrimaryName(groupIdentityPreview.identity)}
                   pictureUrl={groupIdentityPreview.pictureUrl}
+                />
+              )}
+              {groupIdentityPreview && (
+                <ContactChangeNotice
+                  acknowledged={groupIdentityAcknowledged}
+                  check={groupIdentityContact}
+                  handle={
+                    groupIdentityPreview.identity.profile.handle ??
+                    shortId(groupIdentityPreview.identity.id)
+                  }
+                  onAcknowledgedChange={setGroupIdentityAcknowledged}
                 />
               )}
 
