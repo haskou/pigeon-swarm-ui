@@ -11,6 +11,7 @@ import type {
   IdentityPresence,
   IdentityResource,
   LocalKeychain,
+  LocalKeychainUpdate,
   LoginResult,
   Session,
   SelectablePresenceStatus,
@@ -170,9 +171,9 @@ export class PigeonIdentitiesFacade {
 
   public async publishKeychain(
     session: Session,
-    nextKeychain: LocalKeychain,
+    update: LocalKeychainUpdate,
   ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
-    return await this.gateway.publishKeychain(session, nextKeychain);
+    return await this.gateway.publishKeychain(session, update);
   }
 
   public async refresh(identityId: string): Promise<IdentityResource> {

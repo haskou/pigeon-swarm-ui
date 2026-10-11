@@ -254,9 +254,8 @@ export class PigeonConversationCommandsApi {
       peerIdentity.id,
       networkId,
     );
-    const published = await this.keychains.publishKeychain(
-      session,
-      this.withConversationKey(session.keychain, keyEntry),
+    const published = await this.keychains.publishKeychain(session, (current) =>
+      this.withConversationKey(current, keyEntry),
     );
     const conversation = await this.postConversation(session, published, {
       keychainExternalIdentifier: published.keychainExternalIdentifier,
@@ -311,9 +310,8 @@ export class PigeonConversationCommandsApi {
       )
       .toString();
     const keyEntry = this.createGroupConversationKeyEntry(conversationId);
-    const published = await this.keychains.publishKeychain(
-      session,
-      this.withConversationKey(session.keychain, keyEntry),
+    const published = await this.keychains.publishKeychain(session, (current) =>
+      this.withConversationKey(current, keyEntry),
     );
     const conversation = await this.postConversation(session, published, {
       keychainExternalIdentifier: published.keychainExternalIdentifier,

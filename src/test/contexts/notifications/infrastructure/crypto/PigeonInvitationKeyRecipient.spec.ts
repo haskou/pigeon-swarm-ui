@@ -5,6 +5,7 @@ import type { PigeonConversationInvitationKeyDecryptor } from '../../../../../co
 import type {
   ConversationKeyEntry,
   LocalKeychain,
+  LocalKeychainUpdate,
   Session,
 } from '../../../../../shared/domain/pigeonResources.types';
 
@@ -61,6 +62,13 @@ describe(PigeonInvitationKeyRecipient.name, () => {
     );
     expect(identities.publishKeychain).toHaveBeenCalledWith(
       session,
+      expect.any(Function),
+    );
+    const [, update] = identities.publishKeychain.mock.calls[0] as [
+      Session,
+      LocalKeychainUpdate,
+    ];
+    expect(update(keychain)).toEqual(
       expect.objectContaining({
         conversations: { 'conversation-1': keyEntry },
       }),

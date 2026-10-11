@@ -72,18 +72,16 @@ describe(PigeonIdentitiesGateway.name, () => {
     const { gateway, keychain } = gatewayDouble();
     const session = { identity: { id: 'identity-1' } } as unknown as Session;
     const nextKeychain = { conversations: {}, version: 2 } as LocalKeychain;
+    const update = jest.fn().mockReturnValue(nextKeychain);
     const published = {
       keychain: nextKeychain,
       keychainExternalIdentifier: 'keychain-1',
     };
     keychain.publishKeychain.mockResolvedValue(published);
 
-    await expect(gateway.publishKeychain(session, nextKeychain)).resolves.toBe(
+    await expect(gateway.publishKeychain(session, update)).resolves.toBe(
       published,
     );
-    expect(keychain.publishKeychain).toHaveBeenCalledWith(
-      session,
-      nextKeychain,
-    );
+    expect(keychain.publishKeychain).toHaveBeenCalledWith(session, update);
   });
 });

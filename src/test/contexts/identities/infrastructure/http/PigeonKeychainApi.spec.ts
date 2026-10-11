@@ -50,7 +50,7 @@ class FakeKeychainServer {
     return Object.keys(keychain.conversations).sort();
   }
 
-  public async handle(method: string, body?: string): Promise<unknown> {
+  public handle(method: string, body?: string): unknown {
     if (method === 'GET') {
       const head = this.stored.reduce<StoredKeychain | undefined>(
         (best, keychain) =>
@@ -223,8 +223,8 @@ describe(PigeonKeychainApi.name, () => {
     const api = new PigeonKeychainApi(
       {
         request: jest.fn(
-          async (_path: string, init: { body?: string; method: string }) =>
-            await server.handle(init.method, init.body),
+          (_path: string, init: { body?: string; method: string }) =>
+            server.handle(init.method, init.body),
         ),
       } as unknown as HttpJsonClient,
       { headers: jest.fn().mockResolvedValue({}) } as unknown as RequestSigner,
@@ -233,24 +233,24 @@ describe(PigeonKeychainApi.name, () => {
     );
 
     await Promise.all([
-      api.publishKeychain(session, {
-        ...session.keychain,
+      api.publishKeychain(session, (current) => ({
+        ...current,
         conversations: {
-          ...session.keychain.conversations,
+          ...current.conversations,
           'conversation-a': {
             conversationId: 'conversation-a',
           } as ConversationKeyEntry,
         },
-      }),
-      api.publishKeychain(session, {
-        ...session.keychain,
+      })),
+      api.publishKeychain(session, (current) => ({
+        ...current,
         conversations: {
-          ...session.keychain.conversations,
+          ...current.conversations,
           'conversation-b': {
             conversationId: 'conversation-b',
           } as ConversationKeyEntry,
         },
-      }),
+      })),
     ]);
 
     expect(server.headConversationIds()).toEqual([

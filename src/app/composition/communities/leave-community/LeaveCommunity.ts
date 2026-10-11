@@ -35,10 +35,8 @@ export class LeaveCommunity {
 
     const published = await this.identities.publishKeychain(
       session,
-      ConversationKeychainService.withoutCommunityEntry(
-        session.keychain,
-        communityId,
-      ),
+      (current) =>
+        ConversationKeychainService.withoutCommunityEntry(current, communityId),
     );
 
     return {

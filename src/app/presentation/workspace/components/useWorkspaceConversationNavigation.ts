@@ -156,13 +156,13 @@ export function useWorkspaceConversationNavigation({
     async (keyEntry: ConversationKeyEntry): Promise<void> => {
       const result = await applicationContainer.identities.publishKeychain(
         session,
-        {
-          ...session.keychain,
+        (current) => ({
+          ...current,
           conversations: {
-            ...session.keychain.conversations,
+            ...current.conversations,
             [keyEntry.conversationId]: keyEntry,
           },
-        },
+        }),
       );
 
       setSession((current) =>
