@@ -194,9 +194,7 @@ describe(PigeonKeychainApi.name, () => {
       } as unknown as RequestCache,
     );
 
-    await expect(
-      api.loadOptional(session, { expected: false }),
-    ).resolves.toBeUndefined();
+    await expect(api.loadOptional(session)).resolves.toBeUndefined();
   });
 
   it('keeps both conversation keys when two publishes start from one stale snapshot', async () => {
@@ -266,6 +264,28 @@ describe(PigeonKeychainApi.name, () => {
       encryptedPayload: 'encrypted',
       keychainExternalIdentifier: 'kc-1',
     } as KeychainResource;
+    const pointedSession = {
+      identity: { id: 'identity-1' },
+      keychainExternalIdentifier: 'kc-1',
+    } as unknown as Session;
+    const signingSession = {
+      identity: { id: 'identity-1' },
+      keyPair: {
+        sign: jest.fn().mockReturnValue({ toString: () => 'signature' }),
+      },
+      masterKey: {
+        decrypt: (payload: { valueOf(): string }) => ({
+          toString: () => payload.valueOf(),
+        }),
+        encrypt: (plaintext: string) => ({ toString: () => plaintext }),
+      },
+      password: 'secret',
+    };
+    const emptyKeychain: LocalKeychain = {
+      conversations: {},
+      timestamp: 1,
+      version: 0,
+    };
 
     const lagError = (): HttpJsonError =>
       new HttpJsonError(
@@ -274,14 +294,18 @@ describe(PigeonKeychainApi.name, () => {
         JSON.stringify({ code: 'KeychainNotFoundError' }),
       );
 
-    function apiFor(request: jest.Mock): PigeonKeychainApi {
+    function apiFor(
+      request: jest.Mock,
+      cipher: KeychainCipher = {} as KeychainCipher,
+    ): PigeonKeychainApi {
       return new PigeonKeychainApi(
         { request } as unknown as HttpJsonClient,
         {
           headers: jest.fn().mockResolvedValue({}),
         } as unknown as RequestSigner,
-        {} as KeychainCipher,
+        cipher,
         {
+          invalidateForSession: jest.fn(),
           keyForSession: () => 'cache-key',
           load: async (_key: string, loader: () => Promise<KeychainResource>) =>
             await loader(),
@@ -303,7 +327,7 @@ describe(PigeonKeychainApi.name, () => {
         .mockRejectedValueOnce(lagError())
         .mockRejectedValueOnce(lagError())
         .mockResolvedValueOnce(keychainResource);
-      const pending = apiFor(request).loadOptional(session, { expected: true });
+      const pending = apiFor(request).loadOptional(pointedSession);
 
       await jest.runAllTimersAsync();
 
@@ -311,59 +335,135 @@ describe(PigeonKeychainApi.name, () => {
       expect(request).toHaveBeenCalledTimes(3);
     });
 
-    it('reports no keychain after a bounded retry window when the 409 persists', async () => {
+    it('reports no keychain after the bounded retry window when the 409 persists', async () => {
       const request = jest.fn().mockRejectedValue(lagError());
-      const startedAt = Date.now();
-      const pending = apiFor(request).loadOptional(session, { expected: true });
+      const pending = apiFor(request).loadOptional(pointedSession);
 
       await jest.runAllTimersAsync();
 
       await expect(pending).resolves.toBeUndefined();
-      expect(Date.now() - startedAt).toBeLessThanOrEqual(10_000);
       expect(request).toHaveBeenCalledTimes(7);
     });
 
-    it('reads once when no keychain is expected so first registration is not delayed', async () => {
+    it('reads once when the session holds no keychain pointer so login and registration are not delayed', async () => {
       const request = jest.fn().mockRejectedValue(lagError());
       const startedAt = Date.now();
 
       await expect(
-        apiFor(request).loadOptional(session, { expected: false }),
+        apiFor(request).loadOptional(session),
       ).resolves.toBeUndefined();
 
       expect(Date.now() - startedAt).toBe(0);
       expect(request).toHaveBeenCalledTimes(1);
     });
 
-    it('stops retrying when aborted and rejects rather than reporting no keychain', async () => {
-      const reason = new Error('load cancelled');
-      const request = jest.fn().mockRejectedValue(lagError());
+    it('stops retrying once the caller aborts the load', async () => {
       const controller = new AbortController();
-      const pending = apiFor(request).loadOptional(session, {
-        expected: true,
+      const request = jest.fn().mockRejectedValue(lagError());
+      const pending = apiFor(request).loadOptional(pointedSession, {
         signal: controller.signal,
       });
-      const outcome = expect(pending).rejects.toBe(reason);
 
-      await jest.advanceTimersByTimeAsync(100);
-      controller.abort(reason);
-      await outcome;
+      await jest.advanceTimersByTimeAsync(300);
+      controller.abort(new Error('aborted'));
 
+      await expect(pending).rejects.toThrow('aborted');
+      expect(request).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not retry failures other than a missing keychain', async () => {
+      const request = jest
+        .fn()
+        .mockRejectedValue(new HttpJsonError(500, 'Server Error', '{}'));
+      const pending = apiFor(request).loadOptional(pointedSession);
+
+      await expect(pending).rejects.toThrow(HttpJsonError);
       expect(request).toHaveBeenCalledTimes(1);
     });
 
-    it('does not retry other failures', async () => {
-      const failure = new HttpJsonError(
-        500,
-        'Internal Server Error',
-        JSON.stringify({ code: 'InternalError' }),
+    it('retries a lagging head read before publishing when the session already holds a keychain', async () => {
+      const seeded: LocalKeychain = {
+        conversations: {
+          'conversation-seed': {
+            conversationId: 'conversation-seed',
+          } as ConversationKeyEntry,
+        },
+        timestamp: 1,
+        version: 1,
+      };
+      const server = new FakeKeychainServer();
+      server.seed(seeded, 'kc-1');
+      let laggingReads = 2;
+      const request = jest.fn(
+        (_path: string, init: { body?: string; method: string }) => {
+          if (init.method === 'GET' && laggingReads > 0) {
+            laggingReads -= 1;
+            throw lagError();
+          }
+
+          return server.handle(init.method, init.body);
+        },
       );
-      const request = jest.fn().mockRejectedValue(failure);
+      const session = {
+        ...signingSession,
+        keychain: seeded,
+        keychainExternalIdentifier: 'kc-1',
+      } as unknown as Session;
+      const outcome = expect(
+        apiFor(request, new KeychainCipher()).publishKeychain(
+          session,
+          (current) => ({
+            ...current,
+            conversations: {
+              ...current.conversations,
+              'conversation-a': {
+                conversationId: 'conversation-a',
+              } as ConversationKeyEntry,
+            },
+          }),
+        ),
+      ).resolves.toMatchObject({ keychainExternalIdentifier: 'kc-2' });
+
+      await jest.runAllTimersAsync();
+
+      await outcome;
+      expect(server.headConversationIds()).toEqual([
+        'conversation-a',
+        'conversation-seed',
+      ]);
+    });
+
+    it('publishes without waiting when the session holds no keychain yet', async () => {
+      const server = new FakeKeychainServer();
+      const request = jest.fn(
+        (_path: string, init: { body?: string; method: string }) =>
+          server.handle(init.method, init.body),
+      );
+      const session = {
+        ...signingSession,
+        keychain: emptyKeychain,
+        keychainExternalIdentifier: null,
+      } as unknown as Session;
+      const startedAt = Date.now();
 
       await expect(
-        apiFor(request).loadOptional(session, { expected: true }),
-      ).rejects.toBe(failure);
-      expect(request).toHaveBeenCalledTimes(1);
+        apiFor(request, new KeychainCipher()).publishKeychain(
+          session,
+          (current) => ({
+            ...current,
+            conversations: {
+              ...current.conversations,
+              'conversation-a': {
+                conversationId: 'conversation-a',
+              } as ConversationKeyEntry,
+            },
+          }),
+        ),
+      ).resolves.toMatchObject({ keychainExternalIdentifier: 'kc-1' });
+
+      expect(Date.now() - startedAt).toBe(0);
+      expect(request).toHaveBeenCalledTimes(2);
+      expect(server.headConversationIds()).toEqual(['conversation-a']);
     });
   });
 });

@@ -30,12 +30,6 @@ export class PigeonIdentityLoginApi {
     return await this.workspace.hydrate(session, onProgress);
   }
 
-  public async hydrateRegistered(session: Session): Promise<LoginResult> {
-    return await this.workspace.hydrate(session, undefined, {
-      keychainExpected: false,
-    });
-  }
-
   public async unlock(
     identityId: string,
     password: string,
