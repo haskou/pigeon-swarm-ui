@@ -1437,6 +1437,7 @@ export const en = {
   },
   workspace: {
     closeSidebar: 'Close sidebar',
+    directMailboxSyncError: 'Direct messages could not be synced. Retrying.',
     loadMessagesError:
       'Messages could not be loaded. Great, now we have a mystery.',
     loadOlderError: 'Older messages could not be loaded.',

@@ -1441,6 +1441,8 @@ export const es = {
   },
   workspace: {
     closeSidebar: 'Cerrar barra lateral',
+    directMailboxSyncError:
+      'No se pudieron sincronizar los mensajes directos. Reintentando.',
     loadMessagesError: 'No se pudieron cargar los mensajes.',
     loadOlderError: 'No se pudieron cargar mensajes antiguos.',
     newMessages: 'Nuevos mensajes',

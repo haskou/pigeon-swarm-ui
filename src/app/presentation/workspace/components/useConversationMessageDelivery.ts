@@ -152,6 +152,17 @@ export function useConversationMessageDelivery({
             );
           }
 
+          void applicationContainer.directMessages.deliver(
+            session,
+            activeConversation,
+            sent.raw,
+            {
+              attachmentCount: payload.attachments.length,
+              hasReply: !!payload.replyTarget,
+              hasSticker: !!payload.sticker,
+            },
+          );
+
           onMessagesChange((current) =>
             MessageCollection.merge(
               current.filter((message) => message.id !== optimisticId),

@@ -76,6 +76,7 @@ import { MessageMapper } from '../../contexts/messages/infrastructure/http/Messa
 import { MessageOperationContexts } from '../../contexts/messages/infrastructure/http/MessageOperationContexts';
 import { PigeonDraftRepository } from '../../contexts/messages/infrastructure/http/PigeonDraftRepository';
 import { PigeonMessageRepository } from '../../contexts/messages/infrastructure/http/PigeonMessageRepository';
+import { DirectMessageMailbox } from '../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
 import { NetworkNodeClaimer } from '../../contexts/networks/application/claim-network-node/NetworkNodeClaimer';
 import { NetworkCreator } from '../../contexts/networks/application/create-network/NetworkCreator';
 import { PublicNetworkCreator } from '../../contexts/networks/application/create-public-network/PublicNetworkCreator';
@@ -183,6 +184,8 @@ export class PigeonApplication {
 
   public readonly messages: PigeonMessagesFacade;
 
+  public readonly directMessages: DirectMessageMailbox;
+
   public readonly networks: PigeonNetworksFacade;
 
   public readonly notifications: PigeonNotificationsFacade;
@@ -202,6 +205,7 @@ export class PigeonApplication {
     realtime: RealtimeGateway = new RealtimeGateway(),
   ) {
     this.gateway = gateway;
+    this.directMessages = gateway.directMessageMailbox;
     this.attachments = new PigeonAttachmentsFacade(gateway.filesGateway);
     const callContexts = new CallAccessContexts();
     const callMapper = new CallMapper();
