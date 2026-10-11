@@ -6,9 +6,9 @@ import { DevicePairingCode } from '../../../../contexts/identities/domain/value-
 import { DevicePairingCodeField } from '../../../../contexts/identities/presentation/device-pairing/DevicePairingCodeField';
 import { DevicePairingCodeOutput } from '../../../../contexts/identities/presentation/device-pairing/DevicePairingCodeOutput';
 import { DevicePairingQrCode } from '../../../../contexts/identities/presentation/device-pairing/DevicePairingQrCode';
+import { toDevicePairingErrorMessage } from '../../../../contexts/identities/presentation/view-models/toDevicePairingErrorMessage';
 import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
 import { copy } from '../../../../shared/presentation/i18n/copy';
-import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
 
 export function DevicePairingDialog({
@@ -41,7 +41,9 @@ export function DevicePairingDialog({
         ),
       );
     } catch (caught) {
-      setError(toUserErrorMessage(caught, copy.profile.devicePairingError));
+      setError(
+        toDevicePairingErrorMessage(caught, copy.profile.devicePairingError),
+      );
     } finally {
       setState('idle');
     }
@@ -60,7 +62,9 @@ export function DevicePairingDialog({
       setCompletionCode(result.completionCode);
       onSessionUpdated(result.session);
     } catch (caught) {
-      setError(toUserErrorMessage(caught, copy.profile.devicePairingError));
+      setError(
+        toDevicePairingErrorMessage(caught, copy.profile.devicePairingError),
+      );
     } finally {
       setState('idle');
     }

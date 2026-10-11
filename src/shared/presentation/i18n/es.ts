@@ -141,10 +141,10 @@ export const es = {
     peersLabel: 'Pares',
     profileNameLabel: 'Nombre de perfil',
     recoveryKeyCreateHelp:
-      'Guarda esta clave. La necesitarás para abrir tu identidad desde otro nodo o navegador.',
+      'Guarda esta clave. Te permite volver a iniciar sesión en tu identidad desde otro nodo o navegador. Restaura el acceso, no una copia de tus mensajes: el historial vuelve solo en las conversaciones cuyas claves se guardaron en tu llavero.',
     recoveryKeyLabel: 'Clave de recuperación',
     recoveryKeyLoginHelp:
-      'Pega la clave de recuperación que guardaste al crear tu identidad (empieza por psrk1). Los dispositivos que usabas antes dejarán de funcionar.',
+      'Pega la clave de recuperación que guardaste al crear tu identidad (empieza por psrk1). Restaura el acceso a tu identidad en este dispositivo. Los dispositivos que usabas antes dejarán de funcionar. El historial vuelve solo en las conversaciones cuyas claves se guardaron en tu llavero.',
     recoveryKeyPlaceholder: 'psrk1...',
     recoveryKeyRegenerate: 'Regenerar',
     recoveryKeySaved: 'He guardado mi clave de recuperación',
@@ -1264,15 +1264,15 @@ export const es = {
     copySensitiveKeyConfirm:
       'Esta clave permite descifrar contenido privado. Si la copias sin cifrar, cualquier persona o aplicación con acceso al portapapeles podría leerla. ¿Seguro que quieres continuar?',
     currentPassword: 'Contraseña actual',
-    deviceCompromiseFromLabel: 'Desconfiar desde la revisión',
+    deviceCompromiseFromLabel: 'Desconfiar desde la versión',
     deviceCompromiseHelp:
-      'Se rechaza todo lo que este dispositivo firmó desde esa revisión, aunque entonces estuviera autorizado. Usa 1 para desconfiar por completo. La revisión {revision} es la última.',
+      'Se rechaza todo lo que este dispositivo firmó desde esa versión en adelante, aunque entonces fuera válido. Usa 1 para desconfiar de toda su actividad. La versión {version} es la última.',
     deviceCurrent: 'Este dispositivo',
     deviceListEmpty: 'No hay otros dispositivos autorizados.',
     deviceListError: 'No se pudo cargar la lista de dispositivos.',
     deviceManageAction: 'Gestionar dispositivos',
     deviceManageHelp:
-      'Muestra los dispositivos que pueden actuar como tú. Revocar impide que firme nada nuevo; no borra los datos ya guardados en él ni las copias que otras personas hayan conservado.',
+      'Muestra los dispositivos que pueden actuar como tú. Quitar acceso impide que firme nada nuevo. No borra los datos ya guardados en él ni las copias que otras personas hayan conservado.',
     deviceManageTitle: 'Tus dispositivos',
     devicePairingAction: 'Añadir otro dispositivo',
     devicePairingAuthorize: 'Autorizar dispositivo',
@@ -1282,25 +1282,36 @@ export const es = {
       'Escanea este QR final en el dispositivo nuevo, o copia el código y pégalo allí. Está cifrado para ese dispositivo y solo funciona una vez.',
     devicePairingCompletionQr: 'Finalización cifrada del emparejamiento',
     devicePairingError: 'No se ha podido emparejar el dispositivo.',
+    devicePairingExpired:
+      'Este código ha caducado. Crea uno nuevo en tu dispositivo con sesión iniciada e inténtalo de nuevo.',
     devicePairingHelp:
       'Usa códigos QR autenticados y de corta duración. El dispositivo nuevo crea una credencial independiente y su propia envoltura de contraseña.',
+    devicePairingInvalid:
+      'Este código no es válido. Comprueba que copiaste el código completo o crea uno nuevo.',
     devicePairingInvitationCodeLabel:
       'Código de invitación (úsalo si el dispositivo nuevo no puede escanear)',
     devicePairingInvitationHelp:
-      'En el dispositivo nuevo ve a Iniciar sesión y elige Dispositivo nuevo. Escanea este QR allí, o pega el código de abajo. El dispositivo nuevo mostrará su propia solicitud: pégala o escanéala en la caja que hay bajo este QR.',
+      'En el dispositivo nuevo ve a Iniciar sesión y elige Dispositivo nuevo. Escanea este QR allí, o pega el código de abajo. El dispositivo nuevo mostrará su propia solicitud: pégala o escanéala en la caja que hay bajo este QR. El código caduca dos minutos después de crearse.',
     devicePairingInvitationQr: 'Invitación para emparejar dispositivo',
+    devicePairingMismatch:
+      'Esta solicitud está desactualizada o pertenece a otra identidad. Pide al dispositivo nuevo que cree una solicitud nueva.',
     devicePairingRequestLabel: 'Solicitud del dispositivo nuevo',
     devicePairingRequestPlaceholder:
       'Pega el código de solicitud del dispositivo nuevo, o escanea su QR',
     devicePairingReview: 'Revisar solicitud',
     devicePairingTitle: 'Añadir un dispositivo',
+    devicePairingUsed:
+      'Este emparejamiento ya se ha usado. Empieza de nuevo en tu dispositivo con sesión iniciada para añadir un dispositivo.',
     devicePairingVerificationHelp:
       'Confirma que este código es idéntico en el dispositivo nuevo antes de autorizar. Si difiere, cierra este diálogo.',
+    deviceRemoveAccess: 'Quitar acceso',
+    deviceRemoveAccessNote:
+      'Quitar acceso no borra los datos ya guardados en el dispositivo ni las copias que otras personas hayan conservado.',
     deviceRetire: 'Retirar',
     deviceRetireConfirm:
-      'Este dispositivo deja de estar autorizado en cuanto se acepte la revocación. Su actividad anterior sigue siendo válida.',
-    deviceRevokeCompromised: 'Revocar como comprometido',
-    deviceRevokeConfirm: 'Confirmar revocación',
+      'Úsalo cuando ya no utilices el dispositivo. Ya no podrá actuar como tú, y los mensajes que ya envió siguen siendo válidos.',
+    deviceRevokeCompromised: 'Marcar como comprometido',
+    deviceRevokeConfirm: 'Quitar acceso',
     deviceRevokeError: 'No se pudo revocar el dispositivo.',
     discardChanges: 'Descartar',
     discardChangesBody: 'Hay cambios sin guardar. ¿Quieres descartarlos?',

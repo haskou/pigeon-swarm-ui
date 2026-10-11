@@ -136,10 +136,10 @@ export const en = {
     peersLabel: 'Peers',
     profileNameLabel: 'Profile name',
     recoveryKeyCreateHelp:
-      'Save this key. You will need it to open your identity from another node or browser.',
+      'Save this key. It signs you back in to your identity from another node or browser. It restores sign-in, not a copy of your messages: history comes back only for conversations whose keys were saved in your keychain.',
     recoveryKeyLabel: 'Recovery key',
     recoveryKeyLoginHelp:
-      'Paste the recovery key you saved when you created your identity (it starts with psrk1). Devices you used before will stop working.',
+      'Paste the recovery key you saved when you created your identity (it starts with psrk1). It restores sign-in and your identity on this device. Devices you used before will stop working. Conversation history comes back only for conversations whose keys were saved in your keychain.',
     recoveryKeyPlaceholder: 'psrk1...',
     recoveryKeyRegenerate: 'Regenerate',
     recoveryKeySaved: 'I saved my recovery key',
@@ -1260,15 +1260,15 @@ export const en = {
     copySensitiveKeyConfirm:
       'This key can decrypt private content. If you copy it unencrypted, anyone or any application with clipboard access could read it. Are you sure you want to continue?',
     currentPassword: 'Current password',
-    deviceCompromiseFromLabel: 'Distrust it since revision',
+    deviceCompromiseFromLabel: 'Distrust from version',
     deviceCompromiseHelp:
-      'Everything this device signed from that revision on is rejected, even if it was authorized then. Use 1 to distrust it completely. Revision {revision} is the latest.',
+      'Everything this device signed from that version on is rejected, even if it was valid when signed. Use 1 to distrust all of its activity. Version {version} is the latest.',
     deviceCurrent: 'This device',
     deviceListEmpty: 'No other devices are authorized.',
     deviceListError: 'The device list could not be loaded.',
     deviceManageAction: 'Manage devices',
     deviceManageHelp:
-      'Lists the devices that can act as you. Revoking stops it from signing anything new; it does not delete data already stored on it or copies other people retained.',
+      'Lists the devices that can act as you. Removing access stops a device from signing anything new. It does not delete data already stored on it or copies other people kept.',
     deviceManageTitle: 'Your devices',
     devicePairingAction: 'Add another device',
     devicePairingAuthorize: 'Authorize device',
@@ -1278,25 +1278,36 @@ export const en = {
       'Scan this final QR on the new device, or copy the code and paste it there. It is encrypted for that device and works only once.',
     devicePairingCompletionQr: 'Encrypted device pairing completion',
     devicePairingError: 'The device could not be paired.',
+    devicePairingExpired:
+      'This code has expired. Create a new code on your signed-in device and try again.',
     devicePairingHelp:
       'Uses short-lived authenticated QR codes. The new device creates an independent credential and local password envelope.',
+    devicePairingInvalid:
+      'This code is not valid. Check that you copied the whole code, or create a new one.',
     devicePairingInvitationCodeLabel:
       'Invitation code (use it if the new device cannot scan)',
     devicePairingInvitationHelp:
-      'On the new device, go to Login and choose New device. Scan this QR there, or paste the code below. The new device will then show its own request: paste or scan it in the box under this QR.',
+      'On the new device, go to Login and choose New device. Scan this QR there, or paste the code below. The new device will then show its own request: paste or scan it in the box under this QR. The invitation expires two minutes after it is created.',
     devicePairingInvitationQr: 'Device pairing invitation',
+    devicePairingMismatch:
+      'This request is out of date or belongs to another identity. Ask the new device to create a new request.',
     devicePairingRequestLabel: 'Request from the new device',
     devicePairingRequestPlaceholder:
       'Paste the new device request code, or scan its QR',
     devicePairingReview: 'Review request',
     devicePairingTitle: 'Add a device',
+    devicePairingUsed:
+      'This pairing was already used. Start again on your signed-in device to add a device.',
     devicePairingVerificationHelp:
       'Confirm this code is identical on the new device before authorizing. If it differs, close this dialog.',
+    deviceRemoveAccess: 'Remove access',
+    deviceRemoveAccessNote:
+      'Removing access does not delete data already stored on the device, or copies other people kept.',
     deviceRetire: 'Retire',
     deviceRetireConfirm:
-      'This device stops being authorized as soon as the revocation is accepted. Its earlier activity stays valid.',
-    deviceRevokeCompromised: 'Revoke as compromised',
-    deviceRevokeConfirm: 'Confirm revocation',
+      'Use Retire when you no longer use a device. It can no longer act as you, and messages it already sent stay valid.',
+    deviceRevokeCompromised: 'Mark as compromised',
+    deviceRevokeConfirm: 'Remove access',
     deviceRevokeError: 'The device could not be revoked.',
     discardChanges: 'Discard',
     discardChangesBody:

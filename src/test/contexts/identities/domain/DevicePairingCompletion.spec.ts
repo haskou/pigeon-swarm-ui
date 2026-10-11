@@ -10,6 +10,7 @@ import { DeviceAuthorizationRevision } from '../../../../contexts/identities/dom
 import { DevicePairingCode } from '../../../../contexts/identities/domain/value-objects/DevicePairingCode';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { PairingId } from '../../../../contexts/identities/domain/value-objects/PairingId';
+import { thrownPairingFailure } from './thrownPairingFailure';
 
 describe(DevicePairingCompletion.name, () => {
   async function fixture() {
@@ -73,11 +74,13 @@ describe(DevicePairingCompletion.name, () => {
       DevicePairingCode.encode({ ...resource, revision: 5 }),
     );
 
-    expect(() =>
-      completion.open(
-        source.draft.getRequest(),
-        source.draft.getTransportKeyPair(),
+    expect(
+      thrownPairingFailure(() =>
+        completion.open(
+          source.draft.getRequest(),
+          source.draft.getTransportKeyPair(),
+        ),
       ),
-    ).toThrow('Invalid device pairing completion');
+    ).toBe('invalid');
   });
 });

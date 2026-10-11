@@ -4,6 +4,8 @@ import { assert } from '@haskou/value-objects';
 
 import type { DevicePairingRequest } from './DevicePairingRequest';
 
+import { DevicePairingError } from './DevicePairingError';
+
 export class DevicePairingRequestDraft {
   private consumed = false;
 
@@ -16,7 +18,10 @@ export class DevicePairingRequestDraft {
   public assertAvailable(): void {
     assert(
       this.consumed === false,
-      new Error('Device pairing request was already used.'),
+      new DevicePairingError(
+        'used',
+        'Device pairing request was already used.',
+      ),
     );
   }
 

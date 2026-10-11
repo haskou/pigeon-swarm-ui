@@ -1,5 +1,7 @@
 import { assert } from '@haskou/value-objects';
 
+import { DevicePairingError } from './DevicePairingError';
+
 export class DevicePairingResource {
   public static fromUnknown(
     value: unknown,
@@ -7,7 +9,7 @@ export class DevicePairingResource {
   ): DevicePairingResource {
     assert(
       typeof value === 'object' && value !== null,
-      new Error(invalidMessage),
+      new DevicePairingError('invalid', invalidMessage),
     );
 
     return new DevicePairingResource(
@@ -24,7 +26,7 @@ export class DevicePairingResource {
   public assertProtocol(kind: string, version: number): void {
     assert(
       this.getString('kind') === kind && this.getNumber('version') === version,
-      new Error(this.invalidMessage),
+      new DevicePairingError('invalid', this.invalidMessage),
     );
   }
 
@@ -42,7 +44,10 @@ export class DevicePairingResource {
 
   public getNumber(name: string): number {
     const value = this.values[name];
-    assert(typeof value === 'number', new Error(this.invalidMessage));
+    assert(
+      typeof value === 'number',
+      new DevicePairingError('invalid', this.invalidMessage),
+    );
 
     return value;
   }
@@ -56,7 +61,10 @@ export class DevicePairingResource {
 
   public getString(name: string): string {
     const value = this.values[name];
-    assert(typeof value === 'string', new Error(this.invalidMessage));
+    assert(
+      typeof value === 'string',
+      new DevicePairingError('invalid', this.invalidMessage),
+    );
 
     return value;
   }

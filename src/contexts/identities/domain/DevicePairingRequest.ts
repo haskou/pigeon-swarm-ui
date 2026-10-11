@@ -6,6 +6,7 @@ import type { DevicePairingRequestResource } from './DevicePairingRequestResourc
 
 import { DeviceAuthorizationEnrollmentProof } from './DeviceAuthorizationEnrollmentProof';
 import { DeviceAuthorizationTransition } from './DeviceAuthorizationTransition';
+import { DevicePairingError } from './DevicePairingError';
 import { DevicePairingInvitation } from './DevicePairingInvitation';
 import { DevicePairingRequestDraft } from './DevicePairingRequestDraft';
 import { DevicePairingResource } from './DevicePairingResource';
@@ -139,12 +140,17 @@ export class DevicePairingRequest {
 
   public assertValidAt(acceptedAt: Timestamp): void {
     this.invitation.assertValidAt(acceptedAt);
-    assert(this.signature, new Error('Invalid device pairing request.'));
+    assert(
+      this.signature,
+      new DevicePairingError('invalid', 'Invalid device pairing request.'),
+    );
+    assert(
+      this.authorizedAt.valueOf() <= this.invitation.getExpiration().valueOf(),
+      new DevicePairingError('expired', 'Expired device pairing request.'),
+    );
     assert(
       this.authorizedAt.valueOf() <=
         acceptedAt.valueOf() + MAX_FUTURE_SKEW_MS &&
-        this.authorizedAt.valueOf() <=
-          this.invitation.getExpiration().valueOf() &&
         DeviceAuthorizationTransition.isValidEnrollmentProof({
           authorCredential: this.invitation.getAuthorCredential(),
           authorizedAt: this.authorizedAt,
@@ -160,7 +166,10 @@ export class DevicePairingRequest {
           .getCredential()
           .getPublicKey()
           .isValidSignature(this.signingPayload(), this.signature),
-      new Error('Invalid or expired device pairing request.'),
+      new DevicePairingError(
+        'invalid',
+        'Invalid or expired device pairing request.',
+      ),
     );
   }
 

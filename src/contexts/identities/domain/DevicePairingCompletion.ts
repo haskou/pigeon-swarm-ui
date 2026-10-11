@@ -11,6 +11,7 @@ import type { DevicePairingCompletionMaterialResource } from './DevicePairingCom
 import type { DevicePairingCompletionPayload } from './DevicePairingCompletionPayload';
 import type { DevicePairingCompletionResource } from './DevicePairingCompletionResource';
 
+import { DevicePairingError } from './DevicePairingError';
 import { DevicePairingMaterial } from './DevicePairingMaterial';
 import { DevicePairingRequest } from './DevicePairingRequest';
 import { DevicePairingResource } from './DevicePairingResource';
@@ -159,7 +160,10 @@ export class DevicePairingCompletion {
     );
     assert(
       resource.getNumber('version') === 1,
-      new Error('Invalid encrypted device pairing material.'),
+      new DevicePairingError(
+        'invalid',
+        'Invalid encrypted device pairing material.',
+      ),
     );
 
     return new DevicePairingMaterial(
@@ -188,7 +192,7 @@ export class DevicePairingCompletion {
             JSON.stringify({ completion: this.payload(), domain: DOMAIN }),
             this.signature,
           ),
-      new Error('Invalid device pairing completion.'),
+      new DevicePairingError('invalid', 'Invalid device pairing completion.'),
     );
 
     const plaintext = transport.decrypt(this.encryptedMaterial).toString();

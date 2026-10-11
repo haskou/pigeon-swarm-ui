@@ -68,7 +68,7 @@ export function DeviceRevocationPanel({
           />
           <span className="text-xs text-white/60">
             {copy.profile.deviceCompromiseHelp.replace(
-              '{revision}',
+              '{version}',
               String(latestRevision),
             )}
           </span>
@@ -78,6 +78,9 @@ export function DeviceRevocationPanel({
           {copy.profile.deviceRetireConfirm}
         </p>
       )}
+      <p className="text-xs text-white/60">
+        {copy.profile.deviceRemoveAccessNote}
+      </p>
       <div className="flex gap-2">
         <button
           className="ui-button ui-button-danger"

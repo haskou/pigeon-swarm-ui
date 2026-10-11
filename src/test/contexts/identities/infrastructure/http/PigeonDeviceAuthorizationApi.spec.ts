@@ -337,7 +337,7 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
         draft,
         DevicePairingCode.fromString(authorized.completion.toCode().valueOf()),
       ),
-    ).rejects.toThrow('already used');
+    ).rejects.toMatchObject({ failure: 'used' });
   });
 
   describe('device management', () => {
