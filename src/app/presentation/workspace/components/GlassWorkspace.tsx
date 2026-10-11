@@ -44,6 +44,7 @@ import { CommunityUnreadState } from './CommunityUnreadState';
 import { communityVoiceChannelTopologyKey } from './communityVoicePresence';
 import { CommunityWorkspaceContent } from './CommunityWorkspaceContent';
 import { type EditingMessage } from './conversationThreadState';
+import { mergeRefreshedSession } from './mergeRefreshedSession';
 import { MessagesWorkspaceContent } from './MessagesWorkspaceContent';
 import { PushNotificationPrompt } from './PushNotificationPrompt';
 import { Rail, type RailProps } from './Rail';
@@ -76,7 +77,7 @@ import { stableUniqueKey } from './workspaceNotificationState';
 
 interface GlassWorkspaceProps {
   session: Session;
-  setSession: (session: Session | null) => void;
+  setSession: Dispatch<SetStateAction<Session | null>>;
   conversations: ConversationResource[];
   communities: Community[];
   communitiesError: Error | null;
@@ -680,7 +681,7 @@ export function GlassWorkspace({
   const refreshSession = useCallback(async () => {
     const result = await applicationContainer.session.refresh(session);
 
-    setSession(result.session);
+    setSession((current) => mergeRefreshedSession(current, result.session));
     setConversations(result.conversations);
   }, [session, setConversations, setSession]);
 
