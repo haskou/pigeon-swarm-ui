@@ -128,13 +128,19 @@ describe(DirectMessageMailbox.name, () => {
       ).toEqual(expect.objectContaining({ id: 'message-1', type: 'sent' }));
     });
 
-    it('reports a 404 from the recipient inbox as failed instead of dropping silently', async () => {
+    it('reports a 404 from the recipient inbox as failed and logs one count-only line', async () => {
       const { channel, mailbox } = setup();
       channel.send.mockRejectedValue(new MailboxUnavailableError());
+      const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
 
       await expect(
         mailbox.deliver(session('alice'), conversation, sent, plain),
       ).resolves.toBe('failed');
+      expect(debug).toHaveBeenCalledTimes(1);
+      expect(debug).toHaveBeenCalledWith(
+        'Direct mailbox append failed; legacy copy kept.',
+      );
+      debug.mockRestore();
     });
 
     it('reports any other append failure as failed', async () => {

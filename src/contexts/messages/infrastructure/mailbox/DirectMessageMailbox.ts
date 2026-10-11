@@ -46,8 +46,8 @@ export class DirectMessageMailbox {
    * Sender. Appends the already-sent record to the peer's inbox. Returns
    * 'skipped' when there is no peer or the message is not eligible, which
    * leaves it on the legacy path only. Never throws: any failure, including
-   * 404 for an inbox the peer has not opened yet, returns 'failed' so the
-   * caller can surface it.
+   * 404 for an inbox the peer has not opened yet, returns 'failed'. The caller
+   * keeps the legacy copy and shows nothing to the user.
    */
   public async deliver(
     session: Session,
@@ -77,6 +77,10 @@ export class DirectMessageMailbox {
 
       return 'delivered';
     } catch {
+      // Count-only: no ids, content, or error details.
+      // eslint-disable-next-line no-console
+      console.debug('Direct mailbox append failed; legacy copy kept.');
+
       return 'failed';
     }
   }

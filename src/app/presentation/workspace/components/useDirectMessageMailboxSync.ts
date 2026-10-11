@@ -17,7 +17,7 @@ const SYNC_INTERVAL_MS = 5000;
 
 type DirectMessageMailboxSyncInput = {
   activeConversation: ConversationResource | undefined;
-  onErrorChange: (error: string | null) => void;
+  onErrorChange: Dispatch<SetStateAction<string | null>>;
   onMessagesChange: Dispatch<SetStateAction<ChatMessage[]>>;
   session: Session;
 };
@@ -25,8 +25,8 @@ type DirectMessageMailboxSyncInput = {
 /**
  * Polls the recipient inbox of the active one-to-one conversation. A pass
  * never overlaps the next one: the next pass is scheduled after the current
- * one settles. The first failure of a streak shows a notice; the next
- * successful pass clears it.
+ * one settles. A failing streak shows one notice unless another error is
+ * already shown. The next successful pass clears only that notice.
  */
 export function useDirectMessageMailboxSync({
   activeConversation,
@@ -45,7 +45,7 @@ export function useDirectMessageMailboxSync({
     }
 
     const controller = new AbortController();
-    let failing = false;
+    let notice: string | null = null;
     let timer: number | undefined;
 
     const pass = async (): Promise<void> => {
@@ -63,20 +63,23 @@ export function useDirectMessageMailboxSync({
           },
         );
 
-        if (failing) {
-          failing = false;
-          onErrorChange(null);
+        if (notice !== null) {
+          const shown = notice;
+          notice = null;
+          onErrorChange((current) => (current === shown ? null : current));
         }
       } catch (caught) {
         if (controller.signal.aborted) {
           return;
         }
 
-        if (!failing) {
-          failing = true;
-          onErrorChange(
-            toUserErrorMessage(caught, copy.workspace.directMailboxSyncError),
+        if (notice === null) {
+          const message = toUserErrorMessage(
+            caught,
+            copy.workspace.directMailboxSyncError,
           );
+          notice = message;
+          onErrorChange((current) => current ?? message);
         }
       }
 

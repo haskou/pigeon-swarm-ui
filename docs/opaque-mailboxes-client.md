@@ -61,12 +61,13 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 ## Direct messages (spike)
 
 - Scope: one-to-one text with no attachments, reply, or sticker. Anything else stays on the legacy path (`deliver` returns `skipped`).
-- Send: the legacy POST runs first and is unchanged. The sent record is then appended to the recipient's inbox (`DirectMessageMailbox.deliver`). `failed` shows a visible notice. There is no automatic retry, so the legacy copy is never duplicated.
+- Send: the legacy POST runs first and is unchanged. The sent record is then appended to the recipient's inbox (`DirectMessageMailbox.deliver`). A failed append returns `failed` and is silent for the user. The facade logs one count-only debug line (no ids, content, or error details). There is no automatic retry, so the legacy copy is never duplicated.
 - Recipient: the active one-to-one conversation is polled about every 5 s (`useDirectMessageMailboxSync`). Each page is decrypted, applied to the timeline, then acknowledged. The cursor advances only after a successful ack. Replays collapse by message id in `MessageCollection.merge`.
-- A 404 on append means the recipient has not opened the conversation yet, so their inbox does not exist. It surfaces as `failed`.
-- A failing sync shows one notice. The next successful pass clears it.
+- A 404 on append means the recipient has not opened the conversation yet, so their inbox does not exist. That is expected, so it returns `failed` with no user notice.
+- A failing sync shows one notice unless another error is already shown. The next successful pass clears only that notice.
 - Cursor and read token are stored in localStorage under `pigeon.direct-mailbox.<mailboxId>` (scoped per client). There is no cross-device recovery.
 - Gaps: home-node discovery assumes `API_SERVER_URL`; polling only (no realtime hint); no retry beyond the next poll; epoch fixed at 0.
+- Send-failure notice: hidden while the legacy path still delivers every message. It returns when the legacy path is retired and the mailbox is the only delivery path.
 
 ## Open questions (not decided, not implemented)
 
