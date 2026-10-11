@@ -25,13 +25,14 @@ describe(MailboxCreationWorkerClient.name, () => {
 
   it('posts the mining request and resolves with the worker nonce', async () => {
     const { client, worker } = setup();
-    const mined = client.mine('mailbox', 'post-hash', 'read-hash');
+    const mined = client.mine('mailbox', 'post-hash', 'read-hash', 17);
 
     expect(worker.postMessage).toHaveBeenCalledWith({
       id: 0,
       mailboxId: 'mailbox',
       postTokenHash: 'post-hash',
       readTokenHash: 'read-hash',
+      difficultyBits: 17,
     });
 
     worker.respond({ creationNonce: '42', id: 0 });
@@ -41,8 +42,8 @@ describe(MailboxCreationWorkerClient.name, () => {
 
   it('matches responses to requests by id', async () => {
     const { client, worker } = setup();
-    const first = client.mine('a', 'p', 'r');
-    const second = client.mine('b', 'p', 'r');
+    const first = client.mine('a', 'p', 'r', 16);
+    const second = client.mine('b', 'p', 'r', 16);
 
     worker.respond({ creationNonce: 'two', id: 1 });
     worker.respond({ creationNonce: 'one', id: 0 });
@@ -53,7 +54,7 @@ describe(MailboxCreationWorkerClient.name, () => {
 
   it('rejects pending requests when the worker errors', async () => {
     const { client, worker } = setup();
-    const mined = client.mine('mailbox', 'post-hash', 'read-hash');
+    const mined = client.mine('mailbox', 'post-hash', 'read-hash', 16);
 
     worker.fail('boom');
 
@@ -62,7 +63,7 @@ describe(MailboxCreationWorkerClient.name, () => {
 
   it('terminates the worker and rejects pending requests on dispose', async () => {
     const { client, worker } = setup();
-    const mined = client.mine('mailbox', 'post-hash', 'read-hash');
+    const mined = client.mine('mailbox', 'post-hash', 'read-hash', 16);
 
     client.dispose();
 

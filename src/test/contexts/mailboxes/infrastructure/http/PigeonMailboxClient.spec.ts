@@ -1,5 +1,6 @@
 import { mock } from 'jest-mock-extended';
 
+import { MailboxCreationDifficultyError } from '../../../../../contexts/mailboxes/infrastructure/http/MailboxCreationDifficultyError';
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/infrastructure/http/MailboxUnavailableError';
 import { PigeonMailboxClient } from '../../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
 import { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
@@ -112,4 +113,76 @@ describe(PigeonMailboxClient.name, () => {
       ).rejects.toMatchObject({ status });
     },
   );
+
+  it('reports a short creation proof with the difficulty the node requires', async () => {
+    const { client, http } = setup();
+
+    http.request.mockRejectedValue(
+      new HttpJsonError(
+        400,
+        'Bad Request',
+        JSON.stringify({
+          code: 'BadRequestError',
+          errors: [],
+          httpStatus: 400,
+          message: 'Mailbox creation proof does not meet the difficulty',
+          requiredDifficultyBits: 17,
+        }),
+      ),
+    );
+
+    const rejection = client.create(mailboxId, {
+      creationNonce: '1',
+      postTokenHash: 'post-hash',
+      readTokenHash: 'read-hash',
+    });
+
+    await expect(rejection).rejects.toBeInstanceOf(
+      MailboxCreationDifficultyError,
+    );
+    await expect(rejection).rejects.toMatchObject({
+      requiredDifficultyBits: 17,
+    });
+  });
+
+  it.each([
+    {},
+    { requiredDifficultyBits: '17' },
+    { requiredDifficultyBits: 0 },
+    { requiredDifficultyBits: -1 },
+    { requiredDifficultyBits: 16.5 },
+  ])(
+    'propagates a 400 without a usable requiredDifficultyBits (%j) as HttpJsonError',
+    async (body) => {
+      const { client, http } = setup();
+
+      http.request.mockRejectedValue(
+        new HttpJsonError(400, 'Bad Request', JSON.stringify(body)),
+      );
+
+      await expect(
+        client.create(mailboxId, {
+          creationNonce: '1',
+          postTokenHash: 'post-hash',
+          readTokenHash: 'read-hash',
+        }),
+      ).rejects.toBeInstanceOf(HttpJsonError);
+    },
+  );
+
+  it('propagates a 400 with a non-JSON body as HttpJsonError', async () => {
+    const { client, http } = setup();
+
+    http.request.mockRejectedValue(
+      new HttpJsonError(400, 'Bad Request', 'Bad Request'),
+    );
+
+    await expect(
+      client.create(mailboxId, {
+        creationNonce: '1',
+        postTokenHash: 'post-hash',
+        readTokenHash: 'read-hash',
+      }),
+    ).rejects.toBeInstanceOf(HttpJsonError);
+  });
 });
