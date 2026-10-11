@@ -26,6 +26,7 @@ import { NotificationSettingsPolicy } from '../../../../contexts/notifications/p
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { presenceFromRealtimeEvent } from '../presenceFromRealtimeEvent';
+import { applyRefreshedIdentity } from './applyRefreshedIdentity';
 import { isBrowserPageVisible } from './isBrowserPageVisible';
 import {
   eventAggregateId,
@@ -64,7 +65,7 @@ type WorkspaceRealtimeEventRouterInput = {
   setConversations: Dispatch<SetStateAction<ConversationResource[]>>;
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
   setRealtimeEventLog: Dispatch<SetStateAction<RealtimeDomainEvent[]>>;
-  setSession: (session: Session) => void;
+  setSession: Dispatch<SetStateAction<Session | null>>;
   updateMessageCursor: (cursor: null | string) => void;
   workspaceMode: 'community' | 'messages';
 };
@@ -141,7 +142,11 @@ export function useWorkspaceRealtimeEventRouter({
 
       void applicationContainer.identities
         .get(session.identity.id)
-        .then((identity) => setSession({ ...session, identity }))
+        .then((identity) =>
+          setSession((current) =>
+            applyRefreshedIdentity(current, session.identity.id, identity),
+          ),
+        )
         .catch(() => undefined);
     },
     [rememberIdentity, session, setSession],
