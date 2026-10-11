@@ -8,9 +8,8 @@ export type { RealtimeTypingInput } from './RealtimeTypingInput';
 import type { Session } from '../../domain/pigeonResources.types';
 
 import { API_SERVER_URL } from '../../../app/API_SERVER_URL';
-import { IdentityId } from '../../../contexts/identities/domain/value-objects/IdentityId';
-import { signSessionPayload } from '../crypto/signSessionPayload';
 import { ApiUrlBuilder } from '../http/ApiUrlBuilder';
+import { HttpJsonClient } from '../http/HttpJsonClient';
 import { RequestSigner } from '../http/RequestSigner';
 import { RealtimeCallSignalAcknowledgementPublisher } from './RealtimeCallSignalAcknowledgementPublisher';
 import { RealtimeConnectionUrl } from './RealtimeConnectionUrl';
@@ -19,14 +18,19 @@ import {
   type RealtimeHeartbeatActivityMode,
 } from './RealtimeHeartbeat';
 import { RealtimeMessageParser } from './RealtimeMessageParser';
+import { RealtimeTicketIssuer } from './RealtimeTicketIssuer';
 import { RealtimeTypingPublisher } from './RealtimeTypingPublisher';
 
 export type { RealtimeHeartbeatActivityMode } from './RealtimeHeartbeat';
 
 const debugRealtimeStorageKey = 'pigeon:debugRealtime';
+const realtimePath = '/realtime/v1';
+const realtimeProtocol = 'pigeon-realtime.v1';
 
 export class RealtimeGateway {
   private readonly connection: RealtimeConnectionUrl;
+
+  private readonly tickets: RealtimeTicketIssuer;
 
   private readonly heartbeat = new RealtimeHeartbeat();
 
@@ -39,9 +43,14 @@ export class RealtimeGateway {
 
   public constructor(
     urls: ApiUrlBuilder = new ApiUrlBuilder(API_SERVER_URL),
-    private readonly signer: RequestSigner = new RequestSigner(),
+    signer: RequestSigner = new RequestSigner(),
   ) {
     this.connection = new RealtimeConnectionUrl(urls);
+    this.tickets = new RealtimeTicketIssuer(
+      new HttpJsonClient(urls),
+      signer,
+      this.connection,
+    );
   }
 
   private sendIdentityHeartbeat(socket: WebSocket, active: boolean): void {
@@ -57,14 +66,10 @@ export class RealtimeGateway {
   }
 
   private logError(event: string, url: URL, data: unknown): void {
-    const safeUrl = new URL(url.toString());
-
-    safeUrl.searchParams.delete('signature');
-
     // eslint-disable-next-line no-console
     console.error('[pigeon realtime] websocket', event, {
       data,
-      url: safeUrl.toString(),
+      url: url.toString(),
     });
   }
 
@@ -91,24 +96,16 @@ export class RealtimeGateway {
     session: Session,
     onMessage: (message: RealtimeMessage) => void,
   ): Promise<WebSocket> {
-    const timestamp = Date.now();
-    const url = this.connection.websocket('/ws');
-    const signature = await signSessionPayload(
-      session,
-      this.signer.payload('GET', url.pathname, timestamp, {}),
-    );
-
-    url.searchParams.set(
-      'identityId',
-      IdentityId.normalize(session.identity.id),
-    );
-    url.searchParams.set('timestamp', `${timestamp}`);
-    url.searchParams.set('signature', signature.toString());
+    const url = this.connection.websocket(realtimePath);
+    const ticket = await this.tickets.issue(session);
 
     let socket: WebSocket;
 
     try {
-      socket = new WebSocket(url.toString());
+      socket = new WebSocket(url.toString(), [
+        realtimeProtocol,
+        `ticket.${ticket}`,
+      ]);
     } catch (caught) {
       this.logError('constructor', url, caught);
 
