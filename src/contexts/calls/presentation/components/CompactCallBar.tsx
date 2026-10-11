@@ -15,7 +15,7 @@ import {
 import { VideoPreview } from './VideoPreview';
 import { callSessionTitle } from './callSessionDisplay';
 import { MicrophoneBlockedNotice } from './MicrophoneBlockedNotice';
-import { CallRecoveryNotice } from './CallRecoveryNotice';
+import { CallConnectionNotice } from './CallConnectionNotice';
 
 type CompactCallBarProps = {
   call: CallSession;
@@ -67,7 +67,10 @@ export const CompactCallBar = memo(function CompactCallBar({
           </div>
           <CompactCallTitle call={call} subtitle={subtitle} />
         </div>
-        <CallRecoveryNotice call={call} onRetryConnection={onRetryConnection} />
+        <CallConnectionNotice
+          call={call}
+          onRetryConnection={onRetryConnection}
+        />
         {!call.hasMicrophone && (
           <MicrophoneBlockedNotice
             call={call}

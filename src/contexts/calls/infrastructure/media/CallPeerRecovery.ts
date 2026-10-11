@@ -8,6 +8,7 @@ const checkingPeerRecoveryDelayMs = 15_000;
 const maximumPeerRecoveryAttempts = 3;
 const peerRestartOutcomeWaitMs = 15_000;
 const credentialRefreshTimeoutMs = 15_000;
+const disruptionCooldownMs = 5_000;
 
 export class CallPeerRecovery {
   private readonly exhausted = new Set<string>();
@@ -22,6 +23,8 @@ export class CallPeerRecovery {
   >();
 
   private readonly retryNotBefore = new Map<string, number>();
+
+  private readonly lastRestartAt = new Map<string, number>();
 
   public constructor(
     private readonly restartIce: (
@@ -141,6 +144,7 @@ export class CallPeerRecovery {
     const controller = new AbortController();
     this.inFlight.set(peerIdentityId, controller);
     this.attempts.set(peerIdentityId, attempt + 1);
+    this.lastRestartAt.set(peerIdentityId, Date.now());
     const cancelled = new Promise<void>((resolve) => {
       controller.signal.addEventListener('abort', () => resolve(), {
         once: true,
@@ -178,6 +182,11 @@ export class CallPeerRecovery {
   }
 
   public forget(peerIdentityId: string): void {
+    this.release(peerIdentityId);
+    this.lastRestartAt.delete(peerIdentityId);
+  }
+
+  private release(peerIdentityId: string): void {
     this.cancel(peerIdentityId);
     this.inFlight.get(peerIdentityId)?.abort();
     this.inFlight.delete(peerIdentityId);
@@ -194,7 +203,7 @@ export class CallPeerRecovery {
     if (!isCurrent()) return;
 
     if (this.isFinished(peer)) {
-      this.forget(peerIdentityId);
+      this.release(peerIdentityId);
 
       return;
     }
@@ -220,6 +229,50 @@ export class CallPeerRecovery {
     }
   }
 
+  private isDisruptable(
+    peerIdentityId: string,
+    peer: RTCPeerConnection,
+    isCurrent: () => boolean,
+  ): boolean {
+    return (
+      isCurrent() &&
+      peer.connectionState !== 'closed' &&
+      !this.isHealthy(peer) &&
+      Boolean(peer.localDescription && peer.remoteDescription) &&
+      !this.inFlight.has(peerIdentityId)
+    );
+  }
+
+  /**
+   * Starts a fresh recovery after an external disruption (a network path change
+   * or a restored signaling connection). Only negotiated, unhealthy peers are
+   * restarted, and the restart budget is reset because the cause is external.
+   * Restarts are spaced by `disruptionCooldownMs` so a flapping network cannot
+   * restart a peer in a storm.
+   */
+  public disrupt(
+    peerIdentityId: string,
+    peer: RTCPeerConnection,
+    isCurrent: () => boolean,
+  ): void {
+    if (!this.isDisruptable(peerIdentityId, peer, isCurrent)) return;
+
+    const lastRestart = this.lastRestartAt.get(peerIdentityId);
+
+    if (
+      lastRestart !== undefined &&
+      Date.now() - lastRestart < disruptionCooldownMs
+    ) {
+      this.reconcile(peerIdentityId, peer, isCurrent);
+
+      return;
+    }
+
+    this.release(peerIdentityId);
+    logCallWarning('peer-manager:ice-recovery:disruption');
+    this.schedule(peerIdentityId, peer, 0, 0, isCurrent);
+  }
+
   public stateFor(peerIdentityId: string): CallPeerRecoveryState {
     if (this.exhausted.has(peerIdentityId)) return 'exhausted';
 
@@ -242,7 +295,7 @@ export class CallPeerRecovery {
     )
       return;
 
-    this.forget(peerIdentityId);
+    this.release(peerIdentityId);
     logCallWarning('peer-manager:ice-recovery:manual-retry');
     this.schedule(peerIdentityId, peer, 0, 0, isCurrent);
   }
@@ -255,5 +308,6 @@ export class CallPeerRecovery {
     this.attempts.clear();
     this.exhausted.clear();
     this.retryNotBefore.clear();
+    this.lastRestartAt.clear();
   }
 }

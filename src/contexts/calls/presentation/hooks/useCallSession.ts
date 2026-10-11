@@ -21,6 +21,8 @@ import {
 } from '../../infrastructure/media/callDebugLogger';
 import { CallPeerConnections } from '../../infrastructure/media/CallPeerConnections';
 import { LocalCallMedia } from '../../infrastructure/media/LocalCallMedia';
+import { watchMicrophoneAvailability } from '../../infrastructure/media/microphoneAvailability';
+import { watchNetworkChanges } from '../../infrastructure/media/networkChanges';
 import { RemoteCallAudio } from '../../infrastructure/media/RemoteCallAudio';
 import { retainedRemotePeerIdentityIds } from './callPeerConnectionPlan';
 import {
@@ -87,6 +89,7 @@ export function useCallSession(): {
   toggleNoiseCancellation: (enabled: boolean) => Promise<void>;
   retryMicrophone: () => Promise<void>;
   retryConnection: () => void;
+  recoverAfterDisruption: () => void;
   toggleScreenShare: () => Promise<void>;
 } {
   const mediaManager = useMemo(() => new LocalCallMedia(), []);
@@ -133,6 +136,37 @@ export function useCallSession(): {
     },
     [mediaManager, peerManager],
   );
+
+  const recoverAfterDisruption = useCallback(() => {
+    if (activeCallRef.current) peerManager.recoverAfterDisruption();
+  }, [peerManager]);
+
+  const activeCallId = activeCall?.id;
+
+  useEffect(() => {
+    if (!activeCallId) return;
+
+    return watchNetworkChanges(recoverAfterDisruption);
+  }, [activeCallId, recoverAfterDisruption]);
+
+  const microphoneWaiting =
+    activeCall !== null &&
+    !activeCall.hasMicrophone &&
+    (activeCall.microphoneError === 'denied' ||
+      activeCall.microphoneError === 'missing-device');
+  const retryMicrophoneRef = useRef(mediaControls.retryMicrophone);
+
+  useEffect(() => {
+    retryMicrophoneRef.current = mediaControls.retryMicrophone;
+  });
+
+  useEffect(() => {
+    if (!microphoneWaiting) return;
+
+    return watchMicrophoneAvailability(() => {
+      void retryMicrophoneRef.current();
+    });
+  }, [microphoneWaiting]);
 
   const startCall = async (input: StartCallInput) => {
     logCallDebug('session:start-call:requested', {
@@ -351,6 +385,7 @@ export function useCallSession(): {
     receiveSignal,
     reconcileCall,
     retryConnection,
+    recoverAfterDisruption,
     startCall,
     ...mediaControls,
   };

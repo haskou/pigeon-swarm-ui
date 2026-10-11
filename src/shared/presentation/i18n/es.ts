@@ -174,10 +174,13 @@ export const es = {
     connectionQualityDisconnected: 'Desconectado',
     connectionQualityGood: 'Buena conexión',
     connectionQualityPoor: 'Mala conexión',
+    connectionConnecting: 'Conectando el audio de la llamada…',
     connectionQualityWeak: 'Conexión débil',
     connectionRecovering: 'Reconectando el audio de la llamada…',
     connectionRecoveryExhausted:
       'No se pudo reconectar el audio con uno o varios participantes. Comprueba tu conexión y reintenta, o sal y vuelve a entrar en la llamada.',
+    connectionRelayed:
+      'El audio pasa por un servidor de relevo, lo que puede añadir un ligero retraso.',
     deafen: 'Silenciar audio de llamada',
     decline: 'Rechazar',
     declined: 'Llamada rechazada',
@@ -208,10 +211,12 @@ export const es = {
     microphoneBlockedTitle: 'No se puede usar el micrófono',
     microphoneConstraint:
       'La configuración de audio solicitada no es compatible con este dispositivo.',
-    microphoneDenied: 'El navegador no ha concedido permiso de micrófono.',
+    microphoneDenied:
+      'El navegador no ha concedido permiso de micrófono. Permítelo y la llamada usará tu micrófono automáticamente.',
     microphoneHelp: 'Abrir ayuda',
     microphoneInUse: 'El micrófono está ocupado en otra app o pestaña.',
-    microphoneMissingDevice: 'No se ha encontrado ningún micrófono.',
+    microphoneMissingDevice:
+      'No se ha encontrado ningún micrófono. Conéctalo y la llamada lo usará automáticamente si el acceso al micrófono está permitido.',
     microphoneNotSecure: 'El micrófono requiere HTTPS o una app instalada.',
     microphoneRetry: 'Reintentar',
     microphoneSecurity:

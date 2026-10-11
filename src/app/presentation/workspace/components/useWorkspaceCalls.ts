@@ -107,6 +107,7 @@ export function useWorkspaceCalls({
     () => undefined,
   );
   const {
+    recoverAfterDisruption,
     activeCall,
     callMediaConnections,
     endCall,
@@ -238,6 +239,11 @@ export function useWorkspaceCalls({
       reconcileCallResource,
       sessionRef,
     });
+
+  const recoverRealtimeCallsAfterDisruption = useCallback(() => {
+    recoverAfterDisruption();
+    recoverRealtimeCalls();
+  }, [recoverAfterDisruption, recoverRealtimeCalls]);
 
   useEffect(() => {
     reconcileCallResourceRef.current = reconcileCallResource;
@@ -425,7 +431,7 @@ export function useWorkspaceCalls({
     handleRealtimeCallEvent,
     incomingCall,
     leaveActiveCall,
-    recoverRealtimeCalls,
+    recoverRealtimeCalls: recoverRealtimeCallsAfterDisruption,
     retryMicrophone,
     retryConnection,
     setParticipantScreenShareVolume,

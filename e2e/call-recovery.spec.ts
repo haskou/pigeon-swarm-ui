@@ -155,7 +155,9 @@ for (const scenario of [
             { timeout: 5000 },
           )
           .toMatchObject({ iceState: 'new', recoveryState: 'idle' });
-        await expect(pages[0].getByRole('status')).toHaveCount(0);
+        await expect(
+          pages[0].getByRole('status').filter({ hasText: 'Reconnecting' }),
+        ).toHaveCount(0);
         await expect(pages[0].getByRole('status')).toContainText(
           'Reconnecting',
           {
@@ -240,7 +242,12 @@ for (const scenario of [
             { timeout: 10_000 },
           )
           .toBeGreaterThan((before.stats[remote].bytesReceived ?? 0) + 1000);
-        await expect(page.getByRole('status')).toHaveCount(0);
+        await expect(
+          page.getByRole('button', { name: 'Retry connection', exact: true }),
+        ).toHaveCount(0);
+        await expect(
+          page.getByRole('status').filter({ hasText: 'Reconnecting' }),
+        ).toHaveCount(0);
       }
       const downloadPromise = pages[0].waitForEvent('download');
       await pages[0]
