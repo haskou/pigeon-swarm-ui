@@ -70,6 +70,8 @@ import { API_SERVER_URL } from '../API_SERVER_URL';
 export class PigeonApiGateway {
   private readonly requestCache = new RequestCache();
 
+  private readonly attachmentCipher: AttachmentCipher;
+
   public readonly calls: PigeonCallsApi;
 
   public readonly communityGateway: PigeonCommunitiesGateway;
@@ -122,6 +124,7 @@ export class PigeonApiGateway {
     conversationIds: ConversationIdFactory = new ConversationIdFactory(),
     attachmentCipher: AttachmentCipher = AttachmentCipher.inCurrentThread(),
   ) {
+    this.attachmentCipher = attachmentCipher;
     this.identityVault = new DeviceIdentityVault();
     const deviceAuthorization = new PigeonDeviceAuthorizationApi(
       http,
@@ -344,6 +347,7 @@ export class PigeonApiGateway {
 
   public disposeSessionWorkers(): void {
     this.messageProjection.dispose();
+    this.attachmentCipher.dispose();
   }
 
   public apiUrl(path: string): string {
