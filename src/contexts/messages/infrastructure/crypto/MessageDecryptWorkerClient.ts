@@ -49,6 +49,11 @@ export class MessageDecryptWorkerClient {
     this.pending.clear();
   }
 
+  public terminate(): void {
+    this.rejectAll(new Error('Message decrypt worker was terminated'));
+    this.worker.terminate();
+  }
+
   public async decrypt(
     request: Omit<MessageDecryptWorkerRequest, 'requestId'>,
     signal?: AbortSignal,

@@ -193,12 +193,15 @@ export class PigeonApplication {
 
   public readonly session: PigeonSessionFacade;
 
+  private readonly gateway: PigeonApiGateway;
+
   public readonly stickers: PigeonStickersFacade;
 
   public constructor(
     gateway: PigeonApiGateway = new PigeonApiGateway(),
     realtime: RealtimeGateway = new RealtimeGateway(),
   ) {
+    this.gateway = gateway;
     this.attachments = new PigeonAttachmentsFacade(gateway.filesGateway);
     const callContexts = new CallAccessContexts();
     const callMapper = new CallMapper();
@@ -565,5 +568,9 @@ export class PigeonApplication {
         ),
       },
     );
+  }
+
+  public disposeSessionWorkers(): void {
+    this.gateway.disposeSessionWorkers();
   }
 }

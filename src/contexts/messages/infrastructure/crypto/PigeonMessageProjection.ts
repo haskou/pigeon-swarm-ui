@@ -3,25 +3,31 @@ import type {
   MessageResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { MessageDecryptWorkerPort } from './MessageDecryptWorkerPort';
 import type { MessageProjectionCopy } from './MessageProjectionCopy';
 import type { MessageProjectionPort } from './MessageProjectionPort';
 
 import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
 import { throwIfMessageLoadAborted } from '../http/throwIfMessageLoadAborted';
+import { createMessageDecryptWorker } from './createMessageDecryptWorker';
 import { hasEncryptedPayload } from './hasEncryptedPayload';
+import { MessageDecryptWorkerClient } from './MessageDecryptWorkerClient';
 import { MessageProjector } from './MessageProjector';
 import { yieldAfterMessageDecryptBatch } from './yieldAfterMessageDecryptBatch';
 
 const messageDecryptBatchSize = 8;
 
 export class PigeonMessageProjection implements MessageProjectionPort {
-  private decryptWorker: MessageDecryptWorkerPort | null = null;
+  private decryptWorker: MessageDecryptWorkerClient | null = null;
 
   public constructor(
     private readonly projector: MessageProjector,
     private readonly copy: MessageProjectionCopy,
   ) {}
+
+  public dispose(): void {
+    this.decryptWorker?.terminate();
+    this.decryptWorker = null;
+  }
 
   private async decryptDirectly(
     session: Session,
@@ -55,15 +61,8 @@ export class PigeonMessageProjection implements MessageProjectionPort {
     return decrypted;
   }
 
-  private async getDecryptWorker(): Promise<MessageDecryptWorkerPort> {
-    if (this.decryptWorker) return this.decryptWorker;
-
-    const { MessageDecryptWorkerClient } =
-      await import('./MessageDecryptWorkerClient');
-    const { createMessageDecryptWorker } =
-      await import('./createMessageDecryptWorker');
-
-    this.decryptWorker = new MessageDecryptWorkerClient(
+  private getDecryptWorker(): MessageDecryptWorkerClient {
+    this.decryptWorker ??= new MessageDecryptWorkerClient(
       createMessageDecryptWorker(),
     );
 
@@ -108,15 +107,14 @@ export class PigeonMessageProjection implements MessageProjectionPort {
           conversationId,
         )
       : undefined;
-    const worker = await this.getDecryptWorker();
 
-    return await worker.decrypt(
+    return await this.getDecryptWorker().decrypt(
       {
         conversationId,
         copy: this.copy,
         currentIdentityId: session.identity.id,
         messages: pendingMessages,
-        symmetricKey: key?.key,
+        privateKey: key?.key,
       },
       signal,
     );

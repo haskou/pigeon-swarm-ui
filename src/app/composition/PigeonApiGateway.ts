@@ -85,6 +85,8 @@ export class PigeonApiGateway {
 
   public readonly messageCommands: PigeonMessageCommandsApi;
 
+  private readonly messageProjection: PigeonMessageProjection;
+
   public readonly messagesApi: PigeonMessagesApi;
 
   public readonly messagesGateway: PigeonMessagesGateway;
@@ -276,7 +278,7 @@ export class PigeonApiGateway {
       this.filesGateway,
     );
 
-    const messageProjection = new PigeonMessageProjection(
+    this.messageProjection = new PigeonMessageProjection(
       messageProjector,
       copy.messages,
     );
@@ -285,14 +287,14 @@ export class PigeonApiGateway {
       http,
       signer,
       this.requestCache,
-      messageProjection,
+      this.messageProjection,
       mutations,
     );
     this.messageCommands = new PigeonMessageCommandsApi(
       http,
       signer,
       this.messagesApi,
-      messageProjection,
+      this.messageProjection,
       this.filesGateway,
       mutations,
     );
@@ -340,6 +342,10 @@ export class PigeonApiGateway {
       keychainApi,
       this.presence,
     );
+  }
+
+  public disposeSessionWorkers(): void {
+    this.messageProjection.dispose();
   }
 
   public apiUrl(path: string): string {
