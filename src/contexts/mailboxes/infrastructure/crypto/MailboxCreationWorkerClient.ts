@@ -34,6 +34,7 @@ export class MailboxCreationWorkerClient {
     mailboxId: string,
     postTokenHash: string,
     readTokenHash: string,
+    difficultyBits: number,
   ): Promise<string> {
     const id = this.nextRequestId;
 
@@ -43,6 +44,7 @@ export class MailboxCreationWorkerClient {
       this.pending.set(id, { reject, resolve });
 
       const request: MailboxCreationWorkerRequest = {
+        difficultyBits,
         id,
         mailboxId,
         postTokenHash,

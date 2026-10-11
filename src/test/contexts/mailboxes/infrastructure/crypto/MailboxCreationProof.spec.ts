@@ -18,6 +18,22 @@ describe(MailboxCreationProof.name, () => {
     return digest[0] === 0 && digest[1] === 0;
   };
 
+  const leadingZeroBits = (preimage: string): number => {
+    const digest = createHash('sha256').update(preimage).digest();
+    let bits = 0;
+
+    for (const byte of digest) {
+      if (byte === 0) {
+        bits += 8;
+        continue;
+      }
+
+      return bits + Math.clz32(byte) - 24;
+    }
+
+    return bits;
+  };
+
   it('builds the node preimage layout', () => {
     expect(
       MailboxCreationProof.preimage(
@@ -116,6 +132,63 @@ describe(MailboxCreationProof.name, () => {
         postTokenHash,
         readTokenHash,
         longNonce,
+      ),
+    ).toBe(false);
+  });
+
+  it('mines a proof for the requested difficulty that also meets every lower one', () => {
+    const nonce = MailboxCreationProof.mine(
+      mailboxId,
+      postTokenHash,
+      readTokenHash,
+      17,
+    );
+
+    expect(
+      MailboxCreationProof.isValid(
+        mailboxId,
+        postTokenHash,
+        readTokenHash,
+        nonce,
+        17,
+      ),
+    ).toBe(true);
+    expect(
+      MailboxCreationProof.isValid(
+        mailboxId,
+        postTokenHash,
+        readTokenHash,
+        nonce,
+      ),
+    ).toBe(true);
+  });
+
+  it('rejects a proof that meets fewer bits than the requested difficulty', () => {
+    const bits = leadingZeroBits(
+      MailboxCreationProof.preimage(
+        mailboxId,
+        postTokenHash,
+        readTokenHash,
+        pinnedNonce,
+      ),
+    );
+
+    expect(
+      MailboxCreationProof.isValid(
+        mailboxId,
+        postTokenHash,
+        readTokenHash,
+        pinnedNonce,
+        bits,
+      ),
+    ).toBe(true);
+    expect(
+      MailboxCreationProof.isValid(
+        mailboxId,
+        postTokenHash,
+        readTokenHash,
+        pinnedNonce,
+        bits + 1,
       ),
     ).toBe(false);
   });

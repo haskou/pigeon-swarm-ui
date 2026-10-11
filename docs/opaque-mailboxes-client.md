@@ -22,7 +22,7 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 ## Creation proof
 
 - Preimage: `[pigeon-mailbox-creation:v1, mailboxId, postTokenHash, readTokenHash, nonce].join(':')`.
-- SHA-256 must start with at least 16 zero bits.
+- SHA-256 must start with at least `difficultyBits` zero bits. The default is 16 (`MailboxCreationProof.DEFAULT_DIFFICULTY_BITS`). A `PUT` 400 that names `requiredDifficultyBits` raises the requirement; see Creation difficulty and recovery.
 - `nonce` is the first passing decimal integer from 0, at most 64 characters.
 - Mining runs in a dedicated worker: `mailboxCreationWorker.ts`, driven by `MailboxCreationWorkerClient`, constructed by `createMailboxWorkerClient()`.
 - Pinned nonce for the vector: `47805`.
@@ -43,8 +43,14 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 | Read | `GET /mailboxes/{id}/envelopes?after=&limit=` | read token (Bearer) |
 | Acknowledge | `POST /mailboxes/{id}/ack` with `{ upTo }` (204) | read token (Bearer) |
 
-- A 404 maps to `MailboxUnavailableError`. 400, 409, and 429 propagate as `HttpJsonError`.
+- A 404 maps to `MailboxUnavailableError`. A 400 on create that names `requiredDifficultyBits` maps to `MailboxCreationDifficultyError`. Other 400s, 409, and 429 propagate as `HttpJsonError`.
 - Empty success bodies (PUT 200/201, POST 204) resolve to `undefined` in `HttpJsonClient`.
+
+## Creation difficulty and recovery
+
+- `createInbox` mines at the default 16 bits. If `PUT` returns 400 with `requiredDifficultyBits`, it re-mines once at that value and retries the `PUT`. A second refusal, or a value outside 17 to 24, propagates without re-mining.
+- Recipient `read` and `acknowledge` re-create an evicted mailbox once on 404, with the same id and capability hashes, then retry the operation. A second 404 propagates.
+- Senders (`send`) do not re-create. They lack the read-token hash, so they recover after the recipient's next read or acknowledgement.
 
 ## Receive
 

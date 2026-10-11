@@ -6,13 +6,15 @@ import type {
 import { MailboxCreationProof } from './MailboxCreationProof';
 
 self.onmessage = (event: MessageEvent<MailboxCreationWorkerRequest>) => {
-  const { id, mailboxId, postTokenHash, readTokenHash } = event.data;
+  const { difficultyBits, id, mailboxId, postTokenHash, readTokenHash } =
+    event.data;
 
   const response: MailboxCreationWorkerResponse = {
     creationNonce: MailboxCreationProof.mine(
       mailboxId,
       postTokenHash,
       readTokenHash,
+      difficultyBits,
     ),
     id,
   };

@@ -1,6 +1,7 @@
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
+import { MailboxCreationDifficultyError } from './MailboxCreationDifficultyError';
 import { MailboxUnavailableError } from './MailboxUnavailableError';
 
 export type MailboxCreation = {
@@ -28,10 +29,34 @@ export type MailboxPage = {
 /**
  * Wire client for the node mailbox routes. Capabilities travel only as bearer
  * tokens. A 404 means the mailbox does not exist on this node and maps to
- * MailboxUnavailableError; other statuses (400, 409, 429) propagate as
- * HttpJsonError.
+ * MailboxUnavailableError. A 400 on create that names `requiredDifficultyBits`
+ * maps to MailboxCreationDifficultyError. Other statuses (400, 409, 429)
+ * propagate as HttpJsonError.
  */
 export class PigeonMailboxClient {
+  /**
+   * The node's 400 body names the difficulty a creation proof must meet. Only
+   * a positive safe integer counts; any other 400 propagates unchanged.
+   */
+  private static requiredDifficultyBits(error: unknown): number | undefined {
+    if (!(error instanceof HttpJsonError) || error.status !== 400) {
+      return undefined;
+    }
+
+    try {
+      const body = JSON.parse(error.bodyText) as {
+        requiredDifficultyBits?: unknown;
+      } | null;
+      const bits = body?.requiredDifficultyBits;
+
+      return typeof bits === 'number' && Number.isSafeInteger(bits) && bits > 0
+        ? bits
+        : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
   public constructor(private readonly http: Pick<HttpJsonClient, 'request'>) {}
 
   private static bearer(token: string): HeadersInit {
@@ -54,12 +79,23 @@ export class PigeonMailboxClient {
     mailboxId: string,
     creation: MailboxCreation,
   ): Promise<void> {
-    await this.call(() =>
-      this.http.request<void>(`/mailboxes/${mailboxId}`, {
-        body: JSON.stringify(creation),
-        method: 'PUT',
-      }),
-    );
+    try {
+      await this.call(() =>
+        this.http.request<void>(`/mailboxes/${mailboxId}`, {
+          body: JSON.stringify(creation),
+          method: 'PUT',
+        }),
+      );
+    } catch (error: unknown) {
+      const requiredDifficultyBits =
+        PigeonMailboxClient.requiredDifficultyBits(error);
+
+      if (requiredDifficultyBits === undefined) {
+        throw error;
+      }
+
+      throw new MailboxCreationDifficultyError(requiredDifficultyBits);
+    }
   }
 
   public async append(

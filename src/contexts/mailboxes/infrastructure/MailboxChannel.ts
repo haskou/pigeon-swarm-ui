@@ -5,13 +5,17 @@ import type { MailboxKeys } from './crypto/MailboxKeySchedule';
 import type { PigeonMailboxClient } from './http/PigeonMailboxClient';
 
 import { MailboxCapability } from './crypto/MailboxCapability';
+import { MailboxCreationProof } from './crypto/MailboxCreationProof';
 import { MailboxEnvelopeCipher } from './crypto/MailboxEnvelopeCipher';
 import { MailboxEnvelopeError } from './crypto/MailboxEnvelopeError';
+import { MailboxCreationDifficultyError } from './http/MailboxCreationDifficultyError';
+import { MailboxUnavailableError } from './http/MailboxUnavailableError';
 
 export type MailboxCreationMiner = (
   mailboxId: string,
   postTokenHash: string,
   readTokenHash: string,
+  difficultyBits: number,
 ) => Promise<string>;
 
 export type OpenedMailboxEnvelope = {
@@ -37,15 +41,61 @@ export type OpenedMailboxPage = {
  */
 export class MailboxChannel {
   private static readonly ENVELOPE_ID_BYTES = 16;
+  /** Ceiling on the difficulty a creation retry will mine. */
+  private static readonly MAX_CREATION_DIFFICULTY_BITS = 24;
 
   public constructor(
     private readonly client: PigeonMailboxClient,
     private readonly mine: MailboxCreationMiner,
   ) {}
 
+  private async putInbox(
+    mailboxId: string,
+    postTokenHash: string,
+    readTokenHash: string,
+    difficultyBits: number,
+  ): Promise<void> {
+    const creationNonce = await this.mine(
+      mailboxId,
+      postTokenHash,
+      readTokenHash,
+      difficultyBits,
+    );
+
+    await this.client.create(mailboxId, {
+      creationNonce,
+      postTokenHash,
+      readTokenHash,
+    });
+  }
+
   /**
-   * Recipient only. Creates the inbox once. Keep the readToken to read and
-   * acknowledge.
+   * Re-creates the recipient mailbox when the node reports it unavailable,
+   * then retries the operation once. Only recipient routes recover: a sender
+   * lacks the read-token hash needed to re-create the mailbox.
+   */
+  private async recovering<T>(
+    keys: MailboxKeys,
+    readToken: string,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await operation();
+    } catch (error: unknown) {
+      if (!(error instanceof MailboxUnavailableError)) {
+        throw error;
+      }
+
+      await this.createInbox(keys, readToken);
+
+      return operation();
+    }
+  }
+
+  /**
+   * Recipient only. Creates the inbox once, mining at the default difficulty.
+   * If the node names a higher difficulty up to MAX_CREATION_DIFFICULTY_BITS,
+   * re-mines once at that value. Keep the readToken to read and acknowledge.
    */
   public async createInbox(
     keys: MailboxKeys,
@@ -53,17 +103,32 @@ export class MailboxChannel {
   ): Promise<void> {
     const postTokenHash = MailboxCapability.hash(keys.postToken);
     const readTokenHash = MailboxCapability.hash(readToken);
-    const creationNonce = await this.mine(
-      keys.mailboxId,
-      postTokenHash,
-      readTokenHash,
-    );
 
-    await this.client.create(keys.mailboxId, {
-      creationNonce,
-      postTokenHash,
-      readTokenHash,
-    });
+    try {
+      await this.putInbox(
+        keys.mailboxId,
+        postTokenHash,
+        readTokenHash,
+        MailboxCreationProof.DEFAULT_DIFFICULTY_BITS,
+      );
+    } catch (error: unknown) {
+      if (
+        !(error instanceof MailboxCreationDifficultyError) ||
+        error.requiredDifficultyBits <=
+          MailboxCreationProof.DEFAULT_DIFFICULTY_BITS ||
+        error.requiredDifficultyBits >
+          MailboxChannel.MAX_CREATION_DIFFICULTY_BITS
+      ) {
+        throw error;
+      }
+
+      await this.putInbox(
+        keys.mailboxId,
+        postTokenHash,
+        readTokenHash,
+        error.requiredDifficultyBits,
+      );
+    }
   }
 
   /** Sender. Seals one plaintext into a fresh envelope. */
@@ -102,11 +167,8 @@ export class MailboxChannel {
     after: number,
     limit: number,
   ): Promise<OpenedMailboxPage> {
-    const page = await this.client.read(
-      keys.mailboxId,
-      readToken,
-      after,
-      limit,
+    const page = await this.recovering(keys, readToken, () =>
+      this.client.read(keys.mailboxId, readToken, after, limit),
     );
     const envelopes: OpenedMailboxEnvelope[] = [];
 
@@ -139,12 +201,17 @@ export class MailboxChannel {
     };
   }
 
-  /** Recipient. Removes everything up to and including `upTo`. */
+  /**
+   * Recipient. Removes everything up to and including `upTo`. An evicted
+   * mailbox is re-created once and the acknowledgement retried.
+   */
   public async acknowledge(
-    mailboxId: string,
+    keys: MailboxKeys,
     readToken: string,
     upTo: number,
   ): Promise<void> {
-    await this.client.acknowledge(mailboxId, readToken, upTo);
+    await this.recovering(keys, readToken, () =>
+      this.client.acknowledge(keys.mailboxId, readToken, upTo),
+    );
   }
 }

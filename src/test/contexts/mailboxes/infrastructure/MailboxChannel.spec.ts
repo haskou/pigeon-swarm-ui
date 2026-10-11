@@ -5,8 +5,11 @@ import { MailboxCapability } from '../../../../contexts/mailboxes/infrastructure
 import { MailboxCreationProof } from '../../../../contexts/mailboxes/infrastructure/crypto/MailboxCreationProof';
 import { MailboxEnvelopeCipher } from '../../../../contexts/mailboxes/infrastructure/crypto/MailboxEnvelopeCipher';
 import { MailboxKeySchedule } from '../../../../contexts/mailboxes/infrastructure/crypto/MailboxKeySchedule';
+import { MailboxCreationDifficultyError } from '../../../../contexts/mailboxes/infrastructure/http/MailboxCreationDifficultyError';
+import { MailboxUnavailableError } from '../../../../contexts/mailboxes/infrastructure/http/MailboxUnavailableError';
 import { PigeonMailboxClient } from '../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
 import { MailboxChannel } from '../../../../contexts/mailboxes/infrastructure/MailboxChannel';
+import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 
 describe(MailboxChannel.name, () => {
   const bytes = (text: string): Uint8Array => new TextEncoder().encode(text);
@@ -20,13 +23,23 @@ describe(MailboxChannel.name, () => {
   const setup = () => {
     const client = mock<PigeonMailboxClient>();
     const mine = jest.fn(
-      (mailboxId: string, postTokenHash: string, readTokenHash: string) =>
+      (
+        mailboxId: string,
+        postTokenHash: string,
+        readTokenHash: string,
+        difficultyBits: number,
+      ) =>
         Promise.resolve(
-          MailboxCreationProof.mine(mailboxId, postTokenHash, readTokenHash),
+          MailboxCreationProof.mine(
+            mailboxId,
+            postTokenHash,
+            readTokenHash,
+            difficultyBits,
+          ),
         ),
     );
 
-    return { channel: new MailboxChannel(client, mine), client };
+    return { channel: new MailboxChannel(client, mine), client, mine };
   };
 
   it('creates the inbox with capability hashes and a valid creation proof', async () => {
@@ -149,12 +162,167 @@ describe(MailboxChannel.name, () => {
   it('acknowledges a cursor with the read token', async () => {
     const { channel, client } = setup();
 
-    await channel.acknowledge(keys.mailboxId, readToken, 3);
+    await channel.acknowledge(keys, readToken, 3);
 
     expect(client.acknowledge).toHaveBeenCalledWith(
       keys.mailboxId,
       readToken,
       3,
     );
+  });
+
+  describe('creation difficulty', () => {
+    const postTokenHash = MailboxCapability.hash(keys.postToken);
+    const readTokenHash = MailboxCapability.hash(readToken);
+
+    it('re-mines at the difficulty the node requires and retries the PUT once', async () => {
+      const { channel, client, mine } = setup();
+
+      client.create
+        .mockRejectedValueOnce(new MailboxCreationDifficultyError(17))
+        .mockResolvedValueOnce(undefined);
+
+      await channel.createInbox(keys, readToken);
+
+      expect(mine).toHaveBeenNthCalledWith(
+        1,
+        keys.mailboxId,
+        postTokenHash,
+        readTokenHash,
+        16,
+      );
+      expect(mine).toHaveBeenNthCalledWith(
+        2,
+        keys.mailboxId,
+        postTokenHash,
+        readTokenHash,
+        17,
+      );
+      expect(client.create).toHaveBeenCalledTimes(2);
+
+      const retriedNonce = client.create.mock.calls[1][1].creationNonce;
+
+      expect(
+        MailboxCreationProof.isValid(
+          keys.mailboxId,
+          postTokenHash,
+          readTokenHash,
+          retriedNonce,
+          17,
+        ),
+      ).toBe(true);
+    });
+
+    it.each([16, 25])(
+      'propagates a requirement of %i bits without re-mining',
+      async (requiredDifficultyBits) => {
+        const { channel, client, mine } = setup();
+
+        client.create.mockRejectedValueOnce(
+          new MailboxCreationDifficultyError(requiredDifficultyBits),
+        );
+
+        await expect(
+          channel.createInbox(keys, readToken),
+        ).rejects.toBeInstanceOf(MailboxCreationDifficultyError);
+        expect(mine).toHaveBeenCalledTimes(1);
+        expect(client.create).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it('gives up after one re-mined retry', async () => {
+      const { channel, client, mine } = setup();
+
+      client.create.mockRejectedValue(new MailboxCreationDifficultyError(17));
+
+      await expect(channel.createInbox(keys, readToken)).rejects.toBeInstanceOf(
+        MailboxCreationDifficultyError,
+      );
+      expect(mine).toHaveBeenCalledTimes(2);
+      expect(client.create).toHaveBeenCalledTimes(2);
+    });
+
+    it('propagates other creation failures without re-mining', async () => {
+      const { channel, client, mine } = setup();
+
+      client.create.mockRejectedValueOnce(
+        new HttpJsonError(400, 'Bad Request', '{}'),
+      );
+
+      await expect(channel.createInbox(keys, readToken)).rejects.toBeInstanceOf(
+        HttpJsonError,
+      );
+      expect(mine).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('recovering an evicted mailbox', () => {
+    const postTokenHash = MailboxCapability.hash(keys.postToken);
+    const readTokenHash = MailboxCapability.hash(readToken);
+
+    it('re-creates the mailbox with the same hashes and retries the read once', async () => {
+      const { channel, client } = setup();
+
+      client.read
+        .mockRejectedValueOnce(new MailboxUnavailableError())
+        .mockResolvedValueOnce({ envelopes: [], hasMore: false });
+
+      await expect(channel.read(keys, readToken, 7, 10)).resolves.toEqual({
+        envelopes: [],
+        hasMore: false,
+        lastCursor: 7,
+      });
+      expect(client.create).toHaveBeenCalledTimes(1);
+      expect(client.create).toHaveBeenCalledWith(keys.mailboxId, {
+        creationNonce: expect.any(String),
+        postTokenHash,
+        readTokenHash,
+      });
+      expect(client.read).toHaveBeenCalledTimes(2);
+      expect(client.create.mock.invocationCallOrder[0]).toBeLessThan(
+        client.read.mock.invocationCallOrder[1],
+      );
+    });
+
+    it('gives up after one re-creation when the read is still unavailable', async () => {
+      const { channel, client } = setup();
+
+      client.read.mockRejectedValue(new MailboxUnavailableError());
+
+      await expect(channel.read(keys, readToken, 0, 10)).rejects.toBeInstanceOf(
+        MailboxUnavailableError,
+      );
+      expect(client.create).toHaveBeenCalledTimes(1);
+      expect(client.read).toHaveBeenCalledTimes(2);
+    });
+
+    it('re-creates the mailbox before retrying an acknowledgement', async () => {
+      const { channel, client } = setup();
+
+      client.acknowledge
+        .mockRejectedValueOnce(new MailboxUnavailableError())
+        .mockResolvedValueOnce(undefined);
+
+      await channel.acknowledge(keys, readToken, 3);
+
+      expect(client.create).toHaveBeenCalledTimes(1);
+      expect(client.acknowledge).toHaveBeenCalledTimes(2);
+      expect(client.acknowledge).toHaveBeenLastCalledWith(
+        keys.mailboxId,
+        readToken,
+        3,
+      );
+    });
+
+    it('does not re-create the mailbox when a sender append is unavailable', async () => {
+      const { channel, client } = setup();
+
+      client.append.mockRejectedValueOnce(new MailboxUnavailableError());
+
+      await expect(channel.send(keys, bytes('hi bob'))).rejects.toBeInstanceOf(
+        MailboxUnavailableError,
+      );
+      expect(client.create).not.toHaveBeenCalled();
+    });
   });
 });
