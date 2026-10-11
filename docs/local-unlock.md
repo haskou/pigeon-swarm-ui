@@ -22,6 +22,10 @@ the last login (`pigeon-swarm-last-login-identity-v1`). Workspace preferences
 and the last conversation ID are also kept. Drafts are encrypted with the
 session before they are stored.
 
+In the independent-client build (`VITE_INDEPENDENT_CLIENT=true`), the device
+vault database name and the last-login key carry a `:<node scope>` suffix, so
+each node has its own copy.
+
 ## What each choice protects against
 
 - **Someone reading the browser profile on disk.** The device vault contents
@@ -152,10 +156,8 @@ longer writes them. Covered by `deleteLegacyRememberedIdentityStorage.spec.ts`.
 the main jest suite. The main jest config excludes them because its
 `@haskou/pigeon-swarm-crypto` mock does not implement the device factor.
 
-## Not in this change
+## Out of scope
 
-- **Session-only versus remembered-device split.** It overlaps branch
-  `security/session-only-auth` in the primary checkout.
 - **User-presence check** before unlock. Decided against; see the section above.
 - **Sealed conversation keys in session memory.** Raw conversation keys stay in
   session memory while the session is alive. Sealing them at rest in memory was
