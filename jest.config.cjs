@@ -21,6 +21,7 @@ module.exports = {
     '/PigeonApiGateway.spec.ts$',
     '/PigeonIdentityCommandsApi.spec.ts$',
     '/IdentitySignaturePayloadFactory.spec.ts$',
+    '/Mailbox(Capability|Channel|CreationProof|EnvelopeCipher|KeySchedule).spec.ts$',
   ],
   roots: ['<rootDir>/src'],
   testEnvironment: 'node',

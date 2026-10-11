@@ -6,8 +6,9 @@ import { MailboxEnvelopeError } from './MailboxEnvelopeError';
 /**
  * Seals and opens mailbox envelope bodies.
  *
- * Plaintext is framed as `u32be(length) ‖ plaintext`, zero-padded so the framed
- * block fills a size bucket, then sealed with AES-256-GCM under the envelope key.
+ * Plaintext is framed as `u32be(length) ‖ plaintext`, zero-padded so the
+ * framed block fills a size bucket, then sealed with AES-256-GCM under the
+ * envelope key.
  * The wire body is base64url(iv ‖ ciphertext ‖ tag), so its decoded size is
  * exactly one bucket and the node only ever sees bucket sizes. AAD is
  * `<mailboxId>.<envelopeId>`, so a body cannot be moved to another mailbox or
@@ -54,9 +55,7 @@ export class MailboxEnvelopeCipher {
   ): string {
     const bucket = MailboxEnvelopeCipher.bucketFor(plaintext.length);
     const framed = Buffer.alloc(
-      bucket -
-        MailboxEnvelopeCipher.IV_BYTES -
-        MailboxEnvelopeCipher.TAG_BYTES,
+      bucket - MailboxEnvelopeCipher.IV_BYTES - MailboxEnvelopeCipher.TAG_BYTES,
     );
 
     framed.writeUInt32BE(plaintext.length, 0);
@@ -67,7 +66,8 @@ export class MailboxEnvelopeCipher {
       { aad: MailboxEnvelopeCipher.aad(mailboxId, envelopeId) },
     );
 
-    // Payload is `v1.aes-256-gcm.<iv>.<ciphertext>.<tag>` with standard base64 parts.
+    // Payload is `v1.aes-256-gcm.<iv>.<ciphertext>.<tag>`; its parts are
+    // standard base64.
     const sealed = Buffer.concat(
       payload
         .valueOf()
@@ -79,7 +79,10 @@ export class MailboxEnvelopeCipher {
     return sealed.toString('base64url');
   }
 
-  /** Throws MailboxEnvelopeError for any body that is malformed, mis-sized or fails authentication. */
+  /**
+   * Throws MailboxEnvelopeError for any body that is malformed, mis-sized or
+   * fails authentication.
+   */
   public static open(
     envelopeKey: Uint8Array,
     mailboxId: string,

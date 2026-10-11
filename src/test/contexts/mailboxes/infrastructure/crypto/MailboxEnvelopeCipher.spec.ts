@@ -1,8 +1,8 @@
 import { Buffer } from 'buffer';
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 
-import { MailboxEnvelopeCipher } from '../../../../../../contexts/mailboxes/infrastructure/crypto/MailboxEnvelopeCipher';
-import { MailboxEnvelopeError } from '../../../../../../contexts/mailboxes/infrastructure/crypto/MailboxEnvelopeError';
+import { MailboxEnvelopeCipher } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxEnvelopeCipher';
+import { MailboxEnvelopeError } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxEnvelopeError';
 
 describe(MailboxEnvelopeCipher.name, () => {
   const envelopeKey = new Uint8Array(32).fill(7);
@@ -13,7 +13,8 @@ describe(MailboxEnvelopeCipher.name, () => {
   const decodedLength = (body: string): number =>
     Buffer.from(body, 'base64url').length;
 
-  // Seals with node:crypto directly so the wire layout is checked against an independent implementation.
+  // Seals with node:crypto directly, so the wire layout is checked against an
+  // independent implementation.
   const sealWithNode = (framed: Buffer, aad: string): string => {
     const iv = randomBytes(12);
     const cipher = createCipheriv('aes-256-gcm', envelopeKey, iv);

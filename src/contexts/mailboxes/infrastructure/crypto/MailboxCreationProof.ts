@@ -2,10 +2,11 @@ import { sha256 } from '@noble/hashes/sha2.js';
 
 /**
  * Hashcash proof the node requires to create a mailbox. Mirrors the node's
- * `MailboxCreationProof`: SHA-256 over
- * `pigeon-mailbox-creation:v1:<mailboxId>:<postTokenHash>:<readTokenHash>:<nonce>`
- * must start with 16 zero bits. Binding the id and both capability hashes stops
- * a proof solved for one mailbox from being replayed for another.
+ * `MailboxCreationProof`: SHA-256 over the colon-joined fields
+ * `pigeon-mailbox-creation:v1`, `mailboxId`, `postTokenHash`,
+ * `readTokenHash` and `nonce` must start with 16 zero bits. Binding the id
+ * and both capability hashes stops a proof solved for one mailbox from
+ * being replayed for another.
  */
 export class MailboxCreationProof {
   public static readonly DIFFICULTY_BITS = 16;
@@ -74,7 +75,8 @@ export class MailboxCreationProof {
 
   /**
    * Returns the first counter nonce that satisfies the difficulty. Synchronous
-   * and CPU-bound by design: it runs in the mining worker, never on the UI thread.
+   * and CPU-bound by design: it runs in the mining worker, never on the UI
+   * thread.
    */
   public static mine(
     mailboxId: string,

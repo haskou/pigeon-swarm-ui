@@ -1,11 +1,11 @@
 import { Buffer } from 'buffer';
 
-import { MailboxKeySchedule } from '../../../../../../contexts/mailboxes/infrastructure/crypto/MailboxKeySchedule';
+import { MailboxKeySchedule } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxKeySchedule';
 
 describe(MailboxKeySchedule.name, () => {
   const secret = new Uint8Array(32).fill(1);
 
-  // Vector computed independently with node:crypto hkdfSync over the documented info layout.
+  // Vector computed with node:crypto hkdfSync over the documented info layout.
   it('derives the pinned mailbox material for a secret, recipient and epoch', () => {
     const keys = MailboxKeySchedule.derive(secret, 'identity-bob', 0);
 

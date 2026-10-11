@@ -10,7 +10,10 @@ import { Buffer } from 'buffer';
 export class MailboxCapability {
   private static readonly TOKEN_BYTES = 32;
 
-  /** 32 random bytes as base64url. Chosen by the recipient, who keeps it to read and acknowledge. */
+  /**
+   * 32 random bytes as base64url. The recipient chooses it and keeps it to
+   * read and acknowledge.
+   */
   public static generate(): string {
     return Buffer.from(randomBytes(MailboxCapability.TOKEN_BYTES)).toString(
       'base64url',

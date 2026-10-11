@@ -28,7 +28,8 @@ export type MailboxPage = {
 /**
  * Wire client for the node mailbox routes. Capabilities travel only as bearer
  * tokens. A 404 means the mailbox does not exist on this node and maps to
- * MailboxUnavailableError; other statuses (400, 409, 429) propagate as HttpJsonError.
+ * MailboxUnavailableError; other statuses (400, 409, 429) propagate as
+ * HttpJsonError.
  */
 export class PigeonMailboxClient {
   public constructor(private readonly http: Pick<HttpJsonClient, 'request'>) {}

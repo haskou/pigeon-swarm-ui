@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import { MailboxCreationProof } from '../../../../../../contexts/mailboxes/infrastructure/crypto/MailboxCreationProof';
+import { MailboxCreationProof } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxCreationProof';
 
 describe(MailboxCreationProof.name, () => {
   const mailboxId = 'F_vtY7XukvlaT5dzhBXk7iG2Ed2F3YlTDPUJTexhCuo';
@@ -9,7 +9,7 @@ describe(MailboxCreationProof.name, () => {
   const readTokenHash =
     'ccd7349c90b598ca4c5a6ba90a552c8a13d2020cd6f9b926638651dc3d48a18b';
 
-  // Reference value computed independently with node:crypto over the node preimage format.
+  // Reference value computed independently with node:crypto.
   const pinnedNonce = '47805';
 
   const leadingZeroBitsAtLeast16 = (preimage: string): boolean => {
@@ -20,7 +20,12 @@ describe(MailboxCreationProof.name, () => {
 
   it('builds the node preimage layout', () => {
     expect(
-      MailboxCreationProof.preimage(mailboxId, postTokenHash, readTokenHash, '7'),
+      MailboxCreationProof.preimage(
+        mailboxId,
+        postTokenHash,
+        readTokenHash,
+        '7',
+      ),
     ).toBe(
       `pigeon-mailbox-creation:v1:${mailboxId}:${postTokenHash}:${readTokenHash}:7`,
     );

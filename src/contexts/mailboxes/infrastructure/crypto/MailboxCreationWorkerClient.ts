@@ -39,20 +39,18 @@ export class MailboxCreationWorkerClient {
 
     this.nextRequestId += 1;
 
-    const { promise, reject, resolve } = Promise.withResolvers<string>();
+    return new Promise((resolve, reject) => {
+      this.pending.set(id, { reject, resolve });
 
-    this.pending.set(id, { reject, resolve });
+      const request: MailboxCreationWorkerRequest = {
+        id,
+        mailboxId,
+        postTokenHash,
+        readTokenHash,
+      };
 
-    const request: MailboxCreationWorkerRequest = {
-      id,
-      mailboxId,
-      postTokenHash,
-      readTokenHash,
-    };
-
-    this.worker.postMessage(request);
-
-    return promise;
+      this.worker.postMessage(request);
+    });
   }
 
   public dispose(): void {

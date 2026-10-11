@@ -12,8 +12,9 @@ export type MailboxKeys = {
 /**
  * Per-epoch mailbox material for the inbox of one identity in a 1:1
  * conversation, derived from the shared conversation secret S. The node never
- * derives anything: it sees `mailboxId`, the hash of `postToken` and the hash of
- * the read token. Sender and recipient must agree on this schedule byte for byte.
+ * derives anything: it sees `mailboxId`, the hash of `postToken` and the
+ * hash of the read token. Sender and recipient must agree on this schedule
+ * byte for byte.
  *
  * Direction is the recipient identity, so each side has its own inbox. The
  * epoch gives fresh identifiers per rotation.
@@ -25,7 +26,10 @@ export class MailboxKeySchedule {
   private static readonly MAX_EPOCH = 0xffff_ffff;
   private static readonly POST_LABEL = 'pigeon/mailbox/post/v1';
 
-  /** Context is `label ‖ recipientIdentityId ‖ u32be(epoch)`; the label is fixed per purpose, so it is unambiguous. */
+  /**
+   * Context is `label ‖ recipientIdentityId ‖ u32be(epoch)`. The label is fixed
+   * per purpose, so the encoding is unambiguous.
+   */
   private static info(
     label: string,
     recipientIdentityId: string,

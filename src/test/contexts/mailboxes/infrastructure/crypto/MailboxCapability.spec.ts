@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import { MailboxCapability } from '../../../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
+import { MailboxCapability } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
 
 describe(MailboxCapability.name, () => {
   it('hashes a token to the SHA-256 hex the node stores', () => {
