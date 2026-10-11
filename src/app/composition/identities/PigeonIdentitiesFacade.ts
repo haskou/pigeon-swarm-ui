@@ -218,7 +218,9 @@ export class PigeonIdentitiesFacade {
     const identityId = IdentityId.fromString(identity.toPrimitives().id);
 
     return this.hydrateLoginResult(
-      await this.gateway.hydrateSession(this.contexts.find(identityId).session),
+      await this.gateway.hydrateRegisteredSession(
+        this.contexts.find(identityId).session,
+      ),
     );
   }
 

@@ -143,4 +143,45 @@ describe(PigeonIdentityWorkspaceSessionApi.name, () => {
       },
     });
   });
+
+  it('expects a keychain when hydrating an existing identity login', async () => {
+    const workspace = port();
+    const api = new PigeonIdentityWorkspaceSessionApi(workspace);
+
+    await api.hydrate(session);
+
+    expect(workspace.loadKeychain).toHaveBeenCalledWith(session, {
+      expected: true,
+    });
+  });
+
+  it('reads a keychain once when hydrating a newly registered identity', async () => {
+    const workspace = port();
+    const api = new PigeonIdentityWorkspaceSessionApi(workspace);
+
+    await api.hydrate(session, undefined, { keychainExpected: false });
+
+    expect(workspace.loadKeychain).toHaveBeenCalledWith(session, {
+      expected: false,
+    });
+  });
+
+  it('expects a keychain on refresh only when the session already references one', async () => {
+    const workspace = port();
+    const api = new PigeonIdentityWorkspaceSessionApi(workspace);
+    const withKeychain = {
+      ...session,
+      keychainExternalIdentifier: 'keychain-cid',
+    };
+
+    await api.refresh(session);
+    expect(workspace.loadKeychain).toHaveBeenLastCalledWith(session, {
+      expected: false,
+    });
+
+    await api.refresh(withKeychain);
+    expect(workspace.loadKeychain).toHaveBeenLastCalledWith(withKeychain, {
+      expected: true,
+    });
+  });
 });

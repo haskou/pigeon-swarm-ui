@@ -47,4 +47,21 @@ describe(PigeonIdentityLoginApi.name, () => {
     await expect(login.refreshSession(session)).resolves.toBe(result);
     expect(workspace.refresh).toHaveBeenCalledWith(session);
   });
+
+  it('hydrates a registered session without expecting an existing keychain', async () => {
+    const session = { identity: { id: 'identity-1' } } as unknown as Session;
+    const result = { conversations: [], session } as unknown as LoginResult;
+    const workspace = {
+      hydrate: jest.fn().mockResolvedValue(result),
+    } as unknown as PigeonIdentityWorkspaceSessionApi;
+    const login = new PigeonIdentityLoginApi(
+      {} as PigeonIdentitySessionApi,
+      workspace,
+    );
+
+    await expect(login.hydrateRegistered(session)).resolves.toBe(result);
+    expect(workspace.hydrate).toHaveBeenCalledWith(session, undefined, {
+      keychainExpected: false,
+    });
+  });
 });

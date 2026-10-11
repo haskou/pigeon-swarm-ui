@@ -249,7 +249,8 @@ export class PigeonApiGateway {
         keychainApi.decrypt(session, keychain),
       listConversations: async (session) =>
         await conversationsApi.list(session),
-      loadKeychain: async (session) => await keychainApi.loadOptional(session),
+      loadKeychain: async (session, options) =>
+        await keychainApi.loadOptional(session, options),
     });
     const identityLogin = new PigeonIdentityLoginApi(
       identitySession,

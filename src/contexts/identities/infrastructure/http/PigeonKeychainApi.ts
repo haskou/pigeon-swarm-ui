@@ -12,9 +12,33 @@ import type { KeychainCipher, KeychainHead } from '../crypto/KeychainCipher';
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 
 const remoteKeychainCacheTtlMs = 1500;
+// Keychain reads can trail the write that created them. A keychain expected to
+// exist is re-read on this schedule (about 10s in total) before it is reported
+// missing.
+const keychainLagRetryDelaysMs = [250, 500, 1000, 2000, 3000, 3000];
 
 function keychainPath(session: Session): string {
   return `/keychains/${encodeURIComponent(session.identity.id)}`;
+}
+
+function waitBeforeRetry(delayMs: number, signal?: AbortSignal): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason);
+
+      return;
+    }
+
+    const timer = setTimeout(resolve, delayMs);
+    signal?.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timer);
+        reject(signal?.reason);
+      },
+      { once: true },
+    );
+  });
 }
 
 export class PigeonKeychainApi {
@@ -100,10 +124,27 @@ export class PigeonKeychainApi {
 
   public async loadOptional(
     session: Session,
+    options: {
+      // False only before the first keychain can exist, e.g. registration.
+      expected: boolean;
+      signal?: AbortSignal;
+    },
   ): Promise<KeychainResource | undefined> {
-    return await this.undefinedWhenMissing(
-      async () => await this.load(session),
-    );
+    for (let attempt = 0; ; attempt++) {
+      const resource = await this.undefinedWhenMissing(
+        async () => await this.load(session),
+      );
+
+      if (
+        resource ||
+        !options.expected ||
+        attempt >= keychainLagRetryDelaysMs.length
+      ) {
+        return resource;
+      }
+
+      await waitBeforeRetry(keychainLagRetryDelaysMs[attempt], options.signal);
+    }
   }
 
   public async publishKeychain(

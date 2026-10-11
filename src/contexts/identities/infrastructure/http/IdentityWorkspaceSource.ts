@@ -8,5 +8,8 @@ import type {
 export interface IdentityWorkspaceSource {
   decryptKeychain(session: Session, keychain: KeychainResource): LocalKeychain;
   listConversations(session: Session): Promise<ConversationResource[]>;
-  loadKeychain(session: Session): Promise<KeychainResource | undefined>;
+  loadKeychain(
+    session: Session,
+    options: { expected: boolean },
+  ): Promise<KeychainResource | undefined>;
 }

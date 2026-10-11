@@ -223,6 +223,12 @@ export class PigeonIdentitiesGateway {
     return await this.identityLogin.hydrate(session, onProgress);
   }
 
+  public async hydrateRegisteredSession(
+    session: Session,
+  ): Promise<LoginResult> {
+    return await this.identityLogin.hydrateRegistered(session);
+  }
+
   public async unlockSession(
     identityId: string,
     password: string,

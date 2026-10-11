@@ -65,10 +65,13 @@ export class PigeonIdentityWorkspaceSessionApi {
   public async hydrate(
     session: Session,
     onProgress?: LoginIdentityProgressReporter,
+    { keychainExpected = true }: { keychainExpected?: boolean } = {},
   ): Promise<LoginResult> {
     onProgress?.('loading-keychain');
     const conversationsPromise = this.listConversations(session);
-    const keychainResource = await this.workspace.loadKeychain(session);
+    const keychainResource = await this.workspace.loadKeychain(session, {
+      expected: keychainExpected,
+    });
     const hydratedSession = this.hydrateKeychain(session, keychainResource);
 
     onProgress?.('loading-workspace');
@@ -82,7 +85,10 @@ export class PigeonIdentityWorkspaceSessionApi {
   }
 
   public async refresh(session: Session): Promise<LoginResult> {
-    const keychainResource = await this.workspace.loadKeychain(session);
+    // Only a session already holding a keychain can expect one to replicate.
+    const keychainResource = await this.workspace.loadKeychain(session, {
+      expected: Boolean(session.keychainExternalIdentifier),
+    });
     const hydratedSession = this.applyRefreshedKeychain(
       session,
       keychainResource,
