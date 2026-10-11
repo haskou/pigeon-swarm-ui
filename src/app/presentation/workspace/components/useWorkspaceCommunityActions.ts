@@ -17,6 +17,7 @@ import { CommunityList } from '../../../../contexts/communities/presentation/vie
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
+import { applyPublishedKeychain } from './applyPublishedKeychain';
 
 type WorkspaceCommunityActionsInput = {
   activeCommunityId: null | string;
@@ -28,7 +29,7 @@ type WorkspaceCommunityActionsInput = {
   setCommunities: Dispatch<SetStateAction<Community[]>>;
   setMembershipRequests: Dispatch<SetStateAction<CommunityMembershipRequest[]>>;
   setSendError: (error: null | string) => void;
-  setSession: (session: Session) => void;
+  setSession: Dispatch<SetStateAction<Session | null>>;
   showCommunityWorkspace: () => void;
   showMessagesWorkspace: () => void;
 };
@@ -89,7 +90,9 @@ export function useWorkspaceCommunityActions({
       community: Community;
       session: Session;
     }): void => {
-      setSession(nextSession);
+      setSession((current) =>
+        applyPublishedKeychain(current, nextSession.identity.id, nextSession),
+      );
       setCommunities((current) => CommunityList.prepending(current, community));
       setActiveCommunityId(community.id);
       showCommunityWorkspace();
@@ -152,11 +155,9 @@ export function useWorkspaceCommunityActions({
         );
         const removedCommunityId = result.community?.id ?? community.id;
 
-        setSession({
-          ...session,
-          keychain: result.keychain,
-          keychainExternalIdentifier: result.keychainExternalIdentifier,
-        });
+        setSession((current) =>
+          applyPublishedKeychain(current, session.identity.id, result),
+        );
         setCommunities((current) =>
           CommunityList.without(current, removedCommunityId),
         );

@@ -57,6 +57,10 @@ type CommunityWorkspaceContentProps = {
   onCommunityLeft: (community: Community) => void;
   onCommunityUpdated: (community: Community) => void;
   onInvitationAccept: (notification: NotificationResource) => void;
+  onKeychainPublished: (
+    identityId: string,
+    published: Pick<Session, 'keychain' | 'keychainExternalIdentifier'>,
+  ) => void;
   onLogout: () => void;
   onMembersClose: () => void;
   onMembersOpen: () => void;
@@ -114,6 +118,7 @@ export function CommunityWorkspaceContent({
   onCommunityLeft,
   onCommunityUpdated,
   onInvitationAccept,
+  onKeychainPublished,
   onLogout,
   onMembersClose,
   onMembersOpen,
@@ -196,6 +201,7 @@ export function CommunityWorkspaceContent({
         onCommunityUpdated={onCommunityUpdated}
         onInvitationAccept={onInvitationAccept}
         onJoinVoiceChannel={callControls.startCommunityVoiceCall}
+        onKeychainPublished={onKeychainPublished}
         onLogout={onLogout}
         onMobileMembersClose={onMembersClose}
         onMobileSidebarClose={onSidebarClose}

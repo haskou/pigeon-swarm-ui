@@ -13,7 +13,10 @@ type UseCommunityLeaveInput = {
   community: Community;
   onBeforeLeft: () => void;
   onCommunityLeft: (community: Community) => void;
-  onSessionUpdated: (session: Session) => void;
+  onKeychainPublished: (
+    identityId: string,
+    published: Pick<Session, 'keychain' | 'keychainExternalIdentifier'>,
+  ) => void;
   session: Session;
 };
 
@@ -27,7 +30,7 @@ export function useCommunityLeave({
   community,
   onBeforeLeft,
   onCommunityLeft,
-  onSessionUpdated,
+  onKeychainPublished,
   session,
 }: UseCommunityLeaveInput): UseCommunityLeaveResult {
   const [error, setError] = useState<string | null>(null);
@@ -46,11 +49,7 @@ export function useCommunityLeave({
         community.id,
       );
 
-      onSessionUpdated({
-        ...session,
-        keychain: result.keychain,
-        keychainExternalIdentifier: result.keychainExternalIdentifier,
-      });
+      onKeychainPublished(session.identity.id, result);
       onBeforeLeft();
       onCommunityLeft(result.community ?? community);
     } catch (caught) {
