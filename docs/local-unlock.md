@@ -118,8 +118,8 @@ longer writes them. Covered by `deleteLegacyRememberedIdentityStorage.spec.ts`.
   size, or parallelism values are rejected. Covered by
   `DeviceSecurityValueObjects.spec.ts`.
 - **Logs.** Reviewed logging call sites do not log keys, decrypted payloads, or
-  topics. The realtime gateway constructor's signed-URL log is fixed in PR #246,
-  not in this change.
+  topics. The realtime gateway constructor's signed-URL log was fixed in
+  PR #246, which is on `main`.
 - **Content Security Policy.** The production build injects a
   `Content-Security-Policy` meta tag (policy in
   `src/shared/infrastructure/security/contentSecurityPolicy.ts`, applied in
