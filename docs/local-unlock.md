@@ -34,6 +34,10 @@ session before they are stored.
   (see below). A script from an allowed origin is not stopped.
 - **A compromised device or browser session.** Not protected. Unlock has no
   user-presence step.
+- **A same-origin script while the session is alive.** It can read the in-memory
+  session, including the conversation keys and the master key. It can also call
+  the message and attachment crypto paths. Logout drops the session but does not
+  clear JavaScript memory.
 
 ## Logout
 
@@ -50,8 +54,9 @@ It keeps, on purpose:
 - the last-login identity ID, workspace preferences, and
   community unread counts.
 
-Logout also closes realtime sockets and terminates the message decrypt worker.
-In-flight decrypts reject; a new worker starts on the next decrypt. Removing a
+Logout also closes realtime sockets, terminates the message decrypt worker, and
+terminates the attachment cipher worker. In-flight decrypts and attachment
+encrypt or decrypt calls reject; a new worker starts on the next use. Removing a
 push subscription always unsubscribes in the browser, even if the backend
 delete fails.
 
@@ -81,6 +86,16 @@ the sign-in key for the identity and points to the recovery key or "New
 device". It does not show the generic "username or password is incorrect"
 message. A wrong password on a browser that still has the local unlock keeps
 the generic message.
+
+## User-presence check before unlock
+
+A presence step (a click, a biometric prompt, or a WebAuthn assertion) before
+unlock was considered and not added. A same-origin script runs in the page
+after the user has unlocked, so it can trigger the same operations with no new
+prompt. Only a presence factor that gates the key itself, for example a passkey
+PRF wrapping the factor key, would stop that. That needs a passkey registration
+flow and settings UI, which is a product decision and out of scope here. Unlock
+still needs the password and the device-bound factor key.
 
 ## Transition from the previous local format
 
@@ -141,6 +156,9 @@ the main jest suite. The main jest config excludes them because its
 
 - **Session-only versus remembered-device split.** It overlaps branch
   `security/session-only-auth` in the primary checkout.
-- **User-presence check** before unlock.
-- **Attachment cipher worker on logout.** Not terminated yet.
+- **User-presence check** before unlock. Decided against; see the section above.
+- **Sealed conversation keys in session memory.** Raw conversation keys stay in
+  session memory while the session is alive. Sealing them at rest in memory was
+  evaluated and not adopted: it does not stop a same-origin script, which can
+  call the same paths.
 - **Diagnostic export and crash reports.** Not reviewed.

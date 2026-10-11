@@ -1,6 +1,7 @@
 import type { WorkerResponse } from '../../../../../contexts/attachments/infrastructure/crypto/WorkerResponse';
 
 import { AttachmentWorkerDispatcher } from '../../../../../contexts/attachments/infrastructure/crypto/AttachmentWorkerDispatcher';
+import { AttachmentWorkerTerminatedError } from '../../../../../contexts/attachments/infrastructure/crypto/errors/AttachmentWorkerTerminatedError';
 
 describe(AttachmentWorkerDispatcher.name, () => {
   const originalWorker = globalThis.Worker;
@@ -60,5 +61,54 @@ describe(AttachmentWorkerDispatcher.name, () => {
         type: 'encrypt',
       }),
     ).rejects.toThrow('Attachment workers are not available');
+  });
+
+  it('terminates the worker and rejects pending requests on dispose', async () => {
+    globalThis.Worker = {} as unknown as typeof Worker;
+    const worker = {
+      onerror: null,
+      onmessage: null,
+      postMessage: jest.fn(),
+      terminate: jest.fn(),
+    } as unknown as Worker;
+    const dispatcher = new AttachmentWorkerDispatcher(() => worker);
+    const pending = dispatcher.run({
+      file: new File(['content'], 'file.txt'),
+      id: 'ignored',
+      type: 'encrypt',
+    });
+    const rejection = expect(pending).rejects.toBeInstanceOf(
+      AttachmentWorkerTerminatedError,
+    );
+
+    dispatcher.dispose();
+
+    await rejection;
+    expect(worker.terminate).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts a fresh worker for requests made after dispose', () => {
+    globalThis.Worker = {} as unknown as typeof Worker;
+    const createWorker = jest.fn(
+      () =>
+        ({
+          onerror: null,
+          onmessage: null,
+          postMessage: jest.fn(),
+          terminate: jest.fn(),
+        }) as unknown as Worker,
+    );
+    const dispatcher = new AttachmentWorkerDispatcher(createWorker);
+    const request = {
+      file: new File(['content'], 'file.txt'),
+      id: 'ignored',
+      type: 'encrypt' as const,
+    };
+
+    dispatcher.run(request).catch(() => undefined);
+    dispatcher.dispose();
+    dispatcher.run(request).catch(() => undefined);
+
+    expect(createWorker).toHaveBeenCalledTimes(2);
   });
 });

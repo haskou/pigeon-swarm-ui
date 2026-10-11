@@ -9,6 +9,7 @@ import type { WorkerResponse } from './WorkerResponse';
 import { AttachmentBinaryCodec } from './AttachmentBinaryCodec';
 import { AttachmentCryptographer } from './AttachmentCryptographer';
 import { AttachmentWorkerDispatcher } from './AttachmentWorkerDispatcher';
+import { AttachmentWorkerTerminatedError } from './errors/AttachmentWorkerTerminatedError';
 
 export class AttachmentCipher {
   public static inCurrentThread(): AttachmentCipher {
@@ -39,6 +40,10 @@ export class AttachmentCipher {
     private readonly codec: AttachmentBinaryCodec,
   ) {}
 
+  public dispose(): void {
+    this.workers.dispose();
+  }
+
   public async decrypt(
     attachment: MessageAttachment,
     encryptedBytes: ArrayBuffer,
@@ -54,9 +59,15 @@ export class AttachmentCipher {
         },
         onProgress,
       )
-      .catch(() =>
-        this.cryptographer.decrypt(attachment, encryptedBytes, onProgress),
-      );
+      .catch((caught: unknown) => {
+        if (caught instanceof AttachmentWorkerTerminatedError) throw caught;
+
+        return this.cryptographer.decrypt(
+          attachment,
+          encryptedBytes,
+          onProgress,
+        );
+      });
 
     return new Blob([result.bytes], { type: attachment.contentType });
   }
@@ -74,13 +85,15 @@ export class AttachmentCipher {
         },
         onProgress,
       )
-      .catch(async () =>
-        this.cryptographer.encrypt(
+      .catch(async (caught: unknown) => {
+        if (caught instanceof AttachmentWorkerTerminatedError) throw caught;
+
+        return this.cryptographer.encrypt(
           file.name || 'attachment',
           await file.arrayBuffer(),
           onProgress,
-        ),
-      );
+        );
+      });
 
     return {
       encryptedBytes: result.encryptedBytes,

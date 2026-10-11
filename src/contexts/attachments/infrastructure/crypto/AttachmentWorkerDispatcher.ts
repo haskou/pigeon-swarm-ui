@@ -4,6 +4,8 @@ import type { PendingWorkerRequest } from './PendingWorkerRequest';
 import type { WorkerRequest } from './WorkerRequest';
 import type { WorkerResponse } from './WorkerResponse';
 
+import { AttachmentWorkerTerminatedError } from './errors/AttachmentWorkerTerminatedError';
+
 export class AttachmentWorkerDispatcher {
   private nextRequestId = 0;
 
@@ -84,5 +86,9 @@ export class AttachmentWorkerDispatcher {
         reject(caught);
       }
     });
+  }
+
+  public dispose(): void {
+    this.rejectAll(new AttachmentWorkerTerminatedError());
   }
 }
