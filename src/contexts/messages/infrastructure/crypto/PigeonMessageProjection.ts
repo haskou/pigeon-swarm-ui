@@ -114,7 +114,7 @@ export class PigeonMessageProjection implements MessageProjectionPort {
         copy: this.copy,
         currentIdentityId: session.identity.id,
         messages: pendingMessages,
-        privateKey: key?.key,
+        symmetricKey: key?.key,
       },
       signal,
     );

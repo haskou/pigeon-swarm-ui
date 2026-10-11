@@ -23,7 +23,7 @@ describe(MessageDecryptWorkerClient.name, () => {
       copy: { decryptFailed: 'Failed', missingKey: 'Missing key' },
       currentIdentityId: 'identity-a',
       messages: [],
-      privateKey: 'secret',
+      symmetricKey: 'secret',
     });
 
     worker.succeed([]);
@@ -47,7 +47,7 @@ describe(MessageDecryptWorkerClient.name, () => {
         copy: { decryptFailed: 'Failed', missingKey: 'Missing key' },
         currentIdentityId: 'identity-a',
         messages: [],
-        privateKey: 'secret',
+        symmetricKey: 'secret',
       },
       controller.signal,
     );
