@@ -167,7 +167,7 @@ For the full experience, the browser client expects:
 * At least one configured node network.
 * IPFS public/private upload endpoints exposed by the node.
 * Signed request support from the active identity.
-* WebSocket `/ws` support for realtime domain events.
+* WebSocket `/realtime/v1` support for realtime domain events, authenticated with single-use tickets.
 
 The app can still render connection-loss and first-run screens when the node is
 offline or unclaimed.
@@ -184,7 +184,7 @@ The frontend is responsible for:
 * changing passwords by rewrapping local material without rotating identity keys;
 * enrolling devices through short-lived, mutually authenticated QR transfers;
 * replacing every enrolled device from the offline recovery kit;
-* signing HTTP and WebSocket authentication payloads;
+* signing HTTP requests, including the request that issues each realtime WebSocket ticket;
 * signing domain payloads for identities, messages, deletions and keychains;
 * encrypting keychains before publication;
 * encrypting conversation and community message payloads;
@@ -237,4 +237,4 @@ The node must expose `GET <node-base>/client-contract`, including the selected A
 
 The independent build must be served from a trusted client origin with the static server and security headers provided by [the deployment repository](https://github.com/haskou/pigeon-swarm/blob/main/docs/INDEPENDENT_CLIENT.md). That guide covers verified images, TLS, updates, rollback, node-scoped storage, and distributor trust. The service worker retains notifications but bypasses resource caching in this mode.
 
-Independent-client HTTP fetches omit ambient cookies and reject redirects. Native WebSocket connections still use browser-managed cookies eligible for the selected node; signed authentication does not change that browser behavior. Use an API hostname outside unrelated services’ cookie scopes, while recognizing that dedicated hosting does not guarantee an empty cookie jar. Credentialless realtime transport is tracked in [pigeon-swarm-node#291](https://github.com/haskou/pigeon-swarm-node/issues/291).
+Independent-client HTTP fetches omit ambient cookies and reject redirects. Realtime WebSocket connections authenticate with a single-use ticket rather than cookies or signed query parameters: every connection, including each reconnect, first requests a ticket from `POST <api-base>/realtime/v1/tickets` and then presents it in the `ticket.<token>` subprotocol, so the URL never carries credentials. Browsers may still attach cookies for the selected node to the handshake, and the node ignores them for authentication. Use an API hostname outside unrelated services’ cookie scopes, while recognizing that dedicated hosting does not guarantee an empty cookie jar. Credentialless realtime transport is tracked in [pigeon-swarm-node#291](https://github.com/haskou/pigeon-swarm-node/issues/291).

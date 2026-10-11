@@ -1,6 +1,7 @@
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 
 import { ApiUrlBuilder } from '../../../../shared/infrastructure/http/ApiUrlBuilder';
+import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 import { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import { RealtimeGateway } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 
@@ -19,7 +20,10 @@ class WebSocketMock {
 
   public readonly readyState = 1;
 
-  public constructor(public readonly url: string) {
+  public constructor(
+    public readonly url: string,
+    public readonly protocols?: string | string[],
+  ) {
     WebSocketMock.instances.push(this);
   }
 
@@ -54,8 +58,40 @@ class WebSocketMock {
   }
 }
 
+function realtimeSession(): Session {
+  return { identity: { id: 'identity-1' } } as unknown as Session;
+}
+
+function ticketResponse(status: number, body: unknown): Response {
+  return {
+    json: jest.fn().mockResolvedValue(body),
+    ok: status < 400,
+    status,
+    statusText: '',
+    text: jest.fn().mockResolvedValue(JSON.stringify(body)),
+  } as unknown as Response;
+}
+
 describe(RealtimeGateway.name, () => {
+  const originalFetch = global.fetch;
   const originalWebSocket = global.WebSocket;
+
+  beforeEach(() => {
+    let issued = 0;
+
+    global.fetch = jest.fn(() => {
+      issued += 1;
+
+      return Promise.resolve(
+        ticketResponse(201, { expiresAt: 1, ticket: `ticket-${issued}` }),
+      );
+    }) as unknown as typeof fetch;
+    jest.spyOn(RequestSigner.prototype, 'headers').mockResolvedValue({
+      'X-Identity-Id': 'identity-1',
+      'X-Signature': 'signature',
+      'X-Timestamp': '123',
+    });
+  });
 
   afterEach(() => {
     WebSocketMock.instances.forEach((socket) => {
@@ -63,51 +99,31 @@ describe(RealtimeGateway.name, () => {
     });
     jest.restoreAllMocks();
     jest.useRealTimers();
+    global.fetch = originalFetch;
     global.WebSocket = originalWebSocket;
     WebSocketMock.instances = [];
   });
 
-  it('opens a signed websocket using query authentication', async () => {
+  it('opens the realtime endpoint with the ticket as a subprotocol and keeps credentials out of the URL', async () => {
     global.WebSocket = WebSocketMock as unknown as typeof WebSocket;
-    jest.spyOn(Date, 'now').mockReturnValue(1778536870557);
-    const signer = new RequestSigner();
-    const sign = jest.fn().mockResolvedValue({
-      toString: () => 'socket-signature',
-    });
-    const session = {
-      identity: { id: 'identity+with/slash=' },
-      keyPair: { sign },
-      password: 'secret',
-    } as unknown as Session;
     const gateway = new RealtimeGateway(
       new ApiUrlBuilder('http://localhost:8080/api/'),
-      signer,
+      new RequestSigner(),
     );
-    const onMessage = jest.fn();
 
-    await gateway.connect(session, onMessage);
+    await gateway.connect(realtimeSession(), jest.fn());
 
-    const url = new URL(WebSocketMock.instances[0]?.url ?? '');
+    const socket = WebSocketMock.instances[0];
+    const url = new URL(socket?.url ?? '');
 
     expect(url.protocol).toBe('ws:');
     expect(url.origin).toBe('ws://localhost:8080');
-    expect(url.pathname).toBe('/api/ws');
-    expect(url.searchParams.get('identityId')).toBe('identity+with/slash=');
-    expect(url.searchParams.get('timestamp')).toBe('1778536870557');
-
-    expect(url.searchParams.has('nonce')).toBe(false);
-    expect(url.searchParams.get('signature')).toBe('socket-signature');
-    expect(sign).toHaveBeenCalledWith(
-      signer.payload('GET', '/api/ws', 1778536870557, {}),
-    );
-    expect(
-      JSON.parse((sign.mock.calls[0] as [string])[0]) as {
-        timestamp: unknown;
-      },
-    ).toMatchObject({
-      path: '/api/ws',
-      timestamp: 1778536870557,
-    });
+    expect(url.pathname).toBe('/api/realtime/v1');
+    expect(url.search).toBe('');
+    expect(socket?.protocols).toEqual([
+      'pigeon-realtime.v1',
+      'ticket.ticket-1',
+    ]);
   });
 
   it('resolves relative websocket URLs against the current origin', async () => {
@@ -128,11 +144,11 @@ describe(RealtimeGateway.name, () => {
 
     const url = new URL(WebSocketMock.instances[0]?.url ?? '');
 
-    expect(url.pathname).toBe('/api/ws');
+    expect(url.pathname).toBe('/api/realtime/v1');
     expect(['ws:', 'wss:']).toContain(url.protocol);
   });
 
-  it('logs websocket errors without leaking the signature', async () => {
+  it('logs websocket errors without leaking the ticket', async () => {
     global.WebSocket = WebSocketMock as unknown as typeof WebSocket;
     const consoleError = jest
       .spyOn(console, 'error')
@@ -141,24 +157,59 @@ describe(RealtimeGateway.name, () => {
       new ApiUrlBuilder('https://example.com/api'),
       new RequestSigner(),
     );
-    const session = {
-      identity: { id: 'identity-1' },
-      keyPair: {
-        sign: jest.fn().mockResolvedValue({ toString: () => 'signature' }),
-      },
-      password: 'secret',
-    } as unknown as Session;
 
-    await gateway.connect(session, jest.fn());
+    await gateway.connect(realtimeSession(), jest.fn());
     WebSocketMock.instances[0]?.emitError();
 
     expect(consoleError).toHaveBeenCalledWith(
       '[pigeon realtime] websocket',
       'error',
       expect.objectContaining({
-        url: expect.not.stringContaining('signature='),
+        url: 'wss://example.com/api/realtime/v1',
       }),
     );
+    expect(JSON.stringify(consoleError.mock.calls)).not.toContain('ticket-1');
+  });
+
+  it('fetches a new ticket for every connection so reconnects never reuse one', async () => {
+    global.WebSocket = WebSocketMock as unknown as typeof WebSocket;
+    const gateway = new RealtimeGateway(
+      new ApiUrlBuilder('http://localhost:8080/api/'),
+      new RequestSigner(),
+    );
+
+    await gateway.connect(realtimeSession(), jest.fn());
+    await gateway.connect(realtimeSession(), jest.fn());
+
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(global.fetch).toHaveBeenLastCalledWith(
+      'http://localhost:8080/api/realtime/v1/tickets',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(WebSocketMock.instances.map((socket) => socket.protocols)).toEqual([
+      ['pigeon-realtime.v1', 'ticket.ticket-1'],
+      ['pigeon-realtime.v1', 'ticket.ticket-2'],
+    ]);
+    expect(WebSocketMock.instances.map((socket) => socket.url)).toEqual([
+      'ws://localhost:8080/api/realtime/v1',
+      'ws://localhost:8080/api/realtime/v1',
+    ]);
+  });
+
+  it('does not open a socket when the ticket request is refused', async () => {
+    global.WebSocket = WebSocketMock as unknown as typeof WebSocket;
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue(ticketResponse(429, { code: '429050' }));
+    const gateway = new RealtimeGateway(
+      new ApiUrlBuilder('http://localhost:8080/api/'),
+      new RequestSigner(),
+    );
+
+    await expect(
+      gateway.connect(realtimeSession(), jest.fn()),
+    ).rejects.toBeInstanceOf(HttpJsonError);
+    expect(WebSocketMock.instances).toHaveLength(0);
   });
 
   it('parses realtime messages from the socket', async () => {
