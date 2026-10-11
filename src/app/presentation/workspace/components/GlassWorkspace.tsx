@@ -40,6 +40,7 @@ import {
   useWorkspacePreferences,
   useWorkspacePreferenceState,
 } from '../useWorkspacePreferences';
+import { applyPublishedKeychain } from './applyPublishedKeychain';
 import { CommunityUnreadState } from './CommunityUnreadState';
 import { communityVoiceChannelTopologyKey } from './communityVoicePresence';
 import { CommunityWorkspaceContent } from './CommunityWorkspaceContent';
@@ -361,7 +362,9 @@ export function GlassWorkspace({
       conversations?: ConversationResource[];
       session: Session;
     }) => {
-      setSession(next.session);
+      setSession((current) =>
+        applyPublishedKeychain(current, next.session.identity.id, next.session),
+      );
 
       if (next.conversations) {
         setConversations(next.conversations);
@@ -1045,6 +1048,11 @@ export function GlassWorkspace({
             onCommunityUpdated={updateCommunity}
             onInvitationAccept={(notification) =>
               void acceptNotification(notification)
+            }
+            onKeychainPublished={(identityId, published) =>
+              setSession((current) =>
+                applyPublishedKeychain(current, identityId, published),
+              )
             }
             onLogout={logout}
             onMembersClose={() => closeTransientSurface('community-members')}

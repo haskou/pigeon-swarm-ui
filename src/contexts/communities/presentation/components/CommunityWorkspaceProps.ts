@@ -73,6 +73,10 @@ export interface CommunityWorkspaceProps {
   onNotificationSettingsOpen: (target: NotificationScopeSettingsTarget) => void;
   onNotificationMuteToggle: (scope: NotificationSettingScope) => void;
   onJoinVoiceChannel?: (channel: CommunityVoiceChannel) => void;
+  onKeychainPublished: (
+    identityId: string,
+    published: Pick<Session, 'keychain' | 'keychainExternalIdentifier'>,
+  ) => void;
   onOpenConversationWithIdentity?: (
     identityId: string,
     identity?: IdentityResource,

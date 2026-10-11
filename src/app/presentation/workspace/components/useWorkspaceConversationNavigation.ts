@@ -13,6 +13,7 @@ import type {
 import { ConversationTimeline } from '../../../../contexts/conversations/presentation/view-models/ConversationTimeline';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { applicationContainer } from '../../../composition/applicationContainer';
+import { applyPublishedKeychain } from './applyPublishedKeychain';
 import { WorkspaceConversationTarget } from './WorkspaceConversationTarget';
 
 type WorkspaceConversationNavigationInput = {
@@ -25,7 +26,7 @@ type WorkspaceConversationNavigationInput = {
   sessionRef: MutableRefObject<Session>;
   setActiveConversationId: Dispatch<SetStateAction<null | string>>;
   setConversations: Dispatch<SetStateAction<ConversationResource[]>>;
-  setSession: (session: null | Session) => void;
+  setSession: Dispatch<SetStateAction<Session | null>>;
   showMessagesWorkspace: () => void;
 };
 
@@ -57,11 +58,13 @@ export function useWorkspaceConversationNavigation({
 }: WorkspaceConversationNavigationInput): WorkspaceConversationNavigation {
   const openCreatedConversation = useCallback(
     (nextSession: Session, conversation: ConversationResource): void => {
-      setSession(nextSession);
-      setConversations(
+      setSession((current) =>
+        applyPublishedKeychain(current, nextSession.identity.id, nextSession),
+      );
+      setConversations((current) =>
         ConversationTimeline.sortByLatestMessage([
           conversation,
-          ...conversations.filter((item) => item.id !== conversation.id),
+          ...current.filter((item) => item.id !== conversation.id),
         ]),
       );
       setActiveConversationId(conversation.id);
@@ -71,7 +74,6 @@ export function useWorkspaceConversationNavigation({
     [
       closeConversationCreation,
       closeSidebar,
-      conversations,
       setActiveConversationId,
       setConversations,
       setSession,
@@ -112,18 +114,16 @@ export function useWorkspaceConversationNavigation({
         throw new Error(copy.dialog.noSharedNetwork);
       }
 
+      const publishingSession = sessionRef.current;
       const result = await applicationContainer.conversations.create(
-        sessionRef.current,
+        publishingSession,
         identityId,
         sharedNetwork.toString(),
       );
-      const nextSession = {
-        ...sessionRef.current,
-        keychain: result.keychain,
-        keychainExternalIdentifier: result.keychainExternalIdentifier,
-      };
 
-      setSession(nextSession);
+      setSession((current) =>
+        applyPublishedKeychain(current, publishingSession.identity.id, result),
+      );
 
       if (identity) rememberIdentity(identity);
       setConversations((current) =>
@@ -165,11 +165,9 @@ export function useWorkspaceConversationNavigation({
         },
       );
 
-      setSession({
-        ...session,
-        keychain: result.keychain,
-        keychainExternalIdentifier: result.keychainExternalIdentifier,
-      });
+      setSession((current) =>
+        applyPublishedKeychain(current, session.identity.id, result),
+      );
     },
     [session, setSession],
   );

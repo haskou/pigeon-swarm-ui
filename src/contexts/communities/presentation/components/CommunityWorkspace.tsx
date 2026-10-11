@@ -85,6 +85,7 @@ export function CommunityWorkspace({
   onCommunityUpdated,
   onInvitationAccept,
   onJoinVoiceChannel,
+  onKeychainPublished,
   onLogout,
   onMobileMembersClose,
   onMobileSidebarClose,
@@ -384,7 +385,7 @@ export function CommunityWorkspace({
     community,
     onBeforeLeft: () => setCommunityMenuOpen(false),
     onCommunityLeft,
-    onSessionUpdated,
+    onKeychainPublished,
     session,
   });
   const communityData = useMemo(
