@@ -131,8 +131,11 @@ export class PwaPushSubscriptionRegistrar {
 
     if (!subscription) return;
 
-    await this.backend.delete(session, subscription.toJSON());
-    await subscription.unsubscribe();
+    try {
+      await this.backend.delete(session, subscription.toJSON());
+    } finally {
+      await subscription.unsubscribe();
+    }
   }
 
   public async ensure(
