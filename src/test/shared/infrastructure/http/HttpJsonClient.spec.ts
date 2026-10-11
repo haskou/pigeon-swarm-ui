@@ -11,7 +11,7 @@ describe(HttpJsonClient.name, () => {
 
   it('disables browser cache revalidation by default', async () => {
     global.fetch = jest.fn().mockResolvedValue({
-      json: jest.fn().mockResolvedValue({ ok: true }),
+      text: jest.fn().mockResolvedValue('{"ok":true}'),
       ok: true,
       status: 200,
     } as unknown as Response);
@@ -38,9 +38,25 @@ describe(HttpJsonClient.name, () => {
     expect(json).not.toHaveBeenCalled();
   });
 
+  it('treats an empty success body as no content', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      json: jest
+        .fn()
+        .mockRejectedValue(new SyntaxError('Unexpected end of JSON input')),
+      ok: true,
+      status: 201,
+      text: jest.fn().mockResolvedValue(''),
+    } as unknown as Response);
+    const client = new HttpJsonClient(new ApiUrlBuilder('http://localhost'));
+
+    await expect(
+      client.request('/mailboxes/abc', { method: 'PUT' }),
+    ).resolves.toBeUndefined();
+  });
+
   it('keeps JSON content type for string bodies with signed headers', async () => {
     global.fetch = jest.fn().mockResolvedValue({
-      json: jest.fn().mockResolvedValue({ ok: true }),
+      text: jest.fn().mockResolvedValue('{"ok":true}'),
       ok: true,
       status: 200,
     } as unknown as Response);
@@ -66,7 +82,7 @@ describe(HttpJsonClient.name, () => {
 
   it('preserves explicit content type for raw uploads', async () => {
     global.fetch = jest.fn().mockResolvedValue({
-      json: jest.fn().mockResolvedValue({ cid: 'bafy-avatar' }),
+      text: jest.fn().mockResolvedValue('{"cid":"bafy-avatar"}'),
       ok: true,
       status: 200,
     } as unknown as Response);
