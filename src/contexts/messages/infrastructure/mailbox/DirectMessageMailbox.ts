@@ -11,6 +11,7 @@ import type { MailboxKeys } from '../../../mailboxes/infrastructure/crypto/Mailb
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { DirectMessageMailboxState } from './DirectMessageMailboxStore';
 
+import { encodeBase64Url } from '../../../../shared/infrastructure/encoding/base64url';
 import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
 import { MailboxKeySchedule } from '../../../mailboxes/infrastructure/crypto/MailboxKeySchedule';
 import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
@@ -143,9 +144,9 @@ export class DirectMessageMailbox {
   private createState(keys: MailboxKeys): DirectMessageMailboxState {
     const state: DirectMessageMailboxState = {
       cursor: 0,
-      readToken: Buffer.from(
+      readToken: encodeBase64Url(
         randomBytes(DirectMessageMailbox.READ_TOKEN_BYTES),
-      ).toString('base64url'),
+      ),
     };
 
     this.store.save(keys.mailboxId, state);

@@ -1,7 +1,8 @@
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { concatBytes } from '@noble/hashes/utils.js';
-import { Buffer } from 'buffer';
+
+import { encodeBase64Url } from '../../../../shared/infrastructure/encoding/base64url';
 
 export type MailboxKeys = {
   envelopeKey: Uint8Array;
@@ -89,22 +90,22 @@ export class MailboxKeySchedule {
         recipientIdentityId,
         epoch,
       ),
-      mailboxId: Buffer.from(
+      mailboxId: encodeBase64Url(
         MailboxKeySchedule.expand(
           sharedSecret,
           MailboxKeySchedule.ID_LABEL,
           recipientIdentityId,
           epoch,
         ),
-      ).toString('base64url'),
-      postToken: Buffer.from(
+      ),
+      postToken: encodeBase64Url(
         MailboxKeySchedule.expand(
           sharedSecret,
           MailboxKeySchedule.POST_LABEL,
           recipientIdentityId,
           epoch,
         ),
-      ).toString('base64url'),
+      ),
     };
   }
 }

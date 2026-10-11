@@ -1,6 +1,10 @@
 import { EncryptedPayload, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 
+import {
+  decodeBase64Url,
+  encodeBase64Url,
+} from '../../../../shared/infrastructure/encoding/base64url';
 import { MailboxEnvelopeError } from './MailboxEnvelopeError';
 
 /**
@@ -76,7 +80,7 @@ export class MailboxEnvelopeCipher {
         .map((part) => Buffer.from(part, 'base64')),
     );
 
-    return sealed.toString('base64url');
+    return encodeBase64Url(sealed);
   }
 
   /**
@@ -93,7 +97,7 @@ export class MailboxEnvelopeCipher {
       throw new MailboxEnvelopeError('Envelope body is not base64url');
     }
 
-    const sealed = Buffer.from(body, 'base64url');
+    const sealed = decodeBase64Url(body);
 
     if (!MailboxEnvelopeCipher.BUCKETS.includes(sealed.length)) {
       throw new MailboxEnvelopeError('Envelope body is not a bucket size');

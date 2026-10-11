@@ -1,9 +1,9 @@
 import { randomBytes } from '@noble/hashes/utils.js';
-import { Buffer } from 'buffer';
 
 import type { MailboxKeys } from './crypto/MailboxKeySchedule';
 import type { PigeonMailboxClient } from './http/PigeonMailboxClient';
 
+import { encodeBase64Url } from '../../../shared/infrastructure/encoding/base64url';
 import { MailboxCapability } from './crypto/MailboxCapability';
 import { MailboxCreationProof } from './crypto/MailboxCreationProof';
 import { MailboxEnvelopeCipher } from './crypto/MailboxEnvelopeCipher';
@@ -136,9 +136,9 @@ export class MailboxChannel {
     keys: MailboxKeys,
     plaintext: Uint8Array,
   ): Promise<{ cursor: number; envelopeId: string }> {
-    const envelopeId = Buffer.from(
+    const envelopeId = encodeBase64Url(
       randomBytes(MailboxChannel.ENVELOPE_ID_BYTES),
-    ).toString('base64url');
+    );
     const body = MailboxEnvelopeCipher.seal(
       keys.envelopeKey,
       keys.mailboxId,

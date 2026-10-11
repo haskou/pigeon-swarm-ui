@@ -1,6 +1,7 @@
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, randomBytes } from '@noble/hashes/utils.js';
-import { Buffer } from 'buffer';
+
+import { encodeBase64Url } from '../../../../shared/infrastructure/encoding/base64url';
 
 /**
  * Bearer capabilities for a mailbox. The node stores only the SHA-256 hex of
@@ -15,9 +16,7 @@ export class MailboxCapability {
    * read and acknowledge.
    */
   public static generate(): string {
-    return Buffer.from(randomBytes(MailboxCapability.TOKEN_BYTES)).toString(
-      'base64url',
-    );
+    return encodeBase64Url(randomBytes(MailboxCapability.TOKEN_BYTES));
   }
 
   public static hash(token: string): string {
