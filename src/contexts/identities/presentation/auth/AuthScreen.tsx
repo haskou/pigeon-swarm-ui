@@ -23,6 +23,7 @@ import {
   saveLastLoginIdentity,
 } from '../../infrastructure/storage/lastLoginIdentity';
 import { useIdentityPreview } from '../hooks/useIdentityPreview';
+import { toDevicePairingErrorMessage } from '../view-models/toDevicePairingErrorMessage';
 import { AuthFormFields } from './AuthFormFields';
 import {
   type AuthMode,
@@ -236,7 +237,11 @@ export function AuthScreen({
     } catch (caught) {
       setState('error');
       setLoginProgressStep(null);
-      setError(toUserErrorMessage(caught, copy.auth.unknownError));
+      setError(
+        mode === 'login' && useDevicePairing && pairingDraft
+          ? toDevicePairingErrorMessage(caught, copy.auth.devicePairingError)
+          : toUserErrorMessage(caught, copy.auth.unknownError),
+      );
 
       return;
     }
@@ -264,7 +269,9 @@ export function AuthScreen({
         draft.getRequest().getInvitation().getIdentityId().valueOf(),
       );
     } catch (caught) {
-      setError(toUserErrorMessage(caught, copy.auth.devicePairingError));
+      setError(
+        toDevicePairingErrorMessage(caught, copy.auth.devicePairingError),
+      );
     } finally {
       setState('idle');
     }

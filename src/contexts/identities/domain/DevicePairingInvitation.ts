@@ -4,6 +4,7 @@ import { Timestamp, assert } from '@haskou/value-objects';
 import type { DevicePairingInvitationPayload } from './DevicePairingInvitationPayload';
 import type { DevicePairingInvitationResource } from './DevicePairingInvitationResource';
 
+import { DevicePairingError } from './DevicePairingError';
 import { DevicePairingResource } from './DevicePairingResource';
 import { DeviceAuthorizationEpoch } from './value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationRevision } from './value-objects/DeviceAuthorizationRevision';
@@ -111,14 +112,17 @@ export class DevicePairingInvitation {
 
   public assertValidAt(acceptedAt: Timestamp): void {
     assert(
-      acceptedAt.valueOf() <= this.expiresAt.valueOf() &&
-        this.authorCredential
-          .getPublicKey()
-          .isValidSignature(
-            JSON.stringify({ domain: DOMAIN, invitation: this.payload() }),
-            this.signature,
-          ),
-      new Error('Invalid or expired device pairing invitation.'),
+      this.authorCredential
+        .getPublicKey()
+        .isValidSignature(
+          JSON.stringify({ domain: DOMAIN, invitation: this.payload() }),
+          this.signature,
+        ),
+      new DevicePairingError('invalid', 'Invalid device pairing invitation.'),
+    );
+    assert(
+      acceptedAt.valueOf() <= this.expiresAt.valueOf(),
+      new DevicePairingError('expired', 'Expired device pairing invitation.'),
     );
   }
 

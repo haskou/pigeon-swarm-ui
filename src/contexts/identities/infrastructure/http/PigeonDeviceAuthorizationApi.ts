@@ -22,6 +22,7 @@ import type { DeviceIdentityVault } from '../storage/DeviceIdentityVault';
 import { DeviceAuthorizationCheckpoint } from '../../domain/DeviceAuthorizationCheckpoint';
 import { DeviceAuthorizationTransition as AuthorizationTransition } from '../../domain/DeviceAuthorizationTransition';
 import { DevicePairingCompletion } from '../../domain/DevicePairingCompletion';
+import { DevicePairingError } from '../../domain/DevicePairingError';
 import { DevicePairingInvitation } from '../../domain/DevicePairingInvitation';
 import { DevicePairingRequest } from '../../domain/DevicePairingRequest';
 import { DeviceAuthorizationEpoch } from '../../domain/value-objects/DeviceAuthorizationEpoch';
@@ -151,7 +152,10 @@ export class PigeonDeviceAuthorizationApi {
         invitation.getRevision().isEqual(session.authorizationRevision) &&
         invitation.getAuthorCredential().valueOf() ===
           session.deviceCredentialKeyPair.toPrimitives().publicKey,
-      new Error('Device pairing request does not match this session.'),
+      new DevicePairingError(
+        'mismatch',
+        'Device pairing request does not match this session.',
+      ),
     );
 
     const transition = AuthorizationTransition.enrollmentWithProof({
@@ -206,7 +210,10 @@ export class PigeonDeviceAuthorizationApi {
       identityId.isEqual(IdentityId.fromString(identity.id)) &&
         material.getRecoveryAuthorityKeyPair().toPrimitives().publicKey ===
           identity.recoveryAuthority,
-      new Error('Paired identity material does not match the identity.'),
+      new DevicePairingError(
+        'mismatch',
+        'Paired identity material does not match the identity.',
+      ),
     );
 
     const pendingSession = {
@@ -225,7 +232,8 @@ export class PigeonDeviceAuthorizationApi {
     assert(
       checkpoint.getEpoch().isEqual(completion.getEpoch()) &&
         checkpoint.getRevision().isEqual(completion.getRevision()),
-      new Error(
+      new DevicePairingError(
+        'mismatch',
         'Pairing completion is not the current authorization checkpoint.',
       ),
     );

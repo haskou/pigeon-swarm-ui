@@ -8,6 +8,7 @@ import { DeviceAuthorizationRevision } from '../../../../contexts/identities/dom
 import { DevicePairingCode } from '../../../../contexts/identities/domain/value-objects/DevicePairingCode';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { PairingId } from '../../../../contexts/identities/domain/value-objects/PairingId';
+import { thrownPairingFailure } from './thrownPairingFailure';
 
 describe(DevicePairingRequest.name, () => {
   async function draft() {
@@ -62,14 +63,29 @@ describe(DevicePairingRequest.name, () => {
     >;
     const attacker = await KeyPair.generate();
 
-    expect(() =>
-      DevicePairingRequest.fromCode(
-        DevicePairingCode.encode({
-          ...resource,
-          transportPublicKey: attacker.toPrimitives().publicKey,
-        }),
-        new Timestamp(1_100),
+    expect(
+      thrownPairingFailure(() =>
+        DevicePairingRequest.fromCode(
+          DevicePairingCode.encode({
+            ...resource,
+            transportPublicKey: attacker.toPrimitives().publicKey,
+          }),
+          new Timestamp(1_100),
+        ),
       ),
-    ).toThrow('Invalid or expired');
+    ).toBe('invalid');
+  });
+
+  it('reports a request accepted after the invitation expired as expired', async () => {
+    const source = await draft();
+
+    expect(
+      thrownPairingFailure(() =>
+        DevicePairingRequest.fromCode(
+          source.getRequest().toCode(),
+          new Timestamp(2_001),
+        ),
+      ),
+    ).toBe('expired');
   });
 });

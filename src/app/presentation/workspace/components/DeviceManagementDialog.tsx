@@ -113,8 +113,7 @@ export function DeviceManagementDialog({
                       onClick={() => setSelected(device)}
                       type="button"
                     >
-                      {copy.profile.deviceRetire} /{' '}
-                      {copy.profile.deviceRevokeCompromised}
+                      {copy.profile.deviceRemoveAccess}
                     </button>
                   )}
                 </li>

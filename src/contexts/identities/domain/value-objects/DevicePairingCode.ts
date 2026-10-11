@@ -1,8 +1,6 @@
-import {
-  InvalidFormatError,
-  StringValueObject,
-  assert,
-} from '@haskou/value-objects';
+import { StringValueObject, assert } from '@haskou/value-objects';
+
+import { DevicePairingError } from '../DevicePairingError';
 
 const PREFIX = 'psdp1.';
 const MAX_LENGTH = 32_768;
@@ -29,7 +27,7 @@ export class DevicePairingCode extends StringValueObject {
   private constructor(value: string) {
     assert(
       value.startsWith(PREFIX),
-      new InvalidFormatError('[redacted pairing code]'),
+      new DevicePairingError('invalid', 'Invalid device pairing code.'),
     );
     super(value, MAX_LENGTH);
   }
@@ -46,7 +44,7 @@ export class DevicePairingCode extends StringValueObject {
 
       return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
     } catch {
-      throw new InvalidFormatError('[redacted pairing code]');
+      throw new DevicePairingError('invalid', 'Invalid device pairing code.');
     }
   }
 }
