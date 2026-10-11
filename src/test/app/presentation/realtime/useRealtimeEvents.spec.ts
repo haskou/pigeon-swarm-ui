@@ -1,13 +1,20 @@
-import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
+import { setImmediate as flushConnections } from 'node:timers/promises';
 
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 
+import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import {
   closeAllRealtimeConnections,
   useRealtimeEvents,
 } from '../../../../app/presentation/realtime/useRealtimeEvents';
-import { applicationContainer } from '../../../../app/composition/applicationContainer';
-import { setImmediate as flushConnections } from 'node:timers/promises';
 
 type MockEffect = () => void | (() => void);
 
@@ -22,7 +29,6 @@ jest.mock('react', () => ({
 jest.mock('../../../../app/composition/applicationContainer', () => ({
   applicationContainer: { realtime: { connect: jest.fn() } },
 }));
-
 
 class SocketDouble {
   public readonly addEventListener = jest.fn();

@@ -1,14 +1,20 @@
-import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
 import { mock, type MockProxy } from 'jest-mock-extended';
+import { setImmediate as flushImmediate } from 'node:timers/promises';
 
 import type { MessageResource } from '../../../../../shared/domain/pigeonResources.types';
 
+import { createMessageDecryptWorker } from '../../../../../contexts/messages/infrastructure/crypto/createMessageDecryptWorker';
 import { MessageProjector } from '../../../../../contexts/messages/infrastructure/crypto/MessageProjector';
 import { PigeonMessageProjection } from '../../../../../contexts/messages/infrastructure/crypto/PigeonMessageProjection';
 import { sessionFixture } from '../../../conversations/ConversationFixture';
-import { setImmediate as flushImmediate } from 'node:timers/promises';
-
-import { createMessageDecryptWorker } from '../../../../../contexts/messages/infrastructure/crypto/createMessageDecryptWorker';
 
 jest.mock(
   '../../../../../contexts/messages/infrastructure/crypto/createMessageDecryptWorker',
