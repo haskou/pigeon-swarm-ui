@@ -39,13 +39,6 @@ export class PigeonFilesGateway {
     return await this.downloader.download(attachment, onProgress);
   }
 
-  public async downloadAttachment(
-    attachment: MessageAttachment,
-    onProgress?: (progress: AttachmentProgress) => void,
-  ): Promise<Blob> {
-    return await this.download(attachment, onProgress);
-  }
-
   public async getPublicFile(cid: string): Promise<PublicFileContent> {
     const attachment = await this.findAttachment.find(
       new FindAttachmentMessage(cid, false),
