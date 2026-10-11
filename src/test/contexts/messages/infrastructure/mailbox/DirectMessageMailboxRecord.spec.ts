@@ -88,8 +88,14 @@ describe(DirectMessageMailboxRecord.name, () => {
 
     it.each([
       ['non-JSON bytes', text('not json')],
-      ['another kind', text(JSON.stringify({ kind: 'other', record, version: 1 }))],
-      ['another version', text(JSON.stringify({ kind: 'direct-text', record, version: 2 }))],
+      [
+        'another kind',
+        text(JSON.stringify({ kind: 'other', record, version: 1 })),
+      ],
+      [
+        'another version',
+        text(JSON.stringify({ kind: 'direct-text', record, version: 2 })),
+      ],
       [
         'a record with a missing field',
         text(
@@ -101,7 +107,9 @@ describe(DirectMessageMailboxRecord.name, () => {
         ),
       ],
     ])('returns null for %s', (_label, plaintext) => {
-      expect(DirectMessageMailboxRecord.decode(plaintext, conversationId)).toBeNull();
+      expect(
+        DirectMessageMailboxRecord.decode(plaintext, conversationId),
+      ).toBeNull();
     });
   });
 });

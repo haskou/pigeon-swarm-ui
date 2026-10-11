@@ -46,12 +46,17 @@ import { PigeonKeychainApi } from '../../contexts/identities/infrastructure/http
 import { PigeonPresenceApi } from '../../contexts/identities/infrastructure/http/PigeonPresenceApi';
 import { PigeonPresenceGateway } from '../../contexts/identities/infrastructure/http/PigeonPresenceGateway';
 import { DeviceIdentityVault } from '../../contexts/identities/infrastructure/storage/DeviceIdentityVault';
+import { LazyMailboxCreationMiner } from '../../contexts/mailboxes/infrastructure/crypto/LazyMailboxCreationMiner';
+import { PigeonMailboxClient } from '../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
+import { MailboxChannel } from '../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { DraftPayloadCipher } from '../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
 import { MessageProjector } from '../../contexts/messages/infrastructure/crypto/MessageProjector';
 import { PigeonMessageProjection } from '../../contexts/messages/infrastructure/crypto/PigeonMessageProjection';
 import { PigeonMessageCommandsApi } from '../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
 import { PigeonMessagesApi } from '../../contexts/messages/infrastructure/http/PigeonMessagesApi';
 import { PigeonMessagesGateway } from '../../contexts/messages/infrastructure/http/PigeonMessagesGateway';
+import { DirectMessageMailbox } from '../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
+import { DirectMessageMailboxStore } from '../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxStore';
 import { PigeonNodeApi } from '../../contexts/networks/infrastructure/http/PigeonNodeApi';
 import { PigeonNotificationsApi } from '../../contexts/notifications/infrastructure/http/PigeonNotificationsApi';
 import { PigeonNotificationsGateway } from '../../contexts/notifications/infrastructure/http/PigeonNotificationsGateway';
@@ -82,9 +87,13 @@ export class PigeonApiGateway {
 
   public readonly filesGateway: PigeonFilesGateway;
 
+  public readonly directMessageMailbox: DirectMessageMailbox;
+
   public readonly identityGateway: PigeonIdentitiesGateway;
 
   public readonly identityVault: DeviceIdentityVault;
+
+  private readonly mailboxMiner: LazyMailboxCreationMiner;
 
   public readonly messageCommands: PigeonMessageCommandsApi;
 
@@ -303,6 +312,12 @@ export class PigeonApiGateway {
       this.messagesApi,
       this.messageCommands,
     );
+    this.mailboxMiner = new LazyMailboxCreationMiner();
+    this.directMessageMailbox = new DirectMessageMailbox(
+      new MailboxChannel(new PigeonMailboxClient(http), this.mailboxMiner.mine),
+      new DirectMessageMailboxStore(),
+      this.messageProjection,
+    );
     this.node = new PigeonNodeApi(http, signer);
     this.notificationsGateway = new PigeonNotificationsGateway(
       new PigeonNotificationsApi(
@@ -348,6 +363,7 @@ export class PigeonApiGateway {
   public disposeSessionWorkers(): void {
     this.messageProjection.dispose();
     this.attachmentCipher.dispose();
+    this.mailboxMiner.dispose();
   }
 
   public apiUrl(path: string): string {

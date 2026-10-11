@@ -1,8 +1,8 @@
+import { scopeClientStorageKey } from '../../../../shared/infrastructure/storage/ClientStorageScope';
 import {
   readJsonObjectFromLocalStorage,
   writeJsonToLocalStorage,
 } from '../../../../shared/infrastructure/storage/jsonLocalStorage';
-import { scopeClientStorageKey } from '../../../../shared/infrastructure/storage/ClientStorageScope';
 
 export type DirectMessageMailboxState = {
   /** Highest cursor acknowledged to the node. */
@@ -10,7 +10,10 @@ export type DirectMessageMailboxState = {
   readToken: string;
 };
 
-/** Read capability and acknowledged cursor per inbox, kept in scoped client storage. */
+/**
+ * Read capability and acknowledged cursor per inbox, kept in scoped client
+ * storage.
+ */
 export class DirectMessageMailboxStore {
   private static readonly KEY_PREFIX = 'pigeon.direct-mailbox.';
 

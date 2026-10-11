@@ -1437,6 +1437,9 @@ export const en = {
   },
   workspace: {
     closeSidebar: 'Close sidebar',
+    directMailboxDeliveryError:
+      'Saved on the standard path. The direct mailbox copy could not be delivered.',
+    directMailboxSyncError: 'Direct messages could not be synced. Retrying.',
     loadMessagesError:
       'Messages could not be loaded. Great, now we have a mystery.',
     loadOlderError: 'Older messages could not be loaded.',

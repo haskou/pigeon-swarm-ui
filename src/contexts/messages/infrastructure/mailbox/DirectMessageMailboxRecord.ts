@@ -13,6 +13,9 @@ export type DirectTextMailboxRecord = {
   previousMessageIds: string[];
 };
 
+const DIRECT_TEXT_KIND = 'direct-text';
+const DIRECT_TEXT_VERSION = 1;
+
 type DirectTextMailboxEnvelope = {
   kind: 'direct-text';
   record: DirectTextMailboxRecord;
@@ -20,9 +23,6 @@ type DirectTextMailboxEnvelope = {
 };
 
 export class DirectMessageMailboxRecord {
-  private static readonly VERSION = 1;
-  private static readonly KIND = 'direct-text';
-
   /** Only plain text between two participants travels through the mailbox. */
   public static isEligible(input: {
     attachmentCount: number;
@@ -42,29 +42,44 @@ export class DirectMessageMailboxRecord {
     conversationId: string,
     sent: MessageResource,
   ): DirectTextMailboxRecord {
-    const authorId = sent.authorId ?? sent.authorIdentityId;
-    const encryptedPayload = sent.encryptedPayload ?? sent.payload;
-    const createdAt = sent.createdAt ?? sent.timestamp;
+    const fields = DirectMessageMailboxRecord.sentFields(sent);
 
-    if (!sent.id || !authorId || !encryptedPayload || createdAt === undefined) {
+    if (
+      !fields.id ||
+      !fields.authorId ||
+      !fields.encryptedPayload ||
+      fields.createdAt === undefined
+    ) {
       throw new Error('Sent message is missing mailbox fields.');
     }
 
     return {
-      authorId,
+      authorId: fields.authorId,
       conversationId,
-      createdAt,
-      encryptedPayload,
+      createdAt: fields.createdAt,
+      encryptedPayload: fields.encryptedPayload,
+      id: fields.id,
+      previousMessageIds: fields.previousMessageIds ?? [],
+    };
+  }
+
+  private static sentFields(
+    sent: MessageResource,
+  ): Partial<DirectTextMailboxRecord> {
+    return {
+      authorId: sent.authorId ?? sent.authorIdentityId,
+      createdAt: sent.createdAt ?? sent.timestamp,
+      encryptedPayload: sent.encryptedPayload ?? sent.payload,
       id: sent.id,
-      previousMessageIds: sent.previousMessageIds ?? [],
+      previousMessageIds: sent.previousMessageIds,
     };
   }
 
   public static encode(record: DirectTextMailboxRecord): Uint8Array {
     const envelope: DirectTextMailboxEnvelope = {
-      kind: DirectMessageMailboxRecord.KIND,
+      kind: DIRECT_TEXT_KIND,
       record,
-      version: DirectMessageMailboxRecord.VERSION,
+      version: DIRECT_TEXT_VERSION,
     };
 
     return new TextEncoder().encode(JSON.stringify(envelope));
@@ -111,8 +126,8 @@ function isDirectTextEnvelope(
   if (!isObject(value)) return false;
 
   return (
-    value.kind === DirectMessageMailboxRecord.KIND &&
-    value.version === DirectMessageMailboxRecord.VERSION &&
+    value.kind === DIRECT_TEXT_KIND &&
+    value.version === DIRECT_TEXT_VERSION &&
     isDirectTextRecord(value.record)
   );
 }

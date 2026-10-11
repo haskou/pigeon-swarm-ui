@@ -1,14 +1,15 @@
+import { randomBytes } from '@noble/hashes/utils.js';
+import { Buffer } from 'buffer';
+
 import type {
   ChatMessage,
+  ConversationResource,
   MessageResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { MailboxKeys } from '../../../mailboxes/infrastructure/crypto/MailboxKeySchedule';
+import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { DirectMessageMailboxState } from './DirectMessageMailboxStore';
-
-import { Buffer } from 'buffer';
-import { randomBytes } from '@noble/hashes/utils.js';
 
 import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
 import { MailboxKeySchedule } from '../../../mailboxes/infrastructure/crypto/MailboxKeySchedule';
@@ -16,7 +17,14 @@ import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel
 import { DirectMessageMailboxRecord } from './DirectMessageMailboxRecord';
 import { DirectMessageMailboxStore } from './DirectMessageMailboxStore';
 
-export type DirectMessageMailboxDelivery = 'delivered' | 'failed';
+export type DirectMessageMailboxDelivery = 'delivered' | 'failed' | 'skipped';
+
+/** What the outgoing message carries beyond text. */
+export type DirectMessageOutgoing = {
+  attachmentCount: number;
+  hasReply: boolean;
+  hasSticker: boolean;
+};
 
 /**
  * Direct one-to-one text over the opaque mailbox. The legacy send delivers
@@ -35,19 +43,35 @@ export class DirectMessageMailbox {
   ) {}
 
   /**
-   * Sender. Appends the already-sent record to the recipient's inbox. Never
-   * throws: any failure, including 404 for an inbox the recipient has not
-   * opened yet, returns 'failed' so the caller can surface it.
+   * Sender. Appends the already-sent record to the peer's inbox. Returns
+   * 'skipped' when there is no peer or the message is not eligible, which
+   * leaves it on the legacy path only. Never throws: any failure, including
+   * 404 for an inbox the peer has not opened yet, returns 'failed' so the
+   * caller can surface it.
    */
   public async deliver(
     session: Session,
-    conversationId: string,
-    recipientIdentityId: string,
+    conversation: ConversationResource,
     sent: MessageResource,
+    outgoing: DirectMessageOutgoing,
   ): Promise<DirectMessageMailboxDelivery> {
+    const recipientIdentityId = conversation.participantIds.find(
+      (identityId) => identityId !== session.identity.id,
+    );
+
+    if (
+      !recipientIdentityId ||
+      !DirectMessageMailboxRecord.isEligible({
+        ...outgoing,
+        conversationType: conversation.type,
+      })
+    ) {
+      return 'skipped';
+    }
+
     try {
-      const keys = this.keysFor(session, conversationId, recipientIdentityId);
-      const record = DirectMessageMailboxRecord.fromSent(conversationId, sent);
+      const keys = this.keysFor(session, conversation.id, recipientIdentityId);
+      const record = DirectMessageMailboxRecord.fromSent(conversation.id, sent);
 
       await this.channel.send(keys, DirectMessageMailboxRecord.encode(record));
 

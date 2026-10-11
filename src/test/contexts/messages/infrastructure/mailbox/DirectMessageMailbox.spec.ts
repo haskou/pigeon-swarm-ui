@@ -1,21 +1,22 @@
 import { Buffer } from 'buffer';
 import { mock } from 'jest-mock-extended';
 
-import type {
-  ChatMessage,
-  MessageResource,
-  Session,
-} from '../../../../../shared/domain/pigeonResources.types';
 import type { MailboxKeys } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxKeySchedule';
 import type { PigeonMailboxClient } from '../../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
 import type { MessageProjectionPort } from '../../../../../contexts/messages/infrastructure/crypto/MessageProjectionPort';
+import type {
+  ChatMessage,
+  ConversationResource,
+  MessageResource,
+  Session,
+} from '../../../../../shared/domain/pigeonResources.types';
 
-import { DirectMessageMailbox } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
-import { DirectMessageMailboxRecord } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxRecord';
-import { DirectMessageMailboxStore } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxStore';
 import { MailboxKeySchedule } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxKeySchedule';
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/infrastructure/http/MailboxUnavailableError';
 import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
+import { DirectMessageMailbox } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
+import { DirectMessageMailboxRecord } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxRecord';
+import { DirectMessageMailboxStore } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxStore';
 import { MessageCollection } from '../../../../../contexts/messages/presentation/view-models/MessageCollection';
 
 describe(DirectMessageMailbox.name, () => {
@@ -38,6 +39,13 @@ describe(DirectMessageMailbox.name, () => {
     id: 'message-1',
     previousMessageIds: ['message-0'],
   };
+
+  const conversation = {
+    id: conversationId,
+    participantIds: ['alice', 'bob'],
+    type: 'one-to-one',
+  } as unknown as ConversationResource;
+  const plain = { attachmentCount: 0, hasReply: false, hasSticker: false };
 
   const session = (identityId: string): Session =>
     ({
@@ -107,9 +115,9 @@ describe(DirectMessageMailbox.name, () => {
 
       const result = await mailbox.deliver(
         session('alice'),
-        conversationId,
-        'bob',
+        conversation,
         sent,
+        plain,
       );
 
       expect(result).toBe('delivered');
@@ -125,7 +133,7 @@ describe(DirectMessageMailbox.name, () => {
       channel.send.mockRejectedValue(new MailboxUnavailableError());
 
       await expect(
-        mailbox.deliver(session('alice'), conversationId, 'bob', sent),
+        mailbox.deliver(session('alice'), conversation, sent, plain),
       ).resolves.toBe('failed');
     });
 
@@ -134,7 +142,7 @@ describe(DirectMessageMailbox.name, () => {
       channel.send.mockRejectedValue(new Error('network down'));
 
       await expect(
-        mailbox.deliver(session('alice'), conversationId, 'bob', sent),
+        mailbox.deliver(session('alice'), conversation, sent, plain),
       ).resolves.toBe('failed');
     });
 
@@ -146,8 +154,39 @@ describe(DirectMessageMailbox.name, () => {
       } as unknown as Session;
 
       await expect(
-        mailbox.deliver(keyless, conversationId, 'bob', sent),
+        mailbox.deliver(keyless, conversation, sent, plain),
       ).resolves.toBe('failed');
+      expect(channel.send).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [
+        'a group conversation',
+        { ...conversation, type: 'group' } as ConversationResource,
+        plain,
+      ],
+      ['an attachment', conversation, { ...plain, attachmentCount: 1 }],
+      ['a reply', conversation, { ...plain, hasReply: true }],
+      ['a sticker', conversation, { ...plain, hasSticker: true }],
+    ])('skips %s and sends nothing', async (_label, conv, outgoing) => {
+      const { channel, mailbox } = setup();
+
+      await expect(
+        mailbox.deliver(session('alice'), conv, sent, outgoing),
+      ).resolves.toBe('skipped');
+      expect(channel.send).not.toHaveBeenCalled();
+    });
+
+    it('skips a message with no peer in the conversation', async () => {
+      const { channel, mailbox } = setup();
+      const alone = {
+        ...conversation,
+        participantIds: ['alice'],
+      } as ConversationResource;
+
+      await expect(
+        mailbox.deliver(session('alice'), alone, sent, plain),
+      ).resolves.toBe('skipped');
       expect(channel.send).not.toHaveBeenCalled();
     });
   });
@@ -227,9 +266,14 @@ describe(DirectMessageMailbox.name, () => {
       );
       const controller = new AbortController();
 
-      await mailbox.sync(session('alice'), conversationId, controller.signal, () => {
-        controller.abort();
-      });
+      await mailbox.sync(
+        session('alice'),
+        conversationId,
+        controller.signal,
+        () => {
+          controller.abort();
+        },
+      );
 
       expect(channel.acknowledge).not.toHaveBeenCalled();
       expect(store.load(keysFor('alice').mailboxId)?.cursor).toBe(0);
@@ -304,7 +348,7 @@ describe(DirectMessageMailbox.name, () => {
       };
 
       await expect(
-        mailbox.deliver(session('alice'), conversationId, 'bob', sent),
+        mailbox.deliver(session('alice'), conversation, sent, plain),
       ).resolves.toBe('delivered');
 
       await mailbox.sync(
@@ -335,7 +379,7 @@ describe(DirectMessageMailbox.name, () => {
       );
       let timeline: ChatMessage[] = [decrypted(sent)];
 
-      await mailbox.deliver(session('alice'), conversationId, 'bob', sent);
+      await mailbox.deliver(session('alice'), conversation, sent, plain);
       await mailbox.sync(
         session('bob'),
         conversationId,

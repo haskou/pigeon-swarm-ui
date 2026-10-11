@@ -5,7 +5,7 @@ Client side of haskou/pigeon-swarm-node#289. Module: `src/contexts/mailboxes/`.
 ## Scope
 
 - 1:1 channel at epoch 0 only.
-- Not yet wired into the chat send/receive pipeline.
+- Wired into direct 1:1 text (spike). See Direct messages below.
 - No rotation announcement and no realtime hint.
 
 ## Key schedule
@@ -57,6 +57,16 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 - Forged or undecryptable envelopes are dropped silently. Nothing about them is logged.
 - The returned cursor includes dropped envelopes, so acknowledging up to it removes them.
 - Logs never contain decrypted payloads or topics.
+
+## Direct messages (spike)
+
+- Scope: one-to-one text with no attachments, reply, or sticker. Anything else stays on the legacy path (`deliver` returns `skipped`).
+- Send: the legacy POST runs first and is unchanged. The sent record is then appended to the recipient's inbox (`DirectMessageMailbox.deliver`). `failed` shows a visible notice. There is no automatic retry, so the legacy copy is never duplicated.
+- Recipient: the active one-to-one conversation is polled about every 5 s (`useDirectMessageMailboxSync`). Each page is decrypted, applied to the timeline, then acknowledged. The cursor advances only after a successful ack. Replays collapse by message id in `MessageCollection.merge`.
+- A 404 on append means the recipient has not opened the conversation yet, so their inbox does not exist. It surfaces as `failed`.
+- A failing sync shows one notice. The next successful pass clears it.
+- Cursor and read token are stored in localStorage under `pigeon.direct-mailbox.<mailboxId>` (scoped per client). There is no cross-device recovery.
+- Gaps: home-node discovery assumes `API_SERVER_URL`; polling only (no realtime hint); no retry beyond the next poll; epoch fixed at 0.
 
 ## Open questions (not decided, not implemented)
 

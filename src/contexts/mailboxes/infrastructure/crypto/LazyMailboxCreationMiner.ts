@@ -3,7 +3,10 @@ import type { MailboxCreationWorkerClient } from './MailboxCreationWorkerClient'
 
 import { createMailboxWorkerClient } from './createMailboxWorkerClient';
 
-/** Starts the proof-of-work worker on first use so sessions that never touch mailboxes never spawn it. */
+/**
+ * Starts the proof-of-work worker on first use so sessions that never touch
+ * mailboxes never spawn it.
+ */
 export class LazyMailboxCreationMiner {
   private client: MailboxCreationWorkerClient | null = null;
 

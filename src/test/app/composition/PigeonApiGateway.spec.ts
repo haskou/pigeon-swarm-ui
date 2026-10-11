@@ -4,11 +4,15 @@ import { mock } from 'jest-mock-extended';
 import { PigeonApiGateway } from '../../../app/composition/PigeonApiGateway';
 import { AttachmentCipher } from '../../../contexts/attachments/infrastructure/crypto/AttachmentCipher';
 
-// The real worker factory uses import.meta, which the real-crypto Jest config
-// cannot parse. No decrypt runs in this spec.
+// The real worker factories use import.meta, which the real-crypto Jest config
+// cannot parse. No decrypt or mining runs in this spec.
 jest.mock(
   '../../../contexts/messages/infrastructure/crypto/createMessageDecryptWorker',
   () => ({ createMessageDecryptWorker: jest.fn() }),
+);
+jest.mock(
+  '../../../contexts/mailboxes/infrastructure/crypto/createMailboxWorkerClient',
+  () => ({ createMailboxWorkerClient: jest.fn() }),
 );
 
 describe(PigeonApiGateway.name, () => {
@@ -19,6 +23,7 @@ describe(PigeonApiGateway.name, () => {
       calls: expect.any(Object),
       communityGateway: expect.any(Object),
       conversationsGateway: expect.any(Object),
+      directMessageMailbox: expect.any(Object),
       filesGateway: expect.any(Object),
       identityGateway: expect.any(Object),
       identityVault: expect.any(Object),
