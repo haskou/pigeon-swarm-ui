@@ -18,6 +18,8 @@ export const en = {
     loadFailed: 'This attachment could not be loaded.',
     nextImage: 'Next image',
     openImage: 'Open image',
+    originalLoadFailed:
+      'This attachment could not be loaded. Showing the preview instead.',
     previewVideo: 'Preview video',
     previousImage: 'Previous image',
     publicUnencrypted: 'Public unencrypted media in encrypted chat',
@@ -86,7 +88,7 @@ export const en = {
       'Sign in with your password on a device you already used.',
     loginMethodRecovery: 'Recovery key',
     loginMethodRecoveryHelp:
-      'You lost access to your devices. Use the recovery key you saved when you created your identity.',
+      'You lost access to your devices. Use the recovery key you saved when you created your identity. It restores access, but older history may not come back.',
     loginProgress: {
       decryptingKeys: 'Decrypting keys...',
       loadingKeychain: 'Loading keychain...',

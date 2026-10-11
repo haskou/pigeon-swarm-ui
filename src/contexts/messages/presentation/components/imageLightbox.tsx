@@ -9,6 +9,8 @@ import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useClose
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import type { MessageAttachment } from '../../../../shared/domain/pigeonResources.types';
 
+import { loadOriginalImage } from './loadOriginalImage';
+
 export type LightboxImage = {
   alt: string;
   attachment?: MessageAttachment;
@@ -67,6 +69,9 @@ export function ImageLightbox({
   const [swipeDirection, setSwipeDirection] =
     useState<SwipeDirection | null>(null);
   const [loadingOriginal, setLoadingOriginal] = useState(false);
+  const [failedOriginalIndexes, setFailedOriginalIndexes] = useState<
+    Record<number, boolean>
+  >({});
   const [originalUrls, setOriginalUrls] = useState<Record<number, string>>({});
   const originalUrlsRef = useRef<Record<number, string>>({});
   const [touchGestureActive, setTouchGestureActive] = useState(false);
@@ -100,20 +105,36 @@ export function ImageLightbox({
     let cancelled = false;
     const attachment = activeImage?.attachment;
 
-    if (!attachment || !loadImage || originalUrls[activeIndex]) {
+    if (
+      !attachment ||
+      !loadImage ||
+      originalUrls[activeIndex] ||
+      failedOriginalIndexes[activeIndex]
+    ) {
       setLoadingOriginal(false);
 
       return undefined;
     }
 
     setLoadingOriginal(true);
-    loadImage(attachment)
-      .then((url) => {
+    void loadOriginalImage(attachment, loadImage)
+      .then((result) => {
         if (cancelled) {
-          URL.revokeObjectURL(url);
+          if (result.status === 'loaded') URL.revokeObjectURL(result.url);
 
           return;
         }
+
+        if (result.status === 'failed') {
+          setFailedOriginalIndexes((current) => ({
+            ...current,
+            [activeIndex]: true,
+          }));
+
+          return;
+        }
+
+        const url = result.url;
 
         setOriginalUrls((current) => {
           const next = { ...current, [activeIndex]: url };
@@ -123,7 +144,6 @@ export function ImageLightbox({
           return next;
         });
       })
-      .catch(() => undefined)
       .finally(() => {
         if (!cancelled) setLoadingOriginal(false);
       });
@@ -131,7 +151,13 @@ export function ImageLightbox({
     return () => {
       cancelled = true;
     };
-  }, [activeImage?.attachment, activeIndex, loadImage, originalUrls]);
+  }, [
+    activeImage?.attachment,
+    activeIndex,
+    failedOriginalIndexes,
+    loadImage,
+    originalUrls,
+  ]);
 
   useEffect(
     () => () => {
@@ -515,6 +541,14 @@ export function ImageLightbox({
         {loadingOriginal && (
           <div className="pointer-events-none absolute bottom-16 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/70 px-3 py-2 text-xs font-black text-white/75">
             {copy.composer.downloadingAttachment}
+          </div>
+        )}
+        {failedOriginalIndexes[activeIndex] && (
+          <div
+            role="alert"
+            className="pointer-events-none absolute bottom-16 left-1/2 z-20 w-max max-w-[90vw] -translate-x-1/2 rounded-full bg-black/70 px-3 py-2 text-center text-xs font-black text-white/90"
+          >
+            {copy.attachments.originalLoadFailed}
           </div>
         )}
         {hasNext && (
