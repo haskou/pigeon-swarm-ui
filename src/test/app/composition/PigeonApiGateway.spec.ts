@@ -1,6 +1,13 @@
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, jest } from '@jest/globals';
 
 import { PigeonApiGateway } from '../../../app/composition/PigeonApiGateway';
+
+// The real worker factory uses import.meta, which the real-crypto Jest config
+// cannot parse. No decrypt runs in this spec.
+jest.mock(
+  '../../../contexts/messages/infrastructure/crypto/createMessageDecryptWorker',
+  () => ({ createMessageDecryptWorker: jest.fn() }),
+);
 
 describe(PigeonApiGateway.name, () => {
   it('composes the context gateways used by the application', () => {
