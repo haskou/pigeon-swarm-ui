@@ -21,6 +21,7 @@ import { LazyImageLightbox } from './LazyImageLightbox';
 import { LinkPreviewCard } from './LinkPreviewCard';
 import { MarkdownMessage, type MarkdownMention } from './markdownMessage';
 import { PinIcon, ThreadIcon } from './messageActionIcons';
+import { attachmentIdentity } from '../view-models/attachmentIdentity';
 import { EmojiOnlyMessage } from '../view-models/EmojiOnlyMessage';
 import {
   AttachmentCard,
@@ -398,7 +399,7 @@ export function MessageBubble({
                         attachment={attachment}
                         contained={!videoOnlyMessage}
                         encryptedEnvironment={encryptedEnvironment}
-                        key={`${message.id}-${attachment.cid}`}
+                        key={`${message.id}-${attachmentIdentity(attachment)}`}
                         mine={mine}
                         onPreview={onAttachmentPreview}
                         pending={message.deliveryStatus === 'pending'}
@@ -408,7 +409,7 @@ export function MessageBubble({
                       <AttachmentCard
                         attachment={attachment}
                         encryptedEnvironment={encryptedEnvironment}
-                        key={`${message.id}-${attachment.cid}`}
+                        key={`${message.id}-${attachmentIdentity(attachment)}`}
                         mine={mine}
                         onPreview={onAttachmentPreview}
                         pending={message.deliveryStatus === 'pending'}

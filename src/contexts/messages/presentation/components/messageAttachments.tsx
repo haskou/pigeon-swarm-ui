@@ -7,6 +7,7 @@ import type {
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
+import { attachmentIdentity } from '../view-models/attachmentIdentity';
 import type { LightboxImage } from './imageLightbox';
 import { MessageAttachmentPreview } from './MessageAttachmentPreview';
 import { visibleImageAlbumItems } from './visibleImageAlbumItems';
@@ -163,7 +164,7 @@ export function ImageAttachmentAlbum({
 
           return (
             <div
-              key={attachment.cid}
+              key={attachmentIdentity(attachment)}
               className={cx(
                 'relative w-full min-w-0 overflow-hidden rounded-2xl bg-black/25 text-left',
                 visibleItems.length === 1 ? 'aspect-[4/3]' : 'aspect-square',
@@ -232,6 +233,7 @@ export function AttachmentCard({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [progress, setProgress] = useState<AttachmentProgress | null>(null);
   const [shouldLoadPreview, setShouldLoadPreview] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const cardRef = useRef<HTMLDivElement | null>(null);
   const hasPreview =
     !MessageAttachmentPreview.isLargeOrChunked(attachment) &&
@@ -286,7 +288,10 @@ export function AttachmentCard({
         setPreviewUrl(url);
         setProgress(null);
       })
-      .catch(() => setProgress(null));
+      .catch(() => {
+        setProgress(null);
+        setLoadFailed(true);
+      });
 
     return () => {
       cancelled = true;
@@ -335,12 +340,20 @@ export function AttachmentCard({
           </div>
         </div>
       )}
-      {hasPreview && !previewUrl && (
-        <AttachmentPreviewSkeleton
-          mediaType={attachment.contentType.startsWith('audio/') ? 'audio' : 'video'}
-          progress={progress}
-        />
-      )}
+      {hasPreview &&
+        !previewUrl &&
+        (loadFailed ? (
+          <p className="px-3 py-3 text-sm opacity-80">
+            {copy.attachments.loadFailed}
+          </p>
+        ) : (
+          <AttachmentPreviewSkeleton
+            mediaType={
+              attachment.contentType.startsWith('audio/') ? 'audio' : 'video'
+            }
+            progress={progress}
+          />
+        ))}
       {!hasPreview && (
         <div className="grid min-h-20 place-items-center bg-black/20 p-3 sm:min-h-32 sm:p-4">
           <div className="relative h-12 w-9 rounded-lg border border-white/20 bg-white/10 sm:h-16 sm:w-12">
@@ -352,7 +365,7 @@ export function AttachmentCard({
       )}
       <button
         type="button"
-              disabled={pending}
+        disabled={pending}
         onClick={pending ? undefined : onClick}
         className={cx(
           'flex w-full max-w-full items-center gap-3 px-3 py-2 text-left',
@@ -475,7 +488,13 @@ export function VideoAttachmentCard({
     return () => {
       cancelled = true;
     };
-  }, [attachment, largeOrChunked, onPreview, posterAttachment, shouldLoadPreview]);
+  }, [
+    attachment,
+    largeOrChunked,
+    onPreview,
+    posterAttachment,
+    shouldLoadPreview,
+  ]);
 
   useEffect(
     () => () => {
@@ -649,12 +668,7 @@ function useCoarsePointer(): boolean {
 
 function MoreDotsIcon() {
   return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      fill="none"
-      className="h-4 w-4"
-    >
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4">
       <path
         d="M5 12h.01M12 12h.01M19 12h.01"
         stroke="currentColor"
@@ -668,12 +682,7 @@ function MoreDotsIcon() {
 
 function OpenLockIcon() {
   return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      fill="none"
-      className="h-4 w-4"
-    >
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4">
       <path
         d="M9 10V8a5 5 0 0 1 8.7-3.4"
         stroke="currentColor"

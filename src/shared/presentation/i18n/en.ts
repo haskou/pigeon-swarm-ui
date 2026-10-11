@@ -15,6 +15,7 @@ export const en = {
     downloadImageWithSize: 'Download image ({size})',
     downloadVideoWithSize: 'Download video ({size})',
     file: 'File',
+    loadFailed: 'This attachment could not be loaded.',
     nextImage: 'Next image',
     openImage: 'Open image',
     previewVideo: 'Preview video',

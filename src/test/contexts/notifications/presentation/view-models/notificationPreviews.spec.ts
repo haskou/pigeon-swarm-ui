@@ -1,6 +1,12 @@
-import type { MessageAttachment } from '../../../../../shared/domain/pigeonResources.types';
+import type {
+  MessageAttachment,
+  MessageResource,
+} from '../../../../../shared/domain/pigeonResources.types';
 
-import { messageNotificationBody } from '../../../../../contexts/notifications/presentation/view-models/notificationPreviews';
+import {
+  communityNotificationPreview,
+  messageNotificationBody,
+} from '../../../../../contexts/notifications/presentation/view-models/notificationPreviews';
 import { copy } from '../../../../../shared/presentation/i18n/copy';
 
 function imageAttachment(
@@ -43,15 +49,32 @@ describe(messageNotificationBody.name, () => {
       }),
     ).toBe(copy.chat.sentPhoto);
   });
+});
 
-  it('summarizes multiple image attachments as an album', () => {
-    expect(
-      messageNotificationBody({
+describe(communityNotificationPreview.name, () => {
+  it('summarizes an encrypted image stored only in private blobs as a photo', () => {
+    const message = {
+      plaintextPayload: JSON.stringify({
         attachments: [
-          imageAttachment({ cid: 'image-1' }),
-          imageAttachment({ cid: 'image-2', filename: 'second.png' }),
+          {
+            blobs: [{ blobId: 'blob-a', index: 0, size: 1024 }],
+            contentType: 'image/webp',
+            filename: 'photo.webp',
+            size: 1024,
+          },
         ],
       }),
-    ).toBe(copy.chat.sentAlbum);
+    } as MessageResource;
+
+    expect(
+      communityNotificationPreview(
+        [],
+        'missing',
+        'missing',
+        undefined,
+        {},
+        message,
+      ).body,
+    ).toBe(copy.chat.sentPhoto);
   });
 });

@@ -2,6 +2,7 @@ import type {
   ChatMessage,
   ConversationResource,
 } from '../../../../shared/domain/pigeonResources.types';
+import { attachmentIdentity } from './attachmentIdentity';
 
 export class MessageCollection {
   private static applyEdit(
@@ -49,7 +50,7 @@ export class MessageCollection {
     return message.attachments
       .map(
         (attachment) =>
-          `${attachment.cid}:${attachment.filename}:${attachment.size}:${attachment.contentType}`,
+          `${attachmentIdentity(attachment)}:${attachment.filename}:${attachment.size}:${attachment.contentType}`,
       )
       .join('\u0000');
   }
