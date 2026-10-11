@@ -25,7 +25,7 @@ export class PigeonInvitationKeyRecipient implements InvitationKeyRecipient {
     );
     const published = await this.identities.publishKeychain(
       session,
-      ConversationKeychain.withEntry(session.keychain, keyEntry),
+      (current) => ConversationKeychain.withEntry(current, keyEntry),
     );
 
     this.contexts.replace(recipientIdentityId, {

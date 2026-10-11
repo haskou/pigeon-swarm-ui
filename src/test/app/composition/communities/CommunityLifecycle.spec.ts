@@ -2,6 +2,7 @@ import type { PigeonMlsFacade } from '../../../../app/composition/mls/PigeonMlsF
 import type {
   Community,
   LocalKeychain,
+  LocalKeychainUpdate,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
@@ -46,9 +47,9 @@ function identitiesGateway(): jest.Mocked<PigeonIdentitiesGateway> {
 
   gateway.publishKeychain = jest
     .fn()
-    .mockImplementation((_session, nextKeychain: LocalKeychain) =>
+    .mockImplementation((_session, update: LocalKeychainUpdate) =>
       Promise.resolve({
-        keychain: nextKeychain,
+        keychain: update(keychain()),
         keychainExternalIdentifier: 'keychain-external-id',
       }),
     );

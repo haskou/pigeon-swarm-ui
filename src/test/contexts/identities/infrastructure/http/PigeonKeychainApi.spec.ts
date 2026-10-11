@@ -1,5 +1,5 @@
-import type { KeychainCipher } from '../../../../../contexts/identities/infrastructure/crypto/KeychainCipher';
 import type {
+  ConversationKeyEntry,
   KeychainResource,
   LocalKeychain,
   Session,
@@ -8,8 +8,114 @@ import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/H
 import type { RequestCache } from '../../../../../shared/infrastructure/http/RequestCache';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
+import { KeychainCipher } from '../../../../../contexts/identities/infrastructure/crypto/KeychainCipher';
 import { PigeonKeychainApi } from '../../../../../contexts/identities/infrastructure/http/PigeonKeychainApi';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
+
+type StoredKeychain = {
+  encryptedPayload: string;
+  externalId: string;
+  previousKeychainExternalIdentifier: string | null;
+  version: number;
+};
+
+// Mirrors the node publish rules: a candidate needs an existing previous
+// keychain at version - 1 (or no keychain yet for version 1). Forks are
+// accepted. The head is the highest-version stored keychain.
+class FakeKeychainServer {
+  private readonly stored: StoredKeychain[] = [];
+
+  public seed(keychain: LocalKeychain, externalId: string): void {
+    this.stored.push({
+      encryptedPayload: JSON.stringify(keychain),
+      externalId,
+      previousKeychainExternalIdentifier: null,
+      version: keychain.version,
+    });
+  }
+
+  public headConversationIds(): string[] {
+    const head = this.stored.reduce<StoredKeychain | undefined>(
+      (best, keychain) =>
+        !best || keychain.version >= best.version ? keychain : best,
+      undefined,
+    );
+
+    if (!head) {
+      return [];
+    }
+
+    const keychain = JSON.parse(head.encryptedPayload) as LocalKeychain;
+
+    return Object.keys(keychain.conversations).sort();
+  }
+
+  public handle(method: string, body?: string): unknown {
+    if (method === 'GET') {
+      const head = this.stored.reduce<StoredKeychain | undefined>(
+        (best, keychain) =>
+          !best || keychain.version >= best.version ? keychain : best,
+        undefined,
+      );
+
+      if (!head) {
+        throw new HttpJsonError(
+          404,
+          'Not Found',
+          JSON.stringify({ code: 'KeychainNotFoundError' }),
+        );
+      }
+
+      return {
+        encryptedPayload: head.encryptedPayload,
+        keychainExternalIdentifier: head.externalId,
+        ownerIdentityId: 'identity-1',
+        previousKeychainExternalIdentifier:
+          head.previousKeychainExternalIdentifier,
+        signature: 'signature',
+        timestamp: 1,
+        version: head.version,
+      };
+    }
+
+    const candidate = JSON.parse(body ?? '{}') as {
+      encryptedPayload: string;
+      previousKeychainExternalIdentifier: string | null;
+      version: number;
+    };
+    const previous = this.stored.find(
+      (keychain) =>
+        keychain.externalId === candidate.previousKeychainExternalIdentifier,
+    );
+    const accepted = previous
+      ? candidate.version === previous.version + 1
+      : this.stored.length === 0 && candidate.version === 1;
+
+    if (!accepted) {
+      throw new HttpJsonError(
+        409,
+        'Conflict',
+        JSON.stringify({ code: 'InvalidKeychainCandidateError' }),
+      );
+    }
+
+    const externalId = `kc-${this.stored.length + 1}`;
+
+    this.stored.push({
+      encryptedPayload: candidate.encryptedPayload,
+      externalId,
+      previousKeychainExternalIdentifier:
+        candidate.previousKeychainExternalIdentifier,
+      version: candidate.version,
+    });
+
+    return {
+      keychainExternalIdentifier: externalId,
+      ownerIdentityId: 'identity-1',
+      version: candidate.version,
+    };
+  }
+}
 
 describe(PigeonKeychainApi.name, () => {
   const session = {
@@ -89,5 +195,67 @@ describe(PigeonKeychainApi.name, () => {
     );
 
     await expect(api.loadOptional(session)).resolves.toBeUndefined();
+  });
+
+  it('keeps both conversation keys when two publishes start from one stale snapshot', async () => {
+    const server = new FakeKeychainServer();
+    const keychain: LocalKeychain = {
+      conversations: {},
+      timestamp: 1,
+      version: 1,
+    };
+    server.seed(keychain, 'kc-1');
+    const session = {
+      identity: { id: 'identity-1' },
+      keychain,
+      keychainExternalIdentifier: 'kc-1',
+      keyPair: {
+        sign: jest.fn().mockReturnValue({ toString: () => 'signature' }),
+      },
+      masterKey: {
+        decrypt: (payload: { valueOf(): string }) => ({
+          toString: () => payload.valueOf(),
+        }),
+        encrypt: (plaintext: string) => ({ toString: () => plaintext }),
+      },
+      password: 'secret',
+    } as unknown as Session;
+    const api = new PigeonKeychainApi(
+      {
+        request: jest.fn(
+          (_path: string, init: { body?: string; method: string }) =>
+            server.handle(init.method, init.body),
+        ),
+      } as unknown as HttpJsonClient,
+      { headers: jest.fn().mockResolvedValue({}) } as unknown as RequestSigner,
+      new KeychainCipher(),
+      { invalidateForSession: jest.fn() } as unknown as RequestCache,
+    );
+
+    await Promise.all([
+      api.publishKeychain(session, (current) => ({
+        ...current,
+        conversations: {
+          ...current.conversations,
+          'conversation-a': {
+            conversationId: 'conversation-a',
+          } as ConversationKeyEntry,
+        },
+      })),
+      api.publishKeychain(session, (current) => ({
+        ...current,
+        conversations: {
+          ...current.conversations,
+          'conversation-b': {
+            conversationId: 'conversation-b',
+          } as ConversationKeyEntry,
+        },
+      })),
+    ]);
+
+    expect(server.headConversationIds()).toEqual([
+      'conversation-a',
+      'conversation-b',
+    ]);
   });
 });

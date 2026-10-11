@@ -25,7 +25,10 @@ export type { IdentityPresenceResource as IdentityPresence } from '../../context
 export type { PresenceStatusResource as PresenceStatus } from '../../contexts/identities/infrastructure/http/resources/PresenceStatusResource';
 export type { SelectablePresenceStatusResource as SelectablePresenceStatus } from '../../contexts/identities/infrastructure/http/resources/SelectablePresenceStatusResource';
 export type { KeychainResource } from '../../contexts/identities/infrastructure/http/resources/KeychainResource';
-export type { LocalKeychain } from '../../contexts/identities/infrastructure/keychain/LocalKeychain';
+export type {
+  LocalKeychain,
+  LocalKeychainUpdate,
+} from '../../contexts/identities/infrastructure/keychain/LocalKeychain';
 export type { Session } from '../../contexts/identities/infrastructure/session/Session';
 export type { CommunityChannelDraft } from '../../contexts/communities/infrastructure/http/resources/CommunityChannelDraft';
 export type { CommunityChannelDraftResource } from '../../contexts/messages/infrastructure/http/CommunityChannelDraftResource';

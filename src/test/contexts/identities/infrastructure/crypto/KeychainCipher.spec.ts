@@ -10,17 +10,16 @@ describe(KeychainCipher.name, () => {
       identity: {
         id: '-----BEGIN PUBLIC KEY-----\nidentity-1\n-----END PUBLIC KEY-----',
       },
-      keychain: { conversations: {}, version: 0 },
-      keychainExternalIdentifier: null,
       keyPair: { sign },
       masterKey: { encrypt },
       password: 'secret',
     } as unknown as Session;
 
-    const result = await new KeychainCipher().encryptForPublish(session, {
-      conversations: {},
-      version: 1,
-    });
+    const result = await new KeychainCipher().encryptForPublish(
+      session,
+      undefined,
+      { conversations: {}, version: 1 },
+    );
     const [signaturePayload] = sign.mock.calls[0] as [string];
 
     expect(JSON.parse(signaturePayload)).toEqual({
@@ -43,17 +42,19 @@ describe(KeychainCipher.name, () => {
     const encrypt = jest.fn().mockReturnValue({ toString: () => 'encrypted' });
     const session = {
       identity: { id: 'identity-1' },
-      keychain: { conversations: {}, version: 1 },
-      keychainExternalIdentifier: 'keychain-previous',
       keyPair: { sign },
       masterKey: { encrypt },
       password: 'secret',
     } as unknown as Session;
 
-    const result = await new KeychainCipher().encryptForPublish(session, {
-      conversations: {},
-      version: 2,
-    });
+    const result = await new KeychainCipher().encryptForPublish(
+      session,
+      {
+        keychain: { conversations: {}, version: 1 },
+        keychainExternalIdentifier: 'keychain-previous',
+      },
+      { conversations: {}, version: 1 },
+    );
     const [signaturePayload] = sign.mock.calls[0] as [string, string];
 
     expect(JSON.parse(signaturePayload)).toEqual({

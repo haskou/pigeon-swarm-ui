@@ -5,3 +5,5 @@ export type LocalKeychain = {
   timestamp?: number;
   version: number;
 };
+
+export type LocalKeychainUpdate = (current: LocalKeychain) => LocalKeychain;

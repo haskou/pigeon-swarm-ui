@@ -1,18 +1,25 @@
 import type {
   KeychainResource,
   LocalKeychain,
+  LocalKeychainUpdate,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestCache } from '../../../../shared/infrastructure/http/RequestCache';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
-import type { KeychainCipher } from '../crypto/KeychainCipher';
+import type { KeychainCipher, KeychainHead } from '../crypto/KeychainCipher';
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 
 const remoteKeychainCacheTtlMs = 1500;
 
+function keychainPath(session: Session): string {
+  return `/keychains/${encodeURIComponent(session.identity.id)}`;
+}
+
 export class PigeonKeychainApi {
+  private readonly publishQueues = new Map<string, Promise<unknown>>();
+
   public constructor(
     private readonly http: HttpJsonClient,
     private readonly signer: RequestSigner,
@@ -20,29 +27,52 @@ export class PigeonKeychainApi {
     private readonly requestCache: RequestCache,
   ) {}
 
-  public decrypt(session: Session, keychain: KeychainResource): LocalKeychain {
-    return this.cipher.decrypt(session, keychain);
-  }
-
-  public async load(session: Session): Promise<KeychainResource> {
-    const path = `/keychains/${encodeURIComponent(session.identity.id)}`;
-
-    return await this.requestCache.load(
-      this.requestCache.keyForSession(path, session),
-      async () =>
-        await this.http.request<KeychainResource>(path, {
-          headers: await this.signer.headers(session, 'GET', path),
-          method: 'GET',
-        }),
-      { ttlMs: remoteKeychainCacheTtlMs },
+  private async enqueuePublish<T>(
+    identityId: string,
+    publish: () => Promise<T>,
+  ): Promise<T> {
+    const previous: Promise<unknown> =
+      this.publishQueues.get(identityId) ?? Promise.resolve();
+    const current = previous.then(publish);
+    this.publishQueues.set(
+      identityId,
+      current.catch(() => undefined),
     );
+
+    return await current;
   }
 
-  public async loadOptional(
+  private async readPublishHead(
     session: Session,
-  ): Promise<KeychainResource | undefined> {
+  ): Promise<KeychainHead | undefined> {
+    const resource = await this.undefinedWhenMissing(
+      async () => await this.fetchRemote(session),
+    );
+
+    if (!resource) {
+      return undefined;
+    }
+
+    return {
+      keychain: this.decrypt(session, resource),
+      keychainExternalIdentifier: resource.keychainExternalIdentifier,
+    };
+  }
+
+  private async fetchRemote(session: Session): Promise<KeychainResource> {
+    const path = keychainPath(session);
+
+    return await this.http.request<KeychainResource>(path, {
+      headers: await this.signer.headers(session, 'GET', path),
+      method: 'GET',
+    });
+  }
+
+  private async undefinedWhenMissing<T>(
+    read: () => Promise<T>,
+  ): Promise<T | undefined> {
     try {
-      return await this.load(session);
+      return await read();
     } catch (caught: unknown) {
       if (
         caught instanceof HttpJsonError &&
@@ -56,32 +86,58 @@ export class PigeonKeychainApi {
     }
   }
 
+  public decrypt(session: Session, keychain: KeychainResource): LocalKeychain {
+    return this.cipher.decrypt(session, keychain);
+  }
+
+  public async load(session: Session): Promise<KeychainResource> {
+    return await this.requestCache.load(
+      this.requestCache.keyForSession(keychainPath(session), session),
+      async () => await this.fetchRemote(session),
+      { ttlMs: remoteKeychainCacheTtlMs },
+    );
+  }
+
+  public async loadOptional(
+    session: Session,
+  ): Promise<KeychainResource | undefined> {
+    return await this.undefinedWhenMissing(
+      async () => await this.load(session),
+    );
+  }
+
   public async publishKeychain(
     session: Session,
-    nextKeychain: LocalKeychain,
+    update: LocalKeychainUpdate,
   ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
-    const path = '/keychains/';
-    const encrypted = await this.cipher.encryptForPublish(
-      session,
-      nextKeychain,
-    );
-    const published = await this.http.request<{
-      keychainExternalIdentifier: string;
-      ownerIdentityId: string;
-      version: number;
-    }>(path, {
-      body: JSON.stringify(encrypted.body),
-      headers: await this.signer.headers(session, 'POST', path, encrypted.body),
-      method: 'POST',
-    });
-    this.requestCache.invalidateForSession(
-      `/keychains/${encodeURIComponent(session.identity.id)}`,
-      session,
-    );
+    return await this.enqueuePublish(session.identity.id, async () => {
+      const path = '/keychains/';
+      const head = await this.readPublishHead(session);
+      const encrypted = await this.cipher.encryptForPublish(
+        session,
+        head,
+        update(head?.keychain ?? session.keychain),
+      );
+      const published = await this.http.request<{
+        keychainExternalIdentifier: string;
+        ownerIdentityId: string;
+        version: number;
+      }>(path, {
+        body: JSON.stringify(encrypted.body),
+        headers: await this.signer.headers(
+          session,
+          'POST',
+          path,
+          encrypted.body,
+        ),
+        method: 'POST',
+      });
+      this.requestCache.invalidateForSession(keychainPath(session), session);
 
-    return {
-      keychain: encrypted.keychain,
-      keychainExternalIdentifier: published.keychainExternalIdentifier,
-    };
+      return {
+        keychain: encrypted.keychain,
+        keychainExternalIdentifier: published.keychainExternalIdentifier,
+      };
+    });
   }
 }
