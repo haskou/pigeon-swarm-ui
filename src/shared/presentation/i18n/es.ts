@@ -20,6 +20,8 @@ export const es = {
     loadFailed: 'No se pudo cargar este adjunto.',
     nextImage: 'Siguiente imagen',
     openImage: 'Abrir imagen',
+    originalLoadFailed:
+      'No se pudo cargar este adjunto. Se muestra la vista previa.',
     previewVideo: 'Previsualizar video',
     previousImage: 'Imagen anterior',
     publicUnencrypted: 'Media público sin cifrar en chat cifrado',
@@ -91,7 +93,7 @@ export const es = {
       'Entra con tu contraseña en un dispositivo que ya has usado.',
     loginMethodRecovery: 'Clave de recuperación',
     loginMethodRecoveryHelp:
-      'Has perdido el acceso a tus dispositivos. Usa la clave de recuperación que guardaste al crear tu identidad.',
+      'Has perdido el acceso a tus dispositivos. Usa la clave de recuperación que guardaste al crear tu identidad. Restaura el acceso, pero es posible que no vuelva el historial anterior.',
     loginProgress: {
       decryptingKeys: 'Descifrando claves...',
       loadingKeychain: 'Cargando llavero...',
