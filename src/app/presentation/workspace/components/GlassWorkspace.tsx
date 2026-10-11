@@ -143,6 +143,7 @@ export function GlassWorkspace({
     useState<AttachmentProgress | null>(null);
   const { openAttachment: downloadContextAttachment } = useAttachmentDownload({
     errorMessage: copy.composer.attachmentDownloadError,
+    unavailableMessage: copy.attachments.loadFailed,
     onErrorChange: setSendError,
     onProgressChange: setAttachmentProgress,
   });

@@ -91,6 +91,7 @@ export function MessageThreadPanel({
   const threadScrollerRef = useRef<HTMLDivElement | null>(null);
   const { loadAttachmentPreview, openAttachment } = useAttachmentDownload({
     errorMessage: copy.composer.attachmentDownloadError,
+    unavailableMessage: copy.attachments.loadFailed,
     onErrorChange: setAttachmentError,
     onProgressChange: setAttachmentProgress,
   });
