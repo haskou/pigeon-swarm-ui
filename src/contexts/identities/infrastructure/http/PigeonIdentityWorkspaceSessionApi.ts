@@ -38,6 +38,30 @@ export class PigeonIdentityWorkspaceSessionApi {
     };
   }
 
+  private applyRefreshedKeychain(
+    session: Session,
+    keychainResource: KeychainResource | undefined,
+  ): Session {
+    // A missing read does not prove the keychain is empty: it may predate a
+    // publish that already added keys to this session.
+    if (!keychainResource) {
+      return session;
+    }
+
+    const keychain = this.workspace.decryptKeychain(session, keychainResource);
+
+    // Keychain versions only move forward; an older read is stale in-flight.
+    if (keychain.version < session.keychain.version) {
+      return session;
+    }
+
+    return {
+      ...session,
+      keychain,
+      keychainExternalIdentifier: keychainResource.keychainExternalIdentifier,
+    };
+  }
+
   public async hydrate(
     session: Session,
     onProgress?: LoginIdentityProgressReporter,
@@ -59,7 +83,10 @@ export class PigeonIdentityWorkspaceSessionApi {
 
   public async refresh(session: Session): Promise<LoginResult> {
     const keychainResource = await this.workspace.loadKeychain(session);
-    const hydratedSession = this.hydrateKeychain(session, keychainResource);
+    const hydratedSession = this.applyRefreshedKeychain(
+      session,
+      keychainResource,
+    );
     const conversations = await this.listConversations(hydratedSession);
 
     return {
