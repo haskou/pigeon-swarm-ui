@@ -1,9 +1,7 @@
 import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 
-import {
-  PigeonPrivateBlobClient,
-  PrivateBlobUnavailableError,
-} from '../../../../../contexts/attachments/infrastructure/http/PigeonPrivateBlobClient';
+import { PigeonPrivateBlobClient } from '../../../../../contexts/attachments/infrastructure/http/PigeonPrivateBlobClient';
+import { PrivateBlobUnavailableError } from '../../../../../contexts/attachments/infrastructure/http/PrivateBlobUnavailableError';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 
 const uploadToken = 'u'.repeat(43);

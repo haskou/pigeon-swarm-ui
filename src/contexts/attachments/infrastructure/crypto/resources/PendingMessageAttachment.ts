@@ -3,5 +3,4 @@ import type { MessageAttachment } from '../../../application/contracts/MessageAt
 export type PendingMessageAttachment = {
   encryptedBytes: ArrayBuffer;
   metadata: Omit<MessageAttachment, 'cid' | 'encryptedSize'>;
-  uploadFilename: string;
 };

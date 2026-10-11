@@ -10,6 +10,7 @@ import { AttachmentContentType } from '../../../../../contexts/attachments/domai
 import { AttachmentExternalIdentifier } from '../../../../../contexts/attachments/domain/value-objects/AttachmentExternalIdentifier';
 import { AttachmentFilename } from '../../../../../contexts/attachments/domain/value-objects/AttachmentFilename';
 import { AttachmentId } from '../../../../../contexts/attachments/domain/value-objects/AttachmentId';
+import { AttachmentNetworkId } from '../../../../../contexts/attachments/domain/value-objects/AttachmentNetworkId';
 import { AttachmentPublisherExternalIdentifier } from '../../../../../contexts/attachments/domain/value-objects/AttachmentPublisherExternalIdentifier';
 import { AttachmentSourceExternalIdentifier } from '../../../../../contexts/attachments/domain/value-objects/AttachmentSourceExternalIdentifier';
 import { AttachmentPublicationContexts } from '../../../../../contexts/attachments/infrastructure/http/AttachmentPublicationContexts';
@@ -60,6 +61,60 @@ describe(PigeonAttachmentRepository.name, () => {
     );
   });
 
+  it('creates an encrypted attachment in private blobs and identifies it by its first blob', async () => {
+    const file = new File(['secret'], 'secret.bin', {
+      type: 'application/octet-stream',
+    });
+    const session = { identity: { id: 'identity-1' } } as Session;
+    const contexts = new AttachmentPublicationContexts();
+    const uploader = {
+      publishEncrypted: jest.fn().mockResolvedValue({
+        blobs: [
+          {
+            blobId: 'blob-1',
+            downloadToken: 'download-token-0123456789abcdef',
+            expiresAt: 1,
+            index: 0,
+            size: 6,
+          },
+        ],
+        contentType: 'application/octet-stream',
+        filename: 'secret.bin',
+        size: file.size,
+      }),
+      publishPublic: jest.fn(),
+    };
+    const repository = new PigeonAttachmentRepository(
+      { findPrivate: jest.fn(), findPublic: jest.fn() },
+      uploader,
+      contexts,
+    );
+    contexts.register('source-1', 'identity-1', { file, session });
+
+    const result = await repository.create(
+      Attachment.planPublication(
+        AttachmentId.fromString('attachment-1'),
+        AttachmentFilename.fromString('secret.bin'),
+        AttachmentContentType.fromString('application/octet-stream'),
+        AttachmentByteSize.fromBytes(file.size),
+        EncryptedAttachmentStrategy.forNetwork(
+          AttachmentNetworkId.fromString('network-1'),
+        ),
+        new Timestamp(100),
+      ),
+      AttachmentSourceExternalIdentifier.fromString('source-1'),
+      AttachmentPublisherExternalIdentifier.fromString('identity-1'),
+    );
+
+    expect(result.toString()).toBe('blob-1');
+    expect(uploader.publishEncrypted).toHaveBeenCalledWith(
+      session,
+      file,
+      undefined,
+    );
+    expect(uploader.publishPublic).not.toHaveBeenCalled();
+  });
+
   it('hydrates a public attachment aggregate', async () => {
     const findPublic = jest.fn().mockResolvedValue({
       blob: new Blob(['notes']),
@@ -84,7 +139,7 @@ describe(PigeonAttachmentRepository.name, () => {
     expect(findPublic).toHaveBeenCalledWith('public-1');
   });
 
-  it('hydrates an encrypted attachment aggregate', async () => {
+  it('hydrates a legacy encrypted attachment aggregate by its CID', async () => {
     const findPrivate = jest.fn().mockResolvedValue({
       cid: 'private-1',
       contentType: 'application/octet-stream',

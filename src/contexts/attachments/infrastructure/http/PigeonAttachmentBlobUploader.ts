@@ -25,23 +25,12 @@ export class PigeonAttachmentBlobUploader {
 
   public async uploadEncrypted(
     session: Session,
-    networkId: string,
     pending: PendingMessageAttachment,
     onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<EncryptedAttachmentUpload> {
     return pending.encryptedBytes.byteLength <= directUploadLimitBytes
-      ? await this.direct.uploadEncrypted(
-          session,
-          networkId,
-          pending,
-          onProgress,
-        )
-      : await this.chunked.uploadEncrypted(
-          session,
-          networkId,
-          pending,
-          onProgress,
-        );
+      ? await this.direct.uploadEncrypted(session, pending, onProgress)
+      : await this.chunked.uploadEncrypted(session, pending, onProgress);
   }
 
   public async uploadPublic(

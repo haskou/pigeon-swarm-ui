@@ -139,7 +139,6 @@ export class AttachmentCryptographer {
       },
       id: UUID.generate().toString(),
       type: 'encrypt-result',
-      uploadFilename: `${UUID.generate().toString()}.bin`,
     };
   }
 }

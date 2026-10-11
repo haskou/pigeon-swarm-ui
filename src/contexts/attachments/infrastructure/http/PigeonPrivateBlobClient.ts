@@ -1,16 +1,10 @@
-import type { PrivateBlobReservation } from '../../application/contracts/PrivateBlobReservation';
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+import type { PrivateBlobReservation } from '../../application/contracts/PrivateBlobReservation';
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
-
-export class PrivateBlobUnavailableError extends Error {
-  public constructor() {
-    super('Private blob is unavailable.');
-    this.name = PrivateBlobUnavailableError.name;
-  }
-}
+import { PrivateBlobUnavailableError } from './PrivateBlobUnavailableError';
 
 const reservationPath = '/private-blobs';
 
@@ -20,7 +14,7 @@ export class PigeonPrivateBlobClient {
     private readonly signer: Pick<RequestSigner, 'headers'>,
   ) {}
 
-  /** The node answers every unknown, expired or wrong-capability request with 404. */
+  /** Node answers unknown, expired or mismatched capabilities with 404. */
   private async unavailableWhenNotFound<T>(operation: Promise<T>): Promise<T> {
     try {
       return await operation;

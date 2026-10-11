@@ -1,6 +1,5 @@
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { MessageAttachment } from '../../application/contracts/MessageAttachment';
-import type { AttachmentNetworkId } from '../../domain/value-objects/AttachmentNetworkId';
 
 import { AttachmentCipher } from '../crypto/AttachmentCipher';
 import { MessageAttachmentThumbnailPreparer } from '../media/MessageAttachmentThumbnailPreparer';
@@ -25,7 +24,6 @@ export class PigeonAttachmentPreviewCreator {
 
   public async createEncrypted(
     session: Session,
-    networkId: AttachmentNetworkId,
     file: File,
   ): Promise<MessageAttachment | undefined> {
     return await (async () => {
@@ -34,18 +32,13 @@ export class PigeonAttachmentPreviewCreator {
       if (!thumbnail) return undefined;
 
       const pending = await this.cipher.encrypt(thumbnail);
-      const upload = await this.blobs.uploadEncrypted(
-        session,
-        networkId.toString(),
-        pending,
-      );
+      const upload = await this.blobs.uploadEncrypted(session, pending);
 
       return {
         ...pending.metadata,
-        cid: upload.cid,
+        blobs: upload.blobs,
         encrypted: true,
         encryptedSize: upload.size,
-        ...(upload.chunks ? { chunks: upload.chunks } : {}),
         ...(upload.type ? { type: upload.type } : {}),
       };
     })().catch(() => undefined);

@@ -4,13 +4,10 @@ import type {
   AttachmentProgress,
   AttachmentUploadOptions,
   MessageAttachment,
-  PrivateFileContent,
-  PrivateFileUpload,
   PublicFileContent,
   PublicFileUpload,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { PendingMessageAttachment } from '../crypto/resources/PendingMessageAttachment';
 
 import { AttachmentFinder } from '../../application/find-attachment/AttachmentFinder';
 import { FindAttachmentMessage } from '../../application/find-attachment/messages/FindAttachmentMessage';
@@ -18,16 +15,14 @@ import { PublishMessageAttachmentMessage } from '../../application/publish-messa
 import { PublishMessageAttachment } from '../../application/publish-message-attachment/PublishMessageAttachment';
 import { AttachmentPublicationContexts } from './AttachmentPublicationContexts';
 import { PigeonAttachmentDownloader } from './PigeonAttachmentDownloader';
-import { PigeonPrivateFilesClient } from './PigeonPrivateFilesClient';
 import { PigeonPublicFileUploader } from './PigeonPublicFileUploader';
 
 export class PigeonFilesGateway {
   public constructor(
     private readonly downloader: Pick<
       PigeonAttachmentDownloader,
-      'download' | 'findPrivate' | 'findPublic'
+      'download' | 'findPublic'
     >,
-    private readonly privateFiles: Pick<PigeonPrivateFilesClient, 'upload'>,
     private readonly publicFiles: Pick<PigeonPublicFileUploader, 'upload'>,
     private readonly publishAttachment: Pick<
       PublishMessageAttachment,
@@ -49,16 +44,6 @@ export class PigeonFilesGateway {
     onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<Blob> {
     return await this.download(attachment, onProgress);
-  }
-
-  public async getPrivateFile(cid: string): Promise<PrivateFileContent> {
-    const attachment = await this.findAttachment.find(
-      new FindAttachmentMessage(cid, true),
-    );
-
-    return await this.downloader.findPrivate(
-      attachment.getPublishedExternalIdentifier().toString(),
-    );
   }
 
   public async getPublicFile(cid: string): Promise<PublicFileContent> {
@@ -123,19 +108,6 @@ export class PigeonFilesGateway {
     options?: AttachmentUploadOptions,
   ): Promise<MessageAttachment[]> {
     return await this.publish(session, attachments, onProgress, options);
-  }
-
-  public async uploadPrivateFile(
-    session: Session,
-    networkId: string,
-    attachment: PendingMessageAttachment,
-  ): Promise<PrivateFileUpload> {
-    return await this.privateFiles.upload(
-      session,
-      networkId,
-      attachment.encryptedBytes,
-      attachment.uploadFilename,
-    );
   }
 
   public async uploadPublic(

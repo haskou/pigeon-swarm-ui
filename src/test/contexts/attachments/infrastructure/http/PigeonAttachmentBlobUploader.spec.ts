@@ -15,7 +15,6 @@ describe(PigeonAttachmentBlobUploader.name, () => {
       filename: 'file.txt',
       size: 4,
     },
-    uploadFilename: 'encrypted.bin',
   };
 
   it('selects direct upload for small encrypted payloads', async () => {
@@ -28,12 +27,12 @@ describe(PigeonAttachmentBlobUploader.name, () => {
     const chunked = { uploadEncrypted: jest.fn(), uploadPublic: jest.fn() };
     const uploader = new PigeonAttachmentBlobUploader(direct, chunked);
 
-    await expect(
-      uploader.uploadEncrypted(session, 'network-1', pending),
-    ).resolves.toEqual({ cid: 'external-1', size: 4 });
+    await expect(uploader.uploadEncrypted(session, pending)).resolves.toEqual({
+      cid: 'external-1',
+      size: 4,
+    });
     expect(direct.uploadEncrypted).toHaveBeenCalledWith(
       session,
-      'network-1',
       pending,
       undefined,
     );
@@ -75,7 +74,7 @@ describe(PigeonAttachmentBlobUploader.name, () => {
     };
     const uploader = new PigeonAttachmentBlobUploader(direct, chunked);
 
-    await uploader.uploadEncrypted(session, 'network-1', largePending);
+    await uploader.uploadEncrypted(session, largePending);
 
     expect(chunked.uploadEncrypted).toHaveBeenCalled();
     expect(direct.uploadEncrypted).not.toHaveBeenCalled();

@@ -6,14 +6,13 @@ import type {
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
-import { AttachmentNetworkId } from '../../../../../contexts/attachments/domain/value-objects/AttachmentNetworkId';
 import { AttachmentCipher } from '../../../../../contexts/attachments/infrastructure/crypto/AttachmentCipher';
 import { PigeonAttachmentBlobUploader } from '../../../../../contexts/attachments/infrastructure/http/PigeonAttachmentBlobUploader';
 import { PigeonAttachmentPreviewCreator } from '../../../../../contexts/attachments/infrastructure/http/PigeonAttachmentPreviewCreator';
 import { PigeonChunkedAttachmentUploader } from '../../../../../contexts/attachments/infrastructure/http/PigeonChunkedAttachmentUploader';
 import { PigeonDirectAttachmentUploader } from '../../../../../contexts/attachments/infrastructure/http/PigeonDirectAttachmentUploader';
 import { PigeonMessageAttachmentUploader } from '../../../../../contexts/attachments/infrastructure/http/PigeonMessageAttachmentUploader';
-import { PigeonPrivateFilesClient } from '../../../../../contexts/attachments/infrastructure/http/PigeonPrivateFilesClient';
+import { PigeonPrivateBlobClient } from '../../../../../contexts/attachments/infrastructure/http/PigeonPrivateBlobClient';
 import { PigeonPublicFilesClient } from '../../../../../contexts/attachments/infrastructure/http/PigeonPublicFilesClient';
 import { MessageAttachmentThumbnailPreparer } from '../../../../../contexts/attachments/infrastructure/media/MessageAttachmentThumbnailPreparer';
 import { PublicImageUploadPreparer } from '../../../../../contexts/attachments/infrastructure/media/PublicImageUploadPreparer';
@@ -52,15 +51,13 @@ function messageUploader(
     'prepare'
   > = new MessageAttachmentThumbnailPreparer(),
 ): PigeonMessageAttachmentUploader {
-  const privateFiles = new PigeonPrivateFilesClient(http, requestSigner, {
-    register: jest.fn(),
-  });
+  const privateBlobs = new PigeonPrivateBlobClient(http, requestSigner);
   const publicFiles = new PigeonPublicFilesClient(http, requestSigner, {
     register: jest.fn(),
   });
   const blobs = new PigeonAttachmentBlobUploader(
-    new PigeonDirectAttachmentUploader(privateFiles, publicFiles),
-    new PigeonChunkedAttachmentUploader(privateFiles, publicFiles),
+    new PigeonDirectAttachmentUploader(privateBlobs, publicFiles),
+    new PigeonChunkedAttachmentUploader(privateBlobs, publicFiles),
   );
 
   return new PigeonMessageAttachmentUploader(
@@ -313,26 +310,26 @@ describe(PigeonMessageAttachmentUploader.name, () => {
     expect(thumbnailPreparer.prepare).not.toHaveBeenCalledWith(webpFile);
   });
 
-  it('keeps small attachments encrypted by default', async () => {
+  it('keeps small attachments encrypted in a private blob', async () => {
     const file = new File(['hello'], 'hello.txt', { type: 'text/plain' });
-    const encryption = attachmentEncryption();
     const pending: PendingMessageAttachment = {
       encryptedBytes: new Uint8Array([1, 2, 3]).buffer,
       metadata: {
         contentType: 'text/plain',
-        encryption,
+        encryption: attachmentEncryption(),
         filename: 'hello.txt',
         size: file.size,
       },
-      uploadFilename: 'encrypted.bin',
     };
-    const request = jest.fn().mockResolvedValue({
-      cid: 'private-cid',
-      contentType: 'application/octet-stream',
-      encrypted: true,
-      filename: 'encrypted.bin',
-      size: pending.encryptedBytes.byteLength,
-    });
+    const request = jest
+      .fn()
+      .mockResolvedValueOnce({
+        blobId: 'blob-1',
+        downloadToken: 'download-token-1234567890',
+        expiresAt: 1,
+        uploadToken: 'upload-token-1234567890',
+      })
+      .mockResolvedValueOnce(undefined);
     const signerHeaders = jest
       .fn()
       .mockResolvedValue({ 'X-Test-Signature': 'signature' });
@@ -345,88 +342,94 @@ describe(PigeonMessageAttachmentUploader.name, () => {
       cipher,
     );
 
-    await expect(
-      uploader.publishEncrypted(
-        session,
-        file,
-        AttachmentNetworkId.fromString('network-1'),
-      ),
-    ).resolves.toEqual({
+    await expect(uploader.publishEncrypted(session, file)).resolves.toEqual({
       ...pending.metadata,
-      cid: 'private-cid',
+      blobs: [
+        {
+          blobId: 'blob-1',
+          downloadToken: 'download-token-1234567890',
+          expiresAt: 1,
+          index: 0,
+          size: 3,
+        },
+      ],
       encrypted: true,
-      encryptedSize: pending.encryptedBytes.byteLength,
+      encryptedSize: 3,
     });
 
     expect(cipher.encrypt).toHaveBeenCalledWith(file, undefined);
     expect(signerHeaders).toHaveBeenCalledWith(
       session,
       'POST',
-      '/ipfs/network-1',
-      pending.encryptedBytes,
+      '/private-blobs',
+      {
+        size: 3,
+      },
     );
-    expect(request).toHaveBeenCalledWith(
-      '/ipfs/network-1',
+    expect(request).toHaveBeenNthCalledWith(
+      1,
+      '/private-blobs',
       expect.objectContaining({
-        headers: expect.objectContaining({
-          'Content-Type': 'application/octet-stream',
-          'X-Filename': 'encrypted.bin',
-          'X-Test-Signature': 'signature',
-        }),
+        body: JSON.stringify({ size: 3 }),
         method: 'POST',
+      }),
+    );
+    expect(request).toHaveBeenNthCalledWith(
+      2,
+      '/private-blobs/blob-1',
+      expect.objectContaining({
+        body: pending.encryptedBytes,
+        headers: {
+          Authorization: 'Bearer upload-token-1234567890',
+          'Content-Type': 'application/octet-stream',
+        },
+        method: 'PUT',
       }),
     );
   });
 
-  it('keeps thumbnails private when the original image is encrypted', async () => {
+  it('keeps thumbnails in private blobs when the original image is encrypted', async () => {
     const file = new File([new Uint8Array(200 * 1024)], 'secret.png', {
       type: 'image/png',
     });
     const thumbnailFile = new File(['thumb'], 'secret.thumbnail.webp', {
       type: 'image/webp',
     });
-    const originalEncryption = attachmentEncryption();
-    const thumbnailEncryption = {
-      ...attachmentEncryption(),
-      key: 'thumbnail-key',
-    };
     const pendingOriginal: PendingMessageAttachment = {
       encryptedBytes: new Uint8Array([1, 2, 3]).buffer,
       metadata: {
         contentType: 'image/png',
-        encryption: originalEncryption,
+        encryption: attachmentEncryption(),
         filename: 'secret.png',
         size: file.size,
       },
-      uploadFilename: 'original.bin',
     };
     const pendingThumbnail: PendingMessageAttachment = {
       encryptedBytes: new Uint8Array([4, 5, 6]).buffer,
       metadata: {
         contentType: 'image/webp',
-        encryption: thumbnailEncryption,
+        encryption: { ...attachmentEncryption(), key: 'thumbnail-key' },
         filename: 'secret.thumbnail.webp',
         size: thumbnailFile.size,
       },
-      uploadFilename: 'thumbnail.bin',
     };
-    const request = jest.fn().mockImplementation((_path, options) => {
-      const filename = options.headers['X-Filename'];
-      let cid = 'private-cid';
-
-      if (filename === 'thumbnail.bin') cid = 'private-preview-cid';
-
-      return Promise.resolve({
-        cid,
-        contentType: 'application/octet-stream',
-        encrypted: true,
-        filename,
-        size:
-          filename === 'thumbnail.bin'
-            ? pendingThumbnail.encryptedBytes.byteLength
-            : pendingOriginal.encryptedBytes.byteLength,
-      });
-    });
+    // Preview uploads first: one reserve and one upload each.
+    const request = jest
+      .fn()
+      .mockResolvedValueOnce({
+        blobId: 'thumbnail-blob',
+        downloadToken: 'thumbnail-download-token-1',
+        expiresAt: 1,
+        uploadToken: 'thumbnail-upload-token-1',
+      })
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({
+        blobId: 'original-blob',
+        downloadToken: 'original-download-token-1',
+        expiresAt: 2,
+        uploadToken: 'original-upload-token-1',
+      })
+      .mockResolvedValueOnce(undefined);
     const signerHeaders = jest
       .fn()
       .mockResolvedValue({ 'X-Test-Signature': 'signature' });
@@ -448,28 +451,38 @@ describe(PigeonMessageAttachmentUploader.name, () => {
       thumbnailPreparer,
     );
 
-    await expect(
-      uploader.publishEncrypted(
-        session,
-        file,
-        AttachmentNetworkId.fromString('network-1'),
-      ),
-    ).resolves.toEqual({
+    await expect(uploader.publishEncrypted(session, file)).resolves.toEqual({
       ...pendingOriginal.metadata,
-      cid: 'private-cid',
+      blobs: [
+        {
+          blobId: 'original-blob',
+          downloadToken: 'original-download-token-1',
+          expiresAt: 2,
+          index: 0,
+          size: 3,
+        },
+      ],
       encrypted: true,
-      encryptedSize: pendingOriginal.encryptedBytes.byteLength,
+      encryptedSize: 3,
       preview: {
         ...pendingThumbnail.metadata,
-        cid: 'private-preview-cid',
+        blobs: [
+          {
+            blobId: 'thumbnail-blob',
+            downloadToken: 'thumbnail-download-token-1',
+            expiresAt: 1,
+            index: 0,
+            size: 3,
+          },
+        ],
         encrypted: true,
-        encryptedSize: pendingThumbnail.encryptedBytes.byteLength,
+        encryptedSize: 3,
       },
     });
 
     expect(thumbnailPreparer.prepare).toHaveBeenCalledWith(file);
     expect(cipher.encrypt).toHaveBeenCalledWith(thumbnailFile);
     expect(cipher.encrypt).toHaveBeenCalledWith(file, undefined);
-    expect(request).toHaveBeenCalledTimes(2);
+    expect(request).toHaveBeenCalledTimes(4);
   });
 });

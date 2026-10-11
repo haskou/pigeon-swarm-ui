@@ -4,32 +4,54 @@ import { PigeonDirectAttachmentUploader } from '../../../../../contexts/attachme
 
 describe(PigeonDirectAttachmentUploader.name, () => {
   const session = { identity: { id: 'identity-1' } } as Session;
+  const reservation = {
+    blobId: 'blob-1',
+    downloadToken: 'd'.repeat(43),
+    expiresAt: 10,
+    uploadToken: 'u'.repeat(43),
+  };
 
-  it('uploads encrypted bytes directly', async () => {
-    const privateFiles = {
-      upload: jest.fn().mockResolvedValue({ cid: 'private-1', size: 4 }),
+  it('stores encrypted bytes in one private blob reserved for their exact size', async () => {
+    const privateBlobs = {
+      reserve: jest.fn().mockResolvedValue(reservation),
+      upload: jest.fn().mockResolvedValue(undefined),
     };
-    const uploader = new PigeonDirectAttachmentUploader(privateFiles, {
+    const uploader = new PigeonDirectAttachmentUploader(privateBlobs, {
       upload: jest.fn(),
     });
     const progress = jest.fn();
+    const encryptedBytes = new Uint8Array([1, 2, 3, 4]).buffer;
 
     await expect(
       uploader.uploadEncrypted(
         session,
-        'network-1',
         {
-          encryptedBytes: new Uint8Array([1, 2, 3, 4]).buffer,
+          encryptedBytes,
           metadata: {
             contentType: 'text/plain',
             filename: 'file.txt',
             size: 4,
           },
-          uploadFilename: 'encrypted.bin',
         },
         progress,
       ),
-    ).resolves.toEqual({ cid: 'private-1', size: 4 });
+    ).resolves.toEqual({
+      blobs: [
+        {
+          blobId: 'blob-1',
+          downloadToken: reservation.downloadToken,
+          expiresAt: 10,
+          index: 0,
+          size: 4,
+        },
+      ],
+      size: 4,
+    });
+    expect(privateBlobs.reserve).toHaveBeenCalledWith(session, 4);
+    expect(privateBlobs.upload).toHaveBeenCalledWith(
+      reservation,
+      encryptedBytes,
+    );
     expect(progress).toHaveBeenLastCalledWith({
       filename: 'file.txt',
       percent: 100,
@@ -48,7 +70,7 @@ describe(PigeonDirectAttachmentUploader.name, () => {
       }),
     };
     const uploader = new PigeonDirectAttachmentUploader(
-      { upload: jest.fn() },
+      { reserve: jest.fn(), upload: jest.fn() },
       publicFiles,
     );
 
