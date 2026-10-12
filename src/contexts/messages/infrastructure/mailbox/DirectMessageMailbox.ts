@@ -8,6 +8,7 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 import type { MailboxKeys } from '../../../mailboxes/infrastructure/crypto/MailboxKeySchedule';
+import type { OpenedMailboxPage } from '../../../mailboxes/infrastructure/MailboxChannel';
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { DirectMessageMailboxState } from './DirectMessageMailboxStore';
 
@@ -91,7 +92,8 @@ export class DirectMessageMailbox {
    * messages, then acknowledges. The cursor advances only after the
    * acknowledgement succeeds, so an interrupted pass is replayed and the
    * timeline dedupes by id. Aborts before apply or before ack leave the inbox
-   * untouched.
+   * untouched. The first pass on a device creates the inbox. When the inbox
+   * was re-created, its cursors restart at 1, so the stored cursor is reset.
    */
   public async sync(
     session: Session,
@@ -100,33 +102,21 @@ export class DirectMessageMailbox {
     apply: (messages: ChatMessage[]) => void,
   ): Promise<void> {
     const keys = this.keysFor(session, conversationId, session.identity.id);
-    const state = this.store.load(keys.mailboxId) ?? this.createState(keys);
-    const page = await this.channel.read(
-      keys,
-      state.readToken,
-      state.cursor,
-      DirectMessageMailbox.PAGE_SIZE,
+    const stored = this.store.load(keys.mailboxId);
+    const state = stored ?? this.createState(keys);
+
+    if (!stored) await this.ensureInbox(keys, state.readToken);
+
+    const { cursor, page } = await this.readPage(keys, state);
+
+    if (page.lastCursor <= cursor || signal.aborted) return;
+
+    const messages = await this.decryptPage(
+      session,
+      conversationId,
+      page,
+      signal,
     );
-
-    if (page.lastCursor <= state.cursor || signal.aborted) return;
-
-    const records = page.envelopes.flatMap((envelope) => {
-      const decoded = DirectMessageMailboxRecord.decode(
-        envelope.plaintext,
-        conversationId,
-      );
-
-      return decoded ? [decoded] : [];
-    });
-    const messages =
-      records.length > 0
-        ? await this.projection.decryptMany(
-            session,
-            conversationId,
-            records,
-            signal,
-          )
-        : [];
 
     if (signal.aborted) return;
 
@@ -134,9 +124,13 @@ export class DirectMessageMailbox {
 
     if (signal.aborted) return;
 
-    await this.channel.acknowledge(keys, state.readToken, page.lastCursor);
+    const acked = await this.channel.acknowledge(
+      keys,
+      state.readToken,
+      page.lastCursor,
+    );
     this.store.save(keys.mailboxId, {
-      cursor: page.lastCursor,
+      cursor: acked.recreated ? 0 : page.lastCursor,
       readToken: state.readToken,
     });
   }
@@ -152,6 +146,82 @@ export class DirectMessageMailbox {
     this.store.save(keys.mailboxId, state);
 
     return state;
+  }
+
+  /**
+   * Creates the recipient inbox before its first read so that senders can
+   * append to it. Silent on failure: the read's own 404 recovery covers it.
+   */
+  private async ensureInbox(
+    keys: MailboxKeys,
+    readToken: string,
+  ): Promise<void> {
+    try {
+      await this.channel.createInbox(keys, readToken);
+    } catch {
+      // Count-only: no ids, content, or error details.
+      // eslint-disable-next-line no-console
+      console.debug('Direct mailbox inbox create failed; read will retry.');
+    }
+  }
+
+  /**
+   * Reads from the stored cursor. An inbox re-created under that cursor
+   * numbers its envelopes from 1 again, so it is read again from zero. The
+   * reset is saved before the second read, so a crash cannot leave the new
+   * inbox behind the old cursor.
+   */
+  private async readPage(
+    keys: MailboxKeys,
+    state: DirectMessageMailboxState,
+  ): Promise<{ cursor: number; page: OpenedMailboxPage }> {
+    const page = await this.channel.read(
+      keys,
+      state.readToken,
+      state.cursor,
+      DirectMessageMailbox.PAGE_SIZE,
+    );
+
+    if (!page.recreated || state.cursor === 0) {
+      return { cursor: state.cursor, page };
+    }
+
+    this.store.save(keys.mailboxId, { cursor: 0, readToken: state.readToken });
+
+    return {
+      cursor: 0,
+      page: await this.channel.read(
+        keys,
+        state.readToken,
+        0,
+        DirectMessageMailbox.PAGE_SIZE,
+      ),
+    };
+  }
+
+  private async decryptPage(
+    session: Session,
+    conversationId: string,
+    page: OpenedMailboxPage,
+    signal: AbortSignal,
+  ): Promise<ChatMessage[]> {
+    const records = page.envelopes.flatMap((envelope) => {
+      const decoded = DirectMessageMailboxRecord.decode(
+        envelope.plaintext,
+        conversationId,
+      );
+
+      return decoded ? [decoded] : [];
+    });
+
+    if (records.length === 0) return [];
+
+    return this.projection.decryptMany(
+      session,
+      conversationId,
+      records,
+      signal,
+    );
   }
 
   private keysFor(
