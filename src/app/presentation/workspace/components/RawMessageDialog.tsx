@@ -1,12 +1,12 @@
 import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
 
-import { copy } from '../../../../shared/presentation/i18n/copy';
-import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
-import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
-import { collectIpfsLinks } from '../../../../shared/presentation/ipfsLinks';
-import { IpfsLinksPanel } from './IpfsLinksPanel';
 import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
 import { JsonDataViewer } from '../../../../shared/presentation/components/JsonDataViewer';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { collectIpfsLinks } from '../../../../shared/presentation/ipfsLinks';
+import { IpfsLinksPanel } from './IpfsLinksPanel';
 
 export function RawMessageDialog({
   message,

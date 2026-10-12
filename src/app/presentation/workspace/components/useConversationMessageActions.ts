@@ -7,12 +7,11 @@ import {
 
 import type {
   AttachmentProgress,
-  AttachmentUploadOptions,
   ChatMessage,
   ConversationResource,
   Session,
-  StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationMessageActions } from './ConversationMessageActions';
 import type { EditingMessage } from './conversationThreadState';
 import type { MessageContextMenuState } from './messageContextMenu';
 
@@ -45,33 +44,6 @@ type ConversationMessageActionsInput = {
   scrollToBottom: (behavior?: ScrollBehavior) => void;
   session: Session;
   updateActiveConversationDraft: (draft: string) => void;
-};
-
-type ConversationMessageActions = {
-  cancelEdit: () => void;
-  cancelReply: () => void;
-  closeMessageMenu: () => void;
-  copyMessageContent: (message: ChatMessage) => void;
-  deleteMessage: (message: ChatMessage) => Promise<void>;
-  editMessage: (content: string) => Promise<void>;
-  openMessageMenu: (message: ChatMessage, x: number, y: number) => void;
-  openReplyReference: (messageId: string) => Promise<void>;
-  openThreadMessageMenu: (message: ChatMessage, x: number, y: number) => void;
-  retryMessage: (message: ChatMessage) => void;
-  scrollToMessage: (messageId: string) => void;
-  sendMessage: (
-    content: string,
-    attachments: File[],
-    attachmentUpload: AttachmentUploadOptions,
-  ) => Promise<void>;
-  sendSticker: (sticker: StickerMessageReference) => Promise<void>;
-  startEditing: (message: ChatMessage) => void;
-  startReplying: (message: ChatMessage) => void;
-  toggleReaction: (
-    message: ChatMessage,
-    emoji: string,
-    reacted: boolean,
-  ) => Promise<void>;
 };
 
 export function useConversationMessageActions({
@@ -157,7 +129,7 @@ export function useConversationMessageActions({
 
   const scrollToMessage = useCallback(
     (messageId: string) => {
-      requestAnimationFrame(() => {
+      const focusMessage = () => {
         const element = scrollerRef.current?.querySelector<HTMLElement>(
           `[data-message-id="${CSS.escape(messageId)}"]`,
         );
@@ -174,7 +146,9 @@ export function useConversationMessageActions({
           () => focusTarget.classList.remove('message-focus-ring'),
           1600,
         );
-      });
+      };
+
+      requestAnimationFrame(focusMessage);
     },
     [scrollerRef],
   );
@@ -188,6 +162,7 @@ export function useConversationMessageActions({
       }
 
       if (!activeConversation?.id || !activeConversationKeyAvailable) return;
+
       if (activeConversation.type === 'one-to-one') {
         // One-to-one history lives in the mailbox; a reply target that is not
         // in the local timeline cannot be fetched from the legacy endpoint.
@@ -245,6 +220,12 @@ export function useConversationMessageActions({
 
       closeMessageMenu();
       onErrorChange(null);
+      const removeMessage = (current: ChatMessage[]) => {
+        const messageId = message.id;
+
+        return current.filter((item) => item.id !== messageId);
+      };
+
       try {
         if (activeConversation.type === 'one-to-one') {
           await applicationContainer.directMessages.delete(
@@ -259,9 +240,7 @@ export function useConversationMessageActions({
             message.id,
           );
         }
-        onMessagesChange((current) =>
-          current.filter((item) => item.id !== message.id),
-        );
+        onMessagesChange(removeMessage);
       } catch (caught) {
         onErrorChange(toUserErrorMessage(caught, copy.messages.deleteError));
       }
@@ -342,20 +321,24 @@ export function useConversationMessageActions({
       if (!activeConversation?.id) return;
 
       const action = reacted ? 'remove' : 'add';
+      const reactionUpdate = (reactionAction: 'add' | 'remove') => {
+        const messageId = message.id;
+
+        return (current: ChatMessage[]) =>
+          current.map((item) =>
+            item.id === messageId
+              ? MessageReactionUpdater.update(
+                  item,
+                  session.identity.id,
+                  emoji,
+                  reactionAction,
+                )
+              : item,
+          );
+      };
 
       onErrorChange(null);
-      onMessagesChange((current) =>
-        current.map((item) =>
-          item.id === message.id
-            ? MessageReactionUpdater.update(
-                item,
-                session.identity.id,
-                emoji,
-                action,
-              )
-            : item,
-        ),
-      );
+      onMessagesChange(reactionUpdate(action));
 
       try {
         if (activeConversation.type === 'one-to-one') {
@@ -386,18 +369,7 @@ export function useConversationMessageActions({
         }
       } catch (caught) {
         onErrorChange(toUserErrorMessage(caught, copy.messages.reactionError));
-        onMessagesChange((current) =>
-          current.map((item) =>
-            item.id === message.id
-              ? MessageReactionUpdater.update(
-                  item,
-                  session.identity.id,
-                  emoji,
-                  reacted ? 'add' : 'remove',
-                )
-              : item,
-          ),
-        );
+        onMessagesChange(reactionUpdate(reacted ? 'add' : 'remove'));
       }
     },
     [activeConversation, onErrorChange, onMessagesChange, session],

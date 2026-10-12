@@ -18,6 +18,57 @@ export function communityVoiceChannelTopologyKey(
     .join(`${keySeparator}${keySeparator}`);
 }
 
+function voiceChannelKey(communityId: string, channelId: string): string {
+  return `${communityId}${keySeparator}${channelId}`;
+}
+
+function joinedParticipantIdentityIds(
+  participants: CallResourceParticipant[],
+): string[] {
+  return [
+    ...new Set(
+      participants
+        .filter((participant) => participant.connected)
+        .map((participant) => participant.identityId),
+    ),
+  ];
+}
+
+function connectedVoiceIdentities(
+  calls: CallResource[],
+): Map<string, string[]> {
+  const connectedIdentityIdsByChannel = new Map<string, string[]>();
+
+  for (const call of calls) {
+    if (call.status !== 'active') continue;
+
+    if (call.scope.type !== 'community_channel') continue;
+
+    const key = voiceChannelKey(call.scope.communityId, call.scope.channelId);
+    const connectedIdentityIds = joinedParticipantIdentityIds(
+      call.participants,
+    );
+
+    if (connectedIdentityIds.length > 0) {
+      connectedIdentityIdsByChannel.set(key, [
+        ...new Set([
+          ...(connectedIdentityIdsByChannel.get(key) ?? []),
+          ...connectedIdentityIds,
+        ]),
+      ]);
+    }
+  }
+
+  return connectedIdentityIdsByChannel;
+}
+
+function areIdentityListsEqual(left: string[], right: string[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((id, index) => id === right[index])
+  );
+}
+
 export function communitiesWithCallVoicePresence(
   communities: Community[],
   calls: CallResource[],
@@ -65,54 +116,4 @@ export function communitiesWithCallVoicePresence(
   });
 
   return changed ? nextCommunities : communities;
-}
-
-function connectedVoiceIdentities(
-  calls: CallResource[],
-): Map<string, string[]> {
-  const connectedIdentityIdsByChannel = new Map<string, string[]>();
-
-  for (const call of calls) {
-    if (call.status !== 'active') continue;
-    if (call.scope.type !== 'community_channel') continue;
-
-    const key = voiceChannelKey(call.scope.communityId, call.scope.channelId);
-    const connectedIdentityIds = joinedParticipantIdentityIds(
-      call.participants,
-    );
-
-    if (connectedIdentityIds.length > 0) {
-      connectedIdentityIdsByChannel.set(key, [
-        ...new Set([
-          ...(connectedIdentityIdsByChannel.get(key) ?? []),
-          ...connectedIdentityIds,
-        ]),
-      ]);
-    }
-  }
-
-  return connectedIdentityIdsByChannel;
-}
-
-function joinedParticipantIdentityIds(
-  participants: CallResourceParticipant[],
-): string[] {
-  return [
-    ...new Set(
-      participants
-        .filter((participant) => participant.connected)
-        .map((participant) => participant.identityId),
-    ),
-  ];
-}
-
-function voiceChannelKey(communityId: string, channelId: string): string {
-  return `${communityId}${keySeparator}${channelId}`;
-}
-
-function areIdentityListsEqual(left: string[], right: string[]): boolean {
-  return (
-    left.length === right.length &&
-    left.every((id, index) => id === right[index])
-  );
 }

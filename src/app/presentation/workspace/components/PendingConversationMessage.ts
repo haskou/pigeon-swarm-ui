@@ -1,20 +1,8 @@
-import type {
-  ChatMessage,
-  StickerMessageReference,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
+import type { PendingConversationMessageInput } from './PendingConversationMessageInput';
 
 import { PendingMessageAttachments } from '../../../../contexts/attachments/presentation/view-models/PendingMessageAttachments';
 import { replyPreviewFromMessage } from '../../../../contexts/messages/presentation/view-models/replyPreviewFromMessage';
-
-type PendingConversationMessageInput = {
-  attachments: File[];
-  authorIdentityId: string;
-  content: string;
-  id: string;
-  replyTarget: ChatMessage | null;
-  sticker?: StickerMessageReference;
-  timestamp: number;
-};
 
 export class PendingConversationMessage {
   public static create({

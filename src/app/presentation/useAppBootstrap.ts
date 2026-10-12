@@ -7,7 +7,6 @@ import type {
   Session,
 } from '../../shared/domain/pigeonResources.types';
 
-import { applicationContainer } from '../composition/applicationContainer';
 import { useCommunities } from '../../contexts/communities/presentation/hooks/useCommunities';
 import {
   clearCommunityInviteUrl,
@@ -19,6 +18,7 @@ import { deleteLegacyRememberedIdentityStorage } from '../../contexts/identities
 import { useNodeNetworks } from '../../contexts/networks/presentation/hooks/useNodeNetworks';
 import { usePeers } from '../../contexts/networks/presentation/hooks/usePeers';
 import { clearProjectedMessageCaches } from '../../shared/infrastructure/storage/clearProjectedMessageCaches';
+import { applicationContainer } from '../composition/applicationContainer';
 import { closeAllRealtimeConnections } from './realtime/useRealtimeEvents';
 
 export function useAppBootstrap(): {

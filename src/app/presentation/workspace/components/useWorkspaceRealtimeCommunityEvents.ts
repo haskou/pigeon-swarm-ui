@@ -6,6 +6,7 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
+import type { MemberEventDetails } from './MemberEventDetails';
 
 import { CommunityChannels } from '../../../../contexts/communities/presentation/view-models/CommunityChannels';
 import {
@@ -26,32 +27,29 @@ type WorkspaceRealtimeCommunityEventsInput = {
   ) => void;
 };
 
-function updateChannel(
-  input: WorkspaceRealtimeCommunityEventsInput,
-  event: RealtimeDomainEvent,
-): boolean {
-  const communityId =
-    eventAggregateId(event) ?? stringAttribute(event, 'communityId');
+function addChannel(
+  community: Community,
+  channel: CommunityChannel,
+): Community {
+  return channel.type === 'voice'
+    ? {
+        ...community,
+        voiceChannels: [...(community.voiceChannels ?? []), channel],
+      }
+    : {
+        ...community,
+        textChannels: [...community.textChannels, channel],
+      };
+}
 
-  if (event.type === 'communities.v1.channel.was_created') {
-    createChannel(input, communityId, event);
-
-    return true;
-  }
-
-  if (event.type === 'communities.v1.channel.was_renamed') {
-    renameCommunityChannel(input, communityId, event);
-
-    return true;
-  }
-
-  if (event.type === 'communities.v1.channel.was_deleted') {
-    deleteCommunityChannel(input, communityId, event);
-
-    return true;
-  }
-
-  return false;
+function renameChannel<T extends CommunityChannel>(
+  channels: T[],
+  channelId: string,
+  name: string,
+): T[] {
+  return channels.map((channel) =>
+    channel.id === channelId ? { ...channel, name } : channel,
+  );
 }
 
 function createChannel(
@@ -111,61 +109,32 @@ function deleteCommunityChannel(
   }));
 }
 
-function addChannel(
-  community: Community,
-  channel: CommunityChannel,
-): Community {
-  return channel.type === 'voice'
-    ? {
-        ...community,
-        voiceChannels: [...(community.voiceChannels ?? []), channel],
-      }
-    : {
-        ...community,
-        textChannels: [...community.textChannels, channel],
-      };
-}
-
-function renameChannel<T extends CommunityChannel>(
-  channels: T[],
-  channelId: string,
-  name: string,
-): T[] {
-  return channels.map((channel) =>
-    channel.id === channelId ? { ...channel, name } : channel,
-  );
-}
-
-function updateMember(
+function updateChannel(
   input: WorkspaceRealtimeCommunityEventsInput,
   event: RealtimeDomainEvent,
 ): boolean {
-  const member = memberEventDetails(event);
+  const communityId =
+    eventAggregateId(event) ?? stringAttribute(event, 'communityId');
 
-  if (!member) return false;
-
-  if (!member.communityId || !member.identityId) return true;
-
-  if (isSelfLeavingMember(input, member.identityId, member.leaving)) {
-    input.setCommunities((communities) =>
-      communities.filter((item) => item.id !== member.communityId),
-    );
+  if (event.type === 'communities.v1.channel.was_created') {
+    createChannel(input, communityId, event);
 
     return true;
   }
 
-  if (member.community && replaceCommunity(input, member.community)) {
+  if (event.type === 'communities.v1.channel.was_renamed') {
+    renameCommunityChannel(input, communityId, event);
+
     return true;
   }
 
-  updateMemberIds(
-    input,
-    member.communityId,
-    member.identityId,
-    !member.leaving,
-  );
+  if (event.type === 'communities.v1.channel.was_deleted') {
+    deleteCommunityChannel(input, communityId, event);
 
-  return true;
+    return true;
+  }
+
+  return false;
 }
 
 function isMemberEvent(event: RealtimeDomainEvent): boolean {
@@ -174,13 +143,6 @@ function isMemberEvent(event: RealtimeDomainEvent): boolean {
     event.type === 'communities.v1.member.was_left'
   );
 }
-
-type MemberEventDetails = {
-  community?: Community;
-  communityId?: string;
-  identityId?: string;
-  leaving: boolean;
-};
 
 function memberEventDetails(
   event: RealtimeDomainEvent,
@@ -237,6 +199,38 @@ function updateMemberIds(
       memberIds: current.memberIds.filter((id) => id !== identityId),
     };
   });
+}
+
+function updateMember(
+  input: WorkspaceRealtimeCommunityEventsInput,
+  event: RealtimeDomainEvent,
+): boolean {
+  const member = memberEventDetails(event);
+
+  if (!member) return false;
+
+  if (!member.communityId || !member.identityId) return true;
+
+  if (isSelfLeavingMember(input, member.identityId, member.leaving)) {
+    input.setCommunities((communities) =>
+      communities.filter((item) => item.id !== member.communityId),
+    );
+
+    return true;
+  }
+
+  if (member.community && replaceCommunity(input, member.community)) {
+    return true;
+  }
+
+  updateMemberIds(
+    input,
+    member.communityId,
+    member.identityId,
+    !member.leaving,
+  );
+
+  return true;
 }
 
 function handleMembershipRequest(

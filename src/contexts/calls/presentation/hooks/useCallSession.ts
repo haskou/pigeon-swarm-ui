@@ -36,7 +36,7 @@ import { reconciledCallParticipants } from './reconciledCallParticipants';
 import { useCallMediaControls } from './useCallMediaControls';
 import { useCallStatsRefresh } from './useCallStatsRefresh';
 
-type StartCallInput = {
+export type StartCallInput = {
   call?: CallResource;
   currentIdentityId: string;
   id: string;

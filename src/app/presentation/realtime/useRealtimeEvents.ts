@@ -1,48 +1,16 @@
-import type { RefObject } from 'react';
-
 import { useEffect, useRef } from 'react';
 
 import type { Session } from '../../../shared/domain/pigeonResources.types';
-import type { NetworkSynchronizationStatus } from '../../../contexts/networks/presentation/view-models/NetworkSynchronizationStatus';
 import type {
-  RealtimeDomainEvent,
   RealtimeMailboxSubscriptionInput,
   RealtimeTypingInput,
-  RealtimeTypingMessage,
 } from '../../../shared/infrastructure/realtime/RealtimeGateway';
+import type { MailboxHintRegistration } from './MailboxHintRegistration';
+import type { RealtimeHandlers } from './RealtimeHandlers';
+import type { RealtimeSubscription } from './RealtimeSubscription';
+import type { SharedRealtimeConnection } from './SharedRealtimeConnection';
 
 import { applicationContainer } from '../../composition/applicationContainer';
-
-type RealtimeHandlers = {
-  onConnected?: () => void;
-  onDisconnected?: () => void;
-  onDomainEvent: (event: RealtimeDomainEvent) => void;
-  onNetworkSynchronizationStatus?: (
-    status: NetworkSynchronizationStatus,
-  ) => void;
-  onReconnecting?: () => void;
-  onTyping?: (message: RealtimeTypingMessage) => void;
-};
-
-type RealtimeSubscription = {
-  handlersRef: RefObject<RealtimeHandlers>;
-};
-
-type SharedRealtimeConnection = {
-  attempt: number;
-  closeTimer?: number;
-  connect: () => Promise<void>;
-  connectPromise: Promise<void> | null;
-  reconnectTimer?: number;
-  session: Session;
-  socket: WebSocket | null;
-  subscribers: Set<RealtimeSubscription>;
-};
-
-type MailboxHintRegistration = {
-  listeners: Set<() => void>;
-  target: RealtimeMailboxSubscriptionInput;
-};
 
 const realtimeConnections = new Map<string, SharedRealtimeConnection>();
 const sharedConnectionCloseDelayMs = 1000;
@@ -51,106 +19,61 @@ const mailboxHintRegistrations = new Map<
   Map<string, MailboxHintRegistration>
 >();
 
-export function useRealtimeEvents(
-  session: Session,
-  handlers: RealtimeHandlers,
-): void {
-  const handlersRef = useRef(handlers);
-
-  useEffect(() => {
-    handlersRef.current = handlers;
-  }, [handlers]);
-
-  useEffect(() => {
-    const subscription = { handlersRef };
-    const connection = subscribeRealtime(session, subscription);
-
-    return () => {
-      unsubscribeRealtime(connection, subscription);
-    };
-  }, [session.identity.id, session.keyPair]);
+function realtimeConnectionKey(session: Session): string {
+  return session.identity.id;
 }
 
-function subscribeRealtime(
-  session: Session,
-  subscription: RealtimeSubscription,
-): SharedRealtimeConnection {
-  const key = realtimeConnectionKey(session);
-  const connection =
-    realtimeConnections.get(key) ?? createRealtimeConnection(key, session);
-
-  if (connection.closeTimer !== undefined) {
-    window.clearTimeout(connection.closeTimer);
-    connection.closeTimer = undefined;
-  }
-
-  connection.subscribers.add(subscription);
-
-  if (!connection.socket && !connection.connectPromise) {
-    void connection.connect();
-  } else if (connection.socket?.readyState === WebSocket.OPEN) {
-    subscription.handlersRef.current.onConnected?.();
-  }
-
-  return connection;
-}
-
-function unsubscribeRealtime(
+function notifySubscribers(
   connection: SharedRealtimeConnection,
-  subscription: RealtimeSubscription,
+  notify: (handlers: RealtimeHandlers) => void,
 ): void {
-  connection.subscribers.delete(subscription);
-  subscription.handlersRef.current.onDisconnected?.();
-
-  if (connection.subscribers.size > 0) return;
-  if (
-    realtimeConnections.get(realtimeConnectionKey(connection.session)) !==
-    connection
-  ) {
-    return;
-  }
-
-  if (connection.reconnectTimer !== undefined) {
-    window.clearTimeout(connection.reconnectTimer);
-    connection.reconnectTimer = undefined;
-  }
-
-  connection.closeTimer = window.setTimeout(() => {
-    if (connection.subscribers.size > 0) return;
-
-    connection.socket?.close();
-    connection.socket = null;
-    connection.connectPromise = null;
-    realtimeConnections.delete(realtimeConnectionKey(connection.session));
-  }, sharedConnectionCloseDelayMs);
+  connection.subscribers.forEach((subscription) => {
+    notify(subscription.handlersRef.current);
+  });
 }
 
-function createRealtimeConnection(
-  key: string,
-  session: Session,
-): SharedRealtimeConnection {
-  const connection: SharedRealtimeConnection = {
-    attempt: 0,
-    connect: () => Promise.resolve(),
-    connectPromise: null,
-    session,
-    socket: null,
-    subscribers: new Set(),
-  };
+function sendMailboxSubscriptions(connection: SharedRealtimeConnection): void {
+  const socket = connection.socket;
 
-  connection.connect = async () => {
-    if (connection.connectPromise) return connection.connectPromise;
+  if (!socket) return;
 
-    connection.connectPromise = connectRealtime(connection).finally(() => {
-      connection.connectPromise = null;
+  mailboxHintRegistrations
+    .get(realtimeConnectionKey(connection.session))
+    ?.forEach((registration) => {
+      applicationContainer.realtime.subscribeMailbox(
+        socket,
+        registration.target,
+      );
     });
+}
 
-    return connection.connectPromise;
-  };
+function notifyMailboxHint(
+  connection: SharedRealtimeConnection,
+  mailboxId: string,
+): void {
+  mailboxHintRegistrations
+    .get(realtimeConnectionKey(connection.session))
+    ?.get(mailboxId)
+    ?.listeners.forEach((listener) => listener());
+}
 
-  realtimeConnections.set(key, connection);
+function scheduleRealtimeReconnect(connection: SharedRealtimeConnection): void {
+  if (connection.subscribers.size === 0) return;
 
-  return connection;
+  if (connection.reconnectTimer !== undefined) return;
+
+  notifySubscribers(connection, (handlers) => handlers.onReconnecting?.());
+  const delay = Math.min(30000, 1000 * 2 ** connection.attempt);
+  const jitter = Math.floor(Math.random() * 500);
+
+  // eslint-disable-next-line no-param-reassign -- shared connection record
+  connection.attempt += 1;
+  // eslint-disable-next-line no-param-reassign -- shared connection record
+  connection.reconnectTimer = window.setTimeout(() => {
+    // eslint-disable-next-line no-param-reassign -- shared connection record
+    connection.reconnectTimer = undefined;
+    void connection.connect();
+  }, delay + jitter);
 }
 
 async function connectRealtime(
@@ -203,11 +126,14 @@ async function connectRealtime(
       return;
     }
 
+    // eslint-disable-next-line no-param-reassign -- shared connection record
     connection.socket = nextSocket;
     nextSocket.addEventListener('open', () => {
+      // eslint-disable-next-line no-param-reassign -- shared connection record
       connection.attempt = 0;
     });
     nextSocket.addEventListener('close', () => {
+      // eslint-disable-next-line no-param-reassign -- shared connection record
       if (connection.socket === nextSocket) connection.socket = null;
       scheduleRealtimeReconnect(connection);
     });
@@ -220,37 +146,115 @@ async function connectRealtime(
   }
 }
 
-function scheduleRealtimeReconnect(connection: SharedRealtimeConnection): void {
-  if (connection.subscribers.size === 0) return;
+function createRealtimeConnection(
+  key: string,
+  session: Session,
+): SharedRealtimeConnection {
+  const connection: SharedRealtimeConnection = {
+    attempt: 0,
+    connect: () => Promise.resolve(),
+    connectPromise: null,
+    session,
+    socket: null,
+    subscribers: new Set(),
+  };
 
-  if (connection.reconnectTimer !== undefined) return;
+  connection.connect = async () => {
+    if (connection.connectPromise) return connection.connectPromise;
 
-  notifySubscribers(connection, (handlers) => handlers.onReconnecting?.());
-  const delay = Math.min(30000, 1000 * 2 ** connection.attempt);
-  const jitter = Math.floor(Math.random() * 500);
+    connection.connectPromise = connectRealtime(connection).finally(() => {
+      connection.connectPromise = null;
+    });
 
-  connection.attempt += 1;
-  connection.reconnectTimer = window.setTimeout(() => {
-    connection.reconnectTimer = undefined;
+    return connection.connectPromise;
+  };
+
+  realtimeConnections.set(key, connection);
+
+  return connection;
+}
+
+function subscribeRealtime(
+  session: Session,
+  subscription: RealtimeSubscription,
+): SharedRealtimeConnection {
+  const key = realtimeConnectionKey(session);
+  const connection =
+    realtimeConnections.get(key) ?? createRealtimeConnection(key, session);
+
+  if (connection.closeTimer !== undefined) {
+    window.clearTimeout(connection.closeTimer);
+    connection.closeTimer = undefined;
+  }
+
+  connection.subscribers.add(subscription);
+
+  if (!connection.socket && !connection.connectPromise) {
     void connection.connect();
-  }, delay + jitter);
+  } else if (connection.socket?.readyState === WebSocket.OPEN) {
+    subscription.handlersRef.current.onConnected?.();
+  }
+
+  return connection;
 }
 
-function notifySubscribers(
+function unsubscribeRealtime(
   connection: SharedRealtimeConnection,
-  notify: (handlers: RealtimeHandlers) => void,
+  subscription: RealtimeSubscription,
 ): void {
-  connection.subscribers.forEach((subscription) => {
-    notify(subscription.handlersRef.current);
-  });
+  connection.subscribers.delete(subscription);
+  subscription.handlersRef.current.onDisconnected?.();
+
+  if (connection.subscribers.size > 0) return;
+
+  if (
+    realtimeConnections.get(realtimeConnectionKey(connection.session)) !==
+    connection
+  ) {
+    return;
+  }
+
+  if (connection.reconnectTimer !== undefined) {
+    window.clearTimeout(connection.reconnectTimer);
+    // eslint-disable-next-line no-param-reassign -- shared connection record
+    connection.reconnectTimer = undefined;
+  }
+
+  // eslint-disable-next-line no-param-reassign -- shared connection record
+  connection.closeTimer = window.setTimeout(() => {
+    if (connection.subscribers.size > 0) return;
+
+    connection.socket?.close();
+    // eslint-disable-next-line no-param-reassign -- shared connection record
+    connection.socket = null;
+    // eslint-disable-next-line no-param-reassign -- shared connection record
+    connection.connectPromise = null;
+    realtimeConnections.delete(realtimeConnectionKey(connection.session));
+  }, sharedConnectionCloseDelayMs);
 }
 
-function realtimeConnectionKey(session: Session): string {
-  return session.identity.id;
+export function useRealtimeEvents(
+  session: Session,
+  handlers: RealtimeHandlers,
+): void {
+  const handlersRef = useRef(handlers);
+
+  useEffect(() => {
+    handlersRef.current = handlers;
+  }, [handlers]);
+
+  useEffect(() => {
+    const subscription = { handlersRef };
+    const connection = subscribeRealtime(session, subscription);
+
+    return () => {
+      unsubscribeRealtime(connection, subscription);
+    };
+  }, [session.identity.id, session.keyPair]);
 }
 
 export function closeAllRealtimeConnections(): void {
-  realtimeConnections.forEach((connection) => {
+  for (const connection of realtimeConnections.values()) {
     if (connection.closeTimer !== undefined) {
       window.clearTimeout(connection.closeTimer);
     }
@@ -265,7 +269,7 @@ export function closeAllRealtimeConnections(): void {
     connection.socket?.close();
     connection.socket = null;
     connection.connectPromise = null;
-  });
+  }
   realtimeConnections.clear();
   mailboxHintRegistrations.clear();
 }
@@ -344,29 +348,4 @@ export function subscribeRealtimeMailboxHints(
       registrations.delete(target.mailboxId);
     }
   };
-}
-
-function sendMailboxSubscriptions(connection: SharedRealtimeConnection): void {
-  const socket = connection.socket;
-
-  if (!socket) return;
-
-  mailboxHintRegistrations
-    .get(realtimeConnectionKey(connection.session))
-    ?.forEach((registration) => {
-      applicationContainer.realtime.subscribeMailbox(
-        socket,
-        registration.target,
-      );
-    });
-}
-
-function notifyMailboxHint(
-  connection: SharedRealtimeConnection,
-  mailboxId: string,
-): void {
-  mailboxHintRegistrations
-    .get(realtimeConnectionKey(connection.session))
-    ?.get(mailboxId)
-    ?.listeners.forEach((listener) => listener());
 }

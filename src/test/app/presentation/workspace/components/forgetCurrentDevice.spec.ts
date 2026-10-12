@@ -1,10 +1,8 @@
+import type { ForgetDeviceServices } from '../../../../../app/presentation/workspace/components/ForgetDeviceServices';
 import type { OwnDeviceRetirement } from '../../../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
 import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 
-import {
-  forgetCurrentDevice,
-  type ForgetDeviceServices,
-} from '../../../../../app/presentation/workspace/components/forgetCurrentDevice';
+import { forgetCurrentDevice } from '../../../../../app/presentation/workspace/components/forgetCurrentDevice';
 
 const session = { identity: { id: 'identity-1' } } as unknown as Session;
 

@@ -16,11 +16,6 @@ export function startCallHeartbeatLoop({
   let nextHeartbeatTimer: ReturnType<typeof setTimeout> | undefined;
   let stopped = false;
 
-  const scheduleHeartbeat = (delay: number): void => {
-    if (stopped) return;
-
-    nextHeartbeatTimer = setTimeout(sendHeartbeat, delay);
-  };
   const sendHeartbeat = (): void => {
     if (stopped) return;
 
@@ -40,7 +35,12 @@ export function startCallHeartbeatLoop({
       .finally(() => {
         const elapsed = Date.now() - startedAt;
 
-        scheduleHeartbeat(Math.max(0, intervalMs - elapsed));
+        if (stopped) return;
+
+        nextHeartbeatTimer = setTimeout(
+          sendHeartbeat,
+          Math.max(0, intervalMs - elapsed),
+        );
       });
   };
 
@@ -48,9 +48,6 @@ export function startCallHeartbeatLoop({
 
   return () => {
     stopped = true;
-
-    if (nextHeartbeatTimer !== undefined) {
-      clearTimeout(nextHeartbeatTimer);
-    }
+    clearTimeout(nextHeartbeatTimer);
   };
 }

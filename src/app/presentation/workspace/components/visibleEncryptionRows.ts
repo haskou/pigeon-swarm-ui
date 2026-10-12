@@ -1,4 +1,4 @@
-import type { EncryptionDetailsRow } from './EncryptionDetailsDialog';
+import type { EncryptionDetailsRow } from './EncryptionDetailsRow';
 
 export function visibleEncryptionRows(
   rows: EncryptionDetailsRow[],

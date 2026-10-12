@@ -1,17 +1,11 @@
 import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
-import type { CallSession } from '../../../../contexts/calls/presentation/view-models/CallSession';
+import type { PageDepartureInput } from './PageDepartureInput';
 
 import { callDepartureAction } from './callDepartureAction';
 
 export type PageDeparture =
   | { action: 'end'; callId: string }
   | { action: 'leave'; callId: string; declined: boolean };
-
-type PageDepartureInput = {
-  activeCall: Pick<CallSession, 'call' | 'id' | 'kind'> | null;
-  currentIdentityId: string;
-  incomingCall: { call: Pick<CallResource, 'id'> } | null;
-};
 
 function isRingingFor(
   call: CallResource | undefined,

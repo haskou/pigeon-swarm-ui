@@ -1,0 +1,57 @@
+import type { ReactNode, RefObject } from 'react';
+
+import type {
+  IdentityNames,
+  IdentityPictures,
+} from '../../../../contexts/identities/presentation/view-models/identityDisplay';
+import type {
+  AttachmentProgress,
+  ChatMessage,
+  MessageAttachment,
+  PollResource,
+  StickerMessageReference,
+} from '../../../../shared/domain/pigeonResources.types';
+import type { LoadState } from './LoadState';
+
+export interface ChatMessageTimelineProps {
+  bottomRef: RefObject<HTMLDivElement | null>;
+  currentIdentityId: string;
+  currentIdentityName: string;
+  hasConversationKey: boolean;
+  hasReachedMessageStart: boolean;
+  identityNames: IdentityNames;
+  identityPictures: IdentityPictures;
+  isGroupConversation: boolean;
+  loadAttachmentPreview: (
+    attachment: MessageAttachment,
+    onProgress?: (progress: AttachmentProgress) => void,
+  ) => Promise<string>;
+  missingConversationKeyContent?: ReactNode;
+  messageState: LoadState;
+  messages: ChatMessage[];
+  newMessageCount: number;
+  onAttachmentOpen: (attachment?: MessageAttachment) => void;
+  onAuthorProfileOpen: (
+    message: ChatMessage,
+    target: HTMLElement | null,
+  ) => void;
+  onJumpToLatest: () => void;
+  onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
+  onOpenThread?: (message: ChatMessage) => void;
+  onReactionToggle: (
+    message: ChatMessage,
+    emoji: string,
+    reacted: boolean,
+  ) => void;
+  onReplyReferenceClick: (messageId: string) => void;
+  onRetryMessage: (message: ChatMessage) => void;
+  onPollClose?: (poll: PollResource) => Promise<void>;
+  onPollRemoveVote?: (poll: PollResource) => Promise<void>;
+  onPollVote?: (poll: PollResource, optionIds: string[]) => Promise<void>;
+  onStickerClick?: (sticker: StickerMessageReference) => void;
+  onScroll: () => void;
+  pinnedMessageIds: ReadonlySet<string>;
+  reactionAuthorNames: Record<string, string>;
+  polls?: PollResource[];
+  scrollerRef: RefObject<HTMLDivElement | null>;
+}

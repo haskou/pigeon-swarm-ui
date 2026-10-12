@@ -9,12 +9,23 @@ import type {
   IdentityResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { WorkspaceConversationNavigation } from './WorkspaceConversationNavigation';
 
 import { ConversationTimeline } from '../../../../contexts/conversations/presentation/view-models/ConversationTimeline';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { applyPublishedKeychain } from './applyPublishedKeychain';
 import { WorkspaceConversationTarget } from './WorkspaceConversationTarget';
+
+function sortWithConversationFirst(
+  conversations: ConversationResource[],
+  conversation: ConversationResource,
+): ConversationResource[] {
+  return ConversationTimeline.sortByLatestMessage([
+    conversation,
+    ...conversations.filter((item) => item.id !== conversation.id),
+  ]);
+}
 
 type WorkspaceConversationNavigationInput = {
   closeCommunityMembers: () => void;
@@ -28,19 +39,6 @@ type WorkspaceConversationNavigationInput = {
   setConversations: Dispatch<SetStateAction<ConversationResource[]>>;
   setSession: Dispatch<SetStateAction<Session | null>>;
   showMessagesWorkspace: () => void;
-};
-
-type WorkspaceConversationNavigation = {
-  importConversationKey: (keyEntry: ConversationKeyEntry) => Promise<void>;
-  openCreatedConversation: (
-    session: Session,
-    conversation: ConversationResource,
-  ) => void;
-  openOrCreateConversation: (
-    identityId: string,
-    identity?: IdentityResource,
-    preferredNetworkId?: string,
-  ) => Promise<void>;
 };
 
 export function useWorkspaceConversationNavigation({
@@ -62,10 +60,7 @@ export function useWorkspaceConversationNavigation({
         applyPublishedKeychain(current, nextSession.identity.id, nextSession),
       );
       setConversations((current) =>
-        ConversationTimeline.sortByLatestMessage([
-          conversation,
-          ...current.filter((item) => item.id !== conversation.id),
-        ]),
+        sortWithConversationFirst(current, conversation),
       );
       setActiveConversationId(conversation.id);
       closeConversationCreation();
@@ -127,10 +122,7 @@ export function useWorkspaceConversationNavigation({
 
       if (identity) rememberIdentity(identity);
       setConversations((current) =>
-        ConversationTimeline.sortByLatestMessage([
-          result.conversation,
-          ...current.filter((item) => item.id !== result.conversation.id),
-        ]),
+        sortWithConversationFirst(current, result.conversation),
       );
       showMessagesWorkspace();
       setActiveConversationId(result.conversation.id);

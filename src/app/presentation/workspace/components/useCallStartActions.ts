@@ -1,22 +1,11 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  type Dispatch,
-  type SetStateAction,
-} from 'react';
-import type { CallIceServerResource as CallIceServerConfig } from '../../../../contexts/calls/infrastructure/http/resources/CallIceServerResource';
-import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
-import type { CallSignalType } from '../../../../contexts/calls/infrastructure/media/CallSignalType';
-import type { useCallSession } from '../../../../contexts/calls/presentation/hooks/useCallSession';
-import type {
-  Community,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
-import type { IncomingWorkspaceCall } from './useCallResourceReconciliation';
-import type { WorkspaceCallDetails } from './resolveWorkspaceCallDetails';
+import { useCallback, useEffect, useRef } from 'react';
 
-import { applicationContainer } from '../../../composition/applicationContainer';
+import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
+import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
+import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { CallStartActions } from './CallStartActions';
+import type { CallStartActionsInput } from './CallStartActionsInput';
+
 import {
   logCallDebug,
   logCallError,
@@ -29,45 +18,35 @@ import {
   stopIncomingCallSound,
 } from '../../../../shared/presentation/sounds';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import { applicationContainer } from '../../../composition/applicationContainer';
 
-type CallController = ReturnType<typeof useCallSession>;
-type CallMediaEncryptionInput = Pick<
-  Parameters<CallController['startCall']>[0],
-  | 'mediaEncryptionEnabled'
-  | 'mediaEncryptionKey'
-  | 'mediaEncryptionUnavailableReason'
->;
-type SignalSender = (
-  recipientIdentityId: string,
-  signalType: CallSignalType,
-  payload: Record<string, unknown>,
-) => Promise<void>;
+function participantStatusLog(
+  participant: CallResource['participants'][number],
+) {
+  return {
+    connected: participant.connected,
+    identityId: participant.identityId,
+    status: participant.status,
+  };
+}
 
-type CallStartActionsInput = {
-  activeCall: CallController['activeCall'];
-  activeCommunity: Community | null;
-  callDetailsForResource: (
-    call: Parameters<CallController['reconcileCall']>[0],
-  ) => WorkspaceCallDetails;
-  callMediaEncryptionForResource: (
-    call: Parameters<CallController['reconcileCall']>[0],
-  ) => Promise<CallMediaEncryptionInput>;
-  callNoiseCancellationEnabled: boolean;
-  callSignalSender: (callId: string) => SignalSender;
-  cleanupJoinedCalls: (exceptCallId?: string) => Promise<void>;
-  incomingCall: IncomingWorkspaceCall | null;
-  leaveCurrentCallForSwitch: () => Promise<void>;
-  loadCallIceConfig: () => Promise<CallIceServerConfig>;
-  requestOptionalLocalAudio: (
-    event: string,
-    context: Record<string, unknown>,
-  ) => Promise<MediaStream | null>;
-  session: Session;
-  setIncomingCall: Dispatch<SetStateAction<IncomingWorkspaceCall | null>>;
-  setSendError: Dispatch<SetStateAction<string | null>>;
-  startCall: CallController['startCall'];
-  stopLocalAudio: (stream: MediaStream | null) => void;
-};
+function findParticipantByIdentity(
+  call: CallResource,
+  identityId: string,
+): CallResource['participants'][number] | undefined {
+  return call.participants.find(
+    (participant) => participant.identityId === identityId,
+  );
+}
+
+function fetchLatestCall(
+  session: Session,
+  pendingCall: CallResource,
+): Promise<CallResource> {
+  return applicationContainer.calls
+    .get(session, pendingCall.id)
+    .catch(() => pendingCall);
+}
 
 export function useCallStartActions({
   activeCall,
@@ -86,7 +65,7 @@ export function useCallStartActions({
   setSendError,
   startCall,
   stopLocalAudio,
-}: CallStartActionsInput) {
+}: CallStartActionsInput): CallStartActions {
   const callActionInProgressRef = useRef(false);
   const sessionRef = useRef(session);
 
@@ -160,11 +139,7 @@ export function useCallStartActions({
           logCallDebug('workspace:conversation-call:created', {
             callId: call.id,
             conversationId: input.conversationId,
-            participantStatuses: call.participants.map((participant) => ({
-              connected: participant.connected,
-              identityId: participant.identityId,
-              status: participant.status,
-            })),
+            participantStatuses: call.participants.map(participantStatusLog),
           });
           const details = callDetailsForResource(call);
           const mediaEncryption = await callMediaEncryptionForResource(call);
@@ -356,12 +331,10 @@ export function useCallStartActions({
     callActionInProgressRef.current = true;
 
     void (async () => {
-      const latestCall = await applicationContainer.calls
-        .get(sessionRef.current, pendingCall.id)
-        .catch(() => pendingCall);
-      const currentParticipant = latestCall.participants.find(
-        (participant) =>
-          participant.identityId === sessionRef.current.identity.id,
+      const latestCall = await fetchLatestCall(sessionRef.current, pendingCall);
+      const currentParticipant = findParticipantByIdentity(
+        latestCall,
+        sessionRef.current.identity.id,
       );
 
       if (currentParticipant?.status !== 'ringing') {
@@ -395,12 +368,13 @@ export function useCallStartActions({
         sessionRef.current,
         pendingCall.id,
       );
+
       if (!participantJoinWasAccepted(call, sessionRef.current.identity.id)) {
         logCallDebug('workspace:incoming-call:join-skipped-not-joined', {
           callId: call.id,
-          participantStatus: call.participants.find(
-            (participant) =>
-              participant.identityId === sessionRef.current.identity.id,
+          participantStatus: findParticipantByIdentity(
+            call,
+            sessionRef.current.identity.id,
           )?.status,
         });
         stopLocalAudio(localStream);
@@ -410,11 +384,7 @@ export function useCallStartActions({
 
       logCallDebug('workspace:incoming-call:joined', {
         callId: call.id,
-        participantStatuses: call.participants.map((participant) => ({
-          connected: participant.connected,
-          identityId: participant.identityId,
-          status: participant.status,
-        })),
+        participantStatuses: call.participants.map(participantStatusLog),
       });
       const details = callDetailsForResource(call);
       const mediaEncryption = await callMediaEncryptionForResource(call);

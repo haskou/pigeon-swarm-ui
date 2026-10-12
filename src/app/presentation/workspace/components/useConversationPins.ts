@@ -6,6 +6,7 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 import type { MessageCollectionState } from './conversationThreadState';
+import type { UseConversationPinsResult } from './UseConversationPinsResult';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrowserIdle';
@@ -18,20 +19,6 @@ type UseConversationPinsInput = {
   messages: ChatMessage[];
   onError: (error: string | null) => void;
   session: Session;
-};
-
-type UseConversationPinsResult = {
-  close: () => void;
-  collection: MessageCollectionState | null;
-  open: () => Promise<void>;
-  pin: (message: ChatMessage) => Promise<void>;
-  pinnedMessageIds: Set<string>;
-  setCollection: React.Dispatch<
-    React.SetStateAction<MessageCollectionState | null>
-  >;
-  setPinnedMessageIds: React.Dispatch<React.SetStateAction<Set<string>>>;
-  unpin: (message: ChatMessage) => Promise<void>;
-  unpinFromCollection: (message: ChatMessage) => Promise<void>;
 };
 
 function withoutMessage(current: Set<string>, messageId: string): Set<string> {
@@ -66,11 +53,12 @@ export function useConversationPins(
 
       return;
     }
+
     // One-to-one pins are not replicated: they come from mailbox pin changes.
     if (activeConversation?.type === 'one-to-one') return;
 
     let cancelled = false;
-    const cancelIdleWork = runWhenBrowserIdle(async () => {
+    const loadPins = async () => {
       try {
         const pins = await applicationContainer.messages.listPins(
           session,
@@ -83,7 +71,8 @@ export function useConversationPins(
       } catch {
         if (!cancelled) setPinnedMessageIds(new Set());
       }
-    });
+    };
+    const cancelIdleWork = runWhenBrowserIdle(loadPins);
 
     return () => {
       cancelled = true;
@@ -93,13 +82,14 @@ export function useConversationPins(
 
   const open = async () => {
     if (!activeConversationId) return;
+
     if (activeConversation?.type === 'one-to-one') {
       // The mailbox has no pin listing; the pins view is the pinned messages
       // already present in the local timeline.
       setCollection({
         error: null,
-        messages: messages.filter(
-          (message) => pinnedMessageIds.has(message.id),
+        messages: messages.filter((message) =>
+          pinnedMessageIds.has(message.id),
         ),
         state: 'ready',
       });

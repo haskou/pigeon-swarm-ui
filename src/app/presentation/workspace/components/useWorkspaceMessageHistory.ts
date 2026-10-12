@@ -1,16 +1,6 @@
-import type {
-  Dispatch,
-  MutableRefObject,
-  RefObject,
-  SetStateAction,
-} from 'react';
-
-import type {
-  ChatMessage,
-  ConversationKeyEntry,
-  ConversationResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { LoadedMessagesResult } from './LoadedMessagesResult';
+import type { WorkspaceMessageHistory } from './WorkspaceMessageHistory';
+import type { WorkspaceMessageHistoryInput } from './WorkspaceMessageHistoryInput';
 
 import { MessageCollection } from '../../../../contexts/messages/presentation/view-models/MessageCollection';
 import {
@@ -20,41 +10,6 @@ import {
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
-
-type LoadState = 'idle' | 'loading' | 'error';
-type WorkspaceMode = 'community' | 'messages';
-
-type WorkspaceMessageHistoryInput = {
-  activeConversation?: ConversationResource;
-  activeConversationKey?: ConversationKeyEntry;
-  isScrolledNearBottom: () => boolean;
-  keepMessageBottomUntilRef: MutableRefObject<number>;
-  lastScrollTopRef: MutableRefObject<number>;
-  messageCursorRef: MutableRefObject<string | null>;
-  messageRequestRef: MutableRefObject<number>;
-  messageScrollAnchorRef: MutableRefObject<MessageScrollAnchorSnapshot | null>;
-  messageStateRef: MutableRefObject<LoadState>;
-  messagesRef: MutableRefObject<ChatMessage[]>;
-  scrollerRef: RefObject<HTMLDivElement | null>;
-  sessionRef: MutableRefObject<Session>;
-  setMessageLoadState: (state: LoadState) => void;
-  setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
-  setNewMessageCount: Dispatch<SetStateAction<number>>;
-  setSendError: (error: string | null) => void;
-  suppressMessageLoadsUntilRef: MutableRefObject<number>;
-  updateMessageCursor: (cursor: null | string) => void;
-  workspaceMode: WorkspaceMode;
-};
-
-type WorkspaceMessageHistory = {
-  handleLoadOlder: () => Promise<void>;
-  handleScroll: () => void;
-};
-
-type LoadedMessagesResult = {
-  messages: ChatMessage[];
-  nextCursor?: null | string;
-};
 
 function canLoadOlderMessages(input: WorkspaceMessageHistoryInput): boolean {
   return !(
@@ -96,10 +51,38 @@ function applyOlderMessages(
   );
 }
 
+function captureOlderMessagesViewport(input: WorkspaceMessageHistoryInput): {
+  anchor: MessageScrollAnchorSnapshot | null;
+  restorePreviousViewport: () => void;
+} {
+  const scroller = input.scrollerRef.current;
+  const anchor = scroller ? MessageScrollAnchor.capture(scroller) : null;
+  const previousHeight = scroller?.scrollHeight ?? 0;
+  const previousTop = scroller?.scrollTop ?? 0;
+
+  return {
+    anchor,
+    restorePreviousViewport: (): void => {
+      if (!scroller || input.scrollerRef.current !== scroller) return;
+
+      const nextTop = MessageScrollAnchor.restoreOrPreserveOffset(
+        scroller,
+        anchor,
+        previousHeight,
+        previousTop,
+      );
+
+      // eslint-disable-next-line no-param-reassign -- shared React ref
+      input.lastScrollTopRef.current = nextTop;
+    },
+  };
+}
+
 export function useWorkspaceMessageHistory(
   input: WorkspaceMessageHistoryInput,
 ): WorkspaceMessageHistory {
   const handleLoadOlder = async (): Promise<void> => {
+    // eslint-disable-next-line no-param-reassign -- shared React ref
     input.keepMessageBottomUntilRef.current = 0;
 
     if (!canLoadOlderMessages(input)) return;
@@ -110,24 +93,12 @@ export function useWorkspaceMessageHistory(
     if (!conversationId || !requestedCursor) return;
     const requestId = input.messageRequestRef.current + 1;
 
+    // eslint-disable-next-line no-param-reassign -- shared React ref
     input.messageRequestRef.current = requestId;
-    const scroller = input.scrollerRef.current;
-    const anchor = scroller ? MessageScrollAnchor.capture(scroller) : null;
-    const previousHeight = scroller?.scrollHeight ?? 0;
-    const previousTop = scroller?.scrollTop ?? 0;
-    const restorePreviousViewport = (): void => {
-      if (!scroller || input.scrollerRef.current !== scroller) return;
+    const { anchor, restorePreviousViewport } =
+      captureOlderMessagesViewport(input);
 
-      const nextTop = MessageScrollAnchor.restoreOrPreserveOffset(
-        scroller,
-        anchor,
-        previousHeight,
-        previousTop,
-      );
-
-      input.lastScrollTopRef.current = nextTop;
-    };
-
+    // eslint-disable-next-line no-param-reassign -- shared React ref
     input.messageScrollAnchorRef.current = anchor;
     input.setMessageLoadState('loading');
     requestAnimationFrame(restorePreviousViewport);
@@ -143,9 +114,11 @@ export function useWorkspaceMessageHistory(
       applyOlderMessages(input, result, requestedCursor);
       requestAnimationFrame(() => {
         restorePreviousViewport();
+        // eslint-disable-next-line no-param-reassign -- shared React ref
         input.messageScrollAnchorRef.current = null;
       });
     } catch (caught) {
+      // eslint-disable-next-line no-param-reassign -- shared React ref
       input.messageScrollAnchorRef.current = null;
       input.setSendError(
         toUserErrorMessage(caught, copy.workspace.loadOlderError),
@@ -163,6 +136,7 @@ export function useWorkspaceMessageHistory(
     const scrollTop = input.scrollerRef.current?.scrollTop ?? 0;
     const isScrollingUp = scrollTop < input.lastScrollTopRef.current;
 
+    // eslint-disable-next-line no-param-reassign -- shared React ref
     input.lastScrollTopRef.current = scrollTop;
 
     if (Date.now() < input.suppressMessageLoadsUntilRef.current) return;
@@ -170,12 +144,16 @@ export function useWorkspaceMessageHistory(
     if (input.isScrolledNearBottom()) {
       input.setNewMessageCount(0);
     } else {
+      // eslint-disable-next-line no-param-reassign -- shared React ref
       input.keepMessageBottomUntilRef.current = 0;
+      // eslint-disable-next-line no-param-reassign -- shared React ref
       input.messageScrollAnchorRef.current = null;
     }
 
     if (isScrollingUp) {
+      // eslint-disable-next-line no-param-reassign -- shared React ref
       input.keepMessageBottomUntilRef.current = 0;
+      // eslint-disable-next-line no-param-reassign -- shared React ref
       input.messageScrollAnchorRef.current = null;
     }
 

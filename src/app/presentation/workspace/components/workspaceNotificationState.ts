@@ -1,4 +1,4 @@
-import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
+import type { NotificationMentionContext } from '../../../../contexts/notifications/presentation/view-models/NotificationMentionContext';
 import type {
   Community,
   CommunityInvitationNotificationResource,
@@ -7,7 +7,7 @@ import type {
   MessageResource,
   NotificationResource,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { NotificationMentionContext } from '../../../../contexts/notifications/presentation/view-models/NotificationMentionContext';
+import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 
 export function stableUniqueKey(values: string[]): string {
   return [...new Set(values.filter(Boolean))].sort().join('\u0000');

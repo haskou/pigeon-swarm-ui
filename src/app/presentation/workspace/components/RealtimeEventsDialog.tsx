@@ -1,11 +1,11 @@
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 
-import { copy } from '../../../../shared/presentation/i18n/copy';
+import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
+import { JsonTree } from '../../../../shared/presentation/components/JsonDataViewer';
 import { formatTime } from '../../../../shared/presentation/formatting';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
-import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
-import { JsonTree } from '../../../../shared/presentation/components/JsonDataViewer';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 
 interface RealtimeEventsDialogProps {
   events: RealtimeDomainEvent[];

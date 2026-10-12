@@ -1,10 +1,6 @@
-import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
 import type { CallMediaEncryptionUnavailableReason } from '../../../../contexts/calls/presentation/view-models/CallMediaEncryptionUnavailableReason';
-import type {
-  Community,
-  ConversationKeyEntry,
-  LocalKeychain,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationKeyEntry } from '../../../../shared/domain/pigeonResources.types';
+import type { WorkspaceCallMediaEncryptionInput } from './WorkspaceCallMediaEncryptionInput';
 
 import { ConversationKeychain } from '../../../../contexts/identities/infrastructure/keychain/ConversationKeychain';
 
@@ -12,15 +8,6 @@ export type WorkspaceCallMediaEncryption = {
   mediaEncryptionEnabled: boolean;
   mediaEncryptionKey?: string;
   mediaEncryptionUnavailableReason?: CallMediaEncryptionUnavailableReason;
-};
-
-type WorkspaceCallMediaEncryptionInput = {
-  call: CallResource;
-  communities: Community[];
-  currentIdentityId: string;
-  communityCallKey: (communityId: string, callId: string) => Promise<string>;
-  enabled: boolean;
-  keychain: LocalKeychain;
 };
 
 export async function resolveWorkspaceCallMediaEncryption({

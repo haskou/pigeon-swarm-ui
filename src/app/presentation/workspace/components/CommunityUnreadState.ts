@@ -1,5 +1,5 @@
 import type { NotificationSettingMap } from '../../../../contexts/notifications/presentation/view-models/NotificationSettingMap';
-import type { CommunityUnreadCounts } from './workspacePersistence';
+import type { CommunityUnreadCounts } from './CommunityUnreadCounts';
 
 import { NotificationSettingsPolicy } from '../../../../contexts/notifications/presentation/view-models/NotificationSettingsPolicy';
 

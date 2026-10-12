@@ -6,10 +6,10 @@ import type {
   IdentityPresence,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { copy } from '../../../../shared/presentation/i18n/copy';
-import { FallbackImage } from '../../../../shared/presentation/components/FallbackImage';
 import { PresenceStatusDot } from '../../../../contexts/identities/presentation/components/presenceStatusDot';
 import { VerifiedIcon } from '../../../../contexts/identities/presentation/components/VerifiedIcon';
+import { FallbackImage } from '../../../../shared/presentation/components/FallbackImage';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import { LockIcon } from './LockIcon';
 import { WorkspaceHeader } from './WorkspaceHeader';
 
@@ -60,54 +60,36 @@ export function ChatConversationHeader({
   peerVerified,
   realtimeStatus,
 }: ChatConversationHeaderProps) {
-  const e2eTooltip = hasConversationKey
-    ? copy.chat.e2eReady
-    : copy.chat.e2eMissing;
   const canOpenConversation = canOpenActiveConversation(
     activeConversation,
     isGroupConversation,
     canOpenPeerProfile,
   );
+  const conversationTitle = activeConversation
+    ? (activeConversationTitle ?? activeConversation.id)
+    : copy.chat.noConversation;
 
   return (
     <WorkspaceHeader
       avatar={
-        <button
-          type="button"
-          onClick={onConversationOpen}
-          disabled={!canOpenConversation}
-          className="relative grid h-12 w-12 shrink-0 place-items-center overflow-visible rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950 disabled:cursor-default"
-          aria-label={activeConversationName ?? copy.chat.noConversation}
-        >
-          <span className="absolute inset-0 grid place-items-center overflow-hidden rounded-2xl">
-            <ConversationAvatar
-              activeConversation={activeConversation}
-              activeConversationName={activeConversationName}
-              peerPicture={peerPicture}
-            />
-          </span>
-          {!isGroupConversation && activeConversation && (
-            <PresenceStatusDot
-              presence={peerPresence}
-              size="lg"
-              className="-bottom-1 -right-1"
-            />
-          )}
-        </button>
+        <ConversationAvatarButton
+          activeConversation={activeConversation}
+          activeConversationName={activeConversationName}
+          canOpenConversation={canOpenConversation}
+          isGroupConversation={isGroupConversation}
+          onConversationOpen={onConversationOpen}
+          peerPicture={peerPicture}
+          peerPresence={peerPresence}
+        />
       }
       lock={
-        activeConversation ? (
-          <>
-            <ConversationLockState
-              hasConversationKey={hasConversationKey}
-              onClick={onEncryptionDetailsOpen}
-              tooltip={e2eTooltip}
-            />
-            {peerVerified && onVerificationOpen ? (
-              <VerifiedContactBadge onClick={onVerificationOpen} />
-            ) : null}
-          </>
-        ) : null
+        <ConversationLockSlot
+          activeConversation={activeConversation}
+          hasConversationKey={hasConversationKey}
+          onEncryptionDetailsOpen={onEncryptionDetailsOpen}
+          onVerificationOpen={onVerificationOpen}
+          peerVerified={peerVerified}
+        />
       }
       menuContent={children}
       menuOpen={menuOpen}
@@ -129,11 +111,7 @@ export function ChatConversationHeader({
           </div>
         )
       }
-      title={
-        activeConversation
-          ? (activeConversationTitle ?? activeConversation.id)
-          : copy.chat.noConversation
-      }
+      title={conversationTitle}
       titleAction={
         <button
           type="button"
@@ -141,9 +119,7 @@ export function ChatConversationHeader({
           disabled={!canOpenConversation}
           className="min-w-0 truncate text-left text-xl font-black tracking-tight disabled:cursor-default sm:text-2xl"
         >
-          {activeConversation
-            ? (activeConversationTitle ?? activeConversation.id)
-            : copy.chat.noConversation}
+          {conversationTitle}
         </button>
       }
     />
@@ -172,6 +148,51 @@ function ConversationAvatar({
       className="h-full w-full object-cover"
       fallback={fallback}
     />
+  );
+}
+
+function ConversationAvatarButton({
+  activeConversation,
+  activeConversationName,
+  canOpenConversation,
+  isGroupConversation,
+  onConversationOpen,
+  peerPicture,
+  peerPresence,
+}: Pick<
+  ChatConversationHeaderProps,
+  | 'activeConversation'
+  | 'activeConversationName'
+  | 'isGroupConversation'
+  | 'onConversationOpen'
+  | 'peerPicture'
+  | 'peerPresence'
+> & {
+  canOpenConversation: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onConversationOpen}
+      disabled={!canOpenConversation}
+      className="relative grid h-12 w-12 shrink-0 place-items-center overflow-visible rounded-2xl bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950 disabled:cursor-default"
+      aria-label={activeConversationName ?? copy.chat.noConversation}
+    >
+      <span className="absolute inset-0 grid place-items-center overflow-hidden rounded-2xl">
+        <ConversationAvatar
+          activeConversation={activeConversation}
+          activeConversationName={activeConversationName}
+          peerPicture={peerPicture}
+        />
+      </span>
+      {!isGroupConversation && activeConversation && (
+        <PresenceStatusDot
+          presence={peerPresence}
+          size="lg"
+          className="-bottom-1 -right-1"
+        />
+      )}
+    </button>
   );
 }
 
@@ -213,6 +234,36 @@ function VerifiedContactBadge({ onClick }: { onClick: () => void }) {
       <VerifiedIcon className="h-3.5 w-3.5 shrink-0" />
       <span>{copy.contacts.verified}</span>
     </button>
+  );
+}
+
+function ConversationLockSlot({
+  activeConversation,
+  hasConversationKey,
+  onEncryptionDetailsOpen,
+  onVerificationOpen,
+  peerVerified,
+}: Pick<
+  ChatConversationHeaderProps,
+  | 'activeConversation'
+  | 'hasConversationKey'
+  | 'onEncryptionDetailsOpen'
+  | 'onVerificationOpen'
+  | 'peerVerified'
+>) {
+  if (!activeConversation) return null;
+
+  return (
+    <>
+      <ConversationLockState
+        hasConversationKey={hasConversationKey}
+        onClick={onEncryptionDetailsOpen}
+        tooltip={hasConversationKey ? copy.chat.e2eReady : copy.chat.e2eMissing}
+      />
+      {peerVerified && onVerificationOpen ? (
+        <VerifiedContactBadge onClick={onVerificationOpen} />
+      ) : null}
+    </>
   );
 }
 

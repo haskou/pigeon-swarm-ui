@@ -1,5 +1,8 @@
 import { useCallback, useReducer } from 'react';
 
+import type { WorkspaceTransientUiAction } from './WorkspaceTransientUiAction';
+import type { WorkspaceTransientUiState } from './WorkspaceTransientUiState';
+
 export type WorkspaceTransientSurface =
   | 'community-creation'
   | 'community-members'
@@ -9,14 +12,6 @@ export type WorkspaceTransientSurface =
   | 'notifications'
   | 'realtime-events'
   | 'sidebar';
-
-type WorkspaceTransientUiState = Readonly<
-  Record<WorkspaceTransientSurface, boolean>
->;
-
-type WorkspaceTransientUiAction =
-  | { surface: WorkspaceTransientSurface; type: 'close' | 'open' }
-  | { type: 'close-all' };
 
 const closedWorkspaceTransientUi: WorkspaceTransientUiState = {
   'community-creation': false,

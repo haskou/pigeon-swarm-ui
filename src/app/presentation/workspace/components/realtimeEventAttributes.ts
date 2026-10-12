@@ -71,13 +71,8 @@ export function communityChannelAttribute(
   return undefined;
 }
 
-export function communityAttribute(
-  event: RealtimeDomainEvent,
-  key: string,
-): Community | undefined {
-  const value = recordAttribute(event, key);
-
-  return value &&
+function hasCommunityShape(value: Record<string, unknown>): boolean {
+  return (
     typeof value.id === 'string' &&
     typeof value.networkId === 'string' &&
     typeof value.ownerIdentityId === 'string' &&
@@ -85,8 +80,16 @@ export function communityAttribute(
     typeof value.description === 'string' &&
     Array.isArray(value.memberIds) &&
     Array.isArray(value.textChannels)
-    ? (value as Community)
-    : undefined;
+  );
+}
+
+export function communityAttribute(
+  event: RealtimeDomainEvent,
+  key: string,
+): Community | undefined {
+  const value = recordAttribute(event, key);
+
+  return value && hasCommunityShape(value) ? (value as Community) : undefined;
 }
 
 export function callSignalTypeAttribute(
@@ -99,16 +102,6 @@ export function callSignalTypeAttribute(
     : undefined;
 }
 
-export function callIdFromRealtimeEvent(
-  event: RealtimeDomainEvent,
-): string | undefined {
-  if (event.type === 'calls.v1.participant_lease.was_updated') {
-    return stringAttribute(event, 'callId');
-  }
-
-  return eventAggregateId(event) ?? stringAttribute(event, 'callId');
-}
-
 export function eventAggregateId(
   event: RealtimeDomainEvent,
 ): string | undefined {
@@ -119,4 +112,14 @@ export function eventAggregateId(
   return typeof aggregateId === 'string' && aggregateId.length > 0
     ? aggregateId
     : undefined;
+}
+
+export function callIdFromRealtimeEvent(
+  event: RealtimeDomainEvent,
+): string | undefined {
+  if (event.type === 'calls.v1.participant_lease.was_updated') {
+    return stringAttribute(event, 'callId');
+  }
+
+  return eventAggregateId(event) ?? stringAttribute(event, 'callId');
 }

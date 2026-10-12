@@ -23,10 +23,7 @@ type UseCommunityMembershipRequestsInput = {
   session: Session;
 };
 
-export function useCommunityMembershipRequests({
-  onCommunitiesReload,
-  session,
-}: UseCommunityMembershipRequestsInput): {
+export type CommunityMembershipRequestsController = {
   accept: (requestId: string) => Promise<void>;
   action: MembershipRequestAction | null;
   decline: (requestId: string) => Promise<void>;
@@ -35,7 +32,12 @@ export function useCommunityMembershipRequests({
   refresh: () => Promise<void>;
   requests: CommunityMembershipRequest[];
   setRequests: Dispatch<SetStateAction<CommunityMembershipRequest[]>>;
-} {
+};
+
+export function useCommunityMembershipRequests({
+  onCommunitiesReload,
+  session,
+}: UseCommunityMembershipRequestsInput): CommunityMembershipRequestsController {
   const [requests, setRequests] = useState<CommunityMembershipRequest[]>([]);
   const [action, setAction] = useState<MembershipRequestAction | null>(null);
   const [error, setError] = useState<string | null>(null);

@@ -18,7 +18,8 @@ export function updateTypingEntries(
   }
 
   if (Object.keys(nextScope).length === 0) {
-    const { [scopeId]: _removed, ...rest } = entries;
+    const rest = { ...entries };
+    delete rest[scopeId];
 
     return rest;
   }

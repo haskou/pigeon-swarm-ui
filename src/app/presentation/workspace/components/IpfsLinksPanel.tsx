@@ -2,8 +2,8 @@ import { useState } from 'react';
 
 import type { IpfsLink } from '../../../../shared/presentation/ipfsLinks';
 
-import { copy } from '../../../../shared/presentation/i18n/copy';
 import { shortId } from '../../../../shared/presentation/formatting';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 
 export function IpfsLinksPanel({ links }: { links: IpfsLink[] }) {
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);

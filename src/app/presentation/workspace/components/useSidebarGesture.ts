@@ -1,16 +1,12 @@
 import { type PointerEvent, useRef } from 'react';
 
+import type { SidebarGestureHandlers } from './SidebarGestureHandlers';
+
 type SidebarGesture = {
   pointerId: number;
   startX: number;
   startY: number;
 };
-
-interface SidebarGestureHandlers {
-  clearSidebarGesture: (event: PointerEvent<HTMLElement>) => void;
-  handleWorkspacePointerDown: (event: PointerEvent<HTMLElement>) => void;
-  handleWorkspacePointerMove: (event: PointerEvent<HTMLElement>) => void;
-}
 
 export function useSidebarGesture(
   sidebarOpen: boolean,

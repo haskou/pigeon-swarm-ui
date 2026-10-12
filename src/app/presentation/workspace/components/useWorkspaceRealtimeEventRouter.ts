@@ -12,6 +12,7 @@ import type {
   Community,
   ConversationResource,
   IdentityPresence,
+  IdentityResource,
   MessageResource,
   PollResource,
   Session,
@@ -140,13 +141,14 @@ export function useWorkspaceRealtimeEventRouter({
 
       if (event.aggregate_id !== session.identity.id) return;
 
+      const applyRefreshedSession = (identity: IdentityResource) =>
+        setSession((current) =>
+          applyRefreshedIdentity(current, session.identity.id, identity),
+        );
+
       void applicationContainer.identities
         .get(session.identity.id)
-        .then((identity) =>
-          setSession((current) =>
-            applyRefreshedIdentity(current, session.identity.id, identity),
-          ),
-        )
+        .then(applyRefreshedSession)
         .catch(() => undefined);
     },
     [rememberIdentity, session, setSession],
@@ -158,16 +160,13 @@ export function useWorkspaceRealtimeEventRouter({
         const removedNetworkId = stringAttribute(event, 'networkId');
 
         if (removedNetworkId) {
-          setConversations((current) =>
-            current.filter(
-              (conversation) => conversation.networkId !== removedNetworkId,
-            ),
-          );
-          setCommunities((current) =>
-            current.filter(
-              (community) => community.networkId !== removedNetworkId,
-            ),
-          );
+          const isKeptConversation = (conversation: ConversationResource) =>
+            conversation.networkId !== removedNetworkId;
+          const isKeptCommunity = (community: Community) =>
+            community.networkId !== removedNetworkId;
+
+          setConversations((current) => current.filter(isKeptConversation));
+          setCommunities((current) => current.filter(isKeptCommunity));
 
           if (activeConversationNetworkId === removedNetworkId) {
             setActiveConversationId(null);
@@ -377,8 +376,11 @@ export function useWorkspaceRealtimeEventRouter({
   return useCallback(
     (event: RealtimeDomainEvent) => {
       if (realtimeEventsOpen) {
+        const isSameEvent = (item: RealtimeDomainEvent) =>
+          item.event_id === event.event_id;
+
         setRealtimeEventLog((current) => {
-          if (current.some((item) => item.event_id === event.event_id)) {
+          if (current.some(isSameEvent)) {
             return current;
           }
 

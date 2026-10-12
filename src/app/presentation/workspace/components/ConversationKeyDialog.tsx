@@ -1,9 +1,9 @@
 import { createPortal } from 'react-dom';
 
-import { copy } from '../../../../shared/presentation/i18n/copy';
+import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
-import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 
 export function ConversationKeyDialog({
   encryptedConversationKey,

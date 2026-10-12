@@ -13,6 +13,30 @@ export class CallResourceRefreshScheduler {
     ) => Promise<void>,
   ) {}
 
+  private async drain(callId: string): Promise<void> {
+    // request() stores this entry before draining. It stays in the map until
+    // the finally block below, so the lookup cannot miss.
+    const pendingRefresh = this.pendingRefreshes.get(callId)!;
+
+    try {
+      do {
+        const delay = Math.max(
+          0,
+          1000 - (Date.now() - (this.lastRefreshAt.get(callId) ?? 0)),
+        );
+
+        if (delay > 0)
+          await new Promise<void>((resolve) => setTimeout(resolve, delay));
+        // request() sets dirty on this same map entry to queue a re-run.
+        pendingRefresh.dirty = false;
+        this.lastRefreshAt.set(callId, Date.now());
+        await this.refresh(callId, pendingRefresh.eventType);
+      } while (pendingRefresh.dirty);
+    } finally {
+      this.pendingRefreshes.delete(callId);
+    }
+  }
+
   public request(callId: string, eventType: string): void {
     const pendingRefresh = this.pendingRefreshes.get(callId);
 
@@ -23,30 +47,7 @@ export class CallResourceRefreshScheduler {
       return;
     }
 
-    const refresh = { dirty: false, eventType };
-    this.pendingRefreshes.set(callId, refresh);
-    void this.drain(callId, refresh);
-  }
-
-  private async drain(
-    callId: string,
-    pendingRefresh: { dirty: boolean; eventType: string },
-  ): Promise<void> {
-    try {
-      do {
-        const delay = Math.max(
-          0,
-          1000 - (Date.now() - (this.lastRefreshAt.get(callId) ?? 0)),
-        );
-
-        if (delay > 0)
-          await new Promise<void>((resolve) => setTimeout(resolve, delay));
-        pendingRefresh.dirty = false;
-        this.lastRefreshAt.set(callId, Date.now());
-        await this.refresh(callId, pendingRefresh.eventType);
-      } while (pendingRefresh.dirty);
-    } finally {
-      this.pendingRefreshes.delete(callId);
-    }
+    this.pendingRefreshes.set(callId, { dirty: false, eventType });
+    void this.drain(callId);
   }
 }

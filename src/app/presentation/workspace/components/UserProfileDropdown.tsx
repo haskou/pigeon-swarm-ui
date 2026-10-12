@@ -177,6 +177,117 @@ function ownProfileView(
   };
 }
 
+function profileInitial(label: string): string {
+  const [initial] = Array.from(label.replace(/^@/, ''));
+
+  return initial?.toUpperCase() ?? 'P';
+}
+
+function ProfileAvatar({
+  className,
+  label,
+  picture,
+  presence,
+  size = 'md',
+}: {
+  className?: string;
+  label: string;
+  picture?: string | null;
+  presence?: IdentityPresence;
+  size?: 'lg' | 'md' | 'xl';
+}) {
+  return (
+    <div
+      className={cx(
+        'relative grid shrink-0 place-items-center overflow-visible rounded-lg bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950',
+        size === 'xl'
+          ? 'h-16 w-16 text-2xl'
+          : size === 'lg'
+            ? 'h-12 w-12 text-lg'
+            : 'h-11 w-11 text-base',
+        className,
+      )}
+    >
+      <span className="absolute inset-0 grid place-items-center overflow-hidden rounded-lg">
+        <FallbackImage
+          src={picture}
+          alt=""
+          className="h-full w-full object-cover"
+          fallback={profileInitial(label)}
+        />
+      </span>
+      <PresenceStatusDot
+        presence={presence}
+        size={size === 'xl' ? 'lg' : 'md'}
+        className="-bottom-1 -right-1"
+      />
+    </div>
+  );
+}
+
+function formatProfileVersion(version: number): string {
+  return Number.isFinite(version) ? `v${version}` : '-';
+}
+
+function formatProfileVersionDate(timestamp?: number): string | undefined {
+  if (typeof timestamp !== 'number' || !Number.isFinite(timestamp)) {
+    return undefined;
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(timestamp));
+}
+
+function ProfileVersionRow({
+  detail,
+  href,
+  label,
+  value,
+}: {
+  detail?: string;
+  href?: string;
+  label: string;
+  value: string;
+}) {
+  const content = (
+    <>
+      <div className="min-w-0">
+        <div className="truncate font-black text-white/70">{label}</div>
+        {detail ? (
+          <div className="truncate text-[0.68rem] font-bold text-white/35">
+            {detail}
+          </div>
+        ) : null}
+      </div>
+      <div className="shrink-0 font-black text-white/55">{value}</div>
+    </>
+  );
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        className="flex items-center justify-between gap-3 px-1 py-2 transition hover:bg-white/5"
+      >
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-3 px-1 py-2">
+      {content}
+    </div>
+  );
+}
+
 function ProfileMenuButton({
   handle,
   isOpen,
@@ -294,6 +405,35 @@ function ProfileTechnicalDetails({
   );
 }
 
+function presenceStatusOptions(): Array<{
+  indicatorClassName: string;
+  label: string;
+  value: SelectablePresenceStatus;
+}> {
+  return [
+    {
+      indicatorClassName: 'bg-emerald-400',
+      label: copy.presence.statuses.available,
+      value: 'available',
+    },
+    {
+      indicatorClassName: 'bg-amber-400',
+      label: copy.presence.statuses.away,
+      value: 'away',
+    },
+    {
+      indicatorClassName: 'bg-rose-500',
+      label: copy.presence.statuses.busy,
+      value: 'busy',
+    },
+    {
+      indicatorClassName: 'bg-zinc-500',
+      label: copy.presence.statuses.invisible,
+      value: 'invisible',
+    },
+  ];
+}
+
 function ProfileMenuPanel({
   forgetError,
   identityCopied,
@@ -400,6 +540,14 @@ function ProfileMenuPanel({
       )}
     </div>
   );
+}
+
+function selectablePresenceStatus(
+  presence?: IdentityPresence,
+): SelectablePresenceStatus {
+  if (!presence || presence.status === 'disconnected') return 'available';
+
+  return presence.status;
 }
 
 function usePresenceStatusControl({
@@ -646,151 +794,3 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
     </div>
   );
 });
-
-function ProfileVersionRow({
-  detail,
-  href,
-  label,
-  value,
-}: {
-  detail?: string;
-  href?: string;
-  label: string;
-  value: string;
-}) {
-  const content = (
-    <>
-      <div className="min-w-0">
-        <div className="truncate font-black text-white/70">{label}</div>
-        {detail ? (
-          <div className="truncate text-[0.68rem] font-bold text-white/35">
-            {detail}
-          </div>
-        ) : null}
-      </div>
-      <div className="shrink-0 font-black text-white/55">{value}</div>
-    </>
-  );
-
-  if (href) {
-    return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noreferrer"
-        className="flex items-center justify-between gap-3 px-1 py-2 transition hover:bg-white/5"
-      >
-        {content}
-      </a>
-    );
-  }
-
-  return (
-    <div className="flex items-center justify-between gap-3 px-1 py-2">
-      {content}
-    </div>
-  );
-}
-
-function formatProfileVersion(version: number): string {
-  return Number.isFinite(version) ? `v${version}` : '-';
-}
-
-function formatProfileVersionDate(timestamp?: number): string | undefined {
-  if (typeof timestamp !== 'number' || !Number.isFinite(timestamp)) {
-    return undefined;
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(timestamp));
-}
-
-function ProfileAvatar({
-  className,
-  label,
-  picture,
-  presence,
-  size = 'md',
-}: {
-  className?: string;
-  label: string;
-  picture?: string | null;
-  presence?: IdentityPresence;
-  size?: 'lg' | 'md' | 'xl';
-}) {
-  return (
-    <div
-      className={cx(
-        'relative grid shrink-0 place-items-center overflow-visible rounded-lg bg-gradient-to-br from-cyan-300 to-fuchsia-400 font-black text-slate-950',
-        size === 'xl'
-          ? 'h-16 w-16 text-2xl'
-          : size === 'lg'
-            ? 'h-12 w-12 text-lg'
-            : 'h-11 w-11 text-base',
-        className,
-      )}
-    >
-      <span className="absolute inset-0 grid place-items-center overflow-hidden rounded-lg">
-        <FallbackImage
-          src={picture}
-          alt=""
-          className="h-full w-full object-cover"
-          fallback={profileInitial(label)}
-        />
-      </span>
-      <PresenceStatusDot
-        presence={presence}
-        size={size === 'xl' ? 'lg' : 'md'}
-        className="-bottom-1 -right-1"
-      />
-    </div>
-  );
-}
-
-function presenceStatusOptions(): Array<{
-  indicatorClassName: string;
-  label: string;
-  value: SelectablePresenceStatus;
-}> {
-  return [
-    {
-      indicatorClassName: 'bg-emerald-400',
-      label: copy.presence.statuses.available,
-      value: 'available',
-    },
-    {
-      indicatorClassName: 'bg-amber-400',
-      label: copy.presence.statuses.away,
-      value: 'away',
-    },
-    {
-      indicatorClassName: 'bg-rose-500',
-      label: copy.presence.statuses.busy,
-      value: 'busy',
-    },
-    {
-      indicatorClassName: 'bg-zinc-500',
-      label: copy.presence.statuses.invisible,
-      value: 'invisible',
-    },
-  ];
-}
-
-function selectablePresenceStatus(
-  presence?: IdentityPresence,
-): SelectablePresenceStatus {
-  if (!presence || presence.status === 'disconnected') return 'available';
-
-  return presence.status;
-}
-
-function profileInitial(label: string): string {
-  const [initial] = Array.from(label.replace(/^@/, ''));
-
-  return initial?.toUpperCase() ?? 'P';
-}

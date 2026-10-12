@@ -1,4 +1,5 @@
 import { type ReactNode, useRef } from 'react';
+
 import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
 import type {
   ConversationResource,
@@ -37,165 +38,6 @@ interface ConversationActionsMenuProps {
     participants: CallParticipant[];
     title: string;
   }) => void;
-}
-
-export function ConversationActionsMenu({
-  activeConversation,
-  activeConversationName,
-  activeConversationTitle,
-  callParticipants,
-  canShareConversationKey,
-  hasConversationKey,
-  isGroupConversation,
-  notificationSetting,
-  onClose,
-  onConversationDataOpen,
-  onConversationKeyOpen,
-  onGroupInviteOpen,
-  onGroupLeave,
-  onNotificationMuteToggle,
-  onNotificationSettingsOpen,
-  onOpenPins,
-  onRealtimeEventsOpen,
-  onVerificationOpen,
-  onStartCall,
-}: ConversationActionsMenuProps) {
-  const { close, state } = useCloseTransition(onClose);
-  const [technicalDetailsVisible] = useTechnicalDetailsPreference();
-  const openedAtRef = useRef(Date.now());
-
-  useCloseOnEscape(close);
-
-  const closeAfterOpeningSettles = () => {
-    if (Date.now() - openedAtRef.current < 250) return;
-
-    close();
-  };
-
-  return (
-    <>
-      <button
-        type="button"
-        className="app-overlay-scrim fixed inset-0 z-30 cursor-default"
-        data-state={state}
-        onClick={closeAfterOpeningSettles}
-        onContextMenu={(event) => {
-          event.preventDefault();
-          closeAfterOpeningSettles();
-        }}
-        aria-label={copy.dialog.close}
-      />
-      <div
-        className="app-context-menu absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40"
-        data-state={state}
-      >
-        {onStartCall && !isGroupConversation ? (
-          <ConversationHeaderMenuAction
-            icon={<CallMenuIcon />}
-            label={copy.calls.startCall}
-            onClick={() => {
-              onStartCall({
-                conversationId: activeConversation.id,
-                kind: 'one-to-one',
-                participants: callParticipants,
-                title:
-                  activeConversationTitle ??
-                  activeConversationName ??
-                  activeConversation.id,
-              });
-              close();
-            }}
-          />
-        ) : null}
-        {onVerificationOpen ? (
-          <ConversationHeaderMenuAction
-            icon={<VerifiedIcon className="h-4 w-4 shrink-0 text-white/55" />}
-            label={copy.contacts.verifyAction}
-            onClick={() => {
-              onVerificationOpen();
-              close();
-            }}
-          />
-        ) : null}
-        <ConversationHeaderMenuAction
-          icon={<PinMenuIcon />}
-          label={copy.messages.viewPinned}
-          onClick={() => {
-            onOpenPins();
-            close();
-          }}
-          className="sm:hidden"
-        />
-        {technicalDetailsVisible && onRealtimeEventsOpen ? (
-          <ConversationHeaderMenuAction
-            icon={<RealtimeEventsMenuIcon />}
-            label={copy.chat.viewRealtimeEvents}
-            onClick={() => {
-              onRealtimeEventsOpen();
-              close();
-            }}
-            className="sm:hidden"
-          />
-        ) : null}
-        <NotificationScopeMenuActions
-          muteLabel={copy.notifications.muteConversation}
-          notificationSetting={notificationSetting}
-          onNotificationMuteToggle={() => {
-            onNotificationMuteToggle();
-            close();
-          }}
-          onNotificationSettingsOpen={() => {
-            onNotificationSettingsOpen();
-            close();
-          }}
-        />
-        {technicalDetailsVisible ? (
-          <ConversationHeaderMenuAction
-            icon={<DataMenuIcon />}
-            label={copy.chat.viewData}
-            onClick={() => {
-              onConversationDataOpen();
-              close();
-            }}
-          />
-        ) : null}
-        {canShareConversationKey ? (
-          <ConversationHeaderMenuAction
-            icon={<KeyMenuIcon />}
-            label={
-              hasConversationKey
-                ? copy.chat.copyPrivateKey
-                : copy.chat.addPrivateKey
-            }
-            onClick={() => {
-              onConversationKeyOpen();
-              close();
-            }}
-          />
-        ) : null}
-        {isGroupConversation && hasConversationKey ? (
-          <ConversationHeaderMenuAction
-            icon={<InviteMenuIcon />}
-            label={copy.chat.invite}
-            onClick={() => {
-              onGroupInviteOpen();
-              close();
-            }}
-          />
-        ) : null}
-        {isGroupConversation && onGroupLeave ? (
-          <ConversationHeaderMenuAction
-            icon={<LeaveMenuIcon />}
-            label={copy.chat.leaveGroup}
-            onClick={() => {
-              onGroupLeave();
-              close();
-            }}
-          />
-        ) : null}
-      </div>
-    </>
-  );
 }
 
 function ConversationHeaderMenuAction({
@@ -360,5 +202,224 @@ function LeaveMenuIcon() {
         strokeWidth="1.8"
       />
     </svg>
+  );
+}
+
+function StartCallMenuAction({
+  activeConversation,
+  activeConversationName,
+  activeConversationTitle,
+  callParticipants,
+  close,
+  isGroupConversation,
+  onStartCall,
+}: Pick<
+  ConversationActionsMenuProps,
+  | 'activeConversation'
+  | 'activeConversationName'
+  | 'activeConversationTitle'
+  | 'callParticipants'
+  | 'isGroupConversation'
+  | 'onStartCall'
+> & {
+  close: () => void;
+}) {
+  if (!onStartCall || isGroupConversation) return null;
+
+  return (
+    <ConversationHeaderMenuAction
+      icon={<CallMenuIcon />}
+      label={copy.calls.startCall}
+      onClick={() => {
+        onStartCall({
+          conversationId: activeConversation.id,
+          kind: 'one-to-one',
+          participants: callParticipants,
+          title:
+            activeConversationTitle ??
+            activeConversationName ??
+            activeConversation.id,
+        });
+        close();
+      }}
+    />
+  );
+}
+
+function GroupMenuActions({
+  close,
+  hasConversationKey,
+  isGroupConversation,
+  onGroupInviteOpen,
+  onGroupLeave,
+}: Pick<
+  ConversationActionsMenuProps,
+  | 'hasConversationKey'
+  | 'isGroupConversation'
+  | 'onGroupInviteOpen'
+  | 'onGroupLeave'
+> & {
+  close: () => void;
+}) {
+  return (
+    <>
+      {isGroupConversation && hasConversationKey ? (
+        <ConversationHeaderMenuAction
+          icon={<InviteMenuIcon />}
+          label={copy.chat.invite}
+          onClick={() => {
+            onGroupInviteOpen();
+            close();
+          }}
+        />
+      ) : null}
+      {isGroupConversation && onGroupLeave ? (
+        <ConversationHeaderMenuAction
+          icon={<LeaveMenuIcon />}
+          label={copy.chat.leaveGroup}
+          onClick={() => {
+            onGroupLeave();
+            close();
+          }}
+        />
+      ) : null}
+    </>
+  );
+}
+
+export function ConversationActionsMenu({
+  activeConversation,
+  activeConversationName,
+  activeConversationTitle,
+  callParticipants,
+  canShareConversationKey,
+  hasConversationKey,
+  isGroupConversation,
+  notificationSetting,
+  onClose,
+  onConversationDataOpen,
+  onConversationKeyOpen,
+  onGroupInviteOpen,
+  onGroupLeave,
+  onNotificationMuteToggle,
+  onNotificationSettingsOpen,
+  onOpenPins,
+  onRealtimeEventsOpen,
+  onStartCall,
+  onVerificationOpen,
+}: ConversationActionsMenuProps) {
+  const { close, state } = useCloseTransition(onClose);
+  const [technicalDetailsVisible] = useTechnicalDetailsPreference();
+  const openedAtRef = useRef(Date.now());
+
+  useCloseOnEscape(close);
+
+  const closeAfterOpeningSettles = () => {
+    if (Date.now() - openedAtRef.current < 250) return;
+
+    close();
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        className="app-overlay-scrim fixed inset-0 z-30 cursor-default"
+        data-state={state}
+        onClick={closeAfterOpeningSettles}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          closeAfterOpeningSettles();
+        }}
+        aria-label={copy.dialog.close}
+      />
+      <div
+        className="app-context-menu absolute right-0 top-[calc(100%+.5rem)] z-40 min-w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#15172d] p-1 text-sm shadow-2xl shadow-black/40"
+        data-state={state}
+      >
+        <StartCallMenuAction
+          activeConversation={activeConversation}
+          activeConversationName={activeConversationName}
+          activeConversationTitle={activeConversationTitle}
+          callParticipants={callParticipants}
+          close={close}
+          isGroupConversation={isGroupConversation}
+          onStartCall={onStartCall}
+        />
+        {onVerificationOpen ? (
+          <ConversationHeaderMenuAction
+            icon={<VerifiedIcon className="h-4 w-4 shrink-0 text-white/55" />}
+            label={copy.contacts.verifyAction}
+            onClick={() => {
+              onVerificationOpen();
+              close();
+            }}
+          />
+        ) : null}
+        <ConversationHeaderMenuAction
+          icon={<PinMenuIcon />}
+          label={copy.messages.viewPinned}
+          onClick={() => {
+            onOpenPins();
+            close();
+          }}
+          className="sm:hidden"
+        />
+        {technicalDetailsVisible && onRealtimeEventsOpen ? (
+          <ConversationHeaderMenuAction
+            icon={<RealtimeEventsMenuIcon />}
+            label={copy.chat.viewRealtimeEvents}
+            onClick={() => {
+              onRealtimeEventsOpen();
+              close();
+            }}
+            className="sm:hidden"
+          />
+        ) : null}
+        <NotificationScopeMenuActions
+          muteLabel={copy.notifications.muteConversation}
+          notificationSetting={notificationSetting}
+          onNotificationMuteToggle={() => {
+            onNotificationMuteToggle();
+            close();
+          }}
+          onNotificationSettingsOpen={() => {
+            onNotificationSettingsOpen();
+            close();
+          }}
+        />
+        {technicalDetailsVisible ? (
+          <ConversationHeaderMenuAction
+            icon={<DataMenuIcon />}
+            label={copy.chat.viewData}
+            onClick={() => {
+              onConversationDataOpen();
+              close();
+            }}
+          />
+        ) : null}
+        {canShareConversationKey ? (
+          <ConversationHeaderMenuAction
+            icon={<KeyMenuIcon />}
+            label={
+              hasConversationKey
+                ? copy.chat.copyPrivateKey
+                : copy.chat.addPrivateKey
+            }
+            onClick={() => {
+              onConversationKeyOpen();
+              close();
+            }}
+          />
+        ) : null}
+        <GroupMenuActions
+          close={close}
+          hasConversationKey={hasConversationKey}
+          isGroupConversation={isGroupConversation}
+          onGroupInviteOpen={onGroupInviteOpen}
+          onGroupLeave={onGroupLeave}
+        />
+      </div>
+    </>
   );
 }

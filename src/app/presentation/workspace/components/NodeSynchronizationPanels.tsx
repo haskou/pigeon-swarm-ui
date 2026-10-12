@@ -1,8 +1,74 @@
-import type { NetworkSynchronizationStatus } from '../../../../contexts/networks/presentation/view-models/NetworkSynchronizationStatus';
 import type { IpfsReplicationStatus } from '../../../../contexts/networks/presentation/view-models/IpfsReplicationStatus';
+import type { NetworkSynchronizationStatus } from '../../../../contexts/networks/presentation/view-models/NetworkSynchronizationStatus';
 
 import { cx } from '../../../../shared/presentation/cx';
 import { copy } from '../../../../shared/presentation/i18n/copy';
+
+function NodeDetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid gap-1 py-1.5 text-sm sm:grid-cols-[10rem_minmax(0,1fr)]">
+      <div className="text-white/45">{label}</div>
+      <div className="min-w-0 truncate font-black text-white/75">{value}</div>
+    </div>
+  );
+}
+
+function networkSynchronizationProgressLabel(
+  network: NetworkSynchronizationStatus['networks'][number],
+): string {
+  const percentage =
+    network.totalStoreCount <= 0
+      ? 0
+      : Math.round(
+          (network.convergedStoreCount / network.totalStoreCount) * 100,
+        );
+
+  return copy.nodeSettings.synchronizationProgress.replace(
+    '{percentage}',
+    String(percentage),
+  );
+}
+
+function networkSynchronizationStateLabel(
+  state: NetworkSynchronizationStatus['networks'][number]['state'],
+): string {
+  if (state === 'converged') return copy.nodeSettings.synchronizationConverged;
+
+  if (state === 'syncing') return copy.nodeSettings.synchronizationSyncing;
+
+  return copy.nodeSettings.synchronizationWaitingForPeers;
+}
+
+function byteUnit(
+  bytes: number,
+): 'byte' | 'gigabyte' | 'kilobyte' | 'megabyte' {
+  if (bytes >= 1024 * 1024 * 1024) return 'gigabyte';
+
+  if (bytes >= 1024 * 1024) return 'megabyte';
+
+  if (bytes >= 1024) return 'kilobyte';
+
+  return 'byte';
+}
+
+function byteUnitDivisor(bytes: number): number {
+  if (bytes >= 1024 * 1024 * 1024) return 1024 * 1024 * 1024;
+
+  if (bytes >= 1024 * 1024) return 1024 * 1024;
+
+  if (bytes >= 1024) return 1024;
+
+  return 1;
+}
+
+function formatBytes(bytes: number): string {
+  return new Intl.NumberFormat('en', {
+    maximumFractionDigits: bytes >= 1024 * 1024 ? 1 : 0,
+    style: 'unit',
+    unit: byteUnit(bytes),
+    unitDisplay: 'short',
+  }).format(bytes / byteUnitDivisor(bytes));
+}
 
 export function NetworkSynchronizationPanel({
   status,
@@ -42,7 +108,10 @@ export function NetworkSynchronizationPanel({
                 <div className="mt-1 text-xs text-white/45">
                   {networkSynchronizationProgressLabel(network)}
                   {' · '}
-                  {networkConnectionCountLabel(network.connectedPeerIds.length)}
+                  {(network.connectedPeerIds.length === 1
+                    ? copy.nodeSettings.synchronizationConnection
+                    : copy.nodeSettings.synchronizationConnections
+                  ).replace('{count}', String(network.connectedPeerIds.length))}
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-2 text-xs font-black">
@@ -127,78 +196,4 @@ export function ReplicationStatusPanel({
       ) : null}
     </section>
   );
-}
-
-function NodeDetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="grid gap-1 py-1.5 text-sm sm:grid-cols-[10rem_minmax(0,1fr)]">
-      <div className="text-white/45">{label}</div>
-      <div className="min-w-0 truncate font-black text-white/75">{value}</div>
-    </div>
-  );
-}
-
-function networkSynchronizationProgressLabel(
-  network: NetworkSynchronizationStatus['networks'][number],
-): string {
-  const percentage =
-    network.totalStoreCount <= 0
-      ? 0
-      : Math.round(
-          (network.convergedStoreCount / network.totalStoreCount) * 100,
-        );
-
-  return copy.nodeSettings.synchronizationProgress.replace(
-    '{percentage}',
-    String(percentage),
-  );
-}
-
-function networkSynchronizationStateLabel(
-  state: NetworkSynchronizationStatus['networks'][number]['state'],
-): string {
-  if (state === 'converged') return copy.nodeSettings.synchronizationConverged;
-
-  if (state === 'syncing') return copy.nodeSettings.synchronizationSyncing;
-
-  return copy.nodeSettings.synchronizationWaitingForPeers;
-}
-
-function networkConnectionCountLabel(count: number): string {
-  return (
-    count === 1
-      ? copy.nodeSettings.synchronizationConnection
-      : copy.nodeSettings.synchronizationConnections
-  ).replace('{count}', String(count));
-}
-
-function formatBytes(bytes: number): string {
-  return new Intl.NumberFormat('en', {
-    maximumFractionDigits: bytes >= 1024 * 1024 ? 1 : 0,
-    style: 'unit',
-    unit: byteUnit(bytes),
-    unitDisplay: 'short',
-  }).format(bytes / byteUnitDivisor(bytes));
-}
-
-function byteUnit(
-  bytes: number,
-): 'byte' | 'gigabyte' | 'kilobyte' | 'megabyte' {
-  if (bytes >= 1024 * 1024 * 1024) return 'gigabyte';
-
-  if (bytes >= 1024 * 1024) return 'megabyte';
-
-  if (bytes >= 1024) return 'kilobyte';
-
-  return 'byte';
-}
-
-function byteUnitDivisor(bytes: number): number {
-  if (bytes >= 1024 * 1024 * 1024) return 1024 * 1024 * 1024;
-
-  if (bytes >= 1024 * 1024) return 1024 * 1024;
-
-  if (bytes >= 1024) return 1024;
-
-  return 1;
 }

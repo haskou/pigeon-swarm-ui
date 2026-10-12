@@ -1,11 +1,5 @@
-export type ConversationTimelineLoadAction = 'clear' | 'load' | 'preserve';
-
-type ConversationTimelineLoadContext = {
-  activeConversationId?: string;
-  activeConversationKeyAvailable: boolean;
-  loadedConversationId: null | string;
-  workspaceMode: 'community' | 'messages';
-};
+import type { ConversationTimelineLoadAction } from './ConversationTimelineLoadAction';
+import type { ConversationTimelineLoadContext } from './ConversationTimelineLoadContext';
 
 export class ConversationTimelineLoadPlan {
   public static decide(

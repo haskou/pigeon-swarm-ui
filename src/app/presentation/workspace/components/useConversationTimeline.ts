@@ -1,5 +1,3 @@
-import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
-
 import {
   startTransition,
   useCallback,
@@ -10,10 +8,11 @@ import {
 
 import type {
   ChatMessage,
-  ConversationKeyEntry,
   ConversationResource,
-  Session,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationMessageLoadState } from './ConversationMessageLoadState';
+import type { ConversationTimelineController } from './ConversationTimelineController';
+import type { UseConversationTimelineInput } from './UseConversationTimelineInput';
 
 import { MessageCollection } from '../../../../contexts/messages/presentation/view-models/MessageCollection';
 import { copy } from '../../../../shared/presentation/i18n/copy';
@@ -23,45 +22,6 @@ import { ConversationTimelineLoadPlan } from './ConversationTimelineLoadPlan';
 import { useMessageViewport } from './useMessageViewport';
 import { useWorkspaceMessageHistory } from './useWorkspaceMessageHistory';
 import { useWorkspaceResumeSync } from './useWorkspaceResumeSync';
-
-export type ConversationMessageLoadState = 'error' | 'idle' | 'loading';
-
-type UseConversationTimelineInput = {
-  activeConversation?: ConversationResource;
-  activeConversationKey?: ConversationKeyEntry;
-  clearUnreadMessages: (conversationId: string) => void;
-  onCommunitiesReload: () => Promise<void>;
-  onConversationsChange: Dispatch<SetStateAction<ConversationResource[]>>;
-  onErrorChange: (error: null | string) => void;
-  refreshConversations: () => Promise<ConversationResource[]>;
-  sessionRef: MutableRefObject<Session>;
-  suppressMessageLoadsUntilRef: MutableRefObject<number>;
-  workspaceMode: 'community' | 'messages';
-};
-
-export type ConversationTimelineController = {
-  bottomRef: ReturnType<typeof useMessageViewport>['bottomRef'];
-  handleScroll: () => void;
-  isScrolledNearBottom: () => boolean;
-  jumpToLatestMessages: () => void;
-  markConversationReadUntil: (
-    conversationId: string,
-    loadedMessages: ChatMessage[],
-  ) => void;
-  messageCursor: null | string;
-  messageState: ConversationMessageLoadState;
-  messages: ChatMessage[];
-  messagesRef: MutableRefObject<ChatMessage[]>;
-  newMessageCount: number;
-  scrollerRef: ReturnType<typeof useMessageViewport>['scrollerRef'];
-  scrollMessagesToBottom: ReturnType<
-    typeof useMessageViewport
-  >['scrollMessagesToBottom'];
-  setMessageLoadState: (state: ConversationMessageLoadState) => void;
-  setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
-  setNewMessageCount: Dispatch<SetStateAction<number>>;
-  updateMessageCursor: (cursor: null | string) => void;
-};
 
 export function useConversationTimeline({
   activeConversation,
@@ -138,13 +98,14 @@ export function useConversationTimeline({
       if (!lastMessage) return;
 
       clearUnreadMessages(conversationId);
-      onConversationsChange((current) =>
-        current.map((conversation) =>
-          conversation.id === conversationId
-            ? { ...conversation, unreadCount: 0 }
-            : conversation,
-        ),
-      );
+
+      const clearConversationUnread = (conversation: ConversationResource) => {
+        if (conversation.id !== conversationId) return conversation;
+
+        return { ...conversation, unreadCount: 0 };
+      };
+
+      onConversationsChange((current) => current.map(clearConversationUnread));
       const readConversation = activeConversationRef.current;
 
       if (

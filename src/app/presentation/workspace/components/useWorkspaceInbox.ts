@@ -1,49 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import type { useCommunityMembershipRequests } from '../../../../contexts/communities/presentation/hooks/useCommunityMembershipRequests';
-import type { useNotifications } from '../../../../contexts/notifications/presentation/hooks/useNotifications';
-import type {
-  Community,
-  ConversationResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { UseWorkspaceInboxInput } from './UseWorkspaceInboxInput';
+import type { WorkspaceInboxController } from './WorkspaceInboxController';
 
 import { SeenCommunityMembershipRequests } from '../../../../contexts/communities/infrastructure/storage/SeenCommunityMembershipRequests';
 import { useCommunityMembershipRequests as useMembershipRequests } from '../../../../contexts/communities/presentation/hooks/useCommunityMembershipRequests';
 import { useNotificationCommunityPreviews } from '../../../../contexts/notifications/presentation/hooks/useNotificationCommunityPreviews';
 import { useNotifications as useNotificationList } from '../../../../contexts/notifications/presentation/hooks/useNotifications';
 import { WorkspaceInboxState } from './WorkspaceInboxState';
-
-type NotificationController = ReturnType<typeof useNotifications>;
-type MembershipRequestController = ReturnType<
-  typeof useCommunityMembershipRequests
->;
-
-type AcceptedNotificationState = {
-  communities?: Community[];
-  communityId?: string;
-  conversationId?: string;
-  conversations?: ConversationResource[];
-  session: Session;
-};
-
-type UseWorkspaceInboxInput = {
-  communities: Community[];
-  notificationsOpen: boolean;
-  onAccepted: (state: AcceptedNotificationState) => void;
-  onAcceptedPanelClose: () => void;
-  onCommunitiesReload: () => Promise<void>;
-  session: Session;
-};
-
-export type WorkspaceInboxController = {
-  communityAvatarUrls: Record<string, string>;
-  communityPreviews: Record<string, Community>;
-  membershipRequests: MembershipRequestController;
-  notificationCount: number;
-  notifications: NotificationController;
-  onOpen: () => void;
-};
 
 const seenCommunityMembershipRequests = new SeenCommunityMembershipRequests();
 

@@ -11,7 +11,7 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 import type { MessageContextMenuState } from '../../../../app/presentation/workspace/components/messageContextMenu';
-import type { EncryptionDetails } from '../../../../app/presentation/workspace/components/EncryptionDetailsDialog';
+import type { EncryptionDetails } from '../../../../app/presentation/workspace/components/EncryptionDetails';
 import type { ProfilePopoverAnchor } from '../../../identities/presentation/view-models/profilePopoverAnchor';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';

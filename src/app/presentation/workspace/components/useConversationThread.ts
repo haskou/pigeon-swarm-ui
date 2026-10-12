@@ -7,6 +7,8 @@ import type {
   Session,
   StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationThread } from './ConversationThread';
+import type { UseConversationThreadResult } from './UseConversationThreadResult';
 
 import { conversationSupportsThreads } from '../../../../contexts/conversations/presentation/view-models/conversationSupportsThreads';
 import { MessageCollection } from '../../../../contexts/messages/presentation/view-models/MessageCollection';
@@ -16,7 +18,6 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import {
-  type ConversationThreadState,
   mergeConversationMessageIfTargetExists,
   mergeConversationThreadMessage,
   removeConversationThreadMessage,
@@ -30,32 +31,18 @@ type UseConversationThreadInput = {
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
 };
 
-type UseConversationThreadResult = {
-  cancelEditing: () => void;
-  cancelReplying: () => void;
-  close: () => void;
-  edit: (content: string) => Promise<void>;
-  open: (message: ChatMessage) => Promise<void>;
-  remove: (message: ChatMessage) => Promise<void>;
-  send: (
-    content: string,
-    attachments: File[],
-    attachmentUpload: AttachmentUploadOptions,
-  ) => Promise<void>;
-  sendSticker: (sticker: StickerMessageReference) => Promise<void>;
-  setThread: Dispatch<SetStateAction<ConversationThreadState | null>>;
-  startEditing: (message: ChatMessage) => void;
-  startReplying: (message: ChatMessage) => void;
-  thread: ConversationThreadState | null;
-  updateDraft: (draft: string) => void;
-};
+function previousMessageIds(thread: ConversationThread): string[] {
+  const lastMessage = thread.messages[thread.messages.length - 1];
+
+  return [lastMessage?.id ?? thread.root.id];
+}
 
 export function useConversationThread(
   input: UseConversationThreadInput,
 ): UseConversationThreadResult {
   const { activeConversation, closeMessageContextMenu, session, setMessages } =
     input;
-  const [thread, setThread] = useState<ConversationThreadState | null>(null);
+  const [thread, setThread] = useState<ConversationThread | null>(null);
 
   useEffect(() => {
     if (!conversationSupportsThreads(activeConversation)) {
@@ -165,6 +152,27 @@ export function useConversationThread(
     );
   };
 
+  const setThreadError = (caught: unknown, fallback: string) => {
+    setThread((current) =>
+      current
+        ? { ...current, error: toUserErrorMessage(caught, fallback) }
+        : current,
+    );
+  };
+
+  const appendSentMessage = (message: ChatMessage) => {
+    setThread((current) =>
+      current
+        ? {
+            ...current,
+            draft: '',
+            messages: MessageCollection.merge(current.messages, [message]),
+            replyTarget: null,
+          }
+        : current,
+    );
+  };
+
   const edit = async (content: string) => {
     if (!activeConversation || !thread?.editingMessage) return;
 
@@ -269,27 +277,6 @@ export function useConversationThread(
     appendSentMessage(sent);
   };
 
-  const appendSentMessage = (message: ChatMessage) => {
-    setThread((current) =>
-      current
-        ? {
-            ...current,
-            draft: '',
-            messages: MessageCollection.merge(current.messages, [message]),
-            replyTarget: null,
-          }
-        : current,
-    );
-  };
-
-  const setThreadError = (caught: unknown, fallback: string) => {
-    setThread((current) =>
-      current
-        ? { ...current, error: toUserErrorMessage(caught, fallback) }
-        : current,
-    );
-  };
-
   return {
     cancelEditing,
     cancelReplying,
@@ -305,10 +292,4 @@ export function useConversationThread(
     thread,
     updateDraft,
   };
-}
-
-function previousMessageIds(thread: ConversationThreadState): string[] {
-  const lastMessage = thread.messages[thread.messages.length - 1];
-
-  return [lastMessage?.id ?? thread.root.id];
 }

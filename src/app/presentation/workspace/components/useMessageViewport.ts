@@ -1,10 +1,6 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  type RefObject,
-} from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+
+import type { MessageViewport } from './MessageViewport';
 
 import {
   MessageScrollAnchor,
@@ -16,20 +12,6 @@ type MessageViewportInput = {
   messageCount: number;
   messageState: 'error' | 'idle' | 'loading';
   onJumpToLatest: () => void;
-};
-
-type MessageViewport = {
-  bottomRef: RefObject<HTMLDivElement | null>;
-  isScrolledNearBottom: () => boolean;
-  jumpToLatestMessages: () => void;
-  keepMessageBottomUntilRef: RefObject<number>;
-  lastScrollTopRef: RefObject<number>;
-  messageScrollAnchorRef: RefObject<MessageScrollAnchorSnapshot | null>;
-  scrollMessagesToBottom: (
-    behavior?: ScrollBehavior,
-    keepPinned?: boolean,
-  ) => void;
-  scrollerRef: RefObject<HTMLDivElement | null>;
 };
 
 export function useMessageViewport({
@@ -161,7 +143,7 @@ export function useMessageViewport({
     keepMessageBottomUntilRef,
     lastScrollTopRef,
     messageScrollAnchorRef,
-    scrollMessagesToBottom,
     scrollerRef,
+    scrollMessagesToBottom,
   };
 }

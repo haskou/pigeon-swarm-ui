@@ -21,9 +21,8 @@ function loadSidebarModule(): Promise<typeof import('./Sidebar')> {
 function loadCommunityWorkspaceModule(): Promise<
   typeof import('../../../../contexts/communities/presentation/components/CommunityWorkspace')
 > {
-  communityWorkspaceModulePromise ??= import(
-    '../../../../contexts/communities/presentation/components/CommunityWorkspace'
-  );
+  communityWorkspaceModulePromise ??=
+    import('../../../../contexts/communities/presentation/components/CommunityWorkspace');
 
   return communityWorkspaceModulePromise;
 }

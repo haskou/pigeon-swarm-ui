@@ -1,20 +1,12 @@
-import {
-  useCallback,
-  type Dispatch,
-  type RefObject,
-  type SetStateAction,
-} from 'react';
+import { useCallback } from 'react';
 
-import type { NotificationSettingMap } from '../../../../contexts/notifications/presentation/view-models/NotificationSettingMap';
 import type {
   ChatMessage,
   ConversationResource,
-  IdentityResource,
   MessageResource,
-  Session,
 } from '../../../../shared/domain/pigeonResources.types';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
-import type { ConversationThreadState } from './conversationThreadState';
+import type { RealtimeConversationEventsInput } from './RealtimeConversationEventsInput';
 
 import { ConversationTimeline } from '../../../../contexts/conversations/presentation/view-models/ConversationTimeline';
 import { MessageCollection } from '../../../../contexts/messages/presentation/view-models/MessageCollection';
@@ -41,8 +33,6 @@ import {
 } from './realtimeEventAttributes';
 import { notificationMentionContext } from './workspaceNotificationState';
 
-type WorkspaceMode = 'community' | 'messages';
-
 const conversationMessageEventDetails = (event: RealtimeDomainEvent) => {
   const conversationId = eventAggregateId(event);
   const messageId = stringAttribute(event, 'messageId', 'message_id');
@@ -53,39 +43,6 @@ const conversationMessageEventDetails = (event: RealtimeDomainEvent) => {
   if (!conversationId || (!messageId && !timelineMessage)) return null;
 
   return { conversationId, messageId, timelineMessage };
-};
-
-type RealtimeConversationEventsInput = {
-  activeConversationId: null | string;
-  activeConversationKeyId: null | string;
-  clearUnreadMessages: (conversationId: string) => void;
-  conversations: ConversationResource[];
-  identityNames: Record<string, string>;
-  identityProfiles: Record<string, IdentityResource>;
-  isScrolledNearBottom: () => boolean;
-  markConversationReadUntil: (
-    conversationId: string,
-    messages: ChatMessage[],
-  ) => void;
-  markUnreadMessage: (conversationId: string, messageId: string) => void;
-  messagesRef: RefObject<ChatMessage[]>;
-  notificationSettingsRef: RefObject<NotificationSettingMap>;
-  onErrorChange: (error: string | null) => void;
-  onNotificationSound: () => void;
-  refreshConversations: () => Promise<ConversationResource[]>;
-  scrollMessagesToBottom: (
-    behavior?: ScrollBehavior,
-    keepPinned?: boolean,
-  ) => void;
-  session: Session;
-  setConversationThread: Dispatch<
-    SetStateAction<ConversationThreadState | null>
-  >;
-  setConversations: Dispatch<SetStateAction<ConversationResource[]>>;
-  setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
-  setNewMessageCount: Dispatch<SetStateAction<number>>;
-  setPinnedMessageIds: Dispatch<SetStateAction<Set<string>>>;
-  workspaceMode: WorkspaceMode;
 };
 
 export function useWorkspaceRealtimeConversationEvents({
@@ -217,9 +174,10 @@ export function useWorkspaceRealtimeConversationEvents({
 
       if (!targetMessageId) return true;
 
-      setMessages((current) =>
-        current.filter((message) => message.id !== targetMessageId),
-      );
+      const isOtherMessage = (message: ChatMessage): boolean =>
+        message.id !== targetMessageId;
+
+      setMessages((current) => current.filter(isOtherMessage));
       setConversationThread((current) =>
         current
           ? removeConversationThreadMessage(current, targetMessageId)
@@ -243,21 +201,20 @@ export function useWorkspaceRealtimeConversationEvents({
 
       if (!authorId || !emoji) return true;
 
-      setMessages((current) =>
-        current.map((message) =>
-          message.id === messageId
-            ? MessageReactionUpdater.update(
-                message,
-                authorId,
-                emoji,
-                event.type.endsWith('.was_added') ? 'add' : 'remove',
-                typeof event.attributes.createdAt === 'number'
-                  ? event.attributes.createdAt
-                  : event.occurred_on,
-              )
-            : message,
-        ),
-      );
+      const updateMessage = (message: ChatMessage) =>
+        message.id === messageId
+          ? MessageReactionUpdater.update(
+              message,
+              authorId,
+              emoji,
+              event.type.endsWith('.was_added') ? 'add' : 'remove',
+              typeof event.attributes.createdAt === 'number'
+                ? event.attributes.createdAt
+                : event.occurred_on,
+            )
+          : message;
+
+      setMessages((current) => current.map(updateMessage));
 
       return true;
     },
@@ -528,13 +485,12 @@ export function useWorkspaceRealtimeConversationEvents({
       }
 
       clearUnreadMessages(conversationId);
-      setConversations((current) =>
-        current.map((conversation) =>
-          conversation.id === conversationId
-            ? { ...conversation, unreadCount: 0 }
-            : conversation,
-        ),
-      );
+      const markConversationRead = (conversation: ConversationResource) =>
+        conversation.id === conversationId
+          ? { ...conversation, unreadCount: 0 }
+          : conversation;
+
+      setConversations((current) => current.map(markConversationRead));
 
       return true;
     },

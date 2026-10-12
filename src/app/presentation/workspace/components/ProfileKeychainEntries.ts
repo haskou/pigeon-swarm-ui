@@ -7,9 +7,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 import type { ProfileKeychainDisplayEntry } from './ProfileKeychainDisplayEntry';
 
-import {
-  shortId,
-} from '../../../../shared/presentation/formatting';
+import { shortId } from '../../../../shared/presentation/formatting';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 
 export class ProfileKeychainEntries {

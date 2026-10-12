@@ -1,5 +1,5 @@
-import { copy } from '../../../../shared/presentation/i18n/copy';
 import { DialogCloseButton } from '../../../../shared/presentation/components/DialogCloseButton';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 
 type PushNotificationPromptProps = {
   enableState: 'error' | 'idle' | 'loading';

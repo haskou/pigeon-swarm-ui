@@ -1,7 +1,7 @@
 import type { FormEvent } from 'react';
 
-import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 
 interface GroupInvitationDialogProps {
   autoFocus: boolean;
