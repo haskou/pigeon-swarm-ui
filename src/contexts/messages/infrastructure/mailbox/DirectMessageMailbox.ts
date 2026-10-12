@@ -1,5 +1,7 @@
 import { Buffer } from 'buffer';
 
+import { UUID } from '@haskou/value-objects';
+
 import type {
   ChatMessage,
   ConversationResource,
@@ -12,10 +14,12 @@ import type {
   OpenedMailboxPage,
 } from '../../../mailboxes/infrastructure/MailboxChannel';
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
+import type { DirectMessageRecord } from './DirectMessageMailboxRecord';
 import type { DirectMessageMailboxState } from './DirectMessageMailboxStore';
 import type { DirectMessageReaderSet } from './DirectMessageReaderSet';
 
 import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
+import { MailboxEnvelopeCipher } from '../../../mailboxes/infrastructure/crypto/MailboxEnvelopeCipher';
 import { MailboxKeySchedule } from '../../../mailboxes/infrastructure/crypto/MailboxKeySchedule';
 import { MailboxReadToken } from '../../../mailboxes/infrastructure/crypto/MailboxReadToken';
 import { MailboxUnavailableError } from '../../../mailboxes/infrastructure/http/MailboxUnavailableError';
@@ -25,12 +29,19 @@ import { DirectMessageMailboxStore } from './DirectMessageMailboxStore';
 
 export type DirectMessageMailboxDelivery = 'delivered' | 'failed' | 'skipped';
 
-/** What the outgoing message carries beyond text. */
-export type DirectMessageOutgoing = {
-  attachmentCount: number;
-  hasReply: boolean;
-  hasSticker: boolean;
-};
+/** One change to the timeline, in the order the inbox holds it. */
+export type DirectMessageTimelineChange =
+  | { kind: 'edit'; message: ChatMessage }
+  | { kind: 'message'; message: ChatMessage }
+  | {
+      action: 'add' | 'remove';
+      authorId: string;
+      createdAt: number;
+      emoji: string;
+      kind: 'reaction';
+      messageId: string;
+    }
+  | { kind: 'removed'; messageId: string };
 
 /** Keys, reader tokens, and saved state for the inbox this device reads. */
 type RecipientInbox = {
@@ -40,9 +51,10 @@ type RecipientInbox = {
 };
 
 /**
- * Direct one-to-one text over the opaque mailbox. The legacy send delivers
- * first; this path carries a copy so the peer can receive it without the
- * replicated path. Duplicates collapse by message id in the timeline.
+ * Direct one-to-one messages over the opaque mailbox: sent, edited, deleted,
+ * and reactions. The legacy send delivers first; this path carries a copy so
+ * the peer can receive it without the replicated path. Duplicates collapse by
+ * message id in the timeline.
  */
 export class DirectMessageMailbox {
   private static readonly PAGE_SIZE = 50;
@@ -58,51 +70,76 @@ export class DirectMessageMailbox {
   ) {}
 
   /**
-   * Sender. Appends the already-sent record to the peer's inbox. Returns
-   * 'skipped' when there is no peer or the message is not eligible, which
-   * leaves it on the legacy path only. Never throws: any failure, including
-   * 404 for an inbox the peer has not opened yet, returns 'failed'. The caller
-   * keeps the legacy copy and shows nothing to the user.
+   * Sender. Appends a sent message to the peer's inbox. Returns 'skipped' when
+   * there is no peer, the conversation is a group, or the record exceeds the
+   * envelope bound; the message then stays on the legacy path only. Never
+   * throws: any failure, including 404 for an inbox the peer has not opened
+   * yet, returns 'failed'. The caller keeps the legacy copy and shows nothing
+   * to the user.
    */
-  public async deliver(
+  public deliverSent(
     session: Session,
     conversation: ConversationResource,
     sent: MessageResource,
-    outgoing: DirectMessageOutgoing,
   ): Promise<DirectMessageMailboxDelivery> {
-    const recipientIdentityId = conversation.participantIds.find(
-      (identityId) => identityId !== session.identity.id,
+    return this.append(session, conversation, () =>
+      DirectMessageMailboxRecord.fromSent(conversation.id, sent),
     );
+  }
 
-    if (
-      !recipientIdentityId ||
-      !DirectMessageMailboxRecord.isEligible({
-        ...outgoing,
-        conversationType: conversation.type,
-      })
-    ) {
-      return 'skipped';
-    }
+  /** Sender. Appends an edit of a sent message. Same outcomes as deliverSent. */
+  public deliverEdit(
+    session: Session,
+    conversation: ConversationResource,
+    edited: MessageResource,
+  ): Promise<DirectMessageMailboxDelivery> {
+    return this.append(session, conversation, () =>
+      DirectMessageMailboxRecord.fromEdited(conversation.id, edited),
+    );
+  }
 
-    try {
-      const keys = this.keysFor(session, conversation.id, recipientIdentityId);
-      const record = DirectMessageMailboxRecord.fromSent(conversation.id, sent);
+  /** Sender. Appends a delete of a message by its id. Same outcomes as deliverSent. */
+  public deliverDelete(
+    session: Session,
+    conversation: ConversationResource,
+    messageId: string,
+  ): Promise<DirectMessageMailboxDelivery> {
+    return this.append(session, conversation, () => ({
+      authorId: session.identity.id,
+      conversationId: conversation.id,
+      createdAt: Date.now(),
+      id: UUID.generate().toString(),
+      targetMessageId: messageId,
+      type: 'deleted',
+    }));
+  }
 
-      await this.channel.send(keys, DirectMessageMailboxRecord.encode(record));
-
-      return 'delivered';
-    } catch {
-      // Count-only: no ids, content, or error details.
-      // eslint-disable-next-line no-console
-      console.debug('Direct mailbox append failed; legacy copy kept.');
-
-      return 'failed';
-    }
+  /** Sender. Appends a reaction add or remove. Same outcomes as deliverSent. */
+  public deliverReaction(
+    session: Session,
+    conversation: ConversationResource,
+    reaction: {
+      action: 'add' | 'remove';
+      createdAt: number;
+      emoji: string;
+      messageId: string;
+    },
+  ): Promise<DirectMessageMailboxDelivery> {
+    return this.append(session, conversation, () => ({
+      action: reaction.action,
+      authorId: session.identity.id,
+      conversationId: conversation.id,
+      createdAt: reaction.createdAt,
+      emoji: reaction.emoji,
+      id: UUID.generate().toString(),
+      targetMessageId: reaction.messageId,
+      type: 'reaction',
+    }));
   }
 
   /**
-   * Recipient. Reads the next page of this identity's inbox, applies decrypted
-   * messages, then acknowledges. The cursor advances only after the
+   * Recipient. Reads the next page of this identity's inbox, applies its
+   * changes, then acknowledges. The cursor advances only after the
    * acknowledgement succeeds, so an interrupted pass is replayed and the
    * timeline dedupes by id. A pass superseded before its inbox is created or
    * read leaves the inbox untouched. The first pass on a device creates the
@@ -118,7 +155,7 @@ export class DirectMessageMailbox {
     session: Session,
     conversationId: string,
     signal: AbortSignal,
-    apply: (messages: ChatMessage[]) => void,
+    apply: (changes: DirectMessageTimelineChange[]) => void,
   ): Promise<void> {
     if (signal.aborted) return;
 
@@ -135,6 +172,48 @@ export class DirectMessageMailbox {
     if (page.lastCursor <= cursor || signal.aborted) return;
 
     await this.applyPage(session, conversationId, inbox, page, signal, apply);
+  }
+
+  /**
+   * Shared sender path. Skips without sending when there is no peer, the
+   * conversation is a group, or the encoded record exceeds the envelope bound.
+   * Building the record runs inside the try, so a throw there is 'failed'.
+   */
+  private async append(
+    session: Session,
+    conversation: ConversationResource,
+    build: () => DirectMessageRecord,
+  ): Promise<DirectMessageMailboxDelivery> {
+    const recipientIdentityId = conversation.participantIds.find(
+      (identityId) => identityId !== session.identity.id,
+    );
+
+    if (
+      !recipientIdentityId ||
+      !DirectMessageMailboxRecord.isEligible(conversation.type)
+    ) {
+      return 'skipped';
+    }
+
+    try {
+      const plaintext = DirectMessageMailboxRecord.encode(build());
+
+      if (plaintext.byteLength > MailboxEnvelopeCipher.MAX_PLAINTEXT_BYTES) {
+        return 'skipped';
+      }
+
+      const keys = this.keysFor(session, conversation.id, recipientIdentityId);
+
+      await this.channel.send(keys, plaintext);
+
+      return 'delivered';
+    } catch {
+      // Count-only: no ids, content, or error details.
+      // eslint-disable-next-line no-console
+      console.debug('Direct mailbox append failed; legacy copy kept.');
+
+      return 'failed';
+    }
   }
 
   /**
@@ -297,8 +376,9 @@ export class DirectMessageMailbox {
   }
 
   /**
-   * Decrypts the page, hands it to the caller, then acknowledges it. Each
-   * step checks the signal so an aborted pass neither applies nor acks.
+   * Decodes and decrypts the page, hands its changes to the caller, then
+   * acknowledges it. Each step checks the signal so an aborted pass neither
+   * applies nor acks.
    */
   private async applyPage(
     session: Session,
@@ -306,10 +386,10 @@ export class DirectMessageMailbox {
     inbox: RecipientInbox,
     page: OpenedMailboxPage,
     signal: AbortSignal,
-    apply: (messages: ChatMessage[]) => void,
+    apply: (changes: DirectMessageTimelineChange[]) => void,
   ): Promise<void> {
     const { keys, readers, state } = inbox;
-    const messages = await this.decryptPage(
+    const changes = await this.decryptPage(
       session,
       conversationId,
       page,
@@ -318,7 +398,7 @@ export class DirectMessageMailbox {
 
     if (signal.aborted) return;
 
-    apply(messages);
+    apply(changes);
 
     if (signal.aborted) return;
 
@@ -333,12 +413,17 @@ export class DirectMessageMailbox {
     });
   }
 
+  /**
+   * Maps each decoded record to its timeline change, in envelope order. A
+   * sent or edited record whose message does not decrypt drops only its own
+   * change. Deletes and reactions carry no ciphertext and never decrypt.
+   */
   private async decryptPage(
     session: Session,
     conversationId: string,
     page: OpenedMailboxPage,
     signal: AbortSignal,
-  ): Promise<ChatMessage[]> {
+  ): Promise<DirectMessageTimelineChange[]> {
     const records = page.envelopes.flatMap((envelope) => {
       const decoded = DirectMessageMailboxRecord.decode(
         envelope.plaintext,
@@ -347,14 +432,71 @@ export class DirectMessageMailbox {
 
       return decoded ? [decoded] : [];
     });
-
-    if (records.length === 0) return [];
-
-    return this.projection.decryptMany(
+    const messages = await this.decryptMessages(
       session,
       conversationId,
       records,
       signal,
+    );
+
+    return records.flatMap((record): DirectMessageTimelineChange[] => {
+      switch (record.type) {
+        case 'sent':
+        case 'edited': {
+          const message = messages.get(record.id);
+
+          if (!message || message.encrypted) return [];
+
+          return [
+            record.type === 'sent'
+              ? { kind: 'message', message }
+              : { kind: 'edit', message },
+          ];
+        }
+        case 'deleted':
+          return [{ kind: 'removed', messageId: record.targetMessageId }];
+        case 'reaction':
+          return [
+            {
+              action: record.action,
+              authorId: record.authorId,
+              createdAt: record.createdAt,
+              emoji: record.emoji,
+              kind: 'reaction',
+              messageId: record.targetMessageId,
+            },
+          ];
+      }
+    });
+  }
+
+  /**
+   * One batch decrypt for the sent and edited records of a page, keyed by
+   * message id. Makes no call when the page has none.
+   */
+  private async decryptMessages(
+    session: Session,
+    conversationId: string,
+    records: DirectMessageRecord[],
+    signal: AbortSignal,
+  ): Promise<Map<string, ChatMessage>> {
+    const resources = records.flatMap((record) =>
+      record.type === 'sent' || record.type === 'edited'
+        ? [DirectMessageMailboxRecord.toResource(record)]
+        : [],
+    );
+
+    if (resources.length === 0) return new Map();
+
+    const messages = await this.projection.decryptMany(
+      session,
+      conversationId,
+      resources,
+      signal,
+    );
+
+    return new Map(
+      messages.map((message): [string, ChatMessage] => [message.id, message]),
     );
   }
 
