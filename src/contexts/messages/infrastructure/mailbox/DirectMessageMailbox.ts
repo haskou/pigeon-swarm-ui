@@ -71,21 +71,37 @@ type RecipientInbox = {
   state: DirectMessageMailboxState;
 };
 
+/** Count-only: no ids, content, or error details. */
+function logAppendFailure(): void {
+  // eslint-disable-next-line no-console
+  console.debug('Direct mailbox append failed; legacy copy kept.');
+}
+
 /**
  * Direct one-to-one messages over the opaque mailbox: sent, edited, deleted,
- * reactions, and read receipts. The legacy send delivers first; this path
- * carries a copy so the peer can receive it without the replicated path.
- * Duplicates collapse by message id in the timeline.
+ * reactions, pins, and read receipts. The legacy send delivers first; this
+ * path carries a copy so the peer can receive it without the replicated path.
+ * Sent, edited, deleted, reaction, and pin records also go to this identity's
+ * own inbox, so its other devices converge. Duplicates collapse by message id
+ * in the timeline.
  */
 export class DirectMessageMailbox {
   private static readonly PAGE_SIZE = 50;
   private static readonly EPOCH = 0;
   private static readonly OPEN_RETRY_MS = 60_000;
   private static readonly READ_PAGE_LIMIT = 4;
+  private static readonly OWN_COPY_LIMIT = 512;
 
   private readonly opening = new Map<string, Promise<RecipientInbox>>();
   /** Inboxes whose last open failed, keyed by mailbox id, and when to retry. */
   private readonly retryOpenAt = new Map<string, number>();
+  /**
+   * Own copies this instance appended, keyed by identity and record id. A
+   * replayed own copy is acknowledged but not applied: this device already
+   * shows the action, and a stale replay could undo a later local delete.
+   * Bounded by OWN_COPY_LIMIT; an evicted key applies again on replay.
+   */
+  private readonly ownCopyIds = new Set<string>();
 
   public constructor(
     private readonly channel: MailboxChannel,
@@ -96,12 +112,13 @@ export class DirectMessageMailbox {
   ) {}
 
   /**
-   * Sender. Appends a sent message to the peer's inbox. Returns 'skipped' when
-   * there is no peer, the conversation is a group, or the record exceeds the
-   * envelope bound; the message then stays on the legacy path only. Never
-   * throws: any failure, including 404 for an inbox the peer has not opened
-   * yet, returns 'failed'. The caller keeps the legacy copy and shows nothing
-   * to the user.
+   * Sender. Appends a sent message to the peer's inbox and to this identity's
+   * own inbox. Returns 'skipped' when there is no peer, the conversation is a
+   * group, or the record exceeds the envelope bound; the message then stays on
+   * the legacy path only. Never throws: any failure, including 404 for an inbox
+   * the peer has not opened yet, returns 'failed'. The result is the peer
+   * outcome; the own copy never changes it. The caller keeps the legacy copy
+   * and shows nothing to the user.
    */
   public deliverSent(
     session: Session,
@@ -403,12 +420,13 @@ export class DirectMessageMailbox {
   }
 
   /**
-   * Shared sender path for the peer's inbox. Skips without sending when there
-   * is no peer, the conversation is a group, or the encoded record exceeds the
-   * envelope bound. Building the record runs inside the try, so a throw there
-   * is 'failed'.
+   * Shared sender path. Builds the record once, so the peer copy and the own
+   * copy carry the same id and bytes. Skips without sending when there is no
+   * peer, the conversation is a group, or the record exceeds the envelope
+   * bound. The peer copy alone decides the result. The own copy is additive
+   * and silent: a failure changes nothing the user sees.
    */
-  private append(
+  private async append(
     session: Session,
     conversation: ConversationResource,
     build: () => DirectMessageRecord,
@@ -417,14 +435,50 @@ export class DirectMessageMailbox {
       (identityId) => identityId !== session.identity.id,
     );
 
-    return this.appendTo(session, conversation, recipientIdentityId, build);
+    if (
+      !recipientIdentityId ||
+      !DirectMessageMailboxRecord.isEligible(conversation.type)
+    ) {
+      return 'skipped';
+    }
+
+    try {
+      const record = build();
+      const plaintext = DirectMessageMailboxRecord.encode(record);
+
+      if (plaintext.byteLength > MailboxEnvelopeCipher.MAX_PLAINTEXT_BYTES) {
+        return 'skipped';
+      }
+
+      const delivery = await this.sendRecord(
+        session,
+        conversation.id,
+        recipientIdentityId,
+        plaintext,
+      );
+
+      if (delivery === 'failed') logAppendFailure();
+
+      this.rememberOwnCopy(`${session.identity.id}:${record.id}`);
+      await this.sendRecord(
+        session,
+        conversation.id,
+        session.identity.id,
+        plaintext,
+      );
+
+      return delivery;
+    } catch {
+      logAppendFailure();
+
+      return 'failed';
+    }
   }
 
   /**
-   * Appends one record to the inbox of the given identity. Shared by the peer
-   * path and the read receipt path, which writes to this identity's own inbox.
-   * Skips without sending when there is no recipient or the conversation is a
-   * group.
+   * Appends one record to the inbox of the given identity. Used by the read
+   * receipt path, which writes to this identity's own inbox. Skips without
+   * sending when there is no recipient or the conversation is a group.
    */
   private async appendTo(
     session: Session,
@@ -446,17 +500,54 @@ export class DirectMessageMailbox {
         return 'skipped';
       }
 
-      const keys = this.keysFor(session, conversation.id, recipientIdentityId);
+      const delivery = await this.sendRecord(
+        session,
+        conversation.id,
+        recipientIdentityId,
+        plaintext,
+      );
+
+      if (delivery === 'failed') logAppendFailure();
+
+      return delivery;
+    } catch {
+      logAppendFailure();
+
+      return 'failed';
+    }
+  }
+
+  /**
+   * Sends one encoded record to one inbox. Never throws: any failure, including
+   * a 404 for an inbox the peer has not opened yet, returns 'failed'. Logs
+   * nothing, so the caller decides which failures are worth a line.
+   */
+  private async sendRecord(
+    session: Session,
+    conversationId: string,
+    recipientIdentityId: string,
+    plaintext: Uint8Array,
+  ): Promise<DirectMessageMailboxDelivery> {
+    try {
+      const keys = this.keysFor(session, conversationId, recipientIdentityId);
 
       await this.recipients.send(recipientIdentityId, keys, plaintext);
 
       return 'delivered';
     } catch {
-      // Count-only: no ids, content, or error details.
-      // eslint-disable-next-line no-console
-      console.debug('Direct mailbox append failed; legacy copy kept.');
-
       return 'failed';
+    }
+  }
+
+  /** Remembers an own copy so its replay is not applied. Bounded. */
+  private rememberOwnCopy(id: string): void {
+    this.ownCopyIds.add(id);
+
+    if (this.ownCopyIds.size > DirectMessageMailbox.OWN_COPY_LIMIT) {
+      // Insertion order: the first id is the oldest own copy.
+      const [oldest] = this.ownCopyIds;
+
+      this.ownCopyIds.delete(oldest);
     }
   }
 
@@ -714,7 +805,14 @@ export class DirectMessageMailbox {
         conversationId,
       );
 
-      return decoded ? [decoded] : [];
+      if (!decoded) return [];
+
+      // An own copy this device appended is already shown locally.
+      if (this.ownCopyIds.has(`${session.identity.id}:${decoded.id}`)) {
+        return [];
+      }
+
+      return [decoded];
     });
     const messages = await this.decryptMessages(
       session,
