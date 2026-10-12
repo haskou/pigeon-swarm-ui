@@ -5,15 +5,11 @@ import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonApplication } from './PigeonApplication';
 
 export const applicationContainer = new PigeonApplication(
-  new PigeonApiGateway(
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    AttachmentCipher.withWorker(browserAttachmentWorkerFactory),
-  ),
+  new PigeonApiGateway(undefined, undefined, undefined, undefined, {
+    attachmentCipher: AttachmentCipher.withWorker(
+      browserAttachmentWorkerFactory,
+    ),
+  }),
 );
 
 export const contactPinStore = new ContactPinStore();

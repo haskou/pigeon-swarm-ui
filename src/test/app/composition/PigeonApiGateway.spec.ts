@@ -51,13 +51,42 @@ describe(PigeonApiGateway.name, () => {
       undefined,
       undefined,
       undefined,
-      undefined,
-      undefined,
-      attachmentCipher,
+      {
+        attachmentCipher,
+      },
     );
 
     gateway.disposeSessionWorkers();
 
     expect(attachmentCipher.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads attachment upload storage only from the injected storage', () => {
+    const globalStorageRead = jest.fn((): never => {
+      throw new Error('localStorage is not available outside the browser');
+    });
+    const storage = {
+      getItem: jest.fn(() => null),
+      removeItem: jest.fn(),
+      setItem: jest.fn(),
+    };
+
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      get: globalStorageRead,
+    });
+
+    try {
+      expect(
+        () =>
+          new PigeonApiGateway(undefined, undefined, undefined, undefined, {
+            storage,
+          }),
+      ).not.toThrow();
+    } finally {
+      Reflect.deleteProperty(globalThis, 'localStorage');
+    }
+
+    expect(globalStorageRead).not.toHaveBeenCalled();
   });
 });
