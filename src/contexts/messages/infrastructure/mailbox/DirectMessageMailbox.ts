@@ -137,8 +137,8 @@ export class DirectMessageMailbox {
 
   /**
    * Resolves the inbox keys, reader tokens, and saved state. A stored legacy
-   * token is adopted into the reader set first. The derived tokens are never
-   * persisted.
+   * token first frees readers no device holds, then is adopted into the
+   * reader set. The derived tokens are never persisted.
    */
   private async openInbox(
     session: Session,
@@ -152,15 +152,22 @@ export class DirectMessageMailbox {
       return { keys, readers, state: stored };
     }
 
-    if (
-      stored?.readToken &&
-      (await this.adoptLegacy(keys, stored.readToken, readers))
-    ) {
-      const adopted = { cursor: stored.cursor };
+    if (stored?.readToken) {
+      // Before adoption: a full inbox refuses the device readers.
+      await this.readerSet.pruneUnderLegacy(
+        session,
+        keys,
+        readers,
+        stored.readToken,
+      );
 
-      this.store.save(keys.mailboxId, adopted);
+      if (await this.adoptLegacy(keys, stored.readToken, readers)) {
+        const adopted = { cursor: stored.cursor };
 
-      return { keys, readers, state: adopted };
+        this.store.save(keys.mailboxId, adopted);
+
+        return { keys, readers, state: adopted };
+      }
     }
 
     const state = { cursor: 0 };

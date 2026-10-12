@@ -23,6 +23,7 @@ import { DirectMessageMailboxRecord } from '../../../../../contexts/messages/inf
 import { DirectMessageMailboxStore } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxStore';
 import { DirectMessageReaderSet } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageReaderSet';
 import { MessageCollection } from '../../../../../contexts/messages/presentation/view-models/MessageCollection';
+import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 
 describe(DirectMessageMailbox.name, () => {
   const sharedSecret = Buffer.alloc(32, 7);
@@ -645,13 +646,20 @@ describe(DirectMessageMailbox.name, () => {
      * slowest reader has acknowledged it, and reads or acknowledgements need a
      * token whose hash is registered.
      */
-    const nodeMailboxClient = (createGate?: Promise<void>) => {
+    const nodeMailboxClient = (
+      createGate?: Promise<void>,
+      options: { maxReaders?: number; readerTokens?: readonly string[] } = {},
+    ) => {
+      const maxReaders = options.maxReaders ?? 8;
       let present = true;
       let creates = 0;
       let nextCursor = 1;
       let envelopes: { body: string; cursor: number; envelopeId: string }[] =
         [];
       const readers = new Map<string, number>();
+      for (const token of options.readerTokens ?? []) {
+        readers.set(MailboxCapability.hash(token), 0);
+      }
       const requireReader = (readToken: string) => {
         if (!present || !readers.has(MailboxCapability.hash(readToken))) {
           throw new MailboxUnavailableError();
@@ -686,7 +694,7 @@ describe(DirectMessageMailbox.name, () => {
         requireReader(readToken);
 
         return Promise.resolve({
-          maxReaders: 8,
+          maxReaders,
           readers: Array.from(readers, ([readTokenHash, ackedCursor]) => ({
             ackedCursor,
             readTokenHash,
@@ -697,7 +705,15 @@ describe(DirectMessageMailbox.name, () => {
         (_mailboxId, readToken, readTokenHash) => {
           requireReader(readToken);
 
-          if (!readers.has(readTokenHash)) readers.set(readTokenHash, 0);
+          if (!readers.has(readTokenHash)) {
+            if (readers.size >= maxReaders) {
+              return Promise.reject(
+                new HttpJsonError(409, 'Conflict', 'reader limit reached'),
+              );
+            }
+
+            readers.set(readTokenHash, 0);
+          }
 
           return Promise.resolve();
         },
@@ -749,6 +765,7 @@ describe(DirectMessageMailbox.name, () => {
           readers.clear();
           envelopes = [];
         },
+        readerHashes: () => Array.from(readers.keys()),
         wire,
       };
     };
@@ -766,6 +783,21 @@ describe(DirectMessageMailbox.name, () => {
 
       return new DirectMessageMailbox(channel, store, projection, readerSet);
     };
+
+    const hashed = (...tokens: string[]): string[] =>
+      tokens.map((token) => MailboxCapability.hash(token)).sort();
+
+    const deviceTokensFor = (
+      mailboxId: string,
+      credentials: readonly string[],
+    ): string[] =>
+      credentials.map((credential) =>
+        MailboxReadToken.deriveDevice(
+          Buffer.alloc(32, 9),
+          mailboxId,
+          credential,
+        ),
+      );
 
     it('delivers a message once and does not replay it after acknowledgement', async () => {
       const { projection, store } = setup();
@@ -975,6 +1007,177 @@ describe(DirectMessageMailbox.name, () => {
       expect(phoneApplied).toEqual([['message-1']]);
       expect(laptopApplied).toEqual([['message-1']]);
       expect(envelopeCount()).toBe(0);
+    });
+
+    it('frees dead reader slots from a full legacy inbox before adopting it', async () => {
+      const { projection, store } = setup();
+      const keys = keysFor('bob');
+      const tokens = readerTokensFor('bob', keys.mailboxId);
+      const legacy = 'legacy-read-token';
+      const dead = Array.from(
+        { length: 7 },
+        (_, index) => `removed-device-${index}`,
+      );
+      const { readerHashes, wire } = nodeMailboxClient(undefined, {
+        maxReaders: 8,
+        readerTokens: [legacy, ...dead],
+      });
+      const sender = mailboxFor(wire, memoryStore(), projection);
+      const mailbox = mailboxFor(wire, store, projection);
+      const applied: string[][] = [];
+      const recordApplied = (messages: ChatMessage[]) => {
+        applied.push(messages.map((message) => message.id));
+      };
+      store.save(keys.mailboxId, { cursor: 0, readToken: legacy });
+
+      await expect(
+        mailbox.sync(
+          session('bob'),
+          conversationId,
+          new AbortController().signal,
+          recordApplied,
+        ),
+      ).resolves.toBeUndefined();
+
+      expect(readerHashes().sort()).toEqual(hashed(tokens.root, tokens.device));
+      expect(store.load(keys.mailboxId)).toEqual({ cursor: 0 });
+
+      await sender.deliver(session('alice'), conversation, sent, plain);
+      await mailbox.sync(
+        session('bob'),
+        conversationId,
+        new AbortController().signal,
+        recordApplied,
+      );
+
+      expect(applied).toEqual([['message-1']]);
+    });
+
+    it('keeps the legacy state and surfaces the cap when no reader can be freed', async () => {
+      const { projection, store } = setup();
+      const keys = keysFor('bob');
+      const legacy = 'legacy-read-token';
+      const devices = Array.from(
+        { length: 7 },
+        (_, index) => `credential-${index}`,
+      );
+      const deviceTokens = deviceTokensFor(keys.mailboxId, devices);
+      const { readerHashes, wire } = nodeMailboxClient(undefined, {
+        maxReaders: 8,
+        readerTokens: [legacy, ...deviceTokens],
+      });
+      const mailbox = mailboxFor(wire, store, projection, [
+        credentialFor('bob'),
+        ...devices,
+      ]);
+      store.save(keys.mailboxId, { cursor: 0, readToken: legacy });
+
+      await expect(
+        mailbox.sync(
+          session('bob'),
+          conversationId,
+          new AbortController().signal,
+          jest.fn(),
+        ),
+      ).rejects.toMatchObject({ status: 409 });
+
+      expect(store.load(keys.mailboxId)).toEqual({
+        cursor: 0,
+        readToken: legacy,
+      });
+      expect(readerHashes().sort()).toEqual(hashed(legacy, ...deviceTokens));
+    });
+
+    it('prunes a reader whose device was removed, keeping this device and the root', async () => {
+      const { projection, store } = setup();
+      const keys = keysFor('bob');
+      const tokens = readerTokensFor('bob', keys.mailboxId);
+      const { readerHashes, wire } = nodeMailboxClient();
+      await mailboxFor(wire, store, projection).sync(
+        session('bob'),
+        conversationId,
+        new AbortController().signal,
+        jest.fn(),
+      );
+      await wire.addReader(
+        keys.mailboxId,
+        tokens.root,
+        MailboxCapability.hash('removed-device'),
+      );
+      // A new app session starts with an empty reconcile memo.
+      await mailboxFor(wire, store, projection).sync(
+        session('bob'),
+        conversationId,
+        new AbortController().signal,
+        jest.fn(),
+      );
+
+      expect(readerHashes().sort()).toEqual(hashed(tokens.root, tokens.device));
+    });
+
+    it('enrols this device past a removed device reader by pruning first', async () => {
+      const { projection, store } = setup();
+      const keys = keysFor('bob');
+      const tokens = readerTokensFor('bob', keys.mailboxId);
+      const live = Array.from(
+        { length: 6 },
+        (_, index) => `credential-${index}`,
+      );
+      const liveTokens = deviceTokensFor(keys.mailboxId, live);
+      const { readerHashes, wire } = nodeMailboxClient(undefined, {
+        maxReaders: 8,
+        readerTokens: [tokens.root, 'removed-device', ...liveTokens],
+      });
+      const mailbox = mailboxFor(wire, store, projection, [
+        credentialFor('bob'),
+        ...live,
+      ]);
+
+      await expect(
+        mailbox.sync(
+          session('bob'),
+          conversationId,
+          new AbortController().signal,
+          jest.fn(),
+        ),
+      ).resolves.toBeUndefined();
+
+      expect(readerHashes().sort()).toEqual(
+        hashed(tokens.root, tokens.device, ...liveTokens),
+      );
+    });
+
+    it('surfaces the cap refusal when every reader is still a device', async () => {
+      const { projection, store } = setup();
+      const keys = keysFor('bob');
+      const tokens = readerTokensFor('bob', keys.mailboxId);
+      const live = Array.from(
+        { length: 7 },
+        (_, index) => `credential-${index}`,
+      );
+      const liveTokens = deviceTokensFor(keys.mailboxId, live);
+      const { readerHashes, wire } = nodeMailboxClient(undefined, {
+        maxReaders: 8,
+        readerTokens: [tokens.root, ...liveTokens],
+      });
+      const mailbox = mailboxFor(wire, store, projection, [
+        credentialFor('bob'),
+        ...live,
+      ]);
+      const apply = jest.fn();
+
+      await expect(
+        mailbox.sync(
+          session('bob'),
+          conversationId,
+          new AbortController().signal,
+          apply,
+        ),
+      ).rejects.toMatchObject({ status: 409 });
+
+      expect(apply).not.toHaveBeenCalled();
+      expect(store.load(keys.mailboxId)).toEqual({ cursor: 0 });
+      expect(readerHashes().sort()).toEqual(hashed(tokens.root, ...liveTokens));
     });
   });
 });
