@@ -50,7 +50,9 @@ function mountSync(initialError: string | null = null) {
   const onErrorChange = jest.fn((update: SetStateAction<string | null>) => {
     error = typeof update === 'function' ? update(error) : update;
   });
-  const onMessagesChange = jest.fn<void, [SetStateAction<ChatMessage[]>]>();
+  const onMessagesChange = jest.fn<
+    (update: SetStateAction<ChatMessage[]>) => void
+  >();
 
   mockEffects.length = 0;
   useDirectMessageMailboxSync({
