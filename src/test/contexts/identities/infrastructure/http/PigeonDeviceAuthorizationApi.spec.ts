@@ -7,6 +7,7 @@ import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/H
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
 import { DeviceAuthorizationTransition } from '../../../../../contexts/identities/domain/DeviceAuthorizationTransition';
+import { DeviceRemovedError } from '../../../../../contexts/identities/domain/DeviceRemovedError';
 import { DeviceAuthorizationEpoch } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationOperationId } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationOperationId';
 import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
@@ -747,6 +748,145 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
         await expect(api.retireOwnDevice(session)).rejects.toThrow('503');
         expect(http).toHaveBeenCalledTimes(1);
       });
+    });
+  });
+
+  describe('synchronize on a device the node may have removed', () => {
+    const rejection = (code: number) =>
+      new HttpJsonError(
+        401,
+        'Unauthorized',
+        `{"code":${code},"message":"Invalid signed request."}`,
+      );
+    const failureOf = async (promise: Promise<unknown>): Promise<unknown> =>
+      promise.then(() => undefined, (error: unknown) => error);
+
+    async function synchronizing() {
+      const { identityId, session } = await fixture();
+      const http = { request: jest.fn() } as unknown as HttpJsonClient;
+      const signer = {
+        headersWithDeviceProof: jest
+          .fn()
+          .mockResolvedValue({ 'X-Device-Signature': 'device-signed' }),
+        headersWithRecoveryProof: jest
+          .fn()
+          .mockResolvedValue({ 'X-Recovery-Signature': 'recovery-signed' }),
+      } as unknown as RequestSigner;
+      const vault = {
+        synchronizeAuthorization: jest.fn(),
+      } as unknown as DeviceIdentityVault;
+
+      return {
+        api: new PigeonDeviceAuthorizationApi(http, signer, vault),
+        http: http.request as jest.Mock,
+        identityId,
+        session,
+        signer,
+        vault,
+      };
+    }
+
+    it('reports the device as removed when the node rejects it and the recovery catalog no longer lists it', async () => {
+      const other = await KeyPair.generate();
+      const { api, http, identityId, session, signer, vault } =
+        await synchronizing();
+
+      http.mockRejectedValueOnce(rejection(401020)).mockResolvedValueOnce({
+        credentials: [
+          IdentityId.fromString(other.toPrimitives().publicKey).valueOf(),
+        ],
+        epoch: 'genesis',
+        identityId: identityId.valueOf(),
+        revision: 3,
+      });
+
+      await expect(api.synchronize(session)).rejects.toBeInstanceOf(
+        DeviceRemovedError,
+      );
+      expect(signer.headersWithRecoveryProof).toHaveBeenCalledWith(
+        session,
+        'GET',
+        `/identity-devices/${encodeURIComponent(identityId.valueOf())}/devices`,
+      );
+      expect(vault.synchronizeAuthorization).not.toHaveBeenCalled();
+    });
+
+    it('keeps the rejection when the recovery catalog still lists this device', async () => {
+      const { api, http, identityId, session } = await synchronizing();
+      const own = session.deviceCredentialKeyPair.toPrimitives().publicKey;
+
+      http.mockRejectedValueOnce(rejection(401020)).mockResolvedValueOnce({
+        credentials: [IdentityId.fromString(own).valueOf()],
+        epoch: 'genesis',
+        identityId: identityId.valueOf(),
+        revision: 3,
+      });
+
+      const error = await failureOf(api.synchronize(session));
+
+      expect(error).toBeInstanceOf(HttpJsonError);
+      expect(error).not.toBeInstanceOf(DeviceRemovedError);
+    });
+
+    it('keeps the rejection when the recovery check cannot reach the node', async () => {
+      const { api, http, session } = await synchronizing();
+
+      http
+        .mockRejectedValueOnce(rejection(401020))
+        .mockRejectedValueOnce(new TypeError('fetch failed'));
+
+      const error = await failureOf(api.synchronize(session));
+
+      expect(error).toBeInstanceOf(HttpJsonError);
+      expect(error).not.toBeInstanceOf(DeviceRemovedError);
+    });
+
+    it('keeps the rejection when the recovery check is rejected as well', async () => {
+      const { api, http, session } = await synchronizing();
+
+      http
+        .mockRejectedValueOnce(rejection(401020))
+        .mockRejectedValueOnce(rejection(401020));
+
+      const error = await failureOf(api.synchronize(session));
+
+      expect(error).toBeInstanceOf(HttpJsonError);
+      expect(error).not.toBeInstanceOf(DeviceRemovedError);
+    });
+
+    it('does not treat another 401 code as removal', async () => {
+      const { api, http, session } = await synchronizing();
+
+      http.mockRejectedValueOnce(rejection(401021));
+
+      const error = await failureOf(api.synchronize(session));
+
+      expect(error).not.toBeInstanceOf(DeviceRemovedError);
+      expect(http).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not treat a dropped connection on the checkpoint read as removal', async () => {
+      const { api, http, session } = await synchronizing();
+
+      http.mockRejectedValueOnce(new TypeError('fetch failed'));
+
+      const error = await failureOf(api.synchronize(session));
+
+      expect(error).not.toBeInstanceOf(DeviceRemovedError);
+      expect(http).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not treat a server error on the checkpoint read as removal', async () => {
+      const { api, http, session } = await synchronizing();
+
+      http.mockRejectedValueOnce(
+        new HttpJsonError(503, 'Service Unavailable', ''),
+      );
+
+      const error = await failureOf(api.synchronize(session));
+
+      expect(error).not.toBeInstanceOf(DeviceRemovedError);
+      expect(http).toHaveBeenCalledTimes(1);
     });
   });
 });
