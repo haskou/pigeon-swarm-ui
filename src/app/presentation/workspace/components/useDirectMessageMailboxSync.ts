@@ -8,6 +8,7 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
+import { MailboxReaderLimitError } from '../../../../contexts/mailboxes/infrastructure/http/MailboxReaderLimitError';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
@@ -77,10 +78,13 @@ export function useDirectMessageMailboxSync({
         }
 
         if (notice === null) {
-          const message = toUserErrorMessage(
-            caught,
-            copy.workspace.directMailboxSyncError,
-          );
+          const message =
+            caught instanceof MailboxReaderLimitError
+              ? copy.workspace.directMailboxReaderLimitError
+              : toUserErrorMessage(
+                  caught,
+                  copy.workspace.directMailboxSyncError,
+                );
           notice = message;
           onErrorChange((current) => current ?? message);
         }

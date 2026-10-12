@@ -37,7 +37,7 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 - A device reads and acknowledges with its device reader. The same token rules as the root apply: the node sees the raw device token on each read and ack.
 - The root reader lists, enrols, and removes readers, and it mirrors each acknowledgement, so the root cursor tracks the latest device ack.
 - A device enrols its reader when it creates the inbox and when it adopts a legacy inbox. Recovery enrols it again after a re-creation.
-- Cap: the node's `maxReaders` (`MAILBOX_MAX_READERS`) defaults to 129 on nodes that include haskou/pigeon-swarm-node#437: the root reader plus one reader per device, up to 128 devices. A device enrol past the cap is refused (409) and logged with the fixed inbox-create debug line. Its read then gets 404, recovers, and fails again on enrol with 409. That surfaces as the sync error notice. A reader whose device was removed still counts until pruned; the first pass of an app session prunes before the read, so that slot can free in the same pass.
+- Cap: the node's `maxReaders` (`MAILBOX_MAX_READERS`) defaults to 129 on nodes that include haskou/pigeon-swarm-node#437: the root reader plus one reader per device, up to 128 devices. A device enrol past the cap is refused (409) and logged with the fixed inbox-create debug line. Its read then gets 404, recovers, and fails again on enrol with 409. `addReader` maps that 409 to `MailboxReaderLimitError`, and the sync shows the reader-limit notice instead of the generic one. A reader whose device was removed still counts until pruned; the first pass of an app session prunes before the read, so that slot can free in the same pass.
 - Pruning: once per app session per mailbox, a device lists the readers and removes any hash that is neither the root, its own device, nor a credential in the identity's device list. A failed pass logs a fixed debug line and retries on the next sync. The root reader is never removed. A stored legacy inbox is pruned under its legacy token before adoption, on every sync until adoption succeeds, so a full legacy inbox frees dead readers before it is adopted.
 - Mixed versions: a client from before this change reads and acknowledges with the root token only. Its acks do not move the device readers, so envelopes stay until the device readers acknowledge. Update every device.
 
@@ -84,7 +84,7 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 | Enrol       | `POST /mailboxes/{id}/readers` (201 added)       | root token (Bearer) |
 | Remove      | `DELETE /mailboxes/{id}/readers/{hash}` (204)    | root token (Bearer) |
 
-- A 404 maps to `MailboxUnavailableError`. A 400 on create that names `requiredDifficultyBits` maps to `MailboxCreationDifficultyError`. Other 400s, 409, and 429 propagate as `HttpJsonError`.
+- A 404 maps to `MailboxUnavailableError`. A 400 on create that names `requiredDifficultyBits` maps to `MailboxCreationDifficultyError`. A 409 on enrol maps to `MailboxReaderLimitError`. Other 400s, 409s, and 429 propagate as `HttpJsonError`.
 - Empty success bodies (PUT 200/201, POST 204) resolve to `undefined` in `HttpJsonClient`.
 
 ## Creation difficulty and recovery

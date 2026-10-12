@@ -1441,6 +1441,8 @@ export const en = {
   },
   workspace: {
     closeSidebar: 'Close sidebar',
+    directMailboxReaderLimitError:
+      'Direct messages cannot sync here: this identity has reached its device limit. Remove a device you no longer use, then try again.',
     directMailboxSyncError: 'Direct messages could not be synced. Retrying.',
     loadMessagesError:
       'Messages could not be loaded. Great, now we have a mystery.',

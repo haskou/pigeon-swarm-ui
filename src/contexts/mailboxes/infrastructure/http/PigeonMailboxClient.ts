@@ -2,6 +2,7 @@ import type { HttpJsonClient } from '../../../../shared/infrastructure/http/Http
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 import { MailboxCreationDifficultyError } from './MailboxCreationDifficultyError';
+import { MailboxReaderLimitError } from './MailboxReaderLimitError';
 import { MailboxUnavailableError } from './MailboxUnavailableError';
 
 export type MailboxCreation = {
@@ -174,13 +175,21 @@ export class PigeonMailboxClient {
     token: string,
     readTokenHash: string,
   ): Promise<void> {
-    await this.call(() =>
-      this.http.request<void>(`/mailboxes/${mailboxId}/readers`, {
-        body: JSON.stringify({ readTokenHash }),
-        headers: PigeonMailboxClient.bearer(token),
-        method: 'POST',
-      }),
-    );
+    try {
+      await this.call(() =>
+        this.http.request<void>(`/mailboxes/${mailboxId}/readers`, {
+          body: JSON.stringify({ readTokenHash }),
+          headers: PigeonMailboxClient.bearer(token),
+          method: 'POST',
+        }),
+      );
+    } catch (error: unknown) {
+      if (error instanceof HttpJsonError && error.status === 409) {
+        throw new MailboxReaderLimitError();
+      }
+
+      throw error;
+    }
   }
 
   public async removeReader(
