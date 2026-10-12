@@ -947,6 +947,39 @@ describe(DirectMessageMailbox.name, () => {
       expect(creates()).toBe(1);
     });
 
+    it('does not reach the wire before an overlapping pass has created the inbox', async () => {
+      const { projection, store } = setup();
+      let releaseCreate!: (value: void) => void;
+      const gate = new Promise<void>((resolve) => {
+        releaseCreate = resolve;
+      });
+      const { creates, wire } = nodeMailboxClient(gate);
+      const mailbox = mailboxFor(wire, store, projection);
+      const firstPass = new AbortController();
+      const first = mailbox.sync(
+        session('bob'),
+        conversationId,
+        firstPass.signal,
+        jest.fn(),
+      );
+      firstPass.abort();
+      const second = mailbox.sync(
+        session('bob'),
+        conversationId,
+        new AbortController().signal,
+        jest.fn(),
+      );
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+      expect(wire.readers).not.toHaveBeenCalled();
+      expect(wire.read).not.toHaveBeenCalled();
+
+      releaseCreate();
+      await Promise.all([first, second]);
+
+      expect(creates()).toBe(1);
+    });
+
     it('lets a sender deliver without the recipient root key', async () => {
       const { projection, store } = setup();
       const { wire } = nodeMailboxClient();

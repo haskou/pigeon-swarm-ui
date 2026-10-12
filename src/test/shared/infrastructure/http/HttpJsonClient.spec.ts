@@ -38,6 +38,24 @@ describe(HttpJsonClient.name, () => {
     expect(json).not.toHaveBeenCalled();
   });
 
+  it.each([204, 304])(
+    'cancels the unread body of a %i response so the connection is released',
+    async (status) => {
+      const cancel = jest.fn().mockResolvedValue(undefined);
+      global.fetch = jest.fn().mockResolvedValue({
+        body: { cancel },
+        ok: true,
+        status,
+      } as unknown as Response);
+      const client = new HttpJsonClient(new ApiUrlBuilder('http://localhost'));
+
+      await expect(
+        client.request('/acks/abc', { method: 'POST' }),
+      ).resolves.toBeUndefined();
+      expect(cancel).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it('treats an empty success body as no content', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       json: jest
