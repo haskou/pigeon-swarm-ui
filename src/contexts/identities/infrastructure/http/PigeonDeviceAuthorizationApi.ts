@@ -26,6 +26,7 @@ import { DevicePairingCompletion } from '../../domain/DevicePairingCompletion';
 import { DevicePairingError } from '../../domain/DevicePairingError';
 import { DevicePairingInvitation } from '../../domain/DevicePairingInvitation';
 import { DevicePairingRequest } from '../../domain/DevicePairingRequest';
+import { DeviceRemovedError } from '../../domain/DeviceRemovedError';
 import { DeviceAuthorizationEpoch } from '../../domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationOperationId } from '../../domain/value-objects/DeviceAuthorizationOperationId';
 import { DeviceAuthorizationRevision } from '../../domain/value-objects/DeviceAuthorizationRevision';
@@ -281,8 +282,38 @@ export class PigeonDeviceAuthorizationApi {
   public async findDevices(session: Session): Promise<DeviceCredential[]> {
     const identityId = IdentityId.fromString(session.identity.id);
     const path = `${this.checkpointPath(identityId)}/devices`;
+
+    return this.readDevices(
+      identityId,
+      path,
+      await this.signer.headersWithDeviceProof(session, 'GET', path),
+    );
+  }
+
+  /**
+   * Reads the owner's device catalog with the recovery proof, which does not
+   * depend on this device's own credential.
+   */
+  private async findDevicesWithRecoveryProof(
+    session: Session,
+  ): Promise<DeviceCredential[]> {
+    const identityId = IdentityId.fromString(session.identity.id);
+    const path = `${this.checkpointPath(identityId)}/devices`;
+
+    return this.readDevices(
+      identityId,
+      path,
+      await this.signer.headersWithRecoveryProof(session, 'GET', path),
+    );
+  }
+
+  private async readDevices(
+    identityId: IdentityId,
+    path: string,
+    headers: Record<string, string>,
+  ): Promise<DeviceCredential[]> {
     const resource = await this.http.request<DeviceCatalogResource>(path, {
-      headers: await this.signer.headersWithDeviceProof(session, 'GET', path),
+      headers,
       method: 'GET',
     });
 
@@ -370,8 +401,44 @@ export class PigeonDeviceAuthorizationApi {
     return 'revoked';
   }
 
+  /**
+   * Reads the checkpoint. A 401020 rejection means removal only when the
+   * recovery-proof catalog no longer lists this device. Any other failure,
+   * including a failed catalog check, keeps the original error.
+   */
+  private async findForSynchronize(
+    session: Session,
+  ): Promise<DeviceAuthorizationCheckpoint> {
+    try {
+      return await this.find(session);
+    } catch (error) {
+      if (
+        error instanceof HttpJsonError &&
+        error.status === 401 &&
+        error.code === 401020 &&
+        (await this.isRemovedFromCatalog(session))
+      ) {
+        throw new DeviceRemovedError();
+      }
+
+      throw error;
+    }
+  }
+
+  private async isRemovedFromCatalog(session: Session): Promise<boolean> {
+    const own = session.deviceCredentialKeyPair.toPrimitives().publicKey;
+
+    try {
+      const devices = await this.findDevicesWithRecoveryProof(session);
+
+      return !devices.some((device) => device.valueOf() === own);
+    } catch {
+      return false;
+    }
+  }
+
   public async synchronize(session: Session): Promise<Session> {
-    const checkpoint = await this.find(session);
+    const checkpoint = await this.findForSynchronize(session);
 
     await this.vault.synchronizeAuthorization(
       checkpoint.getIdentityId(),

@@ -258,6 +258,9 @@ describe(PigeonIdentitySessionApi.name, () => {
     currentIdentity.deviceCredentialCommitment = SHA256Hash.from(
       new StringValueObject(currentIdentity.deviceCredential),
     ).valueOf();
+    const recoveryAuthorityKeyPair = await KeyPair.generate();
+    currentIdentity.recoveryAuthority =
+      recoveryAuthorityKeyPair.toPrimitives().publicKey;
     const identities = {
       get: jest.fn().mockResolvedValue(currentIdentity),
     } as unknown as PigeonIdentityGateway;
@@ -269,7 +272,7 @@ describe(PigeonIdentitySessionApi.name, () => {
         material: {
           deviceCredentialKeyPair,
           identityKeyPair: keyPair,
-          recoveryAuthorityKeyPair: await KeyPair.generate(),
+          recoveryAuthorityKeyPair,
           rootKey: { getBuffer: () => SymmetricKey.generate().getBuffer() },
         },
         secretHandle: DeviceUnlockSecretHandle.generate(),
