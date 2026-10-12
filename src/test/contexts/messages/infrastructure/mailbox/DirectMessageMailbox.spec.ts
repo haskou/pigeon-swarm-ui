@@ -3,7 +3,9 @@ import { mock } from 'jest-mock-extended';
 
 import type { MailboxKeys } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxKeySchedule';
 import type { PigeonMailboxClient } from '../../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
+import type { MailboxReadTokens } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import type { MessageProjectionPort } from '../../../../../contexts/messages/infrastructure/crypto/MessageProjectionPort';
+import type { DirectMessageMailboxState } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxStore';
 import type {
   ChatMessage,
   ConversationResource,
@@ -19,6 +21,7 @@ import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure
 import { DirectMessageMailbox } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
 import { DirectMessageMailboxRecord } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxRecord';
 import { DirectMessageMailboxStore } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxStore';
+import { DirectMessageReaderSet } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageReaderSet';
 import { MessageCollection } from '../../../../../contexts/messages/presentation/view-models/MessageCollection';
 
 describe(DirectMessageMailbox.name, () => {
@@ -49,12 +52,15 @@ describe(DirectMessageMailbox.name, () => {
   } as unknown as ConversationResource;
   const plain = { attachmentCount: 0, hasReply: false, hasSticker: false };
 
+  const credentialFor = (identityId: string): string =>
+    `device-credential-${identityId}`;
+
   const session = (identityId: string): Session =>
     ({
-      identity: { id: identityId },
-      masterKey: {
-        getBuffer: () => Buffer.alloc(32, identityId === 'alice' ? 3 : 9),
+      deviceCredentialKeyPair: {
+        toPrimitives: () => ({ publicKey: credentialFor(identityId) }),
       },
+      identity: { id: identityId },
       keychain: {
         conversations: {
           [conversationId]: {
@@ -69,10 +75,48 @@ describe(DirectMessageMailbox.name, () => {
         },
         version: 1,
       },
+      masterKey: {
+        getBuffer: () => Buffer.alloc(32, identityId === 'alice' ? 3 : 9),
+      },
     }) as unknown as Session;
 
   const keysFor = (identityId: string): MailboxKeys =>
     MailboxKeySchedule.derive(sharedSecret, identityId, 0);
+
+  const deviceSession = (identityId: string, credential: string): Session =>
+    ({
+      ...session(identityId),
+      deviceCredentialKeyPair: {
+        toPrimitives: () => ({ publicKey: credential }),
+      },
+    }) as unknown as Session;
+
+  const readerTokensFor = (
+    identityId: string,
+    mailboxId: string,
+  ): MailboxReadTokens => {
+    const masterKey = Buffer.alloc(32, identityId === 'alice' ? 3 : 9);
+
+    return {
+      device: MailboxReadToken.deriveDevice(
+        masterKey,
+        mailboxId,
+        credentialFor(identityId),
+      ),
+      root: MailboxReadToken.derive(masterKey, mailboxId),
+    };
+  };
+
+  const memoryStore = (): DirectMessageMailboxStore => {
+    const records = new Map<string, DirectMessageMailboxState>();
+
+    return {
+      load: (mailboxId: string) => records.get(mailboxId) ?? null,
+      save: (mailboxId: string, state: DirectMessageMailboxState) => {
+        records.set(mailboxId, state);
+      },
+    } as unknown as DirectMessageMailboxStore;
+  };
 
   const decrypted = (message: MessageResource): ChatMessage =>
     ({
@@ -93,6 +137,12 @@ describe(DirectMessageMailbox.name, () => {
     });
 
     const channel = mock<MailboxChannel>();
+    channel.listReaders.mockResolvedValue({ maxReaders: 8, readers: [] });
+    channel.addReader.mockResolvedValue(undefined);
+    channel.removeReader.mockResolvedValue(undefined);
+    const readerSet = new DirectMessageReaderSet(channel, (s) =>
+      Promise.resolve([credentialFor(s.identity.id)]),
+    );
     const projection = mock<Pick<MessageProjectionPort, 'decryptMany'>>();
     projection.decryptMany.mockImplementation((_session, _id, records) =>
       Promise.resolve(records.map(decrypted)),
@@ -102,7 +152,7 @@ describe(DirectMessageMailbox.name, () => {
     return {
       channel,
       clearStorage: () => storage.clear(),
-      mailbox: new DirectMessageMailbox(channel, store, projection),
+      mailbox: new DirectMessageMailbox(channel, store, projection, readerSet),
       projection,
       store,
     };
@@ -241,18 +291,19 @@ describe(DirectMessageMailbox.name, () => {
         apply,
       );
 
-      const [keys, readToken, after] = channel.read.mock.calls[0];
+      const [keys, readers, after] = channel.read.mock.calls[0];
       expect(keys.mailboxId).toBe(keysFor('alice').mailboxId);
       expect(after).toBe(0);
+      expect(readers).toEqual(readerTokensFor('alice', keys.mailboxId));
       expect(apply).toHaveBeenCalledWith([
         expect.objectContaining({ id: 'message-1' }),
       ]);
-      expect(channel.acknowledge).toHaveBeenCalledWith(keys, readToken, 2);
+      expect(channel.acknowledge).toHaveBeenCalledWith(keys, readers, 2);
       expect(order).toEqual(['apply', 'ack']);
       expect(store.load(keys.mailboxId)).toEqual({ cursor: 2 });
     });
 
-    it('derives the read token from the root key and stores only the cursor for a new inbox', async () => {
+    it('creates the root reader for a new inbox, enrols this device reader, and stores only the cursor', async () => {
       const { channel, mailbox, store } = setup();
       channel.read.mockResolvedValue({
         envelopes: [],
@@ -269,12 +320,14 @@ describe(DirectMessageMailbox.name, () => {
       );
 
       const keys = keysFor('bob');
-      const readToken = MailboxReadToken.derive(
-        Buffer.alloc(32, 9),
-        keys.mailboxId,
+      const tokens = readerTokensFor('bob', keys.mailboxId);
+      expect(channel.createInbox).toHaveBeenCalledWith(keys, tokens.root);
+      expect(channel.addReader).toHaveBeenCalledWith(
+        keys,
+        tokens.root,
+        tokens.device,
       );
-      expect(channel.createInbox).toHaveBeenCalledWith(keys, readToken);
-      expect(channel.read.mock.calls[0][1]).toBe(readToken);
+      expect(channel.read.mock.calls[0][1]).toEqual(tokens);
       expect(store.load(keys.mailboxId)).toEqual({ cursor: 0 });
     });
 
@@ -367,10 +420,7 @@ describe(DirectMessageMailbox.name, () => {
 
     it('reads from the stored cursor and does nothing when nothing lies past it', async () => {
       const { channel, mailbox, store } = setup();
-      store.save(keysFor('alice').mailboxId, {
-        cursor: 5,
-        readToken: 'read-token',
-      });
+      store.save(keysFor('alice').mailboxId, { cursor: 5 });
       channel.read.mockResolvedValue({
         envelopes: [],
         hasMore: false,
@@ -388,7 +438,7 @@ describe(DirectMessageMailbox.name, () => {
 
       expect(channel.read).toHaveBeenCalledWith(
         keysFor('alice'),
-        'read-token',
+        readerTokensFor('alice', keysFor('alice').mailboxId),
         5,
         50,
       );
@@ -409,13 +459,16 @@ describe(DirectMessageMailbox.name, () => {
       await mailbox.sync(session('alice'), conversationId, signal, jest.fn());
       await mailbox.sync(session('alice'), conversationId, signal, jest.fn());
 
-      const [keys, readToken] = channel.createInbox.mock.calls[0];
+      const [keys, root] = channel.createInbox.mock.calls[0];
       expect(channel.createInbox).toHaveBeenCalledTimes(1);
       expect(keys.mailboxId).toBe(keysFor('alice').mailboxId);
+      expect(root).toBe(readerTokensFor('alice', keys.mailboxId).root);
       expect(channel.createInbox.mock.invocationCallOrder[0]).toBeLessThan(
         channel.read.mock.invocationCallOrder[0],
       );
-      expect(channel.read.mock.calls[0][1]).toBe(readToken);
+      expect(channel.read.mock.calls[0][1]).toEqual(
+        readerTokensFor('alice', keys.mailboxId),
+      );
     });
 
     it('still reads when the up-front create fails, without a user error', async () => {
@@ -448,7 +501,7 @@ describe(DirectMessageMailbox.name, () => {
     it('re-reads from zero when the inbox was re-created under a stored cursor', async () => {
       const { channel, mailbox, store } = setup();
       const keys = keysFor('alice');
-      store.save(keys.mailboxId, { cursor: 5, readToken: 'read-token' });
+      store.save(keys.mailboxId, { cursor: 5 });
       channel.read
         .mockResolvedValueOnce({
           envelopes: [],
@@ -472,18 +525,19 @@ describe(DirectMessageMailbox.name, () => {
       expect(channel.read).toHaveBeenNthCalledWith(
         2,
         keys,
-        'read-token',
+        readerTokensFor('alice', keys.mailboxId),
         0,
         50,
       );
       expect(apply).toHaveBeenCalledWith([
         expect.objectContaining({ id: 'message-1' }),
       ]);
-      expect(channel.acknowledge).toHaveBeenCalledWith(keys, 'read-token', 1);
-      expect(store.load(keys.mailboxId)).toEqual({
-        cursor: 1,
-        readToken: 'read-token',
-      });
+      expect(channel.acknowledge).toHaveBeenCalledWith(
+        keys,
+        readerTokensFor('alice', keys.mailboxId),
+        1,
+      );
+      expect(store.load(keys.mailboxId)).toEqual({ cursor: 1 });
     });
 
     it('stores cursor zero when the inbox was re-created during acknowledgement', async () => {
@@ -502,60 +556,171 @@ describe(DirectMessageMailbox.name, () => {
 
       expect(store.load(keysFor('alice').mailboxId)?.cursor).toBe(0);
     });
+
+    it('adopts a legacy inbox by registering the root and device readers under its stored token', async () => {
+      const { channel, mailbox, store } = setup();
+      const keys = keysFor('alice');
+      const tokens = readerTokensFor('alice', keys.mailboxId);
+      store.save(keys.mailboxId, { cursor: 5, readToken: 'legacy-read-token' });
+      channel.read.mockResolvedValue({
+        envelopes: [],
+        hasMore: false,
+        lastCursor: 5,
+        recreated: false,
+      });
+
+      await mailbox.sync(
+        session('alice'),
+        conversationId,
+        new AbortController().signal,
+        jest.fn(),
+      );
+
+      expect(channel.addReader).toHaveBeenCalledWith(
+        keys,
+        'legacy-read-token',
+        tokens.root,
+      );
+      expect(channel.addReader).toHaveBeenCalledWith(
+        keys,
+        'legacy-read-token',
+        tokens.device,
+      );
+      expect(channel.read.mock.calls[0][1]).toEqual(tokens);
+      expect(store.load(keys.mailboxId)).toEqual({ cursor: 5 });
+    });
+
+    it('treats a legacy inbox that no longer exists as fresh, starting from cursor zero', async () => {
+      const { channel, mailbox, store } = setup();
+      const keys = keysFor('alice');
+      const tokens = readerTokensFor('alice', keys.mailboxId);
+      store.save(keys.mailboxId, { cursor: 5, readToken: 'legacy-read-token' });
+      channel.addReader.mockRejectedValueOnce(new MailboxUnavailableError());
+      channel.read.mockResolvedValue({
+        envelopes: [],
+        hasMore: false,
+        lastCursor: 0,
+        recreated: false,
+      });
+
+      await mailbox.sync(
+        session('alice'),
+        conversationId,
+        new AbortController().signal,
+        jest.fn(),
+      );
+
+      expect(channel.createInbox).toHaveBeenCalledWith(keys, tokens.root);
+      expect(channel.read.mock.calls[0][1]).toEqual(tokens);
+      expect(store.load(keys.mailboxId)).toEqual({ cursor: 0 });
+    });
+
+    it('keeps the legacy state and surfaces the error when adoption fails for another reason', async () => {
+      const { channel, mailbox, store } = setup();
+      const keys = keysFor('alice');
+      store.save(keys.mailboxId, { cursor: 5, readToken: 'legacy-read-token' });
+      channel.addReader.mockRejectedValueOnce(new Error('offline'));
+
+      await expect(
+        mailbox.sync(
+          session('alice'),
+          conversationId,
+          new AbortController().signal,
+          jest.fn(),
+        ),
+      ).rejects.toThrow('offline');
+
+      expect(channel.read).not.toHaveBeenCalled();
+      expect(store.load(keys.mailboxId)).toEqual({
+        cursor: 5,
+        readToken: 'legacy-read-token',
+      });
+    });
   });
 
   describe('over the real channel', () => {
-    const inMemoryMailboxClient = () => {
-      const envelopes: { body: string; cursor: number; envelopeId: string }[] =
-        [];
-      const wire = mock<PigeonMailboxClient>();
-      wire.append.mockImplementation((_mailboxId, _postToken, input) => {
-        const cursor = envelopes.length + 1;
-        envelopes.push({ ...input, cursor });
-
-        return Promise.resolve({ cursor });
-      });
-      wire.read.mockImplementation((_mailboxId, _readToken, after, limit) =>
-        Promise.resolve({
-          envelopes: envelopes
-            .filter((envelope) => envelope.cursor > after)
-            .slice(0, limit),
-          hasMore: false,
-        }),
-      );
-      wire.acknowledge.mockResolvedValue(undefined);
-
-      return wire;
-    };
-
-    const recreatableMailboxClient = () => {
+    /**
+     * Mirrors the node: the inbox keeps the hash of every reader token with
+     * the cursor that reader has acknowledged. An envelope is kept until the
+     * slowest reader has acknowledged it, and reads or acknowledgements need a
+     * token whose hash is registered.
+     */
+    const nodeMailboxClient = (createGate?: Promise<void>) => {
       let present = true;
+      let creates = 0;
       let nextCursor = 1;
       let envelopes: { body: string; cursor: number; envelopeId: string }[] =
         [];
-      const requireInbox = () => {
-        if (!present) throw new MailboxUnavailableError();
+      const readers = new Map<string, number>();
+      const requireReader = (readToken: string) => {
+        if (!present || !readers.has(MailboxCapability.hash(readToken))) {
+          throw new MailboxUnavailableError();
+        }
+      };
+      const retainUnacknowledged = () => {
+        if (readers.size === 0) return;
+        const floor = Math.min(...Array.from(readers.values()));
+        envelopes = envelopes.filter((envelope) => envelope.cursor > floor);
       };
       const wire = mock<PigeonMailboxClient>();
-      wire.create.mockImplementation(() => {
+      wire.create.mockImplementation(async (_mailboxId, creation) => {
+        creates += 1;
+        await createGate;
+
+        if (present && readers.size > 0) {
+          if (!readers.has(creation.readTokenHash)) {
+            throw new Error('mailbox exists with other capabilities');
+          }
+
+          return;
+        }
+
         if (!present) {
           present = true;
           nextCursor = 1;
           envelopes = [];
         }
-
-        return Promise.resolve();
+        readers.set(creation.readTokenHash, 0);
       });
+      wire.readers.mockImplementation((_mailboxId, readToken) => {
+        requireReader(readToken);
+
+        return Promise.resolve({
+          maxReaders: 8,
+          readers: Array.from(readers, ([readTokenHash, ackedCursor]) => ({
+            ackedCursor,
+            readTokenHash,
+          })),
+        });
+      });
+      wire.addReader.mockImplementation(
+        (_mailboxId, readToken, readTokenHash) => {
+          requireReader(readToken);
+
+          if (!readers.has(readTokenHash)) readers.set(readTokenHash, 0);
+
+          return Promise.resolve();
+        },
+      );
+      wire.removeReader.mockImplementation(
+        (_mailboxId, readToken, readTokenHash) => {
+          requireReader(readToken);
+          readers.delete(readTokenHash);
+          retainUnacknowledged();
+
+          return Promise.resolve();
+        },
+      );
       wire.append.mockImplementation((_mailboxId, _postToken, input) => {
-        requireInbox();
+        if (!present) throw new MailboxUnavailableError();
         const cursor = nextCursor;
         nextCursor += 1;
         envelopes.push({ ...input, cursor });
 
         return Promise.resolve({ cursor });
       });
-      wire.read.mockImplementation((_mailboxId, _readToken, after, limit) => {
-        requireInbox();
+      wire.read.mockImplementation((_mailboxId, readToken, after, limit) => {
+        requireReader(readToken);
 
         return Promise.resolve({
           envelopes: envelopes
@@ -564,30 +729,48 @@ describe(DirectMessageMailbox.name, () => {
           hasMore: false,
         });
       });
-      wire.acknowledge.mockImplementation((_mailboxId, _readToken, upTo) => {
-        requireInbox();
-        envelopes = envelopes.filter((envelope) => envelope.cursor > upTo);
+      wire.acknowledge.mockImplementation((_mailboxId, readToken, upTo) => {
+        requireReader(readToken);
+        const readTokenHash = MailboxCapability.hash(readToken);
+        readers.set(
+          readTokenHash,
+          Math.max(readers.get(readTokenHash) ?? 0, upTo),
+        );
+        retainUnacknowledged();
 
         return Promise.resolve();
       });
 
       return {
+        creates: () => creates,
+        envelopeCount: () => envelopes.length,
         evict: () => {
           present = false;
+          readers.clear();
           envelopes = [];
         },
         wire,
       };
     };
 
+    const mailboxFor = (
+      wire: PigeonMailboxClient,
+      store: DirectMessageMailboxStore,
+      projection: Pick<MessageProjectionPort, 'decryptMany'>,
+      catalog: readonly string[] = [credentialFor('bob')],
+    ): DirectMessageMailbox => {
+      const channel = new MailboxChannel(wire, jest.fn());
+      const readerSet = new DirectMessageReaderSet(channel, () =>
+        Promise.resolve(catalog),
+      );
+
+      return new DirectMessageMailbox(channel, store, projection, readerSet);
+    };
+
     it('delivers a message once and does not replay it after acknowledgement', async () => {
       const { projection, store } = setup();
-      const wire = inMemoryMailboxClient();
-      const mailbox = new DirectMessageMailbox(
-        new MailboxChannel(wire, jest.fn()),
-        store,
-        projection,
-      );
+      const { wire } = nodeMailboxClient();
+      const mailbox = mailboxFor(wire, store, projection);
       const applied: string[][] = [];
       const recordApplied = (messages: ChatMessage[]) => {
         applied.push(messages.map((message) => message.id));
@@ -611,18 +794,20 @@ describe(DirectMessageMailbox.name, () => {
       );
 
       expect(applied).toEqual([['message-1']]);
-      expect(wire.acknowledge).toHaveBeenCalledTimes(1);
-      expect(wire.acknowledge.mock.calls[0][2]).toBe(1);
+      // The device reader acks first; the root reader mirrors the cursor.
+      expect(wire.acknowledge).toHaveBeenCalledTimes(2);
+      expect(wire.acknowledge.mock.calls.map((call) => call[2])).toEqual([
+        1, 1,
+      ]);
+      expect(wire.acknowledge.mock.calls[0][1]).toBe(
+        readerTokensFor('bob', keysFor('bob').mailboxId).device,
+      );
     });
 
     it('shows one message when the legacy copy and the mailbox copy share an id', async () => {
       const { projection, store } = setup();
-      const wire = inMemoryMailboxClient();
-      const mailbox = new DirectMessageMailbox(
-        new MailboxChannel(wire, jest.fn()),
-        store,
-        projection,
-      );
+      const { wire } = nodeMailboxClient();
+      const mailbox = mailboxFor(wire, store, projection);
       let timeline: ChatMessage[] = [decrypted(sent)];
 
       await mailbox.deliver(session('alice'), conversation, sent, plain);
@@ -640,12 +825,8 @@ describe(DirectMessageMailbox.name, () => {
 
     it('delivers after the inbox was evicted and re-created under a stored cursor', async () => {
       const { projection, store } = setup();
-      const { evict, wire } = recreatableMailboxClient();
-      const mailbox = new DirectMessageMailbox(
-        new MailboxChannel(wire, jest.fn()),
-        store,
-        projection,
-      );
+      const { evict, wire } = nodeMailboxClient();
+      const mailbox = mailboxFor(wire, store, projection);
       const applied: string[][] = [];
       const sync = () =>
         mailbox.sync(
@@ -672,70 +853,10 @@ describe(DirectMessageMailbox.name, () => {
       expect(applied).toEqual([['message-1'], ['message-2']]);
     });
 
-    /**
-     * Mirrors the node: the inbox keeps only the hash of its read token, and a
-     * read or acknowledge needs the token whose hash it was created with.
-     */
-    const capabilityMailboxClient = (createGate?: Promise<void>) => {
-      let readTokenHash: string | null = null;
-      let envelopes: { body: string; cursor: number; envelopeId: string }[] =
-        [];
-      let nextCursor = 1;
-      let creates = 0;
-      const requireRead = (readToken: string) => {
-        if (readTokenHash !== MailboxCapability.hash(readToken)) {
-          throw new MailboxUnavailableError();
-        }
-      };
-      const wire = mock<PigeonMailboxClient>();
-      wire.create.mockImplementation(async (_mailboxId, creation) => {
-        creates += 1;
-        await createGate;
-
-        if (
-          readTokenHash !== null &&
-          readTokenHash !== creation.readTokenHash
-        ) {
-          throw new Error('mailbox exists with other capabilities');
-        }
-        readTokenHash = creation.readTokenHash;
-      });
-      wire.append.mockImplementation((_mailboxId, _postToken, input) => {
-        if (readTokenHash === null) throw new MailboxUnavailableError();
-        const cursor = nextCursor;
-        nextCursor += 1;
-        envelopes.push({ ...input, cursor });
-
-        return Promise.resolve({ cursor });
-      });
-      wire.read.mockImplementation((_mailboxId, readToken, after, limit) => {
-        requireRead(readToken);
-
-        return Promise.resolve({
-          envelopes: envelopes
-            .filter((envelope) => envelope.cursor > after)
-            .slice(0, limit),
-          hasMore: false,
-        });
-      });
-      wire.acknowledge.mockImplementation((_mailboxId, readToken, upTo) => {
-        requireRead(readToken);
-        envelopes = envelopes.filter((envelope) => envelope.cursor > upTo);
-
-        return Promise.resolve();
-      });
-
-      return { creates: () => creates, wire };
-    };
-
     it('reads the inbox again after the device lost its local storage', async () => {
       const { clearStorage, projection, store } = setup();
-      const { wire } = capabilityMailboxClient();
-      const mailbox = new DirectMessageMailbox(
-        new MailboxChannel(wire, jest.fn()),
-        store,
-        projection,
-      );
+      const { wire } = nodeMailboxClient();
+      const mailbox = mailboxFor(wire, store, projection);
       const applied: string[][] = [];
       const sync = () =>
         mailbox.sync(
@@ -768,12 +889,8 @@ describe(DirectMessageMailbox.name, () => {
       const gate = new Promise<void>((resolve) => {
         releaseCreate = resolve;
       });
-      const { creates, wire } = capabilityMailboxClient(gate);
-      const mailbox = new DirectMessageMailbox(
-        new MailboxChannel(wire, jest.fn()),
-        store,
-        projection,
-      );
+      const { creates, wire } = nodeMailboxClient(gate);
+      const mailbox = mailboxFor(wire, store, projection);
       // StrictMode runs the mount effect twice: the first pass is aborted
       // while its create is in flight.
       const firstPass = new AbortController();
@@ -800,12 +917,8 @@ describe(DirectMessageMailbox.name, () => {
 
     it('lets a sender deliver without the recipient root key', async () => {
       const { projection, store } = setup();
-      const wire = inMemoryMailboxClient();
-      const mailbox = new DirectMessageMailbox(
-        new MailboxChannel(wire, jest.fn()),
-        store,
-        projection,
-      );
+      const { wire } = nodeMailboxClient();
+      const mailbox = mailboxFor(wire, store, projection);
       const senderWithoutRootKey = {
         ...session('alice'),
         masterKey: undefined,
@@ -814,6 +927,54 @@ describe(DirectMessageMailbox.name, () => {
       await expect(
         mailbox.deliver(senderWithoutRootKey, conversation, sent, plain),
       ).resolves.toBe('delivered');
+    });
+
+    it('keeps an envelope until every device of the identity has acknowledged it', async () => {
+      const { projection } = setup();
+      const { envelopeCount, wire } = nodeMailboxClient();
+      const catalog = ['credential-phone', 'credential-laptop'];
+      const phoneStore = memoryStore();
+      const laptopStore = memoryStore();
+      const sender = mailboxFor(wire, memoryStore(), projection, catalog);
+      const phone = mailboxFor(wire, phoneStore, projection, catalog);
+      const laptop = mailboxFor(wire, laptopStore, projection, catalog);
+      const phoneSession = deviceSession('bob', 'credential-phone');
+      const laptopSession = deviceSession('bob', 'credential-laptop');
+      const phoneApplied: string[][] = [];
+      const laptopApplied: string[][] = [];
+      const recordInto = (applied: string[][]) => (messages: ChatMessage[]) => {
+        applied.push(messages.map((message) => message.id));
+      };
+
+      await phone.sync(
+        phoneSession,
+        conversationId,
+        new AbortController().signal,
+        recordInto(phoneApplied),
+      );
+      await laptop.sync(
+        laptopSession,
+        conversationId,
+        new AbortController().signal,
+        recordInto(laptopApplied),
+      );
+      await sender.deliver(session('alice'), conversation, sent, plain);
+      await phone.sync(
+        phoneSession,
+        conversationId,
+        new AbortController().signal,
+        recordInto(phoneApplied),
+      );
+      await laptop.sync(
+        laptopSession,
+        conversationId,
+        new AbortController().signal,
+        recordInto(laptopApplied),
+      );
+
+      expect(phoneApplied).toEqual([['message-1']]);
+      expect(laptopApplied).toEqual([['message-1']]);
+      expect(envelopeCount()).toBe(0);
     });
   });
 });

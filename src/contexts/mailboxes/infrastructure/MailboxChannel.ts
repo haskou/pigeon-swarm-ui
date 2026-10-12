@@ -1,7 +1,10 @@
 import { randomBytes } from '@noble/hashes/utils.js';
 
 import type { MailboxKeys } from './crypto/MailboxKeySchedule';
-import type { PigeonMailboxClient } from './http/PigeonMailboxClient';
+import type {
+  MailboxReaderSet,
+  PigeonMailboxClient,
+} from './http/PigeonMailboxClient';
 
 import { encodeBase64Url } from '../../../shared/infrastructure/encoding/base64url';
 import { MailboxCapability } from './crypto/MailboxCapability';
@@ -17,6 +20,16 @@ export type MailboxCreationMiner = (
   readTokenHash: string,
   difficultyBits: number,
 ) => Promise<string>;
+
+/**
+ * Recipient read capabilities for one inbox. `device` is this device's
+ * reader: it reads and acknowledges. `root` is the first reader and the only
+ * one that manages the reader set; every acknowledgement is mirrored to it.
+ */
+export type MailboxReadTokens = {
+  device: string;
+  root: string;
+};
 
 export type OpenedMailboxEnvelope = {
   cursor: number;
@@ -79,14 +92,14 @@ export class MailboxChannel {
 
   /**
    * Re-creates the recipient mailbox when the node reports it unavailable,
-   * then retries the operation once. Only recipient routes recover: a sender
-   * lacks the read-token hash needed to re-create the mailbox. `recreated`
-   * tells the caller that the mailbox is new, so cursors from the old one no
-   * longer apply.
+   * with the root reader, re-enrols the device reader, then retries the
+   * operation once. Only recipient routes recover: a sender lacks the root
+   * token needed to re-create the mailbox. `recreated` tells the caller that
+   * the mailbox is new, so cursors from the old one no longer apply.
    */
   private async recovering<T>(
     keys: MailboxKeys,
-    readToken: string,
+    readers: MailboxReadTokens,
     operation: () => Promise<T>,
   ): Promise<{ recreated: boolean; value: T }> {
     try {
@@ -96,7 +109,8 @@ export class MailboxChannel {
         throw error;
       }
 
-      await this.createInbox(keys, readToken);
+      await this.createInbox(keys, readers.root);
+      await this.addReader(keys, readers.root, readers.device);
 
       return { recreated: true, value: await operation() };
     }
@@ -105,7 +119,7 @@ export class MailboxChannel {
   /**
    * Recipient only. Creates the inbox once, mining at the default difficulty.
    * If the node names a higher difficulty up to MAX_CREATION_DIFFICULTY_BITS,
-   * re-mines once at that value. Keep the readToken to read and acknowledge.
+   * re-mines once at that value. Keep the root token, which manages readers.
    * Overlapping calls for the same inbox and token share one creation: a
    * second pass can see the inbox as missing while the first is still
    * creating it.
@@ -192,14 +206,14 @@ export class MailboxChannel {
    */
   public async read(
     keys: MailboxKeys,
-    readToken: string,
+    readers: MailboxReadTokens,
     after: number,
     limit: number,
   ): Promise<OpenedMailboxPage> {
     const { recreated, value: page } = await this.recovering(
       keys,
-      readToken,
-      () => this.client.read(keys.mailboxId, readToken, after, limit),
+      readers,
+      () => this.client.read(keys.mailboxId, readers.device, after, limit),
     );
     const envelopes: OpenedMailboxEnvelope[] = [];
 
@@ -234,19 +248,51 @@ export class MailboxChannel {
   }
 
   /**
-   * Recipient. Removes everything up to and including `upTo`. An evicted
+   * Recipient. Acknowledges through the device reader, then mirrors the same
+   * cursor to the root reader so envelopes wait for every reader. An evicted
    * mailbox is re-created once and the acknowledgement retried. Reports
    * whether that re-creation happened.
    */
   public async acknowledge(
     keys: MailboxKeys,
-    readToken: string,
+    readers: MailboxReadTokens,
     upTo: number,
   ): Promise<{ recreated: boolean }> {
-    const { recreated } = await this.recovering(keys, readToken, () =>
-      this.client.acknowledge(keys.mailboxId, readToken, upTo),
-    );
+    const { recreated } = await this.recovering(keys, readers, async () => {
+      await this.client.acknowledge(keys.mailboxId, readers.device, upTo);
+      await this.client.acknowledge(keys.mailboxId, readers.root, upTo);
+    });
 
     return { recreated };
+  }
+
+  /** Lists the inbox's readers. The root token authorises the call. */
+  public listReaders(
+    keys: MailboxKeys,
+    rootToken: string,
+  ): Promise<MailboxReaderSet> {
+    return this.client.readers(keys.mailboxId, rootToken);
+  }
+
+  /** Enrols a reader by its token hash, authorised by the root token. */
+  public async addReader(
+    keys: MailboxKeys,
+    rootToken: string,
+    readerToken: string,
+  ): Promise<void> {
+    await this.client.addReader(
+      keys.mailboxId,
+      rootToken,
+      MailboxCapability.hash(readerToken),
+    );
+  }
+
+  /** Removes a reader by hash. The node refuses to drop the last reader. */
+  public async removeReader(
+    keys: MailboxKeys,
+    rootToken: string,
+    readerTokenHash: string,
+  ): Promise<void> {
+    await this.client.removeReader(keys.mailboxId, rootToken, readerTokenHash);
   }
 }

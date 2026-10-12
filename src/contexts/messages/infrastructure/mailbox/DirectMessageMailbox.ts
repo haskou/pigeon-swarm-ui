@@ -7,13 +7,18 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 import type { MailboxKeys } from '../../../mailboxes/infrastructure/crypto/MailboxKeySchedule';
-import type { OpenedMailboxPage } from '../../../mailboxes/infrastructure/MailboxChannel';
+import type {
+  MailboxReadTokens,
+  OpenedMailboxPage,
+} from '../../../mailboxes/infrastructure/MailboxChannel';
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { DirectMessageMailboxState } from './DirectMessageMailboxStore';
+import type { DirectMessageReaderSet } from './DirectMessageReaderSet';
 
 import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
 import { MailboxKeySchedule } from '../../../mailboxes/infrastructure/crypto/MailboxKeySchedule';
 import { MailboxReadToken } from '../../../mailboxes/infrastructure/crypto/MailboxReadToken';
+import { MailboxUnavailableError } from '../../../mailboxes/infrastructure/http/MailboxUnavailableError';
 import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageMailboxRecord } from './DirectMessageMailboxRecord';
 import { DirectMessageMailboxStore } from './DirectMessageMailboxStore';
@@ -27,10 +32,10 @@ export type DirectMessageOutgoing = {
   hasSticker: boolean;
 };
 
-/** Keys, read token, and saved state for the inbox this device reads. */
+/** Keys, reader tokens, and saved state for the inbox this device reads. */
 type RecipientInbox = {
   keys: MailboxKeys;
-  readToken: string;
+  readers: MailboxReadTokens;
   state: DirectMessageMailboxState;
 };
 
@@ -47,6 +52,7 @@ export class DirectMessageMailbox {
     private readonly channel: MailboxChannel,
     private readonly store: DirectMessageMailboxStore,
     private readonly projection: Pick<MessageProjectionPort, 'decryptMany'>,
+    private readonly readerSet: DirectMessageReaderSet,
   ) {}
 
   /**
@@ -101,9 +107,10 @@ export class DirectMessageMailbox {
    * inbox. When the inbox was re-created, its cursors restart at 1, so the
    * stored cursor is reset.
    *
-   * The read token is derived from the identity's root key, so a device that
+   * Reader tokens are derived from the identity's root key, so a device that
    * lost its local storage reads the inbox it created earlier. Only inboxes
-   * created before this derivation keep a stored token.
+   * created before this derivation keep a stored legacy token, which the
+   * first pass adopts into the reader set.
    */
   public async sync(
     session: Session,
@@ -117,6 +124,10 @@ export class DirectMessageMailbox {
 
     if (signal.aborted) return;
 
+    await this.readerSet.reconcile(session, inbox.keys, inbox.readers);
+
+    if (signal.aborted) return;
+
     const { cursor, page } = await this.readPage(inbox);
 
     if (page.lastCursor <= cursor || signal.aborted) return;
@@ -125,45 +136,99 @@ export class DirectMessageMailbox {
   }
 
   /**
-   * Resolves the inbox keys, read token, and saved state. The derived token
-   * is never persisted.
+   * Resolves the inbox keys, reader tokens, and saved state. A stored legacy
+   * token is adopted into the reader set first. The derived tokens are never
+   * persisted.
    */
   private async openInbox(
     session: Session,
     conversationId: string,
   ): Promise<RecipientInbox> {
     const keys = this.keysFor(session, conversationId, session.identity.id);
+    const readers = this.readersFor(session, keys);
     const stored = this.store.load(keys.mailboxId);
-    const state = stored ?? { cursor: 0 };
-    const readToken =
-      state.readToken ??
-      MailboxReadToken.derive(session.masterKey.getBuffer(), keys.mailboxId);
 
-    if (!stored) {
-      // Saved before the create, so a concurrent pass takes the same path and
-      // shares the in-flight create (see MailboxChannel.createInbox).
-      this.store.save(keys.mailboxId, state);
-      await this.ensureInbox(keys, readToken);
+    if (stored && !stored.readToken) {
+      return { keys, readers, state: stored };
     }
 
-    return { keys, readToken, state };
+    if (
+      stored?.readToken &&
+      (await this.adoptLegacy(keys, stored.readToken, readers))
+    ) {
+      const adopted = { cursor: stored.cursor };
+
+      this.store.save(keys.mailboxId, adopted);
+
+      return { keys, readers, state: adopted };
+    }
+
+    const state = { cursor: 0 };
+
+    // Saved before the create, so a concurrent pass takes the same path and
+    // shares the in-flight create (see MailboxChannel.createInbox).
+    this.store.save(keys.mailboxId, state);
+    await this.ensureInbox(keys, readers);
+
+    return { keys, readers, state };
   }
 
   /**
-   * Creates the recipient inbox before its first read so that senders can
-   * append to it. Silent on failure: the read's own 404 recovery covers it.
+   * Registers both readers under the legacy token, which carries root
+   * authority for an inbox created before derivation. Returns false when that
+   * inbox no longer exists; other failures keep the stored state and surface.
+   */
+  private async adoptLegacy(
+    keys: MailboxKeys,
+    legacyToken: string,
+    readers: MailboxReadTokens,
+  ): Promise<boolean> {
+    try {
+      await this.channel.addReader(keys, legacyToken, readers.root);
+      await this.channel.addReader(keys, legacyToken, readers.device);
+
+      return true;
+    } catch (error: unknown) {
+      if (error instanceof MailboxUnavailableError) return false;
+
+      throw error;
+    }
+  }
+
+  /**
+   * Creates the recipient inbox and enrols this device's reader before the
+   * first read, so senders can append and the device reads without recovery.
+   * Silent on failure: the read's own 404 recovery covers it.
    */
   private async ensureInbox(
     keys: MailboxKeys,
-    readToken: string,
+    readers: MailboxReadTokens,
   ): Promise<void> {
     try {
-      await this.channel.createInbox(keys, readToken);
+      await this.channel.createInbox(keys, readers.root);
+      await this.channel.addReader(keys, readers.root, readers.device);
     } catch {
       // Count-only: no ids, content, or error details.
       // eslint-disable-next-line no-console
       console.debug('Direct mailbox inbox create failed; read will retry.');
     }
+  }
+
+  /**
+   * The root token manages the reader set. The device token reads and acks
+   * under this device's credential. Both derive from the identity root key.
+   */
+  private readersFor(session: Session, keys: MailboxKeys): MailboxReadTokens {
+    const rootKey = session.masterKey.getBuffer();
+
+    return {
+      device: MailboxReadToken.deriveDevice(
+        rootKey,
+        keys.mailboxId,
+        session.deviceCredentialKeyPair.toPrimitives().publicKey,
+      ),
+      root: MailboxReadToken.derive(rootKey, keys.mailboxId),
+    };
   }
 
   /**
@@ -175,10 +240,10 @@ export class DirectMessageMailbox {
   private async readPage(
     inbox: RecipientInbox,
   ): Promise<{ cursor: number; page: OpenedMailboxPage }> {
-    const { keys, readToken, state } = inbox;
+    const { keys, readers, state } = inbox;
     const page = await this.channel.read(
       keys,
-      readToken,
+      readers,
       state.cursor,
       DirectMessageMailbox.PAGE_SIZE,
     );
@@ -193,7 +258,7 @@ export class DirectMessageMailbox {
       cursor: 0,
       page: await this.channel.read(
         keys,
-        readToken,
+        readers,
         0,
         DirectMessageMailbox.PAGE_SIZE,
       ),
@@ -212,7 +277,7 @@ export class DirectMessageMailbox {
     signal: AbortSignal,
     apply: (messages: ChatMessage[]) => void,
   ): Promise<void> {
-    const { keys, readToken, state } = inbox;
+    const { keys, readers, state } = inbox;
     const messages = await this.decryptPage(
       session,
       conversationId,
@@ -228,7 +293,7 @@ export class DirectMessageMailbox {
 
     const acked = await this.channel.acknowledge(
       keys,
-      readToken,
+      readers,
       page.lastCursor,
     );
     this.store.save(keys.mailboxId, {

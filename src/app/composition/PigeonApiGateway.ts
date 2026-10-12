@@ -57,6 +57,7 @@ import { PigeonMessagesApi } from '../../contexts/messages/infrastructure/http/P
 import { PigeonMessagesGateway } from '../../contexts/messages/infrastructure/http/PigeonMessagesGateway';
 import { DirectMessageMailbox } from '../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
 import { DirectMessageMailboxStore } from '../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxStore';
+import { DirectMessageReaderSet } from '../../contexts/messages/infrastructure/mailbox/DirectMessageReaderSet';
 import { PigeonNodeApi } from '../../contexts/networks/infrastructure/http/PigeonNodeApi';
 import { PigeonNotificationsApi } from '../../contexts/notifications/infrastructure/http/PigeonNotificationsApi';
 import { PigeonNotificationsGateway } from '../../contexts/notifications/infrastructure/http/PigeonNotificationsGateway';
@@ -313,10 +314,19 @@ export class PigeonApiGateway {
       this.messageCommands,
     );
     this.mailboxMiner = new LazyMailboxCreationMiner();
+    const mailboxChannel = new MailboxChannel(
+      new PigeonMailboxClient(http),
+      this.mailboxMiner.mine,
+    );
     this.directMessageMailbox = new DirectMessageMailbox(
-      new MailboxChannel(new PigeonMailboxClient(http), this.mailboxMiner.mine),
+      mailboxChannel,
       new DirectMessageMailboxStore(),
       this.messageProjection,
+      new DirectMessageReaderSet(mailboxChannel, async (session) =>
+        (await this.identityGateway.listDevices(session)).map((device) =>
+          device.valueOf(),
+        ),
+      ),
     );
     this.node = new PigeonNodeApi(http, signer);
     this.notificationsGateway = new PigeonNotificationsGateway(

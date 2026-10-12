@@ -26,6 +26,16 @@ export type MailboxPage = {
   hasMore: boolean;
 };
 
+export type MailboxReader = {
+  ackedCursor: number;
+  readTokenHash: string;
+};
+
+export type MailboxReaderSet = {
+  maxReaders: number;
+  readers: MailboxReader[];
+};
+
 /**
  * Wire client for the node mailbox routes. Capabilities travel only as bearer
  * tokens. A 404 means the mailbox does not exist on this node and maps to
@@ -145,6 +155,47 @@ export class PigeonMailboxClient {
         headers: PigeonMailboxClient.bearer(readToken),
         method: 'POST',
       }),
+    );
+  }
+
+  public async readers(
+    mailboxId: string,
+    token: string,
+  ): Promise<MailboxReaderSet> {
+    return this.call(() =>
+      this.http.request<MailboxReaderSet>(`/mailboxes/${mailboxId}/readers`, {
+        headers: PigeonMailboxClient.bearer(token),
+      }),
+    );
+  }
+
+  public async addReader(
+    mailboxId: string,
+    token: string,
+    readTokenHash: string,
+  ): Promise<void> {
+    await this.call(() =>
+      this.http.request<void>(`/mailboxes/${mailboxId}/readers`, {
+        body: JSON.stringify({ readTokenHash }),
+        headers: PigeonMailboxClient.bearer(token),
+        method: 'POST',
+      }),
+    );
+  }
+
+  public async removeReader(
+    mailboxId: string,
+    token: string,
+    readTokenHash: string,
+  ): Promise<void> {
+    await this.call(() =>
+      this.http.request<void>(
+        `/mailboxes/${mailboxId}/readers/${readTokenHash}`,
+        {
+          headers: PigeonMailboxClient.bearer(token),
+          method: 'DELETE',
+        },
+      ),
     );
   }
 }
