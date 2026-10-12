@@ -352,6 +352,22 @@ describe(DirectMessageMailbox.name, () => {
       ).resolves.toEqual(expect.objectContaining({ id: 'message-1' }));
     });
 
+    it('retries the peer append while the recipient inbox is not open yet, then delivers and writes the own copy', async () => {
+      jest.useFakeTimers();
+      const { channel, mailbox } = setup();
+      channel.send
+        .mockRejectedValueOnce(new MailboxUnavailableError())
+        .mockRejectedValueOnce(new MailboxUnavailableError())
+        .mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
+
+      const delivery = mailbox.send(session('alice'), conversation, 'hello', {});
+      await jest.advanceTimersByTimeAsync(10_000);
+
+      await expect(delivery).resolves.toMatchObject({ id: 'message-1' });
+      expect(channel.send).toHaveBeenCalledTimes(4);
+      jest.useRealTimers();
+    });
+
     it('rejects a payload over the envelope bound and sends nothing', async () => {
       const { channel, composed, mailbox } = setup();
       composed.sent = {
@@ -735,16 +751,20 @@ describe(DirectMessageMailbox.name, () => {
   describe.each(deliveries)(
     '%s rejects when the peer copy fails',
     (_label, deliverKind) => {
-      it('rejects with MailboxUnavailableError when the recipient inbox is missing, and logs nothing', async () => {
+      it('retries while the recipient inbox is missing, then rejects with MailboxUnavailableError, and logs nothing', async () => {
+        jest.useFakeTimers();
         const { channel, mailbox } = setup();
         channel.send.mockRejectedValue(new MailboxUnavailableError());
         const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
 
-        await expect(
+        const delivery = expect(
           deliverKind(mailbox, session('alice'), conversation),
         ).rejects.toBeInstanceOf(MailboxUnavailableError);
+        await jest.advanceTimersByTimeAsync(60_000);
+        await delivery;
         expect(debug).not.toHaveBeenCalled();
         debug.mockRestore();
+        jest.useRealTimers();
       });
 
       it('rejects any other append failure', async () => {
@@ -2860,9 +2880,7 @@ describe(DirectMessageMailbox.name, () => {
       evict();
       const mailbox = mailboxFor(wire, store, projection);
 
-      await expect(
-        mailbox.send(session('alice'), conversation, 'hello', {}),
-      ).rejects.toBeInstanceOf(MailboxUnavailableError);
+      const delivery = mailbox.send(session('alice'), conversation, 'hello', {});
       await expect(
         mailbox.openInboxes(
           session('bob'),
@@ -2870,9 +2888,7 @@ describe(DirectMessageMailbox.name, () => {
           new AbortController().signal,
         ),
       ).resolves.toBe(true);
-      await expect(
-        mailbox.send(session('alice'), conversation, 'hello', {}),
-      ).resolves.toMatchObject({ id: 'message-1' });
+      await expect(delivery).resolves.toMatchObject({ id: 'message-1' });
 
       const applied: string[][] = [];
       await mailbox.sync(
