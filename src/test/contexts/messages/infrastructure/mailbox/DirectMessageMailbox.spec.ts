@@ -1,11 +1,11 @@
 import { Buffer } from 'buffer';
 import { mock } from 'jest-mock-extended';
 
-import type { MailboxReadTokens } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import type { MailboxKeys } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxKeySchedule';
 import type { PigeonMailboxClient } from '../../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
-import type { DirectMessageMailboxState } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxStore';
+import type { MailboxReadTokens } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import type { MessageProjectionPort } from '../../../../../contexts/messages/infrastructure/crypto/MessageProjectionPort';
+import type { DirectMessageMailboxState } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxStore';
 import type {
   ChatMessage,
   ConversationResource,
@@ -19,9 +19,9 @@ import { MailboxReadToken } from '../../../../../contexts/mailboxes/infrastructu
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/infrastructure/http/MailboxUnavailableError';
 import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageMailbox } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
-import { DirectMessageReaderSet } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageReaderSet';
 import { DirectMessageMailboxRecord } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxRecord';
 import { DirectMessageMailboxStore } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxStore';
+import { DirectMessageReaderSet } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageReaderSet';
 import { MessageCollection } from '../../../../../contexts/messages/presentation/view-models/MessageCollection';
 
 describe(DirectMessageMailbox.name, () => {
@@ -57,13 +57,10 @@ describe(DirectMessageMailbox.name, () => {
 
   const session = (identityId: string): Session =>
     ({
-      identity: { id: identityId },
-      masterKey: {
-        getBuffer: () => Buffer.alloc(32, identityId === 'alice' ? 3 : 9),
-      },
       deviceCredentialKeyPair: {
         toPrimitives: () => ({ publicKey: credentialFor(identityId) }),
       },
+      identity: { id: identityId },
       keychain: {
         conversations: {
           [conversationId]: {
@@ -77,6 +74,9 @@ describe(DirectMessageMailbox.name, () => {
           },
         },
         version: 1,
+      },
+      masterKey: {
+        getBuffer: () => Buffer.alloc(32, identityId === 'alice' ? 3 : 9),
       },
     }) as unknown as Session;
 
@@ -640,10 +640,10 @@ describe(DirectMessageMailbox.name, () => {
 
   describe('over the real channel', () => {
     /**
-     * Mirrors the node: the inbox keeps the hash of every reader token with the
-     * cursor that reader has acknowledged. An envelope is kept until the slowest
-     * reader has acknowledged it, and reads or acknowledgements need a token
-     * whose hash is registered.
+     * Mirrors the node: the inbox keeps the hash of every reader token with
+     * the cursor that reader has acknowledged. An envelope is kept until the
+     * slowest reader has acknowledged it, and reads or acknowledgements need a
+     * token whose hash is registered.
      */
     const nodeMailboxClient = (createGate?: Promise<void>) => {
       let present = true;
@@ -674,6 +674,7 @@ describe(DirectMessageMailbox.name, () => {
 
           return;
         }
+
         if (!present) {
           present = true;
           nextCursor = 1;
@@ -695,6 +696,7 @@ describe(DirectMessageMailbox.name, () => {
       wire.addReader.mockImplementation(
         (_mailboxId, readToken, readTokenHash) => {
           requireReader(readToken);
+
           if (!readers.has(readTokenHash)) readers.set(readTokenHash, 0);
 
           return Promise.resolve();
@@ -792,7 +794,7 @@ describe(DirectMessageMailbox.name, () => {
       );
 
       expect(applied).toEqual([['message-1']]);
-      // The device reader acknowledges first; the root reader mirrors the cursor.
+      // The device reader acks first; the root reader mirrors the cursor.
       expect(wire.acknowledge).toHaveBeenCalledTimes(2);
       expect(wire.acknowledge.mock.calls.map((call) => call[2])).toEqual([
         1, 1,
@@ -940,10 +942,9 @@ describe(DirectMessageMailbox.name, () => {
       const laptopSession = deviceSession('bob', 'credential-laptop');
       const phoneApplied: string[][] = [];
       const laptopApplied: string[][] = [];
-      const recordInto =
-        (applied: string[][]) => (messages: ChatMessage[]) => {
-          applied.push(messages.map((message) => message.id));
-        };
+      const recordInto = (applied: string[][]) => (messages: ChatMessage[]) => {
+        applied.push(messages.map((message) => message.id));
+      };
 
       await phone.sync(
         phoneSession,

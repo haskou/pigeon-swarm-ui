@@ -69,7 +69,9 @@ describe(MailboxReadToken.name, () => {
     it('differs per device credential, so each device has its own reader', () => {
       expect(
         MailboxReadToken.deriveDevice(rootKey, mailboxId, credentialB),
-      ).not.toBe(MailboxReadToken.deriveDevice(rootKey, mailboxId, credentialA));
+      ).not.toBe(
+        MailboxReadToken.deriveDevice(rootKey, mailboxId, credentialA),
+      );
     });
 
     it('differs per mailbox', () => {
@@ -94,7 +96,11 @@ describe(MailboxReadToken.name, () => {
 
     it('rejects a root key that is not 32 bytes', () => {
       expect(() =>
-        MailboxReadToken.deriveDevice(new Uint8Array(31), mailboxId, credentialA),
+        MailboxReadToken.deriveDevice(
+          new Uint8Array(31),
+          mailboxId,
+          credentialA,
+        ),
       ).toThrow(RangeError);
     });
 

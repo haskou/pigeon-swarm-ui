@@ -163,10 +163,9 @@ export class PigeonMailboxClient {
     token: string,
   ): Promise<MailboxReaderSet> {
     return this.call(() =>
-      this.http.request<MailboxReaderSet>(
-        `/mailboxes/${mailboxId}/readers`,
-        { headers: PigeonMailboxClient.bearer(token) },
-      ),
+      this.http.request<MailboxReaderSet>(`/mailboxes/${mailboxId}/readers`, {
+        headers: PigeonMailboxClient.bearer(token),
+      }),
     );
   }
 

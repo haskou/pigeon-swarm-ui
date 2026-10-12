@@ -238,9 +238,9 @@ describe(PigeonMailboxClient.name, () => {
 
     http.request.mockRejectedValue(new HttpJsonError(404, 'Not Found', ''));
 
-    await expect(client.readers(mailboxId, 'root-token')).rejects.toBeInstanceOf(
-      MailboxUnavailableError,
-    );
+    await expect(
+      client.readers(mailboxId, 'root-token'),
+    ).rejects.toBeInstanceOf(MailboxUnavailableError);
     await expect(
       client.addReader(mailboxId, 'root-token', 'device-hash'),
     ).rejects.toBeInstanceOf(MailboxUnavailableError);
