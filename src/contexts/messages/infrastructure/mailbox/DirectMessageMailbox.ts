@@ -81,6 +81,7 @@ export class DirectMessageMailbox {
   private static readonly PAGE_SIZE = 50;
   private static readonly EPOCH = 0;
   private static readonly OPEN_RETRY_MS = 60_000;
+  private static readonly READ_PAGE_LIMIT = 4;
 
   private readonly opening = new Map<string, Promise<RecipientInbox>>();
   /** Inboxes whose last open failed, keyed by mailbox id, and when to retry. */
@@ -238,6 +239,96 @@ export class DirectMessageMailbox {
     if (page.lastCursor <= cursor || signal.aborted) return;
 
     await this.applyPage(session, conversationId, inbox, page, signal, apply);
+  }
+
+  /**
+   * Recipient, background pass for a conversation that no active pass reads.
+   * It clears unread from this identity's own read receipts. It never
+   * acknowledges and never moves the sync cursor: the active pass owns both.
+   * It opens and decodes envelopes as the active pass does, keeps its own read
+   * cursor, and builds no messages.
+   *
+   * A read clears unread only when no sent message from another identity
+   * follows it, so an unread message is never hidden. A visit reads at most
+   * READ_PAGE_LIMIT pages, and a clear applies only once it reaches the end of
+   * the inbox. The pass reads only an inbox prewarm already opened on this
+   * device, and never creates or adopts one.
+   */
+  public async syncReads(
+    session: Session,
+    conversationId: string,
+    signal: AbortSignal,
+    apply: (changes: DirectMessageTimelineChange[]) => void,
+  ): Promise<void> {
+    const keys = this.keysFor(session, conversationId, session.identity.id);
+
+    if (!this.readsAllowed(keys.mailboxId, signal)) return;
+
+    const readers = this.readersFor(session, keys);
+    let cursor = this.store.loadReadCursor(keys.mailboxId) ?? 0;
+    let pending: string | null = null;
+
+    for (
+      let visit = 0;
+      visit < DirectMessageMailbox.READ_PAGE_LIMIT;
+      visit += 1
+    ) {
+      const page = await this.channel.read(
+        keys,
+        readers,
+        cursor,
+        DirectMessageMailbox.PAGE_SIZE,
+      );
+
+      if (signal.aborted) return;
+
+      if (page.recreated && cursor > 0) {
+        // Re-created inbox: its envelopes number from 1 again.
+        cursor = 0;
+        pending = null;
+        this.store.saveReadCursor(keys.mailboxId, cursor);
+        continue;
+      }
+
+      pending = this.pendingRead(session, conversationId, page, pending);
+      cursor = this.advanceReadCursor(keys.mailboxId, cursor, page.lastCursor);
+
+      if (!page.hasMore) {
+        this.clearUnread(pending, apply);
+
+        return;
+      }
+    }
+  }
+
+  /** Reads only an inbox prewarm already opened, without a legacy readToken. */
+  private readsAllowed(mailboxId: string, signal: AbortSignal): boolean {
+    if (signal.aborted) return false;
+
+    const stored = this.store.load(mailboxId);
+
+    return stored !== null && !stored.readToken;
+  }
+
+  /** Saves the cursor when a page moved it forward, and returns the cursor. */
+  private advanceReadCursor(
+    mailboxId: string,
+    cursor: number,
+    lastCursor: number,
+  ): number {
+    if (lastCursor <= cursor) return cursor;
+
+    this.store.saveReadCursor(mailboxId, lastCursor);
+
+    return lastCursor;
+  }
+
+  /** Clears unread once the pass has reached the end of the inbox. */
+  private clearUnread(
+    pending: string | null,
+    apply: (changes: DirectMessageTimelineChange[]) => void,
+  ): void {
+    if (pending !== null) apply([{ kind: 'read', messageId: pending }]);
   }
 
   /**
@@ -690,12 +781,49 @@ export class DirectMessageMailbox {
     session: Session,
     record: DirectReadRecord,
   ): DirectMessageTimelineChange[] {
-    const own = record.authorId === session.identity.id;
-    const fresh = DirectMessageMailboxRecord.isFreshReceipt(record, Date.now());
-
-    return own && fresh
+    return this.isOwnFreshRead(session, record)
       ? [{ kind: 'read', messageId: record.targetMessageId }]
       : [];
+  }
+
+  /** Own read receipts only, and only while they are fresh. */
+  private isOwnFreshRead(session: Session, record: DirectReadRecord): boolean {
+    return (
+      record.authorId === session.identity.id &&
+      DirectMessageMailboxRecord.isFreshReceipt(record, Date.now())
+    );
+  }
+
+  /**
+   * The read a page leaves pending. A fresh read of this identity sets it, and
+   * a sent message from another identity after it clears it, since that
+   * message is unread. Other records leave it as it is.
+   */
+  private pendingRead(
+    session: Session,
+    conversationId: string,
+    page: OpenedMailboxPage,
+    pending: string | null,
+  ): string | null {
+    let next = pending;
+
+    for (const envelope of page.envelopes) {
+      const record = DirectMessageMailboxRecord.decode(
+        envelope.plaintext,
+        conversationId,
+      );
+
+      if (record?.type === 'read' && this.isOwnFreshRead(session, record)) {
+        next = record.targetMessageId;
+      } else if (
+        record?.type === 'sent' &&
+        record.authorId !== session.identity.id
+      ) {
+        next = null;
+      }
+    }
+
+    return next;
   }
 
   /**

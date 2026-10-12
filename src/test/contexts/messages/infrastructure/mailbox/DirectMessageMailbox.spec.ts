@@ -1273,6 +1273,391 @@ describe(DirectMessageMailbox.name, () => {
     });
   });
 
+  describe('syncReads', () => {
+    const now = 1_700_000_000_000;
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const readOf = (
+      overrides: Partial<DirectReadRecord>,
+    ): DirectReadRecord => ({
+      authorId: 'alice',
+      conversationId,
+      createdAt: now,
+      id: 'read-1',
+      targetMessageId: 'message-1',
+      type: 'read',
+      ...overrides,
+    });
+    const sentBy = (authorId: string, id: string): Uint8Array =>
+      DirectMessageMailboxRecord.encode({ ...storedRecord, authorId, id });
+    const openedInbox = (store: DirectMessageMailboxStore): void => {
+      store.save(keysFor('alice').mailboxId, { cursor: 0 });
+    };
+    const readCursorOf = (store: DirectMessageMailboxStore): number | null =>
+      store.loadReadCursor(keysFor('alice').mailboxId);
+
+    beforeEach(() => {
+      jest.spyOn(Date, 'now').mockReturnValue(now);
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('applies a read that no peer message follows, without decrypting or acknowledging', async () => {
+      const { channel, mailbox, projection, store } = setup();
+      openedInbox(store);
+      channel.read.mockResolvedValue(
+        pageOf([
+          sentBy('bob', 'message-2'),
+          DirectMessageMailboxRecord.encode(readOf({})),
+        ]),
+      );
+      const apply = jest.fn();
+
+      await mailbox.syncReads(
+        session('alice'),
+        conversationId,
+        new AbortController().signal,
+        apply,
+      );
+
+      expect(apply).toHaveBeenCalledWith([
+        { kind: 'read', messageId: 'message-1' },
+      ]);
+      expect(projection.decryptMany).not.toHaveBeenCalled();
+      expect(channel.acknowledge).not.toHaveBeenCalled();
+      expect(store.load(keysFor('alice').mailboxId)).toEqual({ cursor: 0 });
+      expect(readCursorOf(store)).toBe(2);
+    });
+
+    it('does not apply a read that a later peer message follows', async () => {
+      const { channel, mailbox, store } = setup();
+      openedInbox(store);
+      channel.read.mockResolvedValue(
+        pageOf([
+          DirectMessageMailboxRecord.encode(readOf({})),
+          sentBy('bob', 'message-2'),
+        ]),
+      );
+      const apply = jest.fn();
+
+      await mailbox.syncReads(
+        session('alice'),
+        conversationId,
+        new AbortController().signal,
+        apply,
+      );
+
+      expect(apply).not.toHaveBeenCalled();
+      expect(readCursorOf(store)).toBe(2);
+    });
+
+    it('does not let a sent message of this identity block a read', async () => {
+      const { channel, mailbox, store } = setup();
+      openedInbox(store);
+      channel.read.mockResolvedValue(
+        pageOf([
+          DirectMessageMailboxRecord.encode(readOf({})),
+          sentBy('alice', 'message-2'),
+        ]),
+      );
+      const apply = jest.fn();
+
+      await mailbox.syncReads(
+        session('alice'),
+        conversationId,
+        new AbortController().signal,
+        apply,
+      );
+
+      expect(apply).toHaveBeenCalledWith([
+        { kind: 'read', messageId: 'message-1' },
+      ]);
+    });
+
+    it('ignores a read authored by another identity', async () => {
+      const { channel, mailbox, store } = setup();
+      openedInbox(store);
+      channel.read.mockResolvedValue(
+        pageOf([
+          DirectMessageMailboxRecord.encode(readOf({ authorId: 'bob' })),
+        ]),
+      );
+      const apply = jest.fn();
+
+      await mailbox.syncReads(
+        session('alice'),
+        conversationId,
+        new AbortController().signal,
+        apply,
+      );
+
+      expect(apply).not.toHaveBeenCalled();
+    });
+
+    it('ignores a read created more than 14 days ago', async () => {
+      const { channel, mailbox, store } = setup();
+      openedInbox(store);
+      channel.read.mockResolvedValue(
+        pageOf([
+          DirectMessageMailboxRecord.encode(
+            readOf({ createdAt: now - 14 * DAY_MS - 1 }),
+          ),
+        ]),
+      );
+      const apply = jest.fn();
+
+      await mailbox.syncReads(
+        session('alice'),
+        conversationId,
+        new AbortController().signal,
+        apply,
+      );
+
+      expect(apply).not.toHaveBeenCalled();
+    });
+
+    it('applies a read from an earlier page when no peer message follows it in the visit', async () => {
+      const { channel, mailbox, store } = setup();
+      openedInbox(store);
+      channel.read
+        .mockResolvedValueOnce({
+          envelopes: [
+            {
+              cursor: 1,
+              envelopeId: 'envelope-1',
+              plaintext: DirectMessageMailboxRecord.encode(readOf({})),
+            },
+          ],
+          hasMore: true,
+          lastCursor: 1,
+          recreated: false,
+        })
+        .mockResolvedValueOnce({
+          envelopes: [],
+          hasMore: false,
+          lastCursor: 1,
+          recreated: false,
+        });
+      const apply = jest.fn();
+
+      await mailbox.syncReads(
+        session('alice'),
+        conversationId,
+        new AbortController().signal,
+        apply,
+      );
+
+      expect(apply).toHaveBeenCalledWith([
+        { kind: 'read', messageId: 'message-1' },
+      ]);
+    });
+
+    it('keeps a read when a peer message on a later page follows it', async () => {
+      const { channel, mailbox, store } = setup();
+      openedInbox(store);
+      channel.read
+        .mockResolvedValueOnce({
+          envelopes: [
+            {
+              cursor: 1,
+              envelopeId: 'envelope-1',
+              plaintext: DirectMessageMailboxRecord.encode(readOf({})),
+            },
+          ],
+          hasMore: true,
+          lastCursor: 1,
+          recreated: false,
+        })
+        .mockResolvedValueOnce({
+          envelopes: [
+            {
+              cursor: 2,
+              envelopeId: 'envelope-2',
+              plaintext: sentBy('bob', 'message-2'),
+            },
+          ],
+          hasMore: false,
+          lastCursor: 2,
+          recreated: false,
+        });
+      const apply = jest.fn();
+
+      await mailbox.syncReads(
+        session('alice'),
+        conversationId,
+        new AbortController().signal,
+        apply,
+      );
+
+      expect(apply).not.toHaveBeenCalled();
+      expect(readCursorOf(store)).toBe(2);
+    });
+
+    it('reads at most four pages per visit and applies nothing until the inbox is drained', async () => {
+      const { channel, mailbox, store } = setup();
+      openedInbox(store);
+      channel.read.mockImplementation((_keys, _readers, after) =>
+        Promise.resolve({
+          envelopes: [],
+          hasMore: true,
+          lastCursor: after + 50,
+          recreated: false,
+        }),
+      );
+      const apply = jest.fn();
+
+      await mailbox.syncReads(
+        session('alice'),
+        conversationId,
+        new AbortController().signal,
+        apply,
+      );
+
+      expect(channel.read).toHaveBeenCalledTimes(4);
+      expect(apply).not.toHaveBeenCalled();
+      expect(readCursorOf(store)).toBe(200);
+    });
+
+    it('reads from the stored read cursor, not the shared sync cursor', async () => {
+      const { channel, mailbox, store } = setup();
+      store.save(keysFor('alice').mailboxId, { cursor: 5 });
+      store.saveReadCursor(keysFor('alice').mailboxId, 7);
+      channel.read.mockResolvedValue({
+        envelopes: [],
+        hasMore: false,
+        lastCursor: 7,
+        recreated: false,
+      });
+
+      await mailbox.syncReads(
+        session('alice'),
+        conversationId,
+        new AbortController().signal,
+        jest.fn(),
+      );
+
+      expect(channel.read).toHaveBeenCalledWith(
+        keysFor('alice'),
+        expect.anything(),
+        7,
+        50,
+      );
+      expect(store.load(keysFor('alice').mailboxId)).toEqual({ cursor: 5 });
+    });
+
+    it('re-reads from zero when the inbox was re-created under the stored read cursor', async () => {
+      const { channel, mailbox, store } = setup();
+      openedInbox(store);
+      store.saveReadCursor(keysFor('alice').mailboxId, 30);
+      channel.read
+        .mockResolvedValueOnce({
+          envelopes: [],
+          hasMore: false,
+          lastCursor: 30,
+          recreated: true,
+        })
+        .mockResolvedValueOnce(
+          pageOf([DirectMessageMailboxRecord.encode(readOf({}))]),
+        );
+      const apply = jest.fn();
+
+      await mailbox.syncReads(
+        session('alice'),
+        conversationId,
+        new AbortController().signal,
+        apply,
+      );
+
+      expect(channel.read).toHaveBeenLastCalledWith(
+        keysFor('alice'),
+        expect.anything(),
+        0,
+        50,
+      );
+      expect(apply).toHaveBeenCalledWith([
+        { kind: 'read', messageId: 'message-1' },
+      ]);
+    });
+
+    it('reads nothing and creates no inbox before the inbox is open on this device', async () => {
+      const { channel, mailbox } = setup();
+      const apply = jest.fn();
+
+      await mailbox.syncReads(
+        session('alice'),
+        conversationId,
+        new AbortController().signal,
+        apply,
+      );
+
+      expect(channel.read).not.toHaveBeenCalled();
+      expect(channel.createInbox).not.toHaveBeenCalled();
+      expect(apply).not.toHaveBeenCalled();
+    });
+
+    it('leaves a stored legacy inbox to the sync path', async () => {
+      const { channel, mailbox, store } = setup();
+      store.save(keysFor('alice').mailboxId, {
+        cursor: 0,
+        readToken: 'legacy-token',
+      });
+      const apply = jest.fn();
+
+      await mailbox.syncReads(
+        session('alice'),
+        conversationId,
+        new AbortController().signal,
+        apply,
+      );
+
+      expect(channel.read).not.toHaveBeenCalled();
+      expect(apply).not.toHaveBeenCalled();
+    });
+
+    it('reads nothing when the signal is already aborted', async () => {
+      const { channel, mailbox, store } = setup();
+      openedInbox(store);
+      const controller = new AbortController();
+      controller.abort();
+      const apply = jest.fn();
+
+      await mailbox.syncReads(
+        session('alice'),
+        conversationId,
+        controller.signal,
+        apply,
+      );
+
+      expect(channel.read).not.toHaveBeenCalled();
+      expect(apply).not.toHaveBeenCalled();
+    });
+
+    it('applies nothing and keeps the read cursor when aborted during the read', async () => {
+      const { channel, mailbox, store } = setup();
+      openedInbox(store);
+      const controller = new AbortController();
+      channel.read.mockImplementation(() => {
+        controller.abort();
+
+        return Promise.resolve(
+          pageOf([DirectMessageMailboxRecord.encode(readOf({}))]),
+        );
+      });
+      const apply = jest.fn();
+
+      await mailbox.syncReads(
+        session('alice'),
+        conversationId,
+        controller.signal,
+        apply,
+      );
+
+      expect(apply).not.toHaveBeenCalled();
+      expect(readCursorOf(store)).toBeNull();
+    });
+  });
+
   describe('releaseDeviceReaders', () => {
     it('removes this device reader from the inbox with the root token', async () => {
       const { channel, mailbox } = setup();
