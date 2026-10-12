@@ -6,6 +6,7 @@ import type { MessageAttachmentPublisher } from '../../../../../contexts/message
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
+import { ConversationKeyRequiredError } from '../../../../../contexts/messages/domain/errors/ConversationKeyRequiredError';
 import { PigeonMessageCommandsApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
 import { PigeonMessagesApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessagesApi';
 import { PublicMutationSigner } from '../../../../../shared/infrastructure/crypto/PublicMutationSigner';
@@ -44,13 +45,13 @@ describe(PigeonMessageCommandsApi.name, () => {
   it('rejects sending when the conversation key is unavailable', async () => {
     await expect(
       commandApi().send(session, 'conversation-1', 'Hello'),
-    ).rejects.toThrow('Conversation key is required.');
+    ).rejects.toBeInstanceOf(ConversationKeyRequiredError);
   });
 
   it('rejects editing when the conversation key is unavailable', async () => {
     await expect(
       commandApi().edit(session, 'conversation-1', 'message-1', 'Updated'),
-    ).rejects.toThrow('Conversation key is required.');
+    ).rejects.toBeInstanceOf(ConversationKeyRequiredError);
   });
 
   it('signs a delete as a put of its own deleted record', async () => {
