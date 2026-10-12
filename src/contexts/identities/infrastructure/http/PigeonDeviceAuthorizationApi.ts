@@ -43,6 +43,11 @@ const PAIRING_TTL_MS = 2 * 60 * 1000;
 
 export type OwnDeviceRetirement = 'already-revoked' | 'last-device' | 'revoked';
 
+export interface DevicePairingAuthorization {
+  completion: DevicePairingCompletion;
+  session: Session;
+}
+
 export class PigeonDeviceAuthorizationApi {
   public constructor(
     private readonly http: HttpJsonClient,
@@ -220,7 +225,7 @@ export class PigeonDeviceAuthorizationApi {
   public async authorizePairing(
     session: Session,
     requestCode: DevicePairingCode,
-  ): Promise<{ completion: DevicePairingCompletion; session: Session }> {
+  ): Promise<DevicePairingAuthorization> {
     const acceptedAt = new Timestamp(this.clock());
     const request = DevicePairingRequest.fromCode(requestCode, acceptedAt);
     const invitation = request.getInvitation();

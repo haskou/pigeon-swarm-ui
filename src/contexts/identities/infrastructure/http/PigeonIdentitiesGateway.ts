@@ -28,6 +28,7 @@ import type { PigeonIdentityLoginApi } from './PigeonIdentityLoginApi';
 import type { PigeonKeychainApi } from './PigeonKeychainApi';
 import type { PigeonPresenceGateway } from './PigeonPresenceGateway';
 
+import { DevicePairingError } from '../../domain/DevicePairingError';
 import { DevicePairingCode } from '../../domain/value-objects/DevicePairingCode';
 import { IdentityPassword } from '../../domain/value-objects/IdentityPassword';
 import { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
@@ -81,10 +82,22 @@ export class PigeonIdentitiesGateway {
     session: Session,
     requestCode: DevicePairingCode,
   ): Promise<{ completionCode: DevicePairingCode; session: Session }> {
+    const root = session.deviceSealedRootKey;
+    if (!root) {
+      throw new DevicePairingError(
+        'mismatch',
+        'Device sealed root is not open on this session.',
+      );
+    }
+
     const result = await this.deviceAuthorization.authorizePairing(
       session,
       requestCode,
     );
+    // The root is kept, so the new device opens the keychain's root. A failure
+    // here leaves the device authorized without a completion code: revoke it
+    // and pair again.
+    await this.deviceSealedRoot.reseal(result.session, root);
 
     return {
       completionCode: result.completion.toCode(),

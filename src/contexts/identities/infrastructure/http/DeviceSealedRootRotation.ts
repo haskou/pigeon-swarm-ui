@@ -12,9 +12,9 @@ import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonEr
 
 /**
  * Publishes and opens the device-sealed root of one identity. A generation
- * carries a fresh random root, sealed to every device at the head. A device
- * opens its own entry while the entry matches its authorization revision and
- * republishes once the revision moves on.
+ * carries one root, sealed to every device at the head. Enrolment reseals the
+ * same root; a revoke mints a fresh one. A device opens its own entry while it
+ * matches its authorization revision, and rotates otherwise.
  */
 export class DeviceSealedRootRotation {
   public constructor(
@@ -24,21 +24,20 @@ export class DeviceSealedRootRotation {
   ) {}
 
   /**
-   * Publishes a new generation and returns the session holding its root. A
-   * conflicting publish refetches the head once and publishes again.
+   * Publishes a new generation with a fresh root and returns the session
+   * holding it. A conflicting publish refetches the head once and publishes
+   * again.
    */
   public async rotate(session: Session): Promise<Session> {
-    try {
-      return await this.publish(session);
-    } catch (error: unknown) {
-      if (!(error instanceof HttpJsonError) || error.status !== 409) {
-        throw error;
-      }
+    return await this.publishWithRetry(session, SymmetricKey.generate());
+  }
 
-      return await this.publish(
-        await this.deviceAuthorization.synchronize(session),
-      );
-    }
+  /**
+   * Publishes an existing root at a new generation, so enrolment keeps the
+   * keychain readable under the same root.
+   */
+  public async reseal(session: Session, root: SymmetricKey): Promise<void> {
+    await this.publishWithRetry(session, root);
   }
 
   /**
@@ -62,9 +61,29 @@ export class DeviceSealedRootRotation {
     return await this.rotate(session);
   }
 
-  private async publish(session: Session): Promise<Session> {
+  private async publishWithRetry(
+    session: Session,
+    root: SymmetricKey,
+  ): Promise<Session> {
+    try {
+      return await this.publish(session, root);
+    } catch (error: unknown) {
+      if (!(error instanceof HttpJsonError) || error.status !== 409) {
+        throw error;
+      }
+
+      return await this.publish(
+        await this.deviceAuthorization.synchronize(session),
+        root,
+      );
+    }
+  }
+
+  private async publish(
+    session: Session,
+    root: SymmetricKey,
+  ): Promise<Session> {
     const own = await this.sealedSecrets.fetchOwn(session);
-    const root = SymmetricKey.generate();
     const recipients = await this.deviceAuthorization.findDevices(session);
 
     await this.sealedSecrets.publish(session, {
