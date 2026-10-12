@@ -428,11 +428,11 @@ export class DirectMessageMailbox {
   /**
    * Shared sender path. Builds the record once, so the peer copy and the own
    * copy carry the same id and record. Only the own copy is tagged. Skips
-   * without sending when there is no
-   * peer, the conversation is a group, or the record exceeds the envelope
-   * bound. Reading the peer and building the record run inside the try, so a
-   * throw there is 'failed'. The peer copy alone decides the result. The own
-   * copy is additive and silent: a failure changes nothing the user sees.
+   * without sending when there is no peer, the conversation is a group, or the
+   * record exceeds the envelope bound. Reading the peer and building the record
+   * run inside the try, so a throw there is 'failed'. The peer copy alone
+   * decides the result. The own copy runs after it in its own guard
+   * (`appendOwnCopy`), so tagging or sending it cannot change the result.
    */
   private async append(
     session: Session,
@@ -468,18 +468,34 @@ export class DirectMessageMailbox {
       if (delivery === 'failed') logAppendFailure();
 
       this.rememberOwnCopy(`${session.identity.id}:${record.id}`);
-      await this.sendRecord(
-        session,
-        conversation.id,
-        session.identity.id,
-        this.encodeFor(session, session.identity.id, record),
-      );
+      await this.appendOwnCopy(session, conversation.id, record);
 
       return delivery;
     } catch {
       logAppendFailure();
 
       return 'failed';
+    }
+  }
+
+  /**
+   * The own copy is additive. Its tagging or sending never changes the result
+   * the caller sees. A throw while building it logs one count-only line.
+   */
+  private async appendOwnCopy(
+    session: Session,
+    conversationId: string,
+    record: DirectMessageRecord,
+  ): Promise<void> {
+    try {
+      await this.sendRecord(
+        session,
+        conversationId,
+        session.identity.id,
+        this.encodeFor(session, session.identity.id, record),
+      );
+    } catch {
+      logAppendFailure();
     }
   }
 

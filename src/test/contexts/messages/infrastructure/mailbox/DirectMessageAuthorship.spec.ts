@@ -43,15 +43,10 @@ describe('DirectMessageAuthorship', () => {
   });
 
   it('does not depend on property order', () => {
-    const reordered = {
-      type: record.type,
-      previousMessageIds: record.previousMessageIds,
-      id: record.id,
-      encryptedPayload: record.encryptedPayload,
-      createdAt: record.createdAt,
-      conversationId: record.conversationId,
-      authorId: record.authorId,
-    } as DirectSentRecord;
+    // Reversed insertion order; the tag must not depend on it.
+    const reordered = Object.fromEntries(
+      Object.entries(record).reverse(),
+    ) as DirectSentRecord;
 
     expect(DirectMessageAuthorship.tag(rootKey, reordered)).toBe(
       DirectMessageAuthorship.tag(rootKey, record),

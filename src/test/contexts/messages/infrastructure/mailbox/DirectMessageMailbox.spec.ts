@@ -95,7 +95,7 @@ describe(DirectMessageMailbox.name, () => {
       },
     }) as unknown as Session;
 
-  /** Alice's own inbox copy, tagged under her root key as the sender writes it. */
+  /** Alice's own inbox copy, tagged under her root key as the sender does. */
   const ownEncode = (record: DirectMessageRecord): Uint8Array =>
     DirectMessageMailboxRecord.encode(
       record,
@@ -763,7 +763,10 @@ describe(DirectMessageMailbox.name, () => {
       );
 
     const envelopeOf = (plaintext: Uint8Array): Record<string, unknown> =>
-      JSON.parse(new TextDecoder().decode(plaintext));
+      JSON.parse(new TextDecoder().decode(plaintext)) as Record<
+        string,
+        unknown
+      >;
 
     it.each(everyDelivery)(
       'appends the same record to the own inbox after the peer inbox, tagged (%s)',
@@ -1280,9 +1283,7 @@ describe(DirectMessageMailbox.name, () => {
 
     it('keeps the cursor and the inbox untouched when apply throws', async () => {
       const { channel, mailbox, store } = setup();
-      channel.read.mockResolvedValue(
-        pageWith(ownEncode(storedRecord), 1),
-      );
+      channel.read.mockResolvedValue(pageWith(ownEncode(storedRecord), 1));
 
       await expect(
         mailbox.sync(
@@ -1301,9 +1302,7 @@ describe(DirectMessageMailbox.name, () => {
 
     it('does not acknowledge when the conversation is switched after apply', async () => {
       const { channel, mailbox, store } = setup();
-      channel.read.mockResolvedValue(
-        pageWith(ownEncode(storedRecord), 1),
-      );
+      channel.read.mockResolvedValue(pageWith(ownEncode(storedRecord), 1));
       const controller = new AbortController();
 
       await mailbox.sync(
@@ -1410,9 +1409,7 @@ describe(DirectMessageMailbox.name, () => {
           lastCursor: 5,
           recreated: true,
         })
-        .mockResolvedValueOnce(
-          pageWith(ownEncode(storedRecord), 1),
-        );
+        .mockResolvedValueOnce(pageWith(ownEncode(storedRecord), 1));
       const apply = jest.fn();
       channel.acknowledge.mockResolvedValue({ recreated: false });
 
@@ -1446,9 +1443,7 @@ describe(DirectMessageMailbox.name, () => {
 
     it('stores cursor zero when the inbox was re-created during acknowledgement', async () => {
       const { channel, mailbox, store } = setup();
-      channel.read.mockResolvedValue(
-        pageWith(ownEncode(storedRecord), 1),
-      );
+      channel.read.mockResolvedValue(pageWith(ownEncode(storedRecord), 1));
       channel.acknowledge.mockResolvedValue({ recreated: true });
 
       await mailbox.sync(
@@ -1620,9 +1615,7 @@ describe(DirectMessageMailbox.name, () => {
 
     it('applies an edit as an edit change', async () => {
       const { channel, mailbox } = setup();
-      channel.read.mockResolvedValue(
-        pageOf([ownEncode(editRecord)]),
-      );
+      channel.read.mockResolvedValue(pageOf([ownEncode(editRecord)]));
       channel.acknowledge.mockResolvedValue({ recreated: false });
       const apply = jest.fn();
 
@@ -1640,9 +1633,7 @@ describe(DirectMessageMailbox.name, () => {
 
     it('applies a delete as a removed change without decrypting it', async () => {
       const { channel, mailbox, projection } = setup();
-      channel.read.mockResolvedValue(
-        pageOf([ownEncode(deleteRecord)]),
-      );
+      channel.read.mockResolvedValue(pageOf([ownEncode(deleteRecord)]));
       channel.acknowledge.mockResolvedValue({ recreated: false });
       const apply = jest.fn();
 
@@ -1762,9 +1753,7 @@ describe(DirectMessageMailbox.name, () => {
 
       it('applies a fresh read by this identity as a read change without decrypting it', async () => {
         const { channel, mailbox, projection } = setup();
-        channel.read.mockResolvedValue(
-          pageOf([ownEncode(readOf({}))]),
-        );
+        channel.read.mockResolvedValue(pageOf([ownEncode(readOf({}))]));
         channel.acknowledge.mockResolvedValue({ recreated: false });
         const apply = jest.fn();
 
@@ -1805,11 +1794,7 @@ describe(DirectMessageMailbox.name, () => {
       it('ignores a read created more than 14 days ago', async () => {
         const { channel, mailbox } = setup();
         channel.read.mockResolvedValue(
-          pageOf([
-            ownEncode(
-              readOf({ createdAt: now - 14 * DAY_MS - 1 }),
-            ),
-          ]),
+          pageOf([ownEncode(readOf({ createdAt: now - 14 * DAY_MS - 1 }))]),
         );
         channel.acknowledge.mockResolvedValue({ recreated: false });
         const apply = jest.fn();
@@ -1827,11 +1812,7 @@ describe(DirectMessageMailbox.name, () => {
       it('ignores a read more than 30 seconds ahead of this device', async () => {
         const { channel, mailbox } = setup();
         channel.read.mockResolvedValue(
-          pageOf([
-            ownEncode(
-              readOf({ createdAt: now + 30_001 }),
-            ),
-          ]),
+          pageOf([ownEncode(readOf({ createdAt: now + 30_001 }))]),
         );
         channel.acknowledge.mockResolvedValue({ recreated: false });
         const apply = jest.fn();
@@ -1850,12 +1831,8 @@ describe(DirectMessageMailbox.name, () => {
         const { channel, mailbox } = setup();
         channel.read.mockResolvedValue(
           pageOf([
-            ownEncode(
-              readOf({ createdAt: now - 14 * DAY_MS }),
-            ),
-            ownEncode(
-              readOf({ createdAt: now + 30_000, id: 'read-2' }),
-            ),
+            ownEncode(readOf({ createdAt: now - 14 * DAY_MS })),
+            ownEncode(readOf({ createdAt: now + 30_000, id: 'read-2' })),
           ]),
         );
         channel.acknowledge.mockResolvedValue({ recreated: false });
@@ -1915,10 +1892,7 @@ describe(DirectMessageMailbox.name, () => {
       const { channel, mailbox, projection, store } = setup();
       openedInbox(store);
       channel.read.mockResolvedValue(
-        pageOf([
-          sentBy('bob', 'message-2'),
-          ownEncode(readOf({})),
-        ]),
+        pageOf([sentBy('bob', 'message-2'), ownEncode(readOf({}))]),
       );
       const apply = jest.fn();
 
@@ -1960,10 +1934,7 @@ describe(DirectMessageMailbox.name, () => {
       const { channel, mailbox, store } = setup();
       openedInbox(store);
       channel.read.mockResolvedValue(
-        pageOf([
-          ownEncode(readOf({})),
-          sentBy('bob', 'message-2'),
-        ]),
+        pageOf([ownEncode(readOf({})), sentBy('bob', 'message-2')]),
       );
       const apply = jest.fn();
 
@@ -1982,10 +1953,7 @@ describe(DirectMessageMailbox.name, () => {
       const { channel, mailbox, store } = setup();
       openedInbox(store);
       channel.read.mockResolvedValue(
-        pageOf([
-          ownEncode(readOf({})),
-          sentBy('alice', 'message-2'),
-        ]),
+        pageOf([ownEncode(readOf({})), sentBy('alice', 'message-2')]),
       );
       const apply = jest.fn();
 
@@ -2025,11 +1993,7 @@ describe(DirectMessageMailbox.name, () => {
       const { channel, mailbox, store } = setup();
       openedInbox(store);
       channel.read.mockResolvedValue(
-        pageOf([
-          ownEncode(
-            readOf({ createdAt: now - 14 * DAY_MS - 1 }),
-          ),
-        ]),
+        pageOf([ownEncode(readOf({ createdAt: now - 14 * DAY_MS - 1 }))]),
       );
       const apply = jest.fn();
 
@@ -2183,9 +2147,7 @@ describe(DirectMessageMailbox.name, () => {
           lastCursor: 30,
           recreated: true,
         })
-        .mockResolvedValueOnce(
-          pageOf([ownEncode(readOf({}))]),
-        );
+        .mockResolvedValueOnce(pageOf([ownEncode(readOf({}))]));
       const apply = jest.fn();
 
       await mailbox.syncReads(
@@ -2266,9 +2228,7 @@ describe(DirectMessageMailbox.name, () => {
       channel.read.mockImplementation(() => {
         controller.abort();
 
-        return Promise.resolve(
-          pageOf([ownEncode(readOf({}))]),
-        );
+        return Promise.resolve(pageOf([ownEncode(readOf({}))]));
       });
       const apply = jest.fn();
 
@@ -2952,6 +2912,21 @@ describe(DirectMessageMailbox.name, () => {
       await expect(
         mailbox.deliverSent(sender, conversation, sent),
       ).resolves.toBe('delivered');
+    });
+
+    it('delivers the peer copy when the sender cannot tag its own copy', async () => {
+      const { projection, store } = setup();
+      const { envelopeCount, wire } = nodeMailboxClient();
+      const mailbox = mailboxFor(wire, store, projection);
+      const untaggable = {
+        ...session('alice'),
+        masterKey: undefined,
+      } as unknown as Session;
+
+      await expect(
+        mailbox.deliverSent(untaggable, conversation, sent),
+      ).resolves.toBe('delivered');
+      expect(envelopeCount()).toBe(1);
     });
 
     it('keeps an envelope until every device of the identity has acknowledged it', async () => {

@@ -2,9 +2,9 @@ import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { concatBytes } from '@noble/hashes/utils.js';
 
-import { encodeBase64Url } from '../../../../shared/infrastructure/encoding/base64url';
-
 import type { DirectMessageRecord } from './DirectMessageMailboxRecord';
+
+import { encodeBase64Url } from '../../../../shared/infrastructure/encoding/base64url';
 
 /**
  * Authorship tag for a record this identity writes to its own inbox: a
@@ -21,7 +21,7 @@ export class DirectMessageAuthorship {
    * Context is `label ‖ canonical record bytes`. The record is the last field,
    * so the fixed label keeps the encoding unambiguous. Canonical bytes are the
    * record JSON with keys sorted, so the tag does not depend on property order.
-   * The key set is part of the bytes: an added or removed field changes the tag.
+   * The key set is part of the bytes: a field added or removed changes the tag.
    */
   public static tag(rootKey: Uint8Array, record: DirectMessageRecord): string {
     if (rootKey.length !== DirectMessageAuthorship.ROOT_KEY_BYTES) {
