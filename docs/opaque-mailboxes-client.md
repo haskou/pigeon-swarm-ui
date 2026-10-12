@@ -154,7 +154,7 @@ The mailbox is the only delivery path for one-to-one conversations. No shim, fal
   - `read-until` (`conversations.markReadUntil`). Its replacement is the own-inbox `read` record.
   - History load (`messages.load`, `loadAround`, `loadThread`, `loadOne`). The timeline comes from mailbox sync and the local projection cache only.
   - Realtime message events for one-to-one conversation ids.
-  - The copy model: the additive `deliver*` calls, the `DirectMessageMailboxDelivery` outcome type, `runMailboxSideEffect`, and the copy notice (`workspace.directMailboxDeliveryError`). The own copy now follows the peer copy and shares its record id.
+  - The copy model: the additive copy written after each legacy one-to-one write, its separate delivery outcome, its side-effect helper, and the copy notice that reported a failed copy. The own copy now follows the peer copy and shares its record id; a failed own copy is only logged (see Own copy).
   - The message POST as a carrier of 1:1 attachments. They reach the peer only through mailbox records. The attachment downloader's legacy methods stay, because group and community history use them.
 
 - Accepted losses (decided; not backfilled):
