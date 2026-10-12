@@ -3,6 +3,7 @@ import type {
   ConversationResource,
 } from '../../../../shared/domain/pigeonResources.types';
 import { attachmentIdentity } from './attachmentIdentity';
+import { MessageReactionUpdater } from './MessageReactionUpdater';
 
 export class MessageCollection {
   private static applyEdit(
@@ -65,6 +66,18 @@ export class MessageCollection {
       .join('\u0000');
   }
 
+  private static keepReactionClocks(
+    previous: ChatMessage | undefined,
+    next: ChatMessage,
+  ): ChatMessage {
+    const reactionClocks = MessageReactionUpdater.mergeClocks(
+      previous?.reactionClocks,
+      next.reactionClocks,
+    );
+
+    return reactionClocks.length === 0 ? next : { ...next, reactionClocks };
+  }
+
   private static indexMessages(
     byId: Map<string, ChatMessage>,
     messages: ChatMessage[],
@@ -75,7 +88,10 @@ export class MessageCollection {
       if (this.isEditMessage(message)) {
         edits.push(message);
       } else {
-        byId.set(message.id, message);
+        byId.set(
+          message.id,
+          this.keepReactionClocks(byId.get(message.id), message),
+        );
       }
     }
 
