@@ -257,6 +257,34 @@ describe(MailboxChannel.name, () => {
     });
   });
 
+  describe('single-flight creation', () => {
+    it('shares one PUT between overlapping creations of the same inbox', async () => {
+      const { channel, client } = setup();
+      let release!: (value: void) => void;
+      client.create.mockReturnValue(
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+      );
+
+      const first = channel.createInbox(keys, readToken);
+      const second = channel.createInbox(keys, readToken);
+      release();
+
+      await Promise.all([first, second]);
+      expect(client.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('issues a new PUT for a later creation once the first has settled', async () => {
+      const { channel, client } = setup();
+
+      await channel.createInbox(keys, readToken);
+      await channel.createInbox(keys, readToken);
+
+      expect(client.create).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe('recovering an evicted mailbox', () => {
     const postTokenHash = MailboxCapability.hash(keys.postToken);
     const readTokenHash = MailboxCapability.hash(readToken);

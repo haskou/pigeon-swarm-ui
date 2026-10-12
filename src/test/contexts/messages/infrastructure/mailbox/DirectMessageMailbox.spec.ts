@@ -11,7 +11,9 @@ import type {
   Session,
 } from '../../../../../shared/domain/pigeonResources.types';
 
+import { MailboxCapability } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxKeySchedule } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxKeySchedule';
+import { MailboxReadToken } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxReadToken';
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/infrastructure/http/MailboxUnavailableError';
 import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageMailbox } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
@@ -50,6 +52,9 @@ describe(DirectMessageMailbox.name, () => {
   const session = (identityId: string): Session =>
     ({
       identity: { id: identityId },
+      masterKey: {
+        getBuffer: () => Buffer.alloc(32, identityId === 'alice' ? 3 : 9),
+      },
       keychain: {
         conversations: {
           [conversationId]: {
@@ -96,6 +101,7 @@ describe(DirectMessageMailbox.name, () => {
 
     return {
       channel,
+      clearStorage: () => storage.clear(),
       mailbox: new DirectMessageMailbox(channel, store, projection),
       projection,
       store,
@@ -243,7 +249,79 @@ describe(DirectMessageMailbox.name, () => {
       ]);
       expect(channel.acknowledge).toHaveBeenCalledWith(keys, readToken, 2);
       expect(order).toEqual(['apply', 'ack']);
-      expect(store.load(keys.mailboxId)).toEqual({ cursor: 2, readToken });
+      expect(store.load(keys.mailboxId)).toEqual({ cursor: 2 });
+    });
+
+    it('derives the read token from the root key and stores only the cursor for a new inbox', async () => {
+      const { channel, mailbox, store } = setup();
+      channel.read.mockResolvedValue({
+        envelopes: [],
+        hasMore: false,
+        lastCursor: 0,
+        recreated: false,
+      });
+
+      await mailbox.sync(
+        session('bob'),
+        conversationId,
+        new AbortController().signal,
+        jest.fn(),
+      );
+
+      const keys = keysFor('bob');
+      const readToken = MailboxReadToken.derive(
+        Buffer.alloc(32, 9),
+        keys.mailboxId,
+      );
+      expect(channel.createInbox).toHaveBeenCalledWith(keys, readToken);
+      expect(channel.read.mock.calls[0][1]).toBe(readToken);
+      expect(store.load(keys.mailboxId)).toEqual({ cursor: 0 });
+    });
+
+    it('does not touch the inbox when the pass is already superseded', async () => {
+      const { channel, mailbox } = setup();
+      const controller = new AbortController();
+      controller.abort();
+
+      await mailbox.sync(
+        session('bob'),
+        conversationId,
+        controller.signal,
+        jest.fn(),
+      );
+
+      expect(channel.createInbox).not.toHaveBeenCalled();
+      expect(channel.read).not.toHaveBeenCalled();
+    });
+
+    it('does not read after the pass is superseded while its inbox is being created', async () => {
+      const { channel, mailbox } = setup();
+      let finishCreate!: (value: void) => void;
+      channel.createInbox.mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            finishCreate = resolve;
+          }),
+      );
+      channel.read.mockResolvedValue({
+        envelopes: [],
+        hasMore: false,
+        lastCursor: 0,
+        recreated: false,
+      });
+      const controller = new AbortController();
+
+      const pass = mailbox.sync(
+        session('bob'),
+        conversationId,
+        controller.signal,
+        jest.fn(),
+      );
+      controller.abort();
+      finishCreate();
+      await pass;
+
+      expect(channel.read).not.toHaveBeenCalled();
     });
 
     it('keeps the cursor and the inbox untouched when apply throws', async () => {
@@ -592,6 +670,150 @@ describe(DirectMessageMailbox.name, () => {
       await sync();
 
       expect(applied).toEqual([['message-1'], ['message-2']]);
+    });
+
+    /**
+     * Mirrors the node: the inbox keeps only the hash of its read token, and a
+     * read or acknowledge needs the token whose hash it was created with.
+     */
+    const capabilityMailboxClient = (createGate?: Promise<void>) => {
+      let readTokenHash: string | null = null;
+      let envelopes: { body: string; cursor: number; envelopeId: string }[] =
+        [];
+      let nextCursor = 1;
+      let creates = 0;
+      const requireRead = (readToken: string) => {
+        if (readTokenHash !== MailboxCapability.hash(readToken)) {
+          throw new MailboxUnavailableError();
+        }
+      };
+      const wire = mock<PigeonMailboxClient>();
+      wire.create.mockImplementation(async (_mailboxId, creation) => {
+        creates += 1;
+        await createGate;
+
+        if (
+          readTokenHash !== null &&
+          readTokenHash !== creation.readTokenHash
+        ) {
+          throw new Error('mailbox exists with other capabilities');
+        }
+        readTokenHash = creation.readTokenHash;
+      });
+      wire.append.mockImplementation((_mailboxId, _postToken, input) => {
+        if (readTokenHash === null) throw new MailboxUnavailableError();
+        const cursor = nextCursor;
+        nextCursor += 1;
+        envelopes.push({ ...input, cursor });
+
+        return Promise.resolve({ cursor });
+      });
+      wire.read.mockImplementation((_mailboxId, readToken, after, limit) => {
+        requireRead(readToken);
+
+        return Promise.resolve({
+          envelopes: envelopes
+            .filter((envelope) => envelope.cursor > after)
+            .slice(0, limit),
+          hasMore: false,
+        });
+      });
+      wire.acknowledge.mockImplementation((_mailboxId, readToken, upTo) => {
+        requireRead(readToken);
+        envelopes = envelopes.filter((envelope) => envelope.cursor > upTo);
+
+        return Promise.resolve();
+      });
+
+      return { creates: () => creates, wire };
+    };
+
+    it('reads the inbox again after the device lost its local storage', async () => {
+      const { clearStorage, projection, store } = setup();
+      const { wire } = capabilityMailboxClient();
+      const mailbox = new DirectMessageMailbox(
+        new MailboxChannel(wire, jest.fn()),
+        store,
+        projection,
+      );
+      const applied: string[][] = [];
+      const sync = () =>
+        mailbox.sync(
+          session('bob'),
+          conversationId,
+          new AbortController().signal,
+          (messages) => {
+            applied.push(messages.map((message) => message.id));
+          },
+        );
+
+      await sync();
+      await mailbox.deliver(session('alice'), conversation, sent, plain);
+      await sync();
+      clearStorage();
+      await mailbox.deliver(
+        session('alice'),
+        conversation,
+        { ...sent, id: 'message-2' },
+        plain,
+      );
+      await sync();
+
+      expect(applied).toEqual([['message-1'], ['message-2']]);
+    });
+
+    it('creates the inbox once when a superseded pass overlaps the next one', async () => {
+      const { projection, store } = setup();
+      let releaseCreate!: (value: void) => void;
+      const gate = new Promise<void>((resolve) => {
+        releaseCreate = resolve;
+      });
+      const { creates, wire } = capabilityMailboxClient(gate);
+      const mailbox = new DirectMessageMailbox(
+        new MailboxChannel(wire, jest.fn()),
+        store,
+        projection,
+      );
+      // StrictMode runs the mount effect twice: the first pass is aborted
+      // while its create is in flight.
+      const firstPass = new AbortController();
+      const first = mailbox.sync(
+        session('bob'),
+        conversationId,
+        firstPass.signal,
+        jest.fn(),
+      );
+      firstPass.abort();
+      const second = mailbox.sync(
+        session('bob'),
+        conversationId,
+        new AbortController().signal,
+        jest.fn(),
+      );
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      releaseCreate();
+
+      await Promise.all([first, second]);
+
+      expect(creates()).toBe(1);
+    });
+
+    it('lets a sender deliver without the recipient root key', async () => {
+      const { projection, store } = setup();
+      const wire = inMemoryMailboxClient();
+      const mailbox = new DirectMessageMailbox(
+        new MailboxChannel(wire, jest.fn()),
+        store,
+        projection,
+      );
+      const senderWithoutRootKey = {
+        ...session('alice'),
+        masterKey: undefined,
+      } as unknown as Session;
+
+      await expect(
+        mailbox.deliver(senderWithoutRootKey, conversation, sent, plain),
+      ).resolves.toBe('delivered');
     });
   });
 });

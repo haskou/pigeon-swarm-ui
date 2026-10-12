@@ -23,12 +23,14 @@ module.exports = {
     '**/PigeonApiGateway.spec.ts',
     '**/PigeonIdentityCommandsApi.spec.ts',
     '**/IdentitySignaturePayloadFactory.spec.ts',
-    '**/Mailbox{Capability,Channel,CreationProof,EnvelopeCipher,KeySchedule}.spec.ts',
+    '**/Mailbox{Capability,Channel,CreationProof,EnvelopeCipher,KeySchedule,ReadToken}.spec.ts',
     '**/DirectMessageMailbox.spec.ts',
   ],
   testPathIgnorePatterns: [],
   transform: {
     '^.+\\.[tj]s$': ['ts-jest', { tsconfig: 'tsconfig.real-crypto.json' }],
   },
-  transformIgnorePatterns: ['/node_modules/(?!@noble/|ts-mls/|@haskou/pigeon-swarm-crypto/)'],
+  transformIgnorePatterns: [
+    '/node_modules/(?!@noble/|ts-mls/|@haskou/pigeon-swarm-crypto/)',
+  ],
 };
