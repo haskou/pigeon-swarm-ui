@@ -19,6 +19,7 @@ import { PairingId } from '../../../../../contexts/identities/domain/value-objec
 import { RecoveryKey } from '../../../../../contexts/identities/domain/value-objects/RecoveryKey';
 import { RecoveryIdentityMaterial } from '../../../../../contexts/identities/infrastructure/crypto/RecoveryIdentityMaterial';
 import { PigeonDeviceAuthorizationApi } from '../../../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
+import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 
 describe(PigeonDeviceAuthorizationApi.name, () => {
   async function fixture() {
@@ -525,18 +526,10 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
       expect(next.authorizationRevision.valueOf()).toBe(4);
     });
 
-    it('refuses to revoke itself or a frontier in the future', async () => {
+    it('refuses a frontier in the future', async () => {
       const target = await KeyPair.generate();
       const { api, http, session } = await managed([checkpoint(3)]);
 
-      await expect(
-        api.revokeDevice(
-          session,
-          DeviceCredential.fromString(
-            session.deviceCredentialKeyPair.toPrimitives().publicKey,
-          ),
-        ),
-      ).rejects.toThrow('cannot revoke itself');
       await expect(
         api.revokeDevice(
           session,
@@ -545,6 +538,113 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
         ),
       ).rejects.toThrow('in the future');
       expect(http).toHaveBeenCalledTimes(1);
+    });
+
+    describe('retireOwnDevice', () => {
+      const catalog = (identityId: IdentityId, credentials: string[]) => ({
+        credentials,
+        epoch: 'genesis',
+        identityId: identityId.valueOf(),
+        revision: 3,
+      });
+
+      it('revokes its own credential when other devices remain', async () => {
+        const other = await KeyPair.generate();
+        const { api, http, identityId, session } = await managed([]);
+        const own = session.deviceCredentialKeyPair.toPrimitives().publicKey;
+
+        http
+          .mockResolvedValueOnce(
+            catalog(identityId, [
+              IdentityId.fromString(own).valueOf(),
+              IdentityId.fromString(other.toPrimitives().publicKey).valueOf(),
+            ]),
+          )
+          .mockResolvedValueOnce(checkpoint(3)(identityId))
+          .mockResolvedValueOnce(checkpoint(4)(identityId));
+
+        await expect(api.retireOwnDevice(session)).resolves.toBe('revoked');
+
+        expect(JSON.parse(String(http.mock.calls[2][1].body))).toMatchObject({
+          operation: 'revoke',
+          previousRevision: 3,
+          targetCredential: own,
+        });
+        expect(http).toHaveBeenCalledTimes(3);
+      });
+
+      it('reports a device the node no longer accepts as already removed', async () => {
+        const { api, http, session } = await managed([]);
+
+        http.mockRejectedValueOnce(
+          new HttpJsonError(
+            401,
+            'Unauthorized',
+            '{"code":401020,"message":"Invalid signed request."}',
+          ),
+        );
+
+        await expect(api.retireOwnDevice(session)).resolves.toBe(
+          'already-revoked',
+        );
+        expect(http).toHaveBeenCalledTimes(1);
+      });
+
+      it('fails on any other 401 and revokes nothing', async () => {
+        const { api, http, session } = await managed([]);
+
+        http.mockRejectedValueOnce(
+          new HttpJsonError(
+            401,
+            'Unauthorized',
+            '{"code":401021,"message":"Missing authentication headers."}',
+          ),
+        );
+
+        await expect(api.retireOwnDevice(session)).rejects.toThrow(
+          'Unauthorized',
+        );
+        expect(http).toHaveBeenCalledTimes(1);
+      });
+
+      it('reports a device missing from the catalog as already removed', async () => {
+        const other = await KeyPair.generate();
+        const { api, http, identityId, session } = await managed([]);
+
+        http.mockResolvedValueOnce(
+          catalog(identityId, [
+            IdentityId.fromString(other.toPrimitives().publicKey).valueOf(),
+          ]),
+        );
+
+        await expect(api.retireOwnDevice(session)).resolves.toBe(
+          'already-revoked',
+        );
+        expect(http).toHaveBeenCalledTimes(1);
+      });
+
+      it('refuses to remove the only device on the identity and revokes nothing', async () => {
+        const { api, http, identityId, session } = await managed([]);
+        const own = session.deviceCredentialKeyPair.toPrimitives().publicKey;
+
+        http.mockResolvedValueOnce(
+          catalog(identityId, [IdentityId.fromString(own).valueOf()]),
+        );
+
+        await expect(api.retireOwnDevice(session)).resolves.toBe('last-device');
+        expect(http).toHaveBeenCalledTimes(1);
+      });
+
+      it('surfaces any other failed read and revokes nothing', async () => {
+        const { api, http, session } = await managed([]);
+
+        http.mockRejectedValueOnce(
+          new HttpJsonError(503, 'Service Unavailable', ''),
+        );
+
+        await expect(api.retireOwnDevice(session)).rejects.toThrow('503');
+        expect(http).toHaveBeenCalledTimes(1);
+      });
     });
   });
 });

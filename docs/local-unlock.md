@@ -71,19 +71,32 @@ This document does not claim that JavaScript memory is cleared.
 The profile menu has a second action, "Log out and forget this device". It
 asks for confirmation first. Then it:
 
-1. deletes the device vault record for the identity (IndexedDB
+1. revokes this device's own credential on the node through
+   `PigeonDeviceAuthorizationApi.retireOwnDevice`. This is the same revocation
+   as "Remove access" under "Manage devices". The node never revokes the only
+   credential of an identity. For that case the user confirms again, and step 2
+   is skipped: the device stays authorized and keeps its reader;
+2. releases this device's reader from each direct conversation inbox. This step
+   is best effort (see `opaque-mailboxes-client.md`);
+3. deletes the device vault record for the identity (IndexedDB
    `pigeon-swarm-device-vault`) through `DeviceUnlockForgetter`, which calls
    `IdentityUnlockRepository.forget`;
-2. removes legacy remember-me records (`pigeon-swarm-credentials`,
+4. removes legacy remember-me records (`pigeon-swarm-credentials`,
    `pigeon-swarm-identity-preview`) that older builds wrote;
-3. runs the logout described above.
+5. runs the logout described above.
 
-If step 1 fails, the user stays signed in and sees an inline error. Nothing
-else is removed in that case.
+If step 1 fails, the user stays signed in with the device still authorized, and
+sees an inline error. Nothing local is removed. If step 3 fails after the
+revocation, the user stays signed in, sees an inline error, and pressing the
+button again finishes the local removal. The node returns 401 with code 401020
+("Invalid signed request") for a rejected signature. Only that code is read as
+"already revoked"; any other 401 fails step 1. A bad signature that returns
+401020 is read the same way. This is a known residual risk.
 
-The action does not revoke this device's server-side authorization. Revoke it
-under "Manage devices" if it must stop working. Signing in here again needs the
-recovery key or a device pairing from a signed-in device.
+Signing in here again needs the recovery key, or a device pairing from a
+signed-in device when one exists. After a revoke this device's authorization is
+gone. After the only-device forget the device stays authorized, so the recovery
+key is the way back.
 
 Password sign-in on this browser then explains that the browser no longer has
 the sign-in key for the identity and points to the recovery key or "New

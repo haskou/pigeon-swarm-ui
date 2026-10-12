@@ -1322,9 +1322,13 @@ export const es = {
     encryptedPrivateKey: 'Clave privada cifrada',
     forgetDevice: 'Cerrar sesión y olvidar este dispositivo',
     forgetDeviceConfirm:
-      'Esto elimina el desbloqueo local de esta identidad en este navegador y cierra tu sesión. Para volver a entrar aquí necesitarás tu clave de recuperación o vincular el dispositivo desde otro donde ya tengas sesión. Este dispositivo seguirá autorizado hasta que lo revoques en Gestionar dispositivos.',
-    forgetDeviceFailed:
-      'No se pudo eliminar el desbloqueo local. Sigues con la sesión iniciada.',
+      'Se revoca el acceso de este dispositivo a tu cuenta, se elimina el desbloqueo local de esta identidad en este navegador y se cierra tu sesión. Para volver a entrar necesitarás tu clave de recuperación o vincular el dispositivo desde otro donde ya tengas sesión.',
+    forgetDeviceOnlyDeviceConfirm:
+      'Este es tu único dispositivo, así que su acceso no se puede revocar y seguirá autorizado en tu cuenta. ¿Continuar para eliminar el desbloqueo local de este navegador y cerrar sesión?',
+    forgetDeviceRevokeFailed:
+      'No se pudo quitar este dispositivo de tu cuenta, así que sigues con la sesión iniciada. Revisa la conexión e inténtalo de nuevo.',
+    forgetDeviceUnlockFailed:
+      'El acceso se quitó de tu cuenta, pero no se pudo eliminar el desbloqueo local. Sigues con la sesión iniciada. Pulsa el botón de nuevo para terminar.',
     handle: 'Usuario',
     hoverToEdit: 'Pasa el ratón y haz clic en la imagen para editarla.',
     identityId: 'ID de identidad',

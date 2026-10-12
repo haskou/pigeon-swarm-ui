@@ -42,6 +42,7 @@ import {
 import { ipfsUrl } from '../../../../shared/presentation/ipfsLinks';
 import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
 import { applicationContainer } from '../../../composition/applicationContainer';
+import { forgetCurrentDevice } from './forgetCurrentDevice';
 
 const GlobalCallBar = lazy(() =>
   import('../../../../contexts/calls/presentation/components/GlobalCallBar').then(
@@ -469,18 +470,36 @@ function useForgetDeviceAndLogOut({
     if (!window.confirm(copy.profile.forgetDeviceConfirm)) return;
 
     setForgetError(null);
-    try {
-      await applicationContainer.identities.forgetDeviceUnlock(
-        session.identity.id,
-      );
-    } catch {
-      setForgetError(copy.profile.forgetDeviceFailed);
+    let outcome = await forgetCurrentDevice(
+      session,
+      applicationContainer,
+      false,
+    );
 
-      return;
+    if (
+      outcome === 'only-device' &&
+      window.confirm(copy.profile.forgetDeviceOnlyDeviceConfirm)
+    ) {
+      outcome = await forgetCurrentDevice(session, applicationContainer, true);
     }
 
-    deleteLegacyRememberedIdentityStorage();
-    onLogout();
+    switch (outcome) {
+      case 'forgotten':
+        deleteLegacyRememberedIdentityStorage();
+        onLogout();
+
+        return;
+      case 'only-device':
+        return;
+      case 'revoke-failed':
+        setForgetError(copy.profile.forgetDeviceRevokeFailed);
+
+        return;
+      case 'unlock-failed':
+        setForgetError(copy.profile.forgetDeviceUnlockFailed);
+
+        return;
+    }
   };
 
   return { forgetDeviceAndLogOut, forgetError };

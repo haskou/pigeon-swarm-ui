@@ -52,7 +52,7 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 
 - Legacy inboxes: a `readToken` stored by the previous design is adopted on the first pass: both readers are registered under it, then the stored token is dropped. The first reconcile after adoption removes that token's reader, so a client still holding it loses access until it updates. If storage was cleared before adoption, the inbox stays unrecoverable until retention removes it.
 - Mixed versions and the reader cap: see Reader set.
-- Forget is local only: forgetting a device does not revoke its reader on the node.
+- Forget is best effort on readers: forgetting a device removes its device reader through the root token. A failed removal is left to the reader prune that other devices run on sync. The only device of an identity keeps its reader, because its revocation is never sent.
 - Revoked devices keep root authority: the root token derives from the identity root key, which a device keeps after it is revoked. Devices never prune the root reader, and any reader can add or remove any other reader. The node checks only that a token is registered, so a revoked device keeps reading and acknowledging the inbox until someone removes the root reader on the node.
 - Silent readers: a registered reader that stops acknowledging holds every envelope above its cursor until the node's retention expires them (default 14 days). While it is silent the mailbox can fill, and appends return 409. Pruning removes only readers whose device is gone, so a silent device that is still listed keeps its backlog.
 
