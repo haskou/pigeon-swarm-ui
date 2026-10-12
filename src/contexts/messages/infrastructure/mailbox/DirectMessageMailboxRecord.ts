@@ -35,10 +35,17 @@ export type DirectReactionRecord = RecordBase & {
   type: 'reaction';
 };
 
+/** Read receipt for this identity. Sent only to its own inbox. */
+export type DirectReadRecord = RecordBase & {
+  targetMessageId: string;
+  type: 'read';
+};
+
 export type DirectMessageRecord =
   | DirectDeletedRecord
   | DirectEditedRecord
   | DirectReactionRecord
+  | DirectReadRecord
   | DirectSentRecord;
 
 const DIRECT_MESSAGE_KIND = 'direct-message';
@@ -60,6 +67,9 @@ function mailboxFields(message: MessageResource) {
 }
 
 export class DirectMessageMailboxRecord {
+  private static readonly RECEIPT_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+  private static readonly RECEIPT_MAX_FUTURE_SKEW_MS = 30_000;
+
   /** Only one-to-one conversations travel through the mailbox. */
   public static isEligible(conversationType: 'group' | 'one-to-one'): boolean {
     return conversationType === 'one-to-one';
@@ -114,6 +124,19 @@ export class DirectMessageMailboxRecord {
       targetMessageId,
       type: 'edited',
     };
+  }
+
+  /**
+   * A read receipt is fresh when it is at most 14 days old and at most 30
+   * seconds ahead of this device's clock. Stale or future-dated receipts are
+   * ignored, matching the node's read-proof window.
+   */
+  public static isFreshReceipt(record: DirectReadRecord, now: number): boolean {
+    return (
+      now - record.createdAt <= DirectMessageMailboxRecord.RECEIPT_MAX_AGE_MS &&
+      record.createdAt - now <=
+        DirectMessageMailboxRecord.RECEIPT_MAX_FUTURE_SKEW_MS
+    );
   }
 
   public static encode(record: DirectMessageRecord): Uint8Array {
@@ -236,6 +259,8 @@ function isDirectMessageRecord(value: unknown): value is DirectMessageRecord {
     case 'edited':
       return isEditedFields(value);
     case 'deleted':
+      return typeof value.targetMessageId === 'string';
+    case 'read':
       return typeof value.targetMessageId === 'string';
     case 'reaction':
       return isReactionFields(value);

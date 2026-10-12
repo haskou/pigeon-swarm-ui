@@ -88,6 +88,7 @@ export function useConversationTimeline({
   const messageRequestRef = useRef(0);
   const messageStateRef = useRef<ConversationMessageLoadState>('loading');
   const messagesRef = useRef<ChatMessage[]>([]);
+  const activeConversationRef = useRef(activeConversation);
   const clearNewMessageCount = useCallback((): void => {
     setNewMessageCount(0);
   }, []);
@@ -114,6 +115,10 @@ export function useConversationTimeline({
   useEffect(() => {
     messageStateRef.current = messageState;
   }, [messageState]);
+
+  useEffect(() => {
+    activeConversationRef.current = activeConversation;
+  }, [activeConversation]);
 
   const setMessageLoadState = useCallback(
     (state: ConversationMessageLoadState): void => {
@@ -143,6 +148,16 @@ export function useConversationTimeline({
       void applicationContainer.conversations
         .markReadUntil(sessionRef.current, conversationId, lastMessage.id)
         .catch(() => undefined);
+
+      const readConversation = activeConversationRef.current;
+
+      if (readConversation?.id === conversationId) {
+        void applicationContainer.directMessages.deliverRead(
+          sessionRef.current,
+          readConversation,
+          lastMessage.id,
+        );
+      }
     },
     [clearUnreadMessages, onConversationsChange, sessionRef],
   );

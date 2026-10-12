@@ -10,6 +10,7 @@ import type {
   DirectDeletedRecord,
   DirectEditedRecord,
   DirectReactionRecord,
+  DirectReadRecord,
   DirectSentRecord,
 } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxRecord';
 import type { DirectMessageMailboxState } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxStore';
@@ -385,6 +386,60 @@ describe(DirectMessageMailbox.name, () => {
         );
       },
     );
+  });
+
+  describe('deliverRead', () => {
+    it('appends the read record to the inbox of this identity and reports delivery', async () => {
+      const { channel, mailbox } = setup();
+      channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
+
+      await expect(
+        mailbox.deliverRead(session('alice'), conversation, 'message-1'),
+      ).resolves.toBe('delivered');
+      const [keys, plaintext] = channel.send.mock.calls[0];
+      expect(keys.mailboxId).toBe(keysFor('alice').mailboxId);
+      expect(
+        DirectMessageMailboxRecord.decode(plaintext, conversationId),
+      ).toEqual(
+        expect.objectContaining({
+          authorId: 'alice',
+          targetMessageId: 'message-1',
+          type: 'read',
+        }),
+      );
+    });
+
+    it('reports failed when the inbox append is rejected', async () => {
+      const { channel, mailbox } = setup();
+      channel.send.mockRejectedValue(new Error('network down'));
+
+      await expect(
+        mailbox.deliverRead(session('alice'), conversation, 'message-1'),
+      ).resolves.toBe('failed');
+    });
+
+    it('reports failed without a conversation key and sends nothing', async () => {
+      const { channel, mailbox } = setup();
+      const keyless = {
+        identity: { id: 'alice' },
+        keychain: { conversations: {}, version: 1 },
+      } as unknown as Session;
+
+      await expect(
+        mailbox.deliverRead(keyless, conversation, 'message-1'),
+      ).resolves.toBe('failed');
+      expect(channel.send).not.toHaveBeenCalled();
+    });
+
+    it('skips a group conversation and sends nothing', async () => {
+      const { channel, mailbox } = setup();
+      const group = { ...conversation, type: 'group' } as ConversationResource;
+
+      await expect(
+        mailbox.deliverRead(session('alice'), group, 'message-1'),
+      ).resolves.toBe('skipped');
+      expect(channel.send).not.toHaveBeenCalled();
+    });
   });
 
   describe.each(deliveries)('%s delivery outcome', (_label, deliverKind) => {
@@ -990,6 +1045,148 @@ describe(DirectMessageMailbox.name, () => {
       );
 
       expect(apply).toHaveBeenCalledWith([reactionChange]);
+    });
+
+    describe('read receipts', () => {
+      const now = 1_700_000_000_000;
+      const DAY_MS = 24 * 60 * 60 * 1000;
+      const readOf = (
+        overrides: Partial<DirectReadRecord>,
+      ): DirectReadRecord => ({
+        authorId: 'alice',
+        conversationId,
+        createdAt: now,
+        id: 'read-1',
+        targetMessageId: 'message-1',
+        type: 'read',
+        ...overrides,
+      });
+      const changesOf = (apply: jest.Mock): DirectMessageTimelineChange[] =>
+        apply.mock.calls.flatMap(
+          ([changes]) => changes as DirectMessageTimelineChange[],
+        );
+
+      beforeEach(() => {
+        jest.spyOn(Date, 'now').mockReturnValue(now);
+      });
+
+      afterEach(() => {
+        jest.restoreAllMocks();
+      });
+
+      it('applies a fresh read by this identity as a read change without decrypting it', async () => {
+        const { channel, mailbox, projection } = setup();
+        channel.read.mockResolvedValue(
+          pageOf([DirectMessageMailboxRecord.encode(readOf({}))]),
+        );
+        channel.acknowledge.mockResolvedValue({ recreated: false });
+        const apply = jest.fn();
+
+        await mailbox.sync(
+          session('alice'),
+          conversationId,
+          new AbortController().signal,
+          apply,
+        );
+
+        expect(apply).toHaveBeenCalledWith([
+          { kind: 'read', messageId: 'message-1' },
+        ]);
+        expect(projection.decryptMany).not.toHaveBeenCalled();
+      });
+
+      it('ignores a read authored by another identity and still acknowledges it', async () => {
+        const { channel, mailbox } = setup();
+        channel.read.mockResolvedValue(
+          pageOf([
+            DirectMessageMailboxRecord.encode(readOf({ authorId: 'bob' })),
+          ]),
+        );
+        channel.acknowledge.mockResolvedValue({ recreated: false });
+        const apply = jest.fn();
+
+        await mailbox.sync(
+          session('alice'),
+          conversationId,
+          new AbortController().signal,
+          apply,
+        );
+
+        expect(changesOf(apply)).toEqual([]);
+        expect(channel.acknowledge).toHaveBeenCalled();
+      });
+
+      it('ignores a read created more than 14 days ago', async () => {
+        const { channel, mailbox } = setup();
+        channel.read.mockResolvedValue(
+          pageOf([
+            DirectMessageMailboxRecord.encode(
+              readOf({ createdAt: now - 14 * DAY_MS - 1 }),
+            ),
+          ]),
+        );
+        channel.acknowledge.mockResolvedValue({ recreated: false });
+        const apply = jest.fn();
+
+        await mailbox.sync(
+          session('alice'),
+          conversationId,
+          new AbortController().signal,
+          apply,
+        );
+
+        expect(changesOf(apply)).toEqual([]);
+      });
+
+      it('ignores a read more than 30 seconds ahead of this device', async () => {
+        const { channel, mailbox } = setup();
+        channel.read.mockResolvedValue(
+          pageOf([
+            DirectMessageMailboxRecord.encode(
+              readOf({ createdAt: now + 30_001 }),
+            ),
+          ]),
+        );
+        channel.acknowledge.mockResolvedValue({ recreated: false });
+        const apply = jest.fn();
+
+        await mailbox.sync(
+          session('alice'),
+          conversationId,
+          new AbortController().signal,
+          apply,
+        );
+
+        expect(changesOf(apply)).toEqual([]);
+      });
+
+      it('applies reads on the 14 day and 30 second edges', async () => {
+        const { channel, mailbox } = setup();
+        channel.read.mockResolvedValue(
+          pageOf([
+            DirectMessageMailboxRecord.encode(
+              readOf({ createdAt: now - 14 * DAY_MS }),
+            ),
+            DirectMessageMailboxRecord.encode(
+              readOf({ createdAt: now + 30_000, id: 'read-2' }),
+            ),
+          ]),
+        );
+        channel.acknowledge.mockResolvedValue({ recreated: false });
+        const apply = jest.fn();
+
+        await mailbox.sync(
+          session('alice'),
+          conversationId,
+          new AbortController().signal,
+          apply,
+        );
+
+        expect(changesOf(apply)).toEqual([
+          { kind: 'read', messageId: 'message-1' },
+          { kind: 'read', messageId: 'message-1' },
+        ]);
+      });
     });
   });
 

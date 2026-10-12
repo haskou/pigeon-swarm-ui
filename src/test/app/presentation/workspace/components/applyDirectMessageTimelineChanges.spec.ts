@@ -97,6 +97,16 @@ describe('applyDirectMessageTimelineChanges', () => {
     expect(result).toEqual(current);
   });
 
+  it('leaves the timeline unchanged for a read change', () => {
+    const current = [message('message-1', 100)];
+
+    const result = applyDirectMessageTimelineChanges(current, [
+      { kind: 'read', messageId: 'message-1' },
+    ]);
+
+    expect(result).toEqual(current);
+  });
+
   it('removes the message named by a removed change', () => {
     const result = applyDirectMessageTimelineChanges(
       [message('message-1', 100), message('message-2', 200)],

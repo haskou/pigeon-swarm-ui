@@ -13,7 +13,12 @@ import type {
   OpenedMailboxPage,
 } from '../../../mailboxes/infrastructure/MailboxChannel';
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
-import type { DirectMessageRecord } from './DirectMessageMailboxRecord';
+import type {
+  DirectEditedRecord,
+  DirectMessageRecord,
+  DirectReadRecord,
+  DirectSentRecord,
+} from './DirectMessageMailboxRecord';
 import type { DirectMessageMailboxState } from './DirectMessageMailboxStore';
 import type { DirectMessageReaderSet } from './DirectMessageReaderSet';
 import type { RecipientMailboxRouter } from './RecipientMailboxRouter';
@@ -43,6 +48,7 @@ export type DirectMessageTimelineChange =
       kind: 'reaction';
       messageId: string;
     }
+  | { kind: 'read'; messageId: string }
   | { kind: 'removed'; messageId: string };
 
 /**
@@ -61,9 +67,9 @@ type RecipientInbox = {
 
 /**
  * Direct one-to-one messages over the opaque mailbox: sent, edited, deleted,
- * and reactions. The legacy send delivers first; this path carries a copy so
- * the peer can receive it without the replicated path. Duplicates collapse by
- * message id in the timeline.
+ * reactions, and read receipts. The legacy send delivers first; this path
+ * carries a copy so the peer can receive it without the replicated path.
+ * Duplicates collapse by message id in the timeline.
  */
 export class DirectMessageMailbox {
   private static readonly PAGE_SIZE = 50;
@@ -147,6 +153,26 @@ export class DirectMessageMailbox {
       id: UUID.generate().toString(),
       targetMessageId: reaction.messageId,
       type: 'reaction',
+    }));
+  }
+
+  /**
+   * Sender. Appends a read receipt to this identity's own inbox, so its other
+   * devices clear unread. The peer never receives it. Same outcomes as
+   * deliverSent.
+   */
+  public deliverRead(
+    session: Session,
+    conversation: ConversationResource,
+    messageId: string,
+  ): Promise<DirectMessageMailboxDelivery> {
+    return this.appendTo(session, conversation, session.identity.id, () => ({
+      authorId: session.identity.id,
+      conversationId: conversation.id,
+      createdAt: Date.now(),
+      id: UUID.generate().toString(),
+      targetMessageId: messageId,
+      type: 'read',
     }));
   }
 
@@ -259,11 +285,12 @@ export class DirectMessageMailbox {
   }
 
   /**
-   * Shared sender path. Skips without sending when there is no peer, the
-   * conversation is a group, or the encoded record exceeds the envelope bound.
-   * Building the record runs inside the try, so a throw there is 'failed'.
+   * Shared sender path for the peer's inbox. Skips without sending when there
+   * is no peer, the conversation is a group, or the encoded record exceeds the
+   * envelope bound. Building the record runs inside the try, so a throw there
+   * is 'failed'.
    */
-  private async append(
+  private append(
     session: Session,
     conversation: ConversationResource,
     build: () => DirectMessageRecord,
@@ -272,6 +299,21 @@ export class DirectMessageMailbox {
       (identityId) => identityId !== session.identity.id,
     );
 
+    return this.appendTo(session, conversation, recipientIdentityId, build);
+  }
+
+  /**
+   * Appends one record to the inbox of the given identity. Shared by the peer
+   * path and the read receipt path, which writes to this identity's own inbox.
+   * Skips without sending when there is no recipient or the conversation is a
+   * group.
+   */
+  private async appendTo(
+    session: Session,
+    conversation: ConversationResource,
+    recipientIdentityId: string | undefined,
+    build: () => DirectMessageRecord,
+  ): Promise<DirectMessageMailboxDelivery> {
     if (
       !recipientIdentityId ||
       !DirectMessageMailboxRecord.isEligible(conversation.type)
@@ -566,17 +608,8 @@ export class DirectMessageMailbox {
     return records.flatMap((record): DirectMessageTimelineChange[] => {
       switch (record.type) {
         case 'sent':
-        case 'edited': {
-          const message = messages.get(record.id);
-
-          if (!message || message.encrypted) return [];
-
-          return [
-            record.type === 'sent'
-              ? { kind: 'message', message }
-              : { kind: 'edit', message },
-          ];
-        }
+        case 'edited':
+          return this.messageChanges(record, messages);
         case 'deleted':
           return [{ kind: 'removed', messageId: record.targetMessageId }];
         case 'reaction':
@@ -590,8 +623,43 @@ export class DirectMessageMailbox {
               messageId: record.targetMessageId,
             },
           ];
+        case 'read':
+          return this.readChanges(session, record);
       }
     });
+  }
+
+  /**
+   * A sent or edited record yields a change only when its message decrypted.
+   */
+  private messageChanges(
+    record: DirectEditedRecord | DirectSentRecord,
+    messages: Map<string, ChatMessage>,
+  ): DirectMessageTimelineChange[] {
+    const message = messages.get(record.id);
+
+    if (!message || message.encrypted) return [];
+
+    return [
+      record.type === 'sent'
+        ? { kind: 'message', message }
+        : { kind: 'edit', message },
+    ];
+  }
+
+  /**
+   * A read receipt applies only when this identity wrote it and it is fresh.
+   */
+  private readChanges(
+    session: Session,
+    record: DirectReadRecord,
+  ): DirectMessageTimelineChange[] {
+    const own = record.authorId === session.identity.id;
+    const fresh = DirectMessageMailboxRecord.isFreshReceipt(record, Date.now());
+
+    return own && fresh
+      ? [{ kind: 'read', messageId: record.targetMessageId }]
+      : [];
   }
 
   /**

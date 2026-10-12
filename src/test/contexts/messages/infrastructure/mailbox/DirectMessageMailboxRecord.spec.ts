@@ -3,6 +3,7 @@ import type {
   DirectDeletedRecord,
   DirectEditedRecord,
   DirectReactionRecord,
+  DirectReadRecord,
   DirectSentRecord,
 } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxRecord';
 
@@ -259,6 +260,61 @@ describe(DirectMessageMailboxRecord.name, () => {
         targetMessageId: 'message-1',
         type: 'edited',
       });
+    });
+  });
+
+  describe('read records', () => {
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const now = 1_700_000_000_000;
+    const readRecord: DirectReadRecord = {
+      authorId: 'alice',
+      conversationId,
+      createdAt: now,
+      id: 'read-1',
+      targetMessageId: 'message-1',
+      type: 'read',
+    };
+
+    it('round-trips a read record of this conversation', () => {
+      expect(
+        DirectMessageMailboxRecord.decode(
+          DirectMessageMailboxRecord.encode(readRecord),
+          conversationId,
+        ),
+      ).toEqual(readRecord);
+    });
+
+    it('rejects a read record that belongs to another conversation', () => {
+      expect(
+        DirectMessageMailboxRecord.decode(
+          DirectMessageMailboxRecord.encode(readRecord),
+          'conversation-2',
+        ),
+      ).toBeNull();
+    });
+
+    it('returns null for a read record without a target', () => {
+      expect(
+        DirectMessageMailboxRecord.decode(
+          envelope({ ...readRecord, targetMessageId: undefined }),
+          conversationId,
+        ),
+      ).toBeNull();
+    });
+
+    it.each([
+      ['created now', 0, true],
+      ['created 14 days ago', -14 * DAY_MS, true],
+      ['created 14 days and 1 ms ago', -14 * DAY_MS - 1, false],
+      ['created 30 seconds ahead', 30_000, true],
+      ['created 30 seconds and 1 ms ahead', 30_001, false],
+    ])('judges a read record that was %s fresh=%s', (_label, offset, fresh) => {
+      expect(
+        DirectMessageMailboxRecord.isFreshReceipt(
+          { ...readRecord, createdAt: now + offset },
+          now,
+        ),
+      ).toBe(fresh);
     });
   });
 });
