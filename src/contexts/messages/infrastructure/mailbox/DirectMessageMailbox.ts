@@ -194,14 +194,19 @@ export class DirectMessageMailbox {
     conversation: ConversationResource,
     messageId: string,
   ): Promise<DirectMessageMailboxDelivery> {
-    return this.appendTo(session, conversation, session.identity.id, () => ({
-      authorId: session.identity.id,
-      conversationId: conversation.id,
-      createdAt: Date.now(),
-      id: UUID.generate().toString(),
-      targetMessageId: messageId,
-      type: 'read',
-    }));
+    return this.appendTo(
+      session,
+      conversation,
+      () => session.identity.id,
+      () => ({
+        authorId: session.identity.id,
+        conversationId: conversation.id,
+        createdAt: Date.now(),
+        id: UUID.generate().toString(),
+        targetMessageId: messageId,
+        type: 'read',
+      }),
+    );
   }
 
   /**
@@ -405,50 +410,57 @@ export class DirectMessageMailbox {
   /**
    * Shared sender path for the peer's inbox. Skips without sending when there
    * is no peer, the conversation is a group, or the encoded record exceeds the
-   * envelope bound. Building the record runs inside the try, so a throw there
-   * is 'failed'.
+   * envelope bound. Reading the peer and building the record run inside the
+   * try, so a throw there is 'failed'.
    */
   private append(
     session: Session,
     conversation: ConversationResource,
     build: () => DirectMessageRecord,
   ): Promise<DirectMessageMailboxDelivery> {
-    const recipientIdentityId = conversation.participantIds.find(
-      (identityId) => identityId !== session.identity.id,
+    return this.appendTo(
+      session,
+      conversation,
+      () =>
+        conversation.participantIds.find(
+          (identityId) => identityId !== session.identity.id,
+        ),
+      build,
     );
-
-    return this.appendTo(session, conversation, recipientIdentityId, build);
   }
 
   /**
    * Appends one record to the inbox of the given identity. Shared by the peer
    * path and the read receipt path, which writes to this identity's own inbox.
    * Skips without sending when there is no recipient or the conversation is a
-   * group.
+   * group. Reading the recipient and building the record run inside the try,
+   * so a throw there is 'failed' and never reaches the caller.
    */
   private async appendTo(
     session: Session,
     conversation: ConversationResource,
-    recipientIdentityId: string | undefined,
+    recipientIdentityId: () => string | undefined,
     build: () => DirectMessageRecord,
   ): Promise<DirectMessageMailboxDelivery> {
-    if (
-      !recipientIdentityId ||
-      !DirectMessageMailboxRecord.isEligible(conversation.type)
-    ) {
-      return 'skipped';
-    }
-
     try {
+      const recipient = recipientIdentityId();
+
+      if (
+        !recipient ||
+        !DirectMessageMailboxRecord.isEligible(conversation.type)
+      ) {
+        return 'skipped';
+      }
+
       const plaintext = DirectMessageMailboxRecord.encode(build());
 
       if (plaintext.byteLength > MailboxEnvelopeCipher.MAX_PLAINTEXT_BYTES) {
         return 'skipped';
       }
 
-      const keys = this.keysFor(session, conversation.id, recipientIdentityId);
+      const keys = this.keysFor(session, conversation.id, recipient);
 
-      await this.recipients.send(recipientIdentityId, keys, plaintext);
+      await this.recipients.send(recipient, keys, plaintext);
 
       return 'delivered';
     } catch {

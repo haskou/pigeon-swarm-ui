@@ -20,6 +20,7 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { ConversationTimelineLoadPlan } from './ConversationTimelineLoadPlan';
+import { runMailboxSideEffect } from './runMailboxSideEffect';
 import { useMessageViewport } from './useMessageViewport';
 import { useWorkspaceMessageHistory } from './useWorkspaceMessageHistory';
 import { useWorkspaceResumeSync } from './useWorkspaceResumeSync';
@@ -152,10 +153,12 @@ export function useConversationTimeline({
       const readConversation = activeConversationRef.current;
 
       if (readConversation?.id === conversationId) {
-        void applicationContainer.directMessages.deliverRead(
-          sessionRef.current,
-          readConversation,
-          lastMessage.id,
+        runMailboxSideEffect(() =>
+          applicationContainer.directMessages.deliverRead(
+            sessionRef.current,
+            readConversation,
+            lastMessage.id,
+          ),
         );
       }
     },

@@ -1,5 +1,8 @@
+import type { Dispatch, SetStateAction } from 'react';
+
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
+import type { MessageCollectionState } from '../../../../../app/presentation/workspace/components/conversationThreadState';
 import type {
   ChatMessage,
   ConversationResource,
@@ -8,6 +11,7 @@ import type {
 
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';
 import { useConversationPins } from '../../../../../app/presentation/workspace/components/useConversationPins';
+import { captureUnhandledRejections } from '../../../../captureUnhandledRejections';
 
 jest.mock('react', () => ({
   useEffect: () => undefined,
@@ -31,6 +35,29 @@ const conversation = {
 const session = { identity: { id: 'alice' } } as unknown as Session;
 const message = { id: 'message-1' } as unknown as ChatMessage;
 
+const pinnedCollection = {
+  error: null,
+  messages: [message],
+  state: 'ready',
+} as unknown as MessageCollectionState;
+
+// Hook state setters are fresh jest.fn()s; the hook passes them updaters.
+function pinnedUpdaterOf(
+  setPinnedMessageIds: Dispatch<SetStateAction<Set<string>>>,
+): (current: Set<string>) => Set<string> {
+  return jest.mocked(setPinnedMessageIds).mock.calls[0]?.[0] as (
+    current: Set<string>,
+  ) => Set<string>;
+}
+
+function collectionUpdaterOf(
+  setCollection: Dispatch<SetStateAction<MessageCollectionState | null>>,
+): (current: MessageCollectionState | null) => MessageCollectionState | null {
+  return jest.mocked(setCollection).mock.calls[0]?.[0] as (
+    current: MessageCollectionState | null,
+  ) => MessageCollectionState | null;
+}
+
 function mountPins() {
   const onError = jest.fn<(error: string | null) => void>();
   const closeMessageContextMenu = jest.fn<() => void>();
@@ -46,7 +73,7 @@ function mountPins() {
 
 describe('useConversationPins mailbox delivery', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
   });
 
   it('delivers a pin record to the peer after the legacy pin succeeds', async () => {
@@ -117,5 +144,79 @@ describe('useConversationPins mailbox delivery', () => {
     expect(
       applicationContainer.directMessages.deliverPin,
     ).not.toHaveBeenCalled();
+  });
+
+  it('keeps the pin applied when inbox delivery throws synchronously', async () => {
+    jest.mocked(applicationContainer.messages.pin).mockResolvedValue(undefined);
+    jest
+      .mocked(applicationContainer.directMessages.deliverPin)
+      .mockImplementation(() => {
+        throw new Error('inbox unavailable');
+      });
+    const { onError, pins } = mountPins();
+
+    await pins.pin(message);
+
+    expect(onError).toHaveBeenLastCalledWith(null);
+    expect(pinnedUpdaterOf(pins.setPinnedMessageIds)(new Set())).toEqual(
+      new Set(['message-1']),
+    );
+  });
+
+  it('keeps the pin applied with no unhandled rejection when inbox delivery rejects', async () => {
+    jest.mocked(applicationContainer.messages.pin).mockResolvedValue(undefined);
+    jest
+      .mocked(applicationContainer.directMessages.deliverPin)
+      .mockRejectedValue(new Error('inbox unavailable'));
+    const { onError, pins } = mountPins();
+
+    const unhandled = await captureUnhandledRejections(() => pins.pin(message));
+
+    expect(unhandled).toEqual([]);
+    expect(onError).toHaveBeenLastCalledWith(null);
+    expect(pinnedUpdaterOf(pins.setPinnedMessageIds)(new Set())).toEqual(
+      new Set(['message-1']),
+    );
+  });
+
+  it('keeps the unpin applied when inbox delivery throws synchronously', async () => {
+    jest
+      .mocked(applicationContainer.messages.unpin)
+      .mockResolvedValue(undefined);
+    jest
+      .mocked(applicationContainer.directMessages.deliverPin)
+      .mockImplementation(() => {
+        throw new Error('inbox unavailable');
+      });
+    const { pins } = mountPins();
+
+    await pins.unpin(message);
+
+    expect(collectionUpdaterOf(pins.setCollection)(pinnedCollection)).toEqual({
+      error: null,
+      messages: [],
+      state: 'ready',
+    });
+  });
+
+  it('keeps the unpin applied with no unhandled rejection when inbox delivery rejects', async () => {
+    jest
+      .mocked(applicationContainer.messages.unpin)
+      .mockResolvedValue(undefined);
+    jest
+      .mocked(applicationContainer.directMessages.deliverPin)
+      .mockRejectedValue(new Error('inbox unavailable'));
+    const { pins } = mountPins();
+
+    const unhandled = await captureUnhandledRejections(() =>
+      pins.unpin(message),
+    );
+
+    expect(unhandled).toEqual([]);
+    expect(collectionUpdaterOf(pins.setCollection)(pinnedCollection)).toEqual({
+      error: null,
+      messages: [],
+      state: 'ready',
+    });
   });
 });

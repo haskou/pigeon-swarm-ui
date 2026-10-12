@@ -21,6 +21,7 @@ import { MessageReactionUpdater } from '../../../../contexts/messages/presentati
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
+import { runMailboxSideEffect } from './runMailboxSideEffect';
 import { useConversationMessageDelivery } from './useConversationMessageDelivery';
 
 type ConversationMessageActionsInput = {
@@ -243,10 +244,12 @@ export function useConversationMessageActions({
           activeConversation.id,
           message.id,
         );
-        void applicationContainer.directMessages.deliverDelete(
-          session,
-          activeConversation,
-          message.id,
+        runMailboxSideEffect(() =>
+          applicationContainer.directMessages.deliverDelete(
+            session,
+            activeConversation,
+            message.id,
+          ),
         );
         onMessagesChange((current) =>
           current.filter((item) => item.id !== message.id),
@@ -297,10 +300,12 @@ export function useConversationMessageActions({
           editingMessage.message.id,
           content,
         );
-        void applicationContainer.directMessages.deliverEdit(
-          session,
-          activeConversation,
-          editEvent.raw,
+        runMailboxSideEffect(() =>
+          applicationContainer.directMessages.deliverEdit(
+            session,
+            activeConversation,
+            editEvent.raw,
+          ),
         );
 
         onMessagesChange((current) =>
@@ -359,15 +364,17 @@ export function useConversationMessageActions({
           );
         }
 
-        void applicationContainer.directMessages.deliverReaction(
-          session,
-          activeConversation,
-          {
-            action,
-            createdAt: Date.now(),
-            emoji,
-            messageId: message.id,
-          },
+        runMailboxSideEffect(() =>
+          applicationContainer.directMessages.deliverReaction(
+            session,
+            activeConversation,
+            {
+              action,
+              createdAt: Date.now(),
+              emoji,
+              messageId: message.id,
+            },
+          ),
         );
       } catch (caught) {
         onErrorChange(toUserErrorMessage(caught, copy.messages.reactionError));
