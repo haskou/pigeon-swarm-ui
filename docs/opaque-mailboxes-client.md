@@ -158,7 +158,7 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 
 - Epoch rotation announcement.
 - Realtime hint for new envelopes.
-- Root rotation at forget time (not implemented). Revoke rotates the root (see Residual risk above). Forget does not: the forgetting device is revoked before it can publish, so remaining devices publish a fresh root on their next unlock. Until then the old root stays registered, and a forgotten device that still holds it keeps read access. Rotating at forget time needs a publish before the forgetting device's revocation, which the current flow does not do.
+- Root rotation at forget time (not implemented). Revoke rotates the root (see Residual risk above). Forget does not: the forgetting device is revoked, so it cannot publish, and remaining devices publish a fresh root on their next unlock. Until then the old root stays registered, and a forgotten device that still holds it keeps read access. A publish before the revoke would not close this window, because the forgetter must be listed as a recipient and would receive the new root too (node `DeviceSealedSecretBundle.assertPublishableBy`). A tighter bound needs a node contract change (`haskou/pigeon-swarm-node#289`).
 
 ## Verification
 
