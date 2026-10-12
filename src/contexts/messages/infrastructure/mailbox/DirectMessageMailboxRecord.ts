@@ -50,6 +50,15 @@ type DirectMessageEnvelope = {
   version: typeof DIRECT_MESSAGE_VERSION;
 };
 
+/** Some MessageResource fields exist under two names; use whichever is set. */
+function mailboxFields(message: MessageResource) {
+  return {
+    authorId: message.authorId ?? message.authorIdentityId,
+    createdAt: message.createdAt ?? message.timestamp,
+    encryptedPayload: message.encryptedPayload ?? message.payload,
+  };
+}
+
 export class DirectMessageMailboxRecord {
   /** Only one-to-one conversations travel through the mailbox. */
   public static isEligible(conversationType: 'group' | 'one-to-one'): boolean {
@@ -60,9 +69,7 @@ export class DirectMessageMailboxRecord {
     conversationId: string,
     sent: MessageResource,
   ): DirectSentRecord {
-    const authorId = sent.authorId ?? sent.authorIdentityId;
-    const createdAt = sent.createdAt ?? sent.timestamp;
-    const encryptedPayload = sent.encryptedPayload ?? sent.payload;
+    const { authorId, createdAt, encryptedPayload } = mailboxFields(sent);
 
     if (!sent.id || !authorId || !encryptedPayload || createdAt === undefined) {
       throw new Error('Sent message is missing mailbox fields.');
@@ -84,9 +91,7 @@ export class DirectMessageMailboxRecord {
     conversationId: string,
     edited: MessageResource,
   ): DirectEditedRecord {
-    const authorId = edited.authorId ?? edited.authorIdentityId;
-    const createdAt = edited.createdAt ?? edited.timestamp;
-    const encryptedPayload = edited.encryptedPayload ?? edited.payload;
+    const { authorId, createdAt, encryptedPayload } = mailboxFields(edited);
     const targetMessageId = edited.targetMessageId;
 
     if (
@@ -188,40 +193,52 @@ function isDirectMessageEnvelope(
   );
 }
 
-function isDirectMessageRecord(value: unknown): value is DirectMessageRecord {
-  if (!isObject(value)) return false;
+function hasRecordBase(value: Record<string, unknown>): boolean {
+  return (
+    typeof value.authorId === 'string' &&
+    typeof value.conversationId === 'string' &&
+    typeof value.createdAt === 'number' &&
+    typeof value.id === 'string'
+  );
+}
 
-  if (
-    typeof value.authorId !== 'string' ||
-    typeof value.conversationId !== 'string' ||
-    typeof value.createdAt !== 'number' ||
-    typeof value.id !== 'string'
-  ) {
-    return false;
-  }
+function isSentFields(value: Record<string, unknown>): boolean {
+  return (
+    typeof value.encryptedPayload === 'string' &&
+    isStringArray(value.previousMessageIds) &&
+    (value.replyToMessageId === undefined ||
+      typeof value.replyToMessageId === 'string')
+  );
+}
+
+function isEditedFields(value: Record<string, unknown>): boolean {
+  return (
+    typeof value.encryptedPayload === 'string' &&
+    isStringArray(value.previousMessageIds) &&
+    typeof value.targetMessageId === 'string'
+  );
+}
+
+function isReactionFields(value: Record<string, unknown>): boolean {
+  return (
+    (value.action === 'add' || value.action === 'remove') &&
+    typeof value.emoji === 'string' &&
+    typeof value.targetMessageId === 'string'
+  );
+}
+
+function isDirectMessageRecord(value: unknown): value is DirectMessageRecord {
+  if (!isObject(value) || !hasRecordBase(value)) return false;
 
   switch (value.type) {
     case 'sent':
-      return (
-        typeof value.encryptedPayload === 'string' &&
-        isStringArray(value.previousMessageIds) &&
-        (value.replyToMessageId === undefined ||
-          typeof value.replyToMessageId === 'string')
-      );
+      return isSentFields(value);
     case 'edited':
-      return (
-        typeof value.encryptedPayload === 'string' &&
-        isStringArray(value.previousMessageIds) &&
-        typeof value.targetMessageId === 'string'
-      );
+      return isEditedFields(value);
     case 'deleted':
       return typeof value.targetMessageId === 'string';
     case 'reaction':
-      return (
-        (value.action === 'add' || value.action === 'remove') &&
-        typeof value.emoji === 'string' &&
-        typeof value.targetMessageId === 'string'
-      );
+      return isReactionFields(value);
     default:
       return false;
   }
