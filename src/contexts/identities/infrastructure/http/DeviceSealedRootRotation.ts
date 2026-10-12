@@ -16,8 +16,9 @@ import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonEr
  * carries one root, sealed to every device at the head. Enrolment reseals the
  * same root; a revoke mints a fresh one. A device opens its own entry while it
  * matches its authorization revision. A stale session re-syncs once and never
- * mints a root, because the head may already be sealed under a root this
- * device cannot open. Only a device with no entry publishes a new root.
+ * mints a root. A device with no entry mints only after the identity keychain
+ * head reads: a head sealed under a root this device cannot open blocks the
+ * mint, so that keychain is not stranded.
  */
 export class DeviceSealedRootRotation {
   public constructor(
@@ -80,12 +81,15 @@ export class DeviceSealedRootRotation {
 
   /**
    * Returns the session holding the root of the current generation. Publishes
-   * a new generation only when this device has no entry at all.
+   * a new generation only when this device has no entry at all and the
+   * keychain head is readable.
    */
   public async current(session: Session): Promise<Session> {
     const own = await this.sealedSecrets.fetchOwn(session);
 
     if (!own) {
+      await this.keychains.readHead(session);
+
       return await this.rotate(session);
     }
 

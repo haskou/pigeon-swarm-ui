@@ -18,8 +18,8 @@ export type KeychainHead = {
 export class KeychainCipher {
   /**
    * Opens under the device-sealed root. A head sealed under the master key
-   * before the root existed opens once; the next publish seals it under the
-   * root.
+   * before the root existed opens through this fallback until unlock reseals
+   * it under the root.
    */
   private open(session: Session, payload: EncryptedPayload): string {
     try {
@@ -46,6 +46,25 @@ export class KeychainCipher {
       timestamp: parsed.timestamp ?? keychain.timestamp,
       version: parsed.version ?? keychain.version ?? 0,
     };
+  }
+
+  /**
+   * True when the head opens under the session's root alone. Never falls back
+   * to the master key.
+   */
+  public isSealedUnderRoot(
+    session: Session,
+    keychain: KeychainResource,
+  ): boolean {
+    try {
+      sessionRootKey(session).decrypt(
+        new EncryptedPayload(keychain.encryptedPayload),
+      );
+
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   public async encryptForPublish(

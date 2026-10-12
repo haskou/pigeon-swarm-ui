@@ -218,4 +218,32 @@ export class PigeonKeychainApi {
       await this.postKeychain(session, head, head.keychain);
     });
   }
+
+  /**
+   * Reseals a head that opens only under the master key under the session's
+   * root. Unlock runs it once the root is open. A head already under the root
+   * is left alone.
+   */
+  public async migrateLegacyHead(session: Session): Promise<void> {
+    if (!session.deviceSealedRootKey) {
+      return;
+    }
+
+    await this.enqueuePublish(session.identity.id, async () => {
+      const resource = await this.undefinedWhenMissing(
+        async () => await this.fetchRemote(session),
+      );
+
+      if (!resource || this.cipher.isSealedUnderRoot(session, resource)) {
+        return;
+      }
+
+      const head: KeychainHead = {
+        keychain: this.decrypt(session, resource),
+        keychainExternalIdentifier: resource.keychainExternalIdentifier,
+      };
+
+      await this.postKeychain(session, head, head.keychain);
+    });
+  }
 }
