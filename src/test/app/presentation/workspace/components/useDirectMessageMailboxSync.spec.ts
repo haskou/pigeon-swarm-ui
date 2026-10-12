@@ -10,6 +10,7 @@ import {
 } from '@jest/globals';
 
 import type {
+  ChatMessage,
   ConversationResource,
   Session,
 } from '../../../../../shared/domain/pigeonResources.types';
@@ -49,12 +50,15 @@ function mountSync(initialError: string | null = null) {
   const onErrorChange = jest.fn((update: SetStateAction<string | null>) => {
     error = typeof update === 'function' ? update(error) : update;
   });
+  const onMessagesChange = jest.fn(
+    (_update: SetStateAction<ChatMessage[]>) => {},
+  );
 
   mockEffects.length = 0;
   useDirectMessageMailboxSync({
     activeConversation: conversation,
     onErrorChange,
-    onMessagesChange: jest.fn(),
+    onMessagesChange,
     session,
   });
   const cleanup = mockEffects[0]() as () => void;
@@ -63,6 +67,7 @@ function mountSync(initialError: string | null = null) {
     cleanup,
     error: () => error,
     onErrorChange,
+    onMessagesChange,
     replaceError: (value: string) => {
       error = value;
     },
@@ -140,6 +145,73 @@ describe('useDirectMessageMailboxSync notice', () => {
     await settle();
 
     expect(mounted.error()).toBe('Another error');
+    mounted.cleanup();
+  });
+});
+
+describe('useDirectMessageMailboxSync changes', () => {
+  const timelineMessage = {
+    attachments: [],
+    authorIdentityId: 'alice',
+    content: 'hello',
+    encrypted: false,
+    id: 'message-1',
+    mine: true,
+    raw: { conversationId: 'conversation-1', id: 'message-1', type: 'sent' },
+    reactions: [],
+    timestamp: 100,
+  } as unknown as ChatMessage;
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    Reflect.set(globalThis, 'window', {
+      clearTimeout: (id: number | undefined) => globalThis.clearTimeout(id),
+      setTimeout: (callback: () => void, ms: number) =>
+        globalThis.setTimeout(callback, ms),
+    });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    Reflect.deleteProperty(globalThis, 'window');
+    sync.mockReset();
+  });
+
+  it('applies reported changes to the timeline', async () => {
+    sync.mockImplementation(async (_session, _conversationId, _signal, apply) => {
+      apply([
+        {
+          action: 'add',
+          authorId: 'bob',
+          createdAt: 300,
+          emoji: '👍',
+          kind: 'reaction',
+          messageId: 'message-1',
+        },
+      ]);
+    });
+    const mounted = mountSync();
+
+    await settle();
+
+    const update = mounted.onMessagesChange.mock.calls[0][0] as (
+      current: ChatMessage[],
+    ) => ChatMessage[];
+    expect(update([timelineMessage])[0].reactions).toEqual([
+      { authorIdentityId: 'bob', createdAt: 300, emoji: '👍' },
+    ]);
+    mounted.cleanup();
+  });
+
+  it('does not touch the timeline when a pass reports no changes', async () => {
+    sync.mockImplementation(async (_session, _conversationId, _signal, apply) => {
+      apply([]);
+    });
+    const mounted = mountSync();
+
+    await settle();
+
+    expect(mounted.onMessagesChange).not.toHaveBeenCalled();
     mounted.cleanup();
   });
 });

@@ -5,6 +5,13 @@ import type { MailboxKeys } from '../../../../../contexts/mailboxes/infrastructu
 import type { PigeonMailboxClient } from '../../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
 import type { MailboxReadTokens } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import type { MessageProjectionPort } from '../../../../../contexts/messages/infrastructure/crypto/MessageProjectionPort';
+import type { DirectMessageTimelineChange } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
+import type {
+  DirectDeletedRecord,
+  DirectEditedRecord,
+  DirectReactionRecord,
+  DirectSentRecord,
+} from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxRecord';
 import type { DirectMessageMailboxState } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxStore';
 import type {
   ChatMessage,
@@ -14,6 +21,7 @@ import type {
 } from '../../../../../shared/domain/pigeonResources.types';
 
 import { MailboxCapability } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
+import { MailboxEnvelopeCipher } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxEnvelopeCipher';
 import { MailboxKeySchedule } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxKeySchedule';
 import { MailboxReadToken } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxReadToken';
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/infrastructure/http/MailboxUnavailableError';
@@ -37,13 +45,14 @@ describe(DirectMessageMailbox.name, () => {
     previousMessageIds: ['message-0'],
     type: 'sent',
   };
-  const storedRecord = {
+  const storedRecord: DirectSentRecord = {
     authorId: 'alice',
     conversationId,
     createdAt: 100,
     encryptedPayload: 'ciphertext-1',
     id: 'message-1',
     previousMessageIds: ['message-0'],
+    type: 'sent',
   };
 
   const conversation = {
@@ -51,7 +60,6 @@ describe(DirectMessageMailbox.name, () => {
     participantIds: ['alice', 'bob'],
     type: 'one-to-one',
   } as unknown as ConversationResource;
-  const plain = { attachmentCount: 0, hasReply: false, hasSticker: false };
 
   const credentialFor = (identityId: string): string =>
     `device-credential-${identityId}`;
@@ -166,16 +174,72 @@ describe(DirectMessageMailbox.name, () => {
     recreated: false,
   });
 
-  describe('deliver', () => {
+  const messageIds = (changes: DirectMessageTimelineChange[]): string[] =>
+    changes.flatMap((change) =>
+      change.kind === 'message' ? [change.message.id] : [],
+    );
+
+  const messagesOf = (changes: DirectMessageTimelineChange[]): ChatMessage[] =>
+    changes.flatMap((change) =>
+      change.kind === 'message' ? [change.message] : [],
+    );
+
+  const pageOf = (plaintexts: Uint8Array[]) => ({
+    envelopes: plaintexts.map((plaintext, index) => ({
+      cursor: index + 1,
+      envelopeId: `envelope-${index + 1}`,
+      plaintext,
+    })),
+    hasMore: false,
+    lastCursor: plaintexts.length,
+    recreated: false,
+  });
+
+  const edited: MessageResource = {
+    authorId: 'alice',
+    conversationId,
+    createdAt: 200,
+    encryptedPayload: 'ciphertext-2',
+    id: 'edit-1',
+    previousMessageIds: ['message-1'],
+    targetMessageId: 'message-1',
+    type: 'edited',
+  };
+  const reaction = {
+    action: 'add',
+    createdAt: 300,
+    emoji: '👍',
+    messageId: 'message-1',
+  } as const;
+  const deliveries: [
+    string,
+    (
+      mailbox: DirectMessageMailbox,
+      from: Session,
+      conv: ConversationResource,
+    ) => Promise<string>,
+  ][] = [
+    ['sent', (mailbox, from, conv) => mailbox.deliverSent(from, conv, sent)],
+    ['edited', (mailbox, from, conv) => mailbox.deliverEdit(from, conv, edited)],
+    [
+      'deleted',
+      (mailbox, from, conv) => mailbox.deliverDelete(from, conv, 'message-1'),
+    ],
+    [
+      'reaction',
+      (mailbox, from, conv) => mailbox.deliverReaction(from, conv, reaction),
+    ],
+  ];
+
+  describe('deliverSent', () => {
     it('appends the sent record to the recipient mailbox and reports delivery', async () => {
       const { channel, mailbox } = setup();
       channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
 
-      const result = await mailbox.deliver(
+      const result = await mailbox.deliverSent(
         session('alice'),
         conversation,
         sent,
-        plain,
       );
 
       expect(result).toBe('delivered');
@@ -186,13 +250,137 @@ describe(DirectMessageMailbox.name, () => {
       ).toEqual(expect.objectContaining({ id: 'message-1', type: 'sent' }));
     });
 
+    it.each<[string, Partial<MessageResource>]>([
+      ['a reply', { replyToMessageId: 'message-0' }],
+      ['an attachment', { encryptedPayload: 'ciphertext-attachment' }],
+      ['a sticker', { encryptedPayload: 'ciphertext-sticker' }],
+    ])('delivers %s as a sent record', async (_label, change) => {
+      const { channel, mailbox } = setup();
+      channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
+
+      await expect(
+        mailbox.deliverSent(session('alice'), conversation, {
+          ...sent,
+          ...change,
+        }),
+      ).resolves.toBe('delivered');
+      const [, plaintext] = channel.send.mock.calls[0];
+      expect(
+        DirectMessageMailboxRecord.decode(plaintext, conversationId),
+      ).toEqual(expect.objectContaining({ type: 'sent', ...change }));
+    });
+
+    it('delivers a payload just under the envelope bound', async () => {
+      const { channel, mailbox } = setup();
+      channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
+
+      await expect(
+        mailbox.deliverSent(session('alice'), conversation, {
+          ...sent,
+          encryptedPayload: 'x'.repeat(
+            MailboxEnvelopeCipher.MAX_PLAINTEXT_BYTES - 500,
+          ),
+        }),
+      ).resolves.toBe('delivered');
+    });
+
+    it('skips a payload over the envelope bound and sends nothing', async () => {
+      const { channel, mailbox } = setup();
+
+      await expect(
+        mailbox.deliverSent(session('alice'), conversation, {
+          ...sent,
+          encryptedPayload: 'x'.repeat(
+            MailboxEnvelopeCipher.MAX_PLAINTEXT_BYTES,
+          ),
+        }),
+      ).resolves.toBe('skipped');
+      expect(channel.send).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('deliverEdit', () => {
+    it('appends the edit to the recipient mailbox and reports delivery', async () => {
+      const { channel, mailbox } = setup();
+      channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
+
+      await expect(
+        mailbox.deliverEdit(session('alice'), conversation, edited),
+      ).resolves.toBe('delivered');
+      const [keys, plaintext] = channel.send.mock.calls[0];
+      expect(keys.mailboxId).toBe(keysFor('bob').mailboxId);
+      expect(
+        DirectMessageMailboxRecord.decode(plaintext, conversationId),
+      ).toEqual(
+        expect.objectContaining({
+          id: 'edit-1',
+          targetMessageId: 'message-1',
+          type: 'edited',
+        }),
+      );
+    });
+  });
+
+  describe('deliverDelete', () => {
+    it('appends the delete to the recipient mailbox and reports delivery', async () => {
+      const { channel, mailbox } = setup();
+      channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
+
+      await expect(
+        mailbox.deliverDelete(session('alice'), conversation, 'message-1'),
+      ).resolves.toBe('delivered');
+      const [keys, plaintext] = channel.send.mock.calls[0];
+      expect(keys.mailboxId).toBe(keysFor('bob').mailboxId);
+      expect(
+        DirectMessageMailboxRecord.decode(plaintext, conversationId),
+      ).toEqual(
+        expect.objectContaining({
+          authorId: 'alice',
+          targetMessageId: 'message-1',
+          type: 'deleted',
+        }),
+      );
+    });
+  });
+
+  describe('deliverReaction', () => {
+    it.each(['add', 'remove'] as const)(
+      'appends a %s reaction from bob to the mailbox of alice',
+      async (action) => {
+        const { channel, mailbox } = setup();
+        channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
+
+        await expect(
+          mailbox.deliverReaction(session('bob'), conversation, {
+            ...reaction,
+            action,
+          }),
+        ).resolves.toBe('delivered');
+        const [keys, plaintext] = channel.send.mock.calls[0];
+        expect(keys.mailboxId).toBe(keysFor('alice').mailboxId);
+        expect(
+          DirectMessageMailboxRecord.decode(plaintext, conversationId),
+        ).toEqual(
+          expect.objectContaining({
+            action,
+            authorId: 'bob',
+            emoji: '👍',
+            targetMessageId: 'message-1',
+            type: 'reaction',
+          }),
+        );
+      },
+    );
+  });
+
+  describe.each(deliveries)('%s delivery outcome', (_label, deliver) => {
     it('reports a 404 from the recipient inbox as failed and logs one count-only line', async () => {
       const { channel, mailbox } = setup();
       channel.send.mockRejectedValue(new MailboxUnavailableError());
       const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
 
       await expect(
-        mailbox.deliver(session('alice'), conversation, sent, plain),
+        deliver(mailbox, session('alice'), conversation),
       ).resolves.toBe('failed');
       expect(debug).toHaveBeenCalledTimes(1);
       expect(debug).toHaveBeenCalledWith(
@@ -206,7 +394,7 @@ describe(DirectMessageMailbox.name, () => {
       channel.send.mockRejectedValue(new Error('network down'));
 
       await expect(
-        mailbox.deliver(session('alice'), conversation, sent, plain),
+        deliver(mailbox, session('alice'), conversation),
       ).resolves.toBe('failed');
     });
 
@@ -217,27 +405,19 @@ describe(DirectMessageMailbox.name, () => {
         keychain: { conversations: {}, version: 1 },
       } as unknown as Session;
 
-      await expect(
-        mailbox.deliver(keyless, conversation, sent, plain),
-      ).resolves.toBe('failed');
+      await expect(deliver(mailbox, keyless, conversation)).resolves.toBe(
+        'failed',
+      );
       expect(channel.send).not.toHaveBeenCalled();
     });
 
-    it.each([
-      [
-        'a group conversation',
-        { ...conversation, type: 'group' } as ConversationResource,
-        plain,
-      ],
-      ['an attachment', conversation, { ...plain, attachmentCount: 1 }],
-      ['a reply', conversation, { ...plain, hasReply: true }],
-      ['a sticker', conversation, { ...plain, hasSticker: true }],
-    ])('skips %s and sends nothing', async (_label, conv, outgoing) => {
+    it('skips a group conversation and sends nothing', async () => {
       const { channel, mailbox } = setup();
+      const group = { ...conversation, type: 'group' } as ConversationResource;
 
-      await expect(
-        mailbox.deliver(session('alice'), conv, sent, outgoing),
-      ).resolves.toBe('skipped');
+      await expect(deliver(mailbox, session('alice'), group)).resolves.toBe(
+        'skipped',
+      );
       expect(channel.send).not.toHaveBeenCalled();
     });
 
@@ -248,9 +428,9 @@ describe(DirectMessageMailbox.name, () => {
         participantIds: ['alice'],
       } as ConversationResource;
 
-      await expect(
-        mailbox.deliver(session('alice'), alone, sent, plain),
-      ).resolves.toBe('skipped');
+      await expect(deliver(mailbox, session('alice'), alone)).resolves.toBe(
+        'skipped',
+      );
       expect(channel.send).not.toHaveBeenCalled();
     });
   });
@@ -297,7 +477,10 @@ describe(DirectMessageMailbox.name, () => {
       expect(after).toBe(0);
       expect(readers).toEqual(readerTokensFor('alice', keys.mailboxId));
       expect(apply).toHaveBeenCalledWith([
-        expect.objectContaining({ id: 'message-1' }),
+        {
+          kind: 'message',
+          message: expect.objectContaining({ id: 'message-1' }),
+        },
       ]);
       expect(channel.acknowledge).toHaveBeenCalledWith(keys, readers, 2);
       expect(order).toEqual(['apply', 'ack']);
@@ -531,7 +714,10 @@ describe(DirectMessageMailbox.name, () => {
         50,
       );
       expect(apply).toHaveBeenCalledWith([
-        expect.objectContaining({ id: 'message-1' }),
+        {
+          kind: 'message',
+          message: expect.objectContaining({ id: 'message-1' }),
+        },
       ]);
       expect(channel.acknowledge).toHaveBeenCalledWith(
         keys,
@@ -636,6 +822,160 @@ describe(DirectMessageMailbox.name, () => {
         cursor: 5,
         readToken: 'legacy-read-token',
       });
+    });
+  });
+
+  describe('sync changes', () => {
+    const editRecord: DirectEditedRecord = {
+      authorId: 'alice',
+      conversationId,
+      createdAt: 200,
+      encryptedPayload: 'ciphertext-2',
+      id: 'edit-1',
+      previousMessageIds: ['message-1'],
+      targetMessageId: 'message-1',
+      type: 'edited',
+    };
+    const deleteRecord: DirectDeletedRecord = {
+      authorId: 'alice',
+      conversationId,
+      createdAt: 400,
+      id: 'delete-1',
+      targetMessageId: 'message-1',
+      type: 'deleted',
+    };
+    const reactionRecord: DirectReactionRecord = {
+      action: 'add',
+      authorId: 'bob',
+      conversationId,
+      createdAt: 300,
+      emoji: '👍',
+      id: 'reaction-1',
+      targetMessageId: 'message-1',
+      type: 'reaction',
+    };
+    const reactionChange = {
+      action: 'add',
+      authorId: 'bob',
+      createdAt: 300,
+      emoji: '👍',
+      kind: 'reaction',
+      messageId: 'message-1',
+    };
+
+    it('applies an edit as an edit change', async () => {
+      const { channel, mailbox } = setup();
+      channel.read.mockResolvedValue(
+        pageOf([DirectMessageMailboxRecord.encode(editRecord)]),
+      );
+      channel.acknowledge.mockResolvedValue({ recreated: false });
+      const apply = jest.fn();
+
+      await mailbox.sync(
+        session('alice'),
+        conversationId,
+        new AbortController().signal,
+        apply,
+      );
+
+      expect(apply).toHaveBeenCalledWith([
+        { kind: 'edit', message: expect.objectContaining({ id: 'edit-1' }) },
+      ]);
+    });
+
+    it('applies a delete as a removed change without decrypting it', async () => {
+      const { channel, mailbox, projection } = setup();
+      channel.read.mockResolvedValue(
+        pageOf([DirectMessageMailboxRecord.encode(deleteRecord)]),
+      );
+      channel.acknowledge.mockResolvedValue({ recreated: false });
+      const apply = jest.fn();
+
+      await mailbox.sync(
+        session('alice'),
+        conversationId,
+        new AbortController().signal,
+        apply,
+      );
+
+      expect(apply).toHaveBeenCalledWith([
+        { kind: 'removed', messageId: 'message-1' },
+      ]);
+      expect(projection.decryptMany).not.toHaveBeenCalled();
+    });
+
+    it('applies a reaction as a reaction change', async () => {
+      const { channel, mailbox } = setup();
+      channel.read.mockResolvedValue(
+        pageOf([DirectMessageMailboxRecord.encode(reactionRecord)]),
+      );
+      channel.acknowledge.mockResolvedValue({ recreated: false });
+      const apply = jest.fn();
+
+      await mailbox.sync(
+        session('alice'),
+        conversationId,
+        new AbortController().signal,
+        apply,
+      );
+
+      expect(apply).toHaveBeenCalledWith([reactionChange]);
+    });
+
+    it('applies a sent, a reaction and a delete in envelope order with one decrypt call', async () => {
+      const { channel, mailbox, projection } = setup();
+      channel.read.mockResolvedValue(
+        pageOf([
+          DirectMessageMailboxRecord.encode(storedRecord),
+          DirectMessageMailboxRecord.encode(reactionRecord),
+          DirectMessageMailboxRecord.encode(deleteRecord),
+        ]),
+      );
+      channel.acknowledge.mockResolvedValue({ recreated: false });
+      const apply = jest.fn();
+
+      await mailbox.sync(
+        session('alice'),
+        conversationId,
+        new AbortController().signal,
+        apply,
+      );
+
+      expect(apply).toHaveBeenCalledWith([
+        {
+          kind: 'message',
+          message: expect.objectContaining({ id: 'message-1' }),
+        },
+        reactionChange,
+        { kind: 'removed', messageId: 'message-1' },
+      ]);
+      expect(projection.decryptMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('drops only the change of a sent record that does not decrypt', async () => {
+      const { channel, mailbox, projection } = setup();
+      projection.decryptMany.mockImplementation((_session, _id, records) =>
+        Promise.resolve(
+          records.map((record) => ({ ...decrypted(record), encrypted: true })),
+        ),
+      );
+      channel.read.mockResolvedValue(
+        pageOf([
+          DirectMessageMailboxRecord.encode(storedRecord),
+          DirectMessageMailboxRecord.encode(reactionRecord),
+        ]),
+      );
+      channel.acknowledge.mockResolvedValue({ recreated: false });
+      const apply = jest.fn();
+
+      await mailbox.sync(
+        session('alice'),
+        conversationId,
+        new AbortController().signal,
+        apply,
+      );
+
+      expect(apply).toHaveBeenCalledWith([reactionChange]);
     });
   });
 
@@ -804,12 +1144,12 @@ describe(DirectMessageMailbox.name, () => {
       const { wire } = nodeMailboxClient();
       const mailbox = mailboxFor(wire, store, projection);
       const applied: string[][] = [];
-      const recordApplied = (messages: ChatMessage[]) => {
-        applied.push(messages.map((message) => message.id));
+      const recordApplied = (changes: DirectMessageTimelineChange[]) => {
+        applied.push(messageIds(changes));
       };
 
       await expect(
-        mailbox.deliver(session('alice'), conversation, sent, plain),
+        mailbox.deliverSent(session('alice'), conversation, sent),
       ).resolves.toBe('delivered');
 
       await mailbox.sync(
@@ -842,13 +1182,13 @@ describe(DirectMessageMailbox.name, () => {
       const mailbox = mailboxFor(wire, store, projection);
       let timeline: ChatMessage[] = [decrypted(sent)];
 
-      await mailbox.deliver(session('alice'), conversation, sent, plain);
+      await mailbox.deliverSent(session('alice'), conversation, sent);
       await mailbox.sync(
         session('bob'),
         conversationId,
         new AbortController().signal,
-        (messages) => {
-          timeline = MessageCollection.merge(timeline, messages);
+        (changes) => {
+          timeline = MessageCollection.merge(timeline, messagesOf(changes));
         },
       );
 
@@ -865,21 +1205,19 @@ describe(DirectMessageMailbox.name, () => {
           session('bob'),
           conversationId,
           new AbortController().signal,
-          (messages) => {
-            applied.push(messages.map((message) => message.id));
+          (changes) => {
+            applied.push(messageIds(changes));
           },
         );
 
-      await mailbox.deliver(session('alice'), conversation, sent, plain);
+      await mailbox.deliverSent(session('alice'), conversation, sent);
       await sync();
       evict();
       await sync();
-      await mailbox.deliver(
-        session('alice'),
-        conversation,
-        { ...sent, id: 'message-2' },
-        plain,
-      );
+      await mailbox.deliverSent(session('alice'), conversation, {
+        ...sent,
+        id: 'message-2',
+      });
       await sync();
 
       expect(applied).toEqual([['message-1'], ['message-2']]);
@@ -895,21 +1233,19 @@ describe(DirectMessageMailbox.name, () => {
           session('bob'),
           conversationId,
           new AbortController().signal,
-          (messages) => {
-            applied.push(messages.map((message) => message.id));
+          (changes) => {
+            applied.push(messageIds(changes));
           },
         );
 
       await sync();
-      await mailbox.deliver(session('alice'), conversation, sent, plain);
+      await mailbox.deliverSent(session('alice'), conversation, sent);
       await sync();
       clearStorage();
-      await mailbox.deliver(
-        session('alice'),
-        conversation,
-        { ...sent, id: 'message-2' },
-        plain,
-      );
+      await mailbox.deliverSent(session('alice'), conversation, {
+        ...sent,
+        id: 'message-2',
+      });
       await sync();
 
       expect(applied).toEqual([['message-1'], ['message-2']]);
@@ -990,7 +1326,7 @@ describe(DirectMessageMailbox.name, () => {
       } as unknown as Session;
 
       await expect(
-        mailbox.deliver(senderWithoutRootKey, conversation, sent, plain),
+        mailbox.deliverSent(senderWithoutRootKey, conversation, sent),
       ).resolves.toBe('delivered');
     });
 
@@ -1007,9 +1343,10 @@ describe(DirectMessageMailbox.name, () => {
       const laptopSession = deviceSession('bob', 'credential-laptop');
       const phoneApplied: string[][] = [];
       const laptopApplied: string[][] = [];
-      const recordInto = (applied: string[][]) => (messages: ChatMessage[]) => {
-        applied.push(messages.map((message) => message.id));
-      };
+      const recordInto =
+        (applied: string[][]) => (changes: DirectMessageTimelineChange[]) => {
+          applied.push(messageIds(changes));
+        };
 
       await phone.sync(
         phoneSession,
@@ -1023,7 +1360,7 @@ describe(DirectMessageMailbox.name, () => {
         new AbortController().signal,
         recordInto(laptopApplied),
       );
-      await sender.deliver(session('alice'), conversation, sent, plain);
+      await sender.deliverSent(session('alice'), conversation, sent);
       await phone.sync(
         phoneSession,
         conversationId,
@@ -1058,8 +1395,8 @@ describe(DirectMessageMailbox.name, () => {
       const sender = mailboxFor(wire, memoryStore(), projection);
       const mailbox = mailboxFor(wire, store, projection);
       const applied: string[][] = [];
-      const recordApplied = (messages: ChatMessage[]) => {
-        applied.push(messages.map((message) => message.id));
+      const recordApplied = (changes: DirectMessageTimelineChange[]) => {
+        applied.push(messageIds(changes));
       };
       store.save(keys.mailboxId, { cursor: 0, readToken: legacy });
 
@@ -1075,7 +1412,7 @@ describe(DirectMessageMailbox.name, () => {
       expect(readerHashes().sort()).toEqual(hashed(tokens.root, tokens.device));
       expect(store.load(keys.mailboxId)).toEqual({ cursor: 0 });
 
-      await sender.deliver(session('alice'), conversation, sent, plain);
+      await sender.deliverSent(session('alice'), conversation, sent);
       await mailbox.sync(
         session('bob'),
         conversationId,
