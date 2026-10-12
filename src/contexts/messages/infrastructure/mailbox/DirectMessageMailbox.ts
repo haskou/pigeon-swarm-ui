@@ -1,4 +1,3 @@
-import { randomBytes } from '@noble/hashes/utils.js';
 import { Buffer } from 'buffer';
 
 import type {
@@ -12,9 +11,9 @@ import type { OpenedMailboxPage } from '../../../mailboxes/infrastructure/Mailbo
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { DirectMessageMailboxState } from './DirectMessageMailboxStore';
 
-import { encodeBase64Url } from '../../../../shared/infrastructure/encoding/base64url';
 import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
 import { MailboxKeySchedule } from '../../../mailboxes/infrastructure/crypto/MailboxKeySchedule';
+import { MailboxReadToken } from '../../../mailboxes/infrastructure/crypto/MailboxReadToken';
 import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageMailboxRecord } from './DirectMessageMailboxRecord';
 import { DirectMessageMailboxStore } from './DirectMessageMailboxStore';
@@ -28,6 +27,13 @@ export type DirectMessageOutgoing = {
   hasSticker: boolean;
 };
 
+/** Keys, read token, and saved state for the inbox this device reads. */
+type RecipientInbox = {
+  keys: MailboxKeys;
+  readToken: string;
+  state: DirectMessageMailboxState;
+};
+
 /**
  * Direct one-to-one text over the opaque mailbox. The legacy send delivers
  * first; this path carries a copy so the peer can receive it without the
@@ -35,7 +41,6 @@ export type DirectMessageOutgoing = {
  */
 export class DirectMessageMailbox {
   private static readonly PAGE_SIZE = 50;
-  private static readonly READ_TOKEN_BYTES = 32;
   private static readonly EPOCH = 0;
 
   public constructor(
@@ -91,9 +96,14 @@ export class DirectMessageMailbox {
    * Recipient. Reads the next page of this identity's inbox, applies decrypted
    * messages, then acknowledges. The cursor advances only after the
    * acknowledgement succeeds, so an interrupted pass is replayed and the
-   * timeline dedupes by id. Aborts before apply or before ack leave the inbox
-   * untouched. The first pass on a device creates the inbox. When the inbox
-   * was re-created, its cursors restart at 1, so the stored cursor is reset.
+   * timeline dedupes by id. A pass superseded before its inbox is created or
+   * read leaves the inbox untouched. The first pass on a device creates the
+   * inbox. When the inbox was re-created, its cursors restart at 1, so the
+   * stored cursor is reset.
+   *
+   * The read token is derived from the identity's root key, so a device that
+   * lost its local storage reads the inbox it created earlier. Only inboxes
+   * created before this derivation keep a stored token.
    */
   public async sync(
     session: Session,
@@ -101,51 +111,42 @@ export class DirectMessageMailbox {
     signal: AbortSignal,
     apply: (messages: ChatMessage[]) => void,
   ): Promise<void> {
-    const keys = this.keysFor(session, conversationId, session.identity.id);
-    const stored = this.store.load(keys.mailboxId);
-    const state = stored ?? this.createState(keys);
+    if (signal.aborted) return;
 
-    if (!stored) await this.ensureInbox(keys, state.readToken);
+    const inbox = await this.openInbox(session, conversationId);
 
-    const { cursor, page } = await this.readPage(keys, state);
+    if (signal.aborted) return;
+
+    const { cursor, page } = await this.readPage(inbox);
 
     if (page.lastCursor <= cursor || signal.aborted) return;
 
-    const messages = await this.decryptPage(
-      session,
-      conversationId,
-      page,
-      signal,
-    );
-
-    if (signal.aborted) return;
-
-    apply(messages);
-
-    if (signal.aborted) return;
-
-    const acked = await this.channel.acknowledge(
-      keys,
-      state.readToken,
-      page.lastCursor,
-    );
-    this.store.save(keys.mailboxId, {
-      cursor: acked.recreated ? 0 : page.lastCursor,
-      readToken: state.readToken,
-    });
+    await this.applyPage(session, conversationId, inbox, page, signal, apply);
   }
 
-  private createState(keys: MailboxKeys): DirectMessageMailboxState {
-    const state: DirectMessageMailboxState = {
-      cursor: 0,
-      readToken: encodeBase64Url(
-        randomBytes(DirectMessageMailbox.READ_TOKEN_BYTES),
-      ),
-    };
+  /**
+   * Resolves the inbox keys, read token, and saved state. The derived token
+   * is never persisted.
+   */
+  private async openInbox(
+    session: Session,
+    conversationId: string,
+  ): Promise<RecipientInbox> {
+    const keys = this.keysFor(session, conversationId, session.identity.id);
+    const stored = this.store.load(keys.mailboxId);
+    const state = stored ?? { cursor: 0 };
+    const readToken =
+      state.readToken ??
+      MailboxReadToken.derive(session.masterKey.getBuffer(), keys.mailboxId);
 
-    this.store.save(keys.mailboxId, state);
+    if (!stored) {
+      // Saved before the create, so a concurrent pass takes the same path and
+      // shares the in-flight create (see MailboxChannel.createInbox).
+      this.store.save(keys.mailboxId, state);
+      await this.ensureInbox(keys, readToken);
+    }
 
-    return state;
+    return { keys, readToken, state };
   }
 
   /**
@@ -172,12 +173,12 @@ export class DirectMessageMailbox {
    * inbox behind the old cursor.
    */
   private async readPage(
-    keys: MailboxKeys,
-    state: DirectMessageMailboxState,
+    inbox: RecipientInbox,
   ): Promise<{ cursor: number; page: OpenedMailboxPage }> {
+    const { keys, readToken, state } = inbox;
     const page = await this.channel.read(
       keys,
-      state.readToken,
+      readToken,
       state.cursor,
       DirectMessageMailbox.PAGE_SIZE,
     );
@@ -186,17 +187,54 @@ export class DirectMessageMailbox {
       return { cursor: state.cursor, page };
     }
 
-    this.store.save(keys.mailboxId, { cursor: 0, readToken: state.readToken });
+    this.store.save(keys.mailboxId, { ...state, cursor: 0 });
 
     return {
       cursor: 0,
       page: await this.channel.read(
         keys,
-        state.readToken,
+        readToken,
         0,
         DirectMessageMailbox.PAGE_SIZE,
       ),
     };
+  }
+
+  /**
+   * Decrypts the page, hands it to the caller, then acknowledges it. Each
+   * step checks the signal so an aborted pass neither applies nor acks.
+   */
+  private async applyPage(
+    session: Session,
+    conversationId: string,
+    inbox: RecipientInbox,
+    page: OpenedMailboxPage,
+    signal: AbortSignal,
+    apply: (messages: ChatMessage[]) => void,
+  ): Promise<void> {
+    const { keys, readToken, state } = inbox;
+    const messages = await this.decryptPage(
+      session,
+      conversationId,
+      page,
+      signal,
+    );
+
+    if (signal.aborted) return;
+
+    apply(messages);
+
+    if (signal.aborted) return;
+
+    const acked = await this.channel.acknowledge(
+      keys,
+      readToken,
+      page.lastCursor,
+    );
+    this.store.save(keys.mailboxId, {
+      ...state,
+      cursor: acked.recreated ? 0 : page.lastCursor,
+    });
   }
 
   private async decryptPage(

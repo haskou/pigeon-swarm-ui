@@ -23,10 +23,13 @@ type DirectMessageMailboxSyncInput = {
 };
 
 /**
- * Polls the recipient inbox of the active one-to-one conversation. A pass
- * never overlaps the next one: the next pass is scheduled after the current
- * one settles. A failing streak shows one notice unless another error is
- * already shown. The next successful pass clears only that notice.
+ * Polls the recipient inbox of the active one-to-one conversation. Within one
+ * effect run, the next pass is scheduled only after the current one settles.
+ * A cleanup aborts the running pass, but that pass may still be in flight when
+ * the next effect run starts (StrictMode mounts twice). `sync` checks the
+ * signal at each step, and overlapping passes share one inbox creation. A
+ * failing streak shows one notice unless another error is already shown. The
+ * next successful pass clears only that notice.
  */
 export function useDirectMessageMailboxSync({
   activeConversation,

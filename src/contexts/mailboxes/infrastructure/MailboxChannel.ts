@@ -49,6 +49,9 @@ export class MailboxChannel {
   /** Ceiling on the difficulty a creation retry will mine. */
   private static readonly MAX_CREATION_DIFFICULTY_BITS = 24;
 
+  /** Creations in flight, keyed by mailbox and read-token hash. */
+  private readonly pendingCreations = new Map<string, Promise<void>>();
+
   public constructor(
     private readonly client: PigeonMailboxClient,
     private readonly mine: MailboxCreationMiner,
@@ -103,13 +106,32 @@ export class MailboxChannel {
    * Recipient only. Creates the inbox once, mining at the default difficulty.
    * If the node names a higher difficulty up to MAX_CREATION_DIFFICULTY_BITS,
    * re-mines once at that value. Keep the readToken to read and acknowledge.
+   * Overlapping calls for the same inbox and token share one creation: a
+   * second pass can see the inbox as missing while the first is still
+   * creating it.
    */
-  public async createInbox(
+  public createInbox(keys: MailboxKeys, readToken: string): Promise<void> {
+    const readTokenHash = MailboxCapability.hash(readToken);
+    const flightKey = `${keys.mailboxId}|${readTokenHash}`;
+    const inFlight = this.pendingCreations.get(flightKey);
+
+    if (inFlight) {
+      return inFlight;
+    }
+
+    const creation = this.createInboxOnce(keys, readTokenHash).finally(() => {
+      this.pendingCreations.delete(flightKey);
+    });
+    this.pendingCreations.set(flightKey, creation);
+
+    return creation;
+  }
+
+  private async createInboxOnce(
     keys: MailboxKeys,
-    readToken: string,
+    readTokenHash: string,
   ): Promise<void> {
     const postTokenHash = MailboxCapability.hash(keys.postToken);
-    const readTokenHash = MailboxCapability.hash(readToken);
 
     try {
       await this.putInbox(
