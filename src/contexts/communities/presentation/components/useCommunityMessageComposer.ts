@@ -26,6 +26,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
+import { runStickerUsageSideEffect } from '../../../../app/presentation/workspace/components/runStickerUsageSideEffect';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { isBrowserPreviewImage } from '../../../../shared/presentation/isBrowserPreviewImage';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
@@ -546,8 +547,12 @@ export function useCommunityMessageComposer({
           created,
         );
 
-        if (payload.sticker) {
-          void applicationContainer.stickers.markUsed(session, payload.sticker);
+        const sticker = payload.sticker;
+
+        if (sticker) {
+          runStickerUsageSideEffect(() =>
+            applicationContainer.stickers.markUsed(session, sticker),
+          );
         }
 
         if (renderInChannel) {

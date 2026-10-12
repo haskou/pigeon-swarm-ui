@@ -21,6 +21,7 @@ import {
   mergeConversationThreadMessage,
   removeConversationThreadMessage,
 } from './conversationThreadState';
+import { runStickerUsageSideEffect } from './runStickerUsageSideEffect';
 
 type UseConversationThreadInput = {
   activeConversation?: ConversationResource;
@@ -262,7 +263,9 @@ export function useConversationThread(
       },
     );
 
-    void applicationContainer.stickers.markUsed(session, sticker);
+    runStickerUsageSideEffect(() =>
+      applicationContainer.stickers.markUsed(session, sticker),
+    );
     appendSentMessage(sent);
   };
 
