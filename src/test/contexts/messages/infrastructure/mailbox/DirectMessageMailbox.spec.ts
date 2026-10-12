@@ -1,3 +1,4 @@
+import { EncryptedPayload, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 import { mock } from 'jest-mock-extended';
 
@@ -266,24 +267,25 @@ describe(DirectMessageMailbox.name, () => {
       ).toEqual(expect.objectContaining({ id: 'message-1', type: 'sent' }));
     });
 
-    it.each<[string, Partial<MessageResource>]>([
-      ['a reply', { replyToMessageId: 'message-0' }],
-      ['an attachment', { encryptedPayload: 'ciphertext-attachment' }],
-      ['a sticker', { encryptedPayload: 'ciphertext-sticker' }],
-    ])('delivers %s as a sent record', async (_label, change) => {
+    it('delivers a reply as a sent record', async () => {
       const { channel, mailbox } = setup();
       channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
 
       await expect(
         mailbox.deliverSent(session('alice'), conversation, {
           ...sent,
-          ...change,
+          replyToMessageId: 'message-0',
         }),
       ).resolves.toBe('delivered');
       const [, plaintext] = channel.send.mock.calls[0];
       expect(
         DirectMessageMailboxRecord.decode(plaintext, conversationId),
-      ).toEqual(expect.objectContaining({ type: 'sent', ...change }));
+      ).toEqual(
+        expect.objectContaining({
+          replyToMessageId: 'message-0',
+          type: 'sent',
+        }),
+      );
     });
 
     it('delivers a payload just under the envelope bound', async () => {
@@ -312,6 +314,161 @@ describe(DirectMessageMailbox.name, () => {
         }),
       ).resolves.toBe('skipped');
       expect(channel.send).not.toHaveBeenCalled();
+    });
+
+    describe('real encrypted payloads', () => {
+      const mebibyte = 1024 * 1024;
+      const chunkBytes = 8 * mebibyte;
+      const conversationKey = SymmetricKey.fromBase64(
+        sharedSecret.toString('base64'),
+      );
+
+      const encryptPayload = (body: Record<string, unknown>): string =>
+        conversationKey
+          .encrypt(
+            JSON.stringify({
+              authorIdentityId: 'alice',
+              conversationId,
+              timestamp: 100,
+              ...body,
+            }),
+          )
+          .toString();
+
+      const decryptPayload = (encryptedPayload: string): unknown =>
+        JSON.parse(
+          conversationKey
+            .decrypt(new EncryptedPayload(encryptedPayload))
+            .toString(),
+        );
+
+      /** Uploader metadata: blob references and per-part keys, never bytes. */
+      const attachmentOf = (size: number) => {
+        const parts = Math.ceil(size / chunkBytes);
+        const iv = Buffer.alloc(12, 1).toString('base64');
+
+        return {
+          blobs: Array.from({ length: parts }, (_, index) => ({
+            blobId: `blob-${index}`,
+            downloadToken: 'd'.repeat(43),
+            expiresAt: 1_700_000_000_000,
+            index,
+            size: Math.min(chunkBytes, size - index * chunkBytes),
+          })),
+          contentType: 'application/pdf',
+          encrypted: true,
+          encryptedSize: size,
+          encryption: {
+            algorithm: 'AES-GCM',
+            chunks: Array.from({ length: parts }, () => ({
+              iv,
+              size: chunkBytes,
+            })),
+            chunkSize: chunkBytes,
+            iv,
+            key: Buffer.alloc(32, 2).toString('base64'),
+          },
+          filename: 'report.pdf',
+          size,
+        };
+      };
+
+      const sentPayloadOf = (plaintext: Uint8Array): string => {
+        const record = DirectMessageMailboxRecord.decode(
+          plaintext,
+          conversationId,
+        );
+
+        if (record?.type !== 'sent') {
+          throw new Error('expected a sent record');
+        }
+
+        return record.encryptedPayload;
+      };
+
+      it('carries an attachment as blob references and keys, not bytes', async () => {
+        const { channel, mailbox } = setup();
+        channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
+        const encryptedPayload = encryptPayload({
+          attachments: [attachmentOf(20 * mebibyte)],
+          content: '',
+          type: 'MessageSent',
+        });
+
+        await expect(
+          mailbox.deliverSent(session('alice'), conversation, {
+            ...sent,
+            encryptedPayload,
+          }),
+        ).resolves.toBe('delivered');
+
+        const [, plaintext] = channel.send.mock.calls[0];
+        expect(
+          DirectMessageMailboxRecord.decode(plaintext, conversationId),
+        ).toEqual({
+          authorId: 'alice',
+          conversationId,
+          createdAt: 100,
+          encryptedPayload,
+          id: 'message-1',
+          previousMessageIds: ['message-0'],
+          type: 'sent',
+        });
+        expect(decryptPayload(sentPayloadOf(plaintext))).toEqual(
+          expect.objectContaining({
+            attachments: [attachmentOf(20 * mebibyte)],
+            type: 'MessageSent',
+          }),
+        );
+      });
+
+      it('carries a sticker reference in the payload', async () => {
+        const { channel, mailbox } = setup();
+        channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
+        const sticker = { id: 'sticker-1', packId: 'pack-1' };
+        const encryptedPayload = encryptPayload({
+          content: '',
+          sticker,
+          type: 'StickerMessageSent',
+        });
+
+        await expect(
+          mailbox.deliverSent(session('alice'), conversation, {
+            ...sent,
+            encryptedPayload,
+          }),
+        ).resolves.toBe('delivered');
+
+        const [, plaintext] = channel.send.mock.calls[0];
+        expect(decryptPayload(sentPayloadOf(plaintext))).toEqual(
+          expect.objectContaining({
+            sticker,
+            type: 'StickerMessageSent',
+          }),
+        );
+      });
+
+      it('skips an attachment payload over the envelope bound and sends nothing', async () => {
+        const { channel, mailbox } = setup();
+        const encryptedPayload = encryptPayload({
+          attachments: Array.from({ length: 5 }, () =>
+            attachmentOf(500 * mebibyte),
+          ),
+          content: '',
+          type: 'MessageSent',
+        });
+        expect(encryptedPayload.length).toBeGreaterThan(
+          MailboxEnvelopeCipher.MAX_PLAINTEXT_BYTES,
+        );
+
+        await expect(
+          mailbox.deliverSent(session('alice'), conversation, {
+            ...sent,
+            encryptedPayload,
+          }),
+        ).resolves.toBe('skipped');
+        expect(channel.send).not.toHaveBeenCalled();
+      });
     });
   });
 

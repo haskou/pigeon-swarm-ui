@@ -181,18 +181,21 @@ describe('useConversationMessageDelivery inbox delivery', () => {
     expect(delivery.state.error).toBe('send refused');
   });
 
-  it('keeps the legacy send delivered when the inbox reports a failed delivery', async () => {
-    deliverSent.mockResolvedValue('failed');
-    const delivery = mountDelivery();
+  it.each(['failed', 'skipped'] as const)(
+    'keeps the legacy send delivered when the inbox reports %s',
+    async (outcome) => {
+      deliverSent.mockResolvedValue(outcome);
+      const delivery = mountDelivery();
 
-    await delivery.sendMessage('hello', [], {});
-    await drain(delivery.queue);
+      await delivery.sendMessage('hello', [], {});
+      await drain(delivery.queue);
 
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(deliverSent).toHaveBeenCalledWith(session, conversation, sentRaw);
-    expect(delivery.state.error).toBeNull();
-    expect(delivery.state.messages).toEqual([sentMessage]);
-  });
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(deliverSent).toHaveBeenCalledWith(session, conversation, sentRaw);
+      expect(delivery.state.error).toBeNull();
+      expect(delivery.state.messages).toEqual([sentMessage]);
+    },
+  );
 
   it('still makes the legacy send when inbox delivery throws', async () => {
     deliverSent.mockImplementation(() => {
