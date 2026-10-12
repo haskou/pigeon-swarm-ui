@@ -19,6 +19,7 @@ import type {
 
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';
 import { useConversationMessageActions } from '../../../../../app/presentation/workspace/components/useConversationMessageActions';
+import { captureUnhandledRejections } from '../../../../captureUnhandledRejections';
 
 jest.mock('react', () => ({
   startTransition: (callback: () => void) => callback(),
@@ -118,6 +119,8 @@ function mountActions({
       typeof update === 'function' ? update(state.messages) : update;
     messagesRef.current = state.messages;
   });
+  const onEditingMessageChange = jest.fn();
+  const updateActiveConversationDraft = jest.fn();
   const actions = useConversationMessageActions({
     activeConversation,
     activeConversationDraft: '',
@@ -128,7 +131,7 @@ function mountActions({
     onAttachmentProgressChange: jest.fn(),
     onConversationsChange: jest.fn(),
     onDraftsChange: jest.fn(),
-    onEditingMessageChange: jest.fn(),
+    onEditingMessageChange,
     onErrorChange,
     onMessageContextMenuChange: jest.fn(),
     onMessageCursorChange: jest.fn(),
@@ -139,10 +142,15 @@ function mountActions({
     scrollerRef: { current: null },
     scrollToBottom: jest.fn(),
     session,
-    updateActiveConversationDraft: jest.fn(),
+    updateActiveConversationDraft,
   });
 
-  return { ...actions, state };
+  return {
+    ...actions,
+    onEditingMessageChange,
+    state,
+    updateActiveConversationDraft,
+  };
 }
 
 describe('useConversationMessageActions inbox delivery', () => {
@@ -186,6 +194,33 @@ describe('useConversationMessageActions inbox delivery', () => {
       expect(deliverDelete).not.toHaveBeenCalled();
       expect(actions.state.error).toBe('delete refused');
     });
+
+    it('keeps the delete applied when inbox delivery throws synchronously', async () => {
+      deleteLegacy.mockResolvedValue(undefined);
+      deliverDelete.mockImplementation(() => {
+        throw new Error('inbox unavailable');
+      });
+      const actions = mountActions();
+
+      await actions.deleteMessage(target);
+
+      expect(actions.state.error).toBeNull();
+      expect(actions.state.messages).toEqual([]);
+    });
+
+    it('keeps the delete applied with no unhandled rejection when inbox delivery rejects', async () => {
+      deleteLegacy.mockResolvedValue(undefined);
+      deliverDelete.mockRejectedValue(new Error('inbox unavailable'));
+      const actions = mountActions();
+
+      const unhandled = await captureUnhandledRejections(() =>
+        actions.deleteMessage(target),
+      );
+
+      expect(unhandled).toEqual([]);
+      expect(actions.state.error).toBeNull();
+      expect(actions.state.messages).toEqual([]);
+    });
   });
 
   describe('edit', () => {
@@ -220,6 +255,52 @@ describe('useConversationMessageActions inbox delivery', () => {
 
       expect(deliverEdit).not.toHaveBeenCalled();
       expect(actions.state.error).toBe('edit refused');
+    });
+
+    it('finishes the edit when inbox delivery throws synchronously', async () => {
+      editLegacy.mockResolvedValue(editEvent);
+      deliverEdit.mockImplementation(() => {
+        throw new Error('inbox unavailable');
+      });
+      const actions = mountActions({
+        editingMessage: { message: target, previousDraft: '' },
+      });
+
+      await actions.editMessage('changed');
+
+      expect(actions.state.error).toBeNull();
+      expect(actions.state.messages).toContainEqual(
+        expect.objectContaining({
+          content: 'changed',
+          editMessageId: 'edit-1',
+          id: 'message-1',
+        }),
+      );
+      expect(actions.onEditingMessageChange).toHaveBeenCalledWith(null);
+      expect(actions.updateActiveConversationDraft).toHaveBeenCalledWith('');
+    });
+
+    it('finishes the edit with no unhandled rejection when inbox delivery rejects', async () => {
+      editLegacy.mockResolvedValue(editEvent);
+      deliverEdit.mockRejectedValue(new Error('inbox unavailable'));
+      const actions = mountActions({
+        editingMessage: { message: target, previousDraft: '' },
+      });
+
+      const unhandled = await captureUnhandledRejections(() =>
+        actions.editMessage('changed'),
+      );
+
+      expect(unhandled).toEqual([]);
+      expect(actions.state.error).toBeNull();
+      expect(actions.state.messages).toContainEqual(
+        expect.objectContaining({
+          content: 'changed',
+          editMessageId: 'edit-1',
+          id: 'message-1',
+        }),
+      );
+      expect(actions.onEditingMessageChange).toHaveBeenCalledWith(null);
     });
   });
 
@@ -289,6 +370,43 @@ describe('useConversationMessageActions inbox delivery', () => {
 
       expect(deliverReaction).not.toHaveBeenCalled();
       expect(actions.state.error).toBe('reaction refused');
+    });
+
+    it('keeps the reaction applied when inbox delivery throws synchronously', async () => {
+      addReactionLegacy.mockResolvedValue(undefined);
+      deliverReaction.mockImplementation(() => {
+        throw new Error('inbox unavailable');
+      });
+      const actions = mountActions();
+
+      await actions.toggleReaction(target, '👍', false);
+
+      expect(actions.state.error).toBeNull();
+      expect(actions.state.messages[0]?.reactions).toEqual([
+        expect.objectContaining({
+          authorIdentityId: 'identity-1',
+          emoji: '👍',
+        }),
+      ]);
+    });
+
+    it('keeps the reaction applied with no unhandled rejection when inbox delivery rejects', async () => {
+      addReactionLegacy.mockResolvedValue(undefined);
+      deliverReaction.mockRejectedValue(new Error('inbox unavailable'));
+      const actions = mountActions();
+
+      const unhandled = await captureUnhandledRejections(() =>
+        actions.toggleReaction(target, '👍', false),
+      );
+
+      expect(unhandled).toEqual([]);
+      expect(actions.state.error).toBeNull();
+      expect(actions.state.messages[0]?.reactions).toEqual([
+        expect.objectContaining({
+          authorIdentityId: 'identity-1',
+          emoji: '👍',
+        }),
+      ]);
     });
   });
 });

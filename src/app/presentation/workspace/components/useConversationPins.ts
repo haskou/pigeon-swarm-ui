@@ -11,6 +11,7 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrowserIdle';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
+import { runMailboxSideEffect } from './runMailboxSideEffect';
 
 type UseConversationPinsInput = {
   activeConversation?: ConversationResource;
@@ -120,10 +121,12 @@ export function useConversationPins(
         activeConversation.id,
         message.id,
       );
-      void applicationContainer.directMessages.deliverPin(
-        session,
-        activeConversation,
-        { action: 'pin', createdAt, messageId: message.id },
+      runMailboxSideEffect(() =>
+        applicationContainer.directMessages.deliverPin(
+          session,
+          activeConversation,
+          { action: 'pin', createdAt, messageId: message.id },
+        ),
       );
       setPinnedMessageIds((current) => new Set(current).add(message.id));
     } catch (caught) {
@@ -141,10 +144,12 @@ export function useConversationPins(
         activeConversation.id,
         message.id,
       );
-      void applicationContainer.directMessages.deliverPin(
-        session,
-        activeConversation,
-        { action: 'unpin', createdAt, messageId: message.id },
+      runMailboxSideEffect(() =>
+        applicationContainer.directMessages.deliverPin(
+          session,
+          activeConversation,
+          { action: 'unpin', createdAt, messageId: message.id },
+        ),
       );
       setPinnedMessageIds((current) => withoutMessage(current, message.id));
       setCollection((current) =>

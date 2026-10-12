@@ -25,6 +25,7 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { PendingConversationMessage } from './PendingConversationMessage';
+import { runMailboxSideEffect } from './runMailboxSideEffect';
 
 export type PendingConversationSend = {
   attachmentUpload: AttachmentUploadOptions;
@@ -152,10 +153,12 @@ export function useConversationMessageDelivery({
             );
           }
 
-          void applicationContainer.directMessages.deliverSent(
-            session,
-            activeConversation,
-            sent.raw,
+          runMailboxSideEffect(() =>
+            applicationContainer.directMessages.deliverSent(
+              session,
+              activeConversation,
+              sent.raw,
+            ),
           );
 
           onMessagesChange((current) =>
