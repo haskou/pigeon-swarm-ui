@@ -36,6 +36,7 @@ export class PigeonDirectAttachmentUploader {
           downloadToken: reservation.downloadToken,
           expiresAt: reservation.expiresAt,
           index: 0,
+          ...(reservation.origin ? { origin: reservation.origin } : {}),
           size,
         },
       ],

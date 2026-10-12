@@ -210,6 +210,25 @@ uploaded length reveals a size bucket rather than the exact file size:
 - Attachments without the marker were encrypted before padding and are decrypted
   unchanged.
 
+### Attachment blob origins
+
+- Each private attachment part records the canonical base URL of the node that
+  stores it in `origin`. Receivers read the part from that node, even when their
+  session is on another node.
+- The origin uses the `MailboxHomeBase` canonical form: `https` (or `http` on
+  loopback for development), no credentials, query, or fragment, no trailing
+  slash, at most 255 characters, and no private or loopback IP addresses. The
+  `localhost` name is accepted for development.
+- An origin that fails this rule is ignored. The part is read from the session
+  node instead, and the invalid value is never fetched.
+- References without `origin` were created before the field existed and are read
+  from the session node.
+- Reads use an isolated client with `credentials: omit` and `redirect: error`.
+  A body whose size differs from the reference, or a 404, reports the attachment
+  as unavailable. Other failures surface as the original error.
+- Alternate replicas are not implemented yet; see `docs/design/private-blob-store.md`
+  in the node repository.
+
 ## Project Status
 
 This is active development software. Conversations, communities, invitations,

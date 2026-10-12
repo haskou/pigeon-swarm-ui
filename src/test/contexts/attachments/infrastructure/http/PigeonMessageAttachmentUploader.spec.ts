@@ -51,7 +51,10 @@ function messageUploader(
     'prepare'
   > = new MessageAttachmentThumbnailPreparer(),
 ): PigeonMessageAttachmentUploader {
-  const privateBlobs = new PigeonPrivateBlobClient(http, requestSigner);
+  const privateBlobs = new PigeonPrivateBlobClient(http, requestSigner, {
+    client: jest.fn(),
+    home: () => undefined,
+  });
   const publicFiles = new PigeonPublicFilesClient(http, requestSigner, {
     register: jest.fn(),
   });
