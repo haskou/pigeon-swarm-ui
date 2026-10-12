@@ -87,8 +87,9 @@ export class PigeonIdentitySessionApi {
     vaultSession: Awaited<ReturnType<DeviceIdentityVault['unlock']>>,
   ): void {
     assert(
-      vaultSession.authorizationRevision.valueOf() >=
+      vaultSession.authorizationRevision.isGreaterOrEqualThan(
         identity.authorizationRevision,
+      ),
       new Error(copy.auth.invalidLogin),
     );
 
@@ -104,7 +105,7 @@ export class PigeonIdentitySessionApi {
 
     assert(
       identity.authorizationRevision !== 0 ||
-        vaultSession.authorizationRevision.valueOf() !== 0 ||
+        !vaultSession.authorizationRevision.isZero() ||
         genesisMatches,
       new Error(copy.auth.invalidLogin),
     );

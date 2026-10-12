@@ -184,7 +184,7 @@ export class DevicePairingCompletion {
         this.identityId.isEqual(invitation.getIdentityId()) &&
         this.operationId.isEqual(request.getOperationId()) &&
         this.pairingId.isEqual(invitation.getPairingId()) &&
-        this.revision.valueOf() === invitation.getRevision().valueOf() + 1 &&
+        this.revision.isEqual(invitation.getRevision().add(1)) &&
         this.epoch.isEqual(invitation.getEpoch()) &&
         this.authorCredential
           .getPublicKey()

@@ -35,6 +35,7 @@ import { DeviceId } from '../../domain/value-objects/DeviceId';
 import { DevicePairingCode } from '../../domain/value-objects/DevicePairingCode';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
 import { PairingId } from '../../domain/value-objects/PairingId';
+import { RecoveryAuthority } from '../../domain/value-objects/RecoveryAuthority';
 import { RecoveryIdentityMaterial } from '../crypto/RecoveryIdentityMaterial';
 
 const emptyKeychain = { conversations: {}, version: 0 };
@@ -176,7 +177,7 @@ export class PigeonDeviceAuthorizationApi {
     try {
       const devices = await this.findDevicesWithRecoveryProof(session);
 
-      return !devices.some((device) => device.valueOf() === own);
+      return !devices.some((device) => device.hasValue(own));
     } catch {
       return false;
     }
@@ -229,8 +230,9 @@ export class PigeonDeviceAuthorizationApi {
       invitation.getIdentityId().isEqual(identityId) &&
         invitation.getEpoch().isEqual(session.authorizationEpoch) &&
         invitation.getRevision().isEqual(session.authorizationRevision) &&
-        invitation.getAuthorCredential().valueOf() ===
-          session.deviceCredentialKeyPair.toPrimitives().publicKey,
+        invitation
+          .getAuthorCredential()
+          .hasValue(session.deviceCredentialKeyPair.toPrimitives().publicKey),
       new DevicePairingError(
         'mismatch',
         'Device pairing request does not match this session.',
@@ -289,8 +291,9 @@ export class PigeonDeviceAuthorizationApi {
 
       assert(
         identityId.isEqual(IdentityId.fromString(identity.id)) &&
-          material.getRecoveryAuthorityKeyPair().toPrimitives().publicKey ===
-            identity.recoveryAuthority,
+          RecoveryAuthority.fromString(
+            material.getRecoveryAuthorityKeyPair().toPrimitives().publicKey,
+          ).isEqual(RecoveryAuthority.fromString(identity.recoveryAuthority)),
         new DevicePairingError(
           'mismatch',
           'Paired identity material does not match the identity.',
@@ -422,7 +425,7 @@ export class PigeonDeviceAuthorizationApi {
     }
 
     const own = session.deviceCredentialKeyPair.toPrimitives().publicKey;
-    const self = devices.find((device) => device.valueOf() === own);
+    const self = devices.find((device) => device.hasValue(own));
 
     if (!self) {
       return 'already-revoked';
@@ -481,8 +484,9 @@ export class PigeonDeviceAuthorizationApi {
 
     assert(
       identityId.isEqual(IdentityId.fromString(identity.id)) &&
-        material.recoveryAuthorityKeyPair.toPrimitives().publicKey ===
-          identity.recoveryAuthority,
+        RecoveryAuthority.fromString(
+          material.recoveryAuthorityKeyPair.toPrimitives().publicKey,
+        ).isEqual(RecoveryAuthority.fromString(identity.recoveryAuthority)),
       new Error('Recovery kit does not belong to this identity.'),
     );
 
