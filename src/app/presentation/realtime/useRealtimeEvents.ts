@@ -6,6 +6,7 @@ import type { Session } from '../../../shared/domain/pigeonResources.types';
 import type { NetworkSynchronizationStatus } from '../../../contexts/networks/presentation/view-models/NetworkSynchronizationStatus';
 import type {
   RealtimeDomainEvent,
+  RealtimeMailboxSubscriptionInput,
   RealtimeTypingInput,
   RealtimeTypingMessage,
 } from '../../../shared/infrastructure/realtime/RealtimeGateway';
@@ -38,8 +39,17 @@ type SharedRealtimeConnection = {
   subscribers: Set<RealtimeSubscription>;
 };
 
+type MailboxHintRegistration = {
+  listeners: Set<() => void>;
+  target: RealtimeMailboxSubscriptionInput;
+};
+
 const realtimeConnections = new Map<string, SharedRealtimeConnection>();
 const sharedConnectionCloseDelayMs = 1000;
+const mailboxHintRegistrations = new Map<
+  string,
+  Map<string, MailboxHintRegistration>
+>();
 
 export function useRealtimeEvents(
   session: Session,
@@ -151,6 +161,7 @@ async function connectRealtime(
       connection.session,
       (message) => {
         if (message.type === 'connection_ack') {
+          sendMailboxSubscriptions(connection);
           notifySubscribers(connection, (handlers) => handlers.onConnected?.());
 
           return;
@@ -162,6 +173,12 @@ async function connectRealtime(
           notifySubscribers(connection, (handlers) =>
             handlers.onNetworkSynchronizationStatus?.(message.status),
           );
+
+          return;
+        }
+
+        if (message.type === 'mailbox_envelope') {
+          notifyMailboxHint(connection, message.mailboxId);
 
           return;
         }
@@ -250,6 +267,7 @@ export function closeAllRealtimeConnections(): void {
     connection.connectPromise = null;
   });
   realtimeConnections.clear();
+  mailboxHintRegistrations.clear();
 }
 
 export function sendRealtimeTyping(
@@ -276,4 +294,79 @@ export function acknowledgeRealtimeCallSignal(
   if (!socket) return;
 
   applicationContainer.realtime.acknowledgeCallSignal(socket, signalId);
+}
+
+/**
+ * Runs `listener` on each envelope hint for `target`'s mailbox. A hint carries
+ * no content; it only means the mailbox may hold something new. The node keeps
+ * subscriptions per socket, so every acknowledged connect re-sends them.
+ */
+export function subscribeRealtimeMailboxHints(
+  session: Session,
+  target: RealtimeMailboxSubscriptionInput,
+  listener: () => void,
+): () => void {
+  const key = realtimeConnectionKey(session);
+  const registrations =
+    mailboxHintRegistrations.get(key) ??
+    new Map<string, MailboxHintRegistration>();
+  mailboxHintRegistrations.set(key, registrations);
+
+  const registration: MailboxHintRegistration = registrations.get(
+    target.mailboxId,
+  ) ?? {
+    listeners: new Set<() => void>(),
+    target,
+  };
+  const isNewReader =
+    registration.listeners.size === 0 ||
+    registration.target.readToken !== target.readToken;
+
+  registration.target = target;
+  registration.listeners.add(listener);
+  registrations.set(target.mailboxId, registration);
+
+  if (isNewReader) {
+    const socket = realtimeConnections.get(key)?.socket;
+
+    if (socket) {
+      applicationContainer.realtime.subscribeMailbox(socket, target);
+    }
+  }
+
+  return () => {
+    registration.listeners.delete(listener);
+
+    if (
+      registration.listeners.size === 0 &&
+      registrations.get(target.mailboxId) === registration
+    ) {
+      registrations.delete(target.mailboxId);
+    }
+  };
+}
+
+function sendMailboxSubscriptions(connection: SharedRealtimeConnection): void {
+  const socket = connection.socket;
+
+  if (!socket) return;
+
+  mailboxHintRegistrations
+    .get(realtimeConnectionKey(connection.session))
+    ?.forEach((registration) => {
+      applicationContainer.realtime.subscribeMailbox(
+        socket,
+        registration.target,
+      );
+    });
+}
+
+function notifyMailboxHint(
+  connection: SharedRealtimeConnection,
+  mailboxId: string,
+): void {
+  mailboxHintRegistrations
+    .get(realtimeConnectionKey(connection.session))
+    ?.get(mailboxId)
+    ?.listeners.forEach((listener) => listener());
 }

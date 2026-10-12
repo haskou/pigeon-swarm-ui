@@ -1,6 +1,7 @@
 import type { Session } from '../../shared/domain/pigeonResources.types';
 import type {
   RealtimeHeartbeatActivityMode,
+  RealtimeMailboxSubscriptionInput,
   RealtimeMessage,
   RealtimeTypingInput,
 } from '../../shared/infrastructure/realtime/RealtimeGateway';
@@ -30,5 +31,12 @@ export class PigeonRealtimeApplication {
 
   public acknowledgeCallSignal(socket: WebSocket, signalId: string): void {
     this.realtime.acknowledgeCallSignal(socket, signalId);
+  }
+
+  public subscribeMailbox(
+    socket: WebSocket,
+    input: RealtimeMailboxSubscriptionInput,
+  ): void {
+    this.realtime.subscribeMailbox(socket, input);
   }
 }

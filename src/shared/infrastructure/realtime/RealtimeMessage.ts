@@ -17,6 +17,11 @@ export type RealtimeMessage =
       type: 'domain_event';
     }
   | {
+      cursor: number;
+      mailboxId: string;
+      type: 'mailbox_envelope';
+    }
+  | {
       status: NetworkSynchronizationResource;
       type: 'network_synchronization_status';
     }

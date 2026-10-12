@@ -6,6 +6,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../composition/applicationContainer';
+import { subscribeRealtimeMailboxHints } from '../../realtime/useRealtimeEvents';
 
 const TICK_MS = 5000;
 const VISIT_INTERVAL_MS = 30_000;
@@ -49,6 +50,37 @@ function dueConversationIds(
 }
 
 /**
+ * Subscribes to the inbox hint of each one-to-one conversation not yet
+ * subscribed. A conversation whose inbox is not open has no target yet and is
+ * retried on the next tick. Groups have no realtime hint.
+ */
+function subscribeHints(
+  session: Session,
+  conversations: ConversationResource[],
+  subscriptions: Map<string, () => void>,
+  onHint: (conversationId: string) => void,
+): void {
+  conversations.forEach((conversation) => {
+    if (conversation.type !== 'one-to-one') return;
+    if (subscriptions.has(conversation.id)) return;
+
+    const target = applicationContainer.directMessages.hintTarget(
+      session,
+      conversation.id,
+    );
+
+    if (!target) return;
+
+    subscriptions.set(
+      conversation.id,
+      subscribeRealtimeMailboxHints(session, target, () =>
+        onHint(conversation.id),
+      ),
+    );
+  });
+}
+
+/**
  * Clears unread on the one-to-one conversations that are not open, so a read
  * made on another device shows here too. Each tick visits at most
  * VISITS_PER_TICK conversations, and a conversation is visited at most once
@@ -78,6 +110,9 @@ export function useDirectMessageBackgroundReadSync({
     const controller = new AbortController();
     const lastVisit = lastVisitRef.current;
     let timer: number | undefined;
+    let running = false;
+    let queued = false;
+    const hintUnsubscribes = new Map<string, () => void>();
 
     const visit = async (conversationId: string): Promise<void> => {
       lastVisit.set(conversationId, Date.now());
@@ -102,6 +137,25 @@ export function useDirectMessageBackgroundReadSync({
     };
 
     const pass = async (): Promise<void> => {
+      running = true;
+      subscribeHints(
+        session,
+        latestRef.current.conversations,
+        hintUnsubscribes,
+        (conversationId) => {
+          lastVisit.delete(conversationId);
+
+          if (running) {
+            queued = true;
+
+            return;
+          }
+
+          window.clearTimeout(timer);
+          void pass();
+        },
+      );
+
       const due = dueConversationIds(
         latestRef.current,
         lastVisit,
@@ -115,8 +169,15 @@ export function useDirectMessageBackgroundReadSync({
         await visit(conversationId);
       }
 
+      running = false;
+
       if (!controller.signal.aborted) {
-        timer = window.setTimeout(() => void pass(), TICK_MS);
+        if (queued) {
+          queued = false;
+          void pass();
+        } else {
+          timer = window.setTimeout(() => void pass(), TICK_MS);
+        }
       }
     };
 
@@ -125,6 +186,7 @@ export function useDirectMessageBackgroundReadSync({
     return () => {
       controller.abort();
       window.clearTimeout(timer);
+      hintUnsubscribes.forEach((unsubscribe) => unsubscribe());
     };
   }, [session]);
 }
