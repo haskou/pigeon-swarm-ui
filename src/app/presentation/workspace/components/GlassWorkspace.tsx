@@ -44,8 +44,9 @@ import { applyPublishedKeychain } from './applyPublishedKeychain';
 import { CommunityUnreadState } from './CommunityUnreadState';
 import { communityVoiceChannelTopologyKey } from './communityVoicePresence';
 import { CommunityWorkspaceContent } from './CommunityWorkspaceContent';
+import { ConversationListRevision } from './ConversationListRevision';
 import { type EditingMessage } from './conversationThreadState';
-import { mergeRefreshedSession } from './mergeRefreshedSession';
+import { mergeSessionSnapshot } from './mergeSessionSnapshot';
 import { MessagesWorkspaceContent } from './MessagesWorkspaceContent';
 import { PushNotificationPrompt } from './PushNotificationPrompt';
 import { Rail, type RailProps } from './Rail';
@@ -113,9 +114,21 @@ export function GlassWorkspace({
   pendingCommunityInvite,
   session,
   setCommunities,
-  setConversations,
+  setConversations: setConversationsState,
   setSession,
 }: GlassWorkspaceProps) {
+  const [conversationListRevision] = useState(
+    () => new ConversationListRevision(),
+  );
+  const setConversations = useCallback<
+    Dispatch<SetStateAction<ConversationResource[]>>
+  >(
+    (next) => {
+      conversationListRevision.recordWrite();
+      setConversationsState(next);
+    },
+    [conversationListRevision, setConversationsState],
+  );
   const {
     activeCommunityId,
     activeConversationId,
@@ -683,11 +696,25 @@ export function GlassWorkspace({
   }, [activeConversationId, conversations]);
 
   const refreshSession = useCallback(async () => {
+    const isListCurrent = conversationListRevision.begin();
     const result = await applicationContainer.session.refresh(session);
 
-    setSession((current) => mergeRefreshedSession(current, result.session));
-    setConversations(result.conversations);
-  }, [session, setConversations, setSession]);
+    setSession((current) => mergeSessionSnapshot(current, result.session));
+
+    // A list written mid-refresh is newer than this refresh's snapshot.
+    if (isListCurrent()) setConversations(result.conversations);
+  }, [conversationListRevision, session, setConversations, setSession]);
+
+  const applySessionUpdate = useCallback(
+    (nextSession: Session) => {
+      const merged = mergeSessionSnapshot(sessionRef.current, nextSession);
+
+      setSession(merged);
+
+      if (merged) rememberIdentity(merged.identity);
+    },
+    [rememberIdentity, setSession],
+  );
 
   useEffect(() => {
     if (workspaceMode !== 'messages' || !activeConversation?.id) return;
@@ -1005,10 +1032,7 @@ export function GlassWorkspace({
               onPresenceChange={mergePresence}
               onPresenceStatusSelected={rememberPresencePreference}
               onRealtimeEventsOpen={openRealtimeEvents}
-              onSessionUpdated={(nextSession) => {
-                setSession(nextSession);
-                rememberIdentity(nextSession.identity);
-              }}
+              onSessionUpdated={applySessionUpdate}
               onSidebarClose={() => closeTransientSurface('sidebar')}
               onSidebarOpen={() => openTransientSurface('sidebar')}
               pendingInvitation={activeConversationInvitation}
@@ -1073,10 +1097,7 @@ export function GlassWorkspace({
             onPresenceChange={mergePresence}
             onPresenceStatusSelected={rememberPresencePreference}
             onRealtimeEventsOpen={openRealtimeEvents}
-            onSessionUpdated={(nextSession) => {
-              setSession(nextSession);
-              rememberIdentity(nextSession.identity);
-            }}
+            onSessionUpdated={applySessionUpdate}
             onSidebarClose={() => closeTransientSurface('sidebar')}
             onSidebarOpen={() => openTransientSurface('sidebar')}
             pendingInvitation={activeCommunityInvitation}
