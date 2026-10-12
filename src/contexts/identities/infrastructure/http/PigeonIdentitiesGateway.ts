@@ -17,7 +17,10 @@ import type { IdentityMasterKeyProtection } from '../../domain/value-objects/Ide
 import type { IdentityCreationMaterial } from '../crypto/IdentityCreationMaterial';
 import type { CreatedIdentityMaterial } from './CreatedIdentityMaterial';
 import type { IdentityUpdateProfileInput } from './IdentitySignaturePayloadFactory';
-import type { PigeonDeviceAuthorizationApi } from './PigeonDeviceAuthorizationApi';
+import type {
+  OwnDeviceRetirement,
+  PigeonDeviceAuthorizationApi,
+} from './PigeonDeviceAuthorizationApi';
 import type { PigeonIdentityCommandsApi } from './PigeonIdentityCommandsApi';
 import type { PigeonIdentityGateway } from './PigeonIdentityGateway';
 import type { PigeonIdentityLoginApi } from './PigeonIdentityLoginApi';
@@ -101,6 +104,10 @@ export class PigeonIdentitiesGateway {
       target,
       compromisedSince,
     );
+  }
+
+  public async retireOwnDevice(session: Session): Promise<OwnDeviceRetirement> {
+    return await this.deviceAuthorization.retireOwnDevice(session);
   }
 
   public async completeDevicePairing(

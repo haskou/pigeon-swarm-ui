@@ -18,6 +18,7 @@ import type { DirectMessageMailboxState } from './DirectMessageMailboxStore';
 import type { DirectMessageReaderSet } from './DirectMessageReaderSet';
 
 import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
+import { MailboxCapability } from '../../../mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxEnvelopeCipher } from '../../../mailboxes/infrastructure/crypto/MailboxEnvelopeCipher';
 import { MailboxKeySchedule } from '../../../mailboxes/infrastructure/crypto/MailboxKeySchedule';
 import { MailboxReadToken } from '../../../mailboxes/infrastructure/crypto/MailboxReadToken';
@@ -171,6 +172,39 @@ export class DirectMessageMailbox {
     if (page.lastCursor <= cursor || signal.aborted) return;
 
     await this.applyPage(session, conversationId, inbox, page, signal, apply);
+  }
+
+  /**
+   * Removes this device's reader from the inbox of every direct conversation,
+   * so the node stops counting it against the reader cap. Best effort: a
+   * failed removal is left to the reader prune that other devices run on
+   * sync. Never throws.
+   */
+  public async releaseDeviceReaders(session: Session): Promise<void> {
+    const conversations = Object.values(session.keychain.conversations).filter(
+      (entry) => entry.kind === 'conversation',
+    );
+
+    for (const entry of conversations) {
+      try {
+        const keys = this.keysFor(
+          session,
+          entry.conversationId,
+          session.identity.id,
+        );
+        const readers = this.readersFor(session, keys);
+
+        await this.channel.removeReader(
+          keys,
+          readers.root,
+          MailboxCapability.hash(readers.device),
+        );
+      } catch {
+        // Count-only: no ids, content, or error details.
+        // eslint-disable-next-line no-console
+        console.debug('Direct mailbox reader release failed; pruned on sync.');
+      }
+    }
   }
 
   /**

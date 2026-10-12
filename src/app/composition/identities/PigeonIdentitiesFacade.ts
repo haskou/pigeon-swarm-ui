@@ -5,6 +5,7 @@ import type { DeviceCredential } from '../../../contexts/identities/domain/value
 import type { IdentityAccessContexts } from '../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
 import type { IdentityMapper } from '../../../contexts/identities/infrastructure/http/IdentityMapper';
 import type { IdentityPresenceMapper } from '../../../contexts/identities/infrastructure/http/IdentityPresenceMapper';
+import type { OwnDeviceRetirement } from '../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
 import type { PigeonIdentitiesGateway } from '../../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
 import type { IdentityUpdateProfileInput } from '../../../contexts/identities/infrastructure/http/resources/IdentityUpdateProfileInput';
 import type {
@@ -91,6 +92,10 @@ export class PigeonIdentitiesFacade {
     compromisedSince?: DeviceAuthorizationRevision,
   ): Promise<Session> {
     return await this.gateway.revokeDevice(session, target, compromisedSince);
+  }
+
+  public async retireOwnDevice(session: Session): Promise<OwnDeviceRetirement> {
+    return await this.gateway.retireOwnDevice(session);
   }
 
   public async completeDevicePairing(

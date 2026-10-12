@@ -19,6 +19,7 @@ import type { IdentityPassword } from '../../domain/value-objects/IdentityPasswo
 import type { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
 import type { DeviceIdentityVault } from '../storage/DeviceIdentityVault';
 
+import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 import { DeviceAuthorizationCheckpoint } from '../../domain/DeviceAuthorizationCheckpoint';
 import { DeviceAuthorizationTransition as AuthorizationTransition } from '../../domain/DeviceAuthorizationTransition';
 import { DevicePairingCompletion } from '../../domain/DevicePairingCompletion';
@@ -37,6 +38,8 @@ import { RecoveryIdentityMaterial } from '../crypto/RecoveryIdentityMaterial';
 
 const emptyKeychain = { conversations: {}, version: 0 };
 const PAIRING_TTL_MS = 2 * 60 * 1000;
+
+export type OwnDeviceRetirement = 'already-revoked' | 'last-device' | 'revoked';
 
 export class PigeonDeviceAuthorizationApi {
   public constructor(
@@ -300,11 +303,6 @@ export class PigeonDeviceAuthorizationApi {
     target: DeviceCredential,
     compromisedSince?: DeviceAuthorizationRevision,
   ): Promise<Session> {
-    assert(
-      target.valueOf() !==
-        session.deviceCredentialKeyPair.toPrimitives().publicKey,
-      new Error('A device cannot revoke itself.'),
-    );
     const current = await this.find(session);
 
     assert(
@@ -330,6 +328,46 @@ export class PigeonDeviceAuthorizationApi {
       authorizationEpoch: checkpoint.getEpoch(),
       authorizationRevision: checkpoint.getRevision(),
     };
+  }
+
+  /**
+   * Removes this device's own credential through the same revocation
+   * transition every other removal uses. Reports 'already-revoked' when the
+   * node rejects this device's signature with code 401020, or no longer lists
+   * this device. Reports 'last-device' when it is the only credential, which
+   * the node never revokes. Any other failure rejects, with nothing revoked.
+   */
+  public async retireOwnDevice(session: Session): Promise<OwnDeviceRetirement> {
+    let devices: DeviceCredential[];
+
+    try {
+      devices = await this.findDevices(session);
+    } catch (error) {
+      if (
+        error instanceof HttpJsonError &&
+        error.status === 401 &&
+        error.code === 401020
+      ) {
+        return 'already-revoked';
+      }
+
+      throw error;
+    }
+
+    const own = session.deviceCredentialKeyPair.toPrimitives().publicKey;
+    const self = devices.find((device) => device.valueOf() === own);
+
+    if (!self) {
+      return 'already-revoked';
+    }
+
+    if (devices.length === 1) {
+      return 'last-device';
+    }
+
+    await this.revokeDevice(session, self);
+
+    return 'revoked';
   }
 
   public async synchronize(session: Session): Promise<Session> {

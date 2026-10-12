@@ -982,6 +982,60 @@ describe(DirectMessageMailbox.name, () => {
     });
   });
 
+  describe('releaseDeviceReaders', () => {
+    it('removes this device reader from the inbox with the root token', async () => {
+      const { channel, mailbox } = setup();
+      const keys = keysFor('alice');
+      const tokens = readerTokensFor('alice', keys.mailboxId);
+
+      await mailbox.releaseDeviceReaders(session('alice'));
+
+      expect(channel.removeReader).toHaveBeenCalledTimes(1);
+      expect(channel.removeReader).toHaveBeenCalledWith(
+        keys,
+        tokens.root,
+        MailboxCapability.hash(tokens.device),
+      );
+    });
+
+    it('keeps releasing the other inboxes when one removal fails, and never throws', async () => {
+      const { channel, mailbox } = setup();
+      const secondSecret = Buffer.alloc(32, 8);
+      const alice = session('alice');
+      const secondKeys = MailboxKeySchedule.derive(secondSecret, 'alice', 0);
+      const secondTokens = readerTokensFor('alice', secondKeys.mailboxId);
+      const withSecond = {
+        ...alice,
+        keychain: {
+          conversations: {
+            ...alice.keychain.conversations,
+            'conversation-2': {
+              ...alice.keychain.conversations[conversationId],
+              conversationId: 'conversation-2',
+              key: secondSecret.toString('base64'),
+            },
+          },
+          version: 2,
+        },
+      } as unknown as Session;
+
+      channel.removeReader.mockRejectedValueOnce(
+        new HttpJsonError(404, 'Not Found', ''),
+      );
+
+      await expect(
+        mailbox.releaseDeviceReaders(withSecond),
+      ).resolves.toBeUndefined();
+
+      expect(channel.removeReader).toHaveBeenCalledTimes(2);
+      expect(channel.removeReader).toHaveBeenLastCalledWith(
+        secondKeys,
+        secondTokens.root,
+        MailboxCapability.hash(secondTokens.device),
+      );
+    });
+  });
+
   describe('over the real channel', () => {
     /**
      * Mirrors the node: the inbox keeps the hash of every reader token with
