@@ -31,6 +31,16 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 - What the node sees: create sends only `MailboxCapability.hash(token)`. Each read and acknowledge sends the raw token as `Authorization: Bearer`, and the node checks it against that hash. The node therefore learns the raw token on every read and ack. It can already read and delete the inbox's ciphertext envelopes, and the token adds no new capability beyond that.
 - Groups: do not reuse this derivation with a shared conversation or group secret as the input. Every holder of that secret could then read, acknowledge, and delete each member's inbox. Group inboxes need a per-member token.
 
+### Reader set
+
+- Device reader: `MailboxReadToken.deriveDevice(rootKey, mailboxId, deviceCredential)`, same HKDF with info = `pigeon/mailbox/device-read/v1` ‖ u32be(len(mailboxId)) ‖ mailboxId ‖ credential UTF-8. Pinned vector: root key `0x09 × 32`, mailbox `mailbox-fixture-id`, credential `-----BEGIN PUBLIC KEY-----`, `AAAA`, `-----END PUBLIC KEY-----` joined by LF, gives `js4BVkg1uGoEfwYGrPmaTvGh7s8MuZnZhSg1zaYJzDA`.
+- A device reads and acknowledges with its device reader. The same token rules as the root apply: the node sees the raw device token on each read and ack.
+- The root reader lists, enrols, and removes readers, and it mirrors each acknowledgement, so the root cursor tracks the latest device ack.
+- A device enrols its reader when it creates the inbox and when it adopts a legacy inbox. Recovery enrols it again after a re-creation.
+- Cap: the node's `maxReaders` is 8. A ninth device's enrol is refused (409) and logged with the fixed inbox-create debug line. Its read then gets 404, recovers, and fails again on enrol with 409. That surfaces as the sync error notice.
+- Pruning: once per app session per mailbox, a device lists the readers and removes any hash that is neither the root, its own device, nor a credential in the identity's device list. A failed pass logs a fixed debug line and retries on the next sync. The root reader is never removed.
+- Mixed versions: a client from before this change reads and acknowledges with the root token only. Its acks do not move the device readers, so envelopes stay until the device readers acknowledge. Update every device.
+
 ### Alternatives
 
 - Random token, persisted (previous design): lost with local storage. The node keeps the old inbox, so reads return 404 and the recreate PUT returns 409 until the 14-day retention expires.
@@ -40,8 +50,8 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 
 ### Residual risk
 
-- Legacy inboxes: a `readToken` stored by the previous design stays in its localStorage entry and is still used, because the node accepts only that token for the inbox. If that storage is cleared, the inbox stays unrecoverable until retention removes it.
-- Multi-device consumption: see Direct messages.
+- Legacy inboxes: a `readToken` stored by the previous design is adopted on the first pass: both readers are registered under it, then the stored token is dropped. The first reconcile after adoption removes that token's reader, so a client still holding it loses access until it updates. If storage was cleared before adoption, the inbox stays unrecoverable until retention removes it.
+- Mixed versions and the reader cap: see Reader set.
 
 ## Creation proof
 
@@ -66,6 +76,9 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 | Append      | `POST /mailboxes/{id}/envelopes`                 | post token (Bearer) |
 | Read        | `GET /mailboxes/{id}/envelopes?after=&limit=`    | read token (Bearer) |
 | Acknowledge | `POST /mailboxes/{id}/ack` with `{ upTo }` (204) | read token (Bearer) |
+| Readers     | `GET /mailboxes/{id}/readers`                    | root token (Bearer) |
+| Enrol       | `POST /mailboxes/{id}/readers` (201 added)       | root token (Bearer) |
+| Remove      | `DELETE /mailboxes/{id}/readers/{hash}` (204)    | root token (Bearer) |
 
 - A 404 maps to `MailboxUnavailableError`. A 400 on create that names `requiredDifficultyBits` maps to `MailboxCreationDifficultyError`. Other 400s, 409, and 429 propagate as `HttpJsonError`.
 - Empty success bodies (PUT 200/201, POST 204) resolve to `undefined` in `HttpJsonClient`.
@@ -73,7 +86,7 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 ## Creation difficulty and recovery
 
 - `createInbox` mines at the default 16 bits. If `PUT` returns 400 with `requiredDifficultyBits`, it re-mines once at that value and retries the `PUT`. A second refusal, or a value outside 17 to 24, propagates without re-mining.
-- Recipient `read` and `acknowledge` re-create an evicted mailbox once on 404, with the same id and capability hashes, then retry the operation. A second 404 propagates. Both report `recreated: true` when this happened.
+- Recipient `read` and `acknowledge` re-create an evicted mailbox once on 404, with the same id and capability hashes, then retry the operation. A second 404 propagates. Both report `recreated: true` when this happened. The re-creation enrols the device reader again (`createInbox(root)`, then `addReader(device)`).
 - A re-created inbox numbers its envelopes from 1 again, because node `nextCursor` starts at 1 for each mailbox. A cursor stored for the old inbox would hide new envelopes. `DirectMessageMailbox.sync` therefore re-reads from 0 when `read` reports `recreated`, and stores cursor 0 when `acknowledge` does.
 - Senders (`send`) do not re-create. They lack the read-token hash, so they recover after the recipient's next read or acknowledgement.
 
@@ -88,25 +101,24 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 - Scope: one-to-one text with no attachments, reply, or sticker. Anything else stays on the legacy path (`deliver` returns `skipped`).
 - Send: the legacy POST runs first and is unchanged. The sent record is then appended to the recipient's inbox (`DirectMessageMailbox.deliver`). A failed append returns `failed` and is silent for the user. The facade logs one count-only debug line (no ids, content, or error details). There is no automatic retry, so the legacy copy is never duplicated.
 - Recipient: the active one-to-one conversation is polled about every 5 s (`useDirectMessageMailboxSync`). Each page is decrypted, applied to the timeline, then acknowledged. The cursor advances only after a successful ack. Replays collapse by message id in `MessageCollection.merge`.
-- Pre-create: the first sync creates the recipient inbox before the first read. Overlapping passes share one creation (`MailboxChannel.createInbox`), so a StrictMode remount sends one PUT. A failure is silent; the read's 404 recovery covers it on the next pass.
+- Pre-create: the first sync creates the recipient inbox and enrols this device's reader before the first read. Overlapping passes share one creation (`MailboxChannel.createInbox`), so a StrictMode remount sends one PUT. A failure is silent; the read's 404 recovery covers it on the next pass.
 - A 404 on append means the recipient inbox does not exist: the recipient has not opened the conversation yet, or it was evicted and not re-created. That is expected, so `deliver` returns `failed` with no user notice. The legacy copy still delivers.
 - A failing sync shows one notice unless another error is already shown. The next successful pass clears only that notice.
-- The cursor is stored in localStorage under `pigeon.direct-mailbox.<mailboxId>` (scoped per client). The read token is derived, so clearing storage loses only the cursor. A legacy `readToken` in an existing entry is still used (see Read token, Residual risk).
+- The cursor is stored in localStorage under `pigeon.direct-mailbox.<mailboxId>` (scoped per client). Both reader tokens are derived, so clearing storage loses only the cursor. A legacy `readToken` in an existing entry is adopted on the first pass (see Read token, Residual risk).
 - A stored cursor is reset to 0 when the inbox is re-created (see Creation difficulty and recovery).
 - Gaps: home-node discovery assumes `API_SERVER_URL`; polling only (no realtime hint); no retry beyond the next poll; epoch fixed at 0.
-- Multi-device: all devices of an identity read one inbox. An ack from one device removes envelopes the others have not read. Per-device delivery needs a node design change.
+- Multi-device: each device reads and acknowledges with its own device reader, and the node keeps an envelope until every reader has acknowledged it. An ack from one device therefore cannot remove a message another device has not read. The reader set holds at most `maxReaders` (8) readers per inbox, so a ninth device cannot enrol (see Reader set).
 - Send-failure notice: hidden while the legacy path still delivers every message. It returns when the legacy path is retired and the mailbox is the only delivery path.
 
 ## Open questions (not decided, not implemented)
 
 - Home-node discovery: how a sender learns which node hosts a recipient's mailbox.
-- Per-device delivery for identities with more than one device (see Direct messages).
 - Epoch rotation announcement.
 - Realtime hint for new envelopes.
 
 ## Verification
 
 - Pinned vectors and envelope/proof behavior: `src/test/contexts/mailboxes/**` under the real-crypto suite (`yarn test:crypto`).
-- Sync, storage-loss recovery, and single-flight creation: `src/test/contexts/messages/infrastructure/mailbox/DirectMessageMailbox.spec.ts` (`yarn test:crypto`).
+- Sync, reader adoption and pruning, storage-loss recovery, and single-flight creation: `src/test/contexts/messages/infrastructure/mailbox/DirectMessageMailbox.spec.ts` (`yarn test:crypto`).
 - HTTP client and worker client: default jest.
 - `HttpJsonClient` empty-body handling was proven red without the fix.
