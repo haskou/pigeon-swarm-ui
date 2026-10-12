@@ -9,6 +9,7 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
+import { DirectMailboxEligibility } from '../../../../contexts/mailboxes/domain/DirectMailboxEligibility';
 import { MailboxReaderLimitError } from '../../../../contexts/mailboxes/infrastructure/http/MailboxReaderLimitError';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
@@ -87,7 +88,8 @@ export function useDirectMessageMailboxSync({
   setPinnedMessageIds,
 }: DirectMessageMailboxSyncInput): void {
   const conversationId =
-    activeConversation?.type === 'one-to-one'
+    activeConversation &&
+    DirectMailboxEligibility.isEligible(activeConversation.type)
       ? activeConversation.id
       : undefined;
 

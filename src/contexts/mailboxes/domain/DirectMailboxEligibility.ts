@@ -4,8 +4,8 @@ import { ConversationType } from '../../conversations/domain/value-objects/Conve
 export class DirectMailboxEligibility {
   /** An unknown conversation type is not eligible. */
   public static isEligible(conversationType: string): boolean {
-    return (
-      ConversationType.tryFromPrimitives(conversationType)?.isOneToOne() ?? false
-    );
+    const type = ConversationType.tryFromPrimitives(conversationType);
+
+    return type?.isOneToOne() ?? false;
   }
 }

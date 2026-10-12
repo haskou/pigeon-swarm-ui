@@ -1,13 +1,12 @@
+import type { DirectDeletedRecord } from '../../../../../contexts/mailboxes/domain/DirectDeletedRecord';
+import type { DirectEditedRecord } from '../../../../../contexts/mailboxes/domain/DirectEditedRecord';
+import type { DirectPinRecord } from '../../../../../contexts/mailboxes/domain/DirectPinRecord';
+import type { DirectReactionRecord } from '../../../../../contexts/mailboxes/domain/DirectReactionRecord';
+import type { DirectReadRecord } from '../../../../../contexts/mailboxes/domain/DirectReadRecord';
+import type { DirectSentRecord } from '../../../../../contexts/mailboxes/domain/DirectSentRecord';
 import type { MessageResource } from '../../../../../contexts/messages/infrastructure/http/MessageResource';
-import type {
-  DirectDeletedRecord,
-  DirectEditedRecord,
-  DirectPinRecord,
-  DirectReactionRecord,
-  DirectReadRecord,
-  DirectSentRecord,
-} from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxRecord';
 
+import { DirectMailboxRecords } from '../../../../../contexts/mailboxes/domain/DirectMailboxRecords';
 import { DirectMessageMailboxRecord } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxRecord';
 
 describe(DirectMessageMailboxRecord.name, () => {
@@ -95,16 +94,6 @@ describe(DirectMessageMailboxRecord.name, () => {
   const text = (value: string): Uint8Array => new TextEncoder().encode(value);
   const envelope = (record: unknown, version = 2): Uint8Array =>
     text(JSON.stringify({ kind: 'direct-message', record, version }));
-
-  describe('isEligible', () => {
-    it('accepts a one-to-one conversation', () => {
-      expect(DirectMessageMailboxRecord.isEligible('one-to-one')).toBe(true);
-    });
-
-    it('rejects a group conversation', () => {
-      expect(DirectMessageMailboxRecord.isEligible('group')).toBe(false);
-    });
-  });
 
   describe('fromSent', () => {
     it('maps the legacy resource to a sent record', () => {
@@ -340,7 +329,7 @@ describe(DirectMessageMailboxRecord.name, () => {
       ['created 30 seconds and 1 ms ahead', 30_001, false],
     ])('judges a read record that was %s fresh=%s', (_label, offset, fresh) => {
       expect(
-        DirectMessageMailboxRecord.isFreshReceipt(
+        DirectMailboxRecords.isFreshReceipt(
           { ...readRecord, createdAt: now + offset },
           now,
         ),
