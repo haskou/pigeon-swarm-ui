@@ -171,25 +171,54 @@ describe('DirectMessageReaderSet sealed root rotation', () => {
     expect(registered.has(hash(legacyRoot))).toBe(true);
   });
 
-  it('keeps the existing prune for masterKey-only sessions', async () => {
-    const { registered, set } = setup();
+  it('leaves every reader alone under a masterKey-only session', async () => {
+    const { channel, registered, set } = setup();
 
     registered.add(hash('stale-token'));
 
     await set.reconcile(legacySession(), keys, legacyReaders('device-a'));
 
-    expect(registered.has(hash('stale-token'))).toBe(false);
+    expect(channel.listReaders).not.toHaveBeenCalled();
+    expect(registered.has(hash('stale-token'))).toBe(true);
     expect(registered.has(hash(legacyRoot))).toBe(true);
-    expect(registered.has(hash(legacyDevice('device-a')))).toBe(true);
     expect(registered.has(hash(legacyDevice('device-b')))).toBe(true);
   });
 
-  it('prunes again when the root changes', async () => {
-    const { channel, set } = setup();
+  it('keeps a bridged sealed reader under a masterKey-only pruneUnderLegacy', async () => {
+    const { registered, set } = setup();
+
+    registered.add(hash(sealedDevice('device-b')));
+
+    await set.pruneUnderLegacy(
+      legacySession(),
+      keys,
+      legacyReaders('device-a'),
+      legacyRoot,
+    );
+
+    expect(registered.has(hash(sealedDevice('device-b')))).toBe(true);
+  });
+
+  it('keeps the sealed root reader when a refused bridge prunes under the legacy root', async () => {
+    const { registered, set } = setup();
+
+    registered.add(hash(sealedRoot));
+
+    await set.reconcile(sealedSession(), keys, legacyReaders('device-a'));
+
+    expect(registered.has(hash(sealedRoot))).toBe(true);
+  });
+
+  it('skips the prune for a masterKey-only session until a sealed root is opened', async () => {
+    const { channel, registered, set } = setup();
+
+    registered.add(hash(sealedRoot));
+    registered.add(hash(sealedDevice('device-a')));
 
     await set.reconcile(legacySession(), keys, legacyReaders('device-a'));
-    await set.reconcile(sealedSession(), keys, sealedReaders('device-a'));
+    expect(channel.listReaders).not.toHaveBeenCalled();
 
-    expect(channel.listReaders).toHaveBeenCalledTimes(2);
+    await set.reconcile(sealedSession(), keys, sealedReaders('device-a'));
+    expect(channel.listReaders).toHaveBeenCalledTimes(1);
   });
 });

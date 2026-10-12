@@ -56,10 +56,10 @@ export class DirectMessageReaderSet {
   }
 
   /**
-   * Prunes readers that no device of the identity holds. Runs once per
-   * mailbox and root per app session; a failed pass is retried on the next
-   * sync. Never rejects: a stale reader only delays envelope retention, so the
-   * read path does not wait on a failure here.
+   * Prunes readers that no device of the identity holds. Runs only under a
+   * device-sealed session, once per mailbox and root per app session; a failed
+   * pass is retried on the next sync. Never rejects: a stale reader only delays
+   * envelope retention, so the read path does not wait on a failure here.
    */
   public reconcile(
     session: Session,
@@ -86,9 +86,10 @@ export class DirectMessageReaderSet {
   }
 
   /**
-   * Frees slots while a legacy inbox is not adopted yet. The legacy token is
-   * the only reader that can manage it. Best effort and not memoised: the
-   * adoption that follows reports a refusal, and the next sync prunes again.
+   * Frees slots while a legacy inbox is not adopted yet, under a device-sealed
+   * session only (see prune). The legacy token is the only reader that can
+   * manage it. Best effort and not memoised: the adoption that follows reports
+   * a refusal, and the next sync prunes again.
    */
   public async pruneUnderLegacy(
     session: Session,
@@ -125,9 +126,14 @@ export class DirectMessageReaderSet {
   }
 
   /**
+   * Runs under a device-sealed session only. A masterKey-only session cannot
+   * tell a removed device's reader from a bridged device's sealed reader, so
+   * it removes nothing and never locks a bridged device out.
+   *
    * The managing token lists and removes readers, so it is always kept, as
-   * are the root and device readers. The legacy readers stay until every
-   * listed device holds its sealed device reader.
+   * are the root and device readers and the session's own sealed root reader.
+   * The legacy readers stay until every listed device holds its sealed device
+   * reader.
    */
   private async prune(
     session: Session,
@@ -135,50 +141,49 @@ export class DirectMessageReaderSet {
     readers: MailboxReadTokens,
     managingToken = readers.root,
   ): Promise<void> {
+    if (!session.deviceSealedRootKey) return;
+
     const credentials = await this.listCredentials(session);
+    const rootKey = sessionRootKey(session).getBuffer();
     const deviceTokens = credentials.map((credential) =>
-      MailboxReadToken.deriveDevice(
-        sessionRootKey(session).getBuffer(),
-        keys.mailboxId,
-        credential,
-      ),
+      MailboxReadToken.deriveDevice(rootKey, keys.mailboxId, credential),
     );
     const kept = new Set<string>([
       MailboxCapability.hash(managingToken),
       MailboxCapability.hash(readers.root),
       MailboxCapability.hash(readers.device),
+      // The session's sealed root reader stays even when prune runs on the
+      // legacy set after a refused bridge.
+      MailboxCapability.hash(MailboxReadToken.derive(rootKey, keys.mailboxId)),
       ...deviceTokens.map((token) => MailboxCapability.hash(token)),
     ]);
     const listed = await this.channel.listReaders(keys, managingToken);
+    const listedHashes = new Set(
+      listed.readers.map((reader) => reader.readTokenHash),
+    );
+    const migrated = deviceTokens.every((token) =>
+      listedHashes.has(MailboxCapability.hash(token)),
+    );
 
-    if (session.deviceSealedRootKey) {
-      const listedHashes = new Set(
-        listed.readers.map((reader) => reader.readTokenHash),
+    if (!migrated) {
+      const legacyKey = session.masterKey.getBuffer();
+
+      kept.add(
+        MailboxCapability.hash(
+          MailboxReadToken.derive(legacyKey, keys.mailboxId),
+        ),
       );
-      const migrated = deviceTokens.every((token) =>
-        listedHashes.has(MailboxCapability.hash(token)),
-      );
 
-      if (!migrated) {
-        const legacyKey = session.masterKey.getBuffer();
-
+      for (const credential of credentials) {
         kept.add(
           MailboxCapability.hash(
-            MailboxReadToken.derive(legacyKey, keys.mailboxId),
+            MailboxReadToken.deriveDevice(
+              legacyKey,
+              keys.mailboxId,
+              credential,
+            ),
           ),
         );
-
-        for (const credential of credentials) {
-          kept.add(
-            MailboxCapability.hash(
-              MailboxReadToken.deriveDevice(
-                legacyKey,
-                keys.mailboxId,
-                credential,
-              ),
-            ),
-          );
-        }
       }
     }
 

@@ -26,7 +26,7 @@ Client side of haskou/pigeon-swarm-node#451. Design: `docs/design/device-sealed-
 - One fresh random root per generation, shared across recipients. This deviates from the node design's per-credential payload, because every device must derive the same mailbox root from it. The node side should confirm it accepts one payload across recipients.
 - Concurrent publishes: the later generation wins. A device that lost the race re-enrols on its next unlock.
 - Forget: `forgetCurrentDevice` does not publish. The forgetting device is revoked and gets 401 on its own publish. Remaining devices publish on their next unlock.
-- Multi-rotation residual: a device that missed several generations bridges each inbox on its next open. The previous root stays registered until every listed credential has a sealed device reader.
+- Multi-rotation residual: a device that missed several generations bridges each inbox on its next open. The previous root stays registered until every listed credential has a sealed device reader. Pruning runs only under a device-sealed session (see `opaque-mailboxes-client.md`, Pruning).
 
 ## Fetch
 
