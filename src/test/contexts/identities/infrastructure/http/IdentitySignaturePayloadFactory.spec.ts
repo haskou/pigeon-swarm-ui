@@ -25,6 +25,7 @@ describe(IdentitySignaturePayloadFactory.name, () => {
       'deviceCredential',
       'deviceCredentialCommitment',
       'id',
+      'mailboxHome',
       'networks',
       'previousIdentityExternalIdentifier',
       'profile',
@@ -91,6 +92,7 @@ describe(IdentitySignaturePayloadFactory.name, () => {
       'deviceCredential',
       'deviceCredentialCommitment',
       'id',
+      'mailboxHome',
       'networks',
       'previousIdentityExternalIdentifier',
       'profile',
@@ -120,6 +122,74 @@ describe(IdentitySignaturePayloadFactory.name, () => {
     expect(JSON.stringify(payload)).toContain(
       '"profile":{"banner":"banner-cid","handle":"ada","name":"Ada Updated"',
     );
+  });
+
+  describe('mailbox home hint', () => {
+    const id =
+      '-----BEGIN PUBLIC KEY-----\nidentity-1\n-----END PUBLIC KEY-----';
+    const initial = {
+      deviceCredential: 'device-credential',
+      deviceCredentialCommitment: 'device-commitment',
+      id,
+      networks: ['network-1'],
+      profile: { name: 'Ada' },
+      recoveryAuthority: 'recovery-authority',
+      timestamp: 1,
+    };
+    const identity = {
+      admissionNonce: '0',
+      authorizationRevision: 4,
+      deviceCredential: 'device-credential',
+      deviceCredentialCommitment: 'device-commitment',
+      id,
+      mailboxHome: 'https://node.example',
+      networks: ['network-1'],
+      profile: { name: 'Ada' },
+      recoveryAuthority: 'recovery-authority',
+      signature: 'signature',
+      timestamp: 1,
+      version: 1,
+    } as IdentityResource;
+
+    it('signs the published node origin between id and networks', async () => {
+      const payload = await new IdentitySignaturePayloadFactory(
+        'https://node.example',
+      ).createInitial(initial);
+
+      expect(payload.mailboxHome).toBe('https://node.example');
+      expect(JSON.stringify(payload)).toContain(
+        '"id":"identity-1","mailboxHome":"https://node.example","networks":["network-1"]',
+      );
+    });
+
+    it('omits the hint when the node is served under a path prefix', async () => {
+      const payload = await new IdentitySignaturePayloadFactory(
+        'https://node.example/api',
+      ).createInitial(initial);
+
+      expect(payload.mailboxHome).toBeUndefined();
+      expect(JSON.stringify(payload)).not.toContain('mailboxHome');
+    });
+
+    it('resends the current hint on profile updates', async () => {
+      const payload = await new IdentitySignaturePayloadFactory().createUpdate({
+        identity,
+        profile: { name: 'Ada Updated' },
+        timestamp: 2,
+      });
+
+      expect(payload.mailboxHome).toBe('https://node.example');
+    });
+
+    it('drops a stored hint that no longer passes validation', async () => {
+      const payload = await new IdentitySignaturePayloadFactory().createUpdate({
+        identity: { ...identity, mailboxHome: 'http://node.example' },
+        profile: { name: 'Ada Updated' },
+        timestamp: 2,
+      });
+
+      expect(payload.mailboxHome).toBeUndefined();
+    });
   });
 
   describe('admission proof', () => {
