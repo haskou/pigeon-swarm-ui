@@ -295,6 +295,29 @@
       "rules": {
         "max-classes-per-file": "off"
       }
+    },
+    {
+      "files": [
+        "src/shared/domain/**/*.ts"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "**/infrastructure",
+                  "**/infrastructure/**",
+                  "**/presentation",
+                  "**/presentation/**"
+                ],
+                "message": "Shared domain must not import infrastructure or presentation."
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }
