@@ -1,4 +1,4 @@
-import type { DirectMessageTimelineChange } from '../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
+import type { DirectMessageTimelineChange } from '../../../../contexts/messages/infrastructure/mailbox/DirectMessageTimelineChange';
 import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
 
 import { MessageCollection } from '../../../../contexts/messages/presentation/view-models/MessageCollection';
