@@ -156,6 +156,7 @@ describe(MailboxChannel.name, () => {
       envelopes: [],
       hasMore: false,
       lastCursor: 7,
+      recreated: false,
     });
   });
 
@@ -271,6 +272,7 @@ describe(MailboxChannel.name, () => {
         envelopes: [],
         hasMore: false,
         lastCursor: 7,
+        recreated: true,
       });
       expect(client.create).toHaveBeenCalledTimes(1);
       expect(client.create).toHaveBeenCalledWith(keys.mailboxId, {
@@ -303,7 +305,9 @@ describe(MailboxChannel.name, () => {
         .mockRejectedValueOnce(new MailboxUnavailableError())
         .mockResolvedValueOnce(undefined);
 
-      await channel.acknowledge(keys, readToken, 3);
+      await expect(channel.acknowledge(keys, readToken, 3)).resolves.toEqual({
+        recreated: true,
+      });
 
       expect(client.create).toHaveBeenCalledTimes(1);
       expect(client.acknowledge).toHaveBeenCalledTimes(2);

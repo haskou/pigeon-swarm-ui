@@ -32,6 +32,11 @@ export type OpenedMailboxPage = {
    * this value.
    */
   lastCursor: number;
+  /**
+   * True when the inbox was re-created while reading. Its cursors start
+   * again from 1, so a cursor stored for the old inbox no longer applies.
+   */
+  recreated: boolean;
 };
 
 /**
@@ -72,15 +77,17 @@ export class MailboxChannel {
   /**
    * Re-creates the recipient mailbox when the node reports it unavailable,
    * then retries the operation once. Only recipient routes recover: a sender
-   * lacks the read-token hash needed to re-create the mailbox.
+   * lacks the read-token hash needed to re-create the mailbox. `recreated`
+   * tells the caller that the mailbox is new, so cursors from the old one no
+   * longer apply.
    */
   private async recovering<T>(
     keys: MailboxKeys,
     readToken: string,
     operation: () => Promise<T>,
-  ): Promise<T> {
+  ): Promise<{ recreated: boolean; value: T }> {
     try {
-      return await operation();
+      return { recreated: false, value: await operation() };
     } catch (error: unknown) {
       if (!(error instanceof MailboxUnavailableError)) {
         throw error;
@@ -88,7 +95,7 @@ export class MailboxChannel {
 
       await this.createInbox(keys, readToken);
 
-      return operation();
+      return { recreated: true, value: await operation() };
     }
   }
 
@@ -167,8 +174,10 @@ export class MailboxChannel {
     after: number,
     limit: number,
   ): Promise<OpenedMailboxPage> {
-    const page = await this.recovering(keys, readToken, () =>
-      this.client.read(keys.mailboxId, readToken, after, limit),
+    const { recreated, value: page } = await this.recovering(
+      keys,
+      readToken,
+      () => this.client.read(keys.mailboxId, readToken, after, limit),
     );
     const envelopes: OpenedMailboxEnvelope[] = [];
 
@@ -198,20 +207,24 @@ export class MailboxChannel {
         (highest, envelope) => Math.max(highest, envelope.cursor),
         after,
       ),
+      recreated,
     };
   }
 
   /**
    * Recipient. Removes everything up to and including `upTo`. An evicted
-   * mailbox is re-created once and the acknowledgement retried.
+   * mailbox is re-created once and the acknowledgement retried. Reports
+   * whether that re-creation happened.
    */
   public async acknowledge(
     keys: MailboxKeys,
     readToken: string,
     upTo: number,
-  ): Promise<void> {
-    await this.recovering(keys, readToken, () =>
+  ): Promise<{ recreated: boolean }> {
+    const { recreated } = await this.recovering(keys, readToken, () =>
       this.client.acknowledge(keys.mailboxId, readToken, upTo),
     );
+
+    return { recreated };
   }
 }
