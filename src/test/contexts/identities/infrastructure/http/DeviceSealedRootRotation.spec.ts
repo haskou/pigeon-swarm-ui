@@ -138,7 +138,7 @@ describe('DeviceSealedRootRotation', () => {
       await rotation.current(makeSession(4));
 
       expect(sealedSecrets.publish).toHaveBeenCalledTimes(1);
-      expect(sealedSecrets.publish.mock.calls[0][1].generation).toBe(8);
+      expect(sealedSecrets.publish.mock.calls[0][1].generation).toBe(1_001);
     });
 
     it('publishes when this device has no entry yet', async () => {
