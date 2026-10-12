@@ -4,6 +4,7 @@ import { UUID } from '@haskou/value-objects';
 import type {
   ChatMessage,
   EditMessageOptions,
+  MessageAttachment,
   MessageResource,
   SendMessageOptions,
   Session,
@@ -116,6 +117,20 @@ export class PigeonMessageCommandsApi {
       .toString();
   }
 
+  private async abandonAttachmentsOnFailure<T>(
+    session: Session,
+    attachments: MessageAttachment[],
+    run: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await run();
+    } catch (error) {
+      await this.attachments.abandonMessageAttachments(session, attachments);
+
+      throw error;
+    }
+  }
+
   public async send(
     session: Session,
     conversationId: string,
@@ -147,54 +162,63 @@ export class PigeonMessageCommandsApi {
       onAttachmentProgress,
       attachmentUpload,
     );
-    const linkPreview = await this.linkPreviewForMessage(
+    const created = await this.abandonAttachmentsOnFailure(
       session,
-      content,
-      options,
-    );
-    const encryptedPayload = this.encryptPayload({
-      content,
-      conversationId,
-      eventType: threadRootMessageId
-        ? options.sticker
-          ? 'ThreadStickerMessageSent'
-          : 'ThreadMessageSent'
-        : undefined,
-      key,
-      linkPreview,
       messageAttachments,
-      replyPreview,
-      session,
-      sticker: options.sticker,
-      threadRootMessageId,
-      timestamp,
-    });
-    const id =
-      commandIdentity?.id ??
-      `${conversationId}:${timestamp}:${UUID.generate().toString()}`;
-    const path = `/conversations/${encodeURIComponent(
-      conversationId,
-    )}/messages`;
-    const created = await this.submit<MessageResource>(session, 'POST', path, {
-      fields: {
-        createdAt: timestamp,
-        encryptedPayload,
-        id,
-        previousMessageIds,
-        ...(replyToMessageId ? { replyToMessageId } : {}),
+      async () => {
+        const linkPreview = await this.linkPreviewForMessage(
+          session,
+          content,
+          options,
+        );
+        const encryptedPayload = this.encryptPayload({
+          content,
+          conversationId,
+          eventType: threadRootMessageId
+            ? options.sticker
+              ? 'ThreadStickerMessageSent'
+              : 'ThreadMessageSent'
+            : undefined,
+          key,
+          linkPreview,
+          messageAttachments,
+          replyPreview,
+          session,
+          sticker: options.sticker,
+          threadRootMessageId,
+          timestamp,
+        });
+        const id =
+          commandIdentity?.id ??
+          `${conversationId}:${timestamp}:${UUID.generate().toString()}`;
+        const path = `/conversations/${encodeURIComponent(
+          conversationId,
+        )}/messages`;
+
+        return await this.submit<MessageResource>(session, 'POST', path, {
+          fields: {
+            createdAt: timestamp,
+            encryptedPayload,
+            id,
+            previousMessageIds,
+            ...(replyToMessageId ? { replyToMessageId } : {}),
+          },
+          record: {
+            authorId: this.mutations.authorOf(session),
+            conversationId,
+            createdAt: timestamp,
+            encryptedPayload,
+            id,
+            previousMessageIds,
+            replyToMessageId: replyToMessageId || undefined,
+            scopeType: 'conversation',
+            type: 'sent',
+          },
+        });
       },
-      record: {
-        authorId: this.mutations.authorOf(session),
-        conversationId,
-        createdAt: timestamp,
-        encryptedPayload,
-        id,
-        previousMessageIds,
-        replyToMessageId: replyToMessageId || undefined,
-        scopeType: 'conversation',
-        type: 'sent',
-      },
-    });
+    );
+
+    this.attachments.settleMessageAttachments(session, messageAttachments);
 
     return await this.projection.decrypt(session, conversationId, created);
   }

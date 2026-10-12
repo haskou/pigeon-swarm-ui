@@ -12,6 +12,9 @@ import { PrivateBlobUnavailableError } from './PrivateBlobUnavailableError';
 
 const reservationPath = '/private-blobs';
 
+/** Upper bound on one private blob download, response body included. */
+export const privateBlobDownloadTimeoutMs = 60_000;
+
 export class PigeonPrivateBlobClient {
   public constructor(
     private readonly http: Pick<HttpJsonClient, 'request' | 'requestBlob'>,
@@ -20,7 +23,11 @@ export class PigeonPrivateBlobClient {
       /** Session node base, or undefined when not publishable. */
       home: () => string | undefined;
       /** Client bound to one node base, isolated from ambient credentials. */
-      client: (origin: string) => Pick<HttpJsonClient, 'requestBlob'>;
+      client: (
+        origin: string,
+      ) => Pick<HttpJsonClient, 'request' | 'requestBlob'>;
+      /** Signer bound to one node base, isolated from ambient credentials. */
+      signer: (origin: string) => Pick<RequestSigner, 'headers'>;
     },
   ) {}
 
@@ -37,34 +44,58 @@ export class PigeonPrivateBlobClient {
     }
   }
 
+  /**
+   * Canonical origin of a node other than the session node, or undefined when
+   * the session node serves it. A non-canonical origin is refused without
+   * being echoed back in the error.
+   */
+  private foreignOrigin(origin: string | undefined): string | undefined {
+    if (origin === undefined || origin === this.origins.home()) {
+      return undefined;
+    }
+
+    const canonical = MailboxHomeBase.parse(origin);
+
+    if (!canonical) {
+      throw new Error('Private blob origin is not canonical');
+    }
+
+    return canonical;
+  }
+
   public async reserve(
     session: Session,
     size: number,
+    origin?: string,
   ): Promise<PrivateBlobReservation> {
     const body = { size };
-    const reservation = await this.http.request<
+    const foreign = this.foreignOrigin(origin);
+    const client = foreign ? this.origins.client(foreign) : this.http;
+    const signer = foreign ? this.origins.signer(foreign) : this.signer;
+    const reservation = await client.request<
       Omit<PrivateBlobReservation, 'origin'>
     >(reservationPath, {
       body: JSON.stringify(body),
-      headers: await this.signer.headers(
-        session,
-        'POST',
-        reservationPath,
-        body,
-      ),
+      headers: await signer.headers(session, 'POST', reservationPath, body),
       method: 'POST',
     });
-    const home = this.origins.home();
+    const stamp = foreign ?? this.origins.home();
 
-    return home ? { ...reservation, origin: home } : reservation;
+    return stamp ? { ...reservation, origin: stamp } : reservation;
   }
 
   public async upload(
-    capability: Pick<PrivateBlobReservation, 'blobId' | 'uploadToken'>,
+    capability: Pick<
+      PrivateBlobReservation,
+      'blobId' | 'origin' | 'uploadToken'
+    >,
     bytes: ArrayBuffer,
   ): Promise<void> {
+    const foreign = this.foreignOrigin(capability.origin);
+    const client = foreign ? this.origins.client(foreign) : this.http;
+
     await this.unavailableWhenNotFound(
-      this.http.request<void>(
+      client.request<void>(
         `${reservationPath}/${encodeURIComponent(capability.blobId)}`,
         {
           body: bytes,
@@ -78,10 +109,31 @@ export class PigeonPrivateBlobClient {
     );
   }
 
+  public async remove(
+    capability: Pick<
+      PrivateBlobReservation,
+      'blobId' | 'origin' | 'uploadToken'
+    >,
+  ): Promise<void> {
+    const foreign = this.foreignOrigin(capability.origin);
+    const client = foreign ? this.origins.client(foreign) : this.http;
+
+    await this.unavailableWhenNotFound(
+      client.request<void>(
+        `${reservationPath}/${encodeURIComponent(capability.blobId)}`,
+        {
+          headers: { Authorization: `Bearer ${capability.uploadToken}` },
+          method: 'DELETE',
+        },
+      ),
+    );
+  }
+
   /**
    * Reads the part from its origin. An origin that fails the canonical rule is
    * ignored and the session node is used instead, so it is never fetched.
    * No Range header is sent, so the node answers only with 200.
+   * The read, body included, aborts after privateBlobDownloadTimeoutMs.
    */
   public async download(
     reference: Pick<
@@ -91,20 +143,31 @@ export class PigeonPrivateBlobClient {
   ): Promise<ArrayBuffer> {
     const origin = MailboxHomeBase.parse(reference.origin);
     const source = origin ? this.origins.client(origin) : this.http;
-    const blob = await this.unavailableWhenNotFound(
-      source.requestBlob(
-        `${reservationPath}/${encodeURIComponent(reference.blobId)}`,
-        {
-          headers: { Authorization: `Bearer ${reference.downloadToken}` },
-          redirect: 'error',
-        },
-      ),
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      privateBlobDownloadTimeoutMs,
     );
 
-    if (blob.size !== reference.size) {
-      throw new PrivateBlobUnavailableError();
-    }
+    try {
+      const blob = await this.unavailableWhenNotFound(
+        source.requestBlob(
+          `${reservationPath}/${encodeURIComponent(reference.blobId)}`,
+          {
+            headers: { Authorization: `Bearer ${reference.downloadToken}` },
+            redirect: 'error',
+            signal: controller.signal,
+          },
+        ),
+      );
 
-    return await blob.arrayBuffer();
+      if (blob.size !== reference.size) {
+        throw new PrivateBlobUnavailableError();
+      }
+
+      return await blob.arrayBuffer();
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 }

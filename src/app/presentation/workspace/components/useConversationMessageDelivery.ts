@@ -19,6 +19,7 @@ import type {
   StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
 
+import { ConversationPeer } from '../../../../contexts/conversations/presentation/view-models/ConversationPeer';
 import { ConversationTimeline } from '../../../../contexts/conversations/presentation/view-models/ConversationTimeline';
 import { MessageCollection } from '../../../../contexts/messages/presentation/view-models/MessageCollection';
 import { replyPreviewFromMessage } from '../../../../contexts/messages/presentation/view-models/replyPreviewFromMessage';
@@ -166,6 +167,10 @@ export function useConversationMessageDelivery({
               attachmentUpload: {
                 ...payload.attachmentUpload,
                 networkId: activeConversation.networkId,
+                recipientIdentityId: ConversationPeer.identityId(
+                  activeConversation,
+                  session.identity.id,
+                ),
               },
               onAttachmentProgress: (progress) => {
                 startTransition(() => {

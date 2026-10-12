@@ -8,6 +8,7 @@ import { PigeonAttachmentBlobUploader } from '../../../../../contexts/attachment
 
 describe(PigeonAttachmentBlobUploader.name, () => {
   const session = { identity: { id: 'identity-1' } } as Session;
+  const origins = ['https://node-a.example'];
   const pending = {
     encryptedBytes: new Uint8Array([1, 2, 3, 4]).buffer,
     metadata: {
@@ -27,7 +28,9 @@ describe(PigeonAttachmentBlobUploader.name, () => {
     const chunked = { uploadEncrypted: jest.fn(), uploadPublic: jest.fn() };
     const uploader = new PigeonAttachmentBlobUploader(direct, chunked);
 
-    await expect(uploader.uploadEncrypted(session, pending)).resolves.toEqual({
+    await expect(
+      uploader.uploadEncrypted(session, pending, undefined, origins),
+    ).resolves.toEqual({
       cid: 'external-1',
       size: 4,
     });
@@ -35,6 +38,7 @@ describe(PigeonAttachmentBlobUploader.name, () => {
       session,
       pending,
       undefined,
+      origins,
     );
     expect(chunked.uploadEncrypted).not.toHaveBeenCalled();
   });
@@ -74,9 +78,14 @@ describe(PigeonAttachmentBlobUploader.name, () => {
     };
     const uploader = new PigeonAttachmentBlobUploader(direct, chunked);
 
-    await uploader.uploadEncrypted(session, largePending);
+    await uploader.uploadEncrypted(session, largePending, undefined, origins);
 
-    expect(chunked.uploadEncrypted).toHaveBeenCalled();
+    expect(chunked.uploadEncrypted).toHaveBeenCalledWith(
+      session,
+      largePending,
+      undefined,
+      origins,
+    );
     expect(direct.uploadEncrypted).not.toHaveBeenCalled();
   });
 });

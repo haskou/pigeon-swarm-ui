@@ -35,7 +35,11 @@ describe(PigeonAttachmentRepository.name, () => {
       uploader,
       contexts,
     );
-    contexts.register('source-1', 'identity-1', { file, session });
+    contexts.register('source-1', 'identity-1', {
+      file,
+      origins: [undefined],
+      session,
+    });
 
     const result = await repository.create(
       Attachment.planPublication(
@@ -89,7 +93,11 @@ describe(PigeonAttachmentRepository.name, () => {
       uploader,
       contexts,
     );
-    contexts.register('source-1', 'identity-1', { file, session });
+    contexts.register('source-1', 'identity-1', {
+      file,
+      origins: [undefined],
+      session,
+    });
 
     const result = await repository.create(
       Attachment.planPublication(
@@ -111,6 +119,7 @@ describe(PigeonAttachmentRepository.name, () => {
       session,
       file,
       undefined,
+      [undefined],
     );
     expect(uploader.publishPublic).not.toHaveBeenCalled();
   });

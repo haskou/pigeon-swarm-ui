@@ -1,22 +1,26 @@
+import type { StoredPrivateBlobReplica } from '../../../../../contexts/attachments/infrastructure/http/PrivateBlobReplicator';
 import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 
 import { PigeonDirectAttachmentUploader } from '../../../../../contexts/attachments/infrastructure/http/PigeonDirectAttachmentUploader';
 
 describe(PigeonDirectAttachmentUploader.name, () => {
   const session = { identity: { id: 'identity-1' } } as Session;
-  const reservation = {
-    blobId: 'blob-1',
+  const replica = (
+    blobId: string,
+    origin?: string,
+  ): StoredPrivateBlobReplica => ({
+    blobId,
     downloadToken: 'd'.repeat(43),
     expiresAt: 10,
+    ...(origin === undefined ? {} : { origin }),
     uploadToken: 'u'.repeat(43),
-  };
+  });
 
-  it('stores encrypted bytes in one private blob reserved for their exact size', async () => {
-    const privateBlobs = {
-      reserve: jest.fn().mockResolvedValue(reservation),
-      upload: jest.fn().mockResolvedValue(undefined),
+  it('stores encrypted bytes as one part through the replicator', async () => {
+    const replicator = {
+      storeParts: jest.fn().mockResolvedValue([[replica('blob-1')]]),
     };
-    const uploader = new PigeonDirectAttachmentUploader(privateBlobs, {
+    const uploader = new PigeonDirectAttachmentUploader(replicator, {
       upload: jest.fn(),
     });
     const progress = jest.fn();
@@ -34,12 +38,13 @@ describe(PigeonDirectAttachmentUploader.name, () => {
           },
         },
         progress,
+        [undefined],
       ),
     ).resolves.toEqual({
       blobs: [
         {
           blobId: 'blob-1',
-          downloadToken: reservation.downloadToken,
+          downloadToken: 'd'.repeat(43),
           expiresAt: 10,
           index: 0,
           size: 4,
@@ -47,11 +52,16 @@ describe(PigeonDirectAttachmentUploader.name, () => {
       ],
       size: 4,
     });
-    expect(privateBlobs.reserve).toHaveBeenCalledWith(session, 4);
-    expect(privateBlobs.upload).toHaveBeenCalledWith(
-      reservation,
-      encryptedBytes,
+    expect(replicator.storeParts).toHaveBeenCalledWith(
+      session,
+      1,
+      expect.any(Function),
+      [undefined],
     );
+    const partAt = replicator.storeParts.mock.calls[0][2] as (
+      index: number,
+    ) => ArrayBuffer;
+    expect(partAt(0)).toBe(encryptedBytes);
     expect(progress).toHaveBeenLastCalledWith({
       filename: 'file.txt',
       percent: 100,
@@ -59,26 +69,47 @@ describe(PigeonDirectAttachmentUploader.name, () => {
     });
   });
 
-  it('records the reservation origin on the reference when the node publishes one', async () => {
-    const privateBlobs = {
-      reserve: jest.fn().mockResolvedValue({
-        ...reservation,
-        origin: 'https://node-a.example',
-      }),
-      upload: jest.fn().mockResolvedValue(undefined),
+  it('records the primary origin and lists the other origins as alternates', async () => {
+    const replicator = {
+      storeParts: jest
+        .fn()
+        .mockResolvedValue([
+          [
+            replica('blob-1', 'https://node-a.example'),
+            replica('blob-2', 'https://node-b.example'),
+          ],
+        ]),
     };
-    const uploader = new PigeonDirectAttachmentUploader(privateBlobs, {
+    const uploader = new PigeonDirectAttachmentUploader(replicator, {
       upload: jest.fn(),
     });
 
-    const result = await uploader.uploadEncrypted(session, {
-      encryptedBytes: new ArrayBuffer(4),
-      metadata: { contentType: 'text/plain', filename: 'file.txt', size: 4 },
-    });
+    const result = await uploader.uploadEncrypted(
+      session,
+      {
+        encryptedBytes: new ArrayBuffer(4),
+        metadata: { contentType: 'text/plain', filename: 'file.txt', size: 4 },
+      },
+      undefined,
+      ['https://node-a.example', 'https://node-b.example'],
+    );
 
+    expect(replicator.storeParts).toHaveBeenCalledWith(
+      session,
+      1,
+      expect.any(Function),
+      ['https://node-a.example', 'https://node-b.example'],
+    );
     expect(result.blobs[0]).toEqual({
+      alternates: [
+        {
+          blobId: 'blob-2',
+          downloadToken: 'd'.repeat(43),
+          origin: 'https://node-b.example',
+        },
+      ],
       blobId: 'blob-1',
-      downloadToken: reservation.downloadToken,
+      downloadToken: 'd'.repeat(43),
       expiresAt: 10,
       index: 0,
       origin: 'https://node-a.example',
@@ -86,21 +117,26 @@ describe(PigeonDirectAttachmentUploader.name, () => {
     });
   });
 
-  it('omits the origin from the reference when the reservation has none', async () => {
-    const privateBlobs = {
-      reserve: jest.fn().mockResolvedValue(reservation),
-      upload: jest.fn().mockResolvedValue(undefined),
+  it('omits the origin from the reference when the primary is on the session node', async () => {
+    const replicator = {
+      storeParts: jest.fn().mockResolvedValue([[replica('blob-1')]]),
     };
-    const uploader = new PigeonDirectAttachmentUploader(privateBlobs, {
+    const uploader = new PigeonDirectAttachmentUploader(replicator, {
       upload: jest.fn(),
     });
 
-    const result = await uploader.uploadEncrypted(session, {
-      encryptedBytes: new ArrayBuffer(4),
-      metadata: { contentType: 'text/plain', filename: 'file.txt', size: 4 },
-    });
+    const result = await uploader.uploadEncrypted(
+      session,
+      {
+        encryptedBytes: new ArrayBuffer(4),
+        metadata: { contentType: 'text/plain', filename: 'file.txt', size: 4 },
+      },
+      undefined,
+      [undefined],
+    );
 
     expect(result.blobs[0]).not.toHaveProperty('origin');
+    expect(result.blobs[0]).not.toHaveProperty('alternates');
   });
 
   it('uploads public files directly', async () => {
@@ -114,7 +150,7 @@ describe(PigeonDirectAttachmentUploader.name, () => {
       }),
     };
     const uploader = new PigeonDirectAttachmentUploader(
-      { reserve: jest.fn(), upload: jest.fn() },
+      { storeParts: jest.fn() },
       publicFiles,
     );
 

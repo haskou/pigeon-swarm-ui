@@ -27,12 +27,12 @@ export class PigeonAttachmentRepository implements AttachmentRepository {
     sourceExternalIdentifier: AttachmentSourceExternalIdentifier,
     publisherExternalIdentifier: AttachmentPublisherExternalIdentifier,
   ): Promise<AttachmentExternalIdentifier> {
-    const { file, onProgress, session } = this.contexts.take(
+    const { file, onProgress, origins, session } = this.contexts.take(
       sourceExternalIdentifier,
       publisherExternalIdentifier,
     );
     const resource = attachment.isEncrypted()
-      ? await this.uploader.publishEncrypted(session, file, onProgress)
+      ? await this.uploader.publishEncrypted(session, file, onProgress, origins)
       : await this.uploader.publishPublic(session, file, onProgress);
 
     this.contexts.complete(sourceExternalIdentifier, resource);

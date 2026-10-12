@@ -4,7 +4,9 @@ import type {
   PrivateFileContent,
   PublicFileContent,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { PrivateBlobReference } from '../../application/contracts/PrivateBlobReservation';
 
+import { MailboxHomeBase } from '../../../../shared/infrastructure/client/MailboxHomeBase';
 import { AttachmentBinaryCodec } from '../crypto/AttachmentBinaryCodec';
 import { AttachmentCipher } from '../crypto/AttachmentCipher';
 import { attachmentBlobCacheKey } from './attachmentBlobCacheKey';
@@ -12,6 +14,18 @@ import { PigeonFileRequestCache } from './PigeonFileRequestCache';
 import { PigeonPrivateBlobClient } from './PigeonPrivateBlobClient';
 import { PigeonPrivateFilesClient } from './PigeonPrivateFilesClient';
 import { PigeonPublicFilesClient } from './PigeonPublicFilesClient';
+import { PrivateBlobUnavailableError } from './PrivateBlobUnavailableError';
+
+type PrivateBlobCandidate = Pick<
+  PrivateBlobReference,
+  'blobId' | 'downloadToken' | 'origin' | 'size'
+>;
+
+type PrivateBlobPart = {
+  bytes: ArrayBuffer;
+  candidates: PrivateBlobCandidate[];
+  served: number;
+};
 
 export class PigeonAttachmentDownloader {
   private readonly attachmentCache = new PigeonFileRequestCache<Blob>();
@@ -34,6 +48,10 @@ export class PigeonAttachmentDownloader {
     attachment: MessageAttachment,
     onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<Blob> {
+    if (attachment.blobs?.length) {
+      return await this.downloadPrivateBlobs(attachment, onProgress);
+    }
+
     const encryptedBytes = await this.downloadEncryptedBytes(
       attachment,
       onProgress,
@@ -46,10 +64,6 @@ export class PigeonAttachmentDownloader {
     attachment: MessageAttachment,
     onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<ArrayBuffer> {
-    if (attachment.blobs?.length) {
-      return await this.downloadPrivateBlobs(attachment, onProgress);
-    }
-
     if (attachment.chunks?.length) {
       return await this.downloadEncryptedChunks(attachment, onProgress);
     }
@@ -60,14 +74,32 @@ export class PigeonAttachmentDownloader {
   private async downloadPrivateBlobs(
     attachment: MessageAttachment,
     onProgress?: (progress: AttachmentProgress) => void,
-  ): Promise<ArrayBuffer> {
+  ): Promise<Blob> {
     const blobs = [...(attachment.blobs ?? [])].sort(
       (left, right) => left.index - right.index,
     );
-    const buffers: ArrayBuffer[] = [];
+    const parts: PrivateBlobPart[] = [];
 
     for (let index = 0; index < blobs.length; index += 1) {
-      buffers.push(await this.privateBlobs.download(blobs[index]));
+      const blob = blobs[index];
+      const candidates: PrivateBlobCandidate[] = [
+        {
+          blobId: blob.blobId,
+          downloadToken: blob.downloadToken,
+          origin: blob.origin,
+          size: blob.size,
+        },
+        ...(blob.alternates ?? [])
+          .filter((alternate) => MailboxHomeBase.parse(alternate.origin))
+          .map((alternate) => ({
+            blobId: alternate.blobId,
+            downloadToken: alternate.downloadToken,
+            origin: alternate.origin,
+            size: blob.size,
+          })),
+      ];
+
+      parts.push(await this.fetchPart(candidates, 0));
       this.reportProgress(
         onProgress,
         attachment.filename,
@@ -75,7 +107,124 @@ export class PigeonAttachmentDownloader {
       );
     }
 
-    return this.codec.concatArrayBuffers(buffers);
+    try {
+      return await this.cipher.decrypt(
+        attachment,
+        this.codec.concatArrayBuffers(parts.map((part) => part.bytes)),
+        onProgress,
+      );
+    } catch (failure) {
+      if (parts.every((part) => part.candidates.length === 1)) {
+        throw failure;
+      }
+
+      return await this.repairPrivateBlobs(
+        attachment,
+        parts,
+        failure,
+        onProgress,
+      );
+    }
+  }
+
+  private async fetchPart(
+    candidates: PrivateBlobCandidate[],
+    start: number,
+  ): Promise<PrivateBlobPart> {
+    if (candidates.length === 1) {
+      return {
+        bytes: await this.privateBlobs.download(candidates[0]),
+        candidates,
+        served: 0,
+      };
+    }
+
+    for (let step = 0; step < candidates.length; step += 1) {
+      const served = (start + step) % candidates.length;
+
+      try {
+        const bytes = await this.privateBlobs.download(candidates[served]);
+
+        return { bytes, candidates, served };
+      } catch {
+        // Unavailable replica: try the next candidate in rotation.
+      }
+    }
+
+    throw new PrivateBlobUnavailableError();
+  }
+
+  private async repairPrivateBlobs(
+    attachment: MessageAttachment,
+    parts: PrivateBlobPart[],
+    failure: unknown,
+    onProgress?: (progress: AttachmentProgress) => void,
+  ): Promise<Blob> {
+    const { encryption } = attachment;
+
+    if (!encryption) {
+      throw failure;
+    }
+
+    const encryptedSize = parts.reduce(
+      (total, part) => total + part.bytes.byteLength,
+      0,
+    );
+    const chunks = encryption.chunks ?? [
+      { iv: encryption.iv, size: encryptedSize },
+    ];
+    const aligned =
+      chunks.length === parts.length &&
+      parts.every(
+        (part, index) => part.bytes.byteLength === chunks[index].size,
+      );
+    const failing = parts.flatMap((part, index) => {
+      if (!aligned) {
+        return [index];
+      }
+
+      try {
+        this.cipher.decryptWithoutWorker(
+          {
+            ...attachment,
+            encryption: {
+              algorithm: encryption.algorithm,
+              chunks: [chunks[index]],
+              iv: encryption.iv,
+              key: encryption.key,
+            },
+          },
+          part.bytes,
+        );
+
+        return [];
+      } catch {
+        return [index];
+      }
+    });
+
+    if (!failing.length) {
+      throw failure;
+    }
+
+    const repaired = [...parts];
+
+    for (const index of failing) {
+      repaired[index] = await this.fetchPart(
+        parts[index].candidates,
+        parts[index].served + 1,
+      );
+    }
+
+    try {
+      return await this.cipher.decrypt(
+        attachment,
+        this.codec.concatArrayBuffers(repaired.map((part) => part.bytes)),
+        onProgress,
+      );
+    } catch {
+      throw new PrivateBlobUnavailableError();
+    }
   }
 
   /** Legacy: encrypted chunks published to private IPFS before blobs. */

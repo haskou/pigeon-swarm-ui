@@ -3,11 +3,13 @@ import type {
   MessageAttachment,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { PrivateBlobReplicator } from './PrivateBlobReplicator';
 
 import { AttachmentCipher } from '../crypto/AttachmentCipher';
 import { PublicImageUploadPreparer } from '../media/PublicImageUploadPreparer';
 import { PigeonAttachmentBlobUploader } from './PigeonAttachmentBlobUploader';
 import { PigeonAttachmentPreviewCreator } from './PigeonAttachmentPreviewCreator';
+import { privateBlobRefsOf } from './privateBlobReference';
 
 export class PigeonMessageAttachmentUploader {
   public constructor(
@@ -18,6 +20,7 @@ export class PigeonMessageAttachmentUploader {
       PigeonAttachmentPreviewCreator,
       'createEncrypted' | 'createPublic'
     >,
+    private readonly replicator: Pick<PrivateBlobReplicator, 'abandon'>,
   ) {}
 
   private withPreview(
@@ -30,26 +33,36 @@ export class PigeonMessageAttachmentUploader {
   public async publishEncrypted(
     session: Session,
     file: File,
-    onProgress?: (progress: AttachmentProgress) => void,
+    onProgress: ((progress: AttachmentProgress) => void) | undefined,
+    origins: (string | undefined)[],
   ): Promise<MessageAttachment> {
-    const preview = await this.previews.createEncrypted(session, file);
-    const pending = await this.cipher.encrypt(file, onProgress);
-    const upload = await this.blobs.uploadEncrypted(
-      session,
-      pending,
-      onProgress,
-    );
+    const preview = await this.previews.createEncrypted(session, file, origins);
+    try {
+      const pending = await this.cipher.encrypt(file, onProgress);
+      const upload = await this.blobs.uploadEncrypted(
+        session,
+        pending,
+        onProgress,
+        origins,
+      );
 
-    return this.withPreview(
-      {
-        ...pending.metadata,
-        blobs: upload.blobs,
-        encrypted: true,
-        encryptedSize: upload.size,
-        ...(upload.type ? { type: upload.type } : {}),
-      },
-      preview,
-    );
+      return this.withPreview(
+        {
+          ...pending.metadata,
+          blobs: upload.blobs,
+          encrypted: true,
+          encryptedSize: upload.size,
+          ...(upload.type ? { type: upload.type } : {}),
+        },
+        preview,
+      );
+    } catch (error) {
+      if (preview) {
+        await this.replicator.abandon(session, privateBlobRefsOf([preview]));
+      }
+
+      throw error;
+    }
   }
 
   public async publishPublic(
