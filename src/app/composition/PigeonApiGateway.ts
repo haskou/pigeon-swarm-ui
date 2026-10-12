@@ -37,9 +37,11 @@ import { PigeonConversationsApi } from '../../contexts/conversations/infrastruct
 import { PigeonConversationsGateway } from '../../contexts/conversations/infrastructure/http/PigeonConversationsGateway';
 import { KeychainCipher } from '../../contexts/identities/infrastructure/crypto/KeychainCipher';
 import { DeviceAuthorizationRevisionSource } from '../../contexts/identities/infrastructure/http/DeviceAuthorizationRevisionSource';
+import { DeviceSealedRootRotation } from '../../contexts/identities/infrastructure/http/DeviceSealedRootRotation';
 import { IdentityMailboxHomeVerifier } from '../../contexts/identities/infrastructure/http/IdentityMailboxHomeVerifier';
 import { IdentitySignaturePayloadFactory } from '../../contexts/identities/infrastructure/http/IdentitySignaturePayloadFactory';
 import { PigeonDeviceAuthorizationApi } from '../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
+import { PigeonDeviceSealedSecretApi } from '../../contexts/identities/infrastructure/http/PigeonDeviceSealedSecretApi';
 import { PigeonIdentitiesGateway } from '../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
 import { PigeonIdentityCommandsApi } from '../../contexts/identities/infrastructure/http/PigeonIdentityCommandsApi';
 import { PigeonIdentityGateway } from '../../contexts/identities/infrastructure/http/PigeonIdentityGateway';
@@ -147,6 +149,11 @@ export class PigeonApiGateway {
       http,
       signer,
       this.identityVault,
+    );
+    const deviceSealedSecrets = new PigeonDeviceSealedSecretApi(http, signer);
+    const deviceSealedRoot = new DeviceSealedRootRotation(
+      deviceAuthorization,
+      deviceSealedSecrets,
     );
     const mutations = new PublicMutationSigner(
       new DeviceAuthorizationRevisionSource(deviceAuthorization),
@@ -298,6 +305,7 @@ export class PigeonApiGateway {
       identityResourceGateway,
       this.identityVault,
       deviceAuthorization,
+      deviceSealedRoot,
     );
     const identityWorkspace = new PigeonIdentityWorkspaceSessionApi({
       decryptKeychain: (session, keychain) =>
@@ -424,6 +432,7 @@ export class PigeonApiGateway {
       deviceAuthorization,
       keychainApi,
       this.presence,
+      deviceSealedRoot,
     );
   }
 

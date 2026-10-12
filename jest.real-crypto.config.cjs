@@ -16,6 +16,7 @@ module.exports = {
     '**/PigeonDeviceAuthorizationApi.spec.ts',
     '**/DeviceSealedSecretCipher.spec.ts',
     '**/PigeonDeviceSealedSecretApi.spec.ts',
+    '**/DeviceSealedRootRotation.spec.ts',
     '**/CommunityOperationSigner.spec.ts',
     '**/ConversationOperationSigner.spec.ts',
     '**/CallEventSigner.spec.ts',
@@ -29,6 +30,7 @@ module.exports = {
     '**/Mailbox{Capability,Channel,CreationProof,EnvelopeCipher,KeySchedule,ReadToken}.spec.ts',
     '**/DirectMessageAuthorship.spec.ts',
     '**/DirectMessageMailbox.spec.ts',
+    '**/DirectMessageReaderSet.spec.ts',
   ],
   testPathIgnorePatterns: [],
   transform: {

@@ -11,6 +11,7 @@ export type Session = {
   authorizationRevision: DeviceAuthorizationRevision;
   deviceCredentialKeyPair: KeyPair;
   deviceId: DeviceId;
+  deviceSealedRootKey?: SymmetricKey;
   identity: IdentityResource;
   keyPair: KeyPair;
   keychain: LocalKeychain;

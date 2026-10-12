@@ -26,6 +26,7 @@ import type { RecipientMailboxRouter } from './RecipientMailboxRouter';
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
+import { sessionRootKey } from '../../../identities/infrastructure/session/sessionRootKey';
 import { MailboxCapability } from '../../../mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxEnvelopeCipher } from '../../../mailboxes/infrastructure/crypto/MailboxEnvelopeCipher';
 import { MailboxKeySchedule } from '../../../mailboxes/infrastructure/crypto/MailboxKeySchedule';
@@ -649,7 +650,7 @@ export class DirectMessageMailbox {
     const stored = this.store.load(keys.mailboxId);
 
     if (stored && !stored.readToken) {
-      return { keys, outcome: 'open', readers, state: stored };
+      return await this.reopenInbox(session, keys, readers, stored);
     }
 
     if (stored?.readToken) {
@@ -666,12 +667,12 @@ export class DirectMessageMailbox {
 
         this.store.save(keys.mailboxId, adopted);
 
-        return { keys, outcome: 'open', readers, state: adopted };
+        return await this.reopenInbox(session, keys, readers, adopted);
       }
     }
 
     const state = { cursor: 0 };
-    const outcome = await this.ensureInbox(keys, readers);
+    const outcome = await this.ensureInbox(session, keys, readers);
 
     // Saved only once the inbox exists with this device's reader, so a failed
     // open leaves nothing stored and the next pass opens it again.
@@ -746,6 +747,30 @@ export class DirectMessageMailbox {
   }
 
   /**
+   * Opens an inbox that already exists under the stored state. The sealed root
+   * bridges in first. A refused bridge leaves this device's sealed reader
+   * unregistered, so reads use its legacy reader, which stays registered until
+   * every credential bridges. The bridge retries on the next pass.
+   */
+  private async reopenInbox(
+    session: Session,
+    keys: MailboxKeys,
+    readers: MailboxReadTokens,
+    state: RecipientInbox['state'],
+  ): Promise<RecipientInbox> {
+    if (await this.enrolSealed(session, keys, readers)) {
+      return { keys, outcome: 'open', readers, state };
+    }
+
+    return {
+      keys,
+      outcome: 'failed',
+      readers: this.readersFor(session, keys, session.masterKey.getBuffer()),
+      state,
+    };
+  }
+
+  /**
    * Creates the recipient inbox and enrols this device's reader before the
    * first read, so senders can append and the device reads without recovery.
    * A failed open is not retried for OPEN_RETRY_MS, so sync passes do not
@@ -753,6 +778,7 @@ export class DirectMessageMailbox {
    * recovery covers a missing inbox.
    */
   private async ensureInbox(
+    session: Session,
     keys: MailboxKeys,
     readers: MailboxReadTokens,
   ): Promise<InboxOutcome> {
@@ -763,8 +789,7 @@ export class DirectMessageMailbox {
     }
 
     try {
-      await this.channel.createInbox(keys, readers.root);
-      await this.channel.addReader(keys, readers.root, readers.device);
+      await this.provisionInbox(session, keys, readers);
       this.retryOpenAt.delete(keys.mailboxId);
 
       return 'open';
@@ -784,12 +809,64 @@ export class DirectMessageMailbox {
   }
 
   /**
-   * The root token manages the reader set. The device token reads and acks
-   * under this device's credential. Both derive from the identity root key.
+   * Creates the inbox with this device's reader. A 409 means the inbox already
+   * exists under another root, so a sealed root bridges into it instead.
    */
-  private readersFor(session: Session, keys: MailboxKeys): MailboxReadTokens {
-    const rootKey = session.masterKey.getBuffer();
+  private async provisionInbox(
+    session: Session,
+    keys: MailboxKeys,
+    readers: MailboxReadTokens,
+  ): Promise<void> {
+    try {
+      await this.channel.createInbox(keys, readers.root);
+    } catch (error: unknown) {
+      if (
+        !(error instanceof HttpJsonError && error.status === 409) ||
+        !session.deviceSealedRootKey
+      ) {
+        throw error;
+      }
+      await this.readerSet.enrolSealedRoot(session, keys, readers);
 
+      return;
+    }
+    await this.channel.addReader(keys, readers.root, readers.device);
+  }
+
+  /**
+   * Bridges the device-sealed root into the inbox. Without a sealed root the
+   * legacy readers still serve the device, so there is nothing to bridge.
+   */
+  private async enrolSealed(
+    session: Session,
+    keys: MailboxKeys,
+    readers: MailboxReadTokens,
+  ): Promise<boolean> {
+    if (!session.deviceSealedRootKey) return true;
+
+    try {
+      await this.readerSet.enrolSealedRoot(session, keys, readers);
+
+      return true;
+    } catch {
+      // Count-only: no ids, content, or error details.
+      // eslint-disable-next-line no-console
+      console.debug('Direct mailbox sealed root bridge failed; retried later.');
+
+      return false;
+    }
+  }
+
+  /**
+   * The root token manages the reader set. The device token reads and acks
+   * under this device's credential. Both derive from the root key: the session
+   * root by default, the legacy master key after a refused sealed bridge.
+   */
+  private readersFor(
+    session: Session,
+    keys: MailboxKeys,
+    rootKey = sessionRootKey(session).getBuffer(),
+  ): MailboxReadTokens {
     return {
       device: MailboxReadToken.deriveDevice(
         rootKey,

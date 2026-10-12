@@ -5,7 +5,7 @@ Client side of haskou/pigeon-swarm-node#451. Design: `docs/design/device-sealed-
 ## Scope
 
 - Seal, open, publish (`PUT`), and fetch the caller's own entry (`GET`).
-- Not wired into the app yet. Nothing publishes after a revoke, and the mailbox root still derives from `session.masterKey`. The follow-up orchestration publishes the next generation, switches the root derivation to the latest opened secret, rotates readers (`docs/opaque-mailboxes-client.md`), and rotates the keychain key.
+- Wired into the app. Unlock opens the device-sealed root (`PigeonIdentitySessionApi`) and falls back to `masterKey` when none is open. Revoke publishes the next generation (`DeviceSealedRootRotation`). Mailbox readers derive from `sessionRootKey(session)`: the opened root, else `masterKey`. Still on `masterKey`: the authorship tag (`DirectMessageAuthorship.tag`) and the keychain cipher (`KeychainCipher`). The node has no re-encryption endpoint for the keychain, so it stays out of scope.
 
 ## Seal
 
@@ -19,14 +19,23 @@ Client side of haskou/pigeon-swarm-node#451. Design: `docs/design/device-sealed-
 - The ack must echo `identityId`, `generation`, and `authorizationRevision`. Any other ack throws.
 - A `409` is not retried here. The caller refetches the head and rebuilds the publication.
 
+## Rotation
+
+- Revoke: `PigeonIdentitiesGateway.revokeDevice` revokes, then `DeviceSealedRootRotation.rotate` publishes a fresh root to the remaining devices. A rotation failure is count-only and the revoked session is returned. Remaining devices republish on their next unlock.
+- Unlock: `current` runs at the end of `unlock`. It reads the device's own entry when the authorization revision matches, else it publishes. A device without an entry publishes on its first unlock. A failure falls back to a session with no root (`masterKey`).
+- One fresh random root per generation, shared across recipients. This deviates from the node design's per-credential payload, because every device must derive the same mailbox root from it. The node side should confirm it accepts one payload across recipients.
+- Concurrent publishes: the later generation wins. A device that lost the race re-enrols on its next unlock.
+- Forget: `forgetCurrentDevice` does not publish. The forgetting device is revoked and gets 401 on its own publish. Remaining devices publish on their next unlock.
+- Multi-rotation residual: a device that missed several generations bridges each inbox on its next open. The previous root stays registered until every listed credential has a sealed device reader. Pruning runs only under a device-sealed session (see `opaque-mailboxes-client.md`, Pruning).
+
 ## Fetch
 
 - `GET` with device proof. Returns the caller's own entry of the stored generation, opened with the device key. Returns `null` on `404`, meaning no entry exists for this device yet.
 - Opening checks that the identity and recipient match, verifies the publisher signature over the preimage, then decrypts.
 
-## Open point
+## Generation
 
-- A device without its own entry cannot read the stored generation, so a naive `latest + 1` may be stale. Candidate for the follow-up: `max(latest opened generation, clock) + 1`. Not implemented.
+- `max(stored generation, clock) + 1`. A device without its own entry cannot read the stored generation, so the clock keeps the next generation ahead of a stale head. Resolved in `DeviceSealedRootRotation`.
 
 ## Tests
 

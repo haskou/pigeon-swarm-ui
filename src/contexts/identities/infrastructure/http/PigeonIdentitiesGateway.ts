@@ -16,6 +16,7 @@ import type { DeviceCredential } from '../../domain/value-objects/DeviceCredenti
 import type { IdentityMasterKeyProtection } from '../../domain/value-objects/IdentityMasterKeyProtection';
 import type { IdentityCreationMaterial } from '../crypto/IdentityCreationMaterial';
 import type { CreatedIdentityMaterial } from './CreatedIdentityMaterial';
+import type { DeviceSealedRootRotation } from './DeviceSealedRootRotation';
 import type { IdentityUpdateProfileInput } from './IdentitySignaturePayloadFactory';
 import type {
   OwnDeviceRetirement,
@@ -39,6 +40,7 @@ export class PigeonIdentitiesGateway {
     private readonly deviceAuthorization: PigeonDeviceAuthorizationApi,
     private readonly keychain: PigeonKeychainApi,
     private readonly presence: PigeonPresenceGateway,
+    private readonly deviceSealedRoot: DeviceSealedRootRotation,
   ) {}
 
   public async recover(
@@ -99,11 +101,21 @@ export class PigeonIdentitiesGateway {
     target: DeviceCredential,
     compromisedSince?: DeviceAuthorizationRevision,
   ): Promise<Session> {
-    return await this.deviceAuthorization.revokeDevice(
+    const revoked = await this.deviceAuthorization.revokeDevice(
       session,
       target,
       compromisedSince,
     );
+
+    try {
+      return await this.deviceSealedRoot.rotate(revoked);
+    } catch {
+      // Count-only. The remaining devices publish on their next unlock.
+      // eslint-disable-next-line no-console
+      console.debug('Device sealed root rotation after revoke failed.');
+
+      return revoked;
+    }
   }
 
   public async retireOwnDevice(session: Session): Promise<OwnDeviceRetirement> {
