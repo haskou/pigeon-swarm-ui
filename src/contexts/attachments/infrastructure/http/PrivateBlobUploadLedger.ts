@@ -2,11 +2,10 @@ import { EncryptedPayload } from '@haskou/pigeon-swarm-crypto';
 
 import type { Session } from '../../../identities/infrastructure/session/Session';
 
-export type PrivateBlobUploadTicket = {
-  blobId: string;
-  origin?: string;
-  uploadToken: string;
-};
+import {
+  isPrivateBlobUploadTicket,
+  type PrivateBlobUploadTicket,
+} from '../../domain/value-objects/PrivateBlobUploadTicket';
 
 export type PrivateBlobUploadRef = Pick<
   PrivateBlobUploadTicket,
@@ -15,7 +14,9 @@ export type PrivateBlobUploadRef = Pick<
 
 /**
  * Upload tokens of replicas this client stored and has not settled yet, sealed
- * in local storage so an abandoned send can still delete its replicas.
+ * in local storage so an abandoned send can still delete its replicas. Stored
+ * entries that fail the ticket shape check are ignored and dropped on the next
+ * write.
  */
 export class PrivateBlobUploadLedger {
   private static readonly capacity = 200;
@@ -76,7 +77,9 @@ export class PrivateBlobUploadLedger {
         session.masterKey.decrypt(new EncryptedPayload(raw)).toString(),
       );
 
-      return Array.isArray(parsed) ? (parsed as PrivateBlobUploadTicket[]) : [];
+      return Array.isArray(parsed)
+        ? parsed.filter(isPrivateBlobUploadTicket)
+        : [];
     } catch {
       return [];
     }

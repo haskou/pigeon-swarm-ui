@@ -1,10 +1,10 @@
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { PrivateBlobReservation } from '../../application/contracts/PrivateBlobReservation';
+import type { PrivateBlobUploadTicket } from '../../domain/value-objects/PrivateBlobUploadTicket';
 import type { PigeonPrivateBlobClient } from './PigeonPrivateBlobClient';
 import type {
   PrivateBlobUploadLedger,
   PrivateBlobUploadRef,
-  PrivateBlobUploadTicket,
 } from './PrivateBlobUploadLedger';
 
 import { PrivateBlobUploadIncompleteError } from '../../domain/errors/PrivateBlobUploadIncompleteError';
