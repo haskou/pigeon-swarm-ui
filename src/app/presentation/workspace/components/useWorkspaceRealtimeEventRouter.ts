@@ -6,17 +6,15 @@ import {
   type SetStateAction,
 } from 'react';
 
+import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { IdentityPresenceResource as IdentityPresence } from '../../../../contexts/identities/infrastructure/http/resources/IdentityPresenceResource';
+import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
+import type { MessageResource } from '../../../../contexts/messages/infrastructure/http/MessageResource';
+import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
 import type { NotificationSettingMap } from '../../../../contexts/notifications/presentation/view-models/NotificationSettingMap';
-import type {
-  ChatMessage,
-  Community,
-  ConversationResource,
-  IdentityPresence,
-  IdentityResource,
-  MessageResource,
-  PollResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { PollResource } from '../../../../contexts/polls/infrastructure/http/resources/PollResource';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 
 import { CommunityAccessPolicy } from '../../../../contexts/communities/presentation/view-models/CommunityAccessPolicy';

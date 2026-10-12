@@ -1,7 +1,5 @@
-import type {
-  IdentityPresence,
-  PresenceStatus,
-} from '../../../shared/domain/pigeonResources.types';
+import type { IdentityPresenceResource as IdentityPresence } from '../../../contexts/identities/infrastructure/http/resources/IdentityPresenceResource';
+import type { PresenceStatusResource as PresenceStatus } from '../../../contexts/identities/infrastructure/http/resources/PresenceStatusResource';
 import type { RealtimeDomainEvent } from '../../../shared/infrastructure/realtime/RealtimeGateway';
 
 function isPresenceStatus(value: unknown): value is PresenceStatus {

@@ -1,4 +1,4 @@
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 
 export interface PwaPushSubscriptionBackend {
   delete(session: Session, subscription: PushSubscriptionJSON): Promise<void>;

@@ -2,12 +2,10 @@ import type { Dispatch, RefObject, SetStateAction } from 'react';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type {
-  NotificationScopeSettingInput,
-  NotificationScopeSetting,
-  NotificationSettingScope,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { NotificationScopeSettingInputResource as NotificationScopeSettingInput } from '../../infrastructure/http/resources/NotificationScopeSettingInputResource';
+import type { NotificationScopeSettingResource as NotificationScopeSetting } from '../../infrastructure/http/resources/NotificationScopeSettingResource';
+import type { NotificationSettingScopeResource as NotificationSettingScope } from '../../infrastructure/http/resources/NotificationSettingScopeResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { NotificationScopeSettingsTarget } from '../components/NotificationScopeSettingsDialog';
 import type { NotificationSettingMap } from '../view-models/NotificationSettingMap';
 

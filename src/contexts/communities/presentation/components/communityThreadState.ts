@@ -1,7 +1,5 @@
-import type {
-  ChatMessage,
-  CommunityChannelThreadSummary,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
+import type { CommunityChannelThreadSummaryResource as CommunityChannelThreadSummary } from '../../infrastructure/http/resources/CommunityChannelThreadSummaryResource';
 
 import { ThreadMessageVisibility } from '../../../messages/presentation/view-models/ThreadMessageVisibility';
 import { copy } from '../../../../shared/presentation/i18n/copy';

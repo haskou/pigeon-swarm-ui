@@ -1,4 +1,4 @@
-import type { IdentityResource } from '../../../../shared/domain/pigeonResources.types';
+import type { IdentityResource } from '../../infrastructure/http/resources/IdentityResource';
 
 import { isIndependentClient } from '../../../../shared/infrastructure/client/isIndependentClient';
 import { shortId } from '../../../../shared/presentation/formatting';

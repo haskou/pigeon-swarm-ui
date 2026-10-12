@@ -3,12 +3,10 @@ import type { Dispatch, SetStateAction } from 'react';
 import { EncryptedPayload, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { useCallback, useState } from 'react';
 
-import type {
-  ConversationKeyEntry,
-  ConversationResource,
-  IdentityResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
+import type { ConversationKeyEntry } from '../../../../contexts/identities/infrastructure/keychain/ConversationKeyEntry';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { copy } from '../../../../shared/presentation/i18n/copy';

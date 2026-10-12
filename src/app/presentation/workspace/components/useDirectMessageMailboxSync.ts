@@ -2,12 +2,10 @@ import type { Dispatch, SetStateAction } from 'react';
 
 import { useEffect } from 'react';
 
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { DirectMessageTimelineChange } from '../../../../contexts/messages/infrastructure/mailbox/DirectMessageTimelineChange';
-import type {
-  ChatMessage,
-  ConversationResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
 import type { DirectPinChange } from './DirectPinChange';
 
 import { DirectMailboxEligibility } from '../../../../contexts/mailboxes/domain/DirectMailboxEligibility';

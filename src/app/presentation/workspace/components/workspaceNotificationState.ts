@@ -1,12 +1,10 @@
+import type { CommunityMembershipRequestResource as CommunityMembershipRequest } from '../../../../contexts/communities/infrastructure/http/resources/CommunityMembershipRequestResource';
+import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
+import type { MessageResource } from '../../../../contexts/messages/infrastructure/http/MessageResource';
+import type { CommunityInvitationNotificationResource } from '../../../../contexts/notifications/infrastructure/http/resources/CommunityInvitationNotificationResource';
+import type { ConversationInvitationNotificationResource } from '../../../../contexts/notifications/infrastructure/http/resources/ConversationInvitationNotificationResource';
+import type { NotificationResource } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationResource';
 import type { NotificationMentionContext } from '../../../../contexts/notifications/presentation/view-models/NotificationMentionContext';
-import type {
-  Community,
-  CommunityInvitationNotificationResource,
-  CommunityMembershipRequest,
-  ConversationInvitationNotificationResource,
-  MessageResource,
-  NotificationResource,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 
 export function stableUniqueKey(values: string[]): string {

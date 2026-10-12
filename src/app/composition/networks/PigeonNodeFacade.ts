@@ -1,4 +1,5 @@
 import type { IdentityAccessContexts } from '../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { NetworkNodeClaimer } from '../../../contexts/networks/application/claim-network-node/NetworkNodeClaimer';
 import type { PublicNetworkCreator } from '../../../contexts/networks/application/create-public-network/PublicNetworkCreator';
 import type { NodeRelayConfigurationFinder } from '../../../contexts/networks/application/find-node-relay-configuration/NodeRelayConfigurationFinder';
@@ -7,7 +8,6 @@ import type { PigeonNodeApi } from '../../../contexts/networks/infrastructure/ht
 import type { IpfsReplicationStatus } from '../../../contexts/networks/presentation/view-models/IpfsReplicationStatus';
 import type { NodeRelayConfigurationViewModel } from '../../../contexts/networks/presentation/view-models/NodeRelayConfigurationViewModel';
 import type { NodeRelayConfigurationViewModelMapper } from '../../../contexts/networks/presentation/view-models/NodeRelayConfigurationViewModelMapper';
-import type { Session } from '../../../shared/domain/pigeonResources.types';
 
 import { ClaimNetworkNodeMessage } from '../../../contexts/networks/application/claim-network-node/messages/ClaimNetworkNodeMessage';
 import { CreatePublicNetworkMessage } from '../../../contexts/networks/application/create-public-network/messages/CreatePublicNetworkMessage';

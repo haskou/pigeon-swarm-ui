@@ -10,7 +10,7 @@ import {
 import type { CallParticipantStatus } from '../../../../contexts/calls/infrastructure/http/resources/CallParticipantStatus';
 import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
 import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
-import type { Community } from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
 import type { CallResourceReconciliationInput } from './CallResourceReconciliationInput';
 import type { WorkspaceCallDetails } from './resolveWorkspaceCallDetails';
 

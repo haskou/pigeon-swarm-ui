@@ -3,7 +3,7 @@ import type { CallParticipantMediaConnectionResource } from '../../contexts/call
 import type { CallResource } from '../../contexts/calls/infrastructure/http/resources/CallResource';
 import type { CallSignalDeliveryResource } from '../../contexts/calls/infrastructure/http/resources/CallSignalDeliveryResource';
 import type { CallSignalPayload } from '../../contexts/calls/infrastructure/media/CallSignalPayload';
-import type { Session } from '../../shared/domain/pigeonResources.types';
+import type { Session } from '../../contexts/identities/infrastructure/session/Session';
 
 import { PigeonCallParticipation } from './calls/PigeonCallParticipation';
 import { PigeonCallReader } from './calls/PigeonCallReader';

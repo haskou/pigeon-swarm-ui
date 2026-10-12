@@ -1,12 +1,10 @@
 import { type Dispatch, type SetStateAction, useEffect, useState } from 'react';
 
-import type {
-  AttachmentUploadOptions,
-  ChatMessage,
-  ConversationResource,
-  Session,
-  StickerMessageReference,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { AttachmentUploadOptions } from '../../../../contexts/attachments/application/contracts/AttachmentUploadOptions';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
+import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { StickerMessageReference } from '../../../../contexts/stickers/infrastructure/http/resources/StickerMessageReference';
 import type { ConversationThread } from './ConversationThread';
 import type { UseConversationThreadResult } from './UseConversationThreadResult';
 

@@ -1,7 +1,5 @@
-import type {
-  CommunityRoleResource,
-  IdentityResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityRoleResource } from '../../infrastructure/http/resources/CommunityRoleResource';
+import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
 
 import { useMemo, useState } from 'react';
 

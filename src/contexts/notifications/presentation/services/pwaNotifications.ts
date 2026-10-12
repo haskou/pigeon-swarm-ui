@@ -1,4 +1,4 @@
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { EnsurePwaPushSubscriptionOptions } from '../../infrastructure/browser/EnsurePwaPushSubscriptionOptions';
 import type { EnsurePwaPushSubscriptionResult } from '../../infrastructure/browser/EnsurePwaPushSubscriptionResult';
 import type { PermissionRequester } from '../../infrastructure/browser/PermissionRequester';

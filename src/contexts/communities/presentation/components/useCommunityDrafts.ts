@@ -2,7 +2,7 @@ import type { SetStateAction } from 'react';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { mergeCommunityDrafts } from './mergeCommunityDrafts';

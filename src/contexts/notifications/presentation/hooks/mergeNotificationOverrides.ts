@@ -1,4 +1,4 @@
-import type { NotificationResource } from '../../../../shared/domain/pigeonResources.types';
+import type { NotificationResource } from '../../infrastructure/http/resources/NotificationResource';
 
 export function mergeNotificationOverrides(
   notifications: NotificationResource[],

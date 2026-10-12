@@ -1,16 +1,14 @@
 import type { ReactNode } from 'react';
 
-import type {
-  Community,
-  CommunityChannel,
-  CommunityInvitationNotificationResource,
-  CommunityVoiceChannel,
-  IdentityPresence,
-  IdentityResource,
-  NotificationSettingScope,
-  SelectablePresenceStatus,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
+import type { CommunityChannelResource as CommunityChannel } from '../../infrastructure/http/resources/CommunityChannelResource';
+import type { CommunityInvitationNotificationResource } from '../../../notifications/infrastructure/http/resources/CommunityInvitationNotificationResource';
+import type { CommunityVoiceChannelResource as CommunityVoiceChannel } from '../../infrastructure/http/resources/CommunityVoiceChannelResource';
+import type { IdentityPresenceResource as IdentityPresence } from '../../../identities/infrastructure/http/resources/IdentityPresenceResource';
+import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
+import type { NotificationSettingScopeResource as NotificationSettingScope } from '../../../notifications/infrastructure/http/resources/NotificationSettingScopeResource';
+import type { SelectablePresenceStatusResource as SelectablePresenceStatus } from '../../../identities/infrastructure/http/resources/SelectablePresenceStatusResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 import type { CallSession } from '../../../calls/presentation/view-models/CallSession';
 import type { NodeNetwork } from '../../../networks/presentation/view-models/NodeNetwork';

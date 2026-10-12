@@ -2,13 +2,11 @@ import type { MouseEvent } from 'react';
 
 import { useRef, useState } from 'react';
 
-import type {
-  AttachmentProgress,
-  AttachmentUploadOptions,
-  ChatMessage,
-  Session,
-  StickerMessageReference,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { AttachmentProgress } from '../../../attachments/application/contracts/AttachmentProgress';
+import type { AttachmentUploadOptions } from '../../../attachments/application/contracts/AttachmentUploadOptions';
+import type { ChatMessage } from '../view-models/ChatMessage';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { StickerMessageReference } from '../../../stickers/infrastructure/http/resources/StickerMessageReference';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { DialogCloseButton } from '../../../../shared/presentation/components/DialogCloseButton';

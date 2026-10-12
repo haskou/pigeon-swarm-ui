@@ -1,4 +1,4 @@
-import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';

@@ -1,9 +1,7 @@
 import { useCallback, useState } from 'react';
 
-import type {
-  ConversationResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { GroupRosterPermissions } from './GroupRosterPermissions';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';

@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import type {
-  ChatMessage,
-  CommunityChannel,
-  CommunityChannelThreadSummary,
-  CommunityTextChannel,
-  MessageResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
+import type { CommunityChannelResource as CommunityChannel } from '../../infrastructure/http/resources/CommunityChannelResource';
+import type { CommunityChannelThreadSummaryResource as CommunityChannelThreadSummary } from '../../infrastructure/http/resources/CommunityChannelThreadSummaryResource';
+import type { CommunityTextChannelResource as CommunityTextChannel } from '../../infrastructure/http/resources/CommunityTextChannelResource';
+import type { MessageResource } from '../../../messages/infrastructure/http/MessageResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrowserIdle';

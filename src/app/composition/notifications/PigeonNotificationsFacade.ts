@@ -1,11 +1,9 @@
-import type {
-  LocalKeychain,
-  NotificationResource,
-  NotificationScopeSetting,
-  NotificationScopeSettingInput,
-  NotificationSettingScope,
-  Session,
-} from '../../../shared/domain/pigeonResources.types';
+import type { LocalKeychain } from '../../../contexts/identities/infrastructure/keychain/LocalKeychain';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
+import type { NotificationResource } from '../../../contexts/notifications/infrastructure/http/resources/NotificationResource';
+import type { NotificationScopeSettingInputResource as NotificationScopeSettingInput } from '../../../contexts/notifications/infrastructure/http/resources/NotificationScopeSettingInputResource';
+import type { NotificationScopeSettingResource as NotificationScopeSetting } from '../../../contexts/notifications/infrastructure/http/resources/NotificationScopeSettingResource';
+import type { NotificationSettingScopeResource as NotificationSettingScope } from '../../../contexts/notifications/infrastructure/http/resources/NotificationSettingScopeResource';
 import type { NotificationUseCases } from './NotificationUseCases';
 
 import { AcceptConversationInvitationMessage } from '../../../contexts/notifications/application/accept-conversation-invitation/messages/AcceptConversationInvitationMessage';

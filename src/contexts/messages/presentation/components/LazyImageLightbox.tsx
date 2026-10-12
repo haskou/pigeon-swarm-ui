@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 
-import type { MessageAttachment } from '../../../../shared/domain/pigeonResources.types';
+import type { MessageAttachment } from '../../../attachments/application/contracts/MessageAttachment';
 import type { LightboxImage } from './imageLightbox';
 
 type LazyImageLightboxProps = {

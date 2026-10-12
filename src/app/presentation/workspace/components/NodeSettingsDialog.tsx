@@ -3,16 +3,14 @@ import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
 import type { IpfsReplicationStatus } from '../../../../contexts/networks/presentation/view-models/IpfsReplicationStatus';
 import type { NetworkSynchronizationStatus } from '../../../../contexts/networks/presentation/view-models/NetworkSynchronizationStatus';
 import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
 import type { NodeRelayConfigurationViewModel } from '../../../../contexts/networks/presentation/view-models/NodeRelayConfigurationViewModel';
 import type { Peer } from '../../../../contexts/networks/presentation/view-models/Peer';
-import type {
-  IdentityResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { NodeSettingsSection } from './NodeSettingsSection';
 
 import { IdentityMemberRow } from '../../../../contexts/identities/presentation/components/IdentityMemberListPanel';

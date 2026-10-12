@@ -1,8 +1,6 @@
-import type {
-  PublicFileUpload,
-  StickerDimensions,
-  StickerType,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { PublicFileUpload } from '../../../attachments/application/contracts/PublicFileUpload';
+import type { StickerDimensions } from '../../infrastructure/http/resources/StickerDimensions';
+import type { StickerType } from '../../infrastructure/http/resources/StickerType';
 
 import { AnimatedWebpEncoder } from '../../../../shared/presentation/media/AnimatedWebpEncoder';
 

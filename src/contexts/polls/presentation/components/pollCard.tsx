@@ -2,7 +2,7 @@ import type { MouseEvent, PointerEvent } from 'react';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import type { PollResource } from '../../../../shared/domain/pigeonResources.types';
+import type { PollResource } from '../../infrastructure/http/resources/PollResource';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';

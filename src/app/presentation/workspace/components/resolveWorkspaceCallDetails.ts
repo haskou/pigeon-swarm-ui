@@ -1,16 +1,14 @@
 import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
 import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
 import type { CallSession } from '../../../../contexts/calls/presentation/view-models/CallSession';
+import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
+import type { LocalKeychain } from '../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
 import type {
   IdentityNames,
   IdentityPictures,
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
-import type {
-  Community,
-  ConversationResource,
-  IdentityResource,
-  LocalKeychain,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { ResolveWorkspaceCallDetailsInput } from './ResolveWorkspaceCallDetailsInput';
 
 import { CommunityChannels } from '../../../../contexts/communities/presentation/view-models/CommunityChannels';

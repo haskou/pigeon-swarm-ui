@@ -1,7 +1,5 @@
-import type {
-  ChatMessage,
-  ConversationResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from './ChatMessage';
+import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
 import { attachmentIdentity } from './attachmentIdentity';
 import { MessageReactionUpdater } from './MessageReactionUpdater';
 

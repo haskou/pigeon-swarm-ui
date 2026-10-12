@@ -7,7 +7,7 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
-import type { MessageAttachment } from '../../../../shared/domain/pigeonResources.types';
+import type { MessageAttachment } from '../../../attachments/application/contracts/MessageAttachment';
 
 import { loadOriginalImage } from './loadOriginalImage';
 

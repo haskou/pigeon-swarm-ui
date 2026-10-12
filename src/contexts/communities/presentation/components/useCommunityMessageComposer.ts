@@ -9,21 +9,19 @@ import {
   useState,
 } from 'react';
 
-import type {
-  AttachmentProgress,
-  AttachmentUploadOptions,
-  ChatMessage,
-  Community,
-  CommunityMessageMention,
-  CommunityPermission,
-  CommunityTextChannel,
-  IdentityResource,
-  MessageReplyPreview,
-  MessageResource,
-  PollResource,
-  Session,
-  StickerMessageReference,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { AttachmentProgress } from '../../../attachments/application/contracts/AttachmentProgress';
+import type { AttachmentUploadOptions } from '../../../attachments/application/contracts/AttachmentUploadOptions';
+import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
+import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
+import type { CommunityMessageMentionResource as CommunityMessageMention } from '../../infrastructure/http/resources/CommunityMessageMentionResource';
+import type { CommunityPermissionResource as CommunityPermission } from '../../infrastructure/http/resources/CommunityPermissionResource';
+import type { CommunityTextChannelResource as CommunityTextChannel } from '../../infrastructure/http/resources/CommunityTextChannelResource';
+import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
+import type { MessageReplyPreview } from '../../../messages/infrastructure/crypto/resources/MessageReplyPreview';
+import type { MessageResource } from '../../../messages/infrastructure/http/MessageResource';
+import type { PollResource } from '../../../polls/infrastructure/http/resources/PollResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { StickerMessageReference } from '../../../stickers/infrastructure/http/resources/StickerMessageReference';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { runStickerUsageSideEffect } from '../../../../app/presentation/workspace/components/runStickerUsageSideEffect';
@@ -34,9 +32,7 @@ import { useAttachmentDownload } from '../../../attachments/presentation/hooks/u
 import { PendingMessageAttachments } from '../../../attachments/presentation/view-models/PendingMessageAttachments';
 import { MessageContent } from '../../../messages/domain/value-objects/MessageContent';
 import { MessageReactionUpdater } from '../../../messages/presentation/view-models/MessageReactionUpdater';
-import {
-  serializeCommunityChannelPayload,
-} from '../../infrastructure/crypto/serializeCommunityChannelPayload';
+import { serializeCommunityChannelPayload } from '../../infrastructure/crypto/serializeCommunityChannelPayload';
 import { CommunityMessageMentions } from './CommunityMessageMentions';
 import { mergeChatMessages } from './communityWorkspaceHelpers';
 

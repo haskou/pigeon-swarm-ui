@@ -1,7 +1,5 @@
-import type {
-  ChatMessage,
-  StickerMessageReference,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { StickerMessageReference } from '../../../../contexts/stickers/infrastructure/http/resources/StickerMessageReference';
 
 export type PendingConversationMessageInput = {
   attachments: File[];

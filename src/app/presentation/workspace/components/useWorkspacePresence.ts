@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type {
-  Community,
-  ConversationResource,
-  IdentityPresence,
-  SelectablePresenceStatus,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { IdentityPresenceResource as IdentityPresence } from '../../../../contexts/identities/infrastructure/http/resources/IdentityPresenceResource';
+import type { SelectablePresenceStatusResource as SelectablePresenceStatus } from '../../../../contexts/identities/infrastructure/http/resources/SelectablePresenceStatusResource';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
 import { ConversationPeer } from '../../../../contexts/conversations/presentation/view-models/ConversationPeer';
 import { applicationContainer } from '../../../composition/applicationContainer';

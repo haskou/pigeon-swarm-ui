@@ -1,24 +1,22 @@
 import type { RefObject } from 'react';
 
+import type { AttachmentProgress } from '../../../../contexts/attachments/application/contracts/AttachmentProgress';
+import type { AttachmentUploadOptions } from '../../../../contexts/attachments/application/contracts/AttachmentUploadOptions';
 import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { IdentityPresenceResource as IdentityPresence } from '../../../../contexts/identities/infrastructure/http/resources/IdentityPresenceResource';
+import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
+import type { ConversationKeyEntry } from '../../../../contexts/identities/infrastructure/keychain/ConversationKeyEntry';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type {
   IdentityNames,
   IdentityPictures,
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
+import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
 import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
-import type {
-  AttachmentProgress,
-  AttachmentUploadOptions,
-  ChatMessage,
-  ConversationInvitationNotificationResource,
-  ConversationKeyEntry,
-  ConversationResource,
-  IdentityPresence,
-  IdentityResource,
-  NotificationScopeSetting,
-  Session,
-  StickerMessageReference,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationInvitationNotificationResource } from '../../../../contexts/notifications/infrastructure/http/resources/ConversationInvitationNotificationResource';
+import type { NotificationScopeSettingResource as NotificationScopeSetting } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationScopeSettingResource';
+import type { StickerMessageReference } from '../../../../contexts/stickers/infrastructure/http/resources/StickerMessageReference';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 
 export interface ChatColumnProps {

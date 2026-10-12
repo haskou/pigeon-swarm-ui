@@ -1,7 +1,5 @@
-import type {
-  IdentityResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
 /**
  * Applies an identity fetched for the session in state.

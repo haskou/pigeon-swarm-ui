@@ -1,12 +1,10 @@
 import { useCallback, useMemo } from 'react';
 
-import type {
-  Community,
-  CommunityTextChannel,
-  CommunityVoiceChannel,
-  NotificationScopeSetting,
-  NotificationSettingScope,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
+import type { CommunityTextChannelResource as CommunityTextChannel } from '../../infrastructure/http/resources/CommunityTextChannelResource';
+import type { CommunityVoiceChannelResource as CommunityVoiceChannel } from '../../infrastructure/http/resources/CommunityVoiceChannelResource';
+import type { NotificationScopeSettingResource as NotificationScopeSetting } from '../../../notifications/infrastructure/http/resources/NotificationScopeSettingResource';
+import type { NotificationSettingScopeResource as NotificationSettingScope } from '../../../notifications/infrastructure/http/resources/NotificationSettingScopeResource';
 import type { NotificationSettingMap } from '../../../notifications/presentation/view-models/NotificationSettingMap';
 
 import { NotificationSettingsPolicy } from '../../../notifications/presentation/view-models/NotificationSettingsPolicy';

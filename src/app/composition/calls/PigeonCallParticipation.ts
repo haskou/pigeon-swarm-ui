@@ -1,6 +1,6 @@
 import type { CallParticipantMediaConnectionResource } from '../../../contexts/calls/infrastructure/http/resources/CallParticipantMediaConnectionResource';
 import type { CallResource } from '../../../contexts/calls/infrastructure/http/resources/CallResource';
-import type { Session } from '../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 
 import { CallEnder } from '../../../contexts/calls/application/end-call/CallEnder';
 import { EndCallMessage } from '../../../contexts/calls/application/end-call/messages/EndCallMessage';

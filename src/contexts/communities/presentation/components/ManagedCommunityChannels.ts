@@ -1,4 +1,4 @@
-import type { CommunityChannel } from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityChannelResource as CommunityChannel } from '../../infrastructure/http/resources/CommunityChannelResource';
 
 export type ManagedCommunityChannel = CommunityChannel & { pending?: boolean };
 

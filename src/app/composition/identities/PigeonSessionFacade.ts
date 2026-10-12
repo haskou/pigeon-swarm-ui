@@ -1,8 +1,6 @@
 import type { PigeonIdentitiesGateway } from '../../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
-import type {
-  LoginResult,
-  Session,
-} from '../../../shared/domain/pigeonResources.types';
+import type { LoginResult } from '../../../contexts/identities/infrastructure/http/resources/LoginResult';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { PigeonIdentitiesFacade } from './PigeonIdentitiesFacade';
 
 import { ConversationTimeline } from '../../../contexts/conversations/presentation/view-models/ConversationTimeline';

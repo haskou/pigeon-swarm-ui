@@ -1,8 +1,6 @@
-import type {
-  CreatePollInput,
-  PollResource,
-  Session,
-} from '../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
+import type { CreatePollInput } from '../../../contexts/polls/infrastructure/http/resources/CreatePollInput';
+import type { PollResource } from '../../../contexts/polls/infrastructure/http/resources/PollResource';
 import type { PollUseCases } from './PollUseCases';
 
 import { ClosePollMessage } from '../../../contexts/polls/application/close-poll/messages/ClosePollMessage';

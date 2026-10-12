@@ -2,10 +2,8 @@ import type { Dispatch, SetStateAction } from 'react';
 
 import { useCallback, useEffect, useState } from 'react';
 
-import type {
-  ConversationResource,
-  Session,
-} from '../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { Session } from '../../contexts/identities/infrastructure/session/Session';
 
 import { useCommunities } from '../../contexts/communities/presentation/hooks/useCommunities';
 import {

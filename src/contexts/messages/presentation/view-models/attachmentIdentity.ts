@@ -1,4 +1,4 @@
-import type { MessageAttachment } from '../../../../shared/domain/pigeonResources.types';
+import type { MessageAttachment } from '../../../attachments/application/contracts/MessageAttachment';
 
 /**
  * Stable per-attachment identity for React keys and grouping. Public

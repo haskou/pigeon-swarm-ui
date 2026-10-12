@@ -3,12 +3,10 @@ import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { NullObject } from '@haskou/value-objects';
 import { useCallback } from 'react';
 
-import type {
-  ConversationKeyEntry,
-  ConversationResource,
-  IdentityResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
+import type { ConversationKeyEntry } from '../../../../contexts/identities/infrastructure/keychain/ConversationKeyEntry';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { WorkspaceConversationNavigation } from './WorkspaceConversationNavigation';
 
 import { ConversationTimeline } from '../../../../contexts/conversations/presentation/view-models/ConversationTimeline';

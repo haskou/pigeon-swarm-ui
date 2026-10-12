@@ -3,10 +3,8 @@ import type { ReactNode } from 'react';
 import { lazy, Suspense, useState } from 'react';
 
 import type { IdentityNames } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
-import type {
-  ChatMessage,
-  StickerMessageReference,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { StickerMessageReference } from '../../../../contexts/stickers/infrastructure/http/resources/StickerMessageReference';
 import type { ChatColumnProps } from './ChatColumnProps';
 import type { ConversationPollsController } from './useConversationPolls';
 

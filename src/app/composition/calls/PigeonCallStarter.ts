@@ -1,5 +1,5 @@
 import type { CallResource } from '../../../contexts/calls/infrastructure/http/resources/CallResource';
-import type { Session } from '../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 
 import { CommunityChannelCallStarter } from '../../../contexts/calls/application/start-community-channel-call/CommunityChannelCallStarter';
 import { StartCommunityChannelCallMessage } from '../../../contexts/calls/application/start-community-channel-call/messages/StartCommunityChannelCallMessage';

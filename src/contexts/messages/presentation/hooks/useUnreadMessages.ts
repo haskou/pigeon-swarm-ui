@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 
-import type { ConversationResource } from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
 
 import { ConversationTimeline } from '../../../conversations/presentation/view-models/ConversationTimeline';
 

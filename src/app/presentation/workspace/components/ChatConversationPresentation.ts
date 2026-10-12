@@ -1,10 +1,8 @@
 import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
+import type { ConversationKeyEntry } from '../../../../contexts/identities/infrastructure/keychain/ConversationKeyEntry';
 import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
-import type {
-  ConversationKeyEntry,
-  ConversationResource,
-  IdentityResource,
-} from '../../../../shared/domain/pigeonResources.types';
 
 import { memberPrimaryName } from '../../../../contexts/communities/presentation/components/communityMemberNames';
 import { conversationSupportsThreads } from '../../../../contexts/conversations/presentation/view-models/conversationSupportsThreads';

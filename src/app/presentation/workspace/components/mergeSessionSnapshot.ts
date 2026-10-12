@@ -1,4 +1,4 @@
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
 /**
  * Applies a session snapshot (a refresh result or a whole-session update) to

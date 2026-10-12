@@ -1,5 +1,5 @@
 import type { IdentityNames } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
-import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
 import type { ChatColumnProps } from './ChatColumnProps';
 
 import { identityDisplayName } from '../../../../contexts/identities/presentation/view-models/identityDisplay';

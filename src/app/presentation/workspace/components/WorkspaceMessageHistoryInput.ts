@@ -5,13 +5,11 @@ import type {
   SetStateAction,
 } from 'react';
 
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { ConversationKeyEntry } from '../../../../contexts/identities/infrastructure/keychain/ConversationKeyEntry';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
+import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
 import type { MessageScrollAnchorSnapshot } from '../../../../contexts/messages/presentation/view-models/MessageScrollAnchor';
-import type {
-  ChatMessage,
-  ConversationKeyEntry,
-  ConversationResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { LoadState } from './LoadState';
 import type { WorkspaceMode } from './WorkspaceMode';
 

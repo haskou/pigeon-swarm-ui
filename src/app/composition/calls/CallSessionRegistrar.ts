@@ -1,4 +1,4 @@
-import type { Session } from '../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 
 import { CallAccessContexts } from '../../../contexts/calls/infrastructure/http/CallAccessContexts';
 

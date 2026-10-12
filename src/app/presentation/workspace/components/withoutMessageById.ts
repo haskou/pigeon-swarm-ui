@@ -1,4 +1,4 @@
-import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
 
 export function withoutMessageById(
   messages: ChatMessage[],

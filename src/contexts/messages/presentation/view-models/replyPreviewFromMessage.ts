@@ -1,7 +1,5 @@
-import type {
-  ChatMessage,
-  MessageReplyPreview,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from './ChatMessage';
+import type { MessageReplyPreview } from '../../infrastructure/crypto/resources/MessageReplyPreview';
 
 import { isBrowserPreviewImage } from '../../../../shared/presentation/isBrowserPreviewImage';
 

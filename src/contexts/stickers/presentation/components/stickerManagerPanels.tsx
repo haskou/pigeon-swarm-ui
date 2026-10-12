@@ -1,9 +1,7 @@
 import { ChangeEvent, useState } from 'react';
 
-import type {
-  Session,
-  StickerPackResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { StickerPackResource } from '../../infrastructure/http/resources/StickerPackResource';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { cx } from '../../../../shared/presentation/cx';

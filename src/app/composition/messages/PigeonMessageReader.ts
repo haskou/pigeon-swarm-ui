@@ -1,14 +1,12 @@
 import type { IdentityAccessContexts } from '../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { MessageThreadSearcher } from '../../../contexts/messages/application/load-message-thread/MessageThreadSearcher';
 import type { MessageFinder } from '../../../contexts/messages/application/load-message/MessageFinder';
 import type { MessagesAroundSearcher } from '../../../contexts/messages/application/load-messages-around/MessagesAroundSearcher';
 import type { MessagesSearcher } from '../../../contexts/messages/application/load-messages/MessagesSearcher';
 import type { MessageMapper } from '../../../contexts/messages/infrastructure/http/MessageMapper';
 import type { MessageOperationContexts } from '../../../contexts/messages/infrastructure/http/MessageOperationContexts';
-import type {
-  ChatMessage,
-  Session,
-} from '../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../contexts/messages/presentation/view-models/ChatMessage';
 
 import { LoadMessageThreadMessage } from '../../../contexts/messages/application/load-message-thread/messages/LoadMessageThreadMessage';
 import { LoadMessageMessage } from '../../../contexts/messages/application/load-message/messages/LoadMessageMessage';

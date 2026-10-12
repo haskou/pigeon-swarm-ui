@@ -8,12 +8,10 @@ import {
   type PointerEvent,
 } from 'react';
 
-import type {
-  CommunityChannelThreadSummary,
-  CommunityTextChannel,
-  CommunityVoiceChannel,
-  NotificationScopeSetting,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityChannelThreadSummaryResource as CommunityChannelThreadSummary } from '../../infrastructure/http/resources/CommunityChannelThreadSummaryResource';
+import type { CommunityTextChannelResource as CommunityTextChannel } from '../../infrastructure/http/resources/CommunityTextChannelResource';
+import type { CommunityVoiceChannelResource as CommunityVoiceChannel } from '../../infrastructure/http/resources/CommunityVoiceChannelResource';
+import type { NotificationScopeSettingResource as NotificationScopeSetting } from '../../../notifications/infrastructure/http/resources/NotificationScopeSettingResource';
 
 import { NotificationSettingsPolicy } from '../../../notifications/presentation/view-models/NotificationSettingsPolicy';
 import { NotificationScopeMenuActions } from '../../../notifications/presentation/components/NotificationScopeMenuActions';

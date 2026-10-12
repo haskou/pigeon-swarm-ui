@@ -2,8 +2,8 @@ import type { Dispatch, SetStateAction } from 'react';
 
 import { useEffect, useState } from 'react';
 
-import type { ConversationResource } from '../../../shared/domain/pigeonResources.types';
-import type { Session } from '../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { CommunityUnreadCounts } from './components/CommunityUnreadCounts';
 import type { WorkspaceMode } from './components/WorkspaceMode';
 import type { WorkspacePreference } from './components/WorkspacePreference';

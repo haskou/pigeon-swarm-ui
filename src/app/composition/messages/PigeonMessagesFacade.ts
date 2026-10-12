@@ -1,14 +1,12 @@
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
+import type { MessageResource } from '../../../contexts/messages/infrastructure/http/MessageResource';
 import type { PigeonMessagesGateway } from '../../../contexts/messages/infrastructure/http/PigeonMessagesGateway';
-import type {
-  ChatMessage,
-  ConversationDraft,
-  EditMessageOptions,
-  MessageLinkPreview,
-  MessagePin,
-  MessageResource,
-  SendMessageOptions,
-  Session,
-} from '../../../shared/domain/pigeonResources.types';
+import type { ConversationDraftProjection as ConversationDraft } from '../../../contexts/messages/infrastructure/http/resources/ConversationDraftProjection';
+import type { EditMessageOptions } from '../../../contexts/messages/infrastructure/http/resources/EditMessageOptions';
+import type { MessageLinkPreview } from '../../../contexts/messages/infrastructure/http/resources/MessageLinkPreview';
+import type { SendMessageOptions } from '../../../contexts/messages/infrastructure/http/resources/SendMessageOptions';
+import type { ChatMessage } from '../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { MessagePin } from '../../../contexts/messages/presentation/view-models/MessagePin';
 
 import { PigeonConversationDrafts } from './PigeonConversationDrafts';
 import { PigeonMessagePins } from './PigeonMessagePins';

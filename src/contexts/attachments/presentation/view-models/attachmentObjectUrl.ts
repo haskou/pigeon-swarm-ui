@@ -1,7 +1,5 @@
-import type {
-  AttachmentProgress,
-  MessageAttachment,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { AttachmentProgress } from '../../application/contracts/AttachmentProgress';
+import type { MessageAttachment } from '../../application/contracts/MessageAttachment';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 

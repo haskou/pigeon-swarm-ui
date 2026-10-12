@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 
+import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { Peer } from '../../../../contexts/networks/presentation/view-models/Peer';
-import type { IdentityResource } from '../../../../shared/domain/pigeonResources.types';
 
 import { IdentityMemberRow } from '../../../../contexts/identities/presentation/components/IdentityMemberListPanel';
 import { useIdentityPreview } from '../../../../contexts/identities/presentation/hooks/useIdentityPreview';

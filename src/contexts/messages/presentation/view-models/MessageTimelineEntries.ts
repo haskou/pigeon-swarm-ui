@@ -1,7 +1,5 @@
-import type {
-  ChatMessage,
-  PollResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from './ChatMessage';
+import type { PollResource } from '../../../polls/infrastructure/http/resources/PollResource';
 
 import type { MessagePollTimelineItem } from '../../../polls/presentation/components/messagePollTimelineItems';
 import { messagePollTimelineItems } from '../../../polls/presentation/components/messagePollTimelineItems';

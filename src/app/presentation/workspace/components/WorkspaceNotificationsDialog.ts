@@ -1,12 +1,10 @@
+import type { CommunityMembershipRequestResource as CommunityMembershipRequest } from '../../../../contexts/communities/infrastructure/http/resources/CommunityMembershipRequestResource';
+import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
-import type {
-  Community,
-  CommunityMembershipRequest,
-  ConversationResource,
-  IdentityResource,
-  NotificationResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { NotificationResource } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationResource';
 
 export type WorkspaceNotificationsDialog = {
   action: 'accept' | 'archive' | 'decline' | 'refresh' | null;

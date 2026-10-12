@@ -1,4 +1,4 @@
-import type { CommunityMessageMention } from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityMessageMentionResource as CommunityMessageMention } from '../../infrastructure/http/resources/CommunityMessageMentionResource';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 

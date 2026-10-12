@@ -1,8 +1,6 @@
-import type {
-  ChatMessage,
-  CommunityTextChannel,
-  MessageResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
+import type { CommunityTextChannelResource as CommunityTextChannel } from '../../infrastructure/http/resources/CommunityTextChannelResource';
+import type { MessageResource } from '../../../messages/infrastructure/http/MessageResource';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 
 export function resolveCommunityChannelId(

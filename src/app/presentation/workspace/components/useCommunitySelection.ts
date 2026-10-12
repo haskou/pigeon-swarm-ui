@@ -1,9 +1,7 @@
 import { useMemo } from 'react';
 
-import type {
-  Community,
-  CommunityTextChannel,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
+import type { CommunityTextChannelResource as CommunityTextChannel } from '../../../../contexts/communities/infrastructure/http/resources/CommunityTextChannelResource';
 
 import { CommunityChannels } from '../../../../contexts/communities/presentation/view-models/CommunityChannels';
 import { CommunityList } from '../../../../contexts/communities/presentation/view-models/CommunityList';

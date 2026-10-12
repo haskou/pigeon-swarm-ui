@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type {
-  Community,
-  ConversationResource,
-  NotificationResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../../communities/infrastructure/http/resources/CommunityResource';
+import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
+import type { NotificationResource } from '../../infrastructure/http/resources/NotificationResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { copy } from '../../../../shared/presentation/i18n/copy';

@@ -1,4 +1,5 @@
-import type { StickerPackResource, StickerResource } from '../../../../shared/domain/pigeonResources.types';
+import type { StickerPackResource } from '../../infrastructure/http/resources/StickerPackResource';
+import type { StickerResource } from '../../infrastructure/http/resources/StickerResource';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { StickerGrid } from './stickerPickerParts';

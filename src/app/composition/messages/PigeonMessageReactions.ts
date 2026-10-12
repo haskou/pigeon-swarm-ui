@@ -1,7 +1,7 @@
 import type { IdentityAccessContexts } from '../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { MessageReactionAdder } from '../../../contexts/messages/application/add-message-reaction/MessageReactionAdder';
 import type { MessageReactionRemover } from '../../../contexts/messages/application/remove-message-reaction/MessageReactionRemover';
-import type { Session } from '../../../shared/domain/pigeonResources.types';
 
 import { AddMessageReactionMessage } from '../../../contexts/messages/application/add-message-reaction/messages/AddMessageReactionMessage';
 import { RemoveMessageReactionMessage } from '../../../contexts/messages/application/remove-message-reaction/messages/RemoveMessageReactionMessage';

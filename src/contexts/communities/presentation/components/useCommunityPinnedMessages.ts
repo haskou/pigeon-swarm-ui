@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import type {
-  ChatMessage,
-  MessageResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
+import type { MessageResource } from '../../../messages/infrastructure/http/MessageResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';

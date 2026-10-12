@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import type { PollOption } from '../../../../shared/domain/pigeonResources.types';
+import type { PollOptionResource as PollOption } from '../../infrastructure/http/resources/PollOptionResource';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';

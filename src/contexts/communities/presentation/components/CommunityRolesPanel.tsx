@@ -1,7 +1,5 @@
-import type {
-  CommunityPermission,
-  CommunityRoleResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityPermissionResource as CommunityPermission } from '../../infrastructure/http/resources/CommunityPermissionResource';
+import type { CommunityRoleResource } from '../../infrastructure/http/resources/CommunityRoleResource';
 
 import { useState } from 'react';
 

@@ -1,9 +1,7 @@
 import { FormEvent, type ReactElement, useEffect, useState } from 'react';
 
-import type {
-  ConversationResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
+import type { Session } from '../../infrastructure/session/Session';
 import type { NetworkSynchronizationStatus } from '../../../networks/presentation/view-models/NetworkSynchronizationStatus';
 import type { NodeNetwork } from '../../../networks/presentation/view-models/NodeNetwork';
 import type { LoginIdentityProgressStep } from '../../application/login-identity/LoginIdentityProgressStep';

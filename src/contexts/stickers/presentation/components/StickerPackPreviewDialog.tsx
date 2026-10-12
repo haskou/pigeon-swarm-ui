@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import type {
-  Session,
-  StickerMessageReference,
-  StickerPackResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { StickerMessageReference } from '../../infrastructure/http/resources/StickerMessageReference';
+import type { StickerPackResource } from '../../infrastructure/http/resources/StickerPackResource';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';

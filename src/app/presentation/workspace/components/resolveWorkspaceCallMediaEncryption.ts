@@ -1,5 +1,5 @@
 import type { CallMediaEncryptionUnavailableReason } from '../../../../contexts/calls/presentation/view-models/CallMediaEncryptionUnavailableReason';
-import type { ConversationKeyEntry } from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationKeyEntry } from '../../../../contexts/identities/infrastructure/keychain/ConversationKeyEntry';
 import type { WorkspaceCallMediaEncryptionInput } from './WorkspaceCallMediaEncryptionInput';
 
 import { ConversationKeychain } from '../../../../contexts/identities/infrastructure/keychain/ConversationKeychain';

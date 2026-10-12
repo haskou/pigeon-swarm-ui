@@ -2,11 +2,9 @@ import type { CSSProperties, MouseEvent, PointerEvent } from 'react';
 
 import { createPortal } from 'react-dom';
 
-import type {
-  ConversationResource,
-  IdentityPresence,
-  NotificationScopeSetting,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { IdentityPresenceResource as IdentityPresence } from '../../../../contexts/identities/infrastructure/http/resources/IdentityPresenceResource';
+import type { NotificationScopeSettingResource as NotificationScopeSetting } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationScopeSettingResource';
 import type { SidebarConversationLoadingState } from './SidebarConversationLoadingState';
 import type { SidebarConversationMenuState } from './SidebarConversationMenuState';
 

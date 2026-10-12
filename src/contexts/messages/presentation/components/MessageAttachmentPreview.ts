@@ -1,4 +1,4 @@
-import type { MessageAttachment } from '../../../../shared/domain/pigeonResources.types';
+import type { MessageAttachment } from '../../../attachments/application/contracts/MessageAttachment';
 
 import { isBrowserPreviewFile } from '../../../../shared/presentation/isBrowserPreviewFile';
 import { isBrowserPreviewImage } from '../../../../shared/presentation/isBrowserPreviewImage';

@@ -2,15 +2,13 @@ import type { Dispatch, SetStateAction } from 'react';
 
 import { useCallback, useMemo } from 'react';
 
+import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
 import type { NotificationScopeSettingResource } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationScopeSettingResource';
+import type { NotificationSettingScopeResource as NotificationSettingScope } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationSettingScopeResource';
 import type { NotificationScopeSettingsTarget } from '../../../../contexts/notifications/presentation/components/NotificationScopeSettingsDialog';
 import type { NotificationSettingMap } from '../../../../contexts/notifications/presentation/view-models/NotificationSettingMap';
-import type {
-  Community,
-  ConversationResource,
-  NotificationSettingScope,
-} from '../../../../shared/domain/pigeonResources.types';
 
 import { NotificationSettingsPolicy } from '../../../../contexts/notifications/presentation/view-models/NotificationSettingsPolicy';
 import { copy } from '../../../../shared/presentation/i18n/copy';

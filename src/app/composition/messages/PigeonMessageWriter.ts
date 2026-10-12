@@ -1,17 +1,15 @@
 import { UUID } from '@haskou/value-objects';
 
 import type { IdentityAccessContexts } from '../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { MessageDeleter } from '../../../contexts/messages/application/delete-message/MessageDeleter';
 import type { MessageEditor } from '../../../contexts/messages/application/edit-message/MessageEditor';
 import type { MessageSender } from '../../../contexts/messages/application/send-message/MessageSender';
 import type { MessageMapper } from '../../../contexts/messages/infrastructure/http/MessageMapper';
 import type { MessageOperationContexts } from '../../../contexts/messages/infrastructure/http/MessageOperationContexts';
-import type {
-  ChatMessage,
-  EditMessageOptions,
-  SendMessageOptions,
-  Session,
-} from '../../../shared/domain/pigeonResources.types';
+import type { EditMessageOptions } from '../../../contexts/messages/infrastructure/http/resources/EditMessageOptions';
+import type { SendMessageOptions } from '../../../contexts/messages/infrastructure/http/resources/SendMessageOptions';
+import type { ChatMessage } from '../../../contexts/messages/presentation/view-models/ChatMessage';
 
 import { DeleteMessageMessage } from '../../../contexts/messages/application/delete-message/messages/DeleteMessageMessage';
 import { EditMessageMessage } from '../../../contexts/messages/application/edit-message/messages/EditMessageMessage';

@@ -1,13 +1,11 @@
 import { Suspense, type ReactElement } from 'react';
 
+import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
+import type { IdentityPresenceResource as IdentityPresence } from '../../../../contexts/identities/infrastructure/http/resources/IdentityPresenceResource';
+import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
+import type { NotificationResource } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationResource';
 import type { NotificationSettingMap } from '../../../../contexts/notifications/presentation/view-models/NotificationSettingMap';
-import type {
-  Community,
-  IdentityPresence,
-  IdentityResource,
-  NotificationResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 import type { RailProps } from './Rail';
 import type { useWorkspaceCalls } from './useWorkspaceCalls';

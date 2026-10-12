@@ -1,14 +1,12 @@
 import type { CommunityChannel } from '../../../contexts/communities/domain/entities/CommunityChannel';
 import type { CommunityRole } from '../../../contexts/communities/domain/entities/CommunityRole';
+import type { CommunityChannelResource } from '../../../contexts/communities/infrastructure/http/resources/CommunityChannelResource';
+import type { CommunityPermissionResource as CommunityPermission } from '../../../contexts/communities/infrastructure/http/resources/CommunityPermissionResource';
+import type { CommunityResource as Community } from '../../../contexts/communities/infrastructure/http/resources/CommunityResource';
+import type { CommunityRoleResource } from '../../../contexts/communities/infrastructure/http/resources/CommunityRoleResource';
 import type { CommunityTextChannelResource } from '../../../contexts/communities/infrastructure/http/resources/CommunityTextChannelResource';
 import type { CommunityVoiceChannelResource } from '../../../contexts/communities/infrastructure/http/resources/CommunityVoiceChannelResource';
-import type {
-  Community,
-  CommunityChannel as CommunityChannelResource,
-  CommunityPermission,
-  CommunityRoleResource,
-  Session,
-} from '../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { CommunityManagementUseCases } from './CommunityManagementUseCases';
 
 import { AssignCommunityMemberRolesMessage } from '../../../contexts/communities/application/assign-community-member-roles/messages/AssignCommunityMemberRolesMessage';

@@ -2,16 +2,14 @@ import type { MouseEvent, ReactNode } from 'react';
 
 import type { NodeNetwork } from '../../../networks/presentation/view-models/NodeNetwork';
 import type { CallSession } from '../../../calls/presentation/view-models/CallSession';
-import type {
-  Community,
-  CommunityChannelThreadSummary,
-  CommunityTextChannel,
-  CommunityVoiceChannel,
-  IdentityPresence,
-  NotificationScopeSetting,
-  Session,
-  SelectablePresenceStatus,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
+import type { CommunityChannelThreadSummaryResource as CommunityChannelThreadSummary } from '../../infrastructure/http/resources/CommunityChannelThreadSummaryResource';
+import type { CommunityTextChannelResource as CommunityTextChannel } from '../../infrastructure/http/resources/CommunityTextChannelResource';
+import type { CommunityVoiceChannelResource as CommunityVoiceChannel } from '../../infrastructure/http/resources/CommunityVoiceChannelResource';
+import type { IdentityPresenceResource as IdentityPresence } from '../../../identities/infrastructure/http/resources/IdentityPresenceResource';
+import type { NotificationScopeSettingResource as NotificationScopeSetting } from '../../../notifications/infrastructure/http/resources/NotificationScopeSettingResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { SelectablePresenceStatusResource as SelectablePresenceStatus } from '../../../identities/infrastructure/http/resources/SelectablePresenceStatusResource';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';

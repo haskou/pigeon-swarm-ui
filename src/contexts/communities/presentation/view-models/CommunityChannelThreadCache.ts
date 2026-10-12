@@ -1,7 +1,5 @@
-import type {
-  CommunityChannelThreadSummary,
-  CommunityTextChannel,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityChannelThreadSummaryResource as CommunityChannelThreadSummary } from '../../infrastructure/http/resources/CommunityChannelThreadSummaryResource';
+import type { CommunityTextChannelResource as CommunityTextChannel } from '../../infrastructure/http/resources/CommunityTextChannelResource';
 
 type ChannelThreadsById = Record<string, CommunityChannelThreadSummary[]>;
 

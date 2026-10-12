@@ -1,10 +1,8 @@
 import { type Dispatch, type SetStateAction, useEffect, useRef } from 'react';
 
+import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
 import type { PendingCommunityInviteLink } from '../../../../contexts/communities/presentation/view-models/communityInviteLink';
-import type {
-  Community,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';

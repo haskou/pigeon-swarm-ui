@@ -1,8 +1,6 @@
-import type {
-  ConversationResource,
-  IdentityResource,
-  LocalKeychain,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
+import type { LocalKeychain } from '../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
 
 import { ConversationPeer } from '../../../../contexts/conversations/presentation/view-models/ConversationPeer';
 import { SharedNetworkSelectorDomainService } from '../../../../contexts/networks/domain/services/SharedNetworkSelectorDomainService';

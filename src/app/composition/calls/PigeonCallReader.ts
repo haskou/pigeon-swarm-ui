@@ -1,6 +1,6 @@
 import type { CallIceServerResource } from '../../../contexts/calls/infrastructure/http/resources/CallIceServerResource';
 import type { CallResource } from '../../../contexts/calls/infrastructure/http/resources/CallResource';
-import type { Session } from '../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 
 import { CallFinder } from '../../../contexts/calls/application/find-call/CallFinder';
 import { FindCallMessage } from '../../../contexts/calls/application/find-call/messages/FindCallMessage';

@@ -1,9 +1,7 @@
-import type {
-  ChatMessage,
-  CommunityPermission,
-  IdentityResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
+import type { CommunityPermissionResource as CommunityPermission } from '../../infrastructure/http/resources/CommunityPermissionResource';
+import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { CommunityThreadState } from './communityThreadState';
 import type { useCommunityThreadActions } from './useCommunityThreadActions';
 

@@ -1,6 +1,6 @@
 import { memo, type MouseEvent } from 'react';
 
-import type { CommunityVoiceChannel } from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityVoiceChannelResource as CommunityVoiceChannel } from '../../infrastructure/http/resources/CommunityVoiceChannelResource';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';

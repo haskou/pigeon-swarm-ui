@@ -1,4 +1,4 @@
-import type { StickerResource } from '../../../../shared/domain/pigeonResources.types';
+import type { StickerResource } from '../../infrastructure/http/resources/StickerResource';
 
 import { cx } from '../../../../shared/presentation/cx';
 import { StickerImage } from './StickerImage';

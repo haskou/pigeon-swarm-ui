@@ -1,10 +1,8 @@
 import type { Dispatch, SetStateAction } from 'react';
 
 import type { MessageContextMenuState } from '../../../../app/presentation/workspace/components/messageContextMenu';
-import type {
-  ChatMessage,
-  MessageAttachment,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
+import type { MessageAttachment } from '../../../attachments/application/contracts/MessageAttachment';
 import type { useCommunityMessageComposer } from './useCommunityMessageComposer';
 import type { useCommunityThreadActions } from './useCommunityThreadActions';
 

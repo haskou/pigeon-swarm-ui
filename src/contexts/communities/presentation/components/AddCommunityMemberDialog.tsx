@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import type {
-  IdentityResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { Field } from '../../../identities/presentation/auth/Field';

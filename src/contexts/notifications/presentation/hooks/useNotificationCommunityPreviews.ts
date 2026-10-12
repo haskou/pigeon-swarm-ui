@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react';
 
-import type {
-  Community,
-  NotificationResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../../communities/infrastructure/http/resources/CommunityResource';
+import type { NotificationResource } from '../../infrastructure/http/resources/NotificationResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { loadPublicImage } from '../../../communities/presentation/components/communityImages';

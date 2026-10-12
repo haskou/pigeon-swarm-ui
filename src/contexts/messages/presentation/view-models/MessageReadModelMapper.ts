@@ -1,7 +1,5 @@
-import type {
-  ChatMessage,
-  MessageReaction,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from './ChatMessage';
+import type { MessageReaction } from '../../infrastructure/http/MessageReaction';
 
 import { Message } from '../../domain/Message';
 import { MessageAuthorId } from '../../domain/value-objects/MessageAuthorId';

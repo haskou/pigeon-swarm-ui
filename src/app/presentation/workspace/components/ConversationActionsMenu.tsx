@@ -1,10 +1,8 @@
 import { type ReactNode, useRef } from 'react';
 
 import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
-import type {
-  ConversationResource,
-  NotificationScopeSetting,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { NotificationScopeSettingResource as NotificationScopeSetting } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationScopeSettingResource';
 
 import { VerifiedIcon } from '../../../../contexts/identities/presentation/components/VerifiedIcon';
 import { NotificationScopeMenuActions } from '../../../../contexts/notifications/presentation/components/NotificationScopeMenuActions';

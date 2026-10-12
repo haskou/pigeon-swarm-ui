@@ -1,11 +1,9 @@
 import { useCallback, useMemo } from 'react';
 
-import type {
-  Community,
-  CommunityPermission,
-  CommunityTextChannel,
-  IdentityResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
+import type { CommunityPermissionResource as CommunityPermission } from '../../infrastructure/http/resources/CommunityPermissionResource';
+import type { CommunityTextChannelResource as CommunityTextChannel } from '../../infrastructure/http/resources/CommunityTextChannelResource';
+import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
 import type { CommunityMemberListItem } from './communityMembersPanel';
 import type { CommunityMentionSuggestion } from './communityMentionPanel';
 

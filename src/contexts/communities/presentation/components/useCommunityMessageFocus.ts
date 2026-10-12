@@ -7,7 +7,7 @@ import {
   useRef,
 } from 'react';
 
-import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
 import type { CommunityChannelMessageLoadState } from './useCommunityChannelMessages';
 import type { CommunityMessageSearchResultItem } from './CommunityMessageSearchPanel';
 

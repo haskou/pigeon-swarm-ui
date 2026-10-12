@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import type { MessageLinkPreview } from '../../../../shared/domain/pigeonResources.types';
+import type { MessageLinkPreview } from '../../infrastructure/http/resources/MessageLinkPreview';
 
 import { isIndependentClient } from '../../../../shared/infrastructure/client/isIndependentClient';
 import { cx } from '../../../../shared/presentation/cx';

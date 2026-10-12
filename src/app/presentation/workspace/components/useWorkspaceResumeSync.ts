@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 
-import type { ConversationResource } from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { UseWorkspaceResumeSyncInput } from './UseWorkspaceResumeSyncInput';
 import type { WorkspaceMode } from './WorkspaceMode';
 import type { WorkspaceResumeSyncPlan } from './WorkspaceResumeSyncPlan';

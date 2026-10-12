@@ -9,18 +9,16 @@ import {
   useState,
 } from 'react';
 
+import type { AttachmentProgress } from '../../../../contexts/attachments/application/contracts/AttachmentProgress';
+import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
 import type { PendingCommunityInviteLink } from '../../../../contexts/communities/presentation/view-models/communityInviteLink';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
+import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
 import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
 import type { NetworkSynchronizationStatus } from '../../../../contexts/networks/presentation/view-models/NetworkSynchronizationStatus';
 import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
 import type { Peer } from '../../../../contexts/networks/presentation/view-models/Peer';
-import type {
-  ChatMessage,
-  AttachmentProgress,
-  Community,
-  ConversationResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 import type { MessageContextMenuState } from './messageContextMenu';
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import type { NotificationResource } from '../../../../shared/domain/pigeonResources.types';
+import type { NotificationResource } from '../../infrastructure/http/resources/NotificationResource';
 import type {
   NotificationPreview,
   NotificationPreviewContext,
