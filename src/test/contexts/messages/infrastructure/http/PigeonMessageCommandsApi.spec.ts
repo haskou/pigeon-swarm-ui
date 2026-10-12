@@ -9,6 +9,7 @@ import type { RequestSigner } from '../../../../../shared/infrastructure/http/Re
 import { PigeonMessageCommandsApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
 import { PigeonMessagesApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessagesApi';
 import { PublicMutationSigner } from '../../../../../shared/infrastructure/crypto/PublicMutationSigner';
+import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 import { ScopeFrontierReader } from '../../../../../shared/infrastructure/http/ScopeFrontierReader';
 import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
@@ -181,6 +182,36 @@ describe(PigeonMessageCommandsApi.name, () => {
       expect(publisher.settleMessageAttachments).not.toHaveBeenCalled();
       expect(decrypt).not.toHaveBeenCalled();
     });
+
+    it.each([
+      ['network error', new TypeError('Failed to fetch')],
+      ['gateway timeout', new HttpJsonError(504, 'Gateway Timeout', '')],
+    ])(
+      'keeps the uploaded attachments when the post may have been accepted (%s)',
+      async (_label, failure) => {
+        const uploaded = [{ filename: 'notes.txt' }];
+        const request = jest.fn().mockRejectedValue(failure);
+        const decrypt = jest.fn();
+        const publisher = {
+          abandonMessageAttachments: jest.fn().mockResolvedValue(undefined),
+          publishMessageAttachments: jest.fn().mockResolvedValue(uploaded),
+          settleMessageAttachments: jest.fn(),
+        };
+        const session = await sendableSession();
+
+        await expect(
+          sendingApi(request, publisher, decrypt).send(
+            session,
+            'conversation-1',
+            'Hello',
+            { attachments: [new File(['notes'], 'notes.txt')] },
+          ),
+        ).rejects.toThrow(failure.message);
+
+        expect(publisher.abandonMessageAttachments).not.toHaveBeenCalled();
+        expect(publisher.settleMessageAttachments).not.toHaveBeenCalled();
+      },
+    );
 
     it('sends without attachments and settles an empty set', async () => {
       const request = jest.fn().mockResolvedValue({ id: 'message-1' });
