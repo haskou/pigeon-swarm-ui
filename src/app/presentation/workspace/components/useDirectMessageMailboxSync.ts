@@ -2,7 +2,7 @@ import type { Dispatch, SetStateAction } from 'react';
 
 import { useEffect } from 'react';
 
-import type { DirectMessageTimelineChange } from '../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
+import type { DirectMessageTimelineChange } from '../../../../contexts/messages/infrastructure/mailbox/DirectMessageTimelineChange';
 import type {
   ChatMessage,
   ConversationResource,

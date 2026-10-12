@@ -7,7 +7,6 @@ import type { PigeonMailboxClient } from '../../../../../contexts/mailboxes/infr
 import type { MailboxReadTokens } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import type { MessageProjectionPort } from '../../../../../contexts/messages/infrastructure/crypto/MessageProjectionPort';
 import type { PigeonMessageCommandsApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
-import type { DirectMessageTimelineChange } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
 import type {
   DirectDeletedRecord,
   DirectEditedRecord,
@@ -18,6 +17,7 @@ import type {
   DirectSentRecord,
 } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxRecord';
 import type { DirectMessageMailboxState } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxStore';
+import type { DirectMessageTimelineChange } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageTimelineChange';
 import type {
   ChatMessage,
   ConversationResource,

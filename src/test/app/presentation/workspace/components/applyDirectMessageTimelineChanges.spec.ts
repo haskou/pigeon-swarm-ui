@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
-import type { DirectMessageTimelineChange } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
+import type { DirectMessageTimelineChange } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageTimelineChange';
 import type {
   ChatMessage,
   MessageResource,
