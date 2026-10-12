@@ -2,6 +2,7 @@ import { KeyPair, SHA256Hash, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { StringValueObject } from '@haskou/value-objects';
 
 import type { PigeonDeviceAuthorizationApi } from '../../../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
+import type { DeviceSealedRootRotation } from '../../../../../contexts/identities/infrastructure/http/DeviceSealedRootRotation';
 import type { DeviceIdentityVaultStore } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVaultStore';
 import type {
   IdentityResource,
@@ -17,6 +18,10 @@ import { PigeonIdentityGateway } from '../../../../../contexts/identities/infras
 import { PigeonIdentitySessionApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentitySessionApi';
 import { DeviceIdentityVault } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVault';
 import { copy } from '../../../../../shared/presentation/i18n/copy';
+
+const passthroughRoot = {
+  current: async (session: Session) => session,
+} as unknown as DeviceSealedRootRotation;
 
 function identity(id: string): IdentityResource {
   return {
@@ -84,6 +89,7 @@ describe(PigeonIdentitySessionApi.name, () => {
       identities,
       vault,
       deviceAuthorization,
+      passthroughRoot,
     );
 
     await expect(
@@ -129,7 +135,7 @@ describe(PigeonIdentitySessionApi.name, () => {
     await expect(
       new PigeonIdentitySessionApi(identities, vault, {
         synchronize: jest.fn(),
-      } as unknown as PigeonDeviceAuthorizationApi).unlock(
+      } as unknown as PigeonDeviceAuthorizationApi, passthroughRoot).unlock(
         currentIdentity.id,
         'password',
       ),
@@ -149,6 +155,7 @@ describe(PigeonIdentitySessionApi.name, () => {
       identities,
       new DeviceIdentityVault(store),
       { synchronize: jest.fn() } as unknown as PigeonDeviceAuthorizationApi,
+      passthroughRoot,
     );
 
     const unlock = sessionApi.unlock(currentIdentity.id, 'password');
@@ -170,7 +177,7 @@ describe(PigeonIdentitySessionApi.name, () => {
     await expect(
       new PigeonIdentitySessionApi(identities, vault, {
         synchronize: jest.fn(),
-      } as unknown as PigeonDeviceAuthorizationApi).unlock(
+      } as unknown as PigeonDeviceAuthorizationApi, passthroughRoot).unlock(
         currentIdentity.id,
         'wrong password',
       ),
@@ -209,6 +216,7 @@ describe(PigeonIdentitySessionApi.name, () => {
         identities,
         vault,
         deviceAuthorization,
+        passthroughRoot,
       ).unlock(currentIdentity.id, 'password'),
     ).resolves.toMatchObject({ deviceCredentialKeyPair: pairedCredential });
     expect(deviceAuthorization.synchronize).toHaveBeenCalledWith(
@@ -241,7 +249,7 @@ describe(PigeonIdentitySessionApi.name, () => {
     await expect(
       new PigeonIdentitySessionApi(identities, vault, {
         synchronize,
-      } as unknown as PigeonDeviceAuthorizationApi).unlock(
+      } as unknown as PigeonDeviceAuthorizationApi, passthroughRoot).unlock(
         currentIdentity.id,
         'password',
       ),
@@ -285,6 +293,7 @@ describe(PigeonIdentitySessionApi.name, () => {
       identities,
       vault,
       deviceAuthorization,
+      passthroughRoot,
     ).unlock(currentIdentity.id, 'password');
 
     await expect(unlock).rejects.toBeInstanceOf(DeviceRemovedError);

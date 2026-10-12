@@ -8,6 +8,7 @@ import type {
 } from '../../../../shared/domain/pigeonResources.types';
 import type { LoginIdentityProgressReporter } from '../../application/login-identity/LoginIdentityProgressReporter';
 import type { DeviceIdentityVault } from '../storage/DeviceIdentityVault';
+import type { DeviceSealedRootRotation } from './DeviceSealedRootRotation';
 import type { PigeonDeviceAuthorizationApi } from './PigeonDeviceAuthorizationApi';
 import type { PigeonIdentityGateway } from './PigeonIdentityGateway';
 
@@ -25,6 +26,7 @@ export class PigeonIdentitySessionApi {
     private readonly identities: PigeonIdentityGateway,
     private readonly vault: DeviceIdentityVault,
     private readonly deviceAuthorization: PigeonDeviceAuthorizationApi,
+    private readonly deviceSealedRoot: DeviceSealedRootRotation,
   ) {}
 
   private createLoginPayload(identity: IdentityResource): StringValueObject {
@@ -48,6 +50,19 @@ export class PigeonIdentitySessionApi {
       ),
       recoveryAuthorityKeyPair: vaultSession.material.recoveryAuthorityKeyPair,
     };
+  }
+
+  private async openDeviceSealedRoot(session: Session): Promise<Session> {
+    try {
+      return await this.deviceSealedRoot.current(session);
+    } catch {
+      // Count-only. The session keeps the masterKey fallback until the next unlock.
+      // eslint-disable-next-line no-console
+      console.debug(
+        'Device sealed root could not be opened; masterKey fallback in use.',
+      );
+      return session;
+    }
   }
 
   private validateKeyPair(identity: IdentityResource, keyPair: KeyPair): void {
@@ -120,8 +135,10 @@ export class PigeonIdentitySessionApi {
       throw new Error(copy.auth.invalidLogin);
     }
 
-    return await this.deviceAuthorization.synchronize(
+    const synchronized = await this.deviceAuthorization.synchronize(
       this.createSession(identity, vaultSession),
     );
+
+    return await this.openDeviceSealedRoot(synchronized);
   }
 }

@@ -1,3 +1,4 @@
+import type { DeviceSealedRootRotation } from '../../../../../contexts/identities/infrastructure/http/DeviceSealedRootRotation';
 import type { PigeonDeviceAuthorizationApi } from '../../../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
 import type { PigeonIdentityCommandsApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityCommandsApi';
 import type { PigeonIdentityGateway as IdentityProfileGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityGateway';
@@ -52,6 +53,7 @@ function gatewayDouble(): {
       deviceAuthorization,
       keychain as unknown as PigeonKeychainApi,
       presence,
+      {} as DeviceSealedRootRotation,
     ),
     keychain,
     profile,

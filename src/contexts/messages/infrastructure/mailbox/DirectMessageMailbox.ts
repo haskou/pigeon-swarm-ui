@@ -26,6 +26,7 @@ import type { RecipientMailboxRouter } from './RecipientMailboxRouter';
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
+import { sessionRootKey } from '../../../identities/infrastructure/session/sessionRootKey';
 import { MailboxCapability } from '../../../mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxEnvelopeCipher } from '../../../mailboxes/infrastructure/crypto/MailboxEnvelopeCipher';
 import { MailboxKeySchedule } from '../../../mailboxes/infrastructure/crypto/MailboxKeySchedule';
@@ -649,7 +650,14 @@ export class DirectMessageMailbox {
     const stored = this.store.load(keys.mailboxId);
 
     if (stored && !stored.readToken) {
-      return { keys, outcome: 'open', readers, state: stored };
+      const enrolled = await this.enrolSealed(session, keys, readers);
+
+      return {
+        keys,
+        outcome: enrolled ? 'open' : 'failed',
+        readers,
+        state: stored,
+      };
     }
 
     if (stored?.readToken) {
@@ -665,13 +673,19 @@ export class DirectMessageMailbox {
         const adopted = { cursor: stored.cursor };
 
         this.store.save(keys.mailboxId, adopted);
+        const enrolled = await this.enrolSealed(session, keys, readers);
 
-        return { keys, outcome: 'open', readers, state: adopted };
+        return {
+          keys,
+          outcome: enrolled ? 'open' : 'failed',
+          readers,
+          state: adopted,
+        };
       }
     }
 
     const state = { cursor: 0 };
-    const outcome = await this.ensureInbox(keys, readers);
+    const outcome = await this.ensureInbox(session, keys, readers);
 
     // Saved only once the inbox exists with this device's reader, so a failed
     // open leaves nothing stored and the next pass opens it again.
@@ -753,6 +767,7 @@ export class DirectMessageMailbox {
    * recovery covers a missing inbox.
    */
   private async ensureInbox(
+    session: Session,
     keys: MailboxKeys,
     readers: MailboxReadTokens,
   ): Promise<InboxOutcome> {
@@ -769,6 +784,16 @@ export class DirectMessageMailbox {
 
       return 'open';
     } catch (error: unknown) {
+      if (
+        error instanceof HttpJsonError &&
+        error.status === 409 &&
+        session.deviceSealedRootKey &&
+        (await this.enrolSealed(session, keys, readers))
+      ) {
+        this.retryOpenAt.delete(keys.mailboxId);
+
+        return 'open';
+      }
       this.retryOpenAt.set(
         keys.mailboxId,
         Date.now() + DirectMessageMailbox.OPEN_RETRY_MS,
@@ -784,11 +809,35 @@ export class DirectMessageMailbox {
   }
 
   /**
+   * Bridges the device-sealed root into the inbox. Without a sealed root the
+   * legacy readers still serve the device, so there is nothing to bridge.
+   */
+  private async enrolSealed(
+    session: Session,
+    keys: MailboxKeys,
+    readers: MailboxReadTokens,
+  ): Promise<boolean> {
+    if (!session.deviceSealedRootKey) return true;
+
+    try {
+      await this.readerSet.enrolSealedRoot(session, keys, readers);
+
+      return true;
+    } catch {
+      // Count-only: no ids, content, or error details.
+      // eslint-disable-next-line no-console
+      console.debug('Direct mailbox sealed root bridge failed; retried later.');
+
+      return false;
+    }
+  }
+
+  /**
    * The root token manages the reader set. The device token reads and acks
-   * under this device's credential. Both derive from the identity root key.
+   * under this device's credential. Both derive from the session root: the device-sealed root once opened, else the legacy master key.
    */
   private readersFor(session: Session, keys: MailboxKeys): MailboxReadTokens {
-    const rootKey = session.masterKey.getBuffer();
+    const rootKey = sessionRootKey(session).getBuffer();
 
     return {
       device: MailboxReadToken.deriveDevice(
