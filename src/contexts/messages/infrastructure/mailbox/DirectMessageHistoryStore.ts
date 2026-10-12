@@ -19,13 +19,13 @@ function recordAad(
   identityId: string,
   conversationId: string,
   recordId: string,
-): Uint8Array {
+): Uint8Array<ArrayBuffer> {
   return new TextEncoder().encode(
     JSON.stringify(['record', identityId, conversationId, recordId]),
   );
 }
 
-function canaryAad(identityId: string): Uint8Array {
+function canaryAad(identityId: string): Uint8Array<ArrayBuffer> {
   return new TextEncoder().encode(JSON.stringify(['canary', identityId]));
 }
 
@@ -54,15 +54,15 @@ async function deriveKey(root: Buffer, identityId: string): Promise<CryptoKey> {
 
 async function seal(
   key: CryptoKey,
-  aad: Uint8Array,
+  aad: Uint8Array<ArrayBuffer>,
   plaintext: Uint8Array,
-): Promise<Uint8Array> {
+): Promise<Uint8Array<ArrayBuffer>> {
   const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
   const ciphertext = new Uint8Array(
     await crypto.subtle.encrypt(
       { additionalData: aad, iv, name: 'AES-GCM' },
       key,
-      plaintext,
+      new Uint8Array(plaintext),
     ),
   );
   const sealed = new Uint8Array(IV_BYTES + ciphertext.byteLength);
@@ -75,8 +75,8 @@ async function seal(
 
 async function openSealed(
   key: CryptoKey,
-  aad: Uint8Array,
-  sealed: Uint8Array,
+  aad: Uint8Array<ArrayBuffer>,
+  sealed: Uint8Array<ArrayBuffer>,
 ): Promise<Uint8Array | undefined> {
   try {
     return new Uint8Array(
@@ -240,14 +240,14 @@ export class DirectMessageHistoryStore {
 
   private async readCanary(
     identityId: string,
-  ): Promise<Uint8Array | undefined> {
+  ): Promise<Uint8Array<ArrayBuffer> | undefined> {
     const db = await this.open();
 
     try {
       const transaction = db.transaction(CANARIES_STORE, 'readonly');
-      const canary = await request<Uint8Array | undefined>(
+      const canary = await request<Uint8Array<ArrayBuffer> | undefined>(
         transaction.objectStore(CANARIES_STORE).get(identityId) as IDBRequest<
-          Uint8Array | undefined
+          Uint8Array<ArrayBuffer> | undefined
         >,
       );
 
