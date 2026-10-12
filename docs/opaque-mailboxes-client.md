@@ -5,7 +5,7 @@ Client side of haskou/pigeon-swarm-node#289. Module: `src/contexts/mailboxes/`.
 ## Scope
 
 - 1:1 channel at epoch 0 only.
-- Wired into direct 1:1 text (spike). See Direct messages below.
+- Wired into direct 1:1 messages (spike): sent, edited, deleted, and reactions. See Direct messages below.
 - No rotation announcement and no realtime hint.
 
 ## Key schedule
@@ -70,6 +70,7 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 - Body = base64url(iv ‖ ciphertext ‖ tag), AES-256-GCM with the envelope key.
 - AAD = `${mailboxId}.${envelopeId}`.
 - Plaintext framing: u32be(length) ‖ plaintext, zero-padded to the bucket.
+- `MailboxEnvelopeCipher.MAX_PLAINTEXT_BYTES` (65504) is the largest plaintext that fits: the largest bucket minus IV, tag, and length prefix.
 
 ## HTTP (`PigeonMailboxClient`)
 
@@ -101,11 +102,26 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 
 ## Direct messages (spike)
 
-- Scope: one-to-one text with no attachments, reply, or sticker. Anything else stays on the legacy path (`deliver` returns `skipped`).
-- Send: the legacy POST runs first and is unchanged. The sent record is then appended to the recipient's inbox (`DirectMessageMailbox.deliver`). A failed append returns `failed` and is silent for the user. The facade logs one count-only debug line (no ids, content, or error details). There is no automatic retry, so the legacy copy is never duplicated.
-- Recipient: the active one-to-one conversation is polled about every 5 s (`useDirectMessageMailboxSync`). Each page is decrypted, applied to the timeline, then acknowledged. The cursor advances only after a successful ack. Replays collapse by message id in `MessageCollection.merge`.
+- Scope: one-to-one conversations only. Group conversations stay on the legacy path (`skipped`). Attachments, replies, and stickers travel as opaque encrypted payload inside the sent record.
+
+| Kind | Mailbox record | Status |
+| --- | --- | --- |
+| Sent: text, reply, attachments, sticker | `sent` (`replyToMessageId` for replies) | Carried |
+| Edited | `edited` (`targetMessageId`) | Carried |
+| Deleted | `deleted` (`targetMessageId`) | Carried |
+| Reaction add / remove | `reaction` (`action`, `emoji`, `targetMessageId`) | Carried |
+| Read receipts | none | Not carried: `ConversationReadMarker.mark` is actor-local, so no peer-visible receipt exists to deliver. |
+| Thread send, edit, delete, reaction | none | Not carried: thread hooks do not route through the mailbox and stay legacy-only. |
+| Pins | none | Not carried: known gap. Pin state does not reach the mailbox. |
+
+- Envelope: plaintext is `{kind:'direct-message', version:2, record}`. `record.type` is `sent`, `edited`, `deleted`, or `reaction`. `DirectMessageMailboxRecord.decode` returns null for a wrong kind or version, a wrong conversation, missing or invalid fields, an unknown type, or a bad reaction action.
+- v1 `direct-text` envelopes decode to null and are acknowledged, so they do not block the inbox. Legacy delivery covers them; nothing is migrated.
+- Size: a record whose plaintext exceeds `MailboxEnvelopeCipher.MAX_PLAINTEXT_BYTES` is skipped and stays on the legacy path (see Envelopes).
+- Send: the legacy POST runs first and is unchanged. The mailbox append follows through `deliverSent`, `deliverEdit`, `deliverDelete`, or `deliverReaction`. Each returns `delivered`, `failed`, or `skipped`. `skipped` covers no peer, a group conversation, or an oversized record. `failed` covers any throw, including a 404 and a missing conversation key. A failed append is silent for the user. The facade logs one count-only debug line (no ids, content, or error details). There is no automatic retry, so the legacy copy is never duplicated.
+- Recipient: the active one-to-one conversation is polled about every 5 s (`useDirectMessageMailboxSync`). Each page is decrypted in envelope order into timeline changes (`message`, `edit`, `removed`, `reaction`), applied, then acknowledged. The cursor advances only after a successful ack. Messages collapse by id in `MessageCollection.merge`. A sent or edited change is dropped when its message does not decrypt.
+- Known limit: a reaction add replayed after a later legacy remove can resurrect the reaction until the mailbox remove applies.
 - Pre-create: the first sync creates the recipient inbox and enrols this device's reader before the first read. Overlapping passes share one creation (`MailboxChannel.createInbox`), so a StrictMode remount sends one PUT. A failure is silent; the read's 404 recovery covers it on the next pass.
-- A 404 on append means the recipient inbox does not exist: the recipient has not opened the conversation yet, or it was evicted and not re-created. That is expected, so `deliver` returns `failed` with no user notice. The legacy copy still delivers.
+- A 404 on append means the recipient inbox does not exist: the recipient has not opened the conversation yet, or it was evicted and not re-created. That is expected, so the sender returns `failed` with no user notice. The legacy copy still delivers.
 - A failing sync shows one notice unless another error is already shown. The next successful pass clears only that notice.
 - The cursor is stored in localStorage under `pigeon.direct-mailbox.<mailboxId>` (scoped per client). Both reader tokens are derived, so clearing storage loses only the cursor. A legacy `readToken` in an existing entry is adopted on the first pass (see Read token, Residual risk).
 - A stored cursor is reset to 0 when the inbox is re-created (see Creation difficulty and recovery).
