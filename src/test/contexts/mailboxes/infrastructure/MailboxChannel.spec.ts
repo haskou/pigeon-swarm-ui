@@ -14,6 +14,8 @@ import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonEr
 describe(MailboxChannel.name, () => {
   const bytes = (text: string): Uint8Array => new TextEncoder().encode(text);
   const readToken = 'read-token-for-bob';
+  const deviceToken = 'device-read-token-for-bob';
+  const readers = { device: deviceToken, root: readToken };
   const keys = MailboxKeySchedule.derive(
     new Uint8Array(32).fill(3),
     'identity-bob',
@@ -131,7 +133,7 @@ describe(MailboxChannel.name, () => {
       hasMore: true,
     });
 
-    const page = await channel.read(keys, readToken, 0, 3);
+    const page = await channel.read(keys, readers, 0, 3);
 
     expect(client.read).toHaveBeenCalledWith(keys.mailboxId, readToken, 0, 3);
     expect(
@@ -152,7 +154,7 @@ describe(MailboxChannel.name, () => {
 
     client.read.mockResolvedValue({ envelopes: [], hasMore: false });
 
-    await expect(channel.read(keys, readToken, 7, 10)).resolves.toEqual({
+    await expect(channel.read(keys, readers, 7, 10)).resolves.toEqual({
       envelopes: [],
       hasMore: false,
       lastCursor: 7,
@@ -160,16 +162,15 @@ describe(MailboxChannel.name, () => {
     });
   });
 
-  it('acknowledges a cursor with the read token', async () => {
+  it('acknowledges with the device reader, then mirrors the cursor onto the root reader', async () => {
     const { channel, client } = setup();
 
-    await channel.acknowledge(keys, readToken, 3);
+    await channel.acknowledge(keys, readers, 3);
 
-    expect(client.acknowledge).toHaveBeenCalledWith(
-      keys.mailboxId,
-      readToken,
-      3,
-    );
+    expect(client.acknowledge.mock.calls).toEqual([
+      [keys.mailboxId, deviceToken, 3],
+      [keys.mailboxId, readToken, 3],
+    ]);
   });
 
   describe('creation difficulty', () => {
@@ -296,7 +297,7 @@ describe(MailboxChannel.name, () => {
         .mockRejectedValueOnce(new MailboxUnavailableError())
         .mockResolvedValueOnce({ envelopes: [], hasMore: false });
 
-      await expect(channel.read(keys, readToken, 7, 10)).resolves.toEqual({
+      await expect(channel.read(keys, readers, 7, 10)).resolves.toEqual({
         envelopes: [],
         hasMore: false,
         lastCursor: 7,
@@ -312,6 +313,17 @@ describe(MailboxChannel.name, () => {
       expect(client.create.mock.invocationCallOrder[0]).toBeLessThan(
         client.read.mock.invocationCallOrder[1],
       );
+      expect(client.addReader).toHaveBeenCalledWith(
+        keys.mailboxId,
+        readToken,
+        MailboxCapability.hash(deviceToken),
+      );
+      expect(client.addReader.mock.invocationCallOrder[0]).toBeGreaterThan(
+        client.create.mock.invocationCallOrder[0],
+      );
+      expect(client.addReader.mock.invocationCallOrder[0]).toBeLessThan(
+        client.read.mock.invocationCallOrder[1],
+      );
     });
 
     it('gives up after one re-creation when the read is still unavailable', async () => {
@@ -319,31 +331,35 @@ describe(MailboxChannel.name, () => {
 
       client.read.mockRejectedValue(new MailboxUnavailableError());
 
-      await expect(channel.read(keys, readToken, 0, 10)).rejects.toBeInstanceOf(
+      await expect(channel.read(keys, readers, 0, 10)).rejects.toBeInstanceOf(
         MailboxUnavailableError,
       );
       expect(client.create).toHaveBeenCalledTimes(1);
       expect(client.read).toHaveBeenCalledTimes(2);
     });
 
-    it('re-creates the mailbox before retrying an acknowledgement', async () => {
+    it('re-creates the mailbox before retrying an acknowledgement, then re-enrols the device reader', async () => {
       const { channel, client } = setup();
 
       client.acknowledge
         .mockRejectedValueOnce(new MailboxUnavailableError())
-        .mockResolvedValueOnce(undefined);
+        .mockResolvedValue(undefined);
 
-      await expect(channel.acknowledge(keys, readToken, 3)).resolves.toEqual({
+      await expect(channel.acknowledge(keys, readers, 3)).resolves.toEqual({
         recreated: true,
       });
 
       expect(client.create).toHaveBeenCalledTimes(1);
-      expect(client.acknowledge).toHaveBeenCalledTimes(2);
-      expect(client.acknowledge).toHaveBeenLastCalledWith(
+      expect(client.addReader).toHaveBeenCalledWith(
         keys.mailboxId,
         readToken,
-        3,
+        MailboxCapability.hash(deviceToken),
       );
+      expect(client.acknowledge.mock.calls).toEqual([
+        [keys.mailboxId, deviceToken, 3],
+        [keys.mailboxId, deviceToken, 3],
+        [keys.mailboxId, readToken, 3],
+      ]);
     });
 
     it('does not re-create the mailbox when a sender append is unavailable', async () => {
@@ -355,6 +371,44 @@ describe(MailboxChannel.name, () => {
         MailboxUnavailableError,
       );
       expect(client.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('reader set', () => {
+    it('lists the readers with the root reader', async () => {
+      const { channel, client } = setup();
+      const readerSet = { maxReaders: 8, readers: [] };
+
+      client.readers.mockResolvedValue(readerSet);
+
+      await expect(channel.listReaders(keys, readToken)).resolves.toEqual(
+        readerSet,
+      );
+      expect(client.readers).toHaveBeenCalledWith(keys.mailboxId, readToken);
+    });
+
+    it('adds a reader by its hash, authorised by the given reader', async () => {
+      const { channel, client } = setup();
+
+      await channel.addReader(keys, readToken, deviceToken);
+
+      expect(client.addReader).toHaveBeenCalledWith(
+        keys.mailboxId,
+        readToken,
+        MailboxCapability.hash(deviceToken),
+      );
+    });
+
+    it('removes a reader by its hash, authorised by the given reader', async () => {
+      const { channel, client } = setup();
+
+      await channel.removeReader(keys, readToken, 'stale-hash');
+
+      expect(client.removeReader).toHaveBeenCalledWith(
+        keys.mailboxId,
+        readToken,
+        'stale-hash',
+      );
     });
   });
 });

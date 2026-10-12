@@ -185,4 +185,77 @@ describe(PigeonMailboxClient.name, () => {
       }),
     ).rejects.toBeInstanceOf(HttpJsonError);
   });
+
+  it('lists the readers with GET authorised by a reader token', async () => {
+    const { client, http } = setup();
+    const readerSet = {
+      maxReaders: 8,
+      readers: [{ ackedCursor: 4, readTokenHash: 'hash-1' }],
+    };
+
+    http.request.mockResolvedValue(readerSet);
+
+    await expect(client.readers(mailboxId, 'root-token')).resolves.toEqual(
+      readerSet,
+    );
+    expect(http.request).toHaveBeenCalledWith('/mailboxes/mailbox-1/readers', {
+      headers: { Authorization: 'Bearer root-token' },
+    });
+  });
+
+  it('adds a reader with POST carrying only its hash, authorised by a reader token', async () => {
+    const { client, http } = setup();
+
+    http.request.mockResolvedValue(undefined);
+
+    await client.addReader(mailboxId, 'root-token', 'device-hash');
+
+    expect(http.request).toHaveBeenCalledWith('/mailboxes/mailbox-1/readers', {
+      body: JSON.stringify({ readTokenHash: 'device-hash' }),
+      headers: { Authorization: 'Bearer root-token' },
+      method: 'POST',
+    });
+  });
+
+  it('removes a reader by hash with DELETE, authorised by a reader token', async () => {
+    const { client, http } = setup();
+
+    http.request.mockResolvedValue(undefined);
+
+    await client.removeReader(mailboxId, 'root-token', 'stale-hash');
+
+    expect(http.request).toHaveBeenCalledWith(
+      '/mailboxes/mailbox-1/readers/stale-hash',
+      {
+        headers: { Authorization: 'Bearer root-token' },
+        method: 'DELETE',
+      },
+    );
+  });
+
+  it('maps a 404 on the reader routes to MailboxUnavailableError', async () => {
+    const { client, http } = setup();
+
+    http.request.mockRejectedValue(new HttpJsonError(404, 'Not Found', ''));
+
+    await expect(client.readers(mailboxId, 'root-token')).rejects.toBeInstanceOf(
+      MailboxUnavailableError,
+    );
+    await expect(
+      client.addReader(mailboxId, 'root-token', 'device-hash'),
+    ).rejects.toBeInstanceOf(MailboxUnavailableError);
+    await expect(
+      client.removeReader(mailboxId, 'root-token', 'stale-hash'),
+    ).rejects.toBeInstanceOf(MailboxUnavailableError);
+  });
+
+  it('propagates a 409 when the reader set is full as HttpJsonError', async () => {
+    const { client, http } = setup();
+
+    http.request.mockRejectedValue(new HttpJsonError(409, 'Conflict', ''));
+
+    await expect(
+      client.addReader(mailboxId, 'root-token', 'device-hash'),
+    ).rejects.toBeInstanceOf(HttpJsonError);
+  });
 });
