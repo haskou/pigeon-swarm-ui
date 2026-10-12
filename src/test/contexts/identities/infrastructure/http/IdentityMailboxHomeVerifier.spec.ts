@@ -29,7 +29,7 @@ async function fixture(
   const id = IdentityId.fromString(keyPair.toPrimitives().publicKey).valueOf();
   const deviceCredential = (await KeyPair.generate()).toPrimitives().publicKey;
   const unsigned = await new IdentitySignaturePayloadFactory(
-    mailboxHome,
+    () => mailboxHome,
   ).createInitial({
     deviceCredential,
     deviceCredentialCommitment:
@@ -51,17 +51,25 @@ async function fixture(
 }
 
 describe(IdentityMailboxHomeVerifier.name, () => {
-  it('returns the origin when the identity signature covers it', async () => {
+  it('returns the base when the identity signature covers it', async () => {
     const { id, identity } = await fixture(HOME);
 
-    expect(IdentityMailboxHomeVerifier.verifiedOrigin(id, identity)).toBe(HOME);
+    expect(IdentityMailboxHomeVerifier.verifiedBase(id, identity)).toBe(HOME);
+  });
+
+  it('returns a path-prefixed base the identity signature covers', async () => {
+    const { id, identity } = await fixture(`${HOME}/api`);
+
+    expect(IdentityMailboxHomeVerifier.verifiedBase(id, identity)).toBe(
+      `${HOME}/api`,
+    );
   });
 
   it('rejects a mailbox home altered after signing', async () => {
     const { id, identity } = await fixture(HOME);
 
     expect(
-      IdentityMailboxHomeVerifier.verifiedOrigin(id, {
+      IdentityMailboxHomeVerifier.verifiedBase(id, {
         ...identity,
         mailboxHome: 'https://attacker.example',
       }),
@@ -73,7 +81,7 @@ describe(IdentityMailboxHomeVerifier.name, () => {
     const other = await fixture();
 
     expect(
-      IdentityMailboxHomeVerifier.verifiedOrigin(other.id, identity),
+      IdentityMailboxHomeVerifier.verifiedBase(other.id, identity),
     ).toBeUndefined();
   });
 
@@ -81,11 +89,11 @@ describe(IdentityMailboxHomeVerifier.name, () => {
     const { id, identity } = await fixture(HOME, () => 'forged-commitment');
 
     expect(
-      IdentityMailboxHomeVerifier.verifiedOrigin(id, identity),
+      IdentityMailboxHomeVerifier.verifiedBase(id, identity),
     ).toBeUndefined();
   });
 
-  it('rejects a signed origin that fails host validation', async () => {
+  it('rejects a signed base that fails host validation', async () => {
     const { id, keyPair, unsigned } = await fixture();
     const identity = publish(keyPair, {
       ...unsigned,
@@ -93,7 +101,7 @@ describe(IdentityMailboxHomeVerifier.name, () => {
     });
 
     expect(
-      IdentityMailboxHomeVerifier.verifiedOrigin(id, identity),
+      IdentityMailboxHomeVerifier.verifiedBase(id, identity),
     ).toBeUndefined();
   });
 
@@ -101,7 +109,7 @@ describe(IdentityMailboxHomeVerifier.name, () => {
     const { id, identity } = await fixture();
 
     expect(
-      IdentityMailboxHomeVerifier.verifiedOrigin(id, identity),
+      IdentityMailboxHomeVerifier.verifiedBase(id, identity),
     ).toBeUndefined();
   });
 
@@ -109,7 +117,7 @@ describe(IdentityMailboxHomeVerifier.name, () => {
     const { id, identity } = await fixture(HOME);
 
     expect(
-      IdentityMailboxHomeVerifier.verifiedOrigin(id, {
+      IdentityMailboxHomeVerifier.verifiedBase(id, {
         ...identity,
         signature: '',
       }),
@@ -120,13 +128,13 @@ describe(IdentityMailboxHomeVerifier.name, () => {
     const { id, identity } = await fixture(HOME);
 
     expect(() =>
-      IdentityMailboxHomeVerifier.verifiedOrigin(id, {
+      IdentityMailboxHomeVerifier.verifiedBase(id, {
         ...identity,
         signature: 'not-a-signature',
       }),
     ).not.toThrow();
     expect(
-      IdentityMailboxHomeVerifier.verifiedOrigin(id, {
+      IdentityMailboxHomeVerifier.verifiedBase(id, {
         ...identity,
         signature: 'not-a-signature',
       }),
@@ -137,6 +145,6 @@ describe(IdentityMailboxHomeVerifier.name, () => {
     const { id, identity } = await fixture(HOME);
     const served = JSON.parse(JSON.stringify(identity)) as IdentityResource;
 
-    expect(IdentityMailboxHomeVerifier.verifiedOrigin(id, served)).toBe(HOME);
+    expect(IdentityMailboxHomeVerifier.verifiedBase(id, served)).toBe(HOME);
   });
 });
