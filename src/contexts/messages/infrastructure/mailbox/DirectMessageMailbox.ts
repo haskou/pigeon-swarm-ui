@@ -48,6 +48,8 @@ export class DirectMessageMailbox {
   private static readonly PAGE_SIZE = 50;
   private static readonly EPOCH = 0;
 
+  private readonly opening = new Map<string, Promise<RecipientInbox>>();
+
   public constructor(
     private readonly channel: MailboxChannel,
     private readonly store: DirectMessageMailboxStore,
@@ -120,7 +122,7 @@ export class DirectMessageMailbox {
   ): Promise<void> {
     if (signal.aborted) return;
 
-    const inbox = await this.openInbox(session, conversationId);
+    const inbox = await this.openInboxShared(session, conversationId);
 
     if (signal.aborted) return;
 
@@ -172,12 +174,34 @@ export class DirectMessageMailbox {
 
     const state = { cursor: 0 };
 
-    // Saved before the create, so a concurrent pass takes the same path and
-    // shares the in-flight create (see MailboxChannel.createInbox).
+    // Saved before the create: a pass that starts after this open settles
+    // reads the stored state, while overlapping passes await this open.
     this.store.save(keys.mailboxId, state);
     await this.ensureInbox(keys, readers);
 
     return { keys, readers, state };
+  }
+
+  /**
+   * Overlapping passes share one open. A pass that starts while the inbox is
+   * still being created awaits that create, so it never reads a missing inbox.
+   */
+  private openInboxShared(
+    session: Session,
+    conversationId: string,
+  ): Promise<RecipientInbox> {
+    const key = `${session.identity.id}:${conversationId}`;
+    const inFlight = this.opening.get(key);
+
+    if (inFlight) return inFlight;
+
+    const opening = this.openInbox(session, conversationId).finally(() => {
+      this.opening.delete(key);
+    });
+
+    this.opening.set(key, opening);
+
+    return opening;
   }
 
   /**
