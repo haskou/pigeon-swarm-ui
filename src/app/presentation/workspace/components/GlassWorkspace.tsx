@@ -792,8 +792,23 @@ export function GlassWorkspace({
     updateCommunityState,
   });
 
+  const handleMailboxConversationRead = useCallback(
+    (conversationId: string): void => {
+      clearUnreadMessages(conversationId);
+      setConversations((current) =>
+        current.map((conversation) =>
+          conversation.id === conversationId
+            ? { ...conversation, unreadCount: 0 }
+            : conversation,
+        ),
+      );
+    },
+    [clearUnreadMessages, setConversations],
+  );
+
   useDirectMessageMailboxSync({
     activeConversation,
+    onConversationRead: handleMailboxConversationRead,
     onErrorChange: setSendError,
     onMessagesChange: setMessages,
     session,

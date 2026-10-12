@@ -54,10 +54,12 @@ function mountSync(initialError: string | null = null) {
   });
   const onMessagesChange =
     jest.fn<(update: SetStateAction<ChatMessage[]>) => void>();
+  const onConversationRead = jest.fn<(conversationId: string) => void>();
 
   mockEffects.length = 0;
   useDirectMessageMailboxSync({
     activeConversation: conversation,
+    onConversationRead,
     onErrorChange,
     onMessagesChange,
     session,
@@ -67,6 +69,7 @@ function mountSync(initialError: string | null = null) {
   return {
     cleanup,
     error: () => error,
+    onConversationRead,
     onErrorChange,
     onMessagesChange,
     replaceError: (value: string) => {
@@ -227,6 +230,20 @@ describe('useDirectMessageMailboxSync changes', () => {
     await settle();
 
     expect(mounted.onMessagesChange).not.toHaveBeenCalled();
+    mounted.cleanup();
+  });
+
+  it('signals the conversation read on a read change', async () => {
+    sync.mockImplementation((_session, _conversationId, _signal, apply) => {
+      apply([{ kind: 'read', messageId: 'message-1' }]);
+
+      return Promise.resolve();
+    });
+    const mounted = mountSync();
+
+    await settle();
+
+    expect(mounted.onConversationRead).toHaveBeenCalledWith('conversation-1');
     mounted.cleanup();
   });
 });

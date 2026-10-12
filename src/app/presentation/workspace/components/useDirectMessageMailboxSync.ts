@@ -18,6 +18,7 @@ const SYNC_INTERVAL_MS = 5000;
 
 type DirectMessageMailboxSyncInput = {
   activeConversation: ConversationResource | undefined;
+  onConversationRead: (conversationId: string) => void;
   onErrorChange: Dispatch<SetStateAction<string | null>>;
   onMessagesChange: Dispatch<SetStateAction<ChatMessage[]>>;
   session: Session;
@@ -34,6 +35,7 @@ type DirectMessageMailboxSyncInput = {
  */
 export function useDirectMessageMailboxSync({
   activeConversation,
+  onConversationRead,
   onErrorChange,
   onMessagesChange,
   session,
@@ -63,6 +65,9 @@ export function useDirectMessageMailboxSync({
               onMessagesChange((current) =>
                 applyDirectMessageTimelineChanges(current, changes),
               );
+            }
+            if (changes.some((change) => change.kind === 'read')) {
+              onConversationRead(conversationId);
             }
           },
         );
@@ -101,5 +106,11 @@ export function useDirectMessageMailboxSync({
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [conversationId, onErrorChange, onMessagesChange, session]);
+  }, [
+    conversationId,
+    onConversationRead,
+    onErrorChange,
+    onMessagesChange,
+    session,
+  ]);
 }

@@ -36,6 +36,8 @@ export function applyDirectMessageTimelineChanges(
               )
             : message,
         );
+      case 'read':
+        return messages;
     }
   }, current);
 }
