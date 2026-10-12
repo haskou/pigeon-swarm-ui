@@ -14,8 +14,14 @@ function fakeServices({
   unlockFails?: boolean;
 }) {
   const calls: string[] = [];
+  const wiped: string[] = [];
   const services: ForgetDeviceServices = {
     directMessages: {
+      forgetHistory: (identityId) => {
+        wiped.push(identityId);
+
+        return Promise.resolve();
+      },
       releaseDeviceReaders: () => {
         calls.push('release');
 
@@ -38,7 +44,7 @@ function fakeServices({
     },
   };
 
-  return { calls, services };
+  return { calls, services, wiped };
 }
 
 describe('forgetCurrentDevice', () => {
@@ -106,5 +112,50 @@ describe('forgetCurrentDevice', () => {
       'unlock-failed',
     );
     expect(calls).toEqual(['retire', 'release', 'unlock:identity-1']);
+  });
+
+  it('wipes this identity direct history when the device is forgotten', async () => {
+    const { services, wiped } = fakeServices({
+      retirement: () => Promise.resolve('revoked'),
+    });
+
+    await expect(forgetCurrentDevice(session, services, false)).resolves.toBe(
+      'forgotten',
+    );
+    expect(wiped).toEqual(['identity-1']);
+  });
+
+  it('keeps direct history when revocation fails', async () => {
+    const { services, wiped } = fakeServices({
+      retirement: () => Promise.reject(new Error('network')),
+    });
+
+    await expect(forgetCurrentDevice(session, services, false)).resolves.toBe(
+      'revoke-failed',
+    );
+    expect(wiped).toEqual([]);
+  });
+
+  it('keeps direct history for the only device until the user confirms', async () => {
+    const { services, wiped } = fakeServices({
+      retirement: () => Promise.resolve('last-device'),
+    });
+
+    await expect(forgetCurrentDevice(session, services, false)).resolves.toBe(
+      'only-device',
+    );
+    expect(wiped).toEqual([]);
+  });
+
+  it('wipes direct history once revoked even when the local unlock removal fails', async () => {
+    const { services, wiped } = fakeServices({
+      retirement: () => Promise.resolve('revoked'),
+      unlockFails: true,
+    });
+
+    await expect(forgetCurrentDevice(session, services, false)).resolves.toBe(
+      'unlock-failed',
+    );
+    expect(wiped).toEqual(['identity-1']);
   });
 });

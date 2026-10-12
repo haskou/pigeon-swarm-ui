@@ -30,7 +30,11 @@ jest.mock('react', () => ({
 }));
 jest.mock('../../../../../app/composition/applicationContainer', () => ({
   applicationContainer: {
-    directMessages: { hintTarget: jest.fn(), sync: jest.fn() },
+    directMessages: {
+      hintTarget: jest.fn(),
+      restore: jest.fn(),
+      sync: jest.fn(),
+    },
   },
 }));
 jest.mock('../../../../../app/presentation/realtime/useRealtimeEvents', () => ({
@@ -39,6 +43,7 @@ jest.mock('../../../../../app/presentation/realtime/useRealtimeEvents', () => ({
 
 const POLL_MS = 5000;
 const sync = jest.mocked(applicationContainer.directMessages.sync);
+const restore = jest.mocked(applicationContainer.directMessages.restore);
 const conversation = {
   id: 'conversation-1',
   type: 'one-to-one',
@@ -200,6 +205,23 @@ describe('useDirectMessageMailboxSync changes', () => {
     jest.useRealTimers();
     Reflect.deleteProperty(globalThis, 'window');
     sync.mockReset();
+  });
+
+  it('restores stored direct history before the first sync pass', async () => {
+    restore.mockClear();
+    sync.mockResolvedValue(undefined);
+    mountSync();
+    await settle();
+
+    expect(restore).toHaveBeenCalledWith(
+      session,
+      conversation.id,
+      expect.any(AbortSignal),
+      expect.any(Function),
+    );
+    expect(restore.mock.invocationCallOrder[0]).toBeLessThan(
+      sync.mock.invocationCallOrder[0],
+    );
   });
 
   it('applies reported changes to the timeline', async () => {
