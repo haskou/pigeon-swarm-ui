@@ -31,6 +31,7 @@ import { MailboxKeySchedule } from '../../../mailboxes/infrastructure/crypto/Mai
 import { MailboxReadToken } from '../../../mailboxes/infrastructure/crypto/MailboxReadToken';
 import { MailboxUnavailableError } from '../../../mailboxes/infrastructure/http/MailboxUnavailableError';
 import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
+import { DirectMessageAuthorship } from './DirectMessageAuthorship';
 import { DirectMessageMailboxRecord } from './DirectMessageMailboxRecord';
 import { DirectMessageMailboxStore } from './DirectMessageMailboxStore';
 
@@ -426,7 +427,8 @@ export class DirectMessageMailbox {
 
   /**
    * Shared sender path. Builds the record once, so the peer copy and the own
-   * copy carry the same id and bytes. Skips without sending when there is no
+   * copy carry the same id and record. Only the own copy is tagged. Skips
+   * without sending when there is no
    * peer, the conversation is a group, or the record exceeds the envelope
    * bound. Reading the peer and building the record run inside the try, so a
    * throw there is 'failed'. The peer copy alone decides the result. The own
@@ -450,7 +452,7 @@ export class DirectMessageMailbox {
       }
 
       const record = build();
-      const plaintext = DirectMessageMailboxRecord.encode(record);
+      const plaintext = this.encodeFor(session, recipientIdentityId, record);
 
       if (plaintext.byteLength > MailboxEnvelopeCipher.MAX_PLAINTEXT_BYTES) {
         return 'skipped';
@@ -470,7 +472,7 @@ export class DirectMessageMailbox {
         session,
         conversation.id,
         session.identity.id,
-        plaintext,
+        this.encodeFor(session, session.identity.id, record),
       );
 
       return delivery;
@@ -504,7 +506,7 @@ export class DirectMessageMailbox {
         return 'skipped';
       }
 
-      const plaintext = DirectMessageMailboxRecord.encode(build());
+      const plaintext = this.encodeFor(session, recipient, build());
 
       if (plaintext.byteLength > MailboxEnvelopeCipher.MAX_PLAINTEXT_BYTES) {
         return 'skipped';
@@ -525,6 +527,23 @@ export class DirectMessageMailbox {
 
       return 'failed';
     }
+  }
+
+  /**
+   * Encodes a record for one inbox. Only this identity's own inbox gets the
+   * authorship tag, because only that inbox is checked for it on read.
+   */
+  private encodeFor(
+    session: Session,
+    recipientIdentityId: string,
+    record: DirectMessageRecord,
+  ): Uint8Array {
+    return DirectMessageMailboxRecord.encode(
+      record,
+      recipientIdentityId === session.identity.id
+        ? DirectMessageAuthorship.tag(session.masterKey.getBuffer(), record)
+        : undefined,
+    );
   }
 
   /**
@@ -813,6 +832,13 @@ export class DirectMessageMailbox {
       const decoded = DirectMessageMailboxRecord.decode(
         envelope.plaintext,
         conversationId,
+        (record, authorTag) =>
+          DirectMessageAuthorship.isAuthentic(
+            session.identity.id,
+            session.masterKey.getBuffer(),
+            record,
+            authorTag,
+          ),
       );
 
       if (!decoded) return [];
@@ -919,6 +945,13 @@ export class DirectMessageMailbox {
       const record = DirectMessageMailboxRecord.decode(
         envelope.plaintext,
         conversationId,
+        (decodedRecord, authorTag) =>
+          DirectMessageAuthorship.isAuthentic(
+            session.identity.id,
+            session.masterKey.getBuffer(),
+            decodedRecord,
+            authorTag,
+          ),
       );
 
       if (record?.type === 'read' && this.isOwnFreshRead(session, record)) {
