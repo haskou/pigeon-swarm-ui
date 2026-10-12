@@ -142,6 +142,10 @@ export class PigeonApiGateway {
     keychainCipher: KeychainCipher = new KeychainCipher(),
     conversationIds: ConversationIdFactory = new ConversationIdFactory(),
     attachmentCipher: AttachmentCipher = AttachmentCipher.inCurrentThread(),
+    storage: Pick<
+      Storage,
+      'getItem' | 'removeItem' | 'setItem'
+    > = globalThis.localStorage,
   ) {
     this.attachmentCipher = attachmentCipher;
     this.identityVault = new DeviceIdentityVault();
@@ -218,7 +222,7 @@ export class PigeonApiGateway {
     });
     const privateBlobReplicator = new PrivateBlobReplicator(
       privateBlobs,
-      new PrivateBlobUploadLedger(globalThis.localStorage, (session) =>
+      new PrivateBlobUploadLedger(storage, (session) =>
         scopeClientStorageKey(
           `pigeon:privateBlobUploads:${session.identity.id}`,
         ),
