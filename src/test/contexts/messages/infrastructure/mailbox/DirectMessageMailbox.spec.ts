@@ -69,6 +69,7 @@ describe(DirectMessageMailbox.name, () => {
 
   const conversation = {
     id: conversationId,
+    networkId: 'network-1',
     participantIds: ['alice', 'bob'],
     type: 'one-to-one',
   } as unknown as ConversationResource;
@@ -374,7 +375,9 @@ describe(DirectMessageMailbox.name, () => {
       const { channel, composer, mailbox } = setup();
       channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
 
-      await mailbox.send(session('alice'), conversation, 'hello', {
+      const alice = session('alice');
+
+      await mailbox.send(alice, conversation, 'hello', {
         attachmentUpload: {
           encryptLargeAttachments: false,
           encryptSmallAttachments: false,
@@ -382,7 +385,7 @@ describe(DirectMessageMailbox.name, () => {
       });
 
       expect(composer.withSentRecord).toHaveBeenCalledWith(
-        session('alice'),
+        alice,
         conversationId,
         'hello',
         expect.objectContaining({
