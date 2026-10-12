@@ -1,3 +1,7 @@
+import { EncryptedPayload, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+
+import type { KeychainResource } from '../../../../../contexts/identities/infrastructure/http/resources/KeychainResource';
+import type { LocalKeychain } from '../../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { KeychainCipher } from '../../../../../contexts/identities/infrastructure/crypto/KeychainCipher';
@@ -67,5 +71,71 @@ describe(KeychainCipher.name, () => {
     expect(result.body.previousKeychainExternalIdentifier).toBe(
       'keychain-previous',
     );
+  });
+
+  describe('device-sealed root only', () => {
+    const masterKey = SymmetricKey.generate();
+    const rootKey = SymmetricKey.generate();
+    const keychain: LocalKeychain = { conversations: {}, version: 1 };
+    const sealedUnder = (key: SymmetricKey): KeychainResource =>
+      ({
+        encryptedPayload: key.encrypt(JSON.stringify(keychain)).toString(),
+      }) as KeychainResource;
+    const sessionWith = (extra: Record<string, unknown> = {}): Session =>
+      ({
+        identity: { id: 'identity-1' },
+        keyPair: {
+          sign: jest.fn().mockResolvedValue({ toString: () => 'signature' }),
+        },
+        masterKey,
+        password: 'secret',
+        ...extra,
+      }) as unknown as Session;
+
+    it('opens a head sealed under the root', () => {
+      expect(
+        new KeychainCipher().decrypt(
+          sessionWith({ deviceSealedRootKey: rootKey }),
+          sealedUnder(rootKey),
+        ),
+      ).toMatchObject({ version: 1 });
+    });
+
+    it('does not open a head sealed under the master key while a root is held', () => {
+      expect(() =>
+        new KeychainCipher().decrypt(
+          sessionWith({ deviceSealedRootKey: rootKey }),
+          sealedUnder(masterKey),
+        ),
+      ).toThrow();
+    });
+
+    it('does not open a head sealed under the master key without a root', () => {
+      expect(() =>
+        new KeychainCipher().decrypt(sessionWith(), sealedUnder(masterKey)),
+      ).toThrow();
+    });
+
+    it('refuses to publish without a device-sealed root', async () => {
+      await expect(
+        new KeychainCipher().encryptForPublish(
+          sessionWith(),
+          undefined,
+          keychain,
+        ),
+      ).rejects.toThrow();
+    });
+
+    it('seals the publish under the root alone', async () => {
+      const { body } = await new KeychainCipher().encryptForPublish(
+        sessionWith({ deviceSealedRootKey: rootKey }),
+        undefined,
+        keychain,
+      );
+      const payload = new EncryptedPayload(body.encryptedPayload);
+
+      expect(() => rootKey.decrypt(payload)).not.toThrow();
+      expect(() => masterKey.decrypt(payload)).toThrow();
+    });
   });
 });

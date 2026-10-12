@@ -247,7 +247,7 @@ describe(PigeonIdentitySessionApi.name, () => {
     );
   });
 
-  it('reseals a legacy keychain head once the unlocked session holds its root', async () => {
+  it('leaves a legacy keychain head alone when the unlocked session holds its root', async () => {
     const keyPair = await KeyPair.generate();
     const currentIdentity = identity(keyPair.toPrimitives().publicKey);
     const root = SymmetricKey.generate();
@@ -293,10 +293,7 @@ describe(PigeonIdentitySessionApi.name, () => {
         passthroughRecovery,
       ).unlock(currentIdentity.id, 'password'),
     ).resolves.toMatchObject({ deviceSealedRootKey: root });
-    expect(migrateLegacyHead).toHaveBeenCalledTimes(1);
-    expect(migrateLegacyHead).toHaveBeenCalledWith(
-      expect.objectContaining({ deviceSealedRootKey: root }),
-    );
+    expect(migrateLegacyHead).not.toHaveBeenCalled();
   });
 
   it('resumes a pending root reseal before the root opens, and a pending keychain rewrap after it', async () => {

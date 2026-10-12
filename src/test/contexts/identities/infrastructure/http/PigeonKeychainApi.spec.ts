@@ -539,22 +539,20 @@ describe(PigeonKeychainApi.name, () => {
       ).resolves.toBeUndefined();
     });
 
-    it('opens a masterKey-sealed head while a root is held', async () => {
+    it('rejects a masterKey-sealed head while a root is held', async () => {
       const server = new FakeKeychainServer();
       server.seedSealed(sealedUnder(masterKey), 'kc-1', 1);
 
       await expect(
         apiOver(server).readHead(sessionWith({ deviceSealedRootKey: rootKey })),
-      ).resolves.toMatchObject({ keychainExternalIdentifier: 'kc-1' });
+      ).rejects.toThrow();
     });
 
-    it('opens a masterKey-sealed head when no root is held', async () => {
+    it('rejects a masterKey-sealed head when no root is held', async () => {
       const server = new FakeKeychainServer();
       server.seedSealed(sealedUnder(masterKey), 'kc-1', 1);
 
-      await expect(
-        apiOver(server).readHead(sessionWith()),
-      ).resolves.toMatchObject({ keychainExternalIdentifier: 'kc-1' });
+      await expect(apiOver(server).readHead(sessionWith())).rejects.toThrow();
     });
 
     it('rejects a head sealed under neither the root nor masterKey', async () => {
@@ -636,6 +634,22 @@ describe(PigeonKeychainApi.name, () => {
       it('rejects a head sealed under neither the previous root nor the session root', async () => {
         const server = new FakeKeychainServer();
         server.seedSealed(sealedUnder(otherKey), 'kc-1', 1);
+
+        await expect(
+          apiOver(server).rewrapHeadSealedUnder(
+            sessionWith({ deviceSealedRootKey: nextRoot }),
+            rootKey,
+          ),
+        ).rejects.toThrow();
+        expect(server.handle('GET')).toMatchObject({
+          keychainExternalIdentifier: 'kc-1',
+          version: 1,
+        });
+      });
+
+      it('rejects a head sealed under the master key rather than the previous root', async () => {
+        const server = new FakeKeychainServer();
+        server.seedSealed(sealedUnder(masterKey), 'kc-1', 1);
 
         await expect(
           apiOver(server).rewrapHeadSealedUnder(
