@@ -50,9 +50,7 @@ function mountSync(initialError: string | null = null) {
   const onErrorChange = jest.fn((update: SetStateAction<string | null>) => {
     error = typeof update === 'function' ? update(error) : update;
   });
-  const onMessagesChange = jest.fn(
-    (_update: SetStateAction<ChatMessage[]>) => {},
-  );
+  const onMessagesChange = jest.fn<void, [SetStateAction<ChatMessage[]>]>();
 
   mockEffects.length = 0;
   useDirectMessageMailboxSync({
@@ -178,7 +176,7 @@ describe('useDirectMessageMailboxSync changes', () => {
   });
 
   it('applies reported changes to the timeline', async () => {
-    sync.mockImplementation(async (_session, _conversationId, _signal, apply) => {
+    sync.mockImplementation((_session, _conversationId, _signal, apply) => {
       apply([
         {
           action: 'add',
@@ -189,6 +187,8 @@ describe('useDirectMessageMailboxSync changes', () => {
           messageId: 'message-1',
         },
       ]);
+
+      return Promise.resolve();
     });
     const mounted = mountSync();
 
@@ -204,8 +204,10 @@ describe('useDirectMessageMailboxSync changes', () => {
   });
 
   it('does not touch the timeline when a pass reports no changes', async () => {
-    sync.mockImplementation(async (_session, _conversationId, _signal, apply) => {
+    sync.mockImplementation((_session, _conversationId, _signal, apply) => {
       apply([]);
+
+      return Promise.resolve();
     });
     const mounted = mountSync();
 

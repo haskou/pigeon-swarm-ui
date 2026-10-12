@@ -220,7 +220,10 @@ describe(DirectMessageMailbox.name, () => {
     ) => Promise<string>,
   ][] = [
     ['sent', (mailbox, from, conv) => mailbox.deliverSent(from, conv, sent)],
-    ['edited', (mailbox, from, conv) => mailbox.deliverEdit(from, conv, edited)],
+    [
+      'edited',
+      (mailbox, from, conv) => mailbox.deliverEdit(from, conv, edited),
+    ],
     [
       'deleted',
       (mailbox, from, conv) => mailbox.deliverDelete(from, conv, 'message-1'),

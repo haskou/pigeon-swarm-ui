@@ -1,6 +1,5 @@
-import { Buffer } from 'buffer';
-
 import { UUID } from '@haskou/value-objects';
+import { Buffer } from 'buffer';
 
 import type {
   ChatMessage,
@@ -87,7 +86,7 @@ export class DirectMessageMailbox {
     );
   }
 
-  /** Sender. Appends an edit of a sent message. Same outcomes as deliverSent. */
+  /** Sender. Edit of a sent message. Same outcomes as deliverSent. */
   public deliverEdit(
     session: Session,
     conversation: ConversationResource,
@@ -98,7 +97,7 @@ export class DirectMessageMailbox {
     );
   }
 
-  /** Sender. Appends a delete of a message by its id. Same outcomes as deliverSent. */
+  /** Sender. Delete of a message by id. Same outcomes as deliverSent. */
   public deliverDelete(
     session: Session,
     conversation: ConversationResource,

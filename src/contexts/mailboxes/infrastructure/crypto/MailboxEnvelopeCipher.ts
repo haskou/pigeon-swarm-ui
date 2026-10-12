@@ -28,7 +28,7 @@ export class MailboxEnvelopeCipher {
   private static readonly IV_BYTES = 12;
   private static readonly LENGTH_PREFIX_BYTES = 4;
   private static readonly TAG_BYTES = 16;
-  /** Largest plaintext that fits the largest bucket after framing and AEAD overhead. */
+  /** Largest plaintext that fits the top bucket after framing and AEAD. */
   public static readonly MAX_PLAINTEXT_BYTES =
     Math.max(...MailboxEnvelopeCipher.BUCKETS) -
     MailboxEnvelopeCipher.IV_BYTES -
