@@ -104,6 +104,41 @@ device". It does not show the generic "username or password is incorrect"
 message. A wrong password on a browser that still has the local unlock keeps
 the generic message.
 
+### Revoked device on unlock
+
+Unlock makes one device-signed read of `GET /identity-devices/:id/devices`. If
+the node answers 401 with code 401020 ("Invalid signed request"), this browser
+does not decide yet. It repeats the same read signed with the recovery
+authority and checks the device catalog. Only when this device's credential is
+missing from that catalog is the device treated as removed. A bad signature or
+a stale timestamp also returns 401020, so the code alone never counts.
+
+When the device is treated as removed, unlock throws `DeviceRemovedError`, no
+session is returned, and the sign-in screen shows "This device was removed from
+your account." with two actions:
+
+- "Pair this device again" opens the new-device pairing flow. Pairing
+  overwrites the stale local record through `DeviceIdentityVault.register`,
+  which uses `store.put`, so no wipe is needed first.
+- "Erase local copy and start over" calls `identities.forgetDeviceUnlock` for
+  the identity. This deletes only the device vault record, as in step 3 above.
+  It revokes nothing on the node, and the identity stays recoverable with the
+  recovery key.
+
+Other outcomes are not removal:
+
+- A 401 with any other code, a 5xx response, and a network error (a `TypeError`
+  from `fetch`) are rethrown unchanged.
+- If the catalog check itself fails, the original error is rethrown. A
+  transient failure never becomes "removed".
+- Detection changes nothing locally. Only the explicit erase action deletes the
+  vault record.
+
+Residual risk: the removal signal is the node's answer. A node, or a party that
+controls its responses, can show this message for a device that is still
+authorized. The effect stays on the sign-in screen. No key is released, and the
+local copy changes only when the user picks the erase action.
+
 ## User-presence check before unlock
 
 A presence step (a click, a biometric prompt, or a WebAuthn assertion) before
