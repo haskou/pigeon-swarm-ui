@@ -1,6 +1,7 @@
 import { mock } from 'jest-mock-extended';
 
 import { MailboxCreationDifficultyError } from '../../../../../contexts/mailboxes/infrastructure/http/MailboxCreationDifficultyError';
+import { MailboxReaderLimitError } from '../../../../../contexts/mailboxes/infrastructure/http/MailboxReaderLimitError';
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/infrastructure/http/MailboxUnavailableError';
 import { PigeonMailboxClient } from '../../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
 import { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
@@ -249,13 +250,23 @@ describe(PigeonMailboxClient.name, () => {
     ).rejects.toBeInstanceOf(MailboxUnavailableError);
   });
 
-  it('propagates a 409 when the reader set is full as HttpJsonError', async () => {
+  it('maps a 409 on enrol to MailboxReaderLimitError when the reader set is full', async () => {
     const { client, http } = setup();
 
     http.request.mockRejectedValue(new HttpJsonError(409, 'Conflict', ''));
 
     await expect(
       client.addReader(mailboxId, 'root-token', 'device-hash'),
+    ).rejects.toBeInstanceOf(MailboxReaderLimitError);
+  });
+
+  it('propagates a 409 on removing a reader as HttpJsonError', async () => {
+    const { client, http } = setup();
+
+    http.request.mockRejectedValue(new HttpJsonError(409, 'Conflict', ''));
+
+    await expect(
+      client.removeReader(mailboxId, 'root-token', 'device-hash'),
     ).rejects.toBeInstanceOf(HttpJsonError);
   });
 });

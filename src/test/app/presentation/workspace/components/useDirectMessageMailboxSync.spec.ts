@@ -17,6 +17,8 @@ import type {
 
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';
 import { useDirectMessageMailboxSync } from '../../../../../app/presentation/workspace/components/useDirectMessageMailboxSync';
+import { MailboxReaderLimitError } from '../../../../../contexts/mailboxes/infrastructure/http/MailboxReaderLimitError';
+import { copy } from '../../../../../shared/presentation/i18n/copy';
 
 type MockEffect = () => void | (() => void);
 
@@ -144,6 +146,16 @@ describe('useDirectMessageMailboxSync notice', () => {
     await settle();
 
     expect(mounted.error()).toBe('Another error');
+    mounted.cleanup();
+  });
+
+  it('shows the reader-limit notice when the reader set is full', async () => {
+    sync.mockRejectedValue(new MailboxReaderLimitError());
+    const mounted = mountSync();
+
+    await settle();
+
+    expect(mounted.error()).toBe(copy.workspace.directMailboxReaderLimitError);
     mounted.cleanup();
   });
 });

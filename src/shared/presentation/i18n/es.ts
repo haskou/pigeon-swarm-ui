@@ -1445,6 +1445,8 @@ export const es = {
   },
   workspace: {
     closeSidebar: 'Cerrar barra lateral',
+    directMailboxReaderLimitError:
+      'Los mensajes directos no se pueden sincronizar aquí: esta identidad alcanzó su límite de dispositivos. Elimina un dispositivo que ya no uses e inténtalo de nuevo.',
     directMailboxSyncError:
       'No se pudieron sincronizar los mensajes directos. Reintentando.',
     loadMessagesError: 'No se pudieron cargar los mensajes.',
