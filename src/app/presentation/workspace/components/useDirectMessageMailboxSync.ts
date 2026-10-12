@@ -11,7 +11,7 @@ import type {
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
-import { applyDirectMessageTimelineChanges } from './directMessageTimelineChanges';
+import { applyDirectMessageTimelineChanges } from './applyDirectMessageTimelineChanges';
 
 const SYNC_INTERVAL_MS = 5000;
 

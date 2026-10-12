@@ -6,7 +6,7 @@ import type {
   MessageResource,
 } from '../../../../../shared/domain/pigeonResources.types';
 
-import { applyDirectMessageTimelineChanges } from '../../../../../app/presentation/workspace/components/directMessageTimelineChanges';
+import { applyDirectMessageTimelineChanges } from '../../../../../app/presentation/workspace/components/applyDirectMessageTimelineChanges';
 
 const conversationId = 'conversation-1';
 
