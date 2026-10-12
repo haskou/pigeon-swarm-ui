@@ -8,10 +8,10 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { MessageCollection } from '../../../../contexts/messages/presentation/view-models/MessageCollection';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
+import { applyDirectMessageTimelineChanges } from './directMessageTimelineChanges';
 
 const SYNC_INTERVAL_MS = 5000;
 
@@ -57,10 +57,10 @@ export function useDirectMessageMailboxSync({
           session,
           conversationId,
           controller.signal,
-          (messages) => {
-            if (messages.length > 0) {
+          (changes) => {
+            if (changes.length > 0) {
               onMessagesChange((current) =>
-                MessageCollection.merge(current, messages),
+                applyDirectMessageTimelineChanges(current, changes),
               );
             }
           },
