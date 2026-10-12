@@ -258,4 +258,34 @@ describe('useConversationMessageDelivery inbox delivery', () => {
     expect(deliverSent).toHaveBeenCalledWith(session, conversation, sentRaw);
     expect(deliverSent.mock.calls[0]?.[1]).toBe(conversation);
   });
+
+  it('keeps a delivered sticker send delivered when sticker usage throws synchronously', async () => {
+    markUsed.mockImplementation(() => {
+      throw new Error('usage unavailable');
+    });
+    const delivery = mountDelivery();
+
+    await delivery.sendSticker(sticker);
+    await drain(delivery.queue);
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(deliverSent).toHaveBeenCalledWith(session, conversation, sentRaw);
+    expect(delivery.state.error).toBeNull();
+    expect(delivery.state.messages).toEqual([sentMessage]);
+  });
+
+  it('keeps a delivered sticker send delivered when sticker usage rejects, with no unhandled rejection', async () => {
+    markUsed.mockRejectedValue(new Error('usage unavailable'));
+    const delivery = mountDelivery();
+
+    const unhandled = await captureUnhandledRejections(async () => {
+      await delivery.sendSticker(sticker);
+      await drain(delivery.queue);
+    });
+
+    expect(unhandled).toEqual([]);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(delivery.state.error).toBeNull();
+    expect(delivery.state.messages).toEqual([sentMessage]);
+  });
 });
