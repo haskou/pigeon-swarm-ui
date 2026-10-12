@@ -5,6 +5,7 @@ export type IdentityResource = {
   deviceCredentialCommitment: string;
   id: string;
   identityExternalIdentifier?: string | null;
+  mailboxHome?: string | null;
   networks: string[];
   previousIdentityExternalIdentifier?: string | null;
   profile: {

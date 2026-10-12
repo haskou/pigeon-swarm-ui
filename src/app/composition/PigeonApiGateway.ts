@@ -65,6 +65,7 @@ import { PigeonPushApi } from '../../contexts/notifications/infrastructure/http/
 import { PigeonPushGateway } from '../../contexts/notifications/infrastructure/http/PigeonPushGateway';
 import { PigeonPollsApi } from '../../contexts/polls/infrastructure/http/PigeonPollsApi';
 import { PigeonStickersApi } from '../../contexts/stickers/infrastructure/http/PigeonStickersApi';
+import { MailboxHomeOrigin } from '../../shared/infrastructure/client/MailboxHomeOrigin';
 import { PublicMutationSigner } from '../../shared/infrastructure/crypto/PublicMutationSigner';
 import { ApiUrlBuilder } from '../../shared/infrastructure/http/ApiUrlBuilder';
 import { HttpJsonClient } from '../../shared/infrastructure/http/HttpJsonClient';
@@ -240,7 +241,9 @@ export class PigeonApiGateway {
       http,
       signer,
       identityResourceGateway,
-      new IdentitySignaturePayloadFactory(),
+      new IdentitySignaturePayloadFactory(
+        MailboxHomeOrigin.fromNodeEndpoint(API_SERVER_URL),
+      ),
       this.identityVault,
     );
     const keychainApi = new PigeonKeychainApi(
