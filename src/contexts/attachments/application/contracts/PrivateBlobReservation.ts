@@ -18,5 +18,14 @@ export type PrivateBlobReference = {
    * references, which read from the session node.
    */
   origin?: string;
+  /** Other replicas of the same part, read in order after the primary. */
+  alternates?: PrivateBlobAlternate[];
   size: number;
+};
+
+/** Another replica of the same part. A reference holds at most two. */
+export type PrivateBlobAlternate = {
+  blobId: string;
+  downloadToken: string;
+  origin: string;
 };

@@ -4,6 +4,7 @@ import { PigeonAttachmentPreviewCreator } from '../../../../../contexts/attachme
 
 describe(PigeonAttachmentPreviewCreator.name, () => {
   const session = { identity: { id: 'identity-1' } } as Session;
+  const origins = ['https://node-a.example'];
   const source = new File(['source'], 'photo.png', { type: 'image/png' });
   const thumbnail = new File(['thumbnail'], 'photo.thumbnail.webp', {
     type: 'image/webp',
@@ -36,13 +37,20 @@ describe(PigeonAttachmentPreviewCreator.name, () => {
       prepare: jest.fn().mockResolvedValue(thumbnail),
     });
 
-    await expect(creator.createEncrypted(session, source)).resolves.toEqual({
+    await expect(
+      creator.createEncrypted(session, source, origins),
+    ).resolves.toEqual({
       ...pending.metadata,
       blobs: [previewBlob],
       encrypted: true,
       encryptedSize: 3,
     });
-    expect(blobs.uploadEncrypted).toHaveBeenCalledWith(session, pending);
+    expect(blobs.uploadEncrypted).toHaveBeenCalledWith(
+      session,
+      pending,
+      undefined,
+      origins,
+    );
   });
 
   it('omits an unavailable public preview without failing publication', async () => {

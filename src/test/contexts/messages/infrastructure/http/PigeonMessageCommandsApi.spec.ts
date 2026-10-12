@@ -86,4 +86,126 @@ describe(PigeonMessageCommandsApi.name, () => {
       store: 'messages',
     });
   });
+
+  describe('sending with attachments', () => {
+    const conversationKey = {
+      algorithm: 'aes-256-gcm',
+      conversationId: 'conversation-1',
+      createdAt: 1,
+      key: Buffer.alloc(32, 7).toString('base64'),
+      kind: 'conversation',
+      peerIdentityId: 'identity-2',
+      version: 2,
+    };
+
+    async function sendableSession(): Promise<Session> {
+      return {
+        deviceCredentialKeyPair: await KeyPair.generate(),
+        identity: { id: 'identity-1' },
+        keychain: {
+          conversations: { 'conversation-1': conversationKey },
+          version: 1,
+        },
+      } as unknown as Session;
+    }
+
+    function sendingApi(
+      request: jest.Mock,
+      publisher: MessageAttachmentPublisher,
+      decrypt: jest.Mock,
+    ): PigeonMessageCommandsApi {
+      return new PigeonMessageCommandsApi(
+        { request } as unknown as HttpJsonClient,
+        {
+          headers: jest.fn().mockResolvedValue({}),
+        } as unknown as RequestSigner,
+        {} as PigeonMessagesApi,
+        { decrypt } as unknown as MessageProjectionPort,
+        publisher,
+        publicMutationSignerAt(),
+      );
+    }
+
+    it('settles the uploaded attachments once the message is posted', async () => {
+      const uploaded = [{ filename: 'notes.txt' }];
+      const request = jest.fn().mockResolvedValue({ id: 'message-1' });
+      const decrypt = jest.fn().mockResolvedValue({ id: 'message-1' });
+      const publisher = {
+        abandonMessageAttachments: jest.fn(),
+        publishMessageAttachments: jest.fn().mockResolvedValue(uploaded),
+        settleMessageAttachments: jest.fn(),
+      };
+      const session = await sendableSession();
+
+      await sendingApi(request, publisher, decrypt).send(
+        session,
+        'conversation-1',
+        'Hello',
+        { attachments: [new File(['notes'], 'notes.txt')] },
+      );
+
+      expect(publisher.settleMessageAttachments).toHaveBeenCalledWith(
+        session,
+        uploaded,
+      );
+      expect(publisher.abandonMessageAttachments).not.toHaveBeenCalled();
+      expect(
+        publisher.settleMessageAttachments.mock.invocationCallOrder[0],
+      ).toBeLessThan(decrypt.mock.invocationCallOrder[0]);
+    });
+
+    it('abandons the uploaded attachments when the post fails', async () => {
+      const uploaded = [{ filename: 'notes.txt' }];
+      const request = jest.fn().mockRejectedValue(new Error('network down'));
+      const decrypt = jest.fn();
+      const publisher = {
+        abandonMessageAttachments: jest.fn().mockResolvedValue(undefined),
+        publishMessageAttachments: jest.fn().mockResolvedValue(uploaded),
+        settleMessageAttachments: jest.fn(),
+      };
+      const session = await sendableSession();
+
+      await expect(
+        sendingApi(request, publisher, decrypt).send(
+          session,
+          'conversation-1',
+          'Hello',
+          { attachments: [new File(['notes'], 'notes.txt')] },
+        ),
+      ).rejects.toThrow('network down');
+
+      expect(publisher.abandonMessageAttachments).toHaveBeenCalledWith(
+        session,
+        uploaded,
+      );
+      expect(publisher.settleMessageAttachments).not.toHaveBeenCalled();
+      expect(decrypt).not.toHaveBeenCalled();
+    });
+
+    it('sends without attachments and settles an empty set', async () => {
+      const request = jest.fn().mockResolvedValue({ id: 'message-1' });
+      const decrypt = jest.fn().mockResolvedValue({ id: 'message-1' });
+      const publisher = {
+        abandonMessageAttachments: jest.fn(),
+        publishMessageAttachments: jest.fn().mockResolvedValue([]),
+        settleMessageAttachments: jest.fn(),
+      };
+      const session = await sendableSession();
+
+      await expect(
+        sendingApi(request, publisher, decrypt).send(
+          session,
+          'conversation-1',
+          'Hello',
+        ),
+      ).resolves.toEqual({ id: 'message-1' });
+
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(publisher.settleMessageAttachments).toHaveBeenCalledWith(
+        session,
+        [],
+      );
+      expect(publisher.abandonMessageAttachments).not.toHaveBeenCalled();
+    });
+  });
 });

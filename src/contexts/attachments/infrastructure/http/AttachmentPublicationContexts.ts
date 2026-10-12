@@ -69,6 +69,7 @@ export class AttachmentPublicationContexts {
     return {
       file: context.file,
       onProgress: context.onProgress,
+      origins: context.origins,
       session: context.session,
     };
   }

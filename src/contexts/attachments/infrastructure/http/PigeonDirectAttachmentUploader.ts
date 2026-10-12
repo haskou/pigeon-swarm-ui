@@ -3,43 +3,37 @@ import type { AttachmentProgress } from '../../application/contracts/AttachmentP
 import type { MessageAttachment } from '../../application/contracts/MessageAttachment';
 import type { PendingMessageAttachment } from '../crypto/resources/PendingMessageAttachment';
 import type { EncryptedAttachmentUpload } from './EncryptedAttachmentUpload';
+import type { PrivateBlobReplicator } from './PrivateBlobReplicator';
 
-import { PigeonPrivateBlobClient } from './PigeonPrivateBlobClient';
 import { PigeonPublicFilesClient } from './PigeonPublicFilesClient';
+import { toPrivateBlobReference } from './privateBlobReference';
 import { reportAttachmentUploadProgress } from './reportAttachmentUploadProgress';
 
 export class PigeonDirectAttachmentUploader {
   public constructor(
-    private readonly privateBlobs: Pick<
-      PigeonPrivateBlobClient,
-      'reserve' | 'upload'
-    >,
+    private readonly replicator: Pick<PrivateBlobReplicator, 'storeParts'>,
     private readonly publicFiles: Pick<PigeonPublicFilesClient, 'upload'>,
   ) {}
 
   public async uploadEncrypted(
     session: Session,
     pending: PendingMessageAttachment,
-    onProgress?: (progress: AttachmentProgress) => void,
+    onProgress: ((progress: AttachmentProgress) => void) | undefined,
+    origins: (string | undefined)[],
   ): Promise<EncryptedAttachmentUpload> {
     const size = pending.encryptedBytes.byteLength;
 
     reportAttachmentUploadProgress(onProgress, pending.metadata.filename, 0);
-    const reservation = await this.privateBlobs.reserve(session, size);
-    await this.privateBlobs.upload(reservation, pending.encryptedBytes);
+    const [replicas] = await this.replicator.storeParts(
+      session,
+      1,
+      () => pending.encryptedBytes,
+      origins,
+    );
     reportAttachmentUploadProgress(onProgress, pending.metadata.filename, 100);
 
     return {
-      blobs: [
-        {
-          blobId: reservation.blobId,
-          downloadToken: reservation.downloadToken,
-          expiresAt: reservation.expiresAt,
-          index: 0,
-          ...(reservation.origin ? { origin: reservation.origin } : {}),
-          size,
-        },
-      ],
+      blobs: [toPrivateBlobReference(0, size, replicas)],
       size,
     };
   }

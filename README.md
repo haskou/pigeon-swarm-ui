@@ -226,8 +226,14 @@ uploaded length reveals a size bucket rather than the exact file size:
 - Reads use an isolated client with `credentials: omit` and `redirect: error`.
   A body whose size differs from the reference, or a 404, reports the attachment
   as unavailable. Other failures surface as the original error.
-- Alternate replicas are not implemented yet; see `docs/design/private-blob-store.md`
-  in the node repository.
+- Each part is stored on every origin the sender chooses. An origin that
+  fails is skipped. A send is posted only after every part has at least one
+  stored replica. If a part has none, the stored replicas are removed with a
+  best-effort `DELETE` and the send fails.
+- A reference keeps at most two alternates besides its primary origin. Reads
+  try the primary origin, then each valid alternate in order.
+- After the message is posted, its replicas are no longer tracked for
+  removal.
 
 ## Project Status
 

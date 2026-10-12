@@ -18,6 +18,9 @@ import { PigeonPrivateBlobClient } from '../../contexts/attachments/infrastructu
 import { PigeonPrivateFilesClient } from '../../contexts/attachments/infrastructure/http/PigeonPrivateFilesClient';
 import { PigeonPublicFilesClient } from '../../contexts/attachments/infrastructure/http/PigeonPublicFilesClient';
 import { PigeonPublicFileUploader } from '../../contexts/attachments/infrastructure/http/PigeonPublicFileUploader';
+import { PrivateBlobReplicaPlanner } from '../../contexts/attachments/infrastructure/http/PrivateBlobReplicaPlanner';
+import { PrivateBlobReplicator } from '../../contexts/attachments/infrastructure/http/PrivateBlobReplicator';
+import { PrivateBlobUploadLedger } from '../../contexts/attachments/infrastructure/http/PrivateBlobUploadLedger';
 import { MessageAttachmentThumbnailPreparer } from '../../contexts/attachments/infrastructure/media/MessageAttachmentThumbnailPreparer';
 import { PublicImageUploadPreparer } from '../../contexts/attachments/infrastructure/media/PublicImageUploadPreparer';
 import { CallEventSigner } from '../../contexts/calls/infrastructure/http/CallEventSigner';
@@ -73,6 +76,7 @@ import { ApiUrlBuilder } from '../../shared/infrastructure/http/ApiUrlBuilder';
 import { HttpJsonClient } from '../../shared/infrastructure/http/HttpJsonClient';
 import { RequestCache } from '../../shared/infrastructure/http/RequestCache';
 import { RequestSigner } from '../../shared/infrastructure/http/RequestSigner';
+import { scopeClientStorageKey } from '../../shared/infrastructure/storage/ClientStorageScope';
 import { copy } from '../../shared/presentation/i18n/copy';
 import { API_SERVER_URL } from '../API_SERVER_URL';
 
@@ -190,11 +194,41 @@ export class PigeonApiGateway {
       mutations,
     );
     const privateFiles = new PigeonPrivateFilesClient(http);
+    const identityResourceGateway = new PigeonIdentityGateway(http);
+    const ownHome = () =>
+      MailboxHomeBase.fromApiBase(API_SERVER_URL, window.location.origin);
+    const verifiedRecipientBase = async (identityId: string) =>
+      IdentityMailboxHomeVerifier.verifiedBase(
+        identityId,
+        await identityResourceGateway.get(identityId),
+      );
     const privateBlobs = new PigeonPrivateBlobClient(http, signer, {
       client: (origin) =>
         new HttpJsonClient(new ApiUrlBuilder(origin), { isolated: true }),
-      home: () =>
-        MailboxHomeBase.fromApiBase(API_SERVER_URL, window.location.origin),
+      home: ownHome,
+      signer: (origin) =>
+        new RequestSigner(undefined, ApiUrlBuilder.pathPrefix(origin)),
+    });
+    const privateBlobReplicator = new PrivateBlobReplicator(
+      privateBlobs,
+      new PrivateBlobUploadLedger(globalThis.localStorage, (session) =>
+        scopeClientStorageKey(
+          `pigeon:privateBlobUploads:${session.identity.id}`,
+        ),
+      ),
+      {
+        attempts: 3,
+        now: () => Date.now(),
+        retryDelayMs: 500,
+        wait: (ms) =>
+          new Promise<void>((resolve) => {
+            globalThis.setTimeout(resolve, ms);
+          }),
+      },
+    );
+    const privateBlobReplicaPlanner = new PrivateBlobReplicaPlanner({
+      home: ownHome,
+      verifiedRecipientHome: verifiedRecipientBase,
     });
     const publicFiles = new PigeonPublicFilesClient(
       http,
@@ -210,8 +244,8 @@ export class PigeonApiGateway {
     );
     const attachmentPublicationContexts = new AttachmentPublicationContexts();
     const attachmentBlobUploader = new PigeonAttachmentBlobUploader(
-      new PigeonDirectAttachmentUploader(privateBlobs, publicFiles),
-      new PigeonChunkedAttachmentUploader(privateBlobs, publicFiles),
+      new PigeonDirectAttachmentUploader(privateBlobReplicator, publicFiles),
+      new PigeonChunkedAttachmentUploader(privateBlobReplicator, publicFiles),
     );
     const attachmentRepository = new PigeonAttachmentRepository(
       attachmentDownloader,
@@ -224,6 +258,7 @@ export class PigeonApiGateway {
           attachmentBlobUploader,
           new MessageAttachmentThumbnailPreparer(),
         ),
+        privateBlobReplicator,
       ),
       attachmentPublicationContexts,
     );
@@ -240,9 +275,9 @@ export class PigeonApiGateway {
       this.publishMessageAttachmentUseCase,
       new AttachmentFinder(attachmentRepository),
       attachmentPublicationContexts,
+      privateBlobReplicaPlanner,
+      privateBlobReplicator,
     );
-
-    const identityResourceGateway = new PigeonIdentityGateway(http);
 
     const identityCommands = new PigeonIdentityCommandsApi(
       http,
@@ -330,11 +365,7 @@ export class PigeonApiGateway {
     );
     const recipientMailboxes = new RecipientMailboxRouter(
       mailboxChannel,
-      async (identityId) =>
-        IdentityMailboxHomeVerifier.verifiedBase(
-          identityId,
-          await identityResourceGateway.get(identityId),
-        ),
+      verifiedRecipientBase,
       (base) =>
         new MailboxChannel(
           new PigeonMailboxClient(

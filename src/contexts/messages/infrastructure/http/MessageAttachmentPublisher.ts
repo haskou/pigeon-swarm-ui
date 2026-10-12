@@ -12,4 +12,12 @@ export interface MessageAttachmentPublisher {
     onProgress?: (progress: AttachmentProgress) => void,
     options?: AttachmentUploadOptions,
   ): Promise<MessageAttachment[]>;
+  settleMessageAttachments(
+    session: Session,
+    attachments: MessageAttachment[],
+  ): void;
+  abandonMessageAttachments(
+    session: Session,
+    attachments: MessageAttachment[],
+  ): Promise<void>;
 }

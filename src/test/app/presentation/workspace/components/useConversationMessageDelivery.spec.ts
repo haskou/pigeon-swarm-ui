@@ -52,7 +52,14 @@ const session = { identity: { id: 'identity-1' } } as unknown as Session;
 const conversation = {
   id: 'conversation-1',
   networkId: 'network-1',
+  participantIds: ['identity-1', 'identity-2'],
   type: 'one-to-one',
+} as unknown as ConversationResource;
+const groupConversation = {
+  id: 'conversation-2',
+  networkId: 'network-1',
+  participantIds: ['identity-1', 'identity-3'],
+  type: 'group',
 } as unknown as ConversationResource;
 const sentRaw = {
   conversationId: 'conversation-1',
@@ -258,6 +265,37 @@ describe('useConversationMessageDelivery inbox delivery', () => {
     expect(unhandled).toEqual([]);
     expect(delivery.state.error).toBeNull();
     expect(delivery.state.messages).toEqual([sentMessage]);
+  });
+
+  it('sends the one-to-one recipient identity with attachment uploads', async () => {
+    const delivery = mountDelivery();
+
+    await delivery.sendMessage('hello', [], {});
+    await drain(delivery.queue);
+
+    expect(send).toHaveBeenCalledWith(
+      session,
+      conversation.id,
+      'hello',
+      expect.objectContaining({
+        attachmentUpload: {
+          networkId: 'network-1',
+          recipientIdentityId: 'identity-2',
+        },
+      }),
+    );
+  });
+
+  it('sends no recipient identity for group attachment uploads', async () => {
+    const delivery = mountDelivery(groupConversation);
+
+    await delivery.sendMessage('hello', [], {});
+    await drain(delivery.queue);
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(
+      send.mock.calls[0]?.[3]?.attachmentUpload?.recipientIdentityId,
+    ).toBeUndefined();
   });
 
   it('delivers sticker sends to the active conversation inbox with the sent copy', async () => {

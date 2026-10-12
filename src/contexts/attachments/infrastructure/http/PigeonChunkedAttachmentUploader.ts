@@ -7,19 +7,44 @@ import type { MessageAttachment } from '../../application/contracts/MessageAttac
 import type { PrivateBlobReference } from '../../application/contracts/PrivateBlobReservation';
 import type { PendingMessageAttachment } from '../crypto/resources/PendingMessageAttachment';
 import type { EncryptedAttachmentUpload } from './EncryptedAttachmentUpload';
+import type {
+  PrivateBlobReplicator,
+  StoredPrivateBlobReplica,
+} from './PrivateBlobReplicator';
 
-import { PigeonPrivateBlobClient } from './PigeonPrivateBlobClient';
 import { PigeonPublicFilesClient } from './PigeonPublicFilesClient';
+import { toPrivateBlobReference } from './privateBlobReference';
 import { reportAttachmentUploadProgress } from './reportAttachmentUploadProgress';
 
 const uploadChunkBytes = 8 * 1024 * 1024;
 const uploadChunkPauseMs = 35;
 
+function partBounds(
+  pending: PendingMessageAttachment,
+): { end: number; start: number }[] {
+  const chunks = pending.metadata.encryption?.chunks ?? [];
+  const size = pending.encryptedBytes.byteLength;
+  const lengths =
+    chunks.length > 0
+      ? chunks.map((chunk) => chunk.size)
+      : Array.from({ length: Math.ceil(size / uploadChunkBytes) }, (_, index) =>
+          Math.min(uploadChunkBytes, size - index * uploadChunkBytes),
+        );
+  let start = 0;
+
+  return lengths.map((length) => {
+    const bounds = { end: start + length, start };
+    start = bounds.end;
+
+    return bounds;
+  });
+}
+
 export class PigeonChunkedAttachmentUploader {
   public constructor(
-    private readonly privateBlobs: Pick<
-      PigeonPrivateBlobClient,
-      'reserve' | 'upload'
+    private readonly replicator: Pick<
+      PrivateBlobReplicator,
+      'abandon' | 'storeParts'
     >,
     private readonly publicFiles: Pick<PigeonPublicFilesClient, 'upload'>,
   ) {}
@@ -37,38 +62,34 @@ export class PigeonChunkedAttachmentUploader {
   public async uploadEncrypted(
     session: Session,
     pending: PendingMessageAttachment,
-    onProgress?: (progress: AttachmentProgress) => void,
+    onProgress: ((progress: AttachmentProgress) => void) | undefined,
+    origins: (string | undefined)[],
   ): Promise<EncryptedAttachmentUpload> {
     const blobs: PrivateBlobReference[] = [];
+    const stored: StoredPrivateBlobReplica[][] = [];
     const size = pending.encryptedBytes.byteLength;
-    const totalChunks = Math.ceil(size / uploadChunkBytes);
+    const bounds = partBounds(pending);
 
-    for (let index = 0; index < totalChunks; index += 1) {
-      const offset = index * uploadChunkBytes;
-      const chunk = pending.encryptedBytes.slice(
-        offset,
-        Math.min(offset + uploadChunkBytes, size),
-      );
-      const reservation = await this.privateBlobs.reserve(
-        session,
-        chunk.byteLength,
-      );
-      await this.privateBlobs.upload(reservation, chunk);
-
-      blobs.push({
-        blobId: reservation.blobId,
-        downloadToken: reservation.downloadToken,
-        expiresAt: reservation.expiresAt,
-        index,
-        ...(reservation.origin ? { origin: reservation.origin } : {}),
-        size: chunk.byteLength,
-      });
-      reportAttachmentUploadProgress(
-        onProgress,
-        pending.metadata.filename,
-        ((index + 1) * 100) / totalChunks,
-      );
-      await this.yieldToBrowser();
+    try {
+      for (const [index, { end, start }] of bounds.entries()) {
+        const [replicas] = await this.replicator.storeParts(
+          session,
+          1,
+          () => pending.encryptedBytes.slice(start, end),
+          origins,
+        );
+        stored.push(replicas);
+        blobs.push(toPrivateBlobReference(index, end - start, replicas));
+        reportAttachmentUploadProgress(
+          onProgress,
+          pending.metadata.filename,
+          ((index + 1) * 100) / bounds.length,
+        );
+        await this.yieldToBrowser();
+      }
+    } catch (error) {
+      await this.replicator.abandon(session, stored.flat());
+      throw error;
     }
 
     return { blobs, size, type: 'chunked_file' };

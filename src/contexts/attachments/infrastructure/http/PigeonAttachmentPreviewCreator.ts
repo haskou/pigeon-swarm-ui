@@ -25,6 +25,7 @@ export class PigeonAttachmentPreviewCreator {
   public async createEncrypted(
     session: Session,
     file: File,
+    origins: (string | undefined)[],
   ): Promise<MessageAttachment | undefined> {
     return await (async () => {
       const thumbnail = await this.prepareThumbnail(file);
@@ -32,7 +33,12 @@ export class PigeonAttachmentPreviewCreator {
       if (!thumbnail) return undefined;
 
       const pending = await this.cipher.encrypt(thumbnail);
-      const upload = await this.blobs.uploadEncrypted(session, pending);
+      const upload = await this.blobs.uploadEncrypted(
+        session,
+        pending,
+        undefined,
+        origins,
+      );
 
       return {
         ...pending.metadata,

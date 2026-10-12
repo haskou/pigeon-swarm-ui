@@ -2,7 +2,10 @@ import type { PrivateBlobReference } from '../../../../../contexts/attachments/a
 import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 
-import { PigeonPrivateBlobClient } from '../../../../../contexts/attachments/infrastructure/http/PigeonPrivateBlobClient';
+import {
+  PigeonPrivateBlobClient,
+  privateBlobDownloadTimeoutMs,
+} from '../../../../../contexts/attachments/infrastructure/http/PigeonPrivateBlobClient';
 import { PrivateBlobUnavailableError } from '../../../../../contexts/attachments/infrastructure/http/PrivateBlobUnavailableError';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 
@@ -13,13 +16,16 @@ const foreignOrigin = 'https://node-b.example/pigeon';
 const downloadInit = {
   headers: { Authorization: `Bearer ${downloadToken}` },
   redirect: 'error',
+  signal: expect.any(AbortSignal),
 };
 
-type OriginClient = (origin: string) => Pick<HttpJsonClient, 'requestBlob'>;
+type OriginClient = (
+  origin: string,
+) => Pick<HttpJsonClient, 'request' | 'requestBlob'>;
 
 function clientWith(
   http: { request?: jest.Mock; requestBlob?: jest.Mock },
-  origins: { home?: string; client?: OriginClient } = {},
+  origins: { home?: string; client?: OriginClient; signer?: jest.Mock } = {},
   signer = { headers: jest.fn().mockResolvedValue({}) },
 ) {
   return new PigeonPrivateBlobClient(
@@ -28,7 +34,11 @@ function clientWith(
       requestBlob: http.requestBlob ?? jest.fn(),
     },
     signer,
-    { client: origins.client ?? jest.fn(), home: () => origins.home },
+    {
+      client: origins.client ?? jest.fn(),
+      home: () => origins.home,
+      signer: origins.signer ?? jest.fn(),
+    },
   );
 }
 
@@ -206,7 +216,10 @@ describe(PigeonPrivateBlobClient.name, () => {
     const requestBlob = jest
       .fn()
       .mockResolvedValue(new Blob([new Uint8Array([1, 2])]));
-    const client = clientWith({}, { client: () => ({ requestBlob }) });
+    const client = clientWith(
+      {},
+      { client: () => ({ request: jest.fn(), requestBlob }) },
+    );
 
     await expect(
       client.download(reference({ origin: foreignOrigin, size: 3 })),
@@ -217,7 +230,10 @@ describe(PigeonPrivateBlobClient.name, () => {
     const requestBlob = jest
       .fn()
       .mockRejectedValue(new HttpJsonError(404, 'Not Found', ''));
-    const client = clientWith({}, { client: () => ({ requestBlob }) });
+    const client = clientWith(
+      {},
+      { client: () => ({ request: jest.fn(), requestBlob }) },
+    );
 
     await expect(
       client.download(reference({ origin: foreignOrigin })),
@@ -258,5 +274,149 @@ describe(PigeonPrivateBlobClient.name, () => {
     await expect(
       client.upload({ blobId: 'blob-1', uploadToken }, new ArrayBuffer(1)),
     ).rejects.toBe(conflict);
+  });
+
+  it('reserves on a foreign origin through that origin client and signer and stamps the origin', async () => {
+    const reserved = {
+      blobId: 'blob-1',
+      downloadToken,
+      expiresAt: 10,
+      uploadToken,
+    };
+    const foreignRequest = jest.fn().mockResolvedValue(reserved);
+    const foreignSigner = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'foreign' }),
+    };
+    const origin = jest.fn().mockReturnValue({
+      request: foreignRequest,
+      requestBlob: jest.fn(),
+    });
+    const signerFor = jest.fn().mockReturnValue(foreignSigner);
+    const sessionRequest = jest.fn();
+    const sessionSigner = { headers: jest.fn() };
+    const client = new PigeonPrivateBlobClient(
+      { request: sessionRequest, requestBlob: jest.fn() },
+      sessionSigner,
+      { client: origin, home: () => homeOrigin, signer: signerFor },
+    );
+    const session = {} as Session;
+
+    await expect(client.reserve(session, 3, foreignOrigin)).resolves.toEqual({
+      ...reserved,
+      origin: foreignOrigin,
+    });
+    expect(origin).toHaveBeenCalledWith(foreignOrigin);
+    expect(signerFor).toHaveBeenCalledWith(foreignOrigin);
+    expect(foreignSigner.headers).toHaveBeenCalledWith(
+      session,
+      'POST',
+      '/private-blobs',
+      { size: 3 },
+    );
+    expect(foreignRequest).toHaveBeenCalledWith(
+      '/private-blobs',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(sessionRequest).not.toHaveBeenCalled();
+    expect(sessionSigner.headers).not.toHaveBeenCalled();
+  });
+
+  it('uploads to the origin of its reservation through that origin client', async () => {
+    const foreignRequest = jest.fn().mockResolvedValue(undefined);
+    const origin = jest.fn().mockReturnValue({
+      request: foreignRequest,
+      requestBlob: jest.fn(),
+    });
+    const sessionRequest = jest.fn();
+    const client = clientWith(
+      { request: sessionRequest },
+      { client: origin, home: homeOrigin },
+    );
+
+    await client.upload(
+      { blobId: 'blob-1', origin: foreignOrigin, uploadToken },
+      new Uint8Array([1]).buffer,
+    );
+
+    expect(origin).toHaveBeenCalledWith(foreignOrigin);
+    expect(foreignRequest).toHaveBeenCalledWith(
+      '/private-blobs/blob-1',
+      expect.objectContaining({
+        headers: {
+          Authorization: `Bearer ${uploadToken}`,
+          'Content-Type': 'application/octet-stream',
+        },
+        method: 'PUT',
+      }),
+    );
+    expect(sessionRequest).not.toHaveBeenCalled();
+  });
+
+  it('deletes a foreign replica on its origin with the upload token only', async () => {
+    const foreignRequest = jest.fn().mockResolvedValue(undefined);
+    const origin = jest.fn().mockReturnValue({
+      request: foreignRequest,
+      requestBlob: jest.fn(),
+    });
+    const sessionRequest = jest.fn();
+    const client = clientWith(
+      { request: sessionRequest },
+      { client: origin, home: homeOrigin },
+    );
+
+    await client.remove({
+      blobId: 'blob-1',
+      origin: foreignOrigin,
+      uploadToken,
+    });
+
+    expect(origin).toHaveBeenCalledWith(foreignOrigin);
+    expect(foreignRequest).toHaveBeenCalledWith(
+      '/private-blobs/blob-1',
+      expect.objectContaining({
+        headers: { Authorization: `Bearer ${uploadToken}` },
+        method: 'DELETE',
+      }),
+    );
+    expect(sessionRequest).not.toHaveBeenCalled();
+  });
+
+  it('deletes a home replica through the session node', async () => {
+    const sessionRequest = jest.fn().mockResolvedValue(undefined);
+    const origin = jest.fn();
+    const client = clientWith(
+      { request: sessionRequest },
+      { client: origin, home: homeOrigin },
+    );
+
+    await client.remove({ blobId: 'blob-1', origin: homeOrigin, uploadToken });
+
+    expect(sessionRequest).toHaveBeenCalledWith(
+      '/private-blobs/blob-1',
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+    expect(origin).not.toHaveBeenCalled();
+  });
+
+  it('aborts a download that stalls past the timeout', async () => {
+    jest.useFakeTimers();
+    try {
+      const requestBlob = jest.fn(
+        (_path: string, init: { signal?: AbortSignal }) =>
+          new Promise<Blob>((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () => {
+              reject(new Error('aborted'));
+            });
+          }),
+      );
+      const client = clientWith({ requestBlob });
+      const download = client.download(reference({ origin: undefined }));
+
+      jest.advanceTimersByTime(privateBlobDownloadTimeoutMs);
+
+      await expect(download).rejects.toThrow('aborted');
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

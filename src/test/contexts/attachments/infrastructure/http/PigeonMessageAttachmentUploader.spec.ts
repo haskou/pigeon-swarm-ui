@@ -1,4 +1,5 @@
 import type { PendingMessageAttachment } from '../../../../../contexts/attachments/infrastructure/crypto/resources/PendingMessageAttachment';
+import type { PrivateBlobUploadLedger } from '../../../../../contexts/attachments/infrastructure/http/PrivateBlobUploadLedger';
 import type {
   MessageAttachmentEncryption,
   Session,
@@ -14,6 +15,7 @@ import { PigeonDirectAttachmentUploader } from '../../../../../contexts/attachme
 import { PigeonMessageAttachmentUploader } from '../../../../../contexts/attachments/infrastructure/http/PigeonMessageAttachmentUploader';
 import { PigeonPrivateBlobClient } from '../../../../../contexts/attachments/infrastructure/http/PigeonPrivateBlobClient';
 import { PigeonPublicFilesClient } from '../../../../../contexts/attachments/infrastructure/http/PigeonPublicFilesClient';
+import { PrivateBlobReplicator } from '../../../../../contexts/attachments/infrastructure/http/PrivateBlobReplicator';
 import { MessageAttachmentThumbnailPreparer } from '../../../../../contexts/attachments/infrastructure/media/MessageAttachmentThumbnailPreparer';
 import { PublicImageUploadPreparer } from '../../../../../contexts/attachments/infrastructure/media/PublicImageUploadPreparer';
 
@@ -54,13 +56,25 @@ function messageUploader(
   const privateBlobs = new PigeonPrivateBlobClient(http, requestSigner, {
     client: jest.fn(),
     home: () => undefined,
+    signer: jest.fn(),
+  });
+  const ledger = {
+    forget: jest.fn(),
+    remember: jest.fn(),
+    take: jest.fn(() => []),
+  } as unknown as PrivateBlobUploadLedger;
+  const replicator = new PrivateBlobReplicator(privateBlobs, ledger, {
+    attempts: 1,
+    now: () => 0,
+    retryDelayMs: 0,
+    wait: () => Promise.resolve(),
   });
   const publicFiles = new PigeonPublicFilesClient(http, requestSigner, {
     register: jest.fn(),
   });
   const blobs = new PigeonAttachmentBlobUploader(
-    new PigeonDirectAttachmentUploader(privateBlobs, publicFiles),
-    new PigeonChunkedAttachmentUploader(privateBlobs, publicFiles),
+    new PigeonDirectAttachmentUploader(replicator, publicFiles),
+    new PigeonChunkedAttachmentUploader(replicator, publicFiles),
   );
 
   return new PigeonMessageAttachmentUploader(
@@ -68,6 +82,7 @@ function messageUploader(
     blobs,
     publicImages,
     new PigeonAttachmentPreviewCreator(cipher, blobs, thumbnails),
+    replicator,
   );
 }
 
@@ -345,7 +360,9 @@ describe(PigeonMessageAttachmentUploader.name, () => {
       cipher,
     );
 
-    await expect(uploader.publishEncrypted(session, file)).resolves.toEqual({
+    await expect(
+      uploader.publishEncrypted(session, file, undefined, [undefined]),
+    ).resolves.toEqual({
       ...pending.metadata,
       blobs: [
         {
@@ -454,7 +471,9 @@ describe(PigeonMessageAttachmentUploader.name, () => {
       thumbnailPreparer,
     );
 
-    await expect(uploader.publishEncrypted(session, file)).resolves.toEqual({
+    await expect(
+      uploader.publishEncrypted(session, file, undefined, [undefined]),
+    ).resolves.toEqual({
       ...pendingOriginal.metadata,
       blobs: [
         {
@@ -487,5 +506,89 @@ describe(PigeonMessageAttachmentUploader.name, () => {
     expect(cipher.encrypt).toHaveBeenCalledWith(thumbnailFile);
     expect(cipher.encrypt).toHaveBeenCalledWith(file, undefined);
     expect(request).toHaveBeenCalledTimes(4);
+  });
+
+  it('abandons the stored preview when the original upload fails', async () => {
+    const error = new Error('upload refused');
+    const file = new File(['original'], 'photo.png', { type: 'image/png' });
+    const pending = {
+      encryptedBytes: new ArrayBuffer(3),
+      metadata: {},
+    } as unknown as PendingMessageAttachment;
+    const preview = {
+      blobs: [
+        {
+          blobId: 'thumbnail-blob',
+          downloadToken: 'thumbnail-download-token-1',
+          expiresAt: 1,
+          index: 0,
+          origin: 'https://node-a.example',
+          size: 3,
+        },
+      ],
+    };
+    const cipher = {
+      encrypt: jest.fn().mockResolvedValue(pending),
+    } as unknown as AttachmentCipher;
+    const blobs = {
+      uploadEncrypted: jest.fn().mockRejectedValue(error),
+    } as unknown as PigeonAttachmentBlobUploader;
+    const previews = {
+      createEncrypted: jest.fn().mockResolvedValue(preview),
+      createPublic: jest.fn(),
+    };
+    const replicator = { abandon: jest.fn().mockResolvedValue(undefined) };
+    const uploader = new PigeonMessageAttachmentUploader(
+      cipher,
+      blobs,
+      { prepare: jest.fn() },
+      previews,
+      replicator,
+    );
+
+    await expect(
+      uploader.publishEncrypted(session, file, undefined, [undefined]),
+    ).rejects.toBe(error);
+    expect(replicator.abandon).toHaveBeenCalledTimes(1);
+    expect(replicator.abandon).toHaveBeenCalledWith(session, [
+      { blobId: 'thumbnail-blob', origin: 'https://node-a.example' },
+    ]);
+  });
+
+  it('keeps the stored preview and abandons nothing when the upload succeeds', async () => {
+    const file = new File(['original'], 'photo.png', { type: 'image/png' });
+    const pending = {
+      encryptedBytes: new ArrayBuffer(3),
+      metadata: {},
+    } as unknown as PendingMessageAttachment;
+    const preview = { blobs: [] };
+    const cipher = {
+      encrypt: jest.fn().mockResolvedValue(pending),
+    } as unknown as AttachmentCipher;
+    const blobs = {
+      uploadEncrypted: jest.fn().mockResolvedValue({ blobs: [], size: 3 }),
+    } as unknown as PigeonAttachmentBlobUploader;
+    const previews = {
+      createEncrypted: jest.fn().mockResolvedValue(preview),
+      createPublic: jest.fn(),
+    };
+    const replicator = { abandon: jest.fn().mockResolvedValue(undefined) };
+    const uploader = new PigeonMessageAttachmentUploader(
+      cipher,
+      blobs,
+      { prepare: jest.fn() },
+      previews,
+      replicator,
+    );
+
+    await expect(
+      uploader.publishEncrypted(session, file, undefined, [undefined]),
+    ).resolves.toEqual({
+      blobs: [],
+      encrypted: true,
+      encryptedSize: 3,
+      preview,
+    });
+    expect(replicator.abandon).not.toHaveBeenCalled();
   });
 });

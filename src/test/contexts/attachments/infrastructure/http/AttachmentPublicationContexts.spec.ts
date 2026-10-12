@@ -9,15 +9,16 @@ describe(AttachmentPublicationContexts.name, () => {
     const contexts = new AttachmentPublicationContexts();
     const session = { identity: { id: 'identity-1' } } as Session;
     const file = new File(['content'], 'file.txt');
+    const origins = ['https://node-a.example', undefined];
 
-    contexts.register('source-1', 'identity-1', { file, session });
+    contexts.register('source-1', 'identity-1', { file, origins, session });
 
     expect(
       contexts.take(
         AttachmentSourceExternalIdentifier.fromString('source-1'),
         AttachmentPublisherExternalIdentifier.fromString('identity-1'),
       ),
-    ).toEqual({ file, session });
+    ).toEqual({ file, origins, session });
     expect(() =>
       contexts.take(
         AttachmentSourceExternalIdentifier.fromString('source-1'),
@@ -31,6 +32,7 @@ describe(AttachmentPublicationContexts.name, () => {
 
     contexts.register('source-1', 'identity-1', {
       file: new File(['content'], 'file.txt'),
+      origins: [undefined],
       session: { identity: { id: 'identity-1' } } as Session,
     });
 

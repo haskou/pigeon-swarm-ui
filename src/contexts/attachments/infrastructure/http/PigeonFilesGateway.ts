@@ -8,6 +8,8 @@ import type {
   PublicFileUpload,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { PrivateBlobReplicaPlanner } from './PrivateBlobReplicaPlanner';
+import type { PrivateBlobReplicator } from './PrivateBlobReplicator';
 
 import { AttachmentFinder } from '../../application/find-attachment/AttachmentFinder';
 import { FindAttachmentMessage } from '../../application/find-attachment/messages/FindAttachmentMessage';
@@ -16,6 +18,7 @@ import { PublishMessageAttachment } from '../../application/publish-message-atta
 import { AttachmentPublicationContexts } from './AttachmentPublicationContexts';
 import { PigeonAttachmentDownloader } from './PigeonAttachmentDownloader';
 import { PigeonPublicFileUploader } from './PigeonPublicFileUploader';
+import { privateBlobRefsOf } from './privateBlobReference';
 
 export class PigeonFilesGateway {
   public constructor(
@@ -30,6 +33,11 @@ export class PigeonFilesGateway {
     >,
     private readonly findAttachment: Pick<AttachmentFinder, 'find'>,
     private readonly publicationContexts: AttachmentPublicationContexts,
+    private readonly planner: Pick<PrivateBlobReplicaPlanner, 'plan'>,
+    private readonly replicator: Pick<
+      PrivateBlobReplicator,
+      'abandon' | 'settle'
+    >,
   ) {}
 
   public async download(
@@ -56,42 +64,64 @@ export class PigeonFilesGateway {
     options?: AttachmentUploadOptions,
   ): Promise<MessageAttachment[]> {
     const published: MessageAttachment[] = [];
+    const planned = await this.planner.plan(options?.recipientIdentityId);
+    const origins: (string | undefined)[] =
+      planned.length > 0 ? planned : [undefined];
 
-    for (const file of attachments) {
-      const id = UUID.generate().toString();
-      const sourceExternalIdentifier = UUID.generate().toString();
+    try {
+      for (const file of attachments) {
+        const id = UUID.generate().toString();
+        const sourceExternalIdentifier = UUID.generate().toString();
 
-      this.publicationContexts.register(
-        sourceExternalIdentifier,
-        session.identity.id,
-        { file, onProgress, session },
-      );
-
-      try {
-        await this.publishAttachment.publish(
-          new PublishMessageAttachmentMessage({
-            contentType: file.type || 'application/octet-stream',
-            encryptLargeAttachments: options?.encryptLargeAttachments,
-            encryptSmallAttachments: options?.encryptSmallAttachments,
-            filename: file.name || 'attachment',
-            id,
-            networkId: options?.networkId,
-            occurredAt: Date.now(),
-            publisherExternalIdentifier: session.identity.id,
-            size: file.size,
-            sourceExternalIdentifier,
-          }),
+        this.publicationContexts.register(
+          sourceExternalIdentifier,
+          session.identity.id,
+          { file, onProgress, origins, session },
         );
 
-        published.push(
-          this.publicationContexts.takePublished(sourceExternalIdentifier),
-        );
-      } finally {
-        this.publicationContexts.discard(sourceExternalIdentifier);
+        try {
+          await this.publishAttachment.publish(
+            new PublishMessageAttachmentMessage({
+              contentType: file.type || 'application/octet-stream',
+              encryptLargeAttachments: options?.encryptLargeAttachments,
+              encryptSmallAttachments: options?.encryptSmallAttachments,
+              filename: file.name || 'attachment',
+              id,
+              networkId: options?.networkId,
+              occurredAt: Date.now(),
+              publisherExternalIdentifier: session.identity.id,
+              size: file.size,
+              sourceExternalIdentifier,
+            }),
+          );
+
+          published.push(
+            this.publicationContexts.takePublished(sourceExternalIdentifier),
+          );
+        } finally {
+          this.publicationContexts.discard(sourceExternalIdentifier);
+        }
       }
+    } catch (error) {
+      await this.replicator.abandon(session, privateBlobRefsOf(published));
+      throw error;
     }
 
     return published;
+  }
+
+  public settleMessageAttachments(
+    session: Session,
+    attachments: MessageAttachment[],
+  ): void {
+    this.replicator.settle(session, privateBlobRefsOf(attachments));
+  }
+
+  public async abandonMessageAttachments(
+    session: Session,
+    attachments: MessageAttachment[],
+  ): Promise<void> {
+    await this.replicator.abandon(session, privateBlobRefsOf(attachments));
   }
 
   public async publishMessageAttachments(

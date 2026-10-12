@@ -2,6 +2,7 @@ import type { PrivateBlobReference } from '../../../../../contexts/attachments/a
 
 import { AttachmentBinaryCodec } from '../../../../../contexts/attachments/infrastructure/crypto/AttachmentBinaryCodec';
 import { AttachmentCipher } from '../../../../../contexts/attachments/infrastructure/crypto/AttachmentCipher';
+import { AttachmentLengthPadding } from '../../../../../contexts/attachments/infrastructure/crypto/AttachmentLengthPadding';
 import { attachmentBlobCacheKey } from '../../../../../contexts/attachments/infrastructure/http/attachmentBlobCacheKey';
 import { PigeonAttachmentDownloader } from '../../../../../contexts/attachments/infrastructure/http/PigeonAttachmentDownloader';
 import { PigeonPrivateBlobClient } from '../../../../../contexts/attachments/infrastructure/http/PigeonPrivateBlobClient';
@@ -23,6 +24,23 @@ describe(PigeonAttachmentDownloader.name, () => {
     expiresAt: 2,
     index: 1,
     size: 1,
+  };
+
+  const replicaBytes: Record<string, number[]> = {
+    'alt-a': [4, 5],
+    'blob-a': [1, 2],
+    'blob-b': [3],
+  };
+  const replicatedA: PrivateBlobReference = {
+    ...blobA,
+    alternates: [
+      {
+        blobId: 'alt-a',
+        downloadToken: 'token-alt-a-secret-0123456789',
+        origin: 'https://node-b.example',
+      },
+    ],
+    origin: 'https://node-a.example',
   };
 
   it('downloads public content once and caches the resulting blob', async () => {
@@ -226,5 +244,247 @@ describe(PigeonAttachmentDownloader.name, () => {
       expect.any(ArrayBuffer),
       undefined,
     );
+  });
+
+  it('reads an alternate replica when the primary replica is missing', async () => {
+    const download = jest
+      .fn()
+      .mockImplementation(({ blobId }: PrivateBlobReference) =>
+        blobId === 'blob-a'
+          ? Promise.reject(new PrivateBlobUnavailableError())
+          : Promise.resolve(new Uint8Array(replicaBytes[blobId]).buffer),
+      );
+    const decrypted = new Blob(['secret'], { type: 'text/plain' });
+    const cipher = {
+      decrypt: jest.fn().mockResolvedValue(decrypted),
+    } as unknown as AttachmentCipher;
+    const downloader = new PigeonAttachmentDownloader(
+      {} as PigeonPrivateFilesClient,
+      {} as PigeonPublicFilesClient,
+      { download } as unknown as PigeonPrivateBlobClient,
+      cipher,
+      new AttachmentBinaryCodec(),
+    );
+    const attachment = {
+      blobs: [replicatedA],
+      contentType: 'text/plain',
+      encryption: { algorithm: 'AES-GCM' as const, iv: 'iv', key: 'key' },
+      filename: 'file.txt',
+      size: 2,
+    };
+
+    await expect(downloader.download(attachment)).resolves.toBe(decrypted);
+    expect(download).toHaveBeenLastCalledWith({
+      blobId: 'alt-a',
+      downloadToken: 'token-alt-a-secret-0123456789',
+      origin: 'https://node-b.example',
+      size: 2,
+    });
+  });
+
+  it('never fetches an alternate whose origin is not canonical', async () => {
+    const download = jest
+      .fn()
+      .mockImplementation(({ blobId }: PrivateBlobReference) =>
+        blobId === 'blob-a'
+          ? Promise.reject(new PrivateBlobUnavailableError())
+          : Promise.resolve(new Uint8Array(replicaBytes[blobId]).buffer),
+      );
+    const decrypted = new Blob(['secret'], { type: 'text/plain' });
+    const cipher = {
+      decrypt: jest.fn().mockResolvedValue(decrypted),
+    } as unknown as AttachmentCipher;
+    const downloader = new PigeonAttachmentDownloader(
+      {} as PigeonPrivateFilesClient,
+      {} as PigeonPublicFilesClient,
+      { download } as unknown as PigeonPrivateBlobClient,
+      cipher,
+      new AttachmentBinaryCodec(),
+    );
+    const attachment = {
+      blobs: [
+        {
+          ...blobA,
+          alternates: [
+            {
+              blobId: 'alt-http',
+              downloadToken: 'token-http-secret-0123456789',
+              origin: 'http://node-b.example',
+            },
+            {
+              blobId: 'alt-trailing',
+              downloadToken: 'token-trailing-secret-0123456789',
+              origin: 'https://node-c.example/',
+            },
+            {
+              blobId: 'alt-a',
+              downloadToken: 'token-alt-a-secret-0123456789',
+              origin: 'https://node-d.example',
+            },
+          ],
+          origin: 'https://node-a.example',
+        },
+      ],
+      contentType: 'text/plain',
+      encryption: { algorithm: 'AES-GCM' as const, iv: 'iv', key: 'key' },
+      filename: 'file.txt',
+      size: 2,
+    };
+
+    await expect(downloader.download(attachment)).resolves.toBe(decrypted);
+    expect(
+      download.mock.calls.map(([blob]: [PrivateBlobReference]) => blob.blobId),
+    ).toEqual(['blob-a', 'alt-a']);
+  });
+
+  it('reports the attachment unavailable when every replica fails', async () => {
+    const download = jest
+      .fn()
+      .mockRejectedValue(new PrivateBlobUnavailableError());
+    const cipher = { decrypt: jest.fn() } as unknown as AttachmentCipher;
+    const downloader = new PigeonAttachmentDownloader(
+      {} as PigeonPrivateFilesClient,
+      {} as PigeonPublicFilesClient,
+      { download } as unknown as PigeonPrivateBlobClient,
+      cipher,
+      new AttachmentBinaryCodec(),
+    );
+    const attachment = {
+      blobs: [replicatedA],
+      contentType: 'text/plain',
+      encryption: { algorithm: 'AES-GCM' as const, iv: 'iv', key: 'key' },
+      filename: 'file.txt',
+      size: 2,
+    };
+
+    await expect(downloader.download(attachment)).rejects.toBeInstanceOf(
+      PrivateBlobUnavailableError,
+    );
+    expect(download).toHaveBeenCalledTimes(2);
+    expect(cipher.decrypt).not.toHaveBeenCalled();
+  });
+
+  it('propagates a single replica error unchanged', async () => {
+    const failure = new Error('socket closed');
+    const download = jest.fn().mockRejectedValue(failure);
+    const cipher = { decrypt: jest.fn() } as unknown as AttachmentCipher;
+    const downloader = new PigeonAttachmentDownloader(
+      {} as PigeonPrivateFilesClient,
+      {} as PigeonPublicFilesClient,
+      { download } as unknown as PigeonPrivateBlobClient,
+      cipher,
+      new AttachmentBinaryCodec(),
+    );
+    const attachment = {
+      blobs: [blobA],
+      contentType: 'text/plain',
+      encryption: { algorithm: 'AES-GCM' as const, iv: 'iv', key: 'key' },
+      filename: 'file.txt',
+      size: 2,
+    };
+
+    await expect(downloader.download(attachment)).rejects.toBe(failure);
+    expect(download).toHaveBeenCalledTimes(1);
+    expect(cipher.decrypt).not.toHaveBeenCalled();
+  });
+
+  it('refetches only the aligned part that fails its own GCM check', async () => {
+    const download = jest
+      .fn()
+      .mockImplementation(({ blobId }: PrivateBlobReference) =>
+        Promise.resolve(new Uint8Array(replicaBytes[blobId]).buffer),
+      );
+    const decrypted = new Blob(['secret'], { type: 'text/plain' });
+    const cipher = {
+      decrypt: jest
+        .fn()
+        .mockRejectedValueOnce(new Error('GCM tag mismatch'))
+        .mockResolvedValueOnce(decrypted),
+      decryptWithoutWorker: jest.fn((_: unknown, bytes: ArrayBuffer) => {
+        if (new Uint8Array(bytes)[0] === 1) {
+          throw new Error('GCM tag mismatch');
+        }
+
+        return { bytes };
+      }),
+    } as unknown as AttachmentCipher;
+    const downloader = new PigeonAttachmentDownloader(
+      {} as PigeonPrivateFilesClient,
+      {} as PigeonPublicFilesClient,
+      { download } as unknown as PigeonPrivateBlobClient,
+      cipher,
+      new AttachmentBinaryCodec(),
+    );
+    const attachment = {
+      blobs: [replicatedA, blobB],
+      contentType: 'text/plain',
+      encryption: {
+        algorithm: 'AES-GCM' as const,
+        chunks: [
+          { iv: 'iv-a', size: 2 },
+          { iv: 'iv-b', size: 1 },
+        ],
+        iv: 'iv',
+        key: 'key',
+        padding: AttachmentLengthPadding.marker,
+      },
+      filename: 'file.txt',
+      size: 3,
+    };
+
+    await expect(downloader.download(attachment)).resolves.toBe(decrypted);
+    expect(
+      download.mock.calls.map(([blob]: [PrivateBlobReference]) => blob.blobId),
+    ).toEqual(['blob-a', 'blob-b', 'alt-a']);
+    const [, retried] = jest.mocked(cipher.decrypt).mock.calls[1];
+    expect(Array.from(new Uint8Array(retried))).toEqual([4, 5, 3]);
+    const [single] = jest.mocked(cipher.decryptWithoutWorker).mock.calls[0];
+    expect(single.encryption).toEqual({
+      algorithm: 'AES-GCM',
+      chunks: [{ iv: 'iv-a', size: 2 }],
+      iv: 'iv',
+      key: 'key',
+    });
+    expect(single.encryption).not.toHaveProperty('padding');
+  });
+
+  it('retries unaligned parts whole, rotated by one, then reports unavailable', async () => {
+    const download = jest
+      .fn()
+      .mockImplementation(({ blobId }: PrivateBlobReference) =>
+        Promise.resolve(new Uint8Array(replicaBytes[blobId]).buffer),
+      );
+    const cipher = {
+      decrypt: jest.fn().mockRejectedValue(new Error('GCM tag mismatch')),
+      decryptWithoutWorker: jest.fn(),
+    } as unknown as AttachmentCipher;
+    const downloader = new PigeonAttachmentDownloader(
+      {} as PigeonPrivateFilesClient,
+      {} as PigeonPublicFilesClient,
+      { download } as unknown as PigeonPrivateBlobClient,
+      cipher,
+      new AttachmentBinaryCodec(),
+    );
+    const attachment = {
+      blobs: [replicatedA, blobB],
+      contentType: 'text/plain',
+      encryption: {
+        algorithm: 'AES-GCM' as const,
+        chunks: [{ iv: 'iv', size: 3 }],
+        iv: 'iv',
+        key: 'key',
+      },
+      filename: 'file.txt',
+      size: 3,
+    };
+
+    await expect(downloader.download(attachment)).rejects.toBeInstanceOf(
+      PrivateBlobUnavailableError,
+    );
+    expect(
+      download.mock.calls.map(([blob]: [PrivateBlobReference]) => blob.blobId),
+    ).toEqual(['blob-a', 'blob-b', 'alt-a', 'blob-b']);
+    expect(cipher.decrypt).toHaveBeenCalledTimes(2);
+    expect(cipher.decryptWithoutWorker).not.toHaveBeenCalled();
   });
 });
