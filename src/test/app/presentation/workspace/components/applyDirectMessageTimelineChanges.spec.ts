@@ -1,8 +1,8 @@
 import { describe, expect, it } from '@jest/globals';
 
 import type { MessageResource } from '../../../../../contexts/messages/infrastructure/http/MessageResource';
-import type { DirectMessageTimelineChange } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageTimelineChange';
 import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { DirectMessageTimelineChange } from '../../../../../contexts/messages/presentation/view-models/DirectMessageTimelineChange';
 
 import { applyDirectMessageTimelineChanges } from '../../../../../app/presentation/workspace/components/applyDirectMessageTimelineChanges';
 import { MessageReactionUpdater } from '../../../../../contexts/messages/presentation/view-models/MessageReactionUpdater';

@@ -18,8 +18,8 @@ import type { MessageProjectionPort } from '../../../../../contexts/messages/inf
 import type { MessageResource } from '../../../../../contexts/messages/infrastructure/http/MessageResource';
 import type { PigeonMessageCommandsApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
 import type { DirectMessageMailboxState } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxStore';
-import type { DirectMessageTimelineChange } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageTimelineChange';
 import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { DirectMessageTimelineChange } from '../../../../../contexts/messages/presentation/view-models/DirectMessageTimelineChange';
 
 import { MailboxCapability } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxEnvelopeCipher } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxEnvelopeCipher';

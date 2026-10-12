@@ -1,4 +1,4 @@
-import type { DirectMessageTimelineChange } from '../../../../contexts/messages/infrastructure/mailbox/DirectMessageTimelineChange';
+import type { DirectMessageTimelineChange } from '../../../../contexts/messages/presentation/view-models/DirectMessageTimelineChange';
 
 export type DirectPinChange = Extract<
   DirectMessageTimelineChange,

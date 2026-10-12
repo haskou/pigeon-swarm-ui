@@ -1,5 +1,5 @@
-import type { DirectMessageTimelineChange } from '../../../../contexts/messages/infrastructure/mailbox/DirectMessageTimelineChange';
 import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { DirectMessageTimelineChange } from '../../../../contexts/messages/presentation/view-models/DirectMessageTimelineChange';
 
 import { MessageCollection } from '../../../../contexts/messages/presentation/view-models/MessageCollection';
 import { MessageReactionUpdater } from '../../../../contexts/messages/presentation/view-models/MessageReactionUpdater';
