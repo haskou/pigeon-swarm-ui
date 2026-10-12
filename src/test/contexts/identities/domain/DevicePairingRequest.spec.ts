@@ -11,18 +11,24 @@ import { PairingId } from '../../../../contexts/identities/domain/value-objects/
 import { thrownPairingFailure } from './thrownPairingFailure';
 
 describe(DevicePairingRequest.name, () => {
-  async function draft() {
+  async function invitation(expiresAt = 2_000) {
     const identity = await KeyPair.generate();
-    const invitation = DevicePairingInvitation.create({
+
+    return DevicePairingInvitation.create({
       author: await KeyPair.generate(),
       epoch: DeviceAuthorizationEpoch.genesis(),
-      expiresAt: new Timestamp(2_000),
+      expiresAt: new Timestamp(expiresAt),
       identityId: IdentityId.fromString(identity.toPrimitives().publicKey),
       pairingId: PairingId.generate(),
       revision: DeviceAuthorizationRevision.fromNumber(3),
     });
+  }
 
-    return await DevicePairingRequest.create(invitation, new Timestamp(1_000));
+  async function draft() {
+    return await DevicePairingRequest.create(
+      await invitation(),
+      new Timestamp(1_000),
+    );
   }
 
   it('authenticates the target credential and transport key', async () => {
@@ -87,5 +93,37 @@ describe(DevicePairingRequest.name, () => {
         ),
       ),
     ).toBe('expired');
+  });
+
+  it('shows a different verification code on each device that answers one invitation', async () => {
+    const shared = await invitation();
+    const first = await DevicePairingRequest.create(
+      shared,
+      new Timestamp(1_000),
+    );
+    const second = await DevicePairingRequest.create(
+      shared,
+      new Timestamp(1_000),
+    );
+
+    expect(await second.getRequest().getVerificationCode()).not.toBe(
+      await first.getRequest().getVerificationCode(),
+    );
+  });
+
+  it('rejects a request claiming authorization beyond the allowed clock skew', async () => {
+    const source = await DevicePairingRequest.create(
+      await invitation(100_000),
+      new Timestamp(31_001),
+    );
+
+    expect(
+      thrownPairingFailure(() =>
+        DevicePairingRequest.fromCode(
+          source.getRequest().toCode(),
+          new Timestamp(1_000),
+        ),
+      ),
+    ).toBe('invalid');
   });
 });

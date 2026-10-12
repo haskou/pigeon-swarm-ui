@@ -196,66 +196,72 @@ export class PigeonDeviceAuthorizationApi {
     draft: DevicePairingRequestDraft,
     completionCode: DevicePairingCode,
   ): Promise<Session> {
-    draft.assertAvailable();
-    const completion = DevicePairingCompletion.fromCode(completionCode);
-    const material = completion.open(
-      draft.getRequest(),
-      draft.getTransportKeyPair(),
-    );
-    const identityId = IdentityId.fromString(
-      material.getIdentityKeyPair().toPrimitives().publicKey,
-    );
+    draft.reserve();
 
-    assert(
-      identityId.isEqual(IdentityId.fromString(identity.id)) &&
-        material.getRecoveryAuthorityKeyPair().toPrimitives().publicKey ===
-          identity.recoveryAuthority,
-      new DevicePairingError(
-        'mismatch',
-        'Paired identity material does not match the identity.',
-      ),
-    );
+    try {
+      const completion = DevicePairingCompletion.fromCode(completionCode);
+      const material = completion.open(
+        draft.getRequest(),
+        draft.getTransportKeyPair(),
+      );
+      const identityId = IdentityId.fromString(
+        material.getIdentityKeyPair().toPrimitives().publicKey,
+      );
 
-    const pendingSession = {
-      authorizationEpoch: completion.getEpoch(),
-      authorizationRevision: completion.getRevision(),
-      deviceCredentialKeyPair: draft.getTargetKeyPair(),
-      deviceId: DeviceId.generate(),
-      identity,
-      keychain: emptyKeychain,
-      keyPair: material.getIdentityKeyPair(),
-      masterKey: SymmetricKey.fromBuffer(material.getRootKey().getBuffer()),
-      recoveryAuthorityKeyPair: material.getRecoveryAuthorityKeyPair(),
-    } satisfies Session;
-    const checkpoint = await this.find(pendingSession);
+      assert(
+        identityId.isEqual(IdentityId.fromString(identity.id)) &&
+          material.getRecoveryAuthorityKeyPair().toPrimitives().publicKey ===
+            identity.recoveryAuthority,
+        new DevicePairingError(
+          'mismatch',
+          'Paired identity material does not match the identity.',
+        ),
+      );
 
-    assert(
-      checkpoint.getEpoch().isEqual(completion.getEpoch()) &&
-        checkpoint.getRevision().isEqual(completion.getRevision()),
-      new DevicePairingError(
-        'mismatch',
-        'Pairing completion is not the current authorization checkpoint.',
-      ),
-    );
-
-    const vaultSession = await this.vault.register({
-      authorizationEpoch: checkpoint.getEpoch(),
-      authorizationRevision: checkpoint.getRevision(),
-      identityId,
-      material: {
+      const pendingSession = {
+        authorizationEpoch: completion.getEpoch(),
+        authorizationRevision: completion.getRevision(),
         deviceCredentialKeyPair: draft.getTargetKeyPair(),
-        identityKeyPair: material.getIdentityKeyPair(),
+        deviceId: DeviceId.generate(),
+        identity,
+        keychain: emptyKeychain,
+        keyPair: material.getIdentityKeyPair(),
+        masterKey: SymmetricKey.fromBuffer(material.getRootKey().getBuffer()),
         recoveryAuthorityKeyPair: material.getRecoveryAuthorityKeyPair(),
-        rootKey: material.getRootKey(),
-      },
-      password: password.valueOf(),
-    });
-    draft.consume();
+      } satisfies Session;
+      const checkpoint = await this.find(pendingSession);
 
-    return {
-      ...pendingSession,
-      deviceId: vaultSession.deviceId,
-    };
+      assert(
+        checkpoint.getEpoch().isEqual(completion.getEpoch()) &&
+          checkpoint.getRevision().isEqual(completion.getRevision()),
+        new DevicePairingError(
+          'mismatch',
+          'Pairing completion is not the current authorization checkpoint.',
+        ),
+      );
+
+      const vaultSession = await this.vault.register({
+        authorizationEpoch: checkpoint.getEpoch(),
+        authorizationRevision: checkpoint.getRevision(),
+        identityId,
+        material: {
+          deviceCredentialKeyPair: draft.getTargetKeyPair(),
+          identityKeyPair: material.getIdentityKeyPair(),
+          recoveryAuthorityKeyPair: material.getRecoveryAuthorityKeyPair(),
+          rootKey: material.getRootKey(),
+        },
+        password: password.valueOf(),
+      });
+      draft.consume();
+
+      return {
+        ...pendingSession,
+        deviceId: vaultSession.deviceId,
+      };
+    } catch (error) {
+      draft.release();
+      throw error;
+    }
   }
 
   public async find(session: Session): Promise<DeviceAuthorizationCheckpoint> {
