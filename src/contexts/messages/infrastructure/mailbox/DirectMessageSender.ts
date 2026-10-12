@@ -1,11 +1,9 @@
 import { UUID } from '@haskou/value-objects';
 
-import type {
-  ChatMessage,
-  ConversationResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessageRecord';
+import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { PigeonMessageCommandsApi } from '../http/PigeonMessageCommandsApi';
 import type { EditMessageOptions } from '../http/resources/EditMessageOptions';
@@ -13,6 +11,7 @@ import type { SendMessageOptions } from '../http/resources/SendMessageOptions';
 import type { DirectMessageOwnCopies } from './DirectMessageOwnCopies';
 import type { RecipientMailboxRouter } from './RecipientMailboxRouter';
 
+import { sessionRootKey } from '../../../identities/infrastructure/session/sessionRootKey';
 import { DirectMailboxEligibility } from '../../../mailboxes/domain/DirectMailboxEligibility';
 import { DirectMailboxOwnership } from '../../../mailboxes/domain/DirectMailboxOwnership';
 import { DirectMailboxRecordError } from '../../../mailboxes/domain/DirectMailboxRecordError';
@@ -110,7 +109,10 @@ export class DirectMessageSender {
     return DirectMessageMailboxRecord.encode(
       record,
       recipientIdentityId === session.identity.id
-        ? DirectMessageAuthorship.tag(session.masterKey.getBuffer(), record)
+        ? DirectMessageAuthorship.tag(
+            sessionRootKey(session).getBuffer(),
+            record,
+          )
         : undefined,
     );
   }

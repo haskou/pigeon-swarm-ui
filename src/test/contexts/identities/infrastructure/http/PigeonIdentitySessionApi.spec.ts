@@ -3,6 +3,7 @@ import { StringValueObject } from '@haskou/value-objects';
 
 import type { DeviceSealedRootRotation } from '../../../../../contexts/identities/infrastructure/http/DeviceSealedRootRotation';
 import type { PigeonDeviceAuthorizationApi } from '../../../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
+import type { PigeonKeychainApi } from '../../../../../contexts/identities/infrastructure/http/PigeonKeychainApi';
 import type { IdentityResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { DeviceIdentityVaultStore } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVaultStore';
@@ -20,6 +21,10 @@ import { copy } from '../../../../../shared/presentation/i18n/copy';
 const passthroughRoot = {
   current: (session: Session) => Promise.resolve(session),
 } as unknown as DeviceSealedRootRotation;
+
+const passthroughKeychains = {
+  migrateLegacyHead: () => Promise.resolve(undefined),
+} as unknown as PigeonKeychainApi;
 
 function identity(id: string): IdentityResource {
   return {
@@ -88,6 +93,7 @@ describe(PigeonIdentitySessionApi.name, () => {
       vault,
       deviceAuthorization,
       passthroughRoot,
+      passthroughKeychains,
     );
 
     await expect(
@@ -138,6 +144,7 @@ describe(PigeonIdentitySessionApi.name, () => {
           synchronize: jest.fn(),
         } as unknown as PigeonDeviceAuthorizationApi,
         passthroughRoot,
+        passthroughKeychains,
       ).unlock(currentIdentity.id, 'password'),
     ).rejects.toThrow();
   });
@@ -156,6 +163,7 @@ describe(PigeonIdentitySessionApi.name, () => {
       new DeviceIdentityVault(store),
       { synchronize: jest.fn() } as unknown as PigeonDeviceAuthorizationApi,
       passthroughRoot,
+      passthroughKeychains,
     );
 
     const unlock = sessionApi.unlock(currentIdentity.id, 'password');
@@ -182,6 +190,7 @@ describe(PigeonIdentitySessionApi.name, () => {
           synchronize: jest.fn(),
         } as unknown as PigeonDeviceAuthorizationApi,
         passthroughRoot,
+        passthroughKeychains,
       ).unlock(currentIdentity.id, 'wrong password'),
     ).rejects.toThrow(copy.auth.invalidLogin);
   });
@@ -219,11 +228,113 @@ describe(PigeonIdentitySessionApi.name, () => {
         vault,
         deviceAuthorization,
         passthroughRoot,
+        passthroughKeychains,
       ).unlock(currentIdentity.id, 'password'),
     ).resolves.toMatchObject({ deviceCredentialKeyPair: pairedCredential });
     expect(deviceAuthorization.synchronize).toHaveBeenCalledWith(
       expect.objectContaining({ deviceCredentialKeyPair: pairedCredential }),
     );
+  });
+
+  it('reseals a legacy keychain head once the unlocked session holds its root', async () => {
+    const keyPair = await KeyPair.generate();
+    const currentIdentity = identity(keyPair.toPrimitives().publicKey);
+    const root = SymmetricKey.generate();
+    const identities = {
+      get: jest.fn().mockResolvedValue(currentIdentity),
+    } as unknown as PigeonIdentityGateway;
+    const vault = {
+      unlock: jest.fn().mockResolvedValue({
+        authorizationEpoch: DeviceAuthorizationEpoch.genesis(),
+        authorizationRevision: DeviceAuthorizationRevision.fromNumber(1),
+        deviceId: DeviceId.generate(),
+        material: {
+          deviceCredentialKeyPair: await KeyPair.generate(),
+          identityKeyPair: keyPair,
+          recoveryAuthorityKeyPair: await KeyPair.generate(),
+          rootKey: { getBuffer: () => SymmetricKey.generate().getBuffer() },
+        },
+        secretHandle: DeviceUnlockSecretHandle.generate(),
+      }),
+    } as unknown as DeviceIdentityVault;
+    const deviceAuthorization = {
+      synchronize: jest
+        .fn()
+        .mockImplementation((session: Session) => Promise.resolve(session)),
+    } as unknown as PigeonDeviceAuthorizationApi;
+    const rootedRoot = {
+      current: (session: Session) =>
+        Promise.resolve({
+          ...session,
+          deviceSealedRootKey: root,
+        } as unknown as Session),
+    } as unknown as DeviceSealedRootRotation;
+    const migrateLegacyHead = jest.fn().mockResolvedValue(undefined);
+    const keychains = { migrateLegacyHead } as unknown as PigeonKeychainApi;
+
+    await expect(
+      new PigeonIdentitySessionApi(
+        identities,
+        vault,
+        deviceAuthorization,
+        rootedRoot,
+        keychains,
+      ).unlock(currentIdentity.id, 'password'),
+    ).resolves.toMatchObject({ deviceSealedRootKey: root });
+    expect(migrateLegacyHead).toHaveBeenCalledTimes(1);
+    expect(migrateLegacyHead).toHaveBeenCalledWith(
+      expect.objectContaining({ deviceSealedRootKey: root }),
+    );
+  });
+
+  it('unlocks even when the legacy keychain head migration fails', async () => {
+    const keyPair = await KeyPair.generate();
+    const currentIdentity = identity(keyPair.toPrimitives().publicKey);
+    const root = SymmetricKey.generate();
+    const identities = {
+      get: jest.fn().mockResolvedValue(currentIdentity),
+    } as unknown as PigeonIdentityGateway;
+    const vault = {
+      unlock: jest.fn().mockResolvedValue({
+        authorizationEpoch: DeviceAuthorizationEpoch.genesis(),
+        authorizationRevision: DeviceAuthorizationRevision.fromNumber(1),
+        deviceId: DeviceId.generate(),
+        material: {
+          deviceCredentialKeyPair: await KeyPair.generate(),
+          identityKeyPair: keyPair,
+          recoveryAuthorityKeyPair: await KeyPair.generate(),
+          rootKey: { getBuffer: () => SymmetricKey.generate().getBuffer() },
+        },
+        secretHandle: DeviceUnlockSecretHandle.generate(),
+      }),
+    } as unknown as DeviceIdentityVault;
+    const deviceAuthorization = {
+      synchronize: jest
+        .fn()
+        .mockImplementation((session: Session) => Promise.resolve(session)),
+    } as unknown as PigeonDeviceAuthorizationApi;
+    const rootedRoot = {
+      current: (session: Session) =>
+        Promise.resolve({
+          ...session,
+          deviceSealedRootKey: root,
+        } as unknown as Session),
+    } as unknown as DeviceSealedRootRotation;
+    const migrateLegacyHead = jest
+      .fn()
+      .mockRejectedValue(new Error('head unreadable'));
+    const keychains = { migrateLegacyHead } as unknown as PigeonKeychainApi;
+
+    await expect(
+      new PigeonIdentitySessionApi(
+        identities,
+        vault,
+        deviceAuthorization,
+        rootedRoot,
+        keychains,
+      ).unlock(currentIdentity.id, 'password'),
+    ).resolves.toMatchObject({ deviceSealedRootKey: root });
+    expect(migrateLegacyHead).toHaveBeenCalledTimes(1);
   });
 
   it('refuses a non-genesis device that has not observed a chain revision', async () => {
@@ -256,6 +367,7 @@ describe(PigeonIdentitySessionApi.name, () => {
           synchronize,
         } as unknown as PigeonDeviceAuthorizationApi,
         passthroughRoot,
+        passthroughKeychains,
       ).unlock(currentIdentity.id, 'password'),
     ).rejects.toThrow(copy.auth.invalidLogin);
     expect(synchronize).not.toHaveBeenCalled();
@@ -298,6 +410,7 @@ describe(PigeonIdentitySessionApi.name, () => {
       vault,
       deviceAuthorization,
       passthroughRoot,
+      passthroughKeychains,
     ).unlock(currentIdentity.id, 'password');
 
     await expect(unlock).rejects.toBeInstanceOf(DeviceRemovedError);

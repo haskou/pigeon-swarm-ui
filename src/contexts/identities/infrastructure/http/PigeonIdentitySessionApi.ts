@@ -8,6 +8,7 @@ import type { DeviceIdentityVault } from '../storage/DeviceIdentityVault';
 import type { DeviceSealedRootRotation } from './DeviceSealedRootRotation';
 import type { PigeonDeviceAuthorizationApi } from './PigeonDeviceAuthorizationApi';
 import type { PigeonIdentityGateway } from './PigeonIdentityGateway';
+import type { PigeonKeychainApi } from './PigeonKeychainApi';
 import type { IdentityResource } from './resources/IdentityResource';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
@@ -25,6 +26,7 @@ export class PigeonIdentitySessionApi {
     private readonly vault: DeviceIdentityVault,
     private readonly deviceAuthorization: PigeonDeviceAuthorizationApi,
     private readonly deviceSealedRoot: DeviceSealedRootRotation,
+    private readonly keychains: PigeonKeychainApi,
   ) {}
 
   private createLoginPayload(identity: IdentityResource): StringValueObject {
@@ -61,6 +63,19 @@ export class PigeonIdentitySessionApi {
       );
 
       return session;
+    }
+  }
+
+  private async migrateLegacyHead(session: Session): Promise<void> {
+    try {
+      await this.keychains.migrateLegacyHead(session);
+    } catch {
+      // Count-only. The head stays sealed under masterKey and the fallback
+      // still opens it.
+      // eslint-disable-next-line no-console
+      console.debug(
+        'Legacy keychain head could not be resealed under the root.',
+      );
     }
   }
 
@@ -139,6 +154,10 @@ export class PigeonIdentitySessionApi {
       this.createSession(identity, vaultSession),
     );
 
-    return await this.openDeviceSealedRoot(synchronized);
+    const rooted = await this.openDeviceSealedRoot(synchronized);
+
+    await this.migrateLegacyHead(rooted);
+
+    return rooted;
   }
 }

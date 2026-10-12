@@ -1,13 +1,3 @@
-import type {
-  IdentityPresence,
-  IdentityResource,
-  KeychainResource,
-  LocalKeychain,
-  LocalKeychainUpdate,
-  LoginResult,
-  Session,
-  SelectablePresenceStatus,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { LoginIdentityProgressReporter } from '../../application/login-identity/LoginIdentityProgressReporter';
 import type { DevicePairingRequestDraft } from '../../domain/DevicePairingRequestDraft';
 import type { Identity } from '../../domain/Identity';
@@ -15,6 +5,11 @@ import type { DeviceAuthorizationRevision } from '../../domain/value-objects/Dev
 import type { DeviceCredential } from '../../domain/value-objects/DeviceCredential';
 import type { IdentityMasterKeyProtection } from '../../domain/value-objects/IdentityMasterKeyProtection';
 import type { IdentityCreationMaterial } from '../crypto/IdentityCreationMaterial';
+import type {
+  LocalKeychain,
+  LocalKeychainUpdate,
+} from '../keychain/LocalKeychain';
+import type { Session } from '../session/Session';
 import type { CreatedIdentityMaterial } from './CreatedIdentityMaterial';
 import type { DeviceSealedRootRotation } from './DeviceSealedRootRotation';
 import type { IdentityUpdateProfileInput } from './IdentitySignaturePayloadFactory';
@@ -27,7 +22,13 @@ import type { PigeonIdentityGateway } from './PigeonIdentityGateway';
 import type { PigeonIdentityLoginApi } from './PigeonIdentityLoginApi';
 import type { PigeonKeychainApi } from './PigeonKeychainApi';
 import type { PigeonPresenceGateway } from './PigeonPresenceGateway';
+import type { IdentityPresenceResource as IdentityPresence } from './resources/IdentityPresenceResource';
+import type { IdentityResource } from './resources/IdentityResource';
+import type { KeychainResource } from './resources/KeychainResource';
+import type { LoginResult } from './resources/LoginResult';
+import type { SelectablePresenceStatusResource as SelectablePresenceStatus } from './resources/SelectablePresenceStatusResource';
 
+import { DevicePairingError } from '../../domain/DevicePairingError';
 import { DevicePairingCode } from '../../domain/value-objects/DevicePairingCode';
 import { IdentityPassword } from '../../domain/value-objects/IdentityPassword';
 import { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
@@ -81,10 +82,23 @@ export class PigeonIdentitiesGateway {
     session: Session,
     requestCode: DevicePairingCode,
   ): Promise<{ completionCode: DevicePairingCode; session: Session }> {
+    const root = session.deviceSealedRootKey;
+
+    if (!root) {
+      throw new DevicePairingError(
+        'mismatch',
+        'Device sealed root is not open on this session.',
+      );
+    }
+
     const result = await this.deviceAuthorization.authorizePairing(
       session,
       requestCode,
     );
+    // The root is kept, so the new device opens the keychain's root. A failure
+    // here leaves the device authorized without a completion code: revoke it
+    // and pair again.
+    await this.deviceSealedRoot.reseal(result.session, root);
 
     return {
       completionCode: result.completion.toCode(),
@@ -101,21 +115,23 @@ export class PigeonIdentitiesGateway {
     target: DeviceCredential,
     compromisedSince?: DeviceAuthorizationRevision,
   ): Promise<Session> {
+    // The head is read under the current root first, so a failed read revokes
+    // nothing. The rewrap then seals it under the new root. If the rewrap fails
+    // after the new root is published, the keychain stays under the previous
+    // root; see the residuals in docs/device-sealed-secrets-client.md.
+    const head = await this.keychain.readHead(session);
     const revoked = await this.deviceAuthorization.revokeDevice(
       session,
       target,
       compromisedSince,
     );
+    const rotated = await this.deviceSealedRoot.rotate(revoked);
 
-    try {
-      return await this.deviceSealedRoot.rotate(revoked);
-    } catch {
-      // Count-only. The remaining devices publish on their next unlock.
-      // eslint-disable-next-line no-console
-      console.debug('Device sealed root rotation after revoke failed.');
-
-      return revoked;
+    if (head) {
+      await this.keychain.rewrapHead(rotated, head);
     }
+
+    return rotated;
   }
 
   public async retireOwnDevice(session: Session): Promise<OwnDeviceRetirement> {

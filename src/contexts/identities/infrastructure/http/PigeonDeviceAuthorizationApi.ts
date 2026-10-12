@@ -5,10 +5,6 @@ import {
 } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp, assert } from '@haskou/value-objects';
 
-import type {
-  IdentityResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { DeviceAuthorizationCheckpointResource } from '../../domain/DeviceAuthorizationCheckpointResource';
@@ -17,7 +13,10 @@ import type { DeviceCatalogResource } from '../../domain/DeviceCatalogResource';
 import type { DevicePairingRequestDraft } from '../../domain/DevicePairingRequestDraft';
 import type { IdentityPassword } from '../../domain/value-objects/IdentityPassword';
 import type { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
+import type { Session } from '../session/Session';
 import type { DeviceIdentityVault } from '../storage/DeviceIdentityVault';
+import type { DevicePairingAuthorization } from './DevicePairingAuthorization';
+import type { IdentityResource } from './resources/IdentityResource';
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 import { DeviceAuthorizationCheckpoint } from '../../domain/DeviceAuthorizationCheckpoint';
@@ -220,7 +219,7 @@ export class PigeonDeviceAuthorizationApi {
   public async authorizePairing(
     session: Session,
     requestCode: DevicePairingCode,
-  ): Promise<{ completion: DevicePairingCompletion; session: Session }> {
+  ): Promise<DevicePairingAuthorization> {
     const acceptedAt = new Timestamp(this.clock());
     const request = DevicePairingRequest.fromCode(requestCode, acceptedAt);
     const invitation = request.getInvitation();

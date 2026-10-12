@@ -1,9 +1,7 @@
 import { StringValueObject } from '@haskou/value-objects';
 
-import type {
-  ConversationKeyEntry,
-  LocalKeychain,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationKeyEntry } from './ConversationKeyEntry';
+import type { LocalKeychain } from './LocalKeychain';
 
 function sameValue(left: string, right: string): boolean {
   return new StringValueObject(left, Number.MAX_SAFE_INTEGER).isEqual(

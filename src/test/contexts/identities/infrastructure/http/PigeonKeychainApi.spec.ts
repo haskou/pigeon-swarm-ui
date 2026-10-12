@@ -1,3 +1,5 @@
+import { EncryptedPayload, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+
 import type { KeychainResource } from '../../../../../contexts/identities/infrastructure/http/resources/KeychainResource';
 import type { ConversationKeyEntry } from '../../../../../contexts/identities/infrastructure/keychain/ConversationKeyEntry';
 import type { LocalKeychain } from '../../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
@@ -24,11 +26,19 @@ class FakeKeychainServer {
   private readonly stored: StoredKeychain[] = [];
 
   public seed(keychain: LocalKeychain, externalId: string): void {
+    this.seedSealed(JSON.stringify(keychain), externalId, keychain.version);
+  }
+
+  public seedSealed(
+    encryptedPayload: string,
+    externalId: string,
+    version: number,
+  ): void {
     this.stored.push({
-      encryptedPayload: JSON.stringify(keychain),
+      encryptedPayload,
       externalId,
       previousKeychainExternalIdentifier: null,
-      version: keychain.version,
+      version,
     });
   }
 
@@ -462,6 +472,201 @@ describe(PigeonKeychainApi.name, () => {
       expect(Date.now() - startedAt).toBe(0);
       expect(request).toHaveBeenCalledTimes(2);
       expect(server.headConversationIds()).toEqual(['conversation-a']);
+    });
+  });
+
+  describe('device-sealed root head', () => {
+    const masterKey = SymmetricKey.generate();
+    const rootKey = SymmetricKey.generate();
+    const otherKey = SymmetricKey.generate();
+    const keychain: LocalKeychain = {
+      conversations: {
+        'conversation-a': {
+          conversationId: 'conversation-a',
+        } as ConversationKeyEntry,
+      },
+      timestamp: 1,
+      version: 1,
+    };
+    const sealedUnder = (key: SymmetricKey): string =>
+      key.encrypt(JSON.stringify(keychain)).toString();
+    const sessionWith = (extra: Record<string, unknown> = {}): Session =>
+      ({
+        identity: { id: 'identity-1' },
+        keyPair: {
+          sign: jest.fn().mockReturnValue({ toString: () => 'signature' }),
+        },
+        masterKey,
+        ...extra,
+      }) as unknown as Session;
+    const apiOver = (server: FakeKeychainServer): PigeonKeychainApi =>
+      new PigeonKeychainApi(
+        {
+          request: jest.fn(
+            (_path: string, init: { body?: string; method: string }) =>
+              server.handle(init.method, init.body),
+          ),
+        } as unknown as HttpJsonClient,
+        {
+          headers: jest.fn().mockResolvedValue({}),
+        } as unknown as RequestSigner,
+        new KeychainCipher(),
+        {
+          invalidateForSession: jest.fn(),
+          keyForSession: () => 'cache-key',
+          load: async (_key: string, loader: () => Promise<KeychainResource>) =>
+            await loader(),
+        } as unknown as RequestCache,
+      );
+
+    it('reads the head under the session root', async () => {
+      const server = new FakeKeychainServer();
+      server.seedSealed(sealedUnder(rootKey), 'kc-1', 1);
+
+      await expect(
+        apiOver(server).readHead(sessionWith({ deviceSealedRootKey: rootKey })),
+      ).resolves.toMatchObject({
+        keychain: { conversations: keychain.conversations, version: 1 },
+        keychainExternalIdentifier: 'kc-1',
+      });
+    });
+
+    it('returns no head when the identity has no keychain yet', async () => {
+      await expect(
+        apiOver(new FakeKeychainServer()).readHead(
+          sessionWith({ deviceSealedRootKey: rootKey }),
+        ),
+      ).resolves.toBeUndefined();
+    });
+
+    it('opens a masterKey-sealed head while a root is held', async () => {
+      const server = new FakeKeychainServer();
+      server.seedSealed(sealedUnder(masterKey), 'kc-1', 1);
+
+      await expect(
+        apiOver(server).readHead(sessionWith({ deviceSealedRootKey: rootKey })),
+      ).resolves.toMatchObject({ keychainExternalIdentifier: 'kc-1' });
+    });
+
+    it('opens a masterKey-sealed head when no root is held', async () => {
+      const server = new FakeKeychainServer();
+      server.seedSealed(sealedUnder(masterKey), 'kc-1', 1);
+
+      await expect(
+        apiOver(server).readHead(sessionWith()),
+      ).resolves.toMatchObject({ keychainExternalIdentifier: 'kc-1' });
+    });
+
+    it('rejects a head sealed under neither the root nor masterKey', async () => {
+      const server = new FakeKeychainServer();
+      server.seedSealed(sealedUnder(otherKey), 'kc-1', 1);
+
+      await expect(
+        apiOver(server).readHead(sessionWith({ deviceSealedRootKey: rootKey })),
+      ).rejects.toThrow();
+    });
+
+    it('does not fall back to masterKey when no root is held', async () => {
+      const server = new FakeKeychainServer();
+      server.seedSealed(sealedUnder(rootKey), 'kc-1', 1);
+
+      await expect(apiOver(server).readHead(sessionWith())).rejects.toThrow();
+    });
+
+    it('rewraps the head under the session root, chained to the head it replaces', async () => {
+      const server = new FakeKeychainServer();
+      server.seedSealed(sealedUnder(masterKey), 'kc-1', 1);
+
+      await apiOver(server).rewrapHead(
+        sessionWith({ deviceSealedRootKey: rootKey }),
+        { keychain, keychainExternalIdentifier: 'kc-1' },
+      );
+
+      const stored = server.handle('GET') as KeychainResource;
+
+      expect(stored).toMatchObject({
+        keychainExternalIdentifier: 'kc-2',
+        previousKeychainExternalIdentifier: 'kc-1',
+        version: 2,
+      });
+      expect(() =>
+        rootKey.decrypt(new EncryptedPayload(stored.encryptedPayload)),
+      ).not.toThrow();
+    });
+
+    describe('migrateLegacyHead', () => {
+      it('reseals a masterKey-sealed head under the root as the next keychain', async () => {
+        const server = new FakeKeychainServer();
+        server.seedSealed(sealedUnder(masterKey), 'kc-1', 1);
+
+        await apiOver(server).migrateLegacyHead(
+          sessionWith({ deviceSealedRootKey: rootKey }),
+        );
+
+        const stored = server.handle('GET') as KeychainResource;
+
+        expect(stored).toMatchObject({
+          keychainExternalIdentifier: 'kc-2',
+          previousKeychainExternalIdentifier: 'kc-1',
+          version: 2,
+        });
+        expect(() =>
+          rootKey.decrypt(new EncryptedPayload(stored.encryptedPayload)),
+        ).not.toThrow();
+      });
+
+      it('keeps the keychain contents when it reseals them', async () => {
+        const server = new FakeKeychainServer();
+        server.seedSealed(sealedUnder(masterKey), 'kc-1', 1);
+
+        await apiOver(server).migrateLegacyHead(
+          sessionWith({ deviceSealedRootKey: rootKey }),
+        );
+
+        const stored = server.handle('GET') as KeychainResource;
+        const opened = JSON.parse(
+          rootKey
+            .decrypt(new EncryptedPayload(stored.encryptedPayload))
+            .toString(),
+        ) as LocalKeychain;
+
+        expect(opened.conversations).toEqual(keychain.conversations);
+      });
+
+      it('leaves a head already sealed under the root alone', async () => {
+        const server = new FakeKeychainServer();
+        server.seedSealed(sealedUnder(rootKey), 'kc-1', 1);
+
+        await apiOver(server).migrateLegacyHead(
+          sessionWith({ deviceSealedRootKey: rootKey }),
+        );
+
+        expect(server.handle('GET')).toMatchObject({
+          keychainExternalIdentifier: 'kc-1',
+        });
+      });
+
+      it('does nothing without a device-sealed root', async () => {
+        const server = new FakeKeychainServer();
+        server.seedSealed(sealedUnder(masterKey), 'kc-1', 1);
+
+        await apiOver(server).migrateLegacyHead(sessionWith());
+
+        expect(server.handle('GET')).toMatchObject({
+          keychainExternalIdentifier: 'kc-1',
+        });
+      });
+
+      it('does nothing when the identity has no keychain yet', async () => {
+        const server = new FakeKeychainServer();
+
+        await expect(
+          apiOver(server).migrateLegacyHead(
+            sessionWith({ deviceSealedRootKey: rootKey }),
+          ),
+        ).resolves.toBeUndefined();
+        expect(() => server.handle('GET')).toThrow(HttpJsonError);
+      });
     });
   });
 });

@@ -1,13 +1,13 @@
-import type {
-  KeychainResource,
-  LocalKeychain,
-  LocalKeychainUpdate,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestCache } from '../../../../shared/infrastructure/http/RequestCache';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { KeychainCipher, KeychainHead } from '../crypto/KeychainCipher';
+import type {
+  LocalKeychain,
+  LocalKeychainUpdate,
+} from '../keychain/LocalKeychain';
+import type { Session } from '../session/Session';
+import type { KeychainResource } from './resources/KeychainResource';
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 
@@ -136,6 +136,34 @@ export class PigeonKeychainApi {
     }
   }
 
+  private async postKeychain(
+    session: Session,
+    head: KeychainHead | undefined,
+    keychain: LocalKeychain,
+  ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
+    const path = '/keychains/';
+    const encrypted = await this.cipher.encryptForPublish(
+      session,
+      head,
+      keychain,
+    );
+    const published = await this.http.request<{
+      keychainExternalIdentifier: string;
+      ownerIdentityId: string;
+      version: number;
+    }>(path, {
+      body: JSON.stringify(encrypted.body),
+      headers: await this.signer.headers(session, 'POST', path, encrypted.body),
+      method: 'POST',
+    });
+    this.requestCache.invalidateForSession(keychainPath(session), session);
+
+    return {
+      keychain: encrypted.keychain,
+      keychainExternalIdentifier: published.keychainExternalIdentifier,
+    };
+  }
+
   public decrypt(session: Session, keychain: KeychainResource): LocalKeychain {
     return this.cipher.decrypt(session, keychain);
   }
@@ -164,33 +192,58 @@ export class PigeonKeychainApi {
     update: LocalKeychainUpdate,
   ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
     return await this.enqueuePublish(session.identity.id, async () => {
-      const path = '/keychains/';
       const head = await this.readPublishHead(session);
-      const encrypted = await this.cipher.encryptForPublish(
+
+      return await this.postKeychain(
         session,
         head,
         update(head?.keychain ?? session.keychain),
       );
-      const published = await this.http.request<{
-        keychainExternalIdentifier: string;
-        ownerIdentityId: string;
-        version: number;
-      }>(path, {
-        body: JSON.stringify(encrypted.body),
-        headers: await this.signer.headers(
-          session,
-          'POST',
-          path,
-          encrypted.body,
-        ),
-        method: 'POST',
-      });
-      this.requestCache.invalidateForSession(keychainPath(session), session);
+    });
+  }
 
-      return {
-        keychain: encrypted.keychain,
-        keychainExternalIdentifier: published.keychainExternalIdentifier,
+  /**
+   * Reads the current head under the session's root, before the root moves.
+   */
+  public async readHead(session: Session): Promise<KeychainHead | undefined> {
+    return await this.readPublishHead(session);
+  }
+
+  /**
+   * Seals a head read under the previous root with this session's root, so a
+   * revoke moves the keychain before the previous root is dropped.
+   */
+  public async rewrapHead(session: Session, head: KeychainHead): Promise<void> {
+    await this.enqueuePublish(session.identity.id, async () => {
+      await this.postKeychain(session, head, head.keychain);
+    });
+  }
+
+  /**
+   * Reseals a head that opens only under the master key under the session's
+   * root. Unlock runs it once the root is open. A head already under the root
+   * is left alone.
+   */
+  public async migrateLegacyHead(session: Session): Promise<void> {
+    if (!session.deviceSealedRootKey) {
+      return;
+    }
+
+    await this.enqueuePublish(session.identity.id, async () => {
+      const resource = await this.undefinedWhenMissing(
+        async () => await this.fetchRemote(session),
+      );
+
+      if (!resource || this.cipher.isSealedUnderRoot(session, resource)) {
+        return;
+      }
+
+      const head: KeychainHead = {
+        keychain: this.decrypt(session, resource),
+        keychainExternalIdentifier: resource.keychainExternalIdentifier,
       };
+
+      await this.postKeychain(session, head, head.keychain);
     });
   }
 }

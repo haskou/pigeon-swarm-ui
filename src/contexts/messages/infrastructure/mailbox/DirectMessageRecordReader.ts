@@ -1,7 +1,8 @@
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessageRecord';
 import type { DirectReadRecord } from '../../../mailboxes/domain/DirectReadRecord';
 
+import { sessionRootKey } from '../../../identities/infrastructure/session/sessionRootKey';
 import { DirectMailboxOwnership } from '../../../mailboxes/domain/DirectMailboxOwnership';
 import { DirectMailboxRecords } from '../../../mailboxes/domain/DirectMailboxRecords';
 import { DirectMessageAuthorship } from './DirectMessageAuthorship';
@@ -21,7 +22,7 @@ export class DirectMessageRecordReader {
       (record, authorTag) =>
         DirectMessageAuthorship.isAuthentic(
           session.identity.id,
-          session.masterKey.getBuffer(),
+          sessionRootKey(session).getBuffer(),
           record,
           authorTag,
         ),

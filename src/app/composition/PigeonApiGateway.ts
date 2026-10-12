@@ -159,9 +159,16 @@ export class PigeonApiGateway {
       this.identityVault,
     );
     const deviceSealedSecrets = new PigeonDeviceSealedSecretApi(http, signer);
+    const keychainApi = new PigeonKeychainApi(
+      http,
+      signer,
+      keychainCipher,
+      this.requestCache,
+    );
     const deviceSealedRoot = new DeviceSealedRootRotation(
       deviceAuthorization,
       deviceSealedSecrets,
+      keychainApi,
     );
     const mutations = new PublicMutationSigner(
       new DeviceAuthorizationRevisionSource(deviceAuthorization),
@@ -303,17 +310,12 @@ export class PigeonApiGateway {
       ),
       this.identityVault,
     );
-    const keychainApi = new PigeonKeychainApi(
-      http,
-      signer,
-      keychainCipher,
-      this.requestCache,
-    );
     const identitySession = new PigeonIdentitySessionApi(
       identityResourceGateway,
       this.identityVault,
       deviceAuthorization,
       deviceSealedRoot,
+      keychainApi,
     );
     const identityWorkspace = new PigeonIdentityWorkspaceSessionApi({
       decryptKeychain: (session, keychain) =>

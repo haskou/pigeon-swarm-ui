@@ -4,7 +4,9 @@ import { mock } from 'jest-mock-extended';
 import type { DeviceCredential } from '../../../../../contexts/identities/domain/value-objects/DeviceCredential';
 import type { PigeonDeviceAuthorizationApi } from '../../../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
 import type { PigeonDeviceSealedSecretApi } from '../../../../../contexts/identities/infrastructure/http/PigeonDeviceSealedSecretApi';
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import type { PigeonKeychainApi } from '../../../../../contexts/identities/infrastructure/http/PigeonKeychainApi';
+import type { LocalKeychain } from '../../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { DeviceSealedRootRotation } from '../../../../../contexts/identities/infrastructure/http/DeviceSealedRootRotation';
 import {
@@ -31,9 +33,11 @@ const makeSession = (revision: number): SessionWithRoot =>
 const setup = (clock = 1_000) => {
   const deviceAuthorization = mock<PigeonDeviceAuthorizationApi>();
   const sealedSecrets = mock<PigeonDeviceSealedSecretApi>();
+  const keychains = mock<PigeonKeychainApi>();
   const rotation = new DeviceSealedRootRotation(
     deviceAuthorization,
     sealedSecrets,
+    keychains,
     () => clock,
   );
 
@@ -41,7 +45,7 @@ const setup = (clock = 1_000) => {
   sealedSecrets.fetchOwn.mockResolvedValue(null);
   sealedSecrets.publish.mockResolvedValue(undefined);
 
-  return { deviceAuthorization, rotation, sealedSecrets };
+  return { deviceAuthorization, keychains, rotation, sealedSecrets };
 };
 
 describe('DeviceSealedRootRotation', () => {
@@ -127,6 +131,49 @@ describe('DeviceSealedRootRotation', () => {
     });
   });
 
+  describe('reseal', () => {
+    it('publishes the given root at a new generation to the head recipients', async () => {
+      const { deviceAuthorization, rotation, sealedSecrets } = setup(1_000);
+      const session = makeSession(5);
+      const root = SymmetricKey.generate();
+
+      await rotation.reseal(session, root);
+
+      expect(deviceAuthorization.findDevices).toHaveBeenCalledWith(session);
+      expect(sealedSecrets.publish).toHaveBeenCalledTimes(1);
+
+      const [published, input] = sealedSecrets.publish.mock.calls[0];
+
+      expect(published).toBe(session);
+      expect(input.recipients).toEqual(RECIPIENTS);
+      expect(input.generation).toBe(1_001);
+      expect(
+        Buffer.from(decodeBase64Url(input.payload)).equals(root.getBuffer()),
+      ).toBe(true);
+    });
+
+    it('lets a device opened on the resealed revision read the same root without publishing', async () => {
+      const { rotation, sealedSecrets } = setup(1_000);
+      const root = SymmetricKey.generate();
+
+      await rotation.reseal(makeSession(5), root);
+      const [, input] = sealedSecrets.publish.mock.calls[0];
+      sealedSecrets.publish.mockClear();
+      sealedSecrets.fetchOwn.mockResolvedValue({
+        authorizationRevision: 5,
+        generation: input.generation,
+        payload: input.payload,
+      });
+
+      const current = await rotation.current(makeSession(5));
+
+      expect(sealedSecrets.publish).not.toHaveBeenCalled();
+      expect(
+        current.deviceSealedRootKey?.getBuffer().equals(root.getBuffer()),
+      ).toBe(true);
+    });
+  });
+
   describe('current', () => {
     it('opens a fresh entry without publishing', async () => {
       const { rotation, sealedSecrets } = setup();
@@ -144,19 +191,23 @@ describe('DeviceSealedRootRotation', () => {
       expect(current.deviceSealedRootKey?.getBuffer().equals(root)).toBe(true);
     });
 
-    it('republishes when the stored entry is from an older authorization revision', async () => {
-      const { rotation, sealedSecrets } = setup(1_000);
+    it('re-syncs a stale session and opens its entry without publishing', async () => {
+      const { deviceAuthorization, rotation, sealedSecrets } = setup(1_000);
+      const root = SymmetricKey.generate();
 
+      deviceAuthorization.synchronize.mockResolvedValue(makeSession(4));
       sealedSecrets.fetchOwn.mockResolvedValue({
-        authorizationRevision: 3,
-        generation: 7,
-        payload: 'stale',
+        authorizationRevision: 4,
+        generation: 8,
+        payload: encodeBase64Url(root.getBuffer()),
       });
 
-      await rotation.current(makeSession(4));
+      const current = await rotation.current(makeSession(3));
 
-      expect(sealedSecrets.publish).toHaveBeenCalledTimes(1);
-      expect(sealedSecrets.publish.mock.calls[0][1].generation).toBe(1_001);
+      expect(sealedSecrets.publish).not.toHaveBeenCalled();
+      expect(current.deviceSealedRootKey?.getBuffer()).toEqual(
+        root.getBuffer(),
+      );
     });
 
     it('publishes when this device has no entry yet', async () => {
@@ -164,6 +215,32 @@ describe('DeviceSealedRootRotation', () => {
 
       const current = await rotation.current(makeSession(4));
 
+      expect(sealedSecrets.publish).toHaveBeenCalledTimes(1);
+      expect(current.deviceSealedRootKey).toBeDefined();
+    });
+
+    it('does not mint a root when the identity keychain head cannot be read', async () => {
+      const { keychains, rotation, sealedSecrets } = setup(1_000);
+      keychains.readHead.mockRejectedValue(
+        new Error('head sealed under an unopenable root'),
+      );
+
+      await expect(rotation.current(makeSession(4))).rejects.toThrow(
+        'head sealed under an unopenable root',
+      );
+      expect(sealedSecrets.publish).not.toHaveBeenCalled();
+    });
+
+    it('mints the first entry when the identity keychain head is readable', async () => {
+      const { keychains, rotation, sealedSecrets } = setup(1_000);
+      keychains.readHead.mockResolvedValue({
+        keychain: { conversations: {}, version: 1 } as LocalKeychain,
+        keychainExternalIdentifier: 'kc-1',
+      });
+
+      const current = await rotation.current(makeSession(4));
+
+      expect(keychains.readHead).toHaveBeenCalledTimes(1);
       expect(sealedSecrets.publish).toHaveBeenCalledTimes(1);
       expect(current.deviceSealedRootKey).toBeDefined();
     });
