@@ -14,6 +14,8 @@ module.exports = {
     '**/DevicePairingRequest.spec.ts',
     '**/DevicePairingCompletion.spec.ts',
     '**/PigeonDeviceAuthorizationApi.spec.ts',
+    '**/DeviceSealedSecretCipher.spec.ts',
+    '**/PigeonDeviceSealedSecretApi.spec.ts',
     '**/CommunityOperationSigner.spec.ts',
     '**/ConversationOperationSigner.spec.ts',
     '**/CallEventSigner.spec.ts',
