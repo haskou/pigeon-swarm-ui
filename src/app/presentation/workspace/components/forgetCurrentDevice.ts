@@ -15,6 +15,8 @@ export type ForgetDeviceOutcome =
  * changed, unless the user already confirmed. A confirmed forget of the only
  * device removes the local unlock alone, and keeps the device authorized and
  * its reader in place. Reader release is best effort.
+ * Local direct history is wiped once the gate passes, even when the unlock
+ * removal fails.
  */
 export async function forgetCurrentDevice(
   session: Session,
@@ -33,6 +35,8 @@ export async function forgetCurrentDevice(
   } else {
     await services.directMessages.releaseDeviceReaders(session);
   }
+
+  await services.directMessages.forgetHistory(session.identity.id);
 
   try {
     await services.identities.forgetDeviceUnlock(session.identity.id);

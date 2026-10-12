@@ -153,6 +153,13 @@ export function useDirectMessageMailboxSync({
     let running = false;
     let queued = false;
     let unsubscribeHints: (() => void) | undefined;
+    const apply = (changes: DirectMessageTimelineChange[]): void => {
+      applySyncChanges(changes, conversationId, pinClock, {
+        onConversationRead,
+        onMessagesChange,
+        setPinnedMessageIds,
+      });
+    };
 
     const clearNotice = (): void => {
       if (notice !== null) {
@@ -178,13 +185,7 @@ export function useDirectMessageMailboxSync({
           session,
           conversationId,
           controller.signal,
-          (changes) => {
-            applySyncChanges(changes, conversationId, pinClock, {
-              onConversationRead,
-              onMessagesChange,
-              setPinnedMessageIds,
-            });
-          },
+          apply,
         );
         clearNotice();
 
@@ -224,7 +225,18 @@ export function useDirectMessageMailboxSync({
       }
     };
 
-    void pass();
+    const start = async (): Promise<void> => {
+      await applicationContainer.directMessages.restore(
+        session,
+        conversationId,
+        controller.signal,
+        apply,
+      );
+
+      if (!controller.signal.aborted) void pass();
+    };
+
+    void start();
 
     return () => {
       controller.abort();
