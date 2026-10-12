@@ -21,6 +21,7 @@ import type { GroupConversationInput } from './GroupConversationInput';
 import type { PigeonConversationCommandsApiDependencies } from './PigeonConversationCommandsApiDependencies';
 
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
+import { ConversationKeyRequiredError } from '../../../messages/domain/errors/ConversationKeyRequiredError';
 import { NotificationMutationSigner } from '../../../notifications/infrastructure/http/NotificationMutationSigner';
 import { ConversationGroupNonce } from '../../domain/value-objects/ConversationGroupNonce';
 import { ConversationNetworkId } from '../../domain/value-objects/ConversationNetworkId';
@@ -359,7 +360,7 @@ export class PigeonConversationCommandsApi {
   ): Promise<ConversationResource> {
     const keyEntry = session.keychain.conversations[target.id];
 
-    if (!keyEntry) throw new Error('Conversation key is required.');
+    if (!keyEntry) throw new ConversationKeyRequiredError();
 
     const recipientIdentity = await this.identities.get(
       recipientIdentityId.trim(),

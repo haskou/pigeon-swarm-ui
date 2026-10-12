@@ -19,6 +19,7 @@ import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonEr
 import { ScopeFrontierReader } from '../../../../shared/infrastructure/http/ScopeFrontierReader';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
+import { ConversationKeyRequiredError } from '../../domain/errors/ConversationKeyRequiredError';
 import { MessageContent } from '../../domain/value-objects/MessageContent';
 import { PigeonMessagesApi } from './PigeonMessagesApi';
 
@@ -180,7 +181,7 @@ export class PigeonMessageCommandsApi {
       conversationId,
     );
 
-    if (!key) throw new Error('Conversation key is required.');
+    if (!key) throw new ConversationKeyRequiredError();
 
     const {
       attachments = [],
@@ -305,7 +306,7 @@ export class PigeonMessageCommandsApi {
       conversationId,
     );
 
-    if (!key) throw new Error('Conversation key is required.');
+    if (!key) throw new ConversationKeyRequiredError();
 
     const timestamp = commandIdentity?.createdAt ?? Date.now();
     const linkPreview =
