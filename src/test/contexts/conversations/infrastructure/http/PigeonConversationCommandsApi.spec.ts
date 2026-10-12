@@ -10,6 +10,7 @@ import { ConversationIdFactory } from '../../../../../contexts/conversations/dom
 import { ConversationMapper } from '../../../../../contexts/conversations/infrastructure/http/ConversationMapper';
 import { ConversationOperationSigner } from '../../../../../contexts/conversations/infrastructure/http/ConversationOperationSigner';
 import { PigeonConversationCommandsApi } from '../../../../../contexts/conversations/infrastructure/http/PigeonConversationCommandsApi';
+import { ConversationKeyRequiredError } from '../../../../../contexts/messages/domain/errors/ConversationKeyRequiredError';
 import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
 const target = { id: 'group:abc', networkId: 'network-1' };
@@ -64,9 +65,9 @@ describe(PigeonConversationCommandsApi.name, () => {
   });
 
   it('rejects invitations when the conversation key is not available', async () => {
-    await expect(api.addMember(session, target, 'identity-2')).rejects.toThrow(
-      'Conversation key is required.',
-    );
+    await expect(
+      api.addMember(session, target, 'identity-2'),
+    ).rejects.toBeInstanceOf(ConversationKeyRequiredError);
     expect(http.request).not.toHaveBeenCalled();
   });
 
