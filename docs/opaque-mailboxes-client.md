@@ -53,7 +53,7 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 - Legacy inboxes: a `readToken` stored by the previous design is adopted on the first pass: both readers are registered under it, then the stored token is dropped. The first reconcile after adoption removes that token's reader, so a client still holding it loses access until it updates. If storage was cleared before adoption, the inbox stays unrecoverable until retention removes it.
 - Mixed versions and the reader cap: see Reader set.
 - Forget is best effort on readers: forgetting a device removes its device reader through the root token. A failed removal is left to the reader prune that other devices run on sync. The only device of an identity keeps its reader, because its revocation is never sent.
-- Revoked devices keep root authority: the root token derives from the identity root key, which a device keeps after it is revoked. Devices never prune the root reader, and any reader can add or remove any other reader. The node checks only that a token is registered, so a revoked device keeps reading and acknowledging the inbox until someone removes the root reader on the node.
+- Revoked devices keep root authority, and nothing rotates it. The root token derives from the identity root key, which a device keeps after it is revoked, and every device also keeps the identity key pair. The node authenticates identity reads such as `GET /keychains/{id}` by checking the request signature against the identity public key, and it does not check device revocation. Any secret the remaining devices could fetch from the node is therefore also fetchable by a revoked device, so rotating the root token on revoke or forget cannot cut it off yet. The node checks only that a token is registered, so a revoked device keeps reading and acknowledging the inbox until someone removes the root reader on the node. Devices never prune the root reader, and any reader can add or remove any other reader.
 - Silent readers: a registered reader that stops acknowledging holds every envelope above its cursor until the node's retention expires them (default 14 days). While it is silent the mailbox can fill, and appends return 409. Pruning removes only readers whose device is gone, so a silent device that is still listed keeps its backlog.
 
 ## Creation proof
@@ -151,6 +151,7 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 
 - Epoch rotation announcement.
 - Realtime hint for new envelopes.
+- Root rotation on revoke or forget (blocked): the remaining devices need a secret that only they can open, delivered through a device-authenticated read or sealed to each device's credential. The node has neither today. The identity key pair is shared by all devices, and the node's only identity-level read check is a signature against that key. Rotating the identity key or the root key would also re-key the recovery material, which is a product decision. Until one of these lands, revoke and forget keep the existing reader handling.
 
 ## Verification
 
