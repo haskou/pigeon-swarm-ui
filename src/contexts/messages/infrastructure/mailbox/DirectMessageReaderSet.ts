@@ -3,6 +3,7 @@ import type { MailboxKeys } from '../../../mailboxes/infrastructure/crypto/Mailb
 import type { MailboxReadTokens } from '../../../mailboxes/infrastructure/MailboxChannel';
 
 import { sessionRootKey } from '../../../identities/infrastructure/session/sessionRootKey';
+import { MailboxReaderRetention } from '../../../mailboxes/domain/MailboxReaderRetention';
 import { MailboxCapability } from '../../../mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxReadToken } from '../../../mailboxes/infrastructure/crypto/MailboxReadToken';
 import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
@@ -148,34 +149,15 @@ export class DirectMessageReaderSet {
     const deviceTokens = credentials.map((credential) =>
       MailboxReadToken.deriveDevice(rootKey, keys.mailboxId, credential),
     );
-    const kept = new Set<string>([
-      MailboxCapability.hash(managingToken),
-      MailboxCapability.hash(readers.root),
-      MailboxCapability.hash(readers.device),
-      // The session's sealed root reader stays even when prune runs on the
-      // legacy set after a refused bridge.
-      MailboxCapability.hash(MailboxReadToken.derive(rootKey, keys.mailboxId)),
-      ...deviceTokens.map((token) => MailboxCapability.hash(token)),
-    ]);
+    const legacyKey = session.masterKey.getBuffer();
     const listed = await this.channel.listReaders(keys, managingToken);
-    const listedHashes = new Set(
-      listed.readers.map((reader) => reader.readTokenHash),
-    );
-    const migrated = deviceTokens.every((token) =>
-      listedHashes.has(MailboxCapability.hash(token)),
-    );
-
-    if (!migrated) {
-      const legacyKey = session.masterKey.getBuffer();
-
-      kept.add(
+    const removable = MailboxReaderRetention.readersToRemove({
+      devices: deviceTokens.map((token) => MailboxCapability.hash(token)),
+      legacy: [
         MailboxCapability.hash(
           MailboxReadToken.derive(legacyKey, keys.mailboxId),
         ),
-      );
-
-      for (const credential of credentials) {
-        kept.add(
+        ...credentials.map((credential) =>
           MailboxCapability.hash(
             MailboxReadToken.deriveDevice(
               legacyKey,
@@ -183,18 +165,23 @@ export class DirectMessageReaderSet {
               credential,
             ),
           ),
-        );
-      }
-    }
+        ),
+      ],
+      listed: listed.readers.map((reader) => reader.readTokenHash),
+      retained: [
+        MailboxCapability.hash(managingToken),
+        MailboxCapability.hash(readers.root),
+        MailboxCapability.hash(readers.device),
+        // The session's sealed root reader stays even when prune runs on the
+        // legacy set after a refused bridge.
+        MailboxCapability.hash(
+          MailboxReadToken.derive(rootKey, keys.mailboxId),
+        ),
+      ],
+    });
 
-    for (const reader of listed.readers) {
-      if (!kept.has(reader.readTokenHash)) {
-        await this.channel.removeReader(
-          keys,
-          managingToken,
-          reader.readTokenHash,
-        );
-      }
+    for (const readTokenHash of removable) {
+      await this.channel.removeReader(keys, managingToken, readTokenHash);
     }
   }
 }
