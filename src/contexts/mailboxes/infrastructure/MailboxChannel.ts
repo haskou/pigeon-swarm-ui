@@ -7,6 +7,7 @@ import type {
 } from './http/PigeonMailboxClient';
 
 import { encodeBase64Url } from '../../../shared/infrastructure/encoding/base64url';
+import { MailboxCreationDifficultyPolicy } from '../domain/MailboxCreationDifficultyPolicy';
 import { MailboxCapability } from './crypto/MailboxCapability';
 import { MailboxCreationProof } from './crypto/MailboxCreationProof';
 import { MailboxEnvelopeCipher } from './crypto/MailboxEnvelopeCipher';
@@ -62,8 +63,6 @@ export type OpenedMailboxPage = {
  */
 export class MailboxChannel {
   private static readonly ENVELOPE_ID_BYTES = 16;
-  /** Ceiling on the difficulty a creation retry will mine. */
-  private static readonly MAX_CREATION_DIFFICULTY_BITS = 24;
 
   /** Creations in flight, keyed by mailbox and read-token hash. */
   private readonly pendingCreations = new Map<string, Promise<void>>();
@@ -121,7 +120,7 @@ export class MailboxChannel {
 
   /**
    * Recipient only. Creates the inbox once, mining at the default difficulty.
-   * If the node names a higher difficulty up to MAX_CREATION_DIFFICULTY_BITS,
+   * If the node names a higher difficulty the domain policy allows,
    * re-mines once at that value. Keep the root token, which manages readers.
    * Overlapping calls for the same inbox and token share one creation: a
    * second pass can see the inbox as missing while the first is still
@@ -160,10 +159,10 @@ export class MailboxChannel {
     } catch (error: unknown) {
       if (
         !(error instanceof MailboxCreationDifficultyError) ||
-        error.requiredDifficultyBits <=
-          MailboxCreationProof.DEFAULT_DIFFICULTY_BITS ||
-        error.requiredDifficultyBits >
-          MailboxChannel.MAX_CREATION_DIFFICULTY_BITS
+        !MailboxCreationDifficultyPolicy.allowsRaisedDifficulty(
+          MailboxCreationProof.DEFAULT_DIFFICULTY_BITS,
+          error.requiredDifficultyBits,
+        )
       ) {
         throw error;
       }
