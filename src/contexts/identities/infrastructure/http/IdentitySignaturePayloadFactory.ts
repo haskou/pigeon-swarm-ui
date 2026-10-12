@@ -3,7 +3,7 @@ import type { IdentityUpdateProfileInput } from './resources/IdentityUpdateProfi
 export type { IdentityUpdateProfileInput } from './resources/IdentityUpdateProfileInput';
 import type { IdentityResource } from '../../../../shared/domain/pigeonResources.types';
 
-import { MailboxHomeOrigin } from '../../../../shared/infrastructure/client/MailboxHomeOrigin';
+import { MailboxHomeBase } from '../../../../shared/infrastructure/client/MailboxHomeBase';
 import { ProfileBiography } from '../../domain/profile/ProfileBiography';
 import { ProfileHandle } from '../../domain/profile/ProfileHandle';
 import { ProfileName } from '../../domain/profile/ProfileName';
@@ -76,7 +76,7 @@ export class IdentitySignaturePayloadFactory {
       deviceCredential: input.deviceCredential,
       deviceCredentialCommitment: input.deviceCredentialCommitment,
       id,
-      mailboxHome: MailboxHomeOrigin.parse(this.publishedMailboxHome),
+      mailboxHome: MailboxHomeBase.parse(this.publishedMailboxHome),
       networks,
       previousIdentityExternalIdentifier: undefined,
       profile: profileFrom(input.profile),
@@ -108,7 +108,7 @@ export class IdentitySignaturePayloadFactory {
       deviceCredential: input.identity.deviceCredential,
       deviceCredentialCommitment: input.identity.deviceCredentialCommitment,
       id,
-      mailboxHome: MailboxHomeOrigin.parse(input.identity.mailboxHome),
+      mailboxHome: MailboxHomeBase.parse(input.identity.mailboxHome),
       networks,
       previousIdentityExternalIdentifier:
         input.previousIdentityExternalIdentifier,

@@ -59,9 +59,9 @@ describe(IdentitySignaturePayloadFactory.name, () => {
 
   it('builds the canonical identity update payload', async () => {
     const identity = {
+      admissionNonce: '0',
       authorizationRevision: 4,
       deviceCredential: 'device-credential',
-      admissionNonce: '0',
       deviceCredentialCommitment: 'device-commitment',
       id: '-----BEGIN PUBLIC KEY-----\nidentity-1\n-----END PUBLIC KEY-----',
       networks: ['network-1'],
@@ -151,7 +151,7 @@ describe(IdentitySignaturePayloadFactory.name, () => {
       version: 1,
     } as IdentityResource;
 
-    it('signs the published node origin between id and networks', async () => {
+    it('signs the published node base between id and networks', async () => {
       const payload = await new IdentitySignaturePayloadFactory(
         'https://node.example',
       ).createInitial(initial);
@@ -162,9 +162,17 @@ describe(IdentitySignaturePayloadFactory.name, () => {
       );
     });
 
-    it('omits the hint when the node is served under a path prefix', async () => {
+    it('publishes the path-prefixed base the node is served under', async () => {
       const payload = await new IdentitySignaturePayloadFactory(
         'https://node.example/api',
+      ).createInitial(initial);
+
+      expect(payload.mailboxHome).toBe('https://node.example/api');
+    });
+
+    it('omits the hint when the published base is not canonical', async () => {
+      const payload = await new IdentitySignaturePayloadFactory(
+        'https://node.example/api/',
       ).createInitial(initial);
 
       expect(payload.mailboxHome).toBeUndefined();
