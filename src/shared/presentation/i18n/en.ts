@@ -55,6 +55,11 @@ export const en = {
     devicePairingStep4Title: 'Set a password and enter',
     devicePairingVerificationHelp:
       'Show this code to the authorized device. It must be identical there before it authorizes this device.',
+    deviceRemoved: 'This device was removed from your account.',
+    deviceRemovedHelp:
+      "This browser can no longer open this identity. Pair it again from a device where you are signed in, or erase this browser's copy and start over. Your account is not deleted.",
+    deviceRemovedPair: 'Pair this device again',
+    deviceRemovedStartOver: 'Erase local copy and start over',
     fallbackNetworksLabel: 'Networks, comma-separated',
     handleLabel: 'username',
     heroBody:

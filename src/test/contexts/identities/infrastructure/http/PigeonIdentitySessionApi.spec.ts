@@ -8,6 +8,7 @@ import type {
   Session,
 } from '../../../../../shared/domain/pigeonResources.types';
 
+import { DeviceRemovedError } from '../../../../../contexts/identities/domain/DeviceRemovedError';
 import { DeviceAuthorizationEpoch } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
 import { DeviceId } from '../../../../../contexts/identities/domain/value-objects/DeviceId';
@@ -246,5 +247,47 @@ describe(PigeonIdentitySessionApi.name, () => {
       ),
     ).rejects.toThrow(copy.auth.invalidLogin);
     expect(synchronize).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a device the node removed instead of reporting a wrong password', async () => {
+    const keyPair = await KeyPair.generate();
+    const currentIdentity = identity(keyPair.toPrimitives().publicKey);
+    const deviceCredentialKeyPair = await KeyPair.generate();
+    currentIdentity.deviceCredential =
+      deviceCredentialKeyPair.toPrimitives().publicKey;
+    currentIdentity.deviceCredentialCommitment = SHA256Hash.from(
+      new StringValueObject(currentIdentity.deviceCredential),
+    ).valueOf();
+    const recoveryAuthorityKeyPair = await KeyPair.generate();
+    currentIdentity.recoveryAuthority =
+      recoveryAuthorityKeyPair.toPrimitives().publicKey;
+    const identities = {
+      get: jest.fn().mockResolvedValue(currentIdentity),
+    } as unknown as PigeonIdentityGateway;
+    const vault = {
+      unlock: jest.fn().mockResolvedValue({
+        authorizationEpoch: DeviceAuthorizationEpoch.genesis(),
+        authorizationRevision: DeviceAuthorizationRevision.initial(),
+        deviceId: DeviceId.generate(),
+        material: {
+          deviceCredentialKeyPair,
+          identityKeyPair: keyPair,
+          recoveryAuthorityKeyPair,
+          rootKey: { getBuffer: () => SymmetricKey.generate().getBuffer() },
+        },
+        secretHandle: DeviceUnlockSecretHandle.generate(),
+      }),
+    } as unknown as DeviceIdentityVault;
+    const deviceAuthorization = {
+      synchronize: jest.fn().mockRejectedValue(new DeviceRemovedError()),
+    } as unknown as PigeonDeviceAuthorizationApi;
+    const unlock = new PigeonIdentitySessionApi(
+      identities,
+      vault,
+      deviceAuthorization,
+    ).unlock(currentIdentity.id, 'password');
+
+    await expect(unlock).rejects.toBeInstanceOf(DeviceRemovedError);
+    await expect(unlock).rejects.not.toThrow(copy.auth.invalidLogin);
   });
 });

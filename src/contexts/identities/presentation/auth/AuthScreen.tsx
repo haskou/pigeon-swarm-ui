@@ -15,6 +15,7 @@ import { cx } from '../../../../shared/presentation/cx';
 import { useInstallPrompt } from '../../../../shared/presentation/hooks/useInstallPrompt';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import { DeviceRemovedError } from '../../domain/DeviceRemovedError';
 import { DevicePairingCode } from '../../domain/value-objects/DevicePairingCode';
 import { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
 import {
@@ -37,6 +38,7 @@ import {
   normalizeHandleInput,
   passwordValidationChecks,
 } from './credentialsValidation';
+import { DeviceRemovedNotice } from './DeviceRemovedNotice';
 import { Field } from './Field';
 import { LoginIdentityPreview } from './LoginIdentityPreview';
 import { type LoginMethod, LoginMethodPanel } from './LoginMethodPanel';
@@ -86,6 +88,8 @@ export function AuthScreen({
   const [pairingVerificationCode, setPairingVerificationCode] = useState('');
   const [state, setState] = useState<LoadState>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [removedIdentityId, setRemovedIdentityId] =
+    useState<string | null>(null);
   const [loginProgressStep, setLoginProgressStep] =
     useState<LoginIdentityProgressStep | null>(null);
   const [showInstallHelp, setShowInstallHelp] = useState(false);
@@ -192,6 +196,7 @@ export function AuthScreen({
 
     setState('loading');
     setError(null);
+    setRemovedIdentityId(null);
     setLoginProgressStep(mode === 'login' ? 'resolving-identity' : null);
 
     try {
@@ -238,6 +243,12 @@ export function AuthScreen({
     } catch (caught) {
       setState('error');
       setLoginProgressStep(null);
+      if (caught instanceof DeviceRemovedError) {
+        setRemovedIdentityId(normalizeIdentityLogin(identityId));
+
+        return;
+      }
+
       setError(
         mode === 'login' && useDevicePairing && pairingDraft
           ? toDevicePairingErrorMessage(caught, copy.auth.devicePairingError)
@@ -283,8 +294,41 @@ export function AuthScreen({
 
     setMode(nextMode);
     setError(null);
+    setRemovedIdentityId(null);
     setState('idle');
     setLoginProgressStep(null);
+  };
+
+  const handlePairAgain = () => {
+    handleModeChange('login');
+    setLoginMethod('device');
+  };
+
+  const handleStartOver = async (identity: string) => {
+    setState('loading');
+    setError(null);
+
+    try {
+      const applicationContainer = await loadApplicationContainer();
+
+      await applicationContainer.identities.forgetDeviceUnlock(identity);
+    } catch (caught) {
+      setState('error');
+      setError(toUserErrorMessage(caught, copy.auth.unknownError));
+
+      return;
+    }
+
+    clearLastLoginIdentity();
+    setIdentityId('');
+    setIdentityPreviewLookup('');
+    setRemovedIdentityId(null);
+    setState('idle');
+  };
+
+  const handleIdentityIdChange = (value: string) => {
+    setIdentityId(value);
+    setRemovedIdentityId(null);
   };
 
   const handleInstallApp = async () => {
@@ -379,7 +423,7 @@ export function AuthScreen({
               networks={networks}
               selectedNetwork={selectedNetwork}
               onHandleChange={setHandle}
-              onIdentityIdChange={setIdentityId}
+              onIdentityIdChange={handleIdentityIdChange}
               onNameChange={setName}
               onNetworksChange={setNetworks}
               onSelectedNetworkChange={setSelectedNetwork}
@@ -391,6 +435,7 @@ export function AuthScreen({
                   clearLastLoginIdentity();
                   setIdentityId('');
                   setIdentityPreviewLookup('');
+                  setRemovedIdentityId(null);
                 }}
                 preview={loginIdentityPreview}
               />
@@ -484,6 +529,13 @@ export function AuthScreen({
             )}
           </div>
 
+          {removedIdentityId ? (
+            <DeviceRemovedNotice
+              disabled={state === 'loading'}
+              onPairAgain={handlePairAgain}
+              onStartOver={() => void handleStartOver(removedIdentityId)}
+            />
+          ) : null}
           {error && (
             <div className="ui-inline-notice mt-3 border-rose-300/50 bg-rose-500/10 text-rose-100">
               {error}
