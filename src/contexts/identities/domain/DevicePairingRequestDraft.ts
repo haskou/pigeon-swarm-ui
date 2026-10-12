@@ -7,7 +7,7 @@ import type { DevicePairingRequest } from './DevicePairingRequest';
 import { DevicePairingError } from './DevicePairingError';
 
 export class DevicePairingRequestDraft {
-  private consumed = false;
+  private state: 'available' | 'consumed' | 'reserved' = 'available';
 
   public constructor(
     private readonly request: DevicePairingRequest,
@@ -15,19 +15,25 @@ export class DevicePairingRequestDraft {
     private readonly transport: KeyPair,
   ) {}
 
-  public assertAvailable(): void {
+  public reserve(): void {
     assert(
-      this.consumed === false,
+      this.state === 'available',
       new DevicePairingError(
         'used',
         'Device pairing request was already used.',
       ),
     );
+    this.state = 'reserved';
+  }
+
+  public release(): void {
+    if (this.state === 'reserved') {
+      this.state = 'available';
+    }
   }
 
   public consume(): void {
-    this.assertAvailable();
-    this.consumed = true;
+    this.state = 'consumed';
   }
 
   public getRequest(): DevicePairingRequest {

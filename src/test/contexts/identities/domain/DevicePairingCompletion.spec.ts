@@ -45,7 +45,7 @@ describe(DevicePairingCompletion.name, () => {
       rootKey,
     });
 
-    return { completion, draft, identityKeyPair, rootKey };
+    return { completion, draft, identityId, identityKeyPair, rootKey };
   }
 
   it('transfers identity material only to the ephemeral target transport key', async () => {
@@ -77,6 +77,62 @@ describe(DevicePairingCompletion.name, () => {
     expect(
       thrownPairingFailure(() =>
         completion.open(
+          source.draft.getRequest(),
+          source.draft.getTransportKeyPair(),
+        ),
+      ),
+    ).toBe('invalid');
+  });
+
+  it('rejects a completion whose material was swapped in from another completion', async () => {
+    const source = await fixture();
+    const other = await fixture();
+    const resource = source.completion.toCode().decode() as Record<
+      string,
+      unknown
+    >;
+    const foreign = other.completion.toCode().decode() as Record<
+      string,
+      unknown
+    >;
+    const completion = DevicePairingCompletion.fromCode(
+      DevicePairingCode.encode({
+        ...resource,
+        encryptedMaterial: foreign.encryptedMaterial,
+      }),
+    );
+
+    expect(
+      thrownPairingFailure(() =>
+        completion.open(
+          source.draft.getRequest(),
+          source.draft.getTransportKeyPair(),
+        ),
+      ),
+    ).toBe('invalid');
+  });
+
+  it('rejects a completion signed by a device other than the invitation author', async () => {
+    const source = await fixture();
+    const forged = DevicePairingCompletion.create({
+      author: await KeyPair.generate(),
+      checkpoint: DeviceAuthorizationCheckpoint.fromResource(
+        {
+          epoch: 'genesis',
+          identityId: source.identityId.valueOf(),
+          revision: 4,
+        },
+        source.identityId,
+      ),
+      identityKeyPair: source.identityKeyPair,
+      recoveryAuthorityKeyPair: await KeyPair.generate(),
+      request: source.draft.getRequest(),
+      rootKey: source.rootKey,
+    });
+
+    expect(
+      thrownPairingFailure(() =>
+        DevicePairingCompletion.fromCode(forged.toCode()).open(
           source.draft.getRequest(),
           source.draft.getTransportKeyPair(),
         ),

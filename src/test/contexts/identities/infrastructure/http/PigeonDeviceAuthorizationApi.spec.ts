@@ -53,6 +53,83 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
     return { identityId, session, transition };
   }
 
+  async function pairing() {
+    const { identityId, session } = await fixture();
+    const identity = {
+      admissionNonce: '0',
+      authorizationRevision: 0,
+      deviceCredential:
+        session.deviceCredentialKeyPair.toPrimitives().publicKey,
+      deviceCredentialCommitment: 'commitment',
+      id: identityId.valueOf(),
+      networks: [],
+      profile: { name: 'Ada' },
+      recoveryAuthority:
+        session.recoveryAuthorityKeyPair.toPrimitives().publicKey,
+      signature: 'signature',
+      timestamp: 1,
+      version: 1,
+    };
+    const http = {
+      request: jest
+        .fn()
+        .mockImplementation((path: string, init: RequestInit) => {
+          if (path === '/identity-devices/transitions') {
+            const body = JSON.parse(String(init.body)) as {
+              epoch: string;
+              identityId: string;
+              revision: number;
+            };
+
+            return Promise.resolve({
+              epoch: body.epoch,
+              identityId: body.identityId,
+              revision: body.revision,
+            });
+          }
+
+          return Promise.resolve({
+            epoch: 'genesis',
+            identityId: identityId.valueOf(),
+            revision: 1,
+          });
+        }),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'signed' }),
+      headersWithDeviceProof: jest
+        .fn()
+        .mockResolvedValue({ 'X-Device-Signature': 'device-signed' }),
+      headersWithRecoveryProof: jest
+        .fn()
+        .mockResolvedValue({ 'X-Recovery-Signature': 'recovery-signed' }),
+    } as unknown as RequestSigner;
+    const authorVault = {
+      advanceAuthorization: jest.fn(),
+    } as unknown as DeviceIdentityVault;
+    const targetVault = {
+      register: jest.fn().mockImplementation((input) =>
+        Promise.resolve({
+          authorizationEpoch: input.authorizationEpoch,
+          authorizationRevision: input.authorizationRevision,
+          deviceId: DeviceId.generate(),
+          material: input.material,
+        }),
+      ),
+    } as unknown as DeviceIdentityVault;
+
+    return {
+      apiAt: (now: number, vault: DeviceIdentityVault) =>
+        new PigeonDeviceAuthorizationApi(http, signer, vault, () => now),
+      authorVault,
+      http,
+      identity,
+      session,
+      signer,
+      targetVault,
+    };
+  }
+
   it('reads only the signed checkpoint for the current identity', async () => {
     const { identityId, session } = await fixture();
     const http = {
@@ -237,91 +314,21 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
   });
 
   it('pairs a new device through authenticated single-use transfer', async () => {
-    const { identityId, session } = await fixture();
-    const identity = {
-      admissionNonce: '0',
-      authorizationRevision: 0,
-      deviceCredential:
-        session.deviceCredentialKeyPair.toPrimitives().publicKey,
-      deviceCredentialCommitment: 'commitment',
-      id: identityId.valueOf(),
-      networks: [],
-      profile: { name: 'Ada' },
-      recoveryAuthority:
-        session.recoveryAuthorityKeyPair.toPrimitives().publicKey,
-      signature: 'signature',
-      timestamp: 1,
-      version: 1,
-    };
-    const http = {
-      request: jest
-        .fn()
-        .mockImplementation((path: string, init: RequestInit) => {
-          if (path === '/identity-devices/transitions') {
-            const body = JSON.parse(String(init.body)) as {
-              epoch: string;
-              identityId: string;
-              revision: number;
-            };
-
-            return Promise.resolve({
-              epoch: body.epoch,
-              identityId: body.identityId,
-              revision: body.revision,
-            });
-          }
-
-          return Promise.resolve({
-            epoch: 'genesis',
-            identityId: identityId.valueOf(),
-            revision: 1,
-          });
-        }),
-    } as unknown as HttpJsonClient;
-    const signer = {
-      headers: jest.fn().mockResolvedValue({ 'X-Signature': 'signed' }),
-      headersWithDeviceProof: jest
-        .fn()
-        .mockResolvedValue({ 'X-Device-Signature': 'device-signed' }),
-      headersWithRecoveryProof: jest
-        .fn()
-        .mockResolvedValue({ 'X-Recovery-Signature': 'recovery-signed' }),
-    } as unknown as RequestSigner;
-    const authorVault = {
-      advanceAuthorization: jest.fn(),
-    } as unknown as DeviceIdentityVault;
-    const targetVault = {
-      register: jest.fn().mockImplementation((input) =>
-        Promise.resolve({
-          authorizationEpoch: input.authorizationEpoch,
-          authorizationRevision: input.authorizationRevision,
-          deviceId: DeviceId.generate(),
-          material: input.material,
-        }),
-      ),
-    } as unknown as DeviceIdentityVault;
-    const authorApi = new PigeonDeviceAuthorizationApi(
-      http,
-      signer,
-      authorVault,
-      () => 1_000,
+    const { apiAt, authorVault, identity, session, targetVault } =
+      await pairing();
+    const password = IdentityPassword.fromString('Strong password 123!');
+    const authorApi = apiAt(1_000, authorVault);
+    const targetApi = apiAt(1_100, targetVault);
+    const draft = await targetApi.requestPairing(
+      authorApi.invite(session).toCode(),
     );
-    const targetApi = new PigeonDeviceAuthorizationApi(
-      http,
-      signer,
-      targetVault,
-      () => 1_100,
-    );
-
-    const invitation = authorApi.invite(session);
-    const draft = await targetApi.requestPairing(invitation.toCode());
     const authorized = await authorApi.authorizePairing(
       session,
       draft.getRequest().toCode(),
     );
     const paired = await targetApi.completePairing(
       identity,
-      IdentityPassword.fromString('Strong password 123!'),
+      password,
       draft,
       authorized.completion.toCode(),
     );
@@ -333,11 +340,111 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
     await expect(
       targetApi.completePairing(
         identity,
-        IdentityPassword.fromString('Strong password 123!'),
+        password,
         draft,
         DevicePairingCode.fromString(authorized.completion.toCode().valueOf()),
       ),
     ).rejects.toMatchObject({ failure: 'used' });
+  });
+
+  it('lets exactly one of two concurrent completions claim a request', async () => {
+    const { apiAt, authorVault, identity, session, targetVault } =
+      await pairing();
+    const password = IdentityPassword.fromString('Strong password 123!');
+    const authorApi = apiAt(1_000, authorVault);
+    const targetApi = apiAt(1_100, targetVault);
+    const draft = await targetApi.requestPairing(
+      authorApi.invite(session).toCode(),
+    );
+    const authorized = await authorApi.authorizePairing(
+      session,
+      draft.getRequest().toCode(),
+    );
+    const completion = authorized.completion.toCode();
+
+    const attempts = await Promise.allSettled([
+      targetApi.completePairing(identity, password, draft, completion),
+      targetApi.completePairing(identity, password, draft, completion),
+    ]);
+
+    expect(targetVault.register).toHaveBeenCalledTimes(1);
+    expect(attempts.map((attempt) => attempt.status).sort()).toEqual([
+      'fulfilled',
+      'rejected',
+    ]);
+    expect(attempts).toContainEqual(
+      expect.objectContaining({
+        reason: expect.objectContaining({ failure: 'used' }),
+        status: 'rejected',
+      }),
+    );
+  });
+
+  it('refuses to authorize a request again once it has enrolled a device', async () => {
+    const { apiAt, authorVault, http, session, targetVault } = await pairing();
+    const authorApi = apiAt(1_000, authorVault);
+    const draft = await apiAt(1_100, targetVault).requestPairing(
+      authorApi.invite(session).toCode(),
+    );
+    const requestCode = draft.getRequest().toCode();
+    const authorized = await authorApi.authorizePairing(session, requestCode);
+
+    await expect(
+      authorApi.authorizePairing(authorized.session, requestCode),
+    ).rejects.toMatchObject({ failure: 'mismatch' });
+    expect(http.request).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses to authorize a request from a device other than the invitation author', async () => {
+    const { apiAt, authorVault, http, session, targetVault } = await pairing();
+    const authorApi = apiAt(1_000, authorVault);
+    const draft = await apiAt(1_100, targetVault).requestPairing(
+      authorApi.invite(session).toCode(),
+    );
+    const otherDevice = {
+      ...session,
+      deviceCredentialKeyPair: await KeyPair.generate(),
+    };
+
+    await expect(
+      authorApi.authorizePairing(otherDevice, draft.getRequest().toCode()),
+    ).rejects.toMatchObject({ failure: 'mismatch' });
+    expect(http.request).not.toHaveBeenCalled();
+  });
+
+  it('reports a request authorized after the pairing window closed as expired', async () => {
+    const { apiAt, authorVault, http, session, targetVault } = await pairing();
+    const invitation = apiAt(1_000, authorVault).invite(session);
+    const draft = await apiAt(1_100, targetVault).requestPairing(
+      invitation.toCode(),
+    );
+    const lateAuthor = apiAt(
+      invitation.getExpiration().valueOf() + 1,
+      authorVault,
+    );
+
+    await expect(
+      lateAuthor.authorizePairing(session, draft.getRequest().toCode()),
+    ).rejects.toMatchObject({ failure: 'expired' });
+    expect(http.request).not.toHaveBeenCalled();
+  });
+
+  it('keeps local authorization unchanged when the node rejects the device read', async () => {
+    const { session, signer } = await pairing();
+    const http = {
+      request: jest
+        .fn()
+        .mockRejectedValue(new Error('Device credential is revoked.')),
+    } as unknown as HttpJsonClient;
+    const vault = {
+      synchronizeAuthorization: jest.fn(),
+    } as unknown as DeviceIdentityVault;
+    const api = new PigeonDeviceAuthorizationApi(http, signer, vault);
+
+    await expect(api.synchronize(session)).rejects.toThrow(
+      'Device credential is revoked.',
+    );
+    expect(vault.synchronizeAuthorization).not.toHaveBeenCalled();
   });
 
   describe('device management', () => {
