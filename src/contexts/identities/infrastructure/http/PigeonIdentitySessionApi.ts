@@ -56,11 +56,12 @@ export class PigeonIdentitySessionApi {
     try {
       return await this.deviceSealedRoot.current(session);
     } catch {
-      // Count-only. The session keeps the masterKey fallback until the next unlock.
+      // Count-only. The session keeps the masterKey fallback until next unlock.
       // eslint-disable-next-line no-console
       console.debug(
         'Device sealed root could not be opened; masterKey fallback in use.',
       );
+
       return session;
     }
   }

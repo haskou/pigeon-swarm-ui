@@ -650,14 +650,7 @@ export class DirectMessageMailbox {
     const stored = this.store.load(keys.mailboxId);
 
     if (stored && !stored.readToken) {
-      const enrolled = await this.enrolSealed(session, keys, readers);
-
-      return {
-        keys,
-        outcome: enrolled ? 'open' : 'failed',
-        readers,
-        state: stored,
-      };
+      return await this.reopenInbox(session, keys, readers, stored);
     }
 
     if (stored?.readToken) {
@@ -673,14 +666,8 @@ export class DirectMessageMailbox {
         const adopted = { cursor: stored.cursor };
 
         this.store.save(keys.mailboxId, adopted);
-        const enrolled = await this.enrolSealed(session, keys, readers);
 
-        return {
-          keys,
-          outcome: enrolled ? 'open' : 'failed',
-          readers,
-          state: adopted,
-        };
+        return await this.reopenInbox(session, keys, readers, adopted);
       }
     }
 
@@ -760,6 +747,26 @@ export class DirectMessageMailbox {
   }
 
   /**
+   * Opens an inbox that already exists under the stored state. The sealed root
+   * bridges in first, so an enrol failure leaves the inbox failed and retried.
+   */
+  private async reopenInbox(
+    session: Session,
+    keys: MailboxKeys,
+    readers: MailboxReadTokens,
+    state: RecipientInbox['state'],
+  ): Promise<RecipientInbox> {
+    const enrolled = await this.enrolSealed(session, keys, readers);
+
+    return {
+      keys,
+      outcome: enrolled ? 'open' : 'failed',
+      readers,
+      state,
+    };
+  }
+
+  /**
    * Creates the recipient inbox and enrols this device's reader before the
    * first read, so senders can append and the device reads without recovery.
    * A failed open is not retried for OPEN_RETRY_MS, so sync passes do not
@@ -778,22 +785,11 @@ export class DirectMessageMailbox {
     }
 
     try {
-      await this.channel.createInbox(keys, readers.root);
-      await this.channel.addReader(keys, readers.root, readers.device);
+      await this.provisionInbox(session, keys, readers);
       this.retryOpenAt.delete(keys.mailboxId);
 
       return 'open';
     } catch (error: unknown) {
-      if (
-        error instanceof HttpJsonError &&
-        error.status === 409 &&
-        session.deviceSealedRootKey &&
-        (await this.enrolSealed(session, keys, readers))
-      ) {
-        this.retryOpenAt.delete(keys.mailboxId);
-
-        return 'open';
-      }
       this.retryOpenAt.set(
         keys.mailboxId,
         Date.now() + DirectMessageMailbox.OPEN_RETRY_MS,
@@ -806,6 +802,31 @@ export class DirectMessageMailbox {
         ? 'rate-limited'
         : 'failed';
     }
+  }
+
+  /**
+   * Creates the inbox with this device's reader. A 409 means the inbox already
+   * exists under another root, so a sealed root bridges into it instead.
+   */
+  private async provisionInbox(
+    session: Session,
+    keys: MailboxKeys,
+    readers: MailboxReadTokens,
+  ): Promise<void> {
+    try {
+      await this.channel.createInbox(keys, readers.root);
+    } catch (error: unknown) {
+      if (
+        !(error instanceof HttpJsonError && error.status === 409) ||
+        !session.deviceSealedRootKey
+      ) {
+        throw error;
+      }
+      await this.readerSet.enrolSealedRoot(session, keys, readers);
+
+      return;
+    }
+    await this.channel.addReader(keys, readers.root, readers.device);
   }
 
   /**
@@ -834,7 +855,8 @@ export class DirectMessageMailbox {
 
   /**
    * The root token manages the reader set. The device token reads and acks
-   * under this device's credential. Both derive from the session root: the device-sealed root once opened, else the legacy master key.
+   * under this device's credential. Both derive from the session root: the
+   * device-sealed root once opened, else the legacy master key.
    */
   private readersFor(session: Session, keys: MailboxKeys): MailboxReadTokens {
     const rootKey = sessionRootKey(session).getBuffer();

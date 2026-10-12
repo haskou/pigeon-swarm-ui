@@ -37,8 +37,8 @@ import { PigeonConversationsApi } from '../../contexts/conversations/infrastruct
 import { PigeonConversationsGateway } from '../../contexts/conversations/infrastructure/http/PigeonConversationsGateway';
 import { KeychainCipher } from '../../contexts/identities/infrastructure/crypto/KeychainCipher';
 import { DeviceAuthorizationRevisionSource } from '../../contexts/identities/infrastructure/http/DeviceAuthorizationRevisionSource';
-import { IdentityMailboxHomeVerifier } from '../../contexts/identities/infrastructure/http/IdentityMailboxHomeVerifier';
 import { DeviceSealedRootRotation } from '../../contexts/identities/infrastructure/http/DeviceSealedRootRotation';
+import { IdentityMailboxHomeVerifier } from '../../contexts/identities/infrastructure/http/IdentityMailboxHomeVerifier';
 import { IdentitySignaturePayloadFactory } from '../../contexts/identities/infrastructure/http/IdentitySignaturePayloadFactory';
 import { PigeonDeviceAuthorizationApi } from '../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
 import { PigeonDeviceSealedSecretApi } from '../../contexts/identities/infrastructure/http/PigeonDeviceSealedSecretApi';

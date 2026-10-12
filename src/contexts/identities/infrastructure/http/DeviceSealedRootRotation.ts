@@ -48,10 +48,14 @@ export class DeviceSealedRootRotation {
   public async current(session: Session): Promise<Session> {
     const own = await this.sealedSecrets.fetchOwn(session);
 
-    if (own?.authorizationRevision === session.authorizationRevision.valueOf()) {
+    if (
+      own?.authorizationRevision === session.authorizationRevision.valueOf()
+    ) {
       return {
         ...session,
-        deviceSealedRootKey: SymmetricKey.fromBuffer(decodeBase64Url(own.payload)),
+        deviceSealedRootKey: SymmetricKey.fromBuffer(
+          decodeBase64Url(own.payload),
+        ),
       };
     }
 

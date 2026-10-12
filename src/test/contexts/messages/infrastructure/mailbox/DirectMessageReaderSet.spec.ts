@@ -64,24 +64,28 @@ const setup = (credentials: string[] = ['device-a', 'device-b']) => {
     }
   };
 
-  channel.listReaders.mockImplementation(async (_keys, token) => {
+  channel.listReaders.mockImplementation((_keys, token) => {
     requireReader(token);
 
-    return {
+    return Promise.resolve({
       maxReaders: 128,
       readers: Array.from(registered, (readTokenHash) => ({
         ackedCursor: 0,
         readTokenHash,
       })),
-    };
+    });
   });
-  channel.addReader.mockImplementation(async (_keys, rootToken, readerToken) => {
+  channel.addReader.mockImplementation((_keys, rootToken, readerToken) => {
     requireReader(rootToken);
     registered.add(hash(readerToken));
+
+    return Promise.resolve();
   });
-  channel.removeReader.mockImplementation(async (_keys, rootToken, readerHash) => {
+  channel.removeReader.mockImplementation((_keys, rootToken, readerHash) => {
     requireReader(rootToken);
     registered.delete(readerHash);
+
+    return Promise.resolve();
   });
 
   const set = new DirectMessageReaderSet(channel, () =>

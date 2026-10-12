@@ -7,13 +7,19 @@ import type { PigeonDeviceSealedSecretApi } from '../../../../../contexts/identi
 import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 
 import { DeviceSealedRootRotation } from '../../../../../contexts/identities/infrastructure/http/DeviceSealedRootRotation';
-import { decodeBase64Url, encodeBase64Url } from '../../../../../shared/infrastructure/encoding/base64url';
+import {
+  decodeBase64Url,
+  encodeBase64Url,
+} from '../../../../../shared/infrastructure/encoding/base64url';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 
 type SessionWithRoot = Session & { deviceSealedRootKey?: SymmetricKey };
 
 const IDENTITY_ID = '00000000-0000-4000-8000-000000000001';
-const RECIPIENTS = [{ id: 'device-a' }, { id: 'device-b' }] as unknown as DeviceCredential[];
+const RECIPIENTS = [
+  { id: 'device-a' },
+  { id: 'device-b' },
+] as unknown as DeviceCredential[];
 
 const makeSession = (revision: number): SessionWithRoot =>
   ({
@@ -25,7 +31,11 @@ const makeSession = (revision: number): SessionWithRoot =>
 const setup = (clock = 1_000) => {
   const deviceAuthorization = mock<PigeonDeviceAuthorizationApi>();
   const sealedSecrets = mock<PigeonDeviceSealedSecretApi>();
-  const rotation = new DeviceSealedRootRotation(deviceAuthorization, sealedSecrets, () => clock);
+  const rotation = new DeviceSealedRootRotation(
+    deviceAuthorization,
+    sealedSecrets,
+    () => clock,
+  );
 
   deviceAuthorization.findDevices.mockResolvedValue(RECIPIENTS);
   sealedSecrets.fetchOwn.mockResolvedValue(null);
@@ -51,7 +61,11 @@ describe('DeviceSealedRootRotation', () => {
       expect(input.recipients).toEqual(RECIPIENTS);
       expect(input.generation).toBe(1_001);
       expect(decodeBase64Url(input.payload)).toHaveLength(32);
-      expect(rotated.deviceSealedRootKey?.getBuffer().equals(decodeBase64Url(input.payload))).toBe(true);
+      expect(
+        rotated.deviceSealedRootKey
+          ?.getBuffer()
+          .equals(decodeBase64Url(input.payload)),
+      ).toBe(true);
     });
 
     it('issues a generation strictly greater than the stored one even when the clock is behind', async () => {
@@ -101,9 +115,13 @@ describe('DeviceSealedRootRotation', () => {
     it('does not retry on a non-conflict failure', async () => {
       const { deviceAuthorization, rotation, sealedSecrets } = setup(1_000);
 
-      sealedSecrets.publish.mockRejectedValueOnce(new HttpJsonError(500, 'Server Error', ''));
+      sealedSecrets.publish.mockRejectedValueOnce(
+        new HttpJsonError(500, 'Server Error', ''),
+      );
 
-      await expect(rotation.rotate(makeSession(4))).rejects.toThrow(HttpJsonError);
+      await expect(rotation.rotate(makeSession(4))).rejects.toThrow(
+        HttpJsonError,
+      );
       expect(deviceAuthorization.synchronize).not.toHaveBeenCalled();
       expect(sealedSecrets.publish).toHaveBeenCalledTimes(1);
     });

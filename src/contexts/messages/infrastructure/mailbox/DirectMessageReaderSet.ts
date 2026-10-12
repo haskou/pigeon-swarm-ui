@@ -42,11 +42,13 @@ export class DirectMessageReaderSet {
 
     if (known) return known;
 
-    const enrol = this.bridge(session, keys, readers).catch((error: unknown) => {
-      this.enrolled.delete(key);
+    const enrol = this.bridge(session, keys, readers).catch(
+      (error: unknown) => {
+        this.enrolled.delete(key);
 
-      throw error;
-    });
+        throw error;
+      },
+    );
 
     this.enrolled.set(key, enrol);
 
@@ -116,7 +118,7 @@ export class DirectMessageReaderSet {
     try {
       await this.channel.addReader(keys, legacyRoot, readers.root);
     } catch {
-      // Best effort: the inbox may already have been moved past the legacy root.
+      // Best effort: the inbox may already be past the legacy root.
     }
 
     await this.channel.addReader(keys, readers.root, readers.device);
