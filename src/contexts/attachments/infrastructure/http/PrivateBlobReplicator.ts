@@ -7,7 +7,8 @@ import type {
   PrivateBlobUploadTicket,
 } from './PrivateBlobUploadLedger';
 
-import { PrivateBlobUploadIncompleteError } from './PrivateBlobUploadIncompleteError';
+import { PrivateBlobUploadIncompleteError } from '../../domain/errors/PrivateBlobUploadIncompleteError';
+import { PrivateBlobReplicaPolicy } from '../../domain/PrivateBlobReplicaPolicy';
 
 export type StoredPrivateBlobReplica = {
   blobId: string;
@@ -57,7 +58,7 @@ export class PrivateBlobReplicator {
       }),
     );
 
-    if (stored.some((replicas) => replicas.length === 0)) {
+    if (!PrivateBlobReplicaPolicy.everyPartStored(stored)) {
       await this.abandon(session, stored.flat());
       throw new PrivateBlobUploadIncompleteError();
     }

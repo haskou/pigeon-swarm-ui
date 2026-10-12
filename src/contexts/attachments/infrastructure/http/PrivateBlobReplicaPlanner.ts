@@ -1,8 +1,7 @@
 import { MailboxHomeBase } from '../../../../shared/infrastructure/client/MailboxHomeBase';
+import { PrivateBlobReplicaPolicy } from '../../domain/PrivateBlobReplicaPolicy';
 
 export class PrivateBlobReplicaPlanner {
-  private static readonly maximumOrigins = 3;
-
   public constructor(
     private readonly homes: {
       home(): string | undefined;
@@ -27,14 +26,9 @@ export class PrivateBlobReplicaPlanner {
       }
     }
 
-    const origins = [
+    return PrivateBlobReplicaPolicy.plannedOrigins([
       MailboxHomeBase.parse(this.homes.home()),
       MailboxHomeBase.parse(recipientHome),
-    ].filter((origin): origin is string => origin !== undefined);
-
-    return [...new Set(origins)].slice(
-      0,
-      PrivateBlobReplicaPlanner.maximumOrigins,
-    );
+    ]);
   }
 }
