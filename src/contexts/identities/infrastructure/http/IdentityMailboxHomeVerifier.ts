@@ -3,7 +3,7 @@ import { StringValueObject } from '@haskou/value-objects';
 
 import type { IdentityResource } from '../../../../shared/domain/pigeonResources.types';
 
-import { MailboxHomeOrigin } from '../../../../shared/infrastructure/client/MailboxHomeOrigin';
+import { MailboxHomeBase } from '../../../../shared/infrastructure/client/MailboxHomeBase';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
 
 export class IdentityMailboxHomeVerifier {
@@ -56,18 +56,18 @@ export class IdentityMailboxHomeVerifier {
   }
 
   /**
-   * Returns the node-served mailbox home only when the identity signature
+   * Returns the node-served mailbox home base only when the identity signature
    * covers it.
    */
-  public static verifiedOrigin(
+  public static verifiedBase(
     requestedId: string,
     identity: IdentityResource,
   ): string | undefined {
-    const origin = MailboxHomeOrigin.parse(identity.mailboxHome);
+    const base = MailboxHomeBase.parse(identity.mailboxHome);
 
-    return origin !== undefined &&
+    return base !== undefined &&
       IdentityMailboxHomeVerifier.isAuthentic(requestedId, identity)
-      ? origin
+      ? base
       : undefined;
   }
 }
