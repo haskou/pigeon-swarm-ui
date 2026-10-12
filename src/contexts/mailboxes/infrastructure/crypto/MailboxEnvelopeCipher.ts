@@ -28,6 +28,12 @@ export class MailboxEnvelopeCipher {
   private static readonly IV_BYTES = 12;
   private static readonly LENGTH_PREFIX_BYTES = 4;
   private static readonly TAG_BYTES = 16;
+  /** Largest plaintext that fits the largest bucket after framing and AEAD overhead. */
+  public static readonly MAX_PLAINTEXT_BYTES =
+    Math.max(...MailboxEnvelopeCipher.BUCKETS) -
+    MailboxEnvelopeCipher.IV_BYTES -
+    MailboxEnvelopeCipher.TAG_BYTES -
+    MailboxEnvelopeCipher.LENGTH_PREFIX_BYTES;
 
   private static aad(mailboxId: string, envelopeId: string): string {
     return `${mailboxId}.${envelopeId}`;
