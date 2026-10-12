@@ -39,10 +39,14 @@ describe(AttachmentLengthPadding.name, () => {
         const source = new Uint8Array(size).fill(7);
         const padded = AttachmentLengthPadding.pad(source);
 
-        expect(padded.byteLength).toBe(AttachmentLengthPadding.paddedSize(size));
-        expect(Buffer.from(AttachmentLengthPadding.unpad(padded))).toEqual(
-          Buffer.from(source),
+        expect(padded.byteLength).toBe(
+          AttachmentLengthPadding.paddedSize(size),
         );
+        expect(
+          Buffer.from(AttachmentLengthPadding.unpad(padded)).equals(
+            Buffer.from(source),
+          ),
+        ).toBe(true);
       },
     );
 

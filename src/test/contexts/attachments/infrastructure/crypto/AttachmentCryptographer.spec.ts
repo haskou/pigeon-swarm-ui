@@ -103,9 +103,11 @@ describe(AttachmentCryptographer.name, () => {
         offset += chunk.size;
       }
       expect(offset).toBe(result.encryptedBytes.byteLength);
-      expect(Buffer.concat(decoded)).toEqual(
-        Buffer.from(AttachmentLengthPadding.pad(source)),
-      );
+      expect(
+        Buffer.concat(decoded).equals(
+          Buffer.from(AttachmentLengthPadding.pad(source)),
+        ),
+      ).toBe(true);
     },
   );
 
@@ -186,7 +188,8 @@ describe(AttachmentCryptographer.name, () => {
       encrypted.encryptedBytes,
     );
 
-    expect(Buffer.from(decrypted.bytes)).toEqual(Buffer.from(source));
+    // equals(): toEqual on failure would diff megabytes and exhaust the heap.
+    expect(Buffer.from(decrypted.bytes).equals(Buffer.from(source))).toBe(true);
   });
 
   it('rejects a padding marker whose plaintext has no valid frame', () => {
