@@ -34,6 +34,7 @@ import { PigeonConversationsApi } from '../../contexts/conversations/infrastruct
 import { PigeonConversationsGateway } from '../../contexts/conversations/infrastructure/http/PigeonConversationsGateway';
 import { KeychainCipher } from '../../contexts/identities/infrastructure/crypto/KeychainCipher';
 import { DeviceAuthorizationRevisionSource } from '../../contexts/identities/infrastructure/http/DeviceAuthorizationRevisionSource';
+import { IdentityMailboxHomeVerifier } from '../../contexts/identities/infrastructure/http/IdentityMailboxHomeVerifier';
 import { IdentitySignaturePayloadFactory } from '../../contexts/identities/infrastructure/http/IdentitySignaturePayloadFactory';
 import { PigeonDeviceAuthorizationApi } from '../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
 import { PigeonIdentitiesGateway } from '../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
@@ -58,6 +59,7 @@ import { PigeonMessagesGateway } from '../../contexts/messages/infrastructure/ht
 import { DirectMessageMailbox } from '../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
 import { DirectMessageMailboxStore } from '../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxStore';
 import { DirectMessageReaderSet } from '../../contexts/messages/infrastructure/mailbox/DirectMessageReaderSet';
+import { RecipientMailboxRouter } from '../../contexts/messages/infrastructure/mailbox/RecipientMailboxRouter';
 import { PigeonNodeApi } from '../../contexts/networks/infrastructure/http/PigeonNodeApi';
 import { PigeonNotificationsApi } from '../../contexts/notifications/infrastructure/http/PigeonNotificationsApi';
 import { PigeonNotificationsGateway } from '../../contexts/notifications/infrastructure/http/PigeonNotificationsGateway';
@@ -321,8 +323,24 @@ export class PigeonApiGateway {
       new PigeonMailboxClient(http),
       this.mailboxMiner.mine,
     );
+    const recipientMailboxes = new RecipientMailboxRouter(
+      mailboxChannel,
+      async (identityId) =>
+        IdentityMailboxHomeVerifier.verifiedOrigin(
+          identityId,
+          await identityResourceGateway.get(identityId),
+        ),
+      (origin) =>
+        new MailboxChannel(
+          new PigeonMailboxClient(
+            new HttpJsonClient(new ApiUrlBuilder(origin), { isolated: true }),
+          ),
+          this.mailboxMiner.mine,
+        ),
+    );
     this.directMessageMailbox = new DirectMessageMailbox(
       mailboxChannel,
+      recipientMailboxes,
       new DirectMessageMailboxStore(),
       this.messageProjection,
       new DirectMessageReaderSet(mailboxChannel, async (session) =>

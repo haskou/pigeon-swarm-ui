@@ -30,6 +30,7 @@ import { DirectMessageMailbox } from '../../../../../contexts/messages/infrastru
 import { DirectMessageMailboxRecord } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxRecord';
 import { DirectMessageMailboxStore } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxStore';
 import { DirectMessageReaderSet } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageReaderSet';
+import { RecipientMailboxRouter } from '../../../../../contexts/messages/infrastructure/mailbox/RecipientMailboxRouter';
 import { MessageCollection } from '../../../../../contexts/messages/presentation/view-models/MessageCollection';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 
@@ -161,7 +162,17 @@ describe(DirectMessageMailbox.name, () => {
     return {
       channel,
       clearStorage: () => storage.clear(),
-      mailbox: new DirectMessageMailbox(channel, store, projection, readerSet),
+      mailbox: new DirectMessageMailbox(
+        channel,
+        new RecipientMailboxRouter(
+          channel,
+          () => Promise.resolve(undefined),
+          () => channel,
+        ),
+        store,
+        projection,
+        readerSet,
+      ),
       projection,
       store,
     };
@@ -1124,7 +1135,17 @@ describe(DirectMessageMailbox.name, () => {
         Promise.resolve(catalog),
       );
 
-      return new DirectMessageMailbox(channel, store, projection, readerSet);
+      return new DirectMessageMailbox(
+        channel,
+        new RecipientMailboxRouter(
+          channel,
+          () => Promise.resolve(undefined),
+          () => channel,
+        ),
+        store,
+        projection,
+        readerSet,
+      );
     };
 
     const hashed = (...tokens: string[]): string[] =>
