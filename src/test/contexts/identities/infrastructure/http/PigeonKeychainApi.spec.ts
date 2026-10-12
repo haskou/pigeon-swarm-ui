@@ -594,6 +594,62 @@ describe(PigeonKeychainApi.name, () => {
       ).not.toThrow();
     });
 
+    describe('rewrapHeadSealedUnder', () => {
+      const nextRoot = SymmetricKey.generate();
+
+      it('reseals a head sealed under the previous root with the session root, chained to the head it replaces', async () => {
+        const server = new FakeKeychainServer();
+        server.seedSealed(sealedUnder(rootKey), 'kc-1', 1);
+
+        await apiOver(server).rewrapHeadSealedUnder(
+          sessionWith({ deviceSealedRootKey: nextRoot }),
+          rootKey,
+        );
+
+        const stored = server.handle('GET') as KeychainResource;
+
+        expect(stored).toMatchObject({
+          keychainExternalIdentifier: 'kc-2',
+          previousKeychainExternalIdentifier: 'kc-1',
+          version: 2,
+        });
+        expect(() =>
+          nextRoot.decrypt(new EncryptedPayload(stored.encryptedPayload)),
+        ).not.toThrow();
+      });
+
+      it('leaves a head already sealed under the session root alone', async () => {
+        const server = new FakeKeychainServer();
+        server.seedSealed(sealedUnder(nextRoot), 'kc-1', 1);
+
+        await apiOver(server).rewrapHeadSealedUnder(
+          sessionWith({ deviceSealedRootKey: nextRoot }),
+          rootKey,
+        );
+
+        expect(server.handle('GET')).toMatchObject({
+          keychainExternalIdentifier: 'kc-1',
+          version: 1,
+        });
+      });
+
+      it('rejects a head sealed under neither the previous root nor the session root', async () => {
+        const server = new FakeKeychainServer();
+        server.seedSealed(sealedUnder(otherKey), 'kc-1', 1);
+
+        await expect(
+          apiOver(server).rewrapHeadSealedUnder(
+            sessionWith({ deviceSealedRootKey: nextRoot }),
+            rootKey,
+          ),
+        ).rejects.toThrow();
+        expect(server.handle('GET')).toMatchObject({
+          keychainExternalIdentifier: 'kc-1',
+          version: 1,
+        });
+      });
+    });
+
     describe('migrateLegacyHead', () => {
       it('reseals a masterKey-sealed head under the root as the next keychain', async () => {
         const server = new FakeKeychainServer();

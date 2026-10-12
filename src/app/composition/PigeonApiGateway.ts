@@ -37,6 +37,7 @@ import { PigeonConversationsApi } from '../../contexts/conversations/infrastruct
 import { PigeonConversationsGateway } from '../../contexts/conversations/infrastructure/http/PigeonConversationsGateway';
 import { KeychainCipher } from '../../contexts/identities/infrastructure/crypto/KeychainCipher';
 import { DeviceAuthorizationRevisionSource } from '../../contexts/identities/infrastructure/http/DeviceAuthorizationRevisionSource';
+import { DeviceSealedRecovery } from '../../contexts/identities/infrastructure/http/DeviceSealedRecovery';
 import { DeviceSealedRootRotation } from '../../contexts/identities/infrastructure/http/DeviceSealedRootRotation';
 import { IdentityMailboxHomeVerifier } from '../../contexts/identities/infrastructure/http/IdentityMailboxHomeVerifier';
 import { IdentitySignaturePayloadFactory } from '../../contexts/identities/infrastructure/http/IdentitySignaturePayloadFactory';
@@ -52,6 +53,7 @@ import { PigeonKeychainApi } from '../../contexts/identities/infrastructure/http
 import { PigeonPresenceApi } from '../../contexts/identities/infrastructure/http/PigeonPresenceApi';
 import { PigeonPresenceGateway } from '../../contexts/identities/infrastructure/http/PigeonPresenceGateway';
 import { DeviceIdentityVault } from '../../contexts/identities/infrastructure/storage/DeviceIdentityVault';
+import { DeviceSealedRecoveryStore } from '../../contexts/identities/infrastructure/storage/DeviceSealedRecoveryStore';
 import { LazyMailboxCreationMiner } from '../../contexts/mailboxes/infrastructure/crypto/LazyMailboxCreationMiner';
 import { PigeonMailboxClient } from '../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
 import { MailboxChannel } from '../../contexts/mailboxes/infrastructure/MailboxChannel';
@@ -169,6 +171,11 @@ export class PigeonApiGateway {
       deviceAuthorization,
       deviceSealedSecrets,
       keychainApi,
+    );
+    const deviceSealedRecovery = new DeviceSealedRecovery(
+      deviceSealedRoot,
+      keychainApi,
+      new DeviceSealedRecoveryStore(storage),
     );
     const mutations = new PublicMutationSigner(
       new DeviceAuthorizationRevisionSource(deviceAuthorization),
@@ -316,6 +323,7 @@ export class PigeonApiGateway {
       deviceAuthorization,
       deviceSealedRoot,
       keychainApi,
+      deviceSealedRecovery,
     );
     const identityWorkspace = new PigeonIdentityWorkspaceSessionApi({
       decryptKeychain: (session, keychain) =>
@@ -444,6 +452,7 @@ export class PigeonApiGateway {
       keychainApi,
       this.presence,
       deviceSealedRoot,
+      deviceSealedRecovery,
     );
   }
 
