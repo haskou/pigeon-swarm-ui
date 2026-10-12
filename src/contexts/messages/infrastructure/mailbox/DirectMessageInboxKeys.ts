@@ -8,6 +8,7 @@ import { ConversationKeychain } from '../../../identities/infrastructure/keychai
 import { sessionRootKey } from '../../../identities/infrastructure/session/sessionRootKey';
 import { MailboxKeySchedule } from '../../../mailboxes/infrastructure/crypto/MailboxKeySchedule';
 import { MailboxReadToken } from '../../../mailboxes/infrastructure/crypto/MailboxReadToken';
+import { ConversationKeyRequiredError } from '../../domain/errors/ConversationKeyRequiredError';
 
 /** Keys and reader tokens for the inboxes of one direct conversation. */
 export class DirectMessageInboxKeys {
@@ -24,7 +25,7 @@ export class DirectMessageInboxKeys {
       conversationId,
     );
 
-    if (!entry) throw new Error('Conversation key is required.');
+    if (!entry) throw new ConversationKeyRequiredError();
 
     return MailboxKeySchedule.derive(
       Buffer.from(entry.key, 'base64'),

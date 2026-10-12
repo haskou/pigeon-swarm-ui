@@ -7,6 +7,7 @@ import type { DirectMessageMailboxStore } from './DirectMessageMailboxStore';
 import type { DirectMessageTimelineChange } from './DirectMessageTimelineChange';
 
 import { DirectMailboxOwnership } from '../../../mailboxes/domain/DirectMailboxOwnership';
+import { DirectMailboxRecords } from '../../../mailboxes/domain/DirectMailboxRecords';
 import { DirectMessageInboxKeys } from './DirectMessageInboxKeys';
 import { DirectMessageMailboxLimits } from './DirectMessageMailboxLimits';
 import { DirectMessageRecordReader } from './DirectMessageRecordReader';
@@ -72,12 +73,12 @@ export class DirectMessageReadSync {
       );
 
       if (
-        record?.type === 'read' &&
+        record?.type === DirectMailboxRecords.TYPE.read &&
         DirectMessageRecordReader.isOwnFreshRead(session, record)
       ) {
         next = record.targetMessageId;
       } else if (
-        record?.type === 'sent' &&
+        record?.type === DirectMailboxRecords.TYPE.sent &&
         !DirectMailboxOwnership.isAuthoredBy(
           record.authorId,
           session.identity.id,

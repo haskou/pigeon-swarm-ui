@@ -1,5 +1,6 @@
 import type { DirectDeletedRecord } from './DirectDeletedRecord';
 import type { DirectEditedRecord } from './DirectEditedRecord';
+import type { DirectMessageRecord } from './DirectMessageRecord';
 import type { DirectPinRecord } from './DirectPinRecord';
 import type { DirectReactionRecord } from './DirectReactionRecord';
 import type { DirectReadRecord } from './DirectReadRecord';
@@ -13,6 +14,16 @@ import type { DirectSentRecord } from './DirectSentRecord';
 export class DirectMailboxRecords {
   private static readonly RECEIPT_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
   private static readonly RECEIPT_MAX_FUTURE_SKEW_MS = 30_000;
+
+  /** The `type` discriminant that each direct mailbox record carries. */
+  public static readonly TYPE = {
+    deleted: 'deleted',
+    edited: 'edited',
+    pin: 'pin',
+    reaction: 'reaction',
+    read: 'read',
+    sent: 'sent',
+  } as const;
 
   public static sent(fields: Omit<DirectSentRecord, 'type'>): DirectSentRecord {
     return {
@@ -103,6 +114,16 @@ export class DirectMailboxRecords {
     return (
       now - record.createdAt <= DirectMailboxRecords.RECEIPT_MAX_AGE_MS &&
       record.createdAt - now <= DirectMailboxRecords.RECEIPT_MAX_FUTURE_SKEW_MS
+    );
+  }
+
+  /** Sent and edited records carry message content that must be decrypted. */
+  public static carriesMessage(
+    record: DirectMessageRecord,
+  ): record is DirectEditedRecord | DirectSentRecord {
+    return (
+      record.type === DirectMailboxRecords.TYPE.sent ||
+      record.type === DirectMailboxRecords.TYPE.edited
     );
   }
 }

@@ -14,6 +14,7 @@ import type { DirectMessageRecipientInbox } from './DirectMessageRecipientInbox'
 import type { DirectMessageTimelineChange } from './DirectMessageTimelineChange';
 
 import { DirectMailboxOwnership } from '../../../mailboxes/domain/DirectMailboxOwnership';
+import { DirectMailboxRecords } from '../../../mailboxes/domain/DirectMailboxRecords';
 import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageMailboxLimits } from './DirectMessageMailboxLimits';
 import { DirectMessageMailboxRecord } from './DirectMessageMailboxRecord';
@@ -145,12 +146,12 @@ export class DirectMessageTimelineSync {
 
     return records.flatMap((record): DirectMessageTimelineChange[] => {
       switch (record.type) {
-        case 'sent':
-        case 'edited':
+        case DirectMailboxRecords.TYPE.sent:
+        case DirectMailboxRecords.TYPE.edited:
           return this.messageChanges(record, messages);
-        case 'deleted':
+        case DirectMailboxRecords.TYPE.deleted:
           return [{ kind: 'removed', messageId: record.targetMessageId }];
-        case 'reaction':
+        case DirectMailboxRecords.TYPE.reaction:
           return [
             {
               action: record.action,
@@ -161,7 +162,7 @@ export class DirectMessageTimelineSync {
               messageId: record.targetMessageId,
             },
           ];
-        case 'pin':
+        case DirectMailboxRecords.TYPE.pin:
           return [
             {
               action: record.action,
@@ -170,7 +171,7 @@ export class DirectMessageTimelineSync {
               messageId: record.targetMessageId,
             },
           ];
-        case 'read':
+        case DirectMailboxRecords.TYPE.read:
           return this.readChanges(session, record);
       }
     });
@@ -188,7 +189,7 @@ export class DirectMessageTimelineSync {
     if (!message || message.encrypted) return [];
 
     return [
-      record.type === 'sent'
+      record.type === DirectMailboxRecords.TYPE.sent
         ? { kind: 'message', message }
         : { kind: 'edit', message },
     ];
@@ -217,7 +218,7 @@ export class DirectMessageTimelineSync {
     signal: AbortSignal,
   ): Promise<Map<string, ChatMessage>> {
     const resources = records.flatMap((record) =>
-      record.type === 'sent' || record.type === 'edited'
+      DirectMailboxRecords.carriesMessage(record)
         ? [DirectMessageMailboxRecord.toResource(record)]
         : [],
     );
