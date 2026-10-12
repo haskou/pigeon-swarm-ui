@@ -1445,6 +1445,8 @@ export const es = {
   },
   workspace: {
     closeSidebar: 'Cerrar barra lateral',
+    directMailboxDeliveryError:
+      'Enviado solo por la ruta estándar. La copia en el buzón privado no se entregó.',
     directMailboxReaderLimitError:
       'Los mensajes directos no se pueden sincronizar aquí: esta identidad alcanzó su límite de dispositivos. Elimina un dispositivo que ya no uses e inténtalo de nuevo.',
     directMailboxSyncError:

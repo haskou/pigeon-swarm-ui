@@ -17,6 +17,7 @@ import type {
   Session,
   StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { DirectMessageMailboxDelivery } from '../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
 
 import { ConversationTimeline } from '../../../../contexts/conversations/presentation/view-models/ConversationTimeline';
 import { MessageCollection } from '../../../../contexts/messages/presentation/view-models/MessageCollection';
@@ -73,7 +74,39 @@ export function useConversationMessageDelivery({
   const [failedSends, setFailedSends] = useState<
     Record<string, PendingConversationSend>
   >({});
+  // Conversation whose direct copy notice is in the error slot, if any.
+  const directCopyNoticeConversationRef = useRef<string | null>(null);
+  // Latest active conversation, read when an asynchronous copy outcome lands.
+  const activeConversationIdRef = useRef(activeConversation?.id);
+
+  activeConversationIdRef.current = activeConversation?.id;
+
   const sendQueueRef = useRef(Promise.resolve());
+
+  const reportDirectCopyOutcome = useCallback(
+    (conversationId: string, outcome: DirectMessageMailboxDelivery) => {
+      // A skipped copy never reached the mailbox, so it changes nothing here.
+      if (outcome === 'skipped') return;
+
+      const isActive = activeConversationIdRef.current === conversationId;
+
+      if (outcome === 'failed') {
+        if (!isActive) return;
+
+        directCopyNoticeConversationRef.current = conversationId;
+        onErrorChange(copy.workspace.directMailboxDeliveryError);
+
+        return;
+      }
+
+      if (directCopyNoticeConversationRef.current !== conversationId) return;
+
+      directCopyNoticeConversationRef.current = null;
+
+      if (isActive) onErrorChange(null);
+    },
+    [onErrorChange],
+  );
 
   const sendPendingMessage = useCallback(
     (payload: PendingConversationSend) => {
@@ -83,7 +116,11 @@ export function useConversationMessageDelivery({
       const optimisticTimestamp = Date.now();
       const optimisticId = `pending:${conversationId}:${optimisticTimestamp}:${UUID.generate().toString()}`;
 
-      onErrorChange(null);
+      // Keep a showing copy notice for this conversation while its next send runs.
+      if (directCopyNoticeConversationRef.current !== conversationId) {
+        directCopyNoticeConversationRef.current = null;
+        onErrorChange(null);
+      }
       onAttachmentProgressChange(null);
       onConversationsChange((current) =>
         ConversationTimeline.bumpActivity(
@@ -154,12 +191,14 @@ export function useConversationMessageDelivery({
             );
           }
 
-          runMailboxSideEffect(() =>
-            applicationContainer.directMessages.deliverSent(
-              session,
-              activeConversation,
-              sent.raw,
-            ),
+          runMailboxSideEffect(
+            () =>
+              applicationContainer.directMessages.deliverSent(
+                session,
+                activeConversation,
+                sent.raw,
+              ),
+            (outcome) => reportDirectCopyOutcome(conversationId, outcome),
           );
 
           onMessagesChange((current) =>
@@ -177,6 +216,7 @@ export function useConversationMessageDelivery({
           );
           scrollToBottom('smooth');
         } catch (caught) {
+          directCopyNoticeConversationRef.current = null;
           onErrorChange(toUserErrorMessage(caught, copy.workspace.sendError));
           setFailedSends((current) => ({
             ...current,
@@ -203,6 +243,7 @@ export function useConversationMessageDelivery({
       onConversationsChange,
       onErrorChange,
       onMessagesChange,
+      reportDirectCopyOutcome,
       scrollToBottom,
       session,
     ],

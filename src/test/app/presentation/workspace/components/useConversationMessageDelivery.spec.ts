@@ -12,17 +12,23 @@ import type {
 
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';
 import { useConversationMessageDelivery } from '../../../../../app/presentation/workspace/components/useConversationMessageDelivery';
+import { copy } from '../../../../../shared/presentation/i18n/copy';
 import { captureUnhandledRejections } from '../../../../captureUnhandledRejections';
 
 const mockRefs: Array<{ current: unknown }> = [];
+let mockRefIndex = 0;
 
 jest.mock('react', () => ({
   startTransition: (callback: () => void) => callback(),
   useCallback: <T>(callback: T) => callback,
   useRef: <T>(initial: T) => {
-    const ref = { current: initial };
+    const index = mockRefIndex;
 
-    mockRefs.push(ref);
+    mockRefIndex += 1;
+
+    const ref = mockRefs[index] ?? { current: initial };
+
+    mockRefs[index] = ref;
 
     return ref;
   },
@@ -93,7 +99,8 @@ async function drain(queue: { current: unknown }): Promise<void> {
   await (queue.current as Promise<void>);
 }
 
-function mountDelivery(activeConversation = conversation) {
+function mountDelivery(initialConversation = conversation) {
+  mockRefs.length = 0;
   const state: { error: string | null; messages: ChatMessage[] } = {
     error: null,
     messages: [],
@@ -107,22 +114,32 @@ function mountDelivery(activeConversation = conversation) {
       typeof update === 'function' ? update(state.messages) : update;
     messagesRef.current = state.messages;
   });
-  const delivery = useConversationMessageDelivery({
-    activeConversation,
-    messagesRef,
-    onAttachmentProgressChange: jest.fn(),
-    onConversationsChange: jest.fn(),
-    onErrorChange,
-    onMessagesChange,
-    onReplyTargetChange: jest.fn(),
-    replyTarget: null,
-    scrollToBottom: jest.fn(),
-    session,
-  });
+  // Re-renders reuse the same refs, as a mounted component does.
+  const render = (activeConversation: ConversationResource) => {
+    mockRefIndex = 0;
+
+    return useConversationMessageDelivery({
+      activeConversation,
+      messagesRef,
+      onAttachmentProgressChange: jest.fn(),
+      onConversationsChange: jest.fn(),
+      onErrorChange,
+      onMessagesChange,
+      onReplyTargetChange: jest.fn(),
+      replyTarget: null,
+      scrollToBottom: jest.fn(),
+      session,
+    });
+  };
+  const delivery = render(initialConversation);
 
   return {
     ...delivery,
+    onErrorChange,
     queue: mockRefs[mockRefs.length - 1],
+    rerender: (activeConversation: ConversationResource) => {
+      render(activeConversation);
+    },
     state,
   };
 }
@@ -182,7 +199,7 @@ describe('useConversationMessageDelivery inbox delivery', () => {
     expect(delivery.state.error).toBe('send refused');
   });
 
-  it.each(['failed', 'skipped'] as const)(
+  it.each(['skipped'] as const)(
     'keeps the legacy send delivered when the inbox reports %s',
     async (outcome) => {
       deliverSent.mockResolvedValue(outcome);
@@ -287,5 +304,100 @@ describe('useConversationMessageDelivery inbox delivery', () => {
     expect(send).toHaveBeenCalledTimes(1);
     expect(delivery.state.error).toBeNull();
     expect(delivery.state.messages).toEqual([sentMessage]);
+  });
+
+  it('shows the direct copy notice when the inbox copy fails after the legacy send delivers', async () => {
+    deliverSent.mockResolvedValue('failed');
+    const mounted = mountDelivery();
+
+    await mounted.sendMessage('hello', [], {});
+    await drain(mounted.queue);
+    await flushMicrotasks();
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(mounted.state.error).toBe(copy.workspace.directMailboxDeliveryError);
+    expect(mounted.state.messages).toEqual([sentMessage]);
+  });
+
+  it('clears the direct copy notice once a later inbox copy is delivered', async () => {
+    deliverSent
+      .mockResolvedValueOnce('failed')
+      .mockResolvedValueOnce('delivered');
+    const mounted = mountDelivery();
+
+    await mounted.sendMessage('hello', [], {});
+    await drain(mounted.queue);
+    await flushMicrotasks();
+    expect(mounted.state.error).toBe(copy.workspace.directMailboxDeliveryError);
+
+    await mounted.sendMessage('again', [], {});
+    await drain(mounted.queue);
+    await flushMicrotasks();
+
+    expect(mounted.state.error).toBeNull();
+  });
+
+  it('keeps one copy notice steady across repeated inbox failures', async () => {
+    deliverSent.mockResolvedValue('failed');
+    const mounted = mountDelivery();
+
+    await mounted.sendMessage('hello', [], {});
+    await drain(mounted.queue);
+    await flushMicrotasks();
+    await mounted.sendMessage('again', [], {});
+    await drain(mounted.queue);
+    await flushMicrotasks();
+
+    const errors = mounted.onErrorChange.mock.calls.map(([error]) => error);
+    const firstNotice = errors.indexOf(
+      copy.workspace.directMailboxDeliveryError,
+    );
+
+    expect(firstNotice).toBeGreaterThanOrEqual(0);
+    expect(errors.slice(firstNotice)).not.toContain(null);
+    expect(mounted.state.error).toBe(copy.workspace.directMailboxDeliveryError);
+  });
+
+  it('does not show the copy notice on a conversation that is no longer active', async () => {
+    const pendingCopy = deferred<'delivered' | 'failed' | 'skipped'>();
+    const otherConversation = {
+      ...conversation,
+      id: 'conversation-2',
+    } as unknown as ConversationResource;
+    deliverSent.mockReturnValue(pendingCopy.promise);
+    const mounted = mountDelivery();
+
+    await mounted.sendMessage('hello', [], {});
+    await drain(mounted.queue);
+    mounted.rerender(otherConversation);
+    pendingCopy.resolve('failed');
+    await flushMicrotasks();
+
+    expect(mounted.onErrorChange).not.toHaveBeenCalledWith(
+      copy.workspace.directMailboxDeliveryError,
+    );
+    expect(mounted.state.error).toBeNull();
+  });
+
+  it('does not keep a stale send error behind the copy notice', async () => {
+    deliverSent
+      .mockResolvedValueOnce('failed')
+      .mockResolvedValueOnce('skipped');
+    const mounted = mountDelivery();
+
+    await mounted.sendMessage('hello', [], {});
+    await drain(mounted.queue);
+    await flushMicrotasks();
+    send.mockRejectedValueOnce(new Error('send refused'));
+    await mounted.sendMessage('again', [], {});
+    await drain(mounted.queue);
+    await flushMicrotasks();
+    expect(mounted.state.error).toBe('send refused');
+
+    await mounted.sendMessage('third', [], {});
+    await drain(mounted.queue);
+    await flushMicrotasks();
+
+    expect(mounted.state.error).toBeNull();
   });
 });

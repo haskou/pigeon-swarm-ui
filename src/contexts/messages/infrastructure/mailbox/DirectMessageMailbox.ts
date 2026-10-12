@@ -100,8 +100,8 @@ export class DirectMessageMailbox {
    * there is no peer, the conversation is a group, or the record exceeds the
    * envelope bound; the message then stays on the legacy path only. Never
    * throws: any failure, including 404 for an inbox the peer has not opened
-   * yet, returns 'failed'. The caller keeps the legacy copy and shows nothing
-   * to the user.
+   * yet, returns 'failed'. The caller keeps the legacy copy and shows one
+   * non-blocking notice in the active conversation.
    */
   public deliverSent(
     session: Session,
