@@ -360,7 +360,12 @@ describe(DirectMessageMailbox.name, () => {
         .mockRejectedValueOnce(new MailboxUnavailableError())
         .mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
 
-      const delivery = mailbox.send(session('alice'), conversation, 'hello', {});
+      const delivery = mailbox.send(
+        session('alice'),
+        conversation,
+        'hello',
+        {},
+      );
       await jest.advanceTimersByTimeAsync(10_000);
 
       await expect(delivery).resolves.toMatchObject({ id: 'message-1' });
@@ -2880,7 +2885,12 @@ describe(DirectMessageMailbox.name, () => {
       evict();
       const mailbox = mailboxFor(wire, store, projection);
 
-      const delivery = mailbox.send(session('alice'), conversation, 'hello', {});
+      const delivery = mailbox.send(
+        session('alice'),
+        conversation,
+        'hello',
+        {},
+      );
       await expect(
         mailbox.openInboxes(
           session('bob'),
