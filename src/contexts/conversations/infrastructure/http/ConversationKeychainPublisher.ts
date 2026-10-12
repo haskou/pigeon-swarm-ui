@@ -1,8 +1,8 @@
 import type {
   LocalKeychain,
   LocalKeychainUpdate,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+} from '../../../identities/infrastructure/keychain/LocalKeychain';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 
 export type ConversationKeychainPublisher = {
   publishKeychain(

@@ -1,7 +1,5 @@
-import type {
-  IdentityPresence,
-  SelectablePresenceStatus,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { IdentityPresenceResource as IdentityPresence } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityPresenceResource';
+import type { SelectablePresenceStatusResource as SelectablePresenceStatus } from '../../../../../contexts/identities/infrastructure/http/resources/SelectablePresenceStatusResource';
 
 import { presenceStatusForLocalActivity } from '../../../../../app/presentation/workspace/components/presenceStatusForLocalActivity';
 import { presenceWithLocalPreference } from '../../../../../app/presentation/workspace/components/presenceWithLocalPreference';

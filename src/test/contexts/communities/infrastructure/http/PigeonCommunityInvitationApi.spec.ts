@@ -1,9 +1,7 @@
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 
-import type {
-  Community,
-  Session,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 

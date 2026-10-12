@@ -1,7 +1,7 @@
 import { mock } from 'jest-mock-extended';
 
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { PwaPushSubscriptionBackend } from '../../../../../contexts/notifications/presentation/services/PwaPushSubscriptionBackend';
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 
 import { ApplicationServerKeyDecoder } from '../../../../../contexts/notifications/infrastructure/browser/ApplicationServerKeyDecoder';
 import { PushSubscriptionCompatibility } from '../../../../../contexts/notifications/infrastructure/browser/PushSubscriptionCompatibility';

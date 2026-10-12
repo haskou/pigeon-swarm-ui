@@ -1,6 +1,6 @@
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { NodeInfo } from './NodeInfo';
 import type { NodePeersSnapshot } from './NodePeersSnapshot';
 import type { IpfsReplicationStatusResource } from './resources/IpfsReplicationStatusResource';

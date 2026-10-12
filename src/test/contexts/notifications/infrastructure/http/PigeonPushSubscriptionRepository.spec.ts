@@ -1,7 +1,7 @@
 import { mock } from 'jest-mock-extended';
 
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { PigeonPushApi } from '../../../../../contexts/notifications/infrastructure/http/PigeonPushApi';
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 
 import { PushSubscription } from '../../../../../contexts/notifications/domain/PushSubscription';
 import { NotificationRecipientId } from '../../../../../contexts/notifications/domain/value-objects/NotificationRecipientId';

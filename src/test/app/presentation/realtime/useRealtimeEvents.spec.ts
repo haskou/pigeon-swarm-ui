@@ -8,7 +8,7 @@ import {
 } from '@jest/globals';
 import { setImmediate as flushConnections } from 'node:timers/promises';
 
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import {

@@ -1,5 +1,5 @@
 import type { PigeonCallsApi } from '../../../../../contexts/calls/infrastructure/http/PigeonCallsApi';
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { CallId } from '../../../../../contexts/calls/domain/value-objects/CallId';
 import { CallIdentityId } from '../../../../../contexts/calls/domain/value-objects/CallIdentityId';

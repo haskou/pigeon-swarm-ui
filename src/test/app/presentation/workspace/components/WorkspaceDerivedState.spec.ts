@@ -1,9 +1,7 @@
-import type {
-  Community,
-  CommunityInvitationNotificationResource,
-  ConversationInvitationNotificationResource,
-  ConversationResource,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
+import type { ConversationResource } from '../../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { CommunityInvitationNotificationResource } from '../../../../../contexts/notifications/infrastructure/http/resources/CommunityInvitationNotificationResource';
+import type { ConversationInvitationNotificationResource } from '../../../../../contexts/notifications/infrastructure/http/resources/ConversationInvitationNotificationResource';
 
 import { WorkspaceDerivedState } from '../../../../../app/presentation/workspace/components/WorkspaceDerivedState';
 

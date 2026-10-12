@@ -1,6 +1,6 @@
 import type { PigeonConversationCommandsApi } from '../../../../../contexts/conversations/infrastructure/http/PigeonConversationCommandsApi';
 import type { PigeonConversationsApi } from '../../../../../contexts/conversations/infrastructure/http/PigeonConversationsApi';
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { PigeonConversationsGateway } from '../../../../../contexts/conversations/infrastructure/http/PigeonConversationsGateway';
 

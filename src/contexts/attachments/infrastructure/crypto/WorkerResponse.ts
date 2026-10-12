@@ -1,7 +1,5 @@
-import type {
-  AttachmentProgress,
-  MessageAttachmentEncryption,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { AttachmentProgress } from '../../application/contracts/AttachmentProgress';
+import type { MessageAttachmentEncryption } from '../../application/contracts/MessageAttachmentEncryption';
 
 export type WorkerResponse =
   | {

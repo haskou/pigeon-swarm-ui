@@ -1,6 +1,6 @@
-import type { IdentityResource } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { CachedIdentity } from './CachedIdentity';
+import type { IdentityResource } from './resources/IdentityResource';
 
 import { IdentityId } from '../../domain/value-objects/IdentityId';
 

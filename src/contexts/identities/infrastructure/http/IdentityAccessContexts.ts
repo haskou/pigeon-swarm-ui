@@ -1,6 +1,6 @@
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { LoginIdentityProgressReporter } from '../../application/login-identity/LoginIdentityProgressReporter';
 import type { Identity } from '../../domain/Identity';
+import type { Session } from '../session/Session';
 import type { IdentityAccessContext } from './IdentityAccessContext';
 
 import { IdentityId } from '../../domain/value-objects/IdentityId';

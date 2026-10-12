@@ -7,12 +7,10 @@ export type { MessageProjectionCopy } from './MessageProjectionCopy';
 /* eslint-disable @typescript-eslint/no-use-before-define */
 import { EncryptedPayload, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
-import type {
-  ChatMessage,
-  MessageReaction,
-  MessageResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
+import type { MessageReaction } from '../http/MessageReaction';
+import type { MessageResource } from '../http/MessageResource';
 
 import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
 import { PollMessageProjection } from './PollMessageProjection';

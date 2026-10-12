@@ -1,4 +1,4 @@
-import type { MessageAttachment } from '../../../../shared/domain/pigeonResources.types';
+import type { MessageAttachment } from '../../application/contracts/MessageAttachment';
 
 function joinParts<T>(
   parts: T[] | undefined,

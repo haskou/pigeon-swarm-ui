@@ -1,9 +1,7 @@
 import type { PigeonCommunitiesApi } from '../../../../../contexts/communities/infrastructure/http/PigeonCommunitiesApi';
 import type { PigeonCommunityInvitationApi } from '../../../../../contexts/communities/infrastructure/http/PigeonCommunityInvitationApi';
-import type {
-  Community,
-  Session,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { PigeonCommunitiesGateway } from '../../../../../contexts/communities/infrastructure/http/PigeonCommunitiesGateway';
 import { RequestCache } from '../../../../../shared/infrastructure/http/RequestCache';

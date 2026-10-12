@@ -1,10 +1,8 @@
-import type {
-  AttachmentProgress,
-  MessageAttachment,
-  PrivateFileContent,
-  PublicFileContent,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { AttachmentProgress } from '../../application/contracts/AttachmentProgress';
+import type { MessageAttachment } from '../../application/contracts/MessageAttachment';
 import type { PrivateBlobReference } from '../../application/contracts/PrivateBlobReservation';
+import type { PrivateFileContent } from '../../application/contracts/PrivateFileContent';
+import type { PublicFileContent } from '../../application/contracts/PublicFileContent';
 
 import { MailboxHomeBase } from '../../../../shared/infrastructure/client/MailboxHomeBase';
 import { AttachmentBinaryCodec } from '../crypto/AttachmentBinaryCodec';

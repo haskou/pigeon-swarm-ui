@@ -1,9 +1,7 @@
-import type {
-  ConversationKeyEntry,
-  KeychainResource,
-  LocalKeychain,
-  Session,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { KeychainResource } from '../../../../../contexts/identities/infrastructure/http/resources/KeychainResource';
+import type { ConversationKeyEntry } from '../../../../../contexts/identities/infrastructure/keychain/ConversationKeyEntry';
+import type { LocalKeychain } from '../../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestCache } from '../../../../../shared/infrastructure/http/RequestCache';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';

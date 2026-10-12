@@ -1,6 +1,6 @@
 import type { Signature } from '@haskou/pigeon-swarm-crypto';
 
-import type { Session } from '../../domain/pigeonResources.types';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 
 export function signSessionPayload(
   session: Session,

@@ -1,8 +1,8 @@
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { PublicFileUpload } from '../../../attachments/application/contracts/PublicFileUpload';
 import type { PigeonPublicFilesClient } from '../../../attachments/infrastructure/http/PigeonPublicFilesClient';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { MyStickersResource } from './resources/MyStickersResource';
 import type { StickerInput } from './resources/StickerInput';
 import type { StickerPackResource } from './resources/StickerPackResource';

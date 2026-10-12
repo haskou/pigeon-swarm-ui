@@ -1,7 +1,7 @@
 import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 
-import type { Session } from '../../domain/pigeonResources.types';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { Clock } from './Clock';
 
 import { IdentityId } from '../../../contexts/identities/domain/value-objects/IdentityId';

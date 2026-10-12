@@ -1,7 +1,7 @@
 import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
 
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { SignedPublicMutation } from '../../../../shared/infrastructure/crypto/SignedPublicMutation';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 
 import { canonicalJson } from '../../../../shared/infrastructure/crypto/canonicalJson';
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';

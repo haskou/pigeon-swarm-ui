@@ -1,9 +1,9 @@
 import { assert } from '@haskou/value-objects';
 
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { DeviceCredential } from '../../domain/value-objects/DeviceCredential';
+import type { Session } from '../session/Session';
 import type {
   DeviceSealedSecretPublicationResource,
   DeviceSealedSecretPublishedResource,

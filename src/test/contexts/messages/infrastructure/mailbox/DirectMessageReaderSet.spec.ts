@@ -1,9 +1,9 @@
 import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
 
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { MailboxKeys } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxKeySchedule';
 import type { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 
 import { MailboxCapability } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxReadToken } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxReadToken';

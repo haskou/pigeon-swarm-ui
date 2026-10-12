@@ -1,10 +1,8 @@
 import { describe, expect, it } from '@jest/globals';
 
-import type {
-  ConversationKeyEntry,
-  ConversationResource,
-  IdentityResource,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { IdentityResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
+import type { ConversationKeyEntry } from '../../../../../contexts/identities/infrastructure/keychain/ConversationKeyEntry';
 
 import { ChatConversationPresentation } from '../../../../../app/presentation/workspace/components/ChatConversationPresentation';
 

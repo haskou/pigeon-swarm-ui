@@ -1,8 +1,8 @@
 import { mock } from 'jest-mock-extended';
 
 import type { PigeonIdentitiesGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { DeviceIdentityVault } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVault';
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 import { IdentityMasterKeyProtection } from '../../../../../contexts/identities/domain/value-objects/IdentityMasterKeyProtection';

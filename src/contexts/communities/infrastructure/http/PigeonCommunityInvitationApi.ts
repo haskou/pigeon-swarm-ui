@@ -1,14 +1,12 @@
 import { Buffer } from 'buffer';
 
-import type {
-  Community,
-  CommunityInviteLinkResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { CommunityInviteLinkInput } from './CommunityInviteLinkInput';
 import type { PigeonCommunitiesApi } from './PigeonCommunitiesApi';
+import type { CommunityInviteLinkResource } from './resources/CommunityInviteLinkResource';
+import type { CommunityResource as Community } from './resources/CommunityResource';
 
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import { ScopeFrontierReader } from '../../../../shared/infrastructure/http/ScopeFrontierReader';

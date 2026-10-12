@@ -1,7 +1,5 @@
-import type {
-  AttachmentProgress,
-  AttachmentUploadOptions,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { AttachmentProgress } from '../../../../attachments/application/contracts/AttachmentProgress';
+import type { AttachmentUploadOptions } from '../../../../attachments/application/contracts/AttachmentUploadOptions';
 import type { CommunityMessageMentionResource as CommunityMessageMention } from '../../../../communities/infrastructure/http/resources/CommunityMessageMentionResource';
 import type { StickerMessageReference } from '../../../../stickers/infrastructure/http/resources/StickerMessageReference';
 import type { MessageReplyPreview } from '../../crypto/resources/MessageReplyPreview';

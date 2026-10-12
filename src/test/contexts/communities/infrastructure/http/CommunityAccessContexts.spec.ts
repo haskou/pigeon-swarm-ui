@@ -1,4 +1,4 @@
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { CommunityIdentityId } from '../../../../../contexts/communities/domain/value-objects/CommunityIdentityId';
 import { CommunityAccessContexts } from '../../../../../contexts/communities/infrastructure/http/CommunityAccessContexts';

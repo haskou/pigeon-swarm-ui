@@ -1,6 +1,6 @@
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { NotificationMutationSigner } from '../../../../../contexts/notifications/infrastructure/http/NotificationMutationSigner';
 import { canonicalJson } from '../../../../../shared/infrastructure/crypto/canonicalJson';

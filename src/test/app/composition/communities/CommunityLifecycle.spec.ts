@@ -1,10 +1,10 @@
 import type { PigeonMlsFacade } from '../../../../app/composition/mls/PigeonMlsFacade';
+import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
 import type {
-  Community,
   LocalKeychain,
   LocalKeychainUpdate,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+} from '../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
 import { CreateCommunity } from '../../../../app/composition/communities/create-community/CreateCommunity';
 import { LeaveCommunity } from '../../../../app/composition/communities/leave-community/LeaveCommunity';

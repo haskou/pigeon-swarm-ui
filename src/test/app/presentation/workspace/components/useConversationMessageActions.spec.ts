@@ -10,12 +10,10 @@ import {
 } from '@jest/globals';
 
 import type { EditingMessage } from '../../../../../app/presentation/workspace/components/conversationThreadState';
-import type {
-  ChatMessage,
-  ConversationResource,
-  MessageResource,
-  Session,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
+import type { MessageResource } from '../../../../../contexts/messages/infrastructure/http/MessageResource';
+import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
 
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';
 import { useConversationMessageActions } from '../../../../../app/presentation/workspace/components/useConversationMessageActions';

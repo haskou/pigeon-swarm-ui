@@ -1,11 +1,9 @@
+import type { ConversationResource } from '../../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { LoginIdentityProgressReporter } from '../../../../../contexts/identities/application/login-identity/LoginIdentityProgressReporter';
 import type { IdentityWorkspaceSource } from '../../../../../contexts/identities/infrastructure/http/IdentityWorkspaceSource';
-import type {
-  ConversationResource,
-  KeychainResource,
-  LocalKeychain,
-  Session,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { KeychainResource } from '../../../../../contexts/identities/infrastructure/http/resources/KeychainResource';
+import type { LocalKeychain } from '../../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { PigeonIdentityWorkspaceSessionApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityWorkspaceSessionApi';
 

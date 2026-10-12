@@ -1,4 +1,4 @@
-import type { MessageAttachment } from '../../../../../shared/domain/pigeonResources.types';
+import type { MessageAttachment } from '../../../../../contexts/attachments/application/contracts/MessageAttachment';
 
 import { PrivateBlobUnavailableError } from '../../../../../contexts/attachments/infrastructure/http/PrivateBlobUnavailableError';
 import { loadOriginalImage } from '../../../../../contexts/messages/presentation/components/loadOriginalImage';

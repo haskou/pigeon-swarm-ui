@@ -1,4 +1,4 @@
-import type { IdentityResource } from '../../../../shared/domain/pigeonResources.types';
+import type { IdentityResource } from './resources/IdentityResource';
 
 export type CachedIdentity = {
   expiresAt: number;

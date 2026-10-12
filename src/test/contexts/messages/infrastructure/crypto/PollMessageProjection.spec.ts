@@ -1,4 +1,4 @@
-import type { MessageResource } from '../../../../../shared/domain/pigeonResources.types';
+import type { MessageResource } from '../../../../../contexts/messages/infrastructure/http/MessageResource';
 
 import { PollMessageProjection } from '../../../../../contexts/messages/infrastructure/crypto/PollMessageProjection';
 

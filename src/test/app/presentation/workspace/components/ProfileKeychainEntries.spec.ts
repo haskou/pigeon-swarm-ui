@@ -1,10 +1,8 @@
 import { describe, expect, it } from '@jest/globals';
 
-import type {
-  Community,
-  ConversationResource,
-  Session,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
+import type { ConversationResource } from '../../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { ProfileKeychainEntries } from '../../../../../app/presentation/workspace/components/ProfileKeychainEntries';
 

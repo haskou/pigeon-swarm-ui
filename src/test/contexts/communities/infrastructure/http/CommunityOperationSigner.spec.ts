@@ -1,6 +1,6 @@
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { CommunityOperationSigner } from '../../../../../contexts/communities/infrastructure/http/CommunityOperationSigner';
 import { deriveCommunityId } from '../../../../../contexts/communities/infrastructure/http/deriveCommunityRecordId';

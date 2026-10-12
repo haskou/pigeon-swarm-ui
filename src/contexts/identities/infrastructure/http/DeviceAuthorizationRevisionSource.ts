@@ -1,5 +1,5 @@
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { AuthorizationRevisionSource } from '../../../../shared/infrastructure/crypto/AuthorizationRevisionSource';
+import type { Session } from '../session/Session';
 import type { PigeonDeviceAuthorizationApi } from './PigeonDeviceAuthorizationApi';
 
 import { IdentityId } from '../../domain/value-objects/IdentityId';

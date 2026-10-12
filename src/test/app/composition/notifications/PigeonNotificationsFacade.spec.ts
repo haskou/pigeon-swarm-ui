@@ -1,10 +1,10 @@
 import { mock } from 'jest-mock-extended';
 
 import type { NotificationUseCases } from '../../../../app/composition/notifications/NotificationUseCases';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { PushNotificationServerFinder } from '../../../../contexts/notifications/application/find-push-notification-server/PushNotificationServerFinder';
 import type { PushSubscriptionRegistrar } from '../../../../contexts/notifications/application/register-push-subscription/PushSubscriptionRegistrar';
 import type { PushSubscriptionRemover } from '../../../../contexts/notifications/application/remove-push-subscription/PushSubscriptionRemover';
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
 
 import { PigeonNotificationsFacade } from '../../../../app/composition/notifications/PigeonNotificationsFacade';
 import { PushNotificationServer } from '../../../../contexts/notifications/domain/PushNotificationServer';

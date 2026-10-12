@@ -1,4 +1,4 @@
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { AttachmentProgress } from '../../application/contracts/AttachmentProgress';
 import type { MessageAttachment } from '../../application/contracts/MessageAttachment';
 import type { PendingMessageAttachment } from '../crypto/resources/PendingMessageAttachment';

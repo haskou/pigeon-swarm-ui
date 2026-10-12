@@ -1,10 +1,8 @@
-import type {
-  ConversationResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { ConversationMapper } from './ConversationMapper';
+import type { ConversationResource } from './ConversationResource';
 
 export class PigeonConversationsApi {
   public constructor(

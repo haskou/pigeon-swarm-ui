@@ -1,4 +1,4 @@
-import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
 
 /** One change to the timeline, in the order the inbox holds it. */
 export type DirectMessageTimelineChange =

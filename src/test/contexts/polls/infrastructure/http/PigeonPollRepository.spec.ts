@@ -1,8 +1,8 @@
 import { Timestamp } from '@haskou/value-objects';
 import { mock } from 'jest-mock-extended';
 
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { PigeonPollsApi } from '../../../../../contexts/polls/infrastructure/http/PigeonPollsApi';
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 
 import { PollActorId } from '../../../../../contexts/polls/domain/value-objects/PollActorId';
 import { PollOptionId } from '../../../../../contexts/polls/domain/value-objects/PollOptionId';

@@ -1,7 +1,5 @@
-import type {
-  MessageAttachment,
-  Session,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { MessageAttachment } from '../../../../../contexts/attachments/application/contracts/MessageAttachment';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { PublishMessageAttachmentMessage } from '../../../../../contexts/attachments/application/publish-message-attachment/messages/PublishMessageAttachmentMessage';
 import { Attachment } from '../../../../../contexts/attachments/domain/Attachment';

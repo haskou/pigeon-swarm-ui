@@ -1,8 +1,8 @@
 import { Timestamp } from '@haskou/value-objects';
 
 import type { DomainEvent } from '../../../../shared/domain/DomainEvent';
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { IdentityAccessContexts } from '../../../identities/infrastructure/http/IdentityAccessContexts';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { Message } from '../../domain/Message';
 import type { MessagePage } from '../../domain/MessagePage';
 import type { MessageRepository } from '../../domain/repositories/MessageRepository';

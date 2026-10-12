@@ -1,10 +1,8 @@
-import type {
-  PublicFileContent,
-  PublicFileUpload,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { PublicFileContent } from '../../application/contracts/PublicFileContent';
+import type { PublicFileUpload } from '../../application/contracts/PublicFileUpload';
 import type { PigeonContentReplicationClient } from './PigeonContentReplicationClient';
 
 export class PigeonPublicFilesClient {

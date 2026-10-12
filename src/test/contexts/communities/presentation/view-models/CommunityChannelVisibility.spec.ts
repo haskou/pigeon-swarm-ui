@@ -1,8 +1,6 @@
-import type {
-  CommunityTextChannel,
-  CommunityVoiceChannel,
-  NotificationScopeSetting,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { CommunityTextChannelResource as CommunityTextChannel } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityTextChannelResource';
+import type { CommunityVoiceChannelResource as CommunityVoiceChannel } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityVoiceChannelResource';
+import type { NotificationScopeSettingResource as NotificationScopeSetting } from '../../../../../contexts/notifications/infrastructure/http/resources/NotificationScopeSettingResource';
 
 import { CommunityChannelVisibility } from '../../../../../contexts/communities/presentation/view-models/CommunityChannelVisibility';
 import { NotificationSettingsPolicy } from '../../../../../contexts/notifications/presentation/view-models/NotificationSettingsPolicy';

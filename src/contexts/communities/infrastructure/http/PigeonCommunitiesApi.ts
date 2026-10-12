@@ -1,34 +1,32 @@
 import { UUID } from '@haskou/value-objects';
 import { Buffer } from 'buffer';
 
-import type {
-  Community,
-  CommunityChannel,
-  CommunityDiscoveryResource,
-  CommunityMessageMention,
-  CommunityMembershipRequest,
-  CommunityModerationLogPage,
-  CommunityPermission,
-  CommunityRoleResource,
-  CommunityTextChannel,
-  CommunityVisibility,
-  CommunityVoiceChannel,
-  CommunityChannelDraft,
-  CommunityChannelDraftsResource,
-  CommunityChannelMessagePinsResource,
-  MessageResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { CommunityChannelDraftsResource } from '../../../messages/infrastructure/http/CommunityChannelDraftsResource';
+import type { CommunityChannelMessagePinsResource } from '../../../messages/infrastructure/http/CommunityChannelMessagePinsResource';
+import type { MessageResource } from '../../../messages/infrastructure/http/MessageResource';
 import type { CachedRequest } from './CachedRequest';
 import type { CachedRequestInvalidator } from './CachedRequestInvalidator';
-/* eslint-disable @typescript-eslint/no-use-before-define */
 import type { CommunityChannelMessageEditInput } from './CommunityChannelMessageEditInput';
 import type { CommunityChannelMessageInput } from './CommunityChannelMessageInput';
 import type { CommunityChannelMessageSearchResult } from './CommunityChannelMessageSearchResult';
 import type { CommunityModerationLogBody } from './CommunityModerationLogBody';
 import type { CommunityOperationBody } from './CommunityOperationBody';
+import type { CommunityChannelDraft } from './resources/CommunityChannelDraft';
+import type { CommunityChannelResource as CommunityChannel } from './resources/CommunityChannelResource';
+import type { CommunityDiscoveryResource } from './resources/CommunityDiscoveryResource';
+import type { CommunityMembershipRequestResource as CommunityMembershipRequest } from './resources/CommunityMembershipRequestResource';
+import type { CommunityMessageMentionResource as CommunityMessageMention } from './resources/CommunityMessageMentionResource';
+import type { CommunityModerationLogPageResource as CommunityModerationLogPage } from './resources/CommunityModerationLogPageResource';
+import type { CommunityPermissionResource as CommunityPermission } from './resources/CommunityPermissionResource';
+/* eslint-disable @typescript-eslint/no-use-before-define */
+import type { CommunityResource as Community } from './resources/CommunityResource';
+import type { CommunityRoleResource } from './resources/CommunityRoleResource';
+import type { CommunityTextChannelResource as CommunityTextChannel } from './resources/CommunityTextChannelResource';
+import type { CommunityVisibilityResource as CommunityVisibility } from './resources/CommunityVisibilityResource';
+import type { CommunityVoiceChannelResource as CommunityVoiceChannel } from './resources/CommunityVoiceChannelResource';
 
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import { ScopeFrontierReader } from '../../../../shared/infrastructure/http/ScopeFrontierReader';

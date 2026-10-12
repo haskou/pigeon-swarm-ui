@@ -1,13 +1,11 @@
 import { UUID } from '@haskou/value-objects';
 
-import type {
-  AttachmentProgress,
-  AttachmentUploadOptions,
-  MessageAttachment,
-  PublicFileContent,
-  PublicFileUpload,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { AttachmentProgress } from '../../application/contracts/AttachmentProgress';
+import type { AttachmentUploadOptions } from '../../application/contracts/AttachmentUploadOptions';
+import type { MessageAttachment } from '../../application/contracts/MessageAttachment';
+import type { PublicFileContent } from '../../application/contracts/PublicFileContent';
+import type { PublicFileUpload } from '../../application/contracts/PublicFileUpload';
 import type { PrivateBlobReplicaPlanner } from './PrivateBlobReplicaPlanner';
 import type { PrivateBlobReplicator } from './PrivateBlobReplicator';
 

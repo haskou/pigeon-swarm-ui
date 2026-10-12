@@ -1,6 +1,6 @@
 import { EncryptedPayload } from '@haskou/pigeon-swarm-crypto';
 
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { DraftPlainPayload } from './DraftPlainPayload';
 
 export class DraftPayloadCipher {

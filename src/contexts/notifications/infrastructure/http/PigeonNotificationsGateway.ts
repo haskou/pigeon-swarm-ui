@@ -1,4 +1,4 @@
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { NotificationResource } from './resources/NotificationResource';
 import type { NotificationScopeSettingInputResource } from './resources/NotificationScopeSettingInputResource';
 import type { NotificationScopeSettingResource } from './resources/NotificationScopeSettingResource';

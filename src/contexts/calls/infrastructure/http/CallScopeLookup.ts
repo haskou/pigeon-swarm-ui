@@ -1,4 +1,4 @@
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 
 /** Facts about a call scope that the signed call start must commit to. */
 export interface CallScopeLookup {

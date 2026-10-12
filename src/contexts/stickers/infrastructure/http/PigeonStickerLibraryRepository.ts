@@ -1,5 +1,5 @@
 import type { DomainEvent } from '../../../../shared/domain/DomainEvent';
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { StickerLibraryRepository } from '../../domain/repositories/StickerLibraryRepository';
 import type { StickerLibrary } from '../../domain/StickerLibrary';
 import type { StickerOwnerId } from '../../domain/value-objects/StickerOwnerId';

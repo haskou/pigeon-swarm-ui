@@ -1,9 +1,7 @@
+import type { MessageAttachmentEncryption } from '../../../../../contexts/attachments/application/contracts/MessageAttachmentEncryption';
 import type { PendingMessageAttachment } from '../../../../../contexts/attachments/infrastructure/crypto/resources/PendingMessageAttachment';
 import type { StoredPrivateBlobReplica } from '../../../../../contexts/attachments/infrastructure/http/PrivateBlobReplicator';
-import type {
-  MessageAttachmentEncryption,
-  Session,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { PigeonChunkedAttachmentUploader } from '../../../../../contexts/attachments/infrastructure/http/PigeonChunkedAttachmentUploader';
 

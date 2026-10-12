@@ -1,19 +1,17 @@
-import type {
-  ChatMessage,
-  ConversationDraftsResource,
-  ConversationMessagePinsResource,
-  MessageLinkPreview,
-  MessagePin,
-  MessageResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestCache } from '../../../../shared/infrastructure/http/RequestCache';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
+import type { MessagePin } from '../../presentation/view-models/MessagePin';
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { ConversationDraftResource } from './ConversationDraftResource';
+import type { ConversationDraftsResource } from './ConversationDraftsResource';
+import type { ConversationMessagePinsResource } from './ConversationMessagePinsResource';
 import type { MessageLoadOptions } from './MessageLoadOptions';
+import type { MessageResource } from './MessageResource';
 import type { ConversationDraftProjection } from './resources/ConversationDraftProjection';
+import type { MessageLinkPreview } from './resources/MessageLinkPreview';
 
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import { ScopeFrontierReader } from '../../../../shared/infrastructure/http/ScopeFrontierReader';

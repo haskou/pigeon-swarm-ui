@@ -2,7 +2,7 @@ import type { ActivityTracker } from './ActivityTracker';
 import type { RealtimeHeartbeatActivityMode } from './RealtimeHeartbeatActivityMode';
 
 export type { RealtimeHeartbeatActivityMode } from './RealtimeHeartbeatActivityMode';
-import type { Session } from '../../domain/pigeonResources.types';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 
 const heartbeatIntervalMs = 10000;
 const heartbeatTimeoutMs = heartbeatIntervalMs * 3;

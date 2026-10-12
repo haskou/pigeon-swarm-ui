@@ -1,6 +1,6 @@
 import type { KeyPair, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
-import type { IdentityResource } from '../../../../shared/domain/pigeonResources.types';
+import type { IdentityResource } from './resources/IdentityResource';
 
 export type CreatedIdentityMaterial = {
   authorizationEpoch: import('../../domain/value-objects/DeviceAuthorizationEpoch').DeviceAuthorizationEpoch;

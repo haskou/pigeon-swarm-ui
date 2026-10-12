@@ -1,6 +1,6 @@
 import { assert } from '@haskou/value-objects';
 
-import type { LocalKeychain } from '../../../../shared/domain/pigeonResources.types';
+import type { LocalKeychain } from '../../../identities/infrastructure/keychain/LocalKeychain';
 import type { PigeonMessagesGateway } from '../../../messages/infrastructure/http/PigeonMessagesGateway';
 import type { Conversation } from '../../domain/Conversation';
 import type { ConversationRepository } from '../../domain/repositories/ConversationRepository';

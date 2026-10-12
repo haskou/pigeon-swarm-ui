@@ -1,9 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 
-import type {
-  ConversationResource,
-  IdentityResource,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { IdentityResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 
 import { SidebarConversation } from '../../../../../app/presentation/workspace/components/SidebarConversation';
 import { sessionFixture } from '../../../../contexts/conversations/ConversationFixture';

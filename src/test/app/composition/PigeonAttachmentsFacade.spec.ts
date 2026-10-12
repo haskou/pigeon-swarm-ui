@@ -1,5 +1,5 @@
 import type { PigeonFilesGateway } from '../../../contexts/attachments/infrastructure/http/PigeonFilesGateway';
-import type { Session } from '../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 
 import { PigeonAttachmentsFacade } from '../../../app/composition/PigeonAttachmentsFacade';
 

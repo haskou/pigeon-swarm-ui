@@ -1,6 +1,6 @@
 import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
 
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
 import { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 

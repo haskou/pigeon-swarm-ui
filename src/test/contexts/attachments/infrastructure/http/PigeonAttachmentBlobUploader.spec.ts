@@ -1,8 +1,6 @@
+import type { MessageAttachment } from '../../../../../contexts/attachments/application/contracts/MessageAttachment';
 import type { PendingMessageAttachment } from '../../../../../contexts/attachments/infrastructure/crypto/resources/PendingMessageAttachment';
-import type {
-  MessageAttachment,
-  Session,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { PigeonAttachmentBlobUploader } from '../../../../../contexts/attachments/infrastructure/http/PigeonAttachmentBlobUploader';
 

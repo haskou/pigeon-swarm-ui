@@ -1,8 +1,8 @@
 import { Timestamp } from '@haskou/value-objects';
 import { mock } from 'jest-mock-extended';
 
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { PigeonNotificationsGateway } from '../../../../../contexts/notifications/infrastructure/http/PigeonNotificationsGateway';
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 
 import { NotificationDecision } from '../../../../../contexts/notifications/domain/value-objects/NotificationDecision';
 import { NotificationRecipientId } from '../../../../../contexts/notifications/domain/value-objects/NotificationRecipientId';

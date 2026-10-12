@@ -1,13 +1,13 @@
 import { mock } from 'jest-mock-extended';
 
 import type { PigeonIdentitiesGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
-import type { PigeonConversationInvitationKeyDecryptor } from '../../../../../contexts/notifications/infrastructure/crypto/PigeonConversationInvitationKeyDecryptor';
+import type { ConversationKeyEntry } from '../../../../../contexts/identities/infrastructure/keychain/ConversationKeyEntry';
 import type {
-  ConversationKeyEntry,
   LocalKeychain,
   LocalKeychainUpdate,
-  Session,
-} from '../../../../../shared/domain/pigeonResources.types';
+} from '../../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
+import type { PigeonConversationInvitationKeyDecryptor } from '../../../../../contexts/notifications/infrastructure/crypto/PigeonConversationInvitationKeyDecryptor';
 
 import { EncryptedInvitationKey } from '../../../../../contexts/notifications/domain/value-objects/EncryptedInvitationKey';
 import { NotificationRecipientId } from '../../../../../contexts/notifications/domain/value-objects/NotificationRecipientId';

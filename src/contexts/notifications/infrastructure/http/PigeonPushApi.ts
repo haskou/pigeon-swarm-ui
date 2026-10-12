@@ -1,9 +1,9 @@
 import type { PushSubscriptionPayload } from './PushSubscriptionPayload';
 
 export type { PushSubscriptionPayload } from './PushSubscriptionPayload';
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 
 export class PigeonPushApi {
   public constructor(

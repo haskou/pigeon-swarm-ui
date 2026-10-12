@@ -1,10 +1,8 @@
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
 
-import type {
-  NotificationResource,
-  Session,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
+import type { NotificationResource } from '../../../../../contexts/notifications/infrastructure/http/resources/NotificationResource';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 

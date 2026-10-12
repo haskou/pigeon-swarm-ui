@@ -1,7 +1,5 @@
-import type {
-  AttachmentProgress,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { AttachmentProgress } from '../../application/contracts/AttachmentProgress';
 
 export type AttachmentPublicationContext = {
   file: File;

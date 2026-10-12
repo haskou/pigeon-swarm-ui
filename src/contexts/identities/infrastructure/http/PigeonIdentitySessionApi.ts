@@ -1,16 +1,14 @@
 import { KeyPair, SHA256Hash, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { StringValueObject, assert } from '@haskou/value-objects';
 
-import type {
-  IdentityResource,
-  LocalKeychain,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { LoginIdentityProgressReporter } from '../../application/login-identity/LoginIdentityProgressReporter';
+import type { LocalKeychain } from '../keychain/LocalKeychain';
+import type { Session } from '../session/Session';
 import type { DeviceIdentityVault } from '../storage/DeviceIdentityVault';
 import type { DeviceSealedRootRotation } from './DeviceSealedRootRotation';
 import type { PigeonDeviceAuthorizationApi } from './PigeonDeviceAuthorizationApi';
 import type { PigeonIdentityGateway } from './PigeonIdentityGateway';
+import type { IdentityResource } from './resources/IdentityResource';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { IdentityId } from '../../domain/value-objects/IdentityId';

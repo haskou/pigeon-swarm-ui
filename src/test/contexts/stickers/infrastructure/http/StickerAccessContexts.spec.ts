@@ -1,4 +1,4 @@
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { StickerOwnerId } from '../../../../../contexts/stickers/domain/value-objects/StickerOwnerId';
 import { StickerAccessContexts } from '../../../../../contexts/stickers/infrastructure/http/StickerAccessContexts';

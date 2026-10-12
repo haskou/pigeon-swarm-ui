@@ -1,10 +1,8 @@
-import type {
-  ChatMessage,
-  ConversationResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { RealtimeMailboxSubscriptionInput } from '../../../../shared/infrastructure/realtime/RealtimeMailboxSubscriptionInput';
+import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
+import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { PigeonMessageCommandsApi } from '../http/PigeonMessageCommandsApi';
 import type { EditMessageOptions } from '../http/resources/EditMessageOptions';

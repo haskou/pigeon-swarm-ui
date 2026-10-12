@@ -1,5 +1,5 @@
-import type { PrivateFileContent } from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
+import type { PrivateFileContent } from '../../application/contracts/PrivateFileContent';
 
 /**
  * Reads encrypted content published to private IPFS before private blobs.

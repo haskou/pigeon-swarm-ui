@@ -1,7 +1,5 @@
-import type {
-  CommunityChannelThreadSummary,
-  CommunityTextChannel,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { CommunityChannelThreadSummaryResource as CommunityChannelThreadSummary } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityChannelThreadSummaryResource';
+import type { CommunityTextChannelResource as CommunityTextChannel } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityTextChannelResource';
 
 import { CommunityChannelThreadCache } from '../../../../../contexts/communities/presentation/view-models/CommunityChannelThreadCache';
 

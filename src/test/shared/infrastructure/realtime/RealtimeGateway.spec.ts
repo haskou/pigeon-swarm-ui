@@ -1,4 +1,4 @@
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
 import { ApiUrlBuilder } from '../../../../shared/infrastructure/http/ApiUrlBuilder';
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';

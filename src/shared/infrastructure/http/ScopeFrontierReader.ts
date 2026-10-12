@@ -1,4 +1,4 @@
-import type { Session } from '../../domain/pigeonResources.types';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { HttpJsonClient } from './HttpJsonClient';
 import type { RequestSigner } from './RequestSigner';
 

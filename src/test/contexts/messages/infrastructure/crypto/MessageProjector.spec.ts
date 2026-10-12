@@ -1,6 +1,6 @@
 import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { MessageProjector } from '../../../../../contexts/messages/infrastructure/crypto/MessageProjector';
 
