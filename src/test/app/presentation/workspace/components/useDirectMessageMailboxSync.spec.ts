@@ -1,3 +1,5 @@
+import type { SetStateAction } from 'react';
+
 import {
   afterEach,
   beforeEach,
@@ -6,7 +8,6 @@ import {
   it,
   jest,
 } from '@jest/globals';
-import type { SetStateAction } from 'react';
 
 import type {
   ConversationResource,

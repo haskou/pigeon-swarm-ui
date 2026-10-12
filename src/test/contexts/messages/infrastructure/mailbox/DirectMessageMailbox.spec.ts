@@ -106,6 +106,7 @@ describe(DirectMessageMailbox.name, () => {
     envelopes: [{ cursor: lastCursor, envelopeId: 'envelope', plaintext }],
     hasMore: false,
     lastCursor,
+    recreated: false,
   });
 
   describe('deliver', () => {
@@ -216,11 +217,12 @@ describe(DirectMessageMailbox.name, () => {
         ],
         hasMore: false,
         lastCursor: 2,
+        recreated: false,
       });
       channel.acknowledge.mockImplementation(() => {
         order.push('ack');
 
-        return Promise.resolve();
+        return Promise.resolve({ recreated: false });
       });
       const apply = jest.fn(() => {
         order.push('apply');
@@ -295,6 +297,7 @@ describe(DirectMessageMailbox.name, () => {
         envelopes: [],
         hasMore: false,
         lastCursor: 5,
+        recreated: false,
       });
       const apply = jest.fn();
 
@@ -313,6 +316,113 @@ describe(DirectMessageMailbox.name, () => {
       );
       expect(apply).not.toHaveBeenCalled();
       expect(channel.acknowledge).not.toHaveBeenCalled();
+    });
+
+    it('creates the recipient inbox before the first read on this device, once', async () => {
+      const { channel, mailbox } = setup();
+      channel.read.mockResolvedValue({
+        envelopes: [],
+        hasMore: false,
+        lastCursor: 0,
+        recreated: false,
+      });
+      const signal = new AbortController().signal;
+
+      await mailbox.sync(session('alice'), conversationId, signal, jest.fn());
+      await mailbox.sync(session('alice'), conversationId, signal, jest.fn());
+
+      const [keys, readToken] = channel.createInbox.mock.calls[0];
+      expect(channel.createInbox).toHaveBeenCalledTimes(1);
+      expect(keys.mailboxId).toBe(keysFor('alice').mailboxId);
+      expect(channel.createInbox.mock.invocationCallOrder[0]).toBeLessThan(
+        channel.read.mock.invocationCallOrder[0],
+      );
+      expect(channel.read.mock.calls[0][1]).toBe(readToken);
+    });
+
+    it('still reads when the up-front create fails, without a user error', async () => {
+      const { channel, mailbox } = setup();
+      channel.createInbox.mockRejectedValue(new Error('creation refused'));
+      channel.read.mockResolvedValue({
+        envelopes: [],
+        hasMore: false,
+        lastCursor: 0,
+        recreated: false,
+      });
+      const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
+
+      await expect(
+        mailbox.sync(
+          session('alice'),
+          conversationId,
+          new AbortController().signal,
+          jest.fn(),
+        ),
+      ).resolves.toBeUndefined();
+
+      expect(channel.read).toHaveBeenCalledTimes(1);
+      expect(debug).toHaveBeenCalledWith(
+        'Direct mailbox inbox create failed; read will retry.',
+      );
+      debug.mockRestore();
+    });
+
+    it('re-reads from zero when the inbox was re-created under a stored cursor', async () => {
+      const { channel, mailbox, store } = setup();
+      const keys = keysFor('alice');
+      store.save(keys.mailboxId, { cursor: 5, readToken: 'read-token' });
+      channel.read
+        .mockResolvedValueOnce({
+          envelopes: [],
+          hasMore: false,
+          lastCursor: 5,
+          recreated: true,
+        })
+        .mockResolvedValueOnce(
+          pageWith(DirectMessageMailboxRecord.encode(storedRecord), 1),
+        );
+      const apply = jest.fn();
+      channel.acknowledge.mockResolvedValue({ recreated: false });
+
+      await mailbox.sync(
+        session('alice'),
+        conversationId,
+        new AbortController().signal,
+        apply,
+      );
+
+      expect(channel.read).toHaveBeenNthCalledWith(
+        2,
+        keys,
+        'read-token',
+        0,
+        50,
+      );
+      expect(apply).toHaveBeenCalledWith([
+        expect.objectContaining({ id: 'message-1' }),
+      ]);
+      expect(channel.acknowledge).toHaveBeenCalledWith(keys, 'read-token', 1);
+      expect(store.load(keys.mailboxId)).toEqual({
+        cursor: 1,
+        readToken: 'read-token',
+      });
+    });
+
+    it('stores cursor zero when the inbox was re-created during acknowledgement', async () => {
+      const { channel, mailbox, store } = setup();
+      channel.read.mockResolvedValue(
+        pageWith(DirectMessageMailboxRecord.encode(storedRecord), 1),
+      );
+      channel.acknowledge.mockResolvedValue({ recreated: true });
+
+      await mailbox.sync(
+        session('alice'),
+        conversationId,
+        new AbortController().signal,
+        jest.fn(),
+      );
+
+      expect(store.load(keysFor('alice').mailboxId)?.cursor).toBe(0);
     });
   });
 
@@ -338,6 +448,58 @@ describe(DirectMessageMailbox.name, () => {
       wire.acknowledge.mockResolvedValue(undefined);
 
       return wire;
+    };
+
+    const recreatableMailboxClient = () => {
+      let present = true;
+      let nextCursor = 1;
+      let envelopes: { body: string; cursor: number; envelopeId: string }[] =
+        [];
+      const requireInbox = () => {
+        if (!present) throw new MailboxUnavailableError();
+      };
+      const wire = mock<PigeonMailboxClient>();
+      wire.create.mockImplementation(() => {
+        if (!present) {
+          present = true;
+          nextCursor = 1;
+          envelopes = [];
+        }
+
+        return Promise.resolve();
+      });
+      wire.append.mockImplementation((_mailboxId, _postToken, input) => {
+        requireInbox();
+        const cursor = nextCursor;
+        nextCursor += 1;
+        envelopes.push({ ...input, cursor });
+
+        return Promise.resolve({ cursor });
+      });
+      wire.read.mockImplementation((_mailboxId, _readToken, after, limit) => {
+        requireInbox();
+
+        return Promise.resolve({
+          envelopes: envelopes
+            .filter((envelope) => envelope.cursor > after)
+            .slice(0, limit),
+          hasMore: false,
+        });
+      });
+      wire.acknowledge.mockImplementation((_mailboxId, _readToken, upTo) => {
+        requireInbox();
+        envelopes = envelopes.filter((envelope) => envelope.cursor > upTo);
+
+        return Promise.resolve();
+      });
+
+      return {
+        evict: () => {
+          present = false;
+          envelopes = [];
+        },
+        wire,
+      };
     };
 
     it('delivers a message once and does not replay it after acknowledgement', async () => {
@@ -396,6 +558,40 @@ describe(DirectMessageMailbox.name, () => {
       );
 
       expect(timeline.map((message) => message.id)).toEqual(['message-1']);
+    });
+
+    it('delivers after the inbox was evicted and re-created under a stored cursor', async () => {
+      const { projection, store } = setup();
+      const { evict, wire } = recreatableMailboxClient();
+      const mailbox = new DirectMessageMailbox(
+        new MailboxChannel(wire, jest.fn()),
+        store,
+        projection,
+      );
+      const applied: string[][] = [];
+      const sync = () =>
+        mailbox.sync(
+          session('bob'),
+          conversationId,
+          new AbortController().signal,
+          (messages) => {
+            applied.push(messages.map((message) => message.id));
+          },
+        );
+
+      await mailbox.deliver(session('alice'), conversation, sent, plain);
+      await sync();
+      evict();
+      await sync();
+      await mailbox.deliver(
+        session('alice'),
+        conversation,
+        { ...sent, id: 'message-2' },
+        plain,
+      );
+      await sync();
+
+      expect(applied).toEqual([['message-1'], ['message-2']]);
     });
   });
 });
