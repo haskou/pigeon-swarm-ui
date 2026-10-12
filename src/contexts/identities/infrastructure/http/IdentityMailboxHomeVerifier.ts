@@ -1,10 +1,7 @@
-import { SHA256Hash, Signature } from '@haskou/pigeon-swarm-crypto';
-import { StringValueObject } from '@haskou/value-objects';
-
 import type { IdentityResource } from './resources/IdentityResource';
 
 import { MailboxHomeBase } from '../../../../shared/infrastructure/client/MailboxHomeBase';
-import { IdentityId } from '../../domain/value-objects/IdentityId';
+import { IdentityMailboxHomeTrust } from '../../domain/IdentityMailboxHomeTrust';
 
 export class IdentityMailboxHomeVerifier {
   /** Same alphabetical key order the identity signature was computed over. */
@@ -27,37 +24,10 @@ export class IdentityMailboxHomeVerifier {
   }
 
   /**
-   * Fails closed: any mismatch, malformed input, or thrown error is not
-   * authentic.
-   */
-  private static isAuthentic(
-    requestedId: string,
-    identity: IdentityResource,
-  ): boolean {
-    try {
-      const id = IdentityId.fromString(requestedId);
-      const commitment = SHA256Hash.from(
-        new StringValueObject(identity.deviceCredential),
-      ).valueOf();
-
-      return (
-        IdentityId.normalize(identity.id) === id.valueOf() &&
-        commitment === identity.deviceCredentialCommitment &&
-        id
-          .getPublicKey()
-          .isValidSignature(
-            IdentityMailboxHomeVerifier.signedContent(identity),
-            new Signature(identity.signature),
-          )
-      );
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Returns the node-served mailbox home base only when the identity signature
-   * covers it.
+   * Returns the node-served mailbox home base only when the identity is
+   * trusted for the requested id. The trust decision lives in
+   * IdentityMailboxHomeTrust; this adapter parses the base and serializes the
+   * signed record.
    */
   public static verifiedBase(
     requestedId: string,
@@ -65,9 +35,17 @@ export class IdentityMailboxHomeVerifier {
   ): string | undefined {
     const base = MailboxHomeBase.parse(identity.mailboxHome);
 
-    return base !== undefined &&
-      IdentityMailboxHomeVerifier.isAuthentic(requestedId, identity)
-      ? base
-      : undefined;
+    if (base === undefined) return undefined;
+
+    const trusted = IdentityMailboxHomeTrust.isTrusted({
+      deviceCredential: identity.deviceCredential,
+      deviceCredentialCommitment: identity.deviceCredentialCommitment,
+      requestedId,
+      servedId: identity.id,
+      signature: identity.signature,
+      signedContent: IdentityMailboxHomeVerifier.signedContent(identity),
+    });
+
+    return trusted ? base : undefined;
   }
 }

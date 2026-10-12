@@ -27,6 +27,7 @@ module.exports = {
     '**/PigeonIdentityCommandsApi.spec.ts',
     '**/IdentitySignaturePayloadFactory.spec.ts',
     '**/IdentityMailboxHomeVerifier.spec.ts',
+    '**/IdentityMailboxHomeTrust.spec.ts',
     '**/Mailbox{Capability,Channel,CreationProof,EnvelopeCipher,KeySchedule,ReadToken}.spec.ts',
     '**/DirectMessageAuthorship.spec.ts',
     '**/DirectMessageMailbox.spec.ts',
