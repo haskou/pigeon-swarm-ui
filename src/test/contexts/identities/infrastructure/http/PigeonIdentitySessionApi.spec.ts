@@ -329,6 +329,7 @@ describe(PigeonIdentitySessionApi.name, () => {
     const rootedRoot = {
       current: (session: Session) => {
         steps.push('openRoot');
+
         return Promise.resolve({
           ...session,
           deviceSealedRootKey: root,
@@ -338,16 +339,19 @@ describe(PigeonIdentitySessionApi.name, () => {
     const keychains = {
       migrateLegacyHead: jest.fn(() => {
         steps.push('migrateLegacyHead');
+
         return Promise.resolve(undefined);
       }),
     } as unknown as PigeonKeychainApi;
     const recovery = {
-      resumeRootReseal: jest.fn(() => {
-        steps.push('resumeRootReseal');
-        return Promise.resolve();
-      }),
       resumeKeychainRewrap: jest.fn(() => {
         steps.push('resumeKeychainRewrap');
+
+        return Promise.resolve();
+      }),
+      resumeRootReseal: jest.fn(() => {
+        steps.push('resumeRootReseal');
+
         return Promise.resolve();
       }),
     } as unknown as DeviceSealedRecovery;

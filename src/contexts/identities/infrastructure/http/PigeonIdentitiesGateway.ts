@@ -11,6 +11,7 @@ import type {
 } from '../keychain/LocalKeychain';
 import type { Session } from '../session/Session';
 import type { CreatedIdentityMaterial } from './CreatedIdentityMaterial';
+import type { DeviceSealedRecovery } from './DeviceSealedRecovery';
 import type { DeviceSealedRootRotation } from './DeviceSealedRootRotation';
 import type { IdentityUpdateProfileInput } from './IdentitySignaturePayloadFactory';
 import type {
@@ -42,6 +43,7 @@ export class PigeonIdentitiesGateway {
     private readonly keychain: PigeonKeychainApi,
     private readonly presence: PigeonPresenceGateway,
     private readonly deviceSealedRoot: DeviceSealedRootRotation,
+    private readonly recovery: DeviceSealedRecovery,
   ) {}
 
   public async recover(
@@ -95,10 +97,10 @@ export class PigeonIdentitiesGateway {
       session,
       requestCode,
     );
-    // The root is kept, so the new device opens the keychain's root. A failure
-    // here leaves the device authorized without a completion code: revoke it
-    // and pair again.
-    await this.deviceSealedRoot.reseal(result.session, root);
+    // The root is kept, so the new device opens the keychain's root. A failed
+    // reseal is recorded and retried on the next unlock, and the completion
+    // code is still returned.
+    await this.recovery.resealAfterPairing(result.session, root);
 
     return {
       completionCode: result.completion.toCode(),
@@ -116,10 +118,14 @@ export class PigeonIdentitiesGateway {
     compromisedSince?: DeviceAuthorizationRevision,
   ): Promise<Session> {
     // The head is read under the current root first, so a failed read revokes
-    // nothing. The rewrap then seals it under the new root. If the rewrap fails
-    // after the new root is published, the keychain stays under the previous
-    // root; see the residuals in docs/device-sealed-secrets-client.md.
+    // nothing. The root that keeps the keychain readable is recorded before the
+    // revoke, so a failed rewrap is retried on the next unlock.
     const head = await this.keychain.readHead(session);
+
+    if (head) {
+      this.recovery.rememberKeychainRewrap(session);
+    }
+
     const revoked = await this.deviceAuthorization.revokeDevice(
       session,
       target,
@@ -128,7 +134,7 @@ export class PigeonIdentitiesGateway {
     const rotated = await this.deviceSealedRoot.rotate(revoked);
 
     if (head) {
-      await this.keychain.rewrapHead(rotated, head);
+      await this.recovery.rewrapAfterRevoke(rotated, head);
     }
 
     return rotated;

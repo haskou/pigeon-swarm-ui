@@ -1,3 +1,5 @@
+import type { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestCache } from '../../../../shared/infrastructure/http/RequestCache';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
@@ -164,6 +166,32 @@ export class PigeonKeychainApi {
     };
   }
 
+  /**
+   * Opens the head with openWith and reseals it under the session's root. A
+   * head already under the root, or a missing head, is left alone.
+   */
+  private async resealHeadUnderRoot(
+    session: Session,
+    openWith: Session,
+  ): Promise<void> {
+    await this.enqueuePublish(session.identity.id, async () => {
+      const resource = await this.undefinedWhenMissing(
+        async () => await this.fetchRemote(session),
+      );
+
+      if (!resource || this.cipher.isSealedUnderRoot(session, resource)) {
+        return;
+      }
+
+      const head: KeychainHead = {
+        keychain: this.cipher.decrypt(openWith, resource),
+        keychainExternalIdentifier: resource.keychainExternalIdentifier,
+      };
+
+      await this.postKeychain(session, head, head.keychain);
+    });
+  }
+
   public decrypt(session: Session, keychain: KeychainResource): LocalKeychain {
     return this.cipher.decrypt(session, keychain);
   }
@@ -220,6 +248,21 @@ export class PigeonKeychainApi {
   }
 
   /**
+   * Reseals a head that a failed revoke rewrap left under the previous root:
+   * it opens under previousKey, with the master key as fallback, and is sealed
+   * under the session's root. A head already under the root is left alone.
+   */
+  public async rewrapHeadSealedUnder(
+    session: Session,
+    previousKey: SymmetricKey,
+  ): Promise<void> {
+    await this.resealHeadUnderRoot(session, {
+      ...session,
+      deviceSealedRootKey: previousKey,
+    });
+  }
+
+  /**
    * Reseals a head that opens only under the master key under the session's
    * root. Unlock runs it once the root is open. A head already under the root
    * is left alone.
@@ -229,21 +272,6 @@ export class PigeonKeychainApi {
       return;
     }
 
-    await this.enqueuePublish(session.identity.id, async () => {
-      const resource = await this.undefinedWhenMissing(
-        async () => await this.fetchRemote(session),
-      );
-
-      if (!resource || this.cipher.isSealedUnderRoot(session, resource)) {
-        return;
-      }
-
-      const head: KeychainHead = {
-        keychain: this.decrypt(session, resource),
-        keychainExternalIdentifier: resource.keychainExternalIdentifier,
-      };
-
-      await this.postKeychain(session, head, head.keychain);
-    });
+    await this.resealHeadUnderRoot(session, session);
   }
 }

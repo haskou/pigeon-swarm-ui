@@ -5,6 +5,7 @@ import type { LoginIdentityProgressReporter } from '../../application/login-iden
 import type { LocalKeychain } from '../keychain/LocalKeychain';
 import type { Session } from '../session/Session';
 import type { DeviceIdentityVault } from '../storage/DeviceIdentityVault';
+import type { DeviceSealedRecovery } from './DeviceSealedRecovery';
 import type { DeviceSealedRootRotation } from './DeviceSealedRootRotation';
 import type { PigeonDeviceAuthorizationApi } from './PigeonDeviceAuthorizationApi';
 import type { PigeonIdentityGateway } from './PigeonIdentityGateway';
@@ -27,6 +28,7 @@ export class PigeonIdentitySessionApi {
     private readonly deviceAuthorization: PigeonDeviceAuthorizationApi,
     private readonly deviceSealedRoot: DeviceSealedRootRotation,
     private readonly keychains: PigeonKeychainApi,
+    private readonly recovery: DeviceSealedRecovery,
   ) {}
 
   private createLoginPayload(identity: IdentityResource): StringValueObject {
@@ -153,8 +155,10 @@ export class PigeonIdentitySessionApi {
     const synchronized = await this.deviceAuthorization.synchronize(
       this.createSession(identity, vaultSession),
     );
+    await this.recovery.resumeRootReseal(synchronized);
 
     const rooted = await this.openDeviceSealedRoot(synchronized);
+    await this.recovery.resumeKeychainRewrap(rooted);
 
     await this.migrateLegacyHead(rooted);
 

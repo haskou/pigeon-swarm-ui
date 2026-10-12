@@ -6,9 +6,9 @@ import type { PigeonKeychainApi } from '../../../../../contexts/identities/infra
 import type { LocalKeychain } from '../../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
+import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
 import { DeviceSealedRecovery } from '../../../../../contexts/identities/infrastructure/http/DeviceSealedRecovery';
 import { DeviceSealedRecoveryStore } from '../../../../../contexts/identities/infrastructure/storage/DeviceSealedRecoveryStore';
-import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
 
 const identityId = 'identity-1';
 const head = {
@@ -85,9 +85,13 @@ describe(DeviceSealedRecovery.name, () => {
       recovery.rememberKeychainRewrap(sessionAt(1));
 
       expect(
-        masterKey.decrypt(
-          new EncryptedPayload(store.read(identityId).keychainRewrap as string),
-        ).toString(),
+        masterKey
+          .decrypt(
+            new EncryptedPayload(
+              store.read(identityId).keychainRewrap as string,
+            ),
+          )
+          .toString(),
       ).toBe(masterKey.toString());
     });
   });
@@ -191,8 +195,10 @@ describe(DeviceSealedRecovery.name, () => {
       const session = sessionAt(2, { deviceSealedRootKey: currentRoot });
       let pendingDuringReseal: unknown;
 
-      deviceSealedRoot.reseal.mockImplementation(async () => {
+      deviceSealedRoot.reseal.mockImplementation(() => {
         pendingDuringReseal = store.read(identityId).rootReseal;
+
+        return Promise.resolve();
       });
 
       await recovery.resealAfterPairing(session, currentRoot);

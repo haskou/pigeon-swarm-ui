@@ -39,7 +39,9 @@ function gatewayDouble(): {
   >;
   gateway: PigeonIdentitiesGateway;
   profile: jest.Mocked<Pick<IdentityProfileGateway, 'get'>>;
-  keychain: jest.Mocked<Pick<PigeonKeychainApi, 'publishKeychain' | 'readHead'>>;
+  keychain: jest.Mocked<
+    Pick<PigeonKeychainApi, 'publishKeychain' | 'readHead'>
+  >;
   recovery: jest.Mocked<
     Pick<
       DeviceSealedRecovery,
@@ -65,8 +67,8 @@ function gatewayDouble(): {
   >;
   const recovery = {
     rememberKeychainRewrap: jest.fn(),
-    rewrapAfterRevoke: jest.fn(),
     resealAfterPairing: jest.fn(),
+    rewrapAfterRevoke: jest.fn(),
   } as jest.Mocked<
     Pick<
       DeviceSealedRecovery,
