@@ -106,5 +106,11 @@ describe(MailboxReadToken.name, () => {
         MailboxReadToken.deriveDevice(rootKey, mailboxId, ''),
       ).toThrow(RangeError);
     });
+
+    it('derives the pinned device token, matching Node crypto.hkdfSync', () => {
+      expect(
+        MailboxReadToken.deriveDevice(rootKey, mailboxId, credentialA),
+      ).toBe('js4BVkg1uGoEfwYGrPmaTvGh7s8MuZnZhSg1zaYJzDA');
+    });
   });
 });
