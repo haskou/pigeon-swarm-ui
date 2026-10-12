@@ -25,6 +25,7 @@ module.exports = {
     '**/IdentitySignaturePayloadFactory.spec.ts',
     '**/IdentityMailboxHomeVerifier.spec.ts',
     '**/Mailbox{Capability,Channel,CreationProof,EnvelopeCipher,KeySchedule,ReadToken}.spec.ts',
+    '**/DirectMessageAuthorship.spec.ts',
     '**/DirectMessageMailbox.spec.ts',
   ],
   testPathIgnorePatterns: [],

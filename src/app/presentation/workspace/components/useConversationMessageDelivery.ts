@@ -9,6 +9,7 @@ import {
   type SetStateAction,
 } from 'react';
 
+import type { DirectMessageMailboxDelivery } from '../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
 import type {
   AttachmentProgress,
   AttachmentUploadOptions,
@@ -17,7 +18,6 @@ import type {
   Session,
   StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { DirectMessageMailboxDelivery } from '../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
 
 import { ConversationTimeline } from '../../../../contexts/conversations/presentation/view-models/ConversationTimeline';
 import { MessageCollection } from '../../../../contexts/messages/presentation/view-models/MessageCollection';
@@ -117,7 +117,7 @@ export function useConversationMessageDelivery({
       const optimisticTimestamp = Date.now();
       const optimisticId = `pending:${conversationId}:${optimisticTimestamp}:${UUID.generate().toString()}`;
 
-      // Keep a showing copy notice for this conversation while its next send runs.
+      // Keep a shown copy notice while this conversation's next send runs.
       if (directCopyNoticeConversationRef.current !== conversationId) {
         directCopyNoticeConversationRef.current = null;
         onErrorChange(null);
