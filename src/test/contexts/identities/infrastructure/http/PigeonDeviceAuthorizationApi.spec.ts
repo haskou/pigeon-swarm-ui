@@ -759,7 +759,10 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
         `{"code":${code},"message":"Invalid signed request."}`,
       );
     const failureOf = async (promise: Promise<unknown>): Promise<unknown> =>
-      promise.then(() => undefined, (error: unknown) => error);
+      promise.then(
+        () => undefined,
+        (error: unknown) => error,
+      );
 
     async function synchronizing() {
       const { identityId, session } = await fixture();
