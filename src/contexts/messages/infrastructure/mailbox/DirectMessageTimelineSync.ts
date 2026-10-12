@@ -5,13 +5,13 @@ import type { DirectReadRecord } from '../../../mailboxes/domain/DirectReadRecor
 import type { DirectSentRecord } from '../../../mailboxes/domain/DirectSentRecord';
 import type { OpenedMailboxPage } from '../../../mailboxes/infrastructure/MailboxChannel';
 import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
+import type { DirectMessageTimelineChange } from '../../presentation/view-models/DirectMessageTimelineChange';
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { DirectMessageInboxOpener } from './DirectMessageInboxOpener';
 import type { DirectMessageMailboxStore } from './DirectMessageMailboxStore';
 import type { DirectMessageOwnCopies } from './DirectMessageOwnCopies';
 import type { DirectMessageReaderSet } from './DirectMessageReaderSet';
 import type { DirectMessageRecipientInbox } from './DirectMessageRecipientInbox';
-import type { DirectMessageTimelineChange } from './DirectMessageTimelineChange';
 
 import { DirectMailboxOwnership } from '../../../mailboxes/domain/DirectMailboxOwnership';
 import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';

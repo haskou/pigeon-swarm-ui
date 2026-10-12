@@ -3,13 +3,13 @@ import type { ConversationResource } from '../../../conversations/infrastructure
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
 import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
+import type { DirectMessageTimelineChange } from '../../presentation/view-models/DirectMessageTimelineChange';
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { PigeonMessageCommandsApi } from '../http/PigeonMessageCommandsApi';
 import type { EditMessageOptions } from '../http/resources/EditMessageOptions';
 import type { SendMessageOptions } from '../http/resources/SendMessageOptions';
 import type { DirectMessageMailboxStore } from './DirectMessageMailboxStore';
 import type { DirectMessageReaderSet } from './DirectMessageReaderSet';
-import type { DirectMessageTimelineChange } from './DirectMessageTimelineChange';
 import type { RecipientMailboxRouter } from './RecipientMailboxRouter';
 
 import { DirectMessageInboxOpener } from './DirectMessageInboxOpener';

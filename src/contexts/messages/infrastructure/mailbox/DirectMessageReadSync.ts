@@ -3,8 +3,8 @@ import type {
   MailboxChannel,
   OpenedMailboxPage,
 } from '../../../mailboxes/infrastructure/MailboxChannel';
+import type { DirectMessageTimelineChange } from '../../presentation/view-models/DirectMessageTimelineChange';
 import type { DirectMessageMailboxStore } from './DirectMessageMailboxStore';
-import type { DirectMessageTimelineChange } from './DirectMessageTimelineChange';
 
 import { DirectMailboxOwnership } from '../../../mailboxes/domain/DirectMailboxOwnership';
 import { DirectMessageInboxKeys } from './DirectMessageInboxKeys';
