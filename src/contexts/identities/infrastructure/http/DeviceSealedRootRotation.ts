@@ -14,7 +14,9 @@ import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonEr
  * Publishes and opens the device-sealed root of one identity. A generation
  * carries one root, sealed to every device at the head. Enrolment reseals the
  * same root; a revoke mints a fresh one. A device opens its own entry while it
- * matches its authorization revision, and rotates otherwise.
+ * matches its authorization revision. A stale session re-syncs once and never
+ * mints a root, because the head may already be sealed under a root this
+ * device cannot open. Only a device with no entry publishes a new root.
  */
 export class DeviceSealedRootRotation {
   public constructor(
@@ -22,44 +24,6 @@ export class DeviceSealedRootRotation {
     private readonly sealedSecrets: PigeonDeviceSealedSecretApi,
     private readonly clock: () => number = Date.now,
   ) {}
-
-  /**
-   * Publishes a new generation with a fresh root and returns the session
-   * holding it. A conflicting publish refetches the head once and publishes
-   * again.
-   */
-  public async rotate(session: Session): Promise<Session> {
-    return await this.publishWithRetry(session, SymmetricKey.generate());
-  }
-
-  /**
-   * Publishes an existing root at a new generation, so enrolment keeps the
-   * keychain readable under the same root.
-   */
-  public async reseal(session: Session, root: SymmetricKey): Promise<void> {
-    await this.publishWithRetry(session, root);
-  }
-
-  /**
-   * Returns the session holding the root of the current generation. Publishes
-   * a new generation when this device has no entry for the head revision.
-   */
-  public async current(session: Session): Promise<Session> {
-    const own = await this.sealedSecrets.fetchOwn(session);
-
-    if (
-      own?.authorizationRevision === session.authorizationRevision.valueOf()
-    ) {
-      return {
-        ...session,
-        deviceSealedRootKey: SymmetricKey.fromBuffer(
-          decodeBase64Url(own.payload),
-        ),
-      };
-    }
-
-    return await this.rotate(session);
-  }
 
   private async publishWithRetry(
     session: Session,
@@ -93,5 +57,59 @@ export class DeviceSealedRootRotation {
     });
 
     return { ...session, deviceSealedRootKey: root };
+  }
+
+  /**
+   * Publishes a new generation with a fresh root and returns the session
+   * holding it. A conflicting publish refetches the head once and publishes
+   * again.
+   */
+  public async rotate(session: Session): Promise<Session> {
+    return await this.publishWithRetry(session, SymmetricKey.generate());
+  }
+
+  /**
+   * Publishes an existing root at a new generation, so enrolment keeps the
+   * keychain readable under the same root.
+   */
+  public async reseal(session: Session, root: SymmetricKey): Promise<void> {
+    await this.publishWithRetry(session, root);
+  }
+
+  /**
+   * Returns the session holding the root of the current generation. Publishes
+   * a new generation only when this device has no entry at all.
+   */
+  public async current(session: Session): Promise<Session> {
+    const own = await this.sealedSecrets.fetchOwn(session);
+
+    if (!own) {
+      return await this.rotate(session);
+    }
+
+    if (own.authorizationRevision === session.authorizationRevision.valueOf()) {
+      return {
+        ...session,
+        deviceSealedRootKey: SymmetricKey.fromBuffer(
+          decodeBase64Url(own.payload),
+        ),
+      };
+    }
+
+    const synced = await this.deviceAuthorization.synchronize(session);
+    const fresh = await this.sealedSecrets.fetchOwn(synced);
+
+    if (
+      fresh?.authorizationRevision !== synced.authorizationRevision.valueOf()
+    ) {
+      return synced;
+    }
+
+    return {
+      ...synced,
+      deviceSealedRootKey: SymmetricKey.fromBuffer(
+        decodeBase64Url(fresh.payload),
+      ),
+    };
   }
 }

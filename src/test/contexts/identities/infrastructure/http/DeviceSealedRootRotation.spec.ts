@@ -187,19 +187,23 @@ describe('DeviceSealedRootRotation', () => {
       expect(current.deviceSealedRootKey?.getBuffer().equals(root)).toBe(true);
     });
 
-    it('republishes when the stored entry is from an older authorization revision', async () => {
-      const { rotation, sealedSecrets } = setup(1_000);
+    it('re-syncs a stale session and opens its entry without publishing', async () => {
+      const { deviceAuthorization, rotation, sealedSecrets } = setup(1_000);
+      const root = SymmetricKey.generate();
 
+      deviceAuthorization.synchronize.mockResolvedValue(makeSession(4));
       sealedSecrets.fetchOwn.mockResolvedValue({
-        authorizationRevision: 3,
-        generation: 7,
-        payload: 'stale',
+        authorizationRevision: 4,
+        generation: 8,
+        payload: encodeBase64Url(root.getBuffer()),
       });
 
-      await rotation.current(makeSession(4));
+      const current = await rotation.current(makeSession(3));
 
-      expect(sealedSecrets.publish).toHaveBeenCalledTimes(1);
-      expect(sealedSecrets.publish.mock.calls[0][1].generation).toBe(1_001);
+      expect(sealedSecrets.publish).not.toHaveBeenCalled();
+      expect(current.deviceSealedRootKey?.getBuffer()).toEqual(
+        root.getBuffer(),
+      );
     });
 
     it('publishes when this device has no entry yet', async () => {
