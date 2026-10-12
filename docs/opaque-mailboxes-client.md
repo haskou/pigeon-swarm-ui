@@ -37,8 +37,8 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 - A device reads and acknowledges with its device reader. The same token rules as the root apply: the node sees the raw device token on each read and ack.
 - The root reader lists, enrols, and removes readers, and it mirrors each acknowledgement, so the root cursor tracks the latest device ack.
 - A device enrols its reader when it creates the inbox and when it adopts a legacy inbox. Recovery enrols it again after a re-creation.
-- Cap: the node's `maxReaders` is 8. A ninth device's enrol is refused (409) and logged with the fixed inbox-create debug line. Its read then gets 404, recovers, and fails again on enrol with 409. That surfaces as the sync error notice.
-- Pruning: once per app session per mailbox, a device lists the readers and removes any hash that is neither the root, its own device, nor a credential in the identity's device list. A failed pass logs a fixed debug line and retries on the next sync. The root reader is never removed.
+- Cap: the node's `maxReaders` (`MAILBOX_MAX_READERS`) defaults to 129 on nodes that include haskou/pigeon-swarm-node#437: the root reader plus one reader per device, up to 128 devices. A device enrol past the cap is refused (409) and logged with the fixed inbox-create debug line. Its read then gets 404, recovers, and fails again on enrol with 409. That surfaces as the sync error notice. A reader whose device was removed still counts until pruned; the first pass of an app session prunes before the read, so that slot can free in the same pass.
+- Pruning: once per app session per mailbox, a device lists the readers and removes any hash that is neither the root, its own device, nor a credential in the identity's device list. A failed pass logs a fixed debug line and retries on the next sync. The root reader is never removed. A stored legacy inbox is pruned under its legacy token before adoption, on every sync until adoption succeeds, so a full legacy inbox frees dead readers before it is adopted.
 - Mixed versions: a client from before this change reads and acknowledges with the root token only. Its acks do not move the device readers, so envelopes stay until the device readers acknowledge. Update every device.
 
 ### Alternatives
@@ -52,6 +52,9 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 
 - Legacy inboxes: a `readToken` stored by the previous design is adopted on the first pass: both readers are registered under it, then the stored token is dropped. The first reconcile after adoption removes that token's reader, so a client still holding it loses access until it updates. If storage was cleared before adoption, the inbox stays unrecoverable until retention removes it.
 - Mixed versions and the reader cap: see Reader set.
+- Forget is local only: forgetting a device does not revoke its reader on the node.
+- Revoked devices keep root authority: the root token derives from the identity root key, which a device keeps after it is revoked. Devices never prune the root reader, and any reader can add or remove any other reader. The node checks only that a token is registered, so a revoked device keeps reading and acknowledging the inbox until someone removes the root reader on the node.
+- Silent readers: a registered reader that stops acknowledging holds every envelope above its cursor until the node's retention expires them (default 14 days). While it is silent the mailbox can fill, and appends return 409. Pruning removes only readers whose device is gone, so a silent device that is still listed keeps its backlog.
 
 ## Creation proof
 
@@ -107,7 +110,7 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 - The cursor is stored in localStorage under `pigeon.direct-mailbox.<mailboxId>` (scoped per client). Both reader tokens are derived, so clearing storage loses only the cursor. A legacy `readToken` in an existing entry is adopted on the first pass (see Read token, Residual risk).
 - A stored cursor is reset to 0 when the inbox is re-created (see Creation difficulty and recovery).
 - Gaps: home-node discovery assumes `API_SERVER_URL`; polling only (no realtime hint); no retry beyond the next poll; epoch fixed at 0.
-- Multi-device: each device reads and acknowledges with its own device reader, and the node keeps an envelope until every reader has acknowledged it. An ack from one device therefore cannot remove a message another device has not read. The reader set holds at most `maxReaders` (8) readers per inbox, so a ninth device cannot enrol (see Reader set).
+- Multi-device: each device reads and acknowledges with its own device reader, and the node keeps an envelope until every reader has acknowledged it. An ack from one device therefore cannot remove a message another device has not read. The reader set holds at most `maxReaders` readers per inbox (129 by default: the root plus 128 devices), so a device past the cap cannot enrol (see Reader set).
 - Send-failure notice: hidden while the legacy path still delivers every message. It returns when the legacy path is retired and the mailbox is the only delivery path.
 
 ## Open questions (not decided, not implemented)
@@ -119,6 +122,6 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 ## Verification
 
 - Pinned vectors and envelope/proof behavior: `src/test/contexts/mailboxes/**` under the real-crypto suite (`yarn test:crypto`).
-- Sync, reader adoption and pruning, storage-loss recovery, and single-flight creation: `src/test/contexts/messages/infrastructure/mailbox/DirectMessageMailbox.spec.ts` (`yarn test:crypto`).
+- Sync, reader adoption and pruning (including a full legacy inbox and a removed device's slot), the reader cap on a fake node set to 8, storage-loss recovery, and single-flight creation: `src/test/contexts/messages/infrastructure/mailbox/DirectMessageMailbox.spec.ts` (`yarn test:crypto`). Live multi-device behaviour against a real node is not covered.
 - HTTP client and worker client: default jest.
 - `HttpJsonClient` empty-body handling was proven red without the fix.

@@ -51,13 +51,39 @@ export class DirectMessageReaderSet {
     return pass;
   }
 
+  /**
+   * Frees slots while a legacy inbox is not adopted yet. The legacy token is
+   * the only reader that can manage it. Best effort and not memoised: the
+   * adoption that follows reports a refusal, and the next sync prunes again.
+   */
+  public async pruneUnderLegacy(
+    session: Session,
+    keys: MailboxKeys,
+    readers: MailboxReadTokens,
+    legacyToken: string,
+  ): Promise<void> {
+    try {
+      await this.prune(session, keys, readers, legacyToken);
+    } catch {
+      // Count-only: no ids, content, or error details.
+      // eslint-disable-next-line no-console
+      console.debug('Direct mailbox legacy reader prune failed.');
+    }
+  }
+
+  /**
+   * The managing token lists and removes readers, so it is always kept, as
+   * are the root and device readers.
+   */
   private async prune(
     session: Session,
     keys: MailboxKeys,
     readers: MailboxReadTokens,
+    managingToken = readers.root,
   ): Promise<void> {
     const rootKey = session.masterKey.getBuffer();
     const kept = new Set<string>([
+      MailboxCapability.hash(managingToken),
       MailboxCapability.hash(readers.root),
       MailboxCapability.hash(readers.device),
     ]);
@@ -72,13 +98,13 @@ export class DirectMessageReaderSet {
       kept.add(MailboxCapability.hash(token));
     }
 
-    const listed = await this.channel.listReaders(keys, readers.root);
+    const listed = await this.channel.listReaders(keys, managingToken);
 
     for (const reader of listed.readers) {
       if (!kept.has(reader.readTokenHash)) {
         await this.channel.removeReader(
           keys,
-          readers.root,
+          managingToken,
           reader.readTokenHash,
         );
       }
