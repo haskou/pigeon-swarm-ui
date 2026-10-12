@@ -2,6 +2,7 @@ import type { MessageResource } from '../../../../../contexts/messages/infrastru
 import type {
   DirectDeletedRecord,
   DirectEditedRecord,
+  DirectPinRecord,
   DirectReactionRecord,
   DirectReadRecord,
   DirectSentRecord,
@@ -23,9 +24,11 @@ describe(DirectMessageMailboxRecord.name, () => {
   const records: {
     deleted: DirectDeletedRecord;
     edited: DirectEditedRecord;
+    pin: DirectPinRecord;
     reactionAdd: DirectReactionRecord;
     reactionRemove: DirectReactionRecord;
     sentWithReply: DirectSentRecord;
+    unpin: DirectPinRecord;
   } = {
     deleted: {
       authorId: 'alice',
@@ -44,6 +47,15 @@ describe(DirectMessageMailboxRecord.name, () => {
       previousMessageIds: ['message-1'],
       targetMessageId: 'message-1',
       type: 'edited',
+    },
+    pin: {
+      action: 'pin',
+      authorId: 'alice',
+      conversationId,
+      createdAt: 500,
+      id: 'pin-1',
+      targetMessageId: 'message-1',
+      type: 'pin',
     },
     reactionAdd: {
       action: 'add',
@@ -69,6 +81,15 @@ describe(DirectMessageMailboxRecord.name, () => {
       ...sentRecord,
       id: 'message-2',
       replyToMessageId: 'message-1',
+    },
+    unpin: {
+      action: 'unpin',
+      authorId: 'alice',
+      conversationId,
+      createdAt: 501,
+      id: 'pin-2',
+      targetMessageId: 'message-1',
+      type: 'pin',
     },
   };
   const text = (value: string): Uint8Array => new TextEncoder().encode(value);
@@ -179,6 +200,7 @@ describe(DirectMessageMailboxRecord.name, () => {
       ['a sent record', sentRecord],
       ['a deleted record', records.deleted],
       ['a reaction record', records.reactionAdd],
+      ['a pin record', records.pin],
     ])('rejects %s that belongs to another conversation', (_label, record) => {
       expect(
         DirectMessageMailboxRecord.decode(
@@ -205,7 +227,7 @@ describe(DirectMessageMailboxRecord.name, () => {
           }),
         ),
       ],
-      ['an unknown record type', envelope({ ...sentRecord, type: 'pin' })],
+      ['an unknown record type', envelope({ ...sentRecord, type: 'poll' })],
       [
         'a sent record without a payload',
         envelope({ ...sentRecord, encryptedPayload: undefined }),
@@ -225,6 +247,14 @@ describe(DirectMessageMailboxRecord.name, () => {
       [
         'a reaction without an emoji',
         envelope({ ...records.reactionAdd, emoji: undefined }),
+      ],
+      [
+        'a pin with an unknown action',
+        envelope({ ...records.pin, action: 'toggle' }),
+      ],
+      [
+        'a pin without a target',
+        envelope({ ...records.pin, targetMessageId: undefined }),
       ],
     ])('returns null for %s', (_label, plaintext) => {
       expect(

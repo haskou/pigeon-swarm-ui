@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 import type {
   ChatMessage,
+  ConversationResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 import type { MessageCollectionState } from './conversationThreadState';
@@ -12,7 +13,7 @@ import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorM
 import { applicationContainer } from '../../../composition/applicationContainer';
 
 type UseConversationPinsInput = {
-  activeConversationId?: string;
+  activeConversation?: ConversationResource;
   closeMessageContextMenu: () => void;
   onError: (error: string | null) => void;
   session: Session;
@@ -43,8 +44,9 @@ function withoutMessage(current: Set<string>, messageId: string): Set<string> {
 export function useConversationPins(
   input: UseConversationPinsInput,
 ): UseConversationPinsResult {
-  const { activeConversationId, closeMessageContextMenu, onError, session } =
+  const { activeConversation, closeMessageContextMenu, onError, session } =
     input;
+  const activeConversationId = activeConversation?.id;
   const [collection, setCollection] = useState<MessageCollectionState | null>(
     null,
   );
@@ -107,15 +109,21 @@ export function useConversationPins(
   };
 
   const pin = async (message: ChatMessage) => {
-    if (!activeConversationId) return;
+    if (!activeConversation) return;
 
     closeMessageContextMenu();
     onError(null);
+    const createdAt = Date.now();
     try {
       await applicationContainer.messages.pin(
         session,
-        activeConversationId,
+        activeConversation.id,
         message.id,
+      );
+      void applicationContainer.directMessages.deliverPin(
+        session,
+        activeConversation,
+        { action: 'pin', createdAt, messageId: message.id },
       );
       setPinnedMessageIds((current) => new Set(current).add(message.id));
     } catch (caught) {
@@ -124,13 +132,19 @@ export function useConversationPins(
   };
 
   const unpinFromCollection = async (message: ChatMessage) => {
-    if (!activeConversationId) return;
+    if (!activeConversation) return;
 
+    const createdAt = Date.now();
     try {
       await applicationContainer.messages.unpin(
         session,
-        activeConversationId,
+        activeConversation.id,
         message.id,
+      );
+      void applicationContainer.directMessages.deliverPin(
+        session,
+        activeConversation,
+        { action: 'unpin', createdAt, messageId: message.id },
       );
       setPinnedMessageIds((current) => withoutMessage(current, message.id));
       setCollection((current) =>

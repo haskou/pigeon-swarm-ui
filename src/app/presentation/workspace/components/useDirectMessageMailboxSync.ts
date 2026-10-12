@@ -2,6 +2,7 @@ import type { Dispatch, SetStateAction } from 'react';
 
 import { useEffect } from 'react';
 
+import type { DirectMessageTimelineChange } from '../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
 import type {
   ChatMessage,
   ConversationResource,
@@ -22,7 +23,48 @@ type DirectMessageMailboxSyncInput = {
   onErrorChange: Dispatch<SetStateAction<string | null>>;
   onMessagesChange: Dispatch<SetStateAction<ChatMessage[]>>;
   session: Session;
+  setPinnedMessageIds: Dispatch<SetStateAction<Set<string>>>;
 };
+
+type DirectPinChange = Extract<DirectMessageTimelineChange, { kind: 'pin' }>;
+
+/**
+ * Keeps the pin changes newer than the last one applied to their message. The
+ * clock advances as it goes, so a later change in the same pass still wins.
+ */
+function freshPinChanges(
+  changes: DirectMessageTimelineChange[],
+  clock: Map<string, number>,
+): DirectPinChange[] {
+  return changes.flatMap((change): DirectPinChange[] => {
+    if (change.kind !== 'pin') return [];
+
+    const latest = clock.get(change.messageId);
+
+    if (latest !== undefined && change.createdAt <= latest) return [];
+
+    clock.set(change.messageId, change.createdAt);
+
+    return [change];
+  });
+}
+
+function applyPinChanges(
+  current: Set<string>,
+  changes: DirectPinChange[],
+): Set<string> {
+  const next = new Set(current);
+
+  for (const change of changes) {
+    if (change.action === 'pin') {
+      next.add(change.messageId);
+    } else {
+      next.delete(change.messageId);
+    }
+  }
+
+  return next;
+}
 
 /**
  * Polls the recipient inbox of the active one-to-one conversation. Within one
@@ -32,6 +74,8 @@ type DirectMessageMailboxSyncInput = {
  * signal at each step, and overlapping passes share one inbox creation. A
  * failing streak shows one notice unless another error is already shown. The
  * next successful pass clears only that notice.
+ * Pin records apply last-writer-wins per message by createdAt. The clock
+ * lasts one effect run; a replay after a conversation switch applies again.
  */
 export function useDirectMessageMailboxSync({
   activeConversation,
@@ -39,6 +83,7 @@ export function useDirectMessageMailboxSync({
   onErrorChange,
   onMessagesChange,
   session,
+  setPinnedMessageIds,
 }: DirectMessageMailboxSyncInput): void {
   const conversationId =
     activeConversation?.type === 'one-to-one'
@@ -53,6 +98,7 @@ export function useDirectMessageMailboxSync({
     const controller = new AbortController();
     let notice: string | null = null;
     let timer: number | undefined;
+    const pinClock = new Map<string, number>();
 
     const pass = async (): Promise<void> => {
       try {
@@ -64,6 +110,12 @@ export function useDirectMessageMailboxSync({
             if (changes.length > 0) {
               onMessagesChange((current) =>
                 applyDirectMessageTimelineChanges(current, changes),
+              );
+            }
+            const pinChanges = freshPinChanges(changes, pinClock);
+            if (pinChanges.length > 0) {
+              setPinnedMessageIds((current) =>
+                applyPinChanges(current, pinChanges),
               );
             }
             if (changes.some((change) => change.kind === 'read')) {
@@ -112,5 +164,6 @@ export function useDirectMessageMailboxSync({
     onErrorChange,
     onMessagesChange,
     session,
+    setPinnedMessageIds,
   ]);
 }

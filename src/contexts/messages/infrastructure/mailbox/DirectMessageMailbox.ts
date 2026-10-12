@@ -48,6 +48,12 @@ export type DirectMessageTimelineChange =
       kind: 'reaction';
       messageId: string;
     }
+  | {
+      action: 'pin' | 'unpin';
+      createdAt: number;
+      kind: 'pin';
+      messageId: string;
+    }
   | { kind: 'read'; messageId: string }
   | { kind: 'removed'; messageId: string };
 
@@ -153,6 +159,27 @@ export class DirectMessageMailbox {
       id: UUID.generate().toString(),
       targetMessageId: reaction.messageId,
       type: 'reaction',
+    }));
+  }
+
+  /** Sender. Appends a pin or unpin. Same outcomes as deliverSent. */
+  public deliverPin(
+    session: Session,
+    conversation: ConversationResource,
+    pin: {
+      action: 'pin' | 'unpin';
+      createdAt: number;
+      messageId: string;
+    },
+  ): Promise<DirectMessageMailboxDelivery> {
+    return this.append(session, conversation, () => ({
+      action: pin.action,
+      authorId: session.identity.id,
+      conversationId: conversation.id,
+      createdAt: pin.createdAt,
+      id: UUID.generate().toString(),
+      targetMessageId: pin.messageId,
+      type: 'pin',
     }));
   }
 
@@ -620,6 +647,15 @@ export class DirectMessageMailbox {
               createdAt: record.createdAt,
               emoji: record.emoji,
               kind: 'reaction',
+              messageId: record.targetMessageId,
+            },
+          ];
+        case 'pin':
+          return [
+            {
+              action: record.action,
+              createdAt: record.createdAt,
+              kind: 'pin',
               messageId: record.targetMessageId,
             },
           ];

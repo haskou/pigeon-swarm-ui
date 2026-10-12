@@ -525,7 +525,7 @@ export function GlassWorkspace({
     startReplying: startReplyingToConversationThreadMessage,
   } = conversationThreadController;
   const conversationPins = useConversationPins({
-    activeConversationId: activeConversation?.id,
+    activeConversation,
     closeMessageContextMenu: () => setMessageContextMenu(null),
     onError: setSendError,
     session,
@@ -812,6 +812,7 @@ export function GlassWorkspace({
     onErrorChange: setSendError,
     onMessagesChange: setMessages,
     session,
+    setPinnedMessageIds,
   });
 
   useDirectMessageInboxPrewarm({ conversations, session });

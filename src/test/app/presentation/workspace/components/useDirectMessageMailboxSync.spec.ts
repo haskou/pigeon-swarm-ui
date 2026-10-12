@@ -55,6 +55,10 @@ function mountSync(initialError: string | null = null) {
   const onMessagesChange =
     jest.fn<(update: SetStateAction<ChatMessage[]>) => void>();
   const onConversationRead = jest.fn<(conversationId: string) => void>();
+  let pinned = new Set<string>();
+  const setPinnedMessageIds = jest.fn((update: SetStateAction<Set<string>>) => {
+    pinned = typeof update === 'function' ? update(pinned) : update;
+  });
 
   mockEffects.length = 0;
   useDirectMessageMailboxSync({
@@ -63,6 +67,7 @@ function mountSync(initialError: string | null = null) {
     onErrorChange,
     onMessagesChange,
     session,
+    setPinnedMessageIds,
   });
   const cleanup = mockEffects[0]() as () => void;
 
@@ -72,9 +77,11 @@ function mountSync(initialError: string | null = null) {
     onConversationRead,
     onErrorChange,
     onMessagesChange,
+    pinnedIds: () => pinned,
     replaceError: (value: string) => {
       error = value;
     },
+    setPinnedMessageIds,
   };
 }
 
@@ -244,6 +251,187 @@ describe('useDirectMessageMailboxSync changes', () => {
     await settle();
 
     expect(mounted.onConversationRead).toHaveBeenCalledWith('conversation-1');
+    mounted.cleanup();
+  });
+});
+
+describe('useDirectMessageMailboxSync pins', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    Reflect.set(globalThis, 'window', {
+      clearTimeout: (id: number | undefined) => globalThis.clearTimeout(id),
+      setTimeout: (callback: () => void, ms: number) =>
+        globalThis.setTimeout(callback, ms),
+    });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    Reflect.deleteProperty(globalThis, 'window');
+    sync.mockReset();
+  });
+
+  it('adds the message to the pinned set on a pin change', async () => {
+    sync.mockImplementation((_session, _conversationId, _signal, apply) => {
+      apply([
+        { action: 'pin', createdAt: 300, kind: 'pin', messageId: 'message-1' },
+      ]);
+
+      return Promise.resolve();
+    });
+    const mounted = mountSync();
+
+    await settle();
+
+    expect(mounted.pinnedIds()).toEqual(new Set(['message-1']));
+    mounted.cleanup();
+  });
+
+  it('removes the message from the pinned set on a later unpin change in the same pass', async () => {
+    sync.mockImplementation((_session, _conversationId, _signal, apply) => {
+      apply([
+        { action: 'pin', createdAt: 300, kind: 'pin', messageId: 'message-1' },
+        {
+          action: 'unpin',
+          createdAt: 400,
+          kind: 'pin',
+          messageId: 'message-1',
+        },
+      ]);
+
+      return Promise.resolve();
+    });
+    const mounted = mountSync();
+
+    await settle();
+
+    expect(mounted.pinnedIds()).toEqual(new Set());
+    mounted.cleanup();
+  });
+
+  it('keeps the newest write when an out-of-order pass delivers an older pin last', async () => {
+    sync.mockImplementation((_session, _conversationId, _signal, apply) => {
+      apply([
+        {
+          action: 'unpin',
+          createdAt: 400,
+          kind: 'pin',
+          messageId: 'message-1',
+        },
+        { action: 'pin', createdAt: 300, kind: 'pin', messageId: 'message-1' },
+      ]);
+
+      return Promise.resolve();
+    });
+    const mounted = mountSync();
+
+    await settle();
+
+    expect(mounted.pinnedIds()).toEqual(new Set());
+    mounted.cleanup();
+  });
+
+  it('ignores a pin older than the last applied write across passes', async () => {
+    sync
+      .mockImplementationOnce((_session, _conversationId, _signal, apply) => {
+        apply([
+          {
+            action: 'pin',
+            createdAt: 300,
+            kind: 'pin',
+            messageId: 'message-1',
+          },
+        ]);
+
+        return Promise.resolve();
+      })
+      .mockImplementationOnce((_session, _conversationId, _signal, apply) => {
+        apply([
+          {
+            action: 'unpin',
+            createdAt: 400,
+            kind: 'pin',
+            messageId: 'message-1',
+          },
+        ]);
+
+        return Promise.resolve();
+      })
+      .mockImplementationOnce((_session, _conversationId, _signal, apply) => {
+        apply([
+          {
+            action: 'pin',
+            createdAt: 300,
+            kind: 'pin',
+            messageId: 'message-1',
+          },
+        ]);
+
+        return Promise.resolve();
+      });
+    const mounted = mountSync();
+
+    await settle();
+    jest.advanceTimersByTime(POLL_MS);
+    await settle();
+    jest.advanceTimersByTime(POLL_MS);
+    await settle();
+
+    expect(sync).toHaveBeenCalledTimes(3);
+    expect(mounted.pinnedIds()).toEqual(new Set());
+    mounted.cleanup();
+  });
+
+  it('does not change the pinned set again for a replayed pin', async () => {
+    sync
+      .mockImplementationOnce((_session, _conversationId, _signal, apply) => {
+        apply([
+          {
+            action: 'pin',
+            createdAt: 300,
+            kind: 'pin',
+            messageId: 'message-1',
+          },
+        ]);
+
+        return Promise.resolve();
+      })
+      .mockImplementationOnce((_session, _conversationId, _signal, apply) => {
+        apply([
+          {
+            action: 'pin',
+            createdAt: 300,
+            kind: 'pin',
+            messageId: 'message-1',
+          },
+        ]);
+
+        return Promise.resolve();
+      });
+    const mounted = mountSync();
+
+    await settle();
+    jest.advanceTimersByTime(POLL_MS);
+    await settle();
+
+    expect(mounted.setPinnedMessageIds).toHaveBeenCalledTimes(1);
+    expect(mounted.pinnedIds()).toEqual(new Set(['message-1']));
+    mounted.cleanup();
+  });
+
+  it('does not signal a conversation read for a pin change', async () => {
+    sync.mockImplementation((_session, _conversationId, _signal, apply) => {
+      apply([
+        { action: 'pin', createdAt: 300, kind: 'pin', messageId: 'message-1' },
+      ]);
+
+      return Promise.resolve();
+    });
+    const mounted = mountSync();
+
+    await settle();
+
+    expect(mounted.onConversationRead).not.toHaveBeenCalled();
     mounted.cleanup();
   });
 });
