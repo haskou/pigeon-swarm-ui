@@ -56,6 +56,7 @@ import { useConversationMessageActions } from './useConversationMessageActions';
 import { useConversationPins } from './useConversationPins';
 import { useConversationThread } from './useConversationThread';
 import { useConversationTimeline } from './useConversationTimeline';
+import { useDirectMessageInboxPrewarm } from './useDirectMessageInboxPrewarm';
 import { useDirectMessageMailboxSync } from './useDirectMessageMailboxSync';
 import { usePendingCommunityInvite } from './usePendingCommunityInvite';
 import { useSidebarGesture } from './useSidebarGesture';
@@ -770,6 +771,9 @@ export function GlassWorkspace({
     onMessagesChange: setMessages,
     session,
   });
+
+  useDirectMessageInboxPrewarm({ conversations, session });
+
   const handleRealtimeConversationEvent =
     useWorkspaceRealtimeConversationEvents({
       activeConversationId: WorkspaceDerivedState.id(activeConversation),

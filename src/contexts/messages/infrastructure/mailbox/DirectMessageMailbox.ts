@@ -18,6 +18,7 @@ import type { DirectMessageMailboxState } from './DirectMessageMailboxStore';
 import type { DirectMessageReaderSet } from './DirectMessageReaderSet';
 import type { RecipientMailboxRouter } from './RecipientMailboxRouter';
 
+import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
 import { MailboxCapability } from '../../../mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxEnvelopeCipher } from '../../../mailboxes/infrastructure/crypto/MailboxEnvelopeCipher';
@@ -44,10 +45,17 @@ export type DirectMessageTimelineChange =
     }
   | { kind: 'removed'; messageId: string };
 
+/**
+ * How an open of one recipient inbox ended. 'rate-limited' is the node's
+ * creation cap: the pass that hits it stops, and the next pass resumes.
+ */
+type InboxOutcome = 'failed' | 'open' | 'rate-limited';
+
 /** Keys, reader tokens, and saved state for the inbox this device reads. */
 type RecipientInbox = {
   keys: MailboxKeys;
   readers: MailboxReadTokens;
+  outcome: InboxOutcome;
   state: DirectMessageMailboxState;
 };
 
@@ -60,8 +68,11 @@ type RecipientInbox = {
 export class DirectMessageMailbox {
   private static readonly PAGE_SIZE = 50;
   private static readonly EPOCH = 0;
+  private static readonly OPEN_RETRY_MS = 60_000;
 
   private readonly opening = new Map<string, Promise<RecipientInbox>>();
+  /** Inboxes whose last open failed, keyed by mailbox id, and when to retry. */
+  private readonly retryOpenAt = new Map<string, number>();
 
   public constructor(
     private readonly channel: MailboxChannel,
@@ -210,6 +221,44 @@ export class DirectMessageMailbox {
   }
 
   /**
+   * Recipient. Opens the inbox of every one-to-one conversation this identity
+   * holds a key for, so senders can deliver before this device has read it.
+   * Opens run one at a time. A rate-limited open ends the pass, and a failed
+   * open is retried once OPEN_RETRY_MS has passed. Resolves true when every
+   * eligible inbox is open. Never throws.
+   */
+  public async openInboxes(
+    session: Session,
+    conversations: readonly ConversationResource[],
+    signal: AbortSignal,
+  ): Promise<boolean> {
+    const eligible = conversations.filter(
+      (conversation) =>
+        DirectMessageMailboxRecord.isEligible(conversation.type) &&
+        ConversationKeychain.entry(
+          session.keychain,
+          session.identity.id,
+          conversation.id,
+        ) !== undefined,
+    );
+    let complete = true;
+
+    for (const conversation of eligible) {
+      if (signal.aborted) return false;
+
+      const outcome = await this.openRecipientInbox(session, conversation.id);
+
+      if (outcome !== 'open') {
+        complete = false;
+
+        if (outcome === 'rate-limited') break;
+      }
+    }
+
+    return complete && !signal.aborted;
+  }
+
+  /**
    * Shared sender path. Skips without sending when there is no peer, the
    * conversation is a group, or the encoded record exceeds the envelope bound.
    * Building the record runs inside the try, so a throw there is 'failed'.
@@ -265,7 +314,7 @@ export class DirectMessageMailbox {
     const stored = this.store.load(keys.mailboxId);
 
     if (stored && !stored.readToken) {
-      return { keys, readers, state: stored };
+      return { keys, outcome: 'open', readers, state: stored };
     }
 
     if (stored?.readToken) {
@@ -282,18 +331,20 @@ export class DirectMessageMailbox {
 
         this.store.save(keys.mailboxId, adopted);
 
-        return { keys, readers, state: adopted };
+        return { keys, outcome: 'open', readers, state: adopted };
       }
     }
 
     const state = { cursor: 0 };
+    const outcome = await this.ensureInbox(keys, readers);
 
-    // Saved before the create: a pass that starts after this open settles
-    // reads the stored state, while overlapping passes await this open.
-    this.store.save(keys.mailboxId, state);
-    await this.ensureInbox(keys, readers);
+    // Saved only once the inbox exists with this device's reader, so a failed
+    // open leaves nothing stored and the next pass opens it again.
+    if (outcome === 'open') {
+      this.store.save(keys.mailboxId, state);
+    }
 
-    return { keys, readers, state };
+    return { keys, outcome, readers, state };
   }
 
   /**
@@ -316,6 +367,25 @@ export class DirectMessageMailbox {
     this.opening.set(key, opening);
 
     return opening;
+  }
+
+  /**
+   * Opens through the shared open. A throw from the legacy adoption or the
+   * reader prune counts as a failed open, so the pass moves on.
+   */
+  private async openRecipientInbox(
+    session: Session,
+    conversationId: string,
+  ): Promise<InboxOutcome> {
+    try {
+      return (await this.openInboxShared(session, conversationId)).outcome;
+    } catch {
+      // Count-only: no ids, content, or error details.
+      // eslint-disable-next-line no-console
+      console.debug('Direct mailbox inbox open failed; retried later.');
+
+      return 'failed';
+    }
   }
 
   /**
@@ -343,19 +413,38 @@ export class DirectMessageMailbox {
   /**
    * Creates the recipient inbox and enrols this device's reader before the
    * first read, so senders can append and the device reads without recovery.
-   * Silent on failure: the read's own 404 recovery covers it.
+   * A failed open is not retried for OPEN_RETRY_MS, so sync passes do not
+   * repeat the proof of work on every tick. Never throws: the read's own 404
+   * recovery covers a missing inbox.
    */
   private async ensureInbox(
     keys: MailboxKeys,
     readers: MailboxReadTokens,
-  ): Promise<void> {
+  ): Promise<InboxOutcome> {
+    const retryAt = this.retryOpenAt.get(keys.mailboxId);
+
+    if (retryAt !== undefined && Date.now() < retryAt) {
+      return 'failed';
+    }
+
     try {
       await this.channel.createInbox(keys, readers.root);
       await this.channel.addReader(keys, readers.root, readers.device);
-    } catch {
+      this.retryOpenAt.delete(keys.mailboxId);
+
+      return 'open';
+    } catch (error: unknown) {
+      this.retryOpenAt.set(
+        keys.mailboxId,
+        Date.now() + DirectMessageMailbox.OPEN_RETRY_MS,
+      );
       // Count-only: no ids, content, or error details.
       // eslint-disable-next-line no-console
       console.debug('Direct mailbox inbox create failed; read will retry.');
+
+      return error instanceof HttpJsonError && error.status === 429
+        ? 'rate-limited'
+        : 'failed';
     }
   }
 
