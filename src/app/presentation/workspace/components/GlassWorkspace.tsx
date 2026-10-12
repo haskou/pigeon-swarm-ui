@@ -57,6 +57,7 @@ import { useConversationMessageActions } from './useConversationMessageActions';
 import { useConversationPins } from './useConversationPins';
 import { useConversationThread } from './useConversationThread';
 import { useConversationTimeline } from './useConversationTimeline';
+import { useDirectMessageBackgroundReadSync } from './useDirectMessageBackgroundReadSync';
 import { useDirectMessageInboxPrewarm } from './useDirectMessageInboxPrewarm';
 import { useDirectMessageMailboxSync } from './useDirectMessageMailboxSync';
 import { usePendingCommunityInvite } from './usePendingCommunityInvite';
@@ -816,6 +817,13 @@ export function GlassWorkspace({
   });
 
   useDirectMessageInboxPrewarm({ conversations, session });
+
+  useDirectMessageBackgroundReadSync({
+    activeConversationId: WorkspaceDerivedState.id(activeConversation),
+    conversations,
+    onConversationRead: handleMailboxConversationRead,
+    session,
+  });
 
   const handleRealtimeConversationEvent =
     useWorkspaceRealtimeConversationEvents({

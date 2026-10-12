@@ -20,6 +20,7 @@ export type DirectMessageMailboxState = {
  */
 export class DirectMessageMailboxStore {
   private static readonly KEY_PREFIX = 'pigeon.direct-mailbox.';
+  private static readonly READ_KEY_PREFIX = 'pigeon.direct-mailbox-read.';
 
   public load(mailboxId: string): DirectMessageMailboxState | null {
     const key = scopeClientStorageKey(
@@ -42,6 +43,30 @@ export class DirectMessageMailboxStore {
         `${DirectMessageMailboxStore.KEY_PREFIX}${mailboxId}`,
       ),
       state,
+    );
+  }
+
+  /**
+   * Position of the background read pass. Stored apart from the sync cursor,
+   * so that pass never moves the cursor that the node is acknowledged against.
+   */
+  public loadReadCursor(mailboxId: string): number | null {
+    const stored = readJsonObjectFromLocalStorage<{ cursor?: unknown }>(
+      scopeClientStorageKey(
+        `${DirectMessageMailboxStore.READ_KEY_PREFIX}${mailboxId}`,
+      ),
+      {},
+    );
+
+    return typeof stored.cursor === 'number' ? stored.cursor : null;
+  }
+
+  public saveReadCursor(mailboxId: string, cursor: number): void {
+    writeJsonToLocalStorage(
+      scopeClientStorageKey(
+        `${DirectMessageMailboxStore.READ_KEY_PREFIX}${mailboxId}`,
+      ),
+      { cursor },
     );
   }
 }
