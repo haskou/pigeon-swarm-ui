@@ -100,6 +100,14 @@ describe(DirectMessageMailbox.name, () => {
       },
     }) as unknown as Session;
 
+  /** The device-sealed root that tags and reads use once a device holds one. */
+  const sealedRoot = Buffer.alloc(32, 5);
+  const withSealedRoot = (base: Session): Session =>
+    ({
+      ...base,
+      deviceSealedRootKey: SymmetricKey.fromBuffer(sealedRoot),
+    }) as unknown as Session;
+
   /** Alice's own inbox copy, tagged under her root key as the sender does. */
   const ownEncode = (record: DirectMessageRecord): Uint8Array =>
     DirectMessageMailboxRecord.encode(
@@ -850,6 +858,30 @@ describe(DirectMessageMailbox.name, () => {
       },
     );
 
+    it('tags the own copy under the device-sealed root, not the master key', async () => {
+      const { channel, mailbox } = setup();
+      channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
+
+      await mailbox.send(
+        withSealedRoot(session('alice')),
+        conversation,
+        'hello',
+        {},
+      );
+
+      const [, ownPlaintext] = channel.send.mock.calls[1];
+      const { authorTag, record } = envelopeOf(ownPlaintext);
+      expect(authorTag).toBe(
+        DirectMessageAuthorship.tag(sealedRoot, record as DirectMessageRecord),
+      );
+      expect(authorTag).not.toBe(
+        DirectMessageAuthorship.tag(
+          session('alice').masterKey.getBuffer(),
+          record as DirectMessageRecord,
+        ),
+      );
+    });
+
     it('resolves when the own copy fails, and logs the failure count-only', async () => {
       const { channel, mailbox } = setup();
       const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
@@ -1011,6 +1043,47 @@ describe(DirectMessageMailbox.name, () => {
           );
         },
       );
+
+      it('drops an own copy tagged under the master key once the sealed root replaces it', async () => {
+        const { channel } = setup();
+        const revokedTag = DirectMessageAuthorship.tag(
+          session('alice').masterKey.getBuffer(),
+          storedRecord,
+        );
+        channel.read.mockResolvedValue(
+          pageOf([DirectMessageMailboxRecord.encode(storedRecord, revokedTag)]),
+        );
+        channel.acknowledge.mockResolvedValue({ recreated: false });
+        const apply = jest.fn();
+
+        await otherDevice(channel).sync(
+          withSealedRoot(session('alice')),
+          conversationId,
+          new AbortController().signal,
+          apply,
+        );
+
+        expect(appliedOf(apply)).toEqual([]);
+      });
+
+      it('applies an own copy tagged under the sealed root', async () => {
+        const { channel } = setup();
+        const tag = DirectMessageAuthorship.tag(sealedRoot, storedRecord);
+        channel.read.mockResolvedValue(
+          pageOf([DirectMessageMailboxRecord.encode(storedRecord, tag)]),
+        );
+        channel.acknowledge.mockResolvedValue({ recreated: false });
+        const apply = jest.fn();
+
+        await otherDevice(channel).sync(
+          withSealedRoot(session('alice')),
+          conversationId,
+          new AbortController().signal,
+          apply,
+        );
+
+        expect(appliedOf(apply)).not.toEqual([]);
+      });
 
       it('drops a peer copy replayed into the self-inbox', async () => {
         const { channel, mailbox } = setup();
