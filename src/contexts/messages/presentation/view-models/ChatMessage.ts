@@ -10,6 +10,12 @@ import type { MessageReplyPreview } from '../../infrastructure/crypto/resources/
 import type { MessageReaction } from '../../infrastructure/http/MessageReaction';
 import type { MessageResource } from '../../infrastructure/http/MessageResource';
 
+export type MessageReactionClock = {
+  authorIdentityId: string;
+  emoji: string;
+  updatedAt: number;
+};
+
 export type ChatMessage = {
   attachmentProgress?: AttachmentProgress;
   attachments: MessageAttachment[];
@@ -28,6 +34,11 @@ export type ChatMessage = {
   originalContent?: string;
   poll?: PollResource;
   raw: MessageResource;
+  /**
+   * Newest reaction write per author and emoji. Kept after a remove so an
+   * older add cannot reopen the reaction.
+   */
+  reactionClocks?: MessageReactionClock[];
   reactions: MessageReaction[];
   replyPreview?: MessageReplyPreview;
   replyToMessageId?: string;

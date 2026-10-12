@@ -8,7 +8,9 @@ import { mergeConversationMessageIfTargetExists } from './conversationThreadStat
 /**
  * Applies direct mailbox changes to the timeline in envelope order. Messages
  * dedupe by id, so a replayed pass changes nothing. An edit or reaction whose
- * target is not in the timeline is ignored.
+ * target is not in the timeline is ignored. Reactions are last-writer-wins per
+ * message, author and emoji, so a replayed or out-of-order add cannot undo a
+ * newer remove.
  */
 export function applyDirectMessageTimelineChanges(
   current: ChatMessage[],
@@ -25,7 +27,7 @@ export function applyDirectMessageTimelineChanges(
       case 'reaction':
         return messages.map((message) =>
           message.id === change.messageId
-            ? MessageReactionUpdater.update(
+            ? MessageReactionUpdater.updateIfNewer(
                 message,
                 change.authorId,
                 change.emoji,

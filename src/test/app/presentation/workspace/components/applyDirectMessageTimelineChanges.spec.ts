@@ -7,6 +7,7 @@ import type {
 } from '../../../../../shared/domain/pigeonResources.types';
 
 import { applyDirectMessageTimelineChanges } from '../../../../../app/presentation/workspace/components/applyDirectMessageTimelineChanges';
+import { MessageReactionUpdater } from '../../../../../contexts/messages/presentation/view-models/MessageReactionUpdater';
 
 const conversationId = 'conversation-1';
 
@@ -35,6 +36,18 @@ const edit = (
     targetMessageId,
     type: 'edited',
   } as unknown as MessageResource,
+});
+
+const reactionChange = (
+  action: 'add' | 'remove',
+  createdAt: number,
+): DirectMessageTimelineChange => ({
+  action,
+  authorId: 'bob',
+  createdAt,
+  emoji: '👍',
+  kind: 'reaction',
+  messageId: 'message-1',
 });
 
 describe('applyDirectMessageTimelineChanges', () => {
@@ -141,6 +154,81 @@ describe('applyDirectMessageTimelineChanges', () => {
     ]);
 
     expect(result).toEqual(current);
+  });
+
+  it('does not resurrect a reaction when an older add replays after a newer remove', () => {
+    const removed = applyDirectMessageTimelineChanges(
+      [message('message-1', 100)],
+      [reactionChange('add', 300), reactionChange('remove', 400)],
+    );
+
+    const replayed = applyDirectMessageTimelineChanges(removed, [
+      reactionChange('add', 300),
+    ]);
+
+    expect(replayed[0].reactions).toEqual([]);
+  });
+
+  it('keeps a reaction absent when an older add follows a newer remove in one batch', () => {
+    const result = applyDirectMessageTimelineChanges(
+      [message('message-1', 100)],
+      [reactionChange('remove', 400), reactionChange('add', 300)],
+    );
+
+    expect(result[0].reactions).toEqual([]);
+  });
+
+  it('does not resurrect a reaction when an older add arrives after a newer legacy remove', () => {
+    const added = MessageReactionUpdater.update(
+      message('message-1', 100),
+      'bob',
+      '👍',
+      'add',
+      300,
+    );
+    const legacyRemoved = MessageReactionUpdater.update(
+      added,
+      'bob',
+      '👍',
+      'remove',
+      400,
+    );
+
+    const result = applyDirectMessageTimelineChanges(
+      [legacyRemoved],
+      [reactionChange('add', 300)],
+    );
+
+    expect(result[0].reactions).toEqual([]);
+  });
+
+  it('applies a newer add after a remove', () => {
+    const result = applyDirectMessageTimelineChanges(
+      [message('message-1', 100)],
+      [
+        reactionChange('add', 300),
+        reactionChange('remove', 400),
+        reactionChange('add', 500),
+      ],
+    );
+
+    expect(result[0].reactions).toEqual([
+      { authorIdentityId: 'bob', createdAt: 500, emoji: '👍' },
+    ]);
+  });
+
+  it('keeps a removed reaction removed when a replayed sent message merges over it', () => {
+    const removed = applyDirectMessageTimelineChanges(
+      [message('message-1', 100)],
+      [reactionChange('add', 300), reactionChange('remove', 400)],
+    );
+
+    const replayed = applyDirectMessageTimelineChanges(removed, [
+      { kind: 'message', message: message('message-1', 100) },
+      reactionChange('add', 300),
+    ]);
+
+    expect(replayed[0].reactions).toEqual([]);
   });
 
   it('applies ordered changes in sequence', () => {
