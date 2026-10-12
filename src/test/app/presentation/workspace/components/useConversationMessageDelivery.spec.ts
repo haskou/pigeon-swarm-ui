@@ -11,6 +11,8 @@ import type {
 
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';
 import { useConversationMessageDelivery } from '../../../../../app/presentation/workspace/components/useConversationMessageDelivery';
+import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
+import { copy } from '../../../../../shared/presentation/i18n/copy';
 import { captureUnhandledRejections } from '../../../../captureUnhandledRejections';
 
 const mockRefs: Array<{ current: unknown }> = [];
@@ -204,6 +206,20 @@ describe('useConversationMessageDelivery one-to-one mailbox send', () => {
     await drain(delivery.queue);
 
     expect(delivery.state.error).toBe('send refused');
+    expect(delivery.state.messages).toEqual([
+      expect.objectContaining({ deliveryStatus: 'failed' }),
+    ]);
+    expect(legacySend).not.toHaveBeenCalled();
+  });
+
+  it('shows a refused peer write to the composer as the user error', async () => {
+    directSend.mockRejectedValue(new HttpJsonError(404, 'Not Found', ''));
+    const delivery = mountDelivery();
+
+    await delivery.sendMessage('hello', [], {});
+    await drain(delivery.queue);
+
+    expect(delivery.state.error).toBe(copy.errors.notFound);
     expect(delivery.state.messages).toEqual([
       expect.objectContaining({ deliveryStatus: 'failed' }),
     ]);
