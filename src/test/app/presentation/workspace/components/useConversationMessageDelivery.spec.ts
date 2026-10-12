@@ -12,6 +12,7 @@ import type {
 
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';
 import { useConversationMessageDelivery } from '../../../../../app/presentation/workspace/components/useConversationMessageDelivery';
+import { captureUnhandledRejections } from '../../../../captureUnhandledRejections';
 
 const mockRefs: Array<{ current: unknown }> = [];
 
@@ -212,6 +213,34 @@ describe('useConversationMessageDelivery inbox delivery', () => {
       'hello',
       expect.objectContaining({ attachments: [] }),
     );
+  });
+
+  it('keeps a delivered send delivered when inbox delivery throws synchronously', async () => {
+    deliverSent.mockImplementation(() => {
+      throw new Error('inbox unavailable');
+    });
+    const delivery = mountDelivery();
+
+    await delivery.sendMessage('hello', [], {});
+    await drain(delivery.queue);
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(delivery.state.error).toBeNull();
+    expect(delivery.state.messages).toEqual([sentMessage]);
+  });
+
+  it('keeps a delivered send delivered when inbox delivery rejects, with no unhandled rejection', async () => {
+    deliverSent.mockRejectedValue(new Error('inbox unavailable'));
+    const delivery = mountDelivery();
+
+    const unhandled = await captureUnhandledRejections(async () => {
+      await delivery.sendMessage('hello', [], {});
+      await drain(delivery.queue);
+    });
+
+    expect(unhandled).toEqual([]);
+    expect(delivery.state.error).toBeNull();
+    expect(delivery.state.messages).toEqual([sentMessage]);
   });
 
   it('delivers sticker sends to the active conversation inbox with the sent copy', async () => {

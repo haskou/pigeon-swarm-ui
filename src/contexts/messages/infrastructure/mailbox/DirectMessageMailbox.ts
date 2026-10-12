@@ -211,14 +211,19 @@ export class DirectMessageMailbox {
     conversation: ConversationResource,
     messageId: string,
   ): Promise<DirectMessageMailboxDelivery> {
-    return this.appendTo(session, conversation, session.identity.id, () => ({
-      authorId: session.identity.id,
-      conversationId: conversation.id,
-      createdAt: Date.now(),
-      id: UUID.generate().toString(),
-      targetMessageId: messageId,
-      type: 'read',
-    }));
+    return this.appendTo(
+      session,
+      conversation,
+      () => session.identity.id,
+      () => ({
+        authorId: session.identity.id,
+        conversationId: conversation.id,
+        createdAt: Date.now(),
+        id: UUID.generate().toString(),
+        targetMessageId: messageId,
+        type: 'read',
+      }),
+    );
   }
 
   /**
@@ -423,26 +428,27 @@ export class DirectMessageMailbox {
    * Shared sender path. Builds the record once, so the peer copy and the own
    * copy carry the same id and bytes. Skips without sending when there is no
    * peer, the conversation is a group, or the record exceeds the envelope
-   * bound. The peer copy alone decides the result. The own copy is additive
-   * and silent: a failure changes nothing the user sees.
+   * bound. Reading the peer and building the record run inside the try, so a
+   * throw there is 'failed'. The peer copy alone decides the result. The own
+   * copy is additive and silent: a failure changes nothing the user sees.
    */
   private async append(
     session: Session,
     conversation: ConversationResource,
     build: () => DirectMessageRecord,
   ): Promise<DirectMessageMailboxDelivery> {
-    const recipientIdentityId = conversation.participantIds.find(
-      (identityId) => identityId !== session.identity.id,
-    );
-
-    if (
-      !recipientIdentityId ||
-      !DirectMessageMailboxRecord.isEligible(conversation.type)
-    ) {
-      return 'skipped';
-    }
-
     try {
+      const recipientIdentityId = conversation.participantIds.find(
+        (identityId) => identityId !== session.identity.id,
+      );
+
+      if (
+        !recipientIdentityId ||
+        !DirectMessageMailboxRecord.isEligible(conversation.type)
+      ) {
+        return 'skipped';
+      }
+
       const record = build();
       const plaintext = DirectMessageMailboxRecord.encode(record);
 
@@ -479,21 +485,25 @@ export class DirectMessageMailbox {
    * Appends one record to the inbox of the given identity. Used by the read
    * receipt path, which writes to this identity's own inbox. Skips without
    * sending when there is no recipient or the conversation is a group.
+   * Reading the recipient and building the record run inside the try, so a
+   * throw there is 'failed' and never reaches the caller.
    */
   private async appendTo(
     session: Session,
     conversation: ConversationResource,
-    recipientIdentityId: string | undefined,
+    recipientIdentityId: () => string | undefined,
     build: () => DirectMessageRecord,
   ): Promise<DirectMessageMailboxDelivery> {
-    if (
-      !recipientIdentityId ||
-      !DirectMessageMailboxRecord.isEligible(conversation.type)
-    ) {
-      return 'skipped';
-    }
-
     try {
+      const recipient = recipientIdentityId();
+
+      if (
+        !recipient ||
+        !DirectMessageMailboxRecord.isEligible(conversation.type)
+      ) {
+        return 'skipped';
+      }
+
       const plaintext = DirectMessageMailboxRecord.encode(build());
 
       if (plaintext.byteLength > MailboxEnvelopeCipher.MAX_PLAINTEXT_BYTES) {
@@ -503,7 +513,7 @@ export class DirectMessageMailbox {
       const delivery = await this.sendRecord(
         session,
         conversation.id,
-        recipientIdentityId,
+        recipient,
         plaintext,
       );
 

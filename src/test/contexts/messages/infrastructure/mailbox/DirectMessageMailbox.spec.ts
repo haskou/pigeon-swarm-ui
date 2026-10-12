@@ -920,6 +920,57 @@ describe(DirectMessageMailbox.name, () => {
     });
   });
 
+  describe('never throws', () => {
+    const noParticipantList = {
+      ...conversation,
+      participantIds: undefined,
+    } as unknown as ConversationResource;
+
+    it.each(deliveries)(
+      '%s reports failed instead of throwing when the conversation has no participant list',
+      async (_label, deliverKind) => {
+        const { channel, mailbox } = setup();
+        let delivery: Promise<string> | undefined;
+
+        expect(() => {
+          delivery = deliverKind(mailbox, session('alice'), noParticipantList);
+        }).not.toThrow();
+        await expect(delivery).resolves.toBe('failed');
+        expect(channel.send).not.toHaveBeenCalled();
+      },
+    );
+
+    it('pin reports failed instead of throwing when the conversation has no participant list', async () => {
+      const { channel, mailbox } = setup();
+      let delivery: Promise<string> | undefined;
+
+      expect(() => {
+        delivery = mailbox.deliverPin(session('alice'), noParticipantList, {
+          action: 'pin',
+          createdAt: 700,
+          messageId: 'message-1',
+        });
+      }).not.toThrow();
+      await expect(delivery).resolves.toBe('failed');
+      expect(channel.send).not.toHaveBeenCalled();
+    });
+
+    it('read reports failed instead of throwing when the session has no identity', async () => {
+      const { channel, mailbox } = setup();
+      const anonymous = {
+        ...session('alice'),
+        identity: undefined,
+      } as unknown as Session;
+      let delivery: Promise<string> | undefined;
+
+      expect(() => {
+        delivery = mailbox.deliverRead(anonymous, conversation, 'message-1');
+      }).not.toThrow();
+      await expect(delivery).resolves.toBe('failed');
+      expect(channel.send).not.toHaveBeenCalled();
+    });
+  });
+
   describe('sync', () => {
     it('applies decrypted messages, skips malformed envelopes, then acknowledges and persists the cursor', async () => {
       const { channel, mailbox, store } = setup();
