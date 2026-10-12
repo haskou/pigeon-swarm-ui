@@ -1,6 +1,10 @@
 import { KeyPair, SHA256Hash, Signature } from '@haskou/pigeon-swarm-crypto';
 import { StringValueObject, Timestamp, assert } from '@haskou/value-objects';
 
+import type {
+  DeviceAuthorizationCompromisedCredential,
+  DeviceAuthorizationCompromisedCredentialResource,
+} from './DeviceAuthorizationCompromisedCredential';
 import type { DeviceAuthorizationOperation } from './DeviceAuthorizationOperation';
 import type { DeviceAuthorizationTransitionResource } from './DeviceAuthorizationTransitionResource';
 import type { DeviceAuthorizationUnsignedPayload } from './DeviceAuthorizationUnsignedPayload';
@@ -15,12 +19,14 @@ import { IdentityId } from './value-objects/IdentityId';
 
 const PROOF_DOMAIN = 'pigeon:device-authorization:proof-of-possession:v2';
 const SIGNATURE_DOMAIN = 'pigeon:device-authorization:transition:v3';
+const MAX_COMPROMISED_CREDENTIALS = 32;
 
 export class DeviceAuthorizationTransition {
   private static sign(input: {
     author: KeyPair;
     authorCredential?: string;
     authorizedAt?: Timestamp;
+    compromisedCredentials?: DeviceAuthorizationCompromisedCredential[];
     compromisedSince?: DeviceAuthorizationRevision;
     epoch: DeviceAuthorizationEpoch;
     identityId: IdentityId;
@@ -44,6 +50,10 @@ export class DeviceAuthorizationTransition {
           ? undefined
           : (input.authorCredential ?? input.author.toPrimitives().publicKey),
       authorizedAt: input.authorizedAt?.valueOf(),
+      compromisedCredentials: this.compromisedCredentialsOf(
+        input.compromisedCredentials,
+        input.previousRevision,
+      ),
       compromisedSince: input.compromisedSince?.valueOf(),
       epoch: input.epoch.valueOf(),
       identityId: input.identityId.valueOf(),
@@ -83,9 +93,43 @@ export class DeviceAuthorizationTransition {
     );
   }
 
+  private static compromisedCredentialsOf(
+    credentials: DeviceAuthorizationCompromisedCredential[] | undefined,
+    previousRevision: DeviceAuthorizationRevision,
+  ): DeviceAuthorizationCompromisedCredentialResource[] | undefined {
+    const sorted = [...(credentials ?? [])].sort((left, right) =>
+      left.credential.valueOf() < right.credential.valueOf() ? -1 : 1,
+    );
+
+    if (sorted.length === 0) return undefined;
+
+    assert(
+      sorted.length <= MAX_COMPROMISED_CREDENTIALS,
+      new Error('Too many compromised credentials.'),
+    );
+    assert(
+      new Set(sorted.map((entry) => entry.credential.valueOf())).size ===
+        sorted.length,
+      new Error('Duplicate compromised credential.'),
+    );
+
+    return sorted.map((entry) => {
+      assert(
+        entry.compromisedSince.valueOf() <= previousRevision.valueOf(),
+        new Error('Compromise follows the previous revision.'),
+      );
+
+      return {
+        compromisedSince: entry.compromisedSince.valueOf(),
+        credential: entry.credential.valueOf(),
+      };
+    });
+  }
+
   private static unsigned(input: {
     authorCredential?: string;
     authorizedAt?: number;
+    compromisedCredentials?: DeviceAuthorizationCompromisedCredentialResource[];
     compromisedSince?: number;
     epoch: string;
     identityId: string;
@@ -99,6 +143,7 @@ export class DeviceAuthorizationTransition {
     return {
       authorCredential: input.authorCredential,
       authorizedAt: input.authorizedAt,
+      compromisedCredentials: input.compromisedCredentials,
       compromisedSince: input.compromisedSince,
       epoch: input.epoch,
       identityId: input.identityId,
@@ -210,6 +255,7 @@ export class DeviceAuthorizationTransition {
   }
 
   public static recovery(input: {
+    compromisedCredentials: DeviceAuthorizationCompromisedCredential[];
     epoch: DeviceAuthorizationEpoch;
     identityId: IdentityId;
     operationId: DeviceAuthorizationOperationId;
@@ -219,6 +265,7 @@ export class DeviceAuthorizationTransition {
   }): DeviceAuthorizationTransition {
     return this.sign({
       author: input.recoveryAuthority,
+      compromisedCredentials: input.compromisedCredentials,
       epoch: input.epoch,
       identityId: input.identityId,
       operation: 'recover',

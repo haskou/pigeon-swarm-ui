@@ -1,9 +1,11 @@
 import { assert } from '@haskou/value-objects';
 
 import type { DeviceAuthorizationCheckpointResource } from './DeviceAuthorizationCheckpointResource';
+import type { DeviceAuthorizationCompromisedCredential as CompromisedCredential } from './DeviceAuthorizationCompromisedCredential';
 
 import { DeviceAuthorizationEpoch } from './value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationRevision } from './value-objects/DeviceAuthorizationRevision';
+import { DeviceCredential } from './value-objects/DeviceCredential';
 import { IdentityId } from './value-objects/IdentityId';
 
 export class DeviceAuthorizationCheckpoint {
@@ -22,6 +24,12 @@ export class DeviceAuthorizationCheckpoint {
       DeviceAuthorizationEpoch.fromString(resource.epoch),
       identityId,
       DeviceAuthorizationRevision.fromNumber(resource.revision),
+      (resource.compromisedCredentials ?? []).map((entry) => ({
+        compromisedSince: DeviceAuthorizationRevision.fromNumber(
+          entry.compromisedSince,
+        ),
+        credential: DeviceCredential.fromString(entry.credential),
+      })),
     );
   }
 
@@ -29,7 +37,12 @@ export class DeviceAuthorizationCheckpoint {
     private readonly epoch: DeviceAuthorizationEpoch,
     private readonly identityId: IdentityId,
     private readonly revision: DeviceAuthorizationRevision,
+    private readonly compromisedCredentials: CompromisedCredential[],
   ) {}
+
+  public getCompromisedCredentials(): CompromisedCredential[] {
+    return [...this.compromisedCredentials];
+  }
 
   public getEpoch(): DeviceAuthorizationEpoch {
     return this.epoch;

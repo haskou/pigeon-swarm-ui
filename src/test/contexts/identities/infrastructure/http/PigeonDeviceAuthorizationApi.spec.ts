@@ -314,6 +314,108 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
     );
   });
 
+  describe('recovery compromise caps', () => {
+    async function recoverAfter(checkpoint: Record<string, unknown>) {
+      const recoveryKey = RecoveryKey.generate();
+      const material = await RecoveryIdentityMaterial.derive(recoveryKey);
+      const identityId = IdentityId.fromString(
+        material.identityKeyPair.toPrimitives().publicKey,
+      );
+      const http = {
+        request: jest
+          .fn()
+          .mockResolvedValueOnce({
+            epoch: 'genesis',
+            identityId: identityId.valueOf(),
+            revision: 4,
+            ...checkpoint,
+          })
+          .mockImplementationOnce((_path: string, init: RequestInit) => {
+            const body = JSON.parse(String(init.body)) as {
+              operationId: string;
+            };
+
+            return Promise.resolve({
+              epoch: body.operationId,
+              identityId: identityId.valueOf(),
+              revision: 5,
+            });
+          }),
+      } as unknown as HttpJsonClient;
+      const signer = {
+        headers: jest.fn().mockResolvedValue({ 'X-Signature': 'signed' }),
+        headersWithDeviceProof: jest
+          .fn()
+          .mockResolvedValue({ 'X-Device-Signature': 'device-signed' }),
+        headersWithRecoveryProof: jest
+          .fn()
+          .mockResolvedValue({ 'X-Recovery-Signature': 'recovery-signed' }),
+      } as unknown as RequestSigner;
+      const vault = {
+        register: jest.fn().mockImplementation((input) =>
+          Promise.resolve({
+            authorizationEpoch: input.authorizationEpoch,
+            authorizationRevision: input.authorizationRevision,
+            deviceId: DeviceId.generate(),
+            material: input.material,
+          }),
+        ),
+      } as unknown as DeviceIdentityVault;
+      const api = new PigeonDeviceAuthorizationApi(http, signer, vault);
+
+      await api.recover(
+        {
+          admissionNonce: '0',
+          authorizationRevision: 0,
+          deviceCredential: 'retired-device',
+          deviceCredentialCommitment: 'retired-commitment',
+          id: identityId.valueOf(),
+          networks: [],
+          profile: { name: 'Ada' },
+          recoveryAuthority:
+            material.recoveryAuthorityKeyPair.toPrimitives().publicKey,
+          signature: 'signature',
+          timestamp: 1,
+          version: 1,
+        },
+        recoveryKey,
+        IdentityPassword.fromString('Strong password 123!'),
+      );
+
+      const post = (http.request as jest.Mock).mock.calls[1] as [
+        string,
+        RequestInit,
+      ];
+
+      return JSON.parse(String(post[1].body)) as Record<string, unknown>;
+    }
+
+    it('carries the compromised credentials of the authorization into the recovery', async () => {
+      const credentials = (
+        await Promise.all([KeyPair.generate(), KeyPair.generate()])
+      )
+        .map((key) => key.toPrimitives().publicKey)
+        .sort();
+      const compromisedCredentials = [
+        { compromisedSince: 1, credential: credentials[0] },
+        { compromisedSince: 3, credential: credentials[1] },
+      ];
+
+      expect(await recoverAfter({ compromisedCredentials })).toMatchObject({
+        compromisedCredentials,
+      });
+    });
+
+    it('omits compromisedCredentials when the authorization carries none', async () => {
+      expect(await recoverAfter({})).not.toHaveProperty(
+        'compromisedCredentials',
+      );
+      expect(
+        await recoverAfter({ compromisedCredentials: [] }),
+      ).not.toHaveProperty('compromisedCredentials');
+    });
+  });
+
   it('pairs a new device through authenticated single-use transfer', async () => {
     const { apiAt, authorVault, identity, session, targetVault } =
       await pairing();
