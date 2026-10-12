@@ -17,6 +17,7 @@ import { DirectMailboxOwnership } from '../../../mailboxes/domain/DirectMailboxO
 import { DirectMailboxRecordError } from '../../../mailboxes/domain/DirectMailboxRecordError';
 import { DirectMailboxRecords } from '../../../mailboxes/domain/DirectMailboxRecords';
 import { MailboxEnvelopeCipher } from '../../../mailboxes/infrastructure/crypto/MailboxEnvelopeCipher';
+import { MailboxUnavailableError } from '../../../mailboxes/infrastructure/http/MailboxUnavailableError';
 import { DirectMessageAuthorship } from './DirectMessageAuthorship';
 import { DirectMessageInboxKeys } from './DirectMessageInboxKeys';
 import { DirectMessageMailboxRecord } from './DirectMessageMailboxRecord';
@@ -26,6 +27,14 @@ function logAppendFailure(): void {
   // eslint-disable-next-line no-console
   console.debug('Direct mailbox append failed.');
 }
+
+/**
+ * A peer inbox that is not open yet is retried for this long, then the send
+ * rejects.
+ */
+const PEER_INBOX_RETRY_WINDOW_MS = 30_000;
+const PEER_INBOX_RETRY_FIRST_DELAY_MS = 250;
+const PEER_INBOX_RETRY_MAX_DELAY_MS = 4_000;
 
 /**
  * Sender path of the direct mailbox: every write goes to the peer's inbox
@@ -73,12 +82,54 @@ export class DirectMessageSender {
   ): Promise<void> {
     const record = build();
 
-    await this.writeTo(session, conversationId, recipientIdentityId, record);
+    await this.appendToPeer(
+      session,
+      conversationId,
+      recipientIdentityId,
+      record,
+    );
 
     this.ownCopies.remember(
       DirectMailboxOwnership.ownCopyKey(session.identity.id, record.id),
     );
     await this.appendOwnCopy(session, conversationId, record);
+  }
+
+  /**
+   * The peer's inbox exists only once the peer has opened the conversation, so
+   * a send can run ahead of it. An absent inbox is retried with capped backoff
+   * for the window; any other failure, or the window passing, rejects.
+   */
+  private async appendToPeer(
+    session: Session,
+    conversationId: string,
+    recipientIdentityId: string,
+    record: DirectMessageRecord,
+  ): Promise<void> {
+    const deadline = Date.now() + PEER_INBOX_RETRY_WINDOW_MS;
+    let delayMs = PEER_INBOX_RETRY_FIRST_DELAY_MS;
+
+    for (;;) {
+      try {
+        await this.writeTo(
+          session,
+          conversationId,
+          recipientIdentityId,
+          record,
+        );
+
+        return;
+      } catch (error) {
+        if (!(error instanceof MailboxUnavailableError)) throw error;
+
+        if (Date.now() + delayMs > deadline) throw error;
+      }
+
+      await new Promise<void>((resolve) => {
+        globalThis.setTimeout(resolve, delayMs);
+      });
+      delayMs = Math.min(delayMs * 2, PEER_INBOX_RETRY_MAX_DELAY_MS);
+    }
   }
 
   /**
