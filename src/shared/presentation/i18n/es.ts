@@ -59,6 +59,11 @@ export const es = {
     devicePairingStep4Title: 'Elige una contraseña y entra',
     devicePairingVerificationHelp:
       'Muestra este código al dispositivo autorizado. Debe ser idéntico allí antes de que autorice este dispositivo.',
+    deviceRemoved: 'Este dispositivo fue eliminado de tu cuenta.',
+    deviceRemovedHelp:
+      'Este navegador ya no puede abrir esta identidad. Vuelve a vincularlo desde un dispositivo donde tengas la sesión iniciada, o borra la copia de este navegador y empieza de nuevo. Tu cuenta no se elimina.',
+    deviceRemovedPair: 'Vincular este dispositivo de nuevo',
+    deviceRemovedStartOver: 'Borrar la copia local y empezar de nuevo',
     fallbackNetworksLabel: 'Redes, separadas por comas',
     handleLabel: 'usuario',
     heroBody:
