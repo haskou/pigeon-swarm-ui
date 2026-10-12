@@ -118,20 +118,20 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 - v1 `direct-text` envelopes decode to null and are acknowledged, so they do not block the inbox. Legacy delivery covers them; nothing is migrated.
 - Size: a record whose plaintext exceeds `MailboxEnvelopeCipher.MAX_PLAINTEXT_BYTES` is skipped and stays on the legacy path (see Envelopes).
 - Send: the legacy POST runs first and is unchanged. The mailbox append follows through `deliverSent`, `deliverEdit`, `deliverDelete`, or `deliverReaction`. Each returns `delivered`, `failed`, or `skipped`. `skipped` covers no peer, a group conversation, or an oversized record. `failed` covers any throw, including a 404 and a missing conversation key. A failed append is silent for the user. The facade logs one count-only debug line (no ids, content, or error details). There is no automatic retry, so the legacy copy is never duplicated.
+- Recipient home: the append goes to the recipient's `mailboxHome` when the recipient's identity serves one that verifies against the identity signature (`IdentityMailboxHomeVerifier`). Private hosts are rejected; `localhost` is accepted for development. Otherwise, or when the home append throws, the append goes to the connected node. Home calls use an isolated client (`credentials: omit`, `redirect: error`). Reads and acks stay on the connected node. Each send adds one identity lookup. A failed home append can still have stored the envelope, so the fallback can land the same envelope twice; the timeline collapses duplicates by message id. The published hint is last-write-wins across a user's devices.
 - Recipient: the active one-to-one conversation is polled about every 5 s (`useDirectMessageMailboxSync`). Each page is decrypted in envelope order into timeline changes (`message`, `edit`, `removed`, `reaction`), applied, then acknowledged. The cursor advances only after a successful ack. Messages collapse by id in `MessageCollection.merge`. A sent or edited change is dropped when its message does not decrypt.
 - Reaction order: a mailbox reaction applies only when its `createdAt` is newer than the newest write seen for the same message, author, and emoji. A remove leaves its clock on the message (`reactionClocks`), so a replayed older add cannot reopen the reaction. Legacy and local writes apply in arrival order and advance the same clock. The clock is timeline state: it survives a same-id merge but not a reload. After a reload a reaction can reopen only if its remove was never appended to the mailbox, or was acknowledged before an add that was appended later. Mailbox writes use the sender's `createdAt`; legacy writes use the realtime `createdAt` attribute, else the server `occurred_on`. Ordering across the two sources assumes the clocks agree to within the gap between the two actions.
 - Pre-create: the first sync creates the recipient inbox and enrols this device's reader before the first read. Overlapping passes share one creation (`MailboxChannel.createInbox`), so a StrictMode remount sends one PUT. A failure is silent; the read's 404 recovery covers it on the next pass.
-- A 404 on append means the recipient inbox does not exist: the recipient has not opened the conversation yet, or it was evicted and not re-created. That is expected, so the sender returns `failed` with no user notice. The legacy copy still delivers.
+- A 404 on append means the node holding the inbox has no inbox for this recipient. A 404 from the recipient's home falls back to the connected node, and the sender returns `failed` only when that append also fails. Usually the recipient has not opened the conversation yet, or it was evicted and not re-created. That is expected and has no user notice. The legacy copy still delivers.
 - A failing sync shows one notice unless another error is already shown. The next successful pass clears only that notice.
 - The cursor is stored in localStorage under `pigeon.direct-mailbox.<mailboxId>` (scoped per client). Both reader tokens are derived, so clearing storage loses only the cursor. A legacy `readToken` in an existing entry is adopted on the first pass (see Read token, Residual risk).
 - A stored cursor is reset to 0 when the inbox is re-created (see Creation difficulty and recovery).
-- Gaps: home-node discovery assumes `API_SERVER_URL`; polling only (no realtime hint); no retry beyond the next poll; epoch fixed at 0.
+- Gaps: polling only (no realtime hint); no retry beyond the next poll; epoch fixed at 0.
 - Multi-device: each device reads and acknowledges with its own device reader, and the node keeps an envelope until every reader has acknowledged it. An ack from one device therefore cannot remove a message another device has not read. The reader set holds at most `maxReaders` readers per inbox (129 by default: the root plus 128 devices), so a device past the cap cannot enrol (see Reader set).
 - Send-failure notice: hidden while the legacy path still delivers every message. It returns when the legacy path is retired and the mailbox is the only delivery path.
 
 ## Open questions (not decided, not implemented)
 
-- Home-node discovery: how a sender learns which node hosts a recipient's mailbox.
 - Epoch rotation announcement.
 - Realtime hint for new envelopes.
 
@@ -139,5 +139,6 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 
 - Pinned vectors and envelope/proof behavior: `src/test/contexts/mailboxes/**` under the real-crypto suite (`yarn test:crypto`).
 - Sync, reader adoption and pruning (including a full legacy inbox and a removed device's slot), the reader cap on a fake node set to 8, storage-loss recovery, and single-flight creation: `src/test/contexts/messages/infrastructure/mailbox/DirectMessageMailbox.spec.ts` (`yarn test:crypto`). Live multi-device behaviour against a real node is not covered.
+- Home routing: `IdentityMailboxHomeVerifier.spec.ts` runs under `yarn test:crypto`. `RecipientMailboxRouter.spec.ts` and `IsolatedHttpJsonClient.spec.ts` run under the default suite.
 - HTTP client and worker client: default jest.
 - `HttpJsonClient` empty-body handling was proven red without the fix.
