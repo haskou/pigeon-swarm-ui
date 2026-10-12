@@ -164,33 +164,58 @@ export class PigeonKeychainApi {
     update: LocalKeychainUpdate,
   ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
     return await this.enqueuePublish(session.identity.id, async () => {
-      const path = '/keychains/';
       const head = await this.readPublishHead(session);
-      const encrypted = await this.cipher.encryptForPublish(
+
+      return await this.postKeychain(
         session,
         head,
         update(head?.keychain ?? session.keychain),
       );
-      const published = await this.http.request<{
-        keychainExternalIdentifier: string;
-        ownerIdentityId: string;
-        version: number;
-      }>(path, {
-        body: JSON.stringify(encrypted.body),
-        headers: await this.signer.headers(
-          session,
-          'POST',
-          path,
-          encrypted.body,
-        ),
-        method: 'POST',
-      });
-      this.requestCache.invalidateForSession(keychainPath(session), session);
-
-      return {
-        keychain: encrypted.keychain,
-        keychainExternalIdentifier: published.keychainExternalIdentifier,
-      };
     });
+  }
+
+  /**
+   * Reads the current head under the session's root, before the root moves.
+   */
+  public async readHead(session: Session): Promise<KeychainHead | undefined> {
+    return await this.readPublishHead(session);
+  }
+
+  /**
+   * Seals a head read under the previous root with this session's root, so a
+   * revoke moves the keychain before the previous root is dropped.
+   */
+  public async rewrapHead(session: Session, head: KeychainHead): Promise<void> {
+    await this.enqueuePublish(session.identity.id, async () => {
+      await this.postKeychain(session, head, head.keychain);
+    });
+  }
+
+  private async postKeychain(
+    session: Session,
+    head: KeychainHead | undefined,
+    keychain: LocalKeychain,
+  ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
+    const path = '/keychains/';
+    const encrypted = await this.cipher.encryptForPublish(
+      session,
+      head,
+      keychain,
+    );
+    const published = await this.http.request<{
+      keychainExternalIdentifier: string;
+      ownerIdentityId: string;
+      version: number;
+    }>(path, {
+      body: JSON.stringify(encrypted.body),
+      headers: await this.signer.headers(session, 'POST', path, encrypted.body),
+      method: 'POST',
+    });
+    this.requestCache.invalidateForSession(keychainPath(session), session);
+
+    return {
+      keychain: encrypted.keychain,
+      keychainExternalIdentifier: published.keychainExternalIdentifier,
+    };
   }
 }

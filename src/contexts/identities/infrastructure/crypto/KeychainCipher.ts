@@ -10,6 +10,7 @@ import type { PublishedKeychainPayload } from './PublishedKeychainPayload';
 
 import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
+import { sessionRootKey } from '../session/sessionRootKey';
 
 export type KeychainHead = {
   keychain: LocalKeychain;
@@ -18,7 +19,8 @@ export type KeychainHead = {
 
 export class KeychainCipher {
   public decrypt(session: Session, keychain: KeychainResource): LocalKeychain {
-    const decrypted = session.masterKey.decrypt(
+    const decrypted = this.open(
+      session,
       new EncryptedPayload(keychain.encryptedPayload),
     );
 
@@ -39,7 +41,7 @@ export class KeychainCipher {
     const timestamp = Date.now();
     const version = (head?.keychain.version ?? 0) + 1;
     const keychain = { ...nextKeychain, timestamp, version };
-    const encryptedPayload = session.masterKey
+    const encryptedPayload = sessionRootKey(session)
       .encrypt(JSON.stringify(keychain))
       .toString();
     const previousKeychainExternalIdentifier = head?.keychainExternalIdentifier;
@@ -66,5 +68,22 @@ export class KeychainCipher {
       },
       keychain,
     };
+  }
+
+  /**
+   * Opens under the device-sealed root. A head sealed under the master key
+   * before the root existed opens once; the next publish seals it under the
+   * root.
+   */
+  private open(session: Session, payload: EncryptedPayload): string {
+    try {
+      return sessionRootKey(session).decrypt(payload).toString();
+    } catch (error: unknown) {
+      if (!session.deviceSealedRootKey) {
+        throw error;
+      }
+
+      return session.masterKey.decrypt(payload).toString();
+    }
   }
 }

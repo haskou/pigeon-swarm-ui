@@ -83,6 +83,7 @@ export class PigeonIdentitiesGateway {
     requestCode: DevicePairingCode,
   ): Promise<{ completionCode: DevicePairingCode; session: Session }> {
     const root = session.deviceSealedRootKey;
+
     if (!root) {
       throw new DevicePairingError(
         'mismatch',
@@ -114,21 +115,23 @@ export class PigeonIdentitiesGateway {
     target: DeviceCredential,
     compromisedSince?: DeviceAuthorizationRevision,
   ): Promise<Session> {
+    // The head is read under the current root first, so a failed read revokes
+    // nothing. The rewrap then seals it under the new root. If the rewrap fails
+    // after the new root is published, the keychain stays under the previous
+    // root; see the residuals in docs/device-sealed-secrets-client.md.
+    const head = await this.keychain.readHead(session);
     const revoked = await this.deviceAuthorization.revokeDevice(
       session,
       target,
       compromisedSince,
     );
+    const rotated = await this.deviceSealedRoot.rotate(revoked);
 
-    try {
-      return await this.deviceSealedRoot.rotate(revoked);
-    } catch {
-      // Count-only. The remaining devices publish on their next unlock.
-      // eslint-disable-next-line no-console
-      console.debug('Device sealed root rotation after revoke failed.');
-
-      return revoked;
+    if (head) {
+      await this.keychain.rewrapHead(rotated, head);
     }
+
+    return rotated;
   }
 
   public async retireOwnDevice(session: Session): Promise<OwnDeviceRetirement> {
