@@ -5,7 +5,10 @@ import { ApiUrlBuilder } from './ApiUrlBuilder';
 import { HttpJsonError } from './HttpJsonError';
 
 export class HttpJsonClient {
-  public constructor(private readonly urls: ApiUrlBuilder) {}
+  public constructor(
+    private readonly urls: ApiUrlBuilder,
+    private readonly options: { isolated?: boolean } = {},
+  ) {}
 
   private async blobWithProgress(
     response: Response,
@@ -89,13 +92,18 @@ export class HttpJsonClient {
     );
   }
 
+  /** Foreign origins never receive ambient credentials or follow redirects. */
+  private isolationInit(): RequestInit {
+    return this.options.isolated || isIndependentClient()
+      ? { credentials: 'omit', redirect: 'error' }
+      : {};
+  }
+
   public async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const response = await fetch(this.urls.build(path), {
       ...init,
       cache: init.cache ?? 'no-store',
-      ...(isIndependentClient()
-        ? { credentials: 'omit' as const, redirect: 'error' as const }
-        : {}),
+      ...this.isolationInit(),
       headers: this.headers(init, 'application/json'),
     });
 
@@ -124,9 +132,7 @@ export class HttpJsonClient {
     const response = await fetch(this.urls.build(path), {
       ...requestInit,
       cache: requestInit.cache ?? 'no-store',
-      ...(isIndependentClient()
-        ? { credentials: 'omit' as const, redirect: 'error' as const }
-        : {}),
+      ...this.isolationInit(),
       headers: this.headers(requestInit, '*/*'),
     });
 

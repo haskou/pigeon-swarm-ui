@@ -23,6 +23,7 @@ module.exports = {
     '**/PigeonApiGateway.spec.ts',
     '**/PigeonIdentityCommandsApi.spec.ts',
     '**/IdentitySignaturePayloadFactory.spec.ts',
+    '**/IdentityMailboxHomeVerifier.spec.ts',
     '**/Mailbox{Capability,Channel,CreationProof,EnvelopeCipher,KeySchedule,ReadToken}.spec.ts',
     '**/DirectMessageMailbox.spec.ts',
   ],

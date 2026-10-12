@@ -37,6 +37,9 @@ export type OpenedMailboxEnvelope = {
   plaintext: Uint8Array;
 };
 
+/** Acknowledged append: the relay's cursor and the envelope id it stored. */
+export type MailboxAppend = { cursor: number; envelopeId: string };
+
 export type OpenedMailboxPage = {
   envelopes: OpenedMailboxEnvelope[];
   hasMore: boolean;
@@ -178,7 +181,7 @@ export class MailboxChannel {
   public async send(
     keys: MailboxKeys,
     plaintext: Uint8Array,
-  ): Promise<{ cursor: number; envelopeId: string }> {
+  ): Promise<MailboxAppend> {
     const envelopeId = encodeBase64Url(
       randomBytes(MailboxChannel.ENVELOPE_ID_BYTES),
     );

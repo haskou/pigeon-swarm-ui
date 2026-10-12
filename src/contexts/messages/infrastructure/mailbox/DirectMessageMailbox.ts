@@ -16,6 +16,7 @@ import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { DirectMessageRecord } from './DirectMessageMailboxRecord';
 import type { DirectMessageMailboxState } from './DirectMessageMailboxStore';
 import type { DirectMessageReaderSet } from './DirectMessageReaderSet';
+import type { RecipientMailboxRouter } from './RecipientMailboxRouter';
 
 import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
 import { MailboxCapability } from '../../../mailboxes/infrastructure/crypto/MailboxCapability';
@@ -64,6 +65,7 @@ export class DirectMessageMailbox {
 
   public constructor(
     private readonly channel: MailboxChannel,
+    private readonly recipients: RecipientMailboxRouter,
     private readonly store: DirectMessageMailboxStore,
     private readonly projection: Pick<MessageProjectionPort, 'decryptMany'>,
     private readonly readerSet: DirectMessageReaderSet,
@@ -237,7 +239,7 @@ export class DirectMessageMailbox {
 
       const keys = this.keysFor(session, conversation.id, recipientIdentityId);
 
-      await this.channel.send(keys, plaintext);
+      await this.recipients.send(recipientIdentityId, keys, plaintext);
 
       return 'delivered';
     } catch {
