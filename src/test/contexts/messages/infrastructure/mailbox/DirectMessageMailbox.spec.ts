@@ -1,3 +1,4 @@
+import 'fake-indexeddb/auto';
 import { EncryptedPayload, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 import { mock } from 'jest-mock-extended';
@@ -28,6 +29,7 @@ import { MailboxReadToken } from '../../../../../contexts/mailboxes/infrastructu
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/infrastructure/http/MailboxUnavailableError';
 import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageAuthorship } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageAuthorship';
+import { DirectMessageHistoryStore } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageHistoryStore';
 import { DirectMessageMailbox } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
 import { DirectMessageMailboxRecord } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxRecord';
 import { DirectMessageMailboxStore } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxStore';
@@ -3601,6 +3603,89 @@ describe(DirectMessageMailbox.name, () => {
         readToken: legacy,
       });
       expect(readerHashes().sort()).toEqual(hashed(legacy, ...dead));
+    });
+  });
+
+  describe('restore', () => {
+    const reactionAt = (
+      action: 'add' | 'remove',
+      id: string,
+    ): DirectReactionRecord => ({
+      action,
+      authorId: 'alice',
+      conversationId,
+      createdAt: 300,
+      emoji: '👍',
+      id,
+      targetMessageId: 'message-1',
+      type: 'reaction',
+    });
+
+    /** Own copy tagged under the device-sealed root. */
+    const ownSealedEncode = (record: DirectMessageRecord): Uint8Array =>
+      DirectMessageMailboxRecord.encode(
+        record,
+        DirectMessageAuthorship.tag(sealedRoot, record),
+      );
+
+    beforeEach(async () => {
+      await new DirectMessageHistoryStore().forget('alice');
+    });
+
+    it('restores a re-added reaction as a second add and skips a replayed envelope', async () => {
+      const { channel, mailbox } = setup();
+      channel.acknowledge.mockResolvedValue({ recreated: false });
+      channel.read.mockResolvedValue({
+        envelopes: [
+          {
+            cursor: 1,
+            envelopeId: 'envelope-1',
+            plaintext: ownSealedEncode(reactionAt('add', 'reaction-add-1')),
+          },
+          {
+            cursor: 2,
+            envelopeId: 'envelope-2',
+            plaintext: ownSealedEncode(
+              reactionAt('remove', 'reaction-remove-1'),
+            ),
+          },
+          {
+            cursor: 3,
+            envelopeId: 'envelope-3',
+            plaintext: ownSealedEncode(reactionAt('add', 'reaction-add-2')),
+          },
+          {
+            // A replay of the first add under a new envelope.
+            cursor: 4,
+            envelopeId: 'envelope-4',
+            plaintext: ownSealedEncode(reactionAt('add', 'reaction-add-1')),
+          },
+        ],
+        hasMore: false,
+        lastCursor: 4,
+        recreated: false,
+      });
+
+      await mailbox.sync(
+        withSealedRoot(session('alice')),
+        conversationId,
+        new AbortController().signal,
+        jest.fn<void, [DirectMessageTimelineChange[]]>(),
+      );
+
+      const apply = jest.fn<void, [DirectMessageTimelineChange[]]>();
+      await setup().mailbox.restore(
+        withSealedRoot(session('alice')),
+        conversationId,
+        new AbortController().signal,
+        apply,
+      );
+
+      expect(apply.mock.calls.flatMap(([batch]) => batch)).toEqual([
+        expect.objectContaining({ action: 'add', kind: 'reaction' }),
+        expect.objectContaining({ action: 'remove', kind: 'reaction' }),
+        expect.objectContaining({ action: 'add', kind: 'reaction' }),
+      ]);
     });
   });
 

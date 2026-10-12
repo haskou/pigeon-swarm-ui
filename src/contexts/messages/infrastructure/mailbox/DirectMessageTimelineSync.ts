@@ -7,6 +7,7 @@ import type { OpenedMailboxPage } from '../../../mailboxes/infrastructure/Mailbo
 import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
 import type { DirectMessageTimelineChange } from '../../presentation/view-models/DirectMessageTimelineChange';
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
+import type { DirectMessageHistoryStore } from './DirectMessageHistoryStore';
 import type { DirectMessageInboxOpener } from './DirectMessageInboxOpener';
 import type { DirectMessageMailboxStore } from './DirectMessageMailboxStore';
 import type { DirectMessageOwnCopies } from './DirectMessageOwnCopies';
@@ -32,6 +33,7 @@ export class DirectMessageTimelineSync {
     private readonly readerSet: DirectMessageReaderSet,
     private readonly projection: Pick<MessageProjectionPort, 'decryptMany'>,
     private readonly ownCopies: DirectMessageOwnCopies,
+    private readonly history: DirectMessageHistoryStore,
   ) {}
 
   /**
@@ -69,8 +71,10 @@ export class DirectMessageTimelineSync {
   }
 
   /**
-   * Decodes and decrypts the page, hands its changes to the caller, then
-   * acknowledges it. Each step checks the signal so an aborted pass neither
+   * Decodes the page, stores its records on this device, then hands the
+   * changes of records not already on screen to the caller, then acknowledges
+   * the page. The store runs before the ack, so an acked page is never missing
+   * from the history. Each step checks the signal so an aborted pass neither
    * applies nor acks.
    */
   private async applyPage(
@@ -82,10 +86,42 @@ export class DirectMessageTimelineSync {
     apply: (changes: DirectMessageTimelineChange[]) => void,
   ): Promise<void> {
     const { keys, readers, state } = inbox;
-    const changes = await this.decryptPage(
+    const decoded = page.envelopes.flatMap((envelope) => {
+      const record = DirectMessageRecordReader.decode(
+        session,
+        conversationId,
+        envelope.plaintext,
+      );
+
+      return record ? [{ plaintext: envelope.plaintext, record }] : [];
+    });
+
+    // Keyed by record id, so a replayed envelope dedupes while each action
+    // (a reaction add, its removal, a re-add) keeps its own row.
+    await this.history.append(
       session,
       conversationId,
-      page,
+      decoded.flatMap(({ plaintext, record }) =>
+        record.type === DirectMailboxRecords.TYPE.read
+          ? []
+          : [{ plaintext, recordId: record.id }],
+      ),
+    );
+
+    if (signal.aborted) return;
+
+    // An own copy this device appended is already shown locally.
+    const records = decoded.flatMap(({ record }) =>
+      this.ownCopies.has(
+        DirectMailboxOwnership.ownCopyKey(session.identity.id, record.id),
+      )
+        ? []
+        : [record],
+    );
+    const changes = await this.changesFor(
+      session,
+      conversationId,
+      records,
       signal,
     );
 
@@ -107,36 +143,16 @@ export class DirectMessageTimelineSync {
   }
 
   /**
-   * Maps each decoded record to its timeline change, in envelope order. A
-   * sent or edited record whose message does not decrypt drops only its own
-   * change. Deletes and reactions carry no ciphertext and never decrypt.
+   * Maps records to timeline changes, in record order. A sent or edited record
+   * whose message does not decrypt drops only its own change. Deletes and
+   * reactions carry no ciphertext and never decrypt.
    */
-  private async decryptPage(
+  private async changesFor(
     session: Session,
     conversationId: string,
-    page: OpenedMailboxPage,
+    records: DirectMessageRecord[],
     signal: AbortSignal,
   ): Promise<DirectMessageTimelineChange[]> {
-    const records = page.envelopes.flatMap((envelope) => {
-      const decoded = DirectMessageRecordReader.decode(
-        session,
-        conversationId,
-        envelope.plaintext,
-      );
-
-      if (!decoded) return [];
-
-      // An own copy this device appended is already shown locally.
-      if (
-        this.ownCopies.has(
-          DirectMailboxOwnership.ownCopyKey(session.identity.id, decoded.id),
-        )
-      ) {
-        return [];
-      }
-
-      return [decoded];
-    });
     const messages = await this.decryptMessages(
       session,
       conversationId,
@@ -265,5 +281,41 @@ export class DirectMessageTimelineSync {
     if (page.lastCursor <= cursor || signal.aborted) return;
 
     await this.applyPage(session, conversationId, inbox, page, signal, apply);
+  }
+
+  /**
+   * Replays this device's stored history of the conversation as one batch of
+   * changes, in the order it was stored. Read receipts are never stored, so
+   * none replay. Own copies replay too: the live pass skips them only because
+   * they were already on screen when it appended them.
+   */
+  public async restore(
+    session: Session,
+    conversationId: string,
+    signal: AbortSignal,
+    apply: (changes: DirectMessageTimelineChange[]) => void,
+  ): Promise<void> {
+    if (signal.aborted) return;
+
+    const plaintexts = await this.history.load(session, conversationId);
+    const records = plaintexts.flatMap((plaintext) => {
+      const record = DirectMessageRecordReader.decode(
+        session,
+        conversationId,
+        plaintext,
+      );
+
+      return record ? [record] : [];
+    });
+    const changes = await this.changesFor(
+      session,
+      conversationId,
+      records,
+      signal,
+    );
+
+    if (signal.aborted) return;
+
+    apply(changes);
   }
 }

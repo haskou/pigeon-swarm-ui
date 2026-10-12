@@ -3,6 +3,7 @@ import type { Session } from '../../../../contexts/identities/infrastructure/ses
 
 export type ForgetDeviceServices = {
   directMessages: {
+    forgetHistory(identityId: string): Promise<void>;
     releaseDeviceReaders(session: Session): Promise<void>;
   };
   identities: {

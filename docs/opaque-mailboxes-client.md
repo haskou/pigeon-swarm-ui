@@ -158,7 +158,7 @@ The mailbox is the only delivery path for one-to-one conversations. No shim, fal
   - The message POST as a carrier of 1:1 attachments. They reach the peer only through mailbox records. The attachment downloader's legacy methods stay, because group and community history use them.
 
 - Accepted losses (decided; not backfilled):
-  - Replicated 1:1 history is not loaded from the node. Mailbox envelopes are deleted on full acknowledgement, so a 1:1 message that is not in the local projection cache is gone after a reload.
+  - Replicated 1:1 history is not loaded from the node. Mailbox envelopes are deleted on full acknowledgement, so a 1:1 message that is in neither the local history store nor the projection cache is gone after a reload. The local store is described in Same-device history.
   - No backfill for new or restored devices. An own copy reaches only devices that read the self-inbox within the node's 14-day retention. Backfill options are in the node design doc (`docs/design/own-copy-and-history-backfill.md`); none is implemented.
   - A 1:1 send to a peer whose inbox is not open yet fails and is not stored. The message shows the failed-send state until the user retries.
   - Edit, delete, reaction, and pin are rejected when the peer copy is not delivered, and the UI shows the error notice.
@@ -181,6 +181,14 @@ The mailbox is the only delivery path for one-to-one conversations. No shim, fal
 - Epoch rotation announcement.
 - Realtime hint for new envelopes.
 - Root rotation at forget time (not implemented). Revoke rotates the root (see Residual risk above). Forget does not: the forgetting device is revoked, so it cannot publish, and remaining devices publish a fresh root on their next unlock. Until then the old root stays registered, and a forgotten device that still holds it keeps read access. A publish before the revoke would not close this window, because the forgetter must be listed as a recipient and would receive the new root too (node `DeviceSealedSecretBundle.assertPublishableBy`). A tighter bound needs a node contract change (`haskou/pigeon-swarm-node#289`).
+
+## Same-device history
+
+- Store: each stored record of a one-to-one conversation (sent, edited, deleted, reaction, pin; read receipts are never stored) is kept in IndexedDB (`pigeon-direct-history`, scoped by `scopeClientStorageKey`), sealed with AES-256-GCM. The key is HKDF-SHA256 over the device-sealed root, with info `pigeon-direct-history:v1:<identityId>`. A per-identity canary detects a root rotation: a mismatch wipes that identity's rows. Without a device-sealed root (`masterKey` only), nothing is written or read.
+- Write: the sync pass appends each page's records before it acknowledges the page, own copies included. Entries dedupe on the record id the sender mints once per action, so a replayed envelope adds nothing and each reaction add, remove, or re-add keeps its own row. The id is stored in clear for the index; no digest of the content is kept. A failed write is logged count-only and does not block the acknowledgement.
+- Restore: the first sync pass per session and conversation first replays the stored records in stored order (`DirectMessageMailbox.restore`), then runs the normal pass. Logout keeps the store, so re-login shows the history again.
+- Forget: `forgetHistory(identityId)` wipes the identity's rows once the device revocation succeeds, including when the unlock removal fails and for a confirmed only-device forget. A failed revocation keeps them.
+- Not covered: revocation from another device has no wipe path here. Envelopes acknowledged before this change were never stored, and the node has deleted them, so they are not restored.
 
 ## Verification
 

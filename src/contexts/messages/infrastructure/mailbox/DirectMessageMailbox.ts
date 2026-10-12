@@ -12,6 +12,7 @@ import type { DirectMessageMailboxStore } from './DirectMessageMailboxStore';
 import type { DirectMessageReaderSet } from './DirectMessageReaderSet';
 import type { RecipientMailboxRouter } from './RecipientMailboxRouter';
 
+import { DirectMessageHistoryStore } from './DirectMessageHistoryStore';
 import { DirectMessageInboxOpener } from './DirectMessageInboxOpener';
 import { DirectMessageOwnCopies } from './DirectMessageOwnCopies';
 import { DirectMessageReadSync } from './DirectMessageReadSync';
@@ -32,6 +33,7 @@ export class DirectMessageMailbox {
   private readonly sender: DirectMessageSender;
   private readonly timeline: DirectMessageTimelineSync;
   private readonly reads: DirectMessageReadSync;
+  private readonly history: DirectMessageHistoryStore;
 
   public constructor(
     channel: MailboxChannel,
@@ -50,6 +52,7 @@ export class DirectMessageMailbox {
       composer,
       ownCopies,
     );
+    this.history = new DirectMessageHistoryStore();
     this.timeline = new DirectMessageTimelineSync(
       this.inboxes,
       channel,
@@ -57,6 +60,7 @@ export class DirectMessageMailbox {
       readerSet,
       projection,
       ownCopies,
+      this.history,
     );
     this.reads = new DirectMessageReadSync(channel, store);
   }
@@ -178,6 +182,25 @@ export class DirectMessageMailbox {
   }
 
   /**
+   * Recipient. Replays this identity's stored history of the conversation
+   * before its first sync pass, so the history shows again after re-login.
+   * Never throws: a failed replay logs one count-only line, and the sync pass
+   * still runs.
+   */
+  public async restore(
+    session: Session,
+    conversationId: string,
+    signal: AbortSignal,
+    apply: (changes: DirectMessageTimelineChange[]) => void,
+  ): Promise<void> {
+    try {
+      await this.timeline.restore(session, conversationId, signal, apply);
+    } catch {
+      console.debug('Direct history restore failed');
+    }
+  }
+
+  /**
    * Recipient, background pass for a conversation that no active pass reads.
    * It clears unread from this identity's own read receipts. It never
    * acknowledges and never moves the sync cursor: the active pass owns both.
@@ -207,6 +230,14 @@ export class DirectMessageMailbox {
    */
   public async releaseDeviceReaders(session: Session): Promise<void> {
     await this.inboxes.releaseDeviceReaders(session);
+  }
+
+  /**
+   * Wipes this identity's stored direct history on this device. Called when the
+   * device is forgotten. Never throws: the store logs its own failures.
+   */
+  public async forgetHistory(identityId: string): Promise<void> {
+    await this.history.forget(identityId);
   }
 
   /**
