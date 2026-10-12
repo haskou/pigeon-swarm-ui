@@ -5,8 +5,8 @@ import type {
 } from '../../../mailboxes/infrastructure/MailboxChannel';
 
 /**
- * Appends to the recipient's verified mailbox home, falling back to the local
- * node when no home is published or the home cannot be reached.
+ * Appends to the recipient's verified mailbox home base, falling back to the
+ * local node when no home is published or the home cannot be reached.
  */
 export class RecipientMailboxRouter {
   public constructor(
@@ -15,18 +15,21 @@ export class RecipientMailboxRouter {
       identityId: string,
     ) => Promise<string | undefined>,
     private readonly createChannel: (
-      origin: string,
+      base: string,
     ) => Pick<MailboxChannel, 'send'>,
   ) {}
 
   /**
    * A failed lookup means no verified home, so the local node takes the
-   * message.
+   * message. Logs a count-only line: no identity, URL or topic.
    */
   private async homeOf(identityId: string): Promise<string | undefined> {
     try {
       return await this.verifiedHome(identityId);
     } catch {
+      // eslint-disable-next-line no-console
+      console.debug('Recipient mailbox home lookup failed; local node used.');
+
       return undefined;
     }
   }
@@ -36,13 +39,14 @@ export class RecipientMailboxRouter {
     keys: MailboxKeys,
     plaintext: Uint8Array,
   ): Promise<MailboxAppend> {
-    const origin = await this.homeOf(recipientIdentityId);
+    const base = await this.homeOf(recipientIdentityId);
 
-    if (origin !== undefined) {
+    if (base !== undefined) {
       try {
-        return await this.createChannel(origin).send(keys, plaintext);
+        return await this.createChannel(base).send(keys, plaintext);
       } catch {
-        // Home unreachable: the local node keeps the message deliverable.
+        // eslint-disable-next-line no-console
+        console.debug('Recipient mailbox append failed; local node used.');
       }
     }
 

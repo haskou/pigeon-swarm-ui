@@ -326,14 +326,14 @@ export class PigeonApiGateway {
     const recipientMailboxes = new RecipientMailboxRouter(
       mailboxChannel,
       async (identityId) =>
-        IdentityMailboxHomeVerifier.verifiedOrigin(
+        IdentityMailboxHomeVerifier.verifiedBase(
           identityId,
           await identityResourceGateway.get(identityId),
         ),
-      (origin) =>
+      (base) =>
         new MailboxChannel(
           new PigeonMailboxClient(
-            new HttpJsonClient(new ApiUrlBuilder(origin), { isolated: true }),
+            new HttpJsonClient(new ApiUrlBuilder(base), { isolated: true }),
           ),
           this.mailboxMiner.mine,
         ),

@@ -65,4 +65,52 @@ describe(RecipientMailboxRouter.name, () => {
 
     expect(local.send).toHaveBeenCalledWith(keys, plaintext);
   });
+
+  it('appends to a path-prefixed verified base unchanged', async () => {
+    const { createChannel, foreign, router } = fixture(async () =>
+      Promise.resolve('https://home.example/api'),
+    );
+
+    await router.send('bob', keys, plaintext);
+
+    expect(createChannel).toHaveBeenCalledWith('https://home.example/api');
+    expect(foreign.send).toHaveBeenCalledWith(keys, plaintext);
+  });
+
+  it('logs one count-only line when the foreign append fails', async () => {
+    const debug = jest
+      .spyOn(console, 'debug')
+      .mockImplementation(() => undefined);
+    const { foreign, local, router } = fixture(async () =>
+      Promise.resolve('https://home.example/api'),
+    );
+
+    foreign.send.mockRejectedValueOnce(new Error('404 /api/mailboxes/secret'));
+
+    await router.send('bob', keys, plaintext);
+
+    expect(local.send).toHaveBeenCalledWith(keys, plaintext);
+    expect(debug).toHaveBeenCalledTimes(1);
+    expect(debug).toHaveBeenCalledWith(
+      'Recipient mailbox append failed; local node used.',
+    );
+    debug.mockRestore();
+  });
+
+  it('logs one count-only line when the home lookup fails', async () => {
+    const debug = jest
+      .spyOn(console, 'debug')
+      .mockImplementation(() => undefined);
+    const { local, router } = fixture(async () =>
+      Promise.reject(new Error('lookup failed')),
+    );
+
+    await router.send('bob', keys, plaintext);
+
+    expect(local.send).toHaveBeenCalledWith(keys, plaintext);
+    expect(debug).toHaveBeenCalledWith(
+      'Recipient mailbox home lookup failed; local node used.',
+    );
+    debug.mockRestore();
+  });
 });
