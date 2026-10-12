@@ -3,6 +3,7 @@ import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import type { Session } from '../session/Session';
 import type { PigeonDeviceAuthorizationApi } from './PigeonDeviceAuthorizationApi';
 import type { PigeonDeviceSealedSecretApi } from './PigeonDeviceSealedSecretApi';
+import type { PigeonKeychainApi } from './PigeonKeychainApi';
 
 import {
   decodeBase64Url,
@@ -22,6 +23,7 @@ export class DeviceSealedRootRotation {
   public constructor(
     private readonly deviceAuthorization: PigeonDeviceAuthorizationApi,
     private readonly sealedSecrets: PigeonDeviceSealedSecretApi,
+    private readonly keychains: PigeonKeychainApi,
     private readonly clock: () => number = Date.now,
   ) {}
 
