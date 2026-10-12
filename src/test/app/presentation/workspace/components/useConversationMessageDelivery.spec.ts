@@ -319,6 +319,39 @@ describe('useConversationMessageDelivery inbox delivery', () => {
     expect(mounted.state.messages).toEqual([sentMessage]);
   });
 
+  it('keeps the direct copy notice when a later inbox copy has no recipient inbox', async () => {
+    deliverSent
+      .mockResolvedValueOnce('failed')
+      .mockResolvedValueOnce('no-inbox');
+    const mounted = mountDelivery();
+
+    await mounted.sendMessage('hello', [], {});
+    await drain(mounted.queue);
+    await flushMicrotasks();
+    expect(mounted.state.error).toBe(copy.workspace.directMailboxDeliveryError);
+
+    await mounted.sendMessage('again', [], {});
+    await drain(mounted.queue);
+    await flushMicrotasks();
+
+    expect(mounted.state.error).toBe(copy.workspace.directMailboxDeliveryError);
+  });
+
+  it('does not show the direct copy notice when the recipient inbox is not created yet', async () => {
+    deliverSent.mockResolvedValue('no-inbox');
+    const mounted = mountDelivery();
+
+    await mounted.sendMessage('hello', [], {});
+    await drain(mounted.queue);
+    await flushMicrotasks();
+
+    expect(mounted.onErrorChange).not.toHaveBeenCalledWith(
+      copy.workspace.directMailboxDeliveryError,
+    );
+    expect(mounted.state.error).toBeNull();
+    expect(mounted.state.messages).toEqual([sentMessage]);
+  });
+
   it('clears the direct copy notice once a later inbox copy is delivered', async () => {
     deliverSent
       .mockResolvedValueOnce('failed')
@@ -359,7 +392,9 @@ describe('useConversationMessageDelivery inbox delivery', () => {
   });
 
   it('does not show the copy notice on a conversation that is no longer active', async () => {
-    const pendingCopy = deferred<'delivered' | 'failed' | 'skipped'>();
+    const pendingCopy = deferred<
+      'delivered' | 'failed' | 'no-inbox' | 'skipped'
+    >();
     const otherConversation = {
       ...conversation,
       id: 'conversation-2',

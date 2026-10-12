@@ -85,8 +85,9 @@ export function useConversationMessageDelivery({
 
   const reportDirectCopyOutcome = useCallback(
     (conversationId: string, outcome: DirectMessageMailboxDelivery) => {
-      // A skipped copy never reached the mailbox, so it changes nothing here.
-      if (outcome === 'skipped') return;
+      // A skipped copy never reached the mailbox, and a no-inbox copy is
+      // benign: neither changes the notice.
+      if (outcome === 'skipped' || outcome === 'no-inbox') return;
 
       const isActive = activeConversationIdRef.current === conversationId;
 

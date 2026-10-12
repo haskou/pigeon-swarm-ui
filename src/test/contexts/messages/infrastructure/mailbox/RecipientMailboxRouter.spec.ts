@@ -1,5 +1,6 @@
 import type { MailboxKeys } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxKeySchedule';
 
+import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/infrastructure/http/MailboxUnavailableError';
 import { RecipientMailboxRouter } from '../../../../../contexts/messages/infrastructure/mailbox/RecipientMailboxRouter';
 
 describe(RecipientMailboxRouter.name, () => {
@@ -111,6 +112,71 @@ describe(RecipientMailboxRouter.name, () => {
     expect(debug).toHaveBeenCalledWith(
       'Recipient mailbox home lookup failed; local node used.',
     );
+    debug.mockRestore();
+  });
+
+  it('rethrows the foreign append fault when the local node has no inbox', async () => {
+    const debug = jest
+      .spyOn(console, 'debug')
+      .mockImplementation(() => undefined);
+    const { foreign, local, router } = fixture(async () =>
+      Promise.resolve('https://home.example'),
+    );
+
+    foreign.send.mockRejectedValueOnce(new Error('socket hang up'));
+    local.send.mockRejectedValueOnce(new MailboxUnavailableError());
+
+    await expect(router.send('bob', keys, plaintext)).rejects.toThrow(
+      'socket hang up',
+    );
+    debug.mockRestore();
+  });
+
+  it('rethrows the home lookup fault when the local node has no inbox', async () => {
+    const debug = jest
+      .spyOn(console, 'debug')
+      .mockImplementation(() => undefined);
+    const { local, router } = fixture(async () =>
+      Promise.reject(new Error('lookup failed')),
+    );
+
+    local.send.mockRejectedValueOnce(new MailboxUnavailableError());
+
+    await expect(router.send('bob', keys, plaintext)).rejects.toThrow(
+      'lookup failed',
+    );
+    debug.mockRestore();
+  });
+
+  it('keeps a no-inbox error when the home and the local node both have no inbox', async () => {
+    const debug = jest
+      .spyOn(console, 'debug')
+      .mockImplementation(() => undefined);
+    const { foreign, local, router } = fixture(async () =>
+      Promise.resolve('https://home.example'),
+    );
+
+    foreign.send.mockRejectedValueOnce(new MailboxUnavailableError());
+    local.send.mockRejectedValueOnce(new MailboxUnavailableError());
+
+    await expect(router.send('bob', keys, plaintext)).rejects.toBeInstanceOf(
+      MailboxUnavailableError,
+    );
+    debug.mockRestore();
+  });
+
+  it('delivers through the local node after a foreign network fault', async () => {
+    const debug = jest
+      .spyOn(console, 'debug')
+      .mockImplementation(() => undefined);
+    const { foreign, local, router } = fixture(async () =>
+      Promise.resolve('https://home.example'),
+    );
+
+    foreign.send.mockRejectedValueOnce(new Error('socket hang up'));
+
+    await expect(router.send('bob', keys, plaintext)).resolves.toBe(appended);
+    expect(local.send).toHaveBeenCalledWith(keys, plaintext);
     debug.mockRestore();
   });
 });

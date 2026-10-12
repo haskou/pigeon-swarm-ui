@@ -645,14 +645,14 @@ describe(DirectMessageMailbox.name, () => {
   });
 
   describe.each(deliveries)('%s delivery outcome', (_label, deliverKind) => {
-    it('reports a 404 from the recipient inbox as failed and logs one count-only line', async () => {
+    it('reports a 404 from the recipient inbox as no-inbox and logs one count-only line', async () => {
       const { channel, mailbox } = setup();
       channel.send.mockRejectedValue(new MailboxUnavailableError());
       const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
 
       await expect(
         deliverKind(mailbox, session('alice'), conversation),
-      ).resolves.toBe('failed');
+      ).resolves.toBe('no-inbox');
       expect(debug).toHaveBeenCalledTimes(1);
       expect(debug).toHaveBeenCalledWith(
         'Direct mailbox append failed; legacy copy kept.',
@@ -2317,7 +2317,7 @@ describe(DirectMessageMailbox.name, () => {
 
       await expect(
         mailbox.deliverSent(session('alice'), conversation, sent),
-      ).resolves.toBe('failed');
+      ).resolves.toBe('no-inbox');
       await expect(
         mailbox.openInboxes(
           session('bob'),

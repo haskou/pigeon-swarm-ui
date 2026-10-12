@@ -4,9 +4,15 @@ import type {
   MailboxChannel,
 } from '../../../mailboxes/infrastructure/MailboxChannel';
 
+import { MailboxUnavailableError } from '../../../mailboxes/infrastructure/http/MailboxUnavailableError';
+
 /**
  * Appends to the recipient's verified mailbox home base, falling back to the
  * local node when no home is published or the home cannot be reached.
+ *
+ * A home fault (a failed lookup, or a failed append that is not a 404) is
+ * kept. If the local node then answers 404, the fault is rethrown: the caller
+ * must not read a real delivery failure as a benign missing inbox.
  */
 export class RecipientMailboxRouter {
   public constructor(
@@ -20,17 +26,37 @@ export class RecipientMailboxRouter {
   ) {}
 
   /**
-   * A failed lookup means no verified home, so the local node takes the
-   * message. Logs a count-only line: no identity, URL or topic.
+   * Appends to the verified home. Resolves to undefined when no home is
+   * published or the home answers 404, which is benign. Any other home fault
+   * throws, so the caller can keep it. Logs a count-only line per fault.
    */
-  private async homeOf(identityId: string): Promise<string | undefined> {
+  private async appendHome(
+    recipientIdentityId: string,
+    keys: MailboxKeys,
+    plaintext: Uint8Array,
+  ): Promise<MailboxAppend | undefined> {
+    let base: string | undefined;
+
     try {
-      return await this.verifiedHome(identityId);
-    } catch {
+      base = await this.verifiedHome(recipientIdentityId);
+    } catch (error) {
       // eslint-disable-next-line no-console
       console.debug('Recipient mailbox home lookup failed; local node used.');
 
-      return undefined;
+      throw error;
+    }
+
+    if (base === undefined) return undefined;
+
+    try {
+      return await this.createChannel(base).send(keys, plaintext);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.debug('Recipient mailbox append failed; local node used.');
+
+      if (error instanceof MailboxUnavailableError) return undefined;
+
+      throw error;
     }
   }
 
@@ -39,17 +65,28 @@ export class RecipientMailboxRouter {
     keys: MailboxKeys,
     plaintext: Uint8Array,
   ): Promise<MailboxAppend> {
-    const base = await this.homeOf(recipientIdentityId);
+    let fault: { error: unknown } | undefined;
 
-    if (base !== undefined) {
-      try {
-        return await this.createChannel(base).send(keys, plaintext);
-      } catch {
-        // eslint-disable-next-line no-console
-        console.debug('Recipient mailbox append failed; local node used.');
-      }
+    try {
+      const appended = await this.appendHome(
+        recipientIdentityId,
+        keys,
+        plaintext,
+      );
+
+      if (appended !== undefined) return appended;
+    } catch (error) {
+      fault = { error };
     }
 
-    return await this.local.send(keys, plaintext);
+    try {
+      return await this.local.send(keys, plaintext);
+    } catch (error) {
+      if (fault !== undefined && error instanceof MailboxUnavailableError) {
+        throw fault.error;
+      }
+
+      throw error;
+    }
   }
 }
