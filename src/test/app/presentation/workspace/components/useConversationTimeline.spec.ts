@@ -9,7 +9,6 @@ import type {
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';
 import { useConversationTimeline } from '../../../../../app/presentation/workspace/components/useConversationTimeline';
 import { useWorkspaceResumeSync } from '../../../../../app/presentation/workspace/components/useWorkspaceResumeSync';
-import { captureUnhandledRejections } from '../../../../captureUnhandledRejections';
 
 jest.mock('react', () => ({
   startTransition: (run: () => void) => run(),
@@ -49,7 +48,7 @@ jest.mock(
 jest.mock('../../../../../app/composition/applicationContainer', () => ({
   applicationContainer: {
     conversations: { markReadUntil: jest.fn() },
-    directMessages: { deliverRead: jest.fn() },
+    directMessages: { markRead: jest.fn() },
     messages: { load: jest.fn() },
   },
 }));
@@ -109,31 +108,19 @@ describe('useConversationTimeline read marker delivery', () => {
       .mockResolvedValue({ messages: [message], nextCursor: null } as never);
   });
 
-  it('keeps a loaded timeline when read marker delivery throws synchronously', async () => {
-    jest
-      .mocked(applicationContainer.directMessages.deliverRead)
-      .mockImplementation(() => {
-        throw new Error('inbox unavailable');
-      });
+  it('marks a one-to-one conversation read through the mailbox, not read-until', async () => {
     const { onErrorChange, timeline } = mountTimeline();
 
     await loadActiveMessagesOf()(conversation.id);
 
-    expect(onErrorChange).not.toHaveBeenCalledWith(expect.any(String));
-    expect(timeline.setMessages).toHaveBeenLastCalledWith([message]);
-  });
-
-  it('keeps a loaded timeline with no unhandled rejection when read marker delivery rejects', async () => {
-    jest
-      .mocked(applicationContainer.directMessages.deliverRead)
-      .mockRejectedValue(new Error('inbox unavailable'));
-    const { onErrorChange, timeline } = mountTimeline();
-
-    const unhandled = await captureUnhandledRejections(() =>
-      loadActiveMessagesOf()(conversation.id),
+    expect(applicationContainer.directMessages.markRead).toHaveBeenCalledWith(
+      expect.anything(),
+      conversation,
+      message.id,
     );
-
-    expect(unhandled).toEqual([]);
+    expect(
+      applicationContainer.conversations.markReadUntil,
+    ).not.toHaveBeenCalled();
     expect(onErrorChange).not.toHaveBeenCalledWith(expect.any(String));
     expect(timeline.setMessages).toHaveBeenLastCalledWith([message]);
   });

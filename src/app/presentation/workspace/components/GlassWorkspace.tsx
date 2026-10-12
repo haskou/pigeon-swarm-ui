@@ -528,6 +528,7 @@ export function GlassWorkspace({
   const conversationPins = useConversationPins({
     activeConversation,
     closeMessageContextMenu: () => setMessageContextMenu(null),
+    messages,
     onError: setSendError,
     session,
   });

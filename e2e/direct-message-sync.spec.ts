@@ -48,13 +48,16 @@ test('syncs direct messages and peer banner updates across devices', async ({
     await selectConversationByTitle(alicePage, bob.name);
     await selectConversationByTitle(bobPage, alice.name);
 
-    await sendMessage(alicePage, aliceMessage);
-    await expect(bobPage.getByText(aliceMessage, { exact: true })).toBeVisible({
+    // A one-to-one send needs the peer's inbox open. Alice opens hers when she
+    // creates the conversation, so Bob sends first; Alice sends once Bob's
+    // message has arrived, by which point Bob's inbox has been opened too.
+    await sendMessage(bobPage, bobMessage);
+    await expect(alicePage.getByText(bobMessage, { exact: true })).toBeVisible({
       timeout: 45_000,
     });
 
-    await sendMessage(bobPage, bobMessage);
-    await expect(alicePage.getByText(bobMessage, { exact: true })).toBeVisible({
+    await sendMessage(alicePage, aliceMessage);
+    await expect(bobPage.getByText(aliceMessage, { exact: true })).toBeVisible({
       timeout: 45_000,
     });
 

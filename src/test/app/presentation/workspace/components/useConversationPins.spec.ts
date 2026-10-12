@@ -11,7 +11,6 @@ import type {
 
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';
 import { useConversationPins } from '../../../../../app/presentation/workspace/components/useConversationPins';
-import { captureUnhandledRejections } from '../../../../captureUnhandledRejections';
 
 jest.mock('react', () => ({
   useEffect: () => undefined,
@@ -22,18 +21,24 @@ jest.mock('react', () => ({
 }));
 jest.mock('../../../../../app/composition/applicationContainer', () => ({
   applicationContainer: {
-    directMessages: { deliverPin: jest.fn() },
-    messages: { pin: jest.fn(), unpin: jest.fn() },
+    directMessages: { pin: jest.fn() },
+    messages: { listPins: jest.fn(), pin: jest.fn(), unpin: jest.fn() },
   },
 }));
 
-const conversation = {
+const oneToOne = {
   id: 'conversation-1',
   participantIds: ['alice', 'bob'],
   type: 'one-to-one',
 } as unknown as ConversationResource;
+const group = {
+  id: 'group-1',
+  participantIds: ['alice', 'bob', 'carol'],
+  type: 'group',
+} as unknown as ConversationResource;
 const session = { identity: { id: 'alice' } } as unknown as Session;
 const message = { id: 'message-1' } as unknown as ChatMessage;
+const other = { id: 'message-2' } as unknown as ChatMessage;
 
 const pinnedCollection = {
   error: null,
@@ -58,12 +63,19 @@ function collectionUpdaterOf(
   ) => MessageCollectionState | null;
 }
 
-function mountPins() {
+function mountPins({
+  activeConversation = oneToOne,
+  messages = [message],
+}: {
+  activeConversation?: ConversationResource;
+  messages?: ChatMessage[];
+} = {}) {
   const onError = jest.fn<(error: string | null) => void>();
   const closeMessageContextMenu = jest.fn<() => void>();
   const pins = useConversationPins({
-    activeConversation: conversation,
+    activeConversation,
     closeMessageContextMenu,
+    messages,
     onError,
     session,
   });
@@ -71,152 +83,113 @@ function mountPins() {
   return { onError, pins };
 }
 
-describe('useConversationPins mailbox delivery', () => {
+describe('useConversationPins one-to-one mailbox', () => {
   beforeEach(() => {
     jest.resetAllMocks();
   });
 
-  it('delivers a pin record to the peer after the legacy pin succeeds', async () => {
-    jest.mocked(applicationContainer.messages.pin).mockResolvedValue(undefined);
+  it('pins a one-to-one message through the mailbox only', async () => {
+    jest
+      .mocked(applicationContainer.directMessages.pin)
+      .mockResolvedValue(undefined);
     const { pins } = mountPins();
 
     await pins.pin(message);
 
-    expect(applicationContainer.directMessages.deliverPin).toHaveBeenCalledWith(
+    expect(applicationContainer.directMessages.pin).toHaveBeenCalledWith(
       session,
-      conversation,
+      oneToOne,
       {
         action: 'pin',
         createdAt: expect.any(Number),
         messageId: 'message-1',
       },
     );
-    expect(
-      jest.mocked(applicationContainer.messages.pin).mock
-        .invocationCallOrder[0],
-    ).toBeLessThan(
-      jest.mocked(applicationContainer.directMessages.deliverPin).mock
-        .invocationCallOrder[0],
+    expect(applicationContainer.messages.pin).not.toHaveBeenCalled();
+    expect(pinnedUpdaterOf(pins.setPinnedMessageIds)(new Set())).toEqual(
+      new Set(['message-1']),
     );
   });
 
-  it('does not deliver a pin record when the legacy pin fails', async () => {
+  it('shows the pin error and does not mark the message pinned when the mailbox pin rejects', async () => {
     jest
-      .mocked(applicationContainer.messages.pin)
-      .mockRejectedValue(new Error('offline'));
+      .mocked(applicationContainer.directMessages.pin)
+      .mockRejectedValue(new Error('pin refused'));
     const { onError, pins } = mountPins();
 
     await pins.pin(message);
 
-    expect(
-      applicationContainer.directMessages.deliverPin,
-    ).not.toHaveBeenCalled();
-    expect(onError).toHaveBeenLastCalledWith(expect.any(String));
+    expect(applicationContainer.messages.pin).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenLastCalledWith('pin refused');
+    expect(pins.setPinnedMessageIds).not.toHaveBeenCalled();
   });
 
-  it('delivers an unpin record to the peer after the legacy unpin succeeds', async () => {
+  it('unpins a one-to-one message through the mailbox only', async () => {
     jest
-      .mocked(applicationContainer.messages.unpin)
+      .mocked(applicationContainer.directMessages.pin)
       .mockResolvedValue(undefined);
     const { pins } = mountPins();
 
     await pins.unpin(message);
 
-    expect(applicationContainer.directMessages.deliverPin).toHaveBeenCalledWith(
+    expect(applicationContainer.directMessages.pin).toHaveBeenCalledWith(
       session,
-      conversation,
+      oneToOne,
       {
         action: 'unpin',
         createdAt: expect.any(Number),
         messageId: 'message-1',
       },
     );
+    expect(applicationContainer.messages.unpin).not.toHaveBeenCalled();
+    expect(collectionUpdaterOf(pins.setCollection)(pinnedCollection)).toEqual({
+      error: null,
+      messages: [],
+      state: 'ready',
+    });
   });
 
-  it('does not deliver an unpin record when the legacy unpin fails', async () => {
+  it('shows the unpin error in the pins view when the mailbox unpin rejects', async () => {
     jest
-      .mocked(applicationContainer.messages.unpin)
-      .mockRejectedValue(new Error('offline'));
+      .mocked(applicationContainer.directMessages.pin)
+      .mockRejectedValue(new Error('unpin refused'));
     const { pins } = mountPins();
 
     await pins.unpin(message);
 
-    expect(
-      applicationContainer.directMessages.deliverPin,
-    ).not.toHaveBeenCalled();
+    expect(applicationContainer.messages.unpin).not.toHaveBeenCalled();
+    expect(collectionUpdaterOf(pins.setCollection)(pinnedCollection)).toEqual({
+      error: 'unpin refused',
+      messages: [message],
+      state: 'ready',
+    });
   });
 
-  it('keeps the pin applied when inbox delivery throws synchronously', async () => {
+  it('builds the one-to-one pins view from pinned timeline messages without a legacy listing', async () => {
+    const { pins } = mountPins({ messages: [message, other] });
+    pins.pinnedMessageIds.add('message-1');
+
+    await pins.open();
+
+    expect(applicationContainer.messages.listPins).not.toHaveBeenCalled();
+    expect(pins.setCollection).toHaveBeenLastCalledWith({
+      error: null,
+      messages: [message],
+      state: 'ready',
+    });
+  });
+
+  it('pins a group message through the legacy endpoint only', async () => {
     jest.mocked(applicationContainer.messages.pin).mockResolvedValue(undefined);
-    jest
-      .mocked(applicationContainer.directMessages.deliverPin)
-      .mockImplementation(() => {
-        throw new Error('inbox unavailable');
-      });
-    const { onError, pins } = mountPins();
+    const { pins } = mountPins({ activeConversation: group });
 
     await pins.pin(message);
 
-    expect(onError).toHaveBeenLastCalledWith(null);
-    expect(pinnedUpdaterOf(pins.setPinnedMessageIds)(new Set())).toEqual(
-      new Set(['message-1']),
+    expect(applicationContainer.messages.pin).toHaveBeenCalledWith(
+      session,
+      'group-1',
+      'message-1',
     );
-  });
-
-  it('keeps the pin applied with no unhandled rejection when inbox delivery rejects', async () => {
-    jest.mocked(applicationContainer.messages.pin).mockResolvedValue(undefined);
-    jest
-      .mocked(applicationContainer.directMessages.deliverPin)
-      .mockRejectedValue(new Error('inbox unavailable'));
-    const { onError, pins } = mountPins();
-
-    const unhandled = await captureUnhandledRejections(() => pins.pin(message));
-
-    expect(unhandled).toEqual([]);
-    expect(onError).toHaveBeenLastCalledWith(null);
-    expect(pinnedUpdaterOf(pins.setPinnedMessageIds)(new Set())).toEqual(
-      new Set(['message-1']),
-    );
-  });
-
-  it('keeps the unpin applied when inbox delivery throws synchronously', async () => {
-    jest
-      .mocked(applicationContainer.messages.unpin)
-      .mockResolvedValue(undefined);
-    jest
-      .mocked(applicationContainer.directMessages.deliverPin)
-      .mockImplementation(() => {
-        throw new Error('inbox unavailable');
-      });
-    const { pins } = mountPins();
-
-    await pins.unpin(message);
-
-    expect(collectionUpdaterOf(pins.setCollection)(pinnedCollection)).toEqual({
-      error: null,
-      messages: [],
-      state: 'ready',
-    });
-  });
-
-  it('keeps the unpin applied with no unhandled rejection when inbox delivery rejects', async () => {
-    jest
-      .mocked(applicationContainer.messages.unpin)
-      .mockResolvedValue(undefined);
-    jest
-      .mocked(applicationContainer.directMessages.deliverPin)
-      .mockRejectedValue(new Error('inbox unavailable'));
-    const { pins } = mountPins();
-
-    const unhandled = await captureUnhandledRejections(() =>
-      pins.unpin(message),
-    );
-
-    expect(unhandled).toEqual([]);
-    expect(collectionUpdaterOf(pins.setCollection)(pinnedCollection)).toEqual({
-      error: null,
-      messages: [],
-      state: 'ready',
-    });
+    expect(applicationContainer.directMessages.pin).not.toHaveBeenCalled();
   });
 });

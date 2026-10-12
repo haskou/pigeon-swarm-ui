@@ -19,7 +19,7 @@ import type {
 
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';
 import { useConversationMessageActions } from '../../../../../app/presentation/workspace/components/useConversationMessageActions';
-import { captureUnhandledRejections } from '../../../../captureUnhandledRejections';
+import { copy } from '../../../../../shared/presentation/i18n/copy';
 
 jest.mock('react', () => ({
   startTransition: (callback: () => void) => callback(),
@@ -30,19 +30,25 @@ jest.mock('react', () => ({
 jest.mock('../../../../../app/composition/applicationContainer', () => ({
   applicationContainer: {
     directMessages: {
-      deliverDelete: jest.fn(),
-      deliverEdit: jest.fn(),
-      deliverReaction: jest.fn(),
+      delete: jest.fn(),
+      edit: jest.fn(),
+      reaction: jest.fn(),
     },
     messages: {
       addReactionTo: jest.fn(),
       delete: jest.fn(),
       edit: jest.fn(),
+      loadAround: jest.fn(),
       removeReactionFrom: jest.fn(),
     },
   },
 }));
 
+const directDelete = jest.mocked(applicationContainer.directMessages.delete);
+const directEdit = jest.mocked(applicationContainer.directMessages.edit);
+const directReaction = jest.mocked(
+  applicationContainer.directMessages.reaction,
+);
 const deleteLegacy = jest.mocked(applicationContainer.messages.delete);
 const editLegacy = jest.mocked(applicationContainer.messages.edit);
 const addReactionLegacy = jest.mocked(
@@ -51,21 +57,18 @@ const addReactionLegacy = jest.mocked(
 const removeReactionLegacy = jest.mocked(
   applicationContainer.messages.removeReactionFrom,
 );
-const deliverDelete = jest.mocked(
-  applicationContainer.directMessages.deliverDelete,
-);
-const deliverEdit = jest.mocked(
-  applicationContainer.directMessages.deliverEdit,
-);
-const deliverReaction = jest.mocked(
-  applicationContainer.directMessages.deliverReaction,
-);
+const loadAroundLegacy = jest.mocked(applicationContainer.messages.loadAround);
 
 const session = { identity: { id: 'identity-1' } } as unknown as Session;
 const conversation = {
   id: 'conversation-1',
   networkId: 'network-1',
   type: 'one-to-one',
+} as unknown as ConversationResource;
+const groupConversation = {
+  id: 'conversation-2',
+  networkId: 'network-1',
+  type: 'group',
 } as unknown as ConversationResource;
 const target = {
   attachments: [],
@@ -82,17 +85,15 @@ const target = {
   reactions: [],
   timestamp: 2000,
 } as unknown as ChatMessage;
-const editRaw = {
-  conversationId: 'conversation-1',
-  id: 'edit-1',
-  targetMessageId: 'message-1',
-  type: 'edited',
-} as unknown as MessageResource;
 const editEvent = {
   content: 'changed',
   encrypted: false,
   id: 'edit-1',
-  raw: editRaw,
+  raw: {
+    id: 'edit-1',
+    targetMessageId: 'message-1',
+    type: 'edited',
+  },
   timestamp: 3000,
 } as unknown as ChatMessage;
 const createdAt = 1_700_000_000_000;
@@ -153,7 +154,7 @@ function mountActions({
   };
 }
 
-describe('useConversationMessageActions inbox delivery', () => {
+describe('useConversationMessageActions one-to-one mailbox', () => {
   beforeEach(() => {
     jest.resetAllMocks();
   });
@@ -163,176 +164,102 @@ describe('useConversationMessageActions inbox delivery', () => {
   });
 
   describe('delete', () => {
-    it('delivers the delete to the active conversation after the legacy delete resolves', async () => {
-      deleteLegacy.mockResolvedValue(undefined);
+    it('deletes a one-to-one message through the mailbox only', async () => {
+      directDelete.mockResolvedValue(undefined);
       const actions = mountActions();
+
+      await actions.deleteMessage(target);
+
+      expect(directDelete).toHaveBeenCalledWith(
+        session,
+        conversation,
+        'message-1',
+      );
+      expect(deleteLegacy).not.toHaveBeenCalled();
+      expect(actions.state.messages).toEqual([]);
+    });
+
+    it('keeps the message and shows the delete error when the mailbox delete rejects', async () => {
+      directDelete.mockRejectedValue(new Error('delete refused'));
+      const actions = mountActions();
+
+      await actions.deleteMessage(target);
+
+      expect(deleteLegacy).not.toHaveBeenCalled();
+      expect(actions.state.error).toBe('delete refused');
+      expect(actions.state.messages).toEqual([target]);
+    });
+
+    it('deletes a group message through the legacy endpoint only', async () => {
+      deleteLegacy.mockResolvedValue(undefined);
+      const actions = mountActions({ activeConversation: groupConversation });
 
       await actions.deleteMessage(target);
 
       expect(deleteLegacy).toHaveBeenCalledWith(
         session,
-        conversation.id,
+        groupConversation.id,
         'message-1',
       );
-      expect(deliverDelete).toHaveBeenCalledWith(
-        session,
-        conversation,
-        'message-1',
-      );
-      expect(deliverDelete.mock.calls[0]?.[1]).toBe(conversation);
-      expect(deliverDelete.mock.invocationCallOrder[0]).toBeGreaterThan(
-        deleteLegacy.mock.invocationCallOrder[0] ?? Infinity,
-      );
-    });
-
-    it('does not deliver the delete when the legacy delete fails', async () => {
-      deleteLegacy.mockRejectedValue(new Error('delete refused'));
-      const actions = mountActions();
-
-      await actions.deleteMessage(target);
-
-      expect(deliverDelete).not.toHaveBeenCalled();
-      expect(actions.state.error).toBe('delete refused');
-    });
-
-    it('keeps the delete applied when inbox delivery throws synchronously', async () => {
-      deleteLegacy.mockResolvedValue(undefined);
-      deliverDelete.mockImplementation(() => {
-        throw new Error('inbox unavailable');
-      });
-      const actions = mountActions();
-
-      await actions.deleteMessage(target);
-
-      expect(actions.state.error).toBeNull();
-      expect(actions.state.messages).toEqual([]);
-    });
-
-    it('keeps the delete applied with no unhandled rejection when inbox delivery rejects', async () => {
-      deleteLegacy.mockResolvedValue(undefined);
-      deliverDelete.mockRejectedValue(new Error('inbox unavailable'));
-      const actions = mountActions();
-
-      const unhandled = await captureUnhandledRejections(() =>
-        actions.deleteMessage(target),
-      );
-
-      expect(unhandled).toEqual([]);
-      expect(actions.state.error).toBeNull();
-      expect(actions.state.messages).toEqual([]);
+      expect(directDelete).not.toHaveBeenCalled();
     });
   });
 
   describe('edit', () => {
-    it('delivers the edited record to the active conversation after the legacy edit resolves', async () => {
-      editLegacy.mockResolvedValue(editEvent);
+    it('edits a one-to-one message through the mailbox only', async () => {
+      directEdit.mockResolvedValue(editEvent);
       const actions = mountActions({
         editingMessage: { message: target, previousDraft: '' },
       });
 
       await actions.editMessage('changed');
 
-      expect(editLegacy).toHaveBeenCalledWith(
+      expect(directEdit).toHaveBeenCalledWith(
         session,
-        conversation.id,
+        conversation,
         'message-1',
         'changed',
+        {},
       );
-      expect(deliverEdit).toHaveBeenCalledWith(session, conversation, editRaw);
-      expect(deliverEdit.mock.calls[0]?.[1]).toBe(conversation);
-      expect(deliverEdit.mock.invocationCallOrder[0]).toBeGreaterThan(
-        editLegacy.mock.invocationCallOrder[0] ?? Infinity,
-      );
-    });
-
-    it('does not deliver the edit when the legacy edit fails', async () => {
-      editLegacy.mockRejectedValue(new Error('edit refused'));
-      const actions = mountActions({
-        editingMessage: { message: target, previousDraft: '' },
-      });
-
-      await actions.editMessage('changed');
-
-      expect(deliverEdit).not.toHaveBeenCalled();
-      expect(actions.state.error).toBe('edit refused');
-    });
-
-    it('finishes the edit when inbox delivery throws synchronously', async () => {
-      editLegacy.mockResolvedValue(editEvent);
-      deliverEdit.mockImplementation(() => {
-        throw new Error('inbox unavailable');
-      });
-      const actions = mountActions({
-        editingMessage: { message: target, previousDraft: '' },
-      });
-
-      await actions.editMessage('changed');
-
-      expect(actions.state.error).toBeNull();
-      expect(actions.state.messages).toContainEqual(
-        expect.objectContaining({
-          content: 'changed',
-          editMessageId: 'edit-1',
-          id: 'message-1',
-        }),
-      );
+      expect(editLegacy).not.toHaveBeenCalled();
       expect(actions.onEditingMessageChange).toHaveBeenCalledWith(null);
       expect(actions.updateActiveConversationDraft).toHaveBeenCalledWith('');
     });
 
-    it('finishes the edit with no unhandled rejection when inbox delivery rejects', async () => {
-      editLegacy.mockResolvedValue(editEvent);
-      deliverEdit.mockRejectedValue(new Error('inbox unavailable'));
+    it('keeps the edit open and shows the edit error when the mailbox edit rejects', async () => {
+      directEdit.mockRejectedValue(new Error('edit refused'));
       const actions = mountActions({
         editingMessage: { message: target, previousDraft: '' },
       });
 
-      const unhandled = await captureUnhandledRejections(() =>
-        actions.editMessage('changed'),
-      );
+      await actions.editMessage('changed');
 
-      expect(unhandled).toEqual([]);
-      expect(actions.state.error).toBeNull();
-      expect(actions.state.messages).toContainEqual(
-        expect.objectContaining({
-          content: 'changed',
-          editMessageId: 'edit-1',
-          id: 'message-1',
-        }),
-      );
-      expect(actions.onEditingMessageChange).toHaveBeenCalledWith(null);
+      expect(editLegacy).not.toHaveBeenCalled();
+      expect(actions.state.error).toBe('edit refused');
+      expect(actions.onEditingMessageChange).not.toHaveBeenCalledWith(null);
     });
   });
 
   describe('reaction', () => {
-    it('delivers an added reaction to the active conversation after the legacy add resolves', async () => {
+    it('adds a one-to-one reaction through the mailbox only', async () => {
       jest.spyOn(Date, 'now').mockReturnValue(createdAt);
-      addReactionLegacy.mockResolvedValue(undefined);
+      directReaction.mockResolvedValue(undefined);
       const actions = mountActions();
 
       await actions.toggleReaction(target, '👍', false);
 
-      expect(addReactionLegacy).toHaveBeenCalledWith(
-        session,
-        conversation.id,
-        'message-1',
-        '👍',
-      );
-      expect(deliverReaction).toHaveBeenCalledWith(session, conversation, {
+      expect(directReaction).toHaveBeenCalledWith(session, conversation, {
         action: 'add',
         createdAt,
         emoji: '👍',
         messageId: 'message-1',
       });
-      expect(deliverReaction.mock.calls[0]?.[1]).toBe(conversation);
-      expect(deliverReaction.mock.invocationCallOrder[0]).toBeGreaterThan(
-        addReactionLegacy.mock.invocationCallOrder[0] ?? Infinity,
-      );
+      expect(addReactionLegacy).not.toHaveBeenCalled();
     });
 
-    it('delivers a removed reaction to the active conversation after the legacy remove resolves', async () => {
+    it('removes a one-to-one reaction through the mailbox only', async () => {
       jest.spyOn(Date, 'now').mockReturnValue(createdAt);
-      removeReactionLegacy.mockResolvedValue(undefined);
+      directReaction.mockResolvedValue(undefined);
       const reacted = {
         ...target,
         reactions: [
@@ -347,66 +274,34 @@ describe('useConversationMessageActions inbox delivery', () => {
 
       await actions.toggleReaction(reacted, '👍', true);
 
-      expect(removeReactionLegacy).toHaveBeenCalledWith(
-        session,
-        conversation.id,
-        'message-1',
-        '👍',
-      );
-      expect(deliverReaction).toHaveBeenCalledWith(session, conversation, {
+      expect(directReaction).toHaveBeenCalledWith(session, conversation, {
         action: 'remove',
         createdAt,
         emoji: '👍',
         messageId: 'message-1',
       });
-      expect(deliverReaction.mock.calls[0]?.[1]).toBe(conversation);
+      expect(removeReactionLegacy).not.toHaveBeenCalled();
     });
 
-    it('does not deliver the reaction when the legacy call fails', async () => {
-      addReactionLegacy.mockRejectedValue(new Error('reaction refused'));
+    it('shows the reaction error when the mailbox reaction rejects', async () => {
+      directReaction.mockRejectedValue(new Error('reaction refused'));
       const actions = mountActions();
 
       await actions.toggleReaction(target, '👍', false);
 
-      expect(deliverReaction).not.toHaveBeenCalled();
+      expect(addReactionLegacy).not.toHaveBeenCalled();
       expect(actions.state.error).toBe('reaction refused');
     });
+  });
 
-    it('keeps the reaction applied when inbox delivery throws synchronously', async () => {
-      addReactionLegacy.mockResolvedValue(undefined);
-      deliverReaction.mockImplementation(() => {
-        throw new Error('inbox unavailable');
-      });
-      const actions = mountActions();
+  describe('reply reference', () => {
+    it('does not load a one-to-one reply target from the legacy endpoint', async () => {
+      const actions = mountActions({ messages: [] });
 
-      await actions.toggleReaction(target, '👍', false);
+      await actions.openReplyReference('missing-1');
 
-      expect(actions.state.error).toBeNull();
-      expect(actions.state.messages[0]?.reactions).toEqual([
-        expect.objectContaining({
-          authorIdentityId: 'identity-1',
-          emoji: '👍',
-        }),
-      ]);
-    });
-
-    it('keeps the reaction applied with no unhandled rejection when inbox delivery rejects', async () => {
-      addReactionLegacy.mockResolvedValue(undefined);
-      deliverReaction.mockRejectedValue(new Error('inbox unavailable'));
-      const actions = mountActions();
-
-      const unhandled = await captureUnhandledRejections(() =>
-        actions.toggleReaction(target, '👍', false),
-      );
-
-      expect(unhandled).toEqual([]);
-      expect(actions.state.error).toBeNull();
-      expect(actions.state.messages[0]?.reactions).toEqual([
-        expect.objectContaining({
-          authorIdentityId: 'identity-1',
-          emoji: '👍',
-        }),
-      ]);
+      expect(loadAroundLegacy).not.toHaveBeenCalled();
+      expect(actions.state.error).toBe(copy.messages.replyTargetNotFound);
     });
   });
 });

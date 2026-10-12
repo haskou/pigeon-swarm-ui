@@ -23,6 +23,8 @@ import { ConversationKeychain } from '../../../identities/infrastructure/keychai
 import { MessageContent } from '../../domain/value-objects/MessageContent';
 import { PigeonMessagesApi } from './PigeonMessagesApi';
 
+type CommandRecord = MessageResource & { id: string };
+
 export class PigeonMessageCommandsApi {
   public constructor(
     private readonly http: HttpJsonClient,
@@ -131,13 +133,19 @@ export class PigeonMessageCommandsApi {
     }
   }
 
-  public async send(
+  /**
+   * Builds the sent record for a message and hands it to `deliver`. Attachments
+   * are published first and settled only once `deliver` resolves; a failure
+   * abandons them. Nothing is sent here, so the caller decides where it goes.
+   */
+  public async withSentRecord<T>(
     session: Session,
     conversationId: string,
     content: string,
-    options: SendMessageOptions = {},
+    options: SendMessageOptions,
+    deliver: (sent: CommandRecord) => Promise<T>,
     commandIdentity?: MessageCommandIdentity,
-  ): Promise<ChatMessage> {
+  ): Promise<T> {
     const key = ConversationKeychain.entry(
       session.keychain,
       session.identity.id,
@@ -162,7 +170,7 @@ export class PigeonMessageCommandsApi {
       onAttachmentProgress,
       attachmentUpload,
     );
-    const created = await this.abandonAttachmentsOnFailure(
+    const result = await this.abandonAttachmentsOnFailure(
       session,
       messageAttachments,
       async () => {
@@ -191,46 +199,73 @@ export class PigeonMessageCommandsApi {
         const id =
           commandIdentity?.id ??
           `${conversationId}:${timestamp}:${UUID.generate().toString()}`;
-        const path = `/conversations/${encodeURIComponent(
-          conversationId,
-        )}/messages`;
 
-        return await this.submit<MessageResource>(session, 'POST', path, {
-          fields: {
-            createdAt: timestamp,
-            encryptedPayload,
-            id,
-            previousMessageIds,
-            ...(replyToMessageId ? { replyToMessageId } : {}),
-          },
-          record: {
-            authorId: this.mutations.authorOf(session),
-            conversationId,
-            createdAt: timestamp,
-            encryptedPayload,
-            id,
-            previousMessageIds,
-            replyToMessageId: replyToMessageId || undefined,
-            scopeType: 'conversation',
-            type: 'sent',
-          },
+        return await deliver({
+          authorId: this.mutations.authorOf(session),
+          conversationId,
+          createdAt: timestamp,
+          encryptedPayload,
+          id,
+          previousMessageIds,
+          replyToMessageId: replyToMessageId || undefined,
+          type: 'sent',
         });
       },
     );
 
     this.attachments.settleMessageAttachments(session, messageAttachments);
 
+    return result;
+  }
+
+  public async send(
+    session: Session,
+    conversationId: string,
+    content: string,
+    options: SendMessageOptions = {},
+    commandIdentity?: MessageCommandIdentity,
+  ): Promise<ChatMessage> {
+    const created = await this.withSentRecord(
+      session,
+      conversationId,
+      content,
+      options,
+      async (sent) => {
+        const path = `/conversations/${encodeURIComponent(
+          conversationId,
+        )}/messages`;
+
+        return await this.submit<MessageResource>(session, 'POST', path, {
+          fields: {
+            createdAt: sent.createdAt,
+            encryptedPayload: sent.encryptedPayload,
+            id: sent.id,
+            previousMessageIds: sent.previousMessageIds,
+            ...(sent.replyToMessageId
+              ? { replyToMessageId: sent.replyToMessageId }
+              : {}),
+          },
+          record: { ...sent, scopeType: 'conversation' },
+        });
+      },
+      commandIdentity,
+    );
+
     return await this.projection.decrypt(session, conversationId, created);
   }
 
-  public async edit(
+  /**
+   * Builds the edit record for one message: the encrypted payload and the
+   * record a sender writes. Nothing is submitted here.
+   */
+  public async composeEdit(
     session: Session,
     conversationId: string,
     messageId: string,
     content: string,
     options: EditMessageOptions = {},
     commandIdentity?: MessageCommandIdentity,
-  ): Promise<ChatMessage> {
+  ): Promise<CommandRecord> {
     const key = ConversationKeychain.entry(
       session.keychain,
       session.identity.id,
@@ -253,32 +288,49 @@ export class PigeonMessageCommandsApi {
       session,
       timestamp,
     });
-    const id = `${conversationId}:${timestamp}:${UUID.generate().toString()}:edited`;
-    const previousMessageIds = [messageId];
+
+    return {
+      authorId: this.mutations.authorOf(session),
+      conversationId,
+      createdAt: timestamp,
+      encryptedPayload,
+      id: `${conversationId}:${timestamp}:${UUID.generate().toString()}:edited`,
+      previousMessageIds: [messageId],
+      targetMessageId: messageId,
+      type: 'edited',
+    };
+  }
+
+  public async edit(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+    content: string,
+    options: EditMessageOptions = {},
+    commandIdentity?: MessageCommandIdentity,
+  ): Promise<ChatMessage> {
+    const edited = await this.composeEdit(
+      session,
+      conversationId,
+      messageId,
+      content,
+      options,
+      commandIdentity,
+    );
     const path = `/conversations/${encodeURIComponent(
       conversationId,
     )}/messages/${encodeURIComponent(messageId)}`;
-    const edited = await this.submit<MessageResource>(session, 'PUT', path, {
+    const result = await this.submit<MessageResource>(session, 'PUT', path, {
       fields: {
-        createdAt: timestamp,
-        encryptedPayload,
-        id,
-        previousMessageIds,
+        createdAt: edited.createdAt,
+        encryptedPayload: edited.encryptedPayload,
+        id: edited.id,
+        previousMessageIds: edited.previousMessageIds,
       },
-      record: {
-        authorId: this.mutations.authorOf(session),
-        conversationId,
-        createdAt: timestamp,
-        encryptedPayload,
-        id,
-        previousMessageIds,
-        scopeType: 'conversation',
-        targetMessageId: messageId,
-        type: 'edited',
-      },
+      record: { ...edited, scopeType: 'conversation' },
     });
 
-    return await this.projection.decrypt(session, conversationId, edited);
+    return await this.projection.decrypt(session, conversationId, result);
   }
 
   public async delete(

@@ -202,7 +202,29 @@ describe('conversation use cases', () => {
     expect(group.pullDomainEvents()).toHaveLength(1);
   });
 
-  it('marks a conversation read through the aggregate', async () => {
+  it('marks a group conversation read through the aggregate', async () => {
+    const group = conversation('group:a', 0, 'group', 1);
+
+    conversationRepository.find.mockResolvedValue(group);
+
+    await new ConversationReadMarker(conversationRepository).mark(
+      new MarkConversationReadUntilMessage(
+        'group:a',
+        'message-a',
+        'identity-a',
+        200,
+      ),
+    );
+
+    expect(conversationRepository.markReadUntil).toHaveBeenCalledWith(
+      group,
+      expect.anything(),
+      expect.anything(),
+    );
+    expect(group.pullDomainEvents()).toHaveLength(1);
+  });
+
+  it('never sends a one-to-one read to the conversation read-until endpoint', async () => {
     const direct = conversation('one-to-one:a', 0, 'one-to-one', 1);
 
     conversationRepository.find.mockResolvedValue(direct);
@@ -216,12 +238,8 @@ describe('conversation use cases', () => {
       ),
     );
 
-    expect(conversationRepository.markReadUntil).toHaveBeenCalledWith(
-      direct,
-      expect.anything(),
-      expect.anything(),
-    );
-    expect(direct.pullDomainEvents()).toHaveLength(1);
+    expect(conversationRepository.markReadUntil).not.toHaveBeenCalled();
+    expect(direct.pullDomainEvents()).toHaveLength(0);
   });
 
   it('returns conversations ordered by latest activity', async () => {

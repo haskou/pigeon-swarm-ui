@@ -4,7 +4,6 @@ import { Buffer } from 'buffer';
 import type {
   ChatMessage,
   ConversationResource,
-  MessageResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 import type { RealtimeMailboxSubscriptionInput } from '../../../../shared/infrastructure/realtime/RealtimeMailboxSubscriptionInput';
@@ -14,6 +13,9 @@ import type {
   OpenedMailboxPage,
 } from '../../../mailboxes/infrastructure/MailboxChannel';
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
+import type { PigeonMessageCommandsApi } from '../http/PigeonMessageCommandsApi';
+import type { EditMessageOptions } from '../http/resources/EditMessageOptions';
+import type { SendMessageOptions } from '../http/resources/SendMessageOptions';
 import type {
   DirectEditedRecord,
   DirectMessageRecord,
@@ -36,16 +38,6 @@ import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel
 import { DirectMessageAuthorship } from './DirectMessageAuthorship';
 import { DirectMessageMailboxRecord } from './DirectMessageMailboxRecord';
 import { DirectMessageMailboxStore } from './DirectMessageMailboxStore';
-
-/**
- * 'no-inbox': the node has no inbox for the recipient yet (a 404). Benign: the
- * peer has not opened it, so the sender shows no notice for it.
- */
-export type DirectMessageMailboxDelivery =
-  | 'delivered'
-  | 'failed'
-  | 'no-inbox'
-  | 'skipped';
 
 /** One change to the timeline, in the order the inbox holds it. */
 export type DirectMessageTimelineChange =
@@ -85,16 +77,14 @@ type RecipientInbox = {
 /** Count-only: no ids, content, or error details. */
 function logAppendFailure(): void {
   // eslint-disable-next-line no-console
-  console.debug('Direct mailbox append failed; legacy copy kept.');
+  console.debug('Direct mailbox append failed.');
 }
 
 /**
  * Direct one-to-one messages over the opaque mailbox: sent, edited, deleted,
- * reactions, pins, and read receipts. The legacy send delivers first; this
- * path carries a copy so the peer can receive it without the replicated path.
- * Sent, edited, deleted, reaction, and pin records also go to this identity's
- * own inbox, so its other devices converge. Duplicates collapse by message id
- * in the timeline.
+ * reactions, pins, and read receipts. Each action goes to the peer's inbox
+ * first, then to this identity's own inbox, so its other devices converge.
+ * Duplicates collapse by message id in the timeline.
  */
 export class DirectMessageMailbox {
   private static readonly PAGE_SIZE = 50;
@@ -118,8 +108,15 @@ export class DirectMessageMailbox {
     private readonly channel: MailboxChannel,
     private readonly recipients: RecipientMailboxRouter,
     private readonly store: DirectMessageMailboxStore,
-    private readonly projection: Pick<MessageProjectionPort, 'decryptMany'>,
+    private readonly projection: Pick<
+      MessageProjectionPort,
+      'decrypt' | 'decryptMany'
+    >,
     private readonly readerSet: DirectMessageReaderSet,
+    private readonly composer: Pick<
+      PigeonMessageCommandsApi,
+      'composeEdit' | 'withSentRecord'
+    >,
   ) {}
 
   /**
@@ -151,43 +148,77 @@ export class DirectMessageMailbox {
   }
 
   /**
-   * Sender. Appends a sent message to the peer's inbox and to this identity's
-   * own inbox. Returns 'skipped' when there is no peer, the conversation is a
-   * group, or the record exceeds the envelope bound; the message then stays on
-   * the legacy path only. Never throws. A 404 for an inbox the peer has not
-   * opened yet returns 'no-inbox' (benign, no notice); any other failure
-   * returns 'failed'. The result is the peer outcome; the own copy never
-   * changes it. The caller keeps the legacy copy and shows one non-blocking
-   * notice for 'failed' only.
+   * Sender. Sends a message to the peer's inbox, then to this identity's own
+   * inbox. The composer builds the record and publishes its attachments, always
+   * encrypted for the peer whatever the caller passes. Rejects when the peer
+   * copy fails; then no own copy is written and no attachment settles.
    */
-  public deliverSent(
+  public async send(
     session: Session,
     conversation: ConversationResource,
-    sent: MessageResource,
-  ): Promise<DirectMessageMailboxDelivery> {
-    return this.append(session, conversation, () =>
-      DirectMessageMailboxRecord.fromSent(conversation.id, sent),
+    content: string,
+    options: SendMessageOptions,
+  ): Promise<ChatMessage> {
+    const recipientIdentityId = this.peerOf(session, conversation);
+
+    const sent = await this.composer.withSentRecord(
+      session,
+      conversation.id,
+      content,
+      {
+        ...options,
+        attachmentUpload: {
+          encryptLargeAttachments: true,
+          encryptSmallAttachments: true,
+          networkId: conversation.networkId,
+          recipientIdentityId,
+        },
+      },
+      async (record) => {
+        await this.deliver(session, conversation.id, recipientIdentityId, () =>
+          DirectMessageMailboxRecord.fromSent(conversation.id, record),
+        );
+
+        return record;
+      },
     );
+
+    return await this.projection.decrypt(session, conversation.id, sent);
   }
 
-  /** Sender. Edit of a sent message. Same outcomes as deliverSent. */
-  public deliverEdit(
-    session: Session,
-    conversation: ConversationResource,
-    edited: MessageResource,
-  ): Promise<DirectMessageMailboxDelivery> {
-    return this.append(session, conversation, () =>
-      DirectMessageMailboxRecord.fromEdited(conversation.id, edited),
-    );
-  }
-
-  /** Sender. Delete of a message by id. Same outcomes as deliverSent. */
-  public deliverDelete(
+  /** Sender. Edits a sent message. Rejects like send. */
+  public async edit(
     session: Session,
     conversation: ConversationResource,
     messageId: string,
-  ): Promise<DirectMessageMailboxDelivery> {
-    return this.append(session, conversation, () => ({
+    content: string,
+    options: EditMessageOptions,
+  ): Promise<ChatMessage> {
+    const recipientIdentityId = this.peerOf(session, conversation);
+    const edited = await this.composer.composeEdit(
+      session,
+      conversation.id,
+      messageId,
+      content,
+      options,
+    );
+
+    await this.deliver(session, conversation.id, recipientIdentityId, () =>
+      DirectMessageMailboxRecord.fromEdited(conversation.id, edited),
+    );
+
+    return await this.projection.decrypt(session, conversation.id, edited);
+  }
+
+  /** Sender. Deletes a message by id. Rejects like send. */
+  public async delete(
+    session: Session,
+    conversation: ConversationResource,
+    messageId: string,
+  ): Promise<void> {
+    const recipientIdentityId = this.peerOf(session, conversation);
+
+    await this.deliver(session, conversation.id, recipientIdentityId, () => ({
       authorId: session.identity.id,
       conversationId: conversation.id,
       createdAt: Date.now(),
@@ -197,8 +228,8 @@ export class DirectMessageMailbox {
     }));
   }
 
-  /** Sender. Appends a reaction add or remove. Same outcomes as deliverSent. */
-  public deliverReaction(
+  /** Sender. Adds or removes a reaction. Rejects like send. */
+  public async reaction(
     session: Session,
     conversation: ConversationResource,
     reaction: {
@@ -207,8 +238,10 @@ export class DirectMessageMailbox {
       emoji: string;
       messageId: string;
     },
-  ): Promise<DirectMessageMailboxDelivery> {
-    return this.append(session, conversation, () => ({
+  ): Promise<void> {
+    const recipientIdentityId = this.peerOf(session, conversation);
+
+    await this.deliver(session, conversation.id, recipientIdentityId, () => ({
       action: reaction.action,
       authorId: session.identity.id,
       conversationId: conversation.id,
@@ -220,8 +253,8 @@ export class DirectMessageMailbox {
     }));
   }
 
-  /** Sender. Appends a pin or unpin. Same outcomes as deliverSent. */
-  public deliverPin(
+  /** Sender. Pins or unpins a message. Rejects like send. */
+  public async pin(
     session: Session,
     conversation: ConversationResource,
     pin: {
@@ -229,8 +262,10 @@ export class DirectMessageMailbox {
       createdAt: number;
       messageId: string;
     },
-  ): Promise<DirectMessageMailboxDelivery> {
-    return this.append(session, conversation, () => ({
+  ): Promise<void> {
+    const recipientIdentityId = this.peerOf(session, conversation);
+
+    await this.deliver(session, conversation.id, recipientIdentityId, () => ({
       action: pin.action,
       authorId: session.identity.id,
       conversationId: conversation.id,
@@ -242,28 +277,29 @@ export class DirectMessageMailbox {
   }
 
   /**
-   * Sender. Appends a read receipt to this identity's own inbox, so its other
-   * devices clear unread. The peer never receives it. Same outcomes as
-   * deliverSent.
+   * Sender. Writes a read receipt to this identity's own inbox, so its other
+   * devices clear unread. The peer never receives it. Never rejects: a failure
+   * logs one count-only line. Writes nothing for a group conversation.
    */
-  public deliverRead(
+  public async markRead(
     session: Session,
     conversation: ConversationResource,
     messageId: string,
-  ): Promise<DirectMessageMailboxDelivery> {
-    return this.appendTo(
-      session,
-      conversation,
-      () => session.identity.id,
-      () => ({
+  ): Promise<void> {
+    if (!DirectMessageMailboxRecord.isEligible(conversation.type)) return;
+
+    try {
+      await this.writeTo(session, conversation.id, session.identity.id, {
         authorId: session.identity.id,
         conversationId: conversation.id,
         createdAt: Date.now(),
         id: UUID.generate().toString(),
         targetMessageId: messageId,
         type: 'read',
-      }),
-    );
+      });
+    } catch {
+      logAppendFailure();
+    }
   }
 
   /**
@@ -465,61 +501,43 @@ export class DirectMessageMailbox {
   }
 
   /**
-   * Shared sender path. Builds the record once, so the peer copy and the own
-   * copy carry the same id and record. Only the own copy is tagged. Skips
-   * without sending when there is no peer, the conversation is a group, or the
-   * record exceeds the envelope bound. Reading the peer and building the record
-   * run inside the try, so a throw there is 'failed'. The peer copy alone
-   * decides the result. The own copy runs after it in its own guard
-   * (`appendOwnCopy`), so tagging or sending it cannot change the result.
+   * The peer of a one-to-one conversation. Throws before any write when the
+   * conversation is a group or has no other participant.
    */
-  private async append(
-    session: Session,
-    conversation: ConversationResource,
-    build: () => DirectMessageRecord,
-  ): Promise<DirectMessageMailboxDelivery> {
-    try {
-      const recipientIdentityId = conversation.participantIds.find(
-        (identityId) => identityId !== session.identity.id,
-      );
+  private peerOf(session: Session, conversation: ConversationResource): string {
+    const peer = conversation.participantIds.find(
+      (identityId) => identityId !== session.identity.id,
+    );
 
-      if (
-        !recipientIdentityId ||
-        !DirectMessageMailboxRecord.isEligible(conversation.type)
-      ) {
-        return 'skipped';
-      }
-
-      const record = build();
-      const plaintext = this.encodeFor(session, recipientIdentityId, record);
-
-      if (plaintext.byteLength > MailboxEnvelopeCipher.MAX_PLAINTEXT_BYTES) {
-        return 'skipped';
-      }
-
-      const delivery = await this.sendRecord(
-        session,
-        conversation.id,
-        recipientIdentityId,
-        plaintext,
-      );
-
-      if (delivery === 'failed') logAppendFailure();
-
-      this.rememberOwnCopy(`${session.identity.id}:${record.id}`);
-      await this.appendOwnCopy(session, conversation.id, record);
-
-      return delivery;
-    } catch {
-      logAppendFailure();
-
-      return 'failed';
+    if (!peer || !DirectMessageMailboxRecord.isEligible(conversation.type)) {
+      throw new Error('Direct mailbox needs a one-to-one conversation.');
     }
+
+    return peer;
   }
 
   /**
-   * The own copy is additive. Its tagging or sending never changes the result
-   * the caller sees. A throw while building it logs one count-only line.
+   * Sender path shared by every direct write. Builds the record once, so the
+   * peer copy and the own copy carry the same id. The peer copy goes first; its
+   * failure rejects with the original error and no own copy is written.
+   */
+  private async deliver(
+    session: Session,
+    conversationId: string,
+    recipientIdentityId: string,
+    build: () => DirectMessageRecord,
+  ): Promise<void> {
+    const record = build();
+
+    await this.writeTo(session, conversationId, recipientIdentityId, record);
+
+    this.rememberOwnCopy(`${session.identity.id}:${record.id}`);
+    await this.appendOwnCopy(session, conversationId, record);
+  }
+
+  /**
+   * The own copy is additive: a failure after the peer copy logs one
+   * count-only line and resolves, so it never changes what the caller sees.
    */
   private async appendOwnCopy(
     session: Session,
@@ -527,60 +545,9 @@ export class DirectMessageMailbox {
     record: DirectMessageRecord,
   ): Promise<void> {
     try {
-      await this.sendRecord(
-        session,
-        conversationId,
-        session.identity.id,
-        this.encodeFor(session, session.identity.id, record),
-      );
+      await this.writeTo(session, conversationId, session.identity.id, record);
     } catch {
       logAppendFailure();
-    }
-  }
-
-  /**
-   * Appends one record to the inbox of the given identity. Used by the read
-   * receipt path, which writes to this identity's own inbox. Skips without
-   * sending when there is no recipient or the conversation is a group.
-   * Reading the recipient and building the record run inside the try, so a
-   * throw there is 'failed' and never reaches the caller.
-   */
-  private async appendTo(
-    session: Session,
-    conversation: ConversationResource,
-    recipientIdentityId: () => string | undefined,
-    build: () => DirectMessageRecord,
-  ): Promise<DirectMessageMailboxDelivery> {
-    try {
-      const recipient = recipientIdentityId();
-
-      if (
-        !recipient ||
-        !DirectMessageMailboxRecord.isEligible(conversation.type)
-      ) {
-        return 'skipped';
-      }
-
-      const plaintext = this.encodeFor(session, recipient, build());
-
-      if (plaintext.byteLength > MailboxEnvelopeCipher.MAX_PLAINTEXT_BYTES) {
-        return 'skipped';
-      }
-
-      const delivery = await this.sendRecord(
-        session,
-        conversation.id,
-        recipient,
-        plaintext,
-      );
-
-      if (delivery === 'failed') logAppendFailure();
-
-      return delivery;
-    } catch {
-      logAppendFailure();
-
-      return 'failed';
     }
   }
 
@@ -602,26 +569,25 @@ export class DirectMessageMailbox {
   }
 
   /**
-   * Sends one encoded record to one inbox. Never throws: a 404 for an inbox the
-   * peer has not opened yet returns 'no-inbox'; any other failure returns
-   * 'failed'. Logs nothing, so the caller decides which failures are worth a
-   * line.
+   * Encodes one record for one inbox, enforces the envelope bound, and appends
+   * it through the recipient router. Throws before any append when the record
+   * is over the bound, so nothing is written.
    */
-  private async sendRecord(
+  private async writeTo(
     session: Session,
     conversationId: string,
     recipientIdentityId: string,
-    plaintext: Uint8Array,
-  ): Promise<DirectMessageMailboxDelivery> {
-    try {
-      const keys = this.keysFor(session, conversationId, recipientIdentityId);
+    record: DirectMessageRecord,
+  ): Promise<void> {
+    const plaintext = this.encodeFor(session, recipientIdentityId, record);
 
-      await this.recipients.send(recipientIdentityId, keys, plaintext);
-
-      return 'delivered';
-    } catch (error) {
-      return error instanceof MailboxUnavailableError ? 'no-inbox' : 'failed';
+    if (plaintext.byteLength > MailboxEnvelopeCipher.MAX_PLAINTEXT_BYTES) {
+      throw new Error('Direct mailbox record exceeds the envelope bound.');
     }
+
+    const keys = this.keysFor(session, conversationId, recipientIdentityId);
+
+    await this.recipients.send(recipientIdentityId, keys, plaintext);
   }
 
   /** Remembers an own copy so its replay is not applied. Bounded. */

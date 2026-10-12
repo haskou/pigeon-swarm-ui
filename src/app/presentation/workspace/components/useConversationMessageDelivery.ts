@@ -9,7 +9,7 @@ import {
   type SetStateAction,
 } from 'react';
 
-import type { DirectMessageMailboxDelivery } from '../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
+import type { SendMessageOptions } from '../../../../contexts/messages/infrastructure/http/resources/SendMessageOptions';
 import type {
   AttachmentProgress,
   AttachmentUploadOptions,
@@ -27,7 +27,6 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { PendingConversationMessage } from './PendingConversationMessage';
-import { runMailboxSideEffect } from './runMailboxSideEffect';
 import { runStickerUsageSideEffect } from './runStickerUsageSideEffect';
 
 export type PendingConversationSend = {
@@ -76,40 +75,8 @@ export function useConversationMessageDelivery({
   const [failedSends, setFailedSends] = useState<
     Record<string, PendingConversationSend>
   >({});
-  // Conversation whose direct copy notice is in the error slot, if any.
-  const directCopyNoticeConversationRef = useRef<string | null>(null);
-  // Latest active conversation, read when an asynchronous copy outcome lands.
-  const activeConversationIdRef = useRef(activeConversation?.id);
-
-  activeConversationIdRef.current = activeConversation?.id;
 
   const sendQueueRef = useRef(Promise.resolve());
-
-  const reportDirectCopyOutcome = useCallback(
-    (conversationId: string, outcome: DirectMessageMailboxDelivery) => {
-      // A skipped copy never reached the mailbox, and a no-inbox copy is
-      // benign: neither changes the notice.
-      if (outcome === 'skipped' || outcome === 'no-inbox') return;
-
-      const isActive = activeConversationIdRef.current === conversationId;
-
-      if (outcome === 'failed') {
-        if (!isActive) return;
-
-        directCopyNoticeConversationRef.current = conversationId;
-        onErrorChange(copy.workspace.directMailboxDeliveryError);
-
-        return;
-      }
-
-      if (directCopyNoticeConversationRef.current !== conversationId) return;
-
-      directCopyNoticeConversationRef.current = null;
-
-      if (isActive) onErrorChange(null);
-    },
-    [onErrorChange],
-  );
 
   const sendPendingMessage = useCallback(
     (payload: PendingConversationSend) => {
@@ -119,11 +86,7 @@ export function useConversationMessageDelivery({
       const optimisticTimestamp = Date.now();
       const optimisticId = `pending:${conversationId}:${optimisticTimestamp}:${UUID.generate().toString()}`;
 
-      // Keep a shown copy notice while this conversation's next send runs.
-      if (directCopyNoticeConversationRef.current !== conversationId) {
-        directCopyNoticeConversationRef.current = null;
-        onErrorChange(null);
-      }
+      onErrorChange(null);
       onAttachmentProgressChange(null);
       onConversationsChange((current) =>
         ConversationTimeline.bumpActivity(
@@ -158,37 +121,48 @@ export function useConversationMessageDelivery({
           const lastMessageId = MessageCollection.lastDeliveredMessageTarget(
             messagesRef.current,
           )?.id;
-          const sent = await applicationContainer.messages.send(
-            session,
-            conversationId,
-            payload.content,
-            {
-              attachments: payload.attachments,
-              attachmentUpload: {
-                ...payload.attachmentUpload,
-                networkId: activeConversation.networkId,
-                recipientIdentityId: ConversationPeer.identityId(
-                  activeConversation,
-                  session.identity.id,
-                ),
-              },
-              onAttachmentProgress: (progress) => {
-                startTransition(() => {
-                  onMessagesChange((current) =>
-                    current.map((message) =>
-                      message.id === optimisticId
-                        ? { ...message, attachmentProgress: progress }
-                        : message,
-                    ),
-                  );
-                });
-              },
-              previousMessageIds: lastMessageId ? [lastMessageId] : [],
-              replyPreview: replyPreviewFromMessage(payload.replyTarget),
-              replyToMessageId: payload.replyTarget?.id,
-              sticker: payload.sticker,
+          const sendOptions: SendMessageOptions = {
+            attachments: payload.attachments,
+            attachmentUpload: {
+              ...payload.attachmentUpload,
+              networkId: activeConversation.networkId,
+              recipientIdentityId: ConversationPeer.identityId(
+                activeConversation,
+                session.identity.id,
+              ),
             },
-          );
+            onAttachmentProgress: (progress) => {
+              startTransition(() => {
+                onMessagesChange((current) =>
+                  current.map((message) =>
+                    message.id === optimisticId
+                      ? { ...message, attachmentProgress: progress }
+                      : message,
+                  ),
+                );
+              });
+            },
+            previousMessageIds: lastMessageId ? [lastMessageId] : [],
+            replyPreview: replyPreviewFromMessage(payload.replyTarget),
+            replyToMessageId: payload.replyTarget?.id,
+            sticker: payload.sticker,
+          };
+          // One-to-one traffic goes only through the mailbox; groups keep the
+          // legacy message endpoint.
+          const sent =
+            activeConversation.type === 'one-to-one'
+              ? await applicationContainer.directMessages.send(
+                  session,
+                  activeConversation,
+                  payload.content,
+                  sendOptions,
+                )
+              : await applicationContainer.messages.send(
+                  session,
+                  conversationId,
+                  payload.content,
+                  sendOptions,
+                );
 
           const sticker = payload.sticker;
 
@@ -197,16 +171,6 @@ export function useConversationMessageDelivery({
               applicationContainer.stickers.markUsed(session, sticker),
             );
           }
-
-          runMailboxSideEffect(
-            () =>
-              applicationContainer.directMessages.deliverSent(
-                session,
-                activeConversation,
-                sent.raw,
-              ),
-            (outcome) => reportDirectCopyOutcome(conversationId, outcome),
-          );
 
           onMessagesChange((current) =>
             MessageCollection.merge(
@@ -223,7 +187,6 @@ export function useConversationMessageDelivery({
           );
           scrollToBottom('smooth');
         } catch (caught) {
-          directCopyNoticeConversationRef.current = null;
           onErrorChange(toUserErrorMessage(caught, copy.workspace.sendError));
           setFailedSends((current) => ({
             ...current,
@@ -250,7 +213,6 @@ export function useConversationMessageDelivery({
       onConversationsChange,
       onErrorChange,
       onMessagesChange,
-      reportDirectCopyOutcome,
       scrollToBottom,
       session,
     ],

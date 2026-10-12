@@ -392,6 +392,7 @@ export class PigeonApiGateway {
           device.valueOf(),
         ),
       ),
+      this.messageCommands,
     );
     this.node = new PigeonNodeApi(http, signer);
     this.notificationsGateway = new PigeonNotificationsGateway(

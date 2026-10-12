@@ -21,7 +21,6 @@ import { MessageReactionUpdater } from '../../../../contexts/messages/presentati
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
-import { runMailboxSideEffect } from './runMailboxSideEffect';
 import { useConversationMessageDelivery } from './useConversationMessageDelivery';
 
 type ConversationMessageActionsInput = {
@@ -189,6 +188,13 @@ export function useConversationMessageActions({
       }
 
       if (!activeConversation?.id || !activeConversationKeyAvailable) return;
+      if (activeConversation.type === 'one-to-one') {
+        // One-to-one history lives in the mailbox; a reply target that is not
+        // in the local timeline cannot be fetched from the legacy endpoint.
+        onErrorChange(copy.messages.replyTargetNotFound);
+
+        return;
+      }
 
       onErrorChange(null);
       onMessageLoadStateChange('loading');
@@ -221,6 +227,7 @@ export function useConversationMessageActions({
     },
     [
       activeConversation?.id,
+      activeConversation?.type,
       activeConversationKeyAvailable,
       messages,
       onErrorChange,
@@ -239,18 +246,19 @@ export function useConversationMessageActions({
       closeMessageMenu();
       onErrorChange(null);
       try {
-        await applicationContainer.messages.delete(
-          session,
-          activeConversation.id,
-          message.id,
-        );
-        runMailboxSideEffect(() =>
-          applicationContainer.directMessages.deliverDelete(
+        if (activeConversation.type === 'one-to-one') {
+          await applicationContainer.directMessages.delete(
             session,
             activeConversation,
             message.id,
-          ),
-        );
+          );
+        } else {
+          await applicationContainer.messages.delete(
+            session,
+            activeConversation.id,
+            message.id,
+          );
+        }
         onMessagesChange((current) =>
           current.filter((item) => item.id !== message.id),
         );
@@ -294,19 +302,21 @@ export function useConversationMessageActions({
 
       onErrorChange(null);
       try {
-        const editEvent = await applicationContainer.messages.edit(
-          session,
-          activeConversation.id,
-          editingMessage.message.id,
-          content,
-        );
-        runMailboxSideEffect(() =>
-          applicationContainer.directMessages.deliverEdit(
-            session,
-            activeConversation,
-            editEvent.raw,
-          ),
-        );
+        const editEvent =
+          activeConversation.type === 'one-to-one'
+            ? await applicationContainer.directMessages.edit(
+                session,
+                activeConversation,
+                editingMessage.message.id,
+                content,
+                {},
+              )
+            : await applicationContainer.messages.edit(
+                session,
+                activeConversation.id,
+                editingMessage.message.id,
+                content,
+              );
 
         onMessagesChange((current) =>
           MessageCollection.merge(current, [editEvent]),
@@ -348,7 +358,18 @@ export function useConversationMessageActions({
       );
 
       try {
-        if (reacted) {
+        if (activeConversation.type === 'one-to-one') {
+          await applicationContainer.directMessages.reaction(
+            session,
+            activeConversation,
+            {
+              action,
+              createdAt: Date.now(),
+              emoji,
+              messageId: message.id,
+            },
+          );
+        } else if (reacted) {
           await applicationContainer.messages.removeReactionFrom(
             session,
             activeConversation.id,
@@ -363,19 +384,6 @@ export function useConversationMessageActions({
             emoji,
           );
         }
-
-        runMailboxSideEffect(() =>
-          applicationContainer.directMessages.deliverReaction(
-            session,
-            activeConversation,
-            {
-              action,
-              createdAt: Date.now(),
-              emoji,
-              messageId: message.id,
-            },
-          ),
-        );
       } catch (caught) {
         onErrorChange(toUserErrorMessage(caught, copy.messages.reactionError));
         onMessagesChange((current) =>
