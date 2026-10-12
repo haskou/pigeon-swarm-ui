@@ -104,6 +104,10 @@ export class HttpJsonClient {
     }
 
     if (response.status === 204 || response.status === 304) {
+      // An unread body keeps the request open; Chromium reports the next
+      // POST on this connection as net::ERR_ABORTED. Cancel it explicitly.
+      await response.body?.cancel();
+
       return undefined as T;
     }
 
