@@ -3,16 +3,16 @@ import type {
   MailboxAppend,
   MailboxChannel,
 } from '../../../mailboxes/infrastructure/MailboxChannel';
+import type { RecipientMailboxAttempt } from '../../domain/RecipientMailboxAttempt';
 
 import { MailboxUnavailableError } from '../../../mailboxes/infrastructure/http/MailboxUnavailableError';
+import { RecipientMailboxRoutingPolicy } from '../../domain/RecipientMailboxRoutingPolicy';
 
 /**
  * Appends to the recipient's verified mailbox home base, falling back to the
- * local node when no home is published or the home cannot be reached.
- *
- * A home fault (a failed lookup, or a failed append that is not a 404) is
- * kept. If the local node then answers 404, the fault is rethrown: the caller
- * must not read a real delivery failure as a benign missing inbox.
+ * local node when no home is published or the home cannot be reached. This
+ * class performs the I/O and classifies each outcome; the fallback and rethrow
+ * rule lives in RecipientMailboxRoutingPolicy.
  */
 export class RecipientMailboxRouter {
   public constructor(
@@ -25,16 +25,12 @@ export class RecipientMailboxRouter {
     ) => Pick<MailboxChannel, 'send'>,
   ) {}
 
-  /**
-   * Appends to the verified home. Resolves to undefined when no home is
-   * published or the home answers 404, which is benign. Any other home fault
-   * throws, so the caller can keep it. Logs a count-only line per fault.
-   */
-  private async appendHome(
+  /** Logs a count-only line per home fault. A 404 is an absent inbox. */
+  private async attemptHome(
     recipientIdentityId: string,
     keys: MailboxKeys,
     plaintext: Uint8Array,
-  ): Promise<MailboxAppend | undefined> {
+  ): Promise<RecipientMailboxAttempt<MailboxAppend>> {
     let base: string | undefined;
 
     try {
@@ -43,20 +39,39 @@ export class RecipientMailboxRouter {
       // eslint-disable-next-line no-console
       console.debug('Recipient mailbox home lookup failed; local node used.');
 
-      throw error;
+      return { error, kind: 'faulted' };
     }
 
-    if (base === undefined) return undefined;
+    if (base === undefined) return { kind: 'absent' };
 
     try {
-      return await this.createChannel(base).send(keys, plaintext);
+      return {
+        kind: 'delivered',
+        value: await this.createChannel(base).send(keys, plaintext),
+      };
     } catch (error) {
       // eslint-disable-next-line no-console
       console.debug('Recipient mailbox append failed; local node used.');
 
-      if (error instanceof MailboxUnavailableError) return undefined;
+      return error instanceof MailboxUnavailableError
+        ? { error, kind: 'absent' }
+        : { error, kind: 'faulted' };
+    }
+  }
 
-      throw error;
+  private async attemptLocal(
+    keys: MailboxKeys,
+    plaintext: Uint8Array,
+  ): Promise<RecipientMailboxAttempt<MailboxAppend>> {
+    try {
+      return {
+        kind: 'delivered',
+        value: await this.local.send(keys, plaintext),
+      };
+    } catch (error) {
+      return error instanceof MailboxUnavailableError
+        ? { error, kind: 'absent' }
+        : { error, kind: 'faulted' };
     }
   }
 
@@ -65,28 +80,13 @@ export class RecipientMailboxRouter {
     keys: MailboxKeys,
     plaintext: Uint8Array,
   ): Promise<MailboxAppend> {
-    let fault: { error: unknown } | undefined;
+    const home = await this.attemptHome(recipientIdentityId, keys, plaintext);
 
-    try {
-      const appended = await this.appendHome(
-        recipientIdentityId,
-        keys,
-        plaintext,
-      );
+    if (home.kind === 'delivered') return home.value;
 
-      if (appended !== undefined) return appended;
-    } catch (error) {
-      fault = { error };
-    }
-
-    try {
-      return await this.local.send(keys, plaintext);
-    } catch (error) {
-      if (fault !== undefined && error instanceof MailboxUnavailableError) {
-        throw fault.error;
-      }
-
-      throw error;
-    }
+    return RecipientMailboxRoutingPolicy.resolve(
+      home,
+      await this.attemptLocal(keys, plaintext),
+    );
   }
 }
