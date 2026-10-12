@@ -14,6 +14,10 @@ export class ConversationReadMarker {
       actorIdentityId,
     );
 
+    // One-to-one reads go through the own-inbox read record, never through
+    // the conversation read-until endpoint.
+    if (!conversation.isGroup()) return;
+
     conversation.markRead(message.getOccurredAt());
     await this.conversationRepository.markReadUntil(
       conversation,
