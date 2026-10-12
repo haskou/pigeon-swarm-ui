@@ -13,6 +13,7 @@ import type { SendMessageOptions } from '../http/resources/SendMessageOptions';
 import type { DirectMessageOwnCopies } from './DirectMessageOwnCopies';
 import type { RecipientMailboxRouter } from './RecipientMailboxRouter';
 
+import { sessionRootKey } from '../../../identities/infrastructure/session/sessionRootKey';
 import { DirectMailboxEligibility } from '../../../mailboxes/domain/DirectMailboxEligibility';
 import { DirectMailboxOwnership } from '../../../mailboxes/domain/DirectMailboxOwnership';
 import { DirectMailboxRecordError } from '../../../mailboxes/domain/DirectMailboxRecordError';
@@ -110,7 +111,10 @@ export class DirectMessageSender {
     return DirectMessageMailboxRecord.encode(
       record,
       recipientIdentityId === session.identity.id
-        ? DirectMessageAuthorship.tag(session.masterKey.getBuffer(), record)
+        ? DirectMessageAuthorship.tag(
+            sessionRootKey(session).getBuffer(),
+            record,
+          )
         : undefined,
     );
   }
