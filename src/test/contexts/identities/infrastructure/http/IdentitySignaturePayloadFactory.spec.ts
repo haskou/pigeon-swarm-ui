@@ -153,7 +153,7 @@ describe(IdentitySignaturePayloadFactory.name, () => {
 
     it('signs the published node base between id and networks', async () => {
       const payload = await new IdentitySignaturePayloadFactory(
-        'https://node.example',
+        () => 'https://node.example',
       ).createInitial(initial);
 
       expect(payload.mailboxHome).toBe('https://node.example');
@@ -164,7 +164,7 @@ describe(IdentitySignaturePayloadFactory.name, () => {
 
     it('publishes the path-prefixed base the node is served under', async () => {
       const payload = await new IdentitySignaturePayloadFactory(
-        'https://node.example/api',
+        () => 'https://node.example/api',
       ).createInitial(initial);
 
       expect(payload.mailboxHome).toBe('https://node.example/api');
@@ -172,7 +172,7 @@ describe(IdentitySignaturePayloadFactory.name, () => {
 
     it('omits the hint when the published base is not canonical', async () => {
       const payload = await new IdentitySignaturePayloadFactory(
-        'https://node.example/api/',
+        () => 'https://node.example/api/',
       ).createInitial(initial);
 
       expect(payload.mailboxHome).toBeUndefined();

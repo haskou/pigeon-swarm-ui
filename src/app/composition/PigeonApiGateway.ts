@@ -243,7 +243,7 @@ export class PigeonApiGateway {
       http,
       signer,
       identityResourceGateway,
-      new IdentitySignaturePayloadFactory(
+      new IdentitySignaturePayloadFactory(() =>
         MailboxHomeBase.fromApiBase(API_SERVER_URL, window.location.origin),
       ),
       this.identityVault,

@@ -41,7 +41,9 @@ function profileFrom(
 }
 
 export class IdentitySignaturePayloadFactory {
-  public constructor(private readonly publishedMailboxHome?: string) {}
+  public constructor(
+    private readonly publishedMailboxHome?: () => string | undefined,
+  ) {}
 
   /** Reuses the proof unless the networks changed; joining needs new work. */
   private async admissionNonceFor(
@@ -76,7 +78,7 @@ export class IdentitySignaturePayloadFactory {
       deviceCredential: input.deviceCredential,
       deviceCredentialCommitment: input.deviceCredentialCommitment,
       id,
-      mailboxHome: MailboxHomeBase.parse(this.publishedMailboxHome),
+      mailboxHome: MailboxHomeBase.parse(this.publishedMailboxHome?.()),
       networks,
       previousIdentityExternalIdentifier: undefined,
       profile: profileFrom(input.profile),

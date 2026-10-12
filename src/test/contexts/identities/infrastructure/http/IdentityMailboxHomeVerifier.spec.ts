@@ -29,7 +29,7 @@ async function fixture(
   const id = IdentityId.fromString(keyPair.toPrimitives().publicKey).valueOf();
   const deviceCredential = (await KeyPair.generate()).toPrimitives().publicKey;
   const unsigned = await new IdentitySignaturePayloadFactory(
-    mailboxHome,
+    () => mailboxHome,
   ).createInitial({
     deviceCredential,
     deviceCredentialCommitment:
