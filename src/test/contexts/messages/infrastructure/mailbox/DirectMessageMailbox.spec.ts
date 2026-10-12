@@ -2,20 +2,18 @@ import { EncryptedPayload, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 import { mock } from 'jest-mock-extended';
 
+import type { DirectDeletedRecord } from '../../../../../contexts/mailboxes/domain/DirectDeletedRecord';
+import type { DirectEditedRecord } from '../../../../../contexts/mailboxes/domain/DirectEditedRecord';
+import type { DirectMessageRecord } from '../../../../../contexts/mailboxes/domain/DirectMessageRecord';
+import type { DirectPinRecord } from '../../../../../contexts/mailboxes/domain/DirectPinRecord';
+import type { DirectReactionRecord } from '../../../../../contexts/mailboxes/domain/DirectReactionRecord';
+import type { DirectReadRecord } from '../../../../../contexts/mailboxes/domain/DirectReadRecord';
+import type { DirectSentRecord } from '../../../../../contexts/mailboxes/domain/DirectSentRecord';
 import type { MailboxKeys } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxKeySchedule';
 import type { PigeonMailboxClient } from '../../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
 import type { MailboxReadTokens } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import type { MessageProjectionPort } from '../../../../../contexts/messages/infrastructure/crypto/MessageProjectionPort';
 import type { PigeonMessageCommandsApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
-import type {
-  DirectDeletedRecord,
-  DirectEditedRecord,
-  DirectMessageRecord,
-  DirectPinRecord,
-  DirectReactionRecord,
-  DirectReadRecord,
-  DirectSentRecord,
-} from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxRecord';
 import type { DirectMessageMailboxState } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxStore';
 import type { DirectMessageTimelineChange } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageTimelineChange';
 import type {

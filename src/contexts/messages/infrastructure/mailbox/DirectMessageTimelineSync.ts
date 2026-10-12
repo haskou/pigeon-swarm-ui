@@ -2,21 +2,20 @@ import type {
   ChatMessage,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { DirectEditedRecord } from '../../../mailboxes/domain/DirectEditedRecord';
+import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessageRecord';
+import type { DirectReadRecord } from '../../../mailboxes/domain/DirectReadRecord';
+import type { DirectSentRecord } from '../../../mailboxes/domain/DirectSentRecord';
 import type { OpenedMailboxPage } from '../../../mailboxes/infrastructure/MailboxChannel';
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { DirectMessageInboxOpener } from './DirectMessageInboxOpener';
-import type {
-  DirectEditedRecord,
-  DirectMessageRecord,
-  DirectReadRecord,
-  DirectSentRecord,
-} from './DirectMessageMailboxRecord';
 import type { DirectMessageMailboxStore } from './DirectMessageMailboxStore';
 import type { DirectMessageOwnCopies } from './DirectMessageOwnCopies';
 import type { DirectMessageReaderSet } from './DirectMessageReaderSet';
 import type { DirectMessageRecipientInbox } from './DirectMessageRecipientInbox';
 import type { DirectMessageTimelineChange } from './DirectMessageTimelineChange';
 
+import { DirectMailboxOwnership } from '../../../mailboxes/domain/DirectMailboxOwnership';
 import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageMailboxLimits } from './DirectMessageMailboxLimits';
 import { DirectMessageMailboxRecord } from './DirectMessageMailboxRecord';
@@ -129,7 +128,11 @@ export class DirectMessageTimelineSync {
       if (!decoded) return [];
 
       // An own copy this device appended is already shown locally.
-      if (this.ownCopies.has(`${session.identity.id}:${decoded.id}`)) {
+      if (
+        this.ownCopies.has(
+          DirectMailboxOwnership.ownCopyKey(session.identity.id, decoded.id),
+        )
+      ) {
         return [];
       }
 

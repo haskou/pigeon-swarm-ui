@@ -12,12 +12,12 @@ import type { DirectMessageRecipientInbox } from './DirectMessageRecipientInbox'
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
+import { DirectMailboxEligibility } from '../../../mailboxes/domain/DirectMailboxEligibility';
 import { MailboxCapability } from '../../../mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxUnavailableError } from '../../../mailboxes/infrastructure/http/MailboxUnavailableError';
 import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageInboxKeys } from './DirectMessageInboxKeys';
 import { DirectMessageMailboxLimits } from './DirectMessageMailboxLimits';
-import { DirectMessageMailboxRecord } from './DirectMessageMailboxRecord';
 
 /**
  * Recipient inbox open and reader enrolment: creates or adopts the inbox this
@@ -314,7 +314,7 @@ export class DirectMessageInboxOpener {
   ): Promise<boolean> {
     const eligible = conversations.filter(
       (conversation) =>
-        DirectMessageMailboxRecord.isEligible(conversation.type) &&
+        DirectMailboxEligibility.isEligible(conversation.type) &&
         ConversationKeychain.entry(
           session.keychain,
           session.identity.id,

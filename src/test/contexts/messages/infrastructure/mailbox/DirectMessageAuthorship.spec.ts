@@ -1,6 +1,6 @@
 import { Buffer } from 'buffer';
 
-import type { DirectSentRecord } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxRecord';
+import type { DirectSentRecord } from '../../../../../contexts/mailboxes/domain/DirectSentRecord';
 
 import { DirectMessageAuthorship } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageAuthorship';
 

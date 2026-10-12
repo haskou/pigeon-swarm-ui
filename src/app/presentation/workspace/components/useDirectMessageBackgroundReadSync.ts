@@ -5,6 +5,7 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
+import { DirectMailboxEligibility } from '../../../../contexts/mailboxes/domain/DirectMailboxEligibility';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { subscribeRealtimeMailboxHints } from '../../realtime/useRealtimeEvents';
 
@@ -36,7 +37,7 @@ function dueConversationIds(
       const lastVisitAt = lastVisit.get(conversation.id);
 
       return (
-        conversation.type === 'one-to-one' &&
+        DirectMailboxEligibility.isEligible(conversation.type) &&
         conversation.id !== latest.activeConversationId &&
         conversation.unreadCount > 0 &&
         (lastVisitAt === undefined || now - lastVisitAt >= VISIT_INTERVAL_MS)
@@ -61,7 +62,7 @@ function subscribeHints(
   onHint: (conversationId: string) => void,
 ): void {
   conversations.forEach((conversation) => {
-    if (conversation.type !== 'one-to-one') return;
+    if (!DirectMailboxEligibility.isEligible(conversation.type)) return;
     if (subscriptions.has(conversation.id)) return;
 
     const target = applicationContainer.directMessages.hintTarget(
