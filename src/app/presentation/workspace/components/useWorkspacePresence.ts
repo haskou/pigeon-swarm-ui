@@ -8,8 +8,8 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { applicationContainer } from '../../../composition/applicationContainer';
 import { ConversationPeer } from '../../../../contexts/conversations/presentation/view-models/ConversationPeer';
+import { applicationContainer } from '../../../composition/applicationContainer';
 import {
   readPresencePreference,
   writePresencePreference,
@@ -18,6 +18,31 @@ import { presenceStatusForLocalActivity } from './presenceStatusForLocalActivity
 import { presenceWithLocalPreference } from './presenceWithLocalPreference';
 
 const localActivityPresenceRefreshThrottleMs = 30_000;
+
+function reconcileOwnPresence(
+  session: Session,
+  presences: readonly IdentityPresence[],
+  preferredStatus: SelectablePresenceStatus | null,
+  mergePresence: (presence: IdentityPresence) => void,
+): void {
+  const ownPresence = presences.find(
+    (presence) => presence.identityId === session.identity.id,
+  );
+  const pinnedStatus =
+    preferredStatus && preferredStatus !== 'available' ? preferredStatus : null;
+  const needsUpdate = pinnedStatus
+    ? ownPresence?.status !== pinnedStatus
+    : !ownPresence ||
+      ownPresence.status === 'away' ||
+      ownPresence.status === 'disconnected';
+
+  if (!needsUpdate) return;
+
+  void applicationContainer.identities
+    .updatePresence(session, pinnedStatus ?? 'available')
+    .then(mergePresence)
+    .catch(() => undefined);
+}
 
 export function useWorkspacePresence({
   communities,
@@ -29,7 +54,12 @@ export function useWorkspacePresence({
   conversations: ConversationResource[];
   messageAuthorIdentityIdsKey: string;
   session: Session;
-}) {
+}): {
+  mergePresence: (presence: IdentityPresence) => void;
+  notificationsMutedByPresence: boolean;
+  presenceByIdentityId: Record<string, IdentityPresence>;
+  rememberPresencePreference: (status: SelectablePresenceStatus) => void;
+} {
   const [presenceByIdentityId, setPresenceByIdentityId] = useState<
     Record<string, IdentityPresence>
   >({});
@@ -99,6 +129,22 @@ export function useWorkspacePresence({
       [effectivePresence.identityId]: effectivePresence,
     }));
   }, []);
+  const mergePresences = useCallback(
+    (presences: readonly IdentityPresence[]) => {
+      const presenceEntries = presences.map(
+        (presence): [string, IdentityPresence] => [
+          presence.identityId,
+          presence,
+        ],
+      );
+
+      setPresenceByIdentityId((current) => ({
+        ...current,
+        ...Object.fromEntries(presenceEntries),
+      }));
+    },
+    [],
+  );
   const rememberPresencePreference = useCallback(
     (status: SelectablePresenceStatus) => {
       presencePreferenceRef.current = status;
@@ -110,38 +156,39 @@ export function useWorkspacePresence({
     },
     [],
   );
-  const refreshLocalActivityPresence = useCallback((options?: {
-    force?: boolean;
-  }) => {
-    const now = Date.now();
+  const refreshLocalActivityPresence = useCallback(
+    (options?: { force?: boolean }) => {
+      const now = Date.now();
 
-    if (
-      localActivityPresenceRefreshInFlightRef.current ||
-      now - lastLocalActivityPresenceRefreshAtRef.current <
-        localActivityPresenceRefreshThrottleMs
-    ) {
-      return;
-    }
+      if (
+        localActivityPresenceRefreshInFlightRef.current ||
+        now - lastLocalActivityPresenceRefreshAtRef.current <
+          localActivityPresenceRefreshThrottleMs
+      ) {
+        return;
+      }
 
-    const nextStatus = presenceStatusForLocalActivity({
-      force: options?.force,
-      ownPresence:
-        presenceByIdentityIdRef.current[sessionRef.current.identity.id],
-      preferredStatus: presencePreferenceRef.current,
-    });
-
-    if (!nextStatus) return;
-
-    lastLocalActivityPresenceRefreshAtRef.current = now;
-    localActivityPresenceRefreshInFlightRef.current = true;
-    void applicationContainer
-      .identities.updatePresence(sessionRef.current, nextStatus)
-      .then(mergePresence)
-      .catch(() => undefined)
-      .finally(() => {
-        localActivityPresenceRefreshInFlightRef.current = false;
+      const nextStatus = presenceStatusForLocalActivity({
+        force: options?.force,
+        ownPresence:
+          presenceByIdentityIdRef.current[sessionRef.current.identity.id],
+        preferredStatus: presencePreferenceRef.current,
       });
-  }, [mergePresence]);
+
+      if (!nextStatus) return;
+
+      lastLocalActivityPresenceRefreshAtRef.current = now;
+      localActivityPresenceRefreshInFlightRef.current = true;
+      void applicationContainer.identities
+        .updatePresence(sessionRef.current, nextStatus)
+        .then(mergePresence)
+        .catch(() => undefined)
+        .finally(() => {
+          localActivityPresenceRefreshInFlightRef.current = false;
+        });
+    },
+    [mergePresence],
+  );
 
   useEffect(() => {
     const onLocalActivity = () => refreshLocalActivityPresence({ force: true });
@@ -180,10 +227,7 @@ export function useWorkspacePresence({
       for (const eventName of activityEvents) {
         globalThis.removeEventListener?.(eventName, onLocalActivity);
       }
-      globalThis.document?.removeEventListener?.(
-        'visibilitychange',
-        onVisible,
-      );
+      globalThis.document?.removeEventListener?.('visibilitychange', onVisible);
       globalThis.removeEventListener?.('focus', onLocalActivity);
       globalThis.removeEventListener?.('pageshow', onLocalActivity);
     };
@@ -194,53 +238,31 @@ export function useWorkspacePresence({
 
     let cancelled = false;
 
-    void applicationContainer
-      .identities.getPresences(session, presenceIdentityIds)
+    void applicationContainer.identities
+      .getPresences(session, presenceIdentityIds)
       .then((presences) => {
         if (cancelled) return;
 
-        setPresenceByIdentityId((current) => ({
-          ...current,
-          ...Object.fromEntries(
-            presences.map((presence) => [presence.identityId, presence]),
-          ),
-        }));
-
-        const ownPresence = presences.find(
-          (presence) => presence.identityId === session.identity.id,
+        mergePresences(presences);
+        reconcileOwnPresence(
+          session,
+          presences,
+          presencePreferenceRef.current,
+          mergePresence,
         );
-        const preferredStatus = presencePreferenceRef.current;
-
-        if (preferredStatus && preferredStatus !== 'available') {
-          if (ownPresence?.status === preferredStatus) return;
-
-          void applicationContainer
-            .identities.updatePresence(session, preferredStatus)
-            .then(mergePresence)
-            .catch(() => undefined);
-
-          return;
-        }
-
-        if (
-          ownPresence &&
-          ownPresence.status !== 'away' &&
-          ownPresence.status !== 'disconnected'
-        ) {
-          return;
-        }
-
-        void applicationContainer
-          .identities.updatePresence(session, 'available')
-          .then(mergePresence)
-          .catch(() => undefined);
       })
       .catch(() => undefined);
 
     return () => {
       cancelled = true;
     };
-  }, [mergePresence, presenceIdentityIds, presenceIdentityIdsKey, session]);
+  }, [
+    mergePresence,
+    mergePresences,
+    presenceIdentityIds,
+    presenceIdentityIdsKey,
+    session,
+  ]);
 
   return {
     mergePresence,

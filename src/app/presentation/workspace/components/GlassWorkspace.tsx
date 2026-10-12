@@ -161,9 +161,9 @@ export function GlassWorkspace({
     useState<AttachmentProgress | null>(null);
   const { openAttachment: downloadContextAttachment } = useAttachmentDownload({
     errorMessage: copy.composer.attachmentDownloadError,
-    unavailableMessage: copy.attachments.loadFailed,
     onErrorChange: setSendError,
     onProgressChange: setAttachmentProgress,
+    unavailableMessage: copy.attachments.loadFailed,
   });
   const [messageContextMenu, setMessageContextMenu] =
     useState<MessageContextMenuState | null>(null);
@@ -797,13 +797,14 @@ export function GlassWorkspace({
   const handleMailboxConversationRead = useCallback(
     (conversationId: string): void => {
       clearUnreadMessages(conversationId);
-      setConversations((current) =>
-        current.map((conversation) =>
-          conversation.id === conversationId
-            ? { ...conversation, unreadCount: 0 }
-            : conversation,
-        ),
-      );
+
+      const clearConversationUnread = (conversation: ConversationResource) => {
+        if (conversation.id !== conversationId) return conversation;
+
+        return { ...conversation, unreadCount: 0 };
+      };
+
+      setConversations((current) => current.map(clearConversationUnread));
     },
     [clearUnreadMessages, setConversations],
   );

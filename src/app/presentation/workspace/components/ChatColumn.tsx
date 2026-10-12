@@ -7,7 +7,10 @@ import type { ChatColumnProps } from './ChatColumnProps';
 import type { ChatProfileViewer } from './ChatProfileViewer';
 
 import { ContactVerificationDialog } from '../../../../contexts/identities/presentation/components/ContactVerificationDialog';
-import { useContactVerification } from '../../../../contexts/identities/presentation/hooks/useContactVerification';
+import {
+  type ContactVerification,
+  useContactVerification,
+} from '../../../../contexts/identities/presentation/hooks/useContactVerification';
 import { identityDisplayName } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
 import {
   profileAnchorFromTarget,
@@ -48,6 +51,18 @@ function hasPendingConversationInvitation(
   return !hasConversationKey && !!pendingInvitation && !!onInvitationAccept;
 }
 
+function verifiableContactPeerId(
+  activeConversation: ChatColumnProps['activeConversation'],
+  isGroupConversation: boolean,
+  peerIdentityId: ChatColumnProps['peerIdentityId'],
+): string | undefined {
+  if (!activeConversation || isGroupConversation || !peerIdentityId) {
+    return undefined;
+  }
+
+  return peerIdentityId;
+}
+
 function ConversationInvitationPrompt({
   conversationKeyDialog,
   hasConversationKey,
@@ -79,6 +94,34 @@ function ConversationInvitationPrompt({
       kind="conversation"
       onAccept={() => onInvitationAccept(pendingInvitation)}
       onManualImport={conversationKeyDialog.openAdd}
+    />
+  );
+}
+
+function ContactVerificationPrompt({
+  contactVerification,
+  isOpen,
+  localIdentityId,
+  name,
+  onClose,
+  peerIdentityId,
+}: {
+  contactVerification: ContactVerification;
+  isOpen: boolean;
+  localIdentityId: string;
+  name?: string;
+  onClose: () => void;
+  peerIdentityId?: string;
+}) {
+  if (!isOpen || !peerIdentityId) return null;
+
+  return (
+    <ContactVerificationDialog
+      localIdentityId={localIdentityId}
+      name={name ?? peerIdentityId}
+      onClose={onClose}
+      peerIdentityId={peerIdentityId}
+      verification={contactVerification}
     />
   );
 }
@@ -206,12 +249,15 @@ export function ChatColumn({
     ],
   );
   const isGroupConversation = conversationPresentation.isGroup;
-  const canVerifyPeer =
-    !!activeConversation && !isGroupConversation && !!peerIdentityId;
+  const verifiablePeerIdentityId = verifiableContactPeerId(
+    activeConversation,
+    isGroupConversation,
+    peerIdentityId,
+  );
   const contactVerification = useContactVerification({
     localIdentityId: session.identity.id,
     peerHandle: peerIdentity?.profile.handle,
-    peerIdentityId: canVerifyPeer ? peerIdentityId : undefined,
+    peerIdentityId: verifiablePeerIdentityId,
   });
   const groupInvitationDialog = useGroupInvitationDialog({
     conversation: activeConversation,
@@ -328,6 +374,10 @@ export function ChatColumn({
     });
   };
 
+  const openContactVerification = verifiablePeerIdentityId
+    ? () => setContactVerificationOpen(true)
+    : undefined;
+
   return (
     <section className="app-safe-area-panel glass-panel-strong flex min-h-0 flex-col overflow-hidden rounded-none">
       <ChatConversationHeader
@@ -346,9 +396,7 @@ export function ChatColumn({
         onOpenSidebar={onOpenSidebar}
         onPinsOpen={onOpenPins}
         onRealtimeEventsOpen={onRealtimeEventsOpen}
-        onVerificationOpen={
-          canVerifyPeer ? () => setContactVerificationOpen(true) : undefined
-        }
+        onVerificationOpen={openContactVerification}
         peerPicture={peerPicture}
         peerPresence={
           peerIdentityId ? presenceByIdentityId[peerIdentityId] : undefined
@@ -400,9 +448,7 @@ export function ChatColumn({
             onOpenPins={onOpenPins}
             onRealtimeEventsOpen={onRealtimeEventsOpen}
             onStartCall={onStartCall}
-            onVerificationOpen={
-              canVerifyPeer ? () => setContactVerificationOpen(true) : undefined
-            }
+            onVerificationOpen={openContactVerification}
           />
         )}
       </ChatConversationHeader>
@@ -475,15 +521,14 @@ export function ChatColumn({
         session={session}
         setProfileViewer={setProfileViewer}
       />
-      {contactVerificationOpen && canVerifyPeer && peerIdentityId && (
-        <ContactVerificationDialog
-          localIdentityId={session.identity.id}
-          name={activeConversationName ?? peerIdentityId}
-          onClose={() => setContactVerificationOpen(false)}
-          peerIdentityId={peerIdentityId}
-          verification={contactVerification}
-        />
-      )}
+      <ContactVerificationPrompt
+        contactVerification={contactVerification}
+        isOpen={contactVerificationOpen}
+        localIdentityId={session.identity.id}
+        name={activeConversationName}
+        onClose={() => setContactVerificationOpen(false)}
+        peerIdentityId={verifiablePeerIdentityId}
+      />
     </section>
   );
 }

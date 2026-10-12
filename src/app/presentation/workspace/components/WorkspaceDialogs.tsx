@@ -1,26 +1,27 @@
 import { lazy, Suspense, useEffect, useState, type ReactElement } from 'react';
 
 import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
-import type {
-  WorkspaceCreationDialogs,
-  WorkspaceDialogSections,
-  WorkspaceIncomingCallDialog,
-  WorkspaceInspectorDialog,
-  WorkspaceMessageActionDialogs,
-  WorkspaceNodeSettingsDialog,
-  WorkspaceNotificationSettingsDialog,
-  WorkspaceNotificationsDialog,
-  WorkspaceRealtimeEventsDialog,
-} from './WorkspaceDialogSections';
+import type { WorkspaceCreationDialogs } from './WorkspaceCreationDialogs';
+import type { WorkspaceDialogSections } from './WorkspaceDialogSections';
+import type { WorkspaceIncomingCallDialog } from './WorkspaceIncomingCallDialog';
+import type { WorkspaceInspectorDialog } from './WorkspaceInspectorDialog';
+import type { WorkspaceMessageActionDialogs } from './WorkspaceMessageActionDialogs';
+import type { WorkspaceNodeSettingsDialog } from './WorkspaceNodeSettingsDialog';
+import type { WorkspaceNotificationsDialog } from './WorkspaceNotificationsDialog';
+import type { WorkspaceNotificationSettingsDialog } from './WorkspaceNotificationSettingsDialog';
+import type { WorkspaceRealtimeEventsDialog } from './WorkspaceRealtimeEventsDialog';
 
-import { MessageEditability } from '../../../../contexts/messages/presentation/view-models/MessageEditability';
 import { conversationSupportsThreads } from '../../../../contexts/conversations/presentation/view-models/conversationSupportsThreads';
-import { copy } from '../../../../shared/presentation/i18n/copy';
+import { MessageEditability } from '../../../../contexts/messages/presentation/view-models/MessageEditability';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import { Inspector } from './Inspector';
-import { MessageContextMenu } from './messageContextMenu';
+import {
+  MessageContextMenu,
+  type MessageContextMenuState,
+} from './messageContextMenu';
 
 const CommunityDiscoveryDialog = lazy(() =>
   import('../../../../contexts/communities/presentation/components/CommunityDiscoveryDialog').then(
@@ -79,41 +80,6 @@ const RealtimeEventsDialog = lazy(() =>
     default: module.RealtimeEventsDialog,
   })),
 );
-
-export function WorkspaceDialogs({
-  creation,
-  incomingCall,
-  inspector,
-  messageActions,
-  nodeSettings,
-  notificationSettings,
-  notifications,
-  realtimeEvents,
-}: WorkspaceDialogSections): ReactElement {
-  const [communityEntryMode, setCommunityEntryMode] =
-    useState<CommunityEntryMode>('discover');
-
-  useEffect(() => {
-    if (creation.createCommunityOpen) setCommunityEntryMode('discover');
-  }, [creation.createCommunityOpen]);
-
-  return (
-    <>
-      <MobileInspectorDialog {...inspector} />
-      <MessageActionDialogs {...messageActions} />
-      <CreateDialogs
-        {...creation}
-        communityEntryMode={communityEntryMode}
-        onCommunityEntryModeChange={setCommunityEntryMode}
-      />
-      <WorkspaceNotificationDialog {...notifications} />
-      <NotificationSettingsOverlay {...notificationSettings} />
-      <NodeSettingsOverlay {...nodeSettings} />
-      <RealtimeEventsOverlay {...realtimeEvents} />
-      <IncomingCallOverlay {...incomingCall} />
-    </>
-  );
-}
 
 type CommunityEntryMode = 'create' | 'discover';
 
@@ -174,107 +140,131 @@ function MobileInspectorDialog(
   );
 }
 
-function MessageActionDialogs(
-  props: WorkspaceMessageActionDialogs,
-): ReactElement | null {
-  const contextMenuMessage = props.menu?.message;
-  const contextMenuFromThread = props.menu?.source === 'thread';
-  const contextMenuMessagePinned = contextMenuMessage
-    ? isPinnedMessage(contextMenuMessage, props.pinnedMessageIds)
-    : false;
-
-  if (!props.menu) {
-    return props.rawMessage ? (
-      <Suspense fallback={null}>
-        <RawMessageDialog
-          message={props.rawMessage}
-          onClose={props.onCloseRawMessage}
-        />
-      </Suspense>
-    ) : null;
-  }
-
-  return (
-    <>
-      <MessageContextMenu
-        currentIdentityId={props.session.identity.id}
-        menu={props.menu}
-        onClose={props.onCloseMenu}
-        onCopy={
-          contextMenuMessage?.content
-            ? () => props.onCopy(contextMenuMessage)
-            : undefined
-        }
-        onDelete={
-          contextMenuMessage?.kind !== 'poll' &&
-          contextMenuMessage?.authorIdentityId === props.session.identity.id
-            ? () => props.onDelete(contextMenuMessage)
-            : undefined
-        }
-        onDownloadAttachment={props.onDownloadAttachment}
-        onEdit={
-          contextMenuMessage &&
-          !contextMenuFromThread &&
-          MessageEditability.canEdit(
-            contextMenuMessage,
-            props.session.identity.id,
-          )
-            ? () => props.onEdit(contextMenuMessage)
-            : undefined
-        }
-        onOpenThread={
-          contextMenuMessage &&
-          contextMenuMessage.kind !== 'poll' &&
-          !contextMenuFromThread &&
-          conversationSupportsThreads(props.activeConversation)
-            ? () => props.onOpenThread(contextMenuMessage)
-            : undefined
-        }
-        onPin={
-          contextMenuMessage &&
-          contextMenuMessage.kind !== 'poll' &&
-          !contextMenuFromThread &&
-          !contextMenuMessagePinned
-            ? () => props.onPin(contextMenuMessage)
-            : undefined
-        }
-        onReply={
-          contextMenuMessage && contextMenuMessage.kind !== 'poll'
-            ? () => props.onReply(contextMenuMessage)
-            : undefined
-        }
-        onUnpin={
-          contextMenuMessage &&
-          contextMenuMessage.kind !== 'poll' &&
-          !contextMenuFromThread &&
-          contextMenuMessagePinned
-            ? () => props.onUnpin(contextMenuMessage)
-            : undefined
-        }
-        pinned={contextMenuMessagePinned}
-        onReactionToggle={props.onToggleReaction}
-        onViewRaw={() => {
-          if (contextMenuMessage) props.onViewRaw(contextMenuMessage);
-        }}
-      />
-      {props.rawMessage && (
-        <Suspense fallback={null}>
-          <RawMessageDialog
-            message={props.rawMessage}
-            onClose={props.onCloseRawMessage}
-          />
-        </Suspense>
-      )}
-    </>
-  );
-}
-
 function isPinnedMessage(
   message: ChatMessage,
   pinnedMessageIds: ReadonlySet<string>,
 ): boolean {
   return (
     pinnedMessageIds.has(message.id) || Boolean(message.raw.pinnedByIdentityId)
+  );
+}
+
+function messageAction(
+  message: ChatMessage,
+  enabled: boolean,
+  run: (message: ChatMessage) => void,
+): (() => void) | undefined {
+  return enabled ? () => run(message) : undefined;
+}
+
+function ownerMessageActions(
+  props: WorkspaceMessageActionDialogs,
+  message: ChatMessage,
+  fromThread: boolean,
+) {
+  const identityId = props.session.identity.id;
+
+  return {
+    onCopy: messageAction(message, Boolean(message.content), props.onCopy),
+    onDelete: messageAction(
+      message,
+      message.kind !== 'poll' && message.authorIdentityId === identityId,
+      props.onDelete,
+    ),
+    onEdit: messageAction(
+      message,
+      !fromThread && MessageEditability.canEdit(message, identityId),
+      props.onEdit,
+    ),
+  };
+}
+
+function threadAndPinMessageActions(
+  props: WorkspaceMessageActionDialogs,
+  message: ChatMessage,
+  fromThread: boolean,
+  pinned: boolean,
+) {
+  return {
+    onOpenThread: messageAction(
+      message,
+      message.kind !== 'poll' &&
+        !fromThread &&
+        conversationSupportsThreads(props.activeConversation),
+      props.onOpenThread,
+    ),
+    onPin: messageAction(
+      message,
+      message.kind !== 'poll' && !fromThread && !pinned,
+      props.onPin,
+    ),
+    onReply: messageAction(message, message.kind !== 'poll', props.onReply),
+    onUnpin: messageAction(
+      message,
+      message.kind !== 'poll' && !fromThread && pinned,
+      props.onUnpin,
+    ),
+  };
+}
+
+function MessageContextMenuOverlay(
+  props: WorkspaceMessageActionDialogs & { menu: MessageContextMenuState },
+): ReactElement {
+  const message = props.menu.message;
+  const fromThread = props.menu.source === 'thread';
+  const pinned = isPinnedMessage(message, props.pinnedMessageIds);
+
+  return (
+    <MessageContextMenu
+      currentIdentityId={props.session.identity.id}
+      menu={props.menu}
+      onClose={props.onCloseMenu}
+      onDownloadAttachment={props.onDownloadAttachment}
+      onReactionToggle={props.onToggleReaction}
+      onViewRaw={() => props.onViewRaw(message)}
+      pinned={pinned}
+      {...ownerMessageActions(props, message, fromThread)}
+      {...threadAndPinMessageActions(props, message, fromThread, pinned)}
+    />
+  );
+}
+
+function RawMessageOverlay({
+  message,
+  onClose,
+}: {
+  message: ChatMessage;
+  onClose: () => void;
+}): ReactElement {
+  return (
+    <Suspense fallback={null}>
+      <RawMessageDialog message={message} onClose={onClose} />
+    </Suspense>
+  );
+}
+
+function MessageActionDialogs(
+  props: WorkspaceMessageActionDialogs,
+): ReactElement | null {
+  if (!props.menu) {
+    return props.rawMessage ? (
+      <RawMessageOverlay
+        message={props.rawMessage}
+        onClose={props.onCloseRawMessage}
+      />
+    ) : null;
+  }
+
+  return (
+    <>
+      <MessageContextMenuOverlay {...props} menu={props.menu} />
+      {props.rawMessage && (
+        <RawMessageOverlay
+          message={props.rawMessage}
+          onClose={props.onCloseRawMessage}
+        />
+      )}
+    </>
   );
 }
 
@@ -436,5 +426,40 @@ function IncomingCallOverlay(
         title={props.incomingCall.title}
       />
     </Suspense>
+  );
+}
+
+export function WorkspaceDialogs({
+  creation,
+  incomingCall,
+  inspector,
+  messageActions,
+  nodeSettings,
+  notifications,
+  notificationSettings,
+  realtimeEvents,
+}: WorkspaceDialogSections): ReactElement {
+  const [communityEntryMode, setCommunityEntryMode] =
+    useState<CommunityEntryMode>('discover');
+
+  useEffect(() => {
+    if (creation.createCommunityOpen) setCommunityEntryMode('discover');
+  }, [creation.createCommunityOpen]);
+
+  return (
+    <>
+      <MobileInspectorDialog {...inspector} />
+      <MessageActionDialogs {...messageActions} />
+      <CreateDialogs
+        {...creation}
+        communityEntryMode={communityEntryMode}
+        onCommunityEntryModeChange={setCommunityEntryMode}
+      />
+      <WorkspaceNotificationDialog {...notifications} />
+      <NotificationSettingsOverlay {...notificationSettings} />
+      <NodeSettingsOverlay {...nodeSettings} />
+      <RealtimeEventsOverlay {...realtimeEvents} />
+      <IncomingCallOverlay {...incomingCall} />
+    </>
   );
 }

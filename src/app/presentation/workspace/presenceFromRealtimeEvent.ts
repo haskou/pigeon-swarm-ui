@@ -4,6 +4,22 @@ import type {
 } from '../../../shared/domain/pigeonResources.types';
 import type { RealtimeDomainEvent } from '../../../shared/infrastructure/realtime/RealtimeGateway';
 
+function isPresenceStatus(value: unknown): value is PresenceStatus {
+  return (
+    value === 'available' ||
+    value === 'away' ||
+    value === 'busy' ||
+    value === 'disconnected' ||
+    value === 'invisible'
+  );
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) && value.every((item) => typeof item === 'string')
+  );
+}
+
 export function presenceFromRealtimeEvent(
   event: RealtimeDomainEvent,
 ): IdentityPresence | null {
@@ -28,19 +44,8 @@ export function presenceFromRealtimeEvent(
     ...(typeof attributes.lastHeartbeatAt === 'number'
       ? { lastHeartbeatAt: attributes.lastHeartbeatAt }
       : {}),
-    ...(Array.isArray(attributes.networkIds) &&
-    attributes.networkIds.every((networkId) => typeof networkId === 'string')
+    ...(isStringArray(attributes.networkIds)
       ? { networkIds: attributes.networkIds }
       : {}),
   };
-}
-
-function isPresenceStatus(value: unknown): value is PresenceStatus {
-  return (
-    value === 'available' ||
-    value === 'away' ||
-    value === 'busy' ||
-    value === 'disconnected' ||
-    value === 'invisible'
-  );
 }

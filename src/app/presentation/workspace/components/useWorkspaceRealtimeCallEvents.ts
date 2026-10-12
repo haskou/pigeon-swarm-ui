@@ -5,6 +5,7 @@ import type { CallSignalType } from '../../../../contexts/calls/infrastructure/m
 import type { CallSession } from '../../../../contexts/calls/presentation/view-models/CallSession';
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
+import type { ReceivedCallSignal } from './ReceivedCallSignal';
 
 import { acknowledgeRealtimeCallSignal } from '../../../../app/presentation/realtime/useRealtimeEvents';
 import {
@@ -38,14 +39,6 @@ type WorkspaceRealtimeCallEventsInput = {
   }) => Promise<void>;
   reconcileCallResource: (call: CallResource) => void;
   sessionRef: { current: Session };
-};
-
-type ReceivedCallSignal = {
-  expiresAt: number;
-  payload: Record<string, unknown>;
-  senderIdentityId: string;
-  signalId: string;
-  signalType: CallSignalType;
 };
 
 function receivedCallSignal(

@@ -1,16 +1,19 @@
-import { FormEvent, useEffect, useState } from 'react';
+import type { Dispatch, FormEvent, SetStateAction } from 'react';
+
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import type { NodeRelayConfigurationViewModel } from '../../../../contexts/networks/presentation/view-models/NodeRelayConfigurationViewModel';
 import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
 import type { IpfsReplicationStatus } from '../../../../contexts/networks/presentation/view-models/IpfsReplicationStatus';
 import type { NetworkSynchronizationStatus } from '../../../../contexts/networks/presentation/view-models/NetworkSynchronizationStatus';
 import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
+import type { NodeRelayConfigurationViewModel } from '../../../../contexts/networks/presentation/view-models/NodeRelayConfigurationViewModel';
 import type { Peer } from '../../../../contexts/networks/presentation/view-models/Peer';
 import type {
   IdentityResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { NodeSettingsSection } from './NodeSettingsSection';
 
 import { IdentityMemberRow } from '../../../../contexts/identities/presentation/components/IdentityMemberListPanel';
 import { useIdentityPreview } from '../../../../contexts/identities/presentation/hooks/useIdentityPreview';
@@ -44,7 +47,439 @@ interface NodeSettingsDialogProps {
   session: Session;
 }
 
-type NodeSettingsSection = 'info' | 'networks' | 'peers' | 'relay';
+function CopyIcon({ copied }: { copied: boolean }) {
+  if (copied) {
+    return (
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        className="h-4 w-4 text-emerald-200"
+      >
+        <path
+          d="m5 12 4 4 10-10"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+        />
+      </svg>
+    );
+  }
+
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4">
+      <path
+        d="M9 8.5h8.5v10H9zM6.5 15.5V5.5H15"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function relayStatusLabel(
+  relay:
+    | {
+        advertised: boolean;
+        autoEnabled: boolean;
+        enabled: boolean;
+        running: boolean;
+      }
+    | undefined,
+): string {
+  if (!relay?.enabled) return copy.nodeSettings.relayDisabled;
+
+  if (relay.running && relay.advertised)
+    return copy.nodeSettings.relayAdvertised;
+
+  if (relay.running) return copy.nodeSettings.relayRunning;
+
+  if (relay.autoEnabled) return copy.nodeSettings.relayAutoEnabled;
+
+  return copy.nodeSettings.relayEnabled;
+}
+
+function nodeRelayStatusLabel(
+  relayConfiguration: NodeRelayConfigurationViewModel | null,
+  relay:
+    | {
+        advertised: boolean;
+        autoEnabled: boolean;
+        enabled: boolean;
+        running: boolean;
+      }
+    | undefined,
+): string {
+  if (!relayConfiguration) return relayStatusLabel(relay);
+
+  return relayConfiguration.privateRelay.enabled
+    ? copy.nodeSettings.relayEnabled
+    : copy.nodeSettings.relayDisabled;
+}
+
+function NodeDetailRow({
+  label,
+  title,
+  value,
+}: {
+  label: string;
+  title?: string;
+  value: string;
+}) {
+  return (
+    <div className="grid gap-1 py-1.5 text-sm sm:grid-cols-[10rem_minmax(0,1fr)]">
+      <div className="text-white/45">{label}</div>
+      <div
+        className="min-w-0 truncate font-black text-white/75"
+        title={title ?? value}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function NodeRuntimeSummary({
+  node,
+  relayConfiguration,
+}: {
+  node: (NodeInfo & { owner: null | string }) | null;
+  relayConfiguration: NodeRelayConfigurationViewModel | null;
+}) {
+  return (
+    <div className="py-2">
+      <div className="grid gap-1">
+        {relayConfiguration ? (
+          <NodeDetailRow
+            label={copy.nodeSettings.privateRelayDiscoverRecords}
+            value={
+              relayConfiguration.privateRelay.discoveryEnabled
+                ? copy.nodeSettings.relayEnabled
+                : copy.nodeSettings.relayDisabled
+            }
+          />
+        ) : null}
+        <NodeDetailRow
+          label={copy.nodeSettings.relay}
+          value={nodeRelayStatusLabel(relayConfiguration, node?.relay)}
+        />
+        {node?.relay?.peerId ? (
+          <NodeDetailRow
+            label={copy.nodeSettings.relayPeer}
+            title={node.relay.peerId}
+            value={shortId(node.relay.peerId)}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function NodeOwnerIdentity({
+  currentIdentity,
+  ownerIdentityId,
+}: {
+  currentIdentity: IdentityResource;
+  ownerIdentityId: string;
+}) {
+  const owner = useIdentityPreview(ownerIdentityId, currentIdentity);
+
+  return (
+    <div className="mt-2 w-full max-w-[18rem]">
+      <IdentityMemberRow
+        interactive={false}
+        item={{
+          identity: owner.identity ?? undefined,
+          identityId: ownerIdentityId,
+          name:
+            owner.loaded && !owner.identity
+              ? shortId(ownerIdentityId)
+              : undefined,
+          pictureUrl: owner.pictureUrl,
+        }}
+      />
+    </div>
+  );
+}
+
+function NodeOwnerSection({
+  claimLoading,
+  node,
+  onClaim,
+  session,
+}: {
+  claimLoading: boolean;
+  node: NodeSettingsDialogProps['node'];
+  onClaim: () => Promise<void>;
+  session: Session;
+}) {
+  return (
+    <div className="pb-4">
+      {!node?.owner ? (
+        <div>
+          <h4 className="text-base font-bold text-white">
+            {copy.nodeSettings.unclaimedTitle}
+          </h4>
+          <p className="mt-1 text-sm leading-5 text-white/55">
+            {copy.nodeSettings.unclaimedBody}
+          </p>
+          <button
+            type="button"
+            onClick={() => void onClaim()}
+            disabled={claimLoading}
+            className="ui-button ui-button-primary mt-3"
+          >
+            {claimLoading ? copy.nodeSettings.saving : copy.nodeSettings.claim}
+          </button>
+        </div>
+      ) : (
+        <div>
+          <div className="text-sm font-semibold text-white/55">
+            {copy.nodeSettings.owner}
+          </div>
+          <NodeOwnerIdentity
+            currentIdentity={session.identity}
+            ownerIdentityId={node.owner}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NodeIdRow({
+  copiedNodeId,
+  node,
+  onCopyNodeId,
+}: {
+  copiedNodeId: boolean;
+  node: NodeSettingsDialogProps['node'];
+  onCopyNodeId: () => Promise<void>;
+}) {
+  return (
+    <div className="py-3">
+      <div className="mb-1.5 text-sm font-semibold text-white/55">
+        {copy.nodeSettings.nodeId}
+      </div>
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_2.25rem] items-center gap-2">
+        <code
+          className="min-w-0 truncate text-sm text-white/70"
+          title={node?.id ?? undefined}
+        >
+          {node?.id ?? '--'}
+        </code>
+        <button
+          type="button"
+          onClick={() => void onCopyNodeId()}
+          disabled={!node?.id}
+          className="ui-icon-button h-9 w-9 shrink-0"
+          aria-label={copy.nodeSettings.copyNodeId}
+          title={
+            copiedNodeId ? copy.profile.copied : copy.nodeSettings.copyNodeId
+          }
+        >
+          <CopyIcon copied={copiedNodeId} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function NodeInfoSection({
+  claimLoading,
+  copiedNodeId,
+  isOwner,
+  networkSynchronizationStatus,
+  node,
+  onClaim,
+  onCopyNodeId,
+  relayConfiguration,
+  relayConfigurationLoaded,
+  replicationError,
+  replicationLoading,
+  replicationStatus,
+  session,
+  technicalDetailsVisible,
+}: {
+  claimLoading: boolean;
+  copiedNodeId: boolean;
+  isOwner: boolean;
+  networkSynchronizationStatus: NetworkSynchronizationStatus | null;
+  node: NodeSettingsDialogProps['node'];
+  onClaim: () => Promise<void>;
+  onCopyNodeId: () => Promise<void>;
+  relayConfiguration: NodeRelayConfigurationViewModel;
+  relayConfigurationLoaded: boolean;
+  replicationError: string | null;
+  replicationLoading: boolean;
+  replicationStatus: IpfsReplicationStatus | null;
+  session: Session;
+  technicalDetailsVisible: boolean;
+}) {
+  return (
+    <div className="grid content-start gap-7">
+      <section>
+        <h3 className="ui-section-heading pt-0">
+          {copy.nodeSettings.nodeDetails}
+        </h3>
+        <div>
+          <NodeOwnerSection
+            claimLoading={claimLoading}
+            node={node}
+            onClaim={onClaim}
+            session={session}
+          />
+
+          {technicalDetailsVisible ? (
+            <NodeIdRow
+              copiedNodeId={copiedNodeId}
+              node={node}
+              onCopyNodeId={onCopyNodeId}
+            />
+          ) : null}
+
+          <NodeRuntimeSummary
+            node={node}
+            relayConfiguration={
+              isOwner && relayConfigurationLoaded ? relayConfiguration : null
+            }
+          />
+        </div>
+      </section>
+
+      {isOwner && (
+        <>
+          <NetworkSynchronizationPanel status={networkSynchronizationStatus} />
+          <ReplicationStatusPanel
+            error={replicationError}
+            loading={replicationLoading}
+            status={replicationStatus}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
+function NodeRelayForm({
+  onChange,
+  onSubmit,
+  relayConfiguration,
+  relayError,
+  relaySaving,
+}: {
+  onChange: Dispatch<SetStateAction<NodeRelayConfigurationViewModel>>;
+  onSubmit: (event: FormEvent) => Promise<void>;
+  relayConfiguration: NodeRelayConfigurationViewModel;
+  relayError: string | null;
+  relaySaving: boolean;
+}) {
+  return (
+    <form className="grid gap-3" onSubmit={onSubmit}>
+      {relayError && (
+        <div className="ui-inline-notice border-rose-300/50 bg-rose-500/10 text-rose-100">
+          {relayError}
+        </div>
+      )}
+      <NodeRelayConfigurationForm
+        configuration={relayConfiguration}
+        disabled={relaySaving}
+        onChange={onChange}
+      />
+      <button
+        type="submit"
+        disabled={relaySaving}
+        className="ui-button ui-button-primary justify-self-end"
+      >
+        {relaySaving ? copy.nodeSettings.saving : copy.nodeSettings.relaySave}
+      </button>
+    </form>
+  );
+}
+
+function NodeRelaySection({
+  claimLoading,
+  isOwner,
+  node,
+  onClaim,
+  onRelayConfigurationChange,
+  onRelaySubmit,
+  relayConfiguration,
+  relayError,
+  relayLoading,
+  relaySaving,
+}: {
+  claimLoading: boolean;
+  isOwner: boolean;
+  node: NodeSettingsDialogProps['node'];
+  onClaim: () => Promise<void>;
+  onRelayConfigurationChange: Dispatch<
+    SetStateAction<NodeRelayConfigurationViewModel>
+  >;
+  onRelaySubmit: (event: FormEvent) => Promise<void>;
+  relayConfiguration: NodeRelayConfigurationViewModel;
+  relayError: string | null;
+  relayLoading: boolean;
+  relaySaving: boolean;
+}) {
+  return (
+    <div className="grid content-start gap-3">
+      {!isOwner && !node?.owner ? (
+        <div className="ui-inline-notice grid justify-items-start gap-3 text-sm text-white/55">
+          {copy.nodeSettings.ownerOnlyRelayUnclaimed}
+          <button
+            type="button"
+            onClick={() => void onClaim()}
+            disabled={claimLoading}
+            className="ui-button ui-button-primary"
+          >
+            {claimLoading ? copy.nodeSettings.saving : copy.nodeSettings.claim}
+          </button>
+        </div>
+      ) : !isOwner ? (
+        <div className="ui-inline-notice text-sm text-white/55">
+          {copy.nodeSettings.ownerOnlyRelay}
+        </div>
+      ) : relayLoading ? (
+        <div className="py-5 text-sm text-white/55">
+          {copy.nodeSettings.relayLoading}
+        </div>
+      ) : (
+        <NodeRelayForm
+          onChange={onRelayConfigurationChange}
+          onSubmit={onRelaySubmit}
+          relayConfiguration={relayConfiguration}
+          relayError={relayError}
+          relaySaving={relaySaving}
+        />
+      )}
+    </div>
+  );
+}
+
+function NodeSettingsNotice({
+  error,
+  notice,
+}: {
+  error: string | null;
+  notice: string | null;
+}) {
+  return (
+    <div
+      className={cx(
+        'ui-inline-notice mb-4',
+        error
+          ? 'border-rose-300/25 bg-rose-500/15 text-rose-100'
+          : 'border-emerald-300/25 bg-emerald-500/15 text-emerald-100',
+      )}
+    >
+      {error ?? notice}
+    </div>
+  );
+}
 
 export function NodeSettingsDialog({
   networks,
@@ -266,112 +701,26 @@ export function NodeSettingsDialog({
           <div className="ui-settings-content subtle-scrollbar">
             <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col">
               {(error || notice) && (
-                <div
-                  className={cx(
-                    'ui-inline-notice mb-4',
-                    error
-                      ? 'border-rose-300/25 bg-rose-500/15 text-rose-100'
-                      : 'border-emerald-300/25 bg-emerald-500/15 text-emerald-100',
-                  )}
-                >
-                  {error ?? notice}
-                </div>
+                <NodeSettingsNotice error={error} notice={notice} />
               )}
 
               {activeSection === 'info' && (
-                <div className="grid content-start gap-7">
-                  <section>
-                    <h3 className="ui-section-heading pt-0">
-                      {copy.nodeSettings.nodeDetails}
-                    </h3>
-                    <div>
-                      <div className="pb-4">
-                        {!node?.owner ? (
-                          <div>
-                            <h4 className="text-base font-bold text-white">
-                              {copy.nodeSettings.unclaimedTitle}
-                            </h4>
-                            <p className="mt-1 text-sm leading-5 text-white/55">
-                              {copy.nodeSettings.unclaimedBody}
-                            </p>
-                            <button
-                              type="button"
-                              onClick={() => void handleClaim()}
-                              disabled={claimLoading}
-                              className="ui-button ui-button-primary mt-3"
-                            >
-                              {claimLoading
-                                ? copy.nodeSettings.saving
-                                : copy.nodeSettings.claim}
-                            </button>
-                          </div>
-                        ) : (
-                          <div>
-                            <div className="text-sm font-semibold text-white/55">
-                              {copy.nodeSettings.owner}
-                            </div>
-                            <NodeOwnerIdentity
-                              currentIdentity={session.identity}
-                              ownerIdentityId={node.owner}
-                            />
-                          </div>
-                        )}
-                      </div>
-
-                      {technicalDetailsVisible ? (
-                        <div className="py-3">
-                          <div className="mb-1.5 text-sm font-semibold text-white/55">
-                            {copy.nodeSettings.nodeId}
-                          </div>
-                          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_2.25rem] items-center gap-2">
-                            <code
-                              className="min-w-0 truncate text-sm text-white/70"
-                              title={node?.id ?? undefined}
-                            >
-                              {node?.id ?? '--'}
-                            </code>
-                            <button
-                              type="button"
-                              onClick={() => void copyNodeId()}
-                              disabled={!node?.id}
-                              className="ui-icon-button h-9 w-9 shrink-0"
-                              aria-label={copy.nodeSettings.copyNodeId}
-                              title={
-                                copiedNodeId
-                                  ? copy.profile.copied
-                                  : copy.nodeSettings.copyNodeId
-                              }
-                            >
-                              <CopyIcon copied={copiedNodeId} />
-                            </button>
-                          </div>
-                        </div>
-                      ) : null}
-
-                      <NodeRuntimeSummary
-                        node={node}
-                        relayConfiguration={
-                          isOwner && relayConfigurationLoaded
-                            ? relayConfiguration
-                            : null
-                        }
-                      />
-                    </div>
-                  </section>
-
-                  {isOwner && (
-                    <>
-                      <NetworkSynchronizationPanel
-                        status={networkSynchronizationStatus}
-                      />
-                      <ReplicationStatusPanel
-                        error={replicationError}
-                        loading={replicationLoading}
-                        status={replicationStatus}
-                      />
-                    </>
-                  )}
-                </div>
+                <NodeInfoSection
+                  claimLoading={claimLoading}
+                  copiedNodeId={copiedNodeId}
+                  isOwner={isOwner}
+                  networkSynchronizationStatus={networkSynchronizationStatus}
+                  node={node}
+                  onClaim={handleClaim}
+                  onCopyNodeId={copyNodeId}
+                  relayConfiguration={relayConfiguration}
+                  relayConfigurationLoaded={relayConfigurationLoaded}
+                  replicationError={replicationError}
+                  replicationLoading={replicationLoading}
+                  replicationStatus={replicationStatus}
+                  session={session}
+                  technicalDetailsVisible={technicalDetailsVisible}
+                />
               )}
 
               {activeSection === 'networks' && (
@@ -383,56 +732,18 @@ export function NodeSettingsDialog({
                 />
               )}
               {activeSection === 'relay' && (
-                <div className="grid content-start gap-3">
-                  {!isOwner && !node?.owner ? (
-                    <div className="ui-inline-notice grid justify-items-start gap-3 text-sm text-white/55">
-                      {copy.nodeSettings.ownerOnlyRelayUnclaimed}
-                      <button
-                        type="button"
-                        onClick={() => void handleClaim()}
-                        disabled={claimLoading}
-                        className="ui-button ui-button-primary"
-                      >
-                        {claimLoading
-                          ? copy.nodeSettings.saving
-                          : copy.nodeSettings.claim}
-                      </button>
-                    </div>
-                  ) : !isOwner ? (
-                    <div className="ui-inline-notice text-sm text-white/55">
-                      {copy.nodeSettings.ownerOnlyRelay}
-                    </div>
-                  ) : relayLoading ? (
-                    <div className="py-5 text-sm text-white/55">
-                      {copy.nodeSettings.relayLoading}
-                    </div>
-                  ) : (
-                    <form
-                      className="grid gap-3"
-                      onSubmit={handleSaveRelayConfiguration}
-                    >
-                      {relayError && (
-                        <div className="ui-inline-notice border-rose-300/50 bg-rose-500/10 text-rose-100">
-                          {relayError}
-                        </div>
-                      )}
-                      <NodeRelayConfigurationForm
-                        configuration={relayConfiguration}
-                        disabled={relaySaving}
-                        onChange={setRelayConfiguration}
-                      />
-                      <button
-                        type="submit"
-                        disabled={relaySaving}
-                        className="ui-button ui-button-primary justify-self-end"
-                      >
-                        {relaySaving
-                          ? copy.nodeSettings.saving
-                          : copy.nodeSettings.relaySave}
-                      </button>
-                    </form>
-                  )}
-                </div>
+                <NodeRelaySection
+                  claimLoading={claimLoading}
+                  isOwner={isOwner}
+                  node={node}
+                  onClaim={handleClaim}
+                  onRelayConfigurationChange={setRelayConfiguration}
+                  onRelaySubmit={handleSaveRelayConfiguration}
+                  relayConfiguration={relayConfiguration}
+                  relayError={relayError}
+                  relayLoading={relayLoading}
+                  relaySaving={relaySaving}
+                />
               )}
 
               {activeSection === 'peers' && (
@@ -451,162 +762,4 @@ export function NodeSettingsDialog({
     </div>,
     document.body,
   );
-}
-
-function CopyIcon({ copied }: { copied: boolean }) {
-  if (copied) {
-    return (
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 24 24"
-        fill="none"
-        className="h-4 w-4 text-emerald-200"
-      >
-        <path
-          d="m5 12 4 4 10-10"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2"
-        />
-      </svg>
-    );
-  }
-
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4">
-      <path
-        d="M9 8.5h8.5v10H9zM6.5 15.5V5.5H15"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-    </svg>
-  );
-}
-
-function NodeRuntimeSummary({
-  node,
-  relayConfiguration,
-}: {
-  node: (NodeInfo & { owner: null | string }) | null;
-  relayConfiguration: NodeRelayConfigurationViewModel | null;
-}) {
-  return (
-    <div className="py-2">
-      <div className="grid gap-1">
-        {relayConfiguration ? (
-          <NodeDetailRow
-            label={copy.nodeSettings.privateRelayDiscoverRecords}
-            value={
-              relayConfiguration.privateRelay.discoveryEnabled
-                ? copy.nodeSettings.relayEnabled
-                : copy.nodeSettings.relayDisabled
-            }
-          />
-        ) : null}
-        <NodeDetailRow
-          label={copy.nodeSettings.relay}
-          value={nodeRelayStatusLabel(relayConfiguration, node?.relay)}
-        />
-        {node?.relay?.peerId ? (
-          <NodeDetailRow
-            label={copy.nodeSettings.relayPeer}
-            title={node.relay.peerId}
-            value={shortId(node.relay.peerId)}
-          />
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function NodeDetailRow({
-  label,
-  title,
-  value,
-}: {
-  label: string;
-  title?: string;
-  value: string;
-}) {
-  return (
-    <div className="grid gap-1 py-1.5 text-sm sm:grid-cols-[10rem_minmax(0,1fr)]">
-      <div className="text-white/45">{label}</div>
-      <div
-        className="min-w-0 truncate font-black text-white/75"
-        title={title ?? value}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function NodeOwnerIdentity({
-  currentIdentity,
-  ownerIdentityId,
-}: {
-  currentIdentity: IdentityResource;
-  ownerIdentityId: string;
-}) {
-  const owner = useIdentityPreview(ownerIdentityId, currentIdentity);
-
-  return (
-    <div className="mt-2 w-full max-w-[18rem]">
-      <IdentityMemberRow
-        interactive={false}
-        item={{
-          identity: owner.identity ?? undefined,
-          identityId: ownerIdentityId,
-          name:
-            owner.loaded && !owner.identity
-              ? shortId(ownerIdentityId)
-              : undefined,
-          pictureUrl: owner.pictureUrl,
-        }}
-      />
-    </div>
-  );
-}
-
-function relayStatusLabel(
-  relay:
-    | {
-        advertised: boolean;
-        autoEnabled: boolean;
-        enabled: boolean;
-        running: boolean;
-      }
-    | undefined,
-): string {
-  if (!relay?.enabled) return copy.nodeSettings.relayDisabled;
-
-  if (relay.running && relay.advertised)
-    return copy.nodeSettings.relayAdvertised;
-
-  if (relay.running) return copy.nodeSettings.relayRunning;
-
-  if (relay.autoEnabled) return copy.nodeSettings.relayAutoEnabled;
-
-  return copy.nodeSettings.relayEnabled;
-}
-
-function nodeRelayStatusLabel(
-  relayConfiguration: NodeRelayConfigurationViewModel | null,
-  relay:
-    | {
-        advertised: boolean;
-        autoEnabled: boolean;
-        enabled: boolean;
-        running: boolean;
-      }
-    | undefined,
-): string {
-  if (!relayConfiguration) return relayStatusLabel(relay);
-
-  return relayConfiguration.privateRelay.enabled
-    ? copy.nodeSettings.relayEnabled
-    : copy.nodeSettings.relayDisabled;
 }

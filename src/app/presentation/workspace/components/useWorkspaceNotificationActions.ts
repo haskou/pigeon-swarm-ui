@@ -1,25 +1,28 @@
+import type { Dispatch, SetStateAction } from 'react';
+
 import { useCallback, useMemo } from 'react';
 
 import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
+import type { NotificationScopeSettingResource } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationScopeSettingResource';
+import type { NotificationScopeSettingsTarget } from '../../../../contexts/notifications/presentation/components/NotificationScopeSettingsDialog';
+import type { NotificationSettingMap } from '../../../../contexts/notifications/presentation/view-models/NotificationSettingMap';
 import type {
   Community,
   ConversationResource,
+  NotificationSettingScope,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { useNotificationScopeSettings } from '../../../../contexts/notifications/presentation/hooks/useNotificationScopeSettings';
 
 import { NotificationSettingsPolicy } from '../../../../contexts/notifications/presentation/view-models/NotificationSettingsPolicy';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 
-type NotificationSettingsController = ReturnType<
-  typeof useNotificationScopeSettings
->;
-
 type WorkspaceNotificationActionsInput = {
   conversations: ConversationResource[];
   nodeNetworks: NodeNetwork[];
-  openSettings: NotificationSettingsController['open'];
-  settingsByScopeKey: NotificationSettingsController['settingsByScopeKey'];
-  toggleMute: NotificationSettingsController['toggleMute'];
+  openSettings: Dispatch<
+    SetStateAction<NotificationScopeSettingsTarget | null>
+  >;
+  settingsByScopeKey: NotificationSettingMap;
+  toggleMute: (scope: NotificationSettingScope) => void;
 };
 
 export function useWorkspaceNotificationActions({
@@ -28,17 +31,29 @@ export function useWorkspaceNotificationActions({
   openSettings,
   settingsByScopeKey,
   toggleMute,
-}: WorkspaceNotificationActionsInput) {
+}: WorkspaceNotificationActionsInput): {
+  communitySettingFor: (
+    community: Community,
+  ) => NotificationScopeSettingResource;
+  conversationSettingFor: (
+    conversation: ConversationResource,
+  ) => NotificationScopeSettingResource;
+  conversationsWithNotificationState: ConversationResource[];
+  openCommunitySettings: (community: Community) => void;
+  openConversationSettings: (
+    conversation: ConversationResource,
+    title: string,
+  ) => void;
+  toggleCommunityMute: (community: Community) => void;
+  toggleConversationMute: (conversation: ConversationResource) => void;
+} {
   const conversationsWithNotificationState = useMemo(
     () =>
       conversations.map((conversation) => {
-        const setting = NotificationSettingsPolicy.resolve(
-          settingsByScopeKey,
-          {
-            conversationId: conversation.id,
-            type: 'conversation',
-          },
-        );
+        const setting = NotificationSettingsPolicy.resolve(settingsByScopeKey, {
+          conversationId: conversation.id,
+          type: 'conversation',
+        });
 
         return NotificationSettingsPolicy.isMuted(setting)
           ? { ...conversation, unreadCount: 0 }

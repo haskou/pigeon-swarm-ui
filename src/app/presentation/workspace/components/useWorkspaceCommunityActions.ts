@@ -11,6 +11,7 @@ import type {
   CommunityMembershipRequest,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { WorkspaceCommunityActions } from './WorkspaceCommunityActions';
 
 import { CommunityChannels } from '../../../../contexts/communities/presentation/view-models/CommunityChannels';
 import { CommunityList } from '../../../../contexts/communities/presentation/view-models/CommunityList';
@@ -18,6 +19,13 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { applyPublishedKeychain } from './applyPublishedKeychain';
+
+function prependMembershipRequest(
+  requests: CommunityMembershipRequest[],
+  request: CommunityMembershipRequest,
+): CommunityMembershipRequest[] {
+  return [request, ...requests.filter((item) => item.id !== request.id)];
+}
 
 type WorkspaceCommunityActionsInput = {
   activeCommunityId: null | string;
@@ -32,19 +40,6 @@ type WorkspaceCommunityActionsInput = {
   setSession: Dispatch<SetStateAction<Session | null>>;
   showCommunityWorkspace: () => void;
   showMessagesWorkspace: () => void;
-};
-
-type WorkspaceCommunityActions = {
-  create: (input: { community: Community; session: Session }) => void;
-  joinRequested: (request: CommunityMembershipRequest) => void;
-  leave: (community: Community) => Promise<void>;
-  remove: (community: Community) => void;
-  update: (community: Community) => void;
-  updateChannels: (communityId: string, channels: CommunityChannel[]) => void;
-  updateState: (
-    communityId: string,
-    updater: (community: Community) => Community,
-  ) => void;
 };
 
 export function useWorkspaceCommunityActions({
@@ -109,21 +104,22 @@ export function useWorkspaceCommunityActions({
 
   const joinRequested = useCallback(
     (request: CommunityMembershipRequest): void => {
-      setMembershipRequests((current) => [
-        request,
-        ...current.filter((item) => item.id !== request.id),
-      ]);
+      setMembershipRequests((current) =>
+        prependMembershipRequest(current, request),
+      );
 
       if (request.status === 'accepted') {
+        const showJoinedCommunity = (community: Community): void => {
+          setCommunities((current) =>
+            CommunityList.prepending(current, community),
+          );
+          setActiveCommunityId(community.id);
+          showCommunityWorkspace();
+        };
+
         void applicationContainer.communities
           .get(sessionRef.current, request.communityId)
-          .then((community) => {
-            setCommunities((current) =>
-              CommunityList.prepending(current, community),
-            );
-            setActiveCommunityId(community.id);
-            showCommunityWorkspace();
-          })
+          .then(showJoinedCommunity)
           .catch((caught) =>
             setSendError(
               toUserErrorMessage(caught, copy.communities.membershipError),

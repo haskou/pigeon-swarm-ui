@@ -1,4 +1,4 @@
-import type { EncryptionDetails } from '../../../../app/presentation/workspace/components/EncryptionDetailsDialog';
+import type { EncryptionDetails } from '../../../../app/presentation/workspace/components/EncryptionDetails';
 import type {
   Community,
   CommunityTextChannel,

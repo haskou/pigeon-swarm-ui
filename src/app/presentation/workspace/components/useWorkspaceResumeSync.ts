@@ -1,31 +1,14 @@
 import { useCallback, useEffect, useRef } from 'react';
 
-import type {
-  ChatMessage,
-  ConversationResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../../shared/domain/pigeonResources.types';
+import type { UseWorkspaceResumeSyncInput } from './UseWorkspaceResumeSyncInput';
+import type { WorkspaceMode } from './WorkspaceMode';
+import type { WorkspaceResumeSyncPlan } from './WorkspaceResumeSyncPlan';
 
 import { MessageCollection } from '../../../../contexts/messages/presentation/view-models/MessageCollection';
 import { isBrowserPageVisible } from './isBrowserPageVisible';
 
 const MIN_RESUME_SYNC_INTERVAL_MS = 1500;
-
-type WorkspaceMode = 'community' | 'messages';
-
-type UseWorkspaceResumeSyncInput = {
-  activeConversationId?: string | null;
-  activeConversationKeyId?: string | null;
-  loadActiveMessages: (conversationId: string) => Promise<void>;
-  loadedMessages: { current: ChatMessage[] };
-  onCommunitiesReload: () => Promise<void>;
-  refreshConversations: () => Promise<ConversationResource[]>;
-  workspaceMode: WorkspaceMode;
-};
-
-type WorkspaceResumeSyncPlan = {
-  reloadCommunities: boolean;
-  refreshConversations: boolean;
-};
 
 export function workspaceResumeSyncPlan({
   workspaceMode,
@@ -38,6 +21,56 @@ export function workspaceResumeSyncPlan({
     refreshConversations: workspaceMode === 'messages',
     reloadCommunities: workspaceMode === 'community' && workspaceWasHidden,
   };
+}
+
+async function reloadActiveMessageIfBehind(
+  input: UseWorkspaceResumeSyncInput,
+  conversations: ConversationResource[],
+): Promise<void> {
+  const { activeConversationId, activeConversationKeyId } = input;
+
+  if (
+    input.workspaceMode !== 'messages' ||
+    !activeConversationId ||
+    !activeConversationKeyId
+  ) {
+    return;
+  }
+
+  const nextActiveConversation = conversations.find(
+    (conversation) => conversation.id === activeConversationId,
+  );
+
+  if (
+    nextActiveConversation &&
+    !MessageCollection.isCaughtUpWithConversation(
+      input.loadedMessages.current,
+      nextActiveConversation,
+    )
+  ) {
+    await input.loadActiveMessages(activeConversationId);
+  }
+}
+
+async function syncWorkspaceAfterResume(
+  input: UseWorkspaceResumeSyncInput,
+  workspaceWasHidden: boolean,
+): Promise<void> {
+  const plan = workspaceResumeSyncPlan({
+    workspaceMode: input.workspaceMode,
+    workspaceWasHidden,
+  });
+  const nextConversations = plan.refreshConversations
+    ? await input.refreshConversations().catch(() => null)
+    : null;
+
+  if (nextConversations) {
+    await reloadActiveMessageIfBehind(input, nextConversations);
+  }
+
+  if (plan.reloadCommunities) {
+    await input.onCommunitiesReload().catch(() => undefined);
+  }
 }
 
 export function useWorkspaceResumeSync({
@@ -70,40 +103,18 @@ export function useWorkspaceResumeSync({
     workspaceWasHiddenRef.current = false;
     workspaceResumeSyncAtRef.current = now;
 
-    void (async () => {
-      const plan = workspaceResumeSyncPlan({
+    void syncWorkspaceAfterResume(
+      {
+        activeConversationId,
+        activeConversationKeyId,
+        loadActiveMessages,
+        loadedMessages,
+        onCommunitiesReload,
+        refreshConversations,
         workspaceMode,
-        workspaceWasHidden,
-      });
-      const nextConversations = plan.refreshConversations
-        ? await refreshConversations().catch(() => null)
-        : null;
-
-      if (
-        workspaceMode === 'messages' &&
-        activeConversationId &&
-        activeConversationKeyId &&
-        nextConversations
-      ) {
-        const nextActiveConversation = nextConversations.find(
-          (conversation) => conversation.id === activeConversationId,
-        );
-
-        if (
-          nextActiveConversation &&
-          !MessageCollection.isCaughtUpWithConversation(
-            loadedMessages.current,
-            nextActiveConversation,
-          )
-        ) {
-          await loadActiveMessages(activeConversationId);
-        }
-      }
-
-      if (plan.reloadCommunities) {
-        await onCommunitiesReload().catch(() => undefined);
-      }
-    })();
+      },
+      workspaceWasHidden,
+    );
   }, [
     activeConversationId,
     activeConversationKeyId,

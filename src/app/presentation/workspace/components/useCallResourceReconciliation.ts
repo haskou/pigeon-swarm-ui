@@ -9,9 +9,9 @@ import {
 
 import type { CallParticipantStatus } from '../../../../contexts/calls/infrastructure/http/resources/CallParticipantStatus';
 import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
-import type { useCallSession } from '../../../../contexts/calls/presentation/hooks/useCallSession';
 import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
 import type { Community } from '../../../../shared/domain/pigeonResources.types';
+import type { CallResourceReconciliationInput } from './CallResourceReconciliationInput';
 import type { WorkspaceCallDetails } from './resolveWorkspaceCallDetails';
 
 import {
@@ -26,8 +26,6 @@ import {
   stopIncomingCallSound,
 } from '../../../../shared/presentation/sounds';
 
-type CallSessionController = ReturnType<typeof useCallSession>;
-
 export type IncomingWorkspaceCall = {
   call: CallResource;
   caller?: CallParticipant;
@@ -35,14 +33,333 @@ export type IncomingWorkspaceCall = {
   title: string;
 };
 
-type CallResourceReconciliationInput = {
-  activeCall: CallSessionController['activeCall'];
-  callDetailsForResource: (call: CallResource) => WorkspaceCallDetails;
+function communityWithVoicePresence(
+  community: Community,
+  scope: { channelId: string; communityId: string },
+  connectedIdentityIds: string[],
+): Community {
+  if (community.id !== scope.communityId) return community;
+
+  let changed = false;
+  const voiceChannels = (community.voiceChannels ?? []).map((channel) => {
+    if (channel.id !== scope.channelId) return channel;
+
+    const currentIdentityIds = [...(channel.connectedIdentityIds ?? [])].sort();
+
+    if (
+      currentIdentityIds.length === connectedIdentityIds.length &&
+      currentIdentityIds.every(
+        (identityId, index) => identityId === connectedIdentityIds[index],
+      )
+    ) {
+      return channel;
+    }
+
+    changed = true;
+
+    return { ...channel, connectedIdentityIds };
+  });
+
+  return changed ? { ...community, voiceChannels } : community;
+}
+
+function projectCommunityVoicePresence(
+  call: CallResource,
+  setCommunities: Dispatch<SetStateAction<Community[]>>,
+): void {
+  if (call.scope.type !== 'community_channel') return;
+
+  const scope = call.scope;
+  const connectedIdentityIds =
+    call.status === 'active'
+      ? Array.from(
+          new Set(
+            call.participants
+              .filter((participant) => participant.connected)
+              .map((participant) => participant.identityId),
+          ),
+        ).sort()
+      : [];
+
+  setCommunities((current) =>
+    current.map((community) =>
+      communityWithVoicePresence(community, scope, connectedIdentityIds),
+    ),
+  );
+}
+
+function notifyIncomingCallOnce({
+  call,
+  details,
+  notifiedCallIds,
+}: {
+  call: CallResource;
+  details: WorkspaceCallDetails;
+  notifiedCallIds: Set<string>;
+}): void {
+  if (notifiedCallIds.has(call.id)) return;
+
+  notifiedCallIds.add(call.id);
+  void showPwaNotification({
+    body: details.subtitle
+      ? `${details.title} · ${details.subtitle}`
+      : details.title,
+    tag: `call-${call.id}`,
+    title: copy.calls.incoming,
+  });
+}
+
+function ringIncomingCall({
+  call,
+  details,
+  notifiedCallIds,
+  setIncomingCall,
+}: {
+  call: CallResource;
+  details: WorkspaceCallDetails;
+  notifiedCallIds: Set<string>;
+  setIncomingCall: Dispatch<SetStateAction<IncomingWorkspaceCall | null>>;
+}): void {
+  if (details.kind === 'community-voice') return;
+
+  const caller = details.participants.find(
+    (participant) => participant.identityId === call.creatorIdentityId,
+  );
+
+  notifyIncomingCallOnce({ call, details, notifiedCallIds });
+  setIncomingCall({
+    call,
+    caller,
+    participants: details.participants,
+    title: details.title,
+  });
+}
+
+function leftActiveCommunityVoice({
+  call,
+  currentActiveCall,
+  currentIdentityId,
+  nextStatuses,
+  previousStatuses,
+}: {
+  call: CallResource;
+  currentActiveCall: CallResourceReconciliationInput['activeCall'];
   currentIdentityId: string;
-  endCall: CallSessionController['endCall'];
-  reconcileCall: CallSessionController['reconcileCall'];
-  setCommunities: Dispatch<SetStateAction<Community[]>>;
-};
+  nextStatuses: Record<string, CallParticipantStatus>;
+  previousStatuses: Record<string, CallParticipantStatus>;
+}): boolean {
+  return (
+    call.scope.type === 'community_channel' &&
+    currentActiveCall?.id === call.id &&
+    call.status === 'active' &&
+    Object.entries(previousStatuses).some(
+      ([identityId, status]) =>
+        identityId !== currentIdentityId &&
+        status === 'joined' &&
+        (!nextStatuses[identityId] || nextStatuses[identityId] === 'left'),
+    )
+  );
+}
+
+function endedByRemoteParticipant({
+  call,
+  currentActiveCall,
+  currentIdentityId,
+  details,
+}: {
+  call: CallResource;
+  currentActiveCall: CallResourceReconciliationInput['activeCall'];
+  currentIdentityId: string;
+  details: WorkspaceCallDetails;
+}): boolean {
+  return (
+    details.kind === 'one-to-one' &&
+    currentActiveCall?.id === call.id &&
+    call.participants.some(
+      (participant) =>
+        participant.identityId !== currentIdentityId &&
+        ['declined', 'left', 'missed'].includes(participant.status),
+    )
+  );
+}
+
+function endCallForRemoteParticipant({
+  call,
+  currentIdentityId,
+  endCall,
+}: {
+  call: CallResource;
+  currentIdentityId: string;
+  endCall: CallResourceReconciliationInput['endCall'];
+}): void {
+  const remoteParticipant = call.participants.find(
+    (participant) => participant.identityId !== currentIdentityId,
+  );
+
+  logCallWarning('workspace:call:ended-by-remote-participant-status', {
+    callId: call.id,
+    remoteIdentityId: remoteParticipant?.identityId,
+    remoteStatus: remoteParticipant?.status,
+  });
+  playEndedCallSound();
+  endCall();
+}
+
+function endCallOnUnavailableResource({
+  call,
+  context,
+  currentActiveCall,
+  endCall,
+  event,
+  incomingCallId,
+  setIncomingCall,
+}: {
+  call: CallResource;
+  context: Record<string, unknown>;
+  currentActiveCall: CallResourceReconciliationInput['activeCall'];
+  endCall: CallResourceReconciliationInput['endCall'];
+  event: string;
+  incomingCallId: string | undefined;
+  setIncomingCall: Dispatch<SetStateAction<IncomingWorkspaceCall | null>>;
+}): void {
+  if (incomingCallId === call.id) setIncomingCall(null);
+
+  if (currentActiveCall?.id === call.id) {
+    logCallWarning(event, context);
+    playEndedCallSound();
+    endCall();
+  }
+}
+
+function isJoinedOnAnotherDevice({
+  call,
+  currentActiveCall,
+  currentParticipant,
+  details,
+}: {
+  call: CallResource;
+  currentActiveCall: CallResourceReconciliationInput['activeCall'];
+  currentParticipant: CallResource['participants'][number] | undefined;
+  details: WorkspaceCallDetails;
+}): boolean {
+  return (
+    details.kind === 'one-to-one' &&
+    Boolean(currentParticipant?.connected) &&
+    currentActiveCall?.id !== call.id
+  );
+}
+
+function reconcileCallLifecycle({
+  call,
+  currentActiveCall,
+  currentIdentityId,
+  currentParticipant,
+  details,
+  endCall,
+  incomingCallId,
+  notifiedCallIds,
+  reconcileCall,
+  setIncomingCall,
+}: {
+  call: CallResource;
+  currentActiveCall: CallResourceReconciliationInput['activeCall'];
+  currentIdentityId: string;
+  currentParticipant: CallResource['participants'][number] | undefined;
+  details: WorkspaceCallDetails;
+  endCall: CallResourceReconciliationInput['endCall'];
+  incomingCallId: string | undefined;
+  notifiedCallIds: Set<string>;
+  reconcileCall: CallResourceReconciliationInput['reconcileCall'];
+  setIncomingCall: Dispatch<SetStateAction<IncomingWorkspaceCall | null>>;
+}): void {
+  if (call.status !== 'active') {
+    endCallOnUnavailableResource({
+      call,
+      context: { callId: call.id, status: call.status },
+      currentActiveCall,
+      endCall,
+      event: 'workspace:call:ended-by-resource-status',
+      incomingCallId,
+      setIncomingCall,
+    });
+
+    return;
+  }
+
+  if (details.kind === 'group') {
+    endCallOnUnavailableResource({
+      call,
+      context: { callId: call.id },
+      currentActiveCall,
+      endCall,
+      event: 'workspace:call:ended-unsupported-group-call',
+      incomingCallId,
+      setIncomingCall,
+    });
+
+    return;
+  }
+
+  if (
+    endedByRemoteParticipant({
+      call,
+      currentActiveCall,
+      currentIdentityId,
+      details,
+    })
+  ) {
+    endCallForRemoteParticipant({ call, currentIdentityId, endCall });
+
+    return;
+  }
+
+  if (currentParticipant?.status === 'ringing') {
+    ringIncomingCall({ call, details, notifiedCallIds, setIncomingCall });
+
+    return;
+  }
+
+  if (
+    isJoinedOnAnotherDevice({
+      call,
+      currentActiveCall,
+      currentParticipant,
+      details,
+    })
+  ) {
+    logCallDebug('workspace:call:joined-on-another-device', {
+      callId: call.id,
+      identityId: currentIdentityId,
+    });
+
+    return;
+  }
+
+  if (currentActiveCall?.id === call.id) reconcileCall(call, details);
+}
+
+function clearIncomingCallWhenNotRinging({
+  call,
+  currentParticipant,
+  details,
+  incomingCallId,
+  setIncomingCall,
+}: {
+  call: CallResource;
+  currentParticipant: CallResource['participants'][number] | undefined;
+  details: WorkspaceCallDetails;
+  incomingCallId: string | undefined;
+  setIncomingCall: Dispatch<SetStateAction<IncomingWorkspaceCall | null>>;
+}): void {
+  if (
+    details.kind === 'one-to-one' &&
+    incomingCallId === call.id &&
+    currentParticipant?.status !== 'ringing'
+  ) {
+    setIncomingCall(null);
+    stopIncomingCallSound();
+  }
+}
 
 export function useCallResourceReconciliation({
   activeCall,
@@ -83,7 +400,6 @@ export function useCallResourceReconciliation({
       const currentParticipant = call.participants.find(
         (participant) => participant.identityId === currentIdentityId,
       );
-      const previousStatuses = participantStatusesRef.current[call.id] ?? {};
       const nextStatuses = Object.fromEntries(
         call.participants.map((participant) => [
           participant.identityId,
@@ -91,15 +407,13 @@ export function useCallResourceReconciliation({
         ]),
       ) as Record<string, CallParticipantStatus>;
       const remoteParticipantLeftActiveCommunityVoice =
-        call.scope.type === 'community_channel' &&
-        currentActiveCall?.id === call.id &&
-        call.status === 'active' &&
-        Object.entries(previousStatuses).some(
-          ([identityId, status]) =>
-            identityId !== currentIdentityId &&
-            status === 'joined' &&
-            (!nextStatuses[identityId] || nextStatuses[identityId] === 'left'),
-        );
+        leftActiveCommunityVoice({
+          call,
+          currentActiveCall,
+          currentIdentityId,
+          nextStatuses,
+          previousStatuses: participantStatusesRef.current[call.id] ?? {},
+        });
 
       participantStatusesRef.current = {
         ...participantStatusesRef.current,
@@ -108,108 +422,30 @@ export function useCallResourceReconciliation({
 
       if (remoteParticipantLeftActiveCommunityVoice) playEndedCallSound();
 
-      if (
-        details.kind === 'one-to-one' &&
-        incomingCall?.call.id === call.id &&
-        currentParticipant?.status !== 'ringing'
-      ) {
-        setIncomingCall(null);
-        stopIncomingCallSound();
-      }
+      clearIncomingCallWhenNotRinging({
+        call,
+        currentParticipant,
+        details,
+        incomingCallId: incomingCall?.call.id,
+        setIncomingCall,
+      });
 
       if (call.scope.type === 'community_channel') {
         projectCommunityVoicePresence(call, setCommunities);
       }
 
-      if (call.status !== 'active') {
-        if (incomingCall?.call.id === call.id) setIncomingCall(null);
-
-        if (currentActiveCall?.id === call.id) {
-          logCallWarning('workspace:call:ended-by-resource-status', {
-            callId: call.id,
-            status: call.status,
-          });
-          playEndedCallSound();
-          endCall();
-        }
-
-        return;
-      }
-
-      if (details.kind === 'group') {
-        if (incomingCall?.call.id === call.id) setIncomingCall(null);
-
-        if (currentActiveCall?.id === call.id) {
-          logCallWarning('workspace:call:ended-unsupported-group-call', {
-            callId: call.id,
-          });
-          playEndedCallSound();
-          endCall();
-        }
-
-        return;
-      }
-
-      if (
-        details.kind === 'one-to-one' &&
-        currentActiveCall?.id === call.id &&
-        call.participants.some(
-          (participant) =>
-            participant.identityId !== currentIdentityId &&
-            ['declined', 'left', 'missed'].includes(participant.status),
-        )
-      ) {
-        const remoteParticipant = call.participants.find(
-          (participant) => participant.identityId !== currentIdentityId,
-        );
-
-        logCallWarning('workspace:call:ended-by-remote-participant-status', {
-          callId: call.id,
-          remoteIdentityId: remoteParticipant?.identityId,
-          remoteStatus: remoteParticipant?.status,
-        });
-        playEndedCallSound();
-        endCall();
-
-        return;
-      }
-
-      if (currentParticipant?.status === 'ringing') {
-        if (details.kind === 'community-voice') return;
-
-        const caller = details.participants.find(
-          (participant) => participant.identityId === call.creatorIdentityId,
-        );
-
-        notifyIncomingCallOnce({
-          call,
-          details,
-          notifiedCallIds: notifiedIncomingCallIdsRef.current,
-        });
-        setIncomingCall({
-          call,
-          caller,
-          participants: details.participants,
-          title: details.title,
-        });
-
-        return;
-      }
-
-      if (
-        details.kind === 'one-to-one' &&
-        currentParticipant?.connected &&
-        currentActiveCall?.id !== call.id
-      ) {
-        logCallDebug('workspace:call:joined-on-another-device', {
-          callId: call.id,
-          identityId: currentIdentityId,
-        });
-
-        return;
-      }
-
-      if (currentActiveCall?.id === call.id) reconcileCall(call, details);
+      reconcileCallLifecycle({
+        call,
+        currentActiveCall,
+        currentIdentityId,
+        currentParticipant,
+        details,
+        endCall,
+        incomingCallId: incomingCall?.call.id,
+        notifiedCallIds: notifiedIncomingCallIdsRef.current,
+        reconcileCall,
+        setIncomingCall,
+      });
     },
     [
       callDetailsForResource,
@@ -228,74 +464,4 @@ export function useCallResourceReconciliation({
   }, [activeCall?.call, callDetailsForResource, reconcileCall]);
 
   return { incomingCall, reconcileCallResource, setIncomingCall };
-}
-
-function projectCommunityVoicePresence(
-  call: CallResource,
-  setCommunities: Dispatch<SetStateAction<Community[]>>,
-): void {
-  if (call.scope.type !== 'community_channel') return;
-
-  const scope = call.scope;
-  const connectedIdentityIds =
-    call.status === 'active'
-      ? Array.from(
-          new Set(
-            call.participants
-              .filter((participant) => participant.connected)
-              .map((participant) => participant.identityId),
-          ),
-        ).sort()
-      : [];
-
-  setCommunities((current) =>
-    current.map((community) => {
-      if (community.id !== scope.communityId) return community;
-
-      let changed = false;
-      const voiceChannels = (community.voiceChannels ?? []).map((channel) => {
-        if (channel.id !== scope.channelId) return channel;
-
-        const currentIdentityIds = [
-          ...(channel.connectedIdentityIds ?? []),
-        ].sort();
-
-        if (
-          currentIdentityIds.length === connectedIdentityIds.length &&
-          currentIdentityIds.every(
-            (identityId, index) => identityId === connectedIdentityIds[index],
-          )
-        ) {
-          return channel;
-        }
-
-        changed = true;
-
-        return { ...channel, connectedIdentityIds };
-      });
-
-      return changed ? { ...community, voiceChannels } : community;
-    }),
-  );
-}
-
-function notifyIncomingCallOnce({
-  call,
-  details,
-  notifiedCallIds,
-}: {
-  call: CallResource;
-  details: WorkspaceCallDetails;
-  notifiedCallIds: Set<string>;
-}): void {
-  if (notifiedCallIds.has(call.id)) return;
-
-  notifiedCallIds.add(call.id);
-  void showPwaNotification({
-    body: details.subtitle
-      ? `${details.title} · ${details.subtitle}`
-      : details.title,
-    tag: `call-${call.id}`,
-    title: copy.calls.incoming,
-  });
 }

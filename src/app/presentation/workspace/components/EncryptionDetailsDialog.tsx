@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import type { EncryptionDetails } from './EncryptionDetails';
+import type { EncryptionDetailsSecret } from './EncryptionDetailsSecret';
+
 import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
 import { cx } from '../../../../shared/presentation/cx';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
@@ -9,26 +12,59 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
 import { visibleEncryptionRows } from './visibleEncryptionRows';
 
-export type EncryptionDetailsSecret = {
-  label: string;
-  sensitive?: boolean;
-  value?: null | string;
-};
+function maskedValue(value: string, sensitive?: boolean): string {
+  if (!sensitive) return value;
 
-export type EncryptionDetailsRow = {
-  label: string;
-  technical?: boolean;
-  value: string;
-};
+  return '••••••••••••••••••••••••';
+}
 
-export type EncryptionDetails = {
-  note?: string;
-  rows: EncryptionDetailsRow[];
-  secrets: EncryptionDetailsSecret[];
-  status: 'missing' | 'public' | 'ready';
-  subtitle?: string;
-  title: string;
-};
+function SecretRow({ secret }: { secret: EncryptionDetailsSecret }) {
+  const [copied, setCopied] = useState(false);
+  const value = secret.value?.trim();
+
+  const copyValue = async () => {
+    if (!value || !navigator.clipboard) return;
+
+    if (
+      secret.sensitive &&
+      !window.confirm(copy.profile.copySensitiveKeyConfirm)
+    ) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(value);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  };
+
+  return (
+    <div className="flex min-w-0 items-center gap-3 py-3 text-xs">
+      <div className="min-w-0 flex-1">
+        <div className="font-black text-white/70">{secret.label}</div>
+        <div className="mt-1 truncate font-semibold text-white/40">
+          {value ? maskedValue(value, secret.sensitive) : copy.encryption.empty}
+        </div>
+      </div>
+      {value && (
+        <button
+          type="button"
+          onClick={() => void copyValue()}
+          className="ui-button min-h-8 shrink-0 px-2.5 py-1 text-xs"
+        >
+          {copied ? copy.profile.copied : copy.profile.copy}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function statusLabel(status: EncryptionDetails['status']): string {
+  if (status === 'ready') return copy.encryption.ready;
+
+  if (status === 'public') return copy.encryption.public;
+
+  return copy.encryption.missing;
+}
 
 export function EncryptionDetailsDialog({
   details,
@@ -65,9 +101,7 @@ export function EncryptionDetailsDialog({
         aria-label={details.title}
       >
         <DialogHeader
-          description={
-            technicalDetailsVisible ? details.subtitle : undefined
-          }
+          description={technicalDetailsVisible ? details.subtitle : undefined}
           title={details.title}
           onClose={close}
         />
@@ -124,58 +158,4 @@ export function EncryptionDetailsDialog({
     </div>,
     document.body,
   );
-}
-
-function SecretRow({ secret }: { secret: EncryptionDetailsSecret }) {
-  const [copied, setCopied] = useState(false);
-  const value = secret.value?.trim();
-
-  const copyValue = async () => {
-    if (!value || !navigator.clipboard) return;
-
-    if (
-      secret.sensitive &&
-      !window.confirm(copy.profile.copySensitiveKeyConfirm)
-    ) {
-      return;
-    }
-
-    await navigator.clipboard.writeText(value);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1600);
-  };
-
-  return (
-    <div className="flex min-w-0 items-center gap-3 py-3 text-xs">
-      <div className="min-w-0 flex-1">
-        <div className="font-black text-white/70">{secret.label}</div>
-        <div className="mt-1 truncate font-semibold text-white/40">
-          {value ? maskedValue(value, secret.sensitive) : copy.encryption.empty}
-        </div>
-      </div>
-      {value && (
-        <button
-          type="button"
-          onClick={() => void copyValue()}
-          className="ui-button min-h-8 shrink-0 px-2.5 py-1 text-xs"
-        >
-          {copied ? copy.profile.copied : copy.profile.copy}
-        </button>
-      )}
-    </div>
-  );
-}
-
-function maskedValue(value: string, sensitive?: boolean): string {
-  if (!sensitive) return value;
-
-  return '••••••••••••••••••••••••';
-}
-
-function statusLabel(status: EncryptionDetails['status']): string {
-  if (status === 'ready') return copy.encryption.ready;
-
-  if (status === 'public') return copy.encryption.public;
-
-  return copy.encryption.missing;
 }

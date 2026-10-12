@@ -1,5 +1,5 @@
-import { API_SERVER_URL } from '../../API_SERVER_URL';
 import { copy } from '../../../shared/presentation/i18n/copy';
+import { API_SERVER_URL } from '../../API_SERVER_URL';
 
 interface ServerConnectionScreenProps {
   error: Error | null;

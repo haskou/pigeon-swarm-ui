@@ -49,6 +49,15 @@ async function loadBannerUrls(
   return Object.fromEntries(loaded.filter((entry) => entry !== null));
 }
 
+function mergeLoadedBanners(
+  loadedBanners: Record<string, LoadedBanner>,
+): (current: Record<string, LoadedBanner>) => Record<string, LoadedBanner> {
+  return (current) => ({
+    ...current,
+    ...loadedBanners,
+  });
+}
+
 export function useIdentityBannerUrls(
   identities: Record<string, IdentityResource>,
   identityIdsByKey: Record<string, string>,
@@ -67,10 +76,7 @@ export function useIdentityBannerUrls(
       .then((loadedBanners) => {
         if (cancelled) return;
 
-        setBannerUrls((current) => ({
-          ...current,
-          ...loadedBanners,
-        }));
+        setBannerUrls(mergeLoadedBanners(loadedBanners));
       })
       .catch(() => undefined);
 

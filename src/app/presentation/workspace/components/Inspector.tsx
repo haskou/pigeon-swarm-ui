@@ -10,7 +10,6 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { copy } from '../../../../shared/presentation/i18n/copy';
 import { memberPrimaryName } from '../../../../contexts/communities/presentation/components/communityMemberNames';
 import { type IdentityMemberListItem } from '../../../../contexts/identities/presentation/components/IdentityMemberListPanel';
 import {
@@ -18,6 +17,7 @@ import {
   type IdentityMembersAsideVariant,
 } from '../../../../contexts/identities/presentation/components/IdentityMembersAside';
 import { profileAnchorFromTarget } from '../../../../contexts/identities/presentation/view-models/profilePopoverAnchor';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 
 const UserProfileDialog = lazy(() =>
   import('../../../../contexts/identities/presentation/components/UserProfileDialog').then(
@@ -45,6 +45,30 @@ interface InspectorProps {
   presenceByIdentityId?: Record<string, IdentityPresence>;
   transitionState?: 'closing' | 'open';
   variant?: IdentityMembersAsideVariant;
+}
+
+function isGroup(conversation?: ConversationResource): boolean {
+  return conversation?.type === 'group';
+}
+
+function conversationParticipantIds({
+  conversation,
+  currentIdentityId,
+  peerIdentityId,
+}: {
+  conversation?: ConversationResource;
+  currentIdentityId: string;
+  peerIdentityId?: string;
+}): string[] {
+  if (!conversation) return [];
+
+  const ids = isGroup(conversation)
+    ? conversation.participantIds
+    : [currentIdentityId, peerIdentityId].filter(Boolean);
+
+  return [...new Set(ids)].filter(
+    (identityId): identityId is string => typeof identityId === 'string',
+  );
 }
 
 export function Inspector({
@@ -129,7 +153,9 @@ export function Inspector({
             : undefined
         }
         className={className}
-        emptyLabel={activeConversation ? copy.communities.noMatchingMembers : ''}
+        emptyLabel={
+          activeConversation ? copy.communities.noMatchingMembers : ''
+        }
         items={participants}
         onItemClick={openProfile}
         transitionState={transitionState}
@@ -163,28 +189,4 @@ export function Inspector({
       )}
     </>
   );
-}
-
-function conversationParticipantIds({
-  conversation,
-  currentIdentityId,
-  peerIdentityId,
-}: {
-  conversation?: ConversationResource;
-  currentIdentityId: string;
-  peerIdentityId?: string;
-}): string[] {
-  if (!conversation) return [];
-
-  const ids = isGroup(conversation)
-    ? conversation.participantIds
-    : [currentIdentityId, peerIdentityId].filter(Boolean);
-
-  return [...new Set(ids)].filter(
-    (identityId): identityId is string => typeof identityId === 'string',
-  );
-}
-
-function isGroup(conversation?: ConversationResource): boolean {
-  return conversation?.type === 'group';
 }

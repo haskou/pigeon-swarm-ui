@@ -4,6 +4,7 @@ import type {
   ConversationResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { LatestInput } from './LatestInput';
 
 import { DirectMailboxEligibility } from '../../../../contexts/mailboxes/domain/DirectMailboxEligibility';
 import { applicationContainer } from '../../../composition/applicationContainer';
@@ -13,14 +14,12 @@ const TICK_MS = 5000;
 const VISIT_INTERVAL_MS = 30_000;
 const VISITS_PER_TICK = 2;
 
-type DirectMessageBackgroundReadSyncInput = {
+export type DirectMessageBackgroundReadSyncInput = {
   activeConversationId: string | null;
   conversations: ConversationResource[];
   onConversationRead: (conversationId: string) => void;
   session: Session;
 };
-
-type LatestInput = Omit<DirectMessageBackgroundReadSyncInput, 'session'>;
 
 /**
  * The one-to-one conversations that are not open, have unread messages, and
@@ -63,6 +62,7 @@ function subscribeHints(
 ): void {
   conversations.forEach((conversation) => {
     if (!DirectMailboxEligibility.isEligible(conversation.type)) return;
+
     if (subscriptions.has(conversation.id)) return;
 
     const target = applicationContainer.directMessages.hintTarget(
@@ -124,8 +124,12 @@ export function useDirectMessageBackgroundReadSync({
           conversationId,
           controller.signal,
           (changes) => {
-            if (changes.some((change) => change.kind === 'read')) {
-              latestRef.current.onConversationRead(conversationId);
+            for (const change of changes) {
+              if (change.kind === 'read') {
+                latestRef.current.onConversationRead(conversationId);
+
+                return;
+              }
             }
           },
         );

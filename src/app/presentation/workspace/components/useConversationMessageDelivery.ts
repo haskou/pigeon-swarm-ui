@@ -1,23 +1,14 @@
 import { UUID } from '@haskou/value-objects';
-import {
-  startTransition,
-  useCallback,
-  useRef,
-  useState,
-  type Dispatch,
-  type RefObject,
-  type SetStateAction,
-} from 'react';
+import { startTransition, useCallback, useRef, useState } from 'react';
 
 import type { SendMessageOptions } from '../../../../contexts/messages/infrastructure/http/resources/SendMessageOptions';
 import type {
-  AttachmentProgress,
   AttachmentUploadOptions,
   ChatMessage,
-  ConversationResource,
-  Session,
   StickerMessageReference,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationMessageDelivery } from './ConversationMessageDelivery';
+import type { ConversationMessageDeliveryInput } from './ConversationMessageDeliveryInput';
 
 import { ConversationPeer } from '../../../../contexts/conversations/presentation/view-models/ConversationPeer';
 import { ConversationTimeline } from '../../../../contexts/conversations/presentation/view-models/ConversationTimeline';
@@ -26,8 +17,10 @@ import { replyPreviewFromMessage } from '../../../../contexts/messages/presentat
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
+import { patchMessageById } from './patchMessageById';
 import { PendingConversationMessage } from './PendingConversationMessage';
 import { runStickerUsageSideEffect } from './runStickerUsageSideEffect';
+import { withoutMessageById } from './withoutMessageById';
 
 export type PendingConversationSend = {
   attachmentUpload: AttachmentUploadOptions;
@@ -35,29 +28,6 @@ export type PendingConversationSend = {
   content: string;
   replyTarget: ChatMessage | null;
   sticker?: StickerMessageReference;
-};
-
-type ConversationMessageDeliveryInput = {
-  activeConversation: ConversationResource | undefined;
-  messagesRef: RefObject<ChatMessage[]>;
-  onAttachmentProgressChange: (progress: AttachmentProgress | null) => void;
-  onConversationsChange: Dispatch<SetStateAction<ConversationResource[]>>;
-  onErrorChange: (error: string | null) => void;
-  onMessagesChange: Dispatch<SetStateAction<ChatMessage[]>>;
-  onReplyTargetChange: (message: ChatMessage | null) => void;
-  replyTarget: ChatMessage | null;
-  scrollToBottom: (behavior?: ScrollBehavior) => void;
-  session: Session;
-};
-
-type ConversationMessageDelivery = {
-  retryMessage: (message: ChatMessage) => void;
-  sendMessage: (
-    content: string,
-    attachments: File[],
-    attachmentUpload: AttachmentUploadOptions,
-  ) => Promise<void>;
-  sendSticker: (sticker: StickerMessageReference) => Promise<void>;
 };
 
 export function useConversationMessageDelivery({
@@ -116,7 +86,7 @@ export function useConversationMessageDelivery({
       ]);
       scrollToBottom('smooth');
 
-      sendQueueRef.current = sendQueueRef.current.then(async () => {
+      const deliverPendingMessage = async () => {
         try {
           const lastMessageId = MessageCollection.lastDeliveredMessageTarget(
             messagesRef.current,
@@ -133,12 +103,10 @@ export function useConversationMessageDelivery({
             },
             onAttachmentProgress: (progress) => {
               startTransition(() => {
-                onMessagesChange((current) =>
-                  current.map((message) =>
-                    message.id === optimisticId
-                      ? { ...message, attachmentProgress: progress }
-                      : message,
-                  ),
+                onMessagesChange(
+                  patchMessageById(optimisticId, {
+                    attachmentProgress: progress,
+                  }),
                 );
               });
             },
@@ -173,10 +141,9 @@ export function useConversationMessageDelivery({
           }
 
           onMessagesChange((current) =>
-            MessageCollection.merge(
-              current.filter((message) => message.id !== optimisticId),
-              [sent],
-            ),
+            MessageCollection.merge(withoutMessageById(current, optimisticId), [
+              sent,
+            ]),
           );
           onConversationsChange((current) =>
             ConversationTimeline.bumpActivity(
@@ -192,19 +159,16 @@ export function useConversationMessageDelivery({
             ...current,
             [optimisticId]: payload,
           }));
-          onMessagesChange((current) =>
-            current.map((message) =>
-              message.id === optimisticId
-                ? {
-                    ...message,
-                    attachmentProgress: undefined,
-                    deliveryStatus: 'failed',
-                  }
-                : message,
-            ),
+          onMessagesChange(
+            patchMessageById(optimisticId, {
+              attachmentProgress: undefined,
+              deliveryStatus: 'failed',
+            }),
           );
         }
-      });
+      };
+
+      sendQueueRef.current = sendQueueRef.current.then(deliverPendingMessage);
     },
     [
       activeConversation,
@@ -266,9 +230,7 @@ export function useConversationMessageDelivery({
 
         return next;
       });
-      onMessagesChange((current) =>
-        current.filter((item) => item.id !== message.id),
-      );
+      onMessagesChange((current) => withoutMessageById(current, message.id));
       sendPendingMessage(payload);
     },
     [failedSends, onMessagesChange, sendPendingMessage],

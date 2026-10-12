@@ -1,30 +1,21 @@
-/* eslint-disable @typescript-eslint/no-use-before-define */
-import type { ReactNode, RefObject } from 'react';
-
 import { Fragment, useMemo } from 'react';
 
-import type {
-  AttachmentProgress,
-  ChatMessage,
-  MessageAttachment,
-  PollResource,
-  StickerMessageReference,
-} from '../../../../shared/domain/pigeonResources.types';
 import type {
   IdentityNames,
   IdentityPictures,
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
+import type {
+  ChatMessage,
+  PollResource,
+} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessageTimelineProps } from './ChatMessageTimelineProps';
 
-import { copy } from '../../../../shared/presentation/i18n/copy';
-import { formatDateSeparator } from '../../../../shared/presentation/formatting';
-import { cx } from '../../../../shared/presentation/cx';
 import {
   identityDisplayName,
   identityPrimaryDisplayName,
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
 import { DateSeparator } from '../../../../contexts/messages/presentation/components/DateSeparator';
 import { MessageBubble } from '../../../../contexts/messages/presentation/components/MessageBubble';
-import { TimelineJumpButton } from '../../../../contexts/messages/presentation/components/TimelineJumpButton';
 import {
   messageReplyImage,
   messageReplySticker,
@@ -33,245 +24,156 @@ import {
   messageTimelineEnterClassName,
   messageTimelineEnterStyle,
 } from '../../../../contexts/messages/presentation/components/messageTimelineMotion';
+import { TimelineJumpButton } from '../../../../contexts/messages/presentation/components/TimelineJumpButton';
 import {
   MessageTimelineEntries,
   type MessageThreadSummary,
 } from '../../../../contexts/messages/presentation/view-models/MessageTimelineEntries';
 import { PollCard } from '../../../../contexts/polls/presentation/components/pollCard';
+import { cx } from '../../../../shared/presentation/cx';
+import { formatDateSeparator } from '../../../../shared/presentation/formatting';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import { LockIcon } from './LockIcon';
 
-type LoadState = 'idle' | 'loading' | 'error';
-
-interface ChatMessageTimelineProps {
-  bottomRef: RefObject<HTMLDivElement | null>;
-  currentIdentityId: string;
-  currentIdentityName: string;
-  hasConversationKey: boolean;
-  hasReachedMessageStart: boolean;
-  identityNames: IdentityNames;
-  identityPictures: IdentityPictures;
-  isGroupConversation: boolean;
-  loadAttachmentPreview: (
-    attachment: MessageAttachment,
-    onProgress?: (progress: AttachmentProgress) => void,
-  ) => Promise<string>;
-  missingConversationKeyContent?: ReactNode;
-  messageState: LoadState;
-  messages: ChatMessage[];
-  newMessageCount: number;
-  onAttachmentOpen: (attachment?: MessageAttachment) => void;
-  onAuthorProfileOpen: (
-    message: ChatMessage,
-    target: HTMLElement | null,
-  ) => void;
-  onJumpToLatest: () => void;
-  onMessageMenuOpen: (message: ChatMessage, x: number, y: number) => void;
-  onOpenThread?: (message: ChatMessage) => void;
-  onReactionToggle: (
-    message: ChatMessage,
-    emoji: string,
-    reacted: boolean,
-  ) => void;
-  onReplyReferenceClick: (messageId: string) => void;
-  onRetryMessage: (message: ChatMessage) => void;
-  onPollClose?: (poll: PollResource) => Promise<void>;
-  onPollRemoveVote?: (poll: PollResource) => Promise<void>;
-  onPollVote?: (poll: PollResource, optionIds: string[]) => Promise<void>;
-  onStickerClick?: (sticker: StickerMessageReference) => void;
-  onScroll: () => void;
-  pinnedMessageIds: ReadonlySet<string>;
-  reactionAuthorNames: Record<string, string>;
-  polls?: PollResource[];
-  scrollerRef: RefObject<HTMLDivElement | null>;
+function noopPollUpdate(): Promise<void> {
+  return Promise.resolve();
 }
 
-export function ChatMessageTimeline({
-  bottomRef,
-  currentIdentityId,
-  currentIdentityName,
-  hasConversationKey,
-  hasReachedMessageStart,
-  identityNames,
-  identityPictures,
-  isGroupConversation,
-  loadAttachmentPreview,
-  missingConversationKeyContent,
-  messages,
-  messageState,
-  newMessageCount,
-  onAttachmentOpen,
-  onAuthorProfileOpen,
-  onJumpToLatest,
-  onMessageMenuOpen,
-  onOpenThread,
-  onPollClose,
-  onPollRemoveVote,
-  onPollVote,
-  onReactionToggle,
-  onReplyReferenceClick,
-  onRetryMessage,
-  onScroll,
-  onStickerClick,
-  pinnedMessageIds,
-  polls = [],
-  reactionAuthorNames,
-  scrollerRef,
-}: ChatMessageTimelineProps) {
+function noopPollVote(): Promise<void> {
+  return Promise.resolve();
+}
+
+function messageAuthorName(
+  message: ChatMessage,
+  currentIdentityName: string,
+  identityNames: IdentityNames,
+): string {
+  if (message.mine) return currentIdentityName;
+
+  return identityDisplayName(message.authorIdentityId, identityNames);
+}
+
+function messageAuthorPicture(
+  message: ChatMessage,
+  currentIdentityId: string,
+  identityPictures: IdentityPictures,
+): string | undefined {
+  return message.mine
+    ? identityPictures[currentIdentityId]
+    : identityPictures[message.authorIdentityId];
+}
+
+function replyAuthorName(
+  message: ChatMessage,
+  replyMessage: ChatMessage | undefined,
+  identityNames: IdentityNames,
+): string | undefined {
+  if (replyMessage) {
+    return identityPrimaryDisplayName(
+      identityDisplayName(replyMessage.authorIdentityId, identityNames),
+    );
+  }
+
+  if (!message.replyPreview) return undefined;
+
+  return identityPrimaryDisplayName(
+    identityDisplayName(message.replyPreview.authorIdentityId, identityNames),
+  );
+}
+
+function threadLastAuthorName(
+  threadSummary: MessageThreadSummary | undefined,
+  currentIdentityName: string,
+  identityNames: IdentityNames,
+): string | undefined {
+  const lastMessage = threadSummary?.lastMessage;
+
+  if (!lastMessage) return undefined;
+
+  return identityPrimaryDisplayName(
+    messageAuthorName(lastMessage, currentIdentityName, identityNames),
+  );
+}
+
+function threadLastAuthorPicture(
+  threadSummary: MessageThreadSummary | undefined,
+  currentIdentityId: string,
+  identityPictures: IdentityPictures,
+): string | undefined {
+  const lastMessage = threadSummary?.lastMessage;
+
+  if (!lastMessage) return undefined;
+
+  return messageAuthorPicture(lastMessage, currentIdentityId, identityPictures);
+}
+
+function LoadingOlderMessages() {
   return (
-    <div
-      ref={scrollerRef}
-      onScroll={onScroll}
-      className="min-h-0 flex-1 overscroll-contain overflow-x-hidden overflow-y-auto px-2 py-3 [overflow-anchor:none] sm:p-6"
-    >
-      <MessageTimelineContent
-        bottomRef={bottomRef}
-        currentIdentityId={currentIdentityId}
-        currentIdentityName={currentIdentityName}
-        hasConversationKey={hasConversationKey}
-        hasReachedMessageStart={hasReachedMessageStart}
-        identityNames={identityNames}
-        identityPictures={identityPictures}
-        isGroupConversation={isGroupConversation}
-        loadAttachmentPreview={loadAttachmentPreview}
-        missingConversationKeyContent={missingConversationKeyContent}
-        messageState={messageState}
-        messages={messages}
-        onAttachmentOpen={onAttachmentOpen}
-        onAuthorProfileOpen={onAuthorProfileOpen}
-        onMessageMenuOpen={onMessageMenuOpen}
-        onOpenThread={onOpenThread}
-        onReactionToggle={onReactionToggle}
-        onReplyReferenceClick={onReplyReferenceClick}
-        onRetryMessage={onRetryMessage}
-        onPollClose={onPollClose}
-        onPollRemoveVote={onPollRemoveVote}
-        onPollVote={onPollVote}
-        onStickerClick={onStickerClick}
-        pinnedMessageIds={pinnedMessageIds}
-        polls={polls}
-        reactionAuthorNames={reactionAuthorNames}
-      />
-      {newMessageCount > 0 && (
-        <TimelineJumpButton mode="sticky" onClick={onJumpToLatest}>
-          {copy.workspace.newMessages}
-          {newMessageCount > 1 ? ` (${newMessageCount})` : ''}
-        </TimelineJumpButton>
-      )}
+    <div className="mx-auto mb-4 w-fit px-4 py-2 text-xs font-black text-white/50">
+      {copy.chat.loadingEvents}
     </div>
   );
 }
 
-function MessageTimelineContent({
-  bottomRef,
-  currentIdentityId,
-  currentIdentityName,
-  hasConversationKey,
-  hasReachedMessageStart,
-  identityNames,
-  identityPictures,
-  isGroupConversation,
-  loadAttachmentPreview,
-  missingConversationKeyContent,
-  messages,
-  messageState,
-  onAttachmentOpen,
-  onAuthorProfileOpen,
-  onMessageMenuOpen,
-  onOpenThread,
-  onPollClose,
-  onPollRemoveVote,
-  onPollVote,
-  onReactionToggle,
-  onReplyReferenceClick,
-  onRetryMessage,
-  onStickerClick,
-  pinnedMessageIds,
-  polls = [],
-  reactionAuthorNames,
-}: Omit<
-  ChatMessageTimelineProps,
-  'newMessageCount' | 'onJumpToLatest' | 'onScroll' | 'scrollerRef'
->) {
-  const timelineEntries = useMemo(
-    () =>
-      MessageTimelineEntries.build(
-        messages,
-        polls,
-        [],
-        isGroupConversation,
-      ),
-    [isGroupConversation, messages, polls],
+function ReachedMessageStart() {
+  return (
+    <div className="flex items-center gap-3 text-xs font-black uppercase tracking-[0.18em] text-white/35">
+      <span className="h-px flex-1 bg-white/[0.07]" />
+      <span>{copy.chat.noMoreMessages}</span>
+      <span className="h-px flex-1 bg-white/[0.07]" />
+    </div>
   );
+}
+
+function EmptyTimelineState({
+  hasConversationKey,
+}: {
+  hasConversationKey: boolean;
+}) {
+  if (hasConversationKey) {
+    return (
+      <div className="py-12 text-center text-sm text-white/55">
+        {copy.chat.emptyMessages}
+      </div>
+    );
+  }
 
   return (
-    <>
-      {messageState === 'loading' && <LoadingOlderMessages />}
-      <div>
-        {hasReachedMessageStart &&
-          messages.length > 0 &&
-          messageState !== 'loading' && <ReachedMessageStart />}
-        {timelineEntries.map((entry, index) =>
-          entry.type === 'poll' ? (
-            <PollTimelineItem
-              key={entry.id}
-              currentIdentityId={currentIdentityId}
-              enterOrder={timelineEntries.length - index - 1}
-              message={entry.item.message}
-              onClose={onPollClose}
-              onMessageMenuOpen={onMessageMenuOpen}
-              onRemoveVote={onPollRemoveVote}
-              onVote={onPollVote}
-              poll={entry.item.poll}
-              startsNewDay={entry.startsNewDay}
-            />
-          ) : (
-            <MessageTimelineItem
-              key={entry.id}
-              currentIdentityId={currentIdentityId}
-              currentIdentityName={currentIdentityName}
-              identityNames={identityNames}
-              identityPictures={identityPictures}
-              isGroupConversation={isGroupConversation}
-              enterOrder={timelineEntries.length - index - 1}
-              loadAttachmentPreview={loadAttachmentPreview}
-              message={entry.item.message}
-              onAttachmentOpen={onAttachmentOpen}
-              onAuthorProfileOpen={onAuthorProfileOpen}
-              onMessageMenuOpen={onMessageMenuOpen}
-              onOpenThread={onOpenThread}
-              onReactionToggle={onReactionToggle}
-              onReplyReferenceClick={onReplyReferenceClick}
-              onRetryMessage={onRetryMessage}
-              onStickerClick={onStickerClick}
-              pinnedMessageIds={pinnedMessageIds}
-              reactionAuthorNames={reactionAuthorNames}
-              replyMessage={entry.replyMessage}
-              startsNewAuthorRun={entry.startsNewAuthorRun}
-              startsNewDay={entry.startsNewDay}
-              threadSummary={entry.threadSummary}
-            />
-          ),
-        )}
-        {timelineEntries.length === 0 &&
-          messageState !== 'loading' &&
-          (missingConversationKeyContent && !hasConversationKey ? (
-            <>{missingConversationKeyContent}</>
-          ) : (
-            <EmptyTimelineState hasConversationKey={hasConversationKey} />
-          ))}
-        <div ref={bottomRef} />
+    <div className="grid min-h-[42vh] place-items-center">
+      <div className="w-full max-w-md rounded-2xl border border-rose-300/20 bg-rose-500/10 p-5 text-center text-sm text-rose-100">
+        <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/15">
+          <LockIcon locked={false} />
+        </div>
+        <div className="font-black">{copy.chat.e2eMissing}</div>
+        <div className="mt-2 text-rose-100/65">
+          {copy.messages.missingConversationKey}
+        </div>
       </div>
-    </>
+    </div>
   );
+}
+
+function EmptyTimelineFallback({
+  hasConversationKey,
+  missingConversationKeyContent,
+}: {
+  hasConversationKey: boolean;
+  missingConversationKeyContent?: ChatMessageTimelineProps['missingConversationKeyContent'];
+}) {
+  if (missingConversationKeyContent && !hasConversationKey) {
+    return <>{missingConversationKeyContent}</>;
+  }
+
+  return <EmptyTimelineState hasConversationKey={hasConversationKey} />;
 }
 
 function MessageTimelineItem({
   currentIdentityId,
   currentIdentityName,
+  enterOrder,
   identityNames,
   identityPictures,
   isGroupConversation,
-  enterOrder,
   loadAttachmentPreview,
   message,
   onAttachmentOpen,
@@ -364,26 +266,16 @@ function MessageTimelineItem({
             }
             reserveAvatarSpace={false}
             showAvatar={isGroupConversation && startsNewAuthorRun}
-            threadAuthorName={
-              threadSummary?.lastMessage
-                ? identityPrimaryDisplayName(
-                    messageAuthorName(
-                      threadSummary.lastMessage,
-                      currentIdentityName,
-                      identityNames,
-                    ),
-                  )
-                : undefined
-            }
-            threadAuthorPicture={
-              threadSummary?.lastMessage
-                ? messageAuthorPicture(
-                    threadSummary.lastMessage,
-                    currentIdentityId,
-                    identityPictures,
-                  )
-                : undefined
-            }
+            threadAuthorName={threadLastAuthorName(
+              threadSummary,
+              currentIdentityName,
+              identityNames,
+            )}
+            threadAuthorPicture={threadLastAuthorPicture(
+              threadSummary,
+              currentIdentityId,
+              identityPictures,
+            )}
             threadCount={threadSummary?.count}
           />
         </div>
@@ -454,94 +346,176 @@ function PollTimelineItem({
   );
 }
 
-function noopPollUpdate(): Promise<void> {
-  return Promise.resolve();
-}
-
-function noopPollVote(): Promise<void> {
-  return Promise.resolve();
-}
-
-function LoadingOlderMessages() {
-  return (
-    <div className="mx-auto mb-4 w-fit px-4 py-2 text-xs font-black text-white/50">
-      {copy.chat.loadingEvents}
-    </div>
-  );
-}
-
-function ReachedMessageStart() {
-  return (
-    <div className="flex items-center gap-3 text-xs font-black uppercase tracking-[0.18em] text-white/35">
-      <span className="h-px flex-1 bg-white/[0.07]" />
-      <span>{copy.chat.noMoreMessages}</span>
-      <span className="h-px flex-1 bg-white/[0.07]" />
-    </div>
-  );
-}
-
-function EmptyTimelineState({
+function MessageTimelineContent({
+  bottomRef,
+  currentIdentityId,
+  currentIdentityName,
   hasConversationKey,
-}: {
-  hasConversationKey: boolean;
-}) {
-  if (hasConversationKey) {
-    return (
-      <div className="py-12 text-center text-sm text-white/55">
-        {copy.chat.emptyMessages}
-      </div>
-    );
-  }
+  hasReachedMessageStart,
+  identityNames,
+  identityPictures,
+  isGroupConversation,
+  loadAttachmentPreview,
+  messages,
+  messageState,
+  missingConversationKeyContent,
+  onAttachmentOpen,
+  onAuthorProfileOpen,
+  onMessageMenuOpen,
+  onOpenThread,
+  onPollClose,
+  onPollRemoveVote,
+  onPollVote,
+  onReactionToggle,
+  onReplyReferenceClick,
+  onRetryMessage,
+  onStickerClick,
+  pinnedMessageIds,
+  polls = [],
+  reactionAuthorNames,
+}: Omit<
+  ChatMessageTimelineProps,
+  'newMessageCount' | 'onJumpToLatest' | 'onScroll' | 'scrollerRef'
+>) {
+  const timelineEntries = useMemo(
+    () =>
+      MessageTimelineEntries.build(messages, polls, [], isGroupConversation),
+    [isGroupConversation, messages, polls],
+  );
 
   return (
-    <div className="grid min-h-[42vh] place-items-center">
-      <div className="w-full max-w-md rounded-2xl border border-rose-300/20 bg-rose-500/10 p-5 text-center text-sm text-rose-100">
-        <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/15">
-          <LockIcon locked={false} />
-        </div>
-        <div className="font-black">{copy.chat.e2eMissing}</div>
-        <div className="mt-2 text-rose-100/65">
-          {copy.messages.missingConversationKey}
-        </div>
+    <>
+      {messageState === 'loading' && <LoadingOlderMessages />}
+      <div>
+        {hasReachedMessageStart &&
+          messages.length > 0 &&
+          messageState !== 'loading' && <ReachedMessageStart />}
+        {timelineEntries.map((entry, index) =>
+          entry.type === 'poll' ? (
+            <PollTimelineItem
+              key={entry.id}
+              currentIdentityId={currentIdentityId}
+              enterOrder={timelineEntries.length - index - 1}
+              message={entry.item.message}
+              onClose={onPollClose}
+              onMessageMenuOpen={onMessageMenuOpen}
+              onRemoveVote={onPollRemoveVote}
+              onVote={onPollVote}
+              poll={entry.item.poll}
+              startsNewDay={entry.startsNewDay}
+            />
+          ) : (
+            <MessageTimelineItem
+              key={entry.id}
+              currentIdentityId={currentIdentityId}
+              currentIdentityName={currentIdentityName}
+              identityNames={identityNames}
+              identityPictures={identityPictures}
+              isGroupConversation={isGroupConversation}
+              enterOrder={timelineEntries.length - index - 1}
+              loadAttachmentPreview={loadAttachmentPreview}
+              message={entry.item.message}
+              onAttachmentOpen={onAttachmentOpen}
+              onAuthorProfileOpen={onAuthorProfileOpen}
+              onMessageMenuOpen={onMessageMenuOpen}
+              onOpenThread={onOpenThread}
+              onReactionToggle={onReactionToggle}
+              onReplyReferenceClick={onReplyReferenceClick}
+              onRetryMessage={onRetryMessage}
+              onStickerClick={onStickerClick}
+              pinnedMessageIds={pinnedMessageIds}
+              reactionAuthorNames={reactionAuthorNames}
+              replyMessage={entry.replyMessage}
+              startsNewAuthorRun={entry.startsNewAuthorRun}
+              startsNewDay={entry.startsNewDay}
+              threadSummary={entry.threadSummary}
+            />
+          ),
+        )}
+        {timelineEntries.length === 0 && messageState !== 'loading' && (
+          <EmptyTimelineFallback
+            hasConversationKey={hasConversationKey}
+            missingConversationKeyContent={missingConversationKeyContent}
+          />
+        )}
+        <div ref={bottomRef} />
       </div>
-    </div>
+    </>
   );
 }
 
-function messageAuthorName(
-  message: ChatMessage,
-  currentIdentityName: string,
-  identityNames: IdentityNames,
-): string {
-  if (message.mine) return currentIdentityName;
-
-  return identityDisplayName(message.authorIdentityId, identityNames);
-}
-
-function messageAuthorPicture(
-  message: ChatMessage,
-  currentIdentityId: string,
-  identityPictures: IdentityPictures,
-): string | undefined {
-  return message.mine
-    ? identityPictures[currentIdentityId]
-    : identityPictures[message.authorIdentityId];
-}
-
-function replyAuthorName(
-  message: ChatMessage,
-  replyMessage: ChatMessage | undefined,
-  identityNames: IdentityNames,
-): string | undefined {
-  if (replyMessage) {
-    return identityPrimaryDisplayName(
-      identityDisplayName(replyMessage.authorIdentityId, identityNames),
-    );
-  }
-
-  if (!message.replyPreview) return undefined;
-
-  return identityPrimaryDisplayName(
-    identityDisplayName(message.replyPreview.authorIdentityId, identityNames),
+export function ChatMessageTimeline({
+  bottomRef,
+  currentIdentityId,
+  currentIdentityName,
+  hasConversationKey,
+  hasReachedMessageStart,
+  identityNames,
+  identityPictures,
+  isGroupConversation,
+  loadAttachmentPreview,
+  messages,
+  messageState,
+  missingConversationKeyContent,
+  newMessageCount,
+  onAttachmentOpen,
+  onAuthorProfileOpen,
+  onJumpToLatest,
+  onMessageMenuOpen,
+  onOpenThread,
+  onPollClose,
+  onPollRemoveVote,
+  onPollVote,
+  onReactionToggle,
+  onReplyReferenceClick,
+  onRetryMessage,
+  onScroll,
+  onStickerClick,
+  pinnedMessageIds,
+  polls = [],
+  reactionAuthorNames,
+  scrollerRef,
+}: ChatMessageTimelineProps) {
+  return (
+    <div
+      ref={scrollerRef}
+      onScroll={onScroll}
+      className="min-h-0 flex-1 overscroll-contain overflow-x-hidden overflow-y-auto px-2 py-3 [overflow-anchor:none] sm:p-6"
+    >
+      <MessageTimelineContent
+        bottomRef={bottomRef}
+        currentIdentityId={currentIdentityId}
+        currentIdentityName={currentIdentityName}
+        hasConversationKey={hasConversationKey}
+        hasReachedMessageStart={hasReachedMessageStart}
+        identityNames={identityNames}
+        identityPictures={identityPictures}
+        isGroupConversation={isGroupConversation}
+        loadAttachmentPreview={loadAttachmentPreview}
+        missingConversationKeyContent={missingConversationKeyContent}
+        messageState={messageState}
+        messages={messages}
+        onAttachmentOpen={onAttachmentOpen}
+        onAuthorProfileOpen={onAuthorProfileOpen}
+        onMessageMenuOpen={onMessageMenuOpen}
+        onOpenThread={onOpenThread}
+        onReactionToggle={onReactionToggle}
+        onReplyReferenceClick={onReplyReferenceClick}
+        onRetryMessage={onRetryMessage}
+        onPollClose={onPollClose}
+        onPollRemoveVote={onPollRemoveVote}
+        onPollVote={onPollVote}
+        onStickerClick={onStickerClick}
+        pinnedMessageIds={pinnedMessageIds}
+        polls={polls}
+        reactionAuthorNames={reactionAuthorNames}
+      />
+      {newMessageCount > 0 && (
+        <TimelineJumpButton mode="sticky" onClick={onJumpToLatest}>
+          {copy.workspace.newMessages}
+          {newMessageCount > 1 ? ` (${newMessageCount})` : ''}
+        </TimelineJumpButton>
+      )}
+    </div>
   );
 }

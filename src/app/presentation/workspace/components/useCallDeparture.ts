@@ -1,38 +1,71 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  type Dispatch,
-  type SetStateAction,
-} from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
-import type { useCallSession } from '../../../../contexts/calls/presentation/hooks/useCallSession';
 import type {
   Community,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
-import type { WorkspaceCallDetails } from './resolveWorkspaceCallDetails';
-import type { IncomingWorkspaceCall } from './useCallResourceReconciliation';
+import type { CallDepartureInput } from './CallDepartureInput';
 
 import { playEndedCallSound } from '../../../../shared/presentation/sounds';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { callDepartureAction } from './callDepartureAction';
 import { resolvePageDeparture } from './resolvePageDeparture';
 
-type CallSessionController = ReturnType<typeof useCallSession>;
+function removeIdentityFromVoiceChannels(
+  community: Community,
+  identityId: string,
+): Community {
+  return {
+    ...community,
+    voiceChannels: (community.voiceChannels ?? []).map((channel) => ({
+      ...channel,
+      connectedIdentityIds: (channel.connectedIdentityIds ?? []).filter(
+        (connectedIdentityId) => connectedIdentityId !== identityId,
+      ),
+    })),
+  };
+}
 
-type CallDepartureInput = {
-  activeCall: CallSessionController['activeCall'];
-  callDetailsForResource: (call: CallResource) => WorkspaceCallDetails;
-  endCall: CallSessionController['endCall'];
-  incomingCall: IncomingWorkspaceCall | null;
-  listCalls: () => Promise<CallResource[]>;
-  onCommunitiesReload: () => Promise<void>;
-  reconcileCallResource: (call: CallResource) => void;
-  session: Session;
-  setCommunities: Dispatch<SetStateAction<Community[]>>;
-};
+function removeIdentityFromCommunities(
+  communities: Community[],
+  identityId: string,
+): Community[] {
+  return communities.map((community) =>
+    removeIdentityFromVoiceChannels(community, identityId),
+  );
+}
+
+function isJoinedCall(
+  call: CallResource,
+  identityId: string,
+  exceptCallId?: string,
+): boolean {
+  return (
+    call.status === 'active' &&
+    call.id !== exceptCallId &&
+    call.participants.some(
+      (participant) =>
+        participant.identityId === identityId && participant.connected,
+    )
+  );
+}
+
+function ignoreRejection(): undefined {
+  return undefined;
+}
+
+async function reconcileCommunityVoiceCall(
+  session: Session,
+  callId: string,
+  reconcileCallResource: (call: CallResource) => void,
+  onCommunitiesReload: () => Promise<void>,
+): Promise<void> {
+  await applicationContainer.calls
+    .get(session, callId)
+    .then(reconcileCallResource)
+    .catch(() => onCommunitiesReload());
+}
 
 export function useCallDeparture({
   activeCall,
@@ -93,15 +126,7 @@ export function useCallDeparture({
 
   const removeCurrentIdentityFromVoicePresence = useCallback(() => {
     setCommunities((current) =>
-      current.map((community) => ({
-        ...community,
-        voiceChannels: (community.voiceChannels ?? []).map((channel) => ({
-          ...channel,
-          connectedIdentityIds: (channel.connectedIdentityIds ?? []).filter(
-            (identityId) => identityId !== session.identity.id,
-          ),
-        })),
-      })),
+      removeIdentityFromCommunities(current, session.identity.id),
     );
   }, [session.identity.id, setCommunities]);
 
@@ -121,22 +146,15 @@ export function useCallDeparture({
   const cleanupJoinedCalls = useCallback(
     async (exceptCallId?: string): Promise<void> => {
       const calls = await listCalls();
-      const joinedCalls = calls.filter(
-        (call) =>
-          call.status === 'active' &&
-          call.id !== exceptCallId &&
-          call.participants.some(
-            (participant) =>
-              participant.identityId === session.identity.id &&
-              participant.connected,
-          ),
+      const joinedCalls = calls.filter((call) =>
+        isJoinedCall(call, session.identity.id, exceptCallId),
       );
 
       if (joinedCalls.length === 0) return;
 
       await Promise.all(
         joinedCalls.map((call) =>
-          leaveCallResource(call).catch(() => undefined),
+          leaveCallResource(call).catch(ignoreRejection),
         ),
       );
       removeCurrentIdentityFromVoicePresence();
@@ -184,10 +202,12 @@ export function useCallDeparture({
       .then(async () => {
         if (!isCommunityVoiceCall) return;
 
-        await applicationContainer.calls
-          .get(session, callId)
-          .then(reconcileCallResource)
-          .catch(() => onCommunitiesReload());
+        await reconcileCommunityVoiceCall(
+          session,
+          callId,
+          reconcileCallResource,
+          onCommunitiesReload,
+        );
       })
       .catch(() => undefined);
   }, [

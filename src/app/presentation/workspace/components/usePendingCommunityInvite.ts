@@ -6,9 +6,19 @@ import type {
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
 
-import { applicationContainer } from '../../../composition/applicationContainer';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import { applicationContainer } from '../../../composition/applicationContainer';
+
+function prependCommunity(
+  communities: Community[],
+  community: Community,
+): Community[] {
+  return [
+    community,
+    ...communities.filter((current) => current.id !== community.id),
+  ];
+}
 
 export function usePendingCommunityInvite({
   onPendingCommunityInviteHandled,
@@ -26,7 +36,7 @@ export function usePendingCommunityInvite({
   setCommunities: Dispatch<SetStateAction<Community[]>>;
   setSendError: (error: string | null) => void;
   setWorkspaceMode: (mode: 'community' | 'messages') => void;
-}) {
+}): void {
   const pendingCommunityInviteRef = useRef<string | null>(null);
   const sessionRef = useRef(session);
 
@@ -43,21 +53,20 @@ export function usePendingCommunityInvite({
 
     pendingCommunityInviteRef.current = pendingCommunityInvite.token;
     setSendError(null);
-    void (async () => {
+    const acceptInvite = async (): Promise<void> => {
       const acceptedCommunity =
         await applicationContainer.communities.acceptInviteLink(
           sessionRef.current,
           pendingCommunityInvite.token,
         );
 
-      setCommunities((current) => [
-        acceptedCommunity,
-        ...current.filter((community) => community.id !== acceptedCommunity.id),
-      ]);
+      setCommunities((current) => prependCommunity(current, acceptedCommunity));
       setActiveCommunityId(acceptedCommunity.id);
       setWorkspaceMode('community');
       onPendingCommunityInviteHandled?.();
-    })().catch((caught) => {
+    };
+
+    void acceptInvite().catch((caught) => {
       pendingCommunityInviteRef.current = null;
       setSendError(toUserErrorMessage(caught, copy.communities.memberError));
     });
@@ -67,6 +76,6 @@ export function usePendingCommunityInvite({
     setActiveCommunityId,
     setCommunities,
     setSendError,
-      setWorkspaceMode,
+    setWorkspaceMode,
   ]);
 }

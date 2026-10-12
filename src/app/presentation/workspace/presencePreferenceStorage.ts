@@ -10,6 +10,17 @@ function presencePreferenceStorageKey(identityId: string): string {
   );
 }
 
+function isSelectablePresenceStatus(
+  value: unknown,
+): value is SelectablePresenceStatus {
+  return (
+    value === 'available' ||
+    value === 'away' ||
+    value === 'busy' ||
+    value === 'invisible'
+  );
+}
+
 export function readPresencePreference(
   identityId: string,
 ): SelectablePresenceStatus | null {
@@ -36,15 +47,4 @@ export function writePresencePreference(
   } catch {
     // The server still receives the status if local storage fails.
   }
-}
-
-function isSelectablePresenceStatus(
-  value: unknown,
-): value is SelectablePresenceStatus {
-  return (
-    value === 'available' ||
-    value === 'away' ||
-    value === 'busy' ||
-    value === 'invisible'
-  );
 }

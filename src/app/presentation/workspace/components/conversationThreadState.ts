@@ -1,4 +1,5 @@
 import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationThread } from './ConversationThread';
 
 import { MessageCollection } from '../../../../contexts/messages/presentation/view-models/MessageCollection';
 import { ThreadMessageVisibility } from '../../../../contexts/messages/presentation/view-models/ThreadMessageVisibility';
@@ -9,22 +10,34 @@ export type MessageCollectionState = {
   state: 'loading' | 'ready';
 };
 
-export type ConversationThreadState = MessageCollectionState & {
-  draft: string;
-  editingMessage: EditingMessage | null;
-  replyTarget: ChatMessage | null;
-  root: ChatMessage;
-};
-
+// Stays beside MessageCollectionState until #298 retires its importers.
+// eslint-disable-next-line no-restricted-syntax -- pinned export, see above
 export type EditingMessage = {
   message: ChatMessage;
   previousDraft: string;
 };
 
-export function mergeConversationThreadMessage(
-  currentThread: ConversationThreadState,
+export function mergeConversationMessageIfTargetExists(
+  currentMessages: ChatMessage[],
   incomingMessage: ChatMessage,
-): ConversationThreadState {
+): ChatMessage[] {
+  const targetMessageId = incomingMessage.raw.targetMessageId;
+
+  if (
+    incomingMessage.raw.type === 'edited' &&
+    targetMessageId &&
+    !currentMessages.some((message) => message.id === targetMessageId)
+  ) {
+    return currentMessages;
+  }
+
+  return MessageCollection.merge(currentMessages, [incomingMessage]);
+}
+
+export function mergeConversationThreadMessage(
+  currentThread: ConversationThread,
+  incomingMessage: ChatMessage,
+): ConversationThread {
   const rootMessages = mergeConversationMessageIfTargetExists(
     [currentThread.root],
     incomingMessage,
@@ -49,9 +62,9 @@ export function mergeConversationThreadMessage(
 }
 
 export function removeConversationThreadMessage(
-  currentThread: ConversationThreadState,
+  currentThread: ConversationThread,
   messageId: string,
-): ConversationThreadState | null {
+): ConversationThread | null {
   if (currentThread.root.id === messageId) return null;
 
   const deletingEditedMessage =
@@ -69,21 +82,4 @@ export function removeConversationThreadMessage(
     ),
     replyTarget: deletingReplyTarget ? null : currentThread.replyTarget,
   };
-}
-
-export function mergeConversationMessageIfTargetExists(
-  currentMessages: ChatMessage[],
-  incomingMessage: ChatMessage,
-): ChatMessage[] {
-  const targetMessageId = incomingMessage.raw.targetMessageId;
-
-  if (
-    incomingMessage.raw.type === 'edited' &&
-    targetMessageId &&
-    !currentMessages.some((message) => message.id === targetMessageId)
-  ) {
-    return currentMessages;
-  }
-
-  return MessageCollection.merge(currentMessages, [incomingMessage]);
 }

@@ -1,16 +1,17 @@
-import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
 import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
+import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
 import type { CallSession } from '../../../../contexts/calls/presentation/view-models/CallSession';
+import type {
+  IdentityNames,
+  IdentityPictures,
+} from '../../../../contexts/identities/presentation/view-models/identityDisplay';
 import type {
   Community,
   ConversationResource,
   IdentityResource,
   LocalKeychain,
 } from '../../../../shared/domain/pigeonResources.types';
-import type {
-  IdentityNames,
-  IdentityPictures,
-} from '../../../../contexts/identities/presentation/view-models/identityDisplay';
+import type { ResolveWorkspaceCallDetailsInput } from './ResolveWorkspaceCallDetailsInput';
 
 import { CommunityChannels } from '../../../../contexts/communities/presentation/view-models/CommunityChannels';
 import { ConversationPeer } from '../../../../contexts/conversations/presentation/view-models/ConversationPeer';
@@ -25,101 +26,6 @@ export type WorkspaceCallDetails = {
   subtitle?: string;
   title: string;
 };
-
-type ResolveWorkspaceCallDetailsInput = {
-  call: CallResource;
-  communities: Community[];
-  conversations: ConversationResource[];
-  currentIdentity: IdentityResource;
-  fallbackLabels: {
-    noConversation: string;
-    privateCommunity: string;
-    voiceChannel: string;
-  };
-  identityNames: IdentityNames;
-  identityPictures: IdentityPictures;
-  identityProfiles: Record<string, IdentityResource>;
-  keychain: LocalKeychain;
-};
-
-export function resolveWorkspaceCallDetails({
-  call,
-  communities,
-  conversations,
-  currentIdentity,
-  fallbackLabels,
-  identityNames,
-  identityPictures,
-  identityProfiles,
-  keychain,
-}: ResolveWorkspaceCallDetailsInput): WorkspaceCallDetails {
-  const participantIds = callParticipantIds(call, currentIdentity.id);
-  const participants = participantIds.map((identityId) => {
-    const participant = callParticipantForIdentity({
-      currentIdentity,
-      identityId,
-      identityNames,
-      identityPictures,
-      identityProfiles,
-    });
-    const status = call.participants.find(
-      (item) => item.identityId === identityId,
-    )?.status;
-
-    return { ...participant, status };
-  });
-  const scope = call.scope;
-
-  if (scope.type === 'community_channel') {
-    const community = communities.find((item) => item.id === scope.communityId);
-    const channel = community
-      ? CommunityChannels.find(community, scope.channelId)
-      : undefined;
-
-    return {
-      channelId: scope.channelId,
-      communityId: scope.communityId,
-      kind: 'community-voice',
-      participants,
-      subtitle: community?.name ?? fallbackLabels.privateCommunity,
-      title: channel?.name ?? fallbackLabels.voiceChannel,
-    };
-  }
-
-  const conversation = conversations.find(
-    (item) => item.id === scope.conversationId,
-  );
-  const peerIdentityId = conversation
-    ? ConversationPeer.identityId(conversation, currentIdentity.id, keychain)
-    : undefined;
-  const peerIdentity = peerIdentityId
-    ? identityProfiles[peerIdentityId]
-    : undefined;
-  const peerHandle = peerIdentity?.profile.handle?.trim();
-  const oneToOneTitle =
-    peerIdentity?.profile.name.trim() ||
-    (peerHandle ? `@${peerHandle}` : undefined) ||
-    (peerIdentityId ? identityNames[peerIdentityId] : undefined) ||
-    fallbackLabels.noConversation;
-  const groupTitle =
-    conversation?.name ?? fallbackLabels.noConversation;
-  const kind = conversation?.type === 'group' ? 'group' : 'one-to-one';
-
-  return {
-    conversationId: scope.conversationId,
-    kind,
-    participants,
-    subtitle:
-      kind === 'one-to-one'
-        ? peerHandle
-          ? `@${peerHandle}`
-          : peerIdentityId
-            ? shortId(peerIdentityId)
-            : undefined
-        : undefined,
-    title: kind === 'one-to-one' ? oneToOneTitle : groupTitle,
-  };
-}
 
 function callParticipantIds(
   call: CallResource,
@@ -161,4 +67,187 @@ function callParticipantForIdentity({
       identityNames[identityId] ?? identity?.profile.name?.trim() ?? identityId,
     picture: identityPictures[identityId] ?? null,
   };
+}
+
+function callParticipants({
+  call,
+  currentIdentity,
+  identityNames,
+  identityPictures,
+  identityProfiles,
+}: {
+  call: CallResource;
+  currentIdentity: IdentityResource;
+  identityNames: IdentityNames;
+  identityPictures: IdentityPictures;
+  identityProfiles: Record<string, IdentityResource>;
+}): CallParticipant[] {
+  return callParticipantIds(call, currentIdentity.id).map((identityId) => {
+    const participant = callParticipantForIdentity({
+      currentIdentity,
+      identityId,
+      identityNames,
+      identityPictures,
+      identityProfiles,
+    });
+    const status = call.participants.find(
+      (item) => item.identityId === identityId,
+    )?.status;
+
+    return { ...participant, status };
+  });
+}
+
+function communityVoiceCallDetails({
+  channelId,
+  communities,
+  communityId,
+  fallbackLabels,
+  participants,
+}: {
+  channelId: string;
+  communities: Community[];
+  communityId: string;
+  fallbackLabels: ResolveWorkspaceCallDetailsInput['fallbackLabels'];
+  participants: CallParticipant[];
+}): WorkspaceCallDetails {
+  const community = communities.find((item) => item.id === communityId);
+  const channel = community
+    ? CommunityChannels.find(community, channelId)
+    : undefined;
+
+  return {
+    channelId,
+    communityId,
+    kind: 'community-voice',
+    participants,
+    subtitle: community?.name ?? fallbackLabels.privateCommunity,
+    title: channel?.name ?? fallbackLabels.voiceChannel,
+  };
+}
+
+function oneToOneCallTitle({
+  fallbackLabel,
+  identityNames,
+  peerHandle,
+  peerIdentity,
+  peerIdentityId,
+}: {
+  fallbackLabel: string;
+  identityNames: IdentityNames;
+  peerHandle: string | undefined;
+  peerIdentity: IdentityResource | undefined;
+  peerIdentityId: string | undefined;
+}): string {
+  return (
+    peerIdentity?.profile.name.trim() ||
+    (peerHandle ? `@${peerHandle}` : undefined) ||
+    (peerIdentityId ? identityNames[peerIdentityId] : undefined) ||
+    fallbackLabel
+  );
+}
+
+function oneToOneCallSubtitle(
+  peerHandle: string | undefined,
+  peerIdentityId: string | undefined,
+): string | undefined {
+  if (peerHandle) return `@${peerHandle}`;
+
+  return peerIdentityId ? shortId(peerIdentityId) : undefined;
+}
+
+function conversationCallDetails({
+  conversationId,
+  conversations,
+  currentIdentity,
+  fallbackLabels,
+  identityNames,
+  identityProfiles,
+  keychain,
+  participants,
+}: {
+  conversationId: string;
+  conversations: ConversationResource[];
+  currentIdentity: IdentityResource;
+  fallbackLabels: ResolveWorkspaceCallDetailsInput['fallbackLabels'];
+  identityNames: IdentityNames;
+  identityProfiles: Record<string, IdentityResource>;
+  keychain: LocalKeychain;
+  participants: CallParticipant[];
+}): WorkspaceCallDetails {
+  const conversation = conversations.find((item) => item.id === conversationId);
+  const peerIdentityId = conversation
+    ? ConversationPeer.identityId(conversation, currentIdentity.id, keychain)
+    : undefined;
+  const peerIdentity = peerIdentityId
+    ? identityProfiles[peerIdentityId]
+    : undefined;
+  const peerHandle = peerIdentity?.profile.handle?.trim();
+  const kind = conversation?.type === 'group' ? 'group' : 'one-to-one';
+
+  if (kind === 'group') {
+    return {
+      conversationId,
+      kind,
+      participants,
+      subtitle: undefined,
+      title: conversation?.name ?? fallbackLabels.noConversation,
+    };
+  }
+
+  return {
+    conversationId,
+    kind,
+    participants,
+    subtitle: oneToOneCallSubtitle(peerHandle, peerIdentityId),
+    title: oneToOneCallTitle({
+      fallbackLabel: fallbackLabels.noConversation,
+      identityNames,
+      peerHandle,
+      peerIdentity,
+      peerIdentityId,
+    }),
+  };
+}
+
+export function resolveWorkspaceCallDetails({
+  call,
+  communities,
+  conversations,
+  currentIdentity,
+  fallbackLabels,
+  identityNames,
+  identityPictures,
+  identityProfiles,
+  keychain,
+}: ResolveWorkspaceCallDetailsInput): WorkspaceCallDetails {
+  const participants = callParticipants({
+    call,
+    currentIdentity,
+    identityNames,
+    identityPictures,
+    identityProfiles,
+  });
+  const scope = call.scope;
+
+  if (scope.type === 'community_channel') {
+    return communityVoiceCallDetails({
+      channelId: scope.channelId,
+      communities,
+      communityId: scope.communityId,
+      fallbackLabels,
+      participants,
+    });
+  }
+
+  return conversationCallDetails({
+    conversationId: scope.conversationId,
+    conversations,
+    currentIdentity,
+    fallbackLabels,
+    identityNames,
+    identityProfiles,
+    keychain,
+    participants,
+  });
 }

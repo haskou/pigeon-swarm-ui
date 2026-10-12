@@ -7,6 +7,7 @@ import {
 } from 'react';
 
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationDrafts } from './ConversationDrafts';
 
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { ConversationDraftCollection } from './ConversationDraftCollection';
@@ -18,10 +19,26 @@ type ConversationDraftsInput = {
   session: Session;
 };
 
-type ConversationDrafts = {
-  activeDraft: string;
-  updateActiveDraft: (value: string) => void;
-};
+function mergeRemoteDrafts(
+  remoteDrafts: Array<{ content: string; conversationId: string }>,
+): (current: Record<string, string>) => Record<string, string> {
+  return (current) =>
+    ConversationDraftCollection.mergeMissing(current, remoteDrafts);
+}
+
+function persistDraft(session: Session, conversationId: string, value: string) {
+  if (value.trim()) {
+    void applicationContainer.messages
+      .saveDraft(session, conversationId, value)
+      .catch(() => undefined);
+
+    return;
+  }
+
+  void applicationContainer.messages
+    .deleteDraft(session, conversationId)
+    .catch(() => undefined);
+}
 
 export function useConversationDrafts({
   activeConversationId,
@@ -39,9 +56,7 @@ export function useConversationDrafts({
       .then((remoteDrafts) => {
         if (cancelled) return;
 
-        onDraftsChange((current) =>
-          ConversationDraftCollection.mergeMissing(current, remoteDrafts),
-        );
+        onDraftsChange(mergeRemoteDrafts(remoteDrafts));
       })
       .catch(() => undefined);
 
@@ -69,18 +84,7 @@ export function useConversationDrafts({
 
       const timer = window.setTimeout(() => {
         syncTimersRef.current.delete(conversationId);
-
-        if (value.trim()) {
-          void applicationContainer.messages
-            .saveDraft(session, conversationId, value)
-            .catch(() => undefined);
-
-          return;
-        }
-
-        void applicationContainer.messages
-          .deleteDraft(session, conversationId)
-          .catch(() => undefined);
+        persistDraft(session, conversationId, value);
       }, 700);
 
       syncTimersRef.current.set(conversationId, timer);

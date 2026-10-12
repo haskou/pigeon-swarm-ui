@@ -31,11 +31,7 @@ type UseNotificationsInput = {
 const archivedNotifications = new ArchivedNotifications();
 const seenNotifications = new SeenNotifications();
 
-export function useNotifications({
-  onAccepted,
-  onAcceptedPanelClose,
-  session,
-}: UseNotificationsInput): {
+export type NotificationController = {
   action: NotificationAction | null;
   archive: (notificationId: string) => void;
   error: string | null;
@@ -46,7 +42,13 @@ export function useNotifications({
   refresh: () => Promise<void>;
   unreadCount: number;
   visible: NotificationResource[];
-} {
+};
+
+export function useNotifications({
+  onAccepted,
+  onAcceptedPanelClose,
+  session,
+}: UseNotificationsInput): NotificationController {
   const [notifications, setNotifications] = useState<NotificationResource[]>(
     [],
   );

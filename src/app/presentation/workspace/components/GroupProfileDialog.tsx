@@ -6,28 +6,21 @@ import type { NodeNetwork } from '../../../../contexts/networks/presentation/vie
 import type {
   ConversationResource,
   IdentityPresence,
-  IdentityResource,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { GroupParticipant } from './GroupParticipant';
 
-import { copy } from '../../../../shared/presentation/i18n/copy';
-import { shortId } from '../../../../shared/presentation/formatting';
-import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
-import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import {
   IdentityMemberListPanel,
   type IdentityMemberListItem,
 } from '../../../../contexts/identities/presentation/components/IdentityMemberListPanel';
+import { shortId } from '../../../../shared/presentation/formatting';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import {
   groupRosterPermissions,
   type GroupRosterActionsController,
 } from './useGroupRosterActions';
-
-type GroupParticipant = {
-  identity?: IdentityResource;
-  identityId: string;
-  name?: string;
-  picture?: null | string;
-};
 
 interface GroupProfileDialogProps {
   conversation: ConversationResource;
@@ -42,6 +35,27 @@ interface GroupProfileDialogProps {
   participants: GroupParticipant[];
   presenceByIdentityId?: Record<string, IdentityPresence>;
   roster: GroupRosterActionsController;
+}
+
+function RosterButton({
+  disabled,
+  label,
+  onClick,
+}: {
+  disabled: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="rounded-full bg-white/10 px-3 py-1 text-xs font-black text-white/80 transition hover:bg-white/15 disabled:opacity-50"
+    >
+      {label}
+    </button>
+  );
 }
 
 export function GroupProfileDialog({
@@ -186,26 +200,5 @@ export function GroupProfileDialog({
       </section>
     </div>,
     document.body,
-  );
-}
-
-function RosterButton({
-  disabled,
-  label,
-  onClick,
-}: {
-  disabled: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className="rounded-full bg-white/10 px-3 py-1 text-xs font-black text-white/80 transition hover:bg-white/15 disabled:opacity-50"
-    >
-      {label}
-    </button>
   );
 }

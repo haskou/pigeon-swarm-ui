@@ -1,5 +1,5 @@
-import type { NotificationSettingMap } from '../../../../contexts/notifications/presentation/view-models/NotificationSettingMap';
 import type { PwaNotificationPermission } from '../../../../contexts/notifications/infrastructure/browser/PwaNotificationPermission';
+import type { NotificationSettingMap } from '../../../../contexts/notifications/presentation/view-models/NotificationSettingMap';
 import type {
   Community,
   CommunityInvitationNotificationResource,

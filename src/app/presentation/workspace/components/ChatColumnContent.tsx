@@ -126,9 +126,9 @@ export function ChatColumnContent({
     useState<StickerMessageReference | null>(null);
   const { loadAttachmentPreview, openAttachment } = useAttachmentDownload({
     errorMessage: copy.composer.attachmentDownloadError,
-    unavailableMessage: copy.attachments.loadFailed,
     onErrorChange: setAttachmentError,
     onProgressChange: setDownloadProgress,
+    unavailableMessage: copy.attachments.loadFailed,
   });
 
   if (!activeConversation) return <ChatEmptyState onCreate={onCreate} />;

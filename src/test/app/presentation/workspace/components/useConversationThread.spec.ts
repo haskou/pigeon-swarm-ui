@@ -2,7 +2,7 @@ import type { SetStateAction } from 'react';
 
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-import type { ConversationThreadState } from '../../../../../app/presentation/workspace/components/conversationThreadState';
+import type { ConversationThread } from '../../../../../app/presentation/workspace/components/ConversationThread';
 import type {
   ChatMessage,
   ConversationResource,
@@ -102,7 +102,7 @@ async function openThread() {
 }
 
 function threadMessageIds(): string[] {
-  const thread = mockCells[0]?.value as ConversationThreadState | null;
+  const thread = mockCells[0]?.value as ConversationThread | null;
 
   return thread?.messages.map((message) => message.id) ?? [];
 }

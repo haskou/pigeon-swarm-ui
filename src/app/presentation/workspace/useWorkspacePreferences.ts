@@ -4,15 +4,17 @@ import { useEffect, useState } from 'react';
 
 import type { ConversationResource } from '../../../shared/domain/pigeonResources.types';
 import type { Session } from '../../../shared/domain/pigeonResources.types';
+import type { CommunityUnreadCounts } from './components/CommunityUnreadCounts';
+import type { WorkspaceMode } from './components/WorkspaceMode';
+import type { WorkspacePreference } from './components/WorkspacePreference';
 
+import { DraftPayloadCipher } from '../../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
 import {
   writeJsonToLocalStorage,
   writeStringToLocalStorage,
 } from '../../../shared/infrastructure/storage/jsonLocalStorage';
-import { DraftPayloadCipher } from '../../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
 import {
   communityUnreadStorageKey,
-  type CommunityUnreadCounts,
   type ConversationDrafts,
   draftsStorageKey,
   encryptedDraftsStorageValue,
@@ -21,12 +23,49 @@ import {
   loadEncryptedDraftPayloads,
   loadCommunityUnreadCounts,
   loadWorkspacePreference,
-  type WorkspacePreference,
   workspaceStorageKey,
 } from './components/workspacePersistence';
 
-type WorkspaceMode = 'community' | 'messages';
 const draftPayloadCipher = new DraftPayloadCipher();
+
+function encryptDrafts(
+  session: Session,
+  drafts: ConversationDrafts,
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(drafts)
+      .filter(([, content]) => content.trim().length > 0)
+      .map(([conversationId, content]) => [
+        conversationId,
+        draftPayloadCipher.encrypt(session, content),
+      ]),
+  );
+}
+
+async function decryptStoredDrafts(
+  session: Session,
+): Promise<ConversationDrafts> {
+  const encryptedPayloads = loadEncryptedDraftPayloads(session.identity.id);
+  const drafts = await Promise.all(
+    Object.entries(encryptedPayloads).map(
+      async ([conversationId, payload]): Promise<[string, string]> => [
+        conversationId,
+        await draftPayloadCipher.decrypt(session, payload),
+      ],
+    ),
+  );
+
+  return Object.fromEntries(drafts);
+}
+
+function mergeDecryptedDrafts(
+  decryptedDrafts: ConversationDrafts,
+): (current: ConversationDrafts) => ConversationDrafts {
+  return (current) => ({
+    ...current,
+    ...decryptedDrafts,
+  });
+}
 
 export function useWorkspacePreferences(input: {
   activeConversationId: string | null;
@@ -138,10 +177,7 @@ export function useWorkspacePreferenceState(
     void decryptStoredDrafts(session).then((decryptedDrafts) => {
       if (cancelled) return;
 
-      setDrafts((current) => ({
-        ...current,
-        ...decryptedDrafts,
-      }));
+      setDrafts(mergeDecryptedDrafts(decryptedDrafts));
       setDraftsHydrated(true);
     });
 
@@ -171,32 +207,4 @@ export function useWorkspacePreferenceState(
     setWorkspaceMode,
     workspaceMode,
   };
-}
-
-function encryptDrafts(
-  session: Session,
-  drafts: ConversationDrafts,
-): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(drafts)
-      .filter(([, content]) => content.trim().length > 0)
-      .map(([conversationId, content]) => [
-        conversationId,
-        draftPayloadCipher.encrypt(session, content),
-      ]),
-  );
-}
-
-async function decryptStoredDrafts(
-  session: Session,
-): Promise<ConversationDrafts> {
-  const encryptedPayloads = loadEncryptedDraftPayloads(session.identity.id);
-  const drafts = await Promise.all(
-    Object.entries(encryptedPayloads).map(async ([conversationId, payload]) => [
-      conversationId,
-      await draftPayloadCipher.decrypt(session, payload),
-    ]),
-  );
-
-  return Object.fromEntries(drafts);
 }

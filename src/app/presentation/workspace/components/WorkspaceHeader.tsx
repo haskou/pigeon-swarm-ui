@@ -5,6 +5,55 @@ import { cx } from '../../../../shared/presentation/cx';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
 
+function PinnedMessagesButton({ onPinsOpen }: { onPinsOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onPinsOpen}
+      className="hidden h-9 w-9 shrink-0 place-items-center rounded-xl text-white/45 transition hover:bg-white/8 hover:text-white sm:grid"
+      title={copy.messages.pinnedMessages}
+      aria-label={copy.messages.pinnedMessages}
+    >
+      <PinIcon className="h-[1.125rem] w-[1.125rem]" />
+    </button>
+  );
+}
+
+function RealtimeStatusButton({
+  onRealtimeEventsOpen,
+  realtimeStatus,
+}: {
+  onRealtimeEventsOpen?: () => void;
+  realtimeStatus: 'connected' | 'reconnecting';
+}) {
+  const connected = realtimeStatus === 'connected';
+  const label = connected
+    ? copy.chat.realtimeConnected
+    : copy.chat.realtimeReconnecting;
+
+  return (
+    <button
+      type="button"
+      onClick={onRealtimeEventsOpen}
+      className={cx(
+        'hidden items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black transition sm:flex',
+        connected
+          ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/15'
+          : 'border-amber-300/20 bg-amber-400/10 text-amber-100 hover:bg-amber-400/15',
+      )}
+      title={label}
+    >
+      <span
+        className={cx(
+          'h-2 w-2 rounded-full',
+          connected ? 'bg-emerald-300' : 'bg-amber-300',
+        )}
+      />
+      {label}
+    </button>
+  );
+}
+
 export function WorkspaceHeader({
   avatar,
   children,
@@ -84,54 +133,5 @@ export function WorkspaceHeader({
         )}
       </div>
     </header>
-  );
-}
-
-function PinnedMessagesButton({ onPinsOpen }: { onPinsOpen: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onPinsOpen}
-      className="hidden h-9 w-9 shrink-0 place-items-center rounded-xl text-white/45 transition hover:bg-white/8 hover:text-white sm:grid"
-      title={copy.messages.pinnedMessages}
-      aria-label={copy.messages.pinnedMessages}
-    >
-      <PinIcon className="h-[1.125rem] w-[1.125rem]" />
-    </button>
-  );
-}
-
-function RealtimeStatusButton({
-  onRealtimeEventsOpen,
-  realtimeStatus,
-}: {
-  onRealtimeEventsOpen?: () => void;
-  realtimeStatus: 'connected' | 'reconnecting';
-}) {
-  const connected = realtimeStatus === 'connected';
-  const label = connected
-    ? copy.chat.realtimeConnected
-    : copy.chat.realtimeReconnecting;
-
-  return (
-    <button
-      type="button"
-      onClick={onRealtimeEventsOpen}
-      className={cx(
-        'hidden items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black transition sm:flex',
-        connected
-          ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/15'
-          : 'border-amber-300/20 bg-amber-400/10 text-amber-100 hover:bg-amber-400/15',
-      )}
-      title={label}
-    >
-      <span
-        className={cx(
-          'h-2 w-2 rounded-full',
-          connected ? 'bg-emerald-300' : 'bg-amber-300',
-        )}
-      />
-      {label}
-    </button>
   );
 }

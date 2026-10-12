@@ -8,6 +8,7 @@ import type {
   ConversationResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { DirectPinChange } from './DirectPinChange';
 
 import { DirectMailboxEligibility } from '../../../../contexts/mailboxes/domain/DirectMailboxEligibility';
 import { MailboxReaderLimitError } from '../../../../contexts/mailboxes/infrastructure/http/MailboxReaderLimitError';
@@ -27,8 +28,6 @@ type DirectMessageMailboxSyncInput = {
   session: Session;
   setPinnedMessageIds: Dispatch<SetStateAction<Set<string>>>;
 };
-
-type DirectPinChange = Extract<DirectMessageTimelineChange, { kind: 'pin' }>;
 
 /**
  * Keeps the pin changes newer than the last one applied to their message. The
@@ -66,6 +65,57 @@ function applyPinChanges(
   }
 
   return next;
+}
+
+function applySyncChanges(
+  changes: DirectMessageTimelineChange[],
+  conversationId: string,
+  pinClock: Map<string, number>,
+  handlers: Pick<
+    DirectMessageMailboxSyncInput,
+    'onConversationRead' | 'onMessagesChange' | 'setPinnedMessageIds'
+  >,
+): void {
+  if (changes.length > 0) {
+    handlers.onMessagesChange((current) =>
+      applyDirectMessageTimelineChanges(current, changes),
+    );
+  }
+
+  const pinChanges = freshPinChanges(changes, pinClock);
+
+  if (pinChanges.length > 0) {
+    handlers.setPinnedMessageIds((current) =>
+      applyPinChanges(current, pinChanges),
+    );
+  }
+
+  if (changes.some((change) => change.kind === 'read')) {
+    handlers.onConversationRead(conversationId);
+  }
+}
+
+function subscribeMailboxHints(
+  session: Session,
+  conversationId: string,
+  listener: () => void,
+): (() => void) | undefined {
+  const target = applicationContainer.directMessages.hintTarget(
+    session,
+    conversationId,
+  );
+
+  if (!target) {
+    return undefined;
+  }
+
+  return subscribeRealtimeMailboxHints(session, target, listener);
+}
+
+function syncFailureMessage(caught: unknown): string {
+  return caught instanceof MailboxReaderLimitError
+    ? copy.workspace.directMailboxReaderLimitError
+    : toUserErrorMessage(caught, copy.workspace.directMailboxSyncError);
 }
 
 /**
@@ -106,76 +156,62 @@ export function useDirectMessageMailboxSync({
     let queued = false;
     let unsubscribeHints: (() => void) | undefined;
 
+    const clearNotice = (): void => {
+      if (notice !== null) {
+        const shown = notice;
+        notice = null;
+        onErrorChange((current) => (current === shown ? null : current));
+      }
+    };
+
+    const showFailure = (caught: unknown): void => {
+      if (notice === null) {
+        const message = syncFailureMessage(caught);
+        notice = message;
+        onErrorChange((current) => current ?? message);
+      }
+    };
+
     const pass = async (): Promise<void> => {
       running = true;
+
       try {
         await applicationContainer.directMessages.sync(
           session,
           conversationId,
           controller.signal,
           (changes) => {
-            if (changes.length > 0) {
-              onMessagesChange((current) =>
-                applyDirectMessageTimelineChanges(current, changes),
-              );
-            }
-            const pinChanges = freshPinChanges(changes, pinClock);
-            if (pinChanges.length > 0) {
-              setPinnedMessageIds((current) =>
-                applyPinChanges(current, pinChanges),
-              );
-            }
-            if (changes.some((change) => change.kind === 'read')) {
-              onConversationRead(conversationId);
-            }
+            applySyncChanges(changes, conversationId, pinClock, {
+              onConversationRead,
+              onMessagesChange,
+              setPinnedMessageIds,
+            });
           },
         );
-
-        if (notice !== null) {
-          const shown = notice;
-          notice = null;
-          onErrorChange((current) => (current === shown ? null : current));
-        }
+        clearNotice();
 
         if (!unsubscribeHints) {
-          const target = applicationContainer.directMessages.hintTarget(
+          unsubscribeHints = subscribeMailboxHints(
             session,
             conversationId,
+            () => {
+              if (running) {
+                queued = true;
+
+                return;
+              }
+
+              window.clearTimeout(timer);
+              void pass();
+            },
           );
-
-          if (target) {
-            unsubscribeHints = subscribeRealtimeMailboxHints(
-              session,
-              target,
-              () => {
-                if (running) {
-                  queued = true;
-
-                  return;
-                }
-
-                window.clearTimeout(timer);
-                void pass();
-              },
-            );
-          }
         }
       } catch (caught) {
         if (controller.signal.aborted) {
           return;
         }
 
-        if (notice === null) {
-          const message =
-            caught instanceof MailboxReaderLimitError
-              ? copy.workspace.directMailboxReaderLimitError
-              : toUserErrorMessage(
-                  caught,
-                  copy.workspace.directMailboxSyncError,
-                );
-          notice = message;
-          onErrorChange((current) => current ?? message);
-        }
+        showFailure(caught);
       }
 
       running = false;

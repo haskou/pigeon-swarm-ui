@@ -1,6 +1,9 @@
 import { useMemo } from 'react';
 
-import type { Community } from '../../../../shared/domain/pigeonResources.types';
+import type {
+  Community,
+  CommunityTextChannel,
+} from '../../../../shared/domain/pigeonResources.types';
 
 import { CommunityChannels } from '../../../../contexts/communities/presentation/view-models/CommunityChannels';
 import { CommunityList } from '../../../../contexts/communities/presentation/view-models/CommunityList';
@@ -13,7 +16,11 @@ export function useCommunitySelection({
   activeCommunityId?: null | string;
   communities: Community[];
   communityChannelById: Record<string, string>;
-}) {
+}): {
+  activeCommunity: Community;
+  activeCommunityChannelId: null | string;
+  activeCommunityTextChannels: CommunityTextChannel[];
+} {
   const selectableCommunities = useMemo(
     () => CommunityList.withUniqueIds(communities),
     [communities],

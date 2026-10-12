@@ -4,6 +4,7 @@ import type {
   ConversationResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { GroupRosterPermissions } from './GroupRosterPermissions';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { applicationContainer } from '../../../composition/applicationContainer';
@@ -15,13 +16,6 @@ export interface GroupRosterActionsController {
   pending: boolean;
   promoteAdmin: (identityId: string) => Promise<void>;
   removeParticipant: (identityId: string) => Promise<void>;
-}
-
-export interface GroupRosterPermissions {
-  canDemote: (identityId: string) => boolean;
-  canLeave: boolean;
-  canPromote: (identityId: string) => boolean;
-  canRemove: (identityId: string) => boolean;
 }
 
 // Mirrors the node's roster rules: the creator is never an admin and never

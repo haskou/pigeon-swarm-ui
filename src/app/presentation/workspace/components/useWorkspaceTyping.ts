@@ -28,9 +28,16 @@ export function useWorkspaceTyping({
   activeCommunityId,
   activeConversationId,
   session,
-}: WorkspaceTypingInput) {
-  const [conversationEntries, setConversationEntries] =
-    useState<TypingEntries>({});
+}: WorkspaceTypingInput): {
+  communityTypingIdentityIds: string[];
+  conversationTypingIdentityIds: string[];
+  receive: (message: RealtimeTypingMessage) => void;
+  sendCommunityTyping: (channelId: string, active: boolean) => void;
+  sendConversationTyping: (active: boolean) => void;
+} {
+  const [conversationEntries, setConversationEntries] = useState<TypingEntries>(
+    {},
+  );
   const [communityEntries, setCommunityEntries] = useState<TypingEntries>({});
   const sentRef = useRef(
     new Map<string, { active: boolean; sentAt: number }>(),

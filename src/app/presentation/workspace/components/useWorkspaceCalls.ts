@@ -17,6 +17,7 @@ import type {
   IdentityResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { WorkspaceCalls } from './WorkspaceCalls';
 
 import { logCallDebug } from '../../../../contexts/calls/infrastructure/media/callDebugLogger';
 import { useCallMediaAccess } from '../../../../contexts/calls/presentation/hooks/useCallMediaAccess';
@@ -48,43 +49,42 @@ type WorkspaceCallsInput = {
   sessionRef: RefObject<Session>;
 };
 
-type WorkspaceCalls = Pick<
-  ReturnType<typeof useCallSession>,
-  | 'activeCall'
-  | 'retryMicrophone'
-  | 'retryConnection'
-  | 'setParticipantScreenShareVolume'
-  | 'setParticipantVolume'
-  | 'setScreenShareQuality'
-  | 'toggleCamera'
-  | 'toggleDeafen'
-  | 'toggleMute'
-  | 'toggleScreenShare'
-> &
-  Pick<
-    ReturnType<typeof useCallMediaAccess>,
-    'toggleCallMediaEncryption' | 'toggleCallNoiseCancellation'
-  > &
-  Pick<
-    ReturnType<typeof useCallStartActions>,
-    | 'acceptIncomingCall'
-    | 'declineIncomingCall'
-    | 'startCommunityVoiceCall'
-    | 'startConversationCall'
-  > &
-  Pick<ReturnType<typeof useCallDeparture>, 'leaveActiveCall'> & {
-    handleRealtimeCallEvent: (
-      event: Parameters<
-        ReturnType<
-          typeof useWorkspaceRealtimeCallEvents
-        >['handleRealtimeCallEvent']
-      >[0],
-    ) => void;
-    recoverRealtimeCalls: () => void;
-    incomingCall: ReturnType<
-      typeof useCallResourceReconciliation
-    >['incomingCall'];
-  };
+function ignoreRejection(): undefined {
+  return undefined;
+}
+
+function communityVoicePresenceUpdate(calls: CallResource[]) {
+  return (current: Community[]) =>
+    communitiesWithCallVoicePresence(current, calls);
+}
+
+function staleJoinedCallsFor(
+  calls: CallResource[],
+  identityId: string,
+): CallResource[] {
+  return calls.filter(
+    (call) =>
+      call.status === 'active' &&
+      call.scope.type === 'community_channel' &&
+      call.participants.some(
+        (participant) =>
+          participant.identityId === identityId && participant.connected,
+      ),
+  );
+}
+
+function leaveCallsIgnoringErrors(
+  sessionRef: RefObject<Session>,
+  calls: CallResource[],
+): Promise<unknown[]> {
+  return Promise.all(
+    calls.map((call) =>
+      applicationContainer.calls
+        .leave(sessionRef.current, call.id)
+        .catch(ignoreRejection),
+    ),
+  );
+}
 
 export function useWorkspaceCalls({
   activeCommunity,
@@ -107,14 +107,14 @@ export function useWorkspaceCalls({
     () => undefined,
   );
   const {
-    recoverAfterDisruption,
     activeCall,
     callMediaConnections,
     endCall,
     receiveSignal,
     reconcileCall,
-    retryMicrophone,
+    recoverAfterDisruption,
     retryConnection,
+    retryMicrophone,
     setParticipantScreenShareVolume,
     setParticipantVolume,
     setScreenShareQuality,
@@ -216,13 +216,12 @@ export function useWorkspaceCalls({
       reconcileCall,
       setCommunities: onCommunitiesChange,
     });
-  const { handleRealtimeCallEvent, recoverRealtimeCalls, loadCallSnapshots } =
+  const { handleRealtimeCallEvent, loadCallSnapshots, recoverRealtimeCalls } =
     useWorkspaceRealtimeCallEvents({
       activeCallRef,
       onRecoveredCalls: (calls, previousActiveCallId) => {
-        onCommunitiesChange((current) =>
-          communitiesWithCallVoicePresence(current, calls),
-        );
+        onCommunitiesChange(communityVoicePresenceUpdate(calls));
+
         if (
           previousActiveCallId &&
           activeCallRef.current?.id === previousActiveCallId &&
@@ -333,13 +332,13 @@ export function useWorkspaceCalls({
   useWorkspaceCallHeartbeat({
     activeCall,
     heartbeat: heartbeatActiveCall,
+    mediaConnections: callMediaConnections,
     onAccessDenied: (callId) => {
       if (activeCallRef.current?.id !== callId) return;
 
       endCall();
       removeCurrentIdentityFromVoicePresence();
     },
-    mediaConnections: callMediaConnections,
   });
 
   useEffect(() => {
@@ -350,12 +349,10 @@ export function useWorkspaceCalls({
     void loadCallSnapshots(listCalls)
       .then((calls) => {
         if (!cancelled && calls) {
-          onCommunitiesChange((current) =>
-            communitiesWithCallVoicePresence(current, calls),
-          );
+          onCommunitiesChange(communityVoicePresenceUpdate(calls));
         }
       })
-      .catch(() => undefined);
+      .catch(ignoreRejection);
 
     return () => {
       cancelled = true;
@@ -379,37 +376,23 @@ export function useWorkspaceCalls({
       .then(async (calls) => {
         if (cancelled || !calls) return;
 
-        const staleJoinedCalls = calls.filter(
-          (call) =>
-            call.status === 'active' &&
-            call.scope.type === 'community_channel' &&
-            call.participants.some(
-              (participant) =>
-                participant.identityId === identityId && participant.connected,
-            ),
-        );
+        const staleJoinedCalls = staleJoinedCallsFor(calls, identityId);
 
         if (
           staleJoinedCalls.length > 0 &&
           !activeCallRef.current &&
           !isCallActionInProgress()
         ) {
-          await Promise.all(
-            staleJoinedCalls.map((call) =>
-              applicationContainer.calls
-                .leave(sessionRef.current, call.id)
-                .catch(() => undefined),
-            ),
-          );
+          await leaveCallsIgnoringErrors(sessionRef, staleJoinedCalls);
           removeCurrentIdentityFromVoicePresence();
-          await onCommunitiesReload().catch(() => undefined);
+          await onCommunitiesReload().catch(ignoreRejection);
 
           return;
         }
 
-        calls.forEach((call) => reconcileCallResourceRef.current(call));
+        calls.forEach(reconcileCallResourceRef.current);
       })
-      .catch(() => undefined);
+      .catch(ignoreRejection);
 
     return () => {
       cancelled = true;
@@ -432,8 +415,8 @@ export function useWorkspaceCalls({
     incomingCall,
     leaveActiveCall,
     recoverRealtimeCalls: recoverRealtimeCallsAfterDisruption,
-    retryMicrophone,
     retryConnection,
+    retryMicrophone,
     setParticipantScreenShareVolume,
     setParticipantVolume,
     setScreenShareQuality,
