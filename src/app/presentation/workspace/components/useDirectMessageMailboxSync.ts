@@ -13,6 +13,7 @@ import { MailboxReaderLimitError } from '../../../../contexts/mailboxes/infrastr
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
+import { subscribeRealtimeMailboxHints } from '../../realtime/useRealtimeEvents';
 import { applyDirectMessageTimelineChanges } from './applyDirectMessageTimelineChanges';
 
 const SYNC_INTERVAL_MS = 5000;
@@ -99,8 +100,12 @@ export function useDirectMessageMailboxSync({
     let notice: string | null = null;
     let timer: number | undefined;
     const pinClock = new Map<string, number>();
+    let running = false;
+    let queued = false;
+    let unsubscribeHints: (() => void) | undefined;
 
     const pass = async (): Promise<void> => {
+      running = true;
       try {
         await applicationContainer.directMessages.sync(
           session,
@@ -129,6 +134,30 @@ export function useDirectMessageMailboxSync({
           notice = null;
           onErrorChange((current) => (current === shown ? null : current));
         }
+
+        if (!unsubscribeHints) {
+          const target = applicationContainer.directMessages.hintTarget(
+            session,
+            conversationId,
+          );
+
+          if (target) {
+            unsubscribeHints = subscribeRealtimeMailboxHints(
+              session,
+              target,
+              () => {
+                if (running) {
+                  queued = true;
+
+                  return;
+                }
+
+                window.clearTimeout(timer);
+                void pass();
+              },
+            );
+          }
+        }
       } catch (caught) {
         if (controller.signal.aborted) {
           return;
@@ -147,8 +176,15 @@ export function useDirectMessageMailboxSync({
         }
       }
 
+      running = false;
+
       if (!controller.signal.aborted) {
-        timer = window.setTimeout(() => void pass(), SYNC_INTERVAL_MS);
+        if (queued) {
+          queued = false;
+          void pass();
+        } else {
+          timer = window.setTimeout(() => void pass(), SYNC_INTERVAL_MS);
+        }
       }
     };
 
@@ -157,6 +193,7 @@ export function useDirectMessageMailboxSync({
     return () => {
       controller.abort();
       window.clearTimeout(timer);
+      unsubscribeHints?.();
     };
   }, [
     conversationId,

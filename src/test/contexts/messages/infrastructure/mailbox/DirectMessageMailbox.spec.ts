@@ -2759,8 +2759,9 @@ describe(DirectMessageMailbox.name, () => {
 
   describe('hintTarget', () => {
     it('names the own inbox and its device read token without touching the node', () => {
-      const { channel, mailbox } = setup();
+      const { channel, mailbox, store } = setup();
       const keys = keysFor('bob');
+      store.save(keys.mailboxId, { cursor: 0 });
 
       expect(mailbox.hintTarget(session('bob'), conversationId)).toEqual({
         mailboxId: keys.mailboxId,
@@ -2778,6 +2779,12 @@ describe(DirectMessageMailbox.name, () => {
       } as unknown as Session;
 
       expect(mailbox.hintTarget(keyless, conversationId)).toBeNull();
+    });
+
+    it('returns null until the inbox is open on this device', () => {
+      const { mailbox } = setup();
+
+      expect(mailbox.hintTarget(session('bob'), conversationId)).toBeNull();
     });
   });
 });

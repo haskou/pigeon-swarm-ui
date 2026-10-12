@@ -1,7 +1,9 @@
+import type { RealtimeMailboxSubscriptionInput } from './RealtimeMailboxSubscriptionInput';
 import type { RealtimeMessage } from './RealtimeMessage';
 import type { RealtimeTypingInput } from './RealtimeTypingInput';
 
 export type { RealtimeDomainEvent } from './RealtimeDomainEvent';
+export type { RealtimeMailboxSubscriptionInput } from './RealtimeMailboxSubscriptionInput';
 export type { RealtimeMessage } from './RealtimeMessage';
 export type { RealtimeTypingMessage } from './RealtimeTypingMessage';
 export type { RealtimeTypingInput } from './RealtimeTypingInput';
@@ -17,6 +19,7 @@ import {
   RealtimeHeartbeat,
   type RealtimeHeartbeatActivityMode,
 } from './RealtimeHeartbeat';
+import { RealtimeMailboxSubscriptionPublisher } from './RealtimeMailboxSubscriptionPublisher';
 import { RealtimeMessageParser } from './RealtimeMessageParser';
 import { RealtimeTicketIssuer } from './RealtimeTicketIssuer';
 import { RealtimeTypingPublisher } from './RealtimeTypingPublisher';
@@ -40,6 +43,9 @@ export class RealtimeGateway {
   private readonly parser = new RealtimeMessageParser();
 
   private readonly typing = new RealtimeTypingPublisher();
+
+  private readonly mailboxSubscriptions =
+    new RealtimeMailboxSubscriptionPublisher();
 
   public constructor(
     urls: ApiUrlBuilder = new ApiUrlBuilder(API_SERVER_URL),
@@ -164,5 +170,12 @@ export class RealtimeGateway {
     this.callSignalAcknowledgements.send(socket, signalId, (event, data) =>
       this.debug(event, data),
     );
+  }
+
+  public subscribeMailbox(
+    socket: WebSocket,
+    input: RealtimeMailboxSubscriptionInput,
+  ): void {
+    this.mailboxSubscriptions.send(socket, input);
   }
 }

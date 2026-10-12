@@ -221,13 +221,16 @@ describe('useDirectMessageBackgroundReadSync', () => {
 });
 
 describe('useDirectMessageBackgroundReadSync hints', () => {
-  const hintTarget = jest.mocked(applicationContainer.directMessages.hintTarget);
+  const hintTarget = jest.mocked(
+    applicationContainer.directMessages.hintTarget,
+  );
   const subscribe = jest.mocked(subscribeRealtimeMailboxHints);
 
   function hintFor(conversationId: string): () => void {
     const call = subscribe.mock.calls.find(
       ([, target]) => target.mailboxId === `mailbox-${conversationId}`,
     );
+
     if (!call) throw new Error(`No hint subscription for ${conversationId}.`);
 
     return call[2];
@@ -245,7 +248,13 @@ describe('useDirectMessageBackgroundReadSync hints', () => {
       readToken: 'token',
     }));
     subscribe.mockReset();
+    syncReads.mockReset();
     subscribe.mockReturnValue(() => undefined);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    Reflect.deleteProperty(globalThis, 'window');
   });
 
   it('subscribes to the inbox hints of every one-to-one conversation, not groups', async () => {
@@ -260,9 +269,10 @@ describe('useDirectMessageBackgroundReadSync hints', () => {
 
     await settle();
 
-    expect(
-      subscribe.mock.calls.map(([, target]) => target.mailboxId),
-    ).toEqual(['mailbox-peer', 'mailbox-active']);
+    expect(subscribe.mock.calls.map(([, target]) => target.mailboxId)).toEqual([
+      'mailbox-peer',
+      'mailbox-active',
+    ]);
     mounted.cleanup();
   });
 

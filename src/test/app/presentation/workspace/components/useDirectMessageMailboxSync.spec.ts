@@ -443,12 +443,15 @@ describe('useDirectMessageMailboxSync pins', () => {
 });
 
 describe('useDirectMessageMailboxSync hints', () => {
-  const hintTarget = jest.mocked(applicationContainer.directMessages.hintTarget);
+  const hintTarget = jest.mocked(
+    applicationContainer.directMessages.hintTarget,
+  );
   const subscribe = jest.mocked(subscribeRealtimeMailboxHints);
   const target = { mailboxId: 'mailbox-1', readToken: 'token-1' };
 
   function hint(): () => void {
     const call = subscribe.mock.calls[0];
+
     if (!call) throw new Error('No hint subscription.');
 
     return call[2];

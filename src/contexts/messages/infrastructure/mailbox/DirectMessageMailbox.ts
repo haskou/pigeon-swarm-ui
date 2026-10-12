@@ -7,6 +7,7 @@ import type {
   MessageResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { RealtimeMailboxSubscriptionInput } from '../../../../shared/infrastructure/realtime/RealtimeMailboxSubscriptionInput';
 import type { MailboxKeys } from '../../../mailboxes/infrastructure/crypto/MailboxKeySchedule';
 import type {
   MailboxReadTokens,
@@ -94,6 +95,34 @@ export class DirectMessageMailbox {
     private readonly projection: Pick<MessageProjectionPort, 'decryptMany'>,
     private readonly readerSet: DirectMessageReaderSet,
   ) {}
+
+  /**
+   * The own inbox and this device's read token, as a realtime hint names them.
+   * Null until the inbox is open on this device: the node silently ignores a
+   * subscription for a reader it has not enrolled. Makes no node call.
+   */
+  public hintTarget(
+    session: Session,
+    conversationId: string,
+  ): RealtimeMailboxSubscriptionInput | null {
+    const entry = ConversationKeychain.entry(
+      session.keychain,
+      session.identity.id,
+      conversationId,
+    );
+
+    if (!entry) return null;
+
+    const keys = this.keysFor(session, conversationId, session.identity.id);
+    const stored = this.store.load(keys.mailboxId);
+
+    if (stored === null || stored.readToken) return null;
+
+    return {
+      mailboxId: keys.mailboxId,
+      readToken: this.readersFor(session, keys).device,
+    };
+  }
 
   /**
    * Sender. Appends a sent message to the peer's inbox. Returns 'skipped' when

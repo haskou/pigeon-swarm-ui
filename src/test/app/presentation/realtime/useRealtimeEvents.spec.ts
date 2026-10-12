@@ -164,10 +164,10 @@ describe('mailbox hint subscriptions', () => {
 
   function connectTo(...sockets: SocketDouble[]): void {
     sockets.forEach((socket) => {
-      connect.mockImplementationOnce(async (_session, onMessage) => {
+      connect.mockImplementationOnce((_session, onMessage) => {
         deliver = onMessage;
 
-        return socket as unknown as WebSocket;
+        return Promise.resolve(socket as unknown as WebSocket);
       });
     });
   }
@@ -219,7 +219,10 @@ describe('mailbox hint subscriptions', () => {
 
     subscribeRealtimeMailboxHints(session, target, jest.fn());
 
-    expect(subscribeMailbox).toHaveBeenCalledWith(socket, target);
+    expect(subscribeMailbox).toHaveBeenCalledWith(
+      socket as unknown as WebSocket,
+      target,
+    );
   });
 
   it('sends a subscription registered before the socket exists once it is acknowledged', async () => {
@@ -233,7 +236,10 @@ describe('mailbox hint subscriptions', () => {
     await flushConnections();
     deliver({ identityId: 'identity-a', type: 'connection_ack' });
 
-    expect(subscribeMailbox).toHaveBeenCalledWith(socket, target);
+    expect(subscribeMailbox).toHaveBeenCalledWith(
+      socket as unknown as WebSocket,
+      target,
+    );
   });
 
   it('sends every registered subscription again on a reconnected socket', async () => {
@@ -249,7 +255,10 @@ describe('mailbox hint subscriptions', () => {
     await flushConnections();
     deliver({ identityId: 'identity-a', type: 'connection_ack' });
 
-    expect(subscribeMailbox).toHaveBeenLastCalledWith(second, target);
+    expect(subscribeMailbox).toHaveBeenLastCalledWith(
+      second as unknown as WebSocket,
+      target,
+    );
   });
 
   it('stops delivering hints to a listener once it unsubscribes', async () => {
