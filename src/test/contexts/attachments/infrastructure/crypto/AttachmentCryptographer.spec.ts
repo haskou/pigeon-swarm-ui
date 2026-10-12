@@ -2,6 +2,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 
 import { AttachmentBinaryCodec } from '../../../../../contexts/attachments/infrastructure/crypto/AttachmentBinaryCodec';
 import { AttachmentCryptographer } from '../../../../../contexts/attachments/infrastructure/crypto/AttachmentCryptographer';
+import { AttachmentLengthPadding } from '../../../../../contexts/attachments/infrastructure/crypto/AttachmentLengthPadding';
 
 describe(AttachmentCryptographer.name, () => {
   it('encrypts and decrypts attachment bytes', () => {
@@ -102,7 +103,9 @@ describe(AttachmentCryptographer.name, () => {
         offset += chunk.size;
       }
       expect(offset).toBe(result.encryptedBytes.byteLength);
-      expect(Buffer.concat(decoded)).toEqual(Buffer.from(source));
+      expect(Buffer.concat(decoded)).toEqual(
+        Buffer.from(AttachmentLengthPadding.pad(source)),
+      );
     },
   );
 
@@ -124,5 +127,96 @@ describe(AttachmentCryptographer.name, () => {
         encrypted.encryptedBytes,
       ),
     ).toThrow();
+  });
+
+  it('pads plaintext so equal buckets produce equal ciphertext sizes', () => {
+    const codec = new AttachmentBinaryCodec();
+    const cryptographer = new AttachmentCryptographer(codec);
+    const small = cryptographer.encrypt(
+      'a.bin',
+      codec.bytesToArrayBuffer(new Uint8Array(3)),
+    );
+    const larger = cryptographer.encrypt(
+      'b.bin',
+      codec.bytesToArrayBuffer(new Uint8Array(900)),
+    );
+
+    expect(small.encryption.padding).toBe('length-prefix-v1');
+    expect(small.encryptedBytes.byteLength).toBe(1024 + 16);
+    expect(larger.encryptedBytes.byteLength).toBe(
+      small.encryptedBytes.byteLength,
+    );
+  });
+
+  it('keeps the largest padded frame within the 50 MiB blob limit', () => {
+    const codec = new AttachmentBinaryCodec();
+    const cryptographer = new AttachmentCryptographer(codec);
+    const encrypted = cryptographer.encrypt(
+      'top.bin',
+      codec.bytesToArrayBuffer(new Uint8Array(50 * 1024 * 1024 - 7 * 16 - 16)),
+    );
+
+    expect(encrypted.encryptedBytes.byteLength).toBe(50 * 1024 * 1024);
+  });
+
+  it('decrypts padded ciphertext spanning several chunks back to the original bytes', () => {
+    const codec = new AttachmentBinaryCodec();
+    const cryptographer = new AttachmentCryptographer(codec);
+    const source = new Uint8Array(8 * 1024 * 1024 + 9).fill(42);
+    const encrypted = cryptographer.encrypt(
+      'big.bin',
+      codec.bytesToArrayBuffer(source),
+    );
+    const chunkTotal = (encrypted.encryption.chunks ?? []).reduce(
+      (sum, chunk) => sum + chunk.size,
+      0,
+    );
+
+    expect(encrypted.encryption.chunks).toHaveLength(2);
+    expect(chunkTotal).toBe(encrypted.encryptedBytes.byteLength);
+
+    const decrypted = cryptographer.decrypt(
+      {
+        cid: 'cid',
+        contentType: 'application/octet-stream',
+        encryption: encrypted.encryption,
+        filename: 'big.bin',
+        size: source.byteLength,
+      },
+      encrypted.encryptedBytes,
+    );
+
+    expect(Buffer.from(decrypted.bytes)).toEqual(Buffer.from(source));
+  });
+
+  it('rejects a padding marker whose plaintext has no valid frame', () => {
+    const codec = new AttachmentBinaryCodec();
+    const key = randomBytes(32);
+    const iv = randomBytes(12);
+    const source = Buffer.from([0, 255, 128, 1, 2]);
+    const cipher = createCipheriv('aes-256-gcm', key, iv);
+    const encrypted = Buffer.concat([
+      cipher.update(source),
+      cipher.final(),
+      cipher.getAuthTag(),
+    ]);
+
+    expect(() =>
+      new AttachmentCryptographer(codec).decrypt(
+        {
+          cid: 'cid',
+          contentType: 'application/octet-stream',
+          encryption: {
+            algorithm: 'AES-GCM',
+            iv: iv.toString('base64'),
+            key: key.toString('base64'),
+            padding: 'length-prefix-v1',
+          },
+          filename: 'bad.bin',
+          size: source.length,
+        },
+        codec.bytesToArrayBuffer(encrypted),
+      ),
+    ).toThrow('Attachment padding is invalid.');
   });
 });

@@ -4,4 +4,5 @@ export type MessageAttachmentEncryption = {
   chunkSize?: number;
   iv: string;
   key: string;
+  padding?: 'length-prefix-v1';
 };

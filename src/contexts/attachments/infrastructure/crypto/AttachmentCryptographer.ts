@@ -10,6 +10,7 @@ import type { AttachmentProgressHandler } from './AttachmentProgressHandler';
 import type { WorkerResponse } from './WorkerResponse';
 
 import { AttachmentBinaryCodec } from './AttachmentBinaryCodec';
+import { AttachmentLengthPadding } from './AttachmentLengthPadding';
 
 const chunkSize = 8 * 1024 * 1024;
 const gcmTagBytes = 16;
@@ -81,8 +82,16 @@ export class AttachmentCryptographer {
       );
     }
 
+    const plaintext = this.codec.concatArrayBuffers(decryptedParts);
+    const bytes =
+      attachment.encryption.padding === AttachmentLengthPadding.marker
+        ? this.codec.bytesToArrayBuffer(
+            AttachmentLengthPadding.unpad(new Uint8Array(plaintext)),
+          )
+        : plaintext;
+
     return {
-      bytes: this.codec.concatArrayBuffers(decryptedParts),
+      bytes,
       id: UUID.generate().toString(),
       type: 'decrypt-result',
     };
@@ -96,13 +105,14 @@ export class AttachmentCryptographer {
     const key = SymmetricKey.generate();
     const encryptedParts: ArrayBuffer[] = [];
     const chunks: { iv: string; size: number }[] = [];
-    const totalChunks = Math.ceil(bytes.byteLength / chunkSize) || 1;
+    const padded = AttachmentLengthPadding.pad(new Uint8Array(bytes));
+    const totalChunks = Math.ceil(padded.byteLength / chunkSize) || 1;
 
     for (let index = 0; index < totalChunks; index += 1) {
       const offset = index * chunkSize;
-      const chunk = bytes.slice(
+      const chunk = padded.subarray(
         offset,
-        Math.min(offset + chunkSize, bytes.byteLength),
+        Math.min(offset + chunkSize, padded.byteLength),
       );
       const encrypted = key.encrypt(Buffer.from(chunk), { aad: '' });
       const [, , iv, ciphertext, tag] = encrypted.valueOf().split('.');
@@ -136,6 +146,7 @@ export class AttachmentCryptographer {
         chunkSize,
         iv: firstIv,
         key: key.valueOf(),
+        padding: AttachmentLengthPadding.marker,
       },
       id: UUID.generate().toString(),
       type: 'encrypt-result',

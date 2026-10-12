@@ -180,7 +180,7 @@ The frontend is responsible for:
 - signing domain payloads for identities, messages, deletions and keychains;
 - encrypting keychains before publication;
 - encrypting conversation and community message payloads;
-- encrypting private attachments before IPFS upload;
+- encrypting private attachments, padded to size buckets, before upload;
 - decrypting attachments only when previewing or downloading them.
 
 The backend is responsible for:
@@ -191,6 +191,24 @@ The backend is responsible for:
 - publishing and retrieving IPFS content;
 - routing realtime events to related identities;
 - syncing node state through configured networks.
+
+### Attachment size padding
+
+Private attachment plaintext is framed before AES-256-GCM encryption, so the
+uploaded length reveals a size bucket rather than the exact file size:
+
+- Frame: the 8-byte ASCII magic `PGPAD001`, an 8-byte big-endian payload length,
+  the payload, then zero bytes up to the bucket size.
+- Buckets: 1 KiB, 4 KiB, 16 KiB, 64 KiB, 256 KiB, 1 MiB, 4 MiB, 16 MiB, then
+  52,428,688 bytes (50 MiB minus 112). That top frame encrypts to exactly 50 MiB,
+  the node's default `PRIVATE_BLOB_MAX_BYTES`, because each 8 MiB AES-GCM chunk
+  adds a 16-byte tag. The bucket is the smallest one that holds the whole frame,
+  header included. Frames above the top bucket are not padded.
+- Marker: new encryptions set `padding: "length-prefix-v1"` in the attachment's
+  `encryption` metadata. Receivers strip the frame only when the marker is present
+  and reject a frame whose magic or length is invalid.
+- Attachments without the marker were encrypted before padding and are decrypted
+  unchanged.
 
 ## Project Status
 
