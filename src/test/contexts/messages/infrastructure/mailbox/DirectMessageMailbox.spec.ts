@@ -706,6 +706,220 @@ describe(DirectMessageMailbox.name, () => {
     });
   });
 
+  describe('own copy', () => {
+    const pinOf = (action: 'pin' | 'unpin') => ({
+      action,
+      createdAt: 400,
+      messageId: 'message-1',
+    });
+    const everyDelivery: typeof deliveries = [
+      ...deliveries,
+      [
+        'pin',
+        (mailbox, from, conv) => mailbox.deliverPin(from, conv, pinOf('pin')),
+      ],
+    ];
+
+    const projectionOf = () => {
+      const port = mock<Pick<MessageProjectionPort, 'decryptMany'>>();
+      port.decryptMany.mockImplementation((_session, _id, records) =>
+        Promise.resolve(records.map(decrypted)),
+      );
+
+      return port;
+    };
+
+    /** The same identity on a second device: its own store, the same node. */
+    const otherDevice = (channel: MailboxChannel): DirectMessageMailbox =>
+      new DirectMessageMailbox(
+        channel,
+        new RecipientMailboxRouter(
+          channel,
+          () => Promise.resolve(undefined),
+          () => channel,
+        ),
+        new DirectMessageMailboxStore(),
+        projectionOf(),
+        new DirectMessageReaderSet(channel, (s) =>
+          Promise.resolve([credentialFor(s.identity.id)]),
+        ),
+      );
+
+    const appliedOf = (apply: jest.Mock): DirectMessageTimelineChange[] =>
+      apply.mock.calls.flatMap(
+        ([batch]) => batch as DirectMessageTimelineChange[],
+      );
+
+    it.each(everyDelivery)(
+      'appends the same record to the own inbox after the peer inbox (%s)',
+      async (_label, deliver) => {
+        const { channel, mailbox } = setup();
+        channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
+
+        await deliver(mailbox, session('alice'), conversation);
+
+        expect(channel.send).toHaveBeenCalledTimes(2);
+        const [peerKeys, peerPlaintext] = channel.send.mock.calls[0];
+        const [ownKeys, ownPlaintext] = channel.send.mock.calls[1];
+        expect(peerKeys.mailboxId).toBe(keysFor('bob').mailboxId);
+        expect(ownKeys.mailboxId).toBe(keysFor('alice').mailboxId);
+        expect(ownPlaintext).toEqual(peerPlaintext);
+      },
+    );
+
+    it('reports the peer outcome when the own copy fails, and logs nothing for it', async () => {
+      const { channel, mailbox } = setup();
+      const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
+      channel.send
+        .mockResolvedValueOnce({ cursor: 1, envelopeId: 'envelope-1' })
+        .mockRejectedValueOnce(new Error('own inbox down'));
+
+      await expect(
+        mailbox.deliverSent(session('alice'), conversation, sent),
+      ).resolves.toBe('delivered');
+      expect(debug).not.toHaveBeenCalled();
+      debug.mockRestore();
+    });
+
+    it('still appends the own copy when the peer append fails, and reports the peer failure', async () => {
+      const { channel, mailbox } = setup();
+      channel.send
+        .mockRejectedValueOnce(new Error('peer inbox down'))
+        .mockResolvedValueOnce({ cursor: 1, envelopeId: 'envelope-2' });
+
+      await expect(
+        mailbox.deliverSent(session('alice'), conversation, sent),
+      ).resolves.toBe('failed');
+      expect(channel.send).toHaveBeenCalledTimes(2);
+      expect(channel.send.mock.calls[1][0].mailboxId).toBe(
+        keysFor('alice').mailboxId,
+      );
+    });
+
+    describe('on another device of the same identity', () => {
+      it.each<
+        [
+          string,
+          (
+            mailbox: DirectMessageMailbox,
+            from: Session,
+            conv: ConversationResource,
+          ) => Promise<string>,
+          DirectMessageTimelineChange['kind'],
+        ]
+      >([
+        ['sent', (m, f, c) => m.deliverSent(f, c, sent), 'message'],
+        ['edited', (m, f, c) => m.deliverEdit(f, c, edited), 'edit'],
+        ['deleted', (m, f, c) => m.deliverDelete(f, c, 'message-1'), 'removed'],
+        [
+          'reaction',
+          (m, f, c) => m.deliverReaction(f, c, reaction),
+          'reaction',
+        ],
+        ['pin', (m, f, c) => m.deliverPin(f, c, pinOf('pin')), 'pin'],
+      ])(
+        '%s record from the first device reaches the second device',
+        async (_label, deliver, kind) => {
+          const { channel, mailbox } = setup();
+          channel.send.mockResolvedValue({
+            cursor: 1,
+            envelopeId: 'envelope-1',
+          });
+          await deliver(mailbox, session('alice'), conversation);
+          const [, ownPlaintext] = channel.send.mock.calls[1];
+
+          channel.read.mockResolvedValue(pageOf([ownPlaintext]));
+          channel.acknowledge.mockResolvedValue({ recreated: false });
+          const apply = jest.fn();
+
+          await otherDevice(channel).sync(
+            session('alice'),
+            conversationId,
+            new AbortController().signal,
+            apply,
+          );
+
+          expect(appliedOf(apply).map((change) => change.kind)).toEqual([kind]);
+        },
+      );
+    });
+
+    describe('on the sending device', () => {
+      it('does not re-apply its own sent record when the inbox replays it', async () => {
+        const { channel, mailbox } = setup();
+        channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
+        await mailbox.deliverSent(session('alice'), conversation, sent);
+        const [, ownPlaintext] = channel.send.mock.calls[1];
+        channel.read.mockResolvedValue(pageOf([ownPlaintext]));
+        channel.acknowledge.mockResolvedValue({ recreated: false });
+        const apply = jest.fn();
+
+        await mailbox.sync(
+          session('alice'),
+          conversationId,
+          new AbortController().signal,
+          apply,
+        );
+
+        expect(appliedOf(apply)).toEqual([]);
+        expect(channel.acknowledge).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.anything(),
+          1,
+        );
+      });
+
+      it('does not undo a local delete when its own sent and delete records replay', async () => {
+        const { channel, mailbox } = setup();
+        channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
+        await mailbox.deliverSent(session('alice'), conversation, sent);
+        await mailbox.deliverDelete(
+          session('alice'),
+          conversation,
+          'message-1',
+        );
+        const ownSent = channel.send.mock.calls[1][1];
+        const ownDelete = channel.send.mock.calls[3][1];
+        channel.read.mockResolvedValue(pageOf([ownSent, ownDelete]));
+        channel.acknowledge.mockResolvedValue({ recreated: false });
+        const apply = jest.fn();
+
+        await mailbox.sync(
+          session('alice'),
+          conversationId,
+          new AbortController().signal,
+          apply,
+        );
+
+        expect(appliedOf(apply)).toEqual([]);
+      });
+
+      it('still applies a peer record that follows its own copies', async () => {
+        const { channel, mailbox } = setup();
+        channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
+        await mailbox.deliverSent(session('alice'), conversation, sent);
+        const [, ownPlaintext] = channel.send.mock.calls[1];
+        const fromBob = DirectMessageMailboxRecord.encode({
+          ...storedRecord,
+          authorId: 'bob',
+          id: 'message-2',
+        });
+        channel.read.mockResolvedValue(pageOf([ownPlaintext, fromBob]));
+        channel.acknowledge.mockResolvedValue({ recreated: false });
+        const apply = jest.fn();
+
+        await mailbox.sync(
+          session('alice'),
+          conversationId,
+          new AbortController().signal,
+          apply,
+        );
+
+        expect(messageIds(appliedOf(apply))).toEqual(['message-2']);
+      });
+    });
+  });
+
   describe('sync', () => {
     it('applies decrypted messages, skips malformed envelopes, then acknowledges and persists the cursor', async () => {
       const { channel, mailbox, store } = setup();
@@ -2093,7 +2307,9 @@ describe(DirectMessageMailbox.name, () => {
      * Mirrors the node: the inbox keeps the hash of every reader token with
      * the cursor that reader has acknowledged. An envelope is kept until the
      * slowest reader has acknowledged it, and reads or acknowledgements need a
-     * token whose hash is registered.
+     * token whose hash is registered. Only the recipient's inbox exists here:
+     * writes to any other mailbox, such as the sender's own inbox that was
+     * never opened, are unavailable, as on the node.
      */
     const nodeMailboxClient = (
       createGate?: Promise<void>,
@@ -2101,6 +2317,7 @@ describe(DirectMessageMailbox.name, () => {
     ) => {
       const maxReaders = options.maxReaders ?? 8;
       let present = true;
+      const recipientInboxId = keysFor('bob').mailboxId;
       let creates = 0;
       let nextCursor = 1;
       let envelopes: { body: string; cursor: number; envelopeId: string }[] =
@@ -2176,8 +2393,10 @@ describe(DirectMessageMailbox.name, () => {
           return Promise.resolve();
         },
       );
-      wire.append.mockImplementation((_mailboxId, _postToken, input) => {
-        if (!present) throw new MailboxUnavailableError();
+      wire.append.mockImplementation((mailboxId, _postToken, input) => {
+        if (!present || mailboxId !== recipientInboxId) {
+          throw new MailboxUnavailableError();
+        }
         const cursor = nextCursor;
         nextCursor += 1;
         envelopes.push({ ...input, cursor });
