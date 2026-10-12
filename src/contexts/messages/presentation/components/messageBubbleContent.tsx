@@ -1,7 +1,5 @@
-import type {
-  ChatMessage,
-  StickerMessageReference,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../view-models/ChatMessage';
+import type { StickerMessageReference } from '../../../stickers/infrastructure/http/resources/StickerMessageReference';
 
 import { cx } from '../../../../shared/presentation/cx';
 import { copy } from '../../../../shared/presentation/i18n/copy';

@@ -1,11 +1,9 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
 
-import type {
-  ChatMessage,
-  CommunityChannelThreadSummary,
-  MessageResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
+import type { CommunityChannelThreadSummaryResource as CommunityChannelThreadSummary } from '../../infrastructure/http/resources/CommunityChannelThreadSummaryResource';
+import type { MessageResource } from '../../../messages/infrastructure/http/MessageResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { MessageContextMenuState } from '../../../../app/presentation/workspace/components/messageContextMenu';
 import type { CommunityThreadState } from './communityThreadState';
 

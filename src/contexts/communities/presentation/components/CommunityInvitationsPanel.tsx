@@ -1,8 +1,6 @@
-import type {
-  Community,
-  CommunityMembershipRequest,
-  IdentityResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
+import type { CommunityMembershipRequestResource as CommunityMembershipRequest } from '../../infrastructure/http/resources/CommunityMembershipRequestResource';
+import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import {

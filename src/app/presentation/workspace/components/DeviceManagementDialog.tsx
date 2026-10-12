@@ -1,7 +1,7 @@
 import { type ReactElement, useCallback, useEffect, useState } from 'react';
 
 import type { DeviceCredential } from '../../../../contexts/identities/domain/value-objects/DeviceCredential';
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
 import { DeviceAuthorizationRevision } from '../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';

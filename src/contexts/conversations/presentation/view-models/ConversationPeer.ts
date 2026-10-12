@@ -1,7 +1,5 @@
-import type {
-  ConversationResource,
-  LocalKeychain,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../infrastructure/http/ConversationResource';
+import type { LocalKeychain } from '../../../identities/infrastructure/keychain/LocalKeychain';
 
 export class ConversationPeer {
   public static isWithIdentity(

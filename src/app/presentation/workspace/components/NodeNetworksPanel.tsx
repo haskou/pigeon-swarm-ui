@@ -1,8 +1,8 @@
 import { FormEvent, useState } from 'react';
 
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
 import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { NetworkAction } from './NetworkAction';
 import type { NetworkMutation } from './NetworkMutation';
 

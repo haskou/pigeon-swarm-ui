@@ -1,17 +1,15 @@
 /* eslint-disable complexity */
 import { Fragment, memo, type RefObject, useMemo } from 'react';
 
-import type {
-  AttachmentProgress,
-  ChatMessage,
-  CommunityChannelThreadSummary,
-  CommunityInvitationNotificationResource,
-  IdentityResource,
-  MessageAttachment,
-  PollResource,
-  Session,
-  StickerMessageReference,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { AttachmentProgress } from '../../../attachments/application/contracts/AttachmentProgress';
+import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
+import type { CommunityChannelThreadSummaryResource as CommunityChannelThreadSummary } from '../../infrastructure/http/resources/CommunityChannelThreadSummaryResource';
+import type { CommunityInvitationNotificationResource } from '../../../notifications/infrastructure/http/resources/CommunityInvitationNotificationResource';
+import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
+import type { MessageAttachment } from '../../../attachments/application/contracts/MessageAttachment';
+import type { PollResource } from '../../../polls/infrastructure/http/resources/PollResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { StickerMessageReference } from '../../../stickers/infrastructure/http/resources/StickerMessageReference';
 import type { MarkdownMention } from '../../../messages/presentation/components/markdownMessage';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';

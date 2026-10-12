@@ -1,9 +1,7 @@
 import { useEffect } from 'react';
 
-import type {
-  ConversationResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
 import { applicationContainer } from '../../../composition/applicationContainer';
 

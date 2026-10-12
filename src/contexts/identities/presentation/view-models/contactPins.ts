@@ -1,4 +1,4 @@
-import type { IdentityResource } from '../../../../shared/domain/pigeonResources.types';
+import type { IdentityResource } from '../../infrastructure/http/resources/IdentityResource';
 import type { ContactKeyCheck } from '../../domain/ContactPins';
 
 import { contactPinStore } from '../../../../app/composition/applicationContainer';

@@ -1,8 +1,6 @@
 import type { CallSignalType } from '../../../../contexts/calls/infrastructure/media/CallSignalType';
-import type {
-  Community,
-  CommunityChannel,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityChannelResource as CommunityChannel } from '../../../../contexts/communities/infrastructure/http/resources/CommunityChannelResource';
+import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 
 export function stringAttribute(

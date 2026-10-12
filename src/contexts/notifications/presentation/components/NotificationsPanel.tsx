@@ -1,12 +1,10 @@
 import { useState } from 'react';
 
-import type {
-  Community,
-  CommunityMembershipRequest,
-  ConversationResource,
-  IdentityResource,
-  NotificationResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../../communities/infrastructure/http/resources/CommunityResource';
+import type { CommunityMembershipRequestResource as CommunityMembershipRequest } from '../../../communities/infrastructure/http/resources/CommunityMembershipRequestResource';
+import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
+import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
+import type { NotificationResource } from '../../infrastructure/http/resources/NotificationResource';
 import type {
   IdentityNames,
   IdentityPictures,

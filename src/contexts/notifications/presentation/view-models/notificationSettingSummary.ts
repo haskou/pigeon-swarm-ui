@@ -1,4 +1,4 @@
-import type { NotificationScopeSetting } from '../../../../shared/domain/pigeonResources.types';
+import type { NotificationScopeSettingResource as NotificationScopeSetting } from '../../infrastructure/http/resources/NotificationScopeSettingResource';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { NotificationSettingsPolicy } from './NotificationSettingsPolicy';

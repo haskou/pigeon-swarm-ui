@@ -1,7 +1,5 @@
-import type {
-  IdentityPresence,
-  SelectablePresenceStatus,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { IdentityPresenceResource as IdentityPresence } from '../../../../contexts/identities/infrastructure/http/resources/IdentityPresenceResource';
+import type { SelectablePresenceStatusResource as SelectablePresenceStatus } from '../../../../contexts/identities/infrastructure/http/resources/SelectablePresenceStatusResource';
 
 const recoverableActivityStatuses = new Set<IdentityPresence['status']>([
   'away',

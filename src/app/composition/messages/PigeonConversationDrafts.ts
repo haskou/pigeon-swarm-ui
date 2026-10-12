@@ -1,9 +1,9 @@
 import type { IdentityAccessContexts } from '../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { ConversationDraftDeleter } from '../../../contexts/messages/application/delete-conversation-draft/ConversationDraftDeleter';
 import type { ConversationDraftsSearcher } from '../../../contexts/messages/application/list-conversation-drafts/ConversationDraftsSearcher';
 import type { ConversationDraftSaver } from '../../../contexts/messages/application/save-conversation-draft/ConversationDraftSaver';
-import type { ConversationDraft as ConversationDraftProjection } from '../../../shared/domain/pigeonResources.types';
-import type { Session } from '../../../shared/domain/pigeonResources.types';
+import type { ConversationDraftProjection } from '../../../contexts/messages/infrastructure/http/resources/ConversationDraftProjection';
 
 import { DeleteConversationDraftMessage } from '../../../contexts/messages/application/delete-conversation-draft/messages/DeleteConversationDraftMessage';
 import { ListConversationDraftsMessage } from '../../../contexts/messages/application/list-conversation-drafts/messages/ListConversationDraftsMessage';

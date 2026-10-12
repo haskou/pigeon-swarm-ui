@@ -1,7 +1,5 @@
-import type {
-  IdentityPresence,
-  PresenceStatus,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { IdentityPresenceResource as IdentityPresence } from '../../infrastructure/http/resources/IdentityPresenceResource';
+import type { PresenceStatusResource as PresenceStatus } from '../../infrastructure/http/resources/PresenceStatusResource';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';

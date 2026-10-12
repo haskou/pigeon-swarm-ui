@@ -1,10 +1,8 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
 import type { MouseEvent, ReactNode } from 'react';
 
-import type {
-  ConversationResource,
-  IdentityPresence,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { IdentityPresenceResource as IdentityPresence } from '../../../../contexts/identities/infrastructure/http/resources/IdentityPresenceResource';
 
 import { PresenceStatusDot } from '../../../../contexts/identities/presentation/components/presenceStatusDot';
 import { VerifiedIcon } from '../../../../contexts/identities/presentation/components/VerifiedIcon';

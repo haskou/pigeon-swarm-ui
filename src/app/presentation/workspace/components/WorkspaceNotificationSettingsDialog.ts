@@ -1,8 +1,6 @@
+import type { NotificationScopeSettingInputResource as NotificationScopeSettingInput } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationScopeSettingInputResource';
+import type { NotificationScopeSettingResource as NotificationScopeSetting } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationScopeSettingResource';
 import type { NotificationScopeSettingsTarget } from '../../../../contexts/notifications/presentation/components/NotificationScopeSettingsDialog';
-import type {
-  NotificationScopeSetting,
-  NotificationScopeSettingInput,
-} from '../../../../shared/domain/pigeonResources.types';
 
 export type WorkspaceNotificationSettingsDialog = {
   error: null | string;

@@ -1,8 +1,6 @@
-import type {
-  ConversationResource,
-  IdentityResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { SidebarConversationLoadingState } from './SidebarConversationLoadingState';
 
 import { ConversationPeer } from '../../../../contexts/conversations/presentation/view-models/ConversationPeer';

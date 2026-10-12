@@ -1,12 +1,10 @@
 import type { IdentityAccessContexts } from '../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { PinnedMessagesSearcher } from '../../../contexts/messages/application/list-message-pins/PinnedMessagesSearcher';
 import type { MessagePinner } from '../../../contexts/messages/application/pin-message/MessagePinner';
 import type { MessageUnpinner } from '../../../contexts/messages/application/unpin-message/MessageUnpinner';
 import type { MessageMapper } from '../../../contexts/messages/infrastructure/http/MessageMapper';
-import type {
-  MessagePin,
-  Session,
-} from '../../../shared/domain/pigeonResources.types';
+import type { MessagePin } from '../../../contexts/messages/presentation/view-models/MessagePin';
 
 import { ListMessagePinsMessage } from '../../../contexts/messages/application/list-message-pins/messages/ListMessagePinsMessage';
 import { PinMessageMessage } from '../../../contexts/messages/application/pin-message/messages/PinMessageMessage';

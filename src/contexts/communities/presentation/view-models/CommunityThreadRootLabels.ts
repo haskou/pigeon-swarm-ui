@@ -1,7 +1,5 @@
-import type {
-  ChatMessage,
-  CommunityTextChannel,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
+import type { CommunityTextChannelResource as CommunityTextChannel } from '../../infrastructure/http/resources/CommunityTextChannelResource';
 
 import {
   isThreadRootMessage,

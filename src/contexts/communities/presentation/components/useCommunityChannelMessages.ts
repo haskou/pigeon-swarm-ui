@@ -10,7 +10,7 @@ import {
   useState,
 } from 'react';
 
-import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
 
 import { MessageCollection } from '../../../messages/presentation/view-models/MessageCollection';
 import {

@@ -1,4 +1,4 @@
-import type { CommunityVisibility } from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityVisibilityResource as CommunityVisibility } from '../../../../contexts/communities/infrastructure/http/resources/CommunityVisibilityResource';
 
 export type CreateCommunityInput = {
   autoJoinEnabled?: boolean | undefined;

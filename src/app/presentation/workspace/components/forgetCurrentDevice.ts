@@ -1,5 +1,5 @@
 import type { OwnDeviceRetirement } from '../../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { ForgetDeviceServices } from './ForgetDeviceServices';
 
 export type ForgetDeviceOutcome =

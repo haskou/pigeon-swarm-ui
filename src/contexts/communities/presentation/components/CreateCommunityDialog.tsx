@@ -11,11 +11,9 @@ import {
 } from 'react';
 
 import type { NodeNetwork } from '../../../networks/presentation/view-models/NodeNetwork';
-import type {
-  Community,
-  CommunityVisibility,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
+import type { CommunityVisibilityResource as CommunityVisibility } from '../../infrastructure/http/resources/CommunityVisibilityResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { copy } from '../../../../shared/presentation/i18n/copy';

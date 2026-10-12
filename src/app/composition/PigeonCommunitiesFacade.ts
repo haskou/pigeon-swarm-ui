@@ -1,21 +1,19 @@
 import type { CommunityChannelMessageEditInput } from '../../contexts/communities/infrastructure/http/CommunityChannelMessageEditInput';
 import type { CommunityChannelMessageInput } from '../../contexts/communities/infrastructure/http/CommunityChannelMessageInput';
-import type {
-  Community,
-  CommunityChannel,
-  CommunityChannelDraft,
-  CommunityChannelMessagePinsResource,
-  CommunityDiscoveryResource,
-  CommunityInviteLinkResource,
-  CommunityMembershipRequest,
-  CommunityModerationLogPage,
-  CommunityPermission,
-  CommunityRoleResource,
-  CommunityTextChannel,
-  CommunityVoiceChannel,
-  MessageResource,
-  Session,
-} from '../../shared/domain/pigeonResources.types';
+import type { CommunityChannelDraft } from '../../contexts/communities/infrastructure/http/resources/CommunityChannelDraft';
+import type { CommunityChannelResource as CommunityChannel } from '../../contexts/communities/infrastructure/http/resources/CommunityChannelResource';
+import type { CommunityDiscoveryResource } from '../../contexts/communities/infrastructure/http/resources/CommunityDiscoveryResource';
+import type { CommunityInviteLinkResource } from '../../contexts/communities/infrastructure/http/resources/CommunityInviteLinkResource';
+import type { CommunityMembershipRequestResource as CommunityMembershipRequest } from '../../contexts/communities/infrastructure/http/resources/CommunityMembershipRequestResource';
+import type { CommunityModerationLogPageResource as CommunityModerationLogPage } from '../../contexts/communities/infrastructure/http/resources/CommunityModerationLogPageResource';
+import type { CommunityPermissionResource as CommunityPermission } from '../../contexts/communities/infrastructure/http/resources/CommunityPermissionResource';
+import type { CommunityResource as Community } from '../../contexts/communities/infrastructure/http/resources/CommunityResource';
+import type { CommunityRoleResource } from '../../contexts/communities/infrastructure/http/resources/CommunityRoleResource';
+import type { CommunityTextChannelResource as CommunityTextChannel } from '../../contexts/communities/infrastructure/http/resources/CommunityTextChannelResource';
+import type { CommunityVoiceChannelResource as CommunityVoiceChannel } from '../../contexts/communities/infrastructure/http/resources/CommunityVoiceChannelResource';
+import type { Session } from '../../contexts/identities/infrastructure/session/Session';
+import type { CommunityChannelMessagePinsResource } from '../../contexts/messages/infrastructure/http/CommunityChannelMessagePinsResource';
+import type { MessageResource } from '../../contexts/messages/infrastructure/http/MessageResource';
 import type { CreateCommunityInput } from './communities/create-community/CreateCommunityInput';
 import type { LeaveCommunityResult } from './communities/create-community/LeaveCommunityResult';
 import type { PigeonMlsFacade } from './mls/PigeonMlsFacade';

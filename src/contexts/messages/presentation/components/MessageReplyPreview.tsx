@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react';
 
-import type {
-  AttachmentProgress,
-  MessageAttachment,
-  StickerMessageReference,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { AttachmentProgress } from '../../../attachments/application/contracts/AttachmentProgress';
+import type { MessageAttachment } from '../../../attachments/application/contracts/MessageAttachment';
+import type { StickerMessageReference } from '../../../stickers/infrastructure/http/resources/StickerMessageReference';
 
 import { cx } from '../../../../shared/presentation/cx';
 import { copy } from '../../../../shared/presentation/i18n/copy';

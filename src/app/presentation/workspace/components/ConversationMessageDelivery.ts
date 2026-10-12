@@ -1,8 +1,6 @@
-import type {
-  AttachmentUploadOptions,
-  ChatMessage,
-  StickerMessageReference,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { AttachmentUploadOptions } from '../../../../contexts/attachments/application/contracts/AttachmentUploadOptions';
+import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { StickerMessageReference } from '../../../../contexts/stickers/infrastructure/http/resources/StickerMessageReference';
 
 export type ConversationMessageDelivery = {
   retryMessage: (message: ChatMessage) => void;

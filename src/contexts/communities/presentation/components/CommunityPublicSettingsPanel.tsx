@@ -1,4 +1,4 @@
-import type { CommunityVisibility } from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityVisibilityResource as CommunityVisibility } from '../../infrastructure/http/resources/CommunityVisibilityResource';
 
 import { CommunityAutoJoinSwitch } from './CommunityAutoJoinSwitch';
 import { CommunityDiscoverySwitch } from './CommunityDiscoverySwitch';

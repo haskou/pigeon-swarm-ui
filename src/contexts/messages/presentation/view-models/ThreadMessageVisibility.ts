@@ -1,4 +1,4 @@
-import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from './ChatMessage';
 
 export class ThreadMessageVisibility {
   public static forRoot(

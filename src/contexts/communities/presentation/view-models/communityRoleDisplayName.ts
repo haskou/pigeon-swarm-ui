@@ -1,4 +1,4 @@
-import type { CommunityRoleResource } from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityRoleResource } from '../../infrastructure/http/resources/CommunityRoleResource';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 

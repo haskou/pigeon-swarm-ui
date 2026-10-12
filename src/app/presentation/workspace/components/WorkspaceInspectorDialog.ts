@@ -1,10 +1,8 @@
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { IdentityPresenceResource as IdentityPresence } from '../../../../contexts/identities/infrastructure/http/resources/IdentityPresenceResource';
+import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
-import type {
-  ConversationResource,
-  IdentityPresence,
-  IdentityResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
 
 export type WorkspaceInspectorDialog = {
   activeConversation?: ConversationResource;

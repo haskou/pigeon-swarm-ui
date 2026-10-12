@@ -1,11 +1,9 @@
 import type { ReactNode } from 'react';
 
-import type {
-  NotificationLevel,
-  NotificationScopeSetting,
-  NotificationScopeSettingInput,
-  NotificationSettingScope,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { NotificationLevelResource as NotificationLevel } from '../../infrastructure/http/resources/NotificationLevelResource';
+import type { NotificationScopeSettingResource as NotificationScopeSetting } from '../../infrastructure/http/resources/NotificationScopeSettingResource';
+import type { NotificationScopeSettingInputResource as NotificationScopeSettingInput } from '../../infrastructure/http/resources/NotificationScopeSettingInputResource';
+import type { NotificationSettingScopeResource as NotificationSettingScope } from '../../infrastructure/http/resources/NotificationSettingScopeResource';
 
 import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
 import { cx } from '../../../../shared/presentation/cx';

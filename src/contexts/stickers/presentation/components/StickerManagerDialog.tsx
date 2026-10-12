@@ -1,10 +1,8 @@
 import { FormEvent, useEffect, useState } from 'react';
 
-import type {
-  MyStickersResource,
-  Session,
-  StickerPackResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { MyStickersResource } from '../../infrastructure/http/resources/MyStickersResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { StickerPackResource } from '../../infrastructure/http/resources/StickerPackResource';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';

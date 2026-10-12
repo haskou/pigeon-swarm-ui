@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import type {
-  Community,
-  CommunityChannel,
-  CommunityVoiceChannel,
-  IdentityResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
+import type { CommunityChannelResource as CommunityChannel } from '../../infrastructure/http/resources/CommunityChannelResource';
+import type { CommunityVoiceChannelResource as CommunityVoiceChannel } from '../../infrastructure/http/resources/CommunityVoiceChannelResource';
+import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { CallParticipant } from '../../../calls/presentation/view-models/CallParticipant';
 import type { CallSession } from '../../../calls/presentation/view-models/CallSession';
 import type { CommunityMemberListItem } from './communityMembersPanel';

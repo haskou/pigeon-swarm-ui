@@ -1,9 +1,7 @@
 import { useCallback } from 'react';
 
-import type {
-  AttachmentProgress,
-  MessageAttachment,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { AttachmentProgress } from '../../application/contracts/AttachmentProgress';
+import type { MessageAttachment } from '../../application/contracts/MessageAttachment';
 
 import { attachmentDownloadErrorMessage } from '../view-models/attachmentDownloadErrorMessage';
 import { attachmentObjectUrl } from '../view-models/attachmentObjectUrl';

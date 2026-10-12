@@ -1,10 +1,8 @@
 import { useMemo } from 'react';
 
-import type {
-  CommunityTextChannel,
-  CommunityVoiceChannel,
-  NotificationScopeSetting,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityTextChannelResource as CommunityTextChannel } from '../../infrastructure/http/resources/CommunityTextChannelResource';
+import type { CommunityVoiceChannelResource as CommunityVoiceChannel } from '../../infrastructure/http/resources/CommunityVoiceChannelResource';
+import type { NotificationScopeSettingResource as NotificationScopeSetting } from '../../../notifications/infrastructure/http/resources/NotificationScopeSettingResource';
 
 import { CommunityChannelVisibility } from '../view-models/CommunityChannelVisibility';
 

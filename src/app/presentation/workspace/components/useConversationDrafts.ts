@@ -6,7 +6,7 @@ import {
   type SetStateAction,
 } from 'react';
 
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { ConversationDrafts } from './ConversationDrafts';
 
 import { applicationContainer } from '../../../composition/applicationContainer';

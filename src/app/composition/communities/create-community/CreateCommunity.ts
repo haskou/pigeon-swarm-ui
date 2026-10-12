@@ -1,9 +1,7 @@
-import type {
-  Community,
-  CommunityTextChannel,
-  CommunityVoiceChannel,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
+import type { CommunityTextChannelResource as CommunityTextChannel } from '../../../../contexts/communities/infrastructure/http/resources/CommunityTextChannelResource';
+import type { CommunityVoiceChannelResource as CommunityVoiceChannel } from '../../../../contexts/communities/infrastructure/http/resources/CommunityVoiceChannelResource';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { PigeonMlsFacade } from '../../mls/PigeonMlsFacade';
 import type { CommunityImageCids } from './CommunityImageCids';
 import type { CreateCommunityInput } from './CreateCommunityInput';

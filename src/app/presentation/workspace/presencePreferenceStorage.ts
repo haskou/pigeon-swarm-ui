@@ -1,4 +1,4 @@
-import type { SelectablePresenceStatus } from '../../../shared/domain/pigeonResources.types';
+import type { SelectablePresenceStatusResource as SelectablePresenceStatus } from '../../../contexts/identities/infrastructure/http/resources/SelectablePresenceStatusResource';
 
 import { scopeClientStorageKey } from '../../../shared/infrastructure/storage/ClientStorageScope';
 

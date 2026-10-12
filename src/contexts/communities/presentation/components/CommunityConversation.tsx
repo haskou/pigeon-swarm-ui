@@ -1,15 +1,13 @@
 import { lazy, Suspense } from 'react';
 
-import type {
-  ChatMessage,
-  CommunityInvitationNotificationResource,
-  CommunityPermission,
-  CommunityTextChannel,
-  IdentityResource,
-  PollResource,
-  Session,
-  StickerMessageReference,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
+import type { CommunityInvitationNotificationResource } from '../../../notifications/infrastructure/http/resources/CommunityInvitationNotificationResource';
+import type { CommunityPermissionResource as CommunityPermission } from '../../infrastructure/http/resources/CommunityPermissionResource';
+import type { CommunityTextChannelResource as CommunityTextChannel } from '../../infrastructure/http/resources/CommunityTextChannelResource';
+import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
+import type { PollResource } from '../../../polls/infrastructure/http/resources/PollResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { StickerMessageReference } from '../../../stickers/infrastructure/http/resources/StickerMessageReference';
 import type { useCommunityChannelMessages } from './useCommunityChannelMessages';
 import type { useCommunityMentions } from './useCommunityMentions';
 import type { useCommunityMessageComposer } from './useCommunityMessageComposer';

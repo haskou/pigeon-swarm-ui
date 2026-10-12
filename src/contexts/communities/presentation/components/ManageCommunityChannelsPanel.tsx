@@ -1,4 +1,4 @@
-import type { CommunityRoleResource } from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityRoleResource } from '../../infrastructure/http/resources/CommunityRoleResource';
 
 import { useEffect, useMemo, useState } from 'react';
 

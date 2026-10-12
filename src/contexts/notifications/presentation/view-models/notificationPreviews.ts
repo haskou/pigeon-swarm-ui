@@ -1,11 +1,9 @@
-import type {
-  Community,
-  ConversationResource,
-  IdentityResource,
-  MessageAttachment,
-  MessageResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../../communities/infrastructure/http/resources/CommunityResource';
+import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
+import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
+import type { MessageAttachment } from '../../../attachments/application/contracts/MessageAttachment';
+import type { MessageResource } from '../../../messages/infrastructure/http/MessageResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { CommunityChannels } from '../../../communities/presentation/view-models/CommunityChannels';

@@ -3,12 +3,10 @@ import type { MouseEvent, PointerEvent } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import type {
-  AttachmentProgress,
-  ChatMessage,
-  MessageAttachment,
-  StickerMessageReference,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { AttachmentProgress } from '../../../attachments/application/contracts/AttachmentProgress';
+import type { ChatMessage } from '../view-models/ChatMessage';
+import type { MessageAttachment } from '../../../attachments/application/contracts/MessageAttachment';
+import type { StickerMessageReference } from '../../../stickers/infrastructure/http/resources/StickerMessageReference';
 
 import { cx } from '../../../../shared/presentation/cx';
 import { formatTime } from '../../../../shared/presentation/formatting';

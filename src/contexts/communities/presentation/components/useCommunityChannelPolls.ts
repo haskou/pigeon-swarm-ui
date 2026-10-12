@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 
-import type { PollResource } from '../../../../shared/domain/pigeonResources.types';
+import type { PollResource } from '../../../polls/infrastructure/http/resources/PollResource';
 
 type UseCommunityChannelPollsResult = {
   selectedChannelPolls: PollResource[];

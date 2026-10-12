@@ -1,11 +1,9 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 
 import type { NodeNetwork } from '../../../networks/presentation/view-models/NodeNetwork';
-import type {
-  ConversationResource,
-  IdentityResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../infrastructure/http/ConversationResource';
+import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { ContactKeyCheck } from '../../../identities/domain/ContactPins';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';

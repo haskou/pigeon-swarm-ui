@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react';
 
 import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
-import type {
-  Community,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { CallDepartureInput } from './CallDepartureInput';
 
 import { playEndedCallSound } from '../../../../shared/presentation/sounds';

@@ -6,10 +6,8 @@ import {
   useState,
 } from 'react';
 
-import type {
-  ChatMessage,
-  ConversationResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
 import type { ConversationMessageLoadState } from './ConversationMessageLoadState';
 import type { ConversationTimelineController } from './ConversationTimelineController';
 import type { UseConversationTimelineInput } from './UseConversationTimelineInput';

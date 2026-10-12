@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 
 import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
 import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { CallStartActions } from './CallStartActions';
 import type { CallStartActionsInput } from './CallStartActionsInput';
 

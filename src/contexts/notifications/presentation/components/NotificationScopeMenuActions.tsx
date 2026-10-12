@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import type { NotificationScopeSetting } from '../../../../shared/domain/pigeonResources.types';
+import type { NotificationScopeSettingResource as NotificationScopeSetting } from '../../infrastructure/http/resources/NotificationScopeSettingResource';
 
 import { MutedNotificationsIcon } from '../../../../shared/presentation/components/MutedNotificationsIcon';
 import { cx } from '../../../../shared/presentation/cx';

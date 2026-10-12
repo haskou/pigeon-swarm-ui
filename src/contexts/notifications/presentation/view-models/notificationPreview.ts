@@ -1,4 +1,4 @@
-import type { NotificationResource } from '../../../../shared/domain/pigeonResources.types';
+import type { NotificationResource } from '../../infrastructure/http/resources/NotificationResource';
 import type { CommunityInvitationNotificationResource } from '../../infrastructure/http/resources/CommunityInvitationNotificationResource';
 import type { ConversationInvitationNotificationResource } from '../../infrastructure/http/resources/ConversationInvitationNotificationResource';
 import type {

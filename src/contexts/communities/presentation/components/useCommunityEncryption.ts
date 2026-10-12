@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import type { CommunityEncryptionState } from '../view-models/CommunityChannelEncryption';
 
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 
 const refreshIntervalMs = 30_000;

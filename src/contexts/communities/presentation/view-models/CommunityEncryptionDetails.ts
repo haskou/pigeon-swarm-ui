@@ -1,8 +1,6 @@
 import type { EncryptionDetails } from '../../../../app/presentation/workspace/components/EncryptionDetails';
-import type {
-  Community,
-  CommunityTextChannel,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
+import type { CommunityTextChannelResource as CommunityTextChannel } from '../../infrastructure/http/resources/CommunityTextChannelResource';
 
 import { shortId } from '../../../../shared/presentation/formatting';
 import { copy } from '../../../../shared/presentation/i18n/copy';

@@ -1,5 +1,5 @@
 import type { CallPeerRecoveryState } from '../../infrastructure/media/CallPeerRecoveryState';
-import type { IdentityResource } from '../../../../shared/domain/pigeonResources.types';
+import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
 
 export type CallParticipant = {
   audioLevel?: number;

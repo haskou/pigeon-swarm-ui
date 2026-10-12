@@ -1,9 +1,7 @@
 import { type MouseEvent, useEffect, useMemo, useRef, useState } from 'react';
 
-import type {
-  AttachmentProgress,
-  MessageAttachment,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { AttachmentProgress } from '../../../attachments/application/contracts/AttachmentProgress';
+import type { MessageAttachment } from '../../../attachments/application/contracts/MessageAttachment';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';

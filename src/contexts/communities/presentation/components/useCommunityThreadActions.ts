@@ -1,15 +1,9 @@
-import {
-  useCallback,
-  type Dispatch,
-  type SetStateAction,
-} from 'react';
+import { useCallback, type Dispatch, type SetStateAction } from 'react';
 
-import type {
-  AttachmentUploadOptions,
-  ChatMessage,
-  CommunityChannelThreadSummary,
-  StickerMessageReference,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { AttachmentUploadOptions } from '../../../attachments/application/contracts/AttachmentUploadOptions';
+import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
+import type { CommunityChannelThreadSummaryResource as CommunityChannelThreadSummary } from '../../infrastructure/http/resources/CommunityChannelThreadSummaryResource';
+import type { StickerMessageReference } from '../../../stickers/infrastructure/http/resources/StickerMessageReference';
 import type { MessageContextMenuState } from '../../../../app/presentation/workspace/components/messageContextMenu';
 import type { useCommunityMessageComposer } from './useCommunityMessageComposer';
 import type { CommunityThreadState } from './communityThreadState';

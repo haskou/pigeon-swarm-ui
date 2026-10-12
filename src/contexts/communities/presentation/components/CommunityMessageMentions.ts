@@ -1,10 +1,8 @@
-import type {
-  Community,
-  CommunityChannel,
-  CommunityMessageMention,
-  CommunityPermission,
-  IdentityResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
+import type { CommunityChannelResource as CommunityChannel } from '../../infrastructure/http/resources/CommunityChannelResource';
+import type { CommunityMessageMentionResource as CommunityMessageMention } from '../../infrastructure/http/resources/CommunityMessageMentionResource';
+import type { CommunityPermissionResource as CommunityPermission } from '../../infrastructure/http/resources/CommunityPermissionResource';
+import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
 
 import { CommunityAccessPolicy } from '../view-models/CommunityAccessPolicy';
 import { memberDisplayName } from './communityMemberNames';

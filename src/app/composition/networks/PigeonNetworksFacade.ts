@@ -1,4 +1,5 @@
 import type { IdentityAccessContexts } from '../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { NetworkCreator } from '../../../contexts/networks/application/create-network/NetworkCreator';
 import type { NetworkJoiner } from '../../../contexts/networks/application/join-network/NetworkJoiner';
 import type { NodeNetworkRemover } from '../../../contexts/networks/application/remove-node-network/NodeNetworkRemover';
@@ -10,7 +11,6 @@ import type { IpfsReplicationStatus } from '../../../contexts/networks/presentat
 import type { NodeNetwork } from '../../../contexts/networks/presentation/view-models/NodeNetwork';
 import type { NodeRelayConfigurationViewModel } from '../../../contexts/networks/presentation/view-models/NodeRelayConfigurationViewModel';
 import type { Peer } from '../../../contexts/networks/presentation/view-models/Peer';
-import type { Session } from '../../../shared/domain/pigeonResources.types';
 import type { PigeonNodeFacade } from './PigeonNodeFacade';
 
 import { CreateNetworkMessage } from '../../../contexts/networks/application/create-network/messages/CreateNetworkMessage';

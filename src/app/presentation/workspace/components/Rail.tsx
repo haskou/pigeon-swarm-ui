@@ -9,10 +9,8 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 
-import type {
-  Community,
-  NotificationScopeSetting,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
+import type { NotificationScopeSettingResource as NotificationScopeSetting } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationScopeSettingResource';
 import type { CommunityMenuState } from './CommunityMenuState';
 
 import { CommunityList } from '../../../../contexts/communities/presentation/view-models/CommunityList';

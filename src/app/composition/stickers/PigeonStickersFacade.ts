@@ -1,13 +1,11 @@
-import type {
-  MyStickersResource,
-  PublicFileUpload,
-  Session,
-  StickerInput,
-  StickerMessageReference,
-  StickerPackInput,
-  StickerPackResource,
-  StickerResource,
-} from '../../../shared/domain/pigeonResources.types';
+import type { PublicFileUpload } from '../../../contexts/attachments/application/contracts/PublicFileUpload';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
+import type { MyStickersResource } from '../../../contexts/stickers/infrastructure/http/resources/MyStickersResource';
+import type { StickerInput } from '../../../contexts/stickers/infrastructure/http/resources/StickerInput';
+import type { StickerMessageReference } from '../../../contexts/stickers/infrastructure/http/resources/StickerMessageReference';
+import type { StickerPackInput } from '../../../contexts/stickers/infrastructure/http/resources/StickerPackInput';
+import type { StickerPackResource } from '../../../contexts/stickers/infrastructure/http/resources/StickerPackResource';
+import type { StickerResource } from '../../../contexts/stickers/infrastructure/http/resources/StickerResource';
 import type { StickerUseCases } from './StickerUseCases';
 
 import { AddStickerToPackMessage } from '../../../contexts/stickers/application/add-sticker-to-pack/messages/AddStickerToPackMessage';

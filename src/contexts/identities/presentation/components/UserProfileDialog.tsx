@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import type {
-  IdentityPresence,
-  IdentityResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { IdentityPresenceResource as IdentityPresence } from '../../infrastructure/http/resources/IdentityPresenceResource';
+import type { IdentityResource } from '../../infrastructure/http/resources/IdentityResource';
 import type { LightboxImage } from '../../../messages/presentation/components/imageLightbox';
 import type { NodeNetwork } from '../../../networks/presentation/view-models/NodeNetwork';
 

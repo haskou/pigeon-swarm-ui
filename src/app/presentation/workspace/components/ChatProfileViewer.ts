@@ -1,5 +1,5 @@
+import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { ProfilePopoverAnchor } from '../../../../contexts/identities/presentation/view-models/profilePopoverAnchor';
-import type { IdentityResource } from '../../../../shared/domain/pigeonResources.types';
 
 export interface ChatProfileViewer {
   anchor?: ProfilePopoverAnchor;

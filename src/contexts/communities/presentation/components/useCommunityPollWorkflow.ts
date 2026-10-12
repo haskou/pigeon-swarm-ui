@@ -1,9 +1,7 @@
 import { useCallback } from 'react';
 
-import type {
-  PollResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { PollResource } from '../../../polls/infrastructure/http/resources/PollResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 

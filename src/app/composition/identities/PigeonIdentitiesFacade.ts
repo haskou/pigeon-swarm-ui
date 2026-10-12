@@ -7,16 +7,16 @@ import type { IdentityMapper } from '../../../contexts/identities/infrastructure
 import type { IdentityPresenceMapper } from '../../../contexts/identities/infrastructure/http/IdentityPresenceMapper';
 import type { OwnDeviceRetirement } from '../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
 import type { PigeonIdentitiesGateway } from '../../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
+import type { IdentityPresenceResource as IdentityPresence } from '../../../contexts/identities/infrastructure/http/resources/IdentityPresenceResource';
+import type { IdentityResource } from '../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { IdentityUpdateProfileInput } from '../../../contexts/identities/infrastructure/http/resources/IdentityUpdateProfileInput';
+import type { LoginResult } from '../../../contexts/identities/infrastructure/http/resources/LoginResult';
+import type { SelectablePresenceStatusResource as SelectablePresenceStatus } from '../../../contexts/identities/infrastructure/http/resources/SelectablePresenceStatusResource';
 import type {
-  IdentityPresence,
-  IdentityResource,
   LocalKeychain,
   LocalKeychainUpdate,
-  LoginResult,
-  Session,
-  SelectablePresenceStatus,
-} from '../../../shared/domain/pigeonResources.types';
+} from '../../../contexts/identities/infrastructure/keychain/LocalKeychain';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { IdentityUseCases } from './IdentityUseCases';
 
 import { ConversationTimeline } from '../../../contexts/conversations/presentation/view-models/ConversationTimeline';

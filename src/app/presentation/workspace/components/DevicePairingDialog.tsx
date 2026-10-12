@@ -1,6 +1,6 @@
 import { type ReactElement, useState } from 'react';
 
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
 import { DevicePairingCode } from '../../../../contexts/identities/domain/value-objects/DevicePairingCode';
 import { DevicePairingCodeField } from '../../../../contexts/identities/presentation/device-pairing/DevicePairingCodeField';

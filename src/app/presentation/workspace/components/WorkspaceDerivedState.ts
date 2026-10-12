@@ -1,15 +1,13 @@
+import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { PwaNotificationPermission } from '../../../../contexts/notifications/infrastructure/browser/PwaNotificationPermission';
+import type { CommunityInvitationNotificationResource } from '../../../../contexts/notifications/infrastructure/http/resources/CommunityInvitationNotificationResource';
+import type { ConversationInvitationNotificationResource } from '../../../../contexts/notifications/infrastructure/http/resources/ConversationInvitationNotificationResource';
+import type { NotificationResource } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationResource';
+import type { NotificationScopeSettingResource as NotificationScopeSetting } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationScopeSettingResource';
+import type { NotificationSettingScopeResource as NotificationSettingScope } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationSettingScopeResource';
 import type { NotificationSettingMap } from '../../../../contexts/notifications/presentation/view-models/NotificationSettingMap';
-import type {
-  Community,
-  CommunityInvitationNotificationResource,
-  ConversationResource,
-  ConversationInvitationNotificationResource,
-  NotificationResource,
-  NotificationSettingScope,
-  NotificationScopeSetting,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
 
 import { ConversationPeer } from '../../../../contexts/conversations/presentation/view-models/ConversationPeer';
 import { ConversationKeychain } from '../../../../contexts/identities/infrastructure/keychain/ConversationKeychain';

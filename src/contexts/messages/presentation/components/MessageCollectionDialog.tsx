@@ -1,9 +1,7 @@
 import type { ReactNode } from 'react';
 
-import type {
-  ChatMessage,
-  MessageAttachment,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../view-models/ChatMessage';
+import type { MessageAttachment } from '../../../attachments/application/contracts/MessageAttachment';
 
 import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
 import { copy } from '../../../../shared/presentation/i18n/copy';

@@ -1,6 +1,6 @@
 import { Suspense, type ReactElement } from 'react';
 
-import type { ConversationResource } from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { MessagesWorkspaceContentProps } from './MessagesWorkspaceContentProps';
 import type { useConversationThread } from './useConversationThread';
 

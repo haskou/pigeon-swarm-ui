@@ -1,4 +1,4 @@
-import type { CommunityVisibility } from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityVisibilityResource as CommunityVisibility } from '../../infrastructure/http/resources/CommunityVisibilityResource';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';

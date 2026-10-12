@@ -1,6 +1,6 @@
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 
-import type { Community } from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { CommunityPublicSettingsPanel } from './CommunityPublicSettingsPanel';

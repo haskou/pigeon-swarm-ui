@@ -1,6 +1,6 @@
 import type { MouseEvent } from 'react';
 
-import type { IdentityPresence } from '../../../../shared/domain/pigeonResources.types';
+import type { IdentityPresenceResource as IdentityPresence } from '../../../identities/infrastructure/http/resources/IdentityPresenceResource';
 
 import { cx } from '../../../../shared/presentation/cx';
 import { FallbackImage } from '../../../../shared/presentation/components/FallbackImage';

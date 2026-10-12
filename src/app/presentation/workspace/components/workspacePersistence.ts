@@ -1,4 +1,4 @@
-import type { ConversationResource } from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { CommunityUnreadCounts } from './CommunityUnreadCounts';
 import type { EncryptedConversationDrafts } from './EncryptedConversationDrafts';
 import type { WorkspacePreference } from './WorkspacePreference';

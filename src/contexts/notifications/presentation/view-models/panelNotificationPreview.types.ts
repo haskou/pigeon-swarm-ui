@@ -1,8 +1,6 @@
-import type {
-  Community,
-  ConversationResource,
-  IdentityResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../../communities/infrastructure/http/resources/CommunityResource';
+import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
+import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
 import type {
   IdentityNames,
   IdentityPictures,

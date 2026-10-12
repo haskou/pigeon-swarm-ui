@@ -1,14 +1,12 @@
-import type {
-  AttachmentProgress,
-  ChatMessage,
-  Community,
-  ConversationResource,
-  IdentityPresence,
-  IdentityResource,
-  NotificationScopeSetting,
-  SelectablePresenceStatus,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { AttachmentProgress } from '../../../../contexts/attachments/application/contracts/AttachmentProgress';
+import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { IdentityPresenceResource as IdentityPresence } from '../../../../contexts/identities/infrastructure/http/resources/IdentityPresenceResource';
+import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
+import type { SelectablePresenceStatusResource as SelectablePresenceStatus } from '../../../../contexts/identities/infrastructure/http/resources/SelectablePresenceStatusResource';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
+import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { NotificationScopeSettingResource as NotificationScopeSetting } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationScopeSettingResource';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 import type { ChatColumn } from './ChatColumn';
 import type { EditingMessage } from './conversationThreadState';

@@ -2,7 +2,7 @@ import type { MouseEvent } from 'react';
 
 import { useEffect, useMemo, useState } from 'react';
 
-import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
 import type { ChatColumnProps } from './ChatColumnProps';
 import type { ChatProfileViewer } from './ChatProfileViewer';
 

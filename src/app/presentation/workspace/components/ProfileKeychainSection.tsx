@@ -1,12 +1,10 @@
 import { useState, type ReactElement } from 'react';
 
+import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { IdentityNames } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
-import type {
-  Community,
-  ConversationResource,
-  IdentityResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { ProfileKeychainDisplayEntry } from './ProfileKeychainDisplayEntry';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';

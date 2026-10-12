@@ -7,11 +7,9 @@ import {
 } from 'react';
 
 import type { NodeNetwork } from '../../../networks/presentation/view-models/NodeNetwork';
-import type {
-  CommunityDiscoveryResource,
-  CommunityMembershipRequest,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityDiscoveryResource } from '../../infrastructure/http/resources/CommunityDiscoveryResource';
+import type { CommunityMembershipRequestResource as CommunityMembershipRequest } from '../../infrastructure/http/resources/CommunityMembershipRequestResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { copy } from '../../../../shared/presentation/i18n/copy';

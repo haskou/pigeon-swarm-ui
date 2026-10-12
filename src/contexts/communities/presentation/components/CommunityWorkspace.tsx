@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { MessageContextMenuState } from '../../../../app/presentation/workspace/components/messageContextMenu';
-import type {
-  ChatMessage,
-  StickerMessageReference,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
+import type { StickerMessageReference } from '../../../stickers/infrastructure/http/resources/StickerMessageReference';
 import type { CommunityWorkspaceProps } from './CommunityWorkspaceProps';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';

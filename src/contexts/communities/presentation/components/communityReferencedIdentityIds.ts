@@ -1,7 +1,5 @@
-import type {
-  CommunityMembershipRequest,
-  CommunityModerationLog,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityMembershipRequestResource as CommunityMembershipRequest } from '../../infrastructure/http/resources/CommunityMembershipRequestResource';
+import type { CommunityModerationLogResource as CommunityModerationLog } from '../../infrastructure/http/resources/CommunityModerationLogResource';
 
 /**
  * Identities the manage dialog shows by name even though they are not (or no

@@ -1,8 +1,6 @@
-import type {
-  ChatMessage,
-  Community,
-  CommunityPermission,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
+import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
+import type { CommunityPermissionResource as CommunityPermission } from '../../infrastructure/http/resources/CommunityPermissionResource';
 
 import { MessageEditability } from '../../../messages/presentation/view-models/MessageEditability';
 import { communityRoleDisplayName } from '../view-models/communityRoleDisplayName';

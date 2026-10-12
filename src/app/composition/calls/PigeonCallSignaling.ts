@@ -1,6 +1,6 @@
 import type { CallSignalDeliveryResource } from '../../../contexts/calls/infrastructure/http/resources/CallSignalDeliveryResource';
 import type { CallSignalPayload } from '../../../contexts/calls/infrastructure/media/CallSignalPayload';
-import type { Session } from '../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 
 import { CallSignalSender } from '../../../contexts/calls/application/send-call-signal/CallSignalSender';
 import { SendCallSignalMessage } from '../../../contexts/calls/application/send-call-signal/messages/SendCallSignalMessage';

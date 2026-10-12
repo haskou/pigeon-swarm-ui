@@ -1,5 +1,5 @@
-import type { Community } from '../../../../shared/domain/pigeonResources.types';
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { LeaveCommunityResult } from '../create-community/LeaveCommunityResult';
 
 import { PigeonCommunitiesGateway } from '../../../../contexts/communities/infrastructure/http/PigeonCommunitiesGateway';

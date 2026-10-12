@@ -10,15 +10,13 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 
-import type {
-  MyStickersResource,
-  Session,
-  StickerInput,
-  StickerMessageReference,
-  StickerPackResource,
-  StickerResource,
-  StickerUsageResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { MyStickersResource } from '../../infrastructure/http/resources/MyStickersResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { StickerInput } from '../../infrastructure/http/resources/StickerInput';
+import type { StickerMessageReference } from '../../infrastructure/http/resources/StickerMessageReference';
+import type { StickerPackResource } from '../../infrastructure/http/resources/StickerPackResource';
+import type { StickerResource } from '../../infrastructure/http/resources/StickerResource';
+import type { StickerUsageResource } from '../../infrastructure/http/resources/StickerUsageResource';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { cx } from '../../../../shared/presentation/cx';

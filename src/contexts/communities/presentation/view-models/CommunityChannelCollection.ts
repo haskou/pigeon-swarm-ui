@@ -1,9 +1,7 @@
-import type {
-  Community,
-  CommunityChannel,
-  CommunityTextChannel,
-  CommunityVoiceChannel,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
+import type { CommunityChannelResource as CommunityChannel } from '../../infrastructure/http/resources/CommunityChannelResource';
+import type { CommunityTextChannelResource as CommunityTextChannel } from '../../infrastructure/http/resources/CommunityTextChannelResource';
+import type { CommunityVoiceChannelResource as CommunityVoiceChannel } from '../../infrastructure/http/resources/CommunityVoiceChannelResource';
 
 export class CommunityChannelCollection {
   private static mergeCurrentChannelsWithPreferredOrder({

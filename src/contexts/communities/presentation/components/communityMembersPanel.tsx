@@ -1,17 +1,13 @@
 import type { MouseEvent } from 'react';
 
-import type {
-  Community,
-  IdentityPresence,
-  IdentityResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
+import type { IdentityPresenceResource as IdentityPresence } from '../../../identities/infrastructure/http/resources/IdentityPresenceResource';
+import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
-import {
-  type IdentityMemberListItem,
-} from '../../../identities/presentation/components/IdentityMemberListPanel';
+import { type IdentityMemberListItem } from '../../../identities/presentation/components/IdentityMemberListPanel';
 import { IdentityMembersAside } from '../../../identities/presentation/components/IdentityMembersAside';
 
 export type CommunityMemberListItem = {

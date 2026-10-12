@@ -1,10 +1,8 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 
-import type {
-  ConversationKeyEntry,
-  ConversationResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { ConversationKeyEntry } from '../../../../contexts/identities/infrastructure/keychain/ConversationKeyEntry';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
 export type UseConversationTimelineInput = {
   activeConversation?: ConversationResource;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { NodeInfo } from '../../infrastructure/http/NodeInfo';
 import type { NodeNetwork } from '../../presentation/view-models/NodeNetwork';
 

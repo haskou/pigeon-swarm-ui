@@ -2,11 +2,9 @@ import type { MouseEvent } from 'react';
 
 import { createPortal } from 'react-dom';
 
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { IdentityPresenceResource as IdentityPresence } from '../../../../contexts/identities/infrastructure/http/resources/IdentityPresenceResource';
 import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
-import type {
-  ConversationResource,
-  IdentityPresence,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { GroupParticipant } from './GroupParticipant';
 
 import {

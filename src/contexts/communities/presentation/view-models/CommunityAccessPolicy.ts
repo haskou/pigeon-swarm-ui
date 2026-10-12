@@ -1,10 +1,8 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
-import type {
-  Community,
-  CommunityChannel,
-  CommunityPermission,
-  CommunityRoleResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
+import type { CommunityChannelResource as CommunityChannel } from '../../infrastructure/http/resources/CommunityChannelResource';
+import type { CommunityPermissionResource as CommunityPermission } from '../../infrastructure/http/resources/CommunityPermissionResource';
+import type { CommunityRoleResource } from '../../infrastructure/http/resources/CommunityRoleResource';
 
 export const ALL_COMMUNITY_PERMISSIONS: CommunityPermission[] = [
   'view_channels',

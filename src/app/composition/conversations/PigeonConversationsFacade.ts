@@ -1,9 +1,7 @@
 import type { Conversation } from '../../../contexts/conversations/domain/Conversation';
-import type {
-  ConversationResource,
-  LocalKeychain,
-  Session,
-} from '../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { LocalKeychain } from '../../../contexts/identities/infrastructure/keychain/LocalKeychain';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { ConversationUseCases } from './ConversationUseCases';
 
 import { CreateConversationMessage } from '../../../contexts/conversations/application/create-conversation/messages/CreateConversationMessage';

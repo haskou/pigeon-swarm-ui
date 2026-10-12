@@ -1,6 +1,6 @@
 import { Timestamp } from '@haskou/value-objects';
 
-import type { ConversationResource } from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../infrastructure/http/ConversationResource';
 
 export class ConversationTimeline {
   public static bumpActivity(

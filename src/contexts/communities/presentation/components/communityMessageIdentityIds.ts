@@ -1,7 +1,5 @@
-import type {
-  ChatMessage,
-  PollResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
+import type { PollResource } from '../../../polls/infrastructure/http/resources/PollResource';
 
 export function communityMessageIdentityIds({
   messages = [],

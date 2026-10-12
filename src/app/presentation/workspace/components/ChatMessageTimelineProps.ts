@@ -1,16 +1,14 @@
 import type { ReactNode, RefObject } from 'react';
 
+import type { AttachmentProgress } from '../../../../contexts/attachments/application/contracts/AttachmentProgress';
+import type { MessageAttachment } from '../../../../contexts/attachments/application/contracts/MessageAttachment';
 import type {
   IdentityNames,
   IdentityPictures,
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
-import type {
-  AttachmentProgress,
-  ChatMessage,
-  MessageAttachment,
-  PollResource,
-  StickerMessageReference,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { PollResource } from '../../../../contexts/polls/infrastructure/http/resources/PollResource';
+import type { StickerMessageReference } from '../../../../contexts/stickers/infrastructure/http/resources/StickerMessageReference';
 import type { LoadState } from './LoadState';
 
 export interface ChatMessageTimelineProps {

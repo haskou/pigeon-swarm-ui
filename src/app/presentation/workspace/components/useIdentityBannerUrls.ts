@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import type { IdentityResource } from '../../../../shared/domain/pigeonResources.types';
+import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 
 import { loadPublicImage } from '../../../../contexts/communities/presentation/components/communityImages';
 import { identityBanner } from '../../../../contexts/identities/presentation/view-models/identityDisplay';

@@ -11,12 +11,10 @@ import type { CallParticipantMediaConnectionResource as CallParticipantMediaConn
 import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
 import type { CallSignalType } from '../../../../contexts/calls/infrastructure/media/CallSignalType';
 import type { CallSession } from '../../../../contexts/calls/presentation/view-models/CallSession';
-import type {
-  Community,
-  ConversationResource,
-  IdentityResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { WorkspaceCalls } from './WorkspaceCalls';
 
 import { logCallDebug } from '../../../../contexts/calls/infrastructure/media/callDebugLogger';

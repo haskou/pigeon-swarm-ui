@@ -1,8 +1,6 @@
-import type {
-  Community,
-  CommunityTextChannel,
-  NotificationScopeSetting,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
+import type { CommunityTextChannelResource as CommunityTextChannel } from '../../infrastructure/http/resources/CommunityTextChannelResource';
+import type { NotificationScopeSettingResource as NotificationScopeSetting } from '../../../notifications/infrastructure/http/resources/NotificationScopeSettingResource';
 
 import { CommunityHeader } from './CommunityHeader';
 import { CommunityHeaderActionsMenu } from './CommunityHeaderActionsMenu';

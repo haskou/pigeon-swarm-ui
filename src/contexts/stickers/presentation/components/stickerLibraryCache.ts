@@ -1,8 +1,6 @@
-import type {
-  MyStickersResource,
-  Session,
-  StickerPackResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { MyStickersResource } from '../../infrastructure/http/resources/MyStickersResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { StickerPackResource } from '../../infrastructure/http/resources/StickerPackResource';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { isIndependentClient } from '../../../../shared/infrastructure/client/isIndependentClient';

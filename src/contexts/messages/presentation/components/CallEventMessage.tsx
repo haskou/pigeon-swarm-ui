@@ -1,7 +1,5 @@
-import type {
-  ChatMessage,
-  MessageResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../view-models/ChatMessage';
+import type { MessageResource } from '../../infrastructure/http/MessageResource';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { formatTime } from '../../../../shared/presentation/formatting';
