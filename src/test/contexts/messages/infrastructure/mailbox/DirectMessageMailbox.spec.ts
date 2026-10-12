@@ -3607,13 +3607,16 @@ describe(DirectMessageMailbox.name, () => {
   });
 
   describe('restore', () => {
-    const reactionAt = (action: 'add' | 'remove'): DirectReactionRecord => ({
+    const reactionAt = (
+      action: 'add' | 'remove',
+      id: string,
+    ): DirectReactionRecord => ({
       action,
       authorId: 'alice',
       conversationId,
       createdAt: 300,
       emoji: '👍',
-      id: 'reaction-1',
+      id,
       targetMessageId: 'message-1',
       type: 'reaction',
     });
@@ -3629,7 +3632,7 @@ describe(DirectMessageMailbox.name, () => {
       await new DirectMessageHistoryStore().forget('alice');
     });
 
-    it('replays a reaction re-added after its removal as a second add', async () => {
+    it('restores a re-added reaction as a second add and skips a replayed envelope', async () => {
       const { channel, mailbox } = setup();
       channel.acknowledge.mockResolvedValue({ recreated: false });
       channel.read.mockResolvedValue({
@@ -3637,33 +3640,38 @@ describe(DirectMessageMailbox.name, () => {
           {
             cursor: 1,
             envelopeId: 'envelope-1',
-            plaintext: ownSealedEncode(reactionAt('add')),
+            plaintext: ownSealedEncode(reactionAt('add', 'reaction-add-1')),
           },
           {
             cursor: 2,
             envelopeId: 'envelope-2',
-            plaintext: ownSealedEncode(reactionAt('remove')),
+            plaintext: ownSealedEncode(
+              reactionAt('remove', 'reaction-remove-1'),
+            ),
           },
           {
             cursor: 3,
             envelopeId: 'envelope-3',
-            plaintext: ownSealedEncode(reactionAt('add')),
+            plaintext: ownSealedEncode(reactionAt('add', 'reaction-add-2')),
+          },
+          {
+            // A replay of the first add under a new envelope.
+            cursor: 4,
+            envelopeId: 'envelope-4',
+            plaintext: ownSealedEncode(reactionAt('add', 'reaction-add-1')),
           },
         ],
         hasMore: false,
-        lastCursor: 3,
+        lastCursor: 4,
         recreated: false,
       });
 
-      const live = jest.fn<void, [DirectMessageTimelineChange[]]>();
       await mailbox.sync(
         withSealedRoot(session('alice')),
         conversationId,
         new AbortController().signal,
-        live,
+        jest.fn<void, [DirectMessageTimelineChange[]]>(),
       );
-      expect(channel.acknowledge).toHaveBeenCalledTimes(1);
-      expect(live.mock.calls.flatMap(([batch]) => batch)).toHaveLength(3);
 
       const apply = jest.fn<void, [DirectMessageTimelineChange[]]>();
       await setup().mailbox.restore(

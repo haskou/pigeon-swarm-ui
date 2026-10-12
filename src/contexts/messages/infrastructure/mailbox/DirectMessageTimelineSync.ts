@@ -14,8 +14,6 @@ import type { DirectMessageOwnCopies } from './DirectMessageOwnCopies';
 import type { DirectMessageReaderSet } from './DirectMessageReaderSet';
 import type { DirectMessageRecipientInbox } from './DirectMessageRecipientInbox';
 
-import { sha256 } from '@noble/hashes/sha2.js';
-import { bytesToHex } from '@noble/hashes/utils.js';
 import { DirectMailboxOwnership } from '../../../mailboxes/domain/DirectMailboxOwnership';
 import { DirectMailboxRecords } from '../../../mailboxes/domain/DirectMailboxRecords';
 import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
@@ -98,13 +96,15 @@ export class DirectMessageTimelineSync {
       return record ? [{ plaintext: envelope.plaintext, record }] : [];
     });
 
+    // Keyed by record id, so a replayed envelope dedupes while each action
+    // (a reaction add, its removal, a re-add) keeps its own row.
     await this.history.append(
       session,
       conversationId,
       decoded.flatMap(({ plaintext, record }) =>
         record.type === DirectMailboxRecords.TYPE.read
           ? []
-          : [{ plaintext, recordId: bytesToHex(sha256(plaintext)) }],
+          : [{ plaintext, recordId: record.id }],
       ),
     );
 
