@@ -127,6 +127,49 @@ describe('DeviceSealedRootRotation', () => {
     });
   });
 
+  describe('reseal', () => {
+    it('publishes the given root at a new generation to the head recipients', async () => {
+      const { deviceAuthorization, rotation, sealedSecrets } = setup(1_000);
+      const session = makeSession(5);
+      const root = SymmetricKey.generate();
+
+      await rotation.reseal(session, root);
+
+      expect(deviceAuthorization.findDevices).toHaveBeenCalledWith(session);
+      expect(sealedSecrets.publish).toHaveBeenCalledTimes(1);
+
+      const [published, input] = sealedSecrets.publish.mock.calls[0];
+
+      expect(published).toBe(session);
+      expect(input.recipients).toEqual(RECIPIENTS);
+      expect(input.generation).toBe(1_001);
+      expect(
+        Buffer.from(decodeBase64Url(input.payload)).equals(root.getBuffer()),
+      ).toBe(true);
+    });
+
+    it('lets a device opened on the resealed revision read the same root without publishing', async () => {
+      const { rotation, sealedSecrets } = setup(1_000);
+      const root = SymmetricKey.generate();
+
+      await rotation.reseal(makeSession(5), root);
+      const [, input] = sealedSecrets.publish.mock.calls[0];
+      sealedSecrets.publish.mockClear();
+      sealedSecrets.fetchOwn.mockResolvedValue({
+        authorizationRevision: 5,
+        generation: input.generation,
+        payload: input.payload,
+      });
+
+      const current = await rotation.current(makeSession(5));
+
+      expect(sealedSecrets.publish).not.toHaveBeenCalled();
+      expect(
+        current.deviceSealedRootKey?.getBuffer().equals(root.getBuffer()),
+      ).toBe(true);
+    });
+  });
+
   describe('current', () => {
     it('opens a fresh entry without publishing', async () => {
       const { rotation, sealedSecrets } = setup();

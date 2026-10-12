@@ -1,5 +1,11 @@
+import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+
+import type { DevicePairingCode } from '../../../../../contexts/identities/domain/value-objects/DevicePairingCode';
 import type { DeviceSealedRootRotation } from '../../../../../contexts/identities/infrastructure/http/DeviceSealedRootRotation';
-import type { PigeonDeviceAuthorizationApi } from '../../../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
+import type {
+  DevicePairingAuthorization,
+  PigeonDeviceAuthorizationApi,
+} from '../../../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
 import type { PigeonIdentityCommandsApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityCommandsApi';
 import type { PigeonIdentityGateway as IdentityProfileGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityGateway';
 import type { PigeonIdentityLoginApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityLoginApi';
@@ -30,9 +36,13 @@ function identity(): IdentityResource {
 }
 
 function gatewayDouble(): {
+  authorization: jest.Mocked<
+    Pick<PigeonDeviceAuthorizationApi, 'authorizePairing'>
+  >;
   gateway: PigeonIdentitiesGateway;
   profile: jest.Mocked<Pick<IdentityProfileGateway, 'get'>>;
   keychain: jest.Mocked<Pick<PigeonKeychainApi, 'publishKeychain'>>;
+  sealedRoot: jest.Mocked<Pick<DeviceSealedRootRotation, 'reseal'>>;
 } {
   const commands = {} as PigeonIdentityCommandsApi;
   const login = {} as PigeonIdentityLoginApi;
@@ -42,21 +52,28 @@ function gatewayDouble(): {
   const keychain = {
     publishKeychain: jest.fn(),
   } as jest.Mocked<Pick<PigeonKeychainApi, 'publishKeychain'>>;
+  const authorization = {
+    authorizePairing: jest.fn(),
+  } as jest.Mocked<Pick<PigeonDeviceAuthorizationApi, 'authorizePairing'>>;
+  const sealedRoot = {
+    reseal: jest.fn(),
+  } as jest.Mocked<Pick<DeviceSealedRootRotation, 'reseal'>>;
   const presence = {} as PigeonPresenceGateway;
-  const deviceAuthorization = {} as PigeonDeviceAuthorizationApi;
 
   return {
+    authorization,
     gateway: new PigeonIdentitiesGateway(
       commands,
       login,
       profile as unknown as IdentityProfileGateway,
-      deviceAuthorization,
+      authorization as unknown as PigeonDeviceAuthorizationApi,
       keychain as unknown as PigeonKeychainApi,
       presence,
-      {} as DeviceSealedRootRotation,
+      sealedRoot as unknown as DeviceSealedRootRotation,
     ),
     keychain,
     profile,
+    sealedRoot,
   };
 }
 
@@ -85,5 +102,43 @@ describe(PigeonIdentitiesGateway.name, () => {
       published,
     );
     expect(keychain.publishKeychain).toHaveBeenCalledWith(session, update);
+  });
+
+  describe('authorizeDevicePairing', () => {
+    const requestCode = 'request-code' as unknown as DevicePairingCode;
+
+    it('reseals the authorizer root at the new revision before returning the completion', async () => {
+      const { authorization, gateway, sealedRoot } = gatewayDouble();
+      const root = SymmetricKey.generate();
+      const session = {
+        deviceSealedRootKey: root,
+        identity: { id: 'identity-1' },
+      } as unknown as Session;
+      const next = {
+        ...session,
+        authorizationRevision: 2,
+      } as unknown as Session;
+      authorization.authorizePairing.mockResolvedValue({
+        completion: { toCode: () => 'completion-code' },
+        session: next,
+      } as unknown as DevicePairingAuthorization);
+
+      const result = await gateway.authorizeDevicePairing(session, requestCode);
+
+      expect(sealedRoot.reseal).toHaveBeenCalledWith(next, root);
+      expect(result.session).toBe(next);
+      expect(result.completionCode).toBe('completion-code');
+    });
+
+    it('refuses to authorize a device when this session holds no sealed root', async () => {
+      const { authorization, gateway, sealedRoot } = gatewayDouble();
+      const session = { identity: { id: 'identity-1' } } as unknown as Session;
+
+      await expect(
+        gateway.authorizeDevicePairing(session, requestCode),
+      ).rejects.toMatchObject({ failure: 'mismatch' });
+      expect(authorization.authorizePairing).not.toHaveBeenCalled();
+      expect(sealedRoot.reseal).not.toHaveBeenCalled();
+    });
   });
 });
