@@ -142,6 +142,7 @@ export function AuthScreen({
       identityId,
       mode,
       name,
+      networks,
       password,
       passwordConfirmation,
       selectedNetwork,
