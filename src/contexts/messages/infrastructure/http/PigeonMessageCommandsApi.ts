@@ -17,6 +17,7 @@ import type { MessageAttachmentPublisher } from './MessageAttachmentPublisher';
 import type { MessageCommandIdentity } from './resources/MessageCommandIdentity';
 
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
+import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 import { ScopeFrontierReader } from '../../../../shared/infrastructure/http/ScopeFrontierReader';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
@@ -134,9 +135,38 @@ export class PigeonMessageCommandsApi {
   }
 
   /**
+   * Abandons the attachments only when the node answered 4xx, which proves the
+   * message was not stored. Any other failure may hide an accepted message, so
+   * the replicas stay until node retention reclaims them.
+   */
+  private async abandonAttachmentsOnRejection<T>(
+    session: Session,
+    attachments: MessageAttachment[],
+    run: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await run();
+    } catch (error) {
+      if (
+        error instanceof HttpJsonError &&
+        error.status >= 400 &&
+        error.status < 500
+      ) {
+        await this.attachments.abandonMessageAttachments(session, attachments);
+      }
+
+      throw error;
+    }
+  }
+
+  /**
    * Builds the sent record for a message and hands it to `deliver`. Attachments
-   * are published first and settled only once `deliver` resolves; a failure
-   * abandons them. Nothing is sent here, so the caller decides where it goes.
+   * are published first and settled only once `deliver` resolves. A failure
+   * before delivery abandons them. A failure in `deliver` abandons them only
+   * when the node answered 4xx, which proves the message was not stored. Any
+   * other failure may hide an accepted message, so the replicas stay until node
+   * retention reclaims them. Nothing is sent here, so the caller decides where
+   * it goes.
    */
   public async withSentRecord<T>(
     session: Session,
@@ -170,10 +200,10 @@ export class PigeonMessageCommandsApi {
       onAttachmentProgress,
       attachmentUpload,
     );
-    const result = await this.abandonAttachmentsOnFailure(
+    const sent = await this.abandonAttachmentsOnFailure(
       session,
       messageAttachments,
-      async () => {
+      async (): Promise<CommandRecord> => {
         const linkPreview = await this.linkPreviewForMessage(
           session,
           content,
@@ -200,7 +230,7 @@ export class PigeonMessageCommandsApi {
           commandIdentity?.id ??
           `${conversationId}:${timestamp}:${UUID.generate().toString()}`;
 
-        return await deliver({
+        return {
           authorId: this.mutations.authorOf(session),
           conversationId,
           createdAt: timestamp,
@@ -209,8 +239,13 @@ export class PigeonMessageCommandsApi {
           previousMessageIds,
           replyToMessageId: replyToMessageId || undefined,
           type: 'sent',
-        });
+        };
       },
+    );
+    const result = await this.abandonAttachmentsOnRejection(
+      session,
+      messageAttachments,
+      () => deliver(sent),
     );
 
     this.attachments.settleMessageAttachments(session, messageAttachments);
