@@ -243,6 +243,11 @@ export function useConversationMessageActions({
           activeConversation.id,
           message.id,
         );
+        void applicationContainer.directMessages.deliverDelete(
+          session,
+          activeConversation,
+          message.id,
+        );
         onMessagesChange((current) =>
           current.filter((item) => item.id !== message.id),
         );
@@ -251,7 +256,7 @@ export function useConversationMessageActions({
       }
     },
     [
-      activeConversation?.id,
+      activeConversation,
       closeMessageMenu,
       onErrorChange,
       onMessagesChange,
@@ -292,6 +297,11 @@ export function useConversationMessageActions({
           editingMessage.message.id,
           content,
         );
+        void applicationContainer.directMessages.deliverEdit(
+          session,
+          activeConversation,
+          editEvent.raw,
+        );
 
         onMessagesChange((current) =>
           MessageCollection.merge(current, [editEvent]),
@@ -303,7 +313,7 @@ export function useConversationMessageActions({
       }
     },
     [
-      activeConversation?.id,
+      activeConversation,
       editingMessage,
       onErrorChange,
       onMessagesChange,
@@ -348,6 +358,17 @@ export function useConversationMessageActions({
             emoji,
           );
         }
+
+        void applicationContainer.directMessages.deliverReaction(
+          session,
+          activeConversation,
+          {
+            action,
+            createdAt: Date.now(),
+            emoji,
+            messageId: message.id,
+          },
+        );
       } catch (caught) {
         onErrorChange(toUserErrorMessage(caught, copy.messages.reactionError));
         onMessagesChange((current) =>
@@ -364,7 +385,7 @@ export function useConversationMessageActions({
         );
       }
     },
-    [activeConversation?.id, onErrorChange, onMessagesChange, session],
+    [activeConversation, onErrorChange, onMessagesChange, session],
   );
 
   const startReplying = useCallback((message: ChatMessage) => {

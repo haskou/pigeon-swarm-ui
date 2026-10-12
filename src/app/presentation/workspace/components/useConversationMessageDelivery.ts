@@ -152,15 +152,10 @@ export function useConversationMessageDelivery({
             );
           }
 
-          void applicationContainer.directMessages.deliver(
+          void applicationContainer.directMessages.deliverSent(
             session,
             activeConversation,
             sent.raw,
-            {
-              attachmentCount: payload.attachments.length,
-              hasReply: !!payload.replyTarget,
-              hasSticker: !!payload.sticker,
-            },
           );
 
           onMessagesChange((current) =>
