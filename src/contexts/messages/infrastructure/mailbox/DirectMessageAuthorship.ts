@@ -2,9 +2,10 @@ import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { concatBytes } from '@noble/hashes/utils.js';
 
-import type { DirectMessageRecord } from './DirectMessageMailboxRecord';
+import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessageRecord';
 
 import { encodeBase64Url } from '../../../../shared/infrastructure/encoding/base64url';
+import { DirectMailboxOwnership } from '../../../mailboxes/domain/DirectMailboxOwnership';
 
 /**
  * Authorship tag for a record this identity writes to its own inbox: a
@@ -63,7 +64,9 @@ export class DirectMessageAuthorship {
     record: DirectMessageRecord,
     authorTag: string | undefined,
   ): boolean {
-    if (record.authorId !== identityId) return true;
+    if (!DirectMailboxOwnership.isAuthoredBy(record.authorId, identityId)) {
+      return true;
+    }
 
     return (
       authorTag !== undefined &&

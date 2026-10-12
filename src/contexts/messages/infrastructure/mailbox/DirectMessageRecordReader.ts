@@ -1,9 +1,9 @@
 import type { Session } from '../../../../shared/domain/pigeonResources.types';
-import type {
-  DirectMessageRecord,
-  DirectReadRecord,
-} from './DirectMessageMailboxRecord';
+import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessageRecord';
+import type { DirectReadRecord } from '../../../mailboxes/domain/DirectReadRecord';
 
+import { DirectMailboxOwnership } from '../../../mailboxes/domain/DirectMailboxOwnership';
+import { DirectMailboxRecords } from '../../../mailboxes/domain/DirectMailboxRecords';
 import { DirectMessageAuthorship } from './DirectMessageAuthorship';
 import { DirectMessageMailboxRecord } from './DirectMessageMailboxRecord';
 
@@ -34,8 +34,10 @@ export class DirectMessageRecordReader {
     record: DirectReadRecord,
   ): boolean {
     return (
-      record.authorId === session.identity.id &&
-      DirectMessageMailboxRecord.isFreshReceipt(record, Date.now())
+      DirectMailboxOwnership.isAuthoredBy(
+        record.authorId,
+        session.identity.id,
+      ) && DirectMailboxRecords.isFreshReceipt(record, Date.now())
     );
   }
 }

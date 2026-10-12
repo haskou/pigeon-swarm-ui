@@ -5,14 +5,18 @@ import type {
   ConversationResource,
   Session,
 } from '../../../../shared/domain/pigeonResources.types';
+import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessageRecord';
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { PigeonMessageCommandsApi } from '../http/PigeonMessageCommandsApi';
 import type { EditMessageOptions } from '../http/resources/EditMessageOptions';
 import type { SendMessageOptions } from '../http/resources/SendMessageOptions';
-import type { DirectMessageRecord } from './DirectMessageMailboxRecord';
 import type { DirectMessageOwnCopies } from './DirectMessageOwnCopies';
 import type { RecipientMailboxRouter } from './RecipientMailboxRouter';
 
+import { DirectMailboxEligibility } from '../../../mailboxes/domain/DirectMailboxEligibility';
+import { DirectMailboxOwnership } from '../../../mailboxes/domain/DirectMailboxOwnership';
+import { DirectMailboxRecordError } from '../../../mailboxes/domain/DirectMailboxRecordError';
+import { DirectMailboxRecords } from '../../../mailboxes/domain/DirectMailboxRecords';
 import { MailboxEnvelopeCipher } from '../../../mailboxes/infrastructure/crypto/MailboxEnvelopeCipher';
 import { DirectMessageAuthorship } from './DirectMessageAuthorship';
 import { DirectMessageInboxKeys } from './DirectMessageInboxKeys';
@@ -48,8 +52,10 @@ export class DirectMessageSender {
       (identityId) => identityId !== session.identity.id,
     );
 
-    if (!peer || !DirectMessageMailboxRecord.isEligible(conversation.type)) {
-      throw new Error('Direct mailbox needs a one-to-one conversation.');
+    if (!peer || !DirectMailboxEligibility.isEligible(conversation.type)) {
+      throw new DirectMailboxRecordError(
+        'Direct mailbox needs a one-to-one conversation.',
+      );
     }
 
     return peer;
@@ -70,7 +76,9 @@ export class DirectMessageSender {
 
     await this.writeTo(session, conversationId, recipientIdentityId, record);
 
-    this.ownCopies.remember(`${session.identity.id}:${record.id}`);
+    this.ownCopies.remember(
+      DirectMailboxOwnership.ownCopyKey(session.identity.id, record.id),
+    );
     await this.appendOwnCopy(session, conversationId, record);
   }
 
@@ -199,14 +207,15 @@ export class DirectMessageSender {
   ): Promise<void> {
     const recipientIdentityId = this.peerOf(session, conversation);
 
-    await this.deliver(session, conversation.id, recipientIdentityId, () => ({
-      authorId: session.identity.id,
-      conversationId: conversation.id,
-      createdAt: Date.now(),
-      id: UUID.generate().toString(),
-      targetMessageId: messageId,
-      type: 'deleted',
-    }));
+    await this.deliver(session, conversation.id, recipientIdentityId, () =>
+      DirectMailboxRecords.deleted({
+        authorId: session.identity.id,
+        conversationId: conversation.id,
+        createdAt: Date.now(),
+        id: UUID.generate().toString(),
+        targetMessageId: messageId,
+      }),
+    );
   }
 
   /** Sender. Adds or removes a reaction. Rejects like send. */
@@ -222,16 +231,17 @@ export class DirectMessageSender {
   ): Promise<void> {
     const recipientIdentityId = this.peerOf(session, conversation);
 
-    await this.deliver(session, conversation.id, recipientIdentityId, () => ({
-      action: reaction.action,
-      authorId: session.identity.id,
-      conversationId: conversation.id,
-      createdAt: reaction.createdAt,
-      emoji: reaction.emoji,
-      id: UUID.generate().toString(),
-      targetMessageId: reaction.messageId,
-      type: 'reaction',
-    }));
+    await this.deliver(session, conversation.id, recipientIdentityId, () =>
+      DirectMailboxRecords.reaction({
+        action: reaction.action,
+        authorId: session.identity.id,
+        conversationId: conversation.id,
+        createdAt: reaction.createdAt,
+        emoji: reaction.emoji,
+        id: UUID.generate().toString(),
+        targetMessageId: reaction.messageId,
+      }),
+    );
   }
 
   /** Sender. Pins or unpins a message. Rejects like send. */
@@ -246,15 +256,16 @@ export class DirectMessageSender {
   ): Promise<void> {
     const recipientIdentityId = this.peerOf(session, conversation);
 
-    await this.deliver(session, conversation.id, recipientIdentityId, () => ({
-      action: pin.action,
-      authorId: session.identity.id,
-      conversationId: conversation.id,
-      createdAt: pin.createdAt,
-      id: UUID.generate().toString(),
-      targetMessageId: pin.messageId,
-      type: 'pin',
-    }));
+    await this.deliver(session, conversation.id, recipientIdentityId, () =>
+      DirectMailboxRecords.pin({
+        action: pin.action,
+        authorId: session.identity.id,
+        conversationId: conversation.id,
+        createdAt: pin.createdAt,
+        id: UUID.generate().toString(),
+        targetMessageId: pin.messageId,
+      }),
+    );
   }
 
   /**
@@ -267,17 +278,21 @@ export class DirectMessageSender {
     conversation: ConversationResource,
     messageId: string,
   ): Promise<void> {
-    if (!DirectMessageMailboxRecord.isEligible(conversation.type)) return;
+    if (!DirectMailboxEligibility.isEligible(conversation.type)) return;
 
     try {
-      await this.writeTo(session, conversation.id, session.identity.id, {
-        authorId: session.identity.id,
-        conversationId: conversation.id,
-        createdAt: Date.now(),
-        id: UUID.generate().toString(),
-        targetMessageId: messageId,
-        type: 'read',
-      });
+      await this.writeTo(
+        session,
+        conversation.id,
+        session.identity.id,
+        DirectMailboxRecords.read({
+          authorId: session.identity.id,
+          conversationId: conversation.id,
+          createdAt: Date.now(),
+          id: UUID.generate().toString(),
+          targetMessageId: messageId,
+        }),
+      );
     } catch {
       logAppendFailure();
     }

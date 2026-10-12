@@ -8,11 +8,18 @@ export class ConversationType extends Enum<(typeof values)[number]> {
   public static readonly ONE_TO_ONE = new ConversationType('one-to-one');
 
   public static fromPrimitives(value: string): ConversationType {
-    const type = values.find((candidate) => candidate === value);
+    const type = ConversationType.tryFromPrimitives(value);
 
     if (!type) throw new ValueNotInEnumError(value, values);
 
-    return new ConversationType(type);
+    return type;
+  }
+
+  /** Total mapping: an unknown value yields undefined instead of throwing. */
+  public static tryFromPrimitives(value: string): ConversationType | undefined {
+    const type = values.find((candidate) => candidate === value);
+
+    return type ? new ConversationType(type) : undefined;
   }
 
   private constructor(value: (typeof values)[number]) {
@@ -25,5 +32,9 @@ export class ConversationType extends Enum<(typeof values)[number]> {
 
   public isGroup(): boolean {
     return this.isEqual(ConversationType.GROUP);
+  }
+
+  public isOneToOne(): boolean {
+    return this.isEqual(ConversationType.ONE_TO_ONE);
   }
 }

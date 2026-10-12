@@ -1,60 +1,10 @@
+import type { DirectEditedRecord } from '../../../mailboxes/domain/DirectEditedRecord';
+import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessageRecord';
+import type { DirectSentRecord } from '../../../mailboxes/domain/DirectSentRecord';
 import type { MessageResource } from '../http/MessageResource';
 
-type RecordBase = {
-  authorId: string;
-  conversationId: string;
-  createdAt: number;
-  id: string;
-};
-
-/** A message sent to the peer: text, a reply, attachments, or a sticker. */
-export type DirectSentRecord = RecordBase & {
-  encryptedPayload: string;
-  previousMessageIds: string[];
-  replyToMessageId?: string;
-  type: 'sent';
-};
-
-/** Replaces the content of an earlier sent message. */
-export type DirectEditedRecord = RecordBase & {
-  encryptedPayload: string;
-  previousMessageIds: string[];
-  targetMessageId: string;
-  type: 'edited';
-};
-
-export type DirectDeletedRecord = RecordBase & {
-  targetMessageId: string;
-  type: 'deleted';
-};
-
-export type DirectReactionRecord = RecordBase & {
-  action: 'add' | 'remove';
-  emoji: string;
-  targetMessageId: string;
-  type: 'reaction';
-};
-
-/** Pin or unpin of a message. Applied last-writer-wins by createdAt. */
-export type DirectPinRecord = RecordBase & {
-  action: 'pin' | 'unpin';
-  targetMessageId: string;
-  type: 'pin';
-};
-
-/** Read receipt for this identity. Sent only to its own inbox. */
-export type DirectReadRecord = RecordBase & {
-  targetMessageId: string;
-  type: 'read';
-};
-
-export type DirectMessageRecord =
-  | DirectDeletedRecord
-  | DirectEditedRecord
-  | DirectPinRecord
-  | DirectReactionRecord
-  | DirectReadRecord
-  | DirectSentRecord;
+import { DirectMailboxRecordError } from '../../../mailboxes/domain/DirectMailboxRecordError';
+import { DirectMailboxRecords } from '../../../mailboxes/domain/DirectMailboxRecords';
 
 const DIRECT_MESSAGE_KIND = 'direct-message';
 const DIRECT_MESSAGE_VERSION = 2;
@@ -76,14 +26,6 @@ function mailboxFields(message: MessageResource) {
 }
 
 export class DirectMessageMailboxRecord {
-  private static readonly RECEIPT_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
-  private static readonly RECEIPT_MAX_FUTURE_SKEW_MS = 30_000;
-
-  /** Only one-to-one conversations travel through the mailbox. */
-  public static isEligible(conversationType: 'group' | 'one-to-one'): boolean {
-    return conversationType === 'one-to-one';
-  }
-
   public static fromSent(
     conversationId: string,
     sent: MessageResource,
@@ -91,10 +33,12 @@ export class DirectMessageMailboxRecord {
     const { authorId, createdAt, encryptedPayload } = mailboxFields(sent);
 
     if (!sent.id || !authorId || !encryptedPayload || createdAt === undefined) {
-      throw new Error('Sent message is missing mailbox fields.');
+      throw new DirectMailboxRecordError(
+        'Sent message is missing mailbox fields.',
+      );
     }
 
-    return {
+    return DirectMailboxRecords.sent({
       authorId,
       conversationId,
       createdAt,
@@ -102,8 +46,7 @@ export class DirectMessageMailboxRecord {
       id: sent.id,
       previousMessageIds: sent.previousMessageIds ?? [],
       replyToMessageId: sent.replyToMessageId,
-      type: 'sent',
-    };
+    });
   }
 
   public static fromEdited(
@@ -120,32 +63,19 @@ export class DirectMessageMailboxRecord {
       createdAt === undefined ||
       !targetMessageId
     ) {
-      throw new Error('Edited message is missing mailbox fields.');
+      throw new DirectMailboxRecordError(
+        'Edited message is missing mailbox fields.',
+      );
     }
 
-    return {
+    return DirectMailboxRecords.edited({
       authorId,
       conversationId,
       createdAt,
       encryptedPayload,
       id: edited.id,
-      previousMessageIds: [targetMessageId],
       targetMessageId,
-      type: 'edited',
-    };
-  }
-
-  /**
-   * A read receipt is fresh when it is at most 14 days old and at most 30
-   * seconds ahead of this device's clock. Stale or future-dated receipts are
-   * ignored, matching the node's read-proof window.
-   */
-  public static isFreshReceipt(record: DirectReadRecord, now: number): boolean {
-    return (
-      now - record.createdAt <= DirectMessageMailboxRecord.RECEIPT_MAX_AGE_MS &&
-      record.createdAt - now <=
-        DirectMessageMailboxRecord.RECEIPT_MAX_FUTURE_SKEW_MS
-    );
+    });
   }
 
   /**
