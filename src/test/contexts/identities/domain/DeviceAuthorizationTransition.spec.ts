@@ -1,6 +1,8 @@
 import { KeyPair, Signature } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 
+import type { DeviceAuthorizationCompromisedCredential } from '../../../../contexts/identities/domain/DeviceAuthorizationCompromisedCredential';
+
 import { DeviceAuthorizationTransition } from '../../../../contexts/identities/domain/DeviceAuthorizationTransition';
 import { DeviceAuthorizationEpoch } from '../../../../contexts/identities/domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationOperationId } from '../../../../contexts/identities/domain/value-objects/DeviceAuthorizationOperationId';
@@ -8,6 +10,7 @@ import { DeviceAuthorizationRevision } from '../../../../contexts/identities/dom
 import { DeviceCredential } from '../../../../contexts/identities/domain/value-objects/DeviceCredential';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { PairingId } from '../../../../contexts/identities/domain/value-objects/PairingId';
+import vectors from '../../../fixtures/device-authorization-recovery-vectors.json';
 
 describe(DeviceAuthorizationTransition.name, () => {
   it('binds enrollment epoch and exact canonical payload to both devices', async () => {
@@ -31,6 +34,7 @@ describe(DeviceAuthorizationTransition.name, () => {
     expect(Object.keys(unsigned)).toEqual([
       'authorCredential',
       'authorizedAt',
+      'compromisedCredentials',
       'compromisedSince',
       'epoch',
       'identityId',
@@ -69,6 +73,7 @@ describe(DeviceAuthorizationTransition.name, () => {
     const recoveryAuthority = await KeyPair.generate();
     const operationId = DeviceAuthorizationOperationId.generate();
     const transition = DeviceAuthorizationTransition.recovery({
+      compromisedCredentials: [],
       epoch: DeviceAuthorizationEpoch.genesis(),
       identityId: IdentityId.fromString(identity.toPrimitives().publicKey),
       operationId,
@@ -131,5 +136,172 @@ describe(DeviceAuthorizationTransition.name, () => {
         ),
     ).toBe(false);
     expect(make().toPrimitives().compromisedSince).toBeUndefined();
+  });
+
+  describe('compromise caps', () => {
+    let recoveryAuthority: KeyPair;
+    let target: KeyPair;
+
+    beforeAll(async () => {
+      recoveryAuthority = await KeyPair.generate();
+      target = await KeyPair.generate();
+    });
+
+    const cap = (compromisedSince: number, credential: DeviceCredential) => ({
+      compromisedSince:
+        DeviceAuthorizationRevision.fromNumber(compromisedSince),
+      credential,
+    });
+    const credentialOf = async () =>
+      DeviceCredential.fromString(
+        (await KeyPair.generate()).toPrimitives().publicKey,
+      );
+    const recoveryWith = (
+      compromisedCredentials: DeviceAuthorizationCompromisedCredential[],
+      previousRevision = 4,
+    ) =>
+      DeviceAuthorizationTransition.recovery({
+        compromisedCredentials,
+        epoch: DeviceAuthorizationEpoch.genesis(),
+        identityId: IdentityId.fromString(vectors.identityId),
+        operationId: DeviceAuthorizationOperationId.generate(),
+        previousRevision:
+          DeviceAuthorizationRevision.fromNumber(previousRevision),
+        recoveryAuthority,
+        target,
+      });
+
+    it('refuses duplicate credentials', async () => {
+      const credential = await credentialOf();
+
+      expect(() =>
+        recoveryWith([cap(1, credential), cap(2, credential)]),
+      ).toThrow();
+    });
+
+    it('refuses more than 32 compromised credentials', async () => {
+      const caps = await Promise.all(
+        Array.from({ length: 33 }, async () => cap(1, await credentialOf())),
+      );
+
+      expect(() => recoveryWith(caps)).toThrow();
+    });
+
+    it('accepts exactly 32 compromised credentials at the previous revision', async () => {
+      const caps = await Promise.all(
+        Array.from({ length: 32 }, async () => cap(4, await credentialOf())),
+      );
+
+      expect(
+        recoveryWith(caps).getUnsignedPayload().compromisedCredentials,
+      ).toHaveLength(32);
+    });
+
+    it('refuses a compromise after the previous revision', async () => {
+      const credential = await credentialOf();
+
+      expect(() => recoveryWith([cap(5, credential)])).toThrow();
+    });
+
+    it('covers the compromised credentials with the recovery signature', async () => {
+      const credential = await credentialOf();
+      const transition = recoveryWith([cap(2, credential)]);
+      const body = transition.toPrimitives();
+      const signed = (unsigned: unknown) =>
+        JSON.stringify({
+          domain: 'pigeon:device-authorization:transition:v3',
+          proofOfPossession: body.proofOfPossession,
+          transition: unsigned,
+        });
+
+      expect(
+        recoveryAuthority.isValidSignature(
+          signed(transition.getUnsignedPayload()),
+          new Signature(body.signature),
+        ),
+      ).toBe(true);
+      expect(
+        recoveryAuthority.isValidSignature(
+          signed({
+            ...transition.getUnsignedPayload(),
+            compromisedCredentials: [
+              { compromisedSince: 3, credential: credential.valueOf() },
+            ],
+          }),
+          new Signature(body.signature),
+        ),
+      ).toBe(false);
+    });
+  });
+
+  describe('recovery vectors from pigeon-swarm-node', () => {
+    type RecoveryVector = {
+      expected: {
+        proofOfPossessionPayload: string;
+        signingPayload: string;
+        transition: Record<string, unknown>;
+      };
+      input: {
+        compromisedCredentials: {
+          compromisedSince: number;
+          credential: string;
+        }[];
+        epoch: string;
+        operationId: string;
+        previousRevision: number;
+      };
+      name: string;
+    };
+    const keyOf = (pair: { privateKeyPem: string; publicKeyPem: string }) =>
+      KeyPair.fromPrimitives({
+        privateKey: pair.privateKeyPem,
+        publicKey: pair.publicKeyPem,
+      } as never);
+    const recoveryAuthority = keyOf(vectors.keys.recoveryAuthority);
+    const target = keyOf(vectors.keys.target);
+    const cases: RecoveryVector[] = vectors.cases;
+
+    for (const vector of cases) {
+      it(vector.name, () => {
+        const transition = DeviceAuthorizationTransition.recovery({
+          compromisedCredentials: vector.input.compromisedCredentials.map(
+            (entry) => ({
+              compromisedSince: DeviceAuthorizationRevision.fromNumber(
+                entry.compromisedSince,
+              ),
+              credential: DeviceCredential.fromString(entry.credential),
+            }),
+          ),
+          epoch: DeviceAuthorizationEpoch.fromString(vector.input.epoch),
+          identityId: IdentityId.fromString(vectors.identityId),
+          operationId: DeviceAuthorizationOperationId.fromString(
+            vector.input.operationId,
+          ),
+          previousRevision: DeviceAuthorizationRevision.fromNumber(
+            vector.input.previousRevision,
+          ),
+          recoveryAuthority,
+          target,
+        });
+        const body = JSON.parse(JSON.stringify(transition.toPrimitives())) as {
+          proofOfPossession: string;
+          signature: string;
+        };
+
+        expect(body).toEqual(vector.expected.transition);
+        expect(
+          recoveryAuthority.isValidSignature(
+            vector.expected.signingPayload,
+            new Signature(body.signature),
+          ),
+        ).toBe(true);
+        expect(
+          target.isValidSignature(
+            vector.expected.proofOfPossessionPayload,
+            new Signature(body.proofOfPossession),
+          ),
+        ).toBe(true);
+      });
+    }
   });
 });

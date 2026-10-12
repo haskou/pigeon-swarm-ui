@@ -1,5 +1,6 @@
 import { DeviceAuthorizationCheckpoint } from '../../../../contexts/identities/domain/DeviceAuthorizationCheckpoint';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
+import vectors from '../../../fixtures/device-authorization-recovery-vectors.json';
 
 describe(DeviceAuthorizationCheckpoint.name, () => {
   it('exposes validated value objects', () => {
@@ -21,5 +22,35 @@ describe(DeviceAuthorizationCheckpoint.name, () => {
         IdentityId.fromString('identity'),
       ),
     ).toThrow('does not match');
+  });
+
+  it('exposes the compromised credentials of the authorization', () => {
+    const identityId = IdentityId.fromString('identity');
+    const credential = vectors.keys.target.publicKeyPem;
+    const checkpoint = DeviceAuthorizationCheckpoint.fromResource(
+      {
+        compromisedCredentials: [{ compromisedSince: 2, credential }],
+        epoch: 'genesis',
+        identityId: 'identity',
+        revision: 4,
+      },
+      identityId,
+    );
+
+    expect(
+      checkpoint.getCompromisedCredentials().map((entry) => ({
+        compromisedSince: entry.compromisedSince.valueOf(),
+        credential: entry.credential.valueOf(),
+      })),
+    ).toEqual([{ compromisedSince: 2, credential }]);
+  });
+
+  it('reads an authorization without the field as carrying no compromised credentials', () => {
+    const checkpoint = DeviceAuthorizationCheckpoint.fromResource(
+      { epoch: 'genesis', identityId: 'identity', revision: 2 },
+      IdentityId.fromString('identity'),
+    );
+
+    expect(checkpoint.getCompromisedCredentials()).toEqual([]);
   });
 });

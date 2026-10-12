@@ -433,6 +433,7 @@ export class PigeonDeviceAuthorizationApi {
     } satisfies Session;
     const current = await this.findRecoveryCheckpoint(recoverySession);
     const transition = AuthorizationTransition.recovery({
+      compromisedCredentials: current.getCompromisedCredentials(),
       epoch: current.getEpoch(),
       identityId,
       operationId: DeviceAuthorizationOperationId.generate(),
