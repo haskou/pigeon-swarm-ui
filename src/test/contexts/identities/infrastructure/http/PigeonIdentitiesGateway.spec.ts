@@ -1,21 +1,17 @@
 import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
 import type { DevicePairingCode } from '../../../../../contexts/identities/domain/value-objects/DevicePairingCode';
+import type { DevicePairingAuthorization } from '../../../../../contexts/identities/infrastructure/http/DevicePairingAuthorization';
 import type { DeviceSealedRootRotation } from '../../../../../contexts/identities/infrastructure/http/DeviceSealedRootRotation';
-import type {
-  DevicePairingAuthorization,
-  PigeonDeviceAuthorizationApi,
-} from '../../../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
+import type { PigeonDeviceAuthorizationApi } from '../../../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
 import type { PigeonIdentityCommandsApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityCommandsApi';
 import type { PigeonIdentityGateway as IdentityProfileGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityGateway';
 import type { PigeonIdentityLoginApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityLoginApi';
 import type { PigeonKeychainApi } from '../../../../../contexts/identities/infrastructure/http/PigeonKeychainApi';
 import type { PigeonPresenceGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonPresenceGateway';
-import type {
-  IdentityResource,
-  LocalKeychain,
-  Session,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { IdentityResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
+import type { LocalKeychain } from '../../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { PigeonIdentitiesGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
 

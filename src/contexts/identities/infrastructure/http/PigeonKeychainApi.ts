@@ -1,13 +1,13 @@
-import type {
-  KeychainResource,
-  LocalKeychain,
-  LocalKeychainUpdate,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestCache } from '../../../../shared/infrastructure/http/RequestCache';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { KeychainCipher, KeychainHead } from '../crypto/KeychainCipher';
+import type {
+  LocalKeychain,
+  LocalKeychainUpdate,
+} from '../keychain/LocalKeychain';
+import type { Session } from '../session/Session';
+import type { KeychainResource } from './resources/KeychainResource';
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 
@@ -136,6 +136,34 @@ export class PigeonKeychainApi {
     }
   }
 
+  private async postKeychain(
+    session: Session,
+    head: KeychainHead | undefined,
+    keychain: LocalKeychain,
+  ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
+    const path = '/keychains/';
+    const encrypted = await this.cipher.encryptForPublish(
+      session,
+      head,
+      keychain,
+    );
+    const published = await this.http.request<{
+      keychainExternalIdentifier: string;
+      ownerIdentityId: string;
+      version: number;
+    }>(path, {
+      body: JSON.stringify(encrypted.body),
+      headers: await this.signer.headers(session, 'POST', path, encrypted.body),
+      method: 'POST',
+    });
+    this.requestCache.invalidateForSession(keychainPath(session), session);
+
+    return {
+      keychain: encrypted.keychain,
+      keychainExternalIdentifier: published.keychainExternalIdentifier,
+    };
+  }
+
   public decrypt(session: Session, keychain: KeychainResource): LocalKeychain {
     return this.cipher.decrypt(session, keychain);
   }
@@ -189,33 +217,5 @@ export class PigeonKeychainApi {
     await this.enqueuePublish(session.identity.id, async () => {
       await this.postKeychain(session, head, head.keychain);
     });
-  }
-
-  private async postKeychain(
-    session: Session,
-    head: KeychainHead | undefined,
-    keychain: LocalKeychain,
-  ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
-    const path = '/keychains/';
-    const encrypted = await this.cipher.encryptForPublish(
-      session,
-      head,
-      keychain,
-    );
-    const published = await this.http.request<{
-      keychainExternalIdentifier: string;
-      ownerIdentityId: string;
-      version: number;
-    }>(path, {
-      body: JSON.stringify(encrypted.body),
-      headers: await this.signer.headers(session, 'POST', path, encrypted.body),
-      method: 'POST',
-    });
-    this.requestCache.invalidateForSession(keychainPath(session), session);
-
-    return {
-      keychain: encrypted.keychain,
-      keychainExternalIdentifier: published.keychainExternalIdentifier,
-    };
   }
 }

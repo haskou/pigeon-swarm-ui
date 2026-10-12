@@ -4,7 +4,7 @@ import { mock } from 'jest-mock-extended';
 import type { DeviceCredential } from '../../../../../contexts/identities/domain/value-objects/DeviceCredential';
 import type { PigeonDeviceAuthorizationApi } from '../../../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
 import type { PigeonDeviceSealedSecretApi } from '../../../../../contexts/identities/infrastructure/http/PigeonDeviceSealedSecretApi';
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { DeviceSealedRootRotation } from '../../../../../contexts/identities/infrastructure/http/DeviceSealedRootRotation';
 import {

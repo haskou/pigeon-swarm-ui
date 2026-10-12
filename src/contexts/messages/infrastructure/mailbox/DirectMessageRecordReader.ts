@@ -1,4 +1,4 @@
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessageRecord';
 import type { DirectReadRecord } from '../../../mailboxes/domain/DirectReadRecord';
 

@@ -2,6 +2,8 @@ import { EncryptedPayload, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 import { mock } from 'jest-mock-extended';
 
+import type { ConversationResource } from '../../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { DirectDeletedRecord } from '../../../../../contexts/mailboxes/domain/DirectDeletedRecord';
 import type { DirectEditedRecord } from '../../../../../contexts/mailboxes/domain/DirectEditedRecord';
 import type { DirectMessageRecord } from '../../../../../contexts/mailboxes/domain/DirectMessageRecord';
@@ -13,15 +15,11 @@ import type { MailboxKeys } from '../../../../../contexts/mailboxes/infrastructu
 import type { PigeonMailboxClient } from '../../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
 import type { MailboxReadTokens } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import type { MessageProjectionPort } from '../../../../../contexts/messages/infrastructure/crypto/MessageProjectionPort';
+import type { MessageResource } from '../../../../../contexts/messages/infrastructure/http/MessageResource';
 import type { PigeonMessageCommandsApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
 import type { DirectMessageMailboxState } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxStore';
 import type { DirectMessageTimelineChange } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageTimelineChange';
-import type {
-  ChatMessage,
-  ConversationResource,
-  MessageResource,
-  Session,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
 
 import { MailboxCapability } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxEnvelopeCipher } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxEnvelopeCipher';

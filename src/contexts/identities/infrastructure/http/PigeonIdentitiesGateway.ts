@@ -1,13 +1,3 @@
-import type {
-  IdentityPresence,
-  IdentityResource,
-  KeychainResource,
-  LocalKeychain,
-  LocalKeychainUpdate,
-  LoginResult,
-  Session,
-  SelectablePresenceStatus,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { LoginIdentityProgressReporter } from '../../application/login-identity/LoginIdentityProgressReporter';
 import type { DevicePairingRequestDraft } from '../../domain/DevicePairingRequestDraft';
 import type { Identity } from '../../domain/Identity';
@@ -15,6 +5,11 @@ import type { DeviceAuthorizationRevision } from '../../domain/value-objects/Dev
 import type { DeviceCredential } from '../../domain/value-objects/DeviceCredential';
 import type { IdentityMasterKeyProtection } from '../../domain/value-objects/IdentityMasterKeyProtection';
 import type { IdentityCreationMaterial } from '../crypto/IdentityCreationMaterial';
+import type {
+  LocalKeychain,
+  LocalKeychainUpdate,
+} from '../keychain/LocalKeychain';
+import type { Session } from '../session/Session';
 import type { CreatedIdentityMaterial } from './CreatedIdentityMaterial';
 import type { DeviceSealedRootRotation } from './DeviceSealedRootRotation';
 import type { IdentityUpdateProfileInput } from './IdentitySignaturePayloadFactory';
@@ -27,6 +22,11 @@ import type { PigeonIdentityGateway } from './PigeonIdentityGateway';
 import type { PigeonIdentityLoginApi } from './PigeonIdentityLoginApi';
 import type { PigeonKeychainApi } from './PigeonKeychainApi';
 import type { PigeonPresenceGateway } from './PigeonPresenceGateway';
+import type { IdentityPresenceResource as IdentityPresence } from './resources/IdentityPresenceResource';
+import type { IdentityResource } from './resources/IdentityResource';
+import type { KeychainResource } from './resources/KeychainResource';
+import type { LoginResult } from './resources/LoginResult';
+import type { SelectablePresenceStatusResource as SelectablePresenceStatus } from './resources/SelectablePresenceStatusResource';
 
 import { DevicePairingError } from '../../domain/DevicePairingError';
 import { DevicePairingCode } from '../../domain/value-objects/DevicePairingCode';

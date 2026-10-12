@@ -1,6 +1,6 @@
 import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../session/Session';
 import type { PigeonDeviceAuthorizationApi } from './PigeonDeviceAuthorizationApi';
 import type { PigeonDeviceSealedSecretApi } from './PigeonDeviceSealedSecretApi';
 

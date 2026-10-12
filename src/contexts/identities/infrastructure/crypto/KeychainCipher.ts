@@ -1,10 +1,8 @@
 import { EncryptedPayload } from '@haskou/pigeon-swarm-crypto';
 
-import type {
-  KeychainResource,
-  LocalKeychain,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { KeychainResource } from '../http/resources/KeychainResource';
+import type { LocalKeychain } from '../keychain/LocalKeychain';
+import type { Session } from '../session/Session';
 import type { KeychainDomainSignaturePayload } from './KeychainDomainSignaturePayload';
 import type { PublishedKeychainPayload } from './PublishedKeychainPayload';
 
@@ -18,6 +16,23 @@ export type KeychainHead = {
 };
 
 export class KeychainCipher {
+  /**
+   * Opens under the device-sealed root. A head sealed under the master key
+   * before the root existed opens once; the next publish seals it under the
+   * root.
+   */
+  private open(session: Session, payload: EncryptedPayload): string {
+    try {
+      return sessionRootKey(session).decrypt(payload).toString();
+    } catch (error: unknown) {
+      if (!session.deviceSealedRootKey) {
+        throw error;
+      }
+
+      return session.masterKey.decrypt(payload).toString();
+    }
+  }
+
   public decrypt(session: Session, keychain: KeychainResource): LocalKeychain {
     const decrypted = this.open(
       session,
@@ -68,22 +83,5 @@ export class KeychainCipher {
       },
       keychain,
     };
-  }
-
-  /**
-   * Opens under the device-sealed root. A head sealed under the master key
-   * before the root existed opens once; the next publish seals it under the
-   * root.
-   */
-  private open(session: Session, payload: EncryptedPayload): string {
-    try {
-      return sessionRootKey(session).decrypt(payload).toString();
-    } catch (error: unknown) {
-      if (!session.deviceSealedRootKey) {
-        throw error;
-      }
-
-      return session.masterKey.decrypt(payload).toString();
-    }
   }
 }
