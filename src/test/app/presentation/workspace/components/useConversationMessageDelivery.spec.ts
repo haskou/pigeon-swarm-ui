@@ -5,14 +5,12 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type {
   ChatMessage,
   ConversationResource,
-  MessageResource,
   Session,
   StickerMessageReference,
 } from '../../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';
 import { useConversationMessageDelivery } from '../../../../../app/presentation/workspace/components/useConversationMessageDelivery';
-import { copy } from '../../../../../shared/presentation/i18n/copy';
 import { captureUnhandledRejections } from '../../../../captureUnhandledRejections';
 
 const mockRefs: Array<{ current: unknown }> = [];
@@ -36,16 +34,14 @@ jest.mock('react', () => ({
 }));
 jest.mock('../../../../../app/composition/applicationContainer', () => ({
   applicationContainer: {
-    directMessages: { deliverSent: jest.fn() },
+    directMessages: { send: jest.fn() },
     messages: { send: jest.fn() },
     stickers: { markUsed: jest.fn() },
   },
 }));
 
-const send = jest.mocked(applicationContainer.messages.send);
-const deliverSent = jest.mocked(
-  applicationContainer.directMessages.deliverSent,
-);
+const directSend = jest.mocked(applicationContainer.directMessages.send);
+const legacySend = jest.mocked(applicationContainer.messages.send);
 const markUsed = jest.mocked(applicationContainer.stickers.markUsed);
 
 const session = { identity: { id: 'identity-1' } } as unknown as Session;
@@ -61,19 +57,14 @@ const groupConversation = {
   participantIds: ['identity-1', 'identity-3'],
   type: 'group',
 } as unknown as ConversationResource;
-const sentRaw = {
-  conversationId: 'conversation-1',
-  id: 'message-1',
-  type: 'sent',
-} as unknown as MessageResource;
 const sentMessage = {
   attachments: [],
   authorIdentityId: 'identity-1',
   content: 'hello',
   encrypted: false,
   id: 'message-1',
+  raw: { id: 'message-1', type: 'sent' },
   mine: true,
-  raw: sentRaw,
   reactions: [],
   timestamp: 2000,
 } as unknown as ChatMessage;
@@ -151,131 +142,40 @@ function mountDelivery(initialConversation = conversation) {
   };
 }
 
-describe('useConversationMessageDelivery inbox delivery', () => {
+describe('useConversationMessageDelivery one-to-one mailbox send', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     mockRefs.length = 0;
-    send.mockResolvedValue(sentMessage);
-    deliverSent.mockResolvedValue('delivered');
+    directSend.mockResolvedValue(sentMessage);
+    legacySend.mockResolvedValue(sentMessage);
     markUsed.mockResolvedValue(undefined);
   });
 
-  it('delivers the sent copy to the active conversation inbox after the legacy send resolves', async () => {
+  it('sends a one-to-one message through the mailbox and never the legacy message endpoint', async () => {
     const delivery = mountDelivery();
 
     await delivery.sendMessage('hello', [], {});
     await drain(delivery.queue);
 
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(deliverSent).toHaveBeenCalledTimes(1);
-    expect(deliverSent).toHaveBeenCalledWith(session, conversation, sentRaw);
-    expect(deliverSent.mock.calls[0]?.[1]).toBe(conversation);
-    expect(deliverSent.mock.calls[0]?.[2]).toBe(sentRaw);
-    expect(deliverSent.mock.invocationCallOrder[0]).toBeGreaterThan(
-      send.mock.invocationCallOrder[0] ?? Infinity,
-    );
-  });
-
-  it('does not deliver to the inbox while the legacy send is still pending', async () => {
-    const pendingSend = deferred<ChatMessage>();
-
-    send.mockReturnValue(pendingSend.promise);
-    const delivery = mountDelivery();
-
-    await delivery.sendMessage('hello', [], {});
-    await flushMicrotasks();
-
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(deliverSent).not.toHaveBeenCalled();
-
-    pendingSend.resolve(sentMessage);
-    await drain(delivery.queue);
-
-    expect(deliverSent).toHaveBeenCalledTimes(1);
-    expect(deliverSent).toHaveBeenCalledWith(session, conversation, sentRaw);
-  });
-
-  it('does not deliver to the inbox when the legacy send fails', async () => {
-    send.mockRejectedValue(new Error('send refused'));
-    const delivery = mountDelivery();
-
-    await delivery.sendMessage('hello', [], {});
-    await drain(delivery.queue);
-
-    expect(deliverSent).not.toHaveBeenCalled();
-    expect(delivery.state.error).toBe('send refused');
-  });
-
-  it.each(['skipped'] as const)(
-    'keeps the legacy send delivered when the inbox reports %s',
-    async (outcome) => {
-      deliverSent.mockResolvedValue(outcome);
-      const delivery = mountDelivery();
-
-      await delivery.sendMessage('hello', [], {});
-      await drain(delivery.queue);
-
-      expect(send).toHaveBeenCalledTimes(1);
-      expect(deliverSent).toHaveBeenCalledWith(session, conversation, sentRaw);
-      expect(delivery.state.error).toBeNull();
-      expect(delivery.state.messages).toEqual([sentMessage]);
-    },
-  );
-
-  it('still makes the legacy send when inbox delivery throws', async () => {
-    deliverSent.mockImplementation(() => {
-      throw new Error('inbox unavailable');
-    });
-    const delivery = mountDelivery();
-
-    await delivery.sendMessage('hello', [], {});
-    await drain(delivery.queue);
-
-    expect(send).toHaveBeenCalledWith(
+    expect(directSend).toHaveBeenCalledTimes(1);
+    expect(directSend).toHaveBeenCalledWith(
       session,
-      conversation.id,
+      conversation,
       'hello',
-      expect.objectContaining({ attachments: [] }),
+      expect.objectContaining({ attachments: [], previousMessageIds: [] }),
     );
+    expect(legacySend).not.toHaveBeenCalled();
   });
 
-  it('keeps a delivered send delivered when inbox delivery throws synchronously', async () => {
-    deliverSent.mockImplementation(() => {
-      throw new Error('inbox unavailable');
-    });
+  it('passes the one-to-one recipient identity with attachment uploads to the mailbox send', async () => {
     const delivery = mountDelivery();
 
     await delivery.sendMessage('hello', [], {});
     await drain(delivery.queue);
 
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(delivery.state.error).toBeNull();
-    expect(delivery.state.messages).toEqual([sentMessage]);
-  });
-
-  it('keeps a delivered send delivered when inbox delivery rejects, with no unhandled rejection', async () => {
-    deliverSent.mockRejectedValue(new Error('inbox unavailable'));
-    const delivery = mountDelivery();
-
-    const unhandled = await captureUnhandledRejections(async () => {
-      await delivery.sendMessage('hello', [], {});
-      await drain(delivery.queue);
-    });
-
-    expect(unhandled).toEqual([]);
-    expect(delivery.state.error).toBeNull();
-    expect(delivery.state.messages).toEqual([sentMessage]);
-  });
-
-  it('sends the one-to-one recipient identity with attachment uploads', async () => {
-    const delivery = mountDelivery();
-
-    await delivery.sendMessage('hello', [], {});
-    await drain(delivery.queue);
-
-    expect(send).toHaveBeenCalledWith(
+    expect(directSend).toHaveBeenCalledWith(
       session,
-      conversation.id,
+      conversation,
       'hello',
       expect.objectContaining({
         attachmentUpload: {
@@ -286,32 +186,58 @@ describe('useConversationMessageDelivery inbox delivery', () => {
     );
   });
 
-  it('sends no recipient identity for group attachment uploads', async () => {
-    const delivery = mountDelivery(groupConversation);
+  it('shows the mailbox-projected sent message in place of the optimistic one', async () => {
+    const delivery = mountDelivery();
 
     await delivery.sendMessage('hello', [], {});
     await drain(delivery.queue);
 
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(
-      send.mock.calls[0]?.[3]?.attachmentUpload?.recipientIdentityId,
-    ).toBeUndefined();
+    expect(delivery.state.error).toBeNull();
+    expect(delivery.state.messages).toEqual([sentMessage]);
   });
 
-  it('delivers sticker sends to the active conversation inbox with the sent copy', async () => {
+  it('marks the message failed with the send error when the mailbox send rejects', async () => {
+    directSend.mockRejectedValue(new Error('send refused'));
+    const delivery = mountDelivery();
+
+    await delivery.sendMessage('hello', [], {});
+    await drain(delivery.queue);
+
+    expect(delivery.state.error).toBe('send refused');
+    expect(delivery.state.messages).toEqual([
+      expect.objectContaining({ deliveryStatus: 'failed' }),
+    ]);
+    expect(legacySend).not.toHaveBeenCalled();
+  });
+
+  it('clears a previous send error when the next one-to-one send starts', async () => {
+    directSend.mockRejectedValueOnce(new Error('send refused'));
+    const delivery = mountDelivery();
+
+    await delivery.sendMessage('hello', [], {});
+    await drain(delivery.queue);
+    expect(delivery.state.error).toBe('send refused');
+
+    await delivery.sendMessage('again', [], {});
+    await drain(delivery.queue);
+
+    expect(delivery.state.error).toBeNull();
+  });
+
+  it('delivers one-to-one sticker sends through the mailbox', async () => {
     const delivery = mountDelivery();
 
     await delivery.sendSticker(sticker);
     await drain(delivery.queue);
 
-    expect(send).toHaveBeenCalledWith(
+    expect(directSend).toHaveBeenCalledWith(
       session,
-      conversation.id,
+      conversation,
       '',
       expect.objectContaining({ sticker }),
     );
-    expect(deliverSent).toHaveBeenCalledWith(session, conversation, sentRaw);
-    expect(deliverSent.mock.calls[0]?.[1]).toBe(conversation);
+    expect(legacySend).not.toHaveBeenCalled();
+    expect(markUsed).toHaveBeenCalledWith(session, sticker);
   });
 
   it('keeps a delivered sticker send delivered when sticker usage throws synchronously', async () => {
@@ -323,8 +249,7 @@ describe('useConversationMessageDelivery inbox delivery', () => {
     await delivery.sendSticker(sticker);
     await drain(delivery.queue);
 
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(deliverSent).toHaveBeenCalledWith(session, conversation, sentRaw);
+    expect(directSend).toHaveBeenCalledTimes(1);
     expect(delivery.state.error).toBeNull();
     expect(delivery.state.messages).toEqual([sentMessage]);
   });
@@ -339,138 +264,78 @@ describe('useConversationMessageDelivery inbox delivery', () => {
     });
 
     expect(unhandled).toEqual([]);
-    expect(send).toHaveBeenCalledTimes(1);
+    expect(directSend).toHaveBeenCalledTimes(1);
     expect(delivery.state.error).toBeNull();
     expect(delivery.state.messages).toEqual([sentMessage]);
   });
 
-  it('shows the direct copy notice when the inbox copy fails after the legacy send delivers', async () => {
-    deliverSent.mockResolvedValue('failed');
-    const mounted = mountDelivery();
+  it('keeps the optimistic message pending while the mailbox send is still running', async () => {
+    const pendingSend = deferred<ChatMessage>();
 
-    await mounted.sendMessage('hello', [], {});
-    await drain(mounted.queue);
+    directSend.mockReturnValue(pendingSend.promise);
+    const delivery = mountDelivery();
+
+    await delivery.sendMessage('hello', [], {});
     await flushMicrotasks();
 
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(mounted.state.error).toBe(copy.workspace.directMailboxDeliveryError);
-    expect(mounted.state.messages).toEqual([sentMessage]);
+    expect(directSend).toHaveBeenCalledTimes(1);
+    expect(delivery.state.messages).toEqual([
+      expect.objectContaining({ content: 'hello' }),
+    ]);
+
+    pendingSend.resolve(sentMessage);
+    await drain(delivery.queue);
+
+    expect(delivery.state.messages).toEqual([sentMessage]);
+  });
+});
+
+describe('useConversationMessageDelivery group send', () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+    mockRefs.length = 0;
+    directSend.mockResolvedValue(sentMessage);
+    legacySend.mockResolvedValue(sentMessage);
+    markUsed.mockResolvedValue(undefined);
   });
 
-  it('keeps the direct copy notice when a later inbox copy has no recipient inbox', async () => {
-    deliverSent
-      .mockResolvedValueOnce('failed')
-      .mockResolvedValueOnce('no-inbox');
-    const mounted = mountDelivery();
+  it('sends group messages through the legacy message endpoint only', async () => {
+    const delivery = mountDelivery(groupConversation);
 
-    await mounted.sendMessage('hello', [], {});
-    await drain(mounted.queue);
-    await flushMicrotasks();
-    expect(mounted.state.error).toBe(copy.workspace.directMailboxDeliveryError);
+    await delivery.sendMessage('hello', [], {});
+    await drain(delivery.queue);
 
-    await mounted.sendMessage('again', [], {});
-    await drain(mounted.queue);
-    await flushMicrotasks();
-
-    expect(mounted.state.error).toBe(copy.workspace.directMailboxDeliveryError);
-  });
-
-  it('does not show the direct copy notice when the recipient inbox is not created yet', async () => {
-    deliverSent.mockResolvedValue('no-inbox');
-    const mounted = mountDelivery();
-
-    await mounted.sendMessage('hello', [], {});
-    await drain(mounted.queue);
-    await flushMicrotasks();
-
-    expect(mounted.onErrorChange).not.toHaveBeenCalledWith(
-      copy.workspace.directMailboxDeliveryError,
+    expect(legacySend).toHaveBeenCalledWith(
+      session,
+      groupConversation.id,
+      'hello',
+      expect.objectContaining({ attachments: [] }),
     );
-    expect(mounted.state.error).toBeNull();
-    expect(mounted.state.messages).toEqual([sentMessage]);
+    expect(directSend).not.toHaveBeenCalled();
   });
 
-  it('clears the direct copy notice once a later inbox copy is delivered', async () => {
-    deliverSent
-      .mockResolvedValueOnce('failed')
-      .mockResolvedValueOnce('delivered');
-    const mounted = mountDelivery();
+  it('sends no recipient identity for group attachment uploads', async () => {
+    const delivery = mountDelivery(groupConversation);
 
-    await mounted.sendMessage('hello', [], {});
-    await drain(mounted.queue);
-    await flushMicrotasks();
-    expect(mounted.state.error).toBe(copy.workspace.directMailboxDeliveryError);
+    await delivery.sendMessage('hello', [], {});
+    await drain(delivery.queue);
 
-    await mounted.sendMessage('again', [], {});
-    await drain(mounted.queue);
-    await flushMicrotasks();
-
-    expect(mounted.state.error).toBeNull();
+    expect(legacySend).toHaveBeenCalledTimes(1);
+    expect(
+      legacySend.mock.calls[0]?.[3]?.attachmentUpload?.recipientIdentityId,
+    ).toBeUndefined();
   });
 
-  it('keeps one copy notice steady across repeated inbox failures', async () => {
-    deliverSent.mockResolvedValue('failed');
-    const mounted = mountDelivery();
+  it('shows the send error for a failed group send', async () => {
+    legacySend.mockRejectedValue(new Error('send refused'));
+    const delivery = mountDelivery(groupConversation);
 
-    await mounted.sendMessage('hello', [], {});
-    await drain(mounted.queue);
-    await flushMicrotasks();
-    await mounted.sendMessage('again', [], {});
-    await drain(mounted.queue);
-    await flushMicrotasks();
+    await delivery.sendMessage('hello', [], {});
+    await drain(delivery.queue);
 
-    const errors = mounted.onErrorChange.mock.calls.map(([error]) => error);
-    const firstNotice = errors.indexOf(
-      copy.workspace.directMailboxDeliveryError,
-    );
-
-    expect(firstNotice).toBeGreaterThanOrEqual(0);
-    expect(errors.slice(firstNotice)).not.toContain(null);
-    expect(mounted.state.error).toBe(copy.workspace.directMailboxDeliveryError);
-  });
-
-  it('does not show the copy notice on a conversation that is no longer active', async () => {
-    const pendingCopy = deferred<
-      'delivered' | 'failed' | 'no-inbox' | 'skipped'
-    >();
-    const otherConversation = {
-      ...conversation,
-      id: 'conversation-2',
-    } as unknown as ConversationResource;
-    deliverSent.mockReturnValue(pendingCopy.promise);
-    const mounted = mountDelivery();
-
-    await mounted.sendMessage('hello', [], {});
-    await drain(mounted.queue);
-    mounted.rerender(otherConversation);
-    pendingCopy.resolve('failed');
-    await flushMicrotasks();
-
-    expect(mounted.onErrorChange).not.toHaveBeenCalledWith(
-      copy.workspace.directMailboxDeliveryError,
-    );
-    expect(mounted.state.error).toBeNull();
-  });
-
-  it('does not keep a stale send error behind the copy notice', async () => {
-    deliverSent
-      .mockResolvedValueOnce('failed')
-      .mockResolvedValueOnce('skipped');
-    const mounted = mountDelivery();
-
-    await mounted.sendMessage('hello', [], {});
-    await drain(mounted.queue);
-    await flushMicrotasks();
-    send.mockRejectedValueOnce(new Error('send refused'));
-    await mounted.sendMessage('again', [], {});
-    await drain(mounted.queue);
-    await flushMicrotasks();
-    expect(mounted.state.error).toBe('send refused');
-
-    await mounted.sendMessage('third', [], {});
-    await drain(mounted.queue);
-    await flushMicrotasks();
-
-    expect(mounted.state.error).toBeNull();
+    expect(delivery.state.error).toBe('send refused');
+    expect(delivery.state.messages).toEqual([
+      expect.objectContaining({ deliveryStatus: 'failed' }),
+    ]);
   });
 });

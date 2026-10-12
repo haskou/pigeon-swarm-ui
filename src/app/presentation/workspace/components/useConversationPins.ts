@@ -11,11 +11,11 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { runWhenBrowserIdle } from '../../../../shared/presentation/runWhenBrowserIdle';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
-import { runMailboxSideEffect } from './runMailboxSideEffect';
 
 type UseConversationPinsInput = {
   activeConversation?: ConversationResource;
   closeMessageContextMenu: () => void;
+  messages: ChatMessage[];
   onError: (error: string | null) => void;
   session: Session;
 };
@@ -45,8 +45,13 @@ function withoutMessage(current: Set<string>, messageId: string): Set<string> {
 export function useConversationPins(
   input: UseConversationPinsInput,
 ): UseConversationPinsResult {
-  const { activeConversation, closeMessageContextMenu, onError, session } =
-    input;
+  const {
+    activeConversation,
+    closeMessageContextMenu,
+    messages,
+    onError,
+    session,
+  } = input;
   const activeConversationId = activeConversation?.id;
   const [collection, setCollection] = useState<MessageCollectionState | null>(
     null,
@@ -61,6 +66,8 @@ export function useConversationPins(
 
       return;
     }
+    // One-to-one pins are not replicated: they come from mailbox pin changes.
+    if (activeConversation?.type === 'one-to-one') return;
 
     let cancelled = false;
     const cancelIdleWork = runWhenBrowserIdle(async () => {
@@ -82,10 +89,23 @@ export function useConversationPins(
       cancelled = true;
       cancelIdleWork();
     };
-  }, [activeConversationId, session]);
+  }, [activeConversation?.type, activeConversationId, session]);
 
   const open = async () => {
     if (!activeConversationId) return;
+    if (activeConversation?.type === 'one-to-one') {
+      // The mailbox has no pin listing; the pins view is the pinned messages
+      // already present in the local timeline.
+      setCollection({
+        error: null,
+        messages: messages.filter(
+          (message) => pinnedMessageIds.has(message.id),
+        ),
+        state: 'ready',
+      });
+
+      return;
+    }
 
     setCollection({ error: null, messages: [], state: 'loading' });
     try {
@@ -116,18 +136,19 @@ export function useConversationPins(
     onError(null);
     const createdAt = Date.now();
     try {
-      await applicationContainer.messages.pin(
-        session,
-        activeConversation.id,
-        message.id,
-      );
-      runMailboxSideEffect(() =>
-        applicationContainer.directMessages.deliverPin(
+      if (activeConversation.type === 'one-to-one') {
+        await applicationContainer.directMessages.pin(
           session,
           activeConversation,
           { action: 'pin', createdAt, messageId: message.id },
-        ),
-      );
+        );
+      } else {
+        await applicationContainer.messages.pin(
+          session,
+          activeConversation.id,
+          message.id,
+        );
+      }
       setPinnedMessageIds((current) => new Set(current).add(message.id));
     } catch (caught) {
       onError(toUserErrorMessage(caught, copy.messages.pinError));
@@ -139,18 +160,19 @@ export function useConversationPins(
 
     const createdAt = Date.now();
     try {
-      await applicationContainer.messages.unpin(
-        session,
-        activeConversation.id,
-        message.id,
-      );
-      runMailboxSideEffect(() =>
-        applicationContainer.directMessages.deliverPin(
+      if (activeConversation.type === 'one-to-one') {
+        await applicationContainer.directMessages.pin(
           session,
           activeConversation,
           { action: 'unpin', createdAt, messageId: message.id },
-        ),
-      );
+        );
+      } else {
+        await applicationContainer.messages.unpin(
+          session,
+          activeConversation.id,
+          message.id,
+        );
+      }
       setPinnedMessageIds((current) => withoutMessage(current, message.id));
       setCollection((current) =>
         current
