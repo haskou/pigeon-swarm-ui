@@ -139,13 +139,17 @@ export class PigeonApiGateway {
     ),
     conversationMapper: ConversationMapper = new ConversationMapper(),
     messageProjector: MessageProjector = new MessageProjector(copy.messages),
-    keychainCipher: KeychainCipher = new KeychainCipher(),
-    conversationIds: ConversationIdFactory = new ConversationIdFactory(),
-    attachmentCipher: AttachmentCipher = AttachmentCipher.inCurrentThread(),
-    storage: Pick<
-      Storage,
-      'getItem' | 'removeItem' | 'setItem'
-    > = globalThis.localStorage,
+    {
+      attachmentCipher = AttachmentCipher.inCurrentThread(),
+      conversationIds = new ConversationIdFactory(),
+      keychainCipher = new KeychainCipher(),
+      storage = globalThis.localStorage,
+    }: {
+      attachmentCipher?: AttachmentCipher;
+      conversationIds?: ConversationIdFactory;
+      keychainCipher?: KeychainCipher;
+      storage?: Pick<Storage, 'getItem' | 'removeItem' | 'setItem'>;
+    } = {},
   ) {
     this.attachmentCipher = attachmentCipher;
     this.identityVault = new DeviceIdentityVault();

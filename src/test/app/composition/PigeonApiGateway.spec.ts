@@ -51,9 +51,9 @@ describe(PigeonApiGateway.name, () => {
       undefined,
       undefined,
       undefined,
-      undefined,
-      undefined,
-      attachmentCipher,
+      {
+        attachmentCipher,
+      },
     );
 
     gateway.disposeSessionWorkers();
@@ -79,16 +79,9 @@ describe(PigeonApiGateway.name, () => {
     try {
       expect(
         () =>
-          new PigeonApiGateway(
-            undefined,
-            undefined,
-            undefined,
-            undefined,
-            undefined,
-            undefined,
-            undefined,
+          new PigeonApiGateway(undefined, undefined, undefined, undefined, {
             storage,
-          ),
+          }),
       ).not.toThrow();
     } finally {
       Reflect.deleteProperty(globalThis, 'localStorage');
