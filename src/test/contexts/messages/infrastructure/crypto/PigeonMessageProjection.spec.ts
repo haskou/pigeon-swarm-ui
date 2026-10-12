@@ -9,10 +9,8 @@ import {
 import { mock, type MockProxy } from 'jest-mock-extended';
 import { setImmediate as flushImmediate } from 'node:timers/promises';
 
-import type {
-  MessageResource,
-  Session,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
+import type { MessageResource } from '../../../../../contexts/messages/infrastructure/http/MessageResource';
 
 import { createMessageDecryptWorker } from '../../../../../contexts/messages/infrastructure/crypto/createMessageDecryptWorker';
 import { MessageProjector } from '../../../../../contexts/messages/infrastructure/crypto/MessageProjector';

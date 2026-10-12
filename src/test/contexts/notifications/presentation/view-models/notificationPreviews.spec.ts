@@ -1,7 +1,5 @@
-import type {
-  MessageAttachment,
-  MessageResource,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { MessageAttachment } from '../../../../../contexts/attachments/application/contracts/MessageAttachment';
+import type { MessageResource } from '../../../../../contexts/messages/infrastructure/http/MessageResource';
 
 import {
   communityNotificationPreview,

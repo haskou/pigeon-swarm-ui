@@ -3,7 +3,7 @@ import { mock } from 'jest-mock-extended';
 
 import type { PigeonPresenceGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonPresenceGateway';
 import type { IdentityPresenceResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityPresenceResource';
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { IdentityPresence } from '../../../../../contexts/identities/domain/IdentityPresence';
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';

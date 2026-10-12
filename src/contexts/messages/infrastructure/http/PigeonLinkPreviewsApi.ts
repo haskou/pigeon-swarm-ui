@@ -1,9 +1,7 @@
-import type {
-  MessageLinkPreview,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { MessageLinkPreview } from './resources/MessageLinkPreview';
 
 export class PigeonLinkPreviewsApi {
   public constructor(

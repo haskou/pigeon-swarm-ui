@@ -1,6 +1,6 @@
 import { mock } from 'jest-mock-extended';
 
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
 import { PigeonCallParticipation } from '../../../../app/composition/calls/PigeonCallParticipation';
 import { PigeonCallsApi } from '../../../../contexts/calls/infrastructure/http/PigeonCallsApi';

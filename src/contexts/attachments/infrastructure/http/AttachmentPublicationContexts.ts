@@ -1,4 +1,4 @@
-import type { MessageAttachment } from '../../../../shared/domain/pigeonResources.types';
+import type { MessageAttachment } from '../../application/contracts/MessageAttachment';
 import type { AttachmentPublisherExternalIdentifier } from '../../domain/value-objects/AttachmentPublisherExternalIdentifier';
 import type { AttachmentSourceExternalIdentifier } from '../../domain/value-objects/AttachmentSourceExternalIdentifier';
 import type { AttachmentPublicationContext } from './AttachmentPublicationContext';

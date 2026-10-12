@@ -1,7 +1,7 @@
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { DraftPayloadCipher } from '../../../../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 

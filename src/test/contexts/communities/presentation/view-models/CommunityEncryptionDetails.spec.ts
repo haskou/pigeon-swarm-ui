@@ -1,4 +1,4 @@
-import type { Community } from '../../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
 
 import { CommunityEncryptionDetails } from '../../../../../contexts/communities/presentation/view-models/CommunityEncryptionDetails';
 

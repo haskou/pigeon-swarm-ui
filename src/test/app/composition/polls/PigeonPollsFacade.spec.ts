@@ -1,8 +1,8 @@
 import { mock } from 'jest-mock-extended';
 
 import type { PollUseCases } from '../../../../app/composition/polls/PollUseCases';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { PollVoter } from '../../../../contexts/polls/application/vote-poll/PollVoter';
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
 
 import { PigeonPollsFacade } from '../../../../app/composition/polls/PigeonPollsFacade';
 import { PollAccessContexts } from '../../../../contexts/polls/infrastructure/http/PollAccessContexts';

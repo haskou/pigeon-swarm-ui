@@ -1,10 +1,10 @@
 import { Timestamp } from '@haskou/value-objects';
 import { mock } from 'jest-mock-extended';
 
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { PigeonMessageCommandsApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
 import type { PigeonMessagesApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessagesApi';
 import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 
 import { IdentityAccessContexts } from '../../../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
 import { Message } from '../../../../../contexts/messages/domain/Message';

@@ -1,7 +1,7 @@
 import { mock, mockDeep } from 'jest-mock-extended';
 
 import type { StickerUseCases } from '../../../../app/composition/stickers/StickerUseCases';
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
 import { PigeonStickersFacade } from '../../../../app/composition/stickers/PigeonStickersFacade';
 import { Sticker } from '../../../../contexts/stickers/domain/entities/Sticker';

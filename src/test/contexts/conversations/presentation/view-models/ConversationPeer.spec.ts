@@ -1,7 +1,5 @@
-import type {
-  ConversationResource,
-  LocalKeychain,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { LocalKeychain } from '../../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
 
 import { ConversationPeer } from '../../../../../contexts/conversations/presentation/view-models/ConversationPeer';
 

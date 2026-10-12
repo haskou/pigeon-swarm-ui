@@ -1,16 +1,13 @@
 import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
-import type {
-  ConversationResource,
-  ConversationKeyEntry,
-  IdentityResource,
-  LocalKeychain,
-  NotificationResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestCache } from '../../../../shared/infrastructure/http/RequestCache';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
+import type { ConversationKeyEntry } from '../../../identities/infrastructure/keychain/ConversationKeyEntry';
+import type { LocalKeychain } from '../../../identities/infrastructure/keychain/LocalKeychain';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { NotificationResource } from '../../../notifications/infrastructure/http/resources/NotificationResource';
 import type { ConversationIdFactory } from '../../domain/ConversationIdFactory';
 import type { ConversationIdentityReader } from './ConversationIdentityReader';
 import type { ConversationInvitationType } from './ConversationInvitationType';
@@ -18,6 +15,7 @@ import type { ConversationKeychainPublisher } from './ConversationKeychainPublis
 import type { ConversationMapper } from './ConversationMapper';
 import type { ConversationOperationBody } from './ConversationOperationBody';
 import type { ConversationOperationSigner } from './ConversationOperationSigner';
+import type { ConversationResource } from './ConversationResource';
 import type { ConversationTarget } from './ConversationTarget';
 import type { GroupConversationInput } from './GroupConversationInput';
 import type { PigeonConversationCommandsApiDependencies } from './PigeonConversationCommandsApiDependencies';

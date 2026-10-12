@@ -1,4 +1,4 @@
-import type { MessageAttachment } from '../../../../../shared/domain/pigeonResources.types';
+import type { MessageAttachment } from '../../../../../contexts/attachments/application/contracts/MessageAttachment';
 
 import { attachmentIdentity } from '../../../../../contexts/messages/presentation/view-models/attachmentIdentity';
 

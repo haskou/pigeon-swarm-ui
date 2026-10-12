@@ -1,4 +1,4 @@
-import type { NotificationResource } from '../../../../../shared/domain/pigeonResources.types';
+import type { NotificationResource } from '../../../../../contexts/notifications/infrastructure/http/resources/NotificationResource';
 
 import { notificationPreview } from '../../../../../contexts/notifications/presentation/view-models/notificationPreview';
 

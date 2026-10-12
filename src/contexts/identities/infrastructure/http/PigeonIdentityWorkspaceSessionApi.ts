@@ -1,12 +1,10 @@
-import type {
-  ConversationResource,
-  KeychainResource,
-  LocalKeychain,
-  LoginResult,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
 import type { LoginIdentityProgressReporter } from '../../application/login-identity/LoginIdentityProgressReporter';
+import type { LocalKeychain } from '../keychain/LocalKeychain';
+import type { Session } from '../session/Session';
 import type { IdentityWorkspaceSource } from './IdentityWorkspaceSource';
+import type { KeychainResource } from './resources/KeychainResource';
+import type { LoginResult } from './resources/LoginResult';
 
 const emptyKeychain: LocalKeychain = {
   conversations: {},

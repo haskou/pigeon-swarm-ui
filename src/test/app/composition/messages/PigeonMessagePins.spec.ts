@@ -1,9 +1,9 @@
 import { mock } from 'jest-mock-extended';
 
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { PinnedMessagesSearcher } from '../../../../contexts/messages/application/list-message-pins/PinnedMessagesSearcher';
 import type { MessagePinner } from '../../../../contexts/messages/application/pin-message/MessagePinner';
 import type { MessageUnpinner } from '../../../../contexts/messages/application/unpin-message/MessageUnpinner';
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
 
 import { PigeonMessagePins } from '../../../../app/composition/messages/PigeonMessagePins';
 import { IdentityAccessContexts } from '../../../../contexts/identities/infrastructure/http/IdentityAccessContexts';

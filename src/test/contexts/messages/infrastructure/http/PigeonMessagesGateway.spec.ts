@@ -1,9 +1,7 @@
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { PigeonMessageCommandsApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
 import type { PigeonMessagesApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessagesApi';
-import type {
-  ChatMessage,
-  Session,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
 
 import { PigeonMessagesGateway } from '../../../../../contexts/messages/infrastructure/http/PigeonMessagesGateway';
 

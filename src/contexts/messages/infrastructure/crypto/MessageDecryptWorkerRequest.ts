@@ -1,4 +1,4 @@
-import type { MessageResource } from '../../../../shared/domain/pigeonResources.types';
+import type { MessageResource } from '../http/MessageResource';
 
 export type MessageDecryptWorkerRequest = {
   conversationId: string;

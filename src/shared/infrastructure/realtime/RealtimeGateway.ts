@@ -7,7 +7,7 @@ export type { RealtimeMailboxSubscriptionInput } from './RealtimeMailboxSubscrip
 export type { RealtimeMessage } from './RealtimeMessage';
 export type { RealtimeTypingMessage } from './RealtimeTypingMessage';
 export type { RealtimeTypingInput } from './RealtimeTypingInput';
-import type { Session } from '../../domain/pigeonResources.types';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 
 import { API_SERVER_URL } from '../../../app/API_SERVER_URL';
 import { ApiUrlBuilder } from '../http/ApiUrlBuilder';

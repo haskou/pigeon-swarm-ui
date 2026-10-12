@@ -1,7 +1,5 @@
-import type {
-  EditMessageOptions,
-  SendMessageOptions,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { EditMessageOptions } from './resources/EditMessageOptions';
+import type { SendMessageOptions } from './resources/SendMessageOptions';
 
 export class MessageOperationContexts {
   private readonly editOptions = new Map<string, EditMessageOptions>();

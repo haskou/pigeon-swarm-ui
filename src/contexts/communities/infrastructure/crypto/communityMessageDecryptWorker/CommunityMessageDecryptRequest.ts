@@ -1,4 +1,4 @@
-import type { MessageResource } from '../../../../../shared/domain/pigeonResources.types';
+import type { MessageResource } from '../../../../messages/infrastructure/http/MessageResource';
 
 export type CommunityMessageDecryptRequest = {
   channelId: string;

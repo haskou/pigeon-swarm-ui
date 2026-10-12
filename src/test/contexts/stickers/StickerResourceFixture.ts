@@ -1,8 +1,6 @@
-import type {
-  MyStickersResource,
-  StickerPackResource,
-  StickerResource,
-} from '../../../shared/domain/pigeonResources.types';
+import type { MyStickersResource } from '../../../contexts/stickers/infrastructure/http/resources/MyStickersResource';
+import type { StickerPackResource } from '../../../contexts/stickers/infrastructure/http/resources/StickerPackResource';
+import type { StickerResource } from '../../../contexts/stickers/infrastructure/http/resources/StickerResource';
 
 export const stickerResource = (id = 'sticker-a'): StickerResource => ({
   assetCid: `asset-${id}`,

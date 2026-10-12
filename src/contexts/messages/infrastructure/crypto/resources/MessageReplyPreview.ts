@@ -1,4 +1,4 @@
-import type { MessageAttachment } from '../../../../../shared/domain/pigeonResources.types';
+import type { MessageAttachment } from '../../../../attachments/application/contracts/MessageAttachment';
 import type { StickerMessageReference } from '../../../../stickers/infrastructure/http/resources/StickerMessageReference';
 
 export type MessageReplyPreview = {

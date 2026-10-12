@@ -1,10 +1,8 @@
 import { KeyPair, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
+import type { IdentityResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { DeviceIdentityVault } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVault';
-import type {
-  IdentityResource,
-  Session,
-} from '../../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 

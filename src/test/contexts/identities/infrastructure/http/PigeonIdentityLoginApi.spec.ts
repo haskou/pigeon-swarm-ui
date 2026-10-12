@@ -1,8 +1,6 @@
 import type { LoginIdentityProgressReporter } from '../../../../../contexts/identities/application/login-identity/LoginIdentityProgressReporter';
-import type {
-  LoginResult,
-  Session,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { LoginResult } from '../../../../../contexts/identities/infrastructure/http/resources/LoginResult';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { PigeonIdentityLoginApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityLoginApi';
 import { PigeonIdentitySessionApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentitySessionApi';

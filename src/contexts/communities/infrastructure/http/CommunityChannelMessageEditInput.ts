@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
-import type { CommunityMessageMention } from '../../../../shared/domain/pigeonResources.types';
 import type { CommunityChannelMessagePayloadInput } from './CommunityChannelMessagePayloadInput';
+import type { CommunityMessageMentionResource as CommunityMessageMention } from './resources/CommunityMessageMentionResource';
 
 export type CommunityChannelMessageEditInput =
   CommunityChannelMessagePayloadInput & {

@@ -1,8 +1,6 @@
-import type {
-  ConversationResource,
-  LocalKeychain,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { LocalKeychain } from '../../../identities/infrastructure/keychain/LocalKeychain';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { ConversationResource } from './ConversationResource';
 import type { ConversationTarget } from './ConversationTarget';
 import type { GroupConversationInput } from './GroupConversationInput';
 

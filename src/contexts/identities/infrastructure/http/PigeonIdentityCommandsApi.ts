@@ -6,21 +6,19 @@ import {
 } from '@haskou/pigeon-swarm-crypto';
 import { StringValueObject } from '@haskou/value-objects';
 
-import type {
-  IdentityResource,
-  LocalKeychain,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { Identity } from '../../domain/Identity';
 import type { IdentityMasterKeyProtection } from '../../domain/value-objects/IdentityMasterKeyProtection';
 import type { IdentityCreationMaterial } from '../crypto/IdentityCreationMaterial';
+import type { LocalKeychain } from '../keychain/LocalKeychain';
+import type { Session } from '../session/Session';
 import type { DeviceIdentityVault } from '../storage/DeviceIdentityVault';
 import type { CreatedIdentityMaterial } from './CreatedIdentityMaterial';
 import type { IdentityUpdateProfileInput } from './IdentitySignaturePayloadFactory';
 import type { IdentitySignaturePayloadFactory } from './IdentitySignaturePayloadFactory';
 import type { PigeonIdentityGateway } from './PigeonIdentityGateway';
+import type { IdentityResource } from './resources/IdentityResource';
 
 import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
 import { copy } from '../../../../shared/presentation/i18n/copy';

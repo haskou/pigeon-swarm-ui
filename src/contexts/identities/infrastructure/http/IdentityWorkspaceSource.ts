@@ -1,9 +1,7 @@
-import type {
-  ConversationResource,
-  KeychainResource,
-  LocalKeychain,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
+import type { LocalKeychain } from '../keychain/LocalKeychain';
+import type { Session } from '../session/Session';
+import type { KeychainResource } from './resources/KeychainResource';
 
 export interface IdentityWorkspaceSource {
   decryptKeychain(session: Session, keychain: KeychainResource): LocalKeychain;

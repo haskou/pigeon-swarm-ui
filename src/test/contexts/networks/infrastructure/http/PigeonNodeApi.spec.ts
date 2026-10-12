@@ -1,6 +1,6 @@
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { NodeRelayConfigurationResource } from '../../../../../contexts/networks/infrastructure/http/resources/NodeRelayConfigurationResource';
 import type { Peer } from '../../../../../contexts/networks/presentation/view-models/Peer';
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 

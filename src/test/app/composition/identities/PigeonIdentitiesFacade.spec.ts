@@ -4,7 +4,7 @@ import type { IdentityUseCases } from '../../../../app/composition/identities/Id
 import type { IdentityMapper } from '../../../../contexts/identities/infrastructure/http/IdentityMapper';
 import type { IdentityPresenceMapper } from '../../../../contexts/identities/infrastructure/http/IdentityPresenceMapper';
 import type { PigeonIdentitiesGateway } from '../../../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
 import { PigeonIdentitiesFacade } from '../../../../app/composition/identities/PigeonIdentitiesFacade';
 import { Identity } from '../../../../contexts/identities/domain/Identity';

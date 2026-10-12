@@ -1,4 +1,4 @@
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { PollActorId } from '../../../../../contexts/polls/domain/value-objects/PollActorId';
 import { PollAccessContexts } from '../../../../../contexts/polls/infrastructure/http/PollAccessContexts';

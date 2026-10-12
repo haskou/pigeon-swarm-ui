@@ -1,7 +1,7 @@
 import { KeyPair, SHA256Hash } from '@haskou/pigeon-swarm-crypto';
 import { StringValueObject } from '@haskou/value-objects';
 
-import type { IdentityResource } from '../../../../../shared/domain/pigeonResources.types';
+import type { IdentityResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 import { IdentityMailboxHomeVerifier } from '../../../../../contexts/identities/infrastructure/http/IdentityMailboxHomeVerifier';

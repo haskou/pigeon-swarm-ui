@@ -1,7 +1,7 @@
 import { Timestamp } from '@haskou/value-objects';
 import { mock } from 'jest-mock-extended';
 
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { Sticker } from '../../../../../contexts/stickers/domain/entities/Sticker';
 import { StickerAssetExternalIdentifier } from '../../../../../contexts/stickers/domain/value-objects/StickerAssetExternalIdentifier';

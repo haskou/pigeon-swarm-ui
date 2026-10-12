@@ -1,14 +1,12 @@
-import type {
-  NotificationScopeSetting,
-  NotificationScopeSettingInput,
-  NotificationScopeSettingsResource,
-  NotificationSettingScope,
-  NotificationResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { CachedGetRequest } from './CachedGetRequest';
+import type { NotificationResource } from './resources/NotificationResource';
+import type { NotificationScopeSettingInputResource as NotificationScopeSettingInput } from './resources/NotificationScopeSettingInputResource';
+import type { NotificationScopeSettingResource as NotificationScopeSetting } from './resources/NotificationScopeSettingResource';
+import type { NotificationScopeSettingsResource } from './resources/NotificationScopeSettingsResource';
+import type { NotificationSettingScopeResource as NotificationSettingScope } from './resources/NotificationSettingScopeResource';
 
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';

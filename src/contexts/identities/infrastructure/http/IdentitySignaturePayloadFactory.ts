@@ -1,7 +1,7 @@
 import type { IdentityUpdateProfileInput } from './resources/IdentityUpdateProfileInput';
 
 export type { IdentityUpdateProfileInput } from './resources/IdentityUpdateProfileInput';
-import type { IdentityResource } from '../../../../shared/domain/pigeonResources.types';
+import type { IdentityResource } from './resources/IdentityResource';
 
 import { MailboxHomeBase } from '../../../../shared/infrastructure/client/MailboxHomeBase';
 import { ProfileBiography } from '../../domain/profile/ProfileBiography';

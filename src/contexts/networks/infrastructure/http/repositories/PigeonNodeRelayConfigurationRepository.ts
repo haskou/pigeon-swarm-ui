@@ -1,5 +1,5 @@
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 import type { IdentityAccessContexts } from '../../../../identities/infrastructure/http/IdentityAccessContexts';
+import type { Session } from '../../../../identities/infrastructure/session/Session';
 import type { NodeRelayConfiguration } from '../../../domain/NodeRelayConfiguration';
 import type { NodeRelayConfigurationRepository } from '../../../domain/repositories/NodeRelayConfigurationRepository';
 import type { NetworkActorId } from '../../../domain/value-objects/NetworkActorId';

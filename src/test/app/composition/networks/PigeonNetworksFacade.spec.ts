@@ -1,11 +1,11 @@
 import { mock, type MockProxy } from 'jest-mock-extended';
 
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { NetworkCreator } from '../../../../contexts/networks/application/create-network/NetworkCreator';
 import type { NetworkJoiner } from '../../../../contexts/networks/application/join-network/NetworkJoiner';
 import type { NodeNetworkRemover } from '../../../../contexts/networks/application/remove-node-network/NodeNetworkRemover';
 import type { NetworkPeersSearcher } from '../../../../contexts/networks/application/search-network-peers/NetworkPeersSearcher';
 import type { NodeNetworksSearcher } from '../../../../contexts/networks/application/search-node-networks/NodeNetworksSearcher';
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
 
 import { PigeonNetworksFacade } from '../../../../app/composition/networks/PigeonNetworksFacade';
 import { PigeonNodeFacade } from '../../../../app/composition/networks/PigeonNodeFacade';

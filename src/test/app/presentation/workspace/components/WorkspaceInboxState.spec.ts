@@ -1,9 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 
-import type {
-  Community,
-  CommunityMembershipRequest,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { CommunityMembershipRequestResource as CommunityMembershipRequest } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityMembershipRequestResource';
+import type { CommunityResource as Community } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
 
 import { WorkspaceInboxState } from '../../../../../app/presentation/workspace/components/WorkspaceInboxState';
 

@@ -1,7 +1,7 @@
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { SignedPublicMutation } from '../../../../shared/infrastructure/crypto/SignedPublicMutation';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { CallSignalPayload } from '../media/CallSignalPayload';
 import type { CallParticipantState } from './CallEventSigner';
 import type { CallScopeLookup } from './CallScopeLookup';

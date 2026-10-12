@@ -1,4 +1,4 @@
-import type { IdentityResource } from '../../../../../shared/domain/pigeonResources.types';
+import type { IdentityResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 
 import { PigeonIdentityGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityGateway';

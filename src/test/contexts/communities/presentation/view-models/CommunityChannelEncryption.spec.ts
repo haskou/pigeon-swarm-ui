@@ -1,4 +1,4 @@
-import type { CommunityTextChannel } from '../../../../../shared/domain/pigeonResources.types';
+import type { CommunityTextChannelResource as CommunityTextChannel } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityTextChannelResource';
 
 import { CommunityChannelEncryption } from '../../../../../contexts/communities/presentation/view-models/CommunityChannelEncryption';
 import { copy } from '../../../../../shared/presentation/i18n/copy';

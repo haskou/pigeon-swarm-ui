@@ -1,4 +1,4 @@
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../session/Session';
 
 export type IdentityAccessContext = {
   newPassword?: string;

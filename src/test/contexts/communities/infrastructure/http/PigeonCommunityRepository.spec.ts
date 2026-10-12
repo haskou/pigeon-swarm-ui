@@ -1,5 +1,5 @@
 import type { CommunityResource } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { CommunityId } from '../../../../../contexts/communities/domain/value-objects/CommunityId';
 import { CommunityIdentityId } from '../../../../../contexts/communities/domain/value-objects/CommunityIdentityId';

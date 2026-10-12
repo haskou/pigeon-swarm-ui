@@ -1,7 +1,5 @@
-import type {
-  PublicFileUpload,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { PublicFileUpload } from '../../application/contracts/PublicFileUpload';
 
 import { PublicImageUploadPreparer } from '../media/PublicImageUploadPreparer';
 import { PigeonPublicFilesClient } from './PigeonPublicFilesClient';

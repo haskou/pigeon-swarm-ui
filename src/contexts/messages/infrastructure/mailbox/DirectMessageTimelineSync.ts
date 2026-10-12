@@ -1,12 +1,10 @@
-import type {
-  ChatMessage,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { DirectEditedRecord } from '../../../mailboxes/domain/DirectEditedRecord';
 import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessageRecord';
 import type { DirectReadRecord } from '../../../mailboxes/domain/DirectReadRecord';
 import type { DirectSentRecord } from '../../../mailboxes/domain/DirectSentRecord';
 import type { OpenedMailboxPage } from '../../../mailboxes/infrastructure/MailboxChannel';
+import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { DirectMessageInboxOpener } from './DirectMessageInboxOpener';
 import type { DirectMessageMailboxStore } from './DirectMessageMailboxStore';

@@ -1,8 +1,6 @@
-import type {
-  NotificationScopeSetting,
-  NotificationScopeSettingInput,
-  Session,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
+import type { NotificationScopeSettingInputResource as NotificationScopeSettingInput } from '../../../../../contexts/notifications/infrastructure/http/resources/NotificationScopeSettingInputResource';
+import type { NotificationScopeSettingResource as NotificationScopeSetting } from '../../../../../contexts/notifications/infrastructure/http/resources/NotificationScopeSettingResource';
 
 import { PigeonNotificationsApi } from '../../../../../contexts/notifications/infrastructure/http/PigeonNotificationsApi';
 import { PigeonNotificationsGateway } from '../../../../../contexts/notifications/infrastructure/http/PigeonNotificationsGateway';

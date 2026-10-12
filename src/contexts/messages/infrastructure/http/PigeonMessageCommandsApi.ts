@@ -1,20 +1,18 @@
 import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { UUID } from '@haskou/value-objects';
 
-import type {
-  ChatMessage,
-  EditMessageOptions,
-  MessageAttachment,
-  MessageResource,
-  SendMessageOptions,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+import type { MessageAttachment } from '../../../attachments/application/contracts/MessageAttachment';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
 import type { EncryptMessagePayloadInput } from '../crypto/EncryptMessagePayloadInput';
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { MessageAttachmentPublisher } from './MessageAttachmentPublisher';
+import type { MessageResource } from './MessageResource';
+import type { EditMessageOptions } from './resources/EditMessageOptions';
 import type { MessageCommandIdentity } from './resources/MessageCommandIdentity';
+import type { SendMessageOptions } from './resources/SendMessageOptions';
 
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';

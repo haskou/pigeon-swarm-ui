@@ -1,11 +1,9 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
-import type {
-  IdentityPresence,
-  SelectablePresenceStatus,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+import type { Session } from '../session/Session';
+import type { IdentityPresenceResource as IdentityPresence } from './resources/IdentityPresenceResource';
+import type { SelectablePresenceStatusResource as SelectablePresenceStatus } from './resources/SelectablePresenceStatusResource';
 
 export class PigeonPresenceApi {
   public constructor(

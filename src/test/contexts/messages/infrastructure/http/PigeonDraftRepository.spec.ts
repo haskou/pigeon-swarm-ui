@@ -1,7 +1,7 @@
 import { mock } from 'jest-mock-extended';
 
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { PigeonMessagesApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessagesApi';
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
 
 import { IdentityAccessContexts } from '../../../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
 import { ConversationDraft } from '../../../../../contexts/messages/domain/ConversationDraft';

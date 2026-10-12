@@ -1,8 +1,6 @@
-import type {
-  ChatMessage,
-  MessageResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
+import type { MessageResource } from '../http/MessageResource';
 
 export interface MessageProjectionPort {
   decrypt(

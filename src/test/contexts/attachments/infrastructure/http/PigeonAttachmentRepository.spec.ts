@@ -1,6 +1,6 @@
 import { Timestamp } from '@haskou/value-objects';
 
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { Attachment } from '../../../../../contexts/attachments/domain/Attachment';
 import { EncryptedAttachmentStrategy } from '../../../../../contexts/attachments/domain/strategies/EncryptedAttachmentStrategy';

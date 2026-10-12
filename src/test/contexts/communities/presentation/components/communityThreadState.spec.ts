@@ -1,7 +1,5 @@
-import type {
-  ChatMessage,
-  CommunityChannelThreadSummary,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { CommunityChannelThreadSummaryResource as CommunityChannelThreadSummary } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityChannelThreadSummaryResource';
+import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
 
 import {
   hiddenCommunityThreadSummaryKeysFromMessages,

@@ -1,8 +1,6 @@
-import type {
-  Community,
-  CommunityTextChannel,
-  CommunityVoiceChannel,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
+import type { CommunityTextChannelResource as CommunityTextChannel } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityTextChannelResource';
+import type { CommunityVoiceChannelResource as CommunityVoiceChannel } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityVoiceChannelResource';
 
 import { CommunityChannelCollection } from '../../../../../contexts/communities/presentation/view-models/CommunityChannelCollection';
 

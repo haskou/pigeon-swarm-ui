@@ -1,5 +1,5 @@
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { ScopeFrontierReader } from '../../../../shared/infrastructure/http/ScopeFrontierReader';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { CommunityModerationLogBody } from './CommunityModerationLogBody';
 import type { CommunityModerationLogInput } from './CommunityModerationLogInput';
 

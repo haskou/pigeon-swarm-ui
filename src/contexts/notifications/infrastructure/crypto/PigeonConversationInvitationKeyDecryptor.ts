@@ -1,9 +1,7 @@
 import { EncryptedPayload } from '@haskou/pigeon-swarm-crypto';
 
-import type {
-  ConversationKeyEntry,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ConversationKeyEntry } from '../../../identities/infrastructure/keychain/ConversationKeyEntry';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 
 export class PigeonConversationInvitationKeyDecryptor {
   public async decryptInvitationKey(

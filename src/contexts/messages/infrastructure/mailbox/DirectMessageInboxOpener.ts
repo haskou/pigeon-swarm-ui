@@ -1,8 +1,6 @@
-import type {
-  ConversationResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { RealtimeMailboxSubscriptionInput } from '../../../../shared/infrastructure/realtime/RealtimeMailboxSubscriptionInput';
+import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { MailboxKeys } from '../../../mailboxes/infrastructure/crypto/MailboxKeySchedule';
 import type { MailboxReadTokens } from '../../../mailboxes/infrastructure/MailboxChannel';
 import type { DirectMessageInboxOutcome } from './DirectMessageInboxOutcome';

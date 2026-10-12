@@ -1,10 +1,8 @@
 import { EncryptedPayload, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
-import type {
-  ChatMessage,
-  MessageReaction,
-  MessageResource,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
+import type { MessageReaction } from '../http/MessageReaction';
+import type { MessageResource } from '../http/MessageResource';
 import type { MessageDecryptCancelRequest } from './MessageDecryptCancelRequest';
 import type { MessageDecryptRequest } from './MessageDecryptRequest';
 import type { MessageDecryptResponse } from './MessageDecryptResponse';

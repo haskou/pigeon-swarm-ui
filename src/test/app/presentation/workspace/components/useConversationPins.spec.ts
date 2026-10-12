@@ -3,11 +3,9 @@ import type { Dispatch, SetStateAction } from 'react';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import type { MessageCollectionState } from '../../../../../app/presentation/workspace/components/conversationThreadState';
-import type {
-  ChatMessage,
-  ConversationResource,
-  Session,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { ConversationResource } from '../../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
+import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
 
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';
 import { useConversationPins } from '../../../../../app/presentation/workspace/components/useConversationPins';

@@ -4,7 +4,7 @@ import { mock } from 'jest-mock-extended';
 
 import type { PigeonIdentitiesGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
 import type { IdentityResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { Identity } from '../../../../../contexts/identities/domain/Identity';
 import { IdentityProfile } from '../../../../../contexts/identities/domain/profile/IdentityProfile';

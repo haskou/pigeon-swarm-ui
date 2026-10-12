@@ -1,14 +1,12 @@
-import type {
-  ChatMessage,
-  ConversationDraft,
-  EditMessageOptions,
-  MessageLinkPreview,
-  MessagePin,
-  MessageResource,
-  SendMessageOptions,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
+import type { MessagePin } from '../../presentation/view-models/MessagePin';
 import type { MessageLoadOptions } from './MessageLoadOptions';
+import type { MessageResource } from './MessageResource';
+import type { ConversationDraftProjection as ConversationDraft } from './resources/ConversationDraftProjection';
+import type { EditMessageOptions } from './resources/EditMessageOptions';
+import type { MessageLinkPreview } from './resources/MessageLinkPreview';
+import type { SendMessageOptions } from './resources/SendMessageOptions';
 
 import { PigeonMessageCommandsApi } from './PigeonMessageCommandsApi';
 import { PigeonMessagesApi } from './PigeonMessagesApi';

@@ -1,4 +1,4 @@
-import type { ChatMessage } from '../../../../shared/domain/pigeonResources.types';
+import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
 import type { MessageDecryptWorkerRequest } from './MessageDecryptWorkerRequest';
 import type { MessageDecryptWorkerResponse } from './MessageDecryptWorkerResponse';
 import type { PendingRequest } from './PendingRequest';

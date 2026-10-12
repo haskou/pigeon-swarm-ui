@@ -1,25 +1,23 @@
-import type {
-  Community,
-  CommunityChannel,
-  CommunityChannelDraft,
-  CommunityChannelMessagePinsResource,
-  CommunityDiscoveryResource,
-  CommunityInviteLinkResource,
-  CommunityMembershipRequest,
-  CommunityModerationLogPage,
-  CommunityPermission,
-  CommunityRoleResource,
-  CommunityTextChannel,
-  CommunityVoiceChannel,
-  MessageResource,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { PigeonFilesGateway } from '../../../attachments/infrastructure/http/PigeonFilesGateway';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { CommunityChannelMessagePinsResource } from '../../../messages/infrastructure/http/CommunityChannelMessagePinsResource';
+import type { MessageResource } from '../../../messages/infrastructure/http/MessageResource';
 import type { CommunityChannelMessageEditInput } from './CommunityChannelMessageEditInput';
 import type { CommunityChannelMessageInput } from './CommunityChannelMessageInput';
 import type { CommunityInviteLinkInput } from './CommunityInviteLinkInput';
 import type { PigeonCommunitiesApi } from './PigeonCommunitiesApi';
 import type { PigeonCommunityInvitationApi } from './PigeonCommunityInvitationApi';
+import type { CommunityChannelDraft } from './resources/CommunityChannelDraft';
+import type { CommunityChannelResource as CommunityChannel } from './resources/CommunityChannelResource';
+import type { CommunityDiscoveryResource } from './resources/CommunityDiscoveryResource';
+import type { CommunityInviteLinkResource } from './resources/CommunityInviteLinkResource';
+import type { CommunityMembershipRequestResource as CommunityMembershipRequest } from './resources/CommunityMembershipRequestResource';
+import type { CommunityModerationLogPageResource as CommunityModerationLogPage } from './resources/CommunityModerationLogPageResource';
+import type { CommunityPermissionResource as CommunityPermission } from './resources/CommunityPermissionResource';
+import type { CommunityResource as Community } from './resources/CommunityResource';
+import type { CommunityRoleResource } from './resources/CommunityRoleResource';
+import type { CommunityTextChannelResource as CommunityTextChannel } from './resources/CommunityTextChannelResource';
+import type { CommunityVoiceChannelResource as CommunityVoiceChannel } from './resources/CommunityVoiceChannelResource';
 
 import { RequestCache } from '../../../../shared/infrastructure/http/RequestCache';
 

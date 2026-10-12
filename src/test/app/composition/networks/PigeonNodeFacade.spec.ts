@@ -1,12 +1,12 @@
 import { mock, type MockProxy } from 'jest-mock-extended';
 
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { NetworkNodeClaimer } from '../../../../contexts/networks/application/claim-network-node/NetworkNodeClaimer';
 import type { PublicNetworkCreator } from '../../../../contexts/networks/application/create-public-network/PublicNetworkCreator';
 import type { NodeRelayConfigurationFinder } from '../../../../contexts/networks/application/find-node-relay-configuration/NodeRelayConfigurationFinder';
 import type { NodeRelayConfigurationUpdater } from '../../../../contexts/networks/application/update-node-relay-configuration/NodeRelayConfigurationUpdater';
 import type { PigeonNodeApi } from '../../../../contexts/networks/infrastructure/http/PigeonNodeApi';
 import type { NodeRelayConfigurationViewModelMapper } from '../../../../contexts/networks/presentation/view-models/NodeRelayConfigurationViewModelMapper';
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
 
 import { PigeonNodeFacade } from '../../../../app/composition/networks/PigeonNodeFacade';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';

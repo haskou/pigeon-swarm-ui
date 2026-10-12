@@ -1,7 +1,5 @@
-import type {
-  ChatMessage,
-  Community,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
+import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
 
 import { CommunityWorkspaceDialogActions } from '../../../../../contexts/communities/presentation/components/CommunityWorkspaceDialogActions';
 import { copy } from '../../../../../shared/presentation/i18n/copy';

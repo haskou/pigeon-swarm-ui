@@ -1,10 +1,8 @@
 import type { CallResource } from '../../../../../contexts/calls/infrastructure/http/resources/CallResource';
 import type { CallSession } from '../../../../../contexts/calls/presentation/view-models/CallSession';
-import type {
-  Community,
-  IdentityResource,
-  LocalKeychain,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { CommunityResource as Community } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
+import type { IdentityResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
+import type { LocalKeychain } from '../../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
 
 import { resolveWorkspaceCallDetails } from '../../../../../app/presentation/workspace/components/resolveWorkspaceCallDetails';
 

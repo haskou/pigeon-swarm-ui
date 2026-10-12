@@ -1,7 +1,5 @@
-import type {
-  IdentityResource,
-  Session,
-} from '../../../../../shared/domain/pigeonResources.types';
+import type { IdentityResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { applyRefreshedIdentity } from '../../../../../app/presentation/workspace/components/applyRefreshedIdentity';
 

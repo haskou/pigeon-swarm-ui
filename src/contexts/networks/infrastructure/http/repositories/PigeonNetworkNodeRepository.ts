@@ -1,4 +1,4 @@
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../identities/infrastructure/session/Session';
 import type { NetworkNode } from '../../../domain/NetworkNode';
 import type { NetworkNodeRepository } from '../../../domain/repositories/NetworkNodeRepository';
 import type { NetworkActorId } from '../../../domain/value-objects/NetworkActorId';

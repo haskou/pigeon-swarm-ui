@@ -1,4 +1,4 @@
-import type { Session } from '../../domain/pigeonResources.types';
+import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { RequestCacheEntry } from './RequestCacheEntry';
 import type { RequestCacheOptions } from './RequestCacheOptions';
 

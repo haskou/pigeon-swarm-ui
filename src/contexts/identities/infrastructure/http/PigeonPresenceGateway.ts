@@ -1,9 +1,7 @@
-import type {
-  IdentityPresence,
-  SelectablePresenceStatus,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
 import type { RequestCacheOptions } from '../../../../shared/infrastructure/http/RequestCacheOptions';
+import type { Session } from '../session/Session';
+import type { IdentityPresenceResource as IdentityPresence } from './resources/IdentityPresenceResource';
+import type { SelectablePresenceStatusResource as SelectablePresenceStatus } from './resources/SelectablePresenceStatusResource';
 
 import { RequestCache } from '../../../../shared/infrastructure/http/RequestCache';
 import { PigeonPresenceApi } from './PigeonPresenceApi';

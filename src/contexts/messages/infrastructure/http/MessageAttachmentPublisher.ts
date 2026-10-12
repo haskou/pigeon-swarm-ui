@@ -1,9 +1,7 @@
-import type {
-  AttachmentProgress,
-  AttachmentUploadOptions,
-  MessageAttachment,
-  Session,
-} from '../../../../shared/domain/pigeonResources.types';
+import type { AttachmentProgress } from '../../../attachments/application/contracts/AttachmentProgress';
+import type { AttachmentUploadOptions } from '../../../attachments/application/contracts/AttachmentUploadOptions';
+import type { MessageAttachment } from '../../../attachments/application/contracts/MessageAttachment';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 
 export interface MessageAttachmentPublisher {
   publishMessageAttachments(

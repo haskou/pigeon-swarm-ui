@@ -1,7 +1,7 @@
 import { mock, type MockProxy } from 'jest-mock-extended';
 
 import type { ConversationOperationBody } from '../../../../../contexts/conversations/infrastructure/http/ConversationOperationBody';
-import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestCache } from '../../../../../shared/infrastructure/http/RequestCache';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';

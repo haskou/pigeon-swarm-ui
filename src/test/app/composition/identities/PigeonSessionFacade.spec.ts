@@ -2,7 +2,7 @@ import { mock } from 'jest-mock-extended';
 
 import type { PigeonIdentitiesFacade } from '../../../../app/composition/identities/PigeonIdentitiesFacade';
 import type { PigeonIdentitiesGateway } from '../../../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
 import { PigeonSessionFacade } from '../../../../app/composition/identities/PigeonSessionFacade';
 

@@ -1,5 +1,5 @@
-import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import type { IdentityAccessContexts } from '../../../identities/infrastructure/http/IdentityAccessContexts';
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { ConversationDraft } from '../../domain/ConversationDraft';
 import type { ConversationDraftRepository } from '../../domain/repositories/ConversationDraftRepository';
 import type { MessageConversationId } from '../../domain/value-objects/MessageConversationId';
