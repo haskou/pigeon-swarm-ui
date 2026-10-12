@@ -89,7 +89,9 @@ describe('useConversationPins one-to-one mailbox', () => {
   });
 
   it('pins a one-to-one message through the mailbox only', async () => {
-    jest.mocked(applicationContainer.directMessages.pin).mockResolvedValue(undefined);
+    jest
+      .mocked(applicationContainer.directMessages.pin)
+      .mockResolvedValue(undefined);
     const { pins } = mountPins();
 
     await pins.pin(message);
@@ -123,7 +125,9 @@ describe('useConversationPins one-to-one mailbox', () => {
   });
 
   it('unpins a one-to-one message through the mailbox only', async () => {
-    jest.mocked(applicationContainer.directMessages.pin).mockResolvedValue(undefined);
+    jest
+      .mocked(applicationContainer.directMessages.pin)
+      .mockResolvedValue(undefined);
     const { pins } = mountPins();
 
     await pins.unpin(message);

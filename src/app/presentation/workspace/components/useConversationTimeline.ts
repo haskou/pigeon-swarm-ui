@@ -20,7 +20,6 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { ConversationTimelineLoadPlan } from './ConversationTimelineLoadPlan';
-import { runMailboxSideEffect } from './runMailboxSideEffect';
 import { useMessageViewport } from './useMessageViewport';
 import { useWorkspaceMessageHistory } from './useWorkspaceMessageHistory';
 import { useWorkspaceResumeSync } from './useWorkspaceResumeSync';
@@ -146,21 +145,24 @@ export function useConversationTimeline({
             : conversation,
         ),
       );
+      const readConversation = activeConversationRef.current;
+
+      if (
+        readConversation?.id === conversationId &&
+        readConversation.type === 'one-to-one'
+      ) {
+        void applicationContainer.directMessages.markRead(
+          sessionRef.current,
+          readConversation,
+          lastMessage.id,
+        );
+
+        return;
+      }
+
       void applicationContainer.conversations
         .markReadUntil(sessionRef.current, conversationId, lastMessage.id)
         .catch(() => undefined);
-
-      const readConversation = activeConversationRef.current;
-
-      if (readConversation?.id === conversationId) {
-        runMailboxSideEffect(() =>
-          applicationContainer.directMessages.deliverRead(
-            sessionRef.current,
-            readConversation,
-            lastMessage.id,
-          ),
-        );
-      }
     },
     [clearUnreadMessages, onConversationsChange, sessionRef],
   );

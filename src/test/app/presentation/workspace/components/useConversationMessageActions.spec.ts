@@ -46,7 +46,9 @@ jest.mock('../../../../../app/composition/applicationContainer', () => ({
 
 const directDelete = jest.mocked(applicationContainer.directMessages.delete);
 const directEdit = jest.mocked(applicationContainer.directMessages.edit);
-const directReaction = jest.mocked(applicationContainer.directMessages.reaction);
+const directReaction = jest.mocked(
+  applicationContainer.directMessages.reaction,
+);
 const deleteLegacy = jest.mocked(applicationContainer.messages.delete);
 const editLegacy = jest.mocked(applicationContainer.messages.edit);
 const addReactionLegacy = jest.mocked(

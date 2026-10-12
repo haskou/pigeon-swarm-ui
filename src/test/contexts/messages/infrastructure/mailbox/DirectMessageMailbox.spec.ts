@@ -40,10 +40,15 @@ import { RecipientMailboxRouter } from '../../../../../contexts/messages/infrast
 import { MessageCollection } from '../../../../../contexts/messages/presentation/view-models/MessageCollection';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 
+type ComposedRecords = {
+  edited: MessageResource & { id: string };
+  sent: MessageResource & { id: string };
+};
+
 describe(DirectMessageMailbox.name, () => {
   const sharedSecret = Buffer.alloc(32, 7);
   const conversationId = 'conversation-1';
-  const sent: MessageResource = {
+  const sent: MessageResource & { id: string } = {
     authorId: 'alice',
     conversationId,
     createdAt: 100,
@@ -236,7 +241,7 @@ describe(DirectMessageMailbox.name, () => {
     recreated: false,
   });
 
-  const edited: MessageResource = {
+  const edited: MessageResource & { id: string } = {
     authorId: 'alice',
     conversationId,
     createdAt: 200,
@@ -252,15 +257,15 @@ describe(DirectMessageMailbox.name, () => {
     emoji: '👍',
     messageId: 'message-1',
   } as const;
+  const composedRecords = (): ComposedRecords => ({ edited, sent });
   /**
-   * Stands in for the composer in PigeonMessageCommandsApi: it hands the mailbox
-   * the record a test sets on `composed`, without encrypting or publishing.
+   * Stands in for the composer in PigeonMessageCommandsApi: it hands the
+   * mailbox the record a test sets on `composed`, without encrypting or
+   * publishing.
    */
-  const composerDouble = () => {
-    const composed = { edited, sent };
-    const composer = mock<
-      Pick<PigeonMessageCommandsApi, 'composeEdit' | 'withSentRecord'>
-    >();
+  const composerDouble = (composed = composedRecords()) => {
+    const composer =
+      mock<Pick<PigeonMessageCommandsApi, 'composeEdit' | 'withSentRecord'>>();
 
     composer.composeEdit.mockImplementation(() =>
       Promise.resolve(composed.edited),
@@ -720,64 +725,70 @@ describe(DirectMessageMailbox.name, () => {
     });
   });
 
-  describe.each(deliveries)('%s rejects when the peer copy fails', (_label, deliverKind) => {
-    it('rejects with MailboxUnavailableError when the recipient inbox is missing, and logs nothing', async () => {
-      const { channel, mailbox } = setup();
-      channel.send.mockRejectedValue(new MailboxUnavailableError());
-      const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
+  describe.each(deliveries)(
+    '%s rejects when the peer copy fails',
+    (_label, deliverKind) => {
+      it('rejects with MailboxUnavailableError when the recipient inbox is missing, and logs nothing', async () => {
+        const { channel, mailbox } = setup();
+        channel.send.mockRejectedValue(new MailboxUnavailableError());
+        const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
 
-      await expect(
-        deliverKind(mailbox, session('alice'), conversation),
-      ).rejects.toBeInstanceOf(MailboxUnavailableError);
-      expect(debug).not.toHaveBeenCalled();
-      debug.mockRestore();
-    });
+        await expect(
+          deliverKind(mailbox, session('alice'), conversation),
+        ).rejects.toBeInstanceOf(MailboxUnavailableError);
+        expect(debug).not.toHaveBeenCalled();
+        debug.mockRestore();
+      });
 
-    it('rejects any other append failure', async () => {
-      const { channel, mailbox } = setup();
-      channel.send.mockRejectedValue(new Error('network down'));
+      it('rejects any other append failure', async () => {
+        const { channel, mailbox } = setup();
+        channel.send.mockRejectedValue(new Error('network down'));
 
-      await expect(
-        deliverKind(mailbox, session('alice'), conversation),
-      ).rejects.toThrow('network down');
-    });
+        await expect(
+          deliverKind(mailbox, session('alice'), conversation),
+        ).rejects.toThrow('network down');
+      });
 
-    it('rejects without a conversation key and sends nothing', async () => {
-      const { channel, mailbox } = setup();
-      const keyless = {
-        identity: { id: 'alice' },
-        keychain: { conversations: {}, version: 1 },
-      } as unknown as Session;
+      it('rejects without a conversation key and sends nothing', async () => {
+        const { channel, mailbox } = setup();
+        const keyless = {
+          identity: { id: 'alice' },
+          keychain: { conversations: {}, version: 1 },
+        } as unknown as Session;
 
-      await expect(
-        deliverKind(mailbox, keyless, conversation),
-      ).rejects.toThrow();
-      expect(channel.send).not.toHaveBeenCalled();
-    });
+        await expect(
+          deliverKind(mailbox, keyless, conversation),
+        ).rejects.toThrow();
+        expect(channel.send).not.toHaveBeenCalled();
+      });
 
-    it('rejects a group conversation and sends nothing', async () => {
-      const { channel, mailbox } = setup();
-      const group = { ...conversation, type: 'group' } as ConversationResource;
+      it('rejects a group conversation and sends nothing', async () => {
+        const { channel, mailbox } = setup();
+        const group = {
+          ...conversation,
+          type: 'group',
+        } as ConversationResource;
 
-      await expect(
-        deliverKind(mailbox, session('alice'), group),
-      ).rejects.toThrow();
-      expect(channel.send).not.toHaveBeenCalled();
-    });
+        await expect(
+          deliverKind(mailbox, session('alice'), group),
+        ).rejects.toThrow();
+        expect(channel.send).not.toHaveBeenCalled();
+      });
 
-    it('rejects a message with no peer in the conversation and sends nothing', async () => {
-      const { channel, mailbox } = setup();
-      const alone = {
-        ...conversation,
-        participantIds: ['alice'],
-      } as ConversationResource;
+      it('rejects a message with no peer in the conversation and sends nothing', async () => {
+        const { channel, mailbox } = setup();
+        const alone = {
+          ...conversation,
+          participantIds: ['alice'],
+        } as ConversationResource;
 
-      await expect(
-        deliverKind(mailbox, session('alice'), alone),
-      ).rejects.toThrow();
-      expect(channel.send).not.toHaveBeenCalled();
-    });
-  });
+        await expect(
+          deliverKind(mailbox, session('alice'), alone),
+        ).rejects.toThrow();
+        expect(channel.send).not.toHaveBeenCalled();
+      });
+    },
+  );
 
   describe('own copy', () => {
     const pinOf = (action: 'pin' | 'unpin') => ({
@@ -787,10 +798,7 @@ describe(DirectMessageMailbox.name, () => {
     });
     const everyDelivery: typeof deliveries = [
       ...deliveries,
-      [
-        'pin',
-        (mailbox, from, conv) => mailbox.pin(from, conv, pinOf('pin')),
-      ],
+      ['pin', (mailbox, from, conv) => mailbox.pin(from, conv, pinOf('pin'))],
     ];
 
     /** The same identity on a second device: its own store, the same node. */
@@ -2711,8 +2719,9 @@ describe(DirectMessageMailbox.name, () => {
     const mailboxFor = (
       wire: PigeonMailboxClient,
       store: DirectMessageMailboxStore,
-      projection: Pick<MessageProjectionPort, 'decryptMany'>,
+      projection: Pick<MessageProjectionPort, 'decrypt' | 'decryptMany'>,
       catalog: readonly string[] = [credentialFor('bob')],
+      composed: ComposedRecords = composedRecords(),
     ): DirectMessageMailbox => {
       const channel = new MailboxChannel(wire, jest.fn());
       const readerSet = new DirectMessageReaderSet(channel, () =>
@@ -2729,6 +2738,7 @@ describe(DirectMessageMailbox.name, () => {
         store,
         projection,
         readerSet,
+        composerDouble(composed).composer,
       );
     };
 
@@ -2866,13 +2876,7 @@ describe(DirectMessageMailbox.name, () => {
       const { projection, store } = setup();
       const { evict, wire } = nodeMailboxClient();
       const composed = composedRecords();
-      const mailbox = mailboxFor(
-        wire,
-        store,
-        projection,
-        undefined,
-        composed,
-      );
+      const mailbox = mailboxFor(wire, store, projection, undefined, composed);
       const applied: string[][] = [];
       const sync = () =>
         mailbox.sync(
@@ -2899,13 +2903,7 @@ describe(DirectMessageMailbox.name, () => {
       const { clearStorage, projection, store } = setup();
       const { wire } = nodeMailboxClient();
       const composed = composedRecords();
-      const mailbox = mailboxFor(
-        wire,
-        store,
-        projection,
-        undefined,
-        composed,
-      );
+      const mailbox = mailboxFor(wire, store, projection, undefined, composed);
       const applied: string[][] = [];
       const sync = () =>
         mailbox.sync(

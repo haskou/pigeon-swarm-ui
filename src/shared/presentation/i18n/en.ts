@@ -1446,8 +1446,6 @@ export const en = {
   },
   workspace: {
     closeSidebar: 'Close sidebar',
-    directMailboxDeliveryError:
-      'Sent on the standard path only. The private mailbox copy did not go through.',
     directMailboxReaderLimitError:
       'Direct messages cannot sync here: this identity has reached its device limit. Remove a device you no longer use, then try again.',
     directMailboxSyncError: 'Direct messages could not be synced. Retrying.',
