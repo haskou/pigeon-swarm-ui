@@ -72,6 +72,37 @@ describe(PigeonChunkedAttachmentUploader.name, () => {
     );
   });
 
+  it('records the reservation origin on every part reference', async () => {
+    const withOrigin = (blobId: string) => ({
+      ...reservation(blobId),
+      origin: 'https://node-a.example',
+    });
+    const privateBlobs = {
+      reserve: jest
+        .fn()
+        .mockResolvedValueOnce(withOrigin('blob-1'))
+        .mockResolvedValueOnce(withOrigin('blob-2')),
+      upload: jest.fn().mockResolvedValue(undefined),
+    };
+    const uploader = new PigeonChunkedAttachmentUploader(privateBlobs, {
+      upload: jest.fn(),
+    });
+
+    const result = await uploader.uploadEncrypted(session, {
+      encryptedBytes: new ArrayBuffer(8 * mebibyte + 1),
+      metadata: {
+        contentType: 'text/plain',
+        filename: 'file.txt',
+        size: 8 * mebibyte + 1,
+      },
+    });
+
+    expect(result.blobs.map((blob) => blob.origin)).toEqual([
+      'https://node-a.example',
+      'https://node-a.example',
+    ]);
+  });
+
   it('uploads public files as verifiable chunks', async () => {
     const file = new File(['content'], 'file.txt', { type: 'text/plain' });
     const publicFiles = {

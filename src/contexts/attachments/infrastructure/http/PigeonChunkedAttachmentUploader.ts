@@ -60,6 +60,7 @@ export class PigeonChunkedAttachmentUploader {
         downloadToken: reservation.downloadToken,
         expiresAt: reservation.expiresAt,
         index,
+        ...(reservation.origin ? { origin: reservation.origin } : {}),
         size: chunk.byteLength,
       });
       reportAttachmentUploadProgress(

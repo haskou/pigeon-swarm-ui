@@ -148,6 +148,32 @@ describe(PigeonAttachmentDownloader.name, () => {
     ).rejects.toBeInstanceOf(PrivateBlobUnavailableError);
   });
 
+  it('shares the cache between references that differ only by origin', async () => {
+    const download = jest.fn().mockResolvedValue(new Uint8Array([9]).buffer);
+    const cipher = {
+      decrypt: jest.fn().mockResolvedValue(new Blob(['x'])),
+    } as unknown as AttachmentCipher;
+    const downloader = new PigeonAttachmentDownloader(
+      {} as PigeonPrivateFilesClient,
+      {} as PigeonPublicFilesClient,
+      { download } as unknown as PigeonPrivateBlobClient,
+      cipher,
+      new AttachmentBinaryCodec(),
+    );
+    const attachment = (origin: string) => ({
+      blobs: [{ ...blobA, origin }],
+      contentType: 'text/plain',
+      encryption: { algorithm: 'AES-GCM' as const, iv: 'iv', key: 'key' },
+      filename: 'file.txt',
+      size: 1,
+    });
+
+    await downloader.download(attachment('https://node-a.example'));
+    await downloader.download(attachment('https://node-b.example'));
+
+    expect(download).toHaveBeenCalledTimes(1);
+  });
+
   it('keys the cache by blob identifiers and never by download tokens', () => {
     const key = attachmentBlobCacheKey({
       blobs: [blobA],

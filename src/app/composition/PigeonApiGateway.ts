@@ -190,7 +190,12 @@ export class PigeonApiGateway {
       mutations,
     );
     const privateFiles = new PigeonPrivateFilesClient(http);
-    const privateBlobs = new PigeonPrivateBlobClient(http, signer);
+    const privateBlobs = new PigeonPrivateBlobClient(http, signer, {
+      client: (origin) =>
+        new HttpJsonClient(new ApiUrlBuilder(origin), { isolated: true }),
+      home: () =>
+        MailboxHomeBase.fromApiBase(API_SERVER_URL, window.location.origin),
+    });
     const publicFiles = new PigeonPublicFilesClient(
       http,
       signer,

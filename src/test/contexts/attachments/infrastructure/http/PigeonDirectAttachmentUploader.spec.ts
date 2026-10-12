@@ -59,6 +59,50 @@ describe(PigeonDirectAttachmentUploader.name, () => {
     });
   });
 
+  it('records the reservation origin on the reference when the node publishes one', async () => {
+    const privateBlobs = {
+      reserve: jest.fn().mockResolvedValue({
+        ...reservation,
+        origin: 'https://node-a.example',
+      }),
+      upload: jest.fn().mockResolvedValue(undefined),
+    };
+    const uploader = new PigeonDirectAttachmentUploader(privateBlobs, {
+      upload: jest.fn(),
+    });
+
+    const result = await uploader.uploadEncrypted(session, {
+      encryptedBytes: new ArrayBuffer(4),
+      metadata: { contentType: 'text/plain', filename: 'file.txt', size: 4 },
+    });
+
+    expect(result.blobs[0]).toEqual({
+      blobId: 'blob-1',
+      downloadToken: reservation.downloadToken,
+      expiresAt: 10,
+      index: 0,
+      origin: 'https://node-a.example',
+      size: 4,
+    });
+  });
+
+  it('omits the origin from the reference when the reservation has none', async () => {
+    const privateBlobs = {
+      reserve: jest.fn().mockResolvedValue(reservation),
+      upload: jest.fn().mockResolvedValue(undefined),
+    };
+    const uploader = new PigeonDirectAttachmentUploader(privateBlobs, {
+      upload: jest.fn(),
+    });
+
+    const result = await uploader.uploadEncrypted(session, {
+      encryptedBytes: new ArrayBuffer(4),
+      metadata: { contentType: 'text/plain', filename: 'file.txt', size: 4 },
+    });
+
+    expect(result.blobs[0]).not.toHaveProperty('origin');
+  });
+
   it('uploads public files directly', async () => {
     const file = new File(['content'], 'file.txt', { type: 'text/plain' });
     const publicFiles = {

@@ -1,4 +1,6 @@
+import type { PrivateBlobReference } from '../../../../../contexts/attachments/application/contracts/PrivateBlobReservation';
 import type { Session } from '../../../../../shared/domain/pigeonResources.types';
+import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 
 import { PigeonPrivateBlobClient } from '../../../../../contexts/attachments/infrastructure/http/PigeonPrivateBlobClient';
 import { PrivateBlobUnavailableError } from '../../../../../contexts/attachments/infrastructure/http/PrivateBlobUnavailableError';
@@ -6,9 +8,18 @@ import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJso
 
 const uploadToken = 'u'.repeat(43);
 const downloadToken = 'd'.repeat(43);
+const homeOrigin = 'https://home.example';
+const foreignOrigin = 'https://node-b.example/pigeon';
+const downloadInit = {
+  headers: { Authorization: `Bearer ${downloadToken}` },
+  redirect: 'error',
+};
+
+type OriginClient = (origin: string) => Pick<HttpJsonClient, 'requestBlob'>;
 
 function clientWith(
   http: { request?: jest.Mock; requestBlob?: jest.Mock },
+  origins: { home?: string; client?: OriginClient } = {},
   signer = { headers: jest.fn().mockResolvedValue({}) },
 ) {
   return new PigeonPrivateBlobClient(
@@ -17,7 +28,21 @@ function clientWith(
       requestBlob: http.requestBlob ?? jest.fn(),
     },
     signer,
+    { client: origins.client ?? jest.fn(), home: () => origins.home },
   );
+}
+
+function reference(
+  overrides: Partial<PrivateBlobReference> = {},
+): PrivateBlobReference {
+  return {
+    blobId: 'blob-1',
+    downloadToken,
+    expiresAt: 1_700_000_000_000,
+    index: 0,
+    size: 3,
+    ...overrides,
+  };
 }
 
 describe(PigeonPrivateBlobClient.name, () => {
@@ -33,7 +58,7 @@ describe(PigeonPrivateBlobClient.name, () => {
     const signer = {
       headers: jest.fn().mockResolvedValue({ 'X-Signature': 'signature' }),
     };
-    const client = clientWith({ request }, signer);
+    const client = clientWith({ request }, {}, signer);
 
     await expect(client.reserve(session, 3)).resolves.toEqual(reservation);
     expect(signer.headers).toHaveBeenCalledWith(
@@ -47,6 +72,38 @@ describe(PigeonPrivateBlobClient.name, () => {
       headers: { 'X-Signature': 'signature' },
       method: 'POST',
     });
+  });
+
+  it('stamps the reservation with the origin of the home node', async () => {
+    const request = jest.fn().mockResolvedValue({
+      blobId: 'blob-1',
+      downloadToken,
+      expiresAt: 1,
+      uploadToken,
+    });
+    const client = clientWith({ request }, { home: homeOrigin });
+
+    await expect(client.reserve({} as Session, 3)).resolves.toEqual({
+      blobId: 'blob-1',
+      downloadToken,
+      expiresAt: 1,
+      origin: homeOrigin,
+      uploadToken,
+    });
+  });
+
+  it('leaves the origin off the reservation when the home node is not publishable', async () => {
+    const request = jest.fn().mockResolvedValue({
+      blobId: 'blob-1',
+      downloadToken,
+      expiresAt: 1,
+      uploadToken,
+    });
+    const client = clientWith({ request }, { home: undefined });
+
+    const reservation = await client.reserve({} as Session, 3);
+
+    expect(reservation).not.toHaveProperty('origin');
   });
 
   it('uploads exact bytes authorized only by the upload capability', async () => {
@@ -66,28 +123,114 @@ describe(PigeonPrivateBlobClient.name, () => {
     });
   });
 
-  it('downloads a blob authorized only by the download capability', async () => {
-    const bytes = new Uint8Array([4, 5, 6]);
-    const requestBlob = jest.fn().mockResolvedValue(new Blob([bytes]));
-    const client = clientWith({ requestBlob });
+  it('downloads a reference from its origin through a client isolated to that origin', async () => {
+    const requestBlob = jest
+      .fn()
+      .mockResolvedValue(new Blob([new Uint8Array([4, 5, 6])]));
+    const origin = jest.fn().mockReturnValue({ requestBlob });
+    const sessionBlob = jest.fn();
+    const client = clientWith({ requestBlob: sessionBlob }, { client: origin });
 
-    const content = await client.download({ blobId: 'blob-1', downloadToken });
+    const content = await client.download(reference({ origin: foreignOrigin }));
 
-    expect(new Uint8Array(content)).toEqual(bytes);
-    expect(requestBlob).toHaveBeenCalledWith('/private-blobs/blob-1', {
-      headers: { Authorization: `Bearer ${downloadToken}` },
-    });
+    expect(new Uint8Array(content)).toEqual(new Uint8Array([4, 5, 6]));
+    expect(origin).toHaveBeenCalledWith(foreignOrigin);
+    expect(requestBlob).toHaveBeenCalledWith(
+      '/private-blobs/blob-1',
+      downloadInit,
+    );
+    expect(sessionBlob).not.toHaveBeenCalled();
+  });
+
+  it('reads a legacy reference without an origin from the session node only', async () => {
+    const sessionBlob = jest
+      .fn()
+      .mockResolvedValue(new Blob([new Uint8Array([4, 5, 6])]));
+    const origin = jest.fn();
+    const client = clientWith({ requestBlob: sessionBlob }, { client: origin });
+
+    await client.download(reference());
+
+    expect(sessionBlob).toHaveBeenCalledWith(
+      '/private-blobs/blob-1',
+      downloadInit,
+    );
+    expect(origin).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a trailing slash', 'https://node-b.example/'],
+    ['plain http off loopback', 'http://node-b.example'],
+    ['credentials', 'https://user@node-b.example'],
+    ['a query', 'https://node-b.example?x=1'],
+    ['a fragment', 'https://node-b.example#x'],
+    ['a double slash in the path', 'https://node-b.example//api'],
+    ['a private IPv4 host', 'https://10.0.0.5'],
+    ['a value over 255 characters', `https://n.example/${'p'.repeat(250)}`],
+    ['a non-URL', 'not a url'],
+  ])(
+    'never fetches an origin with %s and reads the session node instead',
+    async (_label, origin) => {
+      const sessionBlob = jest
+        .fn()
+        .mockResolvedValue(new Blob([new Uint8Array([4, 5, 6])]));
+      const foreign = jest.fn();
+      const client = clientWith(
+        { requestBlob: sessionBlob },
+        { client: foreign },
+      );
+
+      await client.download(reference({ origin }));
+
+      expect(foreign).not.toHaveBeenCalled();
+      expect(sessionBlob).toHaveBeenCalledWith(
+        '/private-blobs/blob-1',
+        downloadInit,
+      );
+    },
+  );
+
+  it('accepts a localhost origin for development', async () => {
+    const requestBlob = jest
+      .fn()
+      .mockResolvedValue(new Blob([new Uint8Array([4, 5, 6])]));
+    const origin = jest.fn().mockReturnValue({ requestBlob });
+    const client = clientWith({}, { client: origin });
+
+    await client.download(reference({ origin: 'http://localhost:3000' }));
+
+    expect(origin).toHaveBeenCalledWith('http://localhost:3000');
+  });
+
+  it('rejects a body whose size differs from the reference as unavailable', async () => {
+    const requestBlob = jest
+      .fn()
+      .mockResolvedValue(new Blob([new Uint8Array([1, 2])]));
+    const client = clientWith({}, { client: () => ({ requestBlob }) });
+
+    await expect(
+      client.download(reference({ origin: foreignOrigin, size: 3 })),
+    ).rejects.toBeInstanceOf(PrivateBlobUnavailableError);
   });
 
   it('reports a download for an unknown, expired or wrong capability as unavailable', async () => {
     const requestBlob = jest
       .fn()
       .mockRejectedValue(new HttpJsonError(404, 'Not Found', ''));
-    const client = clientWith({ requestBlob });
+    const client = clientWith({}, { client: () => ({ requestBlob }) });
 
     await expect(
-      client.download({ blobId: 'blob-1', downloadToken }),
+      client.download(reference({ origin: foreignOrigin })),
     ).rejects.toBeInstanceOf(PrivateBlobUnavailableError);
+  });
+
+  it('keeps other download failures as the original HTTP error', async () => {
+    const forbidden = new HttpJsonError(403, 'Forbidden', '');
+    const client = clientWith({
+      requestBlob: jest.fn().mockRejectedValue(forbidden),
+    });
+
+    await expect(client.download(reference())).rejects.toBe(forbidden);
   });
 
   it('reports an upload whose reservation is gone as unavailable', async () => {
