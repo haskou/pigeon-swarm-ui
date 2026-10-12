@@ -1319,9 +1319,13 @@ export const en = {
     encryptedPrivateKey: 'Encrypted private key',
     forgetDevice: 'Log out and forget this device',
     forgetDeviceConfirm:
-      'This removes the local unlock for this identity from this browser and signs you out. Signing in here again needs your recovery key or a device pairing from a signed-in device. This device stays authorized until you revoke it under Manage devices.',
-    forgetDeviceFailed:
-      'The local unlock could not be removed. You are still signed in.',
+      'Access for this device is revoked on your account, the local unlock is removed from this browser, and you are signed out. Signing in here again needs your recovery key or a device pairing from a signed-in device.',
+    forgetDeviceOnlyDeviceConfirm:
+      'This is your only device, so its access cannot be revoked and it stays authorized on your account. Continue to remove the local unlock from this browser and sign out?',
+    forgetDeviceRevokeFailed:
+      'This device could not be removed from your account, so you are still signed in. Check your connection and try again.',
+    forgetDeviceUnlockFailed:
+      'Access was removed from your account, but the local unlock could not be cleared. You are still signed in. Press the button again to finish.',
     handle: 'Username',
     hoverToEdit: 'Hover and click the image to edit it.',
     identityId: 'Identity ID',
