@@ -51,4 +51,31 @@ describe(runMailboxSideEffect.name, () => {
       debug.mockRestore();
     }
   });
+
+  it('passes the resolved outcome to the outcome handler', async () => {
+    const outcome = jest.fn();
+
+    runMailboxSideEffect(() => Promise.resolve('failed'), outcome);
+    await flush();
+
+    expect(outcome).toHaveBeenCalledTimes(1);
+    expect(outcome).toHaveBeenCalledWith('failed');
+  });
+
+  it('does not call the outcome handler when the effect rejects', async () => {
+    const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
+    const outcome = jest.fn();
+
+    runMailboxSideEffect(
+      () => Promise.reject(new Error('network down')),
+      outcome,
+    );
+    await flush();
+
+    expect(outcome).not.toHaveBeenCalled();
+    expect(debug).toHaveBeenCalledWith(
+      'Direct mailbox side effect failed; legacy path kept.',
+    );
+    debug.mockRestore();
+  });
 });

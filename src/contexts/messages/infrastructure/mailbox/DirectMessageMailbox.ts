@@ -35,7 +35,15 @@ import { DirectMessageAuthorship } from './DirectMessageAuthorship';
 import { DirectMessageMailboxRecord } from './DirectMessageMailboxRecord';
 import { DirectMessageMailboxStore } from './DirectMessageMailboxStore';
 
-export type DirectMessageMailboxDelivery = 'delivered' | 'failed' | 'skipped';
+/**
+ * 'no-inbox': the node has no inbox for the recipient yet (a 404). Benign: the
+ * peer has not opened it, so the sender shows no notice for it.
+ */
+export type DirectMessageMailboxDelivery =
+  | 'delivered'
+  | 'failed'
+  | 'no-inbox'
+  | 'skipped';
 
 /** One change to the timeline, in the order the inbox holds it. */
 export type DirectMessageTimelineChange =
@@ -116,10 +124,11 @@ export class DirectMessageMailbox {
    * Sender. Appends a sent message to the peer's inbox and to this identity's
    * own inbox. Returns 'skipped' when there is no peer, the conversation is a
    * group, or the record exceeds the envelope bound; the message then stays on
-   * the legacy path only. Never throws: any failure, including 404 for an inbox
-   * the peer has not opened yet, returns 'failed'. The result is the peer
-   * outcome; the own copy never changes it. The caller keeps the legacy copy
-   * and shows nothing to the user.
+   * the legacy path only. Never throws. A 404 for an inbox the peer has not
+   * opened yet returns 'no-inbox' (benign, no notice); any other failure
+   * returns 'failed'. The result is the peer outcome; the own copy never
+   * changes it. The caller keeps the legacy copy and shows one non-blocking
+   * notice for 'failed' only.
    */
   public deliverSent(
     session: Session,
@@ -563,9 +572,10 @@ export class DirectMessageMailbox {
   }
 
   /**
-   * Sends one encoded record to one inbox. Never throws: any failure, including
-   * a 404 for an inbox the peer has not opened yet, returns 'failed'. Logs
-   * nothing, so the caller decides which failures are worth a line.
+   * Sends one encoded record to one inbox. Never throws: a 404 for an inbox the
+   * peer has not opened yet returns 'no-inbox'; any other failure returns
+   * 'failed'. Logs nothing, so the caller decides which failures are worth a
+   * line.
    */
   private async sendRecord(
     session: Session,
@@ -579,8 +589,8 @@ export class DirectMessageMailbox {
       await this.recipients.send(recipientIdentityId, keys, plaintext);
 
       return 'delivered';
-    } catch {
-      return 'failed';
+    } catch (error) {
+      return error instanceof MailboxUnavailableError ? 'no-inbox' : 'failed';
     }
   }
 
