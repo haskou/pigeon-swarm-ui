@@ -16,6 +16,7 @@ import type {
 } from '../../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';
+import { subscribeRealtimeMailboxHints } from '../../../../../app/presentation/realtime/useRealtimeEvents';
 import { useDirectMessageMailboxSync } from '../../../../../app/presentation/workspace/components/useDirectMessageMailboxSync';
 import { MailboxReaderLimitError } from '../../../../../contexts/mailboxes/infrastructure/http/MailboxReaderLimitError';
 import { copy } from '../../../../../shared/presentation/i18n/copy';
@@ -30,7 +31,12 @@ jest.mock('react', () => ({
   },
 }));
 jest.mock('../../../../../app/composition/applicationContainer', () => ({
-  applicationContainer: { directMessages: { sync: jest.fn() } },
+  applicationContainer: {
+    directMessages: { hintTarget: jest.fn(), sync: jest.fn() },
+  },
+}));
+jest.mock('../../../../../app/presentation/realtime/useRealtimeEvents', () => ({
+  subscribeRealtimeMailboxHints: jest.fn(),
 }));
 
 const POLL_MS = 5000;
@@ -433,5 +439,120 @@ describe('useDirectMessageMailboxSync pins', () => {
 
     expect(mounted.onConversationRead).not.toHaveBeenCalled();
     mounted.cleanup();
+  });
+});
+
+describe('useDirectMessageMailboxSync hints', () => {
+  const hintTarget = jest.mocked(applicationContainer.directMessages.hintTarget);
+  const subscribe = jest.mocked(subscribeRealtimeMailboxHints);
+  const target = { mailboxId: 'mailbox-1', readToken: 'token-1' };
+
+  function hint(): () => void {
+    const call = subscribe.mock.calls[0];
+    if (!call) throw new Error('No hint subscription.');
+
+    return call[2];
+  }
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    Reflect.set(globalThis, 'window', {
+      clearTimeout: (id: number | undefined) => globalThis.clearTimeout(id),
+      setTimeout: (callback: () => void, ms: number) =>
+        globalThis.setTimeout(callback, ms),
+    });
+    sync.mockReset();
+    hintTarget.mockReturnValue(target);
+    subscribe.mockReset();
+    subscribe.mockReturnValue(() => undefined);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    Reflect.deleteProperty(globalThis, 'window');
+  });
+
+  it('subscribes to the inbox hints once a pass succeeds, not on every pass', async () => {
+    sync.mockResolvedValue(undefined);
+    const mounted = mountSync();
+
+    await settle();
+    jest.advanceTimersByTime(POLL_MS);
+    await settle();
+
+    expect(sync).toHaveBeenCalledTimes(2);
+    expect(subscribe).toHaveBeenCalledTimes(1);
+    expect(subscribe).toHaveBeenCalledWith(
+      session,
+      target,
+      expect.any(Function),
+    );
+    mounted.cleanup();
+  });
+
+  it('runs a pass as soon as a hint arrives instead of waiting for the poll', async () => {
+    sync.mockResolvedValue(undefined);
+    const mounted = mountSync();
+    await settle();
+
+    hint()();
+    await settle();
+
+    expect(sync).toHaveBeenCalledTimes(2);
+    mounted.cleanup();
+  });
+
+  it('replaces the scheduled poll with the hint pass instead of adding a second one', async () => {
+    sync.mockResolvedValue(undefined);
+    const mounted = mountSync();
+    await settle();
+
+    jest.advanceTimersByTime(1000);
+    hint()();
+    await settle();
+    jest.advanceTimersByTime(POLL_MS - 1000);
+    await settle();
+    expect(sync).toHaveBeenCalledTimes(2);
+
+    jest.advanceTimersByTime(1000);
+    await settle();
+    expect(sync).toHaveBeenCalledTimes(3);
+    mounted.cleanup();
+  });
+
+  it('queues one follow-up pass for hints that arrive during a running pass', async () => {
+    let finish: () => void = () => undefined;
+    sync
+      .mockResolvedValueOnce(undefined)
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finish = resolve;
+          }),
+      )
+      .mockResolvedValue(undefined);
+    const mounted = mountSync();
+    await settle();
+
+    hint()();
+    hint()();
+    expect(sync).toHaveBeenCalledTimes(2);
+
+    finish();
+    await settle();
+    expect(sync).toHaveBeenCalledTimes(3);
+    mounted.cleanup();
+  });
+
+  it('drops its hint subscription on cleanup', async () => {
+    const unsubscribe = jest.fn();
+    subscribe.mockReturnValue(unsubscribe);
+    sync.mockResolvedValue(undefined);
+    const mounted = mountSync();
+    await settle();
+
+    mounted.cleanup();
+
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
   });
 });

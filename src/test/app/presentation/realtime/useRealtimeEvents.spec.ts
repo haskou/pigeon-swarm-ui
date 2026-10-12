@@ -13,6 +13,7 @@ import type { Session } from '../../../../shared/domain/pigeonResources.types';
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import {
   closeAllRealtimeConnections,
+  subscribeRealtimeMailboxHints,
   useRealtimeEvents,
 } from '../../../../app/presentation/realtime/useRealtimeEvents';
 
@@ -27,7 +28,9 @@ jest.mock('react', () => ({
   useRef: (current: unknown) => ({ current }),
 }));
 jest.mock('../../../../app/composition/applicationContainer', () => ({
-  applicationContainer: { realtime: { connect: jest.fn() } },
+  applicationContainer: {
+    realtime: { connect: jest.fn(), subscribeMailbox: jest.fn() },
+  },
 }));
 
 class SocketDouble {
@@ -146,5 +149,132 @@ describe('shared realtime connections', () => {
     jest.advanceTimersByTime(60_000);
 
     expect(freshSocket.close).not.toHaveBeenCalled();
+  });
+});
+
+describe('mailbox hint subscriptions', () => {
+  type OnMessage = Parameters<typeof applicationContainer.realtime.connect>[1];
+
+  const connect = jest.mocked(applicationContainer.realtime.connect);
+  const subscribeMailbox = jest.mocked(
+    applicationContainer.realtime.subscribeMailbox,
+  );
+  const target = { mailboxId: 'mailbox-a', readToken: 'token-a' };
+  let deliver: OnMessage = () => undefined;
+
+  function connectTo(...sockets: SocketDouble[]): void {
+    sockets.forEach((socket) => {
+      connect.mockImplementationOnce(async (_session, onMessage) => {
+        deliver = onMessage;
+
+        return socket as unknown as WebSocket;
+      });
+    });
+  }
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    Reflect.set(globalThis, 'window', {
+      clearTimeout: (...args: Parameters<typeof clearTimeout>) =>
+        clearTimeout(...args),
+      setTimeout: (...args: Parameters<typeof setTimeout>) =>
+        setTimeout(...args),
+    });
+    Reflect.set(globalThis, 'WebSocket', { OPEN: 1 });
+    connect.mockReset();
+    subscribeMailbox.mockReset();
+  });
+
+  afterEach(() => {
+    closeAllRealtimeConnections();
+    jest.useRealTimers();
+    Reflect.deleteProperty(globalThis, 'window');
+    Reflect.deleteProperty(globalThis, 'WebSocket');
+  });
+
+  it('hands a mailbox hint only to listeners of that mailbox', async () => {
+    connectTo(new SocketDouble());
+    mountRealtime();
+    await flushConnections();
+    const onHintA = jest.fn();
+    const onHintB = jest.fn();
+    subscribeRealtimeMailboxHints(session, target, onHintA);
+    subscribeRealtimeMailboxHints(
+      session,
+      { mailboxId: 'mailbox-b', readToken: 'token-b' },
+      onHintB,
+    );
+
+    deliver({ cursor: 3, mailboxId: 'mailbox-a', type: 'mailbox_envelope' });
+
+    expect(onHintA).toHaveBeenCalledTimes(1);
+    expect(onHintB).not.toHaveBeenCalled();
+  });
+
+  it('subscribes on the live socket as soon as a listener registers', async () => {
+    const socket = new SocketDouble();
+    connectTo(socket);
+    mountRealtime();
+    await flushConnections();
+
+    subscribeRealtimeMailboxHints(session, target, jest.fn());
+
+    expect(subscribeMailbox).toHaveBeenCalledWith(socket, target);
+  });
+
+  it('sends a subscription registered before the socket exists once it is acknowledged', async () => {
+    const socket = new SocketDouble();
+    connectTo(socket);
+
+    subscribeRealtimeMailboxHints(session, target, jest.fn());
+    expect(subscribeMailbox).not.toHaveBeenCalled();
+
+    mountRealtime();
+    await flushConnections();
+    deliver({ identityId: 'identity-a', type: 'connection_ack' });
+
+    expect(subscribeMailbox).toHaveBeenCalledWith(socket, target);
+  });
+
+  it('sends every registered subscription again on a reconnected socket', async () => {
+    const first = new SocketDouble();
+    const second = new SocketDouble();
+    connectTo(first, second);
+    mountRealtime();
+    await flushConnections();
+    subscribeRealtimeMailboxHints(session, target, jest.fn());
+
+    first.emit('close');
+    jest.advanceTimersByTime(60_000);
+    await flushConnections();
+    deliver({ identityId: 'identity-a', type: 'connection_ack' });
+
+    expect(subscribeMailbox).toHaveBeenLastCalledWith(second, target);
+  });
+
+  it('stops delivering hints to a listener once it unsubscribes', async () => {
+    connectTo(new SocketDouble());
+    mountRealtime();
+    await flushConnections();
+    const onHint = jest.fn();
+    const unsubscribe = subscribeRealtimeMailboxHints(session, target, onHint);
+
+    unsubscribe();
+    deliver({ cursor: 4, mailboxId: 'mailbox-a', type: 'mailbox_envelope' });
+
+    expect(onHint).not.toHaveBeenCalled();
+  });
+
+  it('forgets every mailbox listener on logout', async () => {
+    connectTo(new SocketDouble());
+    mountRealtime();
+    await flushConnections();
+    const onHint = jest.fn();
+    subscribeRealtimeMailboxHints(session, target, onHint);
+
+    closeAllRealtimeConnections();
+    deliver({ cursor: 5, mailboxId: 'mailbox-a', type: 'mailbox_envelope' });
+
+    expect(onHint).not.toHaveBeenCalled();
   });
 });

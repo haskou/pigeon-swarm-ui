@@ -13,6 +13,7 @@ import type {
 } from '../../../../../shared/domain/pigeonResources.types';
 
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';
+import { subscribeRealtimeMailboxHints } from '../../../../../app/presentation/realtime/useRealtimeEvents';
 import { useDirectMessageBackgroundReadSync } from '../../../../../app/presentation/workspace/components/useDirectMessageBackgroundReadSync';
 
 type MockEffect = () => void | (() => void);
@@ -26,7 +27,12 @@ jest.mock('react', () => ({
   useRef: <T>(value: T) => ({ current: value }),
 }));
 jest.mock('../../../../../app/composition/applicationContainer', () => ({
-  applicationContainer: { directMessages: { syncReads: jest.fn() } },
+  applicationContainer: {
+    directMessages: { hintTarget: jest.fn(), syncReads: jest.fn() },
+  },
+}));
+jest.mock('../../../../../app/presentation/realtime/useRealtimeEvents', () => ({
+  subscribeRealtimeMailboxHints: jest.fn(),
 }));
 
 const TICK_MS = 5000;
@@ -211,5 +217,94 @@ describe('useDirectMessageBackgroundReadSync', () => {
 
     expect(captured?.aborted).toBe(true);
     expect(syncReads).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('useDirectMessageBackgroundReadSync hints', () => {
+  const hintTarget = jest.mocked(applicationContainer.directMessages.hintTarget);
+  const subscribe = jest.mocked(subscribeRealtimeMailboxHints);
+
+  function hintFor(conversationId: string): () => void {
+    const call = subscribe.mock.calls.find(
+      ([, target]) => target.mailboxId === `mailbox-${conversationId}`,
+    );
+    if (!call) throw new Error(`No hint subscription for ${conversationId}.`);
+
+    return call[2];
+  }
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    Reflect.set(globalThis, 'window', {
+      clearTimeout: (id: number | undefined) => globalThis.clearTimeout(id),
+      setTimeout: (callback: () => void, ms: number) =>
+        globalThis.setTimeout(callback, ms),
+    });
+    hintTarget.mockImplementation((_session, conversationId) => ({
+      mailboxId: `mailbox-${conversationId}`,
+      readToken: 'token',
+    }));
+    subscribe.mockReset();
+    subscribe.mockReturnValue(() => undefined);
+  });
+
+  it('subscribes to the inbox hints of every one-to-one conversation, not groups', async () => {
+    const mounted = mountBackgroundReadSync(
+      [
+        conversation('peer'),
+        conversation('team', 'group'),
+        conversation('active'),
+      ],
+      'active',
+    );
+
+    await settle();
+
+    expect(
+      subscribe.mock.calls.map(([, target]) => target.mailboxId),
+    ).toEqual(['mailbox-peer', 'mailbox-active']);
+    mounted.cleanup();
+  });
+
+  it('visits a background conversation as soon as its hint arrives, before its revisit interval', async () => {
+    const mounted = mountBackgroundReadSync([conversation('peer')]);
+    await settle();
+    expect(mounted.visited()).toEqual(['peer']);
+
+    await advance(TICK_MS);
+    expect(mounted.visited()).toEqual(['peer']);
+
+    hintFor('peer')();
+    await settle();
+
+    expect(mounted.visited()).toEqual(['peer', 'peer']);
+    mounted.cleanup();
+  });
+
+  it('does not visit a caught-up conversation on a hint', async () => {
+    const mounted = mountBackgroundReadSync([
+      conversation('quiet', 'one-to-one', 0),
+    ]);
+    await settle();
+
+    hintFor('quiet')();
+    await settle();
+
+    expect(mounted.visited()).toEqual([]);
+    mounted.cleanup();
+  });
+
+  it('drops its hint subscriptions on cleanup', async () => {
+    const unsubscribe = jest.fn();
+    subscribe.mockReturnValue(unsubscribe);
+    const mounted = mountBackgroundReadSync([
+      conversation('peer'),
+      conversation('other'),
+    ]);
+    await settle();
+
+    mounted.cleanup();
+
+    expect(unsubscribe).toHaveBeenCalledTimes(2);
   });
 });

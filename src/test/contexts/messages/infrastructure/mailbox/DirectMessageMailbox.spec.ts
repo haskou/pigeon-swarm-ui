@@ -2756,4 +2756,28 @@ describe(DirectMessageMailbox.name, () => {
       expect(readerHashes().sort()).toEqual(hashed(tokens.root, ...liveTokens));
     });
   });
+
+  describe('hintTarget', () => {
+    it('names the own inbox and its device read token without touching the node', () => {
+      const { channel, mailbox } = setup();
+      const keys = keysFor('bob');
+
+      expect(mailbox.hintTarget(session('bob'), conversationId)).toEqual({
+        mailboxId: keys.mailboxId,
+        readToken: readerTokensFor('bob', keys.mailboxId).device,
+      });
+      expect(channel.read).not.toHaveBeenCalled();
+      expect(channel.createInbox).not.toHaveBeenCalled();
+    });
+
+    it('returns null when the conversation key is not in the keychain', () => {
+      const { mailbox } = setup();
+      const keyless = {
+        ...session('bob'),
+        keychain: { conversations: {}, version: 1 },
+      } as unknown as Session;
+
+      expect(mailbox.hintTarget(keyless, conversationId)).toBeNull();
+    });
+  });
 });
