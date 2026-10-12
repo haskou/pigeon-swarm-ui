@@ -1047,6 +1047,225 @@ describe(DirectMessageMailbox.name, () => {
     });
   });
 
+  describe('openInboxes', () => {
+    const oneToOne = (id: string): ConversationResource =>
+      ({
+        id,
+        participantIds: ['alice', 'bob'],
+        type: 'one-to-one',
+      }) as unknown as ConversationResource;
+
+    const groupOf = (id: string): ConversationResource =>
+      ({
+        id,
+        participantIds: ['alice', 'bob', 'carol'],
+        type: 'group',
+      }) as unknown as ConversationResource;
+
+    /** Alice holds a conversation key for each listed id, in order. */
+    const sessionWithKeys = (conversationIds: readonly string[]): Session =>
+      ({
+        ...session('alice'),
+        keychain: {
+          conversations: Object.fromEntries(
+            conversationIds.map((id, index) => [
+              id,
+              {
+                algorithm: 'aes-256-gcm',
+                conversationId: id,
+                createdAt: 1,
+                key: Buffer.alloc(32, 11 + index).toString('base64'),
+                kind: 'conversation',
+                peerIdentityId: 'bob',
+                version: 2,
+              },
+            ]),
+          ),
+          version: 1,
+        },
+      }) as unknown as Session;
+
+    const mailboxIdOf = (index: number): string =>
+      MailboxKeySchedule.derive(Buffer.alloc(32, 11 + index), 'alice', 0)
+        .mailboxId;
+
+    it('opens every one-to-one inbox this identity holds a key for, without reading', async () => {
+      const { channel, mailbox, store } = setup();
+
+      await expect(
+        mailbox.openInboxes(
+          sessionWithKeys(['conversation-1', 'conversation-2', 'group-1']),
+          [
+            oneToOne('conversation-1'),
+            groupOf('group-1'),
+            oneToOne('conversation-2'),
+            oneToOne('conversation-3'),
+          ],
+          new AbortController().signal,
+        ),
+      ).resolves.toBe(true);
+
+      expect(
+        channel.createInbox.mock.calls.map(([keys]) => keys.mailboxId),
+      ).toEqual([mailboxIdOf(0), mailboxIdOf(1)]);
+      expect(channel.addReader).toHaveBeenCalledTimes(2);
+      expect(channel.read).not.toHaveBeenCalled();
+      expect(store.load(mailboxIdOf(0))).toEqual({ cursor: 0 });
+      expect(store.load(mailboxIdOf(1))).toEqual({ cursor: 0 });
+    });
+
+    it('leaves an inbox that is already open alone', async () => {
+      const { channel, mailbox, store } = setup();
+      store.save(mailboxIdOf(0), { cursor: 4 });
+
+      await expect(
+        mailbox.openInboxes(
+          sessionWithKeys(['conversation-1', 'conversation-2']),
+          [oneToOne('conversation-1'), oneToOne('conversation-2')],
+          new AbortController().signal,
+        ),
+      ).resolves.toBe(true);
+
+      expect(
+        channel.createInbox.mock.calls.map(([keys]) => keys.mailboxId),
+      ).toEqual([mailboxIdOf(1)]);
+      expect(store.load(mailboxIdOf(0))).toEqual({ cursor: 4 });
+    });
+
+    it('opens one inbox at a time', async () => {
+      const { channel, mailbox } = setup();
+      let inFlight = 0;
+      let peak = 0;
+      channel.createInbox.mockImplementation(async () => {
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        await Promise.resolve();
+        inFlight -= 1;
+      });
+
+      await mailbox.openInboxes(
+        sessionWithKeys(['conversation-1', 'conversation-2']),
+        [oneToOne('conversation-1'), oneToOne('conversation-2')],
+        new AbortController().signal,
+      );
+
+      expect(channel.createInbox).toHaveBeenCalledTimes(2);
+      expect(peak).toBe(1);
+    });
+
+    it('retries a failed open only after the retry window, and stores nothing until it succeeds', async () => {
+      jest.useFakeTimers();
+      const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
+
+      try {
+        const { channel, mailbox, store } = setup();
+        channel.createInbox.mockRejectedValueOnce(
+          new Error('creation refused'),
+        );
+        const alice = sessionWithKeys(['conversation-1']);
+        const conversations = [oneToOne('conversation-1')];
+
+        await expect(
+          mailbox.openInboxes(
+            alice,
+            conversations,
+            new AbortController().signal,
+          ),
+        ).resolves.toBe(false);
+        expect(store.load(mailboxIdOf(0))).toBeNull();
+
+        await expect(
+          mailbox.openInboxes(
+            alice,
+            conversations,
+            new AbortController().signal,
+          ),
+        ).resolves.toBe(false);
+        expect(channel.createInbox).toHaveBeenCalledTimes(1);
+
+        jest.advanceTimersByTime(60_000);
+
+        await expect(
+          mailbox.openInboxes(
+            alice,
+            conversations,
+            new AbortController().signal,
+          ),
+        ).resolves.toBe(true);
+        expect(channel.createInbox).toHaveBeenCalledTimes(2);
+        expect(store.load(mailboxIdOf(0))).toEqual({ cursor: 0 });
+      } finally {
+        debug.mockRestore();
+        jest.useRealTimers();
+      }
+    });
+
+    it('stops at the first rate-limit response and reports the pass incomplete', async () => {
+      const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
+
+      try {
+        const { channel, mailbox } = setup();
+        channel.createInbox.mockRejectedValueOnce(
+          new HttpJsonError(429, 'Too Many Requests', 'rate limited'),
+        );
+
+        await expect(
+          mailbox.openInboxes(
+            sessionWithKeys(['conversation-1', 'conversation-2']),
+            [oneToOne('conversation-1'), oneToOne('conversation-2')],
+            new AbortController().signal,
+          ),
+        ).resolves.toBe(false);
+        expect(channel.createInbox).toHaveBeenCalledTimes(1);
+      } finally {
+        debug.mockRestore();
+      }
+    });
+
+    it('carries on past a failed open that is not rate limited', async () => {
+      const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
+
+      try {
+        const { channel, mailbox, store } = setup();
+        channel.createInbox.mockRejectedValueOnce(
+          new Error('creation refused'),
+        );
+
+        await expect(
+          mailbox.openInboxes(
+            sessionWithKeys(['conversation-1', 'conversation-2']),
+            [oneToOne('conversation-1'), oneToOne('conversation-2')],
+            new AbortController().signal,
+          ),
+        ).resolves.toBe(false);
+        expect(
+          channel.createInbox.mock.calls.map(([keys]) => keys.mailboxId),
+        ).toEqual([mailboxIdOf(0), mailboxIdOf(1)]);
+        expect(store.load(mailboxIdOf(1))).toEqual({ cursor: 0 });
+      } finally {
+        debug.mockRestore();
+      }
+    });
+
+    it('stops between conversations once the signal is aborted', async () => {
+      const { channel, mailbox } = setup();
+      const controller = new AbortController();
+      channel.createInbox.mockImplementation(() => {
+        controller.abort();
+
+        return Promise.resolve();
+      });
+
+      await mailbox.openInboxes(
+        sessionWithKeys(['conversation-1', 'conversation-2']),
+        [oneToOne('conversation-1'), oneToOne('conversation-2')],
+        controller.signal,
+      );
+
+      expect(channel.createInbox).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('over the real channel', () => {
     /**
      * Mirrors the node: the inbox keeps the hash of every reader token with
@@ -1216,6 +1435,40 @@ describe(DirectMessageMailbox.name, () => {
           credential,
         ),
       );
+
+    it('lets a sender deliver once the recipient has opened the inbox, before any read', async () => {
+      const { projection, store } = setup();
+      const { creates, evict, wire } = nodeMailboxClient();
+      evict();
+      const mailbox = mailboxFor(wire, store, projection);
+
+      await expect(
+        mailbox.deliverSent(session('alice'), conversation, sent),
+      ).resolves.toBe('failed');
+      await expect(
+        mailbox.openInboxes(
+          session('bob'),
+          [conversation],
+          new AbortController().signal,
+        ),
+      ).resolves.toBe(true);
+      await expect(
+        mailbox.deliverSent(session('alice'), conversation, sent),
+      ).resolves.toBe('delivered');
+
+      const applied: string[][] = [];
+      await mailbox.sync(
+        session('bob'),
+        conversationId,
+        new AbortController().signal,
+        (changes) => {
+          applied.push(messageIds(changes));
+        },
+      );
+
+      expect(applied).toEqual([['message-1']]);
+      expect(creates()).toBe(1);
+    });
 
     it('delivers a message once and does not replay it after acknowledgement', async () => {
       const { projection, store } = setup();
@@ -1624,7 +1877,9 @@ describe(DirectMessageMailbox.name, () => {
       ).rejects.toMatchObject({ status: 409 });
 
       expect(apply).not.toHaveBeenCalled();
-      expect(store.load(keys.mailboxId)).toEqual({ cursor: 0 });
+      // The device reader was never enrolled, so the open is not recorded and
+      // a later pass enrols it.
+      expect(store.load(keys.mailboxId)).toBeNull();
       expect(readerHashes().sort()).toEqual(hashed(tokens.root, ...liveTokens));
     });
   });
