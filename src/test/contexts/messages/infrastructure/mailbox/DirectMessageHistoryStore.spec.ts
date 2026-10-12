@@ -11,7 +11,7 @@ const storeNames = ['entries', 'canaries'];
 
 function session(
   identityId: string,
-  root: Buffer | undefined = Buffer.alloc(32, 5),
+  root: Buffer | null = Buffer.alloc(32, 5),
 ): Session {
   return {
     deviceSealedRootKey: root ? { getBuffer: () => root } : undefined,
@@ -185,12 +185,12 @@ describe(DirectMessageHistoryStore.name, () => {
     const name = databaseName();
     const store = new DirectMessageHistoryStore(name);
 
-    await store.append(session('identity-1', undefined), conversationId, [
+    await store.append(session('identity-1', null), conversationId, [
       entry('a'),
     ]);
 
     expect(
-      await store.load(session('identity-1', undefined), conversationId),
+      await store.load(session('identity-1', null), conversationId),
     ).toEqual([]);
     expect(await storedChunks(name)).toEqual([]);
   });
