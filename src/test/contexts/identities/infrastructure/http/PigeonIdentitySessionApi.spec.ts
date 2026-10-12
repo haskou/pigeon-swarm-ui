@@ -33,6 +33,14 @@ function identity(id: string): IdentityResource {
   };
 }
 
+// The mocked crypto gives every KeyPair the same public key, so a credential
+// that must differ from the genesis one is stood in for by this helper.
+function fakeCredential(publicKey: string): KeyPair {
+  return {
+    toPrimitives: () => ({ privateKey: '', publicKey }),
+  } as unknown as KeyPair;
+}
+
 describe(PigeonIdentitySessionApi.name, () => {
   it('unlocks the identity and validates the recovered key pair', async () => {
     const keyPair = await KeyPair.generate();
@@ -166,5 +174,77 @@ describe(PigeonIdentitySessionApi.name, () => {
         'wrong password',
       ),
     ).rejects.toThrow(copy.auth.invalidLogin);
+  });
+
+  it('unlocks a paired device while the identity document is still at revision 0', async () => {
+    const keyPair = await KeyPair.generate();
+    const currentIdentity = identity(keyPair.toPrimitives().publicKey);
+    const pairedCredential = fakeCredential('paired-device-credential');
+    const identities = {
+      get: jest.fn().mockResolvedValue(currentIdentity),
+    } as unknown as PigeonIdentityGateway;
+    const vault = {
+      unlock: jest.fn().mockResolvedValue({
+        authorizationEpoch: DeviceAuthorizationEpoch.genesis(),
+        authorizationRevision: DeviceAuthorizationRevision.fromNumber(1),
+        deviceId: DeviceId.generate(),
+        material: {
+          deviceCredentialKeyPair: pairedCredential,
+          identityKeyPair: keyPair,
+          recoveryAuthorityKeyPair: await KeyPair.generate(),
+          rootKey: { getBuffer: () => SymmetricKey.generate().getBuffer() },
+        },
+        secretHandle: DeviceUnlockSecretHandle.generate(),
+      }),
+    } as unknown as DeviceIdentityVault;
+    const deviceAuthorization = {
+      synchronize: jest
+        .fn()
+        .mockImplementation((session: Session) => Promise.resolve(session)),
+    } as unknown as PigeonDeviceAuthorizationApi;
+
+    await expect(
+      new PigeonIdentitySessionApi(
+        identities,
+        vault,
+        deviceAuthorization,
+      ).unlock(currentIdentity.id, 'password'),
+    ).resolves.toMatchObject({ deviceCredentialKeyPair: pairedCredential });
+    expect(deviceAuthorization.synchronize).toHaveBeenCalledWith(
+      expect.objectContaining({ deviceCredentialKeyPair: pairedCredential }),
+    );
+  });
+
+  it('refuses a non-genesis device that has not observed a chain revision', async () => {
+    const keyPair = await KeyPair.generate();
+    const currentIdentity = identity(keyPair.toPrimitives().publicKey);
+    const identities = {
+      get: jest.fn().mockResolvedValue(currentIdentity),
+    } as unknown as PigeonIdentityGateway;
+    const vault = {
+      unlock: jest.fn().mockResolvedValue({
+        authorizationEpoch: DeviceAuthorizationEpoch.genesis(),
+        authorizationRevision: DeviceAuthorizationRevision.initial(),
+        deviceId: DeviceId.generate(),
+        material: {
+          deviceCredentialKeyPair: fakeCredential('stranger-device-credential'),
+          identityKeyPair: keyPair,
+          recoveryAuthorityKeyPair: await KeyPair.generate(),
+          rootKey: { getBuffer: () => SymmetricKey.generate().getBuffer() },
+        },
+        secretHandle: DeviceUnlockSecretHandle.generate(),
+      }),
+    } as unknown as DeviceIdentityVault;
+    const synchronize = jest.fn();
+
+    await expect(
+      new PigeonIdentitySessionApi(identities, vault, {
+        synchronize,
+      } as unknown as PigeonDeviceAuthorizationApi).unlock(
+        currentIdentity.id,
+        'password',
+      ),
+    ).rejects.toThrow(copy.auth.invalidLogin);
+    expect(synchronize).not.toHaveBeenCalled();
   });
 });

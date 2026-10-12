@@ -87,7 +87,9 @@ export class PigeonIdentitySessionApi {
       identity.recoveryAuthority === recoveryAuthority;
 
     assert(
-      identity.authorizationRevision !== 0 || genesisMatches,
+      identity.authorizationRevision !== 0 ||
+        vaultSession.authorizationRevision.valueOf() !== 0 ||
+        genesisMatches,
       new Error(copy.auth.invalidLogin),
     );
   }
