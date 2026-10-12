@@ -376,14 +376,14 @@ describe(DirectMessageMailbox.name, () => {
     );
   });
 
-  describe.each(deliveries)('%s delivery outcome', (_label, deliver) => {
+  describe.each(deliveries)('%s delivery outcome', (_label, deliverKind) => {
     it('reports a 404 from the recipient inbox as failed and logs one count-only line', async () => {
       const { channel, mailbox } = setup();
       channel.send.mockRejectedValue(new MailboxUnavailableError());
       const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
 
       await expect(
-        deliver(mailbox, session('alice'), conversation),
+        deliverKind(mailbox, session('alice'), conversation),
       ).resolves.toBe('failed');
       expect(debug).toHaveBeenCalledTimes(1);
       expect(debug).toHaveBeenCalledWith(
@@ -397,7 +397,7 @@ describe(DirectMessageMailbox.name, () => {
       channel.send.mockRejectedValue(new Error('network down'));
 
       await expect(
-        deliver(mailbox, session('alice'), conversation),
+        deliverKind(mailbox, session('alice'), conversation),
       ).resolves.toBe('failed');
     });
 
@@ -408,7 +408,7 @@ describe(DirectMessageMailbox.name, () => {
         keychain: { conversations: {}, version: 1 },
       } as unknown as Session;
 
-      await expect(deliver(mailbox, keyless, conversation)).resolves.toBe(
+      await expect(deliverKind(mailbox, keyless, conversation)).resolves.toBe(
         'failed',
       );
       expect(channel.send).not.toHaveBeenCalled();
@@ -418,7 +418,7 @@ describe(DirectMessageMailbox.name, () => {
       const { channel, mailbox } = setup();
       const group = { ...conversation, type: 'group' } as ConversationResource;
 
-      await expect(deliver(mailbox, session('alice'), group)).resolves.toBe(
+      await expect(deliverKind(mailbox, session('alice'), group)).resolves.toBe(
         'skipped',
       );
       expect(channel.send).not.toHaveBeenCalled();
@@ -431,7 +431,7 @@ describe(DirectMessageMailbox.name, () => {
         participantIds: ['alice'],
       } as ConversationResource;
 
-      await expect(deliver(mailbox, session('alice'), alone)).resolves.toBe(
+      await expect(deliverKind(mailbox, session('alice'), alone)).resolves.toBe(
         'skipped',
       );
       expect(channel.send).not.toHaveBeenCalled();
