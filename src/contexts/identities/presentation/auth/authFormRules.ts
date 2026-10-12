@@ -18,6 +18,7 @@ export function canSubmitAuthForm(input: {
   identityId: string;
   mode: AuthMode;
   name: string;
+  networks: string;
   password: string;
   passwordConfirmation: string;
   selectedNetwork: string;
@@ -48,6 +49,7 @@ function canSubmitCreateIdentity(input: {
   availableNetworkCount: number;
   handle: string;
   name: string;
+  networks: string;
   password: string;
   passwordConfirmation: string;
   selectedNetwork: string;
@@ -57,6 +59,11 @@ function canSubmitCreateIdentity(input: {
     (!input.handle.trim() || isValidHandle(input.handle)) &&
     isValidPassword(input.password) &&
     input.password === input.passwordConfirmation &&
-    (input.availableNetworkCount === 0 || input.selectedNetwork !== '')
+    // The node rejects an identity with no network, so a create must resolve one.
+    registrationNetworks({
+      availableNetworkCount: input.availableNetworkCount,
+      fallbackNetworks: input.networks,
+      selectedNetwork: input.selectedNetwork,
+    }).length > 0
   );
 }
