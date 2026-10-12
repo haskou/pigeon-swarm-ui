@@ -1,8 +1,8 @@
 import type { PrivateBlobReservation } from '../../../../../contexts/attachments/application/contracts/PrivateBlobReservation';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
+import { PrivateBlobUploadIncompleteError } from '../../../../../contexts/attachments/domain/errors/PrivateBlobUploadIncompleteError';
 import { PrivateBlobReplicator } from '../../../../../contexts/attachments/infrastructure/http/PrivateBlobReplicator';
-import { PrivateBlobUploadIncompleteError } from '../../../../../contexts/attachments/infrastructure/http/PrivateBlobUploadIncompleteError';
 import { PrivateBlobUploadLedger } from '../../../../../contexts/attachments/infrastructure/http/PrivateBlobUploadLedger';
 
 describe(PrivateBlobReplicator.name, () => {

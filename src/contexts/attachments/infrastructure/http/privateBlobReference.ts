@@ -1,41 +1,20 @@
 import type { MessageAttachment } from '../../application/contracts/MessageAttachment';
-import type {
-  PrivateBlobAlternate,
-  PrivateBlobReference,
-} from '../../application/contracts/PrivateBlobReservation';
+import type { PrivateBlobReference } from '../../application/contracts/PrivateBlobReservation';
 import type { StoredPrivateBlobReplica } from './PrivateBlobReplicator';
 import type { PrivateBlobUploadRef } from './PrivateBlobUploadLedger';
 
-const maxAlternates = 2;
+import { PrivateBlobReplicaPolicy } from '../../domain/PrivateBlobReplicaPolicy';
 
 /**
  * The first replica is the primary. Other replicas that name an origin become
- * alternates, in stored order, up to `maxAlternates`.
+ * alternates, in stored order, up to the domain's alternate cap.
  */
 export function toPrivateBlobReference(
   index: number,
   size: number,
   replicas: StoredPrivateBlobReplica[],
 ): PrivateBlobReference {
-  const [primary, ...others] = replicas;
-
-  if (!primary) {
-    throw new Error('Private blob part has no stored replica');
-  }
-
-  const alternates: PrivateBlobAlternate[] = others
-    .flatMap((replica) =>
-      replica.origin === undefined
-        ? []
-        : [
-            {
-              blobId: replica.blobId,
-              downloadToken: replica.downloadToken,
-              origin: replica.origin,
-            },
-          ],
-    )
-    .slice(0, maxAlternates);
+  const { alternates, primary } = PrivateBlobReplicaPolicy.split(replicas);
 
   return {
     blobId: primary.blobId,
@@ -43,7 +22,15 @@ export function toPrivateBlobReference(
     expiresAt: primary.expiresAt,
     index,
     ...(primary.origin ? { origin: primary.origin } : {}),
-    ...(alternates.length > 0 ? { alternates } : {}),
+    ...(alternates.length > 0
+      ? {
+          alternates: alternates.map(({ blobId, downloadToken, origin }) => ({
+            blobId,
+            downloadToken,
+            origin,
+          })),
+        }
+      : {}),
     size,
   };
 }
