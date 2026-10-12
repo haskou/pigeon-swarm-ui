@@ -24,6 +24,7 @@ module.exports = {
     '/IdentityMailboxHomeVerifier.spec.ts$',
     '/Mailbox(Capability|Channel|CreationProof|EnvelopeCipher|KeySchedule|ReadToken).spec.ts$',
     '/DirectMessageMailbox.spec.ts$',
+    '/DirectMessageAuthorship.spec.ts$',
   ],
   roots: ['<rootDir>/src'],
   testEnvironment: 'node',

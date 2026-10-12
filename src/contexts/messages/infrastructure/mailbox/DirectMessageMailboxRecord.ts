@@ -60,6 +60,7 @@ const DIRECT_MESSAGE_KIND = 'direct-message';
 const DIRECT_MESSAGE_VERSION = 2;
 
 type DirectMessageEnvelope = {
+  authorTag?: string;
   kind: typeof DIRECT_MESSAGE_KIND;
   record: DirectMessageRecord;
   version: typeof DIRECT_MESSAGE_VERSION;
@@ -147,8 +148,16 @@ export class DirectMessageMailboxRecord {
     );
   }
 
-  public static encode(record: DirectMessageRecord): Uint8Array {
+  /**
+   * `authorTag` is set only on this identity's own-inbox copies. A peer copy
+   * carries none, so its bytes are unchanged.
+   */
+  public static encode(
+    record: DirectMessageRecord,
+    authorTag?: string,
+  ): Uint8Array {
     const envelope: DirectMessageEnvelope = {
+      authorTag,
       kind: DIRECT_MESSAGE_KIND,
       record,
       version: DIRECT_MESSAGE_VERSION,
@@ -159,13 +168,17 @@ export class DirectMessageMailboxRecord {
 
   /**
    * Returns the record for this conversation, or null for anything that is not
-   * a valid version 2 direct-message record. Callers skip null and still
-   * acknowledge, so a bad or superseded (version 1) envelope cannot stall the
-   * inbox.
+   * a valid version 2 direct-message record, or that `isAuthentic` rejects.
+   * Callers skip null and still acknowledge, so a bad, forged or superseded
+   * (version 1) envelope cannot stall the inbox.
    */
   public static decode(
     plaintext: Uint8Array,
     conversationId: string,
+    isAuthentic: (
+      record: DirectMessageRecord,
+      authorTag: string | undefined,
+    ) => boolean = () => true,
   ): DirectMessageRecord | null {
     let parsed: unknown;
 
@@ -177,9 +190,11 @@ export class DirectMessageMailboxRecord {
 
     if (!isDirectMessageEnvelope(parsed)) return null;
 
-    return parsed.record.conversationId === conversationId
-      ? parsed.record
-      : null;
+    const { authorTag, record } = parsed;
+
+    if (record.conversationId !== conversationId) return null;
+
+    return isAuthentic(record, authorTag) ? record : null;
   }
 
   /** The resource the projection decrypts and places in the timeline. */
@@ -220,6 +235,7 @@ function isDirectMessageEnvelope(
   return (
     value.kind === DIRECT_MESSAGE_KIND &&
     value.version === DIRECT_MESSAGE_VERSION &&
+    (value.authorTag === undefined || typeof value.authorTag === 'string') &&
     isDirectMessageRecord(value.record)
   );
 }
