@@ -9,6 +9,7 @@ import type { DirectMessageTimelineChange } from '../../../../../contexts/messag
 import type {
   DirectDeletedRecord,
   DirectEditedRecord,
+  DirectPinRecord,
   DirectReactionRecord,
   DirectReadRecord,
   DirectSentRecord,
@@ -355,6 +356,50 @@ describe(DirectMessageMailbox.name, () => {
           type: 'deleted',
         }),
       );
+    });
+  });
+
+  describe('deliverPin', () => {
+    it.each(['pin', 'unpin'] as const)(
+      'appends a %s record to the mailbox of the peer and reports delivery',
+      async (action) => {
+        const { channel, mailbox } = setup();
+        channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
+
+        await expect(
+          mailbox.deliverPin(session('alice'), conversation, {
+            action,
+            createdAt: 700,
+            messageId: 'message-1',
+          }),
+        ).resolves.toBe('delivered');
+        const [keys, plaintext] = channel.send.mock.calls[0];
+        expect(keys.mailboxId).toBe(keysFor('bob').mailboxId);
+        expect(
+          DirectMessageMailboxRecord.decode(plaintext, conversationId),
+        ).toEqual(
+          expect.objectContaining({
+            action,
+            authorId: 'alice',
+            createdAt: 700,
+            targetMessageId: 'message-1',
+            type: 'pin',
+          }),
+        );
+      },
+    );
+
+    it('skips a pin record that exceeds the envelope bound without sending', async () => {
+      const { channel, mailbox } = setup();
+
+      await expect(
+        mailbox.deliverPin(session('alice'), conversation, {
+          action: 'pin',
+          createdAt: 700,
+          messageId: 'm'.repeat(MailboxEnvelopeCipher.MAX_PLAINTEXT_BYTES),
+        }),
+      ).resolves.toBe('skipped');
+      expect(channel.send).not.toHaveBeenCalled();
     });
   });
 
@@ -931,6 +976,44 @@ describe(DirectMessageMailbox.name, () => {
       kind: 'reaction',
       messageId: 'message-1',
     };
+
+    const pinRecord: DirectPinRecord = {
+      action: 'pin',
+      authorId: 'alice',
+      conversationId,
+      createdAt: 500,
+      id: 'pin-1',
+      targetMessageId: 'message-1',
+      type: 'pin',
+    };
+    const pinChange = {
+      action: 'pin',
+      createdAt: 500,
+      kind: 'pin',
+      messageId: 'message-1',
+    };
+
+    it.each(['pin', 'unpin'] as const)(
+      'applies a %s record as a pin change without decrypting it',
+      async (action) => {
+        const { channel, mailbox, projection } = setup();
+        channel.read.mockResolvedValue(
+          pageOf([DirectMessageMailboxRecord.encode({ ...pinRecord, action })]),
+        );
+        channel.acknowledge.mockResolvedValue({ recreated: false });
+        const apply = jest.fn();
+
+        await mailbox.sync(
+          session('alice'),
+          conversationId,
+          new AbortController().signal,
+          apply,
+        );
+
+        expect(apply).toHaveBeenCalledWith([{ ...pinChange, action }]);
+        expect(projection.decryptMany).not.toHaveBeenCalled();
+      },
+    );
 
     it('applies an edit as an edit change', async () => {
       const { channel, mailbox } = setup();

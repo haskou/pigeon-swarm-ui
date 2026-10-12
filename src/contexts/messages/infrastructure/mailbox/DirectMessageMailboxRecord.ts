@@ -35,6 +35,13 @@ export type DirectReactionRecord = RecordBase & {
   type: 'reaction';
 };
 
+/** Pin or unpin of a message. Applied last-writer-wins by createdAt. */
+export type DirectPinRecord = RecordBase & {
+  action: 'pin' | 'unpin';
+  targetMessageId: string;
+  type: 'pin';
+};
+
 /** Read receipt for this identity. Sent only to its own inbox. */
 export type DirectReadRecord = RecordBase & {
   targetMessageId: string;
@@ -44,6 +51,7 @@ export type DirectReadRecord = RecordBase & {
 export type DirectMessageRecord =
   | DirectDeletedRecord
   | DirectEditedRecord
+  | DirectPinRecord
   | DirectReactionRecord
   | DirectReadRecord
   | DirectSentRecord;
@@ -216,8 +224,9 @@ function isDirectMessageEnvelope(
   );
 }
 
-function hasRecordBase(value: Record<string, unknown>): boolean {
+function hasRecordBase(value: unknown): value is Record<string, unknown> {
   return (
+    isObject(value) &&
     typeof value.authorId === 'string' &&
     typeof value.conversationId === 'string' &&
     typeof value.createdAt === 'number' &&
@@ -250,8 +259,15 @@ function isReactionFields(value: Record<string, unknown>): boolean {
   );
 }
 
+function isPinFields(value: Record<string, unknown>): boolean {
+  return (
+    (value.action === 'pin' || value.action === 'unpin') &&
+    typeof value.targetMessageId === 'string'
+  );
+}
+
 function isDirectMessageRecord(value: unknown): value is DirectMessageRecord {
-  if (!isObject(value) || !hasRecordBase(value)) return false;
+  if (!hasRecordBase(value)) return false;
 
   switch (value.type) {
     case 'sent':
@@ -264,6 +280,8 @@ function isDirectMessageRecord(value: unknown): value is DirectMessageRecord {
       return typeof value.targetMessageId === 'string';
     case 'reaction':
       return isReactionFields(value);
+    case 'pin':
+      return isPinFields(value);
     default:
       return false;
   }
