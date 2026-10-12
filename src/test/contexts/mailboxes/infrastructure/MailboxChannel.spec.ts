@@ -135,7 +135,7 @@ describe(MailboxChannel.name, () => {
 
     const page = await channel.read(keys, readers, 0, 3);
 
-    expect(client.read).toHaveBeenCalledWith(keys.mailboxId, readToken, 0, 3);
+    expect(client.read).toHaveBeenCalledWith(keys.mailboxId, deviceToken, 0, 3);
     expect(
       page.envelopes.map((envelope) => [
         envelope.cursor,
