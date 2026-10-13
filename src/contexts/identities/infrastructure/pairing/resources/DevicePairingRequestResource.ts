@@ -1,4 +1,4 @@
-import type { DevicePairingRequestPayload } from './DevicePairingRequestPayload';
+import type { DevicePairingRequestPayload } from '../../../domain/DevicePairingRequestPayload';
 
 export type DevicePairingRequestResource = DevicePairingRequestPayload & {
   kind: 'pigeon-device-pairing-request';

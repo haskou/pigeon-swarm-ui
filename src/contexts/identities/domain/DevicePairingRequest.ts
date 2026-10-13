@@ -2,16 +2,13 @@ import { KeyPair, Signature } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp, assert } from '@haskou/value-objects';
 
 import type { DevicePairingRequestPayload } from './DevicePairingRequestPayload';
-import type { DevicePairingRequestResource } from './DevicePairingRequestResource';
 
 import { DeviceAuthorizationEnrollmentProof } from './DeviceAuthorizationEnrollmentProof';
 import { DeviceAuthorizationTransition } from './DeviceAuthorizationTransition';
 import { DevicePairingError } from './DevicePairingError';
 import { DevicePairingInvitation } from './DevicePairingInvitation';
 import { DevicePairingRequestDraft } from './DevicePairingRequestDraft';
-import { DevicePairingResource } from './DevicePairingResource';
 import { DeviceAuthorizationOperationId } from './value-objects/DeviceAuthorizationOperationId';
-import { DeviceCredential } from './value-objects/DeviceCredential';
 import { DevicePairingCode } from './value-objects/DevicePairingCode';
 import { PairingTransportPublicKey } from './value-objects/PairingTransportPublicKey';
 
@@ -21,24 +18,30 @@ const VERIFICATION_DOMAIN = 'pigeon:device-pairing:verification:v1';
 const MAX_FUTURE_SKEW_MS = 30_000;
 
 export class DevicePairingRequest {
-  private static resource(value: unknown): DevicePairingRequestResource {
-    const resource = DevicePairingResource.fromUnknown(
-      value,
-      'Invalid device pairing request.',
+  /** Restores a request read from a code; it must verify at `acceptedAt`. */
+  public static restore(
+    state: {
+      authorizedAt: Timestamp;
+      invitation: DevicePairingInvitation;
+      operationId: DeviceAuthorizationOperationId;
+      proof: DeviceAuthorizationEnrollmentProof;
+      signature: Signature;
+      transportPublicKey: PairingTransportPublicKey;
+    },
+    acceptedAt: Timestamp,
+  ): DevicePairingRequest {
+    const request = new DevicePairingRequest(
+      state.authorizedAt,
+      state.invitation,
+      state.operationId,
+      state.proof,
+      state.transportPublicKey,
+      state.signature,
     );
-    resource.assertProtocol(KIND, 1);
 
-    return {
-      authorizedAt: resource.getNumber('authorizedAt'),
-      invitation: resource.getString('invitation'),
-      kind: KIND,
-      operationId: resource.getString('operationId'),
-      proofOfPossession: resource.getString('proofOfPossession'),
-      signature: resource.getString('signature'),
-      targetCredential: resource.getString('targetCredential'),
-      transportPublicKey: resource.getString('transportPublicKey'),
-      version: 1,
-    };
+    request.assertValidAt(acceptedAt);
+
+    return request;
   }
 
   public static async create(
@@ -74,32 +77,6 @@ export class DevicePairingRequest {
       target,
       transport,
     );
-  }
-
-  public static fromCode(
-    code: DevicePairingCode,
-    acceptedAt: Timestamp,
-  ): DevicePairingRequest {
-    const resource = this.resource(code.decode());
-    const invitation = DevicePairingInvitation.fromCode(
-      DevicePairingCode.fromString(resource.invitation),
-      acceptedAt,
-    );
-    const request = new DevicePairingRequest(
-      new Timestamp(resource.authorizedAt),
-      invitation,
-      DeviceAuthorizationOperationId.fromString(resource.operationId),
-      new DeviceAuthorizationEnrollmentProof(
-        DeviceCredential.fromString(resource.targetCredential),
-        new Signature(resource.proofOfPossession),
-      ),
-      PairingTransportPublicKey.fromString(resource.transportPublicKey),
-      new Signature(resource.signature),
-    );
-
-    request.assertValidAt(acceptedAt);
-
-    return request;
   }
 
   private constructor(

@@ -1,6 +1,6 @@
 import { assert } from '@haskou/value-objects';
 
-import { DevicePairingError } from './DevicePairingError';
+import { DevicePairingError } from '../../domain/DevicePairingError';
 
 export class DevicePairingResource {
   public static fromUnknown(

@@ -6,7 +6,7 @@ import type { IdentityAccessContexts } from '../../../contexts/identities/infras
 import type { IdentityAdmissionProgressListener } from '../../../contexts/identities/infrastructure/http/IdentityAdmissionProgressListener';
 import type { IdentityMapper } from '../../../contexts/identities/infrastructure/http/IdentityMapper';
 import type { IdentityPresenceMapper } from '../../../contexts/identities/infrastructure/http/IdentityPresenceMapper';
-import type { OwnDeviceRetirement } from '../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
+import type { OwnDeviceRetirement } from '../../../contexts/identities/infrastructure/http/OwnDeviceRetirement';
 import type { PigeonIdentitiesGateway } from '../../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
 import type { IdentityPresenceResource as IdentityPresence } from '../../../contexts/identities/infrastructure/http/resources/IdentityPresenceResource';
 import type { IdentityResource } from '../../../contexts/identities/infrastructure/http/resources/IdentityResource';

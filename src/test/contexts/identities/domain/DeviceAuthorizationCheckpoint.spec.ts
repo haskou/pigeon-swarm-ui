@@ -1,14 +1,24 @@
 import { DeviceAuthorizationCheckpoint } from '../../../../contexts/identities/domain/DeviceAuthorizationCheckpoint';
 import { DeviceAuthorizationIdentityMismatchError } from '../../../../contexts/identities/domain/errors/DeviceAuthorizationIdentityMismatchError';
+import { DeviceAuthorizationEpoch } from '../../../../contexts/identities/domain/value-objects/DeviceAuthorizationEpoch';
+import { DeviceAuthorizationRevision } from '../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
-import vectors from '../../../fixtures/device-authorization-transition-vectors.json';
 
 describe(DeviceAuthorizationCheckpoint.name, () => {
-  it('exposes validated value objects', () => {
+  const state = (
+    identityId: string,
+  ): Parameters<typeof DeviceAuthorizationCheckpoint.forIdentity>[1] => ({
+    compromisedCredentials: [],
+    epoch: DeviceAuthorizationEpoch.fromString('genesis'),
+    identityId: IdentityId.fromString(identityId),
+    revision: DeviceAuthorizationRevision.fromNumber(2),
+  });
+
+  it('exposes the checkpoint of the expected identity', () => {
     const identityId = IdentityId.fromString('identity');
-    const checkpoint = DeviceAuthorizationCheckpoint.fromResource(
-      { epoch: 'genesis', identityId: 'identity', revision: 2 },
+    const checkpoint = DeviceAuthorizationCheckpoint.forIdentity(
       identityId,
+      state('identity'),
     );
 
     expect(checkpoint.getIdentityId().isEqual(identityId)).toBe(true);
@@ -18,40 +28,10 @@ describe(DeviceAuthorizationCheckpoint.name, () => {
 
   it('rejects a checkpoint for another identity', () => {
     expect(() =>
-      DeviceAuthorizationCheckpoint.fromResource(
-        { epoch: 'genesis', identityId: 'other', revision: 2 },
+      DeviceAuthorizationCheckpoint.forIdentity(
         IdentityId.fromString('identity'),
+        state('other'),
       ),
     ).toThrow(DeviceAuthorizationIdentityMismatchError);
-  });
-
-  it('exposes the compromised credentials of the authorization', () => {
-    const identityId = IdentityId.fromString('identity');
-    const credential = vectors.keys.target.publicKeyPem;
-    const checkpoint = DeviceAuthorizationCheckpoint.fromResource(
-      {
-        compromisedCredentials: [{ compromisedSince: 2, credential }],
-        epoch: 'genesis',
-        identityId: 'identity',
-        revision: 4,
-      },
-      identityId,
-    );
-
-    expect(
-      checkpoint.getCompromisedCredentials().map((entry) => ({
-        compromisedSince: entry.compromisedSince.valueOf(),
-        credential: entry.credential.valueOf(),
-      })),
-    ).toEqual([{ compromisedSince: 2, credential }]);
-  });
-
-  it('reads an authorization without the field as carrying no compromised credentials', () => {
-    const checkpoint = DeviceAuthorizationCheckpoint.fromResource(
-      { epoch: 'genesis', identityId: 'identity', revision: 2 },
-      IdentityId.fromString('identity'),
-    );
-
-    expect(checkpoint.getCompromisedCredentials()).toEqual([]);
   });
 });

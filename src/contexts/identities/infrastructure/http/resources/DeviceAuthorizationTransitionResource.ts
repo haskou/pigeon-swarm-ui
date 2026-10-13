@@ -1,4 +1,4 @@
-import type { DeviceAuthorizationUnsignedPayload } from './DeviceAuthorizationUnsignedPayload';
+import type { DeviceAuthorizationUnsignedPayload } from '../../../domain/DeviceAuthorizationUnsignedPayload';
 
 export type DeviceAuthorizationTransitionResource =
   DeviceAuthorizationUnsignedPayload & {

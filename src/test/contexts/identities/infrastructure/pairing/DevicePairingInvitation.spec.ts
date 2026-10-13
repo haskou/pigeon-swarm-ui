@@ -1,13 +1,14 @@
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 
-import { DevicePairingInvitation } from '../../../../contexts/identities/domain/DevicePairingInvitation';
-import { DeviceAuthorizationEpoch } from '../../../../contexts/identities/domain/value-objects/DeviceAuthorizationEpoch';
-import { DeviceAuthorizationRevision } from '../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
-import { DevicePairingCode } from '../../../../contexts/identities/domain/value-objects/DevicePairingCode';
-import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
-import { PairingId } from '../../../../contexts/identities/domain/value-objects/PairingId';
-import { thrownPairingFailure } from './thrownPairingFailure';
+import { DevicePairingInvitation } from '../../../../../contexts/identities/domain/DevicePairingInvitation';
+import { DeviceAuthorizationEpoch } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationEpoch';
+import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
+import { DevicePairingCode } from '../../../../../contexts/identities/domain/value-objects/DevicePairingCode';
+import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
+import { PairingId } from '../../../../../contexts/identities/domain/value-objects/PairingId';
+import { DevicePairingCodeReader } from '../../../../../contexts/identities/infrastructure/pairing/DevicePairingCodeReader';
+import { thrownPairingFailure } from '../../domain/thrownPairingFailure';
 
 describe(DevicePairingInvitation.name, () => {
   async function invitation() {
@@ -25,7 +26,7 @@ describe(DevicePairingInvitation.name, () => {
 
   it('round-trips an authenticated unexpired invitation', async () => {
     const source = await invitation();
-    const decoded = DevicePairingInvitation.fromCode(
+    const decoded = DevicePairingCodeReader.invitation(
       source.toCode(),
       new Timestamp(1_000),
     );
@@ -39,7 +40,10 @@ describe(DevicePairingInvitation.name, () => {
 
     expect(
       thrownPairingFailure(() =>
-        DevicePairingInvitation.fromCode(source.toCode(), new Timestamp(2_001)),
+        DevicePairingCodeReader.invitation(
+          source.toCode(),
+          new Timestamp(2_001),
+        ),
       ),
     ).toBe('expired');
 
@@ -47,7 +51,7 @@ describe(DevicePairingInvitation.name, () => {
     const tampered = DevicePairingCode.encode({ ...resource, revision: 4 });
     expect(
       thrownPairingFailure(() =>
-        DevicePairingInvitation.fromCode(tampered, new Timestamp(1_000)),
+        DevicePairingCodeReader.invitation(tampered, new Timestamp(1_000)),
       ),
     ).toBe('invalid');
   });
