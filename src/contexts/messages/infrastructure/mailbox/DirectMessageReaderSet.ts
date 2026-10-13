@@ -58,8 +58,35 @@ export class DirectMessageReaderSet {
   }
 
   /**
-   * Enrols this device's reader under the root reader. Memoised per mailbox
-   * and root.
+   * After a revoke rotated the sealed root, the previous root still manages an
+   * inbox created before it, so it adds the new root reader first, best
+   * effort. Then the device reader must succeed.
+   */
+  private async bridge(
+    session: Session,
+    keys: MailboxKeys,
+    readers: MailboxReadTokens,
+  ): Promise<void> {
+    const previous = session.previousDeviceSealedRootKey;
+
+    if (previous) {
+      try {
+        await this.channel.addReader(
+          keys,
+          MailboxReadToken.derive(previous.getBuffer(), keys.mailboxId),
+          readers.root,
+        );
+      } catch {
+        // Best effort: the inbox may already be past the previous root.
+      }
+    }
+
+    await this.channel.addReader(keys, readers.root, readers.device);
+  }
+
+  /**
+   * Enrols this device's reader under the root reader, bridging through the
+   * root a revoke replaced. Memoised per mailbox and root.
    */
   public enrolSealedRoot(
     session: Session,
@@ -71,13 +98,13 @@ export class DirectMessageReaderSet {
 
     if (known) return known;
 
-    const enrol = this.channel
-      .addReader(keys, readers.root, readers.device)
-      .catch((error: unknown) => {
+    const enrol = this.bridge(session, keys, readers).catch(
+      (error: unknown) => {
         this.enrolled.delete(key);
 
         throw error;
-      });
+      },
+    );
 
     this.enrolled.set(key, enrol);
 
