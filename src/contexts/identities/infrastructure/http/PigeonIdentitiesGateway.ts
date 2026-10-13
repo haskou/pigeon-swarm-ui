@@ -1,3 +1,5 @@
+import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+
 import type { LoginIdentityProgressReporter } from '../../application/login-identity/LoginIdentityProgressReporter';
 import type { DevicePairingRequestDraft } from '../../domain/DevicePairingRequestDraft';
 import type { Identity } from '../../domain/Identity';
@@ -11,6 +13,7 @@ import type {
 } from '../keychain/LocalKeychain';
 import type { Session } from '../session/Session';
 import type { CreatedIdentityMaterial } from './CreatedIdentityMaterial';
+import type { DevicePairingHistory } from './DevicePairingHistory';
 import type { DeviceSealedRecovery } from './DeviceSealedRecovery';
 import type { DeviceSealedRootRotation } from './DeviceSealedRootRotation';
 import type { IdentityUpdateProfileInput } from './IdentitySignaturePayloadFactory';
@@ -44,7 +47,25 @@ export class PigeonIdentitiesGateway {
     private readonly presence: PigeonPresenceGateway,
     private readonly deviceSealedRoot: DeviceSealedRootRotation,
     private readonly recovery: DeviceSealedRecovery,
+    private readonly pairingHistory: DevicePairingHistory,
   ) {}
+
+  /** Opens the sealed root for the history import, or undefined. */
+  private async openRootForHistory(
+    session: Session,
+  ): Promise<Session | undefined> {
+    try {
+      const rooted = await this.deviceSealedRoot.current(session);
+
+      return rooted.deviceSealedRootKey ? rooted : undefined;
+    } catch {
+      // Count-only. The pairing completes without the history.
+      // eslint-disable-next-line no-console
+      console.debug('Pairing history skipped: device sealed root unavailable.');
+
+      return undefined;
+    }
+  }
 
   public async recover(
     identityId: string,
@@ -99,9 +120,15 @@ export class PigeonIdentitiesGateway {
       );
     }
 
+    const historyTransferSecret = SymmetricKey.generate();
+    const published = await this.pairingHistory.publish(
+      opened,
+      historyTransferSecret.getBuffer(),
+    );
     const result = await this.deviceAuthorization.authorizePairing(
       opened,
       requestCode,
+      published ? historyTransferSecret : undefined,
     );
     // The root is kept, so the new device opens the keychain's root. A failed
     // reseal is recorded and retried on the next unlock, and the completion
@@ -160,14 +187,26 @@ export class PigeonIdentitiesGateway {
     onProgress?.('resolving-identity');
     const identity = await this.identityProfile.get(identityId);
     onProgress?.('decrypting-keys');
-    const session = await this.deviceAuthorization.completePairing(
+    const paired = await this.deviceAuthorization.completePairing(
       identity,
       password,
       draft,
       completionCode,
     );
+    const result = await this.identityLogin.hydrate(paired.session, onProgress);
 
-    return await this.identityLogin.hydrate(session, onProgress);
+    if (!paired.historyTransferSecret) return result;
+
+    const rooted = await this.openRootForHistory(result.session);
+
+    if (!rooted) return result;
+
+    await this.pairingHistory.receive(
+      rooted,
+      paired.historyTransferSecret.getBuffer(),
+    );
+
+    return { ...result, session: rooted };
   }
 
   public async changePassword(

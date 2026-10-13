@@ -1,11 +1,20 @@
-import type { KeyPair, UserRootKey } from '@haskou/pigeon-swarm-crypto';
+import type {
+  KeyPair,
+  SymmetricKey,
+  UserRootKey,
+} from '@haskou/pigeon-swarm-crypto';
 
 export class DevicePairingMaterial {
   public constructor(
     private readonly identityKeyPair: KeyPair,
     private readonly recoveryAuthorityKeyPair: KeyPair,
     private readonly rootKey: UserRootKey,
+    private readonly historyTransferSecret?: SymmetricKey,
   ) {}
+
+  public getHistoryTransferSecret(): SymmetricKey | undefined {
+    return this.historyTransferSecret;
+  }
 
   public getIdentityKeyPair(): KeyPair {
     return this.identityKeyPair;

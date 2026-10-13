@@ -1,4 +1,8 @@
-import { KeyPair, UserRootKey } from '@haskou/pigeon-swarm-crypto';
+import {
+  KeyPair,
+  SymmetricKey,
+  UserRootKey,
+} from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 
 import { DeviceAuthorizationCheckpoint } from '../../../../contexts/identities/domain/DeviceAuthorizationCheckpoint';
@@ -13,7 +17,7 @@ import { PairingId } from '../../../../contexts/identities/domain/value-objects/
 import { thrownPairingFailure } from './thrownPairingFailure';
 
 describe(DevicePairingCompletion.name, () => {
-  async function fixture() {
+  async function fixture(historyTransferSecret?: SymmetricKey) {
     const author = await KeyPair.generate();
     const identityKeyPair = await KeyPair.generate();
     const identityId = IdentityId.fromString(
@@ -39,6 +43,7 @@ describe(DevicePairingCompletion.name, () => {
         { epoch: 'genesis', identityId: identityId.valueOf(), revision: 4 },
         identityId,
       ),
+      historyTransferSecret,
       identityKeyPair,
       recoveryAuthorityKeyPair,
       request: draft.getRequest(),
@@ -62,6 +67,27 @@ describe(DevicePairingCompletion.name, () => {
       source.identityKeyPair.toPrimitives(),
     );
     expect(material.getRootKey().isEqual(source.rootKey)).toBe(true);
+  });
+
+  it('carries the history transfer secret inside the encrypted material', async () => {
+    const historyTransferSecret = SymmetricKey.generate();
+    const source = await fixture(historyTransferSecret);
+    const material = DevicePairingCompletion.fromCode(
+      source.completion.toCode(),
+    ).open(source.draft.getRequest(), source.draft.getTransportKeyPair());
+
+    expect(material.getHistoryTransferSecret()?.valueOf()).toBe(
+      historyTransferSecret.valueOf(),
+    );
+  });
+
+  it('opens without a history transfer secret when none was published', async () => {
+    const source = await fixture();
+    const material = DevicePairingCompletion.fromCode(
+      source.completion.toCode(),
+    ).open(source.draft.getRequest(), source.draft.getTransportKeyPair());
+
+    expect(material.getHistoryTransferSecret()).toBeUndefined();
   });
 
   it('rejects tampered completion checkpoints before decryption', async () => {

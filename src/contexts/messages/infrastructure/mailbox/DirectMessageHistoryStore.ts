@@ -1,5 +1,6 @@
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { DirectMessageHistoryEntry } from './DirectMessageHistoryEntry';
+import type { DirectMessageHistoryItem } from './DirectMessageHistoryItem';
 import type { DirectMessageHistoryRow } from './DirectMessageHistoryRow';
 
 import { scopeClientStorageKey } from '../../../../shared/infrastructure/storage/ClientStorageScope';
@@ -202,6 +203,44 @@ export class DirectMessageHistoryStore {
     }
   }
 
+  /** Rows across conversations, newest first, at most `limit`. */
+  private async recentRows(
+    identityId: string,
+    limit: number,
+  ): Promise<DirectMessageHistoryRow[]> {
+    const db = await this.open();
+
+    try {
+      const transaction = db.transaction(ENTRIES_STORE, 'readonly');
+      const rows: DirectMessageHistoryRow[] = [];
+
+      await new Promise<void>((resolve, reject) => {
+        const cursor = transaction
+          .objectStore(ENTRIES_STORE)
+          .openCursor(null, 'prev');
+
+        cursor.addEventListener('success', () => {
+          const current = cursor.result;
+
+          if (current === null || rows.length >= limit) return resolve();
+
+          const row = current.value as DirectMessageHistoryRow;
+
+          if (row.identityId === identityId) rows.push(row);
+
+          current.continue();
+        });
+        cursor.addEventListener('error', () => reject(cursor.error));
+      });
+
+      await settle(transaction);
+
+      return rows;
+    } finally {
+      db.close();
+    }
+  }
+
   private async verifiedKey(session: Session): Promise<CryptoKey | undefined> {
     const root = session.deviceSealedRootKey?.getBuffer();
 
@@ -361,6 +400,44 @@ export class DirectMessageHistoryStore {
       );
     } catch {
       console.debug('Direct history load failed.');
+
+      return [];
+    }
+  }
+
+  /**
+   * This identity's newest records across conversations, newest first, capped
+   * at `limit`. Feeds the pairing export. Never throws: failures yield none.
+   */
+  public async recent(
+    session: Session,
+    limit: number,
+  ): Promise<DirectMessageHistoryItem[]> {
+    try {
+      const key = await this.verifiedKey(session);
+
+      if (!key) return [];
+
+      const rows = await this.recentRows(session.identity.id, limit);
+      const opened = await Promise.all(
+        rows.map(async (row) => {
+          const plaintext = await openSealed(
+            key,
+            recordAad(row.identityId, row.conversationId, row.recordId),
+            row.sealed,
+          );
+
+          return plaintext === undefined
+            ? undefined
+            : { conversationId: row.conversationId, plaintext };
+        }),
+      );
+
+      return opened.filter(
+        (item): item is DirectMessageHistoryItem => item !== undefined,
+      );
+    } catch {
+      console.debug('Direct history recent failed.');
 
       return [];
     }
