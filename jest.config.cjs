@@ -9,6 +9,7 @@ const REAL_CRYPTO_SPECS = [
   'AttachmentCipher',
   'AttachmentCryptographer',
   'CallEventSigner',
+  'CommunityModerationLogSigner.vectors',
   'CommunityOperationSigner',
   'ConversationOperationSigner',
   'DeviceAuthorizationTransition',
