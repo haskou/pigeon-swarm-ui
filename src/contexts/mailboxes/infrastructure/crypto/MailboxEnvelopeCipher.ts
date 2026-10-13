@@ -39,7 +39,8 @@ export class MailboxEnvelopeCipher {
     return `${mailboxId}.${envelopeId}`;
   }
 
-  private static bucketFor(plaintextLength: number): number {
+  /** Sealed wire size, in bytes, for a plaintext of this length. */
+  public static bucketFor(plaintextLength: number): number {
     const bucket = MailboxEnvelopeCipher.BUCKETS.find(
       (size) =>
         size -

@@ -18,6 +18,7 @@ import type { DirectMessageReaderSet } from './DirectMessageReaderSet';
 import type { RecipientMailboxRouter } from './RecipientMailboxRouter';
 
 import { DirectMessageHistoryStore } from './DirectMessageHistoryStore';
+import { DirectMessageHistoryTransfer } from './DirectMessageHistoryTransfer';
 import { DirectMessageInboxOpener } from './DirectMessageInboxOpener';
 import { DirectMessageOutboxStore } from './DirectMessageOutboxStore';
 import { DirectMessageOwnCopies } from './DirectMessageOwnCopies';
@@ -40,6 +41,7 @@ export class DirectMessageMailbox {
   private readonly timeline: DirectMessageTimelineSync;
   private readonly reads: DirectMessageReadSync;
   private readonly history: DirectMessageHistoryStore;
+  private readonly transfer: DirectMessageHistoryTransfer;
 
   public constructor(
     channel: MailboxChannel,
@@ -60,6 +62,7 @@ export class DirectMessageMailbox {
       new DirectMessageOutboxStore(),
     );
     this.history = new DirectMessageHistoryStore();
+    this.transfer = new DirectMessageHistoryTransfer(channel, this.history);
     this.timeline = new DirectMessageTimelineSync(
       this.inboxes,
       channel,
@@ -252,6 +255,25 @@ export class DirectMessageMailbox {
    */
   public async forgetHistory(identityId: string): Promise<void> {
     await this.history.forget(identityId);
+  }
+
+  /**
+   * Pairing. Publishes this identity's newest direct history to the transfer
+   * mailbox derived from `secret`. Resolves false on failure. Never throws.
+   */
+  public publishHistory(
+    session: Session,
+    secret: Uint8Array,
+  ): Promise<boolean> {
+    return this.transfer.publish(session, secret);
+  }
+
+  /**
+   * Pairing. Imports the history published to the transfer mailbox derived
+   * from `secret`. Never throws.
+   */
+  public receiveHistory(session: Session, secret: Uint8Array): Promise<void> {
+    return this.transfer.receive(session, secret);
   }
 
   /**
