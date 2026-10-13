@@ -80,28 +80,83 @@ test('locks a revoked device out of the direct messages sent after the revoke', 
     await expect(laptop.getByText(afterRevoke, { exact: true })).toHaveCount(0);
     await expect.poll(() => storedHistoryRows(laptop)).toBeGreaterThan(0);
 
-    // On its next sign-in the node reports the laptop as removed. The laptop
-    // erases the history it stored for Bob before it says so.
-    await laptop.goto('/');
-    await laptop.getByTestId('auth-identity-input').fill(`@${bob.handle}`);
-    await laptop.getByTestId('auth-password-input').fill(bob.password);
-    await laptop.getByTestId('auth-submit-button').click();
+    // On its next sign-in the node reports the laptop as removed. That answer
+    // is not signed, so the laptop says so and keeps what it stored.
+    await signIn(laptop, bob);
     await expect(
       laptop.getByText('This device was removed from your account.'),
     ).toBeVisible({ timeout: 45_000 });
     await expect(
       laptop.getByText(
-        'The messages saved on this browser for this identity were erased.',
+        'The messages saved on this browser stay until you erase them.',
         { exact: false },
       ),
     ).toBeVisible();
-    expect(await storedHistoryRows(laptop)).toBe(0);
+    expect(await storedHistoryRows(laptop)).toBeGreaterThan(0);
+
+    // Only the explicit action erases them.
+    await laptop
+      .getByRole('button', { name: 'Erase local copy and start over' })
+      .click();
+    await expect.poll(() => storedHistoryRows(laptop)).toBe(0);
+
+    // A node that forges the same answer for a device that is still
+    // authorized (401020 on the device-signed read, then a catalog without
+    // this device) gets the notice shown and nothing erased.
+    await expect.poll(() => storedHistoryRows(phone)).toBeGreaterThan(0);
+    await forgeDeviceRemoval(phone);
+    await signIn(phone, bob);
+    await expect(
+      phone.getByText('This device was removed from your account.'),
+    ).toBeVisible({ timeout: 45_000 });
+    expect(await storedHistoryRows(phone)).toBeGreaterThan(0);
   } finally {
     await alicePage.context().close();
     await phone.context().close();
     await laptop.context().close();
   }
 });
+
+async function signIn(page: Page, identity: TestIdentity): Promise<void> {
+  await page.goto('/');
+  await page.getByTestId('auth-identity-input').fill(`@${identity.handle}`);
+  await page.getByTestId('auth-password-input').fill(identity.password);
+  await page.getByTestId('auth-submit-button').click();
+}
+
+/**
+ * Answers the device-signed checkpoint read with 401020 and strips every
+ * credential from the device catalog, as a lying node could.
+ */
+async function forgeDeviceRemoval(page: Page): Promise<void> {
+  await page.route(
+    (url) => /\/identity-devices\/[^/]+(\/devices)?$/.test(url.pathname),
+    async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.continue();
+
+        return;
+      }
+
+      if (new URL(route.request().url()).pathname.endsWith('/devices')) {
+        const response = await route.fetch();
+        const catalog = (await response.json()) as Record<string, unknown>;
+
+        await route.fulfill({
+          json: { ...catalog, credentials: [] },
+          response,
+        });
+
+        return;
+      }
+
+      await route.fulfill({
+        json: { code: 401020, message: 'Invalid signed request' },
+        status: 401,
+      });
+    },
+  );
+}
 
 function testRunToken(projectName: string): string {
   const projectPrefix = projectName.replace(/[^a-z0-9]/gi, '').slice(0, 4);

@@ -91,7 +91,7 @@ export function AuthScreen({
   const [removedIdentityId, setRemovedIdentityId] = useState<string | null>(
     null,
   );
-  const [removedHistoryErased, setRemovedHistoryErased] = useState(true);
+  const [removedEraseFailed, setRemovedEraseFailed] = useState(false);
   const [loginProgressStep, setLoginProgressStep] =
     useState<LoginIdentityProgressStep | null>(null);
   const [admissionNotice, setAdmissionNotice] = useState<string | null>(null);
@@ -289,12 +289,7 @@ export function AuthScreen({
       setLoginProgressStep(null);
 
       if (caught instanceof DeviceRemovedError) {
-        setRemovedHistoryErased(
-          await eraseRemovedDevice(
-            caught.identityId,
-            await loadApplicationContainer(),
-          ),
-        );
+        setRemovedEraseFailed(false);
         setRemovedIdentityId(caught.identityId);
         setState('error');
 
@@ -368,7 +363,7 @@ export function AuthScreen({
       const applicationContainer = await loadApplicationContainer();
       const erased = await eraseRemovedDevice(identity, applicationContainer);
 
-      setRemovedHistoryErased(erased);
+      setRemovedEraseFailed(!erased);
 
       if (!erased) {
         setState('error');
@@ -606,7 +601,7 @@ export function AuthScreen({
           {removedIdentityId ? (
             <DeviceRemovedNotice
               disabled={state === 'loading'}
-              erased={removedHistoryErased}
+              eraseFailed={removedEraseFailed}
               onPairAgain={handlePairAgain}
               onStartOver={() => void handleStartOver(removedIdentityId)}
             />

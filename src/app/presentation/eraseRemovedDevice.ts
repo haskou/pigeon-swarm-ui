@@ -9,11 +9,12 @@ export type RemovedDeviceServices = {
 };
 
 /**
- * Erases what this device stored for an identity once the node reports the
- * device as removed: unsent messages, stored history and pending
- * device-sealed recovery steps. The local unlock stays, so the user can still
- * pair this device again or erase it. Every step runs even when one fails.
- * Resolves false when any step failed. Never throws.
+ * Erases what this device stored for an identity when the user asks to start
+ * over after the node reported the device as removed: unsent messages, stored
+ * history and pending device-sealed recovery steps. The node's report is not
+ * signed, so it never triggers this by itself. The local unlock stays for the
+ * caller to remove. Every step runs even when one fails. Resolves false when
+ * any step failed. Never throws.
  */
 export async function eraseRemovedDevice(
   identityId: string,
