@@ -233,8 +233,13 @@ class SymmetricKey extends StringValueObject {
     try {
       const parsed = JSON.parse(decrypted) as {
         __pigeonTestKey?: string;
+        __pigeonTestKeyPair?: string;
         payload?: string;
       };
+
+      if (parsed.__pigeonTestKeyPair) {
+        throw new Error('Invalid encrypted payload key');
+      }
 
       if (parsed.__pigeonTestKey) {
         if (parsed.__pigeonTestKey !== this.valueOf()) {

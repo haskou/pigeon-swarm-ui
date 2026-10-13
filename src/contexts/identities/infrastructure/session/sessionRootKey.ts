@@ -3,9 +3,13 @@ import type { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import type { Session } from './Session';
 
 /**
- * The root the mailbox read tokens derive from. A device uses the
- * device-sealed root once it has opened a generation. Until then it falls back
- * to the legacy `masterKey`, which every device of the identity still holds.
+ * The device-sealed root that mailbox read tokens and drafts derive from.
+ * Unlock refuses a session that cannot open it, so a missing root is a fault.
  */
-export const sessionRootKey = (session: Session): SymmetricKey =>
-  session.deviceSealedRootKey ?? session.masterKey;
+export const sessionRootKey = (session: Session): SymmetricKey => {
+  if (!session.deviceSealedRootKey) {
+    throw new Error('Device sealed root is not open.');
+  }
+
+  return session.deviceSealedRootKey;
+};

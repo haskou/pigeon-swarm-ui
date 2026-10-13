@@ -32,6 +32,7 @@ import type { KeychainResource } from './resources/KeychainResource';
 import type { LoginResult } from './resources/LoginResult';
 import type { SelectablePresenceStatusResource as SelectablePresenceStatus } from './resources/SelectablePresenceStatusResource';
 
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import { DevicePairingError } from '../../domain/DevicePairingError';
 import { DevicePairingCode } from '../../domain/value-objects/DevicePairingCode';
 import { IdentityPassword } from '../../domain/value-objects/IdentityPassword';
@@ -65,7 +66,10 @@ export class PigeonIdentitiesGateway {
       IdentityPassword.fromString(password),
     );
 
-    return await this.identityLogin.hydrate(session, onProgress);
+    return await this.identityLogin.hydrate(
+      await this.openDeviceSealedRoot(session),
+      onProgress,
+    );
   }
 
   public createDevicePairingInvitation(session: Session): DevicePairingCode {
@@ -250,8 +254,15 @@ export class PigeonIdentitiesGateway {
     return this.keychain.decrypt(session, keychain);
   }
 
+  /** Opens the device-sealed root and refuses a session left without one. */
   public async openDeviceSealedRoot(session: Session): Promise<Session> {
-    return await this.deviceSealedRoot.current(session);
+    const opened = await this.deviceSealedRoot.current(session);
+
+    if (!opened.deviceSealedRootKey) {
+      throw new Error(copy.auth.deviceRootUnavailable);
+    }
+
+    return opened;
   }
 
   public async getIdentity(identityId: string): Promise<IdentityResource> {

@@ -1518,15 +1518,14 @@ export class PigeonCommunitiesApi {
           },
         );
 
-        return await Promise.all(
-          result.drafts.map(async (draft) => ({
-            ...draft,
-            content: await this.draftPayloads.decrypt(
-              session,
-              draft.encryptedPayload,
-            ),
-          })),
-        );
+        return result.drafts.flatMap((draft) => {
+          const content = this.draftPayloads.decrypt(
+            session,
+            draft.encryptedPayload,
+          );
+
+          return content === null ? [] : [{ ...draft, content }];
+        });
       },
       { ttlMs: startupReadCacheTtlMs },
     );

@@ -42,29 +42,16 @@ function encryptDrafts(
   );
 }
 
-async function decryptStoredDrafts(
-  session: Session,
-): Promise<ConversationDrafts> {
-  const encryptedPayloads = loadEncryptedDraftPayloads(session.identity.id);
-  const drafts = await Promise.all(
-    Object.entries(encryptedPayloads).map(
-      async ([conversationId, payload]): Promise<[string, string]> => [
-        conversationId,
-        await draftPayloadCipher.decrypt(session, payload),
-      ],
+function decryptStoredDrafts(session: Session): ConversationDrafts {
+  return Object.fromEntries(
+    Object.entries(loadEncryptedDraftPayloads(session.identity.id)).flatMap(
+      ([conversationId, payload]): [string, string][] => {
+        const content = draftPayloadCipher.decrypt(session, payload);
+
+        return content === null ? [] : [[conversationId, content]];
+      },
     ),
   );
-
-  return Object.fromEntries(drafts);
-}
-
-function mergeDecryptedDrafts(
-  decryptedDrafts: ConversationDrafts,
-): (current: ConversationDrafts) => ConversationDrafts {
-  return (current) => ({
-    ...current,
-    ...decryptedDrafts,
-  });
 }
 
 export function useWorkspacePreferences(input: {
@@ -167,23 +154,10 @@ export function useWorkspacePreferenceState(
   const [draftsHydrated, setDraftsHydrated] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-
-    setDraftsHydrated(false);
-    setDrafts({});
     setCommunityUnreadCountsById(loadCommunityUnreadCounts(identityId));
     setWorkspacePreference(loadWorkspacePreference(identityId));
-
-    void decryptStoredDrafts(session).then((decryptedDrafts) => {
-      if (cancelled) return;
-
-      setDrafts(mergeDecryptedDrafts(decryptedDrafts));
-      setDraftsHydrated(true);
-    });
-
-    return () => {
-      cancelled = true;
-    };
+    setDrafts(decryptStoredDrafts(session));
+    setDraftsHydrated(true);
   }, [identityId, session]);
 
   useEffect(() => {
