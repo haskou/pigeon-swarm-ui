@@ -29,7 +29,7 @@ import { DirectMessageTimelineSync } from './DirectMessageTimelineSync';
  * Direct one-to-one messages over the opaque mailbox: sent, edited, deleted,
  * reactions, pins, and read receipts. Each action goes to the peer's inbox
  * first, then to this identity's own inbox, so its other devices converge.
- * Duplicates collapse by message id in the timeline.
+ * Replayed records collapse by record id in the timeline.
  *
  * The facade keeps the public API. The work lives in collaborators: the
  * sender, the inbox opener, the timeline sync pass, and the read sync pass.
@@ -175,7 +175,8 @@ export class DirectMessageMailbox {
    * Recipient. Reads the next page of this identity's inbox, applies its
    * changes, then acknowledges. The cursor advances only after the
    * acknowledgement succeeds, so an interrupted pass is replayed and the
-   * timeline dedupes by id. A pass superseded before its inbox is created or
+   * timeline skips records it already applied. A pass superseded before its
+   * inbox is created or
    * read leaves the inbox untouched. The first pass on a device creates the
    * inbox. When the inbox was re-created, its cursors restart at 1, so the
    * stored cursor is reset.

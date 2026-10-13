@@ -73,11 +73,11 @@ export class DirectMessageTimelineSync {
   }
 
   /**
-   * Decodes the page, hands the changes of records this timeline has not
-   * applied yet to the caller, then stores the page's records and acknowledges
-   * the page. Apply runs before the store, so a stored record always reached
-   * the timeline. Each step checks the signal so an aborted pass neither
-   * applies, stores, nor acks.
+   * Decodes the page, stores its records on this device, then hands the
+   * changes of records this timeline has not applied yet to the caller, then
+   * acknowledges the page. The store runs before the ack, so an acked page is
+   * never missing from the history. Each step checks the signal so an aborted
+   * pass neither applies nor acks.
    */
   private async applyPage(
     session: Session,
@@ -97,6 +97,20 @@ export class DirectMessageTimelineSync {
 
       return record ? [{ plaintext: envelope.plaintext, record }] : [];
     });
+
+    // Keyed by record id, so a replayed envelope dedupes while each action
+    // (a reaction add, its removal, a re-add) keeps its own row.
+    await this.history.append(
+      session,
+      conversationId,
+      decoded.flatMap(({ plaintext, record }) =>
+        record.type === DirectMailboxRecords.TYPE.read
+          ? []
+          : [{ plaintext, recordId: record.id }],
+      ),
+    );
+
+    if (signal.aborted) return;
 
     // An own copy this device appended is already shown locally.
     const records = decoded.flatMap(({ record }) =>
@@ -118,20 +132,6 @@ export class DirectMessageTimelineSync {
 
     apply(changes);
     this.markApplied(conversationId, unapplied);
-
-    if (signal.aborted) return;
-
-    // Keyed by record id, so a replayed envelope dedupes while each action
-    // (a reaction add, its removal, a re-add) keeps its own row.
-    await this.history.append(
-      session,
-      conversationId,
-      decoded.flatMap(({ plaintext, record }) =>
-        record.type === DirectMailboxRecords.TYPE.read
-          ? []
-          : [{ plaintext, recordId: record.id }],
-      ),
-    );
 
     if (signal.aborted) return;
 
@@ -166,7 +166,7 @@ export class DirectMessageTimelineSync {
     return [...unapplied.values()];
   }
 
-  /** Remembers the records this timeline applied, so a replay adds no change. */
+  /** Remembers the records this timeline applied, so a replay adds nothing. */
   private markApplied(
     conversationId: string,
     records: DirectMessageRecord[],
@@ -300,8 +300,8 @@ export class DirectMessageTimelineSync {
    * Recipient. Reads the next page of this identity's inbox, applies its
    * changes, then acknowledges. The cursor advances only after the
    * acknowledgement succeeds, so an interrupted pass is replayed and the
-   * timeline dedupes by id. A pass superseded before its inbox is created or
-   * read leaves the inbox untouched.
+   * timeline skips records it already applied. A pass superseded before its
+   * inbox is created or read leaves the inbox untouched.
    */
   public async sync(
     session: Session,
@@ -331,6 +331,7 @@ export class DirectMessageTimelineSync {
    * changes, in the order it was stored. Read receipts are never stored, so
    * none replay. Own copies replay too: the live pass skips them only because
    * they were already on screen when it appended them.
+   * Replayed records then count as applied, so a later pass skips them.
    */
   public async restore(
     session: Session,
