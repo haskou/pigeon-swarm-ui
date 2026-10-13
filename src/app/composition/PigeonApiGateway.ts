@@ -15,7 +15,6 @@ import { PigeonDirectAttachmentUploader } from '../../contexts/attachments/infra
 import { PigeonFilesGateway } from '../../contexts/attachments/infrastructure/http/PigeonFilesGateway';
 import { PigeonMessageAttachmentUploader } from '../../contexts/attachments/infrastructure/http/PigeonMessageAttachmentUploader';
 import { PigeonPrivateBlobClient } from '../../contexts/attachments/infrastructure/http/PigeonPrivateBlobClient';
-import { PigeonPrivateFilesClient } from '../../contexts/attachments/infrastructure/http/PigeonPrivateFilesClient';
 import { PigeonPublicFilesClient } from '../../contexts/attachments/infrastructure/http/PigeonPublicFilesClient';
 import { PigeonPublicFileUploader } from '../../contexts/attachments/infrastructure/http/PigeonPublicFileUploader';
 import { PrivateBlobReplicaPlanner } from '../../contexts/attachments/infrastructure/http/PrivateBlobReplicaPlanner';
@@ -222,7 +221,6 @@ export class PigeonApiGateway {
       signer,
       mutations,
     );
-    const privateFiles = new PigeonPrivateFilesClient(http);
     const identityResourceGateway = new PigeonIdentityGateway(http);
     const ownHome = () =>
       MailboxHomeBase.fromApiBase(API_SERVER_URL, window.location.origin);
@@ -265,7 +263,6 @@ export class PigeonApiGateway {
       contentReplication,
     );
     const attachmentDownloader = new PigeonAttachmentDownloader(
-      privateFiles,
       publicFiles,
       privateBlobs,
       attachmentCipher,

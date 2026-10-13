@@ -8,7 +8,6 @@ import { AttachmentLengthPadding } from '../../../../../contexts/attachments/inf
 import { attachmentBlobCacheKey } from '../../../../../contexts/attachments/infrastructure/http/attachmentBlobCacheKey';
 import { PigeonAttachmentDownloader } from '../../../../../contexts/attachments/infrastructure/http/PigeonAttachmentDownloader';
 import { PigeonPrivateBlobClient } from '../../../../../contexts/attachments/infrastructure/http/PigeonPrivateBlobClient';
-import { PigeonPrivateFilesClient } from '../../../../../contexts/attachments/infrastructure/http/PigeonPrivateFilesClient';
 import { PigeonPublicFilesClient } from '../../../../../contexts/attachments/infrastructure/http/PigeonPublicFilesClient';
 import { PrivateBlobUnavailableError } from '../../../../../contexts/attachments/infrastructure/http/PrivateBlobUnavailableError';
 
@@ -57,7 +56,6 @@ describe(PigeonAttachmentDownloader.name, () => {
       }),
     } as unknown as PigeonPublicFilesClient;
     const downloader = new PigeonAttachmentDownloader(
-      {} as PigeonPrivateFilesClient,
       publicFiles,
       {} as PigeonPrivateBlobClient,
       {} as AttachmentCipher,
@@ -86,15 +84,11 @@ describe(PigeonAttachmentDownloader.name, () => {
             : new Uint8Array([3]).buffer,
         ),
       );
-    const privateFiles = {
-      fetch: jest.fn(),
-    } as unknown as PigeonPrivateFilesClient;
     const decrypted = new Blob(['secret'], { type: 'text/plain' });
     const cipher = {
       decrypt: jest.fn().mockResolvedValue(decrypted),
     } as unknown as AttachmentCipher;
     const downloader = new PigeonAttachmentDownloader(
-      privateFiles,
       {} as PigeonPublicFilesClient,
       { download } as unknown as PigeonPrivateBlobClient,
       cipher,
@@ -113,7 +107,6 @@ describe(PigeonAttachmentDownloader.name, () => {
     expect(
       download.mock.calls.map(([blob]: [PrivateBlobReference]) => blob.blobId),
     ).toEqual(['blob-a', 'blob-b']);
-    expect(privateFiles.fetch).not.toHaveBeenCalled();
     const [, bytes] = jest.mocked(cipher.decrypt).mock.calls[0];
     expect(Array.from(new Uint8Array(bytes))).toEqual([1, 2, 3]);
   });
@@ -124,7 +117,6 @@ describe(PigeonAttachmentDownloader.name, () => {
       decrypt: jest.fn().mockResolvedValue(new Blob(['x'])),
     } as unknown as AttachmentCipher;
     const downloader = new PigeonAttachmentDownloader(
-      {} as PigeonPrivateFilesClient,
       {} as PigeonPublicFilesClient,
       { download } as unknown as PigeonPrivateBlobClient,
       cipher,
@@ -150,7 +142,6 @@ describe(PigeonAttachmentDownloader.name, () => {
       .fn()
       .mockRejectedValue(new PrivateBlobUnavailableError());
     const downloader = new PigeonAttachmentDownloader(
-      {} as PigeonPrivateFilesClient,
       {} as PigeonPublicFilesClient,
       { download } as unknown as PigeonPrivateBlobClient,
       {} as AttachmentCipher,
@@ -174,7 +165,6 @@ describe(PigeonAttachmentDownloader.name, () => {
       decrypt: jest.fn().mockResolvedValue(new Blob(['x'])),
     } as unknown as AttachmentCipher;
     const downloader = new PigeonAttachmentDownloader(
-      {} as PigeonPrivateFilesClient,
       {} as PigeonPublicFilesClient,
       { download } as unknown as PigeonPrivateBlobClient,
       cipher,
@@ -207,12 +197,10 @@ describe(PigeonAttachmentDownloader.name, () => {
   });
 
   it('rejects an encrypted attachment without blobs as unavailable', async () => {
-    const privateFiles = mock<PigeonPrivateFilesClient>();
     const publicFiles = mock<PigeonPublicFilesClient>();
     const privateBlobs = mock<PigeonPrivateBlobClient>();
     const cipher = mock<AttachmentCipher>();
     const downloader = new PigeonAttachmentDownloader(
-      privateFiles,
       publicFiles,
       privateBlobs,
       cipher,
@@ -228,7 +216,6 @@ describe(PigeonAttachmentDownloader.name, () => {
         size: 3,
       }),
     ).rejects.toBeInstanceOf(PrivateBlobUnavailableError);
-    expect(privateFiles.fetch).not.toHaveBeenCalled();
     expect(publicFiles.fetch).not.toHaveBeenCalled();
     expect(privateBlobs.download).not.toHaveBeenCalled();
     expect(cipher.decrypt).not.toHaveBeenCalled();
@@ -247,7 +234,6 @@ describe(PigeonAttachmentDownloader.name, () => {
       decrypt: jest.fn().mockResolvedValue(decrypted),
     } as unknown as AttachmentCipher;
     const downloader = new PigeonAttachmentDownloader(
-      {} as PigeonPrivateFilesClient,
       {} as PigeonPublicFilesClient,
       { download } as unknown as PigeonPrivateBlobClient,
       cipher,
@@ -283,7 +269,6 @@ describe(PigeonAttachmentDownloader.name, () => {
       decrypt: jest.fn().mockResolvedValue(decrypted),
     } as unknown as AttachmentCipher;
     const downloader = new PigeonAttachmentDownloader(
-      {} as PigeonPrivateFilesClient,
       {} as PigeonPublicFilesClient,
       { download } as unknown as PigeonPrivateBlobClient,
       cipher,
@@ -331,7 +316,6 @@ describe(PigeonAttachmentDownloader.name, () => {
       .mockRejectedValue(new PrivateBlobUnavailableError());
     const cipher = { decrypt: jest.fn() } as unknown as AttachmentCipher;
     const downloader = new PigeonAttachmentDownloader(
-      {} as PigeonPrivateFilesClient,
       {} as PigeonPublicFilesClient,
       { download } as unknown as PigeonPrivateBlobClient,
       cipher,
@@ -357,7 +341,6 @@ describe(PigeonAttachmentDownloader.name, () => {
     const download = jest.fn().mockRejectedValue(failure);
     const cipher = { decrypt: jest.fn() } as unknown as AttachmentCipher;
     const downloader = new PigeonAttachmentDownloader(
-      {} as PigeonPrivateFilesClient,
       {} as PigeonPublicFilesClient,
       { download } as unknown as PigeonPrivateBlobClient,
       cipher,
@@ -397,7 +380,6 @@ describe(PigeonAttachmentDownloader.name, () => {
       }),
     } as unknown as AttachmentCipher;
     const downloader = new PigeonAttachmentDownloader(
-      {} as PigeonPrivateFilesClient,
       {} as PigeonPublicFilesClient,
       { download } as unknown as PigeonPrivateBlobClient,
       cipher,
@@ -447,7 +429,6 @@ describe(PigeonAttachmentDownloader.name, () => {
       decryptWithoutWorker: jest.fn(),
     } as unknown as AttachmentCipher;
     const downloader = new PigeonAttachmentDownloader(
-      {} as PigeonPrivateFilesClient,
       {} as PigeonPublicFilesClient,
       { download } as unknown as PigeonPrivateBlobClient,
       cipher,

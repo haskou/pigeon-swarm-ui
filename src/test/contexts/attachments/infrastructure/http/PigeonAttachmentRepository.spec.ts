@@ -31,7 +31,7 @@ describe(PigeonAttachmentRepository.name, () => {
       }),
     };
     const repository = new PigeonAttachmentRepository(
-      { findPrivate: jest.fn(), findPublic: jest.fn() },
+      { findPublic: jest.fn() },
       uploader,
       contexts,
     );
@@ -89,7 +89,7 @@ describe(PigeonAttachmentRepository.name, () => {
       publishPublic: jest.fn(),
     };
     const repository = new PigeonAttachmentRepository(
-      { findPrivate: jest.fn(), findPublic: jest.fn() },
+      { findPublic: jest.fn() },
       uploader,
       contexts,
     );
@@ -133,7 +133,7 @@ describe(PigeonAttachmentRepository.name, () => {
       size: 5,
     });
     const repository = new PigeonAttachmentRepository(
-      { findPrivate: jest.fn(), findPublic },
+      { findPublic },
       { publishEncrypted: jest.fn(), publishPublic: jest.fn() },
       new AttachmentPublicationContexts(),
     );
@@ -149,10 +149,9 @@ describe(PigeonAttachmentRepository.name, () => {
   });
 
   it('rejects an encrypted find without fetching any content', async () => {
-    const findPrivate = jest.fn();
     const findPublic = jest.fn();
     const repository = new PigeonAttachmentRepository(
-      { findPrivate, findPublic },
+      { findPublic },
       { publishEncrypted: jest.fn(), publishPublic: jest.fn() },
       new AttachmentPublicationContexts(),
     );
@@ -163,7 +162,6 @@ describe(PigeonAttachmentRepository.name, () => {
         EncryptedAttachmentStrategy.restore(),
       ),
     ).rejects.toThrow('Encrypted attachments are read through their blobs');
-    expect(findPrivate).not.toHaveBeenCalled();
     expect(findPublic).not.toHaveBeenCalled();
   });
 });

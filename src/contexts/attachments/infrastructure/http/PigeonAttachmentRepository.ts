@@ -11,10 +11,7 @@ import { PigeonMessageAttachmentUploader } from './PigeonMessageAttachmentUpload
 
 export class PigeonAttachmentRepository implements AttachmentRepository {
   public constructor(
-    private readonly downloader: Pick<
-      PigeonAttachmentDownloader,
-      'findPrivate' | 'findPublic'
-    >,
+    private readonly downloader: Pick<PigeonAttachmentDownloader, 'findPublic'>,
     private readonly uploader: Pick<
       PigeonMessageAttachmentUploader,
       'publishEncrypted' | 'publishPublic'
@@ -46,26 +43,19 @@ export class PigeonAttachmentRepository implements AttachmentRepository {
     externalIdentifier: AttachmentExternalIdentifier,
     publication: PublicationStrategy,
   ): Promise<Attachment> {
+    if (publication.isEncrypted()) {
+      throw new Error('Encrypted attachments are read through their blobs');
+    }
+
     const identifier = externalIdentifier.toString();
-    const resource = publication.isEncrypted()
-      ? await this.downloader.findPrivate(identifier)
-      : await this.downloader.findPublic(identifier);
+    const resource = await this.downloader.findPublic(identifier);
 
     return Attachment.fromPrimitives({
       contentType: resource.contentType,
       externalIdentifier: identifier,
       filename: resource.filename,
       id: identifier,
-      publication: publication.isEncrypted()
-        ? {
-            encrypted: true,
-            ...(publication.hasEncryptionNetwork()
-              ? {
-                  networkId: publication.getEncryptionNetworkId().toString(),
-                }
-              : {}),
-          }
-        : { encrypted: false },
+      publication: { encrypted: false },
       size: resource.size,
       status: 'published',
     });
