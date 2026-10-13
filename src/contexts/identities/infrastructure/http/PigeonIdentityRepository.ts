@@ -28,7 +28,7 @@ export class PigeonIdentityRepository implements IdentityRepository {
       material,
       protection,
     );
-    const session = {
+    const session = await this.gateway.openDeviceSealedRoot({
       authorizationEpoch: created.authorizationEpoch,
       authorizationRevision: created.authorizationRevision,
       deviceCredentialKeyPair: created.deviceCredentialKeyPair,
@@ -38,7 +38,7 @@ export class PigeonIdentityRepository implements IdentityRepository {
       keyPair: created.keyPair,
       masterKey: created.masterKey,
       recoveryAuthorityKeyPair: created.recoveryAuthorityKeyPair,
-    };
+    });
 
     this.contexts.register(session);
 

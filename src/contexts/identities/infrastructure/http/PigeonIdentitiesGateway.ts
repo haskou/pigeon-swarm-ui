@@ -206,6 +206,10 @@ export class PigeonIdentitiesGateway {
     );
   }
 
+  public async openDeviceSealedRoot(session: Session): Promise<Session> {
+    return await this.deviceSealedRoot.current(session);
+  }
+
   public decryptKeychain(
     session: Session,
     keychain: KeychainResource,
