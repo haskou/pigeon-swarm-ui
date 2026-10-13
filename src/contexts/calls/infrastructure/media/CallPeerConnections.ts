@@ -28,8 +28,9 @@ export class CallPeerConnections {
   private readonly negotiation: CallPeerNegotiation;
   private readonly peers = new Map<string, RTCPeerConnection>();
   private readonly statistics = new CallPeerStatistics();
-  private readonly recovery = new CallPeerRecovery((peer, canRestart) =>
-    this.refreshAndRestartIce(peer, canRestart),
+  private readonly recovery = new CallPeerRecovery(
+    (peerIdentityId, peer, canRestart) =>
+      this.refreshAndRestartIce(peerIdentityId, peer, canRestart),
   );
 
   private readonly peerSignalSenders = new Map<string, SignalSender>();
@@ -225,6 +226,7 @@ export class CallPeerConnections {
   }
 
   private async refreshAndRestartIce(
+    peerIdentityId: string,
     peer: RTCPeerConnection,
     canRestart: () => boolean,
   ): Promise<void> {
@@ -242,6 +244,17 @@ export class CallPeerConnections {
       ...peer.getConfiguration(),
       iceServers: configuration.iceServers,
     });
+    const sendSignal = this.peerSignalSenders.get(peerIdentityId);
+    const resent =
+      sendSignal &&
+      (await this.negotiation.resendUnansweredOffer(
+        peerIdentityId,
+        peer,
+        sendSignal,
+      ));
+
+    if (resent || !canRestart()) return;
+
     peer.restartIce();
   }
 

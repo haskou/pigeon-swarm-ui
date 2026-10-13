@@ -28,6 +28,7 @@ export class CallPeerRecovery {
 
   public constructor(
     private readonly restartIce: (
+      peerIdentityId: string,
       peer: RTCPeerConnection,
       canRestart: () => boolean,
     ) => Promise<void>,
@@ -72,6 +73,7 @@ export class CallPeerRecovery {
   private isNegotiating(peer: RTCPeerConnection): boolean {
     return (
       peer.iceConnectionState === 'checking' ||
+      peer.signalingState === 'have-local-offer' ||
       (peer.iceConnectionState === 'new' &&
         Boolean(peer.localDescription) &&
         Boolean(peer.remoteDescription))
@@ -161,7 +163,10 @@ export class CallPeerRecovery {
       !this.isHealthy(peer);
 
     try {
-      await Promise.race([this.restartIce(peer, canRestart), cancelled]);
+      await Promise.race([
+        this.restartIce(peerIdentityId, peer, canRestart),
+        cancelled,
+      ]);
     } catch {
       logCallWarning('peer-manager:ice-recovery:configuration-unavailable', {
         attempt: attempt + 1,

@@ -305,4 +305,33 @@ export class CallPeerNegotiation {
 
     return state;
   }
+
+  /**
+   * Delivers a local offer the remote peer never answered once more. The
+   * connection cannot leave `have-local-offer` without its answer, so an ICE
+   * restart has no effect. A lost answer also left the remote peer in the
+   * negotiated session, which only this same offer renegotiates consistently.
+   * Resolves whether the offer was re-sent.
+   */
+  public async resendUnansweredOffer(
+    peerIdentityId: string,
+    peer: RTCPeerConnection,
+    sendSignal: SignalSender,
+  ): Promise<boolean> {
+    const offer = peer.localDescription;
+
+    if (
+      peer.signalingState !== 'have-local-offer' ||
+      !offer ||
+      this.state(peerIdentityId).makingOffer
+    )
+      return false;
+
+    logCallWarning('peer-manager:ice-recovery:resent-offer', {
+      peerIdentityId,
+    });
+    await this.sendDescription(peerIdentityId, peer, offer, sendSignal);
+
+    return true;
+  }
 }

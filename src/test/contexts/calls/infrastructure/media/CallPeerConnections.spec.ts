@@ -791,6 +791,56 @@ describe(CallPeerConnections.name, () => {
     expect(jest.getTimerCount()).toBe(0);
   });
 
+  it('re-sends an unanswered offer so a lost answer recovers and a retry stays effective', async () => {
+    jest.useFakeTimers();
+    const peers: FakePeerConnection[] = [];
+    installSessionDescriptionMock();
+    installPeerConnectionMock(peers);
+    const manager = callPeerConnectionManager();
+    const provider = jest.fn().mockResolvedValue({ iceServers: [] });
+    const sendSignal = jest
+      .fn<Promise<void>, Parameters<SignalSender>>()
+      .mockResolvedValue(undefined);
+    manager.configure(provider);
+    manager.setLocalStream(
+      mediaStreamWithTracks([mediaTrack('microphone', 'audio')]),
+    );
+    await manager.ensurePeer('remote-identity-id', true, sendSignal);
+    const [peer] = peers;
+    Object.assign(peer, { getStats: () => Promise.resolve(new Map()) });
+    const offers = () =>
+      sendSignal.mock.calls.filter(([, signalType]) => signalType === 'offer');
+    const recoveryState = async () =>
+      (await manager.collectStats())['remote-identity-id'].recoveryState;
+    registeredPeerEventListener(
+      peer,
+      'signalingstatechange',
+    )(new Event('signalingstatechange'));
+    expect(offers()).toHaveLength(1);
+
+    await jest.advanceTimersByTimeAsync(14_999);
+    expect(offers()).toHaveLength(1);
+    await jest.advanceTimersByTimeAsync(1);
+
+    expect(offers()).toHaveLength(2);
+    // The remote peer may hold the session it answered: only the same offer
+    // renegotiates it consistently.
+    expect(offers()[1]).toEqual(offers()[0]);
+    expect(peer.createOffer).toHaveBeenCalledTimes(1);
+    expect(peer.signalingState).toBe('have-local-offer');
+    expect(await recoveryState()).toBe('recovering');
+
+    await jest.advanceTimersByTimeAsync(45_000);
+    expect(offers()).toHaveLength(4);
+    expect(await recoveryState()).toBe('exhausted');
+
+    manager.retryConnections();
+    await jest.advanceTimersByTimeAsync(0);
+    expect(offers()).toHaveLength(5);
+    expect(await recoveryState()).toBe('recovering');
+    manager.reset();
+  });
+
   it.each(['reset', 'healthy', 'timeout'])(
     'discards late TURN credentials after %s',
     async (reason) => {
