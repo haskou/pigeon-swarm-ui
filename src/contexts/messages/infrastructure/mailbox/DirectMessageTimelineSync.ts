@@ -360,7 +360,9 @@ export class DirectMessageTimelineSync {
    * timeline skips records it already applied. A pass superseded before its
    * inbox is created or read leaves the inbox untouched. The availability
    * servers are read after the connected node, even when it failed; its
-   * error is rethrown once they are done. Their faults log count-only.
+   * error is rethrown once they are done. A page a server's read cannot
+   * store rethrows `DirectMessageHistoryStorageError` instead, so the notice
+   * shows; their other faults log count-only.
    */
   public async sync(
     session: Session,
@@ -385,9 +387,13 @@ export class DirectMessageTimelineSync {
     for (const extra of this.extras) {
       try {
         await this.syncSource(extra, session, conversationId, signal, apply);
-      } catch {
-        // eslint-disable-next-line no-console
-        console.debug('Availability mailbox sync failed.');
+      } catch (error: unknown) {
+        if (error instanceof DirectMessageHistoryStorageError) {
+          failure = { error };
+        } else {
+          // eslint-disable-next-line no-console
+          console.debug('Availability mailbox sync failed.');
+        }
       }
     }
 
