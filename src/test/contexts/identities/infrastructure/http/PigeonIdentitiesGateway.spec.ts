@@ -18,6 +18,7 @@ import type { IdentityResource } from '../../../../../contexts/identities/infras
 import type { LocalKeychain } from '../../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
+import { DevicePairingError } from '../../../../../contexts/identities/domain/DevicePairingError';
 import { PigeonIdentitiesGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
 
 function identity(): IdentityResource {
@@ -289,7 +290,7 @@ describe(PigeonIdentitiesGateway.name, () => {
     const draft = {} as DevicePairingRequestDraft;
     const completionCode = 'completion-code' as unknown as DevicePairingCode;
 
-    it('imports the pairing history once the workspace hydrates, with the sealed root open', async () => {
+    it('opens the sealed root before hydrating, so a keychain head opens, then imports the history', async () => {
       const {
         authorization,
         gateway,
@@ -300,18 +301,18 @@ describe(PigeonIdentitiesGateway.name, () => {
       } = gatewayDouble();
       const secret = SymmetricKey.generate();
       const pending = { identity: { id: 'identity-1' } } as unknown as Session;
-      const hydrated = { ...pending, hydrated: true } as unknown as Session;
       const rooted = {
-        ...hydrated,
+        ...pending,
         deviceSealedRootKey: SymmetricKey.generate(),
       } as unknown as Session;
+      const hydrated = { ...rooted, hydrated: true } as unknown as Session;
       profile.get.mockResolvedValue(identity());
       authorization.completePairing.mockResolvedValue({
         historyTransferSecret: secret,
         session: pending,
       });
-      login.hydrate.mockResolvedValue({ conversations: [], session: hydrated });
       sealedRoot.current.mockResolvedValue(rooted);
+      login.hydrate.mockResolvedValue({ conversations: [], session: hydrated });
 
       const result = await gateway.completeDevicePairing(
         'identity-1',
@@ -320,18 +321,19 @@ describe(PigeonIdentitiesGateway.name, () => {
         completionCode,
       );
 
-      expect(login.hydrate.mock.invocationCallOrder[0]).toBeLessThan(
-        pairingHistory.receive.mock.invocationCallOrder[0],
+      expect(sealedRoot.current).toHaveBeenCalledWith(pending);
+      expect(sealedRoot.current.mock.invocationCallOrder[0]).toBeLessThan(
+        login.hydrate.mock.invocationCallOrder[0],
       );
-      expect(sealedRoot.current).toHaveBeenCalledWith(hydrated);
+      expect(login.hydrate).toHaveBeenCalledWith(rooted, undefined);
       expect(pairingHistory.receive).toHaveBeenCalledWith(
-        rooted,
+        hydrated,
         secret.getBuffer(),
       );
-      expect(result.session).toBe(rooted);
+      expect(result.session).toBe(hydrated);
     });
 
-    it('completes the pairing without importing when the completion carries no history secret', async () => {
+    it('hydrates under the sealed root without importing when the completion carries no history secret', async () => {
       const {
         authorization,
         gateway,
@@ -341,10 +343,14 @@ describe(PigeonIdentitiesGateway.name, () => {
         sealedRoot,
       } = gatewayDouble();
       const pending = { identity: { id: 'identity-1' } } as unknown as Session;
-      const hydrated = { ...pending, hydrated: true } as unknown as Session;
-      const hydrateResult = { conversations: [], session: hydrated };
+      const rooted = {
+        ...pending,
+        deviceSealedRootKey: SymmetricKey.generate(),
+      } as unknown as Session;
+      const hydrateResult = { conversations: [], session: rooted };
       profile.get.mockResolvedValue(identity());
       authorization.completePairing.mockResolvedValue({ session: pending });
+      sealedRoot.current.mockResolvedValue(rooted);
       login.hydrate.mockResolvedValue(hydrateResult);
 
       await expect(
@@ -355,11 +361,11 @@ describe(PigeonIdentitiesGateway.name, () => {
           completionCode,
         ),
       ).resolves.toBe(hydrateResult);
-      expect(sealedRoot.current).not.toHaveBeenCalled();
+      expect(login.hydrate).toHaveBeenCalledWith(rooted, undefined);
       expect(pairingHistory.receive).not.toHaveBeenCalled();
     });
 
-    it('completes the pairing without importing when the sealed root cannot be opened', async () => {
+    it('refuses the pairing without hydrating when the sealed root cannot be opened', async () => {
       const {
         authorization,
         gateway,
@@ -369,14 +375,31 @@ describe(PigeonIdentitiesGateway.name, () => {
         sealedRoot,
       } = gatewayDouble();
       const pending = { identity: { id: 'identity-1' } } as unknown as Session;
-      const hydrated = { ...pending, hydrated: true } as unknown as Session;
-      const hydrateResult = { conversations: [], session: hydrated };
       profile.get.mockResolvedValue(identity());
       authorization.completePairing.mockResolvedValue({
         historyTransferSecret: SymmetricKey.generate(),
         session: pending,
       });
-      login.hydrate.mockResolvedValue(hydrateResult);
+      sealedRoot.current.mockResolvedValue(pending);
+
+      await expect(
+        gateway.completeDevicePairing(
+          'identity-1',
+          password,
+          draft,
+          completionCode,
+        ),
+      ).rejects.toThrow(DevicePairingError);
+      expect(login.hydrate).not.toHaveBeenCalled();
+      expect(pairingHistory.receive).not.toHaveBeenCalled();
+    });
+
+    it('refuses the pairing without hydrating when opening the sealed root fails', async () => {
+      const { authorization, gateway, login, profile, sealedRoot } =
+        gatewayDouble();
+      const pending = { identity: { id: 'identity-1' } } as unknown as Session;
+      profile.get.mockResolvedValue(identity());
+      authorization.completePairing.mockResolvedValue({ session: pending });
       sealedRoot.current.mockRejectedValue(
         new Error('keychain head is unreadable'),
       );
@@ -388,8 +411,8 @@ describe(PigeonIdentitiesGateway.name, () => {
           draft,
           completionCode,
         ),
-      ).resolves.toBe(hydrateResult);
-      expect(pairingHistory.receive).not.toHaveBeenCalled();
+      ).rejects.toThrow('keychain head is unreadable');
+      expect(login.hydrate).not.toHaveBeenCalled();
     });
   });
 
