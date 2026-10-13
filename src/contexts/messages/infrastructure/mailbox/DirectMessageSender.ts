@@ -9,7 +9,10 @@ import type { PigeonMessageCommandsApi } from '../http/PigeonMessageCommandsApi'
 import type { EditMessageOptions } from '../http/resources/EditMessageOptions';
 import type { MessageCommandIdentity } from '../http/resources/MessageCommandIdentity';
 import type { SendMessageOptions } from '../http/resources/SendMessageOptions';
-import type { DirectMessageOutboxItem } from './DirectMessageOutbox';
+import type {
+  DirectMessageOutboxEvent,
+  DirectMessageOutboxItem,
+} from './DirectMessageOutbox';
 import type { DirectMessageOutboxStore } from './DirectMessageOutboxStore';
 import type { DirectMessageOwnCopies } from './DirectMessageOwnCopies';
 import type { RecipientMailboxRouter } from './RecipientMailboxRouter';
@@ -56,7 +59,10 @@ export class DirectMessageSender {
 
   public constructor(
     private readonly recipients: RecipientMailboxRouter,
-    private readonly projection: Pick<MessageProjectionPort, 'decrypt'>,
+    private readonly projection: Pick<
+      MessageProjectionPort,
+      'decrypt' | 'decryptMany'
+    >,
     private readonly composer: Pick<
       PigeonMessageCommandsApi,
       'composeEdit' | 'withSentRecord'
@@ -319,6 +325,21 @@ export class DirectMessageSender {
     );
   }
 
+  /**
+   * Sender. Queued one-to-one sends of a conversation, decrypted in the order
+   * the outbox holds them. Their states come from `items`.
+   */
+  public async queued(
+    session: Session,
+    conversationId: string,
+  ): Promise<ChatMessage[]> {
+    const records = this.outbox
+      .items(session.identity.id, conversationId)
+      .map((item) => DirectMessageMailboxRecord.toResource(item.record));
+
+    return await this.projection.decryptMany(session, conversationId, records);
+  }
+
   /** Re-queues every persisted send of this identity, after unlock. */
   public async resume(session: Session): Promise<void> {
     await this.outbox.resume(session);
@@ -333,7 +354,9 @@ export class DirectMessageSender {
   }
 
   /** Notifies on each outbox state change. Returns the unsubscribe function. */
-  public subscribe(listener: () => void): () => void {
+  public subscribe(
+    listener: (event: DirectMessageOutboxEvent) => void,
+  ): () => void {
     return this.outbox.subscribe(listener);
   }
 

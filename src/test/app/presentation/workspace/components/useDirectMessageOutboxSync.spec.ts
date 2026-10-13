@@ -50,7 +50,7 @@ async function settle(): Promise<void> {
 }
 
 function message(id: string, timestamp: number): ChatMessage {
-  return { id, text: id, timestamp } as unknown as ChatMessage;
+  return { id, raw: {}, text: id, timestamp } as unknown as ChatMessage;
 }
 
 function queuedItem(

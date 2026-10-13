@@ -10,7 +10,10 @@ import type { EditMessageOptions } from '../http/resources/EditMessageOptions';
 import type { MessageCommandIdentity } from '../http/resources/MessageCommandIdentity';
 import type { SendMessageOptions } from '../http/resources/SendMessageOptions';
 import type { DirectMessageMailboxStore } from './DirectMessageMailboxStore';
-import type { DirectMessageOutboxItem } from './DirectMessageOutbox';
+import type {
+  DirectMessageOutboxEvent,
+  DirectMessageOutboxItem,
+} from './DirectMessageOutbox';
 import type { DirectMessageReaderSet } from './DirectMessageReaderSet';
 import type { RecipientMailboxRouter } from './RecipientMailboxRouter';
 
@@ -276,8 +279,18 @@ export class DirectMessageMailbox {
     return this.sender.items(identityId, conversationId);
   }
 
+  /** Sender. Queued one-to-one sends of a conversation, decrypted. */
+  public async queuedMessages(
+    session: Session,
+    conversationId: string,
+  ): Promise<ChatMessage[]> {
+    return await this.sender.queued(session, conversationId);
+  }
+
   /** Sender. Notifies on every outbox change. Returns the unsubscribe. */
-  public subscribeOutbox(listener: () => void): () => void {
+  public subscribeOutbox(
+    listener: (event: DirectMessageOutboxEvent) => void,
+  ): () => void {
     return this.sender.subscribe(listener);
   }
 

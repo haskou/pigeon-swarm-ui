@@ -29,6 +29,14 @@ export type DirectMessageOutboxTicket = {
 /** `retry` is the wait after an absent peer inbox. It is in memory only. */
 export type DirectMessageOutboxState = 'failed' | 'pending' | 'retry';
 
+/**
+ * What changed. `delivered` names the send that left the queue, so a view can
+ * drop its pending state. `changed` is any other state change.
+ */
+export type DirectMessageOutboxEvent =
+  | { kind: 'changed' }
+  | { conversationId: string; id: string; kind: 'delivered' };
+
 export type DirectMessageOutboxItem = {
   conversationId: string;
   id: string;
@@ -83,15 +91,17 @@ function retryDelayMs(elapsedMs: number, attempt: number): number {
  */
 export class DirectMessageOutbox {
   private readonly entries = new Map<string, Entry>();
-  private readonly listeners = new Set<() => void>();
+  private readonly listeners = new Set<
+    (event: DirectMessageOutboxEvent) => void
+  >();
 
   public constructor(
     private readonly store: OutboxStore,
     private readonly delivery: DirectMessageOutboxDelivery,
   ) {}
 
-  private notify(): void {
-    for (const listener of this.listeners) listener();
+  private notify(event: DirectMessageOutboxEvent = { kind: 'changed' }): void {
+    for (const listener of this.listeners) listener(event);
   }
 
   private newSettlement(): Settlement {
@@ -189,7 +199,11 @@ export class DirectMessageOutbox {
       await this.store.remove(entry.identityId, entry.row.id);
       this.entries.delete(entryKey(entry.identityId, entry.row.id));
       entry.settled.resolve();
-      this.notify();
+      this.notify({
+        conversationId: entry.row.conversationId,
+        id: entry.row.id,
+        kind: 'delivered',
+      });
     } catch (error) {
       if (entry.cancelled) return;
 
@@ -296,7 +310,9 @@ export class DirectMessageOutbox {
   }
 
   /** Notifies on each state change. Returns the unsubscribe function. */
-  public subscribe(listener: () => void): () => void {
+  public subscribe(
+    listener: (event: DirectMessageOutboxEvent) => void,
+  ): () => void {
     this.listeners.add(listener);
 
     return () => {

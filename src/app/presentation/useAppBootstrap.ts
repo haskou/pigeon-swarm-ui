@@ -53,6 +53,11 @@ export function useAppBootstrap(): {
     (nextSession: Session, nextConversations: ConversationResource[]) => {
       setSession(nextSession);
       setConversations(nextConversations);
+      // Persisted sends resume once their session is open. A failed load keeps
+      // the rows sealed for the next unlock.
+      applicationContainer.directMessages
+        .resumeOutbox(nextSession)
+        .catch(() => undefined);
     },
     [],
   );
@@ -63,11 +68,14 @@ export function useAppBootstrap(): {
   }, []);
 
   const clearSession = useCallback(() => {
+    if (session) {
+      applicationContainer.directMessages.stopOutbox(session.identity.id);
+    }
     closeAllRealtimeConnections();
     applicationContainer.disposeSessionWorkers();
     void clearProjectedMessageCaches();
     setSession(null);
-  }, []);
+  }, [session]);
 
   const handleNetworkCreated = useCallback(() => {
     window.location.reload();

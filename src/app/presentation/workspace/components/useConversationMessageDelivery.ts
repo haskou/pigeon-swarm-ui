@@ -28,6 +28,22 @@ export type PendingConversationSend = {
   sticker?: StickerMessageReference;
 };
 
+/**
+ * Stamps a one-to-one message with the state of its send while the outbox
+ * still holds that send. A delivered send carries no state.
+ */
+function withQueuedState(
+  identityId: string,
+  conversationId: string,
+  message: ChatMessage,
+): ChatMessage {
+  const state = applicationContainer.directMessages
+    .outboxItems(identityId, conversationId)
+    .find((item) => item.id === message.id)?.state;
+
+  return state ? { ...message, deliveryStatus: state } : message;
+}
+
 export function useConversationMessageDelivery({
   activeConversation,
   messagesRef,
@@ -142,9 +158,13 @@ export function useConversationMessageDelivery({
             );
           }
 
+          const merged = direct
+            ? withQueuedState(session.identity.id, conversationId, sent)
+            : sent;
+
           onMessagesChange((current) =>
             MessageCollection.merge(withoutMessageById(current, optimisticId), [
-              sent,
+              merged,
             ]),
           );
           onConversationsChange((current) =>
@@ -239,9 +259,15 @@ export function useConversationMessageDelivery({
 
         if (retried) {
           failedSendsRef.current.delete(message.id);
+          const queued = withQueuedState(
+            session.identity.id,
+            activeConversation.id,
+            retried,
+          );
+
           onMessagesChange((current) =>
             MessageCollection.merge(withoutMessageById(current, message.id), [
-              retried,
+              queued,
             ]),
           );
 

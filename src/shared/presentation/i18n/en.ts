@@ -912,6 +912,7 @@ export const en = {
     replyingTo: 'Replying to',
     replyTargetNotFound: 'The replied message could not be found.',
     replyTo: 'Reply to',
+    retrying: 'Retrying',
     retrySend: 'Retry',
     saveEdit: 'Save',
     searchReaction: 'Search emoji',

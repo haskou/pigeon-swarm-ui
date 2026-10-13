@@ -58,6 +58,7 @@ import { useConversationTimeline } from './useConversationTimeline';
 import { useDirectMessageBackgroundReadSync } from './useDirectMessageBackgroundReadSync';
 import { useDirectMessageInboxPrewarm } from './useDirectMessageInboxPrewarm';
 import { useDirectMessageMailboxSync } from './useDirectMessageMailboxSync';
+import { useDirectMessageOutboxSync } from './useDirectMessageOutboxSync';
 import { usePendingCommunityInvite } from './usePendingCommunityInvite';
 import { useSidebarGesture } from './useSidebarGesture';
 import { useWorkspaceCalls } from './useWorkspaceCalls';
@@ -814,6 +815,11 @@ export function GlassWorkspace({
     onMessagesChange: setMessages,
     session,
     setPinnedMessageIds,
+  });
+  useDirectMessageOutboxSync({
+    activeConversation,
+    onMessagesChange: setMessages,
+    session,
   });
 
   useDirectMessageInboxPrewarm({ conversations, session });
