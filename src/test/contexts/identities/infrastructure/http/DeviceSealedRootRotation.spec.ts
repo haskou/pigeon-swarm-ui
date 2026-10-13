@@ -291,4 +291,24 @@ describe('DeviceSealedRootRotation', () => {
       await expect(rotation.laggingRoot(makeSession(5))).resolves.toBeNull();
     });
   });
+
+  describe('generation', () => {
+    it('reads the generation of the own entry without exposing its payload', async () => {
+      const { rotation, sealedSecrets } = setup();
+
+      sealedSecrets.fetchOwn.mockResolvedValue({
+        authorizationRevision: 5,
+        generation: 8,
+        payload: encodeBase64Url(SymmetricKey.generate().getBuffer()),
+      });
+
+      await expect(rotation.generation(makeSession(5))).resolves.toBe(8);
+    });
+
+    it('returns null when this device has no entry', async () => {
+      const { rotation } = setup();
+
+      await expect(rotation.generation(makeSession(5))).resolves.toBeNull();
+    });
+  });
 });

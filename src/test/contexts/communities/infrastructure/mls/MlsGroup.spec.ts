@@ -82,6 +82,22 @@ describe('MlsGroup on the real ts-mls library', () => {
     expect(alice.group.leaves()).toHaveLength(3);
   });
 
+  it('exposes the signature public key of every leaf for audit', async () => {
+    const { alice, bob } = await setup(['alice', 'bob']);
+    const leaves = alice.group.leaves();
+
+    expect(leaves.map(({ owner }) => owner.identityId)).toEqual([
+      'alice',
+      'bob',
+    ]);
+    expect(leaves[0].signaturePublicKey).toEqual(
+      alice.key.publicPackage.leafNode.signaturePublicKey,
+    );
+    expect(leaves[1].signaturePublicKey).toEqual(
+      bob.key.publicPackage.leafNode.signaturePublicKey,
+    );
+  });
+
   it('stops a removed member from decrypting what is sent afterwards', async () => {
     const { alice, bob, carol } = await setup(['alice', 'bob', 'carol']);
     const before = await alice.group.encrypt(text.encode('before'));
