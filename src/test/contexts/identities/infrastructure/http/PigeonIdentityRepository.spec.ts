@@ -85,10 +85,9 @@ describe(PigeonIdentityRepository.name, () => {
       recoveryAuthorityKeyPair,
     });
 
-    gateway.openDeviceSealedRoot.mockImplementation(async (session) => ({
-      ...session,
-      deviceSealedRootKey: root,
-    }));
+    gateway.openDeviceSealedRoot.mockImplementation((session) =>
+      Promise.resolve({ ...session, deviceSealedRootKey: root }),
+    );
     const persisted = await new PigeonIdentityRepository(
       gateway,
       contexts,
