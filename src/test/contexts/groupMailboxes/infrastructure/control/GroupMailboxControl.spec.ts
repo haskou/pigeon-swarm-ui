@@ -3,6 +3,8 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { mock } from 'jest-mock-extended';
 
 import type { GroupMailboxControlOutcome } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlOutcome';
+import type { GroupMailboxOutboxRow } from '../../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutboxRow';
+import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { PigeonMailboxClient } from '../../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
 
 import { IndexedDbMlsStateStore } from '../../../../../contexts/communities/infrastructure/mls/IndexedDbMlsStateStore';
@@ -13,6 +15,7 @@ import { GroupMailboxKeyPackageTimeoutError } from '../../../../../contexts/grou
 import { GroupMailboxKeySchedule } from '../../../../../contexts/groupMailboxes/infrastructure/crypto/GroupMailboxKeySchedule';
 import { IndexedDbGroupMailboxGenerationStore } from '../../../../../contexts/groupMailboxes/infrastructure/indexeddb/IndexedDbGroupMailboxGenerationStore';
 import { GroupMailboxMlsEngine } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxMlsEngine';
+import { GroupMailboxOutbox } from '../../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutbox';
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 import { MailboxCapability } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/infrastructure/http/MailboxUnavailableError';
@@ -99,6 +102,28 @@ const fakeNode = (): FakeNode => {
 let node: FakeNode;
 let members: Map<string, Member>;
 
+/** An outbox over `channel` whose rows live in memory. */
+const outboxOf = (
+  name: string,
+  engine: GroupMailboxMlsEngine,
+  channel: Pick<MailboxChannel, 'send'>,
+): GroupMailboxOutbox => {
+  const rows = new Map<string, GroupMailboxOutboxRow>();
+
+  return new GroupMailboxOutbox(
+    { identity: { id: name } } as unknown as Session,
+    engine,
+    channel,
+    {
+      forget: () => Promise.resolve(rows.clear()),
+      load: () => Promise.resolve([...rows.values()]),
+      remove: (_identityId, id) => Promise.resolve(void rows.delete(id)),
+      save: (_session, row) => Promise.resolve(void rows.set(row.id, row)),
+    },
+    () => 1_000,
+  );
+};
+
 const member = (name: string): Member => {
   const databaseName = `group-control-${++database}`;
   const engine = new GroupMailboxMlsEngine(
@@ -123,7 +148,7 @@ const member = (name: string): Member => {
           return Promise.resolve();
         },
       },
-      node.channel,
+      outboxOf(name, engine, node.channel),
     ),
     engine,
     inbox: [],
@@ -338,7 +363,7 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
       alice.engine,
       () => Promise.resolve(roster),
       { send: () => Promise.resolve() },
-      {
+      outboxOf('alice', alice.engine, {
         send: async (keys, plaintext, envelopeId) => {
           const record = GroupMailboxControlRecord.decode(plaintext);
 
@@ -362,7 +387,7 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
 
           return node.channel.send(keys, plaintext, envelopeId);
         },
-      },
+      }),
     );
 
     await racing.remove(CONVERSATION, ['carol']);
