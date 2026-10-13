@@ -9,10 +9,18 @@ import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 
 const origin = 'http://127.0.0.1:8080';
-const specs = [
-  'e2e/login-methods.spec.ts',
-  'e2e/direct-message-sync.spec.ts',
-  'e2e/direct-message-outbox.spec.ts',
+// Each run is one Playwright invocation against the same node. Login,
+// recovery-key sign-in, pairing and 1:1 send/receive run on every engine and
+// viewport CI covers; the outbox retry flow runs on the desktop engines.
+const runs = [
+  {
+    specs: ['e2e/login-methods.spec.ts', 'e2e/direct-message-sync.spec.ts'],
+    projects: ['desktop-chromium', 'desktop-firefox', 'mobile-chromium'],
+  },
+  {
+    specs: ['e2e/direct-message-outbox.spec.ts'],
+    projects: ['desktop-chromium', 'desktop-firefox'],
+  },
 ];
 const image = process.env.PIGEON_NODE_IMAGE?.trim();
 const container = `pigeon-ui-real-node-${randomBytes(4).toString('hex')}`;
@@ -108,15 +116,24 @@ const dumpNodeLogs = () =>
 const main = async () => {
   try {
     const network = await startNode();
-    const code = await inherit(
-      'yarn',
-      ['playwright', 'test', ...specs, '--project=desktop-chromium'],
-      {
-        ...process.env,
-        E2E_BASE_URL: origin,
-        E2E_NETWORK_ID: network.id,
-      },
-    );
+    let code = 0;
+    for (const run of runs) {
+      const runCode = await inherit(
+        'yarn',
+        [
+          'playwright',
+          'test',
+          ...run.specs,
+          ...run.projects.map((project) => `--project=${project}`),
+        ],
+        {
+          ...process.env,
+          E2E_BASE_URL: origin,
+          E2E_NETWORK_ID: network.id,
+        },
+      );
+      code ||= runCode;
+    }
 
     if (code !== 0) {
       await dumpNodeLogs();
