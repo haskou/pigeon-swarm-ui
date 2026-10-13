@@ -244,5 +244,51 @@ describe('DeviceSealedRootRotation', () => {
       expect(sealedSecrets.publish).toHaveBeenCalledTimes(1);
       expect(current.deviceSealedRootKey).toBeDefined();
     });
+
+    it('returns the synchronized session without a root when its entry still lags the head', async () => {
+      const { deviceAuthorization, rotation, sealedSecrets } = setup(1_000);
+      const synced = makeSession(5);
+
+      deviceAuthorization.synchronize.mockResolvedValue(synced);
+      sealedSecrets.fetchOwn.mockResolvedValue({
+        authorizationRevision: 4,
+        generation: 8,
+        payload: encodeBase64Url(SymmetricKey.generate().getBuffer()),
+      });
+
+      await expect(rotation.current(makeSession(3))).resolves.toBe(synced);
+      expect(sealedSecrets.publish).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('laggingRoot', () => {
+    it('opens an own entry behind the session revision', async () => {
+      const { rotation, sealedSecrets } = setup();
+      const root = SymmetricKey.generate();
+
+      sealedSecrets.fetchOwn.mockResolvedValue({
+        authorizationRevision: 4,
+        generation: 8,
+        payload: encodeBase64Url(root.getBuffer()),
+      });
+
+      const lagging = await rotation.laggingRoot(makeSession(5));
+
+      expect(lagging?.getBuffer()).toEqual(root.getBuffer());
+    });
+
+    it('returns null for a current or missing entry', async () => {
+      const { rotation, sealedSecrets } = setup();
+
+      await expect(rotation.laggingRoot(makeSession(5))).resolves.toBeNull();
+
+      sealedSecrets.fetchOwn.mockResolvedValue({
+        authorizationRevision: 5,
+        generation: 8,
+        payload: encodeBase64Url(SymmetricKey.generate().getBuffer()),
+      });
+
+      await expect(rotation.laggingRoot(makeSession(5))).resolves.toBeNull();
+    });
   });
 });

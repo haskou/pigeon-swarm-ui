@@ -34,6 +34,7 @@ const passthroughRoot = {
 const passthroughRecovery = {
   resumeKeychainRewrap: () => Promise.resolve(undefined),
   resumeRootReseal: () => Promise.resolve(undefined),
+  rotateLaggingRoot: (session: Session) => Promise.resolve(session),
 } as unknown as DeviceSealedRecovery;
 
 function memoryStorage(): Pick<Storage, 'getItem' | 'removeItem' | 'setItem'> {
