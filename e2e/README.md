@@ -35,16 +35,20 @@ E2E_NETWORK_ID=<network-id> yarn test:e2e
 `direct-message-sync.spec.ts` (1:1 send and receive across two isolated browser
 contexts), `direct-message-outbox.spec.ts` (a 1:1 send made while the
 recipient's inbox is absent survives a reload and is delivered once the
-recipient accepts) and `device-revoke-mailbox.spec.ts` (a paired device that
+recipient accepts), `device-revoke-mailbox.spec.ts` (a paired device that
 the other device revokes keeps the messages sent before the revoke while it
 stays signed in, never shows a message sent after it while the surviving
 device does, at its next sign-in (from the identity the login screen
 remembers, without typing it) says it was removed and keeps its stored
 history until "Erase local copy and start over" erases it, and a forged
-removal answer for a still-authorized device erases nothing) run against a
-real node. Login and direct-message sync run on `desktop-chromium`,
-`desktop-firefox` and `mobile-chromium`; the outbox spec runs on the two
-desktop projects; the revoke spec runs on `desktop-chromium`.
+removal answer for a still-authorized device erases nothing) and
+`community-mls-kick.spec.ts` (a private community shows encryption as active
+for its creator and an invited member, both exchange messages through the MLS
+group, and a message sent after the member is removed never shows in the
+removed member's page) run against a real node. Login, direct-message sync, the
+outbox spec and the security audit run on `desktop-chromium`, `desktop-firefox`
+and `mobile-chromium`; the revoke and community kick specs run on
+`desktop-chromium`.
 `passkey-unlock.spec.ts` (switching this device from a password to a passkey
 and unlocking with it) runs on `desktop-chromium` only: it uses a DevTools
 virtual authenticator with PRF and opens the app through `localhost`, because
@@ -90,8 +94,7 @@ To bump the pins:
 3. Let `real-node-e2e` run on the PR, or run the local build and suite above.
 4. Merge only when `real-node-e2e` is green.
 
-Only `desktop-chromium` runs here. Mobile, tablet, and Firefox are not covered
-by this suite.
+Tablet and WebKit are not covered by this suite.
 
 ## Call recovery
 
@@ -126,17 +129,6 @@ that has a network, with `E2E_NETWORK_ID` when the node lists none:
 
 ```bash
 yarn test:e2e e2e/call-page-departure.spec.ts --project=desktop-chromium
-```
-
-`community-mls-kick.spec.ts` registers two identities on a real node, creates
-a private community, invites the second one, exchanges messages in both
-directions through the MLS group and then removes the member. A message sent
-after the removal must never show in the removed member's page. It needs a node
-that runs the `GET /communities/{id}/frontier` response with `networkId` and
-takes several minutes on a development node:
-
-```bash
-yarn test:e2e e2e/community-mls-kick.spec.ts --project=desktop-chromium
 ```
 
 ## Visual audit

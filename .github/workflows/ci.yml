@@ -131,7 +131,15 @@ jobs:
       - name: Install Chromium and Firefox
         run: yarn playwright install --with-deps chromium firefox
 
-      - name: Verify login and direct messages against the real node
+      - name: Verify messaging, moderation and devices against the real node
         env:
           PIGEON_NODE_IMAGE: pigeon-swarm-node:real-node
         run: yarn test:e2e:real-node
+
+      - name: Upload Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-node-playwright-results
+          path: node_modules/.cache/pigeon-swarm-playwright-results
+          retention-days: 7
