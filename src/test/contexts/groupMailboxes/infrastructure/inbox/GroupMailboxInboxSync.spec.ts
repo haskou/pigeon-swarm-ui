@@ -563,7 +563,8 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
       ).mailboxId,
     );
     await send(alice, sent('alice', 'm1'));
-    now += GroupMailboxOutbox.EXPIRY_MS;
+    // Records queued within one millisecond are stamped a millisecond apart.
+    now += GroupMailboxOutbox.EXPIRY_MS + 1_000;
     await alice.outbox.resume();
 
     expect(failures).toEqual(['m1']);
