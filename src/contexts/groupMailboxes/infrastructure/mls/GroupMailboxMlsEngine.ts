@@ -9,7 +9,6 @@ import type {
 } from '../../../communities/infrastructure/mls/MlsGroup';
 import type { MlsStateStore } from '../../../communities/infrastructure/mls/MlsStateStore';
 import type { GroupMailboxGeneration } from '../../domain/GroupMailboxGeneration';
-import type { GroupMailboxGenerationLog } from '../../domain/GroupMailboxGenerationLog';
 import type { GroupMailboxGenerationRepository } from '../../domain/repositories/GroupMailboxGenerationRepository';
 import type { GroupMailboxCommit } from './GroupMailboxCommit';
 
@@ -23,6 +22,7 @@ import {
   restoreMlsKeyPackage,
 } from '../../../communities/infrastructure/mls/MlsGroup';
 import { MlsRejectedError } from '../../../communities/infrastructure/mls/MlsRejectedError';
+import { GroupMailboxGenerationLog } from '../../domain/GroupMailboxGenerationLog';
 import { GroupMailboxGenerationSecret } from '../../domain/value-objects/GroupMailboxGenerationSecret';
 
 const GENERATION_LABEL = 'pigeon/group-mailbox/gen/v1';
@@ -52,7 +52,9 @@ export class GroupMailboxMlsEngine {
 
   /**
    * Confirms a commit this device made, then advances the generation if the
-   * tree changed. The log is written first: reapplying is idempotent.
+   * tree changed. The log is written before the group; if saving the group
+   * fails, `load` rewinds the log to the stored group, so a retried commit
+   * exports its own generation.
    */
   private async commit(
     group: MlsGroup,
@@ -91,6 +93,25 @@ export class GroupMailboxMlsEngine {
     return next;
   }
 
+  /** Advances the log when the tree differs from the one it was exported in. */
+  private async caughtUp(
+    group: MlsGroup,
+    log: GroupMailboxGenerationLog,
+  ): Promise<GroupMailboxGenerationLog> {
+    const tree = this.treeOf(group);
+
+    if (log.current().tree === tree || log.current().epoch >= group.epoch) {
+      return log;
+    }
+
+    return log.advance(
+      await this.exportGeneration(group),
+      group.epoch,
+      tree,
+      this.clock(),
+    );
+  }
+
   private async exportGeneration(
     group: MlsGroup,
   ): Promise<GroupMailboxGenerationSecret> {
@@ -111,17 +132,10 @@ export class GroupMailboxMlsEngine {
     commitEpoch: bigint,
   ): Promise<GroupMailboxGenerationLog> {
     if (outcome.kind !== 'applied' && outcome.kind !== 'replaced') return log;
-    let next = outcome.kind === 'replaced' ? log.rewind(commitEpoch) : log;
-    const tree = this.treeOf(group);
-
-    if (next.current().tree !== tree && next.current().epoch < group.epoch) {
-      next = next.advance(
-        await this.exportGeneration(group),
-        group.epoch,
-        tree,
-        this.clock(),
-      );
-    }
+    const next = await this.caughtUp(
+      group,
+      outcome.kind === 'replaced' ? log.rewind(commitEpoch) : log,
+    );
 
     if (next !== log) await this.generations.save(group.groupId, next);
 
@@ -161,6 +175,7 @@ export class GroupMailboxMlsEngine {
       bytes,
     );
 
+    await this.reconcile(group);
     this.groups.set(conversationId, group);
 
     return group;
@@ -176,6 +191,34 @@ export class GroupMailboxMlsEngine {
     this.rosters.set(conversationId, await this.rosterFor(conversationId));
   }
 
+  /**
+   * The stored group is the truth. A log saved before a group save that
+   * failed holds the generation of a commit nobody received: forget what
+   * lies past the group's epoch, then follow its tree.
+   */
+  private async reconcile(group: MlsGroup): Promise<void> {
+    const log = await this.generations.load(group.groupId);
+
+    if (log.isEmpty() || group.isRemoved) return;
+    const next = await this.caughtUp(
+      group,
+      log.current().epoch > group.epoch ? log.rewind(group.epoch) : log,
+    );
+
+    if (next !== log) await this.generations.save(group.groupId, next);
+  }
+
+  /** The log after reconciling it with the stored group, if there is one. */
+  private async reconciledLog(
+    conversationId: string,
+  ): Promise<GroupMailboxGenerationLog> {
+    return this.exclusive(conversationId, async () => {
+      await this.load(conversationId);
+
+      return this.generations.load(conversationId);
+    });
+  }
+
   private async remember(group: MlsGroup): Promise<void> {
     this.groups.set(group.groupId, group);
     await this.store.saveGroup(group.groupId, group.serialize());
@@ -189,7 +232,7 @@ export class GroupMailboxMlsEngine {
     return group;
   }
 
-  /** Adds devices by key package. Adds never rotate the generation. */
+  /** Adds devices by key package; the generation advances with the tree. */
   public async add(
     conversationId: string,
     keyPackages: Uint8Array[],
@@ -371,21 +414,27 @@ export class GroupMailboxMlsEngine {
   public async generation(
     conversationId: string,
   ): Promise<GroupMailboxGeneration> {
-    return (await this.generations.load(conversationId)).current();
+    return (await this.reconciledLog(conversationId)).current();
   }
 
   /**
    * Joins from a welcome. Every add advances the generation, so the joiner
    * exports `gen_k` from the welcome epoch itself; only the public index
-   * `k` comes from the inviter. A welcome opens once.
+   * `k` comes from the inviter. A welcome opens once; a removed device can
+   * join again from a welcome newer than its last membership.
    */
   public async join(
     conversationId: string,
     welcome: Uint8Array,
     index: number,
   ): Promise<void> {
+    if (!Number.isSafeInteger(index) || index < 0) {
+      throw new MlsRejectedError('The generation index is not valid');
+    }
     await this.exclusive(conversationId, async () => {
-      if (await this.load(conversationId)) {
+      const previous = await this.load(conversationId);
+
+      if (previous && !previous.isRemoved) {
         throw new MlsRejectedError('Group already exists on this device');
       }
       await this.refreshRoster(conversationId);
@@ -405,10 +454,15 @@ export class GroupMailboxMlsEngine {
           continue;
         }
 
-        await this.store.deleteKeyPackage(stored.id);
+        if (previous && group.epoch <= previous.epoch) {
+          throw new MlsRejectedError(
+            'The welcome is older than the last membership of this device',
+          );
+        }
+        // The key package goes last: if a save fails, the welcome opens again.
         await this.generations.save(
           conversationId,
-          (await this.generations.load(conversationId)).start(
+          GroupMailboxGenerationLog.empty().start(
             await this.exportGeneration(group),
             group.epoch,
             this.treeOf(group),
@@ -416,6 +470,7 @@ export class GroupMailboxMlsEngine {
           ),
         );
         await this.remember(group);
+        await this.store.deleteKeyPackage(stored.id);
 
         return;
       }
@@ -435,7 +490,7 @@ export class GroupMailboxMlsEngine {
   public async readableGenerations(
     conversationId: string,
   ): Promise<GroupMailboxGeneration[]> {
-    return (await this.generations.load(conversationId)).readable(this.clock());
+    return (await this.reconciledLog(conversationId)).readable(this.clock());
   }
 
   /**
