@@ -4,12 +4,12 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 
 export function DeviceRemovedNotice({
   disabled,
-  erased,
+  eraseFailed,
   onPairAgain,
   onStartOver,
 }: {
   disabled: boolean;
-  erased: boolean;
+  eraseFailed: boolean;
   onPairAgain: () => void;
   onStartOver: () => void;
 }): ReactElement {
@@ -20,9 +20,9 @@ export function DeviceRemovedNotice({
     >
       <p className="font-semibold">{copy.auth.deviceRemoved}</p>
       <p className="mt-1 text-sm">
-        {erased
-          ? copy.auth.deviceRemovedHelp
-          : copy.auth.deviceRemovedEraseFailed}
+        {eraseFailed
+          ? copy.auth.deviceRemovedEraseFailed
+          : copy.auth.deviceRemovedHelp}
       </p>
       <div className="mt-3 grid gap-2">
         <button
