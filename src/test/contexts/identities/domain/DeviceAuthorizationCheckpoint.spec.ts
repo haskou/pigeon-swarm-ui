@@ -1,4 +1,5 @@
 import { DeviceAuthorizationCheckpoint } from '../../../../contexts/identities/domain/DeviceAuthorizationCheckpoint';
+import { DeviceAuthorizationIdentityMismatchError } from '../../../../contexts/identities/domain/errors/DeviceAuthorizationIdentityMismatchError';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import vectors from '../../../fixtures/device-authorization-transition-vectors.json';
 
@@ -21,7 +22,7 @@ describe(DeviceAuthorizationCheckpoint.name, () => {
         { epoch: 'genesis', identityId: 'other', revision: 2 },
         IdentityId.fromString('identity'),
       ),
-    ).toThrow('does not match');
+    ).toThrow(DeviceAuthorizationIdentityMismatchError);
   });
 
   it('exposes the compromised credentials of the authorization', () => {
