@@ -3,6 +3,7 @@ import { Buffer } from 'buffer';
 
 import type { MlsRecordResource } from '../http/resources/MlsRecordResource';
 import type { MlsKeyPackageBundle, MlsLeafOwner } from './MlsGroup';
+import type { MlsGroupCredentials } from './MlsGroupCredentials';
 import type { MlsRecordTransport } from './MlsRecordTransport';
 import type { MlsRoster } from './MlsRoster';
 import type { MlsStateStore } from './MlsStateStore';
@@ -247,6 +248,17 @@ export class MlsCommunityEngine {
     return this.exclusive(groupId, async () =>
       (await this.requireGroup(groupId)).identities(),
     );
+  }
+
+  /** Public leaf credentials of the local group; null without one. */
+  public async credentials(
+    groupId: string,
+  ): Promise<MlsGroupCredentials | null> {
+    return this.exclusive(groupId, async () => {
+      const group = await this.load(groupId);
+
+      return group ? { epoch: group.epoch, leaves: group.leaves() } : null;
+    });
   }
 
   /** Returns base64 ciphertext and keeps the plaintext on this device. */

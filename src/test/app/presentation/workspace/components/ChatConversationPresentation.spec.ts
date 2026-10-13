@@ -1,10 +1,12 @@
 import { describe, expect, it } from '@jest/globals';
+import { Buffer } from 'buffer';
 
 import type { ConversationResource } from '../../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { IdentityResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { ConversationKeyEntry } from '../../../../../contexts/identities/infrastructure/keychain/ConversationKeyEntry';
 
 import { ChatConversationPresentation } from '../../../../../app/presentation/workspace/components/ChatConversationPresentation';
+import { KeyFingerprint } from '../../../../../contexts/identities/presentation/view-models/KeyFingerprint';
 
 describe(ChatConversationPresentation.name, () => {
   it('projects a group conversation and its call participants', () => {
@@ -90,9 +92,15 @@ describe(ChatConversationPresentation.name, () => {
       status: 'ready',
       title: expect.any(String),
     });
-    expect(presentation.encryptionDetails?.secrets[0]).toMatchObject({
-      sensitive: true,
-      value: 'secret',
-    });
+    expect(presentation.encryptionDetails?.identifiers).toEqual([
+      {
+        label: expect.any(String),
+        value: KeyFingerprint.ofSecret(Buffer.from('secret', 'base64')),
+      },
+      { label: expect.any(String), value: 'identity-b' },
+    ]);
+    expect(JSON.stringify(presentation.encryptionDetails)).not.toContain(
+      '"secret"',
+    );
   });
 });

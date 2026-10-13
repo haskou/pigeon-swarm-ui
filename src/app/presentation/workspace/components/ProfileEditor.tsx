@@ -49,7 +49,7 @@ import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorM
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { DeviceManagementDialog } from './DeviceManagementDialog';
 import { DevicePairingDialog } from './DevicePairingDialog';
-import { ProfileKeychainSection } from './ProfileKeychainSection';
+import { SecurityAuditSection } from './SecurityAuditSection';
 
 const ImageCropEditor = lazy(() =>
   import('../../../../shared/presentation/components/ImageCropEditor').then(
@@ -701,15 +701,13 @@ function ProfileSecuritySection({
           </p>
         </div>
       </section>
-      {technicalDetailsVisible && (
-        <ProfileKeychainSection
-          communities={communities}
-          conversations={conversations}
-          identityNames={identityNames}
-          identityProfiles={identityProfiles}
-          session={session}
-        />
-      )}
+      <SecurityAuditSection
+        communities={communities}
+        conversations={conversations}
+        identityNames={identityNames}
+        identityProfiles={identityProfiles}
+        session={session}
+      />
     </>
   );
 }

@@ -28,6 +28,8 @@ import {
   processPrivateMessage,
 } from 'ts-mls';
 
+import type { MlsLeafCredential } from './MlsLeafCredential';
+
 import { MlsRejectedError } from './MlsRejectedError';
 
 const CIPHERSUITE = 'MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519';
@@ -290,8 +292,8 @@ export class MlsGroup {
     return [...new Set(this.leaves().map(({ owner }) => owner.identityId))];
   }
 
-  public leaves(): { index: number; owner: MlsLeafOwner }[] {
-    const leaves: { index: number; owner: MlsLeafOwner }[] = [];
+  public leaves(): (MlsLeafCredential & { index: number })[] {
+    const leaves: (MlsLeafCredential & { index: number })[] = [];
     this.state.ratchetTree.forEach((node, treeIndex) => {
       if (
         node?.nodeType !== 'leaf' ||
@@ -302,6 +304,7 @@ export class MlsGroup {
       leaves.push({
         index: treeIndex / 2,
         owner: decodeMlsLeafOwner(node.leaf.credential.identity),
+        signaturePublicKey: node.leaf.signaturePublicKey,
       });
     });
 

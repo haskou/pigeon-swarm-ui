@@ -22,6 +22,12 @@ export class CommunityEncryptionDetails {
     selectedChannel,
   }: CommunityEncryptionDetailsInput): EncryptionDetails {
     return {
+      identifiers: [
+        { label: copy.encryption.communityId, value: community.id },
+        ...(selectedChannel
+          ? [{ label: copy.encryption.channelId, value: selectedChannel.id }]
+          : []),
+      ],
       note: CommunityEncryptionDetails.note(
         communityIsPublic,
         channelEncryptionReady,
@@ -42,7 +48,6 @@ export class CommunityEncryptionDetails {
             : copy.encryption.mlsCiphersuite,
         },
       ],
-      secrets: [],
       status: CommunityEncryptionDetails.status(
         communityIsPublic,
         channelEncryptionReady,

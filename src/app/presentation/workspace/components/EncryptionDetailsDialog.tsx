@@ -1,8 +1,6 @@
-import { useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import type { EncryptionDetails } from './EncryptionDetails';
-import type { EncryptionDetailsSecret } from './EncryptionDetailsSecret';
 
 import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
 import { cx } from '../../../../shared/presentation/cx';
@@ -10,53 +8,8 @@ import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useClose
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
+import { CopyableIdRow } from './CopyableIdRow';
 import { visibleEncryptionRows } from './visibleEncryptionRows';
-
-function maskedValue(value: string, sensitive?: boolean): string {
-  if (!sensitive) return value;
-
-  return '••••••••••••••••••••••••';
-}
-
-function SecretRow({ secret }: { secret: EncryptionDetailsSecret }) {
-  const [copied, setCopied] = useState(false);
-  const value = secret.value?.trim();
-
-  const copyValue = async () => {
-    if (!value || !navigator.clipboard) return;
-
-    if (
-      secret.sensitive &&
-      !window.confirm(copy.profile.copySensitiveKeyConfirm)
-    ) {
-      return;
-    }
-
-    await navigator.clipboard.writeText(value);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1600);
-  };
-
-  return (
-    <div className="flex min-w-0 items-center gap-3 py-3 text-xs">
-      <div className="min-w-0 flex-1">
-        <div className="font-black text-white/70">{secret.label}</div>
-        <div className="mt-1 truncate font-semibold text-white/40">
-          {value ? maskedValue(value, secret.sensitive) : copy.encryption.empty}
-        </div>
-      </div>
-      {value && (
-        <button
-          type="button"
-          onClick={() => void copyValue()}
-          className="ui-button min-h-8 shrink-0 px-2.5 py-1 text-xs"
-        >
-          {copied ? copy.profile.copied : copy.profile.copy}
-        </button>
-      )}
-    </div>
-  );
-}
 
 function statusLabel(status: EncryptionDetails['status']): string {
   if (status === 'ready') return copy.encryption.ready;
@@ -141,14 +94,18 @@ export function EncryptionDetailsDialog({
             ))}
           </div>
 
-          {technicalDetailsVisible && details.secrets.length > 0 && (
+          {technicalDetailsVisible && details.identifiers.length > 0 && (
             <div className="mt-4">
               <div className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-                {copy.encryption.keys}
+                {copy.encryption.identifiers}
               </div>
               <div className="divide-y divide-white/10 border-y border-white/10">
-                {details.secrets.map((secret) => (
-                  <SecretRow key={secret.label} secret={secret} />
+                {details.identifiers.map((identifier) => (
+                  <CopyableIdRow
+                    key={identifier.label}
+                    label={identifier.label}
+                    value={identifier.value}
+                  />
                 ))}
               </div>
             </div>
