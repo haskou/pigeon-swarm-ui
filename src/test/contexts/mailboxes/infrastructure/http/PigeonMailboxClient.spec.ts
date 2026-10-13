@@ -269,4 +269,27 @@ describe(PigeonMailboxClient.name, () => {
       client.removeReader(mailboxId, 'root-token', 'device-hash'),
     ).rejects.toBeInstanceOf(HttpJsonError);
   });
+
+  it('deletes a mailbox with its read token', async () => {
+    const { client, http } = setup();
+
+    http.request.mockResolvedValue(undefined);
+
+    await client.delete(mailboxId, 'read-token');
+
+    expect(http.request).toHaveBeenCalledWith('/mailboxes/mailbox-1', {
+      headers: { Authorization: 'Bearer read-token' },
+      method: 'DELETE',
+    });
+  });
+
+  it('maps a 404 on delete to MailboxUnavailableError', async () => {
+    const { client, http } = setup();
+
+    http.request.mockRejectedValue(new HttpJsonError(404, 'Not Found', ''));
+
+    await expect(client.delete(mailboxId, 'read-token')).rejects.toBeInstanceOf(
+      MailboxUnavailableError,
+    );
+  });
 });
