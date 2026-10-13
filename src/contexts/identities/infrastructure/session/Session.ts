@@ -17,5 +17,10 @@ export type Session = {
   keychain: LocalKeychain;
   keychainExternalIdentifier?: string | null;
   masterKey: SymmetricKey;
+  /**
+   * The root a revoke on this device replaced, held in memory only. Inboxes
+   * created under it register the new root through it.
+   */
+  previousDeviceSealedRootKey?: SymmetricKey;
   recoveryAuthorityKeyPair: KeyPair;
 };

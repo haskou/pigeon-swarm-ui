@@ -2,8 +2,9 @@ import { expect, test, type Page } from '@playwright/test';
 
 import {
   newIsolatedPage,
-  openSidebar,
+  pairNewDevice,
   registerIdentity,
+  revokeOtherDevice,
   waitForWorkspace,
   type TestIdentity,
 } from './support/pigeonApp';
@@ -83,79 +84,8 @@ test('adds a new device by pairing it with a signed-in device', async ({
 
   try {
     await registerIdentity(authorized, identity);
-    await openSidebar(authorized);
-    await authorized
-      .locator('[data-testid="own-profile-menu-button"]:visible')
-      .first()
-      .click();
-    await authorized.getByTestId('edit-profile-button').click();
-    await authorized.getByRole('button', { name: 'Security' }).click();
-    await authorized.getByTestId('profile-pair-device').click();
-
-    const invitation = await authorized
-      .getByTestId('device-pairing-invitation-output')
-      .inputValue();
-
-    expect(invitation).toMatch(/^\S+$/);
-
-    await fresh.goto('/');
-    await fresh.getByTestId('auth-identity-input').fill(`@${identity.handle}`);
-    await chooseMethod(fresh, 'New device');
-    await fresh
-      .getByTestId('auth-device-pairing-invitation-input')
-      .fill(invitation);
-    await fresh.getByTestId('auth-device-pairing-prepare').click();
-
-    const request = await fresh
-      .getByTestId('auth-device-pairing-request-output')
-      .inputValue();
-    const newDeviceCode = await fresh
-      .getByTestId('auth-device-pairing-verification-code')
-      .innerText();
-
-    await authorized.getByTestId('device-pairing-request-input').fill(request);
-    await authorized.getByTestId('device-pairing-submit').click();
-    await expect(
-      authorized.getByTestId('device-pairing-verification-code'),
-    ).toHaveText(newDeviceCode);
-    await authorized.getByTestId('device-pairing-submit').click();
-
-    const completionOutput = authorized.getByTestId(
-      'device-pairing-completion-output',
-    );
-
-    await expect(completionOutput).toBeVisible();
-
-    const completion = await completionOutput.inputValue();
-
-    await fresh
-      .getByTestId('auth-device-pairing-completion-input')
-      .fill(completion);
-    await fresh.getByTestId('auth-password-input').fill(identity.password);
-    await fresh
-      .getByTestId('auth-password-confirmation-input')
-      .fill(identity.password);
-    await fresh.getByTestId('auth-submit-button').click();
-    await waitForWorkspace(fresh);
-
-    await authorized
-      .getByRole('button', { name: 'Close dialog' })
-      .last()
-      .click();
-    await openSidebar(authorized);
-    await authorized
-      .locator('[data-testid="own-profile-menu-button"]:visible')
-      .first()
-      .click();
-    await authorized.getByTestId('edit-profile-button').click();
-    await authorized.getByRole('button', { name: 'Security' }).click();
-    await authorized.getByTestId('profile-manage-devices').click();
-    await expect(authorized.getByTestId('device-row')).toHaveCount(2);
-    await authorized.getByTestId('device-revoke-open').click();
-    await authorized.getByTestId('device-mode-compromised').click();
-    await authorized.getByTestId('device-compromise-since').fill('1');
-    await authorized.getByTestId('device-revoke-confirm').click();
-    await expect(authorized.getByTestId('device-row')).toHaveCount(1);
+    await pairNewDevice(authorized, fresh, identity);
+    await revokeOtherDevice(authorized, 1);
   } finally {
     await authorized.context().close();
     await fresh.context().close();

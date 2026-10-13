@@ -166,15 +166,23 @@ export class DirectMessageInboxOpener {
   }
 
   /**
-   * Recipient. Opens through the shared open. A throw from the open counts as
-   * a failed open, so the pass moves on.
+   * Recipient. Opens through the shared open, then prunes the reader set, so a
+   * revoke's session update cuts off the old root of every inbox, not only the
+   * one being read. A throw from the open counts as a failed open, so the pass
+   * moves on.
    */
   private async openRecipientInbox(
     session: Session,
     conversationId: string,
   ): Promise<DirectMessageInboxOutcome> {
     try {
-      return (await this.openInboxShared(session, conversationId)).outcome;
+      const inbox = await this.openInboxShared(session, conversationId);
+
+      if (inbox.outcome === 'open') {
+        await this.readerSet.reconcile(session, inbox.keys, inbox.readers);
+      }
+
+      return inbox.outcome;
     } catch {
       // Count-only: no ids, content, or error details.
       // eslint-disable-next-line no-console

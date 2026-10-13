@@ -65,11 +65,19 @@ export class DeviceSealedRootRotation {
 
   /**
    * Publishes a new generation with a fresh root and returns the session
-   * holding it. A conflicting publish refetches the head once and publishes
-   * again.
+   * holding it, with the root it replaces kept as the previous root. A
+   * conflicting publish refetches the head once and publishes again.
    */
   public async rotate(session: Session): Promise<Session> {
-    return await this.publishWithRetry(session, SymmetricKey.generate());
+    const rotated = await this.publishWithRetry(
+      session,
+      SymmetricKey.generate(),
+    );
+
+    return {
+      ...rotated,
+      previousDeviceSealedRootKey: session.deviceSealedRootKey,
+    };
   }
 
   /**
