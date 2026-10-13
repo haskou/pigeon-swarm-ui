@@ -1486,6 +1486,8 @@ export const en = {
   },
   workspace: {
     closeSidebar: 'Close sidebar',
+    directHistoryStorageError:
+      'New direct messages could not be saved on this device, possibly because its storage is full. They stay on the server for up to 14 days and are saved here once space is free.',
     directMailboxReaderLimitError:
       'Direct messages cannot sync here: this identity has reached its device limit. Remove a device you no longer use, then try again.',
     directMailboxSyncError: 'Direct messages could not be synced. Retrying.',

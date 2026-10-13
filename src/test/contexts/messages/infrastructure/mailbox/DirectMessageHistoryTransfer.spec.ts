@@ -162,6 +162,33 @@ describe(DirectMessageHistoryTransfer.name, () => {
     ).resolves.toBeUndefined();
   });
 
+  it('leaves the transfer unacknowledged when the new device cannot store it', async () => {
+    const { channel } = fakeNode();
+    const exporter = new DirectMessageHistoryStore(databaseName());
+
+    await exporter.append(session(), conversationId, [
+      { plaintext: plaintextOf(sent('m1', 100)), recordId: 'm1' },
+    ]);
+    await new DirectMessageHistoryTransfer(channel, exporter).publish(
+      session(),
+      secret,
+    );
+    jest.spyOn(indexedDB, 'open').mockImplementation(() => {
+      throw new DOMException('quota', 'QuotaExceededError');
+    });
+
+    try {
+      await new DirectMessageHistoryTransfer(
+        channel,
+        new DirectMessageHistoryStore(databaseName()),
+      ).receive(session(), secret);
+    } finally {
+      jest.restoreAllMocks();
+    }
+
+    expect(channel.acknowledge).not.toHaveBeenCalled();
+  });
+
   it('does not import records authored under another root', async () => {
     const { channel } = fakeNode();
     const exporter = new DirectMessageHistoryStore(databaseName());

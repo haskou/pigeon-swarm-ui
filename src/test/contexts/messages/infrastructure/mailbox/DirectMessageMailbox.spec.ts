@@ -29,6 +29,7 @@ import { MailboxReadToken } from '../../../../../contexts/mailboxes/infrastructu
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/infrastructure/http/MailboxUnavailableError';
 import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageAuthorship } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageAuthorship';
+import { DirectMessageHistoryStorageError } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageHistoryStorageError';
 import { DirectMessageHistoryStore } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageHistoryStore';
 import { DirectMessageMailbox } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
 import { DirectMessageMailboxRecord } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxRecord';
@@ -1510,6 +1511,65 @@ describe(DirectMessageMailbox.name, () => {
       expect(channel.acknowledge).toHaveBeenCalledWith(keys, readers, 2);
       expect(order).toEqual(['apply', 'ack']);
       expect(store.load(keys.mailboxId)).toEqual({ cursor: 2 });
+    });
+
+    it('shows a page it cannot store but keeps it on the node until a later pass stores it', async () => {
+      await new DirectMessageHistoryStore().forget('alice');
+      const { channel, mailbox, store } = setup();
+      const keys = keysFor('alice');
+      channel.read.mockResolvedValue(pageWith(ownEncode(storedRecord), 1));
+      channel.acknowledge.mockResolvedValue({ recreated: false });
+      const quota = jest.spyOn(indexedDB, 'open').mockImplementation(() => {
+        throw new DOMException('quota', 'QuotaExceededError');
+      });
+      const shown = jest.fn<void, [DirectMessageTimelineChange[]]>();
+
+      const firstPass = mailbox
+        .sync(
+          session('alice'),
+          conversationId,
+          new AbortController().signal,
+          shown,
+        )
+        .finally(() => quota.mockRestore());
+
+      await expect(firstPass).rejects.toBeInstanceOf(
+        DirectMessageHistoryStorageError,
+      );
+      expect(messageIds(shown.mock.calls.flatMap(([batch]) => batch))).toEqual([
+        'message-1',
+      ]);
+      expect(channel.acknowledge).not.toHaveBeenCalled();
+      expect(store.load(keys.mailboxId)).toEqual({ cursor: 0 });
+
+      const replayed = jest.fn<void, [DirectMessageTimelineChange[]]>();
+      await mailbox.sync(
+        session('alice'),
+        conversationId,
+        new AbortController().signal,
+        replayed,
+      );
+
+      expect(
+        messageIds(replayed.mock.calls.flatMap(([batch]) => batch)),
+      ).toEqual([]);
+      expect(channel.acknowledge).toHaveBeenCalledWith(
+        keys,
+        readerTokensFor('alice', keys.mailboxId),
+        1,
+      );
+      expect(store.load(keys.mailboxId)).toEqual({ cursor: 1 });
+
+      const restored = jest.fn<void, [DirectMessageTimelineChange[]]>();
+      await setup().mailbox.restore(
+        session('alice'),
+        conversationId,
+        new AbortController().signal,
+        restored,
+      );
+      expect(
+        messageIds(restored.mock.calls.flatMap(([batch]) => batch)),
+      ).toEqual(['message-1']);
     });
 
     it('creates the root reader for a new inbox, enrols this device reader, and stores only the cursor', async () => {

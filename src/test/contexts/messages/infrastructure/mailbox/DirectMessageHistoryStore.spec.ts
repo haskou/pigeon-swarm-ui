@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
+import { DirectMessageHistoryStorageError } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageHistoryStorageError';
 import { DirectMessageHistoryStore } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageHistoryStore';
 
 const conversationId = 'conversation-1';
@@ -195,20 +196,19 @@ describe(DirectMessageHistoryStore.name, () => {
     expect(await storedChunks(name)).toEqual([]);
   });
 
-  it('resolves and logs only a count when storage fails', async () => {
-    const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
-
+  it('rejects with a storage error that carries no plaintext when storage fails', async () => {
     jest.spyOn(indexedDB, 'open').mockImplementation(() => {
       throw new Error(marker);
     });
 
     const store = new DirectMessageHistoryStore(databaseName());
+    const appended = store.append(session('identity-1'), conversationId, [
+      entry('a'),
+    ]);
 
-    await expect(
-      store.append(session('identity-1'), conversationId, [entry('a')]),
-    ).resolves.toBeUndefined();
-
-    expect(debug).toHaveBeenCalledTimes(1);
-    expect(JSON.stringify(debug.mock.calls)).not.toContain(marker);
+    await expect(appended).rejects.toBeInstanceOf(
+      DirectMessageHistoryStorageError,
+    );
+    await expect(appended).rejects.not.toThrow(marker);
   });
 });
