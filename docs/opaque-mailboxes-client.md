@@ -55,6 +55,7 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 - Mixed versions and the reader cap: see Reader set.
 - Forget is best effort on readers: forgetting a device removes its device reader through the root token. A failed removal is left to the reader prune that other devices run on sync. The only device of an identity keeps its reader, because its revocation is never sent.
 - Revoke rotates the root for the remaining devices (see `device-sealed-secrets-client.md`, Rotation). A revoked device holding `masterKey` keeps the legacy root until the remaining devices have bridged every inbox. After that it has no reader, because it cannot fetch the sealed root (401). Authorship tags derive from the sealed root, and keychain heads open only under it, so it cannot forge own-inbox tags or read the post-revoke keychain. A `masterKey`-sealed keychain head is no longer accepted (#320).
+- Forget rotates the root later. The forgetting device revokes itself, so it cannot publish. The first remaining device to unlock finds its own entry behind the head and publishes a fresh root (see `device-sealed-secrets-client.md`, Rotation and Forget). Until then the old root stays registered, and a forgotten device that still holds it keeps read access. A publish before the revoke would not close this window, because the forgetter must be listed as a recipient and would receive the new root too (node `DeviceSealedSecretBundle.assertPublishableBy`). A tighter bound needs a node contract change (`haskou/pigeon-swarm-node#289`).
 - Silent readers: a registered reader that stops acknowledging holds every envelope above its cursor until the node's retention expires them (default 14 days). While it is silent the mailbox can fill, and appends return 409. Pruning removes only readers whose device is gone, so a silent device that is still listed keeps its backlog.
 
 ## Creation proof
@@ -185,7 +186,6 @@ The mailbox is the only delivery path for one-to-one conversations. No shim, fal
 
 - Epoch rotation announcement.
 - Realtime hint for new envelopes.
-- Root rotation at forget time (not implemented). Revoke rotates the root (see Residual risk above). Forget does not: the forgetting device is revoked, so it cannot publish, and remaining devices publish a fresh root on their next unlock. Until then the old root stays registered, and a forgotten device that still holds it keeps read access. A publish before the revoke would not close this window, because the forgetter must be listed as a recipient and would receive the new root too (node `DeviceSealedSecretBundle.assertPublishableBy`). A tighter bound needs a node contract change (`haskou/pigeon-swarm-node#289`).
 
 ## Same-device history
 
