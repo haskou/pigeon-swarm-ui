@@ -1021,6 +1021,45 @@ describe(CallPeerConnections.name, () => {
     manager.reset();
   });
 
+  it('answers the same offer arriving twice at once one after another', async () => {
+    const peers: FakePeerConnection[] = [];
+    installSessionDescriptionMock();
+    installPeerConnectionMock(peers);
+    const manager = callPeerConnectionManager();
+    const sendSignal = jest
+      .fn<Promise<void>, Parameters<SignalSender>>()
+      .mockResolvedValue(undefined);
+    manager.configure(jest.fn().mockResolvedValue({ iceServers: [] }));
+    await manager.ensurePeer('identity-a', false, sendSignal);
+    const [peer] = peers;
+    const applyLocal = jest.mocked(peer.setLocalDescription);
+    const setLocalDescription = applyLocal.getMockImplementation();
+
+    applyLocal.mockImplementation((description) =>
+      description?.type === 'answer' && peer.signalingState === 'stable'
+        ? Promise.reject(new Error('Called in wrong state: stable'))
+        : (setLocalDescription?.(description) ?? Promise.resolve()),
+    );
+    const offer = () =>
+      manager.handleSignal(
+        'identity-a',
+        'offer',
+        { sdp: 'offer-sdp', type: 'offer' },
+        sendSignal,
+        'identity-b',
+      );
+
+    await expect(Promise.all([offer(), offer()])).resolves.toEqual([
+      undefined,
+      undefined,
+    ]);
+    expect(sendSignal.mock.calls.map(([, signalType]) => signalType)).toEqual([
+      'answer',
+      'answer',
+    ]);
+    manager.reset();
+  });
+
   it.each(['reset', 'healthy', 'timeout'])(
     'discards late TURN credentials after %s',
     async (reason) => {
