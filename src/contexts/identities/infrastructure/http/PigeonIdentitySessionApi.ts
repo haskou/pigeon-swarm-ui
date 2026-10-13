@@ -9,7 +9,6 @@ import type { DeviceSealedRecovery } from './DeviceSealedRecovery';
 import type { DeviceSealedRootRotation } from './DeviceSealedRootRotation';
 import type { PigeonDeviceAuthorizationApi } from './PigeonDeviceAuthorizationApi';
 import type { PigeonIdentityGateway } from './PigeonIdentityGateway';
-import type { PigeonKeychainApi } from './PigeonKeychainApi';
 import type { IdentityResource } from './resources/IdentityResource';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
@@ -27,7 +26,6 @@ export class PigeonIdentitySessionApi {
     private readonly vault: DeviceIdentityVault,
     private readonly deviceAuthorization: PigeonDeviceAuthorizationApi,
     private readonly deviceSealedRoot: DeviceSealedRootRotation,
-    private readonly keychains: PigeonKeychainApi,
     private readonly recovery: DeviceSealedRecovery,
   ) {}
 
@@ -58,26 +56,11 @@ export class PigeonIdentitySessionApi {
     try {
       return await this.deviceSealedRoot.current(session);
     } catch {
-      // Count-only. The session keeps the masterKey fallback until next unlock.
+      // Count-only. Reads and publishes need the root until next unlock.
       // eslint-disable-next-line no-console
-      console.debug(
-        'Device sealed root could not be opened; masterKey fallback in use.',
-      );
+      console.debug('Device sealed root could not be opened.');
 
       return session;
-    }
-  }
-
-  private async migrateLegacyHead(session: Session): Promise<void> {
-    try {
-      await this.keychains.migrateLegacyHead(session);
-    } catch {
-      // Count-only. The head stays sealed under masterKey and the fallback
-      // still opens it.
-      // eslint-disable-next-line no-console
-      console.debug(
-        'Legacy keychain head could not be resealed under the root.',
-      );
     }
   }
 
@@ -159,8 +142,6 @@ export class PigeonIdentitySessionApi {
 
     const rooted = await this.openDeviceSealedRoot(synchronized);
     await this.recovery.resumeKeychainRewrap(rooted);
-
-    await this.migrateLegacyHead(rooted);
 
     return rooted;
   }

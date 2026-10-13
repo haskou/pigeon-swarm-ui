@@ -37,7 +37,7 @@ function resource(name = 'Ada'): IdentityResource {
 }
 
 describe(PigeonIdentityRepository.name, () => {
-  it('persists a new aggregate with its generated key material', async () => {
+  it('persists a new aggregate with key material and a device sealed root', async () => {
     const gateway = mock<PigeonIdentitiesGateway>();
     const contexts = new IdentityAccessContexts();
     const materials = new IdentityCreationMaterials();
@@ -46,6 +46,7 @@ describe(PigeonIdentityRepository.name, () => {
     const recoveryAuthorityKeyPair = await KeyPair.generate();
     const identityId = IdentityId.fromString(keyPair.toPrimitives().publicKey);
     const masterKey = SymmetricKey.generate();
+    const deviceSealedRootKey = SymmetricKey.generate();
     const identity = Identity.create(
       identityId,
       IdentityProfile.fromPrimitives({
@@ -83,6 +84,9 @@ describe(PigeonIdentityRepository.name, () => {
       masterKey,
       recoveryAuthorityKeyPair,
     });
+    gateway.openDeviceSealedRoot.mockImplementation((session) =>
+      Promise.resolve({ ...session, deviceSealedRootKey }),
+    );
 
     const persisted = await new PigeonIdentityRepository(
       gateway,
@@ -98,6 +102,9 @@ describe(PigeonIdentityRepository.name, () => {
       protection,
     );
     expect(contexts.find(identityId).session.identity).toBe(persistedResource);
+    expect(contexts.find(identityId).session.deviceSealedRootKey).toBe(
+      deviceSealedRootKey,
+    );
   });
 
   it('maps identity reads into aggregates', async () => {
