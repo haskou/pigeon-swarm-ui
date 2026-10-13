@@ -48,10 +48,10 @@ group, and a message sent after the member is removed never shows in the
 removed member's page) and `call-page-departure.spec.ts` (a ringing call is
 declined when the callee leaves the page) run against a real node. Login,
 direct-message sync, the outbox spec and the security audit run on
-`desktop-chromium`, `desktop-firefox` and `mobile-chromium`; the call spec runs
-on the two desktop projects, because the call is started from the desktop
-conversation menu; the revoke and community kick specs run on
-`desktop-chromium`.
+`desktop-chromium`, `desktop-firefox` and `mobile-chromium`; the call, revoke
+and community kick specs run on `desktop-chromium`. On Firefox the decline sent
+when the callee leaves the page did not reach the node in CI, so the call spec
+does not run there.
 `passkey-unlock.spec.ts` (switching this device from a password to a passkey
 and unlocking with it) runs on `desktop-chromium` only: it uses a DevTools
 virtual authenticator with PRF and opens the app through `localhost`, because

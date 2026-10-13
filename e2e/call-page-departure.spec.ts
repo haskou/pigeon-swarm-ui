@@ -12,7 +12,7 @@ test('declines a ringing call when the callee leaves the page', async ({
   browser,
 }, testInfo) => {
   test.skip(
-    !testInfo.project.name.startsWith('desktop-'),
+    testInfo.project.name !== 'desktop-chromium',
     'The call is started from the desktop conversation menu.',
   );
   test.slow();
