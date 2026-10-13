@@ -25,6 +25,7 @@ const REAL_CRYPTO_SPECS = [
   'DirectMessageMailboxAvailability',
   'DirectMessageReaderSet',
   'GroupMailboxKeySchedule',
+  'GroupMailboxMlsEngine',
   'IdentityAdmissionProof',
   'IdentityAdmissionProof.vectors',
   'IdentityMailboxHomeTrust',
