@@ -278,6 +278,46 @@ describe('GroupMailboxNotificationPump', () => {
     expect(control.receiveDirect).toHaveBeenCalledTimes(1);
   });
 
+  it('stops when the node does not move past the cursor', async () => {
+    const size = GroupMailboxNotificationPump.PAGE_SIZE;
+    const page = Array.from({ length: size }, (_, index) =>
+      notification({ from: alice, id: `n-${index}` }),
+    );
+    const { notifications, pump } = setup([page]);
+
+    notifications.listPage.mockResolvedValue(page);
+    await pump.run();
+
+    expect(notifications.listPage).toHaveBeenCalledTimes(2);
+  });
+
+  it('reads at most MAX_PAGES pages in one run', async () => {
+    const size = GroupMailboxNotificationPump.PAGE_SIZE;
+    const { notifications, pump } = setup([]);
+    let next = 1_000_000_000;
+    const other = (): NotificationResource => {
+      next -= 1;
+
+      return {
+        id: `other-${next}`,
+        payload: { communityId: 'c', inviterIdentityId: alice.id },
+        recipientIdentityId: bob.id,
+        state: 'pending',
+        status: 'unread',
+        type: 'community_invitation',
+      } as NotificationResource;
+    };
+
+    notifications.listPage.mockImplementation(() =>
+      Promise.resolve(Array.from({ length: size }, other)),
+    );
+    await pump.run();
+
+    expect(notifications.listPage).toHaveBeenCalledTimes(
+      GroupMailboxNotificationPump.MAX_PAGES,
+    );
+  });
+
   it('ignores notifications that are not group control letters', async () => {
     const letter = notification({ from: alice, id: 'n1' });
     const { control, pump } = setup([
