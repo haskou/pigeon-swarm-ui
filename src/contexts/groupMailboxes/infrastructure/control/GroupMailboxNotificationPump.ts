@@ -19,6 +19,8 @@ import { GroupMailboxControlSeal } from './GroupMailboxControlSeal';
  */
 export class GroupMailboxNotificationPump {
   public static readonly ANSWER_WINDOW_MS = 5 * 60_000;
+  /** Pages one run reads at most, so a node cannot keep it reading. */
+  public static readonly MAX_PAGES = 200;
   public static readonly PAGE_SIZE = 100;
 
   private again = false;
@@ -97,14 +99,22 @@ export class GroupMailboxNotificationPump {
     const size = GroupMailboxNotificationPump.PAGE_SIZE;
     let before: string | undefined;
     let failed = 0;
+    let pages = 0;
     let page: NotificationResource[];
+    let previous: string | undefined;
 
     do {
       page = await this.notifications.listPage(this.session, size, before);
+      pages += 1;
       for (const notification of page)
         failed += await this.handle(notification);
+      previous = before;
       before = page[page.length - 1]?.id;
-    } while (page.length === size);
+    } while (
+      page.length === size &&
+      before !== previous &&
+      pages < GroupMailboxNotificationPump.MAX_PAGES
+    );
 
     if (failed > 0) {
       // eslint-disable-next-line no-console
