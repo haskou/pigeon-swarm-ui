@@ -84,7 +84,13 @@ export class PigeonIdentitiesGateway {
     session: Session,
     requestCode: DevicePairingCode,
   ): Promise<{ completionCode: DevicePairingCode; session: Session }> {
-    const root = session.deviceSealedRootKey;
+    // A session that holds no root (a registered device, or one never unlocked
+    // here) opens it first. `current` never mints over a keychain head it
+    // cannot read, so an unreadable head refuses here instead of re-rooting.
+    const opened = session.deviceSealedRootKey
+      ? session
+      : await this.deviceSealedRoot.current(session);
+    const root = opened.deviceSealedRootKey;
 
     if (!root) {
       throw new DevicePairingError(
@@ -94,7 +100,7 @@ export class PigeonIdentitiesGateway {
     }
 
     const result = await this.deviceAuthorization.authorizePairing(
-      session,
+      opened,
       requestCode,
     );
     // The root is kept, so the new device opens the keychain's root. A failed

@@ -19,7 +19,7 @@ describe(DeviceSealedSecretCipher.name, () => {
     const recipient = await KeyPair.generate();
     const other = await KeyPair.generate();
     const outsider = await KeyPair.generate();
-    const publisherCredential = DeviceCredential.fromString(
+    const publisherCredential = IdentityId.fromString(
       publisher.toPrimitives().publicKey,
     ).valueOf();
     const entries = DeviceSealedSecretCipher.seal({
@@ -96,20 +96,77 @@ describe(DeviceSealedSecretCipher.name, () => {
     });
 
     expect(Object.keys(JSON.parse(preimage) as object)).toEqual([
-      'purpose',
-      'identityId',
-      'generation',
       'authorizationRevision',
+      'generation',
+      'identityId',
       'publisherCredential',
+      'purpose',
       'recipientCredential',
       'sealedSecret',
     ]);
     expect(
-      DeviceCredential.fromString(publisherCredential)
+      IdentityId.fromString(publisherCredential)
         .getPublicKey()
         .isValidSignature(preimage, new Signature(entry!.signature)),
     ).toBe(true);
     expect(entry!.sealedSecret.length).toBeLessThanOrEqual(4096);
+  });
+
+  it('builds the preimage byte-for-byte as the node signing payload', () => {
+    // Vector: DeviceSealedSecretBundle.signingPayload in pigeon-swarm-node at
+    // 62de806d. Purpose is pigeon:device-sealed-secret:v1; inputs below.
+    const preimage = DeviceSealedSecretPreimage.of({
+      authorizationRevision: 2,
+      generation: 3,
+      identityId: 'identity-body',
+      publisherCredential: 'publisher-body',
+      recipientCredential: 'recipient-body',
+      sealedSecret: 'v2.sealed-secret',
+    });
+
+    expect(preimage).toBe(
+      '{"authorizationRevision":2,"generation":3,"identityId":"identity-body","publisherCredential":"publisher-body","purpose":"pigeon:device-sealed-secret:v1","recipientCredential":"recipient-body","sealedSecret":"v2.sealed-secret"}',
+    );
+  });
+
+  it('seals body-only credentials, the form the node stores and verifies', async () => {
+    const recipient = await KeyPair.generate();
+    const publisher = await KeyPair.generate();
+    const identityId = IdentityId.fromString(
+      (await KeyPair.generate()).toPrimitives().publicKey,
+    ).valueOf();
+    const [entry] = DeviceSealedSecretCipher.seal({
+      authorizationRevision: 0,
+      generation: 1,
+      identityId,
+      payload,
+      publisher,
+      recipients: [
+        DeviceCredential.fromString(recipient.toPrimitives().publicKey),
+      ],
+    });
+
+    expect(entry!.recipientCredential).toBe(
+      IdentityId.fromString(recipient.toPrimitives().publicKey).valueOf(),
+    );
+    expect(entry!.recipientCredential).not.toContain('BEGIN');
+    expect(
+      IdentityId.fromString(publisher.toPrimitives().publicKey)
+        .getPublicKey()
+        .isValidSignature(
+          DeviceSealedSecretPreimage.of({
+            authorizationRevision: 0,
+            generation: 1,
+            identityId,
+            publisherCredential: IdentityId.fromString(
+              publisher.toPrimitives().publicKey,
+            ).valueOf(),
+            recipientCredential: entry!.recipientCredential,
+            sealedSecret: entry!.sealedSecret,
+          }),
+          new Signature(entry!.signature),
+        ),
+    ).toBe(true);
   });
 
   it('refuses an entry altered after it was signed', async () => {
@@ -133,7 +190,7 @@ describe(DeviceSealedSecretCipher.name, () => {
         identityId,
         recipient,
         resource: resourceFor(entries[0]!, {
-          publisherCredential: DeviceCredential.fromString(
+          publisherCredential: IdentityId.fromString(
             outsider.toPrimitives().publicKey,
           ).valueOf(),
         }),
