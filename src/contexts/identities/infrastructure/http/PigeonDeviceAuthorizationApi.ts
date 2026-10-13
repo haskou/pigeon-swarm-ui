@@ -16,10 +16,14 @@ import type { Session } from '../session/Session';
 import type { DeviceIdentityVault } from '../storage/DeviceIdentityVault';
 import type { CompletedDevicePairing } from './CompletedDevicePairing';
 import type { DevicePairingAuthorization } from './DevicePairingAuthorization';
-import type { OwnDeviceRetirement } from './OwnDeviceRetirement';
+import type { OwnDeviceRevocation } from './OwnDeviceRevocation';
 import type { DeviceAuthorizationCheckpointResource } from './resources/DeviceAuthorizationCheckpointResource';
 import type { DeviceAuthorizationTransitionResource } from './resources/DeviceAuthorizationTransitionResource';
 import type { DeviceCatalogResource } from './resources/DeviceCatalogResource';
+import type {
+  DeviceSealedSecretHandedOverResource,
+  DeviceSealedSecretHandOverResource,
+} from './resources/DeviceSealedSecretResource';
 import type { IdentityResource } from './resources/IdentityResource';
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
@@ -87,19 +91,35 @@ export class PigeonDeviceAuthorizationApi {
     );
   }
 
+  /**
+   * Submits a transition, with the sealed root generation a device hands to
+   * the remaining devices in its own retirement. The node confirms a stored
+   * hand-over in the response; without the confirmation it stored none.
+   */
   private async submit(
     session: Session,
     transition: DeviceAuthorizationTransition,
-  ): Promise<DeviceAuthorizationCheckpoint> {
-    const body: DeviceAuthorizationTransitionResource =
-      transition.toPrimitives();
+    sealedSecrets?: DeviceSealedSecretHandOverResource,
+  ): Promise<{
+    checkpoint: DeviceAuthorizationCheckpoint;
+    handedOver?: DeviceSealedSecretHandedOverResource;
+  }> {
+    const body: DeviceAuthorizationTransitionResource & {
+      sealedSecrets?: DeviceSealedSecretHandOverResource;
+    } = {
+      ...transition.toPrimitives(),
+      ...(sealedSecrets ? { sealedSecrets } : {}),
+    };
     const path = '/identity-devices/transitions';
-    const resource =
-      await this.http.request<DeviceAuthorizationCheckpointResource>(path, {
-        body: JSON.stringify(body),
-        headers: await this.signer.headers(session, 'POST', path, body),
-        method: 'POST',
-      });
+    const resource = await this.http.request<
+      DeviceAuthorizationCheckpointResource & {
+        sealedSecrets?: DeviceSealedSecretHandedOverResource;
+      }
+    >(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'POST', path, body),
+      method: 'POST',
+    });
     const checkpoint = DeviceAuthorizationCheckpointMapper.fromResource(
       resource,
       transition.getIdentityId(),
@@ -111,7 +131,50 @@ export class PigeonDeviceAuthorizationApi {
       new Error('Unexpected device authorization checkpoint.'),
     );
 
-    return checkpoint;
+    return { checkpoint, handedOver: resource.sealedSecrets };
+  }
+
+  private async applyTransition(
+    session: Session,
+    transition: DeviceAuthorizationTransition,
+    sealedSecrets?: DeviceSealedSecretHandOverResource,
+  ): Promise<{
+    checkpoint: DeviceAuthorizationCheckpoint;
+    handedOver?: DeviceSealedSecretHandedOverResource;
+  }> {
+    const submission = await this.submit(session, transition, sealedSecrets);
+
+    await this.vault.advanceAuthorization(
+      transition.getIdentityId(),
+      transition.getPreviousRevision(),
+      transition.getResultEpoch(),
+    );
+
+    return submission;
+  }
+
+  private async revocation(
+    session: Session,
+    target: DeviceCredential,
+    compromisedSince?: DeviceAuthorizationRevision,
+  ): Promise<DeviceAuthorizationTransition> {
+    const current = await this.find(session);
+
+    assert(
+      !compromisedSince ||
+        !compromisedSince.isGreaterThan(current.getRevision()),
+      new Error('The compromise revision is in the future.'),
+    );
+
+    return AuthorizationTransition.revocation({
+      author: session.deviceCredentialKeyPair,
+      compromisedSince,
+      epoch: current.getEpoch(),
+      identityId: current.getIdentityId(),
+      operationId: DeviceAuthorizationOperationId.generate(),
+      previousRevision: current.getRevision(),
+      targetCredential: target,
+    });
   }
 
   /**
@@ -388,24 +451,9 @@ export class PigeonDeviceAuthorizationApi {
     target: DeviceCredential,
     compromisedSince?: DeviceAuthorizationRevision,
   ): Promise<Session> {
-    const current = await this.find(session);
-
-    assert(
-      !compromisedSince ||
-        !compromisedSince.isGreaterThan(current.getRevision()),
-      new Error('The compromise revision is in the future.'),
-    );
     const checkpoint = await this.apply(
       session,
-      AuthorizationTransition.revocation({
-        author: session.deviceCredentialKeyPair,
-        compromisedSince,
-        epoch: current.getEpoch(),
-        identityId: current.getIdentityId(),
-        operationId: DeviceAuthorizationOperationId.generate(),
-        previousRevision: current.getRevision(),
-        targetCredential: target,
-      }),
+      await this.revocation(session, target, compromisedSince),
     );
 
     return {
@@ -416,13 +464,16 @@ export class PigeonDeviceAuthorizationApi {
   }
 
   /**
-   * Removes this device's own credential through the same revocation
-   * transition every other removal uses. Reports 'already-revoked' when the
-   * node rejects this device's signature with code 401020, or no longer lists
-   * this device. Reports 'last-device' when it is the only credential, which
-   * the node never revokes. Any other failure rejects, with nothing revoked.
+   * Prepares this device's own revocation, the same transition every other
+   * removal uses, and the devices that remain after it. Reports
+   * 'already-revoked' when the node rejects this device's signature with code
+   * 401020, or no longer lists this device. Reports 'last-device' when it is
+   * the only credential, which the node never revokes. Any other failure
+   * rejects. Nothing is submitted.
    */
-  public async retireOwnDevice(session: Session): Promise<OwnDeviceRetirement> {
+  public async prepareOwnRetirement(
+    session: Session,
+  ): Promise<'already-revoked' | 'last-device' | OwnDeviceRevocation> {
     let devices: DeviceCredential[];
 
     try {
@@ -450,9 +501,36 @@ export class PigeonDeviceAuthorizationApi {
       return 'last-device';
     }
 
-    await this.revokeDevice(session, self);
+    return {
+      remaining: devices.filter((device) => device !== self),
+      transition: await this.revocation(session, self),
+    };
+  }
 
-    return 'revoked';
+  /**
+   * Submits this device's own prepared revocation, with the sealed root
+   * generation it hands to the remaining devices. Resolves true only when the
+   * node confirms it stored that generation at the revocation revision; false
+   * when it applied the revocation without it, as when a concurrent change
+   * won the race. Any failure rejects, with nothing revoked.
+   */
+  public async retireOwnDevice(
+    session: Session,
+    revocation: OwnDeviceRevocation,
+    sealedSecrets?: DeviceSealedSecretHandOverResource,
+  ): Promise<boolean> {
+    const { handedOver } = await this.applyTransition(
+      session,
+      revocation.transition,
+      sealedSecrets,
+    );
+
+    return (
+      sealedSecrets !== undefined &&
+      handedOver?.authorizationRevision ===
+        revocation.transition.getResultRevision().valueOf() &&
+      handedOver.generation === sealedSecrets.generation
+    );
   }
 
   public async synchronize(session: Session): Promise<Session> {
@@ -476,15 +554,7 @@ export class PigeonDeviceAuthorizationApi {
     session: Session,
     transition: DeviceAuthorizationTransition,
   ): Promise<DeviceAuthorizationCheckpoint> {
-    const checkpoint = await this.submit(session, transition);
-
-    await this.vault.advanceAuthorization(
-      transition.getIdentityId(),
-      transition.getPreviousRevision(),
-      transition.getResultEpoch(),
-    );
-
-    return checkpoint;
+    return (await this.applyTransition(session, transition)).checkpoint;
   }
 
   public async recover(
@@ -527,7 +597,7 @@ export class PigeonDeviceAuthorizationApi {
       recoveryAuthority: material.recoveryAuthorityKeyPair,
       target: deviceCredentialKeyPair,
     });
-    const checkpoint = await this.submit(recoverySession, transition);
+    const { checkpoint } = await this.submit(recoverySession, transition);
     const vaultSession = await this.vault.register({
       authorizationEpoch: checkpoint.getEpoch(),
       authorizationRevision: checkpoint.getRevision(),

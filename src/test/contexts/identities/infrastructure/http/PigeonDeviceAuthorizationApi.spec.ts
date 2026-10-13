@@ -712,17 +712,28 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
       expect(http).toHaveBeenCalledTimes(1);
     });
 
-    describe('retireOwnDevice', () => {
+    describe('own retirement', () => {
       const catalog = (identityId: IdentityId, credentials: string[]) => ({
         credentials,
         epoch: 'genesis',
         identityId: identityId.valueOf(),
         revision: 3,
       });
+      const handOver = {
+        entries: [
+          {
+            recipientCredential: 'remaining-device',
+            sealedSecret: 'sealed',
+            signature: 'signed',
+          },
+        ],
+        generation: 7,
+      };
 
-      it('revokes its own credential when other devices remain', async () => {
+      async function revocable() {
         const other = await KeyPair.generate();
-        const { api, http, identityId, session } = await managed([]);
+        const managedApi = await managed([]);
+        const { api, http, identityId, session } = managedApi;
         const own = session.deviceCredentialKeyPair.toPrimitives().publicKey;
 
         http
@@ -732,17 +743,110 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
               IdentityId.fromString(other.toPrimitives().publicKey).valueOf(),
             ]),
           )
-          .mockResolvedValueOnce(checkpoint(3)(identityId))
-          .mockResolvedValueOnce(checkpoint(4)(identityId));
+          .mockResolvedValueOnce(checkpoint(3)(identityId));
 
-        await expect(api.retireOwnDevice(session)).resolves.toBe('revoked');
+        const revocation = await api.prepareOwnRetirement(session);
 
-        expect(JSON.parse(String(http.mock.calls[2][1].body))).toMatchObject({
+        if (typeof revocation === 'string') throw new Error(revocation);
+
+        return { ...managedApi, other, own, revocation };
+      }
+
+      it('prepares its own revocation at the next revision and the devices that remain, submitting nothing', async () => {
+        const { http, other, own, revocation } = await revocable();
+
+        expect(revocation.transition.getResultRevision().valueOf()).toBe(4);
+        expect(revocation.transition.toPrimitives()).toMatchObject({
           operation: 'revoke',
           previousRevision: 3,
           targetCredential: own,
         });
+        expect(revocation.remaining.map((device) => device.valueOf())).toEqual([
+          other.toPrimitives().publicKey,
+        ]);
+        expect(http).toHaveBeenCalledTimes(2);
+      });
+
+      it('submits its own revocation with the sealed root hand-over and reports it delivered once the node stored it', async () => {
+        const { api, http, identityId, own, revocation, session } =
+          await revocable();
+
+        http.mockResolvedValueOnce({
+          ...checkpoint(4)(identityId),
+          sealedSecrets: { authorizationRevision: 4, generation: 7 },
+        });
+
+        await expect(
+          api.retireOwnDevice(session, revocation, handOver),
+        ).resolves.toBe(true);
+
+        expect(JSON.parse(String(http.mock.calls[2][1].body))).toEqual({
+          ...revocation.transition.toPrimitives(),
+          sealedSecrets: handOver,
+        });
+        expect(JSON.parse(String(http.mock.calls[2][1].body))).toMatchObject({
+          operation: 'revoke',
+          targetCredential: own,
+        });
         expect(http).toHaveBeenCalledTimes(3);
+      });
+
+      it('reports the hand-over undelivered when the node applied the retirement without storing it', async () => {
+        const { api, http, identityId, revocation, session } =
+          await revocable();
+
+        http.mockResolvedValueOnce(checkpoint(4)(identityId));
+
+        await expect(
+          api.retireOwnDevice(session, revocation, handOver),
+        ).resolves.toBe(false);
+      });
+
+      it('reports the hand-over undelivered when the node confirms another generation or revision', async () => {
+        const { api, http, identityId, revocation, session } =
+          await revocable();
+
+        http
+          .mockResolvedValueOnce({
+            ...checkpoint(4)(identityId),
+            sealedSecrets: { authorizationRevision: 4, generation: 8 },
+          })
+          .mockResolvedValueOnce({
+            ...checkpoint(4)(identityId),
+            sealedSecrets: { authorizationRevision: 5, generation: 7 },
+          });
+
+        await expect(
+          api.retireOwnDevice(session, revocation, handOver),
+        ).resolves.toBe(false);
+        await expect(
+          api.retireOwnDevice(session, revocation, handOver),
+        ).resolves.toBe(false);
+      });
+
+      it('submits a plain revocation when there is nothing to hand over', async () => {
+        const { api, http, identityId, revocation, session } =
+          await revocable();
+
+        http.mockResolvedValueOnce(checkpoint(4)(identityId));
+
+        await expect(api.retireOwnDevice(session, revocation)).resolves.toBe(
+          false,
+        );
+        expect(JSON.parse(String(http.mock.calls[2][1].body))).toEqual(
+          revocation.transition.toPrimitives(),
+        );
+      });
+
+      it('fails when the node applies another revision', async () => {
+        const { api, http, identityId, revocation, session } =
+          await revocable();
+
+        http.mockResolvedValueOnce(checkpoint(5)(identityId));
+
+        await expect(
+          api.retireOwnDevice(session, revocation, handOver),
+        ).rejects.toThrow();
       });
 
       it('reports a device the node no longer accepts as already removed', async () => {
@@ -756,13 +860,13 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
           ),
         );
 
-        await expect(api.retireOwnDevice(session)).resolves.toBe(
+        await expect(api.prepareOwnRetirement(session)).resolves.toBe(
           'already-revoked',
         );
         expect(http).toHaveBeenCalledTimes(1);
       });
 
-      it('fails on any other 401 and revokes nothing', async () => {
+      it('fails on any other 401', async () => {
         const { api, http, session } = await managed([]);
 
         http.mockRejectedValueOnce(
@@ -773,7 +877,7 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
           ),
         );
 
-        await expect(api.retireOwnDevice(session)).rejects.toThrow(
+        await expect(api.prepareOwnRetirement(session)).rejects.toThrow(
           'Unauthorized',
         );
         expect(http).toHaveBeenCalledTimes(1);
@@ -789,13 +893,13 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
           ]),
         );
 
-        await expect(api.retireOwnDevice(session)).resolves.toBe(
+        await expect(api.prepareOwnRetirement(session)).resolves.toBe(
           'already-revoked',
         );
         expect(http).toHaveBeenCalledTimes(1);
       });
 
-      it('refuses to remove the only device on the identity and revokes nothing', async () => {
+      it('refuses to remove the only device on the identity', async () => {
         const { api, http, identityId, session } = await managed([]);
         const own = session.deviceCredentialKeyPair.toPrimitives().publicKey;
 
@@ -803,18 +907,20 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
           catalog(identityId, [IdentityId.fromString(own).valueOf()]),
         );
 
-        await expect(api.retireOwnDevice(session)).resolves.toBe('last-device');
+        await expect(api.prepareOwnRetirement(session)).resolves.toBe(
+          'last-device',
+        );
         expect(http).toHaveBeenCalledTimes(1);
       });
 
-      it('surfaces any other failed read and revokes nothing', async () => {
+      it('surfaces any other failed read', async () => {
         const { api, http, session } = await managed([]);
 
         http.mockRejectedValueOnce(
           new HttpJsonError(503, 'Service Unavailable', ''),
         );
 
-        await expect(api.retireOwnDevice(session)).rejects.toThrow('503');
+        await expect(api.prepareOwnRetirement(session)).rejects.toThrow('503');
         expect(http).toHaveBeenCalledTimes(1);
       });
     });

@@ -1,15 +1,14 @@
 import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
+import type { DeviceCredential } from '../../domain/value-objects/DeviceCredential';
 import type { Session } from '../session/Session';
+import type { DeviceSealedRootHandOver } from './DeviceSealedRootHandOver';
 import type { PigeonDeviceAuthorizationApi } from './PigeonDeviceAuthorizationApi';
 import type { PigeonDeviceSealedSecretApi } from './PigeonDeviceSealedSecretApi';
 import type { PigeonKeychainApi } from './PigeonKeychainApi';
 
-import {
-  decodeBase64Url,
-  encodeBase64Url,
-} from '../../../../shared/infrastructure/encoding/base64url';
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
+import { DeviceSealedRootPayload } from '../crypto/DeviceSealedRootPayload';
 
 /**
  * Publishes and opens the device-sealed root of one identity. A generation
@@ -19,7 +18,9 @@ import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonEr
  * mints a root itself: an entry still behind the head is only read as the
  * lagging root that a fresh one replaces. A device with no entry mints only
  * after the identity keychain head reads: a head sealed under a root this
- * device cannot open blocks the mint, so that keychain is not stranded.
+ * device cannot open blocks the mint, so that keychain is not stranded. A
+ * device that forgets itself hands a fresh root, with the root it replaces,
+ * to the devices that remain, inside its own retirement.
  */
 export class DeviceSealedRootRotation {
   public constructor(
@@ -28,6 +29,10 @@ export class DeviceSealedRootRotation {
     private readonly keychains: PigeonKeychainApi,
     private readonly clock: () => number = Date.now,
   ) {}
+
+  private nextGeneration(stored: number | undefined): number {
+    return Math.max(stored ?? 0, this.clock()) + 1;
+  }
 
   private async publishWithRetry(
     session: Session,
@@ -55,8 +60,8 @@ export class DeviceSealedRootRotation {
     const recipients = await this.deviceAuthorization.findDevices(session);
 
     await this.sealedSecrets.publish(session, {
-      generation: Math.max(own?.generation ?? 0, this.clock()) + 1,
-      payload: encodeBase64Url(root.getBuffer()),
+      generation: this.nextGeneration(own?.generation),
+      payload: DeviceSealedRootPayload.encode({ root }),
       recipients,
     });
 
@@ -104,13 +109,13 @@ export class DeviceSealedRootRotation {
       return null;
     }
 
-    return SymmetricKey.fromBuffer(decodeBase64Url(own.payload));
+    return DeviceSealedRootPayload.decode(own.payload).root;
   }
 
   /**
-   * Returns the session holding the root of the current generation. Publishes
-   * a new generation only when this device has no entry at all and the
-   * keychain head is readable.
+   * Returns the session holding the root of the current generation, and the
+   * root a hand-over replaced. Publishes a new generation only when this
+   * device has no entry at all and the keychain head is readable.
    */
   public async current(session: Session): Promise<Session> {
     const own = await this.sealedSecrets.fetchOwn(session);
@@ -121,29 +126,63 @@ export class DeviceSealedRootRotation {
       return await this.rotate(session);
     }
 
-    if (own.authorizationRevision === session.authorizationRevision.valueOf()) {
-      return {
-        ...session,
-        deviceSealedRootKey: SymmetricKey.fromBuffer(
-          decodeBase64Url(own.payload),
-        ),
-      };
+    let opening = { entry: own, session };
+
+    if (own.authorizationRevision !== session.authorizationRevision.valueOf()) {
+      const synced = await this.deviceAuthorization.synchronize(session);
+      const fresh = await this.sealedSecrets.fetchOwn(synced);
+
+      if (
+        fresh?.authorizationRevision !== synced.authorizationRevision.valueOf()
+      ) {
+        return synced;
+      }
+
+      opening = { entry: fresh, session: synced };
     }
 
-    const synced = await this.deviceAuthorization.synchronize(session);
-    const fresh = await this.sealedSecrets.fetchOwn(synced);
-
-    if (
-      fresh?.authorizationRevision !== synced.authorizationRevision.valueOf()
-    ) {
-      return synced;
-    }
+    const roots = DeviceSealedRootPayload.decode(opening.entry.payload);
 
     return {
-      ...synced,
-      deviceSealedRootKey: SymmetricKey.fromBuffer(
-        decodeBase64Url(fresh.payload),
-      ),
+      ...opening.session,
+      deviceSealedRootKey: roots.root,
+      ...(roots.previous
+        ? { previousDeviceSealedRootKey: roots.previous }
+        : {}),
+    };
+  }
+
+  /**
+   * Seals a fresh root, carrying the root of this device's own entry, to the
+   * devices that remain after this device's own retirement at the given
+   * revision. Nothing is submitted: the generation rides in the retirement.
+   * Returns `null` when this device holds no entry to hand over from.
+   */
+  public async handOver(
+    session: Session,
+    retirement: {
+      authorizationRevision: number;
+      recipients: readonly DeviceCredential[];
+    },
+  ): Promise<DeviceSealedRootHandOver | null> {
+    const own = await this.sealedSecrets.fetchOwn(session);
+
+    if (!own) {
+      return null;
+    }
+
+    const previous = DeviceSealedRootPayload.decode(own.payload).root;
+    const root = SymmetricKey.generate();
+
+    return {
+      previous,
+      root,
+      sealedSecrets: this.sealedSecrets.sealHandOver(session, {
+        authorizationRevision: retirement.authorizationRevision,
+        generation: this.nextGeneration(own.generation),
+        payload: DeviceSealedRootPayload.encode({ previous, root }),
+        recipients: retirement.recipients,
+      }),
     };
   }
 

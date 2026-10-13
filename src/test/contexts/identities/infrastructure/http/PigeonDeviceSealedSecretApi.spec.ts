@@ -124,6 +124,39 @@ describe(PigeonDeviceSealedSecretApi.name, () => {
     expect(http.request).toHaveBeenCalledTimes(1);
   });
 
+  it('seals a hand-over that the remaining devices open as signed by the retiring device at the retirement revision', async () => {
+    const { api, http, identityId, otherDevice, recipients, session } =
+      await fixture();
+    const remaining = recipients[1]!;
+
+    const handOver = api.sealHandOver(session, {
+      authorizationRevision: 3,
+      generation: 7,
+      payload,
+      recipients: [remaining],
+    });
+
+    expect(http.request).not.toHaveBeenCalled();
+    expect(handOver.generation).toBe(7);
+    expect(handOver.entries).toHaveLength(1);
+    expect(JSON.stringify(handOver)).not.toContain(payload);
+    expect(
+      DeviceSealedSecretCipher.open({
+        identityId: identityId.valueOf(),
+        recipient: otherDevice,
+        resource: {
+          ...handOver.entries[0]!,
+          authorizationRevision: 3,
+          generation: 7,
+          identityId: identityId.valueOf(),
+          publisherCredential: IdentityId.fromString(
+            session.deviceCredentialKeyPair.toPrimitives().publicKey,
+          ).valueOf(),
+        },
+      }),
+    ).toEqual({ authorizationRevision: 3, generation: 7, payload });
+  });
+
   it('returns null when no entry exists for the caller', async () => {
     const { api, http, session } = await fixture();
     http.request.mockRejectedValue(new HttpJsonError(404, 'Not Found', ''));

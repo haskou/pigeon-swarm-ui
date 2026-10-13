@@ -39,6 +39,7 @@ const passthroughRoot = {
 const passthroughRecovery = {
   resumeKeychainRewrap: () => Promise.resolve(undefined),
   resumeRootReseal: () => Promise.resolve(undefined),
+  rewrapHandedOverKeychain: () => Promise.resolve(undefined),
   rotateLaggingRoot: (session: Session) => Promise.resolve(session),
 } as unknown as DeviceSealedRecovery;
 
@@ -313,7 +314,7 @@ describe(PigeonIdentitySessionApi.name, () => {
     );
   });
 
-  it('resumes a pending root reseal before the root opens, and a pending keychain rewrap after it', async () => {
+  it('resumes a pending root reseal before the root opens, and the pending keychain rewraps after it', async () => {
     const keyPair = await KeyPair.generate();
     const currentIdentity = identity(keyPair.toPrimitives().publicKey);
     const root = SymmetricKey.generate();
@@ -361,6 +362,11 @@ describe(PigeonIdentitySessionApi.name, () => {
 
         return Promise.resolve();
       }),
+      rewrapHandedOverKeychain: jest.fn(() => {
+        steps.push('rewrapHandedOverKeychain');
+
+        return Promise.resolve();
+      }),
     } as unknown as DeviceSealedRecovery;
 
     await new PigeonIdentitySessionApi(
@@ -375,8 +381,12 @@ describe(PigeonIdentitySessionApi.name, () => {
       'resumeRootReseal',
       'openRoot',
       'resumeKeychainRewrap',
+      'rewrapHandedOverKeychain',
     ]);
     expect(recovery.resumeKeychainRewrap).toHaveBeenCalledWith(
+      expect.objectContaining({ deviceSealedRootKey: root }),
+    );
+    expect(recovery.rewrapHandedOverKeychain).toHaveBeenCalledWith(
       expect.objectContaining({ deviceSealedRootKey: root }),
     );
   });
@@ -463,6 +473,77 @@ describe(PigeonIdentitySessionApi.name, () => {
     );
     expect(keychains.rewrapHead).toHaveBeenCalledWith(rooted, head);
     expect(store.read(currentIdentity.id)).toEqual({});
+  });
+
+  it('opens the root another device handed over when it forgot itself and moves the keychain head from the root it replaced', async () => {
+    const keyPair = await KeyPair.generate();
+    const currentIdentity = identity(keyPair.toPrimitives().publicKey);
+    const handedOverRoot = SymmetricKey.generate();
+    const replacedRoot = SymmetricKey.generate();
+    const identities = {
+      get: jest.fn().mockResolvedValue(currentIdentity),
+    } as unknown as PigeonIdentityGateway;
+    const vault = {
+      unlock: jest.fn().mockResolvedValue({
+        authorizationEpoch: DeviceAuthorizationEpoch.genesis(),
+        authorizationRevision: DeviceAuthorizationRevision.fromNumber(1),
+        deviceId: DeviceId.generate(),
+        material: {
+          deviceCredentialKeyPair: await KeyPair.generate(),
+          identityKeyPair: keyPair,
+          recoveryAuthorityKeyPair: await KeyPair.generate(),
+          rootKey: { getBuffer: () => SymmetricKey.generate().getBuffer() },
+        },
+        secretHandle: DeviceUnlockSecretHandle.generate(),
+      }),
+    } as unknown as DeviceIdentityVault;
+    // The forgotten device revoked itself at revision 2 and, in the same
+    // transition, handed this device a fresh root carrying the replaced one.
+    const deviceAuthorization = mock<PigeonDeviceAuthorizationApi>();
+    deviceAuthorization.synchronize.mockImplementation((session) =>
+      Promise.resolve({
+        ...session,
+        authorizationRevision: DeviceAuthorizationRevision.fromNumber(2),
+      }),
+    );
+    const sealedSecrets = mock<PigeonDeviceSealedSecretApi>();
+    sealedSecrets.fetchOwn.mockResolvedValue({
+      authorizationRevision: 2,
+      generation: 6,
+      payload: `${encodeBase64Url(handedOverRoot.getBuffer())}.${encodeBase64Url(replacedRoot.getBuffer())}`,
+    });
+    const keychains = mock<PigeonKeychainApi>();
+    keychains.rewrapHeadSealedUnder.mockResolvedValue(undefined);
+    const deviceSealedRoot = new DeviceSealedRootRotation(
+      deviceAuthorization,
+      sealedSecrets,
+      keychains,
+      () => 0,
+    );
+
+    const rooted = await new PigeonIdentitySessionApi(
+      identities,
+      vault,
+      deviceAuthorization,
+      deviceSealedRoot,
+      new DeviceSealedRecovery(
+        deviceSealedRoot,
+        keychains,
+        new DeviceSealedRecoveryStore(memoryStorage()),
+      ),
+    ).unlock(currentIdentity.id, 'password');
+
+    expect(sealedSecrets.publish).not.toHaveBeenCalled();
+    expect(rooted.deviceSealedRootKey?.getBuffer()).toEqual(
+      handedOverRoot.getBuffer(),
+    );
+    expect(rooted.previousDeviceSealedRootKey?.getBuffer()).toEqual(
+      replacedRoot.getBuffer(),
+    );
+    expect(keychains.rewrapHeadSealedUnder).toHaveBeenCalledWith(
+      rooted,
+      rooted.previousDeviceSealedRootKey,
+    );
   });
 
   it('refuses a non-genesis device that has not observed a chain revision', async () => {

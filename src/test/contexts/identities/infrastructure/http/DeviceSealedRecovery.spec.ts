@@ -395,5 +395,69 @@ describe(DeviceSealedRecovery.name, () => {
       expect(keychains.rewrapHead).not.toHaveBeenCalled();
       expect(store.read(identityId).keychainRewrap).toBeUndefined();
     });
+
+    it('rotates from the lagging root, so the rotated session keeps it for the mailboxes to bridge from', async () => {
+      const { deviceSealedRoot, keychains, recovery } = harness();
+      const synchronized = sessionAt(2);
+
+      deviceSealedRoot.laggingRoot.mockResolvedValue(previousRoot);
+      keychains.readHead.mockResolvedValue(undefined);
+      deviceSealedRoot.rotate.mockImplementation((session) =>
+        Promise.resolve({
+          ...session,
+          deviceSealedRootKey: currentRoot,
+          previousDeviceSealedRootKey: session.deviceSealedRootKey,
+        }),
+      );
+
+      const rotated = await recovery.rotateLaggingRoot(synchronized);
+
+      expect(deviceSealedRoot.rotate).toHaveBeenCalledWith(
+        expect.objectContaining({ deviceSealedRootKey: previousRoot }),
+      );
+      expect(rotated.previousDeviceSealedRootKey).toBe(previousRoot);
+    });
+  });
+
+  describe('rewrapHandedOverKeychain', () => {
+    it('reseals a head still under the root a hand-over replaced under the handed-over root', async () => {
+      const { keychains, recovery } = harness();
+      const rooted = sessionAt(2, {
+        deviceSealedRootKey: currentRoot,
+        previousDeviceSealedRootKey: previousRoot,
+      });
+
+      await recovery.rewrapHandedOverKeychain(rooted);
+
+      expect(keychains.rewrapHeadSealedUnder).toHaveBeenCalledWith(
+        rooted,
+        previousRoot,
+      );
+    });
+
+    it('does nothing for a root that replaced none', async () => {
+      const { keychains, recovery } = harness();
+
+      await recovery.rewrapHandedOverKeychain(
+        sessionAt(2, { deviceSealedRootKey: currentRoot }),
+      );
+
+      expect(keychains.rewrapHeadSealedUnder).not.toHaveBeenCalled();
+    });
+
+    it('does not throw when the rewrap fails, leaving it to the next unlock', async () => {
+      const { keychains, recovery } = harness();
+
+      keychains.rewrapHeadSealedUnder.mockRejectedValue(new Error('offline'));
+
+      await expect(
+        recovery.rewrapHandedOverKeychain(
+          sessionAt(2, {
+            deviceSealedRootKey: currentRoot,
+            previousDeviceSealedRootKey: previousRoot,
+          }),
+        ),
+      ).resolves.toBeUndefined();
+    });
   });
 });

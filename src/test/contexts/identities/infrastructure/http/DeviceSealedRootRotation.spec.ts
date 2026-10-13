@@ -213,6 +213,24 @@ describe('DeviceSealedRootRotation', () => {
       expect(current.deviceSealedRootKey?.getBuffer().equals(root)).toBe(true);
     });
 
+    it('keeps the previous root of the session when the entry carries none', async () => {
+      const { rotation, sealedSecrets } = setup();
+      const previous = SymmetricKey.generate();
+
+      sealedSecrets.fetchOwn.mockResolvedValue({
+        authorizationRevision: 4,
+        generation: 7,
+        payload: encodeBase64Url(SymmetricKey.generate().getBuffer()),
+      });
+
+      const current = await rotation.current({
+        ...makeSession(4),
+        previousDeviceSealedRootKey: previous,
+      });
+
+      expect(current.previousDeviceSealedRootKey).toBe(previous);
+    });
+
     it('re-syncs a stale session and opens its entry without publishing', async () => {
       const { deviceAuthorization, rotation, sealedSecrets } = setup(1_000);
       const root = SymmetricKey.generate();
@@ -281,6 +299,41 @@ describe('DeviceSealedRootRotation', () => {
       await expect(rotation.current(makeSession(3))).resolves.toBe(synced);
       expect(sealedSecrets.publish).not.toHaveBeenCalled();
     });
+
+    it('opens the root of a hand-over and keeps the root it replaced, so the keychain and mailboxes move from it', async () => {
+      const { rotation, sealedSecrets } = setup();
+      const root = SymmetricKey.generate();
+      const previous = SymmetricKey.generate();
+
+      sealedSecrets.fetchOwn.mockResolvedValue({
+        authorizationRevision: 4,
+        generation: 9,
+        payload: `${encodeBase64Url(root.getBuffer())}.${encodeBase64Url(previous.getBuffer())}`,
+      });
+
+      const current = await rotation.current(makeSession(4));
+
+      expect(sealedSecrets.publish).not.toHaveBeenCalled();
+      expect(current.deviceSealedRootKey?.getBuffer()).toEqual(
+        root.getBuffer(),
+      );
+      expect(current.previousDeviceSealedRootKey?.getBuffer()).toEqual(
+        previous.getBuffer(),
+      );
+    });
+
+    it('refuses a payload carrying more than a root and the root it replaced', async () => {
+      const { rotation, sealedSecrets } = setup();
+      const part = encodeBase64Url(SymmetricKey.generate().getBuffer());
+
+      sealedSecrets.fetchOwn.mockResolvedValue({
+        authorizationRevision: 4,
+        generation: 9,
+        payload: `${part}.${part}.${part}`,
+      });
+
+      await expect(rotation.current(makeSession(4))).rejects.toThrow();
+    });
   });
 
   describe('laggingRoot', () => {
@@ -292,6 +345,21 @@ describe('DeviceSealedRootRotation', () => {
         authorizationRevision: 4,
         generation: 8,
         payload: encodeBase64Url(root.getBuffer()),
+      });
+
+      const lagging = await rotation.laggingRoot(makeSession(5));
+
+      expect(lagging?.getBuffer()).toEqual(root.getBuffer());
+    });
+
+    it('opens only the root of a lagging hand-over', async () => {
+      const { rotation, sealedSecrets } = setup();
+      const root = SymmetricKey.generate();
+
+      sealedSecrets.fetchOwn.mockResolvedValue({
+        authorizationRevision: 4,
+        generation: 8,
+        payload: `${encodeBase64Url(root.getBuffer())}.${encodeBase64Url(SymmetricKey.generate().getBuffer())}`,
       });
 
       const lagging = await rotation.laggingRoot(makeSession(5));
@@ -311,6 +379,110 @@ describe('DeviceSealedRootRotation', () => {
       });
 
       await expect(rotation.laggingRoot(makeSession(5))).resolves.toBeNull();
+    });
+  });
+
+  describe('handOver', () => {
+    const HAND_OVER = {
+      entries: [
+        {
+          recipientCredential: 'device-b',
+          sealedSecret: 'sealed',
+          signature: 'signed',
+        },
+      ],
+      generation: 1_001,
+    };
+
+    it('seals a fresh root carrying the root of its own entry to the remaining devices at the retirement revision', async () => {
+      const { rotation, sealedSecrets } = setup(1_000);
+      const session = makeSession(4);
+      const previous = SymmetricKey.generate();
+
+      sealedSecrets.fetchOwn.mockResolvedValue({
+        authorizationRevision: 4,
+        generation: 7,
+        payload: encodeBase64Url(previous.getBuffer()),
+      });
+      sealedSecrets.sealHandOver.mockReturnValue(HAND_OVER);
+
+      const handOver = await rotation.handOver(session, {
+        authorizationRevision: 5,
+        recipients: RECIPIENTS,
+      });
+
+      expect(sealedSecrets.publish).not.toHaveBeenCalled();
+      expect(sealedSecrets.sealHandOver).toHaveBeenCalledTimes(1);
+
+      const [sealedBy, input] = sealedSecrets.sealHandOver.mock.calls[0];
+      const [root, carried, ...rest] = input.payload.split('.');
+
+      expect(sealedBy).toBe(session);
+      expect(input.authorizationRevision).toBe(5);
+      expect(input.generation).toBe(1_001);
+      expect(input.recipients).toEqual(RECIPIENTS);
+      expect(rest).toEqual([]);
+      expect(decodeBase64Url(carried)).toEqual(previous.getBuffer());
+      expect(decodeBase64Url(root)).not.toEqual(previous.getBuffer());
+      expect(handOver?.root.getBuffer()).toEqual(decodeBase64Url(root));
+      expect(handOver?.previous.getBuffer()).toEqual(previous.getBuffer());
+      expect(handOver?.sealedSecrets).toBe(HAND_OVER);
+    });
+
+    it('carries only the root of an own entry that is itself a hand-over', async () => {
+      const { rotation, sealedSecrets } = setup(1_000);
+      const previous = SymmetricKey.generate();
+
+      sealedSecrets.fetchOwn.mockResolvedValue({
+        authorizationRevision: 4,
+        generation: 7,
+        payload: `${encodeBase64Url(previous.getBuffer())}.${encodeBase64Url(SymmetricKey.generate().getBuffer())}`,
+      });
+      sealedSecrets.sealHandOver.mockReturnValue(HAND_OVER);
+
+      const handOver = await rotation.handOver(makeSession(4), {
+        authorizationRevision: 5,
+        recipients: RECIPIENTS,
+      });
+
+      const [, carried, ...rest] =
+        sealedSecrets.sealHandOver.mock.calls[0][1].payload.split('.');
+
+      expect(rest).toEqual([]);
+      expect(decodeBase64Url(carried)).toEqual(previous.getBuffer());
+      expect(handOver?.previous.getBuffer()).toEqual(previous.getBuffer());
+    });
+
+    it('issues a generation strictly greater than the stored one even when the clock is behind', async () => {
+      const { rotation, sealedSecrets } = setup(1_000);
+
+      sealedSecrets.fetchOwn.mockResolvedValue({
+        authorizationRevision: 4,
+        generation: 9_000,
+        payload: encodeBase64Url(SymmetricKey.generate().getBuffer()),
+      });
+      sealedSecrets.sealHandOver.mockReturnValue(HAND_OVER);
+
+      await rotation.handOver(makeSession(4), {
+        authorizationRevision: 5,
+        recipients: RECIPIENTS,
+      });
+
+      expect(sealedSecrets.sealHandOver.mock.calls[0][1].generation).toBe(
+        9_001,
+      );
+    });
+
+    it('hands nothing over when this device has no entry naming the root the keychain is under', async () => {
+      const { rotation, sealedSecrets } = setup(1_000);
+
+      await expect(
+        rotation.handOver(makeSession(4), {
+          authorizationRevision: 5,
+          recipients: RECIPIENTS,
+        }),
+      ).resolves.toBeNull();
+      expect(sealedSecrets.sealHandOver).not.toHaveBeenCalled();
     });
   });
 

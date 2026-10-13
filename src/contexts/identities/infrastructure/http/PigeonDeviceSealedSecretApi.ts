@@ -5,6 +5,7 @@ import type { RequestSigner } from '../../../../shared/infrastructure/http/Reque
 import type { DeviceCredential } from '../../domain/value-objects/DeviceCredential';
 import type { Session } from '../session/Session';
 import type {
+  DeviceSealedSecretHandOverResource,
   DeviceSealedSecretPublicationResource,
   DeviceSealedSecretPublishedResource,
   DeviceSealedSecretResource,
@@ -76,6 +77,28 @@ export class PigeonDeviceSealedSecretApi {
         published.authorizationRevision === authorizationRevision,
       new Error('Unexpected device sealed secret publication.'),
     );
+  }
+
+  /**
+   * Seals the payload to the recipients at the revision of this device's own
+   * retirement, signed by this device, without submitting it: the generation
+   * travels inside the retirement transition.
+   */
+  public sealHandOver(
+    session: Session,
+    input: DeviceSealedSecretPublication & { authorizationRevision: number },
+  ): DeviceSealedSecretHandOverResource {
+    return {
+      entries: DeviceSealedSecretCipher.seal({
+        authorizationRevision: input.authorizationRevision,
+        generation: input.generation,
+        identityId: IdentityId.fromString(session.identity.id).valueOf(),
+        payload: input.payload,
+        publisher: session.deviceCredentialKeyPair,
+        recipients: input.recipients,
+      }),
+      generation: input.generation,
+    };
   }
 
   /**
