@@ -1,3 +1,4 @@
+import { sha256 } from '@noble/hashes/sha2.js';
 import { randomBytes } from '@noble/hashes/utils.js';
 
 import type { MailboxKeys } from './crypto/MailboxKeySchedule';
@@ -66,6 +67,19 @@ export class MailboxChannel {
 
   /** Creations in flight, keyed by mailbox and read-token hash. */
   private readonly pendingCreations = new Map<string, Promise<void>>();
+
+  /**
+   * A stable envelope id for one send to one inbox. Seeded, so a resend of the
+   * same send posts the id the node already holds.
+   */
+  public static envelopeIdFor(seed: string): string {
+    return encodeBase64Url(
+      sha256(new TextEncoder().encode(seed)).subarray(
+        0,
+        MailboxChannel.ENVELOPE_ID_BYTES,
+      ),
+    );
+  }
 
   public constructor(
     private readonly client: PigeonMailboxClient,
@@ -176,14 +190,14 @@ export class MailboxChannel {
     }
   }
 
-  /** Sender. Seals one plaintext into a fresh envelope. */
+  /** Sender. Seals one plaintext under `envelopeId`, a fresh id by default. */
   public async send(
     keys: MailboxKeys,
     plaintext: Uint8Array,
-  ): Promise<MailboxAppend> {
-    const envelopeId = encodeBase64Url(
+    envelopeId: string = encodeBase64Url(
       randomBytes(MailboxChannel.ENVELOPE_ID_BYTES),
-    );
+    ),
+  ): Promise<MailboxAppend> {
     const body = MailboxEnvelopeCipher.seal(
       keys.envelopeKey,
       keys.mailboxId,

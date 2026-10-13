@@ -24,6 +24,7 @@ import { DirectMailboxRecordError } from '../../../mailboxes/domain/DirectMailbo
 import { DirectMailboxRecords } from '../../../mailboxes/domain/DirectMailboxRecords';
 import { MailboxEnvelopeCipher } from '../../../mailboxes/infrastructure/crypto/MailboxEnvelopeCipher';
 import { MailboxUnavailableError } from '../../../mailboxes/infrastructure/http/MailboxUnavailableError';
+import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageAuthorship } from './DirectMessageAuthorship';
 import { DirectMessageInboxKeys } from './DirectMessageInboxKeys';
 import { DirectMessageMailboxRecord } from './DirectMessageMailboxRecord';
@@ -34,6 +35,16 @@ function assertWithinEnvelope(plaintext: Uint8Array): void {
   if (plaintext.byteLength > MailboxEnvelopeCipher.MAX_PLAINTEXT_BYTES) {
     throw new Error('Direct mailbox record exceeds the envelope bound.');
   }
+}
+
+/**
+ * The envelope id of one queued copy. A retry or a reload re-posts the same
+ * id to the same inbox, so the node keeps one copy rather than two.
+ */
+function queuedEnvelopeId(sendId: string, recipientIdentityId: string): string {
+  return MailboxChannel.envelopeIdFor(
+    `direct-send\u0000${recipientIdentityId}\u0000${sendId}`,
+  );
 }
 
 /** Count-only: no ids, content, or error details. */
@@ -76,7 +87,12 @@ export class DirectMessageSender {
           DirectMailboxOwnership.ownCopyKey(session.identity.id, row.record.id),
         );
 
-        return this.appendOwnCopy(session, row.conversationId, row.record);
+        return this.appendOwnCopy(
+          session,
+          row.conversationId,
+          row.record,
+          queuedEnvelopeId(row.id, session.identity.id),
+        );
       },
       toPeer: (session, row) =>
         this.writeTo(
@@ -84,6 +100,7 @@ export class DirectMessageSender {
           row.conversationId,
           row.peerIdentityId,
           row.record,
+          queuedEnvelopeId(row.id, row.peerIdentityId),
         ),
     });
   }
@@ -177,9 +194,16 @@ export class DirectMessageSender {
     session: Session,
     conversationId: string,
     record: DirectMessageRecord,
+    envelopeId?: string,
   ): Promise<void> {
     try {
-      await this.writeTo(session, conversationId, session.identity.id, record);
+      await this.writeTo(
+        session,
+        conversationId,
+        session.identity.id,
+        record,
+        envelopeId,
+      );
     } catch {
       logAppendFailure();
     }
@@ -215,6 +239,7 @@ export class DirectMessageSender {
     conversationId: string,
     recipientIdentityId: string,
     record: DirectMessageRecord,
+    envelopeId?: string,
   ): Promise<void> {
     const plaintext = this.encodeFor(session, recipientIdentityId, record);
 
@@ -226,7 +251,12 @@ export class DirectMessageSender {
       recipientIdentityId,
     );
 
-    await this.recipients.send(recipientIdentityId, keys, plaintext);
+    await this.recipients.send(
+      recipientIdentityId,
+      keys,
+      plaintext,
+      envelopeId,
+    );
   }
 
   /**

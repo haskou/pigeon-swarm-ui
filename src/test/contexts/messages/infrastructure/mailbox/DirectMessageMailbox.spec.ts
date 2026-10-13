@@ -2932,6 +2932,15 @@ describe(DirectMessageMailbox.name, () => {
         if (!present || mailboxId !== recipientInboxId) {
           throw new MailboxUnavailableError();
         }
+        // The node answers a retained envelope id with its existing cursor.
+        const known = envelopes.find(
+          (envelope) => envelope.envelopeId === input.envelopeId,
+        );
+
+        if (known) {
+          return Promise.resolve({ cursor: known.cursor });
+        }
+
         const cursor = nextCursor;
         nextCursor += 1;
         envelopes.push({ ...input, cursor });
@@ -3787,6 +3796,116 @@ describe(DirectMessageMailbox.name, () => {
         readToken: legacy,
       });
       expect(readerHashes().sort()).toEqual(hashed(legacy, ...dead));
+    });
+
+    describe('retried writes', () => {
+      beforeEach(async () => {
+        jest.useRealTimers();
+        await new DirectMessageOutboxStore().forget('alice');
+      });
+
+      afterEach(async () => {
+        await new DirectMessageOutboxStore().forget('alice');
+      });
+
+      /** Resolves once `check` holds, letting queued work run. */
+      const until = async (check: () => boolean): Promise<void> => {
+        for (let turn = 0; turn < 500 && !check(); turn += 1) {
+          await new Promise<void>((resolve) => {
+            globalThis.setTimeout(resolve, 0);
+          });
+        }
+
+        if (!check()) throw new Error('condition not reached');
+      };
+
+      /** Writes per mailbox; a repeated envelope id is stored once. */
+      const appendLog = () => {
+        const logs = new Map<string, Map<string, number>>();
+        const wire = mock<PigeonMailboxClient>();
+        wire.append.mockImplementation((mailboxId, _postToken, input) => {
+          const log = logs.get(mailboxId) ?? new Map<string, number>();
+          logs.set(mailboxId, log);
+          const cursor = log.get(input.envelopeId) ?? log.size + 1;
+          log.set(input.envelopeId, cursor);
+
+          return Promise.resolve({ cursor });
+        });
+
+        return {
+          appended: (mailboxId: string) => logs.get(mailboxId)?.size ?? 0,
+          wire,
+        };
+      };
+
+      it('writes the own copy once when a retry follows a failed outbox removal', async () => {
+        const { projection, store } = setup();
+        const { appended, wire } = appendLog();
+        const remove = jest
+          .spyOn(DirectMessageOutboxStore.prototype, 'remove')
+          .mockRejectedValueOnce(new Error('outbox removal failed'));
+        const mailbox = mailboxFor(wire, store, projection);
+
+        await mailbox.send(session('alice'), conversation, 'hello', {});
+        await until(() =>
+          mailbox
+            .outboxItems('alice', conversationId)
+            .some((item) => item.state === 'failed'),
+        );
+        remove.mockRestore();
+        await mailbox.retry(session('alice'), conversation, 'message-1');
+        await until(
+          () => mailbox.outboxItems('alice', conversationId).length === 0,
+        );
+
+        expect(appended(keysFor('alice').mailboxId)).toBe(1);
+        expect(appended(keysFor('bob').mailboxId)).toBe(1);
+      });
+
+      it('delivers the peer copy once when a reload resumes a send whose peer write was not saved', async () => {
+        const alice = withSealedRoot(session('alice'));
+        const { projection, store } = setup();
+        const { envelopeCount, wire } = nodeMailboxClient();
+        const save = DirectMessageOutboxStore.prototype.save;
+        // The page closes before the peer copy is recorded as delivered.
+        const stalled = jest
+          .spyOn(DirectMessageOutboxStore.prototype, 'save')
+          .mockImplementation(function (
+            this: DirectMessageOutboxStore,
+            owner,
+            row,
+          ) {
+            return row.peerDelivered
+              ? new Promise<void>(() => undefined)
+              : save.call(this, owner, row);
+          });
+        const first = mailboxFor(wire, store, projection);
+
+        await first.send(alice, conversation, 'hello', {});
+        await until(() => envelopeCount() === 1);
+        first.stopOutbox('alice');
+        stalled.mockRestore();
+
+        const reloaded = mailboxFor(wire, store, projection);
+        await reloaded.resumeOutbox(alice);
+        await until(
+          () => reloaded.outboxItems('alice', conversationId).length === 0,
+        );
+
+        expect(envelopeCount()).toBe(1);
+
+        let timeline: ChatMessage[] = [];
+        await reloaded.sync(
+          session('bob'),
+          conversationId,
+          new AbortController().signal,
+          (changes) => {
+            timeline = MessageCollection.merge(timeline, messagesOf(changes));
+          },
+        );
+
+        expect(timeline.map((message) => message.id)).toEqual(['message-1']);
+      });
     });
   });
 
