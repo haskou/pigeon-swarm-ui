@@ -600,4 +600,37 @@ describe('DirectMessageMailbox availability servers', () => {
       );
     });
   });
+
+  describe('enrolDeviceReader', () => {
+    const laptop = 'device-credential-bob-laptop';
+    const laptopReader = (): string =>
+      MailboxCapability.hash(
+        MailboxReadToken.deriveDevice(
+          Buffer.alloc(32, 9),
+          mailboxIdOf('bob'),
+          laptop,
+        ),
+      );
+
+    it('enrols a paired device in the inbox on every availability server', async () => {
+      const { bob, extra, home } = network();
+      await syncPass(bob, 'bob');
+
+      await bob.enrolDeviceReader(session('bob'), laptop);
+
+      expect(home.readerHashes(mailboxIdOf('bob'))).toContain(laptopReader());
+      expect(extra.readerHashes(mailboxIdOf('bob'))).toContain(laptopReader());
+    });
+
+    it('still enrols it on the availability servers, and resolves, while the home node is unreachable', async () => {
+      const { bob, extra, home } = network();
+      await syncPass(bob, 'bob');
+      home.setDown(true);
+
+      await expect(
+        bob.enrolDeviceReader(session('bob'), laptop),
+      ).resolves.toBeUndefined();
+      expect(extra.readerHashes(mailboxIdOf('bob'))).toContain(laptopReader());
+    });
+  });
 });

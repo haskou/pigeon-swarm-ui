@@ -3520,6 +3520,42 @@ describe(DirectMessageMailbox.name, () => {
       );
     });
 
+    it('keeps the records other devices acknowledge for a paired device until its first open', async () => {
+      const { projection } = setup();
+      const laptop = 'device-credential-bob-laptop';
+      const devices = [credentialFor('bob'), laptop];
+      const { wire } = nodeMailboxClient();
+      const phone = mailboxFor(wire, memoryStore(), projection, devices);
+      const phoneApplied: string[][] = [];
+      const laptopApplied: string[][] = [];
+      await syncPass(phone, session('bob'), jest.fn());
+
+      // The phone authorizes the laptop, which opens no inbox until it signs
+      // in. The phone reads and acknowledges the next record first.
+      await phone.enrolDeviceReader(session('bob'), laptop);
+      await mailboxFor(wire, memoryStore(), projection).send(
+        session('alice'),
+        conversation,
+        'hello',
+        {},
+      );
+      await syncPass(phone, session('bob'), (changes) => {
+        phoneApplied.push(messageIds(changes));
+      });
+      await syncPass(
+        mailboxFor(wire, memoryStore(), projection, devices),
+        deviceSession('bob', laptop),
+        (changes) => {
+          laptopApplied.push(messageIds(changes));
+        },
+      );
+
+      expect([phoneApplied, laptopApplied]).toEqual([
+        [['message-1']],
+        [['message-1']],
+      ]);
+    });
+
     describe('cutOffRevokedReaders', () => {
       const laptop = 'device-credential-bob-laptop';
       const rotatedRoot = Buffer.alloc(32, 6);
