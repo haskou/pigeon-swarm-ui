@@ -69,8 +69,8 @@ a tiny distributed hostage negotiation.
   messages and owner management UI.
 - Conversation, group conversation and community invitations.
 - Public IPFS uploads for profile/community media.
-- Private encrypted IPFS uploads for message attachments, including large-file
-  chunking.
+- End-to-end encrypted message attachments stored as private blobs, including
+  large-file chunking.
 - Realtime updates over WebSocket for conversations, communities,
   notifications and peer state.
 - Node first-run flow, public/private network management, peer metrics and
@@ -159,7 +159,7 @@ For the full experience, the browser client expects:
 - A running `pigeon-swarm-node` HTTP/WebSocket API.
 - A claimed or claimable local node.
 - At least one configured node network.
-- IPFS public/private upload endpoints exposed by the node.
+- Public IPFS upload and private blob endpoints exposed by the node.
 - Signed request support from the active identity.
 - WebSocket `/realtime/v1` support for realtime domain events, authenticated with single-use tickets.
 

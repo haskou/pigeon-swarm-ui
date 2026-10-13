@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import type { ConversationResource } from '../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../contexts/identities/infrastructure/session/Session';
@@ -11,8 +11,6 @@ import {
   parseCommunityInviteUrl,
   type PendingCommunityInviteLink,
 } from '../../contexts/communities/presentation/view-models/communityInviteLink';
-import { deleteLegacyLocalDeviceUnlockStore } from '../../contexts/identities/infrastructure/storage/deleteLegacyLocalDeviceUnlockStore';
-import { deleteLegacyRememberedIdentityStorage } from '../../contexts/identities/infrastructure/storage/deleteLegacyRememberedIdentityStorage';
 import { useNodeNetworks } from '../../contexts/networks/presentation/hooks/useNodeNetworks';
 import { usePeers } from '../../contexts/networks/presentation/hooks/usePeers';
 import { clearProjectedMessageCaches } from '../../shared/infrastructure/storage/clearProjectedMessageCaches';
@@ -61,11 +59,6 @@ export function useAppBootstrap(): {
     },
     [],
   );
-
-  useEffect(() => {
-    void deleteLegacyLocalDeviceUnlockStore();
-    deleteLegacyRememberedIdentityStorage();
-  }, []);
 
   const clearSession = useCallback(() => {
     if (session) {

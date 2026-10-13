@@ -1,7 +1,6 @@
 import type { AttachmentProgress } from '../../application/contracts/AttachmentProgress';
 import type { MessageAttachment } from '../../application/contracts/MessageAttachment';
 import type { PrivateBlobReference } from '../../application/contracts/PrivateBlobReservation';
-import type { PrivateFileContent } from '../../application/contracts/PrivateFileContent';
 import type { PublicFileContent } from '../../application/contracts/PublicFileContent';
 
 import { MailboxHomeBase } from '../../../../shared/infrastructure/client/MailboxHomeBase';
@@ -10,7 +9,6 @@ import { AttachmentCipher } from '../crypto/AttachmentCipher';
 import { attachmentBlobCacheKey } from './attachmentBlobCacheKey';
 import { PigeonFileRequestCache } from './PigeonFileRequestCache';
 import { PigeonPrivateBlobClient } from './PigeonPrivateBlobClient';
-import { PigeonPrivateFilesClient } from './PigeonPrivateFilesClient';
 import { PigeonPublicFilesClient } from './PigeonPublicFilesClient';
 import { PrivateBlobUnavailableError } from './PrivateBlobUnavailableError';
 
@@ -28,14 +26,10 @@ type PrivateBlobPart = {
 export class PigeonAttachmentDownloader {
   private readonly attachmentCache = new PigeonFileRequestCache<Blob>();
 
-  private readonly privateFileCache =
-    new PigeonFileRequestCache<PrivateFileContent>();
-
   private readonly publicFileCache =
     new PigeonFileRequestCache<PublicFileContent>();
 
   public constructor(
-    private readonly privateFiles: PigeonPrivateFilesClient,
     private readonly publicFiles: PigeonPublicFilesClient,
     private readonly privateBlobs: Pick<PigeonPrivateBlobClient, 'download'>,
     private readonly cipher: AttachmentCipher,
@@ -46,27 +40,11 @@ export class PigeonAttachmentDownloader {
     attachment: MessageAttachment,
     onProgress?: (progress: AttachmentProgress) => void,
   ): Promise<Blob> {
-    if (attachment.blobs?.length) {
-      return await this.downloadPrivateBlobs(attachment, onProgress);
+    if (!attachment.blobs?.length) {
+      throw new PrivateBlobUnavailableError();
     }
 
-    const encryptedBytes = await this.downloadEncryptedBytes(
-      attachment,
-      onProgress,
-    );
-
-    return await this.cipher.decrypt(attachment, encryptedBytes, onProgress);
-  }
-
-  private async downloadEncryptedBytes(
-    attachment: MessageAttachment,
-    onProgress?: (progress: AttachmentProgress) => void,
-  ): Promise<ArrayBuffer> {
-    if (attachment.chunks?.length) {
-      return await this.downloadEncryptedChunks(attachment, onProgress);
-    }
-
-    return await this.downloadPrivateBytes(attachment, onProgress);
+    return await this.downloadPrivateBlobs(attachment, onProgress);
   }
 
   private async downloadPrivateBlobs(
@@ -225,46 +203,6 @@ export class PigeonAttachmentDownloader {
     }
   }
 
-  /** Legacy: encrypted chunks published to private IPFS before blobs. */
-  private async downloadEncryptedChunks(
-    attachment: MessageAttachment,
-    onProgress?: (progress: AttachmentProgress) => void,
-  ): Promise<ArrayBuffer> {
-    const chunks = [...(attachment.chunks ?? [])].sort(
-      (left, right) => left.index - right.index,
-    );
-    const buffers: ArrayBuffer[] = [];
-
-    for (let index = 0; index < chunks.length; index += 1) {
-      const content = await this.findPrivate(chunks[index].cid);
-
-      buffers.push(this.codec.base64ToArrayBuffer(content.encryptedData));
-      this.reportProgress(
-        onProgress,
-        attachment.filename,
-        ((index + 1) * 100) / chunks.length,
-      );
-    }
-
-    return this.codec.concatArrayBuffers(buffers);
-  }
-
-  /** Legacy: single encrypted payload published to private IPFS. */
-  private async downloadPrivateBytes(
-    attachment: MessageAttachment,
-    onProgress?: (progress: AttachmentProgress) => void,
-  ): Promise<ArrayBuffer> {
-    this.reportProgress(onProgress, attachment.filename, 0);
-
-    if (!attachment.cid) {
-      throw new Error('Attachment is missing its content identifier');
-    }
-    const content = await this.findPrivate(attachment.cid);
-    this.reportProgress(onProgress, attachment.filename, 100);
-
-    return this.codec.base64ToArrayBuffer(content.encryptedData);
-  }
-
   private async downloadPublic(
     attachment: MessageAttachment,
     onProgress?: (progress: AttachmentProgress) => void,
@@ -333,12 +271,6 @@ export class PigeonAttachmentDownloader {
         this.isEncrypted(attachment)
           ? this.downloadEncrypted(attachment, onProgress)
           : this.downloadPublic(attachment, onProgress),
-    );
-  }
-
-  public async findPrivate(cid: string): Promise<PrivateFileContent> {
-    return await this.privateFileCache.getOrCreate(cid, () =>
-      this.privateFiles.fetch(cid),
     );
   }
 

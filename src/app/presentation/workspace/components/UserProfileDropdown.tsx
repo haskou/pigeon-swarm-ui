@@ -17,7 +17,6 @@ import type { SelectablePresenceStatusResource as SelectablePresenceStatus } fro
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
 
-import { deleteLegacyRememberedIdentityStorage } from '../../../../contexts/identities/infrastructure/storage/deleteLegacyRememberedIdentityStorage';
 import { PresenceStatusDot } from '../../../../contexts/identities/presentation/components/presenceStatusDot';
 import {
   identityDisplayName,
@@ -631,7 +630,6 @@ function useForgetDeviceAndLogOut({
 
     switch (outcome) {
       case 'forgotten':
-        deleteLegacyRememberedIdentityStorage();
         onLogout();
 
         return;

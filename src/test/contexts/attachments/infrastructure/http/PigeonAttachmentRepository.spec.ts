@@ -31,7 +31,7 @@ describe(PigeonAttachmentRepository.name, () => {
       }),
     };
     const repository = new PigeonAttachmentRepository(
-      { findPrivate: jest.fn(), findPublic: jest.fn() },
+      { findPublic: jest.fn() },
       uploader,
       contexts,
     );
@@ -89,7 +89,7 @@ describe(PigeonAttachmentRepository.name, () => {
       publishPublic: jest.fn(),
     };
     const repository = new PigeonAttachmentRepository(
-      { findPrivate: jest.fn(), findPublic: jest.fn() },
+      { findPublic: jest.fn() },
       uploader,
       contexts,
     );
@@ -133,7 +133,7 @@ describe(PigeonAttachmentRepository.name, () => {
       size: 5,
     });
     const repository = new PigeonAttachmentRepository(
-      { findPrivate: jest.fn(), findPublic },
+      { findPublic },
       { publishEncrypted: jest.fn(), publishPublic: jest.fn() },
       new AttachmentPublicationContexts(),
     );
@@ -148,28 +148,20 @@ describe(PigeonAttachmentRepository.name, () => {
     expect(findPublic).toHaveBeenCalledWith('public-1');
   });
 
-  it('hydrates a legacy encrypted attachment aggregate by its CID', async () => {
-    const findPrivate = jest.fn().mockResolvedValue({
-      cid: 'private-1',
-      contentType: 'application/octet-stream',
-      encrypted: true,
-      encryptedData: 'AQID',
-      filename: 'archive.bin',
-      size: 3,
-    });
+  it('rejects an encrypted find without fetching any content', async () => {
+    const findPublic = jest.fn();
     const repository = new PigeonAttachmentRepository(
-      { findPrivate, findPublic: jest.fn() },
+      { findPublic },
       { publishEncrypted: jest.fn(), publishPublic: jest.fn() },
       new AttachmentPublicationContexts(),
     );
 
-    const attachment = await repository.find(
-      AttachmentExternalIdentifier.fromString('private-1'),
-      EncryptedAttachmentStrategy.restore(),
-    );
-
-    expect(attachment.isPublished()).toBe(true);
-    expect(attachment.isEncrypted()).toBe(true);
-    expect(findPrivate).toHaveBeenCalledWith('private-1');
+    await expect(
+      repository.find(
+        AttachmentExternalIdentifier.fromString('private-1'),
+        EncryptedAttachmentStrategy.restore(),
+      ),
+    ).rejects.toThrow('Encrypted attachments are read through their blobs');
+    expect(findPublic).not.toHaveBeenCalled();
   });
 });

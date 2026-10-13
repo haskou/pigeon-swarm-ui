@@ -81,9 +81,7 @@ asks for confirmation first. Then it:
 3. deletes the device vault record for the identity (IndexedDB
    `pigeon-swarm-device-vault`) through `DeviceUnlockForgetter`, which calls
    `IdentityUnlockRepository.forget`;
-4. removes legacy remember-me records (`pigeon-swarm-credentials`,
-   `pigeon-swarm-identity-preview`) that older builds wrote;
-5. runs the logout described above.
+4. runs the logout described above.
 
 If step 1 fails, the user stays signed in with the device still authorized, and
 sees an inline error. Nothing local is removed. If step 3 fails after the
@@ -148,32 +146,6 @@ prompt. Only a presence factor that gates the key itself, for example a passkey
 PRF wrapping the factor key, would stop that. That needs a passkey registration
 flow and settings UI, which is a product decision and out of scope here. Unlock
 still needs the password and the device-bound factor key.
-
-## Transition from the previous local format
-
-Earlier builds stored a local unlock in IndexedDB database
-`pigeon-swarm-device-unlock` (store `sessions`). It held the identity master
-key and identity key pair, encrypted with an AES key kept in the same database.
-That format was removed in `b03d913`.
-
-`deleteLegacyLocalDeviceUnlockStore`
-(`src/contexts/identities/infrastructure/storage/deleteLegacyLocalDeviceUnlockStore.ts`)
-deletes that database. `useAppBootstrap` calls it once on mount, after a node
-is selected, so node-scoped storage keys resolve.
-
-- A missing database is not created.
-- Without `indexedDB`, the step is skipped.
-- A delete blocked by another open tab completes when that tab closes.
-- Nothing on `main` reads the legacy store, so deleting it changes no unlock
-  behaviour.
-
-Covered by `deleteLegacyLocalDeviceUnlockStore.spec.ts`.
-
-Older builds also stored remember-me records under `pigeon-swarm-credentials`
-and `pigeon-swarm-identity-preview`. `deleteLegacyRememberedIdentityStorage`
-(`src/contexts/identities/infrastructure/storage/deleteLegacyRememberedIdentityStorage.ts`)
-removes them on mount and when a device is forgotten. The current build no
-longer writes them. Covered by `deleteLegacyRememberedIdentityStorage.spec.ts`.
 
 ## Other protections
 
