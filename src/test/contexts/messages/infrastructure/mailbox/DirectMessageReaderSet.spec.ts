@@ -49,29 +49,32 @@ const setup = (credentials: string[] = ['device-a', 'device-b']) => {
     }
   };
 
-  channel.listReaders.mockImplementation((_keys, token) => {
-    requireReader(token);
+  // A node call rejects; it never throws synchronously.
+  channel.listReaders.mockImplementation((_keys, token) =>
+    Promise.resolve().then(() => {
+      requireReader(token);
 
-    return Promise.resolve({
-      maxReaders: 128,
-      readers: Array.from(registered, (readTokenHash) => ({
-        ackedCursor: 0,
-        readTokenHash,
-      })),
-    });
-  });
-  channel.addReader.mockImplementation((_keys, rootToken, readerToken) => {
-    requireReader(rootToken);
-    registered.add(hash(readerToken));
-
-    return Promise.resolve();
-  });
-  channel.removeReader.mockImplementation((_keys, rootToken, readerHash) => {
-    requireReader(rootToken);
-    registered.delete(readerHash);
-
-    return Promise.resolve();
-  });
+      return {
+        maxReaders: 128,
+        readers: Array.from(registered, (readTokenHash) => ({
+          ackedCursor: 0,
+          readTokenHash,
+        })),
+      };
+    }),
+  );
+  channel.addReader.mockImplementation((_keys, rootToken, readerToken) =>
+    Promise.resolve().then(() => {
+      requireReader(rootToken);
+      registered.add(hash(readerToken));
+    }),
+  );
+  channel.removeReader.mockImplementation((_keys, rootToken, readerHash) =>
+    Promise.resolve().then(() => {
+      requireReader(rootToken);
+      registered.delete(readerHash);
+    }),
+  );
 
   const set = new DirectMessageReaderSet(channel, () =>
     Promise.resolve([...credentials]),

@@ -235,8 +235,10 @@ describe(DirectMessageMailbox.name, () => {
       check();
     });
 
-  // Every session holds a root, so queued sends persist between tests.
+  // Every session holds a root, so queued sends persist between tests. The
+  // outbox store runs on IndexedDB, so fake timers must spare setImmediate.
   beforeEach(async () => {
+    jest.useRealTimers();
     await new DirectMessageOutboxStore().forget('alice');
     await new DirectMessageOutboxStore().forget('bob');
   });
@@ -380,7 +382,7 @@ describe(DirectMessageMailbox.name, () => {
     });
 
     it('retries the peer append while the recipient inbox is not open yet, then delivers and writes the own copy', async () => {
-      jest.useFakeTimers();
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
       const { channel, mailbox } = setup();
       channel.send
         .mockRejectedValueOnce(new MailboxUnavailableError())
@@ -393,7 +395,11 @@ describe(DirectMessageMailbox.name, () => {
         'hello',
         {},
       );
-      await jest.advanceTimersByTimeAsync(10_000);
+      // The outbox persists on IndexedDB in real time, so step the retry
+      // clock until the third append lands.
+      while (channel.send.mock.calls.length < 4) {
+        await jest.advanceTimersByTimeAsync(1_000);
+      }
 
       await expect(delivery).resolves.toMatchObject({ id: 'message-1' });
       expect(channel.send).toHaveBeenCalledTimes(4);
@@ -903,7 +909,7 @@ describe(DirectMessageMailbox.name, () => {
     '%s rejects when the peer copy fails',
     (_label, deliverKind) => {
       it('retries while the recipient inbox is missing, then rejects with MailboxUnavailableError, and logs nothing', async () => {
-        jest.useFakeTimers();
+        jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
         const { channel, mailbox } = setup();
         channel.send.mockRejectedValue(new MailboxUnavailableError());
         const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
@@ -2636,7 +2642,7 @@ describe(DirectMessageMailbox.name, () => {
     });
 
     it('retries a failed open only after the retry window, and stores nothing until it succeeds', async () => {
-      jest.useFakeTimers();
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
       const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
 
       try {
