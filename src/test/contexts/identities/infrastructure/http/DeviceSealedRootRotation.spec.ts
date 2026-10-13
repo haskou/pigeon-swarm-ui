@@ -213,6 +213,24 @@ describe('DeviceSealedRootRotation', () => {
       expect(current.deviceSealedRootKey?.getBuffer().equals(root)).toBe(true);
     });
 
+    it('keeps the previous root of the session when the entry carries none', async () => {
+      const { rotation, sealedSecrets } = setup();
+      const previous = SymmetricKey.generate();
+
+      sealedSecrets.fetchOwn.mockResolvedValue({
+        authorizationRevision: 4,
+        generation: 7,
+        payload: encodeBase64Url(SymmetricKey.generate().getBuffer()),
+      });
+
+      const current = await rotation.current({
+        ...makeSession(4),
+        previousDeviceSealedRootKey: previous,
+      });
+
+      expect(current.previousDeviceSealedRootKey).toBe(previous);
+    });
+
     it('re-syncs a stale session and opens its entry without publishing', async () => {
       const { deviceAuthorization, rotation, sealedSecrets } = setup(1_000);
       const root = SymmetricKey.generate();
