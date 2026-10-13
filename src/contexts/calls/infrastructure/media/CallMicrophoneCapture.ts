@@ -101,6 +101,37 @@ export class CallMicrophoneCapture {
     return this.rnnoiseBinary;
   }
 
+  /**
+   * A chosen microphone may be unplugged or renamed by the browser; capture
+   * from an available one instead of leaving the call without audio.
+   */
+  private static async request(
+    mediaDevices: MicrophoneMediaDevices,
+    options: CallMicrophoneCaptureOptions,
+  ): Promise<MediaStream> {
+    try {
+      return await mediaDevices.getUserMedia(this.mediaConstraints(options));
+    } catch (error) {
+      if (
+        options.deviceId &&
+        error instanceof Error &&
+        ['NotFoundError', 'OverconstrainedError'].includes(error.name)
+      ) {
+        logCallWarning('call-microphone-capture:device-unavailable', {
+          errorName: error.name,
+        });
+
+        return await this.request(mediaDevices, {
+          noiseCancellationEnabled: options.noiseCancellationEnabled,
+        });
+      }
+
+      if (!this.shouldRetryWithoutAudioProcessing(error)) throw error;
+
+      return await mediaDevices.getUserMedia(fallbackMediaConstraints);
+    }
+  }
+
   private static shouldRetryWithoutAudioProcessing(error: unknown): boolean {
     if (error instanceof TypeError) return true;
 
@@ -122,6 +153,7 @@ export class CallMicrophoneCapture {
         ...(options.noiseCancellationEnabled
           ? enhancedAudioConstraints
           : basicAudioConstraints),
+        ...(options.deviceId ? { deviceId: { exact: options.deviceId } } : {}),
       },
       video: false,
     };
@@ -133,19 +165,9 @@ export class CallMicrophoneCapture {
       noiseCancellationEnabled: true,
     },
   ): Promise<MediaStream> {
-    let stream: MediaStream;
-
-    try {
-      stream = this.configureStream(
-        await mediaDevices.getUserMedia(this.mediaConstraints(options)),
-      );
-    } catch (error) {
-      if (!this.shouldRetryWithoutAudioProcessing(error)) throw error;
-
-      stream = this.configureStream(
-        await mediaDevices.getUserMedia(fallbackMediaConstraints),
-      );
-    }
+    const stream = this.configureStream(
+      await this.request(mediaDevices, options),
+    );
 
     return options.noiseCancellationEnabled
       ? await this.processStream(stream)

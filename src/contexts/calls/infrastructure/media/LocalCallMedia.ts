@@ -53,6 +53,8 @@ export class LocalCallMedia {
 
   private noiseCancellationEnabled = true;
 
+  private microphoneDeviceId: string | undefined;
+
   private screenAudioVolume = 1;
 
   private screenShareQuality: ScreenShareQualityPreset = 'auto';
@@ -254,6 +256,7 @@ export class LocalCallMedia {
   ): MediaStream {
     this.stop();
     this.noiseCancellationEnabled = options.noiseCancellationEnabled;
+    this.microphoneDeviceId = options.microphoneDeviceId;
     this.microphoneStream = stream.getAudioTracks().length > 0 ? stream : null;
     this.stream = new MediaStream(stream.getTracks());
     this.configureAudioAnalyser();
@@ -280,10 +283,14 @@ export class LocalCallMedia {
     try {
       const microphoneStream = await CallMicrophoneCapture.capture(
         navigator.mediaDevices,
-        { noiseCancellationEnabled: this.noiseCancellationEnabled },
+        {
+          deviceId: options.microphoneDeviceId,
+          noiseCancellationEnabled: this.noiseCancellationEnabled,
+        },
       );
 
       this.replaceMicrophoneStream(microphoneStream);
+      this.microphoneDeviceId = options.microphoneDeviceId;
     } catch (error) {
       logCallError('local-media:start-audio:failed', error, {
         hasGetUserMedia: Boolean(navigator.mediaDevices?.getUserMedia),
@@ -429,7 +436,7 @@ export class LocalCallMedia {
       this.microphoneStream.getAudioTracks().length === 0;
     const microphoneStream = await CallMicrophoneCapture.capture(
       navigator.mediaDevices,
-      { noiseCancellationEnabled: enabled },
+      { deviceId: this.microphoneDeviceId, noiseCancellationEnabled: enabled },
     );
 
     for (const track of microphoneStream.getAudioTracks()) {

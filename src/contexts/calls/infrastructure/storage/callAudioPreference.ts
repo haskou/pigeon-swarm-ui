@@ -6,6 +6,7 @@ import {
 
 type CallAudioPreference = {
   mediaEncryptionEnabled?: boolean;
+  microphoneDeviceId?: string;
   noiseCancellationEnabled?: boolean;
 };
 
@@ -37,6 +38,20 @@ export function loadCallNoiseCancellationEnabled(identityId: string): boolean {
 
 export function loadCallMediaEncryptionEnabled(identityId: string): boolean {
   return loadCallAudioPreference(identityId).mediaEncryptionEnabled ?? true;
+}
+
+export function loadCallMicrophoneDeviceId(
+  identityId: string,
+): string | undefined {
+  return loadCallAudioPreference(identityId).microphoneDeviceId;
+}
+
+/** An undefined device chooses the browser's default microphone again. */
+export function saveCallMicrophoneDeviceId(
+  identityId: string,
+  deviceId: string | undefined,
+): void {
+  saveCallAudioPreference(identityId, { microphoneDeviceId: deviceId });
 }
 
 export function saveCallNoiseCancellationEnabled(

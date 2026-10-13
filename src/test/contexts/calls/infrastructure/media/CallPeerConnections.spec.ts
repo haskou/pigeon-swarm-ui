@@ -4,6 +4,11 @@ import type { SignalSender } from '../../../../../contexts/calls/infrastructure/
 import type { FakePeerConnection } from '../../../../../contexts/calls/infrastructure/media/FakePeerConnection';
 import type { FakeSender } from '../../../../../contexts/calls/infrastructure/media/FakeSender';
 
+import {
+  readCallDiagnostics,
+  startCallDiagnostics,
+  stopCallDiagnostics,
+} from '../../../../../contexts/calls/infrastructure/media/callDebugLogger';
 import { CallPeerConnections } from '../../../../../contexts/calls/infrastructure/media/CallPeerConnections';
 import { EncodedCallMediaCipher } from '../../../../../contexts/calls/infrastructure/media/EncodedCallMediaCipher';
 import { RemoteCallAudio } from '../../../../../contexts/calls/infrastructure/media/RemoteCallAudio';
@@ -838,6 +843,220 @@ describe(CallPeerConnections.name, () => {
     await jest.advanceTimersByTimeAsync(0);
     expect(offers()).toHaveLength(5);
     expect(await recoveryState()).toBe('recovering');
+    manager.reset();
+  });
+
+  it('retries a timed-out offer and keeps recovery able to re-send it', async () => {
+    jest.useFakeTimers();
+    const peers: FakePeerConnection[] = [];
+    installSessionDescriptionMock();
+    installPeerConnectionMock(peers);
+    const manager = callPeerConnectionManager();
+    const timeout = new DOMException('Call signal timed out.', 'TimeoutError');
+    const sendSignal = jest
+      .fn<Promise<void>, Parameters<SignalSender>>()
+      .mockRejectedValueOnce(timeout)
+      .mockRejectedValueOnce(timeout)
+      .mockRejectedValueOnce(timeout)
+      .mockRejectedValueOnce(timeout)
+      .mockResolvedValue(undefined);
+    const offers = () =>
+      sendSignal.mock.calls.filter(([, signalType]) => signalType === 'offer');
+    manager.configure(jest.fn().mockResolvedValue({ iceServers: [] }));
+    const ensured = manager
+      .ensurePeer('remote-identity-id', true, sendSignal)
+      .catch((error: unknown) => error);
+    await jest.advanceTimersByTimeAsync(0);
+    const [peer] = peers;
+    registeredPeerEventListener(
+      peer,
+      'signalingstatechange',
+    )(new Event('signalingstatechange'));
+
+    await jest.advanceTimersByTimeAsync(3_500);
+    await expect(ensured).resolves.toBe(timeout);
+    expect(offers()).toHaveLength(4);
+
+    await jest.advanceTimersByTimeAsync(11_500);
+    expect(offers()).toHaveLength(5);
+    expect(offers()[4]).toEqual(offers()[0]);
+    manager.reset();
+  });
+
+  it.each([
+    ['configuration', 'peer-manager:ice-recovery:configuration-unavailable'],
+    ['signal', 'peer-manager:ice-recovery:offer-undelivered'],
+    ['ice-restart', 'peer-manager:ice-recovery:restart-failed'],
+  ])('logs a %s recovery failure by its reason', async (reason, event) => {
+    jest.useFakeTimers();
+    const peers: FakePeerConnection[] = [];
+    installSessionDescriptionMock();
+    installPeerConnectionMock(peers);
+    const manager = callPeerConnectionManager();
+    const provider = jest.fn().mockResolvedValue({ iceServers: [] });
+    const sendSignal = jest
+      .fn<Promise<void>, Parameters<SignalSender>>()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValue(new HttpJsonError(403, 'Forbidden', ''));
+
+    if (reason === 'configuration')
+      provider
+        .mockResolvedValueOnce({ iceServers: [] })
+        .mockRejectedValueOnce(new Error('credential endpoint down'));
+    manager.configure(provider);
+    startCallDiagnostics();
+    try {
+      await manager.ensurePeer(
+        'peer-identity-id',
+        reason === 'signal',
+        sendSignal,
+      );
+      const [peer] = peers;
+
+      if (reason === 'ice-restart')
+        (peer.restartIce as jest.Mock).mockImplementation(() => {
+          throw new Error('restart rejected');
+        });
+
+      if (reason !== 'signal') {
+        peer.connectionState = 'failed';
+        peer.iceConnectionState = 'failed';
+      }
+      registeredPeerEventListener(
+        peer,
+        'signalingstatechange',
+      )(new Event('signalingstatechange'));
+      await jest.advanceTimersByTimeAsync(15_000);
+
+      const events = readCallDiagnostics().events.map(
+        (diagnostic) => diagnostic.event,
+      );
+      expect(events).toContain(event);
+      expect(
+        new Set(
+          events.filter((logged) =>
+            [
+              'peer-manager:ice-recovery:configuration-unavailable',
+              'peer-manager:ice-recovery:offer-undelivered',
+              'peer-manager:ice-recovery:restart-failed',
+            ].includes(logged),
+          ),
+        ),
+      ).toEqual(new Set([event]));
+      expect(JSON.stringify(readCallDiagnostics())).not.toMatch(
+        /credential endpoint|restart rejected|offer-sdp/,
+      );
+    } finally {
+      stopCallDiagnostics();
+      manager.reset();
+    }
+  });
+
+  it('bounds a callee that never receives an offer and requests one', async () => {
+    jest.useFakeTimers();
+    const peers: FakePeerConnection[] = [];
+    installSessionDescriptionMock();
+    installPeerConnectionMock(peers);
+    const manager = callPeerConnectionManager();
+    const sendSignal = jest
+      .fn<Promise<void>, Parameters<SignalSender>>()
+      .mockResolvedValue(undefined);
+    const offers = () =>
+      sendSignal.mock.calls.filter(([, signalType]) => signalType === 'offer');
+    const recoveryState = async () =>
+      (await manager.collectStats())['offerer-identity-id'].recoveryState;
+    manager.configure(jest.fn().mockResolvedValue({ iceServers: [] }));
+    manager.setLocalStream(
+      mediaStreamWithTracks([mediaTrack('microphone', 'audio')]),
+    );
+    await manager.ensurePeer('offerer-identity-id', false, sendSignal);
+    const [peer] = peers;
+    Object.assign(peer, { getStats: () => Promise.resolve(new Map()) });
+    expect(await recoveryState()).toBe('idle');
+
+    await jest.advanceTimersByTimeAsync(14_999);
+    expect(offers()).toHaveLength(0);
+    await jest.advanceTimersByTimeAsync(1);
+    expect(offers()).toHaveLength(1);
+    expect(await recoveryState()).toBe('recovering');
+
+    await jest.advanceTimersByTimeAsync(45_000);
+    expect(offers()).toHaveLength(3);
+    expect(peer.createOffer).toHaveBeenCalledTimes(1);
+    expect(await recoveryState()).toBe('exhausted');
+
+    manager.retryConnections();
+    await jest.advanceTimersByTimeAsync(0);
+    expect(offers()).toHaveLength(4);
+    expect(await recoveryState()).toBe('recovering');
+    manager.reset();
+  });
+
+  it('answers a requested offer during glare by re-sending its own offer', async () => {
+    const peers: FakePeerConnection[] = [];
+    installSessionDescriptionMock();
+    installPeerConnectionMock(peers);
+    const manager = callPeerConnectionManager();
+    const sendSignal = jest
+      .fn<Promise<void>, Parameters<SignalSender>>()
+      .mockResolvedValue(undefined);
+    manager.configure(jest.fn().mockResolvedValue({ iceServers: [] }));
+    await manager.ensurePeer('identity-b', true, sendSignal);
+    const [peer] = peers;
+
+    await manager.handleSignal(
+      'identity-b',
+      'offer',
+      { sdp: 'callee-offer-sdp', type: 'offer' },
+      sendSignal,
+      'identity-a',
+    );
+
+    expect(peer.setRemoteDescription).not.toHaveBeenCalled();
+    expect(sendSignal.mock.calls.map(([, signalType]) => signalType)).toEqual([
+      'offer',
+      'offer',
+    ]);
+    expect(sendSignal.mock.calls[1]).toEqual(sendSignal.mock.calls[0]);
+    manager.reset();
+  });
+
+  it('answers the same offer arriving twice at once one after another', async () => {
+    const peers: FakePeerConnection[] = [];
+    installSessionDescriptionMock();
+    installPeerConnectionMock(peers);
+    const manager = callPeerConnectionManager();
+    const sendSignal = jest
+      .fn<Promise<void>, Parameters<SignalSender>>()
+      .mockResolvedValue(undefined);
+    manager.configure(jest.fn().mockResolvedValue({ iceServers: [] }));
+    await manager.ensurePeer('identity-a', false, sendSignal);
+    const [peer] = peers;
+    const applyLocal = jest.mocked(peer.setLocalDescription);
+    const setLocalDescription = applyLocal.getMockImplementation();
+
+    applyLocal.mockImplementation((description) =>
+      description?.type === 'answer' && peer.signalingState === 'stable'
+        ? Promise.reject(new Error('Called in wrong state: stable'))
+        : (setLocalDescription?.(description) ?? Promise.resolve()),
+    );
+    const offer = () =>
+      manager.handleSignal(
+        'identity-a',
+        'offer',
+        { sdp: 'offer-sdp', type: 'offer' },
+        sendSignal,
+        'identity-b',
+      );
+
+    await expect(Promise.all([offer(), offer()])).resolves.toEqual([
+      undefined,
+      undefined,
+    ]);
+    expect(sendSignal.mock.calls.map(([, signalType]) => signalType)).toEqual([
+      'answer',
+      'answer',
+    ]);
     manager.reset();
   });
 

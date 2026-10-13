@@ -155,4 +155,31 @@ describe(PigeonCallsApi.name, () => {
       sequence: 4,
     });
   });
+
+  it('aborts a call signal that receives no response', async () => {
+    jest.useFakeTimers();
+    const { api, request } = build([]);
+
+    request.mockImplementation(
+      async (_path: string, init: RequestInit) =>
+        await new Promise((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () =>
+            reject(init.signal?.reason),
+          );
+        }),
+    );
+    const result = expect(
+      api.sendSignal(session, 'call-a', {
+        payload: { sdp: 'offer-sdp', type: 'offer' },
+        recipientIdentityId: 'identity-b',
+        signalType: 'offer',
+      }),
+    ).rejects.toMatchObject({ name: 'TimeoutError' });
+
+    await jest.advanceTimersByTimeAsync(4_999);
+    expect(request.mock.calls[0]?.[1].signal.aborted).toBe(false);
+    await jest.advanceTimersByTimeAsync(1);
+    await result;
+    jest.useRealTimers();
+  });
 });

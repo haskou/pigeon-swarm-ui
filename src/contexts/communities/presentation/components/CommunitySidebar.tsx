@@ -41,7 +41,7 @@ type CommunitySidebarProps = {
     identityId: string,
     volumePercent: number,
   ) => void;
-  onCallRetryMicrophone?: () => void;
+  onCallRetryMicrophone?: (deviceId?: string) => void;
   onCallRetryConnection?: () => void;
   onCallScreenShareQualityChange?: (
     quality: CallSession['screenShareQuality'],

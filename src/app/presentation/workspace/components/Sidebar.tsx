@@ -70,7 +70,7 @@ interface SidebarProps {
   onCallToggleMute?: () => void;
   onCallToggleMediaEncryption?: () => void;
   onCallToggleNoiseCancellation?: () => void;
-  onCallRetryMicrophone?: () => void;
+  onCallRetryMicrophone?: (deviceId?: string) => void;
   onCallRetryConnection?: () => void;
   onCallToggleScreenShare?: () => void;
 }

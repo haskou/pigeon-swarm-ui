@@ -19,6 +19,11 @@ export class CallPeerNegotiation {
     symbol
   >();
 
+  private readonly descriptionHandlings = new WeakMap<
+    RTCPeerConnection,
+    Promise<void>
+  >();
+
   private readonly pendingAnswers = new WeakMap<
     RTCPeerConnection,
     Promise<void>
@@ -98,6 +103,85 @@ export class CallPeerNegotiation {
     );
   }
 
+  private async applyDescriptionSignal(
+    senderIdentityId: string,
+    peer: RTCPeerConnection,
+    payload: DescriptionSignalPayload,
+    state: PeerNegotiationState,
+    sendSignal: SignalSender,
+  ): Promise<void> {
+    const description = new RTCSessionDescription(payload);
+    const offerCollision = this.isOfferCollision(description, state, peer);
+    const wasSendingEncryptedMedia =
+      this.encryption.outboundEnabled(senderIdentityId);
+
+    if (
+      !this.acceptRemoteDescription(senderIdentityId, peer, state, description)
+    ) {
+      await this.redeliverAfterIgnoredOffer(
+        senderIdentityId,
+        peer,
+        state,
+        sendSignal,
+      );
+
+      return;
+    }
+
+    this.encryption.rememberRemoteMetadata(
+      senderIdentityId,
+      payload,
+      this.peerFor(senderIdentityId),
+    );
+    this.screenShareStreams.rememberRemoteMetadata(senderIdentityId, payload);
+    await peer.setRemoteDescription(description);
+    logCallDebug('peer-manager:handle-signal:remote-description-set', {
+      screenStreamCount: payload.screenStreamIds?.length ?? 0,
+      screenTrackCount: payload.screenTrackIds?.length ?? 0,
+      senderIdentityId,
+      signalType: description.type,
+    });
+    await this.iceCandidates.flush(senderIdentityId, peer);
+
+    if (description.type !== 'offer') {
+      if (
+        !wasSendingEncryptedMedia &&
+        this.encryption.outboundEnabled(senderIdentityId)
+      ) {
+        await this.sendRenegotiationOffer(senderIdentityId, peer, sendSignal);
+      }
+
+      return;
+    }
+
+    const answer = await peer.createAnswer();
+
+    await peer.setLocalDescription(answer);
+
+    if (offerCollision) {
+      await this.localTracks.rebindAudioSenders(senderIdentityId, peer);
+    }
+    logCallDebug('peer-manager:handle-signal:send-answer', {
+      senderIdentityId,
+    });
+    await this.sendDescription(senderIdentityId, peer, answer, sendSignal);
+  }
+
+  /**
+   * A polite offer during glare may mean ours never arrived, e.g. its
+   * recovery asking for one; deliver ours again so it can answer.
+   */
+  private async redeliverAfterIgnoredOffer(
+    senderIdentityId: string,
+    peer: RTCPeerConnection,
+    state: PeerNegotiationState,
+    sendSignal: SignalSender,
+  ): Promise<void> {
+    if (!state.ignoreOffer) return;
+
+    await this.resendUnansweredOffer(senderIdentityId, peer, sendSignal);
+  }
+
   private async sendDescription(
     peerIdentityId: string,
     peer: RTCPeerConnection,
@@ -152,6 +236,10 @@ export class CallPeerNegotiation {
     this.states.delete(peerIdentityId);
   }
 
+  /**
+   * Descriptions are applied one at a time per peer: a re-sent offer may
+   * arrive while its first copy is still being answered.
+   */
   public async handleDescriptionSignal(
     senderIdentityId: string,
     peer: RTCPeerConnection,
@@ -159,54 +247,27 @@ export class CallPeerNegotiation {
     state: PeerNegotiationState,
     sendSignal: SignalSender,
   ): Promise<void> {
-    const description = new RTCSessionDescription(payload);
-    const offerCollision = this.isOfferCollision(description, state, peer);
-    const wasSendingEncryptedMedia =
-      this.encryption.outboundEnabled(senderIdentityId);
+    const previous = this.descriptionHandlings.get(peer) ?? Promise.resolve();
+    const handling = previous
+      .catch(() => undefined)
+      .then(() =>
+        this.applyDescriptionSignal(
+          senderIdentityId,
+          peer,
+          payload,
+          state,
+          sendSignal,
+        ),
+      );
 
-    if (
-      !this.acceptRemoteDescription(senderIdentityId, peer, state, description)
-    ) {
-      return;
+    this.descriptionHandlings.set(peer, handling);
+
+    try {
+      await handling;
+    } finally {
+      if (this.descriptionHandlings.get(peer) === handling)
+        this.descriptionHandlings.delete(peer);
     }
-
-    this.encryption.rememberRemoteMetadata(
-      senderIdentityId,
-      payload,
-      this.peerFor(senderIdentityId),
-    );
-    this.screenShareStreams.rememberRemoteMetadata(senderIdentityId, payload);
-    await peer.setRemoteDescription(description);
-    logCallDebug('peer-manager:handle-signal:remote-description-set', {
-      screenStreamCount: payload.screenStreamIds?.length ?? 0,
-      screenTrackCount: payload.screenTrackIds?.length ?? 0,
-      senderIdentityId,
-      signalType: description.type,
-    });
-    await this.iceCandidates.flush(senderIdentityId, peer);
-
-    if (description.type !== 'offer') {
-      if (
-        !wasSendingEncryptedMedia &&
-        this.encryption.outboundEnabled(senderIdentityId)
-      ) {
-        await this.sendRenegotiationOffer(senderIdentityId, peer, sendSignal);
-      }
-
-      return;
-    }
-
-    const answer = await peer.createAnswer();
-
-    await peer.setLocalDescription(answer);
-
-    if (offerCollision) {
-      await this.localTracks.rebindAudioSenders(senderIdentityId, peer);
-    }
-    logCallDebug('peer-manager:handle-signal:send-answer', {
-      senderIdentityId,
-    });
-    await this.sendDescription(senderIdentityId, peer, answer, sendSignal);
   }
 
   public async offerIfNeeded(

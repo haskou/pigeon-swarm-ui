@@ -1,6 +1,7 @@
 import type { CallPeerRecoveryState } from './CallPeerRecoveryState';
 
 import { logCallWarning } from './callDebugLogger';
+import { CallPeerRestartError } from './CallPeerRestartError';
 
 const disconnectedPeerRecoveryDelayMs = 3_000;
 const maximumPeerRecoveryDelayMs = 15_000;
@@ -70,13 +71,15 @@ export class CallPeerRecovery {
     return undefined;
   }
 
+  /**
+   * ICE that never left `new` includes a peer still waiting for an offer
+   * that may never arrive, which must not look like "Connecting" forever.
+   */
   private isNegotiating(peer: RTCPeerConnection): boolean {
     return (
+      peer.iceConnectionState === 'new' ||
       peer.iceConnectionState === 'checking' ||
-      peer.signalingState === 'have-local-offer' ||
-      (peer.iceConnectionState === 'new' &&
-        Boolean(peer.localDescription) &&
-        Boolean(peer.remoteDescription))
+      peer.signalingState === 'have-local-offer'
     );
   }
 
@@ -90,6 +93,17 @@ export class CallPeerRecovery {
 
   private isFinished(peer: RTCPeerConnection): boolean {
     return peer.connectionState === 'closed' || this.isHealthy(peer);
+  }
+
+  private failureEvent(error: unknown): string {
+    if (!(error instanceof CallPeerRestartError))
+      return 'peer-manager:ice-recovery:restart-failed';
+
+    return {
+      configuration: 'peer-manager:ice-recovery:configuration-unavailable',
+      'ice-restart': 'peer-manager:ice-recovery:restart-failed',
+      signal: 'peer-manager:ice-recovery:offer-undelivered',
+    }[error.stage];
   }
 
   private schedule(
@@ -167,10 +181,8 @@ export class CallPeerRecovery {
         this.restartIce(peerIdentityId, peer, canRestart),
         cancelled,
       ]);
-    } catch {
-      logCallWarning('peer-manager:ice-recovery:configuration-unavailable', {
-        attempt: attempt + 1,
-      });
+    } catch (error) {
+      logCallWarning(this.failureEvent(error), { attempt: attempt + 1 });
     } finally {
       clearTimeout(timeout);
       controller.abort();
