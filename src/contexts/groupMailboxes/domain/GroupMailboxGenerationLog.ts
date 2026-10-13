@@ -53,6 +53,17 @@ export class GroupMailboxGenerationLog {
     return current;
   }
 
+  /**
+   * The retired generations whose drain window has closed: their inboxes
+   * are no longer read and are deleted.
+   */
+  public drained(now: number): GroupMailboxGeneration[] {
+    return this.generations.filter(
+      (generation) =>
+        generation.retiredAt !== undefined && !generation.isReadableAt(now),
+    );
+  }
+
   public isEmpty(): boolean {
     return this.generations.length === 0;
   }

@@ -1,0 +1,505 @@
+import { sha256 } from '@noble/hashes/sha2.js';
+
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { GroupMailboxGeneration } from '../../domain/GroupMailboxGeneration';
+import type { GroupMailboxCommit } from '../mls/GroupMailboxCommit';
+import type { GroupMailboxOutboxCopy } from './GroupMailboxOutboxCopy';
+import type { GroupMailboxOutboxEngine } from './GroupMailboxOutboxEngine';
+import type { GroupMailboxOutboxFailure } from './GroupMailboxOutboxFailure';
+import type { GroupMailboxOutboxRow } from './GroupMailboxOutboxRow';
+import type { GroupMailboxOutboxStore } from './GroupMailboxOutboxStore';
+
+import {
+  decodeBase64Url,
+  encodeBase64Url,
+} from '../../../../shared/infrastructure/encoding/base64url';
+import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
+import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
+import { GroupMailboxControlRecord } from '../control/GroupMailboxControlRecord';
+import { GroupMailboxKeySchedule } from '../crypto/GroupMailboxKeySchedule';
+
+/**
+ * Durable fan-out of group records (node `docs/design/group-mailboxes.md`,
+ * D5, D9). A record is persisted before its first append, then appended to
+ * each recipient's inbox of its generation under a deterministic envelope id,
+ * so a retry is stored once. A failed append (an inbox not yet created, a
+ * conflict, a rate limit, the network) stays queued and is retried with
+ * backoff; later records to that recipient wait behind it, so each inbox
+ * receives one sender's records in order. A message whose generation was
+ * superseded before every copy landed is re-encrypted in the current epoch
+ * for the current members; a commit belongs to its generation and is never
+ * re-encrypted. A record still queued after the expiry is dropped and
+ * reported. Logs carry counts only.
+ */
+export class GroupMailboxOutbox {
+  public static readonly EXPIRY_MS = 14 * 24 * 60 * 60 * 1000;
+  public static readonly RETRY_BASE_MS = 5_000;
+  public static readonly RETRY_MAX_MS = 5 * 60 * 1000;
+
+  private readonly listeners = new Set<
+    (failure: GroupMailboxOutboxFailure) => void
+  >();
+
+  private readonly rows = new Map<string, GroupMailboxOutboxRow>();
+  private lastCreatedAt = 0;
+  private queue: Promise<void> = Promise.resolve();
+  private stopped = false;
+
+  private static commitSeed(
+    commit: GroupMailboxCommit,
+    identityId: string,
+  ): string {
+    const next = GroupMailboxKeySchedule.inbox(
+      commit.generation.secret,
+      IdentityId.fromString(identityId),
+    );
+
+    const hash = encodeBase64Url(sha256(commit.commit));
+
+    return `group-commit|${hash}|${next.mailboxId}`;
+  }
+
+  private static ordered(
+    rows: Iterable<GroupMailboxOutboxRow>,
+  ): GroupMailboxOutboxRow[] {
+    return [...rows].sort(
+      (left, right) =>
+        left.createdAt - right.createdAt || left.id.localeCompare(right.id),
+    );
+  }
+
+  /** One recipient's inbox of one generation, for the in-order rule. */
+  private static recipient(
+    row: GroupMailboxOutboxRow,
+    copy: GroupMailboxOutboxCopy,
+  ): string {
+    return [
+      row.conversationId,
+      row.generationIndex.toString(),
+      copy.identityId,
+    ].join('\u0000');
+  }
+
+  private static retryDelay(attempts: number): number {
+    return Math.min(
+      GroupMailboxOutbox.RETRY_MAX_MS,
+      GroupMailboxOutbox.RETRY_BASE_MS * 2 ** Math.max(0, attempts - 1),
+    );
+  }
+
+  public constructor(
+    private readonly session: Session,
+    private readonly engine: GroupMailboxOutboxEngine,
+    private readonly channel: Pick<MailboxChannel, 'send'>,
+    private readonly store: Pick<
+      GroupMailboxOutboxStore,
+      'forget' | 'load' | 'remove' | 'save'
+    >,
+    private readonly clock: () => number = Date.now,
+  ) {}
+
+  private cancelTimer: () => void = () => undefined;
+
+  /** Appends every due copy, oldest record first. */
+  private async attemptAll(): Promise<void> {
+    const now = this.clock();
+    const blocked = new Set<string>();
+
+    for (const row of GroupMailboxOutbox.ordered(this.rows.values())) {
+      if (this.stopped) return;
+
+      if (now - row.createdAt >= GroupMailboxOutbox.EXPIRY_MS) {
+        await this.fail(row);
+        continue;
+      }
+      await this.attemptRow(row, now, blocked);
+    }
+    this.schedule(now);
+  }
+
+  /**
+   * Appends the copies of one row. A row waiting for its retry only holds
+   * back later rows to its recipients.
+   */
+  private async attemptRow(
+    row: GroupMailboxOutboxRow,
+    now: number,
+    blocked: Set<string>,
+  ): Promise<void> {
+    if (row.retryAt > now) {
+      for (const copy of row.copies) {
+        blocked.add(GroupMailboxOutbox.recipient(row, copy));
+      }
+
+      return;
+    }
+    const delivery = await this.deliverable(row);
+
+    if (!delivery) {
+      await this.fail(row);
+
+      return;
+    }
+    const { failed, pending } = await this.sendCopies(
+      delivery.current,
+      delivery.generation,
+      blocked,
+    );
+
+    await this.settle(row, delivery.current, pending, failed, now);
+  }
+
+  /** Appends one copy; false when the node refused it or was unreachable. */
+  private async appended(
+    record: Uint8Array,
+    generation: GroupMailboxGeneration,
+    copy: GroupMailboxOutboxCopy,
+  ): Promise<boolean> {
+    try {
+      await this.channel.send(
+        GroupMailboxKeySchedule.inbox(
+          generation.secret,
+          IdentityId.fromString(copy.identityId),
+        ),
+        record,
+        copy.envelopeId,
+      );
+
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * The row to deliver now: a message whose generation was superseded is
+   * re-encrypted in the current epoch for those of its pending recipients
+   * still in the group; a member who joined since never gets it. Undefined
+   * when it can no longer be encrypted, as after this identity's removal.
+   */
+  private async currentRow(
+    row: GroupMailboxOutboxRow,
+  ): Promise<GroupMailboxOutboxRow | undefined> {
+    if (row.body === undefined) return row;
+
+    try {
+      const generation = await this.engine.generation(row.conversationId);
+
+      if (generation.index === row.generationIndex) return row;
+
+      return await this.sealedMessage(
+        row,
+        new Uint8Array(decodeBase64Url(row.body)),
+        new Set(row.copies.map(({ identityId }) => identityId)),
+      );
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * The row to deliver now with the generation of its inboxes, or undefined
+   * when it can no longer be delivered.
+   */
+  private async deliverable(
+    row: GroupMailboxOutboxRow,
+  ): Promise<
+    | { current: GroupMailboxOutboxRow; generation: GroupMailboxGeneration }
+    | undefined
+  > {
+    const current = await this.currentRow(row);
+
+    if (!current) return undefined;
+    const generation = (
+      await this.engine.readableGenerations(current.conversationId)
+    ).find(({ index }) => index === current.generationIndex);
+
+    return generation ? { current, generation } : undefined;
+  }
+
+  private async fail(row: GroupMailboxOutboxRow): Promise<void> {
+    await this.forgetRow(row);
+    // eslint-disable-next-line no-console
+    console.debug('Group outbox dropped 1 record.');
+
+    for (const listener of this.listeners) {
+      listener({
+        conversationId: row.conversationId,
+        reference: row.reference,
+      });
+    }
+  }
+
+  private async forgetRow(row: GroupMailboxOutboxRow): Promise<void> {
+    this.rows.delete(row.id);
+    await this.store.remove(this.session.identity.id, row.id).catch(() => {
+      // eslint-disable-next-line no-console
+      console.debug('Group outbox remove failed.');
+    });
+  }
+
+  /** Keeps the row in memory; persists it, or runs from memory alone. */
+  private async keep(row: GroupMailboxOutboxRow): Promise<void> {
+    this.rows.set(row.id, row);
+    await this.store.save(this.session, row).catch(() => undefined);
+  }
+
+  /** Runs one pass after any pass already queued. */
+  private pass(): Promise<void> {
+    const next = this.queue.then(() => this.attemptAll());
+
+    this.queue = next.catch(() => undefined);
+
+    return next;
+  }
+
+  /**
+   * A creation time later than every queued record's, so records enqueued
+   * within one millisecond keep their order.
+   */
+  private stamp(): number {
+    this.lastCreatedAt = Math.max(this.clock(), this.lastCreatedAt + 1);
+
+    return this.lastCreatedAt;
+  }
+
+  private schedule(now: number): void {
+    this.cancelTimer();
+    const waits = [...this.rows.values()]
+      .map(({ retryAt }) => retryAt - now)
+      .filter((wait) => wait > 0);
+
+    if (this.stopped || waits.length === 0) return;
+    const timer = setTimeout(
+      () => {
+        void this.pass().catch(() => undefined);
+      },
+      Math.min(...waits),
+    );
+
+    this.cancelTimer = () => {
+      clearTimeout(timer);
+    };
+  }
+
+  /**
+   * Appends each copy not held back by an earlier row to its recipient.
+   * Returns the copies left, and whether an append failed.
+   */
+  private async sendCopies(
+    row: GroupMailboxOutboxRow,
+    generation: GroupMailboxGeneration,
+    blocked: Set<string>,
+  ): Promise<{ failed: boolean; pending: GroupMailboxOutboxCopy[] }> {
+    const record = new Uint8Array(decodeBase64Url(row.record));
+    const pending: GroupMailboxOutboxCopy[] = [];
+    let failed = false;
+
+    for (const copy of row.copies) {
+      const recipient = GroupMailboxOutbox.recipient(row, copy);
+      const held = blocked.has(recipient);
+
+      if (!held && (await this.appended(record, generation, copy))) continue;
+      failed = failed || !held;
+      pending.push(copy);
+      blocked.add(recipient);
+    }
+
+    return { failed, pending };
+  }
+
+  /**
+   * Forgets a row once every copy landed; otherwise keeps the copies left,
+   * backing off after a failure.
+   */
+  private async settle(
+    row: GroupMailboxOutboxRow,
+    current: GroupMailboxOutboxRow,
+    pending: GroupMailboxOutboxCopy[],
+    failed: boolean,
+    now: number,
+  ): Promise<void> {
+    if (pending.length === 0) {
+      await this.forgetRow(current);
+
+      return;
+    }
+
+    if (failed) {
+      // eslint-disable-next-line no-console
+      console.debug(`Group outbox kept ${pending.length.toString()} copies.`);
+    }
+
+    if (current === row && pending.length === row.copies.length && !failed) {
+      return;
+    }
+    const attempts = failed ? current.attempts + 1 : current.attempts;
+
+    await this.keep({
+      ...current,
+      attempts,
+      copies: pending,
+      retryAt: failed ? now + GroupMailboxOutbox.retryDelay(attempts) : 0,
+    });
+  }
+
+  /**
+   * Encrypts `body` in the current epoch, addressed to every current
+   * member, this identity included, or to those of them in `recipients`. A
+   * commit applied between reading the generation and encrypting makes it
+   * encrypt again, up to three times.
+   */
+  private async sealedMessage(
+    row: Omit<GroupMailboxOutboxRow, 'copies' | 'generationIndex' | 'record'>,
+    body: Uint8Array,
+    recipients?: ReadonlySet<string>,
+  ): Promise<GroupMailboxOutboxRow> {
+    const { conversationId } = row;
+
+    for (let attempt = 1; ; attempt += 1) {
+      const before = await this.engine.generation(conversationId);
+      const ciphertext = await this.engine.encrypt(conversationId, body);
+      const generation = await this.engine.generation(conversationId);
+
+      if (generation.index !== before.index && attempt < 3) continue;
+      const record = GroupMailboxControlRecord.encode({
+        ciphertext,
+        conversationId,
+        type: 'message',
+      });
+
+      if (GroupMailboxControlRecord.decode(record) === null) {
+        throw new RangeError('Group message exceeds the record limit');
+      }
+
+      return {
+        ...row,
+        copies: (await this.engine.members(conversationId))
+          .filter((identityId) => recipients?.has(identityId) ?? true)
+          .map((identityId) => ({
+            envelopeId: MailboxChannel.envelopeIdFor(
+              `group-message|${row.id}|${
+                GroupMailboxKeySchedule.inbox(
+                  generation.secret,
+                  IdentityId.fromString(identityId),
+                ).mailboxId
+              }`,
+            ),
+            identityId,
+          })),
+        generationIndex: generation.index,
+        record: encodeBase64Url(record),
+      };
+    }
+  }
+
+  /**
+   * Queues a commit for `I(Y,k)` of each recipient, `k` being the generation
+   * the commit was made in. The envelope id is seeded from the commit's hash
+   * and the recipient's inbox of the generation after it: a removed member,
+   * who can still append to `I(Y,k)` and may see one copy, cannot derive
+   * the id of another. Resolves after the first delivery attempt.
+   */
+  public async enqueueCommit(
+    conversationId: string,
+    commit: GroupMailboxCommit,
+    recipients: readonly string[],
+  ): Promise<void> {
+    const { deliveryGeneration } = commit;
+    await this.keep({
+      attempts: 0,
+      conversationId,
+      copies: recipients.map((identityId) => ({
+        envelopeId: MailboxChannel.envelopeIdFor(
+          `${GroupMailboxOutbox.commitSeed(commit, identityId)}|${
+            GroupMailboxKeySchedule.inbox(
+              deliveryGeneration.secret,
+              IdentityId.fromString(identityId),
+            ).mailboxId
+          }`,
+        ),
+        identityId,
+      })),
+      createdAt: this.stamp(),
+      generationIndex: deliveryGeneration.index,
+      id: MailboxChannel.randomEnvelopeId(),
+      record: encodeBase64Url(
+        GroupMailboxControlRecord.encode({
+          commit: commit.commit,
+          conversationId,
+          type: 'commit',
+        }),
+      ),
+      reference: encodeBase64Url(sha256(commit.commit)),
+      retryAt: 0,
+    });
+    await this.pass();
+  }
+
+  /**
+   * Encrypts an application message in the current epoch and queues it for
+   * every member's inbox, this identity's included. Resolves after the first
+   * delivery attempt; rejects only when the message cannot be encrypted.
+   */
+  public async enqueueMessage(
+    conversationId: string,
+    reference: string,
+    body: Uint8Array,
+  ): Promise<void> {
+    const row = await this.sealedMessage(
+      {
+        attempts: 0,
+        body: encodeBase64Url(body),
+        conversationId,
+        createdAt: this.stamp(),
+        id: MailboxChannel.randomEnvelopeId(),
+        reference,
+        retryAt: 0,
+      },
+      body,
+    );
+
+    await this.keep(row);
+    await this.pass();
+  }
+
+  /** Drops this identity's queue, in memory and at rest. */
+  public async forget(): Promise<void> {
+    this.stop();
+    this.rows.clear();
+    await this.store.forget(this.session.identity.id);
+  }
+
+  /** The records still queued for one conversation, oldest first. */
+  public pending(conversationId: string): string[] {
+    return GroupMailboxOutbox.ordered(this.rows.values())
+      .filter((row) => row.conversationId === conversationId)
+      .map(({ reference }) => reference);
+  }
+
+  /** Loads the persisted queue and retries it. */
+  public async resume(): Promise<void> {
+    this.stopped = false;
+
+    for (const row of await this.store.load(this.session)) {
+      if (!this.rows.has(row.id)) this.rows.set(row.id, row);
+      this.lastCreatedAt = Math.max(this.lastCreatedAt, row.createdAt);
+    }
+    await this.pass();
+  }
+
+  public stop(): void {
+    this.stopped = true;
+    this.cancelTimer();
+  }
+
+  public subscribe(
+    listener: (failure: GroupMailboxOutboxFailure) => void,
+  ): () => void {
+    this.listeners.add(listener);
+
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+}

@@ -35,6 +35,21 @@ export class GroupMailboxControlRecord {
       : undefined;
   }
 
+  /** A commit or an MLS application message, carried as opaque bytes. */
+  private static carried(
+    value: Record<string, unknown>,
+    conversationId: string,
+  ): GroupMailboxControlFields | null {
+    if (value.type === 'commit') {
+      const commit = GroupMailboxControlRecord.binary(value.commit);
+
+      return commit ? { commit, conversationId, type: 'commit' } : null;
+    }
+    const ciphertext = GroupMailboxControlRecord.binary(value.ciphertext);
+
+    return ciphertext ? { ciphertext, conversationId, type: 'message' } : null;
+  }
+
   private static fieldsOf(plaintext: Uint8Array): Record<string, unknown> {
     try {
       const value: unknown = JSON.parse(new TextDecoder().decode(plaintext));
@@ -60,11 +75,9 @@ export class GroupMailboxControlRecord {
         return GroupMailboxControlRecord.response(value, conversationId);
       case 'welcome':
         return GroupMailboxControlRecord.welcome(value, conversationId);
-      case 'commit': {
-        const commit = GroupMailboxControlRecord.binary(value.commit);
-
-        return commit ? { commit, conversationId, type: value.type } : null;
-      }
+      case 'commit':
+      case 'message':
+        return GroupMailboxControlRecord.carried(value, conversationId);
       default:
         return null;
     }
@@ -160,6 +173,11 @@ export class GroupMailboxControlRecord {
         return GroupMailboxControlRecord.json({
           ...header,
           commit: encodeBase64Url(fields.commit),
+        });
+      case 'message':
+        return GroupMailboxControlRecord.json({
+          ...header,
+          ciphertext: encodeBase64Url(fields.ciphertext),
         });
     }
   }

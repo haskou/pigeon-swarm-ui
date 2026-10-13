@@ -1,29 +1,25 @@
-import { sha256 } from '@noble/hashes/sha2.js';
-
-import type { GroupMailboxGeneration } from '../../domain/GroupMailboxGeneration';
 import type { GroupMailboxCommit } from '../mls/GroupMailboxCommit';
+import type { GroupMailboxOutbox } from '../outbox/GroupMailboxOutbox';
 import type { GroupMailboxControlEngine } from './GroupMailboxControlEngine';
 import type { GroupMailboxControlFields } from './GroupMailboxControlFields';
 import type { GroupMailboxControlOutcome } from './GroupMailboxControlOutcome';
 import type { GroupMailboxDirectLink } from './GroupMailboxDirectLink';
 import type { PendingGroupMailboxKeyPackage } from './PendingGroupMailboxKeyPackage';
 
-import { encodeBase64Url } from '../../../../shared/infrastructure/encoding/base64url';
 import { mlsKeyPackageOwner } from '../../../communities/infrastructure/mls/MlsGroup';
 import { MlsRejectedError } from '../../../communities/infrastructure/mls/MlsRejectedError';
-import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
-import { GroupMailboxKeySchedule } from '../crypto/GroupMailboxKeySchedule';
 import { GroupMailboxControlRecord } from './GroupMailboxControlRecord';
 import { GroupMailboxKeyPackageTimeoutError } from './GroupMailboxKeyPackageTimeoutError';
 
 /**
  * Control traffic of a group conversation (node
  * `docs/design/group-mailboxes.md`, D8). An inviter asks each joiner for a
- * key package over their 1:1 mailbox, commits the add, delivers the commit
- * to every existing member's inbox of the generation the commit was made in,
- * and hands each joiner `{welcome, k}` over the 1:1 mailbox. A removal is
- * delivered the same way, to the remaining members only. Only the
+ * key package over their 1:1 mailbox, commits the add, queues the commit in
+ * the durable outbox for every existing member's inbox of the generation the
+ * commit was made in, and hands each joiner `{welcome, k}` over the 1:1
+ * mailbox. A removal is delivered the same way, to the remaining members
+ * only. Only the
  * conversation roster can request key packages or send welcomes; MLS
  * authenticates commits. Logs never carry key material, welcomes or
  * commits.
@@ -42,18 +38,6 @@ export class GroupMailboxControl {
     }
   }
 
-  private static commitSeed(
-    commit: GroupMailboxCommit,
-    identityId: string,
-  ): string {
-    const next = GroupMailboxKeySchedule.inbox(
-      commit.generation.secret,
-      IdentityId.fromString(identityId),
-    );
-
-    return `group-commit|${encodeBase64Url(sha256(commit.commit))}|${next.mailboxId}`;
-  }
-
   public constructor(
     private readonly selfIdentityId: string,
     private readonly engine: GroupMailboxControlEngine,
@@ -61,7 +45,7 @@ export class GroupMailboxControl {
       conversationId: string,
     ) => Promise<ReadonlySet<string>>,
     private readonly direct: GroupMailboxDirectLink,
-    private readonly inboxes: Pick<MailboxChannel, 'send'>,
+    private readonly outbox: Pick<GroupMailboxOutbox, 'enqueueCommit'>,
   ) {}
 
   /** The peer and this device both belong to the conversation roster. */
@@ -75,36 +59,6 @@ export class GroupMailboxControl {
       peerIdentityId !== this.selfIdentityId &&
       roster.has(peerIdentityId) &&
       roster.has(this.selfIdentityId)
-    );
-  }
-
-  /**
-   * Appends the commit to `I(Y,k)` of each recipient, `k` being the
-   * generation the commit was made in. The envelope id is seeded from the
-   * commit's hash and the recipient's inbox of the generation after it: a
-   * resend is stored once, and a removed member, who can still append to
-   * `I(Y,k)` and may see one copy, cannot derive the id of another.
-   */
-  private async deliver(
-    conversationId: string,
-    commit: GroupMailboxCommit,
-    recipients: readonly string[],
-  ): Promise<void> {
-    const plaintext = GroupMailboxControlRecord.encode({
-      commit: commit.commit,
-      conversationId,
-      type: 'commit',
-    });
-
-    await Promise.all(
-      recipients.map((identityId) =>
-        this.sendToInbox(
-          commit.deliveryGeneration,
-          identityId,
-          plaintext,
-          GroupMailboxControl.commitSeed(commit, identityId),
-        ),
-      ),
     );
   }
 
@@ -234,24 +188,6 @@ export class GroupMailboxControl {
     return answer;
   }
 
-  private async sendToInbox(
-    generation: GroupMailboxGeneration,
-    identityId: string,
-    plaintext: Uint8Array,
-    seed: string,
-  ): Promise<void> {
-    const keys = GroupMailboxKeySchedule.inbox(
-      generation.secret,
-      IdentityId.fromString(identityId),
-    );
-
-    await this.inboxes.send(
-      keys,
-      plaintext,
-      MailboxChannel.envelopeIdFor(`${seed}|${keys.mailboxId}`),
-    );
-  }
-
   /**
    * Adds identities from the roster: one key package each, asked over the
    * 1:1 mailbox. The commit reaches every existing member; each joiner gets
@@ -274,7 +210,7 @@ export class GroupMailboxControl {
     const existing = await this.engine.members(conversationId);
     const commit = await this.engine.add(conversationId, keyPackages);
 
-    await this.deliver(conversationId, commit, existing);
+    await this.outbox.enqueueCommit(conversationId, commit, existing);
     const { welcome } = commit;
 
     if (welcome) {
@@ -359,7 +295,7 @@ export class GroupMailboxControl {
     const commit = await this.engine.remove(conversationId, [...identityIds]);
 
     if (!commit) return undefined;
-    await this.deliver(
+    await this.outbox.enqueueCommit(
       conversationId,
       commit,
       await this.engine.members(conversationId),
