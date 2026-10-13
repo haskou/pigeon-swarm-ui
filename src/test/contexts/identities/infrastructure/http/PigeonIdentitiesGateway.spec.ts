@@ -10,10 +10,8 @@ import type { DevicePairingHistory } from '../../../../../contexts/identities/in
 import type { DevicePairingReaders } from '../../../../../contexts/identities/infrastructure/http/DevicePairingReaders';
 import type { DeviceSealedRecovery } from '../../../../../contexts/identities/infrastructure/http/DeviceSealedRecovery';
 import type { DeviceSealedRootRotation } from '../../../../../contexts/identities/infrastructure/http/DeviceSealedRootRotation';
-import type {
-  OwnDeviceRevocation,
-  PigeonDeviceAuthorizationApi,
-} from '../../../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
+import type { OwnDeviceRevocation } from '../../../../../contexts/identities/infrastructure/http/OwnDeviceRevocation';
+import type { PigeonDeviceAuthorizationApi } from '../../../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
 import type { PigeonIdentityCommandsApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityCommandsApi';
 import type { PigeonIdentityGateway as IdentityProfileGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityGateway';
 import type { PigeonIdentityLoginApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityLoginApi';

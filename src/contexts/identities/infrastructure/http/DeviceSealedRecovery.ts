@@ -120,6 +120,28 @@ export class DeviceSealedRecovery {
   }
 
   /**
+   * Moves a keychain head still sealed under the root a hand-over replaced,
+   * as when another device forgot itself and handed this device a fresh
+   * root. A head already under the current root is left as it is. Never
+   * throws: the next unlock tries again while the hand-over is current.
+   */
+  public async rewrapHandedOverKeychain(rooted: Session): Promise<void> {
+    if (!rooted.previousDeviceSealedRootKey) return;
+
+    try {
+      await this.keychains.rewrapHeadSealedUnder(
+        rooted,
+        rooted.previousDeviceSealedRootKey,
+      );
+    } catch {
+      // eslint-disable-next-line no-console
+      console.debug(
+        'Handed-over keychain rewrap failed; retrying on next unlock',
+      );
+    }
+  }
+
+  /**
    * Reseals the root after a pairing authorization is applied. The root is
    * recorded first, so a failed reseal is retried on unlock. A record that
    * cannot be written does not stop the reseal, and a failed reseal in that
@@ -198,10 +220,12 @@ export class DeviceSealedRecovery {
   }
 
   /**
-   * Mints a fresh root when this device's own entry is behind the head, as
-   * after another device forgot itself: that device can no longer publish, so
+   * Mints a fresh root when this device's own entry is behind the head and
+   * no device handed a fresh one over, as after another device forgot itself
+   * while its hand-over lost a race: that device can no longer publish, so
    * the next remaining device to unlock does. The keychain head is read under
-   * the lagging root and moved to the fresh one, recorded first like a revoke.
+   * the lagging root and moved to the fresh one, recorded first like a revoke,
+   * and the lagging root stays on the session for the mailboxes to bridge.
    * Returns the session unchanged when nothing lags or nothing was minted.
    * Never throws.
    */
@@ -220,7 +244,7 @@ export class DeviceSealedRecovery {
 
       if (head) this.rememberKeychainRewrap(previous);
 
-      rotated = await this.deviceSealedRoot.rotate(synchronized);
+      rotated = await this.deviceSealedRoot.rotate(previous);
     } catch {
       // eslint-disable-next-line no-console
       console.debug('Lagging root rotation failed; retrying on next unlock');

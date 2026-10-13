@@ -159,6 +159,7 @@ export class PigeonIdentitySessionApi {
 
     const rooted = await this.openDeviceSealedRoot(synchronized);
     await this.recovery.resumeKeychainRewrap(rooted);
+    await this.recovery.rewrapHandedOverKeychain(rooted);
 
     return rooted;
   }

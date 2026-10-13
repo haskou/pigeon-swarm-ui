@@ -17,6 +17,7 @@ import type { CreatedIdentityMaterial } from './CreatedIdentityMaterial';
 import type { DevicePairingHistory } from './DevicePairingHistory';
 import type { DevicePairingReaders } from './DevicePairingReaders';
 import type { DeviceSealedRecovery } from './DeviceSealedRecovery';
+import type { DeviceSealedRootHandOver } from './DeviceSealedRootHandOver';
 import type { DeviceSealedRootRotation } from './DeviceSealedRootRotation';
 import type { IdentityAdmissionProgressListener } from './IdentityAdmissionProgressListener';
 import type { IdentityUpdateProfileInput } from './IdentitySignaturePayloadFactory';
@@ -170,8 +171,61 @@ export class PigeonIdentitiesGateway {
     return rotated;
   }
 
+  /**
+   * Removes this device and, when other devices remain, rotates the sealed
+   * root in the same transition: a fresh root, carrying the root it replaces,
+   * is sealed to the remaining devices and the keychain head moves under it
+   * once the node confirms it stored the generation. A hand-over that cannot
+   * be prepared or is not stored leaves the rotation to the next remaining
+   * device that unlocks.
+   */
   public async retireOwnDevice(session: Session): Promise<OwnDeviceRetirement> {
-    return await this.deviceAuthorization.retireOwnDevice(session);
+    const revocation =
+      await this.deviceAuthorization.prepareOwnRetirement(session);
+
+    if (typeof revocation === 'string') {
+      return revocation;
+    }
+
+    let handOver: DeviceSealedRootHandOver | null;
+
+    try {
+      handOver = await this.deviceSealedRoot.handOver(session, {
+        authorizationRevision: revocation.transition
+          .getResultRevision()
+          .valueOf(),
+        recipients: revocation.remaining,
+      });
+    } catch {
+      // eslint-disable-next-line no-console
+      console.debug('Sealed root hand-over could not be prepared.');
+      handOver = null;
+    }
+
+    const delivered = await this.deviceAuthorization.retireOwnDevice(
+      session,
+      revocation,
+      handOver?.sealedSecrets,
+    );
+
+    if (!handOver || !delivered) {
+      return 'revoked';
+    }
+
+    try {
+      // Identity-signed, so it still lands after this device's revocation.
+      await this.keychain.rewrapHeadSealedUnder(
+        { ...session, deviceSealedRootKey: handOver.root },
+        handOver.previous,
+      );
+    } catch {
+      // eslint-disable-next-line no-console
+      console.debug(
+        'Keychain rewrap after hand-over failed; a remaining device moves it.',
+      );
+    }
+
+    return 'revoked';
   }
 
   /** Drops the device-sealed steps a removed device can never resume. */
