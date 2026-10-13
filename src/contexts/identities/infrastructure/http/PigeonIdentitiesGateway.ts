@@ -15,6 +15,7 @@ import type { Session } from '../session/Session';
 import type { DeviceUnlockMethod } from '../storage/DeviceUnlockMethod';
 import type { CreatedIdentityMaterial } from './CreatedIdentityMaterial';
 import type { DevicePairingHistory } from './DevicePairingHistory';
+import type { DevicePairingReaders } from './DevicePairingReaders';
 import type { DeviceSealedRecovery } from './DeviceSealedRecovery';
 import type { DeviceSealedRootRotation } from './DeviceSealedRootRotation';
 import type { IdentityAdmissionProgressListener } from './IdentityAdmissionProgressListener';
@@ -49,6 +50,7 @@ export class PigeonIdentitiesGateway {
     private readonly deviceSealedRoot: DeviceSealedRootRotation,
     private readonly recovery: DeviceSealedRecovery,
     private readonly pairingHistory: DevicePairingHistory,
+    private readonly pairingReaders: DevicePairingReaders,
   ) {}
 
   public async recover(
@@ -121,6 +123,10 @@ export class PigeonIdentitiesGateway {
       requestCode,
       historyTransferSecret,
     );
+    // The new device's reader is enrolled in every direct inbox before it gets
+    // the completion code, so a message this device acknowledges before the
+    // new device's first open is kept for it. Never throws.
+    await this.pairingReaders.enrol(result.session, result.credential);
     // The root is kept, so the new device opens the keychain's root. A failed
     // reseal is recorded and retried on the next unlock, and the completion
     // code is still returned.

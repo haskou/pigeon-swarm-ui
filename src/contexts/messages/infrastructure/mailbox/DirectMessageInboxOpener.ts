@@ -318,6 +318,45 @@ export class DirectMessageInboxOpener {
   }
 
   /**
+   * Enrols a newly paired device's reader in the inbox of every direct
+   * conversation, so the node keeps each record for it until it acknowledges
+   * one, including those this device acknowledges before the paired device
+   * first opens the inbox. Best effort: an inbox missed here is joined on
+   * the paired device's first open. Never throws.
+   */
+  public async enrolDeviceReader(
+    session: Session,
+    credential: string,
+  ): Promise<void> {
+    const conversations = Object.values(session.keychain.conversations).filter(
+      (entry) => entry.kind === 'conversation',
+    );
+
+    for (const entry of conversations) {
+      try {
+        const keys = DirectMessageInboxKeys.keysFor(
+          session,
+          entry.conversationId,
+          session.identity.id,
+        );
+        const readers = DirectMessageInboxKeys.readersFor(
+          session,
+          keys,
+          credential,
+        );
+
+        await this.channel.addReader(keys, readers.root, readers.device);
+      } catch {
+        // Count-only: no ids, content, or error details.
+        // eslint-disable-next-line no-console
+        console.debug(
+          'Direct mailbox paired reader enrol failed; joins on open.',
+        );
+      }
+    }
+  }
+
+  /**
    * A revoke's cut-off: in the inbox of every direct conversation, bridges the
    * rotated sealed root in and prunes every reader no remaining device holds,
    * so a revoked device opens no record written afterwards. Every inbox is
