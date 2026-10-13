@@ -7,7 +7,7 @@ import {
   deviceStorage,
 } from '../../../../../app/composition/applicationContainer';
 import { useDeviceStorageNotice } from '../../../../../app/presentation/workspace/components/useDeviceStorageNotice';
-import { DeviceStorageEstimate } from '../../../../../shared/infrastructure/storage/DeviceStorage';
+import { DeviceStorageEstimate } from '../../../../../shared/infrastructure/storage/DeviceStorageEstimate';
 import { copy } from '../../../../../shared/presentation/i18n/copy';
 
 type MockEffect = () => void | (() => void);

@@ -256,6 +256,15 @@ export class DirectMessageMailbox {
   }
 
   /**
+   * Whether this device dropped this identity's stored direct history because
+   * it no longer opens under the device-sealed root, as after a device revoke.
+   * Reports each drop once. Never throws.
+   */
+  public checkHistoryDropped(session: Session): Promise<boolean> {
+    return this.history.checkDropped(session);
+  }
+
+  /**
    * Pairing. Publishes this identity's newest direct history to the transfer
    * mailbox derived from `secret`. A failure is logged without content and
    * leaves the transfer partial or absent. Never throws.

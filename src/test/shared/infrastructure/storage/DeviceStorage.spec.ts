@@ -1,14 +1,12 @@
 import { describe, expect, it } from '@jest/globals';
-import { mock } from 'jest-mock-extended';
+import { mock, type MockProxy } from 'jest-mock-extended';
 
-import {
-  DeviceStorage,
-  DeviceStorageEstimate,
-} from '../../../../shared/infrastructure/storage/DeviceStorage';
+import { DeviceStorage } from '../../../../shared/infrastructure/storage/DeviceStorage';
+import { DeviceStorageEstimate } from '../../../../shared/infrastructure/storage/DeviceStorageEstimate';
 
 const MIB = 1024 * 1024;
 
-function manager(persisted: boolean): StorageManager {
+function manager(persisted: boolean): MockProxy<StorageManager> {
   const storage = mock<StorageManager>();
 
   storage.persisted.mockResolvedValue(persisted);

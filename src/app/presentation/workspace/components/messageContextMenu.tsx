@@ -455,7 +455,7 @@ function MessageMenuTrailingActions({
           <div className="my-1 h-px bg-white/10" />
           <MessageMenuAction
             icon={<TrashIcon />}
-            label={copy.messages.delete}
+            label={copy.messages.deleteForEveryone}
             onClick={() => runAction(onDelete)}
             tone="danger"
           />

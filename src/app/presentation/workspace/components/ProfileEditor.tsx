@@ -49,6 +49,7 @@ import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorM
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { DeviceManagementDialog } from './DeviceManagementDialog';
 import { DevicePairingDialog } from './DevicePairingDialog';
+import { DeviceStorageSection } from './DeviceStorageSection';
 import { SecurityAuditSection } from './SecurityAuditSection';
 
 const ImageCropEditor = lazy(() =>
@@ -701,6 +702,7 @@ function ProfileSecuritySection({
           </p>
         </div>
       </section>
+      <DeviceStorageSection />
       <SecurityAuditSection
         communities={communities}
         conversations={conversations}
