@@ -8,6 +8,7 @@ for (const scenario of [
   'simultaneous-restart',
   'connected-restart',
   'exhausted-retry',
+  'lost-answer',
 ])
   test(`exchanges real browser audio after ${scenario}`, async ({
     baseURL,
@@ -39,7 +40,12 @@ for (const scenario of [
     const pages = await Promise.all(
       contexts.map((context) => context.newPage()),
     );
-    let blockCandidates = !['normal', 'connected-restart'].includes(scenario);
+    let blockCandidates = ![
+      'normal',
+      'connected-restart',
+      'lost-answer',
+    ].includes(scenario);
+    let dropAnswer = scenario === 'lost-answer';
     const signalingErrors: string[] = [];
     let collideOffers = false;
     const collisionSignals: Array<{
@@ -68,6 +74,10 @@ for (const scenario of [
           original: Record<string, unknown>,
         ) => {
           if (blockCandidates && type === 'ice_candidate') return;
+          if (dropAnswer && type === 'answer') {
+            dropAnswer = false;
+            return;
+          }
           const payload = { ...original };
           if (blockCandidates && typeof payload.sdp === 'string')
             payload.sdp = payload.sdp
@@ -137,13 +147,20 @@ for (const scenario of [
       );
       await pages[1].evaluate(() => window.callRecoveryTest.start(false));
       await pages[0].evaluate(() => window.callRecoveryTest.start(true));
+      if (scenario === 'lost-answer') {
+        await expect.poll(() => dropAnswer, { timeout: 10_000 }).toBe(false);
+        expect(
+          (await pages[0].evaluate(() => window.callRecoveryTest.inspect()))
+            .native[0].signalingState,
+        ).toBe('have-local-offer');
+      }
       for (const page of pages)
         await expect
           .poll(
             async () =>
               (await page.evaluate(() => window.callRecoveryTest.inspect()))
                 .native[0],
-            { timeout: 10_000 },
+            { timeout: scenario === 'lost-answer' ? 45_000 : 10_000 },
           )
           .toMatchObject({ signalingState: 'stable', hasDescriptions: true });
       if (scenario === 'exhausted-retry') {

@@ -41,7 +41,7 @@ describe('CallPeerRecovery', () => {
     },
   );
 
-  it('bounds a negotiated connection with no remote candidates, without retrying an unanswered offer', async () => {
+  it('bounds an offer the remote peer never answers like a negotiation that never connects', async () => {
     jest.useFakeTimers();
     const restart = jest.fn(() => Promise.resolve());
     const recovery = new CallPeerRecovery(restart);
@@ -49,20 +49,34 @@ describe('CallPeerRecovery', () => {
     Object.assign(peer, {
       localDescription: { type: 'offer' },
       remoteDescription: null,
+      signalingState: 'have-local-offer',
     });
-    recovery.reconcile('peer', peer, () => true);
-    await jest.advanceTimersByTimeAsync(60_000);
-    expect(restart).not.toHaveBeenCalled();
-    Object.assign(peer, { remoteDescription: { type: 'answer' } });
     recovery.reconcile('peer', peer, () => true);
     await jest.advanceTimersByTimeAsync(14_999);
     expect(restart).not.toHaveBeenCalled();
+    expect(recovery.stateFor('peer')).toBe('idle');
     await jest.advanceTimersByTimeAsync(1);
     expect(restart).toHaveBeenCalledTimes(1);
     await jest.advanceTimersByTimeAsync(45_000);
     expect(restart).toHaveBeenCalledTimes(3);
     expect(recovery.stateFor('peer')).toBe('exhausted');
     recovery.reset();
+  });
+
+  it('waits for a peer that has not started negotiating', async () => {
+    jest.useFakeTimers();
+    const restart = jest.fn(() => Promise.resolve());
+    const recovery = new CallPeerRecovery(restart);
+    const peer = peerConnection('new', 'new');
+    Object.assign(peer, {
+      localDescription: null,
+      remoteDescription: null,
+      signalingState: 'stable',
+    });
+    recovery.reconcile('peer', peer, () => true);
+    await jest.advanceTimersByTimeAsync(60_000);
+    expect(restart).not.toHaveBeenCalled();
+    expect(recovery.stateFor('peer')).toBe('idle');
   });
 
   it('exposes exhaustion only after the final outcome window and retries only on request', async () => {
