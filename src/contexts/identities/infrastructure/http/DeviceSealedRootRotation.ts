@@ -146,7 +146,9 @@ export class DeviceSealedRootRotation {
     return {
       ...opening.session,
       deviceSealedRootKey: roots.root,
-      previousDeviceSealedRootKey: roots.previous,
+      ...(roots.previous
+        ? { previousDeviceSealedRootKey: roots.previous }
+        : {}),
     };
   }
 
