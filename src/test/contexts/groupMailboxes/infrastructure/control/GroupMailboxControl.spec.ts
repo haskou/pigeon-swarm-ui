@@ -159,9 +159,20 @@ const inboxKeys = async (owner: Member, of: Member = owner) =>
     IdentityId.fromString(owner.name),
   );
 
-/** Creates `I(self,k)` for the current generation, as PR3's sync will. */
-const openInbox = async (owner: Member): Promise<void> => {
-  await node.channel.createInbox(await inboxKeys(owner), `read-${owner.name}`);
+/**
+ * Creates `I(Y,k)` for every member, `k` being the generation of `inviter`,
+ * as each member's own sync will once it holds that generation.
+ */
+const openInboxes = async (inviter: Member): Promise<void> => {
+  for (const name of await inviter.engine.members(CONVERSATION)) {
+    const owner = members.get(name);
+
+    if (!owner) throw new Error(`unknown member ${name}`);
+    await node.channel.createInbox(
+      await inboxKeys(owner, inviter),
+      `read-${owner.name}`,
+    );
+  }
 };
 
 /** Reads `I(self,k)` of the current generation and applies its records. */
@@ -186,6 +197,7 @@ const readGroup = async (
 
 /** `inviter` adds `joiners`; each answers its key package request. */
 const add = async (inviter: Member, joiners: Member[]): Promise<void> => {
+  await openInboxes(inviter);
   const adding = inviter.control.add(
     CONVERSATION,
     joiners.map(({ name }) => name),
@@ -225,6 +237,7 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
     carol = member('carol');
     mallory = member('mallory');
     await alice.engine.createGroup(CONVERSATION);
+    await openInboxes(alice);
   });
 
   afterEach(() => {
@@ -257,7 +270,6 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
   it('delivers an add commit to the inbox of every existing member', async () => {
     await add(alice, [bob]);
     await drain(bob);
-    await Promise.all([openInbox(alice), openInbox(bob)]);
 
     await add(alice, [carol]);
 
@@ -270,7 +282,7 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
   it('delivers a removal to the remaining members only', async () => {
     await add(alice, [bob, carol]);
     await Promise.all([drain(bob), drain(carol)]);
-    await Promise.all([openInbox(alice), openInbox(bob), openInbox(carol)]);
+    await openInboxes(alice);
     const carolInbox = (await inboxKeys(carol)).mailboxId;
 
     await alice.control.remove(CONVERSATION, ['carol']);
@@ -318,7 +330,6 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
   it('rejects a forged commit and keeps the generation', async () => {
     await add(alice, [bob]);
     await drain(bob);
-    await Promise.all([openInbox(alice), openInbox(bob)]);
     const before = await bob.engine.generation(CONVERSATION);
     const { mailboxId } = await inboxKeys(bob);
 
