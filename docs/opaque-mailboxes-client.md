@@ -104,7 +104,7 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 
 ## Direct messages
 
-- Scope: one-to-one conversations only. The mailbox is the only delivery path for them; the legacy one-to-one endpoints are no longer called (see Cutover below). Groups and communities keep their legacy endpoints and are not described here. Attachments, replies, and stickers travel as opaque encrypted payload inside the sent record.
+- Scope: one-to-one conversations only. The mailbox is the only delivery path for them. The legacy one-to-one write endpoints are no longer called, and the legacy message list is still read for pre-cutover history (see Cutover below). Groups and communities keep their legacy endpoints and are not described here. Attachments, replies, and stickers travel as opaque encrypted payload inside the sent record.
 
 | Kind                                    | Mailbox record                                    | Status                                                                                     |
 | --------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -148,19 +148,23 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 - Multi-device: each device reads and acknowledges with its own device reader, and the node keeps an envelope until every reader has acknowledged it. An ack from one device therefore cannot remove a message another device has not read. The reader set holds at most `maxReaders` readers per inbox (129 by default: the root plus 128 devices), so a device past the cap cannot enrol (see Reader set).
 ### Cutover: legacy 1:1 path retired
 
-The mailbox is the only delivery path for one-to-one conversations. No shim, fallback, feature flag, or history migration remains. The client no longer calls the node's one-to-one message endpoints. Groups and communities keep their legacy endpoints; this cutover does not change them.
+The mailbox is the only delivery path for one-to-one conversations. No shim, fallback, feature flag, or history migration remains. The client no longer writes to the node's one-to-one message endpoints, and it still reads the legacy list for one-to-one history (see the legacy read under Cutover). Groups and communities keep their legacy endpoints; this cutover does not change them.
 
 - Removed for one-to-one:
   - Send, edit, delete, reactions (add and remove), pin, unpin, and the pin list (`listPins`).
   - `read-until` (`conversations.markReadUntil`). Its replacement is the own-inbox `read` record.
-  - History load (`messages.load`, `loadAround`, `loadThread`, `loadOne`). The timeline comes from mailbox sync and the local projection cache only.
+  - `loadAround` and `loadThread` for one-to-one conversations. The reply-target fetch shows an error, and threads are group-only.
   - Realtime message events for one-to-one conversation ids.
   - The copy model: the additive copy written after each legacy one-to-one write, its separate delivery outcome, its side-effect helper, and the copy notice that reported a failed copy. The own copy now follows the peer copy and shares its record id; a failed own copy is only logged (see Own copy).
   - The message POST as a carrier of 1:1 attachments. They reach the peer only through mailbox records. The attachment downloader's legacy methods stay, because group and community history use them.
 
+- Still read for one-to-one (decided; node design D2 and D3):
+  - The timeline message list (`messages.load`, on open and on older pages) and latest-message recovery (`PigeonConversationRepository`, one message, for a conversation without `latestMessageAt`) call `GET /conversations/{conversationId}/messages` for one-to-one conversations too. The client writes no one-to-one messages there, so the endpoint holds only pre-cutover history.
+  - This read is the only backfill for pre-cutover history on a new or restored device. Removing it drops that history from the timeline. It stays until the pairing export (node design doc, option 1) replaces it. That export is not implemented.
+
 - Accepted losses (decided; not backfilled):
-  - Replicated 1:1 history is not loaded from the node. Mailbox envelopes are deleted on full acknowledgement, so a 1:1 message that is in neither the local history store nor the projection cache is gone after a reload. The local store is described in Same-device history.
-  - No backfill for new or restored devices. An own copy reaches only devices that read the self-inbox within the node's 14-day retention. Backfill options are in the node design doc (`docs/design/own-copy-and-history-backfill.md`); none is implemented.
+  - Post-cutover one-to-one history is not loaded from the node. Mailbox envelopes are deleted on full acknowledgement, so a 1:1 message written after the cutover that is in neither the local history store nor the projection cache is gone after a reload. The local store is described in Same-device history.
+  - No backfill for new or restored devices. A post-cutover own copy reaches only devices that read the self-inbox within the node's 14-day retention. The legacy read under Cutover returns pre-cutover messages only. Backfill options are in the node design doc (`docs/design/own-copy-and-history-backfill.md`); the pairing export is not implemented.
   - A 1:1 send to a peer whose inbox is not open yet is retried until its peer copy lands, with no give-up while the session lives. It survives a reload and sign-out through the sealed outbox and resumes on unlock (see Same-device history). Without a device-sealed root (`masterKey` only), nothing is stored, so a pending send lives in memory only: a reload or a closed page loses it. Sends in the same conversation no longer queue behind a pending one, so concurrent sends share a predecessor and appear as siblings. A forget that runs while a peer copy is in flight can still leave that copy on the peer's inbox, and the attachment blobs of a forgotten send remain until the node's retention removes them. A send whose peer copy lands but whose `peerDelivered` flag is not saved before a stop or reload is appended again on resume; the recipient's timeline collapses messages by id.
   - Edit, delete, reaction, and pin are rejected when the peer copy is not delivered, and the UI shows the error notice.
   - Read receipts never block and never show errors. A failed receipt is not retried; the next read mark sends a new one.
@@ -175,7 +179,7 @@ The mailbox is the only delivery path for one-to-one conversations. No shim, fal
   - Reader cap: 128 devices per identity. An extra device has no read path for the inbox.
   - Own copies double the envelopes in this identity's self-inbox. A full self-inbox refuses both the own copy and the peer's sends into it, so a stuck own device blocks the peer too.
   - A failed own copy is not retried, so the other devices of this identity miss that change.
-  - Legacy 1:1 messages already stored on the node are no longer read by this client. Node-side cleanup is not covered here.
+  - Legacy 1:1 messages already stored on the node are still read for the timeline and latest-message recovery (see the legacy read under Cutover). Node-side cleanup is not covered here.
 
 ## Open questions (not decided, not implemented)
 
