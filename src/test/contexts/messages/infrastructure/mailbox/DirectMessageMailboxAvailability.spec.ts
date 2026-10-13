@@ -17,6 +17,7 @@ import { MailboxKeySchedule } from '../../../../../contexts/mailboxes/infrastruc
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/infrastructure/http/MailboxUnavailableError';
 import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageAvailabilityAnnouncement } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageAvailabilityAnnouncement';
+import { DirectMessageHistoryStorageError } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageHistoryStorageError';
 import { DirectMessageMailbox } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
 import { DirectMessageMailboxStore } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxStore';
 import { DirectMessageReaderSet } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageReaderSet';
@@ -439,6 +440,32 @@ describe('DirectMessageMailbox availability servers', () => {
 
     await expect(syncPass(bob, 'bob', apply)).rejects.toThrow('offline');
     expect(messageIds(apply)).toEqual(['message-1']);
+    debug.mockRestore();
+  });
+
+  it('acknowledges no server until the history stores the page', async () => {
+    const debug = jest
+      .spyOn(console, 'debug')
+      .mockImplementation(() => undefined);
+    const { alice, bob, extra, home } = await announced();
+
+    await alice.send(session('alice'), conversation, 'hello', {});
+    await outboxSettled(alice, 'alice');
+    home.setDown(true);
+    const quota = jest.spyOn(indexedDB, 'open').mockImplementation(() => {
+      throw new DOMException('quota', 'QuotaExceededError');
+    });
+
+    await expect(
+      syncPass(bob, 'bob').finally(() => quota.mockRestore()),
+    ).rejects.toBeInstanceOf(DirectMessageHistoryStorageError);
+    expect(extra.acked(mailboxIdOf('bob'))).toBe(0);
+
+    home.setDown(false);
+    await syncPass(bob, 'bob');
+
+    expect(home.acked(mailboxIdOf('bob'))).toBe(1);
+    expect(extra.acked(mailboxIdOf('bob'))).toBe(1);
     debug.mockRestore();
   });
 
