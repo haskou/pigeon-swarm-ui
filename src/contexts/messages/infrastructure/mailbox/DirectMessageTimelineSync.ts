@@ -26,6 +26,8 @@ import { DirectMessageRecordReader } from './DirectMessageRecordReader';
  * identity's inbox, maps it to timeline changes, then acknowledges it.
  */
 export class DirectMessageTimelineSync {
+  private readonly applied = new Map<string, Set<string>>();
+
   public constructor(
     private readonly opener: DirectMessageInboxOpener,
     private readonly channel: MailboxChannel,
@@ -71,11 +73,11 @@ export class DirectMessageTimelineSync {
   }
 
   /**
-   * Decodes the page, stores its records on this device, then hands the
-   * changes of records not already on screen to the caller, then acknowledges
-   * the page. The store runs before the ack, so an acked page is never missing
-   * from the history. Each step checks the signal so an aborted pass neither
-   * applies nor acks.
+   * Decodes the page, hands the changes of records this timeline has not
+   * applied yet to the caller, then stores the page's records and acknowledges
+   * the page. Apply runs before the store, so a stored record always reached
+   * the timeline. Each step checks the signal so an aborted pass neither
+   * applies, stores, nor acks.
    */
   private async applyPage(
     session: Session,
@@ -96,6 +98,29 @@ export class DirectMessageTimelineSync {
       return record ? [{ plaintext: envelope.plaintext, record }] : [];
     });
 
+    // An own copy this device appended is already shown locally.
+    const records = decoded.flatMap(({ record }) =>
+      this.ownCopies.has(
+        DirectMailboxOwnership.ownCopyKey(session.identity.id, record.id),
+      )
+        ? []
+        : [record],
+    );
+    const unapplied = this.unappliedRecords(conversationId, records);
+    const changes = await this.changesFor(
+      session,
+      conversationId,
+      unapplied,
+      signal,
+    );
+
+    if (signal.aborted) return;
+
+    apply(changes);
+    this.markApplied(conversationId, unapplied);
+
+    if (signal.aborted) return;
+
     // Keyed by record id, so a replayed envelope dedupes while each action
     // (a reaction add, its removal, a re-add) keeps its own row.
     await this.history.append(
@@ -110,27 +135,6 @@ export class DirectMessageTimelineSync {
 
     if (signal.aborted) return;
 
-    // An own copy this device appended is already shown locally.
-    const records = decoded.flatMap(({ record }) =>
-      this.ownCopies.has(
-        DirectMailboxOwnership.ownCopyKey(session.identity.id, record.id),
-      )
-        ? []
-        : [record],
-    );
-    const changes = await this.changesFor(
-      session,
-      conversationId,
-      records,
-      signal,
-    );
-
-    if (signal.aborted) return;
-
-    apply(changes);
-
-    if (signal.aborted) return;
-
     const acked = await this.channel.acknowledge(
       keys,
       readers,
@@ -140,6 +144,45 @@ export class DirectMessageTimelineSync {
       ...state,
       cursor: acked.recreated ? 0 : page.lastCursor,
     });
+  }
+
+  /**
+   * Records this timeline has not applied yet, each id once. A replayed
+   * envelope carries a record id this timeline already holds.
+   */
+  private unappliedRecords(
+    conversationId: string,
+    records: DirectMessageRecord[],
+  ): DirectMessageRecord[] {
+    const applied = this.appliedIn(conversationId);
+    const unapplied = new Map<string, DirectMessageRecord>();
+
+    for (const record of records) {
+      if (!applied.has(record.id) && !unapplied.has(record.id)) {
+        unapplied.set(record.id, record);
+      }
+    }
+
+    return [...unapplied.values()];
+  }
+
+  /** Remembers the records this timeline applied, so a replay adds no change. */
+  private markApplied(
+    conversationId: string,
+    records: DirectMessageRecord[],
+  ): void {
+    const applied = this.appliedIn(conversationId);
+
+    for (const record of records) applied.add(record.id);
+  }
+
+  /** Record ids this timeline has applied, per conversation. */
+  private appliedIn(conversationId: string): Set<string> {
+    const applied = this.applied.get(conversationId) ?? new Set<string>();
+
+    this.applied.set(conversationId, applied);
+
+    return applied;
   }
 
   /**
@@ -317,5 +360,6 @@ export class DirectMessageTimelineSync {
     if (signal.aborted) return;
 
     apply(changes);
+    this.markApplied(conversationId, records);
   }
 }

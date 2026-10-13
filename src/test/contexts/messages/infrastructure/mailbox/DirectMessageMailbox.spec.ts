@@ -3802,12 +3802,10 @@ describe(DirectMessageMailbox.name, () => {
       beforeEach(async () => {
         jest.useRealTimers();
         await new DirectMessageOutboxStore().forget('alice');
-        await new DirectMessageHistoryStore().forget('bob');
       });
 
       afterEach(async () => {
         await new DirectMessageOutboxStore().forget('alice');
-        await new DirectMessageHistoryStore().forget('bob');
       });
 
       /** Resolves once `check` holds, letting queued work run. */
