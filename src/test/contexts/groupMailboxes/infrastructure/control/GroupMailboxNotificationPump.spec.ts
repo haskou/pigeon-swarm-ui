@@ -20,7 +20,7 @@ type Letter = {
   id: string;
   inviter?: Person;
   record?: GroupMailboxControlFields;
-  reseal?: (envelope: Record<string, unknown>) => void;
+  reseal?: Record<string, unknown>;
   sentAt?: number;
 };
 
@@ -63,10 +63,9 @@ const notification = (letter: Letter): NotificationResource => {
       bob.keyPair.decrypt(new EncryptedPayload(sealed)).toString(),
     ) as Record<string, unknown>;
 
-    letter.reseal(envelope);
     sealed = IdentityId.fromString(bob.id)
       .getPublicKey()
-      .encrypt(JSON.stringify(envelope))
+      .encrypt(JSON.stringify({ ...envelope, ...letter.reseal }))
       .toString();
   }
 
@@ -118,7 +117,9 @@ beforeAll(async () => {
 
 describe('GroupMailboxNotificationPump', () => {
   it('hands a fresh signed record to the control as its sender', async () => {
-    const { control, pump } = setup([[notification({ from: alice, id: 'n1' })]]);
+    const { control, pump } = setup([
+      [notification({ from: alice, id: 'n1' })],
+    ]);
 
     await pump.run();
 
@@ -135,9 +136,7 @@ describe('GroupMailboxNotificationPump', () => {
         notification({
           from: alice,
           id: 'n1',
-          reseal: (envelope) => {
-            delete envelope.signature;
-          },
+          reseal: { signature: undefined },
         }),
       ],
     ]);
@@ -155,9 +154,7 @@ describe('GroupMailboxNotificationPump', () => {
           from: mallory,
           id: 'n2',
           inviter: alice,
-          reseal: (envelope) => {
-            envelope.senderIdentityId = alice.id;
-          },
+          reseal: { senderIdentityId: alice.id },
         }),
       ],
     ]);
@@ -234,7 +231,9 @@ describe('GroupMailboxNotificationPump', () => {
   });
 
   it('hands each notification over once', async () => {
-    const { control, pump } = setup([[notification({ from: alice, id: 'n1' })]]);
+    const { control, pump } = setup([
+      [notification({ from: alice, id: 'n1' })],
+    ]);
 
     await pump.run();
     await pump.run();
@@ -243,7 +242,9 @@ describe('GroupMailboxNotificationPump', () => {
   });
 
   it('hands a notification over again after its handling failed', async () => {
-    const { control, pump } = setup([[notification({ from: alice, id: 'n1' })]]);
+    const { control, pump } = setup([
+      [notification({ from: alice, id: 'n1' })],
+    ]);
 
     control.receiveDirect.mockRejectedValueOnce(new Error('offline'));
     await pump.run();
@@ -286,5 +287,22 @@ describe('GroupMailboxNotificationPump', () => {
     await pump.run();
 
     expect(control.receiveDirect).not.toHaveBeenCalled();
+  });
+
+  it('skips a malformed notification and reads the rest', async () => {
+    const broken = notification({ from: alice, id: 'n1' });
+    const { control, pump } = setup([
+      [
+        {
+          ...broken,
+          payload: { ...broken.payload, inviterIdentityId: undefined },
+        } as unknown as NotificationResource,
+        notification({ from: alice, id: 'n2' }),
+      ],
+    ]);
+
+    await pump.run();
+
+    expect(control.receiveDirect).toHaveBeenCalledTimes(1);
   });
 });

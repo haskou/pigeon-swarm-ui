@@ -76,7 +76,20 @@ export class PigeonNotificationsApi {
   }
 
   public async list(session: Session): Promise<NotificationResource[]> {
-    const path = '/notifications/?limit=30';
+    return await this.listPage(session, 30);
+  }
+
+  /** Up to `limit` notifications, newest id first, after `before` if set. */
+  public async listPage(
+    session: Session,
+    limit: number,
+    beforeNotificationId?: string,
+  ): Promise<NotificationResource[]> {
+    const before =
+      beforeNotificationId === undefined
+        ? ''
+        : `&beforeNotificationId=${encodeURIComponent(beforeNotificationId)}`;
+    const path = `/notifications/?limit=${limit}${before}`;
     const result = await this.http.request<{ results: NotificationResource[] }>(
       path,
       {

@@ -15,14 +15,14 @@ import { GroupMailboxKeyPackageTimeoutError } from './GroupMailboxKeyPackageTime
 /**
  * Control traffic of a group conversation (node
  * `docs/design/group-mailboxes.md`, D8). An inviter asks each joiner for a
- * key package over their 1:1 mailbox, commits the add, queues the commit in
- * the durable outbox for every existing member's inbox of the generation the
- * commit was made in, and hands each joiner `{welcome, k}` over the 1:1
- * mailbox. A removal is delivered the same way, to the remaining members
- * only. Only the
- * conversation roster can request key packages or send welcomes; MLS
- * authenticates commits. Logs never carry key material, welcomes or
- * commits.
+ * key package in a letter signed by its identity key and sealed to the
+ * joiner (`GroupMailboxNotificationLink`), commits the add, queues the
+ * commit in the durable outbox for every existing member's inbox of the
+ * generation the commit was made in, and hands each joiner `{welcome, k}`
+ * in another letter. A removal is delivered through the outbox to the
+ * remaining members only. Only the conversation roster can request key
+ * packages or send welcomes; MLS authenticates commits. Logs never carry
+ * key material, welcomes or commits.
  */
 export class GroupMailboxControl {
   public static readonly KEY_PACKAGE_TIMEOUT_MS = 60_000;
@@ -72,6 +72,7 @@ export class GroupMailboxControl {
     }
 
     await this.direct.send(
+      conversationId,
       peerIdentityId,
       GroupMailboxControlRecord.encode({
         conversationId,
@@ -169,6 +170,7 @@ export class GroupMailboxControl {
 
     try {
       await this.direct.send(
+        conversationId,
         peerIdentityId,
         GroupMailboxControlRecord.encode({
           conversationId,
@@ -189,9 +191,9 @@ export class GroupMailboxControl {
   }
 
   /**
-   * Adds identities from the roster: one key package each, asked over the
-   * 1:1 mailbox. The commit reaches every existing member; each joiner gets
-   * `{welcome, k}`.
+   * Adds identities from the roster: one key package each, asked in a
+   * signed letter. The commit reaches every existing member; each joiner
+   * gets `{welcome, k}`.
    */
   public async add(
     conversationId: string,
@@ -223,7 +225,7 @@ export class GroupMailboxControl {
 
       await Promise.all(
         identityIds.map((identityId) =>
-          this.direct.send(identityId, plaintext),
+          this.direct.send(conversationId, identityId, plaintext),
         ),
       );
     }
@@ -241,8 +243,8 @@ export class GroupMailboxControl {
   }
 
   /**
-   * A record read from the 1:1 mailbox shared with `peerIdentityId`. That
-   * mailbox authenticates the peer, so it is the author.
+   * A record `peerIdentityId` sent this identity directly. The link that
+   * read it verified the peer's signature, so the peer is its author.
    */
   public async receiveDirect(
     peerIdentityId: string,

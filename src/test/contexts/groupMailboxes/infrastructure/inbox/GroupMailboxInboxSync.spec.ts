@@ -190,7 +190,7 @@ const member = (name: string): Member => {
     engine,
     () => Promise.resolve(roster),
     {
-      send: (peer, plaintext) => {
+      send: (_conversationId, peer, plaintext) => {
         members.get(peer)?.direct.push({ from: name, plaintext });
 
         return Promise.resolve();

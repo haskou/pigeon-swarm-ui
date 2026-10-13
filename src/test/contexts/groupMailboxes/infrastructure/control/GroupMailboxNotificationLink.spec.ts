@@ -50,9 +50,7 @@ describe('GroupMailboxNotificationLink', () => {
       () => NOW,
     ).send(CONVERSATION, bob.id, new Uint8Array([7, 8]));
 
-    const [input] = invitations.invitation.mock.calls[0].slice(1) as [
-      { encryptedKey: string; recipientIdentityId: string; subjectId: string },
-    ];
+    const [, input] = invitations.invitation.mock.calls[0];
     const [path, init] = http.request.mock.calls[0];
     const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
     const opened = GroupMailboxControlSeal.open(

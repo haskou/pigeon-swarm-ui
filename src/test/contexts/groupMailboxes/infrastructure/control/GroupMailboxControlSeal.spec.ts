@@ -6,7 +6,6 @@ import { GroupMailboxControlSeal } from '../../../../../contexts/groupMailboxes/
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 
 type Person = { id: string; keyPair: KeyPair; session: Session };
-type Envelope = Record<string, unknown>;
 
 const CONVERSATION = 'group:control-seal';
 const SENT_AT = 1_700_000_000_000;
@@ -47,17 +46,15 @@ const reseal = (
   sealed: string,
   holder: Person,
   to: Person,
-  change: (envelope: Envelope) => void = () => undefined,
+  change: Record<string, unknown> = {},
 ): string => {
   const envelope = JSON.parse(
     holder.keyPair.decrypt(new EncryptedPayload(sealed)).toString(),
-  ) as Envelope;
-
-  change(envelope);
+  ) as Record<string, unknown>;
 
   return IdentityId.fromString(to.id)
     .getPublicKey()
-    .encrypt(JSON.stringify(envelope))
+    .encrypt(JSON.stringify({ ...envelope, ...change }))
     .toString();
 };
 
@@ -94,9 +91,7 @@ describe('GroupMailboxControlSeal', () => {
     expect(
       openAs(
         carol,
-        reseal(letter, bob, carol, (envelope) => {
-          envelope.recipientIdentityId = carol.id;
-        }),
+        reseal(letter, bob, carol, { recipientIdentityId: carol.id }),
         alice.id,
       ),
     ).toBeUndefined();
@@ -106,28 +101,20 @@ describe('GroupMailboxControlSeal', () => {
     const letter = sealFor(alice, bob);
 
     expect(
-      openAs(
-        bob,
-        reseal(letter, bob, bob, (envelope) => {
-          delete envelope.signature;
-        }),
-        alice.id,
-      ),
+      openAs(bob, reseal(letter, bob, bob, { signature: undefined }), alice.id),
     ).toBeUndefined();
     expect(
       openAs(
         bob,
-        reseal(letter, bob, bob, (envelope) => {
-          envelope.signature = 'not-a-signature';
-        }),
+        reseal(letter, bob, bob, { signature: 'not-a-signature' }),
         alice.id,
       ),
     ).toBeUndefined();
   });
 
   it('opens nothing signed by an identity other than its sender', () => {
-    const forged = reseal(sealFor(mallory, bob), bob, bob, (envelope) => {
-      envelope.senderIdentityId = alice.id;
+    const forged = reseal(sealFor(mallory, bob), bob, bob, {
+      senderIdentityId: alice.id,
     });
 
     expect(openAs(bob, forged, alice.id)).toBeUndefined();
@@ -144,9 +131,7 @@ describe('GroupMailboxControlSeal', () => {
     expect(
       openAs(
         bob,
-        reseal(letter, bob, bob, (envelope) => {
-          envelope.conversationId = 'group:other';
-        }),
+        reseal(letter, bob, bob, { conversationId: 'group:other' }),
         alice.id,
         'group:other',
       ),
@@ -155,13 +140,9 @@ describe('GroupMailboxControlSeal', () => {
 
   it('opens nothing whose payload or time was altered', () => {
     const letter = sealFor(alice, bob);
-    const altered = [
-      (envelope: Envelope) => {
-        envelope.payload = 'AQID';
-      },
-      (envelope: Envelope) => {
-        envelope.sentAt = SENT_AT + 1;
-      },
+    const altered: Record<string, unknown>[] = [
+      { payload: 'AQID' },
+      { sentAt: SENT_AT + 1 },
     ];
 
     for (const change of altered) {
@@ -182,9 +163,7 @@ describe('GroupMailboxControlSeal', () => {
     expect(
       openAs(
         bob,
-        reseal(letter, bob, bob, (envelope) => {
-          envelope.kind = 'conversation-key';
-        }),
+        reseal(letter, bob, bob, { kind: 'conversation-key' }),
         alice.id,
       ),
     ).toBeUndefined();

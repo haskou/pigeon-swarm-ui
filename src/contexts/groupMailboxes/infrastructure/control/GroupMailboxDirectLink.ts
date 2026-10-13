@@ -1,4 +1,8 @@
-/** Sends a plaintext sealed in the 1:1 mailbox shared with a peer. */
+/** Sends a control record of a conversation to one peer, signed and sealed. */
 export interface GroupMailboxDirectLink {
-  send(peerIdentityId: string, plaintext: Uint8Array): Promise<void>;
+  send(
+    conversationId: string,
+    peerIdentityId: string,
+    plaintext: Uint8Array,
+  ): Promise<void>;
 }

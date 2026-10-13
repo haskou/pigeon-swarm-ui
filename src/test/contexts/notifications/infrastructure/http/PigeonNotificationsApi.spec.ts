@@ -63,7 +63,8 @@ describe(PigeonNotificationsApi.name, () => {
       publicMutationSignerAt(),
     );
     const invitation = { id: 'invitation' } as NotificationResource;
-    const path = '/notifications/?limit=100&beforeNotificationId=invitation%3Aa';
+    const path =
+      '/notifications/?limit=100&beforeNotificationId=invitation%3Aa';
 
     http.request.mockResolvedValue({ results: [invitation] });
     signer.headers.mockResolvedValue({ signature: 'signed' });
