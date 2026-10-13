@@ -35,9 +35,12 @@ E2E_NETWORK_ID=<network-id> yarn test:e2e
 `direct-message-sync.spec.ts` (1:1 send and receive across two isolated browser
 contexts) and `direct-message-outbox.spec.ts` (a 1:1 send made while the
 recipient's inbox is absent survives a reload and is delivered once the
-recipient accepts) run against a real node. The `real-node-e2e` job in
+recipient accepts) run against a real node on `desktop-chromium`,
+`desktop-firefox` and `mobile-chromium`. `community-mls-kick.spec.ts`
+(moderation: an owner removes a member from an encrypted community) runs on
+`desktop-chromium` only because it is slow. The `real-node-e2e` job in
 `.github/workflows/ci.yml` builds the node image from the pins below and runs
-all three specs on `desktop-chromium`. It is the check that catches UI and node
+these specs. It is the check that catches UI and node
 contract breaks before merge.
 
 The pins are:
@@ -64,7 +67,7 @@ PIGEON_NODE_IMAGE=pigeon-swarm-node:local yarn test:e2e:real-node
 ```
 
 The script starts the image on `127.0.0.1:8080`, registers a network through the
-node API, runs both specs, then removes the container. A failed run prints the
+node API, runs the specs, then removes the container. A failed run prints the
 last 200 node log lines. `yarn test:ci` runs the unit suites followed by this
 suite and needs `PIGEON_NODE_IMAGE` set.
 
