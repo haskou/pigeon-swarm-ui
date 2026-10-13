@@ -9,10 +9,10 @@ export class DevicePairingMaterial {
     private readonly identityKeyPair: KeyPair,
     private readonly recoveryAuthorityKeyPair: KeyPair,
     private readonly rootKey: UserRootKey,
-    private readonly historyTransferSecret?: SymmetricKey,
+    private readonly historyTransferSecret: SymmetricKey,
   ) {}
 
-  public getHistoryTransferSecret(): SymmetricKey | undefined {
+  public getHistoryTransferSecret(): SymmetricKey {
     return this.historyTransferSecret;
   }
 

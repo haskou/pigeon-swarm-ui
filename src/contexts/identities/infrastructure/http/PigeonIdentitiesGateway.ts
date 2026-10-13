@@ -103,15 +103,19 @@ export class PigeonIdentitiesGateway {
       );
     }
 
+    // Every completion carries the secret. A failed publish leaves the transfer
+    // partial or absent, and the new device imports whatever was sent.
     const historyTransferSecret = SymmetricKey.generate();
-    const published = await this.pairingHistory.publish(
+
+    await this.pairingHistory.publish(
       opened,
       historyTransferSecret.getBuffer(),
     );
+
     const result = await this.deviceAuthorization.authorizePairing(
       opened,
       requestCode,
-      published ? historyTransferSecret : undefined,
+      historyTransferSecret,
     );
     // The root is kept, so the new device opens the keychain's root. A failed
     // reseal is recorded and retried on the next unlock, and the completion
@@ -189,12 +193,10 @@ export class PigeonIdentitiesGateway {
 
     const result = await this.identityLogin.hydrate(rooted, onProgress);
 
-    if (paired.historyTransferSecret) {
-      await this.pairingHistory.receive(
-        result.session,
-        paired.historyTransferSecret.getBuffer(),
-      );
-    }
+    await this.pairingHistory.receive(
+      result.session,
+      paired.historyTransferSecret.getBuffer(),
+    );
 
     return result;
   }

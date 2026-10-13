@@ -220,7 +220,7 @@ export class PigeonDeviceAuthorizationApi {
   public async authorizePairing(
     session: Session,
     requestCode: DevicePairingCode,
-    historyTransferSecret?: SymmetricKey,
+    historyTransferSecret: SymmetricKey,
   ): Promise<DevicePairingAuthorization> {
     const acceptedAt = new Timestamp(this.clock());
     const request = DevicePairingRequest.fromCode(requestCode, acceptedAt);

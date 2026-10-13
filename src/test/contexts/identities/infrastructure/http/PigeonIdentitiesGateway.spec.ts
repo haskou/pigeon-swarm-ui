@@ -204,7 +204,7 @@ describe(PigeonIdentitiesGateway.name, () => {
       expect(authorization.authorizePairing).toHaveBeenCalledWith(
         rooted,
         requestCode,
-        undefined,
+        expect.any(SymmetricKey),
       );
       expect(recovery.resealAfterPairing).toHaveBeenCalledWith(next, root);
       expect(result.completionCode).toBe('completion-code');
@@ -346,7 +346,10 @@ describe(PigeonIdentitiesGateway.name, () => {
         gatewayDouble();
       const pending = { identity: { id: 'identity-1' } } as unknown as Session;
       profile.get.mockResolvedValue(identity());
-      authorization.completePairing.mockResolvedValue({ session: pending });
+      authorization.completePairing.mockResolvedValue({
+        historyTransferSecret: SymmetricKey.generate(),
+        session: pending,
+      });
       sealedRoot.current.mockRejectedValue(
         new Error('keychain head is unreadable'),
       );

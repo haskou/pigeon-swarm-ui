@@ -5,8 +5,8 @@ import type { Session } from '../session/Session';
  * in its completion. Neither call throws.
  */
 export interface DevicePairingHistory {
-  /** Publishes this identity's history. Resolves false when any part fails. */
-  publish(session: Session, secret: Uint8Array): Promise<boolean>;
+  /** Publishes this identity's history; a failure leaves it partial or gone. */
+  publish(session: Session, secret: Uint8Array): Promise<void>;
   /** Imports the history published under `secret` into a rooted session. */
   receive(session: Session, secret: Uint8Array): Promise<void>;
 }
