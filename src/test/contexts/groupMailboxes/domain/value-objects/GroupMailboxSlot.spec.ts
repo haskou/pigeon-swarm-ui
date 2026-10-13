@@ -37,11 +37,16 @@ describe(GroupMailboxSlot.name, () => {
   it('never echoes the rejected value', () => {
     const secret = 'secret-generation-material';
 
-    expect(() => GroupMailboxGenerationSecret.fromString(secret)).toThrow(
-      expect.not.objectContaining({
-        message: expect.stringContaining(secret),
-      }),
-    );
+    let rejection: unknown;
+
+    try {
+      GroupMailboxGenerationSecret.fromString(secret);
+    } catch (error) {
+      rejection = error;
+    }
+
+    expect(rejection).toBeInstanceOf(InvalidFormatError);
+    expect(String(rejection)).not.toContain(secret);
   });
 
   it('keeps a slot and a generation secret of the same bytes distinct', () => {
