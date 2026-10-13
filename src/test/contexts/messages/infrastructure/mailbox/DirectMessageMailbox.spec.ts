@@ -3458,6 +3458,56 @@ describe(DirectMessageMailbox.name, () => {
       expect(phoneApplied).toEqual([['message-1'], ['message-2']]);
     });
 
+    it("prunes a revoked device's old root readers when the inboxes open, before any read", async () => {
+      const keys = keysFor('bob');
+      const { projection } = setup();
+      const laptop = 'device-credential-bob-laptop';
+      const rotatedRoot = Buffer.alloc(32, 6);
+      const rotatedPhone = {
+        ...session('bob'),
+        deviceSealedRootKey: SymmetricKey.fromBuffer(rotatedRoot),
+        previousDeviceSealedRootKey: SymmetricKey.fromBuffer(rootFor('bob')),
+      } as unknown as Session;
+      const { readerHashes, wire } = nodeMailboxClient();
+      const phoneStore = memoryStore();
+      const opened = await mailboxFor(wire, phoneStore, projection, [
+        credentialFor('bob'),
+        laptop,
+      ]).openInboxes(
+        session('bob'),
+        [conversation],
+        new AbortController().signal,
+      );
+      await wire.addReader(
+        keys.mailboxId,
+        MailboxReadToken.derive(rootFor('bob'), keys.mailboxId),
+        MailboxCapability.hash(
+          MailboxReadToken.deriveDevice(rootFor('bob'), keys.mailboxId, laptop),
+        ),
+      );
+
+      // The revoke's session update reopens every inbox, and the open prunes.
+      const reopened = await mailboxFor(wire, phoneStore, projection, [
+        credentialFor('bob'),
+      ]).openInboxes(
+        rotatedPhone,
+        [conversation],
+        new AbortController().signal,
+      );
+
+      expect([opened, reopened]).toEqual([true, true]);
+      expect(readerHashes().sort()).toEqual(
+        hashed(
+          MailboxReadToken.derive(rotatedRoot, keys.mailboxId),
+          MailboxReadToken.deriveDevice(
+            rotatedRoot,
+            keys.mailboxId,
+            credentialFor('bob'),
+          ),
+        ),
+      );
+    });
+
     describe('retried writes', () => {
       beforeEach(() => {
         jest.useRealTimers();
