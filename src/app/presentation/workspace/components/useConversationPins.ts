@@ -122,21 +122,12 @@ export function useConversationPins(
 
     closeMessageContextMenu();
     onError(null);
-    const createdAt = Date.now();
     try {
-      if (activeConversation.type === 'one-to-one') {
-        await applicationContainer.directMessages.pin(
-          session,
-          activeConversation,
-          { action: 'pin', createdAt, messageId: message.id },
-        );
-      } else {
-        await applicationContainer.messages.pin(
-          session,
-          activeConversation.id,
-          message.id,
-        );
-      }
+      await applicationContainer.messages.pin(
+        session,
+        activeConversation,
+        message.id,
+      );
       setPinnedMessageIds((current) => new Set(current).add(message.id));
     } catch (caught) {
       onError(toUserErrorMessage(caught, copy.messages.pinError));
@@ -146,21 +137,12 @@ export function useConversationPins(
   const unpinFromCollection = async (message: ChatMessage) => {
     if (!activeConversation) return;
 
-    const createdAt = Date.now();
     try {
-      if (activeConversation.type === 'one-to-one') {
-        await applicationContainer.directMessages.pin(
-          session,
-          activeConversation,
-          { action: 'unpin', createdAt, messageId: message.id },
-        );
-      } else {
-        await applicationContainer.messages.unpin(
-          session,
-          activeConversation.id,
-          message.id,
-        );
-      }
+      await applicationContainer.messages.unpin(
+        session,
+        activeConversation,
+        message.id,
+      );
       setPinnedMessageIds((current) => withoutMessage(current, message.id));
       setCollection((current) =>
         current

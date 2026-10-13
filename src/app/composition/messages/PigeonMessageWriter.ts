@@ -1,5 +1,7 @@
 import { UUID } from '@haskou/value-objects';
 
+import type { ConversationAccessContexts } from '../../../contexts/conversations/infrastructure/http/ConversationAccessContexts';
+import type { ConversationResource } from '../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { IdentityAccessContexts } from '../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
 import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { MessageDeleter } from '../../../contexts/messages/application/delete-message/MessageDeleter';
@@ -18,6 +20,7 @@ import { SendMessageMessage } from '../../../contexts/messages/application/send-
 export class PigeonMessageWriter {
   public constructor(
     private readonly identityContexts: IdentityAccessContexts,
+    private readonly conversationContexts: ConversationAccessContexts,
     private readonly operationContexts: MessageOperationContexts,
     private readonly mapper: MessageMapper,
     private readonly sender: MessageSender,
@@ -44,14 +47,18 @@ export class PigeonMessageWriter {
 
   public async delete(
     session: Session,
-    conversationId: string,
+    conversation: ConversationResource,
     messageId: string,
   ): Promise<void> {
     this.register(session);
+    this.conversationContexts.registerOpen(conversation);
     await this.deleter.delete(
-      new DeleteMessageMessage(
-        this.mutationInput(session, conversationId, messageId),
-      ),
+      new DeleteMessageMessage({
+        authorIdentityId: session.identity.id,
+        conversationId: conversation.id,
+        conversationType: conversation.type,
+        messageId,
+      }),
     );
   }
 

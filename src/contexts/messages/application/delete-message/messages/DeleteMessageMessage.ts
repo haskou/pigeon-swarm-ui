@@ -1,7 +1,6 @@
-import { Timestamp } from '@haskou/value-objects';
-
 import { MessageAuthorId } from '../../../domain/value-objects/MessageAuthorId';
 import { MessageConversationId } from '../../../domain/value-objects/MessageConversationId';
+import { MessageConversationType } from '../../../domain/value-objects/MessageConversationType';
 import { MessageId } from '../../../domain/value-objects/MessageId';
 
 export class DeleteMessageMessage {
@@ -9,8 +8,8 @@ export class DeleteMessageMessage {
     private readonly input: {
       authorIdentityId: string;
       conversationId: string;
+      conversationType: string;
       messageId: string;
-      occurredAt: number;
     },
   ) {}
 
@@ -22,11 +21,11 @@ export class DeleteMessageMessage {
     return MessageConversationId.fromString(this.input.conversationId);
   }
 
-  public getMessageId(): MessageId {
-    return MessageId.fromString(this.input.messageId);
+  public getConversationType(): MessageConversationType {
+    return MessageConversationType.fromPrimitives(this.input.conversationType);
   }
 
-  public getOccurredAt(): Timestamp {
-    return new Timestamp(this.input.occurredAt);
+  public getMessageId(): MessageId {
+    return MessageId.fromString(this.input.messageId);
   }
 }

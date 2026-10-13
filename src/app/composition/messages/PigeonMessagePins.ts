@@ -1,3 +1,5 @@
+import type { ConversationAccessContexts } from '../../../contexts/conversations/infrastructure/http/ConversationAccessContexts';
+import type { ConversationResource } from '../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { IdentityAccessContexts } from '../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
 import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { PinnedMessagesSearcher } from '../../../contexts/messages/application/list-message-pins/PinnedMessagesSearcher';
@@ -13,6 +15,7 @@ import { UnpinMessageMessage } from '../../../contexts/messages/application/unpi
 export class PigeonMessagePins {
   public constructor(
     private readonly identityContexts: IdentityAccessContexts,
+    private readonly conversationContexts: ConversationAccessContexts,
     private readonly mapper: MessageMapper,
     private readonly searcher: PinnedMessagesSearcher,
     private readonly pinner: MessagePinner,
@@ -21,14 +24,17 @@ export class PigeonMessagePins {
 
   private mutationInput(
     session: Session,
-    conversationId: string,
+    conversation: ConversationResource,
     messageId: string,
   ) {
+    this.identityContexts.register(session);
+    this.conversationContexts.registerOpen(conversation);
+
     return {
       authorIdentityId: session.identity.id,
-      conversationId,
+      conversationId: conversation.id,
+      conversationType: conversation.type,
       messageId,
-      occurredAt: Date.now(),
     };
   }
 
@@ -58,26 +64,24 @@ export class PigeonMessagePins {
 
   public async pin(
     session: Session,
-    conversationId: string,
+    conversation: ConversationResource,
     messageId: string,
   ): Promise<void> {
-    this.identityContexts.register(session);
     await this.pinner.pin(
       new PinMessageMessage(
-        this.mutationInput(session, conversationId, messageId),
+        this.mutationInput(session, conversation, messageId),
       ),
     );
   }
 
   public async unpin(
     session: Session,
-    conversationId: string,
+    conversation: ConversationResource,
     messageId: string,
   ): Promise<void> {
-    this.identityContexts.register(session);
     await this.unpinner.unpin(
       new UnpinMessageMessage(
-        this.mutationInput(session, conversationId, messageId),
+        this.mutationInput(session, conversation, messageId),
       ),
     );
   }

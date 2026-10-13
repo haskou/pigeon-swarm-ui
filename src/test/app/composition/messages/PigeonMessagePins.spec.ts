@@ -7,8 +7,8 @@ import type { MessagePinner } from '../../../../contexts/messages/application/pi
 import type { MessageUnpinner } from '../../../../contexts/messages/application/unpin-message/MessageUnpinner';
 
 import { PigeonMessagePins } from '../../../../app/composition/messages/PigeonMessagePins';
-import { ConversationAccessContexts } from '../../../../contexts/conversations/infrastructure/http/ConversationAccessContexts';
 import { ConversationId } from '../../../../contexts/conversations/domain/value-objects/ConversationId';
+import { ConversationAccessContexts } from '../../../../contexts/conversations/infrastructure/http/ConversationAccessContexts';
 import { IdentityAccessContexts } from '../../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
 import { PinnedMessage } from '../../../../contexts/messages/domain/entities/PinnedMessage';
 import { MessageMapper } from '../../../../contexts/messages/infrastructure/http/MessageMapper';

@@ -225,19 +225,11 @@ export function useConversationMessageActions({
       };
 
       try {
-        if (activeConversation.type === 'one-to-one') {
-          await applicationContainer.directMessages.delete(
-            session,
-            activeConversation,
-            message.id,
-          );
-        } else {
-          await applicationContainer.messages.delete(
-            session,
-            activeConversation.id,
-            message.id,
-          );
-        }
+        await applicationContainer.messages.delete(
+          session,
+          activeConversation,
+          message.id,
+        );
         onMessagesChange(removeMessage);
       } catch (caught) {
         onErrorChange(toUserErrorMessage(caught, copy.messages.deleteError));
@@ -339,32 +331,19 @@ export function useConversationMessageActions({
       onMessagesChange(reactionUpdate(action));
 
       try {
-        if (activeConversation.type === 'one-to-one') {
-          await applicationContainer.directMessages.reaction(
-            session,
-            activeConversation,
-            {
-              action,
-              createdAt: Date.now(),
+        await (reacted
+          ? applicationContainer.messages.removeReactionFrom(
+              session,
+              activeConversation,
+              message.id,
               emoji,
-              messageId: message.id,
-            },
-          );
-        } else if (reacted) {
-          await applicationContainer.messages.removeReactionFrom(
-            session,
-            activeConversation.id,
-            message.id,
-            emoji,
-          );
-        } else {
-          await applicationContainer.messages.addReactionTo(
-            session,
-            activeConversation.id,
-            message.id,
-            emoji,
-          );
-        }
+            )
+          : applicationContainer.messages.addReactionTo(
+              session,
+              activeConversation,
+              message.id,
+              emoji,
+            ));
       } catch (caught) {
         onErrorChange(toUserErrorMessage(caught, copy.messages.reactionError));
         onMessagesChange(reactionUpdate(reacted ? 'add' : 'remove'));

@@ -87,9 +87,10 @@ describe('message mutation use cases', () => {
     await new MessageEditor(repository).edit(
       new EditMessageMessage({ ...mutation, content: 'Updated' }),
     );
-    await new MessageDeleter(repository, mock<DirectMessageRepository>()).delete(
-      new DeleteMessageMessage(groupMutation),
-    );
+    await new MessageDeleter(
+      repository,
+      mock<DirectMessageRepository>(),
+    ).delete(new DeleteMessageMessage(groupMutation));
 
     expect(aggregate.toPrimitives()).toMatchObject({
       content: 'Updated',
@@ -114,7 +115,9 @@ describe('message mutation use cases', () => {
     await new MessageReactionRemover(
       repository,
       mock<DirectMessageRepository>(),
-    ).remove(new RemoveMessageReactionMessage({ ...groupMutation, emoji: '👍' }));
+    ).remove(
+      new RemoveMessageReactionMessage({ ...groupMutation, emoji: '👍' }),
+    );
     expect(aggregate.reactionCount()).toBe(0);
   });
 

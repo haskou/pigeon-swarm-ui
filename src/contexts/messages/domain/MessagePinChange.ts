@@ -5,6 +5,14 @@ import { MessagePinAction } from './value-objects/MessagePinAction';
 
 /** One pin or unpin of a message, stamped with when its author made it. */
 export class MessagePinChange {
+  public static create(
+    action: MessagePinAction,
+    messageId: MessageId,
+    createdAt: Timestamp,
+  ): MessagePinChange {
+    return new MessagePinChange(action, createdAt, messageId);
+  }
+
   public static fromPrimitives(primitives: {
     action: string;
     createdAt: number;
