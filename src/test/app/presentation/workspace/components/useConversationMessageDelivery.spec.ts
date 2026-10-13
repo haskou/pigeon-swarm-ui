@@ -34,13 +34,14 @@ jest.mock('react', () => ({
 }));
 jest.mock('../../../../../app/composition/applicationContainer', () => ({
   applicationContainer: {
-    directMessages: { send: jest.fn() },
+    directMessages: { retry: jest.fn(), send: jest.fn() },
     messages: { send: jest.fn() },
     stickers: { markUsed: jest.fn() },
   },
 }));
 
 const directSend = jest.mocked(applicationContainer.directMessages.send);
+const directRetry = jest.mocked(applicationContainer.directMessages.retry);
 const legacySend = jest.mocked(applicationContainer.messages.send);
 const markUsed = jest.mocked(applicationContainer.stickers.markUsed);
 
@@ -63,8 +64,8 @@ const sentMessage = {
   content: 'hello',
   encrypted: false,
   id: 'message-1',
-  raw: { id: 'message-1', type: 'sent' },
   mine: true,
+  raw: { id: 'message-1', type: 'sent' },
   reactions: [],
   timestamp: 2000,
 } as unknown as ChatMessage;
@@ -72,6 +73,10 @@ const sticker = {
   id: 'sticker-1',
   packId: 'pack-1',
 } as unknown as StickerMessageReference;
+const commandIdentity = expect.objectContaining({
+  createdAt: expect.any(Number),
+  id: expect.any(String),
+});
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -79,10 +84,7 @@ type Deferred<T> = {
 };
 
 function deferred<T>(): Deferred<T> {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((next) => {
-    resolve = next;
-  });
+  const { promise, resolve } = Promise.withResolvers<T>();
 
   return { promise, resolve };
 }
@@ -93,8 +95,22 @@ async function flushMicrotasks(): Promise<void> {
   }
 }
 
-async function drain(queue: { current: unknown }): Promise<void> {
-  await (queue.current as Promise<void>);
+// Waits for every chained microtask, including the group send queue.
+async function drain(): Promise<void> {
+  const { promise, resolve } = Promise.withResolvers<void>();
+
+  setTimeout(resolve, 0);
+  await promise;
+}
+
+function onlyMessage(delivery: {
+  state: { messages: ChatMessage[] };
+}): ChatMessage {
+  const [message] = delivery.state.messages;
+
+  if (!message) throw new Error('expected one message');
+
+  return message;
 }
 
 function mountDelivery(initialConversation = conversation) {
@@ -134,7 +150,6 @@ function mountDelivery(initialConversation = conversation) {
   return {
     ...delivery,
     onErrorChange,
-    queue: mockRefs[mockRefs.length - 1],
     rerender: (activeConversation: ConversationResource) => {
       render(activeConversation);
     },
@@ -147,6 +162,7 @@ describe('useConversationMessageDelivery one-to-one mailbox send', () => {
     jest.resetAllMocks();
     mockRefs.length = 0;
     directSend.mockResolvedValue(sentMessage);
+    directRetry.mockResolvedValue(null);
     legacySend.mockResolvedValue(sentMessage);
     markUsed.mockResolvedValue(undefined);
   });
@@ -155,7 +171,7 @@ describe('useConversationMessageDelivery one-to-one mailbox send', () => {
     const delivery = mountDelivery();
 
     await delivery.sendMessage('hello', [], {});
-    await drain(delivery.queue);
+    await drain();
 
     expect(directSend).toHaveBeenCalledTimes(1);
     expect(directSend).toHaveBeenCalledWith(
@@ -163,6 +179,7 @@ describe('useConversationMessageDelivery one-to-one mailbox send', () => {
       conversation,
       'hello',
       expect.objectContaining({ attachments: [], previousMessageIds: [] }),
+      commandIdentity,
     );
     expect(legacySend).not.toHaveBeenCalled();
   });
@@ -171,7 +188,7 @@ describe('useConversationMessageDelivery one-to-one mailbox send', () => {
     const delivery = mountDelivery();
 
     await delivery.sendMessage('hello', [], {});
-    await drain(delivery.queue);
+    await drain();
 
     expect(directSend).toHaveBeenCalledWith(
       session,
@@ -183,14 +200,51 @@ describe('useConversationMessageDelivery one-to-one mailbox send', () => {
           recipientIdentityId: 'identity-2',
         },
       }),
+      commandIdentity,
     );
+  });
+
+  it('uses the optimistic message id as the mailbox record id', async () => {
+    const pendingSend = deferred<ChatMessage>();
+
+    directSend.mockReturnValue(pendingSend.promise);
+    const delivery = mountDelivery();
+
+    await delivery.sendMessage('hello', [], {});
+    await flushMicrotasks();
+
+    expect(directSend.mock.calls[0]?.[4]).toEqual({
+      createdAt: onlyMessage(delivery).timestamp,
+      id: onlyMessage(delivery).id,
+    });
+
+    pendingSend.resolve(sentMessage);
+    await drain();
+  });
+
+  it('starts the next one-to-one send without waiting for an earlier one to finish', async () => {
+    const firstSend = deferred<ChatMessage>();
+
+    directSend
+      .mockReturnValueOnce(firstSend.promise)
+      .mockResolvedValueOnce(sentMessage);
+    const delivery = mountDelivery();
+
+    await delivery.sendMessage('first', [], {});
+    await delivery.sendMessage('second', [], {});
+    await flushMicrotasks();
+
+    expect(directSend).toHaveBeenCalledTimes(2);
+
+    firstSend.resolve(sentMessage);
+    await drain();
   });
 
   it('shows the mailbox-projected sent message in place of the optimistic one', async () => {
     const delivery = mountDelivery();
 
     await delivery.sendMessage('hello', [], {});
-    await drain(delivery.queue);
+    await drain();
 
     expect(delivery.state.error).toBeNull();
     expect(delivery.state.messages).toEqual([sentMessage]);
@@ -201,7 +255,7 @@ describe('useConversationMessageDelivery one-to-one mailbox send', () => {
     const delivery = mountDelivery();
 
     await delivery.sendMessage('hello', [], {});
-    await drain(delivery.queue);
+    await drain();
 
     expect(delivery.state.error).toBe('send refused');
     expect(delivery.state.messages).toEqual([
@@ -215,7 +269,7 @@ describe('useConversationMessageDelivery one-to-one mailbox send', () => {
     const delivery = mountDelivery();
 
     await delivery.sendMessage('hello', [], {});
-    await drain(delivery.queue);
+    await drain();
 
     expect(delivery.state.error).toBe(copy.errors.notFound);
     expect(delivery.state.messages).toEqual([
@@ -224,16 +278,61 @@ describe('useConversationMessageDelivery one-to-one mailbox send', () => {
     expect(legacySend).not.toHaveBeenCalled();
   });
 
+  it('retries a queued one-to-one message through the outbox without sending it again', async () => {
+    directSend.mockRejectedValueOnce(new Error('send refused'));
+    directRetry.mockResolvedValueOnce(sentMessage);
+    const delivery = mountDelivery();
+
+    await delivery.sendMessage('hello', [], {});
+    await drain();
+
+    const failed = onlyMessage(delivery);
+
+    delivery.retryMessage(failed);
+    await drain();
+
+    expect(directRetry).toHaveBeenCalledWith(session, conversation, failed.id);
+    expect(directSend).toHaveBeenCalledTimes(1);
+    expect(delivery.state.messages).toEqual([sentMessage]);
+    expect(delivery.state.error).toBeNull();
+  });
+
+  it('sends a failed one-to-one message again with its record id when the outbox never queued it', async () => {
+    directSend
+      .mockRejectedValueOnce(new Error('send refused'))
+      .mockResolvedValueOnce(sentMessage);
+    directRetry.mockResolvedValueOnce(null);
+    const delivery = mountDelivery();
+
+    await delivery.sendMessage('hello', [], {});
+    await drain();
+
+    const failed = onlyMessage(delivery);
+
+    delivery.retryMessage(failed);
+    await drain();
+
+    expect(directSend).toHaveBeenCalledTimes(2);
+    expect(directSend).toHaveBeenLastCalledWith(
+      session,
+      conversation,
+      'hello',
+      expect.anything(),
+      { createdAt: expect.any(Number), id: failed.id },
+    );
+    expect(delivery.state.messages).toEqual([sentMessage]);
+  });
+
   it('clears a previous send error when the next one-to-one send starts', async () => {
     directSend.mockRejectedValueOnce(new Error('send refused'));
     const delivery = mountDelivery();
 
     await delivery.sendMessage('hello', [], {});
-    await drain(delivery.queue);
+    await drain();
     expect(delivery.state.error).toBe('send refused');
 
     await delivery.sendMessage('again', [], {});
-    await drain(delivery.queue);
+    await drain();
 
     expect(delivery.state.error).toBeNull();
   });
@@ -242,13 +341,14 @@ describe('useConversationMessageDelivery one-to-one mailbox send', () => {
     const delivery = mountDelivery();
 
     await delivery.sendSticker(sticker);
-    await drain(delivery.queue);
+    await drain();
 
     expect(directSend).toHaveBeenCalledWith(
       session,
       conversation,
       '',
       expect.objectContaining({ sticker }),
+      commandIdentity,
     );
     expect(legacySend).not.toHaveBeenCalled();
     expect(markUsed).toHaveBeenCalledWith(session, sticker);
@@ -261,7 +361,7 @@ describe('useConversationMessageDelivery one-to-one mailbox send', () => {
     const delivery = mountDelivery();
 
     await delivery.sendSticker(sticker);
-    await drain(delivery.queue);
+    await drain();
 
     expect(directSend).toHaveBeenCalledTimes(1);
     expect(delivery.state.error).toBeNull();
@@ -274,7 +374,7 @@ describe('useConversationMessageDelivery one-to-one mailbox send', () => {
 
     const unhandled = await captureUnhandledRejections(async () => {
       await delivery.sendSticker(sticker);
-      await drain(delivery.queue);
+      await drain();
     });
 
     expect(unhandled).toEqual([]);
@@ -298,7 +398,7 @@ describe('useConversationMessageDelivery one-to-one mailbox send', () => {
     ]);
 
     pendingSend.resolve(sentMessage);
-    await drain(delivery.queue);
+    await drain();
 
     expect(delivery.state.messages).toEqual([sentMessage]);
   });
@@ -317,7 +417,7 @@ describe('useConversationMessageDelivery group send', () => {
     const delivery = mountDelivery(groupConversation);
 
     await delivery.sendMessage('hello', [], {});
-    await drain(delivery.queue);
+    await drain();
 
     expect(legacySend).toHaveBeenCalledWith(
       session,
@@ -332,7 +432,7 @@ describe('useConversationMessageDelivery group send', () => {
     const delivery = mountDelivery(groupConversation);
 
     await delivery.sendMessage('hello', [], {});
-    await drain(delivery.queue);
+    await drain();
 
     expect(legacySend).toHaveBeenCalledTimes(1);
     expect(
@@ -345,7 +445,7 @@ describe('useConversationMessageDelivery group send', () => {
     const delivery = mountDelivery(groupConversation);
 
     await delivery.sendMessage('hello', [], {});
-    await drain(delivery.queue);
+    await drain();
 
     expect(delivery.state.error).toBe('send refused');
     expect(delivery.state.messages).toEqual([
