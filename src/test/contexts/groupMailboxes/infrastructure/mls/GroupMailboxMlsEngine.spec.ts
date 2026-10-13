@@ -2,8 +2,8 @@ import 'fake-indexeddb/auto';
 
 import { IndexedDbMlsStateStore } from '../../../../../contexts/communities/infrastructure/mls/IndexedDbMlsStateStore';
 import { MlsRejectedError } from '../../../../../contexts/communities/infrastructure/mls/MlsRejectedError';
-import { GroupMailboxMlsEngine } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxMlsEngine';
 import { IndexedDbGroupMailboxGenerationStore } from '../../../../../contexts/groupMailboxes/infrastructure/indexeddb/IndexedDbGroupMailboxGenerationStore';
+import { GroupMailboxMlsEngine } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxMlsEngine';
 
 const text = new TextEncoder();
 const read = (bytes: Uint8Array): string => new TextDecoder().decode(bytes);
@@ -26,7 +26,7 @@ const engine = (
       `${databaseName}-generations`,
       identityId,
     ),
-    async () => roster,
+    () => Promise.resolve(roster),
     () => clock,
   );
 
@@ -170,6 +170,24 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
       bob.applyCommit(CONVERSATION, tampered),
     ).rejects.toBeInstanceOf(MlsRejectedError);
     expect((await bob.generation(CONVERSATION)).index).toBe(0);
+  });
+
+  it('keeps a removed member unable to send after a restart', async () => {
+    const alice = engine('alice');
+    await alice.createGroup(CONVERSATION);
+    const carol = engine('carol', 'd1', 'carol-restart');
+    const added = await alice.add(CONVERSATION, [
+      await carol.createKeyPackage(),
+    ]);
+    await carol.join(CONVERSATION, added.welcome!, added.generation);
+    const removal = await alice.remove(CONVERSATION, ['carol']);
+    await carol.applyCommit(CONVERSATION, removal!.commit);
+    const restarted = engine('carol', 'd1', 'carol-restart');
+
+    await expect(
+      restarted.encrypt(CONVERSATION, text.encode('still here?')),
+    ).rejects.toBeInstanceOf(MlsRejectedError);
+    expect((await restarted.generation(CONVERSATION)).index).toBe(0);
   });
 
   it('rejects a replayed welcome, also after the member was removed', async () => {
