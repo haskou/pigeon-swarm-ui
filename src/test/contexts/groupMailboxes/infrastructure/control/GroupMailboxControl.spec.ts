@@ -142,7 +142,10 @@ const member = (name: string): Member => {
       engine,
       () => Promise.resolve(roster),
       {
-        send: (peerIdentityId, plaintext) => {
+        send: (conversationId, peerIdentityId, plaintext) => {
+          if (conversationId !== CONVERSATION) {
+            return Promise.reject(new Error('letter for another conversation'));
+          }
           members.get(peerIdentityId)?.inbox.push({ from: name, plaintext });
 
           return Promise.resolve();
