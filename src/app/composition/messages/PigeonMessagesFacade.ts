@@ -1,3 +1,4 @@
+import type { ConversationResource } from '../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { MessageResource } from '../../../contexts/messages/infrastructure/http/MessageResource';
 import type { PigeonMessagesGateway } from '../../../contexts/messages/infrastructure/http/PigeonMessagesGateway';
@@ -26,11 +27,11 @@ export class PigeonMessagesFacade {
 
   public async addReactionTo(
     session: Session,
-    conversationId: string,
+    conversation: ConversationResource,
     messageId: string,
     emoji: string,
   ): Promise<void> {
-    await this.reactions.add(session, conversationId, messageId, emoji);
+    await this.reactions.add(session, conversation, messageId, emoji);
   }
 
   public async createLinkPreview(
@@ -50,10 +51,10 @@ export class PigeonMessagesFacade {
 
   public async delete(
     session: Session,
-    conversationId: string,
+    conversation: ConversationResource,
     messageId: string,
   ): Promise<void> {
-    await this.writer.delete(session, conversationId, messageId);
+    await this.writer.delete(session, conversation, messageId);
   }
 
   public async deleteDraft(
@@ -138,19 +139,19 @@ export class PigeonMessagesFacade {
 
   public async pin(
     session: Session,
-    conversationId: string,
+    conversation: ConversationResource,
     messageId: string,
   ): Promise<void> {
-    await this.pins.pin(session, conversationId, messageId);
+    await this.pins.pin(session, conversation, messageId);
   }
 
   public async removeReactionFrom(
     session: Session,
-    conversationId: string,
+    conversation: ConversationResource,
     messageId: string,
     emoji: string,
   ): Promise<void> {
-    await this.reactions.remove(session, conversationId, messageId, emoji);
+    await this.reactions.remove(session, conversation, messageId, emoji);
   }
 
   public async saveDraft(
@@ -173,9 +174,9 @@ export class PigeonMessagesFacade {
 
   public async unpin(
     session: Session,
-    conversationId: string,
+    conversation: ConversationResource,
     messageId: string,
   ): Promise<void> {
-    await this.pins.unpin(session, conversationId, messageId);
+    await this.pins.unpin(session, conversation, messageId);
   }
 }

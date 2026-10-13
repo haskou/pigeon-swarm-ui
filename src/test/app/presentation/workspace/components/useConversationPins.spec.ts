@@ -81,65 +81,54 @@ function mountPins({
   return { onError, pins };
 }
 
-describe('useConversationPins one-to-one mailbox', () => {
+describe('useConversationPins', () => {
   beforeEach(() => {
     jest.resetAllMocks();
   });
 
-  it('pins a one-to-one message through the mailbox only', async () => {
-    jest
-      .mocked(applicationContainer.directMessages.pin)
-      .mockResolvedValue(undefined);
+  it('pins a one-to-one message through the messages use cases only', async () => {
+    jest.mocked(applicationContainer.messages.pin).mockResolvedValue(undefined);
     const { pins } = mountPins();
 
     await pins.pin(message);
 
-    expect(applicationContainer.directMessages.pin).toHaveBeenCalledWith(
+    expect(applicationContainer.messages.pin).toHaveBeenCalledWith(
       session,
       oneToOne,
-      {
-        action: 'pin',
-        createdAt: expect.any(Number),
-        messageId: 'message-1',
-      },
+      'message-1',
     );
-    expect(applicationContainer.messages.pin).not.toHaveBeenCalled();
+    expect(applicationContainer.directMessages.pin).not.toHaveBeenCalled();
     expect(pinnedUpdaterOf(pins.setPinnedMessageIds)(new Set())).toEqual(
       new Set(['message-1']),
     );
   });
 
-  it('shows the pin error and does not mark the message pinned when the mailbox pin rejects', async () => {
+  it('shows the pin error and does not mark the message pinned when the pin rejects', async () => {
     jest
-      .mocked(applicationContainer.directMessages.pin)
+      .mocked(applicationContainer.messages.pin)
       .mockRejectedValue(new Error('pin refused'));
     const { onError, pins } = mountPins();
 
     await pins.pin(message);
 
-    expect(applicationContainer.messages.pin).not.toHaveBeenCalled();
     expect(onError).toHaveBeenLastCalledWith('pin refused');
     expect(pins.setPinnedMessageIds).not.toHaveBeenCalled();
   });
 
-  it('unpins a one-to-one message through the mailbox only', async () => {
+  it('unpins a one-to-one message through the messages use cases only', async () => {
     jest
-      .mocked(applicationContainer.directMessages.pin)
+      .mocked(applicationContainer.messages.unpin)
       .mockResolvedValue(undefined);
     const { pins } = mountPins();
 
     await pins.unpin(message);
 
-    expect(applicationContainer.directMessages.pin).toHaveBeenCalledWith(
+    expect(applicationContainer.messages.unpin).toHaveBeenCalledWith(
       session,
       oneToOne,
-      {
-        action: 'unpin',
-        createdAt: expect.any(Number),
-        messageId: 'message-1',
-      },
+      'message-1',
     );
-    expect(applicationContainer.messages.unpin).not.toHaveBeenCalled();
+    expect(applicationContainer.directMessages.pin).not.toHaveBeenCalled();
     expect(collectionUpdaterOf(pins.setCollection)(pinnedCollection)).toEqual({
       error: null,
       messages: [],
@@ -147,15 +136,14 @@ describe('useConversationPins one-to-one mailbox', () => {
     });
   });
 
-  it('shows the unpin error in the pins view when the mailbox unpin rejects', async () => {
+  it('shows the unpin error in the pins view when the unpin rejects', async () => {
     jest
-      .mocked(applicationContainer.directMessages.pin)
+      .mocked(applicationContainer.messages.unpin)
       .mockRejectedValue(new Error('unpin refused'));
     const { pins } = mountPins();
 
     await pins.unpin(message);
 
-    expect(applicationContainer.messages.unpin).not.toHaveBeenCalled();
     expect(collectionUpdaterOf(pins.setCollection)(pinnedCollection)).toEqual({
       error: 'unpin refused',
       messages: [message],
@@ -177,7 +165,7 @@ describe('useConversationPins one-to-one mailbox', () => {
     });
   });
 
-  it('pins a group message through the legacy endpoint only', async () => {
+  it('pins a group message through the messages use cases only', async () => {
     jest.mocked(applicationContainer.messages.pin).mockResolvedValue(undefined);
     const { pins } = mountPins({ activeConversation: group });
 
@@ -185,7 +173,7 @@ describe('useConversationPins one-to-one mailbox', () => {
 
     expect(applicationContainer.messages.pin).toHaveBeenCalledWith(
       session,
-      'group-1',
+      group,
       'message-1',
     );
     expect(applicationContainer.directMessages.pin).not.toHaveBeenCalled();

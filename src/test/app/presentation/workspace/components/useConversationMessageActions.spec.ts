@@ -47,12 +47,12 @@ const directEdit = jest.mocked(applicationContainer.directMessages.edit);
 const directReaction = jest.mocked(
   applicationContainer.directMessages.reaction,
 );
-const deleteLegacy = jest.mocked(applicationContainer.messages.delete);
+const deleteUseCase = jest.mocked(applicationContainer.messages.delete);
 const editLegacy = jest.mocked(applicationContainer.messages.edit);
-const addReactionLegacy = jest.mocked(
+const addReactionUseCase = jest.mocked(
   applicationContainer.messages.addReactionTo,
 );
-const removeReactionLegacy = jest.mocked(
+const removeReactionUseCase = jest.mocked(
   applicationContainer.messages.removeReactionFrom,
 );
 const loadAroundLegacy = jest.mocked(applicationContainer.messages.loadAround);
@@ -94,7 +94,6 @@ const editEvent = {
   },
   timestamp: 3000,
 } as unknown as ChatMessage;
-const createdAt = 1_700_000_000_000;
 
 function mountActions({
   activeConversation = conversation,
@@ -162,41 +161,40 @@ describe('useConversationMessageActions one-to-one mailbox', () => {
   });
 
   describe('delete', () => {
-    it('deletes a one-to-one message through the mailbox only', async () => {
-      directDelete.mockResolvedValue(undefined);
+    it('deletes a one-to-one message through the messages use cases only', async () => {
+      deleteUseCase.mockResolvedValue(undefined);
       const actions = mountActions();
 
       await actions.deleteMessage(target);
 
-      expect(directDelete).toHaveBeenCalledWith(
+      expect(deleteUseCase).toHaveBeenCalledWith(
         session,
         conversation,
         'message-1',
       );
-      expect(deleteLegacy).not.toHaveBeenCalled();
+      expect(directDelete).not.toHaveBeenCalled();
       expect(actions.state.messages).toEqual([]);
     });
 
-    it('keeps the message and shows the delete error when the mailbox delete rejects', async () => {
-      directDelete.mockRejectedValue(new Error('delete refused'));
+    it('keeps the message and shows the delete error when the delete rejects', async () => {
+      deleteUseCase.mockRejectedValue(new Error('delete refused'));
       const actions = mountActions();
 
       await actions.deleteMessage(target);
 
-      expect(deleteLegacy).not.toHaveBeenCalled();
       expect(actions.state.error).toBe('delete refused');
       expect(actions.state.messages).toEqual([target]);
     });
 
-    it('deletes a group message through the legacy endpoint only', async () => {
-      deleteLegacy.mockResolvedValue(undefined);
+    it('deletes a group message through the messages use cases only', async () => {
+      deleteUseCase.mockResolvedValue(undefined);
       const actions = mountActions({ activeConversation: groupConversation });
 
       await actions.deleteMessage(target);
 
-      expect(deleteLegacy).toHaveBeenCalledWith(
+      expect(deleteUseCase).toHaveBeenCalledWith(
         session,
-        groupConversation.id,
+        groupConversation,
         'message-1',
       );
       expect(directDelete).not.toHaveBeenCalled();
@@ -239,25 +237,23 @@ describe('useConversationMessageActions one-to-one mailbox', () => {
   });
 
   describe('reaction', () => {
-    it('adds a one-to-one reaction through the mailbox only', async () => {
-      jest.spyOn(Date, 'now').mockReturnValue(createdAt);
-      directReaction.mockResolvedValue(undefined);
+    it('adds a one-to-one reaction through the messages use cases only', async () => {
+      addReactionUseCase.mockResolvedValue(undefined);
       const actions = mountActions();
 
       await actions.toggleReaction(target, '👍', false);
 
-      expect(directReaction).toHaveBeenCalledWith(session, conversation, {
-        action: 'add',
-        createdAt,
-        emoji: '👍',
-        messageId: 'message-1',
-      });
-      expect(addReactionLegacy).not.toHaveBeenCalled();
+      expect(addReactionUseCase).toHaveBeenCalledWith(
+        session,
+        conversation,
+        'message-1',
+        '👍',
+      );
+      expect(directReaction).not.toHaveBeenCalled();
     });
 
-    it('removes a one-to-one reaction through the mailbox only', async () => {
-      jest.spyOn(Date, 'now').mockReturnValue(createdAt);
-      directReaction.mockResolvedValue(undefined);
+    it('removes a one-to-one reaction through the messages use cases only', async () => {
+      removeReactionUseCase.mockResolvedValue(undefined);
       const reacted = {
         ...target,
         reactions: [
@@ -272,22 +268,21 @@ describe('useConversationMessageActions one-to-one mailbox', () => {
 
       await actions.toggleReaction(reacted, '👍', true);
 
-      expect(directReaction).toHaveBeenCalledWith(session, conversation, {
-        action: 'remove',
-        createdAt,
-        emoji: '👍',
-        messageId: 'message-1',
-      });
-      expect(removeReactionLegacy).not.toHaveBeenCalled();
+      expect(removeReactionUseCase).toHaveBeenCalledWith(
+        session,
+        conversation,
+        'message-1',
+        '👍',
+      );
+      expect(directReaction).not.toHaveBeenCalled();
     });
 
-    it('shows the reaction error when the mailbox reaction rejects', async () => {
-      directReaction.mockRejectedValue(new Error('reaction refused'));
+    it('shows the reaction error when the reaction rejects', async () => {
+      addReactionUseCase.mockRejectedValue(new Error('reaction refused'));
       const actions = mountActions();
 
       await actions.toggleReaction(target, '👍', false);
 
-      expect(addReactionLegacy).not.toHaveBeenCalled();
       expect(actions.state.error).toBe('reaction refused');
     });
   });

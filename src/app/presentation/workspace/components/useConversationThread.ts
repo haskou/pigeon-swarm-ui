@@ -212,7 +212,7 @@ export function useConversationThread(
     try {
       await applicationContainer.messages.delete(
         session,
-        activeConversation.id,
+        activeConversation,
         message.id,
       );
       setMessages((current) =>

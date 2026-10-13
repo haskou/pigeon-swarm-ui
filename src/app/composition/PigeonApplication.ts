@@ -81,6 +81,7 @@ import { MessageOperationContexts } from '../../contexts/messages/infrastructure
 import { PigeonDraftRepository } from '../../contexts/messages/infrastructure/http/PigeonDraftRepository';
 import { PigeonMessageRepository } from '../../contexts/messages/infrastructure/http/PigeonMessageRepository';
 import { DirectMessageMailbox } from '../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
+import { MailboxDirectMessageRepository } from '../../contexts/messages/infrastructure/mailbox/MailboxDirectMessageRepository';
 import { NetworkNodeClaimer } from '../../contexts/networks/application/claim-network-node/NetworkNodeClaimer';
 import { NetworkCreator } from '../../contexts/networks/application/create-network/NetworkCreator';
 import { PublicNetworkCreator } from '../../contexts/networks/application/create-public-network/PublicNetworkCreator';
@@ -392,6 +393,11 @@ export class PigeonApplication {
       gateway.messagesApi,
       identityContexts,
     );
+    const directMessageRepository = new MailboxDirectMessageRepository(
+      identityContexts,
+      conversationContexts,
+      gateway.directMessageMailbox,
+    );
     this.messages = new PigeonMessagesFacade(
       new PigeonMessageReader(
         identityContexts,
@@ -404,11 +410,12 @@ export class PigeonApplication {
       ),
       new PigeonMessageWriter(
         identityContexts,
+        conversationContexts,
         messageOperationContexts,
         messageMapper,
         new MessageSender(messageRepository),
         new MessageEditor(messageRepository),
-        new MessageDeleter(messageRepository),
+        new MessageDeleter(messageRepository, directMessageRepository),
       ),
       new PigeonConversationDrafts(
         identityContexts,
@@ -418,15 +425,17 @@ export class PigeonApplication {
       ),
       new PigeonMessageReactions(
         identityContexts,
-        new MessageReactionAdder(messageRepository),
-        new MessageReactionRemover(messageRepository),
+        conversationContexts,
+        new MessageReactionAdder(messageRepository, directMessageRepository),
+        new MessageReactionRemover(messageRepository, directMessageRepository),
       ),
       new PigeonMessagePins(
         identityContexts,
+        conversationContexts,
         messageMapper,
         new PinnedMessagesSearcher(messageRepository),
-        new MessagePinner(messageRepository),
-        new MessageUnpinner(messageRepository),
+        new MessagePinner(messageRepository, directMessageRepository),
+        new MessageUnpinner(messageRepository, directMessageRepository),
       ),
       gateway.messagesGateway,
     );
