@@ -798,9 +798,9 @@ describe(CallPeerConnections.name, () => {
     installPeerConnectionMock(peers);
     const manager = callPeerConnectionManager();
     const provider = jest.fn().mockResolvedValue({ iceServers: [] });
-    const sendSignal: jest.MockedFunction<SignalSender> = jest.fn(() =>
-      Promise.resolve(),
-    );
+    const sendSignal = jest
+      .fn<Promise<void>, Parameters<SignalSender>>()
+      .mockResolvedValue(undefined);
     manager.configure(provider);
     manager.setLocalStream(
       mediaStreamWithTracks([mediaTrack('microphone', 'audio')]),
