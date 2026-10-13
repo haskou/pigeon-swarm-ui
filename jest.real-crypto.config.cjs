@@ -33,6 +33,7 @@ module.exports = {
     '**/IdentityMailboxHomeTrust.spec.ts',
     '**/Mailbox{Capability,Channel,CreationProof,EnvelopeCipher,KeySchedule,ReadToken}.spec.ts',
     '**/MailboxCreationProof.vectors.spec.ts',
+    '**/GroupMailboxKeySchedule.spec.ts',
     '**/DirectMessageAuthorship.spec.ts',
     '**/DirectMessageMailbox.spec.ts',
     '**/DirectMessageReaderSet.spec.ts',
