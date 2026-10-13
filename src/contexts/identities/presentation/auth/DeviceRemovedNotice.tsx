@@ -4,10 +4,12 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 
 export function DeviceRemovedNotice({
   disabled,
+  erased,
   onPairAgain,
   onStartOver,
 }: {
   disabled: boolean;
+  erased: boolean;
   onPairAgain: () => void;
   onStartOver: () => void;
 }): ReactElement {
@@ -17,7 +19,11 @@ export function DeviceRemovedNotice({
       className="ui-inline-notice mt-3 border-rose-300/50 bg-rose-500/10 text-rose-100"
     >
       <p className="font-semibold">{copy.auth.deviceRemoved}</p>
-      <p className="mt-1 text-sm">{copy.auth.deviceRemovedHelp}</p>
+      <p className="mt-1 text-sm">
+        {erased
+          ? copy.auth.deviceRemovedHelp
+          : copy.auth.deviceRemovedEraseFailed}
+      </p>
       <div className="mt-3 grid gap-2">
         <button
           type="button"

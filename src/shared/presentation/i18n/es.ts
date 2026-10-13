@@ -60,8 +60,10 @@ export const es = {
     devicePairingVerificationHelp:
       'Muestra este código al dispositivo autorizado. Debe ser idéntico allí antes de que autorice este dispositivo.',
     deviceRemoved: 'Este dispositivo fue eliminado de tu cuenta.',
+    deviceRemovedEraseFailed:
+      "Este navegador ya no puede abrir esta identidad, y los mensajes guardados en este navegador no se han podido borrar. Elige 'Borrar la copia local y empezar de nuevo' para intentarlo otra vez, o vuelve a vincularlo desde un dispositivo donde tengas la sesión iniciada. Tu cuenta no se elimina.",
     deviceRemovedHelp:
-      'Este navegador ya no puede abrir esta identidad. Vuelve a vincularlo desde un dispositivo donde tengas la sesión iniciada, o borra la copia de este navegador y empieza de nuevo. Tu cuenta no se elimina.',
+      'Este navegador ya no puede abrir esta identidad. Los mensajes guardados en este navegador para esta identidad se han borrado. Vuelve a vincularlo desde un dispositivo donde tengas la sesión iniciada, o borra la copia de este navegador y empieza de nuevo. Tu cuenta no se elimina.',
     deviceRemovedPair: 'Vincular este dispositivo de nuevo',
     deviceRemovedStartOver: 'Borrar la copia local y empezar de nuevo',
     deviceRootUnavailable:

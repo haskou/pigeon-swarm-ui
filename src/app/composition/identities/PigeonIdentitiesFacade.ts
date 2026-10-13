@@ -132,6 +132,10 @@ export class PigeonIdentitiesFacade {
     return await this.gateway.retireOwnDevice(session);
   }
 
+  public discardDeviceSealedRecovery(identityId: string): void {
+    this.gateway.discardDeviceSealedRecovery(identityId);
+  }
+
   public async completeDevicePairing(
     identityId: string,
     password: string,

@@ -170,6 +170,11 @@ export class PigeonIdentitiesGateway {
     return await this.deviceAuthorization.retireOwnDevice(session);
   }
 
+  /** Drops the device-sealed steps a removed device can never resume. */
+  public discardDeviceSealedRecovery(identityId: string): void {
+    this.recovery.discard(identityId);
+  }
+
   public async completeDevicePairing(
     identityId: string,
     password: IdentityPassword,
