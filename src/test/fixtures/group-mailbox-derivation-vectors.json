@@ -1,0 +1,75 @@
+{
+  "description": "Group mailbox key schedule vectors (docs/design/group-mailboxes.md in haskou/pigeon-swarm-node, section Derivation). Generated with node:crypto hkdfSync, independent of the UI implementation.",
+  "algorithms": {
+    "hkdf": "HKDF-SHA256 (RFC 5869), empty salt, 32-byte output.",
+    "mailboxId": "base64url(HKDF(ikm = generationSecret, info = utf8(labels.mailboxId) || slot)), unpadded.",
+    "postToken": "base64url(HKDF(ikm = generationSecret, info = utf8(labels.postToken) || slot)), unpadded.",
+    "envelopeKey": "hex(HKDF(ikm = generationSecret, info = utf8(labels.envelopeKey) || slot)); the AES-256-GCM key of the per-copy outer AEAD (D5).",
+    "readToken": "base64url(HKDF(ikm = ownerRootKey, info = utf8(labels.readToken) || utf8(mailboxId))), unpadded; the same derivation as the one-to-one read token."
+  },
+  "labels": {
+    "mailboxId": "pigeon/group-mailbox/id/v1",
+    "postToken": "pigeon/group-mailbox/post/v1",
+    "envelopeKey": "pigeon/group-mailbox/envelope/v1",
+    "readToken": "pigeon/mailbox/read/v1"
+  },
+  "inputEncoding": "generationSecret (gen_k), slot (s_Y) and ownerRootKey (rootKey_Y) are 32 bytes, hex.",
+  "cases": [
+    {
+      "name": "fill bytes",
+      "input": {
+        "generationSecret": "1111111111111111111111111111111111111111111111111111111111111111",
+        "slot": "2222222222222222222222222222222222222222222222222222222222222222",
+        "ownerRootKey": "3333333333333333333333333333333333333333333333333333333333333333"
+      },
+      "expected": {
+        "mailboxId": "pbtCIxrBaIgYBLp5X_YP1egJPy03dSLsGYxkekG3vzQ",
+        "postToken": "3XihnK4v375tvKVIRKsroFDGLa4IoelmkQdMewIfh0I",
+        "envelopeKey": "dcbb30ae28aa459074f9fc7be6fc926c372ff626f5d8319e68e0abf26ea74286",
+        "readToken": "8UDn8TkPUebRETcOM22oONQQmFlmpgFh69bU66wwk4A"
+      }
+    },
+    {
+      "name": "same generation, another slot",
+      "input": {
+        "generationSecret": "1111111111111111111111111111111111111111111111111111111111111111",
+        "slot": "4444444444444444444444444444444444444444444444444444444444444444",
+        "ownerRootKey": "3333333333333333333333333333333333333333333333333333333333333333"
+      },
+      "expected": {
+        "mailboxId": "xD-Vohv8v4IKjC1huoXoT-siCfGhxVpwcxX7uO0Jiww",
+        "postToken": "fE78vJIyf03GeKOWwxQ3074jyBv0bMbuQCfilvwGy0g",
+        "envelopeKey": "7f9120569c48e13e762ab23dcac68b711c00cb42d67ac24d6e86c592c712ceea",
+        "readToken": "JVGhBcNQaLU4Mvv1cC00_HA3Rg3YlYsTB5ERD2UTJOc"
+      }
+    },
+    {
+      "name": "next generation, same slot",
+      "input": {
+        "generationSecret": "5555555555555555555555555555555555555555555555555555555555555555",
+        "slot": "2222222222222222222222222222222222222222222222222222222222222222",
+        "ownerRootKey": "3333333333333333333333333333333333333333333333333333333333333333"
+      },
+      "expected": {
+        "mailboxId": "260yDMhGPx7hsgU-Q3nFEeFcEpLRGRaE-5WtbOe3MNw",
+        "postToken": "hl9lPs7CEOCmdtQA9slwYlBIRF2fJYcaLWl-dQpCGaY",
+        "envelopeKey": "53dd5e451e4f0dc31f24242f13aca3e09e3a1fd39697d71b24357b7ece6b87b2",
+        "readToken": "FwpT-IJMmnLY4efVwyfzvuZbRjnsrv4sBZKounMw9sQ"
+      }
+    },
+    {
+      "name": "sequential bytes",
+      "input": {
+        "generationSecret": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "slot": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+        "ownerRootKey": "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f"
+      },
+      "expected": {
+        "mailboxId": "-oqK5SKqaehuSZ3nQOEFOb2MXqBx5N_uMuTpQk_Bc1s",
+        "postToken": "9_O7Sp3og2FkMGSWY4cZw4UKj-jgndlDzl6aR15lY_8",
+        "envelopeKey": "799ef25c391538c0f4358fe31107751633828109d418106c60129457640ca020",
+        "readToken": "Klklc80ClxDBZa6T8M92bOjcTaKiGvCXme7ZDA4j22U"
+      }
+    }
+  ]
+}
