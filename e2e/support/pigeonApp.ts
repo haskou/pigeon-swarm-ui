@@ -1,4 +1,10 @@
-import { expect, type Browser, type Locator, type Page } from '@playwright/test';
+import {
+  expect,
+  type Browser,
+  type BrowserContextOptions,
+  type Locator,
+  type Page,
+} from '@playwright/test';
 
 export type TestIdentity = {
   handle: string;
@@ -18,9 +24,9 @@ export async function loginIdentity(
 
   if (recoveryKey) {
     await page
-        .getByTestId('auth-login-method-control')
-        .getByRole('button', { name: 'Recovery key' })
-        .click();
+      .getByTestId('auth-login-method-control')
+      .getByRole('button', { name: 'Recovery key' })
+      .click();
     await page.getByTestId('auth-recovery-key-input').fill(recoveryKey);
     await page.getByTestId('auth-password-confirmation-input').fill(password);
   }
@@ -30,8 +36,11 @@ export async function loginIdentity(
   await dismissPushPrompt(page);
 }
 
-export async function newIsolatedPage(browser: Browser): Promise<Page> {
-  const context = await browser.newContext();
+export async function newIsolatedPage(
+  browser: Browser,
+  options?: BrowserContextOptions,
+): Promise<Page> {
+  const context = await browser.newContext(options);
 
   await context.addInitScript(() => {
     window.localStorage.setItem('pigeon-swarm-language-v2', 'en');
@@ -109,9 +118,9 @@ export async function createDirectConversation(
   await page
     .getByTestId('create-conversation-recipient-input')
     .fill(`@${recipientHandle}`);
-  await expect(page.getByTestId('create-conversation-submit-button')).toBeEnabled(
-    { timeout: 45_000 },
-  );
+  await expect(
+    page.getByTestId('create-conversation-submit-button'),
+  ).toBeEnabled({ timeout: 45_000 });
   await page.getByTestId('create-conversation-submit-button').click();
   await expect(
     page.getByTestId('create-conversation-recipient-input'),
@@ -122,9 +131,9 @@ export async function createDirectConversation(
 export async function acceptLatestInvitation(page: Page): Promise<void> {
   await openSidebar(page);
   await clickFirstVisible(page.getByTestId('notifications-open-button'));
-  await expect(page.getByTestId('notification-accept-button').first()).toBeVisible(
-    { timeout: 45_000 },
-  );
+  await expect(
+    page.getByTestId('notification-accept-button').first(),
+  ).toBeVisible({ timeout: 45_000 });
   await page.getByTestId('notification-accept-button').first().click();
   await expect(page.getByTestId('message-composer-input')).toBeEnabled({
     timeout: 45_000,
@@ -158,7 +167,10 @@ export async function selectConversationByTitle(
 }
 
 export function conversationRow(page: Page, title: string): Locator {
-  return page.getByTestId('conversation-list-item').filter({ hasText: title }).first();
+  return page
+    .getByTestId('conversation-list-item')
+    .filter({ hasText: title })
+    .first();
 }
 
 export async function updateOwnProfileBanner(
@@ -197,7 +209,8 @@ export async function waitForConversationBannerChange(
   await expect
     .poll(
       async () => {
-        const nextBannerUrl = await conversation.getAttribute('data-banner-url');
+        const nextBannerUrl =
+          await conversation.getAttribute('data-banner-url');
 
         return nextBannerUrl && nextBannerUrl !== previousBannerUrl
           ? nextBannerUrl
@@ -224,11 +237,15 @@ export async function waitForWorkspace(page: Page): Promise<void> {
 }
 
 export async function openSidebar(page: Page): Promise<void> {
-  if (await isVisibleInViewport(page.getByTestId('create-conversation-button'))) {
+  if (
+    await isVisibleInViewport(page.getByTestId('create-conversation-button'))
+  ) {
     return;
   }
 
-  if (await isVisibleInViewport(page.getByTestId('workspace-sidebar-open-button'))) {
+  if (
+    await isVisibleInViewport(page.getByTestId('workspace-sidebar-open-button'))
+  ) {
     await clickFirstVisible(page.getByTestId('workspace-sidebar-open-button'));
   }
 

@@ -1,5 +1,7 @@
 import { KeyPair, UserRootKey } from '@haskou/pigeon-swarm-crypto';
+import { mock } from 'jest-mock-extended';
 
+import type { DevicePasskeyAuthenticator } from '../../../../../contexts/identities/infrastructure/crypto/DevicePasskeyAuthenticator';
 import type { DeviceIdentityVaultRecord } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVaultRecord';
 import type { DeviceIdentityVaultStore } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVaultStore';
 
@@ -7,6 +9,7 @@ import { DeviceAuthorizationEpoch } from '../../../../../contexts/identities/dom
 import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 import { DeviceIdentityVault } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVault';
+import { DevicePasskeyUnlockEnabledError } from '../../../../../contexts/identities/infrastructure/storage/DevicePasskeyUnlockEnabledError';
 
 class MemoryStore implements DeviceIdentityVaultStore {
   public readonly records = new Map<string, DeviceIdentityVaultRecord>();
@@ -183,6 +186,127 @@ describe(DeviceIdentityVault.name, () => {
     expect(after?.authorizationEpoch).toBe(before?.authorizationEpoch);
     expect(after?.authorizationRevision).toBe(before?.authorizationRevision);
     expect(after?.envelope).not.toBe(before?.envelope);
+  });
+
+  describe('passkey unlock', () => {
+    const credential = { credentialId: 'credential-id', salt: 'prf-salt' };
+    const passkeySecret = 'prf-output-secret';
+
+    function passkeys() {
+      const authenticator = mock<DevicePasskeyAuthenticator>();
+      authenticator.register.mockResolvedValue({
+        credential,
+        secret: passkeySecret,
+      });
+      authenticator.evaluate.mockResolvedValue(passkeySecret);
+
+      return authenticator;
+    }
+
+    it('reports password unlock for records written before passkeys existed', async () => {
+      const store = new MemoryStore();
+      const source = await fixture();
+      const vault = new DeviceIdentityVault(store, undefined, passkeys());
+
+      await expect(vault.unlockMethod(source.identityId)).resolves.toBe(
+        undefined,
+      );
+      await vault.register({ ...source, password: 'password' });
+
+      expect(store.records.get(source.identityId.valueOf())).not.toHaveProperty(
+        'passkey',
+      );
+      await expect(vault.unlockMethod(source.identityId)).resolves.toBe(
+        'password',
+      );
+    });
+
+    it('replaces the password envelope so the password no longer unlocks this device', async () => {
+      const store = new MemoryStore();
+      const source = await fixture();
+      const authenticator = passkeys();
+      const vault = new DeviceIdentityVault(store, undefined, authenticator);
+      await vault.register({ ...source, password: 'password' });
+      const before = store.records.get(source.identityId.valueOf());
+
+      await vault.enablePasskey(source.identityId, 'password', 'Alice');
+
+      const after = store.records.get(source.identityId.valueOf());
+      expect(authenticator.register).toHaveBeenCalledWith({
+        displayName: 'Alice',
+        identityId: source.identityId,
+      });
+      expect(after?.passkey).toEqual(credential);
+      expect(after?.envelope).not.toBe(before?.envelope);
+      expect(after?.encryptedMaterial).toBe(before?.encryptedMaterial);
+      await expect(vault.unlockMethod(source.identityId)).resolves.toBe(
+        'passkey',
+      );
+      await expect(
+        vault.unlock(source.identityId, 'password'),
+      ).rejects.toThrow();
+      const secret = await vault.passkeyUnlockSecret(source.identityId);
+      const restored = await vault.unlock(source.identityId, secret);
+      expect(authenticator.evaluate).toHaveBeenCalledWith(credential);
+      expect(restored.material.rootKey.isEqual(source.material.rootKey)).toBe(
+        true,
+      );
+    });
+
+    it('does not create a passkey when the current password is wrong', async () => {
+      const store = new MemoryStore();
+      const source = await fixture();
+      const authenticator = passkeys();
+      const vault = new DeviceIdentityVault(store, undefined, authenticator);
+      await vault.register({ ...source, password: 'password' });
+
+      await expect(
+        vault.enablePasskey(source.identityId, 'wrong password', 'Alice'),
+      ).rejects.toThrow();
+
+      expect(authenticator.register).not.toHaveBeenCalled();
+      await expect(vault.unlockMethod(source.identityId)).resolves.toBe(
+        'password',
+      );
+    });
+
+    it('refuses a password change while a passkey protects this device', async () => {
+      const store = new MemoryStore();
+      const source = await fixture();
+      const vault = new DeviceIdentityVault(store, undefined, passkeys());
+      await vault.register({ ...source, password: 'password' });
+      await vault.enablePasskey(source.identityId, 'password', 'Alice');
+
+      await expect(
+        vault.changePassword(source.identityId, passkeySecret, 'next password'),
+      ).rejects.toBeInstanceOf(DevicePasskeyUnlockEnabledError);
+    });
+
+    it('restores password unlock with a new password when the passkey is turned off', async () => {
+      const store = new MemoryStore();
+      const source = await fixture();
+      const authenticator = passkeys();
+      const vault = new DeviceIdentityVault(store, undefined, authenticator);
+      await vault.register({ ...source, password: 'password' });
+      await vault.enablePasskey(source.identityId, 'password', 'Alice');
+
+      await vault.disablePasskey(source.identityId, 'next password');
+
+      expect(authenticator.evaluate).toHaveBeenCalledWith(credential);
+      expect(store.records.get(source.identityId.valueOf())).not.toHaveProperty(
+        'passkey',
+      );
+      await expect(vault.unlockMethod(source.identityId)).resolves.toBe(
+        'password',
+      );
+      await expect(
+        vault.unlock(source.identityId, passkeySecret),
+      ).rejects.toThrow();
+      const restored = await vault.unlock(source.identityId, 'next password');
+      expect(restored.material.rootKey.isEqual(source.material.rootKey)).toBe(
+        true,
+      );
+    });
   });
 
   it('persists an authorization checkpoint across vault instances', async () => {

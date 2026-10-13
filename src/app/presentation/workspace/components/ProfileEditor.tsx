@@ -16,6 +16,7 @@ import type { CommunityResource as Community } from '../../../../contexts/commun
 import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
+import type { DeviceUnlockMethod } from '../../../../contexts/identities/infrastructure/storage/DeviceUnlockMethod';
 import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
 
 import {
@@ -51,6 +52,8 @@ import { applicationContainer } from '../../../composition/applicationContainer'
 import { DeviceManagementDialog } from './DeviceManagementDialog';
 import { DevicePairingDialog } from './DevicePairingDialog';
 import { DeviceStorageSection } from './DeviceStorageSection';
+import { profileEditorInputClass, ProfileInput } from './ProfileInput';
+import { ProfilePasskeyUnlock } from './ProfilePasskeyUnlock';
 import { SecurityAuditSection } from './SecurityAuditSection';
 
 const ImageCropEditor = lazy(() =>
@@ -60,9 +63,6 @@ const ImageCropEditor = lazy(() =>
     }),
   ),
 );
-
-const profileEditorInputClass =
-  'ui-field-control px-4 py-3 placeholder:text-white/30';
 
 type ProfileEditorSection = 'networks' | 'profile' | 'security';
 
@@ -200,33 +200,6 @@ function profileDraftDefaults(
       currentPicture ??
       (profile.picture ? profilePictureUrl(profile.picture) : null),
   };
-}
-
-function ProfileInput({
-  label,
-  onChange,
-  placeholder,
-  type = 'text',
-  value,
-}: {
-  label: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  type?: string;
-  value: string;
-}) {
-  return (
-    <label className="grid gap-2 text-sm font-black text-white/70">
-      {label}
-      <input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        type={type}
-        className={cx(profileEditorInputClass, 'text-sm font-normal')}
-      />
-    </label>
-  );
 }
 
 function ProfileSwitchButton({
@@ -652,22 +625,30 @@ function ProfileSecuritySection({
   session: Session;
   technicalDetailsVisible: boolean;
 }) {
+  const [unlockMethod, setUnlockMethod] = useState<DeviceUnlockMethod>();
+
   return (
     <>
       <section className="ui-section">
         <div className="border-b border-white/[0.06] px-4 py-3 text-sm font-black text-white/70">
           {copy.profile.security}
         </div>
-        <ProfilePasswordSection
-          currentPassword={currentPassword}
-          newPassword={newPassword}
-          newPasswordConfirmation={newPasswordConfirmation}
-          onCurrentPasswordChange={onCurrentPasswordChange}
-          onNewPasswordChange={onNewPasswordChange}
-          onNewPasswordConfirmationChange={onNewPasswordConfirmationChange}
-          onToggle={onTogglePassword}
-          open={passwordOpen}
-          passwordsMatch={passwordsMatch}
+        {unlockMethod !== 'passkey' && (
+          <ProfilePasswordSection
+            currentPassword={currentPassword}
+            newPassword={newPassword}
+            newPasswordConfirmation={newPasswordConfirmation}
+            onCurrentPasswordChange={onCurrentPasswordChange}
+            onNewPasswordChange={onNewPasswordChange}
+            onNewPasswordConfirmationChange={onNewPasswordConfirmationChange}
+            onToggle={onTogglePassword}
+            open={passwordOpen}
+            passwordsMatch={passwordsMatch}
+          />
+        )}
+        <ProfilePasskeyUnlock
+          onMethodChange={setUnlockMethod}
+          session={session}
         />
         <div className="border-t border-white/[0.06] px-4 py-4">
           <button
