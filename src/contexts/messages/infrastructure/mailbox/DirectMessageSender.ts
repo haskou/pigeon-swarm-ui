@@ -71,13 +71,6 @@ export class DirectMessageSender {
     outboxStore: DirectMessageOutboxStore,
   ) {
     this.outbox = new DirectMessageOutbox(outboxStore, {
-      toPeer: (session, row) =>
-        this.writeTo(
-          session,
-          row.conversationId,
-          row.peerIdentityId,
-          row.record,
-        ),
       toOwn: (session, row) => {
         this.ownCopies.remember(
           DirectMailboxOwnership.ownCopyKey(session.identity.id, row.record.id),
@@ -85,6 +78,13 @@ export class DirectMessageSender {
 
         return this.appendOwnCopy(session, row.conversationId, row.record);
       },
+      toPeer: (session, row) =>
+        this.writeTo(
+          session,
+          row.conversationId,
+          row.peerIdentityId,
+          row.record,
+        ),
     });
   }
 
