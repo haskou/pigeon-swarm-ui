@@ -46,6 +46,7 @@ describe(PigeonIdentityRepository.name, () => {
     const recoveryAuthorityKeyPair = await KeyPair.generate();
     const identityId = IdentityId.fromString(keyPair.toPrimitives().publicKey);
     const masterKey = SymmetricKey.generate();
+    const root = SymmetricKey.generate();
     const identity = Identity.create(
       identityId,
       IdentityProfile.fromPrimitives({
@@ -84,6 +85,10 @@ describe(PigeonIdentityRepository.name, () => {
       recoveryAuthorityKeyPair,
     });
 
+    gateway.openDeviceSealedRoot.mockImplementation(async (session) => ({
+      ...session,
+      deviceSealedRootKey: root,
+    }));
     const persisted = await new PigeonIdentityRepository(
       gateway,
       contexts,
@@ -98,6 +103,7 @@ describe(PigeonIdentityRepository.name, () => {
       protection,
     );
     expect(contexts.find(identityId).session.identity).toBe(persistedResource);
+    expect(contexts.find(identityId).session.deviceSealedRootKey).toBe(root);
   });
 
   it('maps identity reads into aggregates', async () => {
