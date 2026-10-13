@@ -17,6 +17,7 @@ import { applicationContainer } from '../../../../../app/composition/application
 import { subscribeRealtimeMailboxHints } from '../../../../../app/presentation/realtime/useRealtimeEvents';
 import { useDirectMessageMailboxSync } from '../../../../../app/presentation/workspace/components/useDirectMessageMailboxSync';
 import { MailboxReaderLimitError } from '../../../../../contexts/mailboxes/infrastructure/http/MailboxReaderLimitError';
+import { DirectMessageHistoryStorageError } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageHistoryStorageError';
 import { copy } from '../../../../../shared/presentation/i18n/copy';
 
 type MockEffect = () => void | (() => void);
@@ -179,6 +180,16 @@ describe('useDirectMessageMailboxSync notice', () => {
     await settle();
 
     expect(mounted.error()).toBe(copy.workspace.directMailboxReaderLimitError);
+    mounted.cleanup();
+  });
+
+  it('shows the storage notice when this device cannot save the history', async () => {
+    sync.mockRejectedValue(new DirectMessageHistoryStorageError());
+    const mounted = mountSync();
+
+    await settle();
+
+    expect(mounted.error()).toBe(copy.workspace.directHistoryStorageError);
     mounted.cleanup();
   });
 });

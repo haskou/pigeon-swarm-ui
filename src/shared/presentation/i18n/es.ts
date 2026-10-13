@@ -1490,6 +1490,8 @@ export const es = {
   },
   workspace: {
     closeSidebar: 'Cerrar barra lateral',
+    directHistoryStorageError:
+      'Los mensajes directos nuevos no se pudieron guardar en este dispositivo, quizá porque su almacenamiento está lleno. Se conservan en el servidor hasta 14 días y se guardarán aquí cuando haya espacio.',
     directMailboxReaderLimitError:
       'Los mensajes directos no se pueden sincronizar aquí: esta identidad alcanzó su límite de dispositivos. Elimina un dispositivo que ya no uses e inténtalo de nuevo.',
     directMailboxSyncError:
