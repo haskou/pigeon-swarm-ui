@@ -10,7 +10,10 @@ import type { DevicePairingHistory } from '../../../../../contexts/identities/in
 import type { DevicePairingReaders } from '../../../../../contexts/identities/infrastructure/http/DevicePairingReaders';
 import type { DeviceSealedRecovery } from '../../../../../contexts/identities/infrastructure/http/DeviceSealedRecovery';
 import type { DeviceSealedRootRotation } from '../../../../../contexts/identities/infrastructure/http/DeviceSealedRootRotation';
-import type { PigeonDeviceAuthorizationApi } from '../../../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
+import type {
+  OwnDeviceRevocation,
+  PigeonDeviceAuthorizationApi,
+} from '../../../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
 import type { PigeonIdentityCommandsApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityCommandsApi';
 import type { PigeonIdentityGateway as IdentityProfileGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityGateway';
 import type { PigeonIdentityLoginApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityLoginApi';
@@ -46,12 +49,20 @@ function gatewayDouble(): {
   authorization: jest.Mocked<
     Pick<
       PigeonDeviceAuthorizationApi,
-      'authorizePairing' | 'completePairing' | 'recover' | 'revokeDevice'
+      | 'authorizePairing'
+      | 'completePairing'
+      | 'prepareOwnRetirement'
+      | 'recover'
+      | 'retireOwnDevice'
+      | 'revokeDevice'
     >
   >;
   gateway: PigeonIdentitiesGateway;
   keychain: jest.Mocked<
-    Pick<PigeonKeychainApi, 'publishKeychain' | 'readHead'>
+    Pick<
+      PigeonKeychainApi,
+      'publishKeychain' | 'readHead' | 'rewrapHeadSealedUnder'
+    >
   >;
   login: jest.Mocked<Pick<PigeonIdentityLoginApi, 'hydrate'>>;
   pairingHistory: jest.Mocked<
@@ -65,7 +76,9 @@ function gatewayDouble(): {
       'rememberKeychainRewrap' | 'rewrapAfterRevoke' | 'resealAfterPairing'
     >
   >;
-  sealedRoot: jest.Mocked<Pick<DeviceSealedRootRotation, 'current' | 'rotate'>>;
+  sealedRoot: jest.Mocked<
+    Pick<DeviceSealedRootRotation, 'current' | 'handOver' | 'rotate'>
+  >;
 } {
   const commands = {} as PigeonIdentityCommandsApi;
   const login = {
@@ -77,16 +90,29 @@ function gatewayDouble(): {
   const keychain = {
     publishKeychain: jest.fn(),
     readHead: jest.fn(),
-  } as jest.Mocked<Pick<PigeonKeychainApi, 'publishKeychain' | 'readHead'>>;
+    rewrapHeadSealedUnder: jest.fn(),
+  } as jest.Mocked<
+    Pick<
+      PigeonKeychainApi,
+      'publishKeychain' | 'readHead' | 'rewrapHeadSealedUnder'
+    >
+  >;
   const authorization = {
     authorizePairing: jest.fn(),
     completePairing: jest.fn(),
+    prepareOwnRetirement: jest.fn(),
     recover: jest.fn(),
+    retireOwnDevice: jest.fn(),
     revokeDevice: jest.fn(),
   } as jest.Mocked<
     Pick<
       PigeonDeviceAuthorizationApi,
-      'authorizePairing' | 'completePairing' | 'recover' | 'revokeDevice'
+      | 'authorizePairing'
+      | 'completePairing'
+      | 'prepareOwnRetirement'
+      | 'recover'
+      | 'retireOwnDevice'
+      | 'revokeDevice'
     >
   >;
   const recovery = {
@@ -101,8 +127,11 @@ function gatewayDouble(): {
   >;
   const sealedRoot = {
     current: jest.fn(),
+    handOver: jest.fn(),
     rotate: jest.fn(),
-  } as jest.Mocked<Pick<DeviceSealedRootRotation, 'current' | 'rotate'>>;
+  } as jest.Mocked<
+    Pick<DeviceSealedRootRotation, 'current' | 'handOver' | 'rotate'>
+  >;
   const pairingHistory = {
     publish: jest.fn().mockResolvedValue(false),
     receive: jest.fn(),
@@ -549,5 +578,112 @@ describe(PigeonIdentitiesGateway.name, () => {
       expect(recovery.rememberKeychainRewrap).not.toHaveBeenCalled();
       expect(recovery.rewrapAfterRevoke).not.toHaveBeenCalled();
     });
+  });
+
+  describe('retireOwnDevice', () => {
+    const session = { identity: { id: 'identity-1' } } as unknown as Session;
+    const remaining = ['device-b'] as unknown as DeviceCredential[];
+    const revocation = {
+      remaining,
+      transition: { getResultRevision: () => ({ valueOf: () => 4 }) },
+    } as unknown as OwnDeviceRevocation;
+    const handOver = {
+      previous: SymmetricKey.generate(),
+      root: SymmetricKey.generate(),
+      sealedSecrets: { entries: [], generation: 7 },
+    };
+
+    it('hands a fresh root to the remaining devices in its own revocation and moves the keychain head under it once the node stored it', async () => {
+      const { authorization, gateway, keychain, sealedRoot } = gatewayDouble();
+      authorization.prepareOwnRetirement.mockResolvedValue(revocation);
+      sealedRoot.handOver.mockResolvedValue(handOver);
+      authorization.retireOwnDevice.mockResolvedValue(true);
+
+      await expect(gateway.retireOwnDevice(session)).resolves.toBe('revoked');
+
+      expect(sealedRoot.handOver).toHaveBeenCalledWith(session, {
+        authorizationRevision: 4,
+        recipients: remaining,
+      });
+      expect(authorization.retireOwnDevice).toHaveBeenCalledWith(
+        session,
+        revocation,
+        handOver.sealedSecrets,
+      );
+      expect(keychain.rewrapHeadSealedUnder).toHaveBeenCalledWith(
+        expect.objectContaining({ deviceSealedRootKey: handOver.root }),
+        handOver.previous,
+      );
+      expect(
+        authorization.retireOwnDevice.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        keychain.rewrapHeadSealedUnder.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('keeps the keychain head under the old root when the node applied the retirement without the hand-over', async () => {
+      const { authorization, gateway, keychain, sealedRoot } = gatewayDouble();
+      authorization.prepareOwnRetirement.mockResolvedValue(revocation);
+      sealedRoot.handOver.mockResolvedValue(handOver);
+      authorization.retireOwnDevice.mockResolvedValue(false);
+
+      await expect(gateway.retireOwnDevice(session)).resolves.toBe('revoked');
+
+      expect(keychain.rewrapHeadSealedUnder).not.toHaveBeenCalled();
+    });
+
+    it('still reports the retirement when the keychain head cannot move, leaving it to the remaining devices', async () => {
+      const { authorization, gateway, keychain, sealedRoot } = gatewayDouble();
+      authorization.prepareOwnRetirement.mockResolvedValue(revocation);
+      sealedRoot.handOver.mockResolvedValue(handOver);
+      authorization.retireOwnDevice.mockResolvedValue(true);
+      keychain.rewrapHeadSealedUnder.mockRejectedValue(new Error('offline'));
+
+      await expect(gateway.retireOwnDevice(session)).resolves.toBe('revoked');
+    });
+
+    it('retires without a hand-over when none can be prepared', async () => {
+      const { authorization, gateway, keychain, sealedRoot } = gatewayDouble();
+      authorization.prepareOwnRetirement.mockResolvedValue(revocation);
+      sealedRoot.handOver.mockRejectedValue(new Error('offline'));
+      authorization.retireOwnDevice.mockResolvedValue(false);
+
+      await expect(gateway.retireOwnDevice(session)).resolves.toBe('revoked');
+
+      expect(authorization.retireOwnDevice).toHaveBeenCalledWith(
+        session,
+        revocation,
+        undefined,
+      );
+      expect(keychain.rewrapHeadSealedUnder).not.toHaveBeenCalled();
+    });
+
+    it('retires without a hand-over when this device holds no entry', async () => {
+      const { authorization, gateway, sealedRoot } = gatewayDouble();
+      authorization.prepareOwnRetirement.mockResolvedValue(revocation);
+      sealedRoot.handOver.mockResolvedValue(null);
+      authorization.retireOwnDevice.mockResolvedValue(false);
+
+      await expect(gateway.retireOwnDevice(session)).resolves.toBe('revoked');
+
+      expect(authorization.retireOwnDevice).toHaveBeenCalledWith(
+        session,
+        revocation,
+        undefined,
+      );
+    });
+
+    it.each(['already-revoked', 'last-device'] as const)(
+      'reports %s without handing anything over',
+      async (outcome) => {
+        const { authorization, gateway, sealedRoot } = gatewayDouble();
+        authorization.prepareOwnRetirement.mockResolvedValue(outcome);
+
+        await expect(gateway.retireOwnDevice(session)).resolves.toBe(outcome);
+
+        expect(sealedRoot.handOver).not.toHaveBeenCalled();
+        expect(authorization.retireOwnDevice).not.toHaveBeenCalled();
+      },
+    );
   });
 });
