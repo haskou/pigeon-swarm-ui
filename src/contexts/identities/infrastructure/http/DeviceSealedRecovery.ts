@@ -44,6 +44,15 @@ export class DeviceSealedRecovery {
   }
 
   /**
+   * Drops every step this device recorded for the identity, as when the node
+   * no longer authorizes this device and it can never resume them. Throws
+   * when the browser refuses the removal.
+   */
+  public discard(identityId: string): void {
+    this.store.write(identityId, {});
+  }
+
+  /**
    * Records the root that keeps the keychain readable, before a revoke moves
    * it. Throws when the record cannot be written, so the revoke does not run.
    */

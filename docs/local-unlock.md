@@ -144,17 +144,22 @@ authority and checks the device catalog. Only when this device's credential is
 missing from that catalog is the device treated as removed. A bad signature or
 a stale timestamp also returns 401020, so the code alone never counts.
 
-When the device is treated as removed, unlock throws `DeviceRemovedError`, no
-session is returned, and the sign-in screen shows "This device was removed from
-your account." with two actions:
+When the device is treated as removed, unlock throws `DeviceRemovedError`
+naming the identity, and no session is returned. The sign-in screen first runs
+`eraseRemovedDevice` for that identity: it wipes the stored one-to-one history,
+the outbox, and the pending device-sealed recovery records (see
+`opaque-mailboxes-client.md`, "Same-device history"). It then shows "This
+device was removed from your account." and says that the messages saved on this
+browser were erased, or that they could not be erased. Two actions follow:
 
 - "Pair this device again" opens the new-device pairing flow. Pairing
   overwrites the stale local record through `DeviceIdentityVault.register`,
   which uses `store.put`, so no wipe is needed first.
-- "Erase local copy and start over" calls `identities.forgetDeviceUnlock` for
-  the identity. This deletes only the device vault record, as in step 3 above.
-  It revokes nothing on the node, and the identity stays recoverable with the
-  recovery key.
+- "Erase local copy and start over" runs the same wipe again, then calls
+  `identities.forgetDeviceUnlock` for the identity, which deletes the device
+  vault record as in step 3 above. When the wipe fails, the vault record stays
+  and the screen keeps the action, so it can be retried. It revokes nothing on
+  the node, and the identity stays recoverable with the recovery key.
 
 Other outcomes are not removal:
 
@@ -162,13 +167,19 @@ Other outcomes are not removal:
   from `fetch`) are rethrown unchanged.
 - If the catalog check itself fails, the original error is rethrown. A
   transient failure never becomes "removed".
-- Detection changes nothing locally. Only the explicit erase action deletes the
-  vault record.
+- Detection keeps the vault record. Only the explicit erase action deletes it.
 
 Residual risk: the removal signal is the node's answer. A node, or a party that
-controls its responses, can show this message for a device that is still
-authorized. The effect stays on the sign-in screen. No key is released, and the
-local copy changes only when the user picks the erase action.
+controls its responses, can report removal for a device that is still
+authorized. It must reject the device-signed read with 401020 and also leave
+this device out of the recovery-signed catalog. The device then erases its
+stored history, outbox and pending recovery records. Nothing is released, so
+the loss is availability only: history that another device still stores comes
+back through the pairing history export when this device pairs again. The
+vault record stays until the user picks the erase action.
+
+Residual: detection runs only at unlock. A revoked device that stays signed in
+keeps its session and stored history until its next sign-in.
 
 ## User-presence check before unlock
 
@@ -216,6 +227,13 @@ password creates no passkey. `WebAuthnPasskeyPrf.spec.ts` covers browsers
 without WebAuthn, without a secure context, or without PRF, and cancelled or
 aborted requests. `e2e/passkey-unlock.spec.ts` sets up a passkey and unlocks
 with it in Chromium against a real node.
+
+Revoked device: `PigeonDeviceAuthorizationApi.spec.ts` (`yarn test:crypto`)
+checks that `DeviceRemovedError` names the identity. `eraseRemovedDevice.spec.ts`
+and `deviceRemovedCopy.spec.ts` (`yarn test`) cover the wipe steps, the failure
+result, and the sign-in copy. `e2e/device-revoke-mailbox.spec.ts` signs the
+revoked device in again against a real node and checks the message and that
+no history row is left.
 
 ## Out of scope
 

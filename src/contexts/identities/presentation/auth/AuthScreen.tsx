@@ -8,6 +8,7 @@ import type { DevicePairingRequestDraft } from '../../domain/DevicePairingReques
 import type { Session } from '../../infrastructure/session/Session';
 
 import { loadApplicationContainer } from '../../../../app/composition/loadApplicationContainer';
+import { eraseRemovedDevice } from '../../../../app/presentation/eraseRemovedDevice';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
 import { cx } from '../../../../shared/presentation/cx';
 import { useInstallPrompt } from '../../../../shared/presentation/hooks/useInstallPrompt';
@@ -90,6 +91,7 @@ export function AuthScreen({
   const [removedIdentityId, setRemovedIdentityId] = useState<string | null>(
     null,
   );
+  const [removedHistoryErased, setRemovedHistoryErased] = useState(true);
   const [loginProgressStep, setLoginProgressStep] =
     useState<LoginIdentityProgressStep | null>(null);
   const [admissionNotice, setAdmissionNotice] = useState<string | null>(null);
@@ -284,15 +286,22 @@ export function AuthScreen({
 
       onAuthenticated(result.session, result.conversations);
     } catch (caught) {
-      setState('error');
       setLoginProgressStep(null);
 
       if (caught instanceof DeviceRemovedError) {
-        setRemovedIdentityId(normalizeIdentityLogin(identityId));
+        setRemovedHistoryErased(
+          await eraseRemovedDevice(
+            caught.identityId,
+            await loadApplicationContainer(),
+          ),
+        );
+        setRemovedIdentityId(caught.identityId);
+        setState('error');
 
         return;
       }
 
+      setState('error');
       setError(
         mode === 'login' && useDevicePairing && pairingDraft
           ? toDevicePairingErrorMessage(caught, copy.auth.devicePairingError)
@@ -357,6 +366,15 @@ export function AuthScreen({
 
     try {
       const applicationContainer = await loadApplicationContainer();
+      const erased = await eraseRemovedDevice(identity, applicationContainer);
+
+      setRemovedHistoryErased(erased);
+
+      if (!erased) {
+        setState('error');
+
+        return;
+      }
 
       await applicationContainer.identities.forgetDeviceUnlock(identity);
     } catch (caught) {
@@ -588,6 +606,7 @@ export function AuthScreen({
           {removedIdentityId ? (
             <DeviceRemovedNotice
               disabled={state === 'loading'}
+              erased={removedHistoryErased}
               onPairAgain={handlePairAgain}
               onStartOver={() => void handleStartOver(removedIdentityId)}
             />

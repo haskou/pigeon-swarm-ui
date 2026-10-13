@@ -164,7 +164,7 @@ export class PigeonDeviceAuthorizationApi {
         error.code === 401020 &&
         (await this.isRemovedFromCatalog(session))
       ) {
-        throw new DeviceRemovedError();
+        throw new DeviceRemovedError(session.identity.id);
       }
 
       throw error;

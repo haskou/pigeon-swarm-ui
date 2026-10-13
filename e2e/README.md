@@ -36,8 +36,10 @@ E2E_NETWORK_ID=<network-id> yarn test:e2e
 contexts), `direct-message-outbox.spec.ts` (a 1:1 send made while the
 recipient's inbox is absent survives a reload and is delivered once the
 recipient accepts) and `device-revoke-mailbox.spec.ts` (a paired device that
-the other device revokes keeps the messages sent before the revoke, and never
-shows a message sent after it while the surviving device does) run against a
+the other device revokes keeps the messages sent before the revoke while it
+stays signed in, never shows a message sent after it while the surviving
+device does, and at its next sign-in says it was removed and erases its stored
+history) run against a
 real node. Login and direct-message sync run on `desktop-chromium`,
 `desktop-firefox` and `mobile-chromium`; the outbox spec runs on the two
 desktop projects; the revoke spec runs on `desktop-chromium`.

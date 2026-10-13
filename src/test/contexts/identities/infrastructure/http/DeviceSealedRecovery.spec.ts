@@ -100,6 +100,25 @@ describe(DeviceSealedRecovery.name, () => {
     });
   });
 
+  describe('discard', () => {
+    it('drops every pending step this device recorded for the identity', async () => {
+      const { deviceSealedRoot, recovery, store } = harness();
+      const pairingRoot = SymmetricKey.generate();
+
+      recovery.rememberKeychainRewrap(
+        sessionAt(1, { deviceSealedRootKey: previousRoot }),
+      );
+      deviceSealedRoot.reseal.mockRejectedValue(new Error('network down'));
+      await recovery.resealAfterPairing(sessionAt(2), pairingRoot);
+      expect(store.read(identityId).keychainRewrap).toBeDefined();
+      expect(store.read(identityId).rootReseal).toBeDefined();
+
+      recovery.discard(identityId);
+
+      expect(store.read(identityId)).toEqual({});
+    });
+  });
+
   describe('rewrapAfterRevoke', () => {
     it('clears the record once the rewrap under the new root lands', async () => {
       const { keychains, recovery, store } = harness();
