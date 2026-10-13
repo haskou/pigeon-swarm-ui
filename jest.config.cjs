@@ -45,6 +45,7 @@ const REAL_CRYPTO_SPECS = [
   'PigeonDeviceAuthorizationApi',
   'PigeonDeviceSealedSecretApi',
   'PigeonIdentityCommandsApi',
+  'RecipientMailboxRouter',
   'RecoveryAuthorityKeyPair',
   'RequestSigner.vectors',
 ];

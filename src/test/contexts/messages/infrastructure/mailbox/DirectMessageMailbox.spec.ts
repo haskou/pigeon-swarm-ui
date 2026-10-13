@@ -207,6 +207,7 @@ describe(DirectMessageMailbox.name, () => {
         projection,
         readerSet,
         composer,
+        [],
       ),
       projection,
       store,
@@ -1002,6 +1003,7 @@ describe(DirectMessageMailbox.name, () => {
           Promise.resolve([credentialFor(s.identity.id)]),
         ),
         composerDouble().composer,
+        [],
       );
 
     const appliedOf = (apply: jest.Mock): DirectMessageTimelineChange[] =>
@@ -2997,6 +2999,7 @@ describe(DirectMessageMailbox.name, () => {
         projection,
         readerSet,
         composerDouble(composed).composer,
+        [],
       );
     };
 

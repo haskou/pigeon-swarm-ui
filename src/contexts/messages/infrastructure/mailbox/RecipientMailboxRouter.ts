@@ -1,11 +1,9 @@
 import type { MailboxKeys } from '../../../mailboxes/infrastructure/crypto/MailboxKeySchedule';
-import type {
-  MailboxAppend,
-  MailboxChannel,
-} from '../../../mailboxes/infrastructure/MailboxChannel';
+import type { MailboxAppend } from '../../../mailboxes/infrastructure/MailboxChannel';
 import type { RecipientMailboxAttempt } from '../../domain/RecipientMailboxAttempt';
 
 import { MailboxUnavailableError } from '../../../mailboxes/infrastructure/http/MailboxUnavailableError';
+import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
 import { RecipientMailboxRoutingPolicy } from '../../domain/RecipientMailboxRoutingPolicy';
 
 /**
@@ -13,6 +11,10 @@ import { RecipientMailboxRoutingPolicy } from '../../domain/RecipientMailboxRout
  * local node when no home is published or the home cannot be reached. This
  * class performs the I/O and classifies each outcome; the fallback and rethrow
  * rule lives in RecipientMailboxRoutingPolicy.
+ *
+ * The same envelope also goes to every availability server the recipient
+ * announced, in parallel. The send lands when any server takes it, so a down
+ * home does not lose the message; the recipient dedupes by record id.
  */
 export class RecipientMailboxRouter {
   public constructor(
@@ -30,7 +32,7 @@ export class RecipientMailboxRouter {
     recipientIdentityId: string,
     keys: MailboxKeys,
     plaintext: Uint8Array,
-    envelopeId: string | undefined,
+    envelopeId: string,
   ): Promise<RecipientMailboxAttempt<MailboxAppend>> {
     let base: string | undefined;
 
@@ -63,7 +65,7 @@ export class RecipientMailboxRouter {
   private async attemptLocal(
     keys: MailboxKeys,
     plaintext: Uint8Array,
-    envelopeId: string | undefined,
+    envelopeId: string,
   ): Promise<RecipientMailboxAttempt<MailboxAppend>> {
     try {
       return {
@@ -77,11 +79,12 @@ export class RecipientMailboxRouter {
     }
   }
 
-  public async send(
+  /** Home, then local node, as RecipientMailboxRoutingPolicy decides. */
+  private async sendPrimary(
     recipientIdentityId: string,
     keys: MailboxKeys,
     plaintext: Uint8Array,
-    envelopeId?: string,
+    envelopeId: string,
   ): Promise<MailboxAppend> {
     const home = await this.attemptHome(
       recipientIdentityId,
@@ -96,5 +99,46 @@ export class RecipientMailboxRouter {
       home,
       await this.attemptLocal(keys, plaintext, envelopeId),
     );
+  }
+
+  /**
+   * Appends to the primary route and to each availability server under one
+   * envelope id. Resolves the primary append, else the first availability
+   * append that landed. Throws the primary error only when none landed, so a
+   * 404 still reads as an absent inbox. Logs a count-only line per failed
+   * availability server.
+   */
+  public async send(
+    recipientIdentityId: string,
+    servers: readonly string[],
+    keys: MailboxKeys,
+    plaintext: Uint8Array,
+    envelopeId: string = MailboxChannel.randomEnvelopeId(),
+  ): Promise<MailboxAppend> {
+    const [primary, ...extras] = await Promise.allSettled([
+      this.sendPrimary(recipientIdentityId, keys, plaintext, envelopeId),
+      ...servers.map(
+        async (base) =>
+          await this.createChannel(base).send(keys, plaintext, envelopeId),
+      ),
+    ]);
+
+    for (const extra of extras) {
+      if (extra.status === 'rejected') {
+        // eslint-disable-next-line no-console
+        console.debug('Availability mailbox append failed.');
+      }
+    }
+
+    if (primary.status === 'fulfilled') return primary.value;
+
+    const landed = extras.find(
+      (extra): extra is PromiseFulfilledResult<MailboxAppend> =>
+        extra.status === 'fulfilled',
+    );
+
+    if (landed) return landed.value;
+
+    throw primary.reason;
   }
 }

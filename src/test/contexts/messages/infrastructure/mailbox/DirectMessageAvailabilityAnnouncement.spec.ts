@@ -68,7 +68,10 @@ describe(DirectMessageAvailabilityAnnouncement.name, () => {
     ],
   ])('rejects %s', (_label, value) => {
     expect(
-      DirectMessageAvailabilityAnnouncement.decode(raw(value), 'conversation-1'),
+      DirectMessageAvailabilityAnnouncement.decode(
+        raw(value),
+        'conversation-1',
+      ),
     ).toBeNull();
   });
 

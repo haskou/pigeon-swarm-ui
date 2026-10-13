@@ -7,16 +7,14 @@ import type { OpenedMailboxPage } from '../../../mailboxes/infrastructure/Mailbo
 import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
 import type { DirectMessageTimelineChange } from '../../presentation/view-models/DirectMessageTimelineChange';
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
+import type { DirectMessageAvailability } from './DirectMessageAvailability';
 import type { DirectMessageHistoryStore } from './DirectMessageHistoryStore';
-import type { DirectMessageInboxOpener } from './DirectMessageInboxOpener';
-import type { DirectMessageMailboxStore } from './DirectMessageMailboxStore';
+import type { DirectMessageInboxSource } from './DirectMessageInboxSource';
 import type { DirectMessageOwnCopies } from './DirectMessageOwnCopies';
-import type { DirectMessageReaderSet } from './DirectMessageReaderSet';
 import type { DirectMessageRecipientInbox } from './DirectMessageRecipientInbox';
 
 import { DirectMailboxOwnership } from '../../../mailboxes/domain/DirectMailboxOwnership';
 import { DirectMailboxRecords } from '../../../mailboxes/domain/DirectMailboxRecords';
-import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageHistoryStorageError } from './DirectMessageHistoryStorageError';
 import { DirectMessageMailboxLimits } from './DirectMessageMailboxLimits';
 import { DirectMessageMailboxRecord } from './DirectMessageMailboxRecord';
@@ -24,19 +22,20 @@ import { DirectMessageRecordReader } from './DirectMessageRecordReader';
 
 /**
  * Recipient sync pass of the direct mailbox: reads the next page of this
- * identity's inbox, maps it to timeline changes, then acknowledges it.
+ * identity's inbox, maps it to timeline changes, then acknowledges it. The
+ * inbox is read on the connected node and on every availability server; a
+ * record replicated on several is applied once.
  */
 export class DirectMessageTimelineSync {
   private readonly applied = new Map<string, Set<string>>();
 
   public constructor(
-    private readonly opener: DirectMessageInboxOpener,
-    private readonly channel: MailboxChannel,
-    private readonly store: DirectMessageMailboxStore,
-    private readonly readerSet: DirectMessageReaderSet,
+    private readonly primary: DirectMessageInboxSource,
+    private readonly extras: readonly DirectMessageInboxSource[],
     private readonly projection: Pick<MessageProjectionPort, 'decryptMany'>,
     private readonly ownCopies: DirectMessageOwnCopies,
     private readonly history: DirectMessageHistoryStore,
+    private readonly availability: Pick<DirectMessageAvailability, 'receive'>,
   ) {}
 
   /**
@@ -46,10 +45,11 @@ export class DirectMessageTimelineSync {
    * inbox behind the old cursor.
    */
   private async readPage(
+    source: DirectMessageInboxSource,
     inbox: DirectMessageRecipientInbox,
   ): Promise<{ cursor: number; page: OpenedMailboxPage }> {
     const { keys, readers, state } = inbox;
-    const page = await this.channel.read(
+    const page = await source.channel.read(
       keys,
       readers,
       state.cursor,
@@ -60,11 +60,11 @@ export class DirectMessageTimelineSync {
       return { cursor: state.cursor, page };
     }
 
-    this.store.save(keys.mailboxId, { ...state, cursor: 0 });
+    source.store.save(keys.mailboxId, { ...state, cursor: 0 });
 
     return {
       cursor: 0,
-      page: await this.channel.read(
+      page: await source.channel.read(
         keys,
         readers,
         0,
@@ -81,10 +81,13 @@ export class DirectMessageTimelineSync {
    * shown but not acknowledged, and the pass rejects with
    * `DirectMessageHistoryStorageError`. Each step checks the signal so an
    * aborted pass neither applies nor acks.
+   * An envelope that is no record may be an availability announcement from
+   * the peer.
    */
   private async applyPage(
     session: Session,
     conversationId: string,
+    source: DirectMessageInboxSource,
     inbox: DirectMessageRecipientInbox,
     page: OpenedMailboxPage,
     signal: AbortSignal,
@@ -97,6 +100,10 @@ export class DirectMessageTimelineSync {
         conversationId,
         envelope.plaintext,
       );
+
+      if (!record) {
+        this.availability.receive(session, conversationId, envelope.plaintext);
+      }
 
       return record ? [{ plaintext: envelope.plaintext, record }] : [];
     });
@@ -147,15 +154,53 @@ export class DirectMessageTimelineSync {
     // it, and acks it. Its records are applied, so the replay adds no change.
     if (!stored) throw new DirectMessageHistoryStorageError();
 
-    const acked = await this.channel.acknowledge(
+    const acked = await source.channel.acknowledge(
       keys,
       readers,
       page.lastCursor,
     );
-    this.store.save(keys.mailboxId, {
+    source.store.save(keys.mailboxId, {
       ...state,
       cursor: acked.recreated ? 0 : page.lastCursor,
     });
+  }
+
+  /**
+   * One source's pass: open, reconcile readers, read a page, apply it. An
+   * availability server whose inbox did not open is skipped this pass.
+   */
+  private async syncSource(
+    source: DirectMessageInboxSource,
+    session: Session,
+    conversationId: string,
+    signal: AbortSignal,
+    apply: (changes: DirectMessageTimelineChange[]) => void,
+  ): Promise<void> {
+    if (signal.aborted) return;
+
+    const inbox = await source.opener.openInboxShared(session, conversationId);
+
+    if (signal.aborted) return;
+
+    if (source !== this.primary && inbox.outcome !== 'open') return;
+
+    await source.readerSet.reconcile(session, inbox.keys, inbox.readers);
+
+    if (signal.aborted) return;
+
+    const { cursor, page } = await this.readPage(source, inbox);
+
+    if (page.lastCursor <= cursor || signal.aborted) return;
+
+    await this.applyPage(
+      session,
+      conversationId,
+      source,
+      inbox,
+      page,
+      signal,
+      apply,
+    );
   }
 
   /**
@@ -313,7 +358,9 @@ export class DirectMessageTimelineSync {
    * changes, then acknowledges. The cursor advances only after the
    * acknowledgement succeeds, so an interrupted pass is replayed and the
    * timeline skips records it already applied. A pass superseded before its
-   * inbox is created or read leaves the inbox untouched.
+   * inbox is created or read leaves the inbox untouched. The availability
+   * servers are read after the connected node, even when it failed; its
+   * error is rethrown once they are done. Their faults log count-only.
    */
   public async sync(
     session: Session,
@@ -321,21 +368,30 @@ export class DirectMessageTimelineSync {
     signal: AbortSignal,
     apply: (changes: DirectMessageTimelineChange[]) => void,
   ): Promise<void> {
-    if (signal.aborted) return;
+    let failure: { error: unknown } | undefined;
 
-    const inbox = await this.opener.openInboxShared(session, conversationId);
+    try {
+      await this.syncSource(
+        this.primary,
+        session,
+        conversationId,
+        signal,
+        apply,
+      );
+    } catch (error: unknown) {
+      failure = { error };
+    }
 
-    if (signal.aborted) return;
+    for (const extra of this.extras) {
+      try {
+        await this.syncSource(extra, session, conversationId, signal, apply);
+      } catch {
+        // eslint-disable-next-line no-console
+        console.debug('Availability mailbox sync failed.');
+      }
+    }
 
-    await this.readerSet.reconcile(session, inbox.keys, inbox.readers);
-
-    if (signal.aborted) return;
-
-    const { cursor, page } = await this.readPage(inbox);
-
-    if (page.lastCursor <= cursor || signal.aborted) return;
-
-    await this.applyPage(session, conversationId, inbox, page, signal, apply);
+    if (failure) throw failure.error;
   }
 
   /**

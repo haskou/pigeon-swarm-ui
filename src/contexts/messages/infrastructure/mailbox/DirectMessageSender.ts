@@ -9,6 +9,7 @@ import type { PigeonMessageCommandsApi } from '../http/PigeonMessageCommandsApi'
 import type { EditMessageOptions } from '../http/resources/EditMessageOptions';
 import type { MessageCommandIdentity } from '../http/resources/MessageCommandIdentity';
 import type { SendMessageOptions } from '../http/resources/SendMessageOptions';
+import type { DirectMessageAvailability } from './DirectMessageAvailability';
 import type { DirectMessageOutboxEvent } from './DirectMessageOutboxEvent';
 import type { DirectMessageOutboxItem } from './DirectMessageOutboxItem';
 import type { DirectMessageOutboxStore } from './DirectMessageOutboxStore';
@@ -78,6 +79,10 @@ export class DirectMessageSender {
     >,
     private readonly ownCopies: DirectMessageOwnCopies,
     outboxStore: DirectMessageOutboxStore,
+    private readonly availability: Pick<
+      DirectMessageAvailability,
+      'serversFor'
+    >,
   ) {
     this.outbox = new DirectMessageOutbox(outboxStore, {
       toOwn: (session, row) => {
@@ -229,8 +234,9 @@ export class DirectMessageSender {
 
   /**
    * Encodes one record for one inbox, enforces the envelope bound, and appends
-   * it through the recipient router. Throws before any append when the record
-   * is over the bound, so nothing is written.
+   * it through the recipient router, to the inbox's availability servers too.
+   * Throws before any append when the record is over the bound, so nothing is
+   * written.
    */
   private async writeTo(
     session: Session,
@@ -251,6 +257,11 @@ export class DirectMessageSender {
 
     await this.recipients.send(
       recipientIdentityId,
+      this.availability.serversFor(
+        session,
+        recipientIdentityId,
+        keys.mailboxId,
+      ),
       keys,
       plaintext,
       envelopeId,

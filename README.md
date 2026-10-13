@@ -154,6 +154,10 @@ is `http://localhost:8080/`, set in `src/app/API_SERVER_URL.ts`. Set
 `VITE_API_SERVER_URL` when Vite starts to point the combined build at another
 node.
 
+Set `VITE_MAILBOX_AVAILABILITY_SERVERS` to a comma-separated list of up to three
+public node API bases to keep a copy of each direct inbox on those nodes as
+well. See [Availability servers](docs/opaque-mailboxes-client.md#availability-servers).
+
 ## Runtime Dependencies
 
 For the full experience, the browser client expects:

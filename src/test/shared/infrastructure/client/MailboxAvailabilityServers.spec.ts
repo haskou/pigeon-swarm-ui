@@ -52,7 +52,11 @@ describe(MailboxAvailabilityServers.name, () => {
           connected,
           () => origin,
         ),
-      ).toEqual(['https://a.example', 'https://b.example', 'https://c.example']);
+      ).toEqual([
+        'https://a.example',
+        'https://b.example',
+        'https://c.example',
+      ]);
     });
   });
 

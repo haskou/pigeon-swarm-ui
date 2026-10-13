@@ -9,6 +9,8 @@ import type { PigeonMessageCommandsApi } from '../http/PigeonMessageCommandsApi'
 import type { EditMessageOptions } from '../http/resources/EditMessageOptions';
 import type { MessageCommandIdentity } from '../http/resources/MessageCommandIdentity';
 import type { SendMessageOptions } from '../http/resources/SendMessageOptions';
+import type { DirectMessageAvailabilityServer } from './DirectMessageAvailabilityServer';
+import type { DirectMessageInboxSource } from './DirectMessageInboxSource';
 import type { DirectMessageMailboxStore } from './DirectMessageMailboxStore';
 import type { DirectMessageOutboxEvent } from './DirectMessageOutboxEvent';
 import type { DirectMessageOutboxItem } from './DirectMessageOutboxItem';
@@ -16,6 +18,8 @@ import type { DirectMessageReaderSet } from './DirectMessageReaderSet';
 import type { RecipientMailboxRouter } from './RecipientMailboxRouter';
 
 import { ConversationKeyRequiredError } from '../../domain/errors/ConversationKeyRequiredError';
+import { DirectMessageAvailability } from './DirectMessageAvailability';
+import { DirectMessageAvailabilityStore } from './DirectMessageAvailabilityStore';
 import { DirectMessageHistoryStore } from './DirectMessageHistoryStore';
 import { DirectMessageHistoryTransfer } from './DirectMessageHistoryTransfer';
 import { DirectMessageInboxKeys } from './DirectMessageInboxKeys';
@@ -33,10 +37,13 @@ import { DirectMessageTimelineSync } from './DirectMessageTimelineSync';
  * Replayed records collapse by record id in the timeline.
  *
  * The facade keeps the public API. The work lives in collaborators: the
- * sender, the inbox opener, the timeline sync pass, and the read sync pass.
+ * sender, the inbox opener, the timeline sync pass, the read sync pass, and
+ * the availability servers that hold a copy of each inbox.
  */
 export class DirectMessageMailbox {
   private readonly inboxes: DirectMessageInboxOpener;
+  private readonly extras: DirectMessageInboxSource[];
+  private readonly availability: DirectMessageAvailability;
   private readonly sender: DirectMessageSender;
   private readonly timeline: DirectMessageTimelineSync;
   private readonly reads: DirectMessageReadSync;
@@ -50,27 +57,43 @@ export class DirectMessageMailbox {
     projection: Pick<MessageProjectionPort, 'decrypt' | 'decryptMany'>,
     readerSet: DirectMessageReaderSet,
     composer: Pick<PigeonMessageCommandsApi, 'composeEdit' | 'withSentRecord'>,
+    servers: readonly DirectMessageAvailabilityServer[],
   ) {
     const ownCopies = new DirectMessageOwnCopies();
 
     this.inboxes = new DirectMessageInboxOpener(channel, store, readerSet);
+    this.extras = servers.map((server) => ({
+      channel: server.channel,
+      opener: new DirectMessageInboxOpener(
+        server.channel,
+        server.store,
+        server.readerSet,
+      ),
+      readerSet: server.readerSet,
+      store: server.store,
+    }));
+    this.availability = new DirectMessageAvailability(
+      servers,
+      recipients,
+      new DirectMessageAvailabilityStore(),
+    );
     this.sender = new DirectMessageSender(
       recipients,
       projection,
       composer,
       ownCopies,
       new DirectMessageOutboxStore(),
+      this.availability,
     );
     this.history = new DirectMessageHistoryStore();
     this.transfer = new DirectMessageHistoryTransfer(channel, this.history);
     this.timeline = new DirectMessageTimelineSync(
-      this.inboxes,
-      channel,
-      store,
-      readerSet,
+      { channel, opener: this.inboxes, readerSet, store },
+      this.extras,
       projection,
       ownCopies,
       this.history,
+      this.availability,
     );
     this.reads = new DirectMessageReadSync(channel, store);
   }
@@ -186,6 +209,10 @@ export class DirectMessageMailbox {
    *
    * Reader tokens are derived from the device-sealed root, so a device that
    * lost its local storage reads the inbox it created earlier.
+   *
+   * The same pass reads the inbox on every availability server, then tells
+   * the peer which of them hold it when that changed, even after a failed
+   * read of the connected node.
    */
   public async sync(
     session: Session,
@@ -193,7 +220,13 @@ export class DirectMessageMailbox {
     signal: AbortSignal,
     apply: (changes: DirectMessageTimelineChange[]) => void,
   ): Promise<void> {
-    await this.timeline.sync(session, conversationId, signal, apply);
+    try {
+      await this.timeline.sync(session, conversationId, signal, apply);
+    } finally {
+      if (!signal.aborted) {
+        await this.availability.announce(session, conversationId);
+      }
+    }
   }
 
   /**
@@ -239,12 +272,16 @@ export class DirectMessageMailbox {
 
   /**
    * Removes this device's reader from the inbox of every direct conversation,
-   * so the node stops counting it against the reader cap. Best effort: a
-   * failed removal is left to the reader prune that other devices run on
-   * sync. Never throws.
+   * on the connected node and every availability server, so no node counts it
+   * against the reader cap. Best effort: a failed removal is left to the
+   * reader prune that other devices run on sync. Never throws.
    */
   public async releaseDeviceReaders(session: Session): Promise<void> {
     await this.inboxes.releaseDeviceReaders(session);
+
+    for (const extra of this.extras) {
+      await extra.opener.releaseDeviceReaders(session);
+    }
   }
 
   /**
@@ -352,14 +389,21 @@ export class DirectMessageMailbox {
    * Recipient. Opens the inbox of every one-to-one conversation this identity
    * holds a key for, so senders can deliver before this device has read it.
    * Opens run one at a time. A rate-limited open ends the pass, and a failed
-   * open is retried once OPEN_RETRY_MS has passed. Resolves true when every
-   * eligible inbox is open. Never throws.
+   * open is retried once OPEN_RETRY_MS has passed. The availability servers
+   * open after the connected node. Resolves true when every eligible inbox is
+   * open on the connected node. Never throws.
    */
   public async openInboxes(
     session: Session,
     conversations: readonly ConversationResource[],
     signal: AbortSignal,
   ): Promise<boolean> {
-    return await this.inboxes.openInboxes(session, conversations, signal);
+    const open = await this.inboxes.openInboxes(session, conversations, signal);
+
+    for (const extra of this.extras) {
+      await extra.opener.openInboxes(session, conversations, signal);
+    }
+
+    return open;
   }
 }
