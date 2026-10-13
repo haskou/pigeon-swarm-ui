@@ -1,0 +1,73 @@
+import { mock, type MockProxy } from 'jest-mock-extended';
+
+import {
+  eraseRemovedDevice,
+  type RemovedDeviceServices,
+} from '../../../app/presentation/eraseRemovedDevice';
+
+function services(): {
+  directMessages: MockProxy<RemovedDeviceServices['directMessages']>;
+  identities: MockProxy<RemovedDeviceServices['identities']>;
+} {
+  const directMessages = mock<RemovedDeviceServices['directMessages']>();
+  const identities = mock<RemovedDeviceServices['identities']>();
+
+  directMessages.cancelOutbox.mockResolvedValue(undefined);
+  directMessages.forgetHistory.mockResolvedValue(undefined);
+
+  return { directMessages, identities };
+}
+
+describe('eraseRemovedDevice', () => {
+  it("erases the identity's outbox, stored history and pending device-sealed recovery", async () => {
+    const removed = services();
+
+    await expect(eraseRemovedDevice('identity-1', removed)).resolves.toBe(true);
+
+    expect(removed.directMessages.cancelOutbox).toHaveBeenCalledWith(
+      'identity-1',
+    );
+    expect(removed.directMessages.forgetHistory).toHaveBeenCalledWith(
+      'identity-1',
+    );
+    expect(removed.identities.discardDeviceSealedRecovery).toHaveBeenCalledWith(
+      'identity-1',
+    );
+  });
+
+  it('still erases the rest and reports it when the outbox cannot be erased', async () => {
+    const removed = services();
+
+    removed.directMessages.cancelOutbox.mockRejectedValue(new Error('storage'));
+
+    await expect(eraseRemovedDevice('identity-1', removed)).resolves.toBe(
+      false,
+    );
+
+    expect(removed.directMessages.forgetHistory).toHaveBeenCalledWith(
+      'identity-1',
+    );
+    expect(removed.identities.discardDeviceSealedRecovery).toHaveBeenCalledWith(
+      'identity-1',
+    );
+  });
+
+  it('reports it when the pending device-sealed recovery cannot be erased', async () => {
+    const removed = services();
+
+    removed.identities.discardDeviceSealedRecovery.mockImplementation(() => {
+      throw new Error('storage');
+    });
+
+    await expect(eraseRemovedDevice('identity-1', removed)).resolves.toBe(
+      false,
+    );
+
+    expect(removed.directMessages.cancelOutbox).toHaveBeenCalledWith(
+      'identity-1',
+    );
+    expect(removed.directMessages.forgetHistory).toHaveBeenCalledWith(
+      'identity-1',
+    );
+  });
+});

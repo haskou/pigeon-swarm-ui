@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 import {
   acceptLatestInvitation,
@@ -78,6 +78,24 @@ test('locks a revoked device out of the direct messages sent after the revoke', 
     await laptop.waitForTimeout(REVOKED_SYNC_WINDOW_MS);
     await expect(laptop.getByText(beforeRevoke, { exact: true })).toBeVisible();
     await expect(laptop.getByText(afterRevoke, { exact: true })).toHaveCount(0);
+    await expect.poll(() => storedHistoryRows(laptop)).toBeGreaterThan(0);
+
+    // On its next sign-in the node reports the laptop as removed. The laptop
+    // erases the history it stored for Bob before it says so.
+    await laptop.goto('/');
+    await laptop.getByTestId('auth-identity-input').fill(`@${bob.handle}`);
+    await laptop.getByTestId('auth-password-input').fill(bob.password);
+    await laptop.getByTestId('auth-submit-button').click();
+    await expect(
+      laptop.getByText('This device was removed from your account.'),
+    ).toBeVisible({ timeout: 45_000 });
+    await expect(
+      laptop.getByText(
+        'The messages saved on this browser for this identity were erased.',
+        { exact: false },
+      ),
+    ).toBeVisible();
+    expect(await storedHistoryRows(laptop)).toBe(0);
   } finally {
     await alicePage.context().close();
     await phone.context().close();
@@ -91,4 +109,41 @@ function testRunToken(projectName: string): string {
   const random = Math.random().toString(36).slice(2, 6);
 
   return `${projectPrefix}${timestamp}${random}`.toLowerCase();
+}
+
+/** Counts the encrypted history rows this browser stores for any identity. */
+async function storedHistoryRows(page: Page): Promise<number> {
+  return page.evaluate(async () => {
+    const countEntries = (name: string): Promise<number> =>
+      new Promise((resolve, reject) => {
+        const opening = indexedDB.open(name);
+
+        opening.onerror = () => reject(opening.error);
+        opening.onsuccess = () => {
+          const database = opening.result;
+          const counting = database
+            .transaction('entries', 'readonly')
+            .objectStore('entries')
+            .count();
+
+          counting.onsuccess = () => {
+            database.close();
+            resolve(counting.result);
+          };
+          counting.onerror = () => {
+            database.close();
+            reject(counting.error);
+          };
+        };
+      });
+    let rows = 0;
+
+    for (const { name } of await indexedDB.databases()) {
+      if (name?.startsWith('pigeon-direct-history')) {
+        rows += await countEntries(name);
+      }
+    }
+
+    return rows;
+  });
 }

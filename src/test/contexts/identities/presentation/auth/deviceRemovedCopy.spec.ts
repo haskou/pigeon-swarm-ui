@@ -14,9 +14,19 @@ describe('device removed copy', () => {
     );
   });
 
-  it('offers re-pairing and a local start over in both languages', () => {
+  it('says that the messages saved on this browser were erased', () => {
+    expect(en.auth.deviceRemovedHelp).toContain(
+      'The messages saved on this browser for this identity were erased.',
+    );
+    expect(es.auth.deviceRemovedHelp).toContain(
+      'Los mensajes guardados en este navegador para esta identidad se han borrado.',
+    );
+  });
+
+  it('offers re-pairing, a local start over and an erase retry in both languages', () => {
     for (const copy of [en.auth, es.auth]) {
       expect(copy.deviceRemovedHelp.length).toBeGreaterThan(0);
+      expect(copy.deviceRemovedEraseFailed.length).toBeGreaterThan(0);
       expect(copy.deviceRemovedPair.length).toBeGreaterThan(0);
       expect(copy.deviceRemovedStartOver.length).toBeGreaterThan(0);
     }
@@ -25,8 +35,10 @@ describe('device removed copy', () => {
   it('shows no request, signature, or credential details', () => {
     for (const text of [
       en.auth.deviceRemoved,
+      en.auth.deviceRemovedEraseFailed,
       en.auth.deviceRemovedHelp,
       es.auth.deviceRemoved,
+      es.auth.deviceRemovedEraseFailed,
       es.auth.deviceRemovedHelp,
     ]) {
       expect(text).not.toMatch(/401|signature|credential|request|invalid/i);

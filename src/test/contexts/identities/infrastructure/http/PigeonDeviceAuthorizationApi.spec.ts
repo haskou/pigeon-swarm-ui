@@ -846,8 +846,11 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
         revision: 3,
       });
 
-      await expect(api.synchronize(session)).rejects.toBeInstanceOf(
-        DeviceRemovedError,
+      const failure = await failureOf(api.synchronize(session));
+
+      expect(failure).toBeInstanceOf(DeviceRemovedError);
+      expect((failure as DeviceRemovedError).identityId).toBe(
+        identityId.valueOf(),
       );
       expect(signer.headersWithRecoveryProof).toHaveBeenCalledWith(
         session,
