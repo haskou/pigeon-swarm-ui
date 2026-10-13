@@ -42,6 +42,18 @@ export class GroupMailboxControl {
     }
   }
 
+  private static commitSeed(
+    commit: GroupMailboxCommit,
+    identityId: string,
+  ): string {
+    const next = GroupMailboxKeySchedule.inbox(
+      commit.generation.secret,
+      IdentityId.fromString(identityId),
+    );
+
+    return `group-commit|${encodeBase64Url(sha256(commit.commit))}|${next.mailboxId}`;
+  }
+
   public constructor(
     private readonly selfIdentityId: string,
     private readonly engine: GroupMailboxControlEngine,
@@ -69,9 +81,9 @@ export class GroupMailboxControl {
   /**
    * Appends the commit to `I(Y,k)` of each recipient, `k` being the
    * generation the commit was made in. The envelope id is seeded from the
-   * commit's hash: a resend is stored once, and a member being removed, who
-   * can still append to `I(Y,k)`, cannot claim the id before the commit
-   * exists.
+   * commit's hash and the recipient's inbox of the generation after it: a
+   * resend is stored once, and a removed member, who can still append to
+   * `I(Y,k)` and may see one copy, cannot derive the id of another.
    */
   private async deliver(
     conversationId: string,
@@ -90,7 +102,7 @@ export class GroupMailboxControl {
           commit.deliveryGeneration,
           identityId,
           plaintext,
-          `group-commit|${encodeBase64Url(sha256(commit.commit))}`,
+          GroupMailboxControl.commitSeed(commit, identityId),
         ),
       ),
     );
