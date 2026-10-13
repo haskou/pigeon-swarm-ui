@@ -10,7 +10,7 @@ import { DeviceAuthorizationRevision } from '../../../../contexts/identities/dom
 import { DeviceCredential } from '../../../../contexts/identities/domain/value-objects/DeviceCredential';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { PairingId } from '../../../../contexts/identities/domain/value-objects/PairingId';
-import vectors from '../../../fixtures/device-authorization-recovery-vectors.json';
+import vectors from '../../../fixtures/device-authorization-transition-vectors.json';
 
 describe(DeviceAuthorizationTransition.name, () => {
   it('binds enrollment epoch and exact canonical payload to both devices', async () => {
@@ -232,76 +232,5 @@ describe(DeviceAuthorizationTransition.name, () => {
         ),
       ).toBe(false);
     });
-  });
-
-  describe('recovery vectors from pigeon-swarm-node', () => {
-    type RecoveryVector = {
-      expected: {
-        proofOfPossessionPayload: string;
-        signingPayload: string;
-        transition: Record<string, unknown>;
-      };
-      input: {
-        compromisedCredentials: {
-          compromisedSince: number;
-          credential: string;
-        }[];
-        epoch: string;
-        operationId: string;
-        previousRevision: number;
-      };
-      name: string;
-    };
-    const keyOf = (pair: { privateKeyPem: string; publicKeyPem: string }) =>
-      KeyPair.fromPrimitives({
-        privateKey: pair.privateKeyPem,
-        publicKey: pair.publicKeyPem,
-      } as never);
-    const recoveryAuthority = keyOf(vectors.keys.recoveryAuthority);
-    const target = keyOf(vectors.keys.target);
-    const cases: RecoveryVector[] = vectors.cases;
-
-    for (const vector of cases) {
-      it(vector.name, () => {
-        const transition = DeviceAuthorizationTransition.recovery({
-          compromisedCredentials: vector.input.compromisedCredentials.map(
-            (entry) => ({
-              compromisedSince: DeviceAuthorizationRevision.fromNumber(
-                entry.compromisedSince,
-              ),
-              credential: DeviceCredential.fromString(entry.credential),
-            }),
-          ),
-          epoch: DeviceAuthorizationEpoch.fromString(vector.input.epoch),
-          identityId: IdentityId.fromString(vectors.identityId),
-          operationId: DeviceAuthorizationOperationId.fromString(
-            vector.input.operationId,
-          ),
-          previousRevision: DeviceAuthorizationRevision.fromNumber(
-            vector.input.previousRevision,
-          ),
-          recoveryAuthority,
-          target,
-        });
-        const body = JSON.parse(JSON.stringify(transition.toPrimitives())) as {
-          proofOfPossession: string;
-          signature: string;
-        };
-
-        expect(body).toEqual(vector.expected.transition);
-        expect(
-          recoveryAuthority.isValidSignature(
-            vector.expected.signingPayload,
-            new Signature(body.signature),
-          ),
-        ).toBe(true);
-        expect(
-          target.isValidSignature(
-            vector.expected.proofOfPossessionPayload,
-            new Signature(body.proofOfPossession),
-          ),
-        ).toBe(true);
-      });
-    }
   });
 });
