@@ -288,6 +288,27 @@ export class DirectMessageMailbox {
   }
 
   /**
+   * A revoke's cut-off: once it resolves, no reader of a revoked device opens
+   * a record written afterwards to an inbox of a direct conversation, on the
+   * connected node or any availability server. Every node is attempted;
+   * rejects with the first failure once all were.
+   */
+  public async cutOffRevokedReaders(session: Session): Promise<void> {
+    const failures: unknown[] = [];
+
+    for (const opener of [
+      this.inboxes,
+      ...this.extras.map((extra) => extra.opener),
+    ]) {
+      await opener.cutOffRevokedReaders(session).catch((error: unknown) => {
+        failures.push(error);
+      });
+    }
+
+    if (failures.length > 0) throw failures[0];
+  }
+
+  /**
    * Wipes this identity's stored direct history on this device. Called when the
    * device is forgotten. Never throws: the store logs its own failures.
    */

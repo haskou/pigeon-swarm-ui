@@ -6,13 +6,16 @@ import { sessionRootKey } from '../../../identities/infrastructure/session/sessi
 import { MailboxReaderRetention } from '../../../mailboxes/domain/MailboxReaderRetention';
 import { MailboxCapability } from '../../../mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxReadToken } from '../../../mailboxes/infrastructure/crypto/MailboxReadToken';
+import { MailboxUnavailableError } from '../../../mailboxes/infrastructure/http/MailboxUnavailableError';
 import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
+import { DirectMessageReaderCutOffError } from './DirectMessageReaderCutOffError';
 
 /**
  * Keeps the mailbox reader set in line with the identity's devices. Each
  * device holds a reader derived from the root it opened. A reader whose
  * device was removed is pruned, so it stops counting against the node's
- * reader cap.
+ * reader cap, and after a revoke the pruned readers no longer open records
+ * written to the inbox.
  */
 export class DirectMessageReaderSet {
   /** Mailboxes reconciled this app session. A failed pass is not kept. */
@@ -84,6 +87,54 @@ export class DirectMessageReaderSet {
     await this.channel.addReader(keys, readers.root, readers.device);
   }
 
+  /** Prunes once per mailbox and root; a failed pass is dropped, rethrown. */
+  private prunePass(
+    session: Session,
+    keys: MailboxKeys,
+    readers: MailboxReadTokens,
+  ): Promise<void> {
+    const key = `${keys.mailboxId}:${MailboxCapability.hash(readers.root)}`;
+    const known = this.reconciled.get(key);
+
+    if (known) return known;
+
+    const pass = this.prune(session, keys, readers).catch((error: unknown) => {
+      this.reconciled.delete(key);
+
+      throw error;
+    });
+
+    this.reconciled.set(key, pass);
+
+    return pass;
+  }
+
+  /**
+   * The rotated root could not reach the inbox, so nothing was pruned there.
+   * Rejects while the root the revoke replaced still reads it.
+   */
+  private async requireClosedToPreviousRoot(
+    session: Session,
+    keys: MailboxKeys,
+  ): Promise<void> {
+    const previous = session.previousDeviceSealedRootKey;
+
+    if (!previous) return;
+
+    try {
+      await this.channel.listReaders(
+        keys,
+        MailboxReadToken.derive(previous.getBuffer(), keys.mailboxId),
+      );
+    } catch (error: unknown) {
+      if (error instanceof MailboxUnavailableError) return;
+
+      throw error;
+    }
+
+    throw new DirectMessageReaderCutOffError();
+  }
+
   /**
    * Enrols this device's reader under the root reader, bridging through the
    * root a revoke replaced. Memoised per mailbox and root.
@@ -122,22 +173,34 @@ export class DirectMessageReaderSet {
     keys: MailboxKeys,
     readers: MailboxReadTokens,
   ): Promise<void> {
-    const key = `${keys.mailboxId}:${MailboxCapability.hash(readers.root)}`;
-    const known = this.reconciled.get(key);
-
-    if (known) return known;
-
-    const pass = this.prune(session, keys, readers).catch(() => {
-      this.reconciled.delete(key);
+    return this.prunePass(session, keys, readers).catch(() => {
       // Count-only: no ids, content, or error details.
       // eslint-disable-next-line no-console
       console.debug(
         'Direct mailbox reader reconcile failed; retried next sync.',
       );
     });
+  }
 
-    this.reconciled.set(key, pass);
+  /**
+   * A revoke's cut-off of one inbox: bridges the rotated root in, then prunes
+   * every reader no remaining device holds, joining a pass already running.
+   * Rejects when either fails, or when the rotated root cannot reach an inbox
+   * the replaced root still reads. An inbox neither root reaches has nothing
+   * to cut off.
+   */
+  public async cutOff(
+    session: Session,
+    keys: MailboxKeys,
+    readers: MailboxReadTokens,
+  ): Promise<void> {
+    try {
+      await this.enrolSealedRoot(session, keys, readers);
+      await this.prunePass(session, keys, readers);
+    } catch (error: unknown) {
+      if (!(error instanceof MailboxUnavailableError)) throw error;
 
-    return pass;
+      await this.requireClosedToPreviousRoot(session, keys);
+    }
   }
 }

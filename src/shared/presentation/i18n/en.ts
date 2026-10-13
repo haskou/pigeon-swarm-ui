@@ -1347,6 +1347,8 @@ export const en = {
       'Use Retire when you no longer use a device. It can no longer act as you, and messages it already sent stay valid.',
     deviceRevokeCompromised: 'Mark as compromised',
     deviceRevokeConfirm: 'Remove access',
+    deviceRevokeCutOffError:
+      'The device was revoked, but it could not yet be locked out of every inbox. Your next sync retries this.',
     deviceRevokeError: 'The device could not be revoked.',
     discardChanges: 'Discard',
     discardChangesBody:
