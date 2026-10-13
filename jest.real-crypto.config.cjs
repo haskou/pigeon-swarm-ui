@@ -32,6 +32,7 @@ module.exports = {
     '**/DirectMessageAuthorship.spec.ts',
     '**/DirectMessageMailbox.spec.ts',
     '**/DirectMessageReaderSet.spec.ts',
+    '**/DirectMessageHistoryTransfer.spec.ts',
   ],
   testPathIgnorePatterns: [],
   transform: {

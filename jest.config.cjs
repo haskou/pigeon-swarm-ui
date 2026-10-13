@@ -30,6 +30,7 @@ module.exports = {
     '/DirectMessageMailbox.spec.ts$',
     '/DirectMessageReaderSet.spec.ts$',
     '/DirectMessageAuthorship.spec.ts$',
+    '/DirectMessageHistoryTransfer.spec.ts$',
   ],
   roots: ['<rootDir>/src'],
   testEnvironment: 'node',
