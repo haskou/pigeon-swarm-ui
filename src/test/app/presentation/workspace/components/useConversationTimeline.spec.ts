@@ -56,6 +56,11 @@ const conversation = {
   participantIds: ['alice', 'bob'],
   type: 'one-to-one',
 } as unknown as ConversationResource;
+const group = {
+  id: 'group-1',
+  participantIds: ['alice', 'bob', 'carol'],
+  type: 'group',
+} as unknown as ConversationResource;
 const session = { identity: { id: 'alice' } } as unknown as Session;
 const message = {
   attachments: [],
@@ -69,10 +74,10 @@ const message = {
   timestamp: 1000,
 } as unknown as ChatMessage;
 
-function mountTimeline() {
+function mountTimeline(activeConversation = conversation) {
   const onErrorChange = jest.fn<(error: null | string) => void>();
   const timeline = useConversationTimeline({
-    activeConversation: conversation,
+    activeConversation,
     clearUnreadMessages: jest.fn(),
     onCommunitiesReload: () => Promise.resolve(),
     onConversationsChange: jest.fn(),
@@ -95,7 +100,7 @@ function loadActiveMessagesOf() {
   return input.loadActiveMessages;
 }
 
-describe('useConversationTimeline read marker delivery', () => {
+describe('useConversationTimeline', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     jest
@@ -106,10 +111,31 @@ describe('useConversationTimeline read marker delivery', () => {
       .mockResolvedValue({ messages: [message], nextCursor: null } as never);
   });
 
-  it('marks a one-to-one conversation read through the mailbox, not read-until', async () => {
+  it('never reads the node message list for a one-to-one conversation', async () => {
     const { onErrorChange, timeline } = mountTimeline();
 
     await loadActiveMessagesOf()(conversation.id);
+
+    expect(applicationContainer.messages.load).not.toHaveBeenCalled();
+    expect(timeline.setMessages).toHaveBeenCalledTimes(1);
+    expect(timeline.setMessages).toHaveBeenCalledWith([]);
+    expect(onErrorChange).not.toHaveBeenCalledWith(expect.any(String));
+  });
+
+  it('keeps the mailbox timeline of a one-to-one conversation on resume', async () => {
+    const { timeline } = mountTimeline();
+
+    await loadActiveMessagesOf()(conversation.id);
+    await loadActiveMessagesOf()(conversation.id);
+
+    expect(timeline.setMessages).toHaveBeenCalledTimes(1);
+    expect(applicationContainer.messages.load).not.toHaveBeenCalled();
+  });
+
+  it('marks a one-to-one conversation read through the mailbox, not read-until', () => {
+    const { timeline } = mountTimeline();
+
+    timeline.markConversationReadUntil(conversation.id, [message]);
 
     expect(applicationContainer.directMessages.markRead).toHaveBeenCalledWith(
       expect.anything(),
@@ -119,7 +145,23 @@ describe('useConversationTimeline read marker delivery', () => {
     expect(
       applicationContainer.conversations.markReadUntil,
     ).not.toHaveBeenCalled();
-    expect(onErrorChange).not.toHaveBeenCalledWith(expect.any(String));
+  });
+
+  it('loads a group timeline from the node and marks it read-until', async () => {
+    const { timeline } = mountTimeline(group);
+
+    await loadActiveMessagesOf()(group.id);
+
+    expect(applicationContainer.messages.load).toHaveBeenCalledWith(
+      session,
+      group.id,
+      null,
+      expect.anything(),
+    );
     expect(timeline.setMessages).toHaveBeenLastCalledWith([message]);
+    expect(
+      applicationContainer.conversations.markReadUntil,
+    ).toHaveBeenCalledWith(session, group.id, message.id);
+    expect(applicationContainer.directMessages.markRead).not.toHaveBeenCalled();
   });
 });

@@ -807,11 +807,19 @@ export function GlassWorkspace({
     },
     [clearUnreadMessages, setConversations],
   );
+  const handleDirectHistoryRestored = useCallback(
+    (conversationId: string, restored: ChatMessage[]): void => {
+      markConversationReadUntil(conversationId, restored);
+      scrollMessagesToBottom('auto', true);
+    },
+    [markConversationReadUntil, scrollMessagesToBottom],
+  );
 
   useDirectMessageMailboxSync({
     activeConversation,
     onConversationRead: handleMailboxConversationRead,
     onErrorChange: setSendError,
+    onHistoryRestored: handleDirectHistoryRestored,
     onMessagesChange: setMessages,
     session,
     setPinnedMessageIds,
