@@ -1,3 +1,5 @@
+import { sha256 } from '@noble/hashes/sha2.js';
+
 import type { GroupMailboxGeneration } from '../../domain/GroupMailboxGeneration';
 import type { GroupMailboxCommit } from '../mls/GroupMailboxCommit';
 import type { GroupMailboxControlEngine } from './GroupMailboxControlEngine';
@@ -6,6 +8,8 @@ import type { GroupMailboxControlOutcome } from './GroupMailboxControlOutcome';
 import type { GroupMailboxDirectLink } from './GroupMailboxDirectLink';
 import type { PendingGroupMailboxKeyPackage } from './PendingGroupMailboxKeyPackage';
 
+import { encodeBase64Url } from '../../../../shared/infrastructure/encoding/base64url';
+import { mlsKeyPackageOwner } from '../../../communities/infrastructure/mls/MlsGroup';
 import { MlsRejectedError } from '../../../communities/infrastructure/mls/MlsRejectedError';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
@@ -28,6 +32,15 @@ export class GroupMailboxControl {
   public static readonly KEY_PACKAGE_TIMEOUT_MS = 60_000;
 
   private readonly pending = new Map<string, PendingGroupMailboxKeyPackage>();
+
+  /** The identity a key package's credential names, if it decodes. */
+  private static ownerOf(keyPackage: Uint8Array): string | undefined {
+    try {
+      return mlsKeyPackageOwner(keyPackage).identityId;
+    } catch {
+      return undefined;
+    }
+  }
 
   public constructor(
     private readonly selfIdentityId: string,
@@ -55,8 +68,10 @@ export class GroupMailboxControl {
 
   /**
    * Appends the commit to `I(Y,k)` of each recipient, `k` being the
-   * generation the commit was made in. The envelope id is seeded, so a
-   * resend never stores it twice.
+   * generation the commit was made in. The envelope id is seeded from the
+   * commit's hash: a resend is stored once, and a member being removed, who
+   * can still append to `I(Y,k)`, cannot claim the id before the commit
+   * exists.
    */
   private async deliver(
     conversationId: string,
@@ -75,7 +90,7 @@ export class GroupMailboxControl {
           commit.deliveryGeneration,
           identityId,
           plaintext,
-          `group-commit|${commit.epoch.toString()}`,
+          `group-commit|${encodeBase64Url(sha256(commit.commit))}`,
         ),
       ),
     );
@@ -103,7 +118,10 @@ export class GroupMailboxControl {
     return 'applied';
   }
 
-  /** Only an answer to a request this device sent that peer counts. */
+  /**
+   * Only an answer to a request this device sent that peer counts, and its
+   * key package must be that peer's.
+   */
   private receiveKeyPackageResponse(
     peerIdentityId: string,
     conversationId: string,
@@ -120,6 +138,16 @@ export class GroupMailboxControl {
     }
     this.pending.delete(requestId);
     clearTimeout(waiting.timer);
+
+    if (GroupMailboxControl.ownerOf(keyPackage) !== peerIdentityId) {
+      // eslint-disable-next-line no-console
+      console.debug('Group mailbox control record rejected.');
+      waiting.reject(
+        new MlsRejectedError('Key package does not belong to the peer'),
+      );
+
+      return 'rejected';
+    }
     waiting.resolve(keyPackage);
 
     return 'applied';
