@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { randomUUID } from 'node:crypto';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
-import type { DirectMessageOutboxRow } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageOutboxStore';
+import type { DirectMessageOutboxRow } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageOutboxRow';
 
 import { DirectMessageOutboxStore } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageOutboxStore';
 

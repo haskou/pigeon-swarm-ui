@@ -4,10 +4,8 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import type { ConversationResource } from '../../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
-import type {
-  DirectMessageOutboxEvent,
-  DirectMessageOutboxItem,
-} from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageOutbox';
+import type { DirectMessageOutboxEvent } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageOutboxEvent';
+import type { DirectMessageOutboxItem } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageOutboxItem';
 import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
 
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';
