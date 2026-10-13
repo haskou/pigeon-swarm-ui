@@ -32,6 +32,7 @@ describe('GroupMailboxControlRecord', () => {
       welcome: bytes,
     },
     { commit: bytes, conversationId: 'conversation-1', type: 'commit' },
+    { ciphertext: bytes, conversationId: 'conversation-1', type: 'message' },
   ])('round-trips a $type record', (fields) => {
     expect(
       GroupMailboxControlRecord.decode(
@@ -82,6 +83,15 @@ describe('GroupMailboxControlRecord', () => {
     [
       'an oversized commit',
       json({ ...header, commit: 'A'.repeat(60_000), type: 'commit' }),
+    ],
+    ['an empty message', json({ ...header, ciphertext: '', type: 'message' })],
+    [
+      'an oversized message',
+      json({ ...header, ciphertext: 'A'.repeat(60_000), type: 'message' }),
+    ],
+    [
+      'a message without ciphertext',
+      json({ ...header, commit: 'AA', type: 'message' }),
     ],
   ])('does not decode %s', (_name, plaintext) => {
     expect(GroupMailboxControlRecord.decode(plaintext)).toBeNull();

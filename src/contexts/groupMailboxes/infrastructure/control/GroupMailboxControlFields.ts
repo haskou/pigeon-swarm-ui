@@ -2,8 +2,9 @@
  * A control record of a group conversation. Key-package requests and
  * responses and welcomes travel sealed in the 1:1 mailbox with the peer, so
  * that mailbox authenticates their author. Commits travel in the group
- * inboxes `I(Y,k)`, and MLS authenticates them. `gen_k` is never part of a
- * record: a welcome carries only the public index `k`.
+ * inboxes `I(Y,k)`, and MLS authenticates them. Application messages travel
+ * there too, as one MLS ciphertext whose sender MLS authenticates. `gen_k` is
+ * never part of a record: a welcome carries only the public index `k`.
  */
 export type GroupMailboxControlFields =
   | {
@@ -27,4 +28,9 @@ export type GroupMailboxControlFields =
       readonly commit: Uint8Array;
       readonly conversationId: string;
       readonly type: 'commit';
+    }
+  | {
+      readonly ciphertext: Uint8Array;
+      readonly conversationId: string;
+      readonly type: 'message';
     };

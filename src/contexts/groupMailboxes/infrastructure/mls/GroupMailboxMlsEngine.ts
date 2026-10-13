@@ -335,7 +335,11 @@ export class GroupMailboxMlsEngine {
     return bundle.publicBytes;
   }
 
-  /** Idempotent: the same ciphertext always yields the stored message. */
+  /**
+   * Idempotent: the same ciphertext always yields the stored message. A
+   * message MLS does not accept rejects with `MlsRejectedError`; a storage
+   * failure rejects with its own error.
+   */
   public async decrypt(
     conversationId: string,
     ciphertext: Uint8Array,
@@ -356,7 +360,11 @@ export class GroupMailboxMlsEngine {
         };
       }
       const group = await this.requireGroup(conversationId);
-      const opened = await group.open(ciphertext);
+      const opened = await group.open(ciphertext).catch((error: unknown) => {
+        throw error instanceof MlsRejectedError
+          ? error
+          : new MlsRejectedError('Message rejected');
+      });
       const { deviceId, identityId } = opened.sender;
 
       // Once a removal is applied, its leaf's late messages are not read.
@@ -484,6 +492,13 @@ export class GroupMailboxMlsEngine {
     return this.exclusive(conversationId, async () =>
       (await this.requireGroup(conversationId)).identities().sort(),
     );
+  }
+
+  /** Retired generations whose drain window has closed. */
+  public async drainedGenerations(
+    conversationId: string,
+  ): Promise<GroupMailboxGeneration[]> {
+    return (await this.reconciledLog(conversationId)).drained(this.clock());
   }
 
   /** The current generation first, then any retired one still drained. */
