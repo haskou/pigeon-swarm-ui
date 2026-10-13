@@ -1,5 +1,7 @@
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
+import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
+
 /**
  * Applies a keychain published for a session snapshot to the session in state.
  *
@@ -18,7 +20,7 @@ export function applyPublishedKeychain(
   }
 
   // The user switched identities while publishing: discard the old keychain.
-  if (current.identity.id !== identityId) {
+  if (!IdentityMatch.isSame(current.identity.id, identityId)) {
     return current;
   }
 

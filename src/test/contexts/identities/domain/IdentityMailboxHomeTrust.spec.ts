@@ -67,4 +67,24 @@ describe(IdentityMailboxHomeTrust.name, () => {
       }),
     ).toBe(false);
   });
+
+  it('trusts a served id in the PEM form of the requested id', async () => {
+    const base = await claim();
+
+    expect(
+      IdentityMailboxHomeTrust.isTrusted({
+        ...base,
+        servedId: `-----BEGIN PUBLIC KEY-----\n${base.requestedId}\n-----END PUBLIC KEY-----\n`,
+      }),
+    ).toBe(true);
+  });
+
+  it('fails closed on a malformed commitment', async () => {
+    expect(
+      IdentityMailboxHomeTrust.isTrusted({
+        ...(await claim()),
+        deviceCredentialCommitment: 'not-a-hash',
+      }),
+    ).toBe(false);
+  });
 });
