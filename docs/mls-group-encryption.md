@@ -16,12 +16,21 @@ its content is encrypted with the community key anyway.
 Use MLS (RFC 9420) through `ts-mls` with the cipher suite
 `MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519`.
 
-| Scope                                | Group                                           |
-| ------------------------------------ | ----------------------------------------------- |
-| Community text, polls, reactions     | one group, `groupId = communityId`              |
-| Role-restricted channel (not yet)    | planned: `groupId = communityId:channelId`      |
-| Call media, attachments              | MLS exporter of the owning group (below)        |
-| Direct and group conversations       | out of scope here, tracked by the same issue    |
+| Scope                               | Group                                         |
+| ----------------------------------- | --------------------------------------------- |
+| Community text, polls, reactions    | one group, `groupId = communityId`            |
+| Role-restricted channel (not yet)   | planned: `groupId = communityId:channelId`    |
+| Call media, attachments             | MLS exporter of the owning group (below)      |
+| Group conversations (non-community) | one group, `groupId = conversationId` (below) |
+| Direct conversations                | out of scope: opaque 1:1 mailboxes            |
+
+Group conversations do not use the node record transport. Their commits,
+welcomes and messages travel through per-member group mailboxes, and the
+mailbox generation `gen_k` is the MLS exporter
+`("pigeon/group-mailbox/gen/v1", "", 32)` of the epoch after the last removal.
+See "Generations from MLS" in `docs/opaque-mailboxes-client.md`. The engine is
+`GroupMailboxMlsEngine`; it reuses `MlsGroup` and `MlsStateStore` in a separate
+IndexedDB database.
 
 Each leaf is a **device**, not an identity. An identity is in the group while
 at least one of its devices is. Removing an identity removes all its leaves.
@@ -60,7 +69,7 @@ GET  /communities/{communityId}/mls/records?groupId=&kind=&afterEpoch=
 
 - `id` is derived from the record content, so a retry is idempotent:
   `base64url(sha256(canonicalize({epoch?, groupId, kind, payload,
-  recipientIdentityId?})))`, with an empty recipient omitted
+recipientIdentityId?})))`, with an empty recipient omitted
   (`deriveMlsRecordId`). `src/test/fixtures/mls-record-id-vectors.json` is a
   copy of the node's fixture and pins the same bytes.
 - `key_package`: author must be a community member. One use only; a client

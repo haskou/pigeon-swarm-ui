@@ -1,5 +1,6 @@
 import {
   type AuthenticationService,
+  type PrivateMessage,
   type ClientConfig,
   type ClientState,
   type CiphersuiteImpl,
@@ -27,6 +28,7 @@ import {
   mlsExporter,
   processPrivateMessage,
 } from 'ts-mls';
+import { decryptSenderData } from 'ts-mls/privateMessage.js';
 
 import type { MlsLeafCredential } from './MlsLeafCredential';
 
@@ -44,6 +46,20 @@ const suite = (): Promise<CiphersuiteImpl> => {
 
   return suitePromise;
 };
+
+/** Whether `after` blanked or replaced any leaf that `before` held. */
+const removesLeaves = (before: ClientState, after: ClientState): boolean =>
+  before.ratchetTree.some((node, treeIndex) => {
+    if (node?.nodeType !== 'leaf') return false;
+    const kept = after.ratchetTree[treeIndex];
+    const key = node.leaf.signaturePublicKey;
+
+    return (
+      kept?.nodeType !== 'leaf' ||
+      kept.leaf.signaturePublicKey.length !== key.length ||
+      kept.leaf.signaturePublicKey.some((byte, index) => byte !== key[index])
+    );
+  });
 
 /** The identity and device that an MLS leaf claims to be. */
 export interface MlsLeafOwner {
@@ -77,9 +93,20 @@ export interface MlsCommitOutput {
   readonly welcome?: Uint8Array;
 }
 
+/** An application message and the leaf that signed it. */
+export interface MlsOpenedMessage {
+  readonly plaintext: Uint8Array;
+  readonly sender: MlsLeafOwner;
+}
+
 export type MlsCommitOutcome =
-  | { kind: 'applied'; epoch: bigint }
-  | { kind: 'replaced'; epoch: bigint; discardedCommitId: string }
+  | { kind: 'applied'; epoch: bigint; removesLeaves: boolean }
+  | {
+      kind: 'replaced';
+      epoch: bigint;
+      discardedCommitId: string;
+      removesLeaves: boolean;
+    }
   | { kind: 'ignored'; reason: 'duplicate' | 'lost-race' | 'stale' }
   | { kind: 'gap'; have: bigint; got: bigint }
   | { kind: 'removed' };
@@ -271,7 +298,8 @@ export class MlsGroup {
       policy,
       { ...decoded, clientConfig: clientConfig(policy) },
       new Map(),
-      false,
+      // A device removed before a restart must stay unable to send.
+      decoded.groupActiveState.kind !== 'active',
     );
   }
 
@@ -368,18 +396,31 @@ export class MlsGroup {
   }
 
   public async decrypt(bytes: Uint8Array): Promise<Uint8Array> {
-    const decoded = decodeMlsMessage(bytes, 0)?.[0];
+    return (await this.open(bytes)).plaintext;
+  }
 
-    if (!decoded || decoded.wireformat !== 'mls_private_message') {
-      throw new MlsRejectedError('Not an MLS private message');
-    }
+  /**
+   * Names the leaf that sent a private message (application or commit) in
+   * an epoch this device still holds. Proves only that the sender held that
+   * epoch's sender-data secret; signatures are checked when it is processed.
+   */
+  public async authenticate(bytes: Uint8Array): Promise<MlsLeafOwner> {
+    return (await this.sender(bytes)).owner;
+  }
 
-    if (decoded.privateMessage.contentType !== 'application') {
+  /**
+   * Decrypts an application message and names its sender: the leaf whose
+   * signature `processPrivateMessage` verified, in the epoch it was sent.
+   */
+  public async open(bytes: Uint8Array): Promise<MlsOpenedMessage> {
+    const { message, owner } = await this.sender(bytes);
+
+    if (message.contentType !== 'application') {
       throw new MlsRejectedError('Not an application message');
     }
     const result = await processPrivateMessage(
       this.state,
-      decoded.privateMessage,
+      message,
       emptyPskIndex,
       await suite(),
     );
@@ -389,7 +430,58 @@ export class MlsGroup {
     }
     this.state = result.newState;
 
-    return result.message;
+    return { plaintext: result.message, sender: owner };
+  }
+
+  /** Sender-data secret and tree of the current or a retained past epoch. */
+  private retained(
+    epoch: bigint,
+  ): Pick<ClientState, 'ratchetTree'> & { senderDataSecret: Uint8Array } {
+    const data =
+      epoch === this.state.groupContext.epoch
+        ? {
+            ratchetTree: this.state.ratchetTree,
+            senderDataSecret: this.state.keySchedule.senderDataSecret,
+          }
+        : this.state.historicalReceiverData.get(epoch);
+
+    if (!data) throw new MlsRejectedError('Message epoch is not retained');
+
+    return data;
+  }
+
+  private async sender(
+    bytes: Uint8Array,
+  ): Promise<{ message: PrivateMessage; owner: MlsLeafOwner }> {
+    const decoded = decodeMlsMessage(bytes, 0)?.[0];
+
+    if (!decoded || decoded.wireformat !== 'mls_private_message') {
+      throw new MlsRejectedError('Not an MLS private message');
+    }
+    const message = decoded.privateMessage;
+    const epoch = this.retained(message.epoch);
+    const senderData = await decryptSenderData(
+      message,
+      epoch.senderDataSecret,
+      await suite(),
+    ).catch(() => undefined);
+
+    if (!senderData) {
+      throw new MlsRejectedError('Message sender data does not open');
+    }
+    const leaf = epoch.ratchetTree[senderData.leafIndex * 2];
+
+    if (
+      leaf?.nodeType !== 'leaf' ||
+      leaf.leaf.credential.credentialType !== 'basic'
+    ) {
+      throw new MlsRejectedError('Unknown message sender');
+    }
+
+    return {
+      message,
+      owner: decodeMlsLeafOwner(leaf.leaf.credential.identity),
+    };
   }
 
   /** Derives a purpose-bound secret from the current epoch. */
@@ -492,7 +584,11 @@ export class MlsGroup {
       return { kind: 'removed' };
     }
 
-    return { epoch: result.newState.groupContext.epoch, kind: 'applied' };
+    return {
+      epoch: result.newState.groupContext.epoch,
+      kind: 'applied',
+      removesLeaves: removesLeaves(from, result.newState),
+    };
   }
 
   private async commit(proposals: Proposal[]): Promise<MlsCommitOutput> {
@@ -549,7 +645,11 @@ export class MlsGroup {
     this.applied.set(pending.epoch, { before: pending.before, commitId });
     this.state = pending.state;
 
-    return { epoch: this.state.groupContext.epoch, kind: 'applied' };
+    return {
+      epoch: this.state.groupContext.epoch,
+      kind: 'applied',
+      removesLeaves: removesLeaves(pending.before, pending.state),
+    };
   }
 
   /** Drops a created commit, e.g. because another commit won the epoch. */
