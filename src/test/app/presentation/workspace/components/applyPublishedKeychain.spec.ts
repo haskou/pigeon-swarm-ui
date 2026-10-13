@@ -48,4 +48,15 @@ describe(applyPublishedKeychain.name, () => {
 
     expect(applyPublishedKeychain(null, 'identity-1', published)).toBeNull();
   });
+
+  it('applies a publish whose identity id is the PEM form of the current one', () => {
+    const current = sessionAt('MCowBQYDK2VwAyEAidentity', 2, 'cid-2');
+    const published = sessionAt('MCowBQYDK2VwAyEAidentity', 3, 'cid-3');
+    const pem =
+      '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAidentity\n-----END PUBLIC KEY-----\n';
+
+    expect(applyPublishedKeychain(current, pem, published)?.keychain).toBe(
+      published.keychain,
+    );
+  });
 });
