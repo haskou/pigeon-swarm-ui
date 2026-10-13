@@ -1,8 +1,8 @@
-import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
+import type { ProjectedMessage } from './ProjectedMessage';
 
 export type MessageDecryptWorkerResponse =
   | {
-      messages: ChatMessage[];
+      projected: ProjectedMessage[];
       requestId: number;
       type: 'success';
     }

@@ -32,7 +32,7 @@ export class DirectMessageTimelineSync {
   public constructor(
     private readonly primary: DirectMessageInboxSource,
     private readonly extras: readonly DirectMessageInboxSource[],
-    private readonly projection: Pick<MessageProjectionPort, 'decryptMany'>,
+    private readonly projection: Pick<MessageProjectionPort, 'decryptReadable'>,
     private readonly ownCopies: DirectMessageOwnCopies,
     private readonly history: DirectMessageHistoryStore,
     private readonly availability: Pick<DirectMessageAvailability, 'receive'>,
@@ -294,7 +294,8 @@ export class DirectMessageTimelineSync {
   }
 
   /**
-   * A sent or edited record yields a change only when its message decrypted.
+   * A sent or edited record yields a change only when its message could be
+   * read; the projection leaves an unreadable message out.
    */
   private messageChanges(
     record: DirectEditedRecord | DirectSentRecord,
@@ -302,7 +303,7 @@ export class DirectMessageTimelineSync {
   ): DirectMessageTimelineChange[] {
     const message = messages.get(record.id);
 
-    if (!message || message.encrypted) return [];
+    if (!message) return [];
 
     return [
       record.type === DirectMailboxRecords.TYPE.sent
@@ -325,7 +326,8 @@ export class DirectMessageTimelineSync {
 
   /**
    * One batch decrypt for the sent and edited records of a page, keyed by
-   * message id. Makes no call when the page has none.
+   * message id, holding only the messages that could be read. Makes no call
+   * when the page has none.
    */
   private async decryptMessages(
     session: Session,
@@ -341,7 +343,7 @@ export class DirectMessageTimelineSync {
 
     if (resources.length === 0) return new Map();
 
-    const messages = await this.projection.decryptMany(
+    const messages = await this.projection.decryptReadable(
       session,
       conversationId,
       resources,

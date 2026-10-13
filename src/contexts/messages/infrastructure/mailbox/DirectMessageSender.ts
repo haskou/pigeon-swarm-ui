@@ -1,5 +1,3 @@
-import { UUID } from '@haskou/value-objects';
-
 import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessageRecord';
@@ -445,8 +443,6 @@ export class DirectMessageSender {
       DirectMailboxRecords.deleted({
         authorId: session.identity.id,
         conversationId: conversation.id,
-        createdAt: Date.now(),
-        id: UUID.generate().toString(),
         targetMessageId: messageId,
       }),
     );
@@ -472,7 +468,6 @@ export class DirectMessageSender {
         conversationId: conversation.id,
         createdAt: reaction.createdAt,
         emoji: reaction.emoji,
-        id: UUID.generate().toString(),
         targetMessageId: reaction.messageId,
       }),
     );
@@ -496,7 +491,6 @@ export class DirectMessageSender {
         authorId: session.identity.id,
         conversationId: conversation.id,
         createdAt: pin.createdAt,
-        id: UUID.generate().toString(),
         targetMessageId: pin.messageId,
       }),
     );
@@ -522,8 +516,6 @@ export class DirectMessageSender {
         DirectMailboxRecords.read({
           authorId: session.identity.id,
           conversationId: conversation.id,
-          createdAt: Date.now(),
-          id: UUID.generate().toString(),
           targetMessageId: messageId,
         }),
       );

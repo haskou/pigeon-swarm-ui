@@ -54,7 +54,10 @@ export class DirectMessageMailbox {
     channel: MailboxChannel,
     recipients: RecipientMailboxRouter,
     store: DirectMessageMailboxStore,
-    projection: Pick<MessageProjectionPort, 'decrypt' | 'decryptMany'>,
+    projection: Pick<
+      MessageProjectionPort,
+      'decrypt' | 'decryptMany' | 'decryptReadable'
+    >,
     readerSet: DirectMessageReaderSet,
     composer: Pick<PigeonMessageCommandsApi, 'composeEdit' | 'withSentRecord'>,
     servers: readonly DirectMessageAvailabilityServer[],

@@ -2,6 +2,7 @@ import type { MessageListEnvelope } from '../http/MessageListEnvelope';
 import type { MessageProjectionCopy } from './MessageProjectionCopy';
 import type { MessageReactionRecord } from './MessageReactionRecord';
 import type { PlainMessage } from './PlainMessage';
+import type { ProjectedMessage } from './ProjectedMessage';
 
 export type { MessageProjectionCopy } from './MessageProjectionCopy';
 /* eslint-disable @typescript-eslint/no-use-before-define */
@@ -81,7 +82,7 @@ export class MessageProjector {
     encryptedPayload: string,
     symmetricKey: SymmetricKey,
     currentIdentityId: string,
-  ): ChatMessage {
+  ): ProjectedMessage {
     try {
       const decrypted = symmetricKey.decrypt(
         new EncryptedPayload(encryptedPayload),
@@ -89,15 +90,21 @@ export class MessageProjector {
       const decryptedText = decrypted.toString();
       const parsed = JSON.parse(decryptedText) as PlainMessage;
 
-      return this.projectDecrypted(
-        base,
-        message,
-        decryptedText,
-        parsed,
-        currentIdentityId,
-      );
+      return {
+        message: this.projectDecrypted(
+          base,
+          message,
+          decryptedText,
+          parsed,
+          currentIdentityId,
+        ),
+        readable: true,
+      };
     } catch {
-      return this.encryptedError(base, message, 'decrypt-failed');
+      return {
+        message: this.encryptedError(base, message, 'decrypt-failed'),
+        readable: false,
+      };
     }
   }
 
@@ -199,34 +206,38 @@ export class MessageProjector {
     };
   }
 
-  public toChatMessage(
+  /** Projects one resource and reports whether its payload could be read. */
+  public project(
     session: Session,
     conversationId: string,
     message: MessageResource,
-  ): ChatMessage {
+  ): ProjectedMessage {
     const pollMessage = PollMessageProjection.toChatMessage(
       message,
       session.identity.id,
     );
 
-    if (pollMessage) return pollMessage;
+    if (pollMessage) return { message: pollMessage, readable: true };
 
     const base = this.baseMessage(session, message);
 
     if (message.type === 'call_event') {
-      return this.callEventMessage(base, message);
+      return { message: this.callEventMessage(base, message), readable: true };
     }
 
     const encryptedPayload = message.encryptedPayload ?? message.payload;
 
     if (!encryptedPayload) {
-      return this.plainMessage(base, message);
+      return { message: this.plainMessage(base, message), readable: true };
     }
 
     const key = this.conversationKey(session, conversationId);
 
     if (!key) {
-      return this.encryptedError(base, message, 'missing-key');
+      return {
+        message: this.encryptedError(base, message, 'missing-key'),
+        readable: false,
+      };
     }
 
     return this.decryptMessage(
