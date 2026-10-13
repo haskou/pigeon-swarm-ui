@@ -15,8 +15,14 @@ function fakeServices({
 }) {
   const calls: string[] = [];
   const wiped: string[] = [];
+  const cancelled: string[] = [];
   const services: ForgetDeviceServices = {
     directMessages: {
+      cancelOutbox: (identityId) => {
+        cancelled.push(identityId);
+
+        return Promise.resolve();
+      },
       forgetHistory: (identityId) => {
         wiped.push(identityId);
 
@@ -44,7 +50,7 @@ function fakeServices({
     },
   };
 
-  return { calls, services, wiped };
+  return { calls, cancelled, services, wiped };
 }
 
 describe('forgetCurrentDevice', () => {
@@ -157,5 +163,39 @@ describe('forgetCurrentDevice', () => {
       'unlock-failed',
     );
     expect(wiped).toEqual(['identity-1']);
+  });
+
+  it('cancels queued one-to-one sends once the device is revoked', async () => {
+    const { cancelled, services } = fakeServices({
+      retirement: () => Promise.resolve('revoked'),
+    });
+
+    await expect(forgetCurrentDevice(session, services, false)).resolves.toBe(
+      'forgotten',
+    );
+    expect(cancelled).toEqual(['identity-1']);
+  });
+
+  it('keeps queued one-to-one sends when revocation fails', async () => {
+    const { cancelled, services } = fakeServices({
+      retirement: () => Promise.reject(new Error('network')),
+    });
+
+    await expect(forgetCurrentDevice(session, services, false)).resolves.toBe(
+      'revoke-failed',
+    );
+    expect(cancelled).toEqual([]);
+  });
+
+  it('cancels queued sends once revoked even when the local unlock removal fails', async () => {
+    const { cancelled, services } = fakeServices({
+      retirement: () => Promise.resolve('revoked'),
+      unlockFails: true,
+    });
+
+    await expect(forgetCurrentDevice(session, services, false)).resolves.toBe(
+      'unlock-failed',
+    );
+    expect(cancelled).toEqual(['identity-1']);
   });
 });

@@ -33,6 +33,7 @@ import { DirectMessageHistoryStore } from '../../../../../contexts/messages/infr
 import { DirectMessageMailbox } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
 import { DirectMessageMailboxRecord } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxRecord';
 import { DirectMessageMailboxStore } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxStore';
+import { DirectMessageOutboxStore } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageOutboxStore';
 import { DirectMessageReaderSet } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageReaderSet';
 import { RecipientMailboxRouter } from '../../../../../contexts/messages/infrastructure/mailbox/RecipientMailboxRouter';
 import { MessageCollection } from '../../../../../contexts/messages/presentation/view-models/MessageCollection';
@@ -497,6 +498,83 @@ describe(DirectMessageMailbox.name, () => {
       expect(debug).not.toHaveBeenCalled();
       debug.mockRestore();
       jest.useRealTimers();
+    });
+
+    describe('queued sends across unlock and forget', () => {
+      beforeEach(async () => {
+        await new DirectMessageOutboxStore().forget('alice');
+      });
+
+      afterEach(() => {
+        jest.useRealTimers();
+      });
+
+      it('projects queued sends as decrypted messages', async () => {
+        jest.useFakeTimers();
+        const { channel, mailbox } = setup();
+        channel.send.mockRejectedValue(new MailboxUnavailableError());
+
+        await mailbox.send(session('alice'), conversation, 'hello', {});
+
+        await expect(
+          mailbox.queuedMessages(session('alice'), conversationId),
+        ).resolves.toEqual([
+          expect.objectContaining({ id: 'message-1', text: 'decrypted' }),
+        ]);
+
+        mailbox.stopOutbox('alice');
+      });
+
+      it('projects no queued send once the peer inbox accepts it', async () => {
+        const { channel, mailbox } = setup();
+        channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
+
+        await mailbox.send(session('alice'), conversation, 'hello', {});
+        await outboxSettled(mailbox, 'alice');
+
+        await expect(
+          mailbox.queuedMessages(session('alice'), conversationId),
+        ).resolves.toEqual([]);
+      });
+
+      it('resumes a send stopped at logout once the identity unlocks', async () => {
+        const alice = withSealedRoot(session('alice'));
+        const first = setup();
+        first.channel.send.mockRejectedValue(new MailboxUnavailableError());
+
+        await first.mailbox.send(alice, conversation, 'hello', {});
+        first.mailbox.stopOutbox('alice');
+
+        const second = setup();
+        second.channel.send.mockResolvedValue({
+          cursor: 1,
+          envelopeId: 'envelope-1',
+        });
+        await second.mailbox.resumeOutbox(alice);
+        await outboxSettled(second.mailbox, 'alice');
+
+        expect(second.channel.send).toHaveBeenCalled();
+        expect(second.mailbox.outboxItems('alice', conversationId)).toEqual([]);
+      });
+
+      it('wipes the queued sends of a forgotten identity', async () => {
+        const alice = withSealedRoot(session('alice'));
+        const first = setup();
+        first.channel.send.mockRejectedValue(new MailboxUnavailableError());
+
+        await first.mailbox.send(alice, conversation, 'hello', {});
+        await first.mailbox.cancelOutbox('alice');
+
+        const second = setup();
+        second.channel.send.mockResolvedValue({
+          cursor: 1,
+          envelopeId: 'envelope-1',
+        });
+        await second.mailbox.resumeOutbox(alice);
+
+        expect(second.mailbox.outboxItems('alice', conversationId)).toEqual([]);
+        expect(second.channel.send).not.toHaveBeenCalled();
+      });
     });
 
     describe('real encrypted payloads', () => {

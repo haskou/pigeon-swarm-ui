@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import type { ConversationResource } from '../../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
+import type { DirectMessageOutboxItem } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageOutbox';
 import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
 import type { StickerMessageReference } from '../../../../../contexts/stickers/infrastructure/http/resources/StickerMessageReference';
 
@@ -34,7 +35,11 @@ jest.mock('react', () => ({
 }));
 jest.mock('../../../../../app/composition/applicationContainer', () => ({
   applicationContainer: {
-    directMessages: { retry: jest.fn(), send: jest.fn() },
+    directMessages: {
+      outboxItems: jest.fn(),
+      retry: jest.fn(),
+      send: jest.fn(),
+    },
     messages: { send: jest.fn() },
     stickers: { markUsed: jest.fn() },
   },
@@ -42,6 +47,9 @@ jest.mock('../../../../../app/composition/applicationContainer', () => ({
 
 const directSend = jest.mocked(applicationContainer.directMessages.send);
 const directRetry = jest.mocked(applicationContainer.directMessages.retry);
+const outboxItems = jest.mocked(
+  applicationContainer.directMessages.outboxItems,
+);
 const legacySend = jest.mocked(applicationContainer.messages.send);
 const markUsed = jest.mocked(applicationContainer.stickers.markUsed);
 
@@ -165,6 +173,7 @@ describe('useConversationMessageDelivery one-to-one mailbox send', () => {
     mockRefs.length = 0;
     directSend.mockResolvedValue(sentMessage);
     directRetry.mockResolvedValue(null);
+    outboxItems.mockReturnValue([]);
     legacySend.mockResolvedValue(sentMessage);
     markUsed.mockResolvedValue(undefined);
   });
@@ -250,6 +259,25 @@ describe('useConversationMessageDelivery one-to-one mailbox send', () => {
 
     expect(delivery.state.error).toBeNull();
     expect(delivery.state.messages).toEqual([sentMessage]);
+  });
+
+  it('keeps a one-to-one send pending while it waits in the outbox', async () => {
+    outboxItems.mockReturnValue([
+      {
+        conversationId: conversation.id,
+        id: sentMessage.id,
+        record: {} as DirectMessageOutboxItem['record'],
+        state: 'retry',
+      },
+    ]);
+    const delivery = mountDelivery();
+
+    await delivery.sendMessage('hello', [], {});
+    await drain();
+
+    expect(delivery.state.messages).toEqual([
+      expect.objectContaining({ deliveryStatus: 'retry', id: sentMessage.id }),
+    ]);
   });
 
   it('marks the message failed with the send error when the mailbox send rejects', async () => {

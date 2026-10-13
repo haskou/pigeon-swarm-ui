@@ -373,4 +373,38 @@ describe(DirectMessageOutbox.name, () => {
 
     expect(listener).not.toHaveBeenCalled();
   });
+
+  it('reports the send it delivered by conversation and id', async () => {
+    const outbox = new DirectMessageOutbox(store, delivery);
+    const listener = jest.fn();
+
+    outbox.subscribe(listener);
+
+    await outbox.enqueue(session(), draft('a'));
+    await settle();
+
+    expect(listener).toHaveBeenLastCalledWith({
+      conversationId: 'conversation-1',
+      id: 'a',
+      kind: 'delivered',
+    });
+  });
+
+  it('does not report a cancelled send as delivered', async () => {
+    delivery.toPeer.mockRejectedValue(new MailboxUnavailableError());
+
+    const outbox = new DirectMessageOutbox(store, delivery);
+    const listener = jest.fn();
+
+    outbox.subscribe(listener);
+
+    await outbox.enqueue(session(), draft('a'));
+    await settle();
+    await outbox.cancel('identity-1');
+    await settle();
+
+    expect(listener).not.toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'delivered' }),
+    );
+  });
 });
