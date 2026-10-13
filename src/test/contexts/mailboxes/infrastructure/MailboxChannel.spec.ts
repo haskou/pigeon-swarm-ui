@@ -1,12 +1,12 @@
 import { Buffer } from 'buffer';
 import { mock } from 'jest-mock-extended';
 
+import { MailboxCreationDifficultyError } from '../../../../contexts/mailboxes/domain/errors/MailboxCreationDifficultyError';
+import { MailboxUnavailableError } from '../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
 import { MailboxCapability } from '../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxCreationProof } from '../../../../contexts/mailboxes/infrastructure/crypto/MailboxCreationProof';
 import { MailboxEnvelopeCipher } from '../../../../contexts/mailboxes/infrastructure/crypto/MailboxEnvelopeCipher';
 import { MailboxKeySchedule } from '../../../../contexts/mailboxes/infrastructure/crypto/MailboxKeySchedule';
-import { MailboxCreationDifficultyError } from '../../../../contexts/mailboxes/infrastructure/http/MailboxCreationDifficultyError';
-import { MailboxUnavailableError } from '../../../../contexts/mailboxes/infrastructure/http/MailboxUnavailableError';
 import { PigeonMailboxClient } from '../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
 import { MailboxChannel } from '../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';

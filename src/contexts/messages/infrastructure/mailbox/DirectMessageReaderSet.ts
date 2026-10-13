@@ -3,10 +3,10 @@ import type { MailboxKeys } from '../../../mailboxes/infrastructure/crypto/Mailb
 import type { MailboxReadTokens } from '../../../mailboxes/infrastructure/MailboxChannel';
 
 import { sessionRootKey } from '../../../identities/infrastructure/session/sessionRootKey';
-import { MailboxReaderRetention } from '../../../mailboxes/domain/MailboxReaderRetention';
+import { MailboxUnavailableError } from '../../../mailboxes/domain/errors/MailboxUnavailableError';
+import { MailboxReaderPruningDomainService } from '../../../mailboxes/domain/services/MailboxReaderPruningDomainService';
 import { MailboxCapability } from '../../../mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxReadToken } from '../../../mailboxes/infrastructure/crypto/MailboxReadToken';
-import { MailboxUnavailableError } from '../../../mailboxes/infrastructure/http/MailboxUnavailableError';
 import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageReaderCutOffError } from './DirectMessageReaderCutOffError';
 
@@ -32,32 +32,37 @@ export class DirectMessageReaderSet {
 
   /**
    * The root reader lists and removes readers, so it is always kept, as is
-   * this device's reader while the credential list lags.
+   * this device's reader while the credential list lags. The pass itself is
+   * MailboxReaderPruningDomainService.
    */
-  private async prune(
+  private prune(
     session: Session,
     keys: MailboxKeys,
     readers: MailboxReadTokens,
   ): Promise<void> {
-    const credentials = await this.listCredentials(session);
-    const rootKey = sessionRootKey(session).getBuffer();
-    const listed = await this.channel.listReaders(keys, readers.root);
-    const removable = MailboxReaderRetention.readersToRemove({
-      devices: credentials.map((credential) =>
-        MailboxCapability.hash(
-          MailboxReadToken.deriveDevice(rootKey, keys.mailboxId, credential),
-        ),
-      ),
-      listed: listed.readers.map((reader) => reader.readTokenHash),
-      retained: [
+    return MailboxReaderPruningDomainService.prune({
+      deviceReaders: async () => {
+        const credentials = await this.listCredentials(session);
+        const rootKey = sessionRootKey(session).getBuffer();
+
+        return credentials.map((credential) =>
+          MailboxCapability.hash(
+            MailboxReadToken.deriveDevice(rootKey, keys.mailboxId, credential),
+          ),
+        );
+      },
+      listedReaders: async () => {
+        const listed = await this.channel.listReaders(keys, readers.root);
+
+        return listed.readers.map((reader) => reader.readTokenHash);
+      },
+      removeReader: (readTokenHash) =>
+        this.channel.removeReader(keys, readers.root, readTokenHash),
+      retainedReaders: () => [
         MailboxCapability.hash(readers.root),
         MailboxCapability.hash(readers.device),
       ],
     });
-
-    for (const readTokenHash of removable) {
-      await this.channel.removeReader(keys, readers.root, readTokenHash);
-    }
   }
 
   /**

@@ -16,7 +16,7 @@ import { GroupMailboxControlRecord } from '../../../../../contexts/groupMailboxe
 import { GroupMailboxKeySchedule } from '../../../../../contexts/groupMailboxes/infrastructure/crypto/GroupMailboxKeySchedule';
 import { GroupMailboxOutbox } from '../../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutbox';
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
-import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/infrastructure/http/MailboxUnavailableError';
+import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 
 const CONVERSATION = 'conversation-1';

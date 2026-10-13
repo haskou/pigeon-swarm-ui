@@ -1,3 +1,4 @@
+import { MailboxUnavailableError } from '../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
 import { RecipientMailboxRoutingPolicy } from '../../../../contexts/messages/domain/RecipientMailboxRoutingPolicy';
 
 const DELIVERED = 'appended';
@@ -6,6 +7,22 @@ const LOCAL_FAULT = new Error('local fault');
 const NO_INBOX = new Error('no inbox');
 
 describe(RecipientMailboxRoutingPolicy.name, () => {
+  it('classifies an unavailable mailbox as an absent inbox', () => {
+    const unavailable = new MailboxUnavailableError();
+
+    expect(RecipientMailboxRoutingPolicy.failed(unavailable)).toEqual({
+      error: unavailable,
+      kind: 'absent',
+    });
+  });
+
+  it('classifies any other failure as a fault', () => {
+    expect(RecipientMailboxRoutingPolicy.failed(HOME_FAULT)).toEqual({
+      error: HOME_FAULT,
+      kind: 'faulted',
+    });
+  });
+
   it('delivers locally when no home is published', () => {
     expect(
       RecipientMailboxRoutingPolicy.resolve(

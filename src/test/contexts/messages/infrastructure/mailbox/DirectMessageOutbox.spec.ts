@@ -15,7 +15,7 @@ import type { DirectMessageOutboxDelivery } from '../../../../../contexts/messag
 import type { DirectMessageOutboxRow } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageOutboxRow';
 import type { DirectMessageOutboxStore } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageOutboxStore';
 
-import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/infrastructure/http/MailboxUnavailableError';
+import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
 import { DirectMessageOutbox } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageOutbox';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 

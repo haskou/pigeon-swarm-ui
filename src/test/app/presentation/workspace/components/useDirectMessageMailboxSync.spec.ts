@@ -16,7 +16,7 @@ import type { ChatMessage } from '../../../../../contexts/messages/presentation/
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';
 import { subscribeRealtimeMailboxHints } from '../../../../../app/presentation/realtime/useRealtimeEvents';
 import { useDirectMessageMailboxSync } from '../../../../../app/presentation/workspace/components/useDirectMessageMailboxSync';
-import { MailboxReaderLimitError } from '../../../../../contexts/mailboxes/infrastructure/http/MailboxReaderLimitError';
+import { MailboxReaderLimitError } from '../../../../../contexts/mailboxes/domain/errors/MailboxReaderLimitError';
 import { DirectMessageHistoryStorageError } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageHistoryStorageError';
 import { copy } from '../../../../../shared/presentation/i18n/copy';
 
