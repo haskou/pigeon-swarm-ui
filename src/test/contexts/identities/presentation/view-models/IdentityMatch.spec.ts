@@ -19,4 +19,8 @@ describe(IdentityMatch.name, () => {
   it('does not match a missing identity id', () => {
     expect(IdentityMatch.isSame(undefined, BARE)).toBe(false);
   });
+
+  it('does not match an identity id the value object rejects', () => {
+    expect(IdentityMatch.isSame('x'.repeat(5000), BARE)).toBe(false);
+  });
 });
