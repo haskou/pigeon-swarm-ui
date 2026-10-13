@@ -3802,10 +3802,12 @@ describe(DirectMessageMailbox.name, () => {
       beforeEach(async () => {
         jest.useRealTimers();
         await new DirectMessageOutboxStore().forget('alice');
+        await new DirectMessageHistoryStore().forget('bob');
       });
 
       afterEach(async () => {
         await new DirectMessageOutboxStore().forget('alice');
+        await new DirectMessageHistoryStore().forget('bob');
       });
 
       /** Resolves once `check` holds, letting queued work run. */
@@ -3905,6 +3907,69 @@ describe(DirectMessageMailbox.name, () => {
         );
 
         expect(timeline.map((message) => message.id)).toEqual(['message-1']);
+      });
+
+      it('does not deliver a message again when the recipient already removed its first copy', async () => {
+        const alice = withSealedRoot(session('alice'));
+        const bob = withSealedRoot(session('bob'));
+        const { projection, store } = setup();
+        const { envelopeCount, wire } = nodeMailboxClient();
+        const save = DirectMessageOutboxStore.prototype.save;
+        // The page closes before the peer copy is recorded as delivered.
+        let peerCopyRecorded = false;
+        const stalled = jest
+          .spyOn(DirectMessageOutboxStore.prototype, 'save')
+          .mockImplementation(function (
+            this: DirectMessageOutboxStore,
+            owner,
+            row,
+          ) {
+            if (!row.peerDelivered) return save.call(this, owner, row);
+
+            peerCopyRecorded = true;
+
+            return new Promise<void>(() => undefined);
+          });
+        const first = mailboxFor(wire, store, projection);
+
+        await first.send(alice, conversation, 'hello', {});
+        await until(() => peerCopyRecorded);
+        first.stopOutbox('alice');
+        stalled.mockRestore();
+
+        // The recipient reads and acks the envelope, so the node removes it.
+        const recipient = mailboxFor(wire, store, projection);
+        const firstPass: DirectMessageTimelineChange[] = [];
+        await recipient.sync(
+          bob,
+          conversationId,
+          new AbortController().signal,
+          (changes) => {
+            firstPass.push(...changes);
+          },
+        );
+        expect(messageIds(firstPass)).toEqual(['message-1']);
+        expect(envelopeCount()).toBe(0);
+
+        // The sender reloads and re-posts the same envelope id.
+        const reloaded = mailboxFor(wire, store, projection);
+        await reloaded.resumeOutbox(alice);
+        await until(
+          () => reloaded.outboxItems('alice', conversationId).length === 0,
+        );
+        expect(envelopeCount()).toBe(1);
+
+        const secondPass: DirectMessageTimelineChange[] = [];
+        await recipient.sync(
+          bob,
+          conversationId,
+          new AbortController().signal,
+          (changes) => {
+            secondPass.push(...changes);
+          },
+        );
+
+        expect(messageIds(secondPass)).toEqual([]);
       });
     });
   });
