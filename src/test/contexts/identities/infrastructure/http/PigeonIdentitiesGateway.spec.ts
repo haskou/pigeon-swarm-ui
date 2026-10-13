@@ -48,7 +48,7 @@ function gatewayDouble(): {
       'rememberKeychainRewrap' | 'rewrapAfterRevoke' | 'resealAfterPairing'
     >
   >;
-  sealedRoot: jest.Mocked<Pick<DeviceSealedRootRotation, 'rotate'>>;
+  sealedRoot: jest.Mocked<Pick<DeviceSealedRootRotation, 'current' | 'rotate'>>;
 } {
   const commands = {} as PigeonIdentityCommandsApi;
   const login = {} as PigeonIdentityLoginApi;
@@ -76,8 +76,9 @@ function gatewayDouble(): {
     >
   >;
   const sealedRoot = {
+    current: jest.fn(),
     rotate: jest.fn(),
-  } as jest.Mocked<Pick<DeviceSealedRootRotation, 'rotate'>>;
+  } as jest.Mocked<Pick<DeviceSealedRootRotation, 'current' | 'rotate'>>;
   const presence = {} as PigeonPresenceGateway;
 
   return {
@@ -155,13 +156,56 @@ describe(PigeonIdentitiesGateway.name, () => {
       expect(result.completionCode).toBe('completion-code');
     });
 
-    it('refuses to authorize a device when this session holds no sealed root', async () => {
-      const { authorization, gateway, recovery } = gatewayDouble();
+    it('opens the sealed root for a session that holds none before authorizing the pairing', async () => {
+      const { authorization, gateway, recovery, sealedRoot } = gatewayDouble();
+      const root = SymmetricKey.generate();
       const session = { identity: { id: 'identity-1' } } as unknown as Session;
+      const rooted = {
+        ...session,
+        deviceSealedRootKey: root,
+      } as unknown as Session;
+      const next = {
+        ...rooted,
+        authorizationRevision: 2,
+      } as unknown as Session;
+      sealedRoot.current.mockResolvedValue(rooted);
+      authorization.authorizePairing.mockResolvedValue({
+        completion: { toCode: () => 'completion-code' },
+        session: next,
+      } as unknown as DevicePairingAuthorization);
+
+      const result = await gateway.authorizeDevicePairing(session, requestCode);
+
+      expect(sealedRoot.current).toHaveBeenCalledWith(session);
+      expect(authorization.authorizePairing).toHaveBeenCalledWith(
+        rooted,
+        requestCode,
+      );
+      expect(recovery.resealAfterPairing).toHaveBeenCalledWith(next, root);
+      expect(result.completionCode).toBe('completion-code');
+    });
+
+    it('refuses to authorize a device when opening the sealed root leaves none open', async () => {
+      const { authorization, gateway, recovery, sealedRoot } = gatewayDouble();
+      const session = { identity: { id: 'identity-1' } } as unknown as Session;
+      sealedRoot.current.mockResolvedValue(session);
 
       await expect(
         gateway.authorizeDevicePairing(session, requestCode),
       ).rejects.toMatchObject({ failure: 'mismatch' });
+      expect(authorization.authorizePairing).not.toHaveBeenCalled();
+      expect(recovery.resealAfterPairing).not.toHaveBeenCalled();
+    });
+
+    it('authorizes nothing when the sealed root cannot be opened', async () => {
+      const { authorization, gateway, recovery, sealedRoot } = gatewayDouble();
+      const session = { identity: { id: 'identity-1' } } as unknown as Session;
+      const failure = new Error('keychain head is unreadable');
+      sealedRoot.current.mockRejectedValue(failure);
+
+      await expect(
+        gateway.authorizeDevicePairing(session, requestCode),
+      ).rejects.toBe(failure);
       expect(authorization.authorizePairing).not.toHaveBeenCalled();
       expect(recovery.resealAfterPairing).not.toHaveBeenCalled();
     });
