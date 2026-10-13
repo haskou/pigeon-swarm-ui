@@ -1,11 +1,11 @@
 import { FormEvent, type ReactElement, useEffect, useState } from 'react';
 
 import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
-import type { Session } from '../../infrastructure/session/Session';
 import type { NetworkSynchronizationStatus } from '../../../networks/presentation/view-models/NetworkSynchronizationStatus';
 import type { NodeNetwork } from '../../../networks/presentation/view-models/NodeNetwork';
 import type { LoginIdentityProgressStep } from '../../application/login-identity/LoginIdentityProgressStep';
 import type { DevicePairingRequestDraft } from '../../domain/DevicePairingRequestDraft';
+import type { Session } from '../../infrastructure/session/Session';
 
 import { loadApplicationContainer } from '../../../../app/composition/loadApplicationContainer';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
@@ -21,6 +21,7 @@ import {
   loadLastLoginIdentity,
   saveLastLoginIdentity,
 } from '../../infrastructure/storage/lastLoginIdentity';
+import { admissionRetryLabel } from '../admissionRetryLabel';
 import { useIdentityPreview } from '../hooks/useIdentityPreview';
 import { toDevicePairingErrorMessage } from '../view-models/toDevicePairingErrorMessage';
 import { AuthFormFields } from './AuthFormFields';
@@ -86,10 +87,12 @@ export function AuthScreen({
   const [pairingVerificationCode, setPairingVerificationCode] = useState('');
   const [state, setState] = useState<LoadState>('idle');
   const [error, setError] = useState<string | null>(null);
-  const [removedIdentityId, setRemovedIdentityId] =
-    useState<string | null>(null);
+  const [removedIdentityId, setRemovedIdentityId] = useState<string | null>(
+    null,
+  );
   const [loginProgressStep, setLoginProgressStep] =
     useState<LoginIdentityProgressStep | null>(null);
+  const [admissionNotice, setAdmissionNotice] = useState<string | null>(null);
   const [showInstallHelp, setShowInstallHelp] = useState(false);
   const { installState, requestInstall } = useInstallPrompt();
   const [selectedNetwork, setSelectedNetwork] = useState('');
@@ -196,9 +199,14 @@ export function AuthScreen({
     setError(null);
     setRemovedIdentityId(null);
     setLoginProgressStep(mode === 'login' ? 'resolving-identity' : null);
+    let stopAdmissionProgress: (() => void) | undefined;
 
     try {
       const applicationContainer = await loadApplicationContainer();
+      stopAdmissionProgress =
+        applicationContainer.identities.watchAdmissionProgress((progress) =>
+          setAdmissionNotice(admissionRetryLabel(progress)),
+        );
       const result =
         mode === 'login'
           ? useDevicePairing && pairingDraft
@@ -241,6 +249,7 @@ export function AuthScreen({
     } catch (caught) {
       setState('error');
       setLoginProgressStep(null);
+
       if (caught instanceof DeviceRemovedError) {
         setRemovedIdentityId(normalizeIdentityLogin(identityId));
 
@@ -254,6 +263,9 @@ export function AuthScreen({
       );
 
       return;
+    } finally {
+      stopAdmissionProgress?.();
+      setAdmissionNotice(null);
     }
 
     setLoginProgressStep(null);
@@ -551,9 +563,10 @@ export function AuthScreen({
             data-testid="auth-submit-button"
           >
             {state === 'loading'
-              ? mode === 'login' && loginProgressStep
-                ? loginProgressLabel(loginProgressStep)
-                : copy.auth.loadingSubmit
+              ? (admissionNotice ??
+                (mode === 'login' && loginProgressStep
+                  ? loginProgressLabel(loginProgressStep)
+                  : copy.auth.loadingSubmit))
               : mode === 'login'
                 ? copy.auth.loginSubmit
                 : copy.auth.createIdentity}

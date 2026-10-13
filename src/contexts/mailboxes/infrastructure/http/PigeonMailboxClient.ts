@@ -1,6 +1,7 @@
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
+import { requiredDifficultyBits } from '../../../../shared/infrastructure/http/requiredDifficultyBits';
 import { MailboxCreationDifficultyError } from './MailboxCreationDifficultyError';
 import { MailboxReaderLimitError } from './MailboxReaderLimitError';
 import { MailboxUnavailableError } from './MailboxUnavailableError';
@@ -45,29 +46,6 @@ export type MailboxReaderSet = {
  * propagate as HttpJsonError.
  */
 export class PigeonMailboxClient {
-  /**
-   * The node's 400 body names the difficulty a creation proof must meet. Only
-   * a positive safe integer counts; any other 400 propagates unchanged.
-   */
-  private static requiredDifficultyBits(error: unknown): number | undefined {
-    if (!(error instanceof HttpJsonError) || error.status !== 400) {
-      return undefined;
-    }
-
-    try {
-      const body = JSON.parse(error.bodyText) as {
-        requiredDifficultyBits?: unknown;
-      } | null;
-      const bits = body?.requiredDifficultyBits;
-
-      return typeof bits === 'number' && Number.isSafeInteger(bits) && bits > 0
-        ? bits
-        : undefined;
-    } catch {
-      return undefined;
-    }
-  }
-
   public constructor(private readonly http: Pick<HttpJsonClient, 'request'>) {}
 
   private static bearer(token: string): HeadersInit {
@@ -98,14 +76,13 @@ export class PigeonMailboxClient {
         }),
       );
     } catch (error: unknown) {
-      const requiredDifficultyBits =
-        PigeonMailboxClient.requiredDifficultyBits(error);
+      const requiredBits = requiredDifficultyBits(error);
 
-      if (requiredDifficultyBits === undefined) {
+      if (requiredBits === undefined) {
         throw error;
       }
 
-      throw new MailboxCreationDifficultyError(requiredDifficultyBits);
+      throw new MailboxCreationDifficultyError(requiredBits);
     }
   }
 

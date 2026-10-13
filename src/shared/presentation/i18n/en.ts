@@ -932,6 +932,8 @@ export const en = {
     viewRaw: 'View message data',
   },
   network: {
+    admissionRetry:
+      'Network busy. Strengthening proof to {bits} bits ({attempt} of {maximum})...',
     body: 'Before creating identities, this node needs to connect to a network.',
     configureRelay: 'Configure node connectivity',
     configureRelayBody:

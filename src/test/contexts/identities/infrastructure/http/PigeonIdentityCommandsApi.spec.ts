@@ -11,9 +11,11 @@ import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/
 import { DeviceId } from '../../../../../contexts/identities/domain/value-objects/DeviceId';
 import { DeviceUnlockSecretHandle } from '../../../../../contexts/identities/domain/value-objects/DeviceUnlockSecretHandle';
 import { RecoveryKey } from '../../../../../contexts/identities/domain/value-objects/RecoveryKey';
+import { IdentityAdmissionProof } from '../../../../../contexts/identities/infrastructure/crypto/IdentityAdmissionProof';
 import { IdentitySignaturePayloadFactory } from '../../../../../contexts/identities/infrastructure/http/IdentitySignaturePayloadFactory';
 import { PigeonIdentityCommandsApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityCommandsApi';
 import { PigeonIdentityGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityGateway';
+import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 
 function identity(overrides: Partial<IdentityResource> = {}): IdentityResource {
   return {
@@ -135,5 +137,168 @@ describe(PigeonIdentityCommandsApi.name, () => {
       expect.objectContaining({ method: 'PUT' }),
     );
     expect(identities.remember).toHaveBeenCalledWith(updatedIdentity);
+  });
+});
+
+describe(`${PigeonIdentityCommandsApi.name} admission difficulty`, () => {
+  function busy(requiredDifficultyBits: number): HttpJsonError {
+    return new HttpJsonError(
+      400,
+      'Bad Request',
+      JSON.stringify({ httpStatus: 400, requiredDifficultyBits }),
+    );
+  }
+
+  function vault(): DeviceIdentityVault {
+    return {
+      delete: jest.fn(),
+      register: jest.fn().mockImplementation(({ material }) =>
+        Promise.resolve({
+          authorizationEpoch: DeviceAuthorizationEpoch.genesis(),
+          authorizationRevision: DeviceAuthorizationRevision.initial(),
+          deviceId: DeviceId.generate(),
+          material,
+          secretHandle: DeviceUnlockSecretHandle.generate(),
+        }),
+      ),
+    } as unknown as DeviceIdentityVault;
+  }
+
+  function commandsWith(
+    http: HttpJsonClient,
+    identities: PigeonIdentityGateway = new PigeonIdentityGateway(http),
+    deviceVault: DeviceIdentityVault = vault(),
+  ): PigeonIdentityCommandsApi {
+    return new PigeonIdentityCommandsApi(
+      http,
+      {
+        headers: jest.fn().mockResolvedValue({ 'X-Signature': 'signed' }),
+      } as unknown as RequestSigner,
+      identities,
+      new IdentitySignaturePayloadFactory(),
+      deviceVault,
+    );
+  }
+
+  function sentBody(http: HttpJsonClient, call: number): IdentityResource {
+    return JSON.parse(
+      String(jest.mocked(http.request).mock.calls[call][1]?.body),
+    ) as IdentityResource;
+  }
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('re-mines a created identity at the requested difficulty and reports progress', async () => {
+    const http = {
+      request: jest
+        .fn()
+        .mockRejectedValueOnce(busy(17))
+        .mockResolvedValueOnce(identity()),
+    } as unknown as HttpJsonClient;
+    const commands = commandsWith(http);
+    const progress = jest.fn();
+    const stop = commands.watchAdmissionProgress(progress);
+
+    await commands.create('Ada', 'password', ['network-1'], undefined, {
+      recoveryKey: RecoveryKey.generate().valueOf(),
+    });
+    stop();
+
+    const retried = sentBody(http, 1);
+
+    expect(http.request).toHaveBeenCalledTimes(2);
+    expect(
+      IdentityAdmissionProof.isValid(
+        retried.id,
+        retried.networks,
+        retried.admissionNonce,
+        17,
+      ),
+    ).toBe(true);
+    expect(progress).toHaveBeenCalledWith({
+      attempt: 1,
+      difficultyBits: 17,
+      maximumAttempts: 2,
+    });
+  });
+
+  it('re-mines a profile update even when its networks are unchanged', async () => {
+    const current = identity({ identityExternalIdentifier: 'identity-cid' });
+    const http = {
+      request: jest
+        .fn()
+        .mockRejectedValueOnce(busy(17))
+        .mockResolvedValueOnce(current),
+    } as unknown as HttpJsonClient;
+    const identities = {
+      get: jest.fn().mockResolvedValue(current),
+      remember: jest.fn(),
+    } as unknown as PigeonIdentityGateway;
+    const commands = commandsWith(http, identities);
+    const session = {
+      identity: current,
+      keychain: { conversations: {}, version: 0 },
+      keyPair: await KeyPair.generate(),
+      masterKey: SymmetricKey.generate(),
+    } as Session;
+
+    await commands.updateProfile(session, { name: 'Ada Next' }, undefined, {});
+
+    const retried = sentBody(http, 1);
+
+    expect(sentBody(http, 0).admissionNonce).toBe('0');
+    expect(
+      IdentityAdmissionProof.isValid(
+        retried.id,
+        retried.networks,
+        retried.admissionNonce,
+        17,
+      ),
+    ).toBe(true);
+  });
+
+  it('gives up after two re-mined retries', async () => {
+    jest.spyOn(IdentityAdmissionProof, 'mine').mockResolvedValue('1');
+    const refusal = busy(19);
+    const http = {
+      request: jest
+        .fn()
+        .mockRejectedValueOnce(busy(17))
+        .mockRejectedValueOnce(busy(18))
+        .mockRejectedValueOnce(refusal),
+    } as unknown as HttpJsonClient;
+    const deviceVault = vault();
+
+    await expect(
+      commandsWith(http, undefined, deviceVault).create(
+        'Ada',
+        'password',
+        ['network-1'],
+        undefined,
+        { recoveryKey: RecoveryKey.generate().valueOf() },
+      ),
+    ).rejects.toBe(refusal);
+    expect(http.request).toHaveBeenCalledTimes(3);
+    expect(deviceVault.delete).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not mine above 24 bits', async () => {
+    const mine = jest.spyOn(IdentityAdmissionProof, 'mine');
+    const refusal = busy(25);
+    const http = {
+      request: jest.fn().mockRejectedValueOnce(refusal),
+    } as unknown as HttpJsonClient;
+
+    mine.mockResolvedValue('1');
+
+    await expect(
+      commandsWith(http).create('Ada', 'password', ['network-1'], undefined, {
+        recoveryKey: RecoveryKey.generate().valueOf(),
+      }),
+    ).rejects.toBe(refusal);
+    expect(http.request).toHaveBeenCalledTimes(1);
+    expect(mine).toHaveBeenCalledTimes(1);
   });
 });

@@ -45,22 +45,28 @@ export class IdentitySignaturePayloadFactory {
     private readonly publishedMailboxHome?: () => string | undefined,
   ) {}
 
-  /** Reuses the proof unless the networks changed; joining needs new work. */
+  /**
+   * Reuses the proof unless the networks changed or the node asked for a
+   * stronger one; joining needs new work.
+   */
   private async admissionNonceFor(
     id: string,
     networks: string[],
     current: IdentityResource,
+    difficultyBits?: number,
   ): Promise<string> {
     const unchanged =
       networks.length === current.networks.length &&
       networks.every((network) => current.networks.includes(network));
 
-    return unchanged
+    return unchanged && difficultyBits === undefined
       ? current.admissionNonce
-      : await IdentityAdmissionProof.mine(id, networks);
+      : await IdentityAdmissionProof.mine(id, networks, difficultyBits);
   }
 
+  /** `admissionDifficultyBits` defaults to the protocol minimum. */
   public async createInitial(input: {
+    admissionDifficultyBits?: number;
     deviceCredential: string;
     deviceCredentialCommitment: string;
     id: string;
@@ -73,7 +79,11 @@ export class IdentitySignaturePayloadFactory {
     const networks = uniqueNetworks(input.networks);
 
     return {
-      admissionNonce: await IdentityAdmissionProof.mine(id, networks),
+      admissionNonce: await IdentityAdmissionProof.mine(
+        id,
+        networks,
+        input.admissionDifficultyBits,
+      ),
       authorizationRevision: 0,
       deviceCredential: input.deviceCredential,
       deviceCredentialCommitment: input.deviceCredentialCommitment,
@@ -88,7 +98,9 @@ export class IdentitySignaturePayloadFactory {
     };
   }
 
+  /** A set `admissionDifficultyBits` always re-mines the proof. */
   public async createUpdate(input: {
+    admissionDifficultyBits?: number;
     identity: IdentityResource;
     previousIdentityExternalIdentifier?: string;
     profile: IdentityUpdateProfileInput;
@@ -105,6 +117,7 @@ export class IdentitySignaturePayloadFactory {
         id,
         networks,
         input.identity,
+        input.admissionDifficultyBits,
       ),
       authorizationRevision: input.identity.authorizationRevision,
       deviceCredential: input.identity.deviceCredential,

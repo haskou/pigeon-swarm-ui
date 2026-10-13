@@ -15,15 +15,20 @@ import type { LocalKeychain } from '../keychain/LocalKeychain';
 import type { Session } from '../session/Session';
 import type { DeviceIdentityVault } from '../storage/DeviceIdentityVault';
 import type { CreatedIdentityMaterial } from './CreatedIdentityMaterial';
+import type { IdentityAdmissionProgress } from './IdentityAdmissionProgress';
+import type { IdentityAdmissionProgressListener } from './IdentityAdmissionProgressListener';
 import type { IdentityUpdateProfileInput } from './IdentitySignaturePayloadFactory';
 import type { IdentitySignaturePayloadFactory } from './IdentitySignaturePayloadFactory';
 import type { PigeonIdentityGateway } from './PigeonIdentityGateway';
 import type { IdentityResource } from './resources/IdentityResource';
 
 import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
+import { requiredDifficultyBits } from '../../../../shared/infrastructure/http/requiredDifficultyBits';
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { IdentityAdmissionDifficultyPolicy } from '../../domain/IdentityAdmissionDifficultyPolicy';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
 import { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
+import { IdentityAdmissionProof } from '../crypto/IdentityAdmissionProof';
 import { RecoveryIdentityMaterial } from '../crypto/RecoveryIdentityMaterial';
 
 const emptyKeychain: LocalKeychain = {
@@ -32,6 +37,9 @@ const emptyKeychain: LocalKeychain = {
 };
 
 export class PigeonIdentityCommandsApi {
+  private readonly admissionListeners =
+    new Set<IdentityAdmissionProgressListener>();
+
   public constructor(
     private readonly http: HttpJsonClient,
     private readonly signer: RequestSigner,
@@ -39,6 +47,50 @@ export class PigeonIdentityCommandsApi {
     private readonly signatures: IdentitySignaturePayloadFactory,
     private readonly vault: DeviceIdentityVault,
   ) {}
+
+  /**
+   * Publishes with a default-difficulty proof first. A busy node answers 400
+   * with `requiredDifficultyBits`; the payload is then re-mined at that value
+   * and re-signed, at most `IdentityAdmissionDifficultyPolicy.maximumRetries`
+   * times and never above its ceiling. Any other refusal propagates.
+   */
+  private async publishAdmitted<T>(
+    publish: (admissionDifficultyBits?: number) => Promise<T>,
+  ): Promise<T> {
+    let admissionDifficultyBits: number | undefined;
+
+    for (let retry = 1; ; retry += 1) {
+      try {
+        return await publish(admissionDifficultyBits);
+      } catch (error: unknown) {
+        const requiredBits = requiredDifficultyBits(error);
+
+        if (
+          requiredBits === undefined ||
+          !IdentityAdmissionDifficultyPolicy.allowsRetry(
+            IdentityAdmissionProof.DEFAULT_DIFFICULTY_BITS,
+            requiredBits,
+            retry,
+          )
+        ) {
+          throw error;
+        }
+
+        admissionDifficultyBits = requiredBits;
+        this.reportAdmission({
+          attempt: retry,
+          difficultyBits: requiredBits,
+          maximumAttempts: IdentityAdmissionDifficultyPolicy.maximumRetries,
+        });
+      }
+    }
+  }
+
+  private reportAdmission(progress: IdentityAdmissionProgress): void {
+    for (const listener of this.admissionListeners) {
+      listener(progress);
+    }
+  }
 
   private credentialCommitment(keyPair: KeyPair): string {
     return SHA256Hash.from(
@@ -83,40 +135,49 @@ export class PigeonIdentityCommandsApi {
       },
       password,
     });
-    const unsigned = await this.signatures.createInitial({
-      deviceCredential: deviceCredentialKeyPair.toPrimitives().publicKey,
-      deviceCredentialCommitment: this.credentialCommitment(
-        deviceCredentialKeyPair,
-      ),
-      id: identityId,
-      networks,
-      profile: { handle, name },
-      recoveryAuthority: recoveryAuthorityKeyPair.toPrimitives().publicKey,
-      timestamp: Date.now(),
-    });
-    const body = {
-      ...unsigned,
-      signature: keyPair.sign(JSON.stringify(unsigned)).toString(),
-    };
-    const signingSession = {
-      authorizationEpoch: vaultSession.authorizationEpoch,
-      authorizationRevision: vaultSession.authorizationRevision,
-      deviceCredentialKeyPair,
-      deviceId: vaultSession.deviceId,
-      identity: body,
-      keychain: emptyKeychain,
-      keyPair,
-      masterKey,
-      recoveryAuthorityKeyPair,
-    } as Session;
     const path = '/identities/';
     let identity: IdentityResource;
 
     try {
-      identity = await this.http.request<IdentityResource>(path, {
-        body: JSON.stringify(body),
-        headers: await this.signer.headers(signingSession, 'POST', path, body),
-        method: 'POST',
+      identity = await this.publishAdmitted(async (admissionDifficultyBits) => {
+        const unsigned = await this.signatures.createInitial({
+          admissionDifficultyBits,
+          deviceCredential: deviceCredentialKeyPair.toPrimitives().publicKey,
+          deviceCredentialCommitment: this.credentialCommitment(
+            deviceCredentialKeyPair,
+          ),
+          id: identityId,
+          networks,
+          profile: { handle, name },
+          recoveryAuthority: recoveryAuthorityKeyPair.toPrimitives().publicKey,
+          timestamp: Date.now(),
+        });
+        const body = {
+          ...unsigned,
+          signature: keyPair.sign(JSON.stringify(unsigned)).toString(),
+        };
+        const signingSession = {
+          authorizationEpoch: vaultSession.authorizationEpoch,
+          authorizationRevision: vaultSession.authorizationRevision,
+          deviceCredentialKeyPair,
+          deviceId: vaultSession.deviceId,
+          identity: body,
+          keychain: emptyKeychain,
+          keyPair,
+          masterKey,
+          recoveryAuthorityKeyPair,
+        } as Session;
+
+        return await this.http.request<IdentityResource>(path, {
+          body: JSON.stringify(body),
+          headers: await this.signer.headers(
+            signingSession,
+            'POST',
+            path,
+            body,
+          ),
+          method: 'POST',
+        });
       });
     } catch (error) {
       await this.vault.delete(IdentityId.fromString(identityId));
@@ -154,39 +215,50 @@ export class PigeonIdentityCommandsApi {
       },
       password: options.password,
     });
-    const unsigned = await this.signatures.createInitial({
-      deviceCredential:
-        material.deviceCredentialKeyPair.toPrimitives().publicKey,
-      deviceCredentialCommitment: this.credentialCommitment(
-        material.deviceCredentialKeyPair,
-      ),
-      id: primitives.id,
-      networks: primitives.networkIds,
-      profile: primitives.profile,
-      recoveryAuthority: recoveryAuthorityKeyPair.toPrimitives().publicKey,
-      timestamp: primitives.createdAt,
-    });
-    const body = {
-      ...unsigned,
-      signature: material.keyPair.sign(JSON.stringify(unsigned)).toString(),
-    };
-    const signingSession = {
-      authorizationEpoch: vaultSession.authorizationEpoch,
-      authorizationRevision: vaultSession.authorizationRevision,
-      deviceCredentialKeyPair: material.deviceCredentialKeyPair,
-      deviceId: vaultSession.deviceId,
-      identity: body,
-      keychain: emptyKeychain,
-      keyPair: material.keyPair,
-      masterKey: material.masterKey,
-      recoveryAuthorityKeyPair,
-    } as Session;
     const path = '/identities/';
-    const persistedIdentity = await this.http.request<IdentityResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(signingSession, 'POST', path, body),
-      method: 'POST',
-    });
+    const persistedIdentity = await this.publishAdmitted(
+      async (admissionDifficultyBits) => {
+        const unsigned = await this.signatures.createInitial({
+          admissionDifficultyBits,
+          deviceCredential:
+            material.deviceCredentialKeyPair.toPrimitives().publicKey,
+          deviceCredentialCommitment: this.credentialCommitment(
+            material.deviceCredentialKeyPair,
+          ),
+          id: primitives.id,
+          networks: primitives.networkIds,
+          profile: primitives.profile,
+          recoveryAuthority: recoveryAuthorityKeyPair.toPrimitives().publicKey,
+          timestamp: primitives.createdAt,
+        });
+        const body = {
+          ...unsigned,
+          signature: material.keyPair.sign(JSON.stringify(unsigned)).toString(),
+        };
+        const signingSession = {
+          authorizationEpoch: vaultSession.authorizationEpoch,
+          authorizationRevision: vaultSession.authorizationRevision,
+          deviceCredentialKeyPair: material.deviceCredentialKeyPair,
+          deviceId: vaultSession.deviceId,
+          identity: body,
+          keychain: emptyKeychain,
+          keyPair: material.keyPair,
+          masterKey: material.masterKey,
+          recoveryAuthorityKeyPair,
+        } as Session;
+
+        return await this.http.request<IdentityResource>(path, {
+          body: JSON.stringify(body),
+          headers: await this.signer.headers(
+            signingSession,
+            'POST',
+            path,
+            body,
+          ),
+          method: 'POST',
+        });
+      },
+    );
 
     return {
       authorizationEpoch: vaultSession.authorizationEpoch,
@@ -229,26 +301,43 @@ export class PigeonIdentityCommandsApi {
       );
     }
     const path = `/identities/${encodeURIComponent(identityId)}`;
-    const unsigned = await this.signatures.createUpdate({
-      identity: currentIdentity,
-      previousIdentityExternalIdentifier,
-      profile,
-      timestamp: Date.now(),
-    });
-    const body = {
-      ...unsigned,
-      signature: (
-        await signSessionPayload(session, JSON.stringify(unsigned))
-      ).toString(),
-    };
-    const updatedIdentity = await this.http.request<IdentityResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'PUT', path, body),
-      method: 'PUT',
-    });
+    const updatedIdentity = await this.publishAdmitted(
+      async (admissionDifficultyBits) => {
+        const unsigned = await this.signatures.createUpdate({
+          admissionDifficultyBits,
+          identity: currentIdentity,
+          previousIdentityExternalIdentifier,
+          profile,
+          timestamp: Date.now(),
+        });
+        const body = {
+          ...unsigned,
+          signature: (
+            await signSessionPayload(session, JSON.stringify(unsigned))
+          ).toString(),
+        };
+
+        return await this.http.request<IdentityResource>(path, {
+          body: JSON.stringify(body),
+          headers: await this.signer.headers(session, 'PUT', path, body),
+          method: 'PUT',
+        });
+      },
+    );
 
     this.identities.remember(updatedIdentity);
 
     return updatedIdentity;
+  }
+
+  /** Notifies while a publish re-mines for a busy node; returns unsubscribe. */
+  public watchAdmissionProgress(
+    listener: IdentityAdmissionProgressListener,
+  ): () => void {
+    this.admissionListeners.add(listener);
+
+    return () => {
+      this.admissionListeners.delete(listener);
+    };
   }
 }
