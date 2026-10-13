@@ -38,7 +38,8 @@ recipient's inbox is absent survives a reload and is delivered once the
 recipient accepts) and `device-revoke-mailbox.spec.ts` (a paired device that
 the other device revokes keeps the messages sent before the revoke while it
 stays signed in, never shows a message sent after it while the surviving
-device does, at its next sign-in says it was removed and keeps its stored
+device does, at its next sign-in (from the identity the login screen
+remembers, without typing it) says it was removed and keeps its stored
 history until "Erase local copy and start over" erases it, and a forged
 removal answer for a still-authorized device erases nothing) run against a
 real node. Login and direct-message sync run on `desktop-chromium`,
