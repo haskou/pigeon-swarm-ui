@@ -37,7 +37,11 @@ export class MessageMapper {
       conversationId,
       createdAt: projection.timestamp,
       deleted: projection.raw.type === 'deleted',
-      deliveryState: projection.deliveryStatus ?? 'delivered',
+      // A send waiting to retry is still undelivered.
+      deliveryState:
+        projection.deliveryStatus === 'retry'
+          ? 'pending'
+          : (projection.deliveryStatus ?? 'delivered'),
       encrypted: projection.encrypted,
       id: projection.id,
       kind: projection.kind ?? (projection.sticker ? 'sticker' : 'message'),

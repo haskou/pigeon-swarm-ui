@@ -77,6 +77,14 @@ export function MessageDeliveryStatus({
   message: ChatMessage;
   onRetryMessage?: (message: ChatMessage) => void;
 }) {
+  if (message.deliveryStatus === 'retry') {
+    return (
+      <div className="mt-1 flex items-center justify-end gap-2 text-xs font-black opacity-65">
+        <span>{copy.messages.retrying}</span>
+      </div>
+    );
+  }
+
   if (message.deliveryStatus !== 'failed') return null;
 
   return (

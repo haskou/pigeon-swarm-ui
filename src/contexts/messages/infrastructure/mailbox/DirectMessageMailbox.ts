@@ -7,13 +7,19 @@ import type { DirectMessageTimelineChange } from '../../presentation/view-models
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { PigeonMessageCommandsApi } from '../http/PigeonMessageCommandsApi';
 import type { EditMessageOptions } from '../http/resources/EditMessageOptions';
+import type { MessageCommandIdentity } from '../http/resources/MessageCommandIdentity';
 import type { SendMessageOptions } from '../http/resources/SendMessageOptions';
 import type { DirectMessageMailboxStore } from './DirectMessageMailboxStore';
+import type {
+  DirectMessageOutboxEvent,
+  DirectMessageOutboxItem,
+} from './DirectMessageOutbox';
 import type { DirectMessageReaderSet } from './DirectMessageReaderSet';
 import type { RecipientMailboxRouter } from './RecipientMailboxRouter';
 
 import { DirectMessageHistoryStore } from './DirectMessageHistoryStore';
 import { DirectMessageInboxOpener } from './DirectMessageInboxOpener';
+import { DirectMessageOutboxStore } from './DirectMessageOutboxStore';
 import { DirectMessageOwnCopies } from './DirectMessageOwnCopies';
 import { DirectMessageReadSync } from './DirectMessageReadSync';
 import { DirectMessageSender } from './DirectMessageSender';
@@ -51,6 +57,7 @@ export class DirectMessageMailbox {
       projection,
       composer,
       ownCopies,
+      new DirectMessageOutboxStore(),
     );
     this.history = new DirectMessageHistoryStore();
     this.timeline = new DirectMessageTimelineSync(
@@ -78,18 +85,24 @@ export class DirectMessageMailbox {
   }
 
   /**
-   * Sender. Sends a message to the peer's inbox, then to this identity's own
-   * inbox. The composer builds the record and publishes its attachments, always
-   * encrypted for the peer whatever the caller passes. Rejects when the peer
-   * copy fails; then no own copy is written and no attachment settles.
+   * Sender. Queues a message to the peer's inbox and this identity's own inbox
+   * in the durable outbox. Resolves once queued; delivery continues in the
+   * background. Rejects before anything is persisted.
    */
   public async send(
     session: Session,
     conversation: ConversationResource,
     content: string,
     options: SendMessageOptions,
+    commandIdentity?: MessageCommandIdentity,
   ): Promise<ChatMessage> {
-    return await this.sender.send(session, conversation, content, options);
+    return await this.sender.send(
+      session,
+      conversation,
+      content,
+      options,
+      commandIdentity,
+    );
   }
 
   /** Sender. Edits a sent message. Rejects like send. */
@@ -238,6 +251,60 @@ export class DirectMessageMailbox {
    */
   public async forgetHistory(identityId: string): Promise<void> {
     await this.history.forget(identityId);
+  }
+
+  /**
+   * Sender. Retries a one-to-one send held in the outbox. Resolves with its
+   * message once re-queued, or null when the outbox holds no such send.
+   * Rejects when the conversation is not one-to-one.
+   */
+  public async retry(
+    session: Session,
+    conversation: ConversationResource,
+    messageId: string,
+  ): Promise<ChatMessage | null> {
+    return await this.sender.retry(session, conversation, messageId);
+  }
+
+  /** Sender. Re-queues the persisted sends of this identity after unlock. */
+  public async resumeOutbox(session: Session): Promise<void> {
+    await this.sender.resume(session);
+  }
+
+  /** Sender. Queued one-to-one sends of a conversation, each with its state. */
+  public outboxItems(
+    identityId: string,
+    conversationId: string,
+  ): DirectMessageOutboxItem[] {
+    return this.sender.items(identityId, conversationId);
+  }
+
+  /** Sender. Queued one-to-one sends of a conversation, decrypted. */
+  public async queuedMessages(
+    session: Session,
+    conversationId: string,
+  ): Promise<ChatMessage[]> {
+    return await this.sender.queued(session, conversationId);
+  }
+
+  /** Sender. Notifies on every outbox change. Returns the unsubscribe. */
+  public subscribeOutbox(
+    listener: (event: DirectMessageOutboxEvent) => void,
+  ): () => void {
+    return this.sender.subscribe(listener);
+  }
+
+  /** Sender. Stops this identity's sends in memory, for logout. */
+  public stopOutbox(identityId: string): void {
+    this.sender.stop(identityId);
+  }
+
+  /**
+   * Sender. Cancels and wipes this identity's queued sends. Called when the
+   * device is forgotten. Never throws.
+   */
+  public async cancelOutbox(identityId: string): Promise<void> {
+    await this.sender.cancel(identityId);
   }
 
   /**

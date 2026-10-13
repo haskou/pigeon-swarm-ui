@@ -159,6 +159,8 @@ export function MessageBubble({
   const hasTextContent = message.content.trim().length > 0;
   const stickerWithReply = Boolean(sticker && hasReply);
   const canViewOriginalMessage = Boolean(message.originalContent && !sticker);
+  const awaitingDelivery =
+    message.deliveryStatus === 'pending' || message.deliveryStatus === 'retry';
   const encryptedEnvironment = Boolean(
     message.encrypted || message.raw.encryptedPayload || message.raw.payload,
   );
@@ -334,7 +336,7 @@ export function MessageBubble({
                 className={cx(
                   'min-w-0 max-w-full select-text text-sm leading-6',
                   onMessageClick && 'cursor-pointer',
-                  message.deliveryStatus === 'pending' && 'opacity-70',
+                  awaitingDelivery && 'opacity-70',
                   sticker
                     ? 'rounded-2xl bg-transparent p-0'
                     : emojiOnlyMessage
@@ -400,7 +402,7 @@ export function MessageBubble({
                         key={`${message.id}-${attachmentIdentity(attachment)}`}
                         mine={mine}
                         onPreview={onAttachmentPreview}
-                        pending={message.deliveryStatus === 'pending'}
+                        pending={awaitingDelivery}
                       />
                     ))}
                     {otherAttachments.map(({ attachment, index }) => (
@@ -410,7 +412,7 @@ export function MessageBubble({
                         key={`${message.id}-${attachmentIdentity(attachment)}`}
                         mine={mine}
                         onPreview={onAttachmentPreview}
-                        pending={message.deliveryStatus === 'pending'}
+                        pending={awaitingDelivery}
                         onClick={() => onAttachmentOpen(index)}
                       />
                     ))}

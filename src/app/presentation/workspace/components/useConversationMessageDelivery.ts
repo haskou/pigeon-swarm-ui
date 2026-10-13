@@ -1,5 +1,5 @@
 import { UUID } from '@haskou/value-objects';
-import { startTransition, useCallback, useRef, useState } from 'react';
+import { startTransition, useCallback, useRef } from 'react';
 
 import type { AttachmentUploadOptions } from '../../../../contexts/attachments/application/contracts/AttachmentUploadOptions';
 import type { SendMessageOptions } from '../../../../contexts/messages/infrastructure/http/resources/SendMessageOptions';
@@ -28,6 +28,22 @@ export type PendingConversationSend = {
   sticker?: StickerMessageReference;
 };
 
+/**
+ * Stamps a one-to-one message with the state of its send while the outbox
+ * still holds that send. A delivered send carries no state.
+ */
+function withQueuedState(
+  identityId: string,
+  conversationId: string,
+  message: ChatMessage,
+): ChatMessage {
+  const state = applicationContainer.directMessages
+    .outboxItems(identityId, conversationId)
+    .find((item) => item.id === message.id)?.state;
+
+  return state ? { ...message, deliveryStatus: state } : message;
+}
+
 export function useConversationMessageDelivery({
   activeConversation,
   messagesRef,
@@ -40,19 +56,29 @@ export function useConversationMessageDelivery({
   scrollToBottom,
   session,
 }: ConversationMessageDeliveryInput): ConversationMessageDelivery {
-  const [failedSends, setFailedSends] = useState<
-    Record<string, PendingConversationSend>
-  >({});
+  // A ref: a retry reads the payload of a failed send at once, not on a later
+  // render.
+  const failedSendsRef = useRef(new Map<string, PendingConversationSend>());
 
   const sendQueueRef = useRef(Promise.resolve());
 
   const sendPendingMessage = useCallback(
-    (payload: PendingConversationSend) => {
+    (
+      payload: PendingConversationSend,
+      identity?: { createdAt: number; id: string },
+    ) => {
       if (!activeConversation?.id) return;
 
       const conversationId = activeConversation.id;
-      const optimisticTimestamp = Date.now();
-      const optimisticId = `pending:${conversationId}:${optimisticTimestamp}:${UUID.generate().toString()}`;
+      const direct = activeConversation.type === 'one-to-one';
+      const optimisticTimestamp = identity?.createdAt ?? Date.now();
+      // A one-to-one optimistic id is the mailbox record id, so a retry keeps
+      // the id it had.
+      const optimisticId =
+        identity?.id ??
+        (direct
+          ? UUID.generate().toString()
+          : `pending:${conversationId}:${optimisticTimestamp}:${UUID.generate().toString()}`);
 
       onErrorChange(null);
       onAttachmentProgressChange(null);
@@ -63,13 +89,7 @@ export function useConversationMessageDelivery({
           optimisticTimestamp,
         ),
       );
-      setFailedSends((current) => {
-        const next = { ...current };
-
-        delete next[optimisticId];
-
-        return next;
-      });
+      failedSendsRef.current.delete(optimisticId);
       onMessagesChange((current) => [
         ...current,
         PendingConversationMessage.create({
@@ -115,20 +135,20 @@ export function useConversationMessageDelivery({
           };
           // One-to-one traffic goes only through the mailbox; groups keep the
           // legacy message endpoint.
-          const sent =
-            activeConversation.type === 'one-to-one'
-              ? await applicationContainer.directMessages.send(
-                  session,
-                  activeConversation,
-                  payload.content,
-                  sendOptions,
-                )
-              : await applicationContainer.messages.send(
-                  session,
-                  conversationId,
-                  payload.content,
-                  sendOptions,
-                );
+          const sent = direct
+            ? await applicationContainer.directMessages.send(
+                session,
+                activeConversation,
+                payload.content,
+                sendOptions,
+                { createdAt: optimisticTimestamp, id: optimisticId },
+              )
+            : await applicationContainer.messages.send(
+                session,
+                conversationId,
+                payload.content,
+                sendOptions,
+              );
 
           const sticker = payload.sticker;
 
@@ -138,9 +158,13 @@ export function useConversationMessageDelivery({
             );
           }
 
+          const merged = direct
+            ? withQueuedState(session.identity.id, conversationId, sent)
+            : sent;
+
           onMessagesChange((current) =>
             MessageCollection.merge(withoutMessageById(current, optimisticId), [
-              sent,
+              merged,
             ]),
           );
           onConversationsChange((current) =>
@@ -153,10 +177,7 @@ export function useConversationMessageDelivery({
           scrollToBottom('smooth');
         } catch (caught) {
           onErrorChange(toUserErrorMessage(caught, copy.workspace.sendError));
-          setFailedSends((current) => ({
-            ...current,
-            [optimisticId]: payload,
-          }));
+          failedSendsRef.current.set(optimisticId, payload);
           onMessagesChange(
             patchMessageById(optimisticId, {
               attachmentProgress: undefined,
@@ -166,7 +187,13 @@ export function useConversationMessageDelivery({
         }
       };
 
-      sendQueueRef.current = sendQueueRef.current.then(deliverPendingMessage);
+      if (direct) {
+        // Each one-to-one send is persisted on its own, so none waits for an
+        // earlier one.
+        void deliverPendingMessage();
+      } else {
+        sendQueueRef.current = sendQueueRef.current.then(deliverPendingMessage);
+      }
     },
     [
       activeConversation,
@@ -215,23 +242,85 @@ export function useConversationMessageDelivery({
     [onReplyTargetChange, replyTarget, sendPendingMessage],
   );
 
-  const retryMessage = useCallback(
-    (message: ChatMessage) => {
-      const payload = failedSends[message.id];
+  // The outbox re-queues a one-to-one send it holds. Otherwise the send goes
+  // again under the same record id.
+  const retryDirectMessage = useCallback(
+    async (message: ChatMessage): Promise<void> => {
+      if (!activeConversation) return;
+
+      onErrorChange(null);
+
+      try {
+        const retried = await applicationContainer.directMessages.retry(
+          session,
+          activeConversation,
+          message.id,
+        );
+
+        if (retried) {
+          failedSendsRef.current.delete(message.id);
+          const queued = withQueuedState(
+            session.identity.id,
+            activeConversation.id,
+            retried,
+          );
+
+          onMessagesChange((current) =>
+            MessageCollection.merge(withoutMessageById(current, message.id), [
+              queued,
+            ]),
+          );
+
+          return;
+        }
+      } catch (caught) {
+        onErrorChange(toUserErrorMessage(caught, copy.workspace.sendError));
+
+        return;
+      }
+
+      const payload = failedSendsRef.current.get(message.id);
 
       if (!payload) return;
 
-      setFailedSends((current) => {
-        const next = { ...current };
-
-        delete next[message.id];
-
-        return next;
+      failedSendsRef.current.delete(message.id);
+      onMessagesChange((current) => withoutMessageById(current, message.id));
+      sendPendingMessage(payload, {
+        createdAt: message.timestamp,
+        id: message.id,
       });
+    },
+    [
+      activeConversation,
+      onErrorChange,
+      onMessagesChange,
+      sendPendingMessage,
+      session,
+    ],
+  );
+
+  const retryMessage = useCallback(
+    (message: ChatMessage) => {
+      if (activeConversation?.type === 'one-to-one') {
+        void retryDirectMessage(message);
+
+        return;
+      }
+
+      const payload = failedSendsRef.current.get(message.id);
+
+      if (!payload) return;
+
+      failedSendsRef.current.delete(message.id);
       onMessagesChange((current) => withoutMessageById(current, message.id));
       sendPendingMessage(payload);
     },
-    [failedSends, onMessagesChange, sendPendingMessage],
+    [
+      activeConversation,
+      onMessagesChange,
+      retryDirectMessage,
+      sendPendingMessage,
+    ],
   );
 
   return { retryMessage, sendMessage, sendSticker };

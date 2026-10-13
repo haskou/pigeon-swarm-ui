@@ -12,7 +12,11 @@ export class MessageReadModelMapper {
       conversationId: readModel.raw.conversationId ?? readModel.id,
       createdAt: readModel.timestamp,
       deleted: readModel.raw.type === 'deleted',
-      deliveryState: readModel.deliveryStatus ?? 'delivered',
+      // A send waiting to retry is still undelivered.
+      deliveryState:
+        readModel.deliveryStatus === 'retry'
+          ? 'pending'
+          : (readModel.deliveryStatus ?? 'delivered'),
       encrypted: readModel.encrypted,
       id: readModel.id,
       kind: MessageReadModelMapper.kindOf(readModel),

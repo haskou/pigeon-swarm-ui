@@ -9,7 +9,11 @@ import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 
 const origin = 'http://127.0.0.1:8080';
-const specs = ['e2e/login-methods.spec.ts', 'e2e/direct-message-sync.spec.ts'];
+const specs = [
+  'e2e/login-methods.spec.ts',
+  'e2e/direct-message-sync.spec.ts',
+  'e2e/direct-message-outbox.spec.ts',
+];
 const image = process.env.PIGEON_NODE_IMAGE?.trim();
 const container = `pigeon-ui-real-node-${randomBytes(4).toString('hex')}`;
 

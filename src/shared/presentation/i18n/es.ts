@@ -916,6 +916,7 @@ export const es = {
     replyingTo: 'Respondiendo a',
     replyTargetNotFound: 'No se encontró el mensaje respondido.',
     replyTo: 'Responder a',
+    retrying: 'Reintentando',
     retrySend: 'Reintentar',
     saveEdit: 'Guardar',
     searchReaction: 'Buscar emoji',
