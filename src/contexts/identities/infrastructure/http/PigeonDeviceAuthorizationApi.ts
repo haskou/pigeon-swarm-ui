@@ -1,5 +1,6 @@
 import {
   KeyPair,
+  PublicKey,
   SymmetricKey,
   UserRootKey,
 } from '@haskou/pigeon-swarm-crypto';
@@ -32,7 +33,7 @@ import { DevicePairingCompletion } from '../../domain/DevicePairingCompletion';
 import { DevicePairingError } from '../../domain/DevicePairingError';
 import { DevicePairingInvitation } from '../../domain/DevicePairingInvitation';
 import { DevicePairingRequest } from '../../domain/DevicePairingRequest';
-import { DeviceRemovedError } from '../../domain/DeviceRemovedError';
+import { DeviceRemovalDomainService } from '../../domain/services/DeviceRemovalDomainService';
 import { DeviceAuthorizationEpoch } from '../../domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationOperationId } from '../../domain/value-objects/DeviceAuthorizationOperationId';
 import { DeviceAuthorizationRevision } from '../../domain/value-objects/DeviceAuthorizationRevision';
@@ -217,39 +218,29 @@ export class PigeonDeviceAuthorizationApi {
   }
 
   /**
-   * Reads the checkpoint. A 401020 rejection means removal only when the
-   * recovery-proof catalog no longer lists this device. Any other failure,
-   * including a failed catalog check, keeps the original error.
+   * Reads the checkpoint. DeviceRemovalDomainService decides whether a
+   * 401020 rejection of this device's signature means it was removed.
    */
-  private async findForSynchronize(
+  private findForSynchronize(
     session: Session,
   ): Promise<DeviceAuthorizationCheckpoint> {
-    try {
-      return await this.find(session);
-    } catch (error) {
-      if (
-        error instanceof HttpJsonError &&
-        error.status === 401 &&
-        error.code === 401020 &&
-        (await this.isRemovedFromCatalog(session))
-      ) {
-        throw new DeviceRemovedError(session.identity.id);
-      }
-
-      throw error;
-    }
-  }
-
-  private async isRemovedFromCatalog(session: Session): Promise<boolean> {
-    const own = session.deviceCredentialKeyPair.toPrimitives().publicKey;
-
-    try {
-      const devices = await this.findDevicesWithRecoveryProof(session);
-
-      return !devices.some((device) => device.hasValue(own));
-    } catch {
-      return false;
-    }
+    return DeviceRemovalDomainService.findCheckpoint(
+      {
+        findCatalog: () => this.findDevicesWithRecoveryProof(session),
+        findCheckpoint: () => this.find(session),
+        isCredentialRejection: (error) =>
+          error instanceof HttpJsonError &&
+          error.status === 401 &&
+          error.code === 401020,
+        ownCredential: () =>
+          DeviceCredential.fromPublicKey(
+            PublicKey.fromPEM(
+              session.deviceCredentialKeyPair.toPrimitives().publicKey,
+            ),
+          ),
+      },
+      session.identity.id,
+    );
   }
 
   public invite(session: Session): DevicePairingInvitation {
