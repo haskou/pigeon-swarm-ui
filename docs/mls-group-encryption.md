@@ -58,7 +58,11 @@ GET  /communities/{communityId}/mls/records?groupId=&kind=&afterEpoch=
   epoch?, recipientIdentityId?, payload (base64), createdAt, mutation }
 ```
 
-- `id` is derived from the record content, so a retry is idempotent.
+- `id` is derived from the record content, so a retry is idempotent:
+  `base64url(sha256(canonicalize({epoch?, groupId, kind, payload,
+  recipientIdentityId?})))`, with an empty recipient omitted
+  (`deriveMlsRecordId`). `src/test/fixtures/mls-record-id-vectors.json` is a
+  copy of the node's fixture and pins the same bytes.
 - `key_package`: author must be a community member. One use only; a client
   publishes a fresh one whenever it has fewer than 4 unused.
 - `commit`: author must be a member; for a channel group, able to see the
