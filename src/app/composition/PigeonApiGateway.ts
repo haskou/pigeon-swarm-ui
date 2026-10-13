@@ -322,7 +322,6 @@ export class PigeonApiGateway {
       this.identityVault,
       deviceAuthorization,
       deviceSealedRoot,
-      keychainApi,
       deviceSealedRecovery,
     );
     const identityWorkspace = new PigeonIdentityWorkspaceSessionApi({

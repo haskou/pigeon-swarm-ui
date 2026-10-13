@@ -249,8 +249,8 @@ export class PigeonKeychainApi {
 
   /**
    * Reseals a head that a failed revoke rewrap left under the previous root:
-   * it opens under previousKey, with the master key as fallback, and is sealed
-   * under the session's root. A head already under the root is left alone.
+   * it opens under previousKey and is sealed under the session's root. A head
+   * already under the root is left alone.
    */
   public async rewrapHeadSealedUnder(
     session: Session,
@@ -260,18 +260,5 @@ export class PigeonKeychainApi {
       ...session,
       deviceSealedRootKey: previousKey,
     });
-  }
-
-  /**
-   * Reseals a head that opens only under the master key under the session's
-   * root. Unlock runs it once the root is open. A head already under the root
-   * is left alone.
-   */
-  public async migrateLegacyHead(session: Session): Promise<void> {
-    if (!session.deviceSealedRootKey) {
-      return;
-    }
-
-    await this.resealHeadUnderRoot(session, session);
   }
 }

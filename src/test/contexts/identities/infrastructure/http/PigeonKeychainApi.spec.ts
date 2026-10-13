@@ -214,17 +214,17 @@ describe(PigeonKeychainApi.name, () => {
     };
     server.seed(keychain, 'kc-1');
     const session = {
+      deviceSealedRootKey: {
+        decrypt: (payload: { valueOf(): string }) => ({
+          toString: () => payload.valueOf(),
+        }),
+        encrypt: (plaintext: string) => ({ toString: () => plaintext }),
+      },
       identity: { id: 'identity-1' },
       keychain,
       keychainExternalIdentifier: 'kc-1',
       keyPair: {
         sign: jest.fn().mockReturnValue({ toString: () => 'signature' }),
-      },
-      masterKey: {
-        decrypt: (payload: { valueOf(): string }) => ({
-          toString: () => payload.valueOf(),
-        }),
-        encrypt: (plaintext: string) => ({ toString: () => plaintext }),
       },
       password: 'secret',
     } as unknown as Session;
@@ -277,15 +277,15 @@ describe(PigeonKeychainApi.name, () => {
       keychainExternalIdentifier: 'kc-1',
     } as unknown as Session;
     const signingSession = {
-      identity: { id: 'identity-1' },
-      keyPair: {
-        sign: jest.fn().mockReturnValue({ toString: () => 'signature' }),
-      },
-      masterKey: {
+      deviceSealedRootKey: {
         decrypt: (payload: { valueOf(): string }) => ({
           toString: () => payload.valueOf(),
         }),
         encrypt: (plaintext: string) => ({ toString: () => plaintext }),
+      },
+      identity: { id: 'identity-1' },
+      keyPair: {
+        sign: jest.fn().mockReturnValue({ toString: () => 'signature' }),
       },
       password: 'secret',
     };
@@ -573,7 +573,7 @@ describe(PigeonKeychainApi.name, () => {
 
     it('rewraps the head under the session root, chained to the head it replaces', async () => {
       const server = new FakeKeychainServer();
-      server.seedSealed(sealedUnder(masterKey), 'kc-1', 1);
+      server.seedSealed(sealedUnder(rootKey), 'kc-1', 1);
 
       await apiOver(server).rewrapHead(
         sessionWith({ deviceSealedRootKey: rootKey }),
@@ -661,81 +661,6 @@ describe(PigeonKeychainApi.name, () => {
           keychainExternalIdentifier: 'kc-1',
           version: 1,
         });
-      });
-    });
-
-    describe('migrateLegacyHead', () => {
-      it('reseals a masterKey-sealed head under the root as the next keychain', async () => {
-        const server = new FakeKeychainServer();
-        server.seedSealed(sealedUnder(masterKey), 'kc-1', 1);
-
-        await apiOver(server).migrateLegacyHead(
-          sessionWith({ deviceSealedRootKey: rootKey }),
-        );
-
-        const stored = server.handle('GET') as KeychainResource;
-
-        expect(stored).toMatchObject({
-          keychainExternalIdentifier: 'kc-2',
-          previousKeychainExternalIdentifier: 'kc-1',
-          version: 2,
-        });
-        expect(() =>
-          rootKey.decrypt(new EncryptedPayload(stored.encryptedPayload)),
-        ).not.toThrow();
-      });
-
-      it('keeps the keychain contents when it reseals them', async () => {
-        const server = new FakeKeychainServer();
-        server.seedSealed(sealedUnder(masterKey), 'kc-1', 1);
-
-        await apiOver(server).migrateLegacyHead(
-          sessionWith({ deviceSealedRootKey: rootKey }),
-        );
-
-        const stored = server.handle('GET') as KeychainResource;
-        const opened = JSON.parse(
-          rootKey
-            .decrypt(new EncryptedPayload(stored.encryptedPayload))
-            .toString(),
-        ) as LocalKeychain;
-
-        expect(opened.conversations).toEqual(keychain.conversations);
-      });
-
-      it('leaves a head already sealed under the root alone', async () => {
-        const server = new FakeKeychainServer();
-        server.seedSealed(sealedUnder(rootKey), 'kc-1', 1);
-
-        await apiOver(server).migrateLegacyHead(
-          sessionWith({ deviceSealedRootKey: rootKey }),
-        );
-
-        expect(server.handle('GET')).toMatchObject({
-          keychainExternalIdentifier: 'kc-1',
-        });
-      });
-
-      it('does nothing without a device-sealed root', async () => {
-        const server = new FakeKeychainServer();
-        server.seedSealed(sealedUnder(masterKey), 'kc-1', 1);
-
-        await apiOver(server).migrateLegacyHead(sessionWith());
-
-        expect(server.handle('GET')).toMatchObject({
-          keychainExternalIdentifier: 'kc-1',
-        });
-      });
-
-      it('does nothing when the identity has no keychain yet', async () => {
-        const server = new FakeKeychainServer();
-
-        await expect(
-          apiOver(server).migrateLegacyHead(
-            sessionWith({ deviceSealedRootKey: rootKey }),
-          ),
-        ).resolves.toBeUndefined();
-        expect(() => server.handle('GET')).toThrow(HttpJsonError);
       });
     });
   });

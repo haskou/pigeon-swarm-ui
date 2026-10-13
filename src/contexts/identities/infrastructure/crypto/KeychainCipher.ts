@@ -1,4 +1,7 @@
-import { EncryptedPayload } from '@haskou/pigeon-swarm-crypto';
+import {
+  EncryptedPayload,
+  type SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
 
 import type { KeychainResource } from '../http/resources/KeychainResource';
 import type { LocalKeychain } from '../keychain/LocalKeychain';
@@ -8,7 +11,6 @@ import type { PublishedKeychainPayload } from './PublishedKeychainPayload';
 
 import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
-import { sessionRootKey } from '../session/sessionRootKey';
 
 export type KeychainHead = {
   keychain: LocalKeychain;
@@ -17,25 +19,19 @@ export type KeychainHead = {
 
 export class KeychainCipher {
   /**
-   * Opens under the device-sealed root. A head sealed under the master key
-   * before the root existed opens through this fallback until unlock reseals
-   * it under the root.
+   * The device-sealed root is the only key that opens or seals a keychain
+   * head. A session without a root can neither read nor publish one.
    */
-  private open(session: Session, payload: EncryptedPayload): string {
-    try {
-      return sessionRootKey(session).decrypt(payload).toString();
-    } catch (error: unknown) {
-      if (!session.deviceSealedRootKey) {
-        throw error;
-      }
-
-      return session.masterKey.decrypt(payload).toString();
+  private root(session: Session): SymmetricKey {
+    if (!session.deviceSealedRootKey) {
+      throw new Error('Device sealed root is not open.');
     }
+
+    return session.deviceSealedRootKey;
   }
 
   public decrypt(session: Session, keychain: KeychainResource): LocalKeychain {
-    const decrypted = this.open(
-      session,
+    const decrypted = this.root(session).decrypt(
       new EncryptedPayload(keychain.encryptedPayload),
     );
 
@@ -49,15 +45,15 @@ export class KeychainCipher {
   }
 
   /**
-   * True when the head opens under the session's root alone. Never falls back
-   * to the master key.
+   * True when the head opens under the session's device-sealed root. False
+   * when no root is held.
    */
   public isSealedUnderRoot(
     session: Session,
     keychain: KeychainResource,
   ): boolean {
     try {
-      sessionRootKey(session).decrypt(
+      this.root(session).decrypt(
         new EncryptedPayload(keychain.encryptedPayload),
       );
 
@@ -75,7 +71,7 @@ export class KeychainCipher {
     const timestamp = Date.now();
     const version = (head?.keychain.version ?? 0) + 1;
     const keychain = { ...nextKeychain, timestamp, version };
-    const encryptedPayload = sessionRootKey(session)
+    const encryptedPayload = this.root(session)
       .encrypt(JSON.stringify(keychain))
       .toString();
     const previousKeychainExternalIdentifier = head?.keychainExternalIdentifier;
