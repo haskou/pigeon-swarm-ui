@@ -791,7 +791,7 @@ describe(CallPeerConnections.name, () => {
     expect(jest.getTimerCount()).toBe(0);
   });
 
-  it('withdraws an unanswered offer so recovery renegotiates and a retry stays effective', async () => {
+  it('re-sends an unanswered offer so a lost answer recovers and a retry stays effective', async () => {
     jest.useFakeTimers();
     const peers: FakePeerConnection[] = [];
     installSessionDescriptionMock();
@@ -801,21 +801,13 @@ describe(CallPeerConnections.name, () => {
     const sendSignal: jest.MockedFunction<SignalSender> = jest.fn(() =>
       Promise.resolve(),
     );
-    const audio = mediaTrack('microphone', 'audio');
     manager.configure(provider);
-    manager.setLocalStream(mediaStreamWithTracks([audio]));
+    manager.setLocalStream(
+      mediaStreamWithTracks([mediaTrack('microphone', 'audio')]),
+    );
     await manager.ensurePeer('remote-identity-id', true, sendSignal);
     const [peer] = peers;
     Object.assign(peer, { getStats: () => Promise.resolve(new Map()) });
-    const negotiationNeeded = registeredPeerEventListener(
-      peer,
-      'negotiationneeded',
-    );
-    // Browsers defer a requested ICE restart while an offer is outstanding.
-    jest.mocked(peer.restartIce).mockImplementation(() => {
-      if (peer.signalingState === 'stable')
-        negotiationNeeded(new Event('negotiationneeded'));
-    });
     const offers = () =>
       sendSignal.mock.calls.filter(([, signalType]) => signalType === 'offer');
     const recoveryState = async () =>
@@ -830,9 +822,11 @@ describe(CallPeerConnections.name, () => {
     expect(offers()).toHaveLength(1);
     await jest.advanceTimersByTimeAsync(1);
 
-    expect(peer.setLocalDescription).toHaveBeenCalledWith({ type: 'rollback' });
-    expect(peer.senders[0].replaceTrack).toHaveBeenCalledWith(audio);
     expect(offers()).toHaveLength(2);
+    // The remote peer may hold the session it answered: only the same offer
+    // renegotiates it consistently.
+    expect(offers()[1]).toEqual(offers()[0]);
+    expect(peer.createOffer).toHaveBeenCalledTimes(1);
     expect(peer.signalingState).toBe('have-local-offer');
     expect(await recoveryState()).toBe('recovering');
 

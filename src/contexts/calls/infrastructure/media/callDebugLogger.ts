@@ -13,6 +13,7 @@ const allowedEvents = new Set([
   'peer-manager:ice-recovery:configuration-unavailable',
   'peer-manager:ice-recovery:exhausted',
   'peer-manager:ice-recovery:manual-retry',
+  'peer-manager:ice-recovery:resent-offer',
   'peer-manager:create-peer',
   'peer-manager:track-received',
   'peer-manager:reset',

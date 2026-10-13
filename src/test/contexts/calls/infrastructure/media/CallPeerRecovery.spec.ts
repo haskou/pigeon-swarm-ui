@@ -82,11 +82,13 @@ describe('CallPeerRecovery', () => {
   it('exposes exhaustion only after the final outcome window and retries only on request', async () => {
     jest.useFakeTimers();
     const peer = peerConnection('failed', 'failed');
-    const recovery = new CallPeerRecovery((current, canRestart) => {
-      if (canRestart()) current.restartIce();
+    const recovery = new CallPeerRecovery(
+      (_peerIdentityId, current, canRestart) => {
+        if (canRestart()) current.restartIce();
 
-      return Promise.resolve();
-    });
+        return Promise.resolve();
+      },
+    );
     recovery.reconcile('peer-1', peer, () => true);
     await jest.advanceTimersByTimeAsync(30_000);
     expect(peer.restartIce).toHaveBeenCalledTimes(3);
@@ -111,11 +113,13 @@ describe('CallPeerRecovery', () => {
   it('clears exhaustion when a late connection succeeds and refuses stale manual retries', async () => {
     jest.useFakeTimers();
     const peer = peerConnection('failed', 'failed');
-    const recovery = new CallPeerRecovery((current, canRestart) => {
-      if (canRestart()) current.restartIce();
+    const recovery = new CallPeerRecovery(
+      (_peerIdentityId, current, canRestart) => {
+        if (canRestart()) current.restartIce();
 
-      return Promise.resolve();
-    });
+        return Promise.resolve();
+      },
+    );
     recovery.reconcile('peer-1', peer, () => true);
     await jest.advanceTimersByTimeAsync(120_000);
     recovery.retry('peer-1', peer, () => false);
@@ -135,11 +139,13 @@ describe('CallPeerRecovery', () => {
 
   it('restarts ICE immediately after a failed connection', async () => {
     jest.useFakeTimers();
-    const recovery = new CallPeerRecovery((peer, canRestart) => {
-      if (canRestart()) peer.restartIce();
+    const recovery = new CallPeerRecovery(
+      (_peerIdentityId, peer, canRestart) => {
+        if (canRestart()) peer.restartIce();
 
-      return Promise.resolve();
-    });
+        return Promise.resolve();
+      },
+    );
     const peer = peerConnection('failed', 'failed');
 
     recovery.reconcile('peer-1', peer, () => true);
@@ -150,11 +156,13 @@ describe('CallPeerRecovery', () => {
 
   it('cancels pending recovery when the peer is forgotten', async () => {
     jest.useFakeTimers();
-    const recovery = new CallPeerRecovery((peer, canRestart) => {
-      if (canRestart()) peer.restartIce();
+    const recovery = new CallPeerRecovery(
+      (_peerIdentityId, peer, canRestart) => {
+        if (canRestart()) peer.restartIce();
 
-      return Promise.resolve();
-    });
+        return Promise.resolve();
+      },
+    );
     const peer = peerConnection('disconnected', 'disconnected');
 
     recovery.reconcile('peer-1', peer, () => true);
@@ -166,11 +174,13 @@ describe('CallPeerRecovery', () => {
 
   it('recovers stalled checking without extending the deadline on repeated events', async () => {
     jest.useFakeTimers();
-    const recovery = new CallPeerRecovery((peer, canRestart) => {
-      if (canRestart()) peer.restartIce();
+    const recovery = new CallPeerRecovery(
+      (_peerIdentityId, peer, canRestart) => {
+        if (canRestart()) peer.restartIce();
 
-      return Promise.resolve();
-    });
+        return Promise.resolve();
+      },
+    );
     const peer = peerConnection('connecting', 'checking');
 
     recovery.reconcile('peer-1', peer, () => true);
@@ -184,11 +194,13 @@ describe('CallPeerRecovery', () => {
 
   it('bounds recovery when checking never changes and ignores later retry events', async () => {
     jest.useFakeTimers();
-    const recovery = new CallPeerRecovery((peer, canRestart) => {
-      if (canRestart()) peer.restartIce();
+    const recovery = new CallPeerRecovery(
+      (_peerIdentityId, peer, canRestart) => {
+        if (canRestart()) peer.restartIce();
 
-      return Promise.resolve();
-    });
+        return Promise.resolve();
+      },
+    );
     const peer = peerConnection('connecting', 'checking');
 
     recovery.reconcile('peer-1', peer, () => true);
@@ -204,11 +216,13 @@ describe('CallPeerRecovery', () => {
     'cancels stalled checking recovery when %s',
     async (reason) => {
       jest.useFakeTimers();
-      const recovery = new CallPeerRecovery((peer, canRestart) => {
-        if (canRestart()) peer.restartIce();
+      const recovery = new CallPeerRecovery(
+        (_peerIdentityId, peer, canRestart) => {
+          if (canRestart()) peer.restartIce();
 
-        return Promise.resolve();
-      });
+          return Promise.resolve();
+        },
+      );
       const peer = peerConnection('connecting', 'checking');
       let current = true;
       recovery.reconcile('peer-1', peer, () => current);
@@ -238,11 +252,13 @@ describe('CallPeerRecovery', () => {
 
   it('resets the recovery budget after a healthy connection', async () => {
     jest.useFakeTimers();
-    const recovery = new CallPeerRecovery((peer, canRestart) => {
-      if (canRestart()) peer.restartIce();
+    const recovery = new CallPeerRecovery(
+      (_peerIdentityId, peer, canRestart) => {
+        if (canRestart()) peer.restartIce();
 
-      return Promise.resolve();
-    });
+        return Promise.resolve();
+      },
+    );
     const peer = peerConnection('connecting', 'checking');
     recovery.reconcile('peer-1', peer, () => true);
     await jest.advanceTimersByTimeAsync(120_000);
@@ -266,11 +282,13 @@ describe('CallPeerRecovery', () => {
 
   it('also bounds retries when a failed connection never emits another event', async () => {
     jest.useFakeTimers();
-    const recovery = new CallPeerRecovery((peer, canRestart) => {
-      if (canRestart()) peer.restartIce();
+    const recovery = new CallPeerRecovery(
+      (_peerIdentityId, peer, canRestart) => {
+        if (canRestart()) peer.restartIce();
 
-      return Promise.resolve();
-    });
+        return Promise.resolve();
+      },
+    );
     const peer = peerConnection('failed', 'failed');
     recovery.reconcile('peer-1', peer, () => true);
     await jest.advanceTimersByTimeAsync(120_000);
@@ -281,11 +299,13 @@ describe('CallPeerRecovery', () => {
 
   it('replaces a checking deadline with immediate recovery when ICE fails', async () => {
     jest.useFakeTimers();
-    const recovery = new CallPeerRecovery((peer, canRestart) => {
-      if (canRestart()) peer.restartIce();
+    const recovery = new CallPeerRecovery(
+      (_peerIdentityId, peer, canRestart) => {
+        if (canRestart()) peer.restartIce();
 
-      return Promise.resolve();
-    });
+        return Promise.resolve();
+      },
+    );
     const peer = peerConnection('connecting', 'checking');
     recovery.reconcile('peer-1', peer, () => true);
     await jest.advanceTimersByTimeAsync(1_000);
@@ -302,11 +322,13 @@ describe('CallPeerRecovery', () => {
 
   it('allows a restart time to negotiate before consuming the next attempt', async () => {
     jest.useFakeTimers();
-    const recovery = new CallPeerRecovery((peer, canRestart) => {
-      if (canRestart()) peer.restartIce();
+    const recovery = new CallPeerRecovery(
+      (_peerIdentityId, peer, canRestart) => {
+        if (canRestart()) peer.restartIce();
 
-      return Promise.resolve();
-    });
+        return Promise.resolve();
+      },
+    );
     const peer = peerConnection('failed', 'failed');
     recovery.reconcile('peer-1', peer, () => true);
     await jest.advanceTimersByTimeAsync(0);
@@ -324,7 +346,11 @@ describe('CallPeerRecovery', () => {
     const peer = peerConnection('failed', 'failed');
     const completions: (() => void)[] = [];
     const restart = jest.fn(
-      (currentPeer: RTCPeerConnection, canRestart: () => boolean) =>
+      (
+        _peerIdentityId: string,
+        currentPeer: RTCPeerConnection,
+        canRestart: () => boolean,
+      ) =>
         new Promise<void>((resolve) => {
           completions.push(() => {
             if (canRestart()) currentPeer.restartIce();
@@ -350,7 +376,11 @@ describe('CallPeerRecovery', () => {
     const newPeer = peerConnection('failed', 'failed');
     const completions: (() => void)[] = [];
     const restart = jest.fn(
-      (peer: RTCPeerConnection, canRestart: () => boolean) =>
+      (
+        _peerIdentityId: string,
+        peer: RTCPeerConnection,
+        canRestart: () => boolean,
+      ) =>
         new Promise<void>((resolve) => {
           completions.push(() => {
             if (canRestart()) peer.restartIce();
