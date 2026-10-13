@@ -98,6 +98,21 @@ export class CallPeerNegotiation {
     );
   }
 
+  /**
+   * A polite offer during glare may mean ours never arrived, e.g. its
+   * recovery asking for one; deliver ours again so it can answer.
+   */
+  private async redeliverAfterIgnoredOffer(
+    senderIdentityId: string,
+    peer: RTCPeerConnection,
+    state: PeerNegotiationState,
+    sendSignal: SignalSender,
+  ): Promise<void> {
+    if (!state.ignoreOffer) return;
+
+    await this.resendUnansweredOffer(senderIdentityId, peer, sendSignal);
+  }
+
   private async sendDescription(
     peerIdentityId: string,
     peer: RTCPeerConnection,
@@ -167,6 +182,13 @@ export class CallPeerNegotiation {
     if (
       !this.acceptRemoteDescription(senderIdentityId, peer, state, description)
     ) {
+      await this.redeliverAfterIgnoredOffer(
+        senderIdentityId,
+        peer,
+        state,
+        sendSignal,
+      );
+
       return;
     }
 

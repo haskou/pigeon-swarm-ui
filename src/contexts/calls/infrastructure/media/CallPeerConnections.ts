@@ -10,6 +10,7 @@ import { CallMediaEncryption } from './CallMediaEncryption';
 import { hasAudioTrack } from './callMediaTrackClassification';
 import { CallPeerNegotiation } from './CallPeerNegotiation';
 import { CallPeerRecovery } from './CallPeerRecovery';
+import { CallPeerRestartError } from './CallPeerRestartError';
 import { CallPeerStatistics } from './CallPeerStatistics';
 import { CallScreenShareStreams } from './CallScreenShareStreams';
 import { CallSignalRetry } from './CallSignalRetry';
@@ -178,6 +179,13 @@ export class CallPeerConnections {
       this.handleRemoteTrack(peerIdentityId, event);
     });
     this.peers.set(peerIdentityId, peer);
+    // Bound a peer that never starts negotiating, such as a callee whose
+    // offer was lost before any state change would schedule recovery.
+    this.recovery.reconcile(
+      peerIdentityId,
+      peer,
+      () => this.peers.get(peerIdentityId) === peer,
+    );
 
     return peer;
   }
@@ -225,37 +233,84 @@ export class CallPeerConnections {
     }
   }
 
+  /**
+   * Repeats whichever step left the peer stuck: an offer the remote peer
+   * never answered, an initial offer that never arrived, or ICE itself. Each
+   * failure names its step for diagnostics.
+   */
   private async refreshAndRestartIce(
     peerIdentityId: string,
     peer: RTCPeerConnection,
     canRestart: () => boolean,
   ): Promise<void> {
-    if (!this.rtcConfigurationProvider) {
-      throw new Error('RTC configuration provider is unavailable.');
-    }
+    const configuration = await this.rtcConfigurationProvider?.().catch(
+      () => undefined,
+    );
 
-    const configuration = await this.rtcConfigurationProvider();
+    if (!configuration) throw new CallPeerRestartError('configuration');
 
     if (!canRestart()) return;
 
-    // Rotate server credentials without changing the established transport
-    // policy or other immutable peer configuration.
-    peer.setConfiguration({
-      ...peer.getConfiguration(),
-      iceServers: configuration.iceServers,
-    });
-    const sendSignal = this.peerSignalSenders.get(peerIdentityId);
-    const resent =
-      sendSignal &&
-      (await this.negotiation.resendUnansweredOffer(
-        peerIdentityId,
-        peer,
-        sendSignal,
-      ));
+    try {
+      // Rotate server credentials without changing the established transport
+      // policy or other immutable peer configuration.
+      peer.setConfiguration({
+        ...peer.getConfiguration(),
+        iceServers: configuration.iceServers,
+      });
+    } catch {
+      throw new CallPeerRestartError('ice-restart');
+    }
+
+    const resent = await this.sendRecoveryOffer(peerIdentityId, peer).catch(
+      () => {
+        throw new CallPeerRestartError('signal');
+      },
+    );
 
     if (resent || !canRestart()) return;
 
-    peer.restartIce();
+    try {
+      peer.restartIce();
+    } catch {
+      throw new CallPeerRestartError('ice-restart');
+    }
+  }
+
+  /**
+   * A peer that never received an offer asks for negotiation with its own;
+   * the designated offerer answers it, or re-sends its pending offer during
+   * glare. An offer left unanswered is delivered once more.
+   */
+  private async sendRecoveryOffer(
+    peerIdentityId: string,
+    peer: RTCPeerConnection,
+  ): Promise<boolean> {
+    const sendSignal = this.peerSignalSenders.get(peerIdentityId);
+
+    if (!sendSignal) return false;
+
+    if (
+      peer.iceConnectionState === 'new' &&
+      !peer.localDescription &&
+      !peer.remoteDescription
+    ) {
+      logCallWarning('peer-manager:ice-recovery:requested-offer');
+      await this.negotiation.offerIfNeeded(
+        peerIdentityId,
+        peer,
+        true,
+        sendSignal,
+      );
+
+      return true;
+    }
+
+    return await this.negotiation.resendUnansweredOffer(
+      peerIdentityId,
+      peer,
+      sendSignal,
+    );
   }
 
   private removePeer(peerIdentityId: string): void {
