@@ -1,4 +1,5 @@
 import 'fake-indexeddb/auto';
+import { sha256 } from '@noble/hashes/sha2.js';
 import { mock } from 'jest-mock-extended';
 
 import type { GroupMailboxControlOutcome } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlOutcome';
@@ -16,6 +17,7 @@ import { IdentityId } from '../../../../../contexts/identities/domain/value-obje
 import { MailboxCapability } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/infrastructure/http/MailboxUnavailableError';
 import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
+import { encodeBase64Url } from '../../../../../shared/infrastructure/encoding/base64url';
 
 const CONVERSATION = 'conversation-1';
 
@@ -320,6 +322,50 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
     );
 
     await alice.control.remove(CONVERSATION, ['carol']);
+
+    await expect(readGroup(bob)).resolves.toEqual(['rejected', 'applied']);
+    await sameGeneration(alice, bob);
+  });
+
+  it('delivers a removal whose first copy the removed member saw before the rest', async () => {
+    await add(alice, [bob, carol]);
+    await Promise.all([drain(bob), drain(carol)]);
+    await openInboxes(alice);
+    const bobKeys = await inboxKeys(bob, carol);
+    let squatted = Promise.resolve();
+    const racing = new GroupMailboxControl(
+      'alice',
+      alice.engine,
+      () => Promise.resolve(roster),
+      { send: () => Promise.resolve() },
+      {
+        send: async (keys, plaintext, envelopeId) => {
+          const record = GroupMailboxControlRecord.decode(plaintext);
+
+          if (keys.mailboxId === bobKeys.mailboxId) {
+            await squatted;
+          } else if (record?.type === 'commit') {
+            squatted = node.channel
+              .send(
+                bobKeys,
+                GroupMailboxControlRecord.encode({
+                  ...record,
+                  commit: new Uint8Array([1, 2, 3]),
+                }),
+                MailboxChannel.envelopeIdFor(
+                  `group-commit|${encodeBase64Url(sha256(record.commit))}|${bobKeys.mailboxId}`,
+                ),
+              )
+              .then(() => undefined);
+            await squatted;
+          }
+
+          return node.channel.send(keys, plaintext, envelopeId);
+        },
+      },
+    );
+
+    await racing.remove(CONVERSATION, ['carol']);
 
     await expect(readGroup(bob)).resolves.toEqual(['rejected', 'applied']);
     await sameGeneration(alice, bob);
