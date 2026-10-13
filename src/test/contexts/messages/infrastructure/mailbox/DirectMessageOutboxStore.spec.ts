@@ -47,28 +47,26 @@ function databaseName(): string {
 }
 
 function openRaw(name: string): Promise<IDBDatabase> {
-  const { promise, reject, resolve } = Promise.withResolvers<IDBDatabase>();
-  const request = indexedDB.open(name);
+  return new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open(name);
 
-  request.onsuccess = () => resolve(request.result);
-  request.onerror = () => reject(request.error);
-
-  return promise;
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
 }
 
 function rowsOf(db: IDBDatabase, storeName: string): Promise<unknown[]> {
   if (!db.objectStoreNames.contains(storeName)) return Promise.resolve([]);
 
-  const { promise, reject, resolve } = Promise.withResolvers<unknown[]>();
-  const request = db
-    .transaction(storeName, 'readonly')
-    .objectStore(storeName)
-    .getAll();
+  return new Promise<unknown[]>((resolve, reject) => {
+    const request = db
+      .transaction(storeName, 'readonly')
+      .objectStore(storeName)
+      .getAll();
 
-  request.onsuccess = () => resolve(request.result);
-  request.onerror = () => reject(request.error);
-
-  return promise;
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
 }
 
 function rowBytes(stored: unknown): Buffer[] {

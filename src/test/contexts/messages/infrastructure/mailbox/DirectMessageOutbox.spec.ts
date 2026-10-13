@@ -244,11 +244,11 @@ describe(DirectMessageOutbox.name, () => {
   });
 
   it('does not append to the peer again after a reload that follows the peer copy', async () => {
-    const own = Promise.withResolvers<void>();
+    const own = new Promise<void>(() => undefined);
     const firstDelivery = mock<DirectMessageOutboxDelivery>();
 
     firstDelivery.toPeer.mockResolvedValue(undefined);
-    firstDelivery.toOwn.mockReturnValue(own.promise);
+    firstDelivery.toOwn.mockReturnValue(own);
     await new DirectMessageOutbox(store, firstDelivery).enqueue(
       session(),
       draft('a'),
