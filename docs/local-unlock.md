@@ -102,22 +102,26 @@ This document does not claim that JavaScript memory is cleared.
 ### Log out and forget this device
 
 The profile menu has a second action, "Log out and forget this device". It
-asks for confirmation first. Then it:
+asks for confirmation first. Then `identities.forgetCurrentDevice` runs the
+identities use case `CurrentDeviceForgetter`, which:
 
 1. revokes this device's own credential on the node through
-   `PigeonDeviceAuthorizationApi.retireOwnDevice`. This is the same revocation
+   `OwnDeviceRepository` (`PigeonOwnDeviceRepository`, which calls
+   `PigeonDeviceAuthorizationApi.retireOwnDevice`). This is the same revocation
    as "Remove access" under "Manage devices". The node never revokes the only
    credential of an identity. For that case the user confirms again, and step 2
    is skipped: the device stays authorized and keeps its reader;
-2. releases this device's reader from each direct conversation inbox. This step
-   is best effort (see `opaque-mailboxes-client.md`);
-3. deletes the device vault record for the identity (IndexedDB
-   `pigeon-swarm-device-vault`) through `DeviceUnlockForgetter`, which calls
-   `IdentityUnlockRepository.forget`;
-4. runs the logout described above.
+2. releases this device's reader from each direct conversation inbox through
+   `DeviceMailboxRepository`. This step is best effort (see
+   `opaque-mailboxes-client.md`);
+3. wipes this identity's local direct history and queued one-to-one sends
+   through `DeviceMailboxRepository`;
+4. deletes the device vault record for the identity (IndexedDB
+   `pigeon-swarm-device-vault`) through `IdentityUnlockRepository.forget`;
+5. runs the logout described above.
 
 If step 1 fails, the user stays signed in with the device still authorized, and
-sees an inline error. Nothing local is removed. If step 3 fails after the
+sees an inline error. Nothing local is removed. If step 4 fails after the
 revocation, the user stays signed in, sees an inline error, and pressing the
 button again finishes the local removal. The node returns 401 with code 401020
 ("Invalid signed request") for a rejected signature. Only that code is read as

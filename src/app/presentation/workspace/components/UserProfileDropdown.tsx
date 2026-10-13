@@ -39,7 +39,6 @@ import {
 import { ipfsUrl } from '../../../../shared/presentation/ipfsLinks';
 import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
 import { applicationContainer } from '../../../composition/applicationContainer';
-import { forgetCurrentDevice } from './forgetCurrentDevice';
 
 const GlobalCallBar = lazy(() =>
   import('../../../../contexts/calls/presentation/components/GlobalCallBar').then(
@@ -615,9 +614,8 @@ function useForgetDeviceAndLogOut({
     if (!window.confirm(copy.profile.forgetDeviceConfirm)) return;
 
     setForgetError(null);
-    let outcome = await forgetCurrentDevice(
+    let outcome = await applicationContainer.identities.forgetCurrentDevice(
       session,
-      applicationContainer,
       false,
     );
 
@@ -625,7 +623,10 @@ function useForgetDeviceAndLogOut({
       outcome === 'only-device' &&
       window.confirm(copy.profile.forgetDeviceOnlyDeviceConfirm)
     ) {
-      outcome = await forgetCurrentDevice(session, applicationContainer, true);
+      outcome = await applicationContainer.identities.forgetCurrentDevice(
+        session,
+        true,
+      );
     }
 
     switch (outcome) {

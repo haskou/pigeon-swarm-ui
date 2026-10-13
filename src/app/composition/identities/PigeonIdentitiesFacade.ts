@@ -1,3 +1,4 @@
+import type { ForgetCurrentDeviceOutcome } from '../../../contexts/identities/application/forget-current-device/ForgetCurrentDeviceOutcome';
 import type { LoginIdentityProgressReporter } from '../../../contexts/identities/application/login-identity/LoginIdentityProgressReporter';
 import type { DevicePairingRequestDraft } from '../../../contexts/identities/domain/DevicePairingRequestDraft';
 import type { DeviceAuthorizationRevision } from '../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
@@ -6,7 +7,6 @@ import type { IdentityAccessContexts } from '../../../contexts/identities/infras
 import type { IdentityAdmissionProgressListener } from '../../../contexts/identities/infrastructure/http/IdentityAdmissionProgressListener';
 import type { IdentityMapper } from '../../../contexts/identities/infrastructure/http/IdentityMapper';
 import type { IdentityPresenceMapper } from '../../../contexts/identities/infrastructure/http/IdentityPresenceMapper';
-import type { OwnDeviceRetirement } from '../../../contexts/identities/infrastructure/http/OwnDeviceRetirement';
 import type { PigeonIdentitiesGateway } from '../../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
 import type { IdentityPresenceResource as IdentityPresence } from '../../../contexts/identities/infrastructure/http/resources/IdentityPresenceResource';
 import type { IdentityResource } from '../../../contexts/identities/infrastructure/http/resources/IdentityResource';
@@ -24,6 +24,7 @@ import type { IdentityUseCases } from './IdentityUseCases';
 import { ConversationTimeline } from '../../../contexts/conversations/presentation/view-models/ConversationTimeline';
 import { FindIdentityPresenceMessage } from '../../../contexts/identities/application/find-identity-presence/messages/FindIdentityPresenceMessage';
 import { FindIdentityMessage } from '../../../contexts/identities/application/find-identity/messages/FindIdentityMessage';
+import { ForgetCurrentDeviceMessage } from '../../../contexts/identities/application/forget-current-device/messages/ForgetCurrentDeviceMessage';
 import { ForgetDeviceUnlockMessage } from '../../../contexts/identities/application/forget-device-unlock/messages/ForgetDeviceUnlockMessage';
 import { LoginIdentityMessage } from '../../../contexts/identities/application/login-identity/messages/LoginIdentityMessage';
 import { RefreshIdentityMessage } from '../../../contexts/identities/application/refresh-identity/messages/RefreshIdentityMessage';
@@ -128,8 +129,19 @@ export class PigeonIdentitiesFacade {
     return await this.gateway.revokeDevice(session, target, compromisedSince);
   }
 
-  public async retireOwnDevice(session: Session): Promise<OwnDeviceRetirement> {
-    return await this.gateway.retireOwnDevice(session);
+  /**
+   * Retires this device's credential, then wipes its local direct state and
+   * unlock. The only device is kept until `allowOnlyDevice` confirms it.
+   */
+  public async forgetCurrentDevice(
+    session: Session,
+    allowOnlyDevice: boolean,
+  ): Promise<ForgetCurrentDeviceOutcome> {
+    this.contexts.register(session);
+
+    return await this.useCases.currentDeviceForgetter.forget(
+      new ForgetCurrentDeviceMessage(session.identity.id, allowOnlyDevice),
+    );
   }
 
   public discardDeviceSealedRecovery(identityId: string): void {

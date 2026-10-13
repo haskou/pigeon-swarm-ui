@@ -43,6 +43,7 @@ import { PigeonConversationRepository } from '../../contexts/conversations/infra
 import { MailboxConversationReadReceiptRepository } from '../../contexts/conversations/infrastructure/mailbox/MailboxConversationReadReceiptRepository';
 import { IdentityPresenceFinder } from '../../contexts/identities/application/find-identity-presence/IdentityPresenceFinder';
 import { IdentityFinder } from '../../contexts/identities/application/find-identity/IdentityFinder';
+import { CurrentDeviceForgetter } from '../../contexts/identities/application/forget-current-device/CurrentDeviceForgetter';
 import { DeviceUnlockForgetter } from '../../contexts/identities/application/forget-device-unlock/DeviceUnlockForgetter';
 import { LoginIdentity } from '../../contexts/identities/application/login-identity/LoginIdentity';
 import { IdentityRefresher } from '../../contexts/identities/application/refresh-identity/IdentityRefresher';
@@ -57,7 +58,9 @@ import { IdentityMapper } from '../../contexts/identities/infrastructure/http/Id
 import { IdentityPresenceMapper } from '../../contexts/identities/infrastructure/http/IdentityPresenceMapper';
 import { PigeonIdentityRepository } from '../../contexts/identities/infrastructure/http/PigeonIdentityRepository';
 import { PigeonIdentityUnlockRepository } from '../../contexts/identities/infrastructure/http/PigeonIdentityUnlockRepository';
+import { PigeonOwnDeviceRepository } from '../../contexts/identities/infrastructure/http/PigeonOwnDeviceRepository';
 import { PigeonPresenceRepository } from '../../contexts/identities/infrastructure/http/PigeonPresenceRepository';
+import { MailboxDeviceRepository } from '../../contexts/identities/infrastructure/mailbox/MailboxDeviceRepository';
 import { MessageReactionAdder } from '../../contexts/messages/application/add-message-reaction/MessageReactionAdder';
 import { ConversationDraftDeleter } from '../../contexts/messages/application/delete-conversation-draft/ConversationDraftDeleter';
 import { MessageDeleter } from '../../contexts/messages/application/delete-message/MessageDeleter';
@@ -348,6 +351,17 @@ export class PigeonApplication {
       identityMapper,
       identityPresenceMapper,
       {
+        currentDeviceForgetter: new CurrentDeviceForgetter(
+          new PigeonOwnDeviceRepository(
+            gateway.identityGateway,
+            identityContexts,
+          ),
+          new MailboxDeviceRepository(
+            identityContexts,
+            gateway.directMessageMailbox,
+          ),
+          identityUnlockRepository,
+        ),
         deviceUnlockForgetter: new DeviceUnlockForgetter(
           identityUnlockRepository,
         ),
