@@ -123,10 +123,10 @@ export class DirectMessageHistoryTransfer {
 
   /**
    * Exporter. Publishes this identity's newest history to the transfer mailbox
-   * derived from `secret`. Resolves true once every selected record is sent,
-   * false on any failure. Never throws.
+   * derived from `secret`. A failure stops the publish and leaves the transfer
+   * partial or absent; the importer then gets what was sent. Never throws.
    */
-  public async publish(session: Session, secret: Uint8Array): Promise<boolean> {
+  public async publish(session: Session, secret: Uint8Array): Promise<void> {
     try {
       const keys = MailboxKeySchedule.derive(
         secret,
@@ -145,12 +145,8 @@ export class DirectMessageHistoryTransfer {
       for (const framed of frames) {
         await this.channel.send(keys, framed);
       }
-
-      return true;
     } catch {
       console.debug('Direct history transfer publish failed.');
-
-      return false;
     }
   }
 

@@ -257,12 +257,10 @@ export class DirectMessageMailbox {
 
   /**
    * Pairing. Publishes this identity's newest direct history to the transfer
-   * mailbox derived from `secret`. Resolves false on failure. Never throws.
+   * mailbox derived from `secret`. A failure is logged without content and
+   * leaves the transfer partial or absent. Never throws.
    */
-  public publishHistory(
-    session: Session,
-    secret: Uint8Array,
-  ): Promise<boolean> {
+  public publishHistory(session: Session, secret: Uint8Array): Promise<void> {
     return this.transfer.publish(session, secret);
   }
 

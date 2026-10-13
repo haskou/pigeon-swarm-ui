@@ -61,7 +61,7 @@ export class DevicePairingCompletion {
   public static create(input: {
     author: KeyPair;
     checkpoint: DeviceAuthorizationCheckpoint;
-    historyTransferSecret?: SymmetricKey;
+    historyTransferSecret: SymmetricKey;
     identityKeyPair: KeyPair;
     recoveryAuthorityKeyPair: KeyPair;
     request: DevicePairingRequest;
@@ -72,7 +72,7 @@ export class DevicePairingCompletion {
       .getPublicKey()
       .encrypt(
         JSON.stringify({
-          historyTransferSecret: input.historyTransferSecret?.valueOf(),
+          historyTransferSecret: input.historyTransferSecret.valueOf(),
           identityKeyPair: input.identityKeyPair.toPrimitives(),
           recoveryAuthorityKeyPair:
             input.recoveryAuthorityKeyPair.toPrimitives(),
@@ -169,17 +169,11 @@ export class DevicePairingCompletion {
       ),
     );
 
-    const historyTransferSecret = resource.getOptionalString(
-      'historyTransferSecret',
-    );
-
     return new DevicePairingMaterial(
       KeyPair.fromPrimitives(resource.getKeyPair('identityKeyPair')),
       KeyPair.fromPrimitives(resource.getKeyPair('recoveryAuthorityKeyPair')),
       UserRootKey.fromBase64(resource.getString('rootKey')),
-      historyTransferSecret === undefined
-        ? undefined
-        : SymmetricKey.fromBase64(historyTransferSecret),
+      SymmetricKey.fromBase64(resource.getString('historyTransferSecret')),
     );
   }
 

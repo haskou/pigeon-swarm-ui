@@ -429,6 +429,7 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
     const authorized = await authorApi.authorizePairing(
       session,
       draft.getRequest().toCode(),
+      SymmetricKey.generate(),
     );
     const { session: paired } = await targetApi.completePairing(
       identity,
@@ -488,6 +489,7 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
     const authorized = await authorApi.authorizePairing(
       session,
       draft.getRequest().toCode(),
+      SymmetricKey.generate(),
     );
     const completion = authorized.completion.toCode();
 
@@ -516,10 +518,18 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
       authorApi.invite(session).toCode(),
     );
     const requestCode = draft.getRequest().toCode();
-    const authorized = await authorApi.authorizePairing(session, requestCode);
+    const authorized = await authorApi.authorizePairing(
+      session,
+      requestCode,
+      SymmetricKey.generate(),
+    );
 
     await expect(
-      authorApi.authorizePairing(authorized.session, requestCode),
+      authorApi.authorizePairing(
+        authorized.session,
+        requestCode,
+        SymmetricKey.generate(),
+      ),
     ).rejects.toMatchObject({ failure: 'mismatch' });
     expect(http.request).toHaveBeenCalledTimes(1);
   });
@@ -536,7 +546,11 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
     };
 
     await expect(
-      authorApi.authorizePairing(otherDevice, draft.getRequest().toCode()),
+      authorApi.authorizePairing(
+        otherDevice,
+        draft.getRequest().toCode(),
+        SymmetricKey.generate(),
+      ),
     ).rejects.toMatchObject({ failure: 'mismatch' });
     expect(http.request).not.toHaveBeenCalled();
   });
@@ -553,7 +567,11 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
     );
 
     await expect(
-      lateAuthor.authorizePairing(session, draft.getRequest().toCode()),
+      lateAuthor.authorizePairing(
+        session,
+        draft.getRequest().toCode(),
+        SymmetricKey.generate(),
+      ),
     ).rejects.toMatchObject({ failure: 'expired' });
     expect(http.request).not.toHaveBeenCalled();
   });

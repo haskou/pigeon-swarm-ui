@@ -1,4 +1,5 @@
 import {
+  EncryptedPayload,
   KeyPair,
   SymmetricKey,
   UserRootKey,
@@ -17,7 +18,9 @@ import { PairingId } from '../../../../contexts/identities/domain/value-objects/
 import { thrownPairingFailure } from './thrownPairingFailure';
 
 describe(DevicePairingCompletion.name, () => {
-  async function fixture(historyTransferSecret?: SymmetricKey) {
+  async function fixture(
+    historyTransferSecret: SymmetricKey = SymmetricKey.generate(),
+  ) {
     const author = await KeyPair.generate();
     const identityKeyPair = await KeyPair.generate();
     const identityId = IdentityId.fromString(
@@ -50,7 +53,7 @@ describe(DevicePairingCompletion.name, () => {
       rootKey,
     });
 
-    return { completion, draft, identityId, identityKeyPair, rootKey };
+    return { author, completion, draft, identityId, identityKeyPair, rootKey };
   }
 
   it('transfers identity material only to the ephemeral target transport key', async () => {
@@ -81,13 +84,59 @@ describe(DevicePairingCompletion.name, () => {
     );
   });
 
-  it('opens without a history transfer secret when none was published', async () => {
+  it('refuses a validly signed completion whose material carries no history transfer secret', async () => {
     const source = await fixture();
-    const material = DevicePairingCompletion.fromCode(
-      source.completion.toCode(),
-    ).open(source.draft.getRequest(), source.draft.getTransportKeyPair());
+    const resource = source.completion.toCode().decode() as Record<
+      string,
+      string
+    >;
+    const material = JSON.parse(
+      source.draft
+        .getTransportKeyPair()
+        .decrypt(new EncryptedPayload(resource.encryptedMaterial))
+        .toString(),
+    ) as Record<string, unknown>;
 
-    expect(material.getHistoryTransferSecret()).toBeUndefined();
+    delete material.historyTransferSecret;
+
+    const payload = {
+      authorCredential: resource.authorCredential,
+      encryptedMaterial: source.draft
+        .getRequest()
+        .getTransportPublicKey()
+        .getPublicKey()
+        .encrypt(JSON.stringify(material))
+        .valueOf(),
+      epoch: resource.epoch,
+      identityId: resource.identityId,
+      operationId: resource.operationId,
+      pairingId: resource.pairingId,
+      revision: resource.revision,
+      version: 1,
+    };
+    const completion = DevicePairingCompletion.fromCode(
+      DevicePairingCode.encode({
+        kind: resource.kind,
+        ...payload,
+        signature: source.author
+          .sign(
+            JSON.stringify({
+              completion: payload,
+              domain: 'pigeon:device-pairing:completion:v1',
+            }),
+          )
+          .valueOf(),
+      }),
+    );
+
+    expect(
+      thrownPairingFailure(() =>
+        completion.open(
+          source.draft.getRequest(),
+          source.draft.getTransportKeyPair(),
+        ),
+      ),
+    ).toBe('invalid');
   });
 
   it('rejects tampered completion checkpoints before decryption', async () => {
@@ -150,6 +199,7 @@ describe(DevicePairingCompletion.name, () => {
         },
         source.identityId,
       ),
+      historyTransferSecret: SymmetricKey.generate(),
       identityKeyPair: source.identityKeyPair,
       recoveryAuthorityKeyPair: await KeyPair.generate(),
       request: source.draft.getRequest(),

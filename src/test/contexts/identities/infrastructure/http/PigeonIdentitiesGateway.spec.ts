@@ -204,7 +204,7 @@ describe(PigeonIdentitiesGateway.name, () => {
       expect(authorization.authorizePairing).toHaveBeenCalledWith(
         rooted,
         requestCode,
-        undefined,
+        expect.any(SymmetricKey),
       );
       expect(recovery.resealAfterPairing).toHaveBeenCalledWith(next, root);
       expect(result.completionCode).toBe('completion-code');
@@ -235,13 +235,13 @@ describe(PigeonIdentitiesGateway.name, () => {
       expect(recovery.resealAfterPairing).not.toHaveBeenCalled();
     });
 
-    it('publishes the pairing history before authorizing and hands the secret to the authorizer', async () => {
+    it('publishes the pairing history before authorizing and always hands the secret to the authorizer', async () => {
       const { authorization, gateway, pairingHistory } = gatewayDouble();
       const session = {
         deviceSealedRootKey: SymmetricKey.generate(),
         identity: { id: 'identity-1' },
       } as unknown as Session;
-      pairingHistory.publish.mockResolvedValue(true);
+      pairingHistory.publish.mockResolvedValue();
       authorization.authorizePairing.mockResolvedValue({
         completion: { toCode: () => 'completion-code' },
         session,
@@ -260,27 +260,6 @@ describe(PigeonIdentitiesGateway.name, () => {
       expect(secret).toBeInstanceOf(SymmetricKey);
       expect(secret?.getBuffer()).toEqual(
         pairingHistory.publish.mock.calls[0][1],
-      );
-    });
-
-    it('withholds the history secret from the authorizer when no history was published', async () => {
-      const { authorization, gateway, pairingHistory } = gatewayDouble();
-      const session = {
-        deviceSealedRootKey: SymmetricKey.generate(),
-        identity: { id: 'identity-1' },
-      } as unknown as Session;
-      pairingHistory.publish.mockResolvedValue(false);
-      authorization.authorizePairing.mockResolvedValue({
-        completion: { toCode: () => 'completion-code' },
-        session,
-      } as unknown as DevicePairingAuthorization);
-
-      await gateway.authorizeDevicePairing(session, requestCode);
-
-      expect(authorization.authorizePairing).toHaveBeenCalledWith(
-        session,
-        requestCode,
-        undefined,
       );
     });
   });
@@ -333,38 +312,6 @@ describe(PigeonIdentitiesGateway.name, () => {
       expect(result.session).toBe(hydrated);
     });
 
-    it('hydrates under the sealed root without importing when the completion carries no history secret', async () => {
-      const {
-        authorization,
-        gateway,
-        login,
-        pairingHistory,
-        profile,
-        sealedRoot,
-      } = gatewayDouble();
-      const pending = { identity: { id: 'identity-1' } } as unknown as Session;
-      const rooted = {
-        ...pending,
-        deviceSealedRootKey: SymmetricKey.generate(),
-      } as unknown as Session;
-      const hydrateResult = { conversations: [], session: rooted };
-      profile.get.mockResolvedValue(identity());
-      authorization.completePairing.mockResolvedValue({ session: pending });
-      sealedRoot.current.mockResolvedValue(rooted);
-      login.hydrate.mockResolvedValue(hydrateResult);
-
-      await expect(
-        gateway.completeDevicePairing(
-          'identity-1',
-          password,
-          draft,
-          completionCode,
-        ),
-      ).resolves.toBe(hydrateResult);
-      expect(login.hydrate).toHaveBeenCalledWith(rooted, undefined);
-      expect(pairingHistory.receive).not.toHaveBeenCalled();
-    });
-
     it('refuses the pairing without hydrating when the sealed root cannot be opened', async () => {
       const {
         authorization,
@@ -399,7 +346,10 @@ describe(PigeonIdentitiesGateway.name, () => {
         gatewayDouble();
       const pending = { identity: { id: 'identity-1' } } as unknown as Session;
       profile.get.mockResolvedValue(identity());
-      authorization.completePairing.mockResolvedValue({ session: pending });
+      authorization.completePairing.mockResolvedValue({
+        historyTransferSecret: SymmetricKey.generate(),
+        session: pending,
+      });
       sealedRoot.current.mockRejectedValue(
         new Error('keychain head is unreadable'),
       );
