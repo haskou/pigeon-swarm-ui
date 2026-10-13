@@ -3,6 +3,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { concatBytes } from '@noble/hashes/utils.js';
 
 import type { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
+import type { MailboxKeys } from '../../../mailboxes/infrastructure/crypto/MailboxKeySchedule';
 
 import { MailboxReadToken } from '../../../mailboxes/infrastructure/crypto/MailboxReadToken';
 import { GroupMailboxEnvelopeKey } from '../../domain/value-objects/GroupMailboxEnvelopeKey';
@@ -83,6 +84,23 @@ export class GroupMailboxKeySchedule {
         slot,
       ),
     );
+  }
+
+  /** The sender keys of `I(Y,k)`: what any member needs to append to it. */
+  public static inbox(
+    generation: GroupMailboxGenerationSecret,
+    identityId: IdentityId,
+  ): MailboxKeys {
+    const slot = GroupMailboxKeySchedule.slot(generation, identityId);
+
+    return {
+      envelopeKey: GroupMailboxKeySchedule.envelopeKey(
+        generation,
+        slot,
+      ).getBytes(),
+      mailboxId: GroupMailboxKeySchedule.mailboxId(generation, slot).valueOf(),
+      postToken: GroupMailboxKeySchedule.postToken(generation, slot).valueOf(),
+    };
   }
 
   public static mailboxId(
