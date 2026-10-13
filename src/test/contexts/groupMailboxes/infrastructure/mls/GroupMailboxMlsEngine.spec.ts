@@ -369,6 +369,24 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
     expect(read(opened.plaintext)).toBe('from bob');
   });
 
+  it('rejects a member message whose content was altered and reads on', async () => {
+    const { alice, bob } = await setup(['alice', 'bob']);
+    const sealed = await bob.encrypt(CONVERSATION, text.encode('altered'));
+    const altered = sealed.slice();
+
+    altered[altered.length - 1] = (altered[altered.length - 1] + 1) % 256;
+
+    await expect(alice.decrypt(CONVERSATION, altered)).rejects.toBeInstanceOf(
+      MlsRejectedError,
+    );
+    const opened = await alice.decrypt(
+      CONVERSATION,
+      await bob.encrypt(CONVERSATION, text.encode('next')),
+    );
+
+    expect(read(opened.plaintext)).toBe('next');
+  });
+
   it('reads one message twice, including its own, without consuming the ratchet twice', async () => {
     const { alice, bob } = await setup(['alice', 'bob']);
 

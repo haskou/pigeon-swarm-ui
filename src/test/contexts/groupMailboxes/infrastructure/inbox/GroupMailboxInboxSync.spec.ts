@@ -13,6 +13,7 @@ import { GroupMailboxGeneration } from '../../../../../contexts/groupMailboxes/d
 import { GroupMailboxControl } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControl';
 import { GroupMailboxControlRecord } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlRecord';
 import { GroupMailboxKeySchedule } from '../../../../../contexts/groupMailboxes/infrastructure/crypto/GroupMailboxKeySchedule';
+import { GroupMessageId } from '../../../../../contexts/groupMailboxes/infrastructure/crypto/GroupMessageId';
 import { GroupMessageHistoryStore } from '../../../../../contexts/groupMailboxes/infrastructure/history/GroupMessageHistoryStore';
 import { GroupMailboxInboxStore } from '../../../../../contexts/groupMailboxes/infrastructure/inbox/GroupMailboxInboxStore';
 import { GroupMailboxInboxSync } from '../../../../../contexts/groupMailboxes/infrastructure/inbox/GroupMailboxInboxSync';
@@ -258,6 +259,23 @@ const add = async (inviter: Member, joiners: Member[]): Promise<void> => {
   for (const joiner of joiners) await pump(joiner);
 };
 
+const labels = new Map<string, string>();
+const made = new Map<string, string>();
+
+/** The author-bound id that `label` of `author` stands for. */
+const mid = (author: string, label: string): string => {
+  const key = `${author}/${label}`;
+  const known = made.get(key);
+
+  if (known) return known;
+  const id = GroupMessageId.create(author);
+
+  made.set(key, id);
+  labels.set(id, label);
+
+  return id;
+};
+
 const sent = (author: string, id: string, text = MARKER) =>
   DirectMailboxRecords.sent({
     authorId: author,
@@ -268,6 +286,25 @@ const sent = (author: string, id: string, text = MARKER) =>
     previousMessageIds: [],
   });
 
+const edited = (author: string, id: string, targetMessageId: string) =>
+  DirectMailboxRecords.edited({
+    authorId: author,
+    conversationId: CONVERSATION,
+    createdAt: now,
+    encryptedPayload: 'edit',
+    id,
+    targetMessageId,
+  });
+
+const deleted = (author: string, id: string, targetMessageId: string) => ({
+  ...DirectMailboxRecords.deleted({
+    authorId: author,
+    conversationId: CONVERSATION,
+    targetMessageId,
+  }),
+  id,
+});
+
 const send = (from: Member, record: DirectMessageRecord): Promise<void> =>
   from.outbox.enqueueMessage(
     CONVERSATION,
@@ -276,7 +313,7 @@ const send = (from: Member, record: DirectMessageRecord): Promise<void> =>
   );
 
 const ids = (records: DirectMessageRecord[]): string[] =>
-  records.map(({ id, type }) => `${type}:${id}`);
+  records.map(({ id, type }) => `${type}:${labels.get(id) ?? id}`);
 
 /** Appends `plaintext` to the inbox of `to` of its current generation. */
 const inject = async (to: Member, plaintext: Uint8Array): Promise<void> => {
@@ -323,7 +360,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
   });
 
   it('delivers a message to every member, the sender included', async () => {
-    await send(alice, sent('alice', 'm1'));
+    await send(alice, sent('alice', mid('alice', 'm1')));
 
     for (const reader of [alice, bob, carol]) {
       await sync(reader);
@@ -336,7 +373,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
   });
 
   it('never puts the plaintext on the node', async () => {
-    await send(alice, sent('alice', 'm1'));
+    await send(alice, sent('alice', mid('alice', 'm1')));
 
     for (const { envelopes } of inboxes.values()) {
       for (const { body } of envelopes) expect(body).not.toContain(MARKER);
@@ -344,7 +381,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
   });
 
   it('hands a message over once across passes', async () => {
-    await send(alice, sent('alice', 'm1'));
+    await send(alice, sent('alice', mid('alice', 'm1')));
     await sync(bob);
     await sync(bob);
 
@@ -355,8 +392,8 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
     await alice.control.remove(CONVERSATION, ['carol']);
     await sync(bob);
     await sync(alice);
-    await send(alice, sent('alice', 'after-removal'));
-    await send(bob, sent('bob', 'bob-after-removal'));
+    await send(alice, sent('alice', mid('alice', 'after-removal')));
+    await send(bob, sent('bob', mid('bob', 'bob-after-removal')));
     await sync(carol);
 
     expect(carol.received).toEqual([]);
@@ -380,7 +417,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
   });
 
   it('rejects a message whose author is not its MLS sender', async () => {
-    await send(bob, sent('alice', 'forged'));
+    await send(bob, sent('alice', mid('alice', 'forged')));
     await sync(carol);
 
     expect(carol.received).toEqual([]);
@@ -392,7 +429,9 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
     await mallory.engine.createGroup(CONVERSATION);
     const ciphertext = await mallory.engine.encrypt(
       CONVERSATION,
-      DirectMessageMailboxRecord.encode(sent('mallory', 'outsider')),
+      DirectMessageMailboxRecord.encode(
+        sent('mallory', mid('mallory', 'outsider')),
+      ),
     );
 
     await inject(
@@ -404,15 +443,15 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
       }),
     );
     await inject(bob, new TextEncoder().encode('not a record'));
-    await send(alice, sent('alice', 'm1'));
+    await send(alice, sent('alice', mid('alice', 'm1')));
     await sync(bob);
 
     expect(ids(bob.received)).toEqual(['sent:m1']);
   });
 
   it('rejects a message reusing the id of another author', async () => {
-    await send(alice, sent('alice', 'm1'));
-    await send(bob, sent('bob', 'm1', 'hijacked'));
+    await send(alice, sent('alice', mid('alice', 'm1')));
+    await send(bob, sent('bob', mid('alice', 'm1'), 'hijacked'));
     await sync(carol);
 
     expect(carol.received).toEqual([
@@ -420,47 +459,55 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
     ]);
   });
 
-  it('accepts edits and deletions from the original author only', async () => {
-    await send(alice, sent('alice', 'm1'));
-    await sync(carol);
-    const target = { conversationId: CONVERSATION, createdAt: now };
+  it('rejects a squatter who sends under the id of another author first', async () => {
+    const victim = mid('alice', 'm1');
 
-    await send(
-      bob,
-      DirectMailboxRecords.edited({
-        ...target,
-        authorId: 'bob',
-        encryptedPayload: 'forged edit',
-        id: 'e-bob',
-        targetMessageId: 'm1',
-      }),
-    );
+    await send(bob, sent('bob', victim, 'squatted'));
+    await send(alice, sent('alice', victim));
+    await send(bob, edited('bob', mid('bob', 'e-bob'), victim));
+    await send(bob, deleted('bob', mid('bob', 'd-bob'), victim));
+    await sync(carol);
+
+    expect(ids(carol.received)).toEqual(['sent:m1']);
+    expect(carol.received[0]).toMatchObject({
+      authorId: 'alice',
+      encryptedPayload: MARKER,
+    });
+  });
+
+  it('rejects every record whose id or target is not bound to its sender', async () => {
+    const own = mid('bob', 'b1');
+
+    await send(bob, sent('bob', 'legacy-id'));
+    await send(bob, sent('bob', own));
+    await send(bob, edited('bob', mid('alice', 'e1'), own));
+    await send(bob, deleted('bob', mid('alice', 'd1'), own));
+    await send(bob, edited('bob', mid('bob', 'e2'), 'legacy-id'));
     await send(bob, {
-      ...DirectMailboxRecords.deleted({
+      ...DirectMailboxRecords.reaction({
+        action: 'add',
         authorId: 'bob',
         conversationId: CONVERSATION,
-        targetMessageId: 'm1',
+        createdAt: now,
+        emoji: '+1',
+        targetMessageId: own,
       }),
-      id: 'd-bob',
+      id: mid('alice', 'r1'),
     });
-    await send(
-      alice,
-      DirectMailboxRecords.edited({
-        ...target,
-        authorId: 'alice',
-        encryptedPayload: 'edit',
-        id: 'e-alice',
-        targetMessageId: 'm1',
-      }),
-    );
-    await send(alice, {
-      ...DirectMailboxRecords.deleted({
-        authorId: 'alice',
-        conversationId: CONVERSATION,
-        targetMessageId: 'm1',
-      }),
-      id: 'd-alice',
-    });
+    await sync(carol);
+
+    expect(ids(carol.received)).toEqual(['sent:b1']);
+  });
+
+  it('accepts edits and deletions from the original author only', async () => {
+    const target = mid('alice', 'm1');
+
+    await send(alice, sent('alice', target));
+    await sync(carol);
+    await send(bob, edited('bob', mid('bob', 'e-bob'), target));
+    await send(bob, deleted('bob', mid('bob', 'd-bob'), target));
+    await send(alice, edited('alice', mid('alice', 'e-alice'), target));
+    await send(alice, deleted('alice', mid('alice', 'd-alice'), target));
     await sync(carol);
 
     expect(ids(carol.received)).toEqual([
@@ -471,7 +518,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
   });
 
   it('accepts an edit after a restart from the stored history', async () => {
-    await send(alice, sent('alice', 'm1'));
+    await send(alice, sent('alice', mid('alice', 'm1')));
     await sync(carol);
     const restarted = new GroupMailboxInboxSync(
       carol.session,
@@ -485,14 +532,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
 
     await send(
       alice,
-      DirectMailboxRecords.edited({
-        authorId: 'alice',
-        conversationId: CONVERSATION,
-        createdAt: now,
-        encryptedPayload: 'edit',
-        id: 'e-alice',
-        targetMessageId: 'm1',
-      }),
+      edited('alice', mid('alice', 'e-alice'), mid('alice', 'm1')),
     );
     const received: DirectMessageRecord[] = [];
 
@@ -503,6 +543,90 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
     expect(ids(received)).toEqual(['edited:e-alice']);
   });
 
+  it('drops a forged future-epoch envelope without stalling the removal behind it', async () => {
+    const retired = GroupMailboxKeySchedule.inbox(
+      (await bob.engine.generation(CONVERSATION)).secret,
+      IdentityId.fromString('bob'),
+    ).mailboxId;
+
+    // Carol forks the group into an epoch only she holds.
+    await carol.engine.remove(CONVERSATION, ['bob']);
+    await inject(
+      bob,
+      GroupMailboxControlRecord.encode({
+        ciphertext: await carol.engine.encrypt(
+          CONVERSATION,
+          DirectMessageMailboxRecord.encode(
+            sent('carol', mid('carol', 'ahead')),
+          ),
+        ),
+        conversationId: CONVERSATION,
+        type: 'message',
+      }),
+    );
+    const forged = inboxes.get(retired)?.envelopes.length ?? 0;
+
+    await alice.control.remove(CONVERSATION, ['carol']);
+    await sync(bob);
+    await send(alice, sent('alice', mid('alice', 'after')));
+    await sync(bob);
+
+    expect(ids(bob.received)).toEqual(['sent:after']);
+    expect(
+      wire.acknowledge.mock.calls.some(
+        ([mailboxId, , upTo]) => mailboxId === retired && upTo >= forged,
+      ),
+    ).toBe(true);
+    expect(
+      (await bob.engine.generation(CONVERSATION)).secret.isEqual(
+        (await alice.engine.generation(CONVERSATION)).secret,
+      ),
+    ).toBe(true);
+  });
+
+  it('keeps an envelope whose plaintext could not be stored and reads it again', async () => {
+    await send(alice, sent('alice', mid('alice', 'm1')));
+    const save = jest
+      .spyOn(IndexedDbMlsStateStore.prototype, 'savePlaintext')
+      .mockRejectedValueOnce(new Error('quota'));
+
+    await expect(sync(bob)).rejects.toThrow('quota');
+    save.mockRestore();
+    await sync(bob);
+
+    expect(ids(bob.received)).toEqual(['sent:m1']);
+  });
+
+  it('drops an envelope that keeps failing to open and reads on', async () => {
+    const failing = new GroupMailboxInboxSync(
+      bob.session,
+      {
+        decrypt: () => Promise.reject(new Error('unexpected')),
+        drainedGenerations: (id) => bob.engine.drainedGenerations(id),
+        readableGenerations: (id) => bob.engine.readableGenerations(id),
+      },
+      bob.control,
+      channel,
+      wire,
+      new GroupMailboxInboxStore(),
+      new GroupMessageHistoryStore(bob.history),
+    );
+    const pass = () =>
+      failing.sync(CONVERSATION, new AbortController().signal, (records) => {
+        expect(records).toEqual([]);
+      });
+
+    await send(alice, sent('alice', mid('alice', 'm1')));
+    for (let turn = 1; turn < GroupMailboxInboxSync.MAX_FAILURES; turn += 1) {
+      await expect(pass()).rejects.toThrow('unexpected');
+    }
+    await pass();
+    await send(alice, sent('alice', mid('alice', 'm2')));
+    await sync(bob);
+
+    expect(ids(bob.received)).toEqual(['sent:m2']);
+  });
+
   it('keeps a copy whose inbox is missing and appends it on retry', async () => {
     const bobInbox = GroupMailboxKeySchedule.inbox(
       (await bob.engine.generation(CONVERSATION)).secret,
@@ -510,9 +634,9 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
     ).mailboxId;
 
     inboxes.delete(bobInbox);
-    await send(alice, sent('alice', 'm1'));
+    await send(alice, sent('alice', mid('alice', 'm1')));
 
-    expect(alice.outbox.pending(CONVERSATION)).toEqual(['m1']);
+    expect(alice.outbox.pending(CONVERSATION)).toEqual([mid('alice', 'm1')]);
     await sync(bob);
     await retry(alice);
     await sync(bob);
@@ -530,7 +654,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
     ).mailboxId;
 
     inboxes.delete(bobInbox);
-    await send(alice, sent('alice', 'stranded'));
+    await send(alice, sent('alice', mid('alice', 'stranded')));
     const stranded = (await alice.engine.generation(CONVERSATION)).index;
 
     roster = new Set(['alice', 'bob', 'carol', 'dave']);
@@ -562,12 +686,12 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
         IdentityId.fromString('bob'),
       ).mailboxId,
     );
-    await send(alice, sent('alice', 'm1'));
+    await send(alice, sent('alice', mid('alice', 'm1')));
     // Records queued within one millisecond are stamped a millisecond apart.
     now += GroupMailboxOutbox.EXPIRY_MS + 1_000;
     await alice.outbox.resume();
 
-    expect(failures).toEqual(['m1']);
+    expect(failures).toEqual([mid('alice', 'm1')]);
     expect(alice.outbox.pending(CONVERSATION)).toEqual([]);
   });
 
