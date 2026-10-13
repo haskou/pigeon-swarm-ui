@@ -228,6 +228,7 @@ export class DirectMessageInboxOpener {
       conversationId,
       session.identity.id,
     );
+
     if (this.store.load(keys.mailboxId) === null) return null;
 
     return {
