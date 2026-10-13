@@ -1,12 +1,15 @@
 import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
+import { IdentitySnapshotSelection } from '../../../../contexts/identities/domain/IdentitySnapshotSelection';
+import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
+import { IdentityVersion } from '../../../../contexts/identities/domain/value-objects/IdentityVersion';
+
 /**
- * Applies an identity fetched for the session in state.
- *
- * The fetch started before it resolved, so it can predate an identity already
- * held, and it must not roll back a keychain published in the meantime. Only
- * the identity is replaced.
+ * Applies an identity fetched for the session in state. The identities domain
+ * `IdentitySnapshotSelection` decides whether it wins: a fetch for another
+ * identity or an older version is dropped. Only the identity is replaced, so a
+ * keychain published in the meantime is never rolled back.
  */
 export function applyRefreshedIdentity(
   current: Session | null,
@@ -18,15 +21,16 @@ export function applyRefreshedIdentity(
     return null;
   }
 
-  // The user switched identities while fetching: discard the old identity.
-  if (current.identity.id !== identityId) {
-    return current;
-  }
+  const choice = IdentitySnapshotSelection.selectIdentity(
+    {
+      id: IdentityId.fromString(current.identity.id),
+      version: IdentityVersion.fromNumber(current.identity.version),
+    },
+    {
+      id: IdentityId.fromString(identityId),
+      version: IdentityVersion.fromNumber(identity.version),
+    },
+  );
 
-  // Identity versions only move forward: keep the newer identity already held.
-  if (identity.version < current.identity.version) {
-    return current;
-  }
-
-  return { ...current, identity };
+  return choice === 'incoming' ? { ...current, identity } : current;
 }

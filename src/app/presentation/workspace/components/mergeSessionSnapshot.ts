@@ -1,13 +1,15 @@
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
+import { IdentitySnapshotSelection } from '../../../../contexts/identities/domain/IdentitySnapshotSelection';
+import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
+import { IdentityVersion } from '../../../../contexts/identities/domain/value-objects/IdentityVersion';
+import { KeychainVersion } from '../../../../contexts/identities/domain/value-objects/KeychainVersion';
+
 /**
  * Applies a session snapshot (a refresh result or a whole-session update) to
- * the session currently held in state.
- *
- * A snapshot is built from the session it started with, so it can predate a
- * newer identity or keychain already in state. Each versioned part moves only
- * forward: the identity and the keychain are each kept from whichever side is
- * newer, and the rest of the snapshot is applied as given.
+ * the session currently held in state. The identities domain
+ * `IdentitySnapshotSelection` decides which identity and keychain win; the
+ * rest of the snapshot is applied as given.
  */
 export function mergeSessionSnapshot(
   current: Session | null,
@@ -18,26 +20,33 @@ export function mergeSessionSnapshot(
     return null;
   }
 
-  // The user switched identities while the snapshot was in flight: discard it.
-  if (current.identity.id !== snapshot.identity.id) {
+  const identityChoice = IdentitySnapshotSelection.selectIdentity(
+    {
+      id: IdentityId.fromString(current.identity.id),
+      version: IdentityVersion.fromNumber(current.identity.version),
+    },
+    {
+      id: IdentityId.fromString(snapshot.identity.id),
+      version: IdentityVersion.fromNumber(snapshot.identity.version),
+    },
+  );
+
+  if (identityChoice === 'discard') {
     return current;
   }
 
-  // Identity versions only move forward: keep the newer identity already held.
-  const identity =
-    snapshot.identity.version < current.identity.version
-      ? current.identity
-      : snapshot.identity;
-
-  // Keychain versions only move forward: keep the newer keychain already held.
-  const keychainIsNewer = snapshot.keychain.version < current.keychain.version;
+  const keychainSource =
+    IdentitySnapshotSelection.selectKeychain(
+      KeychainVersion.fromNumber(current.keychain.version),
+      KeychainVersion.fromNumber(snapshot.keychain.version),
+    ) === 'held'
+      ? current
+      : snapshot;
 
   return {
     ...snapshot,
-    identity,
-    keychain: keychainIsNewer ? current.keychain : snapshot.keychain,
-    keychainExternalIdentifier: keychainIsNewer
-      ? current.keychainExternalIdentifier
-      : snapshot.keychainExternalIdentifier,
+    identity: identityChoice === 'held' ? current.identity : snapshot.identity,
+    keychain: keychainSource.keychain,
+    keychainExternalIdentifier: keychainSource.keychainExternalIdentifier,
   };
 }
