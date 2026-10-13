@@ -132,19 +132,15 @@ describe('useConversationTimeline', () => {
     expect(applicationContainer.messages.load).not.toHaveBeenCalled();
   });
 
-  it('marks a one-to-one conversation read through the mailbox, not read-until', () => {
+  it('hands a one-to-one read to the read use case with the open conversation', () => {
     const { timeline } = mountTimeline();
 
     timeline.markConversationReadUntil(conversation.id, [message]);
 
-    expect(applicationContainer.directMessages.markRead).toHaveBeenCalledWith(
-      expect.anything(),
-      conversation,
-      message.id,
-    );
     expect(
       applicationContainer.conversations.markReadUntil,
-    ).not.toHaveBeenCalled();
+    ).toHaveBeenCalledWith(session, conversation.id, message.id, conversation);
+    expect(applicationContainer.directMessages.markRead).not.toHaveBeenCalled();
   });
 
   it('loads a group timeline from the node and marks it read-until', async () => {
@@ -161,7 +157,7 @@ describe('useConversationTimeline', () => {
     expect(timeline.setMessages).toHaveBeenLastCalledWith([message]);
     expect(
       applicationContainer.conversations.markReadUntil,
-    ).toHaveBeenCalledWith(session, group.id, message.id);
+    ).toHaveBeenCalledWith(session, group.id, message.id, group);
     expect(applicationContainer.directMessages.markRead).not.toHaveBeenCalled();
   });
 });
