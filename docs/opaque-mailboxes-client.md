@@ -65,6 +65,7 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 - `nonce` is the first passing decimal integer from 0, at most 64 characters.
 - Mining runs in a dedicated worker: `mailboxCreationWorker.ts`, driven by `MailboxCreationWorkerClient`, constructed by `createMailboxWorkerClient()`.
 - Pinned nonce for the vector: `47805`.
+- Shared vectors: `src/test/fixtures/mailbox-creation-proof-vectors.json` is byte-identical to the node's `tests/fixtures/mailbox-creation-proof-vectors.json` (preimage, digest, leading zero bits, mined nonce, rejected cases), checked by `MailboxCreationProof.vectors.spec.ts`.
 
 ## Envelopes
 
