@@ -8,6 +8,7 @@ import { DevicePairingCodeOutput } from '../../../../contexts/identities/present
 import { DevicePairingQrCode } from '../../../../contexts/identities/presentation/device-pairing/DevicePairingQrCode';
 import { toDevicePairingErrorMessage } from '../../../../contexts/identities/presentation/view-models/toDevicePairingErrorMessage';
 import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
+import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { applicationContainer } from '../../../composition/applicationContainer';
 
@@ -70,9 +71,16 @@ export function DevicePairingDialog({
     }
   };
 
+  useCloseOnEscape(onClose);
+
   return (
     <div className="app-overlay-scrim fixed inset-0 z-[70] grid place-items-stretch bg-black/70 p-0 backdrop-blur-md sm:place-items-center sm:p-4">
-      <div className="app-overlay-surface ui-dialog-surface relative flex h-[100dvh] w-full max-w-xl flex-col overflow-hidden sm:h-auto sm:max-h-[90vh]">
+      <div
+        aria-label={copy.profile.devicePairingTitle}
+        aria-modal="true"
+        className="app-overlay-surface ui-dialog-surface relative flex h-[100dvh] w-full max-w-xl flex-col overflow-hidden sm:h-auto sm:max-h-[90vh]"
+        role="dialog"
+      >
         <DialogHeader
           title={copy.profile.devicePairingTitle}
           onClose={onClose}

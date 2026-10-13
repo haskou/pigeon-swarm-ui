@@ -1,5 +1,6 @@
 import { type ReactElement, useState } from 'react';
 
+import { cx } from '../../../../shared/presentation/cx';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 
 export function DeviceRevocationPanel({
@@ -37,7 +38,10 @@ export function DeviceRevocationPanel({
       <div className="flex gap-2">
         <button
           aria-pressed={!compromised}
-          className="ui-button"
+          className={cx(
+            'ui-button flex-1',
+            !compromised && 'ui-button-primary',
+          )}
           data-testid="device-mode-retire"
           onClick={() => setCompromised(false)}
           type="button"
@@ -46,7 +50,7 @@ export function DeviceRevocationPanel({
         </button>
         <button
           aria-pressed={compromised}
-          className="ui-button"
+          className={cx('ui-button flex-1', compromised && 'ui-button-primary')}
           data-testid="device-mode-compromised"
           onClick={() => setCompromised(true)}
           type="button"
