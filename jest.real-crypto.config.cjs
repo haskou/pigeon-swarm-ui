@@ -19,6 +19,8 @@ module.exports = {
     '**/DeviceSealedRootRotation.spec.ts',
     '**/CommunityOperationSigner.spec.ts',
     '**/ConversationOperationSigner.spec.ts',
+    '**/RequestSigner.vectors.spec.ts',
+    '**/PigeonConversationsApi.readUntilVectors.spec.ts',
     '**/CallEventSigner.spec.ts',
     '**/MlsGroup.spec.ts',
     '**/MlsCommunityEngine.spec.ts',

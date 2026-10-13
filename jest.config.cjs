@@ -17,6 +17,8 @@ module.exports = {
     '/PigeonDeviceSealedSecretApi.spec.ts$',
     '/CommunityOperationSigner.spec.ts$',
     '/ConversationOperationSigner.spec.ts$',
+    '/RequestSigner.vectors.spec.ts$',
+    '/PigeonConversationsApi.readUntilVectors.spec.ts$',
     '/CallEventSigner.spec.ts$',
     '/Mls(Group|CommunityEngine).spec.ts$',
     '/IdentityAdmissionProof.spec.ts$',
