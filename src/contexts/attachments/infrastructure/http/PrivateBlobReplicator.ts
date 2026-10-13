@@ -7,8 +7,7 @@ import type {
   PrivateBlobUploadRef,
 } from './PrivateBlobUploadLedger';
 
-import { PrivateBlobUploadIncompleteError } from '../../domain/errors/PrivateBlobUploadIncompleteError';
-import { PrivateBlobReplicaPolicy } from '../../domain/PrivateBlobReplicaPolicy';
+import { PrivateBlobReplicationDomainService } from '../../domain/services/PrivateBlobReplicationDomainService';
 
 export type StoredPrivateBlobReplica = {
   blobId: string;
@@ -35,8 +34,8 @@ export class PrivateBlobReplicator {
 
   /**
    * Uploads every part to every origin (`undefined` is the session node) and
-   * resolves with each part's replicas. If any part ends with none, removes the
-   * replicas already stored and rejects.
+   * resolves with each part's replicas. PrivateBlobReplicationDomainService
+   * abandons the stored replicas and rejects when any part ends with none.
    */
   public async storeParts(
     session: Session,
@@ -45,25 +44,25 @@ export class PrivateBlobReplicator {
     origins: (string | undefined)[],
   ): Promise<StoredPrivateBlobReplica[][]> {
     const parts = Array.from({ length: count }, (_, index) => partAt(index));
-    const stored = await Promise.all(
-      parts.map(async (bytes) => {
-        const replicas = await Promise.all(
-          origins.map((origin) => this.storeReplica(session, bytes, origin)),
-        );
 
-        return replicas.filter(
-          (replica): replica is StoredPrivateBlobReplica =>
-            replica !== undefined,
-        );
-      }),
+    return await PrivateBlobReplicationDomainService.storeParts(
+      {
+        abandon: (replicas) => this.abandon(session, replicas),
+        storePart: async (index) => {
+          const replicas = await Promise.all(
+            origins.map((origin) =>
+              this.storeReplica(session, parts[index], origin),
+            ),
+          );
+
+          return replicas.filter(
+            (replica): replica is StoredPrivateBlobReplica =>
+              replica !== undefined,
+          );
+        },
+      },
+      count,
     );
-
-    if (!PrivateBlobReplicaPolicy.everyPartStored(stored)) {
-      await this.abandon(session, stored.flat());
-      throw new PrivateBlobUploadIncompleteError();
-    }
-
-    return stored;
   }
 
   /**
