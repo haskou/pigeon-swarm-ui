@@ -12,6 +12,7 @@ import type {
 
 import { DeviceSealedSecretPreimage } from '../../domain/DeviceSealedSecretPreimage';
 import { DeviceCredential } from '../../domain/value-objects/DeviceCredential';
+import { IdentityId } from '../../domain/value-objects/IdentityId';
 
 export type OpenedDeviceSealedSecret = {
   authorizationRevision: number;
@@ -38,6 +39,14 @@ export type DeviceSealedSecretSealInput = {
 export class DeviceSealedSecretCipher {
   private static readonly MAX_RECIPIENTS = 128;
 
+  /**
+   * The body-only base64 form the node stores and verifies. PEM headers and
+   * whitespace are not part of it, so credentials are sent and signed in it.
+   */
+  private static credentialBody(credential: DeviceCredential): string {
+    return IdentityId.fromString(credential.valueOf()).valueOf();
+  }
+
   public static seal(
     input: DeviceSealedSecretSealInput,
   ): DeviceSealedSecretEntryResource[] {
@@ -47,12 +56,13 @@ export class DeviceSealedSecretCipher {
       new Error('Device sealed secret needs between 1 and 128 recipients.'),
     );
 
-    const publisherCredential = DeviceCredential.fromString(
-      input.publisher.toPrimitives().publicKey,
-    ).valueOf();
+    const publisherCredential = DeviceSealedSecretCipher.credentialBody(
+      DeviceCredential.fromString(input.publisher.toPrimitives().publicKey),
+    );
 
     return input.recipients.map((recipient) => {
-      const recipientCredential = recipient.valueOf();
+      const recipientCredential =
+        DeviceSealedSecretCipher.credentialBody(recipient);
       const sealedSecret = recipient
         .getPublicKey()
         .encrypt(input.payload)
@@ -80,9 +90,9 @@ export class DeviceSealedSecretCipher {
     resource: DeviceSealedSecretResource;
   }): OpenedDeviceSealedSecret {
     const { resource } = input;
-    const recipientCredential = DeviceCredential.fromString(
-      input.recipient.toPrimitives().publicKey,
-    ).valueOf();
+    const recipientCredential = DeviceSealedSecretCipher.credentialBody(
+      DeviceCredential.fromString(input.recipient.toPrimitives().publicKey),
+    );
 
     assert(
       resource.identityId === input.identityId &&
@@ -100,7 +110,7 @@ export class DeviceSealedSecretCipher {
     });
 
     assert(
-      DeviceCredential.fromString(resource.publisherCredential)
+      IdentityId.fromString(resource.publisherCredential)
         .getPublicKey()
         .isValidSignature(preimage, new Signature(resource.signature)),
       new Error('Invalid device sealed secret signature.'),

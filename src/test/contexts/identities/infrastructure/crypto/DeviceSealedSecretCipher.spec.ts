@@ -114,7 +114,7 @@ describe(DeviceSealedSecretCipher.name, () => {
 
   it('builds the preimage byte-for-byte as the node signing payload', () => {
     // Vector: DeviceSealedSecretBundle.signingPayload in pigeon-swarm-node at
-    // 62de806d, with purpose pigeon:device-sealed-secret:v1 and the inputs below.
+    // 62de806d. Purpose is pigeon:device-sealed-secret:v1; inputs below.
     const preimage = DeviceSealedSecretPreimage.of({
       authorizationRevision: 2,
       generation: 3,

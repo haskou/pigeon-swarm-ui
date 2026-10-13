@@ -88,7 +88,9 @@ describe(PigeonDeviceSealedSecretApi.name, () => {
       generation: 3,
     });
     expect(body.entries.map((entry) => entry.recipientCredential)).toEqual(
-      recipients.map((recipient) => recipient.valueOf()),
+      recipients.map((recipient) =>
+        IdentityId.fromString(recipient.valueOf()).valueOf(),
+      ),
     );
     expect(JSON.stringify(body)).not.toContain(payload);
   });
@@ -148,7 +150,7 @@ describe(PigeonDeviceSealedSecretApi.name, () => {
       publisher: otherDevice,
       recipients: [recipients[0]!],
     });
-    const publisherCredential = DeviceCredential.fromString(
+    const publisherCredential = IdentityId.fromString(
       otherDevice.toPrimitives().publicKey,
     ).valueOf();
     http.request.mockResolvedValue({
