@@ -98,6 +98,28 @@ describe('DeviceSealedRootRotation', () => {
       expect(first).not.toBe(second);
     });
 
+    it('keeps the root it replaces on the session, so the mailboxes bridge from it', async () => {
+      const { rotation } = setup(1_000);
+      const previous = SymmetricKey.generate();
+      const session = {
+        ...makeSession(4),
+        deviceSealedRootKey: previous,
+      } as SessionWithRoot;
+
+      const rotated = await rotation.rotate(session);
+
+      expect(rotated.previousDeviceSealedRootKey).toBe(previous);
+      expect(rotated.deviceSealedRootKey).not.toBe(previous);
+    });
+
+    it('keeps no previous root when the session held none', async () => {
+      const { rotation } = setup(1_000);
+
+      const rotated = await rotation.rotate(makeSession(4));
+
+      expect(rotated.previousDeviceSealedRootKey).toBeUndefined();
+    });
+
     it('synchronizes and retries once on a conflicting publish, against the synchronized session', async () => {
       const { deviceAuthorization, rotation, sealedSecrets } = setup(1_000);
       const stale = makeSession(4);

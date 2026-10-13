@@ -3369,6 +3369,95 @@ describe(DirectMessageMailbox.name, () => {
       expect(readerHashes().sort()).toEqual(hashed(tokens.root, ...liveTokens));
     });
 
+    it("locks a revoked device's old root out of records written after the revoke", async () => {
+      const keys = keysFor('bob');
+      const { projection } = setup();
+      const laptop = 'device-credential-bob-laptop';
+      const beforeRevoke = [credentialFor('bob'), laptop];
+      const afterRevoke = [credentialFor('bob')];
+      const rotatedRoot = Buffer.alloc(32, 6);
+      // The session the revoke returns: the new root, and the root it replaced.
+      const rotatedPhone = {
+        ...session('bob'),
+        deviceSealedRootKey: SymmetricKey.fromBuffer(rotatedRoot),
+        previousDeviceSealedRootKey: SymmetricKey.fromBuffer(rootFor('bob')),
+      } as unknown as Session;
+      const { readerHashes, wire } = nodeMailboxClient();
+      const composed = composedRecords();
+      const sender = mailboxFor(
+        wire,
+        memoryStore(),
+        projection,
+        undefined,
+        composed,
+      );
+      const phoneStore = memoryStore();
+      const laptopStore = memoryStore();
+      const phoneApplied: string[][] = [];
+      const laptopApplied: string[][] = [];
+      const recordPhone = (changes: DirectMessageTimelineChange[]) => {
+        phoneApplied.push(messageIds(changes));
+      };
+      const recordLaptop = (changes: DirectMessageTimelineChange[]) => {
+        laptopApplied.push(messageIds(changes));
+      };
+      const laptopPass = async (laptopSession: Session) => {
+        await syncPass(
+          mailboxFor(wire, laptopStore, projection, beforeRevoke),
+          laptopSession,
+          recordLaptop,
+        ).catch(() => undefined);
+      };
+
+      // Both devices read under the first sealed root before the revoke.
+      await syncPass(
+        mailboxFor(wire, phoneStore, projection, beforeRevoke),
+        session('bob'),
+        recordPhone,
+      );
+      await laptopPass(deviceSession('bob', laptop));
+      await sender.send(session('alice'), conversation, 'hello', {});
+      await laptopPass(deviceSession('bob', laptop));
+      expect(laptopApplied).toEqual([['message-1']]);
+
+      // The phone revokes the laptop and rotates the sealed root. Its next
+      // pass reads under the new root and prunes every older reader.
+      await syncPass(
+        mailboxFor(wire, phoneStore, projection, afterRevoke),
+        rotatedPhone,
+        recordPhone,
+      );
+      expect(readerHashes().sort()).toEqual(
+        hashed(
+          MailboxReadToken.derive(rotatedRoot, keys.mailboxId),
+          MailboxReadToken.deriveDevice(
+            rotatedRoot,
+            keys.mailboxId,
+            credentialFor('bob'),
+          ),
+        ),
+      );
+
+      composed.sent = {
+        ...sent,
+        id: 'message-2',
+        previousMessageIds: ['message-1'],
+      };
+      await sender.send(session('alice'), conversation, 'hello', {});
+
+      // The laptop keeps the old root, which does not open the record written
+      // after the revoke.
+      await laptopPass(deviceSession('bob', laptop));
+      expect(laptopApplied).toEqual([['message-1']]);
+
+      await syncPass(
+        mailboxFor(wire, phoneStore, projection, afterRevoke),
+        rotatedPhone,
+        recordPhone,
+      );
+      expect(phoneApplied).toEqual([['message-1'], ['message-2']]);
+    });
+
     describe('retried writes', () => {
       beforeEach(() => {
         jest.useRealTimers();
