@@ -15,8 +15,10 @@ import type { DirectMessageOutboxItem } from './DirectMessageOutboxItem';
 import type { DirectMessageReaderSet } from './DirectMessageReaderSet';
 import type { RecipientMailboxRouter } from './RecipientMailboxRouter';
 
+import { ConversationKeyRequiredError } from '../../domain/errors/ConversationKeyRequiredError';
 import { DirectMessageHistoryStore } from './DirectMessageHistoryStore';
 import { DirectMessageHistoryTransfer } from './DirectMessageHistoryTransfer';
+import { DirectMessageInboxKeys } from './DirectMessageInboxKeys';
 import { DirectMessageInboxOpener } from './DirectMessageInboxOpener';
 import { DirectMessageOutboxStore } from './DirectMessageOutboxStore';
 import { DirectMessageOwnCopies } from './DirectMessageOwnCopies';
@@ -296,6 +298,28 @@ export class DirectMessageMailbox {
     conversationId: string,
   ): DirectMessageOutboxItem[] {
     return this.sender.items(identityId, conversationId);
+  }
+
+  /**
+   * Public id of a recipient's inbox for a conversation, for audit display.
+   * Null without a conversation key. Never exposes post or read tokens.
+   */
+  public mailboxId(
+    session: Session,
+    conversationId: string,
+    recipientIdentityId: string,
+  ): string | null {
+    try {
+      return DirectMessageInboxKeys.keysFor(
+        session,
+        conversationId,
+        recipientIdentityId,
+      ).mailboxId;
+    } catch (error) {
+      if (error instanceof ConversationKeyRequiredError) return null;
+
+      throw error;
+    }
   }
 
   /** Sender. Queued one-to-one sends of a conversation, decrypted. */

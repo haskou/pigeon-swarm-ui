@@ -17,7 +17,9 @@ describe('CommunityEncryptionDetails', () => {
     });
 
     expect(details.status).toBe('public');
-    expect(details.secrets).toEqual([]);
+    expect(details.identifiers).toEqual([
+      { label: expect.any(String), value: 'community-identifier' },
+    ]);
   });
 
   it('marks private communities this device cannot read as missing', () => {
@@ -29,6 +31,8 @@ describe('CommunityEncryptionDetails', () => {
     });
 
     expect(details.status).toBe('missing');
-    expect(details.secrets).toEqual([]);
+    expect(details.identifiers.map(({ value }) => value)).toEqual([
+      'community-identifier',
+    ]);
   });
 });

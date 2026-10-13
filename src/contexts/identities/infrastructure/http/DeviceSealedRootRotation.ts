@@ -138,4 +138,9 @@ export class DeviceSealedRootRotation {
       ),
     };
   }
+
+  /** Generation of this device's sealed root entry; null without one. */
+  public async generation(session: Session): Promise<number | null> {
+    return (await this.sealedSecrets.fetchOwn(session))?.generation ?? null;
+  }
 }

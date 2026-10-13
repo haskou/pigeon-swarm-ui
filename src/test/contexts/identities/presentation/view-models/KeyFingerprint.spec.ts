@@ -5,11 +5,7 @@ import { createHash } from 'crypto';
 import { KeyFingerprint } from '../../../../../contexts/identities/presentation/view-models/KeyFingerprint';
 
 const grouped = (hex: string): string =>
-  hex
-    .slice(0, 32)
-    .toUpperCase()
-    .match(/.{4}/g)!
-    .join(' ');
+  hex.slice(0, 32).toUpperCase().match(/.{4}/g)!.join(' ');
 
 describe(KeyFingerprint.name, () => {
   it('fingerprints the decoded public key, from a bare id or a PEM block', () => {

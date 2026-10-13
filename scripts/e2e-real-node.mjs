@@ -10,11 +10,16 @@ const execFileAsync = promisify(execFile);
 
 const origin = 'http://127.0.0.1:8080';
 // Each run is one Playwright invocation against the same node. Login,
-// recovery-key sign-in, pairing and 1:1 send/receive run on every engine and
-// viewport CI covers; the outbox retry flow runs on the desktop engines.
+// recovery-key sign-in, pairing, 1:1 send/receive and the security audit view
+// run on every engine and viewport CI covers; the outbox retry flow runs on
+// the desktop engines.
 const runs = [
   {
-    specs: ['e2e/login-methods.spec.ts', 'e2e/direct-message-sync.spec.ts'],
+    specs: [
+      'e2e/login-methods.spec.ts',
+      'e2e/direct-message-sync.spec.ts',
+      'e2e/security-audit.spec.ts',
+    ],
     projects: ['desktop-chromium', 'desktop-firefox', 'mobile-chromium'],
   },
   {

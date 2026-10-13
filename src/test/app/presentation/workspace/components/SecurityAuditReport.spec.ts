@@ -27,7 +27,10 @@ const session = {
   authorizationEpoch: { valueOf: () => 'epoch-1' },
   authorizationRevision: { valueOf: () => 7 },
   deviceCredentialKeyPair: {
-    toPrimitives: () => ({ privateKey: 'device-private', publicKey: pem(OWN_DEVICE) }),
+    toPrimitives: () => ({
+      privateKey: 'device-private',
+      publicKey: pem(OWN_DEVICE),
+    }),
   },
   deviceId: { valueOf: () => '11111111-1111-4111-8111-111111111111' },
   deviceSealedRootKey: { getBuffer: () => ROOT_KEY },

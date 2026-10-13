@@ -358,4 +358,10 @@ export class PigeonIdentitiesGateway {
   ): Promise<IdentityPresence> {
     return await this.presence.update(session, status);
   }
+
+  public async deviceSealedRootGeneration(
+    session: Session,
+  ): Promise<number | null> {
+    return await this.deviceSealedRoot.generation(session);
+  }
 }

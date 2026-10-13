@@ -86,6 +86,12 @@ export class PigeonIdentitiesFacade {
     return await this.gateway.listDevices(session);
   }
 
+  public async deviceSealedRootGeneration(
+    session: Session,
+  ): Promise<number | null> {
+    return await this.gateway.deviceSealedRootGeneration(session);
+  }
+
   public async revokeDevice(
     session: Session,
     target: DeviceCredential,

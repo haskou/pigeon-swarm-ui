@@ -1,8 +1,11 @@
+import { Buffer } from 'buffer';
+
 import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
 import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { ConversationKeyEntry } from '../../../../contexts/identities/infrastructure/keychain/ConversationKeyEntry';
 import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
+import type { EncryptionDetailsIdentifier } from './EncryptionDetailsIdentifier';
 
 import { memberPrimaryName } from '../../../../contexts/communities/presentation/components/communityMemberNames';
 import { conversationSupportsThreads } from '../../../../contexts/conversations/presentation/view-models/conversationSupportsThreads';
@@ -11,6 +14,7 @@ import {
   type IdentityNames,
   type IdentityPictures,
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
+import { KeyFingerprint } from '../../../../contexts/identities/presentation/view-models/KeyFingerprint';
 import { shortId } from '../../../../shared/presentation/formatting';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 
@@ -31,11 +35,7 @@ export class ChatConversationPresentation {
   public readonly encryptionDetails: {
     note: string;
     rows: Array<{ label: string; technical?: boolean; value: string }>;
-    secrets: Array<{
-      label: string;
-      sensitive?: boolean;
-      value?: string;
-    }>;
+    identifiers: EncryptionDetailsIdentifier[];
     status: 'missing' | 'ready';
     subtitle: string;
     title: string;
@@ -173,6 +173,20 @@ export class ChatConversationPresentation {
     hasConversationKey: boolean,
   ): ChatConversationPresentation['encryptionDetails'] {
     return {
+      identifiers: conversationKey
+        ? [
+            {
+              label: copy.encryption.keyFingerprint,
+              value: KeyFingerprint.ofSecret(
+                Buffer.from(conversationKey.key, 'base64'),
+              ),
+            },
+            {
+              label: copy.encryption.peerIdentity,
+              value: conversationKey.peerIdentityId,
+            },
+          ]
+        : [],
       note: hasConversationKey
         ? copy.encryption.conversationNote
         : copy.encryption.missingNote,
@@ -201,17 +215,6 @@ export class ChatConversationPresentation {
                 year: 'numeric',
               }).format(new Date(conversationKey.createdAt))
             : '-',
-        },
-      ],
-      secrets: [
-        {
-          label: copy.encryption.symmetricKey,
-          sensitive: true,
-          value: conversationKey?.key,
-        },
-        {
-          label: copy.encryption.peerIdentity,
-          value: conversationKey?.peerIdentityId,
         },
       ],
       status: hasConversationKey ? 'ready' : 'missing',

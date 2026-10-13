@@ -2,6 +2,7 @@ import { Buffer } from 'buffer';
 
 import type { PigeonCommunitiesGateway } from '../../../contexts/communities/infrastructure/http/PigeonCommunitiesGateway';
 import type { PigeonMlsRecordsApi } from '../../../contexts/communities/infrastructure/http/PigeonMlsRecordsApi';
+import type { MlsGroupCredentials } from '../../../contexts/communities/infrastructure/mls/MlsGroupCredentials';
 import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { MessageResource } from '../../../contexts/messages/infrastructure/http/MessageResource';
 
@@ -184,6 +185,14 @@ export class PigeonMlsFacade {
     ciphertext: string,
   ): Promise<string> {
     return await this.engineFor(session).decrypt(groupId, ciphertext);
+  }
+
+  /** Public leaf credentials of a group this device holds, for audit. */
+  public async credentials(
+    session: Session,
+    groupId: string,
+  ): Promise<MlsGroupCredentials | null> {
+    return await this.engineFor(session).credentials(groupId);
   }
 
   public async exportSecret(
