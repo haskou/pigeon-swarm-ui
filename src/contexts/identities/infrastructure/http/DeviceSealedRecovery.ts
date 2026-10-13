@@ -184,4 +184,40 @@ export class DeviceSealedRecovery {
 
     this.forget(identityId, 'rootReseal');
   }
+
+  /**
+   * Mints a fresh root when this device's own entry is behind the head, as
+   * after another device forgot itself: that device can no longer publish, so
+   * the next remaining device to unlock does. The keychain head is read under
+   * the lagging root and moved to the fresh one, recorded first like a revoke.
+   * Returns the session unchanged when nothing lags or nothing was minted.
+   * Never throws.
+   */
+  public async rotateLaggingRoot(synchronized: Session): Promise<Session> {
+    let rotated: Session;
+    let head: KeychainHead | undefined;
+
+    try {
+      const lagging = await this.deviceSealedRoot.laggingRoot(synchronized);
+
+      if (!lagging) return synchronized;
+
+      const previous = { ...synchronized, deviceSealedRootKey: lagging };
+
+      head = await this.keychains.readHead(previous);
+
+      if (head) this.rememberKeychainRewrap(previous);
+
+      rotated = await this.deviceSealedRoot.rotate(synchronized);
+    } catch {
+      // eslint-disable-next-line no-console
+      console.debug('Lagging root rotation failed; retrying on next unlock');
+
+      return synchronized;
+    }
+
+    if (head) await this.rewrapAfterRevoke(rotated, head);
+
+    return rotated;
+  }
 }

@@ -16,9 +16,10 @@ import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonEr
  * carries one root, sealed to every device at the head. Enrolment reseals the
  * same root; a revoke mints a fresh one. A device opens its own entry while it
  * matches its authorization revision. A stale session re-syncs once and never
- * mints a root. A device with no entry mints only after the identity keychain
- * head reads: a head sealed under a root this device cannot open blocks the
- * mint, so that keychain is not stranded.
+ * mints a root itself: an entry still behind the head is only read as the
+ * lagging root that a fresh one replaces. A device with no entry mints only
+ * after the identity keychain head reads: a head sealed under a root this
+ * device cannot open blocks the mint, so that keychain is not stranded.
  */
 export class DeviceSealedRootRotation {
   public constructor(
@@ -77,6 +78,25 @@ export class DeviceSealedRootRotation {
    */
   public async reseal(session: Session, root: SymmetricKey): Promise<void> {
     await this.publishWithRetry(session, root);
+  }
+
+  /**
+   * Returns the root of this device's own entry when that entry is behind the
+   * session revision, or `null` when it is current or missing. A device that
+   * forgot itself may still hold this root, so it only opens the keychain head
+   * before a fresh root replaces it, and is never resealed.
+   */
+  public async laggingRoot(session: Session): Promise<SymmetricKey | null> {
+    const own = await this.sealedSecrets.fetchOwn(session);
+
+    if (
+      !own ||
+      own.authorizationRevision >= session.authorizationRevision.valueOf()
+    ) {
+      return null;
+    }
+
+    return SymmetricKey.fromBuffer(decodeBase64Url(own.payload));
   }
 
   /**

@@ -282,4 +282,71 @@ describe(DeviceSealedRecovery.name, () => {
       expect(store.read(identityId).rootReseal).toBeDefined();
     });
   });
+
+  describe('rotateLaggingRoot', () => {
+    it('leaves the session alone when its own entry does not lag', async () => {
+      const { deviceSealedRoot, keychains, recovery } = harness();
+      const synchronized = sessionAt(2);
+
+      deviceSealedRoot.laggingRoot.mockResolvedValue(null);
+
+      await expect(recovery.rotateLaggingRoot(synchronized)).resolves.toBe(
+        synchronized,
+      );
+      expect(keychains.readHead).not.toHaveBeenCalled();
+      expect(deviceSealedRoot.rotate).not.toHaveBeenCalled();
+    });
+
+    it('mints nothing when the keychain head does not open under the lagging root', async () => {
+      const { deviceSealedRoot, keychains, recovery, store } = harness();
+      const synchronized = sessionAt(2);
+
+      deviceSealedRoot.laggingRoot.mockResolvedValue(previousRoot);
+      keychains.readHead.mockRejectedValue(new Error('cannot open'));
+
+      await expect(recovery.rotateLaggingRoot(synchronized)).resolves.toBe(
+        synchronized,
+      );
+      expect(deviceSealedRoot.rotate).not.toHaveBeenCalled();
+      expect(store.read(identityId).keychainRewrap).toBeUndefined();
+    });
+
+    it('keeps the lagging root for the next unlock when the publish fails', async () => {
+      const { deviceSealedRoot, keychains, recovery, store } = harness();
+      const synchronized = sessionAt(2);
+
+      deviceSealedRoot.laggingRoot.mockResolvedValue(previousRoot);
+      keychains.readHead.mockResolvedValue(head);
+      deviceSealedRoot.rotate.mockRejectedValue(new Error('offline'));
+
+      await expect(recovery.rotateLaggingRoot(synchronized)).resolves.toBe(
+        synchronized,
+      );
+      expect(
+        masterKey
+          .decrypt(
+            new EncryptedPayload(
+              store.read(identityId).keychainRewrap as string,
+            ),
+          )
+          .toString(),
+      ).toBe(previousRoot.toString());
+    });
+
+    it('rotates without a rewrap record when no keychain head exists yet', async () => {
+      const { deviceSealedRoot, keychains, recovery, store } = harness();
+      const synchronized = sessionAt(2);
+      const rotated = sessionAt(2, { deviceSealedRootKey: currentRoot });
+
+      deviceSealedRoot.laggingRoot.mockResolvedValue(previousRoot);
+      keychains.readHead.mockResolvedValue(undefined);
+      deviceSealedRoot.rotate.mockResolvedValue(rotated);
+
+      await expect(recovery.rotateLaggingRoot(synchronized)).resolves.toBe(
+        rotated,
+      );
+      expect(keychains.rewrapHead).not.toHaveBeenCalled();
+      expect(store.read(identityId).keychainRewrap).toBeUndefined();
+    });
+  });
 });
