@@ -7,6 +7,7 @@ import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/real
 import type { RealtimeConversationEventsInput } from './RealtimeConversationEventsInput';
 
 import { ConversationTimeline } from '../../../../contexts/conversations/presentation/view-models/ConversationTimeline';
+import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
 import { MessageCollection } from '../../../../contexts/messages/presentation/view-models/MessageCollection';
 import { MessageReactionUpdater } from '../../../../contexts/messages/presentation/view-models/MessageReactionUpdater';
 import { ThreadMessageVisibility } from '../../../../contexts/messages/presentation/view-models/ThreadMessageVisibility';
@@ -249,7 +250,10 @@ export function useWorkspaceRealtimeConversationEvents({
         encrypted: false,
         id: message.id ?? `${event.event_id}:call-event`,
         kind: 'call-event',
-        mine: message.actorIdentityId === session.identity.id,
+        mine: IdentityMatch.isSame(
+          message.actorIdentityId,
+          session.identity.id,
+        ),
         raw: message,
         reactions: message.reactions ?? [],
         timestamp: message.createdAt ?? event.occurred_on,
@@ -333,8 +337,11 @@ export function useWorkspaceRealtimeConversationEvents({
 
       if (
         !allowed ||
-        authorId === session.identity.id ||
-        timelineMessage?.actorIdentityId === session.identity.id
+        IdentityMatch.isSame(authorId, session.identity.id) ||
+        IdentityMatch.isSame(
+          timelineMessage?.actorIdentityId,
+          session.identity.id,
+        )
       ) {
         return;
       }
@@ -478,7 +485,10 @@ export function useWorkspaceRealtimeConversationEvents({
         'reader_identity_id',
       );
 
-      if (!conversationId || readerIdentityId !== session.identity.id) {
+      if (
+        !conversationId ||
+        !IdentityMatch.isSame(readerIdentityId, session.identity.id)
+      ) {
         return true;
       }
 
