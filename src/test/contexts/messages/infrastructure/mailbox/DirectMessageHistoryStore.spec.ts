@@ -242,20 +242,6 @@ describe(DirectMessageHistoryStore.name, () => {
     ).toEqual([`${marker}:a`]);
   });
 
-  it('does nothing without a device-sealed root', async () => {
-    const name = databaseName();
-    const store = new DirectMessageHistoryStore(name);
-
-    await store.append(session('identity-1', null), conversationId, [
-      entry('a'),
-    ]);
-
-    expect(
-      await store.load(session('identity-1', null), conversationId),
-    ).toEqual([]);
-    expect(await storedChunks(name)).toEqual([]);
-  });
-
   it('rejects with a storage error that carries no plaintext when storage fails', async () => {
     jest.spyOn(indexedDB, 'open').mockImplementation(() => {
       throw new Error(marker);

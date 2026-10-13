@@ -6,10 +6,12 @@ import type { ConversationResource } from '../../../../contexts/conversations/in
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
 import type { DirectMessageTimelineChange } from '../../../../contexts/messages/presentation/view-models/DirectMessageTimelineChange';
-import type { DirectPinChange } from './DirectPinChange';
 
 import { DirectMailboxEligibility } from '../../../../contexts/mailboxes/domain/DirectMailboxEligibility';
 import { MailboxReaderLimitError } from '../../../../contexts/mailboxes/infrastructure/http/MailboxReaderLimitError';
+import { MessagePinChange } from '../../../../contexts/messages/domain/MessagePinChange';
+import { MessagePinClock } from '../../../../contexts/messages/domain/MessagePinClock';
+import { MessageId } from '../../../../contexts/messages/domain/value-objects/MessageId';
 import { DirectMessageHistoryStorageError } from '../../../../contexts/messages/infrastructure/mailbox/DirectMessageHistoryStorageError';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
@@ -29,48 +31,10 @@ type DirectMessageMailboxSyncInput = {
   setPinnedMessageIds: Dispatch<SetStateAction<Set<string>>>;
 };
 
-/**
- * Keeps the pin changes newer than the last one applied to their message. The
- * clock advances as it goes, so a later change in the same pass still wins.
- */
-function freshPinChanges(
-  changes: DirectMessageTimelineChange[],
-  clock: Map<string, number>,
-): DirectPinChange[] {
-  return changes.flatMap((change): DirectPinChange[] => {
-    if (change.kind !== 'pin') return [];
-
-    const latest = clock.get(change.messageId);
-
-    if (latest !== undefined && change.createdAt <= latest) return [];
-
-    clock.set(change.messageId, change.createdAt);
-
-    return [change];
-  });
-}
-
-function applyPinChanges(
-  current: Set<string>,
-  changes: DirectPinChange[],
-): Set<string> {
-  const next = new Set(current);
-
-  for (const change of changes) {
-    if (change.action === 'pin') {
-      next.add(change.messageId);
-    } else {
-      next.delete(change.messageId);
-    }
-  }
-
-  return next;
-}
-
 function applySyncChanges(
   changes: DirectMessageTimelineChange[],
   conversationId: string,
-  pinClock: Map<string, number>,
+  pinClock: MessagePinClock,
   handlers: Pick<
     DirectMessageMailboxSyncInput,
     'onConversationRead' | 'onMessagesChange' | 'setPinnedMessageIds'
@@ -82,11 +46,29 @@ function applySyncChanges(
     );
   }
 
-  const pinChanges = freshPinChanges(changes, pinClock);
+  // A peer can write a pin the domain cannot hold (an empty or over-long id):
+  // skip it, so one bad record does not stall the sync of the whole page.
+  const pinChanges = pinClock.admit(
+    changes.flatMap((change) => {
+      if (change.kind !== 'pin') return [];
+
+      try {
+        return [MessagePinChange.fromPrimitives(change)];
+      } catch {
+        return [];
+      }
+    }),
+  );
 
   if (pinChanges.length > 0) {
-    handlers.setPinnedMessageIds((current) =>
-      applyPinChanges(current, pinChanges),
+    handlers.setPinnedMessageIds(
+      (current) =>
+        new Set(
+          MessagePinClock.applyTo(
+            [...current].map((messageId) => MessageId.fromString(messageId)),
+            pinChanges,
+          ).map((messageId) => messageId.valueOf()),
+        ),
     );
   }
 
@@ -135,8 +117,9 @@ function syncFailureMessage(caught: unknown): string {
  * signal at each step, and overlapping passes share one inbox creation. A
  * failing streak shows one notice unless another error is already shown. The
  * next successful pass clears only that notice.
- * Pin records apply last-writer-wins per message by createdAt. The clock
- * lasts one effect run; a replay after a conversation switch applies again.
+ * Pin records apply last-writer-wins per message by createdAt through the
+ * domain MessagePinClock. The clock lasts one effect run; a replay after a
+ * conversation switch applies again.
  */
 export function useDirectMessageMailboxSync({
   activeConversation,
@@ -161,7 +144,7 @@ export function useDirectMessageMailboxSync({
     const controller = new AbortController();
     let notice: string | null = null;
     let timer: number | undefined;
-    const pinClock = new Map<string, number>();
+    const pinClock = new MessagePinClock();
     let running = false;
     let queued = false;
     let unsubscribeHints: (() => void) | undefined;

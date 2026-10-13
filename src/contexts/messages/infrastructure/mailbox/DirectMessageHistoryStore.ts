@@ -8,6 +8,7 @@ import {
   indexedDbRequest,
   indexedDbTransaction,
 } from '../../../../shared/infrastructure/storage/indexedDbRequest';
+import { sessionRootKey } from '../../../identities/infrastructure/session/sessionRootKey';
 import { DeviceRootRowCipher } from './DeviceRootRowCipher';
 import { DirectMessageHistoryStorageError } from './DirectMessageHistoryStorageError';
 
@@ -155,12 +156,8 @@ export class DirectMessageHistoryStore {
     }
   }
 
-  private async verifiedCipher(
-    session: Session,
-  ): Promise<DeviceRootRowCipher | undefined> {
-    const root = session.deviceSealedRootKey?.getBuffer();
-
-    if (!root) return undefined;
+  private async verifiedCipher(session: Session): Promise<DeviceRootRowCipher> {
+    const root = sessionRootKey(session).getBuffer();
 
     const identityId = session.identity.id;
     const cipher = await DeviceRootRowCipher.derive(
@@ -236,9 +233,9 @@ export class DirectMessageHistoryStore {
   }
 
   /**
-   * Stores the entries, deduped by record id. Without a device-sealed root
-   * nothing is stored. A failed write, such as an exhausted browser quota,
-   * rejects with `DirectMessageHistoryStorageError`, which carries no content.
+   * Stores the entries, deduped by record id. A failed write, such as an
+   * exhausted browser quota, rejects with `DirectMessageHistoryStorageError`,
+   * which carries no content.
    */
   public async append(
     session: Session,
@@ -248,7 +245,7 @@ export class DirectMessageHistoryStore {
     try {
       const cipher = await this.verifiedCipher(session);
 
-      if (!cipher || entries.length === 0) return;
+      if (entries.length === 0) return;
 
       const identityId = session.identity.id;
       const rows = await Promise.all(
@@ -315,8 +312,6 @@ export class DirectMessageHistoryStore {
     try {
       const cipher = await this.verifiedCipher(session);
 
-      if (!cipher) return [];
-
       const rows = await this.rowsFor(session.identity.id, conversationId);
       const opened = await Promise.all(
         rows.map((row) =>
@@ -348,8 +343,6 @@ export class DirectMessageHistoryStore {
   ): Promise<DirectMessageHistoryItem[]> {
     try {
       const cipher = await this.verifiedCipher(session);
-
-      if (!cipher) return [];
 
       const rows = await this.recentRows(session.identity.id, limit);
       const opened = await Promise.all(

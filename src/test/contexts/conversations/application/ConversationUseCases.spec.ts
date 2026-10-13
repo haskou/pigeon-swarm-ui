@@ -1,5 +1,6 @@
 import { mock, type MockProxy } from 'jest-mock-extended';
 
+import type { ConversationReadReceiptRepository } from '../../../../contexts/conversations/domain/repositories/ConversationReadReceiptRepository';
 import type { ConversationRepository } from '../../../../contexts/conversations/domain/repositories/ConversationRepository';
 
 import { ConversationCreator } from '../../../../contexts/conversations/application/create-conversation/ConversationCreator';
@@ -44,9 +45,11 @@ function conversation(
 
 describe('conversation use cases', () => {
   let conversationRepository: MockProxy<ConversationRepository>;
+  let readReceiptRepository: MockProxy<ConversationReadReceiptRepository>;
 
   beforeEach(() => {
     conversationRepository = mock<ConversationRepository>();
+    readReceiptRepository = mock<ConversationReadReceiptRepository>();
   });
 
   it('creates a direct conversation through its repository', async () => {
@@ -207,7 +210,10 @@ describe('conversation use cases', () => {
 
     conversationRepository.find.mockResolvedValue(group);
 
-    await new ConversationReadMarker(conversationRepository).mark(
+    await new ConversationReadMarker(
+      conversationRepository,
+      readReceiptRepository,
+    ).mark(
       new MarkConversationReadUntilMessage(
         'group:a',
         'message-a',
@@ -229,7 +235,10 @@ describe('conversation use cases', () => {
 
     conversationRepository.find.mockResolvedValue(direct);
 
-    await new ConversationReadMarker(conversationRepository).mark(
+    await new ConversationReadMarker(
+      conversationRepository,
+      readReceiptRepository,
+    ).mark(
       new MarkConversationReadUntilMessage(
         'one-to-one:a',
         'message-a',
@@ -240,6 +249,78 @@ describe('conversation use cases', () => {
 
     expect(conversationRepository.markReadUntil).not.toHaveBeenCalled();
     expect(direct.pullDomainEvents()).toHaveLength(0);
+  });
+
+  it('sends a read of the open one-to-one conversation as a read receipt', async () => {
+    await new ConversationReadMarker(
+      conversationRepository,
+      readReceiptRepository,
+    ).mark(
+      new MarkConversationReadUntilMessage(
+        'one-to-one:a',
+        'message-a',
+        'identity-a',
+        200,
+        { id: 'one-to-one:a', type: 'one-to-one' },
+      ),
+    );
+
+    const [conversationId, messageId, actorIdentityId] =
+      readReceiptRepository.markRead.mock.calls[0] ?? [];
+
+    expect(conversationId?.toString()).toBe('one-to-one:a');
+    expect(messageId?.toString()).toBe('message-a');
+    expect(actorIdentityId?.toString()).toBe('identity-a');
+    expect(conversationRepository.find).not.toHaveBeenCalled();
+    expect(conversationRepository.markReadUntil).not.toHaveBeenCalled();
+  });
+
+  it('reads through the aggregate when the open conversation is another one', async () => {
+    const group = conversation('group:a', 0, 'group', 1);
+
+    conversationRepository.find.mockResolvedValue(group);
+
+    await new ConversationReadMarker(
+      conversationRepository,
+      readReceiptRepository,
+    ).mark(
+      new MarkConversationReadUntilMessage(
+        'group:a',
+        'message-a',
+        'identity-a',
+        200,
+        { id: 'one-to-one:a', type: 'one-to-one' },
+      ),
+    );
+
+    expect(readReceiptRepository.markRead).not.toHaveBeenCalled();
+    expect(conversationRepository.markReadUntil).toHaveBeenCalledWith(
+      group,
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  it('never sends a read receipt for an open group conversation', async () => {
+    const group = conversation('group:a', 0, 'group', 1);
+
+    conversationRepository.find.mockResolvedValue(group);
+
+    await new ConversationReadMarker(
+      conversationRepository,
+      readReceiptRepository,
+    ).mark(
+      new MarkConversationReadUntilMessage(
+        'group:a',
+        'message-a',
+        'identity-a',
+        200,
+        { id: 'group:a', type: 'group' },
+      ),
+    );
+
+    expect(readReceiptRepository.markRead).not.toHaveBeenCalled();
+    expect(conversationRepository.markReadUntil).toHaveBeenCalled();
   });
 
   it('returns conversations ordered by latest activity', async () => {

@@ -104,23 +104,13 @@ export function useConversationTimeline({
       };
 
       onConversationsChange((current) => current.map(clearConversationUnread));
-      const readConversation = activeConversationRef.current;
-
-      if (
-        readConversation?.id === conversationId &&
-        readConversation.type === 'one-to-one'
-      ) {
-        void applicationContainer.directMessages.markRead(
-          sessionRef.current,
-          readConversation,
-          lastMessage.id,
-        );
-
-        return;
-      }
-
       void applicationContainer.conversations
-        .markReadUntil(sessionRef.current, conversationId, lastMessage.id)
+        .markReadUntil(
+          sessionRef.current,
+          conversationId,
+          lastMessage.id,
+          activeConversationRef.current,
+        )
         .catch(() => undefined);
     },
     [clearUnreadMessages, onConversationsChange, sessionRef],

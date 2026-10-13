@@ -157,17 +157,28 @@ export class PigeonConversationsFacade {
     );
   }
 
+  /**
+   * Marks a conversation read up to a message. The reader's open
+   * conversation, if any, lets the read use case send a one-to-one read
+   * through the reader's own inbox.
+   */
   public async markReadUntil(
     session: Session,
     conversationId: string,
     messageId: string,
+    openConversation?: ConversationResource,
   ): Promise<void> {
+    if (openConversation) this.contexts.registerOpen(openConversation);
+
     await this.useCases.readMarker.mark(
       new MarkConversationReadUntilMessage(
         conversationId,
         messageId,
         this.actor(session),
         Date.now(),
+        openConversation
+          ? { id: openConversation.id, type: openConversation.type }
+          : null,
       ),
     );
   }

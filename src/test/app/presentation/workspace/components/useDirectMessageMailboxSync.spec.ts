@@ -350,6 +350,34 @@ describe('useDirectMessageMailboxSync pins', () => {
     mounted.cleanup();
   });
 
+  it('skips a peer pin whose message id is not a message id and applies the rest', async () => {
+    let applyError: unknown;
+    sync.mockImplementation((_session, _conversationId, _signal, apply) => {
+      try {
+        apply([
+          { action: 'pin', createdAt: 200, kind: 'pin', messageId: '   ' },
+          {
+            action: 'pin',
+            createdAt: 300,
+            kind: 'pin',
+            messageId: 'message-1',
+          },
+        ]);
+      } catch (error) {
+        applyError = error;
+      }
+
+      return Promise.resolve();
+    });
+    const mounted = mountSync();
+
+    await settle();
+
+    expect(applyError).toBeUndefined();
+    expect(mounted.pinnedIds()).toEqual(new Set(['message-1']));
+    mounted.cleanup();
+  });
+
   it('removes the message from the pinned set on a later unpin change in the same pass', async () => {
     sync.mockImplementation((_session, _conversationId, _signal, apply) => {
       apply([
