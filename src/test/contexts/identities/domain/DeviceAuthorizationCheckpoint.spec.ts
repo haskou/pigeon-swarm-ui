@@ -1,6 +1,6 @@
 import { DeviceAuthorizationCheckpoint } from '../../../../contexts/identities/domain/DeviceAuthorizationCheckpoint';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
-import vectors from '../../../fixtures/device-authorization-recovery-vectors.json';
+import vectors from '../../../fixtures/device-authorization-transition-vectors.json';
 
 describe(DeviceAuthorizationCheckpoint.name, () => {
   it('exposes validated value objects', () => {
