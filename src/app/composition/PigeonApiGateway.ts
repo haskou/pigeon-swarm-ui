@@ -452,6 +452,12 @@ export class PigeonApiGateway {
       this.presence,
       deviceSealedRoot,
       deviceSealedRecovery,
+      {
+        publish: async (session, secret) =>
+          await this.directMessageMailbox.publishHistory(session, secret),
+        receive: async (session, secret) =>
+          await this.directMessageMailbox.receiveHistory(session, secret),
+      },
     );
   }
 
