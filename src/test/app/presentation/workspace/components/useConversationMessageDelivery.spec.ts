@@ -84,7 +84,10 @@ type Deferred<T> = {
 };
 
 function deferred<T>(): Deferred<T> {
-  const { promise, resolve } = Promise.withResolvers<T>();
+  let resolve: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
 
   return { promise, resolve };
 }
@@ -97,10 +100,9 @@ async function flushMicrotasks(): Promise<void> {
 
 // Waits for every chained microtask, including the group send queue.
 async function drain(): Promise<void> {
-  const { promise, resolve } = Promise.withResolvers<void>();
-
-  setTimeout(resolve, 0);
-  await promise;
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, 0);
+  });
 }
 
 function onlyMessage(delivery: {
