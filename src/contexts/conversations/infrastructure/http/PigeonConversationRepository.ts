@@ -24,13 +24,20 @@ export class PigeonConversationRepository implements ConversationRepository {
     private readonly mapper: ConversationMapper,
   ) {}
 
+  /**
+   * Only groups still keep their messages on the node. A one-to-one
+   * conversation's activity lives in its mailboxes, so it is never recovered
+   * from the node message list.
+   */
   private async recoverLatestMessageAt(
     conversation: Conversation,
     actorIdentityId: ConversationParticipantId,
   ): Promise<Conversation> {
     const primitives = conversation.toPrimitives();
 
-    if (primitives.latestMessageAt !== undefined) return conversation;
+    if (primitives.latestMessageAt !== undefined || !conversation.isGroup()) {
+      return conversation;
+    }
 
     try {
       const result = await this.messagesGateway.loadMessages(

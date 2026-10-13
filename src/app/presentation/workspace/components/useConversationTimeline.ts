@@ -125,14 +125,49 @@ export function useConversationTimeline({
     },
     [clearUnreadMessages, onConversationsChange, sessionRef],
   );
+  /**
+   * A one-to-one timeline comes only from its mailboxes: the mailbox sync
+   * restores stored history and applies new records. Opening clears it on a
+   * conversation switch and keeps it on a resume. Returns false for a group,
+   * which still loads from the node.
+   */
+  const openDirectTimeline = useCallback(
+    (conversationId: string): boolean => {
+      const conversation = activeConversationRef.current;
+
+      if (
+        conversation?.id !== conversationId ||
+        conversation.type !== 'one-to-one'
+      ) {
+        return false;
+      }
+
+      if (loadedConversationIdRef.current !== conversationId) {
+        setMessages([]);
+        updateMessageCursor(null);
+        onErrorChange(null);
+      }
+
+      loadedConversationIdRef.current = conversationId;
+      setMessageLoadState('idle');
+
+      return true;
+    },
+    [onErrorChange, setMessageLoadState, updateMessageCursor],
+  );
   const loadActiveMessages = useCallback(
     async (conversationId: string): Promise<void> => {
       const requestId = messageRequestRef.current + 1;
-      const controller = new AbortController();
 
       messageAbortRef.current?.abort();
-      messageAbortRef.current = controller;
+      messageAbortRef.current = null;
       messageRequestRef.current = requestId;
+
+      if (openDirectTimeline(conversationId)) return;
+
+      const controller = new AbortController();
+
+      messageAbortRef.current = controller;
       loadedConversationIdRef.current = null;
       setMessages([]);
       updateMessageCursor(null);
@@ -184,6 +219,7 @@ export function useConversationTimeline({
     [
       markConversationReadUntil,
       onErrorChange,
+      openDirectTimeline,
       scrollMessagesToBottom,
       sessionRef,
       setMessageLoadState,

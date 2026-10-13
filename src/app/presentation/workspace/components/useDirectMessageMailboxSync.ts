@@ -22,6 +22,7 @@ type DirectMessageMailboxSyncInput = {
   activeConversation: ConversationResource | undefined;
   onConversationRead: (conversationId: string) => void;
   onErrorChange: Dispatch<SetStateAction<string | null>>;
+  onHistoryRestored: (conversationId: string, messages: ChatMessage[]) => void;
   onMessagesChange: Dispatch<SetStateAction<ChatMessage[]>>;
   session: Session;
   setPinnedMessageIds: Dispatch<SetStateAction<Set<string>>>;
@@ -117,7 +118,10 @@ function syncFailureMessage(caught: unknown): string {
 }
 
 /**
- * Polls the recipient inbox of the active one-to-one conversation. Within one
+ * Builds and polls the timeline of the active one-to-one conversation from its
+ * mailboxes alone. Each effect run first restores the stored history and hands
+ * the restored messages to `onHistoryRestored`, so the opener can mark them
+ * read. It then polls the recipient inbox. Within one
  * effect run, the next pass is scheduled only after the current one settles.
  * A cleanup aborts the running pass, but that pass may still be in flight when
  * the next effect run starts (StrictMode mounts twice). `sync` checks the
@@ -131,6 +135,7 @@ export function useDirectMessageMailboxSync({
   activeConversation,
   onConversationRead,
   onErrorChange,
+  onHistoryRestored,
   onMessagesChange,
   session,
   setPinnedMessageIds,
@@ -226,14 +231,25 @@ export function useDirectMessageMailboxSync({
     };
 
     const start = async (): Promise<void> => {
+      let restored: DirectMessageTimelineChange[] = [];
+
       await applicationContainer.directMessages.restore(
         session,
         conversationId,
         controller.signal,
-        apply,
+        (changes) => {
+          restored = changes;
+          apply(changes);
+        },
       );
 
-      if (!controller.signal.aborted) void pass();
+      if (controller.signal.aborted) return;
+
+      onHistoryRestored(
+        conversationId,
+        applyDirectMessageTimelineChanges([], restored),
+      );
+      void pass();
     };
 
     void start();
@@ -247,6 +263,7 @@ export function useDirectMessageMailboxSync({
     conversationId,
     onConversationRead,
     onErrorChange,
+    onHistoryRestored,
     onMessagesChange,
     session,
     setPinnedMessageIds,
