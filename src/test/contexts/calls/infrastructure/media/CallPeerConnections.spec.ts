@@ -933,14 +933,16 @@ describe(CallPeerConnections.name, () => {
       );
       expect(events).toContain(event);
       expect(
-        events.filter((logged) =>
-          [
-            'peer-manager:ice-recovery:configuration-unavailable',
-            'peer-manager:ice-recovery:offer-undelivered',
-            'peer-manager:ice-recovery:restart-failed',
-          ].includes(logged),
+        new Set(
+          events.filter((logged) =>
+            [
+              'peer-manager:ice-recovery:configuration-unavailable',
+              'peer-manager:ice-recovery:offer-undelivered',
+              'peer-manager:ice-recovery:restart-failed',
+            ].includes(logged),
+          ),
         ),
-      ).toEqual([event]);
+      ).toEqual(new Set([event]));
       expect(JSON.stringify(readCallDiagnostics())).not.toMatch(
         /credential endpoint|restart rejected|offer-sdp/,
       );

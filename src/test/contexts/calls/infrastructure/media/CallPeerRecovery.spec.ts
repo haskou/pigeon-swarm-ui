@@ -63,7 +63,7 @@ describe('CallPeerRecovery', () => {
     recovery.reset();
   });
 
-  it('waits for a peer that has not started negotiating', async () => {
+  it('bounds a peer that never starts negotiating', async () => {
     jest.useFakeTimers();
     const restart = jest.fn(() => Promise.resolve());
     const recovery = new CallPeerRecovery(restart);
@@ -74,9 +74,15 @@ describe('CallPeerRecovery', () => {
       signalingState: 'stable',
     });
     recovery.reconcile('peer', peer, () => true);
-    await jest.advanceTimersByTimeAsync(60_000);
+    await jest.advanceTimersByTimeAsync(14_999);
     expect(restart).not.toHaveBeenCalled();
     expect(recovery.stateFor('peer')).toBe('idle');
+    await jest.advanceTimersByTimeAsync(1);
+    expect(restart).toHaveBeenCalledTimes(1);
+    expect(recovery.stateFor('peer')).toBe('recovering');
+    await jest.advanceTimersByTimeAsync(45_000);
+    expect(restart).toHaveBeenCalledTimes(3);
+    expect(recovery.stateFor('peer')).toBe('exhausted');
   });
 
   it('exposes exhaustion only after the final outcome window and retries only on request', async () => {
