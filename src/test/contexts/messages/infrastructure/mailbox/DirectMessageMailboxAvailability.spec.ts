@@ -1,4 +1,5 @@
 import 'fake-indexeddb/auto';
+import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 import { type MockProxy, mock } from 'jest-mock-extended';
 
@@ -56,6 +57,9 @@ describe('DirectMessageMailbox availability servers', () => {
       deviceCredentialKeyPair: {
         toPrimitives: () => ({ publicKey: credentialFor(identityId) }),
       },
+      deviceSealedRootKey: SymmetricKey.fromBuffer(
+        Buffer.alloc(32, identityId === 'alice' ? 3 : 9),
+      ),
       identity: { id: identityId },
       keychain: {
         conversations: {
@@ -70,9 +74,6 @@ describe('DirectMessageMailbox availability servers', () => {
           },
         },
         version: 1,
-      },
-      masterKey: {
-        getBuffer: () => Buffer.alloc(32, identityId === 'alice' ? 3 : 9),
       },
     }) as unknown as Session;
 
