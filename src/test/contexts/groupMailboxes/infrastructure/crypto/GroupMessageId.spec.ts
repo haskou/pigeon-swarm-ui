@@ -38,7 +38,7 @@ describe(GroupMessageId.name, () => {
   it('rejects a nonce with non-canonical trailing bits', () => {
     const id = GroupMessageId.create('alice');
     const [nonce] = id.split('.');
-    const last = nonce.at(-1) ?? '';
+    const last = nonce.slice(-1);
     // 22 characters carry 132 bits; the last 4 of 16 bytes must be zero.
     const bumped = String.fromCharCode(last.charCodeAt(0) + 1);
 

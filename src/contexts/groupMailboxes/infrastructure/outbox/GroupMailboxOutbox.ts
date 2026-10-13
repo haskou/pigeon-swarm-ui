@@ -3,6 +3,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { GroupMailboxGeneration } from '../../domain/GroupMailboxGeneration';
 import type { GroupMailboxCommit } from '../mls/GroupMailboxCommit';
+import type { GroupMailboxOutboxAttempt } from './GroupMailboxOutboxAttempt';
 import type { GroupMailboxOutboxCopy } from './GroupMailboxOutboxCopy';
 import type { GroupMailboxOutboxEngine } from './GroupMailboxOutboxEngine';
 import type { GroupMailboxOutboxFailure } from './GroupMailboxOutboxFailure';
@@ -13,6 +14,7 @@ import {
   decodeBase64Url,
   encodeBase64Url,
 } from '../../../../shared/infrastructure/encoding/base64url';
+import { MlsRejectedError } from '../../../communities/infrastructure/mls/MlsRejectedError';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
 import { GroupMailboxControlRecord } from '../control/GroupMailboxControlRecord';
@@ -24,12 +26,14 @@ import { GroupMailboxKeySchedule } from '../crypto/GroupMailboxKeySchedule';
  * each recipient's inbox of its generation under a deterministic envelope id,
  * so a retry is stored once. A failed append (an inbox not yet created, a
  * conflict, a rate limit, the network) stays queued and is retried with
- * backoff; later records to that recipient wait behind it, so each inbox
- * receives one sender's records in order. A message whose generation was
- * superseded before every copy landed is re-encrypted in the current epoch
- * for the current members; a commit belongs to its generation and is never
- * re-encrypted. A record still queued after the expiry is dropped and
- * reported. Logs carry counts only.
+ * backoff; later records to that recipient, in any generation, wait behind
+ * it, so a commit reaches each member before the messages of the epoch it
+ * starts. A message whose generation was superseded before every copy
+ * landed is re-encrypted in the current epoch for the current members; one
+ * that cannot be re-encrypted for a moment is retried with backoff. A
+ * commit belongs to its generation and is never re-encrypted. A record
+ * still queued after the expiry is dropped and reported. Logs carry counts
+ * only.
  */
 export class GroupMailboxOutbox {
   public static readonly EXPIRY_MS = 14 * 24 * 60 * 60 * 1000;
@@ -59,6 +63,13 @@ export class GroupMailboxOutbox {
     return `group-commit|${hash}|${next.mailboxId}`;
   }
 
+  /** Holds back later rows to the recipients of `row`. */
+  private static hold(row: GroupMailboxOutboxRow, blocked: Set<string>): void {
+    for (const copy of row.copies) {
+      blocked.add(GroupMailboxOutbox.recipient(row, copy));
+    }
+  }
+
   private static ordered(
     rows: Iterable<GroupMailboxOutboxRow>,
   ): GroupMailboxOutboxRow[] {
@@ -68,16 +79,16 @@ export class GroupMailboxOutbox {
     );
   }
 
-  /** One recipient's inbox of one generation, for the in-order rule. */
+  /**
+   * One recipient of one conversation, for the in-order rule. Generations
+   * share it: a commit held in `I(Y,k)` holds back the messages queued for
+   * `I(Y,k+1)`, which `Y` could not decrypt before the commit.
+   */
   private static recipient(
     row: GroupMailboxOutboxRow,
     copy: GroupMailboxOutboxCopy,
   ): string {
-    return [
-      row.conversationId,
-      row.generationIndex.toString(),
-      copy.identityId,
-    ].join('\u0000');
+    return [row.conversationId, copy.identityId].join('\u0000');
   }
 
   private static retryDelay(attempts: number): number {
@@ -100,19 +111,31 @@ export class GroupMailboxOutbox {
 
   private cancelTimer: () => void = () => undefined;
 
-  /** Appends every due copy, oldest record first. */
+  /**
+   * Prepares every row, re-encrypting the stale messages, then appends the
+   * due copies: older generations first, so a commit goes out before the
+   * messages of the epoch it starts, then oldest record first.
+   */
   private async attemptAll(): Promise<void> {
     const now = this.clock();
-    const blocked = new Set<string>();
+    const attempts: GroupMailboxOutboxAttempt[] = [];
 
     for (const row of GroupMailboxOutbox.ordered(this.rows.values())) {
       if (this.stopped) return;
+      const attempt = await this.prepared(row, now);
 
-      if (now - row.createdAt >= GroupMailboxOutbox.EXPIRY_MS) {
-        await this.fail(row);
-        continue;
-      }
-      await this.attemptRow(row, now, blocked);
+      if (attempt) attempts.push(attempt);
+    }
+    const blocked = new Set<string>();
+
+    attempts.sort(
+      (left, right) =>
+        left.current.generationIndex - right.current.generationIndex,
+    );
+
+    for (const attempt of attempts) {
+      if (this.stopped) return;
+      await this.attemptRow(attempt, now, blocked);
     }
     this.schedule(now);
   }
@@ -122,31 +145,22 @@ export class GroupMailboxOutbox {
    * back later rows to its recipients.
    */
   private async attemptRow(
-    row: GroupMailboxOutboxRow,
+    { current, generation, row }: GroupMailboxOutboxAttempt,
     now: number,
     blocked: Set<string>,
   ): Promise<void> {
-    if (row.retryAt > now) {
-      for (const copy of row.copies) {
-        blocked.add(GroupMailboxOutbox.recipient(row, copy));
-      }
-
-      return;
-    }
-    const delivery = await this.deliverable(row);
-
-    if (!delivery) {
-      await this.fail(row);
+    if (!generation) {
+      GroupMailboxOutbox.hold(current, blocked);
 
       return;
     }
     const { failed, pending } = await this.sendCopies(
-      delivery.current,
-      delivery.generation,
+      current,
+      generation,
       blocked,
     );
 
-    await this.settle(row, delivery.current, pending, failed, now);
+    await this.settle(row, current, pending, failed, now);
   }
 
   /** Appends one copy; false when the node refused it or was unreachable. */
@@ -175,7 +189,9 @@ export class GroupMailboxOutbox {
    * The row to deliver now: a message whose generation was superseded is
    * re-encrypted in the current epoch for those of its pending recipients
    * still in the group; a member who joined since never gets it. Undefined
-   * when it can no longer be encrypted, as after this identity's removal.
+   * when it can no longer be encrypted, as after this identity's removal or
+   * when it outgrew the record limit; any other failure rejects, so the
+   * row is retried.
    */
   private async currentRow(
     row: GroupMailboxOutboxRow,
@@ -192,8 +208,11 @@ export class GroupMailboxOutbox {
         new Uint8Array(decodeBase64Url(row.body)),
         new Set(row.copies.map(({ identityId }) => identityId)),
       );
-    } catch {
-      return undefined;
+    } catch (error: unknown) {
+      if (error instanceof MlsRejectedError || error instanceof RangeError) {
+        return undefined;
+      }
+      throw error;
     }
   }
 
@@ -203,10 +222,7 @@ export class GroupMailboxOutbox {
    */
   private async deliverable(
     row: GroupMailboxOutboxRow,
-  ): Promise<
-    | { current: GroupMailboxOutboxRow; generation: GroupMailboxGeneration }
-    | undefined
-  > {
+  ): Promise<GroupMailboxOutboxAttempt | undefined> {
     const current = await this.currentRow(row);
 
     if (!current) return undefined;
@@ -214,7 +230,7 @@ export class GroupMailboxOutbox {
       await this.engine.readableGenerations(current.conversationId)
     ).find(({ index }) => index === current.generationIndex);
 
-    return generation ? { current, generation } : undefined;
+    return generation ? { current, generation, row } : undefined;
   }
 
   private async fail(row: GroupMailboxOutboxRow): Promise<void> {
@@ -242,6 +258,55 @@ export class GroupMailboxOutbox {
   private async keep(row: GroupMailboxOutboxRow): Promise<void> {
     this.rows.set(row.id, row);
     await this.store.save(this.session, row).catch(() => undefined);
+  }
+
+  /**
+   * Keeps a row that could not be prepared for delivery, as when the
+   * engine failed to re-encrypt it, and retries it after a backoff.
+   */
+  private async postpone(
+    row: GroupMailboxOutboxRow,
+    now: number,
+  ): Promise<GroupMailboxOutboxRow> {
+    const attempts = row.attempts + 1;
+    const kept = {
+      ...row,
+      attempts,
+      retryAt: now + GroupMailboxOutbox.retryDelay(attempts),
+    };
+
+    // eslint-disable-next-line no-console
+    console.debug('Group outbox postponed 1 record.');
+    await this.keep(kept);
+
+    return kept;
+  }
+
+  /**
+   * One row ready for this pass, or undefined once it is dropped. A row
+   * waiting for its retry, or one that could not be prepared for now, has
+   * no generation and only holds back its recipients.
+   */
+  private async prepared(
+    row: GroupMailboxOutboxRow,
+    now: number,
+  ): Promise<GroupMailboxOutboxAttempt | undefined> {
+    if (now - row.createdAt >= GroupMailboxOutbox.EXPIRY_MS) {
+      await this.fail(row);
+
+      return undefined;
+    }
+
+    if (row.retryAt > now) return { current: row, row };
+    // Null: the row could not be prepared for now; undefined: never again.
+    const delivery = await this.deliverable(row).catch(() => null);
+
+    if (delivery === null)
+      return { current: await this.postpone(row, now), row };
+
+    if (!delivery) await this.fail(row);
+
+    return delivery;
   }
 
   /** Runs one pass after any pass already queued. */

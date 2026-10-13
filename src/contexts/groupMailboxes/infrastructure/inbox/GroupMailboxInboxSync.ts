@@ -22,6 +22,7 @@ import { DirectMessageInboxKeys } from '../../../messages/infrastructure/mailbox
 import { DirectMessageMailboxRecord } from '../../../messages/infrastructure/mailbox/DirectMessageMailboxRecord';
 import { GroupMailboxControlRecord } from '../control/GroupMailboxControlRecord';
 import { GroupMailboxKeySchedule } from '../crypto/GroupMailboxKeySchedule';
+import { GroupMessageId } from '../crypto/GroupMessageId';
 
 /**
  * Recipient pass of a group conversation (node
@@ -29,33 +30,49 @@ import { GroupMailboxKeySchedule } from '../crypto/GroupMailboxKeySchedule';
  * `I(self,k)` of every readable generation, oldest first, so a commit is
  * applied before the messages of the generation it starts. The first read
  * of a generation creates its inbox. A commit goes to the control; a message
- * is decrypted by MLS, whose sender must be the record's author. An edit or
- * a deletion counts only from the author of its target message. Accepted
- * records are stored on this device, handed to the caller, then the page is
- * acknowledged; a rejected envelope is acknowledged too, so it cannot stall
- * the inbox. Inboxes whose drain window closed are deleted. Logs carry
- * counts only.
+ * is decrypted by MLS, whose sender must be the record's author and must
+ * own the record's id (`GroupMessageId`). An edit or a deletion counts only
+ * from the author of its target message. Accepted records are stored on
+ * this device, handed to the caller, then the page is acknowledged; a
+ * rejected envelope is acknowledged too, so it cannot stall the inbox, and
+ * so is an envelope that failed to open `MAX_FAILURES` times.
+ *
+ * A message from an epoch this device has not reached is rejected, not kept
+ * for later: every epoch change here is a membership change, which also
+ * starts a new generation, so a member's genuine message of the next epoch
+ * lands in the next generation's inbox, read after the commit. A commit that
+ * changes the epoch but not the members (a self-update) would break this;
+ * adding one needs a bounded local buffer of such envelopes, acknowledged,
+ * and retried after the next applied commit. Inboxes whose drain window
+ * closed are deleted. Logs carry counts only.
  */
 export class GroupMailboxInboxSync {
+  public static readonly MAX_FAILURES = 5;
   public static readonly MAX_ROUNDS = 8;
   public static readonly PAGE_SIZE = 50;
 
   /**
-   * Whether `sender` may send `record`: an edit or a deletion only for its
-   * own message, a message only under an id no other author holds. Read
-   * receipts have no meaning in a group.
+   * Whether `sender` may send `record`: only under an id it owns; an edit
+   * or a deletion only for its own message, a message only under an id no
+   * other author holds. Read receipts have no meaning in a group.
    */
   private static authorized(
     record: DirectMessageRecord,
     sender: string,
     authors: Map<string, string>,
   ): boolean {
+    if (!GroupMessageId.belongsTo(record.id, sender)) return false;
+
     switch (record.type) {
       case DirectMailboxRecords.TYPE.sent:
         return GroupMailboxInboxSync.claimed(record.id, sender, authors);
       case DirectMailboxRecords.TYPE.edited:
       case DirectMailboxRecords.TYPE.deleted:
-        return authors.get(record.targetMessageId) === sender;
+        return GroupMailboxInboxSync.owns(
+          record.targetMessageId,
+          sender,
+          authors,
+        );
       case DirectMailboxRecords.TYPE.pin:
       case DirectMailboxRecords.TYPE.reaction:
         return true;
@@ -74,6 +91,15 @@ export class GroupMailboxInboxSync {
     authors.set(id, sender);
 
     return true;
+  }
+
+  /** Whether `id` is a message `sender` sent under an id it owns. */
+  private static owns(
+    id: string,
+    sender: string,
+    authors: Map<string, string>,
+  ): boolean {
+    return GroupMessageId.belongsTo(id, sender) && authors.get(id) === sender;
   }
 
   public constructor(
@@ -97,8 +123,9 @@ export class GroupMailboxInboxSync {
     conversationId: string,
     ciphertext: Uint8Array,
     authors: Map<string, string>,
+    envelope: { envelopeId: string; mailboxId: string },
   ): Promise<DirectMessageRecord | null> {
-    const opened = await this.opened(conversationId, ciphertext);
+    const opened = await this.opened(conversationId, ciphertext, envelope);
 
     if (!opened) return null;
     const sender = opened.sender.identityId;
@@ -187,6 +214,7 @@ export class GroupMailboxInboxSync {
       const page = await this.readPage(keys, readers);
       const { accepted, applied } = await this.openedPage(
         conversationId,
+        keys.mailboxId,
         page,
         authors,
       );
@@ -209,32 +237,50 @@ export class GroupMailboxInboxSync {
     );
   }
 
-  /** The decrypted message, or null when MLS rejects it. */
+  /**
+   * The decrypted message, or null when MLS rejects it. Any other failure
+   * is rethrown, so the page is read again, until the envelope failed
+   * `MAX_FAILURES` times; it is then dropped like a rejected one.
+   */
   private async opened(
     conversationId: string,
     ciphertext: Uint8Array,
+    { envelopeId, mailboxId }: { envelopeId: string; mailboxId: string },
   ): Promise<MlsOpenedMessage | null> {
     try {
       return await this.engine.decrypt(conversationId, ciphertext);
     } catch (error: unknown) {
       if (error instanceof MlsRejectedError) return null;
-      throw error;
+      const failures = this.inboxes.failures(mailboxId, envelopeId) + 1;
+
+      if (failures < GroupMailboxInboxSync.MAX_FAILURES) {
+        this.inboxes.saveFailures(mailboxId, envelopeId, failures);
+        throw error;
+      }
+      // eslint-disable-next-line no-console
+      console.debug('Group envelope dropped after repeated failures.', {
+        failures,
+      });
+
+      return null;
     }
   }
 
   /**
    * Hands the page's commits to the control and keeps the accepted
-   * messages. `applied` tells whether a commit moved the group on.
+   * messages of inbox `mailboxId`. `applied` tells whether a commit moved
+   * the group on.
    */
   private async openedPage(
     conversationId: string,
+    mailboxId: string,
     page: OpenedMailboxPage,
     authors: Map<string, string>,
   ): Promise<{ accepted: DirectMessageRecord[]; applied: boolean }> {
     const accepted: (DirectMessageRecord | null)[] = [];
     let applied = false;
 
-    for (const { plaintext } of page.envelopes) {
+    for (const { envelopeId, plaintext } of page.envelopes) {
       const record = GroupMailboxControlRecord.decode(plaintext);
 
       if (record?.conversationId !== conversationId) continue;
@@ -245,7 +291,10 @@ export class GroupMailboxInboxSync {
             'applied' || applied;
       } else if (record.type === 'message') {
         accepted.push(
-          await this.accepted(conversationId, record.ciphertext, authors),
+          await this.accepted(conversationId, record.ciphertext, authors, {
+            envelopeId,
+            mailboxId,
+          }),
         );
       }
     }
