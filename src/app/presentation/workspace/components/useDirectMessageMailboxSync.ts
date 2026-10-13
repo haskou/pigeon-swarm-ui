@@ -46,10 +46,18 @@ function applySyncChanges(
     );
   }
 
+  // A peer can write a pin the domain cannot hold (an empty or over-long id):
+  // skip it, so one bad record does not stall the sync of the whole page.
   const pinChanges = pinClock.admit(
-    changes.flatMap((change) =>
-      change.kind === 'pin' ? [MessagePinChange.fromPrimitives(change)] : [],
-    ),
+    changes.flatMap((change) => {
+      if (change.kind !== 'pin') return [];
+
+      try {
+        return [MessagePinChange.fromPrimitives(change)];
+      } catch {
+        return [];
+      }
+    }),
   );
 
   if (pinChanges.length > 0) {
