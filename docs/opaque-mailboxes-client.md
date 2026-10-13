@@ -119,17 +119,18 @@ Each group conversation is one MLS group (`GroupMailboxMlsEngine`, `infrastructu
 
 ## HTTP (`PigeonMailboxClient`)
 
-| Action      | Route                                            | Auth                |
-| ----------- | ------------------------------------------------ | ------------------- |
-| Create      | `PUT /mailboxes/{id}` (201 created, 200 repeat)  | creation proof body |
-| Append      | `POST /mailboxes/{id}/envelopes`                 | post token (Bearer) |
-| Read        | `GET /mailboxes/{id}/envelopes?after=&limit=`    | read token (Bearer) |
-| Acknowledge | `POST /mailboxes/{id}/ack` with `{ upTo }` (204) | read token (Bearer) |
-| Readers     | `GET /mailboxes/{id}/readers`                    | root token (Bearer) |
-| Enrol       | `POST /mailboxes/{id}/readers` (201 added)       | root token (Bearer) |
-| Remove      | `DELETE /mailboxes/{id}/readers/{hash}` (204)    | root token (Bearer) |
+| Action      | Route                                            | Auth                          |
+| ----------- | ------------------------------------------------ | ----------------------------- |
+| Create      | `PUT /mailboxes/{id}` (201 created, 200 repeat)  | creation proof body           |
+| Append      | `POST /mailboxes/{id}/envelopes`                 | post token (Bearer)           |
+| Read        | `GET /mailboxes/{id}/envelopes?after=&limit=`    | read token (Bearer)           |
+| Acknowledge | `POST /mailboxes/{id}/ack` with `{ upTo }` (204) | read token (Bearer)           |
+| Delete      | `DELETE /mailboxes/{id}` (204)                   | any read token of it (Bearer) |
+| Readers     | `GET /mailboxes/{id}/readers`                    | root token (Bearer)           |
+| Enrol       | `POST /mailboxes/{id}/readers` (201 added)       | root token (Bearer)           |
+| Remove      | `DELETE /mailboxes/{id}/readers/{hash}` (204)    | root token (Bearer)           |
 
-- A 404 maps to `MailboxUnavailableError`. A 400 on create that names `requiredDifficultyBits` maps to `MailboxCreationDifficultyError`. A 409 on enrol maps to `MailboxReaderLimitError`. Other 400s, 409s, and 429 propagate as `HttpJsonError`.
+- A 404 maps to `MailboxUnavailableError`. A 400 on create that names `requiredDifficultyBits` maps to `MailboxCreationDifficultyError`. A 409 on enrol maps to `MailboxReaderLimitError`. Other 400s, 409s, and 429 propagate as `HttpJsonError`. `delete` is for a group member's retired generation inbox after the 6 h drain; nothing calls it yet.
 - Empty success bodies (PUT 200/201, POST 204) resolve to `undefined` in `HttpJsonClient`.
 
 ## Creation difficulty and recovery

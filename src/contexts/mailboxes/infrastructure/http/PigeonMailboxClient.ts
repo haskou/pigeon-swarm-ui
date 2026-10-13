@@ -136,6 +136,16 @@ export class PigeonMailboxClient {
     );
   }
 
+  /** Deletes the mailbox and its envelopes; any read token of it may. */
+  public async delete(mailboxId: string, readToken: string): Promise<void> {
+    await this.call(() =>
+      this.http.request<void>(`/mailboxes/${mailboxId}`, {
+        headers: PigeonMailboxClient.bearer(readToken),
+        method: 'DELETE',
+      }),
+    );
+  }
+
   public async readers(
     mailboxId: string,
     token: string,
