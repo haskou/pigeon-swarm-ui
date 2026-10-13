@@ -18,7 +18,8 @@ import { DirectMessageMailboxLimits } from './DirectMessageMailboxLimits';
 
 /**
  * Recipient inbox open and reader enrolment: creates or adopts the inbox this
- * device reads, bridges its sealed root in, and releases readers on sign-out.
+ * device reads, bridges its sealed root in, cuts revoked readers off, and
+ * releases readers on sign-out.
  */
 export class DirectMessageInboxOpener {
   /** Overlapping passes share one open, keyed by identity and conversation. */
@@ -314,5 +315,77 @@ export class DirectMessageInboxOpener {
         console.debug('Direct mailbox reader release failed; pruned on sync.');
       }
     }
+  }
+
+  /**
+   * Enrols a newly paired device's reader in the inbox of every direct
+   * conversation, so the node keeps each record for it until it acknowledges
+   * one, including those this device acknowledges before the paired device
+   * first opens the inbox. Best effort: an inbox missed here is joined on
+   * the paired device's first open. Never throws.
+   */
+  public async enrolDeviceReader(
+    session: Session,
+    credential: string,
+  ): Promise<void> {
+    const conversations = Object.values(session.keychain.conversations).filter(
+      (entry) => entry.kind === 'conversation',
+    );
+
+    for (const entry of conversations) {
+      try {
+        const keys = DirectMessageInboxKeys.keysFor(
+          session,
+          entry.conversationId,
+          session.identity.id,
+        );
+        const readers = DirectMessageInboxKeys.readersFor(
+          session,
+          keys,
+          credential,
+        );
+
+        await this.channel.addReader(keys, readers.root, readers.device);
+      } catch {
+        // Count-only: no ids, content, or error details.
+        // eslint-disable-next-line no-console
+        console.debug(
+          'Direct mailbox paired reader enrol failed; joins on open.',
+        );
+      }
+    }
+  }
+
+  /**
+   * A revoke's cut-off: in the inbox of every direct conversation, bridges the
+   * rotated sealed root in and prunes every reader no remaining device holds,
+   * so a revoked device opens no record written afterwards. Every inbox is
+   * attempted; rejects with the first failure once all were.
+   */
+  public async cutOffRevokedReaders(session: Session): Promise<void> {
+    const conversations = Object.values(session.keychain.conversations).filter(
+      (entry) => entry.kind === 'conversation',
+    );
+    const failures: unknown[] = [];
+
+    for (const entry of conversations) {
+      try {
+        const keys = DirectMessageInboxKeys.keysFor(
+          session,
+          entry.conversationId,
+          session.identity.id,
+        );
+
+        await this.readerSet.cutOff(
+          session,
+          keys,
+          DirectMessageInboxKeys.readersFor(session, keys),
+        );
+      } catch (error: unknown) {
+        failures.push(error);
+      }
+    }
+
+    if (failures.length > 0) throw failures[0];
   }
 }

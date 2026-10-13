@@ -1352,6 +1352,8 @@ export const es = {
       'Úsalo cuando ya no utilices el dispositivo. Ya no podrá actuar como tú, y los mensajes que ya envió siguen siendo válidos.',
     deviceRevokeCompromised: 'Marcar como comprometido',
     deviceRevokeConfirm: 'Quitar acceso',
+    deviceRevokeCutOffError:
+      'El dispositivo se revocó, pero aún no se pudo bloquear su acceso a todos los buzones. La próxima sincronización lo reintenta.',
     deviceRevokeError: 'No se pudo revocar el dispositivo.',
     discardChanges: 'Descartar',
     discardChangesBody: 'Hay cambios sin guardar. ¿Quieres descartarlos?',

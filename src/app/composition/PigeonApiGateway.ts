@@ -473,6 +473,13 @@ export class PigeonApiGateway {
         receive: async (session, secret) =>
           await this.directMessageMailbox.receiveHistory(session, secret),
       },
+      {
+        enrol: async (session, credential) =>
+          await this.directMessageMailbox.enrolDeviceReader(
+            session,
+            credential.valueOf(),
+          ),
+      },
     );
   }
 

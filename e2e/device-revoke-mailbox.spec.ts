@@ -117,9 +117,16 @@ test('locks a revoked device out of the direct messages sent after the revoke', 
   }
 });
 
+/**
+ * Signs in with the password. Both devices last signed in as this identity, so
+ * the login screen replaces the identity input with the remembered identity.
+ */
 async function signIn(page: Page, identity: TestIdentity): Promise<void> {
   await page.goto('/');
-  await page.getByTestId('auth-identity-input').fill(`@${identity.handle}`);
+  await expect(page.getByTestId('auth-identity-preview')).toContainText(
+    `@${identity.handle}`,
+    { timeout: 30_000 },
+  );
   await page.getByTestId('auth-password-input').fill(identity.password);
   await page.getByTestId('auth-submit-button').click();
 }

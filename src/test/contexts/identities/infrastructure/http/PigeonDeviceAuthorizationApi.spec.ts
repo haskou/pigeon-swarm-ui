@@ -477,6 +477,32 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
     expect(paired.historyTransferSecret?.valueOf()).toBe(secret.valueOf());
   });
 
+  it('names the paired device by the credential it reads its inboxes with', async () => {
+    const { apiAt, authorVault, identity, session, targetVault } =
+      await pairing();
+    const password = IdentityPassword.fromString('Strong password 123!');
+    const authorApi = apiAt(1_000, authorVault);
+    const targetApi = apiAt(1_100, targetVault);
+    const draft = await targetApi.requestPairing(
+      authorApi.invite(session).toCode(),
+    );
+    const authorized = await authorApi.authorizePairing(
+      session,
+      draft.getRequest().toCode(),
+      SymmetricKey.generate(),
+    );
+    const { session: paired } = await targetApi.completePairing(
+      identity,
+      password,
+      draft,
+      authorized.completion.toCode(),
+    );
+
+    expect(authorized.credential.valueOf()).toBe(
+      paired.deviceCredentialKeyPair.toPrimitives().publicKey,
+    );
+  });
+
   it('lets exactly one of two concurrent completions claim a request', async () => {
     const { apiAt, authorVault, identity, session, targetVault } =
       await pairing();

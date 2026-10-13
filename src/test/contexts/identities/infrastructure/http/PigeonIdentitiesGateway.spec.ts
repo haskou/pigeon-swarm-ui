@@ -1,4 +1,5 @@
 import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import { type MockProxy, mock } from 'jest-mock-extended';
 
 import type { DevicePairingRequestDraft } from '../../../../../contexts/identities/domain/DevicePairingRequestDraft';
 import type { DeviceCredential } from '../../../../../contexts/identities/domain/value-objects/DeviceCredential';
@@ -6,6 +7,7 @@ import type { DevicePairingCode } from '../../../../../contexts/identities/domai
 import type { IdentityPassword } from '../../../../../contexts/identities/domain/value-objects/IdentityPassword';
 import type { DevicePairingAuthorization } from '../../../../../contexts/identities/infrastructure/http/DevicePairingAuthorization';
 import type { DevicePairingHistory } from '../../../../../contexts/identities/infrastructure/http/DevicePairingHistory';
+import type { DevicePairingReaders } from '../../../../../contexts/identities/infrastructure/http/DevicePairingReaders';
 import type { DeviceSealedRecovery } from '../../../../../contexts/identities/infrastructure/http/DeviceSealedRecovery';
 import type { DeviceSealedRootRotation } from '../../../../../contexts/identities/infrastructure/http/DeviceSealedRootRotation';
 import type { PigeonDeviceAuthorizationApi } from '../../../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
@@ -55,6 +57,7 @@ function gatewayDouble(): {
   pairingHistory: jest.Mocked<
     Pick<DevicePairingHistory, 'publish' | 'receive'>
   >;
+  pairingReaders: MockProxy<DevicePairingReaders>;
   profile: jest.Mocked<Pick<IdentityProfileGateway, 'get'>>;
   recovery: jest.Mocked<
     Pick<
@@ -104,6 +107,7 @@ function gatewayDouble(): {
     publish: jest.fn().mockResolvedValue(false),
     receive: jest.fn(),
   } as jest.Mocked<Pick<DevicePairingHistory, 'publish' | 'receive'>>;
+  const pairingReaders = mock<DevicePairingReaders>();
   const presence = {} as PigeonPresenceGateway;
 
   return {
@@ -118,10 +122,12 @@ function gatewayDouble(): {
       sealedRoot as unknown as DeviceSealedRootRotation,
       recovery as unknown as DeviceSealedRecovery,
       pairingHistory as unknown as DevicePairingHistory,
+      pairingReaders,
     ),
     keychain,
     login,
     pairingHistory,
+    pairingReaders,
     profile,
     recovery,
     sealedRoot,
@@ -236,6 +242,32 @@ describe(PigeonIdentitiesGateway.name, () => {
       ).toBeLessThan(recovery.resealAfterPairing.mock.invocationCallOrder[0]);
       expect(recovery.resealAfterPairing).toHaveBeenCalledWith(next, root);
       expect(result.session).toBe(next);
+      expect(result.completionCode).toBe('completion-code');
+    });
+
+    it('enrols the paired device as a reader of the inboxes at the new revision before returning the completion', async () => {
+      const { authorization, gateway, pairingReaders } = gatewayDouble();
+      const session = {
+        deviceSealedRootKey: SymmetricKey.generate(),
+        identity: { id: 'identity-1' },
+      } as unknown as Session;
+      const next = {
+        ...session,
+        authorizationRevision: 2,
+      } as unknown as Session;
+      const credential = 'paired-credential' as unknown as DeviceCredential;
+      authorization.authorizePairing.mockResolvedValue({
+        completion: { toCode: () => 'completion-code' },
+        credential,
+        session: next,
+      } as unknown as DevicePairingAuthorization);
+
+      const result = await gateway.authorizeDevicePairing(session, requestCode);
+
+      expect(pairingReaders.enrol).toHaveBeenCalledWith(next, credential);
+      expect(
+        authorization.authorizePairing.mock.invocationCallOrder[0],
+      ).toBeLessThan(pairingReaders.enrol.mock.invocationCallOrder[0]);
       expect(result.completionCode).toBe('completion-code');
     });
 

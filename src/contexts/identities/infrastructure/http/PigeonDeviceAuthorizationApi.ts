@@ -232,6 +232,7 @@ export class PigeonDeviceAuthorizationApi {
     const request = DevicePairingCodeReader.request(requestCode, acceptedAt);
     const invitation = request.getInvitation();
     const identityId = IdentityId.fromString(session.identity.id);
+    const credential = request.getProof().getCredential();
 
     assert(
       invitation.getIdentityId().isEqual(identityId) &&
@@ -256,7 +257,7 @@ export class PigeonDeviceAuthorizationApi {
       pairingId: invitation.getPairingId(),
       previousRevision: invitation.getRevision(),
       proofOfPossession: request.getProof().getSignature(),
-      targetCredential: request.getProof().getCredential(),
+      targetCredential: credential,
     });
     const checkpoint = await this.apply(session, transition);
     const completion = DevicePairingCompletion.create({
@@ -271,6 +272,7 @@ export class PigeonDeviceAuthorizationApi {
 
     return {
       completion,
+      credential,
       session: {
         ...session,
         authorizationEpoch: checkpoint.getEpoch(),

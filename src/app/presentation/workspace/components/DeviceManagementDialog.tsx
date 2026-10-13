@@ -12,6 +12,7 @@ import { useCloseTransition } from '../../../../shared/presentation/hooks/useClo
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
+import { revokeOtherDevice } from '../../revokeOtherDevice';
 import { DeviceRevocationPanel } from './DeviceRevocationPanel';
 
 export function DeviceManagementDialog({
@@ -51,18 +52,25 @@ export function DeviceManagementDialog({
     setError(null);
 
     try {
-      const next = await applicationContainer.identities.revokeDevice(
-        current,
-        selected,
-        compromisedSince === undefined
-          ? undefined
-          : DeviceAuthorizationRevision.fromNumber(compromisedSince),
+      const revoked = await revokeOtherDevice(
+        {
+          compromisedSince:
+            compromisedSince === undefined
+              ? undefined
+              : DeviceAuthorizationRevision.fromNumber(compromisedSince),
+          onRotated: (next) => {
+            setCurrent(next);
+            onSessionUpdated(next);
+          },
+          session: current,
+          target: selected,
+        },
+        applicationContainer,
       );
 
-      setCurrent(next);
-      onSessionUpdated(next);
+      if (!revoked.cutOff) setError(copy.profile.deviceRevokeCutOffError);
       setSelected(null);
-      await load(next);
+      await load(revoked.session);
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.profile.deviceRevokeError));
     }
