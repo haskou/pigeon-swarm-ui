@@ -15,6 +15,12 @@ import { submitPublicMutation } from '../../../../shared/infrastructure/http/sub
 import { CallEventSigner } from './CallEventSigner';
 import { CallSignalRequestBody } from './CallSignalRequestBody';
 
+/**
+ * A signal POST that never settles would hold its negotiation forever, so
+ * the request is aborted and left to `CallSignalRetry` instead.
+ */
+const signalTimeoutMs = 5_000;
+
 export class PigeonCallsApi {
   public constructor(
     private readonly http: HttpJsonClient,
@@ -262,11 +268,25 @@ export class PigeonCallsApi {
     const path = `/calls/${encodeURIComponent(callId)}/signals`;
     const requestBody = new CallSignalRequestBody(signal);
     const body = requestBody.body();
+    const headers = await this.signer.headers(session, 'POST', path, body);
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () =>
+        controller.abort(
+          new DOMException('Call signal timed out.', 'TimeoutError'),
+        ),
+      signalTimeoutMs,
+    );
 
-    return await this.http.request<CallSignalDelivery>(path, {
-      body: requestBody.toString(),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
+    try {
+      return await this.http.request<CallSignalDelivery>(path, {
+        body: requestBody.toString(),
+        headers,
+        method: 'POST',
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 }
