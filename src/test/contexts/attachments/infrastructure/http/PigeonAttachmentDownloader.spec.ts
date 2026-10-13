@@ -1,3 +1,5 @@
+import { mock } from 'jest-mock-extended';
+
 import type { PrivateBlobReference } from '../../../../../contexts/attachments/application/contracts/PrivateBlobReservation';
 
 import { AttachmentBinaryCodec } from '../../../../../contexts/attachments/infrastructure/crypto/AttachmentBinaryCodec';
@@ -204,46 +206,32 @@ describe(PigeonAttachmentDownloader.name, () => {
     expect(key).not.toContain(blobA.downloadToken);
   });
 
-  it('downloads and decrypts legacy private content', async () => {
-    const decrypted = new Blob(['private'], { type: 'text/plain' });
-    const privateFiles = {
-      fetch: jest.fn().mockResolvedValue({
-        cid: 'external-1',
-        contentType: 'application/octet-stream',
-        encrypted: true,
-        encryptedData: 'AQID',
-        filename: 'encrypted.bin',
-        size: 3,
-      }),
-    } as unknown as PigeonPrivateFilesClient;
-    const cipher = {
-      decrypt: jest.fn().mockResolvedValue(decrypted),
-    } as unknown as AttachmentCipher;
+  it('rejects an encrypted attachment without blobs as unavailable', async () => {
+    const privateFiles = mock<PigeonPrivateFilesClient>();
+    const publicFiles = mock<PigeonPublicFilesClient>();
+    const privateBlobs = mock<PigeonPrivateBlobClient>();
+    const cipher = mock<AttachmentCipher>();
     const downloader = new PigeonAttachmentDownloader(
       privateFiles,
-      {} as PigeonPublicFilesClient,
-      {} as PigeonPrivateBlobClient,
+      publicFiles,
+      privateBlobs,
       cipher,
       new AttachmentBinaryCodec(),
     );
-    const attachment = {
-      cid: 'external-1',
-      contentType: 'text/plain',
-      encryption: {
-        algorithm: 'AES-GCM' as const,
-        iv: 'iv',
-        key: 'key',
-      },
-      filename: 'file.txt',
-      size: 3,
-    };
 
-    await expect(downloader.download(attachment)).resolves.toBe(decrypted);
-    expect(cipher.decrypt).toHaveBeenCalledWith(
-      attachment,
-      expect.any(ArrayBuffer),
-      undefined,
-    );
+    await expect(
+      downloader.download({
+        cid: 'external-1',
+        contentType: 'text/plain',
+        encryption: { algorithm: 'AES-GCM' as const, iv: 'iv', key: 'key' },
+        filename: 'file.txt',
+        size: 3,
+      }),
+    ).rejects.toBeInstanceOf(PrivateBlobUnavailableError);
+    expect(privateFiles.fetch).not.toHaveBeenCalled();
+    expect(publicFiles.fetch).not.toHaveBeenCalled();
+    expect(privateBlobs.download).not.toHaveBeenCalled();
+    expect(cipher.decrypt).not.toHaveBeenCalled();
   });
 
   it('reads an alternate replica when the primary replica is missing', async () => {
