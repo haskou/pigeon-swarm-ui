@@ -12,7 +12,7 @@ const origin = 'http://127.0.0.1:8080';
 // Each run is one Playwright invocation against the same node. Login,
 // recovery-key sign-in, pairing, 1:1 send/receive and the security audit view
 // run on every engine and viewport CI covers; the outbox retry flow runs on
-// the desktop engines.
+// the desktop engines; the two-device revoke flow runs on desktop Chromium.
 const runs = [
   {
     specs: [
@@ -25,6 +25,10 @@ const runs = [
   {
     specs: ['e2e/direct-message-outbox.spec.ts'],
     projects: ['desktop-chromium', 'desktop-firefox'],
+  },
+  {
+    specs: ['e2e/device-revoke-mailbox.spec.ts'],
+    projects: ['desktop-chromium'],
   },
 ];
 const image = process.env.PIGEON_NODE_IMAGE?.trim();

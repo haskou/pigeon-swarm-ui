@@ -237,6 +237,103 @@ export async function openSidebar(page: Page): Promise<void> {
   });
 }
 
+export async function pairNewDevice(
+  authorized: Page,
+  fresh: Page,
+  identity: TestIdentity,
+): Promise<void> {
+  await openSecurityProfile(authorized);
+  await authorized.getByTestId('profile-pair-device').click();
+
+  const invitation = await authorized
+    .getByTestId('device-pairing-invitation-output')
+    .inputValue();
+
+  expect(invitation).toMatch(/^\S+$/);
+
+  await fresh.goto('/');
+  await fresh.getByTestId('auth-identity-input').fill(`@${identity.handle}`);
+  await fresh
+    .getByTestId('auth-login-method-control')
+    .getByRole('button', { name: 'New device' })
+    .click();
+  await fresh
+    .getByTestId('auth-device-pairing-invitation-input')
+    .fill(invitation);
+  await fresh.getByTestId('auth-device-pairing-prepare').click();
+
+  const request = await fresh
+    .getByTestId('auth-device-pairing-request-output')
+    .inputValue();
+  const newDeviceCode = await fresh
+    .getByTestId('auth-device-pairing-verification-code')
+    .innerText();
+
+  await authorized.getByTestId('device-pairing-request-input').fill(request);
+  await authorized.getByTestId('device-pairing-submit').click();
+  await expect(
+    authorized.getByTestId('device-pairing-verification-code'),
+  ).toHaveText(newDeviceCode);
+  await authorized.getByTestId('device-pairing-submit').click();
+
+  const completionOutput = authorized.getByTestId(
+    'device-pairing-completion-output',
+  );
+
+  await expect(completionOutput).toBeVisible();
+
+  const completion = await completionOutput.inputValue();
+
+  await fresh
+    .getByTestId('auth-device-pairing-completion-input')
+    .fill(completion);
+  await fresh.getByTestId('auth-password-input').fill(identity.password);
+  await fresh
+    .getByTestId('auth-password-confirmation-input')
+    .fill(identity.password);
+  await fresh.getByTestId('auth-submit-button').click();
+  await waitForWorkspace(fresh);
+
+  await authorized
+    .getByRole('button', { name: 'Close dialog' })
+    .last()
+    .click();
+}
+
+/**
+ * Revokes the one other device from the device management dialog. With
+ * compromisedSince the revoke is a compromise from that revision.
+ */
+export async function revokeOtherDevice(
+  authorized: Page,
+  compromisedSince?: number,
+): Promise<void> {
+  await openSecurityProfile(authorized);
+  await authorized.getByTestId('profile-manage-devices').click();
+  await expect(authorized.getByTestId('device-row')).toHaveCount(2);
+  await authorized.getByTestId('device-revoke-open').click();
+
+  if (compromisedSince !== undefined) {
+    await authorized.getByTestId('device-mode-compromised').click();
+    await authorized
+      .getByTestId('device-compromise-since')
+      .fill(String(compromisedSince));
+  }
+
+  await authorized.getByTestId('device-revoke-confirm').click();
+  await expect(authorized.getByTestId('device-row')).toHaveCount(1);
+}
+
+async function openSecurityProfile(page: Page): Promise<void> {
+  await openSidebar(page);
+  await page
+    .locator('[data-testid="own-profile-menu-button"]:visible')
+    .first()
+    .click();
+  await page.getByTestId('edit-profile-button').click();
+  await page.getByRole('button', { name: 'Security' }).click();
+}
+
 async function dismissPushPrompt(page: Page): Promise<void> {
   const prompt = page.getByTestId('push-notification-prompt');
 

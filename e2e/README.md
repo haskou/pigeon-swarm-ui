@@ -33,13 +33,16 @@ E2E_NETWORK_ID=<network-id> yarn test:e2e
 
 `login-methods.spec.ts` (login choices, recovery-key sign-in and device pairing),
 `direct-message-sync.spec.ts` (1:1 send and receive across two isolated browser
-contexts) and `direct-message-outbox.spec.ts` (a 1:1 send made while the
+contexts), `direct-message-outbox.spec.ts` (a 1:1 send made while the
 recipient's inbox is absent survives a reload and is delivered once the
-recipient accepts) run against a real node. Login and direct-message sync run
-on `desktop-chromium`, `desktop-firefox` and `mobile-chromium`; the outbox spec
-runs on the two desktop projects. The `real-node-e2e` job in
-`.github/workflows/ci.yml` builds the node image from the pins below and runs
-these specs. It is the check that catches UI and node
+recipient accepts) and `device-revoke-mailbox.spec.ts` (a paired device that
+the other device revokes keeps the messages sent before the revoke, and never
+shows a message sent after it while the surviving device does) run against a
+real node. Login and direct-message sync run on `desktop-chromium`,
+`desktop-firefox` and `mobile-chromium`; the outbox spec runs on the two
+desktop projects; the revoke spec runs on `desktop-chromium`. The
+`real-node-e2e` job in `.github/workflows/ci.yml` builds the node image from the
+pins below and runs these specs. It is the check that catches UI and node
 contract breaks before merge.
 
 The pins are:
