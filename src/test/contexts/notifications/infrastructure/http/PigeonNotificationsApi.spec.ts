@@ -52,6 +52,32 @@ describe(PigeonNotificationsApi.name, () => {
     });
   });
 
+  it('reads a signed page of notifications before a given id', async () => {
+    const http = mock<HttpJsonClient>();
+    const signer = mock<RequestSigner>();
+    const cache = new RequestCache();
+    const api = new PigeonNotificationsApi(
+      http,
+      signer,
+      cache.load.bind(cache),
+      publicMutationSignerAt(),
+    );
+    const invitation = { id: 'invitation' } as NotificationResource;
+    const path = '/notifications/?limit=100&beforeNotificationId=invitation%3Aa';
+
+    http.request.mockResolvedValue({ results: [invitation] });
+    signer.headers.mockResolvedValue({ signature: 'signed' });
+
+    expect(await api.listPage(session, 100, 'invitation:a')).toEqual([
+      invitation,
+    ]);
+    expect(signer.headers).toHaveBeenCalledWith(session, 'GET', path);
+    expect(http.request).toHaveBeenCalledWith(path, {
+      headers: { signature: 'signed' },
+      method: 'GET',
+    });
+  });
+
   it('retains settings caching', async () => {
     const http = mock<HttpJsonClient>();
     const signer = mock<RequestSigner>();
