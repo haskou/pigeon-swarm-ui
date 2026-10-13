@@ -104,12 +104,10 @@ describe(DirectMessageHistoryTransfer.name, () => {
       { plaintext: second, recordId: 'm2' },
     ]);
 
-    await expect(
-      new DirectMessageHistoryTransfer(channel, exporter).publish(
-        session(),
-        secret,
-      ),
-    ).resolves.toBe(true);
+    await new DirectMessageHistoryTransfer(channel, exporter).publish(
+      session(),
+      secret,
+    );
     await new DirectMessageHistoryTransfer(channel, importer).receive(
       session(),
       secret,
@@ -151,7 +149,7 @@ describe(DirectMessageHistoryTransfer.name, () => {
     );
   }, 60_000);
 
-  it('reports a failed publish without throwing', async () => {
+  it('does not throw when the publish fails', async () => {
     const { channel } = fakeNode();
 
     channel.createInbox.mockRejectedValue(new Error('offline'));
@@ -161,7 +159,7 @@ describe(DirectMessageHistoryTransfer.name, () => {
         channel,
         new DirectMessageHistoryStore(databaseName()),
       ).publish(session(), secret),
-    ).resolves.toBe(false);
+    ).resolves.toBeUndefined();
   });
 
   it('does not import records authored under another root', async () => {
