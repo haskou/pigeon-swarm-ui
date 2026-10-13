@@ -23,6 +23,7 @@ import {
   IDENTITY_PROFILE_HANDLE_MAX_LENGTH,
   IDENTITY_PROFILE_NAME_MAX_LENGTH,
 } from '../../../../contexts/identities/domain/profile/IdentityProfileConstraints';
+import { admissionRetryLabel } from '../../../../contexts/identities/presentation/admissionRetryLabel';
 import { AuthSwitch } from '../../../../contexts/identities/presentation/auth/AuthSecurityControls';
 import {
   isValidPassword,
@@ -794,9 +795,11 @@ function ProfileEditorError({ message }: { message: string | null }) {
 }
 
 function ProfileSaveFooter({
+  admissionNotice,
   canSubmit,
   saving,
 }: {
+  admissionNotice: string | null;
   canSubmit: boolean;
   saving: boolean;
 }) {
@@ -807,7 +810,7 @@ function ProfileSaveFooter({
         className="ui-button ui-button-primary px-5"
         data-testid="profile-save-button"
       >
-        {saving ? copy.profile.saving : copy.profile.save}
+        {saving ? (admissionNotice ?? copy.profile.saving) : copy.profile.save}
       </button>
     </div>
   );
@@ -867,6 +870,7 @@ export function ProfileEditor({
   const [state, setState] = useState<'idle' | 'loading'>('idle');
   const { close, state: transitionState } = useCloseTransition(onClose);
   const [error, setError] = useState<string | null>(null);
+  const [admissionNotice, setAdmissionNotice] = useState<string | null>(null);
   const normalizedHandle = handle.trim() ? normalizeHandle(handle) : undefined;
   const { canChangePassword, passwordsMatch, wantsPasswordChange } =
     passwordChangeState(newPassword, newPasswordConfirmation, currentPassword);
@@ -1028,6 +1032,11 @@ export function ProfileEditor({
 
     setState('loading');
     setError(null);
+    const stopAdmissionProgress =
+      applicationContainer.identities.watchAdmissionProgress((progress) =>
+        setAdmissionNotice(admissionRetryLabel(progress)),
+      );
+
     try {
       let identity = session.identity;
 
@@ -1056,6 +1065,9 @@ export function ProfileEditor({
       );
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.profile.updateError));
+    } finally {
+      stopAdmissionProgress();
+      setAdmissionNotice(null);
     }
     setState('idle');
   };
@@ -1153,7 +1165,11 @@ export function ProfileEditor({
           </div>
         </div>
 
-        <ProfileSaveFooter canSubmit={canSubmit} saving={state === 'loading'} />
+        <ProfileSaveFooter
+          admissionNotice={admissionNotice}
+          canSubmit={canSubmit}
+          saving={state === 'loading'}
+        />
       </form>
       <ProfileEditorOverlays
         deviceManagementOpen={deviceManagementOpen}

@@ -3,6 +3,7 @@ import type { DevicePairingRequestDraft } from '../../../contexts/identities/dom
 import type { DeviceAuthorizationRevision } from '../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
 import type { DeviceCredential } from '../../../contexts/identities/domain/value-objects/DeviceCredential';
 import type { IdentityAccessContexts } from '../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
+import type { IdentityAdmissionProgressListener } from '../../../contexts/identities/infrastructure/http/IdentityAdmissionProgressListener';
 import type { IdentityMapper } from '../../../contexts/identities/infrastructure/http/IdentityMapper';
 import type { IdentityPresenceMapper } from '../../../contexts/identities/infrastructure/http/IdentityPresenceMapper';
 import type { OwnDeviceRetirement } from '../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
@@ -283,5 +284,12 @@ export class PigeonIdentitiesFacade {
       identity,
       await this.gateway.getIdentity(session.identity.id),
     );
+  }
+
+  /** Reports re-mining while a busy node asks for a stronger proof. */
+  public watchAdmissionProgress(
+    listener: IdentityAdmissionProgressListener,
+  ): () => void {
+    return this.gateway.watchAdmissionProgress(listener);
   }
 }

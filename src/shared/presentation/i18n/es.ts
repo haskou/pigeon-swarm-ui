@@ -936,6 +936,8 @@ export const es = {
     viewRaw: 'Ver datos del mensaje',
   },
   network: {
+    admissionRetry:
+      'Red ocupada. Reforzando la prueba a {bits} bits ({attempt} de {maximum})...',
     body: 'Antes de crear identidades, este nodo necesita conectarse a una red.',
     configureRelay: 'Configurar conexión del nodo',
     configureRelayBody:

@@ -16,6 +16,7 @@ import type { CreatedIdentityMaterial } from './CreatedIdentityMaterial';
 import type { DevicePairingHistory } from './DevicePairingHistory';
 import type { DeviceSealedRecovery } from './DeviceSealedRecovery';
 import type { DeviceSealedRootRotation } from './DeviceSealedRootRotation';
+import type { IdentityAdmissionProgressListener } from './IdentityAdmissionProgressListener';
 import type { IdentityUpdateProfileInput } from './IdentitySignaturePayloadFactory';
 import type {
   OwnDeviceRetirement,
@@ -374,5 +375,11 @@ export class PigeonIdentitiesGateway {
     session: Session,
   ): Promise<number | null> {
     return await this.deviceSealedRoot.generation(session);
+  }
+
+  public watchAdmissionProgress(
+    listener: IdentityAdmissionProgressListener,
+  ): () => void {
+    return this.identityCommands.watchAdmissionProgress(listener);
   }
 }

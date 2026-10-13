@@ -118,6 +118,18 @@ Important backend docs live in the node repository:
 - [Realtime WebSocket API](https://github.com/haskou/pigeon-swarm-node/blob/main/docs/api.md#realtime-websocket-api)
 - [`src/apps/apis/open-api.yaml`](https://github.com/haskou/pigeon-swarm-node/blob/main/src/apps/apis/open-api.yaml)
 
+### Identity admission proof
+
+Publishing an identity (`POST /identities/`, and `PUT /identities/{id}`
+when the networks change) carries an `admissionNonce` mined at 16 bits
+(`IdentityAdmissionProof`). A busy node answers `400` with
+`requiredDifficultyBits`. `PigeonIdentityCommandsApi` then re-mines at that
+value, signs again and retries, also for updates whose networks did not
+change. It retries at most twice and never mines above 24 bits
+(`IdentityAdmissionDifficultyPolicy`); any other refusal propagates. While it
+re-mines, the create and profile save buttons show the requested difficulty
+and the retry number.
+
 ## Development
 
 Install dependencies:
