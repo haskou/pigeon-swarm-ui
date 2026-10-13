@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 
 import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
+import type { CallMicrophoneRequest } from '../../../../contexts/calls/presentation/hooks/CallMicrophoneRequest';
 import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { CallStartActions } from './CallStartActions';
@@ -110,7 +111,7 @@ export function useCallStartActions({
         return;
       }
 
-      let localStream: MediaStream | null = null;
+      let microphone: CallMicrophoneRequest = { stream: null };
 
       callActionInProgressRef.current = true;
       const localAudioRequest = requestOptionalLocalAudio(
@@ -121,8 +122,8 @@ export function useCallStartActions({
       );
 
       void localAudioRequest
-        .then(async (stream) => {
-          localStream = stream;
+        .then(async (request) => {
+          microphone = request;
           await leaveCurrentCallForSwitch();
           await cleanupJoinedCalls();
 
@@ -150,7 +151,8 @@ export function useCallStartActions({
             currentIdentityId: sessionRef.current.identity.id,
             id: call.id,
             loadIceConfig: loadCallIceConfig,
-            localStream,
+            localStream: microphone.stream,
+            microphoneError: microphone.microphoneError,
             ...mediaEncryption,
             noiseCancellationEnabled: callNoiseCancellationEnabled,
             onSignal: callSignalSender(call.id),
@@ -162,7 +164,7 @@ export function useCallStartActions({
           });
         })
         .catch((caught) => {
-          stopLocalAudio(localStream);
+          stopLocalAudio(microphone.stream);
           setSendError(toUserErrorMessage(caught, copy.workspace.sendError));
         })
         .finally(() => {
@@ -226,10 +228,10 @@ export function useCallStartActions({
 
       callActionInProgressRef.current = true;
       setSendError(null);
-      let localStream: MediaStream | null = null;
+      let microphone: CallMicrophoneRequest = { stream: null };
 
       void (async () => {
-        localStream = await requestOptionalLocalAudio(
+        microphone = await requestOptionalLocalAudio(
           'workspace:community-voice:microphone-unavailable',
           {
             channelId: channel.id,
@@ -272,7 +274,8 @@ export function useCallStartActions({
           currentIdentityId,
           id: call.id,
           loadIceConfig: loadCallIceConfig,
-          localStream,
+          localStream: microphone.stream,
+          microphoneError: microphone.microphoneError,
           ...mediaEncryption,
           noiseCancellationEnabled: callNoiseCancellationEnabled,
           onSignal: callSignalSender(call.id),
@@ -283,7 +286,7 @@ export function useCallStartActions({
         playAnsweredCallSound();
       })()
         .catch((caught) => {
-          stopLocalAudio(localStream);
+          stopLocalAudio(microphone.stream);
           logCallError('workspace:community-voice:failed', caught, {
             channelId: channel.id,
             communityId: activeCommunity.id,
@@ -326,7 +329,7 @@ export function useCallStartActions({
 
     const pendingCall = incomingCall.call;
 
-    let localStream: MediaStream | null = null;
+    let microphone: CallMicrophoneRequest = { stream: null };
 
     callActionInProgressRef.current = true;
 
@@ -350,7 +353,7 @@ export function useCallStartActions({
 
       setIncomingCall(null);
       stopIncomingCallSound();
-      localStream = await requestOptionalLocalAudio(
+      microphone = await requestOptionalLocalAudio(
         'workspace:incoming-call:microphone-unavailable',
         {
           callId: pendingCall.id,
@@ -377,7 +380,7 @@ export function useCallStartActions({
             sessionRef.current.identity.id,
           )?.status,
         });
-        stopLocalAudio(localStream);
+        stopLocalAudio(microphone.stream);
 
         return;
       }
@@ -395,14 +398,15 @@ export function useCallStartActions({
         currentIdentityId: sessionRef.current.identity.id,
         id: call.id,
         loadIceConfig: loadCallIceConfig,
-        localStream,
+        localStream: microphone.stream,
+        microphoneError: microphone.microphoneError,
         ...mediaEncryption,
         noiseCancellationEnabled: callNoiseCancellationEnabled,
         onSignal: callSignalSender(call.id),
       });
     })()
       .catch((caught) => {
-        stopLocalAudio(localStream);
+        stopLocalAudio(microphone.stream);
         setSendError(toUserErrorMessage(caught, copy.workspace.sendError));
       })
       .finally(() => {

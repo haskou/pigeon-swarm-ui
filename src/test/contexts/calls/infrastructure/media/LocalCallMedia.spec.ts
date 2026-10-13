@@ -211,7 +211,10 @@ describe(LocalCallMedia.name, () => {
   });
 
   it('keeps the chosen microphone when noise cancellation changes', async () => {
-    const getUserMedia = jest.fn((_constraints: MediaStreamConstraints) =>
+    const getUserMedia = jest.fn<
+      Promise<MediaStream>,
+      [MediaStreamConstraints]
+    >(() =>
       Promise.resolve(
         mediaStreamWithTracks([mediaTrack('microphone', 'audio')]),
       ),

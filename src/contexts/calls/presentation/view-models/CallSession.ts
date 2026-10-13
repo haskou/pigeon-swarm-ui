@@ -14,6 +14,8 @@ export type CallSession = {
   kind: 'community-voice' | 'group' | 'one-to-one';
   mediaEncryption: CallMediaEncryptionState;
   muted: boolean;
+  /** The chosen microphone; undefined uses the browser default. */
+  microphoneDeviceId?: string;
   microphoneError?: CallMicrophoneErrorCode;
   noiseCancellationEnabled: boolean;
   hasMicrophone: boolean;

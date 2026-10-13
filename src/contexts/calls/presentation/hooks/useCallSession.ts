@@ -24,6 +24,7 @@ import { LocalCallMedia } from '../../infrastructure/media/LocalCallMedia';
 import { watchMicrophoneAvailability } from '../../infrastructure/media/microphoneAvailability';
 import { watchNetworkChanges } from '../../infrastructure/media/networkChanges';
 import { RemoteCallAudio } from '../../infrastructure/media/RemoteCallAudio';
+import { loadCallMicrophoneDeviceId } from '../../infrastructure/storage/callAudioPreference';
 import { retainedRemotePeerIdentityIds } from './callPeerConnectionPlan';
 import {
   callMediaEncryptionState,
@@ -46,6 +47,7 @@ export type StartCallInput = {
   kind: CallSession['kind'];
   loadIceConfig: () => Promise<CallIceServerConfig>;
   localStream?: MediaStream | null;
+  microphoneError?: CallMicrophoneErrorCode;
   mediaEncryptionEnabled: boolean;
   mediaEncryptionKey?: string;
   mediaEncryptionUnavailableReason?: CallMediaEncryptionUnavailableReason;
@@ -87,7 +89,7 @@ export function useCallSession(): {
   toggleMute: () => void;
   toggleMediaEncryption: () => void;
   toggleNoiseCancellation: (enabled: boolean) => Promise<void>;
-  retryMicrophone: () => Promise<void>;
+  retryMicrophone: (deviceId?: string) => Promise<void>;
   retryConnection: () => void;
   recoverAfterDisruption: () => void;
   toggleScreenShare: () => Promise<void>;
@@ -184,6 +186,9 @@ export function useCallSession(): {
       key: input.mediaEncryptionKey,
       reason: input.mediaEncryptionUnavailableReason,
     });
+    const microphoneDeviceId = loadCallMicrophoneDeviceId(
+      input.currentIdentityId,
+    );
     const nextCall: CallSession = {
       call: input.call,
       cameraEnabled: false,
@@ -196,6 +201,7 @@ export function useCallSession(): {
       id: input.id,
       kind: input.kind,
       mediaEncryption,
+      microphoneDeviceId,
       muted: input.localStream === null,
       noiseCancellationEnabled: input.noiseCancellationEnabled,
       participants: input.participants,
@@ -228,10 +234,12 @@ export function useCallSession(): {
           ? null
           : input.localStream
             ? mediaManager.useStream(input.localStream, {
+                microphoneDeviceId,
                 noiseCancellationEnabled: input.noiseCancellationEnabled,
               })
             : await mediaManager
                 .startAudio({
+                  microphoneDeviceId,
                   noiseCancellationEnabled: input.noiseCancellationEnabled,
                 })
                 .catch((error): null => {
@@ -250,7 +258,8 @@ export function useCallSession(): {
             ? {
                 ...current,
                 hasMicrophone: false,
-                microphoneError: microphoneError ?? 'unknown',
+                microphoneError:
+                  microphoneError ?? input.microphoneError ?? 'unknown',
                 muted: true,
               }
             : current,

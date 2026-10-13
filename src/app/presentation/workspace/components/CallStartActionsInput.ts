@@ -2,6 +2,7 @@ import type { Dispatch, SetStateAction } from 'react';
 
 import type { CallIceServerResource as CallIceServerConfig } from '../../../../contexts/calls/infrastructure/http/resources/CallIceServerResource';
 import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
+import type { CallMicrophoneRequest } from '../../../../contexts/calls/presentation/hooks/CallMicrophoneRequest';
 import type { StartCallInput } from '../../../../contexts/calls/presentation/hooks/useCallSession';
 import type { CallSession } from '../../../../contexts/calls/presentation/view-models/CallSession';
 import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
@@ -27,7 +28,7 @@ export type CallStartActionsInput = {
   requestOptionalLocalAudio: (
     event: string,
     context: Record<string, unknown>,
-  ) => Promise<MediaStream | null>;
+  ) => Promise<CallMicrophoneRequest>;
   session: Session;
   setIncomingCall: Dispatch<SetStateAction<IncomingWorkspaceCall | null>>;
   setSendError: Dispatch<SetStateAction<string | null>>;

@@ -10,11 +10,13 @@ import {
   logCallError,
   logCallWarning,
 } from '../../infrastructure/media/callDebugLogger';
+import { saveCallMicrophoneDeviceId } from '../../infrastructure/storage/callAudioPreference';
 import { localMediaSession } from './callSessionMediaState';
 import { classifyCallMicrophoneError } from './classifyCallMicrophoneError';
 
 export type CallMediaControls = {
-  retryMicrophone: () => Promise<void>;
+  /** A device id switches microphones; an empty one picks the default. */
+  retryMicrophone: (deviceId?: string) => Promise<void>;
   setParticipantScreenShareVolume: (
     identityId: string,
     volumePercent: number,
@@ -125,16 +127,31 @@ export function useCallMediaControls({
     });
   };
 
-  const retryMicrophone = async () => {
+  const retryMicrophone = async (deviceId?: string) => {
     const current = activeCallRef.current;
 
     if (!current) return;
 
+    const microphoneDeviceId =
+      deviceId === undefined
+        ? current.microphoneDeviceId
+        : deviceId || undefined;
+    const muted = current.hasMicrophone && current.muted;
+
     try {
       const stream = await mediaManager.startAudio({
+        microphoneDeviceId,
         noiseCancellationEnabled: current.noiseCancellationEnabled,
       });
 
+      if (deviceId !== undefined) {
+        saveCallMicrophoneDeviceId(
+          current.currentIdentityId,
+          microphoneDeviceId,
+        );
+      }
+
+      mediaManager.setMicrophoneMuted(muted);
       peerManager.setLocalStream(stream);
       setActiveCall((active) =>
         active?.id === current.id
@@ -142,11 +159,12 @@ export function useCallMediaControls({
               ...active,
               hasMicrophone: true,
               localPreviewStream: stream,
+              microphoneDeviceId,
               microphoneError: undefined,
-              muted: false,
+              muted,
               participants: active.participants.map((participant) =>
                 participant.identityId === active.currentIdentityId
-                  ? { ...participant, mediaStream: stream, muted: false }
+                  ? { ...participant, mediaStream: stream, muted }
                   : participant,
               ),
               status:
@@ -155,16 +173,22 @@ export function useCallMediaControls({
           : active,
       );
     } catch (error) {
-      setActiveCall((active) =>
-        active?.id === current.id
-          ? {
+      const microphoneError = classifyCallMicrophoneError(error);
+
+      // A failed switch leaves the working microphone in use.
+      setActiveCall((active) => {
+        if (active?.id !== current.id) return active;
+
+        return current.hasMicrophone
+          ? { ...active, microphoneError }
+          : {
               ...active,
               hasMicrophone: false,
-              microphoneError: classifyCallMicrophoneError(error),
+              microphoneDeviceId,
+              microphoneError,
               muted: true,
-            }
-          : active,
-      );
+            };
+      });
     }
   };
 

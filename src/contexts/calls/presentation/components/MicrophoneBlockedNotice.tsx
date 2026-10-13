@@ -2,6 +2,8 @@ import type { CallSession } from '../view-models/CallSession';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
+import { MicrophoneDevicePicker } from './MicrophoneDevicePicker';
+import { microphoneErrorText } from './microphoneErrorText';
 
 export function MicrophoneBlockedNotice({
   call,
@@ -10,7 +12,7 @@ export function MicrophoneBlockedNotice({
 }: {
   call: CallSession;
   compact?: boolean;
-  onRetryMicrophone: () => void;
+  onRetryMicrophone: (deviceId?: string) => void;
 }) {
   return (
     <div
@@ -34,7 +36,7 @@ export function MicrophoneBlockedNotice({
       <div className="mt-2 flex flex-wrap gap-2">
         <button
           type="button"
-          onClick={onRetryMicrophone}
+          onClick={() => onRetryMicrophone()}
           className={cx(
             microphoneNoticeActionClass(compact),
             'border-amber-100/60 bg-amber-100 text-amber-950 hover:bg-white',
@@ -44,7 +46,7 @@ export function MicrophoneBlockedNotice({
         </button>
         <button
           type="button"
-          onClick={onRetryMicrophone}
+          onClick={() => onRetryMicrophone()}
           className={cx(
             microphoneNoticeActionClass(compact),
             'border-white/10 bg-white/10 text-white/75 hover:bg-white/15 hover:text-white',
@@ -64,6 +66,11 @@ export function MicrophoneBlockedNotice({
           {copy.calls.microphoneHelp}
         </a>
       </div>
+      <MicrophoneDevicePicker
+        call={call}
+        compact={compact}
+        onRetryMicrophone={onRetryMicrophone}
+      />
       <div
         className={cx(
           'mt-2 leading-snug text-white/35',
@@ -81,16 +88,4 @@ function microphoneNoticeActionClass(compact: boolean): string {
     'inline-flex items-center justify-center rounded-xl border font-black leading-none transition',
     compact ? 'h-8 px-3 text-[0.7rem]' : 'h-9 px-4 text-xs',
   );
-}
-
-function microphoneErrorText(error: CallSession['microphoneError']): string {
-  if (error === 'denied') return copy.calls.microphoneDenied;
-  if (error === 'missing-device') return copy.calls.microphoneMissingDevice;
-  if (error === 'in-use') return copy.calls.microphoneInUse;
-  if (error === 'constraint') return copy.calls.microphoneConstraint;
-  if (error === 'not-secure') return copy.calls.microphoneNotSecure;
-  if (error === 'security') return copy.calls.microphoneSecurity;
-  if (error === 'unsupported') return copy.calls.microphoneUnsupported;
-
-  return copy.calls.microphoneUnknown;
 }

@@ -220,11 +220,14 @@ export const es = {
     microphoneAllow: 'Permitir micrófono',
     microphoneBlockedTitle: 'No se puede usar el micrófono',
     microphoneConstraint:
-      'La configuración de audio solicitada no es compatible con este dispositivo.',
+      'Este micrófono no admite la configuración de audio solicitada. Elige otro micrófono o reintenta.',
     microphoneDenied:
       'El navegador no ha concedido permiso de micrófono. Permítelo y la llamada usará tu micrófono automáticamente.',
+    microphoneDevice: 'Micrófono',
+    microphoneDeviceDefault: 'Predeterminado del navegador',
     microphoneHelp: 'Abrir ayuda',
-    microphoneInUse: 'El micrófono está ocupado en otra app o pestaña.',
+    microphoneInUse:
+      'El micrófono está ocupado en otra app o pestaña. Ciérrala y reintenta, o elige otro micrófono.',
     microphoneMissingDevice:
       'No se ha encontrado ningún micrófono. Conéctalo y la llamada lo usará automáticamente si el acceso al micrófono está permitido.',
     microphoneNotSecure: 'El micrófono requiere HTTPS o una app instalada.',

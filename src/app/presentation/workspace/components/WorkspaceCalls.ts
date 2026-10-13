@@ -17,7 +17,7 @@ export type WorkspaceCalls = Pick<
   leaveActiveCall: () => void;
   recoverRealtimeCalls: () => void;
   retryConnection: () => void;
-  retryMicrophone: () => Promise<void>;
+  retryMicrophone: (deviceId?: string) => Promise<void>;
   setParticipantScreenShareVolume: (
     identityId: string,
     volumePercent: number,

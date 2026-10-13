@@ -25,7 +25,7 @@ type CompactCallBarProps = {
   onToggleDeafen: () => void;
   onToggleMute: () => void;
   onToggleNoiseCancellation: () => void;
-  onRetryMicrophone: () => void;
+  onRetryMicrophone: (deviceId?: string) => void;
   onRetryConnection: () => void;
   onToggleScreenShare: () => void;
   screenParticipant?: CallSession['participants'][number];

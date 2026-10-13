@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import type { CallMicrophoneRequest } from './CallMicrophoneRequest';
+
 import { CallMicrophoneCapture } from '../../infrastructure/media/CallMicrophoneCapture';
 import { logCallWarning } from '../../infrastructure/media/callDebugLogger';
 import {
   loadCallMediaEncryptionEnabled,
+  loadCallMicrophoneDeviceId,
   loadCallNoiseCancellationEnabled,
   saveCallMediaEncryptionEnabled,
   saveCallNoiseCancellationEnabled,
 } from '../../infrastructure/storage/callAudioPreference';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import { requestCallMicrophone } from './requestCallMicrophone';
 
 type CallMediaAccessInput = {
   identityId: string;
@@ -24,7 +28,7 @@ type CallMediaAccess = {
   requestOptionalLocalAudio: (
     event: string,
     context: Record<string, unknown>,
-  ) => Promise<MediaStream | null>;
+  ) => Promise<CallMicrophoneRequest>;
   stopLocalAudio: (stream: MediaStream | null) => void;
   toggleCallMediaEncryption: () => void;
   toggleCallNoiseCancellation: () => void;
@@ -39,15 +43,13 @@ export function useCallMediaAccess({
   const [mediaEncryptionEnabled, setMediaEncryptionEnabled] = useState(() =>
     loadCallMediaEncryptionEnabled(identityId),
   );
-  const [noiseCancellationEnabled, setNoiseCancellationEnabled] = useState(
-    () => loadCallNoiseCancellationEnabled(identityId),
+  const [noiseCancellationEnabled, setNoiseCancellationEnabled] = useState(() =>
+    loadCallNoiseCancellationEnabled(identityId),
   );
 
   useEffect(() => {
     setMediaEncryptionEnabled(loadCallMediaEncryptionEnabled(identityId));
-    setNoiseCancellationEnabled(
-      loadCallNoiseCancellationEnabled(identityId),
-    );
+    setNoiseCancellationEnabled(loadCallNoiseCancellationEnabled(identityId));
   }, [identityId]);
 
   useEffect(() => {
@@ -58,31 +60,26 @@ export function useCallMediaAccess({
     saveCallNoiseCancellationEnabled(identityId, noiseCancellationEnabled);
   }, [identityId, noiseCancellationEnabled]);
 
-  const requestLocalAudio = useCallback(async (): Promise<MediaStream> => {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error(copy.calls.microphoneUnavailable);
-    }
-
-    try {
-      return await CallMicrophoneCapture.capture(navigator.mediaDevices, {
-        noiseCancellationEnabled,
-      });
-    } catch {
-      throw new Error(copy.calls.microphoneUnavailable);
-    }
-  }, [noiseCancellationEnabled]);
-
   const requestOptionalLocalAudio = useCallback(
     async (
       event: string,
       context: Record<string, unknown>,
-    ): Promise<MediaStream | null> =>
-      await requestLocalAudio().catch((caught): null => {
-        logCallWarning(event, { ...context, error: caught });
+    ): Promise<CallMicrophoneRequest> => {
+      const request = await requestCallMicrophone({
+        deviceId: loadCallMicrophoneDeviceId(identityId),
+        noiseCancellationEnabled,
+      });
 
-        return null;
-      }),
-    [requestLocalAudio],
+      if (request.microphoneError) {
+        logCallWarning(event, {
+          ...context,
+          microphoneError: request.microphoneError,
+        });
+      }
+
+      return request;
+    },
+    [identityId, noiseCancellationEnabled],
   );
 
   const toggleCallNoiseCancellation = useCallback(() => {
