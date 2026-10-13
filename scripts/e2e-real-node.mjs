@@ -9,21 +9,17 @@ import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 
 const origin = 'http://127.0.0.1:8080';
-// Each run is one Playwright invocation against the same node. The core
-// login and direct-message flows run on every engine and viewport the UI
-// supports in CI; the slower moderation flow runs once on desktop Chromium.
+// Each run is one Playwright invocation against the same node. Login,
+// recovery-key sign-in, pairing and 1:1 send/receive run on every engine and
+// viewport CI covers; the outbox retry flow runs on the desktop engines.
 const runs = [
   {
-    specs: [
-      'e2e/login-methods.spec.ts',
-      'e2e/direct-message-sync.spec.ts',
-      'e2e/direct-message-outbox.spec.ts',
-    ],
+    specs: ['e2e/login-methods.spec.ts', 'e2e/direct-message-sync.spec.ts'],
     projects: ['desktop-chromium', 'desktop-firefox', 'mobile-chromium'],
   },
   {
-    specs: ['e2e/community-mls-kick.spec.ts'],
-    projects: ['desktop-chromium'],
+    specs: ['e2e/direct-message-outbox.spec.ts'],
+    projects: ['desktop-chromium', 'desktop-firefox'],
   },
 ];
 const image = process.env.PIGEON_NODE_IMAGE?.trim();

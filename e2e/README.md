@@ -35,10 +35,9 @@ E2E_NETWORK_ID=<network-id> yarn test:e2e
 `direct-message-sync.spec.ts` (1:1 send and receive across two isolated browser
 contexts) and `direct-message-outbox.spec.ts` (a 1:1 send made while the
 recipient's inbox is absent survives a reload and is delivered once the
-recipient accepts) run against a real node on `desktop-chromium`,
-`desktop-firefox` and `mobile-chromium`. `community-mls-kick.spec.ts`
-(moderation: an owner removes a member from an encrypted community) runs on
-`desktop-chromium` only because it is slow. The `real-node-e2e` job in
+recipient accepts) run against a real node. Login and direct-message sync run
+on `desktop-chromium`, `desktop-firefox` and `mobile-chromium`; the outbox spec
+runs on the two desktop projects. The `real-node-e2e` job in
 `.github/workflows/ci.yml` builds the node image from the pins below and runs
 these specs. It is the check that catches UI and node
 contract breaks before merge.

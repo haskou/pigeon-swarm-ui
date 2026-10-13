@@ -131,7 +131,7 @@ jobs:
       - name: Install Chromium and Firefox
         run: yarn playwright install --with-deps chromium firefox
 
-      - name: Verify login, direct messages and moderation against the real node
+      - name: Verify login and direct messages against the real node
         env:
           PIGEON_NODE_IMAGE: pigeon-swarm-node:real-node
         run: yarn test:e2e:real-node
