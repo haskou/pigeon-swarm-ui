@@ -1,3 +1,4 @@
+import type { Session } from '../../contexts/identities/infrastructure/session/Session';
 import type { RequestCacheOptions } from '../../shared/infrastructure/http/RequestCacheOptions';
 
 import { AttachmentFinder } from '../../contexts/attachments/application/find-attachment/AttachmentFinder';
@@ -73,6 +74,7 @@ import { PigeonPushApi } from '../../contexts/notifications/infrastructure/http/
 import { PigeonPushGateway } from '../../contexts/notifications/infrastructure/http/PigeonPushGateway';
 import { PigeonPollsApi } from '../../contexts/polls/infrastructure/http/PigeonPollsApi';
 import { PigeonStickersApi } from '../../contexts/stickers/infrastructure/http/PigeonStickersApi';
+import { MailboxAvailabilityServers } from '../../shared/infrastructure/client/MailboxAvailabilityServers';
 import { MailboxHomeBase } from '../../shared/infrastructure/client/MailboxHomeBase';
 import { PublicMutationSigner } from '../../shared/infrastructure/crypto/PublicMutationSigner';
 import { ApiUrlBuilder } from '../../shared/infrastructure/http/ApiUrlBuilder';
@@ -82,6 +84,7 @@ import { RequestSigner } from '../../shared/infrastructure/http/RequestSigner';
 import { scopeClientStorageKey } from '../../shared/infrastructure/storage/ClientStorageScope';
 import { copy } from '../../shared/presentation/i18n/copy';
 import { API_SERVER_URL } from '../API_SERVER_URL';
+import { MAILBOX_AVAILABILITY_SERVERS } from '../MAILBOX_AVAILABILITY_SERVERS';
 
 export class PigeonApiGateway {
   private readonly requestCache = new RequestCache();
@@ -385,28 +388,43 @@ export class PigeonApiGateway {
       new PigeonMailboxClient(http),
       this.mailboxMiner.mine,
     );
+    const remoteMailboxChannel = (base: string): MailboxChannel =>
+      new MailboxChannel(
+        new PigeonMailboxClient(
+          new HttpJsonClient(new ApiUrlBuilder(base), { isolated: true }),
+        ),
+        this.mailboxMiner.mine,
+      );
+    const listDeviceCredentials = async (session: Session) =>
+      (await this.identityGateway.listDevices(session)).map((device) =>
+        device.valueOf(),
+      );
     const recipientMailboxes = new RecipientMailboxRouter(
       mailboxChannel,
       verifiedRecipientBase,
-      (base) =>
-        new MailboxChannel(
-          new PigeonMailboxClient(
-            new HttpJsonClient(new ApiUrlBuilder(base), { isolated: true }),
-          ),
-          this.mailboxMiner.mine,
-        ),
+      remoteMailboxChannel,
     );
     this.directMessageMailbox = new DirectMessageMailbox(
       mailboxChannel,
       recipientMailboxes,
       new DirectMessageMailboxStore(),
       this.messageProjection,
-      new DirectMessageReaderSet(mailboxChannel, async (session) =>
-        (await this.identityGateway.listDevices(session)).map((device) =>
-          device.valueOf(),
-        ),
-      ),
+      new DirectMessageReaderSet(mailboxChannel, listDeviceCredentials),
       this.messageCommands,
+      MailboxAvailabilityServers.pick(
+        MAILBOX_AVAILABILITY_SERVERS,
+        API_SERVER_URL,
+        () => window.location.origin,
+      ).map((base) => {
+        const channel = remoteMailboxChannel(base);
+
+        return {
+          base,
+          channel,
+          readerSet: new DirectMessageReaderSet(channel, listDeviceCredentials),
+          store: new DirectMessageMailboxStore(base),
+        };
+      }),
     );
     this.node = new PigeonNodeApi(http, signer);
     this.notificationsGateway = new PigeonNotificationsGateway(

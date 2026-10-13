@@ -11,19 +11,27 @@ export type DirectMessageMailboxState = {
 
 /**
  * Read capability and acknowledged cursor per inbox, kept in scoped client
- * storage.
+ * storage. Each availability server keeps its own cursor, so its store is
+ * namespaced by the server base; the connected node uses no namespace.
  */
 export class DirectMessageMailboxStore {
   private static readonly KEY_PREFIX = 'pigeon.direct-mailbox.';
   private static readonly READ_KEY_PREFIX = 'pigeon.direct-mailbox-read.';
 
-  public load(mailboxId: string): DirectMessageMailboxState | null {
-    const key = scopeClientStorageKey(
-      `${DirectMessageMailboxStore.KEY_PREFIX}${mailboxId}`,
+  public constructor(private readonly namespace = '') {}
+
+  private keyFor(prefix: string, mailboxId: string): string {
+    return scopeClientStorageKey(
+      this.namespace === ''
+        ? `${prefix}${mailboxId}`
+        : `${prefix}${this.namespace}:${mailboxId}`,
     );
+  }
+
+  public load(mailboxId: string): DirectMessageMailboxState | null {
     const stored = readJsonObjectFromLocalStorage<
       Partial<DirectMessageMailboxState>
-    >(key, {});
+    >(this.keyFor(DirectMessageMailboxStore.KEY_PREFIX, mailboxId), {});
 
     if (typeof stored.cursor !== 'number') return null;
 
@@ -32,9 +40,7 @@ export class DirectMessageMailboxStore {
 
   public save(mailboxId: string, state: DirectMessageMailboxState): void {
     writeJsonToLocalStorage(
-      scopeClientStorageKey(
-        `${DirectMessageMailboxStore.KEY_PREFIX}${mailboxId}`,
-      ),
+      this.keyFor(DirectMessageMailboxStore.KEY_PREFIX, mailboxId),
       state,
     );
   }
@@ -45,9 +51,7 @@ export class DirectMessageMailboxStore {
    */
   public loadReadCursor(mailboxId: string): number | null {
     const stored = readJsonObjectFromLocalStorage<{ cursor?: unknown }>(
-      scopeClientStorageKey(
-        `${DirectMessageMailboxStore.READ_KEY_PREFIX}${mailboxId}`,
-      ),
+      this.keyFor(DirectMessageMailboxStore.READ_KEY_PREFIX, mailboxId),
       {},
     );
 
@@ -56,9 +60,7 @@ export class DirectMessageMailboxStore {
 
   public saveReadCursor(mailboxId: string, cursor: number): void {
     writeJsonToLocalStorage(
-      scopeClientStorageKey(
-        `${DirectMessageMailboxStore.READ_KEY_PREFIX}${mailboxId}`,
-      ),
+      this.keyFor(DirectMessageMailboxStore.READ_KEY_PREFIX, mailboxId),
       { cursor },
     );
   }

@@ -32,6 +32,9 @@ export default defineConfig(({ mode }) => {
       __PIGEON_API_SERVER_URL__: JSON.stringify(
         env.VITE_API_SERVER_URL || 'http://localhost:8080/',
       ),
+      __PIGEON_MAILBOX_AVAILABILITY_SERVERS__: JSON.stringify(
+        env.VITE_MAILBOX_AVAILABILITY_SERVERS ?? '',
+      ),
     },
     plugins: [react(), tailwindcss(), contentSecurityPolicyPlugin()],
     resolve: {

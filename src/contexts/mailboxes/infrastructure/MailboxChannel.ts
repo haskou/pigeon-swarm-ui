@@ -81,6 +81,11 @@ export class MailboxChannel {
     );
   }
 
+  /** A fresh envelope id, for a send that is not resent under a seed. */
+  public static randomEnvelopeId(): string {
+    return encodeBase64Url(randomBytes(MailboxChannel.ENVELOPE_ID_BYTES));
+  }
+
   public constructor(
     private readonly client: PigeonMailboxClient,
     private readonly mine: MailboxCreationMiner,
@@ -194,9 +199,7 @@ export class MailboxChannel {
   public async send(
     keys: MailboxKeys,
     plaintext: Uint8Array,
-    envelopeId: string = encodeBase64Url(
-      randomBytes(MailboxChannel.ENVELOPE_ID_BYTES),
-    ),
+    envelopeId: string = MailboxChannel.randomEnvelopeId(),
   ): Promise<MailboxAppend> {
     const body = MailboxEnvelopeCipher.seal(
       keys.envelopeKey,
