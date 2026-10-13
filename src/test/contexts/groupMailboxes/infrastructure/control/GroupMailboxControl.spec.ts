@@ -5,6 +5,7 @@ import type { GroupMailboxControlOutcome } from '../../../../../contexts/groupMa
 import type { PigeonMailboxClient } from '../../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
 
 import { IndexedDbMlsStateStore } from '../../../../../contexts/communities/infrastructure/mls/IndexedDbMlsStateStore';
+import { MlsRejectedError } from '../../../../../contexts/communities/infrastructure/mls/MlsRejectedError';
 import { GroupMailboxControl } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControl';
 import { GroupMailboxControlRecord } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlRecord';
 import { GroupMailboxKeyPackageTimeoutError } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxKeyPackageTimeoutError';
@@ -299,6 +300,31 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
     ).toBe(false);
   });
 
+  it('delivers a removal whose envelope id the removed member squatted', async () => {
+    await add(alice, [bob, carol]);
+    await Promise.all([drain(bob), drain(carol)]);
+    await openInboxes(alice);
+    const bobKeys = await inboxKeys(bob, carol);
+    const { epoch } = await carol.engine.generation(CONVERSATION);
+
+    await node.channel.send(
+      bobKeys,
+      GroupMailboxControlRecord.encode({
+        commit: new Uint8Array([1, 2, 3]),
+        conversationId: CONVERSATION,
+        type: 'commit',
+      }),
+      MailboxChannel.envelopeIdFor(
+        `group-commit|${epoch.toString()}|${bobKeys.mailboxId}`,
+      ),
+    );
+
+    await alice.control.remove(CONVERSATION, ['carol']);
+
+    await expect(readGroup(bob)).resolves.toEqual(['rejected', 'applied']);
+    await sameGeneration(alice, bob);
+  });
+
   it('rejects a replayed welcome', async () => {
     await add(alice, [bob]);
     const [welcome] = bob.inbox;
@@ -422,6 +448,34 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
       'alice',
       'bob',
     ]);
+  });
+
+  it("rejects a key package that is not the answering peer's", async () => {
+    const adding = alice.control.add(CONVERSATION, ['bob']);
+
+    await until(() => bob.inbox.length > 0);
+    const request = GroupMailboxControlRecord.decode(bob.inbox[0].plaintext);
+
+    if (request?.type !== 'key-package-request') {
+      throw new Error('expected a key package request');
+    }
+
+    await expect(
+      alice.control.receiveDirect(
+        'bob',
+        GroupMailboxControlRecord.encode({
+          conversationId: CONVERSATION,
+          keyPackage: await carol.engine.createKeyPackage(),
+          requestId: request.requestId,
+          type: 'key-package-response',
+        }),
+      ),
+    ).resolves.toBe('rejected');
+    await expect(adding).rejects.toBeInstanceOf(MlsRejectedError);
+    await expect(alice.engine.members(CONVERSATION)).resolves.toEqual([
+      'alice',
+    ]);
+    expect(carol.inbox).toEqual([]);
   });
 
   it('refuses to add an identity outside the roster', async () => {
