@@ -15,11 +15,14 @@ import type { PigeonIdentityLoginApi } from '../../../../../contexts/identities/
 import type { PigeonKeychainApi } from '../../../../../contexts/identities/infrastructure/http/PigeonKeychainApi';
 import type { PigeonPresenceGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonPresenceGateway';
 import type { IdentityResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
+import type { LoginResult } from '../../../../../contexts/identities/infrastructure/http/resources/LoginResult';
 import type { LocalKeychain } from '../../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { DevicePairingError } from '../../../../../contexts/identities/domain/DevicePairingError';
+import { RecoveryKey } from '../../../../../contexts/identities/domain/value-objects/RecoveryKey';
 import { PigeonIdentitiesGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
+import { copy } from '../../../../../shared/presentation/i18n/copy';
 
 function identity(): IdentityResource {
   return {
@@ -41,7 +44,7 @@ function gatewayDouble(): {
   authorization: jest.Mocked<
     Pick<
       PigeonDeviceAuthorizationApi,
-      'authorizePairing' | 'completePairing' | 'revokeDevice'
+      'authorizePairing' | 'completePairing' | 'recover' | 'revokeDevice'
     >
   >;
   gateway: PigeonIdentitiesGateway;
@@ -75,11 +78,12 @@ function gatewayDouble(): {
   const authorization = {
     authorizePairing: jest.fn(),
     completePairing: jest.fn(),
+    recover: jest.fn(),
     revokeDevice: jest.fn(),
   } as jest.Mocked<
     Pick<
       PigeonDeviceAuthorizationApi,
-      'authorizePairing' | 'completePairing' | 'revokeDevice'
+      'authorizePairing' | 'completePairing' | 'recover' | 'revokeDevice'
     >
   >;
   const recovery = {
@@ -149,6 +153,61 @@ describe(PigeonIdentitiesGateway.name, () => {
       published,
     );
     expect(keychain.publishKeychain).toHaveBeenCalledWith(session, update);
+  });
+
+  describe('recover', () => {
+    const recoveryKey = RecoveryKey.generate().valueOf();
+
+    it('opens the sealed root before hydrating the recovered device', async () => {
+      const { authorization, gateway, login, profile, sealedRoot } =
+        gatewayDouble();
+      const recovered = {
+        identity: { id: 'identity-1' },
+      } as unknown as Session;
+      const rooted = {
+        ...recovered,
+        deviceSealedRootKey: SymmetricKey.generate(),
+      } as Session;
+      const hydrateResult = { session: rooted } as unknown as LoginResult;
+      profile.get.mockResolvedValue(identity());
+      authorization.recover.mockResolvedValue(recovered);
+      sealedRoot.current.mockResolvedValue(rooted);
+      login.hydrate.mockResolvedValue(hydrateResult);
+
+      await expect(
+        gateway.recover('identity-1', 'password', recoveryKey),
+      ).resolves.toBe(hydrateResult);
+      expect(sealedRoot.current).toHaveBeenCalledWith(recovered);
+      expect(login.hydrate).toHaveBeenCalledWith(rooted, undefined);
+    });
+
+    it('refuses the recovery without hydrating when no sealed root opens', async () => {
+      const { authorization, gateway, login, profile, sealedRoot } =
+        gatewayDouble();
+      const recovered = {
+        identity: { id: 'identity-1' },
+      } as unknown as Session;
+      profile.get.mockResolvedValue(identity());
+      authorization.recover.mockResolvedValue(recovered);
+      sealedRoot.current.mockResolvedValue(recovered);
+
+      await expect(
+        gateway.recover('identity-1', 'password', recoveryKey),
+      ).rejects.toThrow(copy.auth.deviceRootUnavailable);
+      expect(login.hydrate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('openDeviceSealedRoot', () => {
+    it('refuses a session left without a sealed root', async () => {
+      const { gateway, sealedRoot } = gatewayDouble();
+      const session = { identity: { id: 'identity-1' } } as unknown as Session;
+      sealedRoot.current.mockResolvedValue(session);
+
+      await expect(gateway.openDeviceSealedRoot(session)).rejects.toThrow(
+        copy.auth.deviceRootUnavailable,
+      );
+    });
   });
 
   describe('authorizeDevicePairing', () => {

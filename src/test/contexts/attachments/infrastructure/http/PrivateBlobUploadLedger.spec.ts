@@ -1,4 +1,10 @@
-import { EncryptedPayload } from '@haskou/pigeon-swarm-crypto';
+import {
+  EncryptedPayload,
+  KeyPair,
+  PrivateKey,
+  PublicKey,
+  SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
 
 import type { PrivateBlobUploadRef } from '../../../../../contexts/attachments/infrastructure/http/PrivateBlobUploadLedger';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
@@ -6,17 +12,15 @@ import type { Session } from '../../../../../contexts/identities/infrastructure/
 import { PrivateBlobUploadLedger } from '../../../../../contexts/attachments/infrastructure/http/PrivateBlobUploadLedger';
 
 describe(PrivateBlobUploadLedger.name, () => {
+  const device = new KeyPair(
+    new PublicKey('device-a-credential'),
+    new PrivateKey('device-a-private'),
+  );
+  const masterKey = SymmetricKey.generate();
   const session = {
+    deviceCredentialKeyPair: device,
     identity: { id: 'identity-1' },
-    masterKey: {
-      decrypt: (payload: { toString: () => string }) => ({
-        toString: () =>
-          [...payload.toString().replace(/^sealed:/, '')].reverse().join(''),
-      }),
-      encrypt: (plain: string) => ({
-        toString: () => `sealed:${[...plain].reverse().join('')}`,
-      }),
-    },
+    masterKey,
   } as unknown as Session;
   const nodeA = 'https://node-a.example';
   const nodeB = 'https://node-b.example';
@@ -45,10 +49,10 @@ describe(PrivateBlobUploadLedger.name, () => {
   };
 
   const seal = (value: unknown): string =>
-    session.masterKey.encrypt(JSON.stringify(value)).toString();
+    device.encrypt(JSON.stringify(value)).toString();
   const storedTickets = (items: Map<string, string>): unknown =>
     JSON.parse(
-      session.masterKey
+      device
         .decrypt(new EncryptedPayload(items.get('ledger-test-key') ?? ''))
         .toString(),
     );
@@ -71,6 +75,35 @@ describe(PrivateBlobUploadLedger.name, () => {
     );
     expect(ledger.take(session, [{ blobId: 'blob-2', origin: nodeB }])).toEqual(
       [ticket('blob-2', nodeB)],
+    );
+  });
+
+  it("seals the ledger to this device's credential, not the identity root", () => {
+    const { items, ledger } = setup();
+    const otherDevice = new KeyPair(
+      new PublicKey('device-b-credential'),
+      new PrivateKey('device-b-private'),
+    );
+
+    ledger.remember(session, [ticket('blob-1')]);
+
+    const sealed = new EncryptedPayload(items.get('ledger-test-key') ?? '');
+
+    expect(storedTickets(items)).toEqual([ticket('blob-1')]);
+    expect(() => otherDevice.decrypt(sealed)).toThrow();
+    expect(() => masterKey.decrypt(sealed)).toThrow();
+  });
+
+  it('reads a ledger sealed under the identity root as empty', () => {
+    const { items, ledger } = setup();
+
+    items.set(
+      'ledger-test-key',
+      masterKey.encrypt(JSON.stringify([ticket('blob-1')])).toString(),
+    );
+
+    expect(ledger.take(session, [{ blobId: 'blob-1', origin: nodeA }])).toEqual(
+      [],
     );
   });
 

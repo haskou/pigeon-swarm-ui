@@ -1,12 +1,12 @@
-import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import { KeyPair, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
-import type { DraftPayloadCipher } from '../../../../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
 import { deriveModerationLogId } from '../../../../../contexts/communities/infrastructure/http/deriveCommunityRecordId';
 import { PigeonCommunitiesApi } from '../../../../../contexts/communities/infrastructure/http/PigeonCommunitiesApi';
+import { DraftPayloadCipher } from '../../../../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
 import { ScopeFrontierReader } from '../../../../../shared/infrastructure/http/ScopeFrontierReader';
 import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
@@ -677,6 +677,45 @@ describe(PigeonCommunitiesApi.name, () => {
         method: 'PUT',
       },
     );
+  });
+
+  it('lists the channel drafts that open under the device sealed root and skips the rest', async () => {
+    const rooted = {
+      deviceSealedRootKey: SymmetricKey.generate(),
+      identity: { id: 'identity-1' },
+    } as unknown as Session;
+    const cipher = new DraftPayloadCipher();
+    const openable = {
+      channelId: 'channel-1',
+      communityId: 'community-1',
+      encryptedPayload: cipher.encrypt(rooted, 'draft text'),
+      updatedAt: 1,
+    };
+    const unopenable = {
+      channelId: 'channel-2',
+      communityId: 'community-1',
+      encryptedPayload: cipher.encrypt(
+        { ...rooted, deviceSealedRootKey: SymmetricKey.generate() },
+        'replaced root draft',
+      ),
+      updatedAt: 2,
+    };
+    const http = {
+      request: jest.fn().mockResolvedValue({ drafts: [unopenable, openable] }),
+    } as unknown as HttpJsonClient;
+    const signer = {
+      headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
+    } as unknown as RequestSigner;
+    const api = new PigeonCommunitiesApi(
+      http,
+      signer,
+      async (_key, loader) => await loader(),
+      publicMutationSignerAt(),
+    );
+
+    await expect(api.listDrafts(rooted)).resolves.toEqual([
+      { ...openable, content: 'draft text' },
+    ]);
   });
 
   it('invalidates the community detail cache after assigning member roles', async () => {

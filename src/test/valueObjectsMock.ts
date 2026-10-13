@@ -458,6 +458,38 @@ class KeyPair {
     return new KeyPair();
   }
 
+  // Stands in for the library's ECIES to the pair's own public key: only a
+  // pair with the same public key opens the payload.
+  public decrypt(payload: EncryptedPayload): Buffer {
+    const parsed = JSON.parse(
+      Buffer.from(payload.toString(), 'base64').toString('utf8'),
+    ) as { __pigeonTestKeyPair?: string; payload?: string };
+
+    if (parsed.__pigeonTestKeyPair !== this.publicKey.toString()) {
+      throw new Error('Invalid encrypted payload key');
+    }
+
+    return Buffer.from(parsed.payload ?? '', 'base64');
+  }
+
+  public encrypt(
+    payload: string | StringValueObject | Buffer,
+  ): EncryptedPayload {
+    const plain = Buffer.isBuffer(payload)
+      ? payload
+      : Buffer.from(payload.toString(), 'utf8');
+
+    return new EncryptedPayload(
+      Buffer.from(
+        JSON.stringify({
+          __pigeonTestKeyPair: this.publicKey.toString(),
+          payload: plain.toString('base64'),
+        }),
+        'utf8',
+      ).toString('base64'),
+    );
+  }
+
   public async encryptKeyPair(): Promise<EncryptedKeyPair> {
     return new EncryptedKeyPair(
       new PublicKey('public-key'),
