@@ -35,6 +35,19 @@ const readers = (credential = 'device-a') => ({
   root: sealedRoot,
 });
 
+/** The sealed root a revoke rotated in, replacing SEALED. */
+const ROTATED = Buffer.alloc(32, 3);
+const rotatedSession = (): Session =>
+  ({
+    ...session(),
+    deviceSealedRootKey: SymmetricKey.fromBuffer(ROTATED),
+    previousDeviceSealedRootKey: SymmetricKey.fromBuffer(SEALED),
+  }) as unknown as Session;
+const rotatedReaders = (credential = 'device-a') => ({
+  device: MailboxReadToken.deriveDevice(ROTATED, MAILBOX, credential),
+  root: MailboxReadToken.derive(ROTATED, MAILBOX),
+});
+
 /**
  * In-memory node holding an inbox created under the sealed root: a call is
  * refused unless its root token is a registered reader, the way the node
@@ -162,5 +175,80 @@ describe(DirectMessageReaderSet.name, () => {
 
     expect(channel.listReaders).toHaveBeenCalledTimes(2);
     debug.mockRestore();
+  });
+
+  describe('cutOff', () => {
+    it("leaves only the rotated root and the remaining devices' readers once it resolves", async () => {
+      const { registered, set } = setup(['device-a']);
+
+      registered.add(hash(sealedDevice('device-a')));
+      registered.add(hash(sealedDevice('device-b')));
+
+      await set.cutOff(rotatedSession(), keys, rotatedReaders('device-a'));
+
+      expect([...registered].sort()).toEqual(
+        [
+          hash(rotatedReaders('device-a').root),
+          hash(rotatedReaders('device-a').device),
+        ].sort(),
+      );
+    });
+
+    it('rejects when the reconcile it joins fails, and prunes on the next call', async () => {
+      const { channel, registered, set } = setup(['device-a']);
+      const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
+      let failListing: (error: Error) => void = () => undefined;
+
+      registered.add(hash(sealedDevice('device-b')));
+      channel.listReaders.mockReturnValueOnce(
+        new Promise((_resolve, reject) => {
+          failListing = reject;
+        }),
+      );
+      await set.enrolSealedRoot(
+        rotatedSession(),
+        keys,
+        rotatedReaders('device-a'),
+      );
+      // The revoke's session update starts the reconcile; the cut-off joins it.
+      const reconciling = set.reconcile(
+        rotatedSession(),
+        keys,
+        rotatedReaders('device-a'),
+      );
+      const cutting = set.cutOff(
+        rotatedSession(),
+        keys,
+        rotatedReaders('device-a'),
+      );
+      await new Promise<void>((resolve) => {
+        setImmediate(resolve);
+      });
+      failListing(new Error('node down'));
+
+      await expect(cutting).rejects.toThrow('node down');
+      await expect(reconciling).resolves.toBeUndefined();
+      expect(channel.listReaders).toHaveBeenCalledTimes(1);
+      expect(registered.has(hash(sealedDevice('device-b')))).toBe(true);
+
+      await set.cutOff(rotatedSession(), keys, rotatedReaders('device-a'));
+
+      expect(registered.has(hash(sealedDevice('device-b')))).toBe(false);
+      debug.mockRestore();
+    });
+
+    it('rejects when a revoked reader cannot be removed', async () => {
+      const { channel, registered, set } = setup(['device-a']);
+
+      registered.add(hash(sealedDevice('device-b')));
+      channel.removeReader.mockRejectedValue(
+        new HttpJsonError(503, 'Service Unavailable', ''),
+      );
+
+      await expect(
+        set.cutOff(rotatedSession(), keys, rotatedReaders('device-a')),
+      ).rejects.toThrow(HttpJsonError);
+      expect(registered.has(hash(sealedDevice('device-b')))).toBe(true);
+    });
   });
 });

@@ -35,6 +35,7 @@ import { DirectMessageMailbox } from '../../../../../contexts/messages/infrastru
 import { DirectMessageMailboxRecord } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxRecord';
 import { DirectMessageMailboxStore } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxStore';
 import { DirectMessageOutboxStore } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageOutboxStore';
+import { DirectMessageReaderCutOffError } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageReaderCutOffError';
 import { DirectMessageReaderSet } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageReaderSet';
 import { RecipientMailboxRouter } from '../../../../../contexts/messages/infrastructure/mailbox/RecipientMailboxRouter';
 import { MessageCollection } from '../../../../../contexts/messages/presentation/view-models/MessageCollection';
@@ -3517,6 +3518,116 @@ describe(DirectMessageMailbox.name, () => {
           ),
         ),
       );
+    });
+
+    describe('cutOffRevokedReaders', () => {
+      const laptop = 'device-credential-bob-laptop';
+      const rotatedRoot = Buffer.alloc(32, 6);
+      // The session the revoke returns: the new root, and the root it replaced.
+      const rotatedPhone = (): Session =>
+        ({
+          ...session('bob'),
+          deviceSealedRootKey: SymmetricKey.fromBuffer(rotatedRoot),
+          previousDeviceSealedRootKey: SymmetricKey.fromBuffer(rootFor('bob')),
+        }) as unknown as Session;
+
+      it('locks the revoked device out of records written once it resolves, before any read', async () => {
+        const keys = keysFor('bob');
+        const { projection } = setup();
+        const { readerHashes, wire } = nodeMailboxClient();
+        const composed = composedRecords();
+        const sender = mailboxFor(
+          wire,
+          memoryStore(),
+          projection,
+          undefined,
+          composed,
+        );
+        const beforeRevoke = [credentialFor('bob'), laptop];
+        const laptopStore = memoryStore();
+        const laptopApplied: string[][] = [];
+        const laptopPass = async () => {
+          await syncPass(
+            mailboxFor(wire, laptopStore, projection, beforeRevoke),
+            deviceSession('bob', laptop),
+            (changes) => {
+              laptopApplied.push(messageIds(changes));
+            },
+          ).catch(() => undefined);
+        };
+
+        await syncPass(
+          mailboxFor(wire, memoryStore(), projection, beforeRevoke),
+          session('bob'),
+          jest.fn(),
+        );
+        await laptopPass();
+        await sender.send(session('alice'), conversation, 'hello', {});
+        await laptopPass();
+        expect(laptopApplied).toEqual([['message-1']]);
+
+        // No sync pass of the phone runs between the revoke and the next send.
+        await mailboxFor(wire, memoryStore(), projection).cutOffRevokedReaders(
+          rotatedPhone(),
+        );
+
+        expect(readerHashes().sort()).toEqual(
+          hashed(
+            MailboxReadToken.derive(rotatedRoot, keys.mailboxId),
+            MailboxReadToken.deriveDevice(
+              rotatedRoot,
+              keys.mailboxId,
+              credentialFor('bob'),
+            ),
+          ),
+        );
+        composed.sent = {
+          ...sent,
+          id: 'message-2',
+          previousMessageIds: ['message-1'],
+        };
+        await sender.send(session('alice'), conversation, 'hello', {});
+        await laptopPass();
+        expect(laptopApplied).toEqual([['message-1']]);
+      });
+
+      it('rejects while the replaced root still reads an inbox the rotated root cannot reach', async () => {
+        const keys = keysFor('bob');
+        const { projection } = setup();
+        const { readerHashes, wire } = nodeMailboxClient(undefined, {
+          refusedReaders: [
+            MailboxReadToken.derive(rotatedRoot, keys.mailboxId),
+          ],
+        });
+        await syncPass(
+          mailboxFor(wire, memoryStore(), projection),
+          session('bob'),
+          jest.fn(),
+        );
+
+        await expect(
+          mailboxFor(wire, memoryStore(), projection).cutOffRevokedReaders(
+            rotatedPhone(),
+          ),
+        ).rejects.toThrow(DirectMessageReaderCutOffError);
+        expect(readerHashes()).toContain(
+          MailboxCapability.hash(
+            MailboxReadToken.derive(rootFor('bob'), keys.mailboxId),
+          ),
+        );
+      });
+
+      it('resolves for an inbox that neither root reaches', async () => {
+        const { projection } = setup();
+        const { readerHashes, wire } = nodeMailboxClient();
+
+        await expect(
+          mailboxFor(wire, memoryStore(), projection).cutOffRevokedReaders(
+            rotatedPhone(),
+          ),
+        ).resolves.toBeUndefined();
+        expect(readerHashes()).toEqual([]);
+      });
     });
 
     describe('retried writes', () => {

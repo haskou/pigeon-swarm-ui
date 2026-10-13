@@ -14,6 +14,7 @@ import type { DirectMessageTimelineChange } from '../../../../../contexts/messag
 
 import { MailboxCapability } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxKeySchedule } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxKeySchedule';
+import { MailboxReadToken } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxReadToken';
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/infrastructure/http/MailboxUnavailableError';
 import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageAvailabilityAnnouncement } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageAvailabilityAnnouncement';
@@ -85,6 +86,7 @@ describe('DirectMessageMailbox availability servers', () => {
     acked(mailboxId: string): number;
     envelopeIds(mailboxId: string): string[];
     hasInbox(mailboxId: string): boolean;
+    readerHashes(mailboxId: string): string[];
     setDown(value: boolean): void;
     wire: MockProxy<PigeonMailboxClient>;
   }
@@ -199,6 +201,9 @@ describe('DirectMessageMailbox availability servers', () => {
           (envelope) => envelope.envelopeId,
         ),
       hasInbox: (mailboxId: string) => inboxes.has(mailboxId),
+      readerHashes: (mailboxId: string) => [
+        ...(inboxes.get(mailboxId)?.readers ?? []),
+      ],
       setDown: (value: boolean) => {
         down = value;
       },
@@ -521,5 +526,78 @@ describe('DirectMessageMailbox availability servers', () => {
     await outboxSettled(alice, 'alice');
 
     expect(extra.envelopeIds(mailboxIdOf('bob'))).toHaveLength(1);
+  });
+
+  describe('cutOffRevokedReaders', () => {
+    const bobRoot = Buffer.alloc(32, 9);
+    const rotatedRoot = Buffer.alloc(32, 6);
+    // The session Bob's revoke returns: the new root, and the root it replaced.
+    const rotatedBob = (): Session =>
+      ({
+        ...session('bob'),
+        deviceSealedRootKey: SymmetricKey.fromBuffer(rotatedRoot),
+        previousDeviceSealedRootKey: SymmetricKey.fromBuffer(bobRoot),
+      }) as unknown as Session;
+    const rotatedReaders = (): string[] =>
+      [
+        MailboxReadToken.derive(rotatedRoot, mailboxIdOf('bob')),
+        MailboxReadToken.deriveDevice(
+          rotatedRoot,
+          mailboxIdOf('bob'),
+          credentialFor('bob'),
+        ),
+      ]
+        .map((token) => MailboxCapability.hash(token))
+        .sort();
+
+    /** Bob's inbox open on both nodes, each read by his revoked laptop too. */
+    const readByLaptop = async () => {
+      const parties = network();
+      const mailboxId = mailboxIdOf('bob');
+
+      await syncPass(parties.bob, 'bob');
+
+      for (const node of [parties.home, parties.extra]) {
+        await node.wire.addReader(
+          mailboxId,
+          MailboxReadToken.derive(bobRoot, mailboxId),
+          MailboxCapability.hash(
+            MailboxReadToken.deriveDevice(
+              bobRoot,
+              mailboxId,
+              'device-credential-bob-laptop',
+            ),
+          ),
+        );
+      }
+
+      return parties;
+    };
+
+    it('cuts the revoked device out of the inbox on every availability server', async () => {
+      const { bob, extra, home } = await readByLaptop();
+
+      await bob.cutOffRevokedReaders(rotatedBob());
+
+      expect(home.readerHashes(mailboxIdOf('bob')).sort()).toEqual(
+        rotatedReaders(),
+      );
+      expect(extra.readerHashes(mailboxIdOf('bob')).sort()).toEqual(
+        rotatedReaders(),
+      );
+    });
+
+    it('rejects while the home node is unreachable, after cutting off the availability servers', async () => {
+      const { bob, extra, home } = await readByLaptop();
+
+      home.setDown(true);
+
+      await expect(bob.cutOffRevokedReaders(rotatedBob())).rejects.toThrow(
+        'offline',
+      );
+      expect(extra.readerHashes(mailboxIdOf('bob')).sort()).toEqual(
+        rotatedReaders(),
+      );
+    });
   });
 });
