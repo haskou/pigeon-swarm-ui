@@ -8,6 +8,7 @@ import type { PigeonDeviceSealedSecretApi } from '../../../../../contexts/identi
 import type { PigeonKeychainApi } from '../../../../../contexts/identities/infrastructure/http/PigeonKeychainApi';
 import type { IdentityResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
+import type { DeviceIdentityVaultSession } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVaultSession';
 import type { DeviceIdentityVaultStore } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVaultStore';
 
 import { DeviceRemovedError } from '../../../../../contexts/identities/domain/DeviceRemovedError';
@@ -28,7 +29,11 @@ import {
 import { copy } from '../../../../../shared/presentation/i18n/copy';
 
 const passthroughRoot = {
-  current: (session: Session) => Promise.resolve(session),
+  current: (session: Session) =>
+    Promise.resolve({
+      ...session,
+      deviceSealedRootKey: SymmetricKey.generate(),
+    }),
 } as unknown as DeviceSealedRootRotation;
 
 const passthroughRecovery = {
@@ -73,6 +78,53 @@ function fakeCredential(publicKey: string): KeyPair {
   return {
     toPrimitives: () => ({ privateKey: '', publicKey }),
   } as unknown as KeyPair;
+}
+
+async function unlockableDevice(
+  deviceSealedRoot: DeviceSealedRootRotation,
+  recovery: DeviceSealedRecovery,
+): Promise<{ identityId: string; sessionApi: PigeonIdentitySessionApi }> {
+  const keyPair = await KeyPair.generate();
+  const currentIdentity = identity(keyPair.toPrimitives().publicKey);
+  const deviceCredentialKeyPair = await KeyPair.generate();
+  const recoveryAuthorityKeyPair = await KeyPair.generate();
+  currentIdentity.deviceCredential =
+    deviceCredentialKeyPair.toPrimitives().publicKey;
+  currentIdentity.deviceCredentialCommitment = SHA256Hash.from(
+    new StringValueObject(currentIdentity.deviceCredential),
+  ).valueOf();
+  currentIdentity.recoveryAuthority =
+    recoveryAuthorityKeyPair.toPrimitives().publicKey;
+  const identities = mock<PigeonIdentityGateway>();
+  const vault = mock<DeviceIdentityVault>();
+  const deviceAuthorization = mock<PigeonDeviceAuthorizationApi>();
+  identities.get.mockResolvedValue(currentIdentity);
+  vault.unlock.mockResolvedValue({
+    authorizationEpoch: DeviceAuthorizationEpoch.genesis(),
+    authorizationRevision: DeviceAuthorizationRevision.initial(),
+    deviceId: DeviceId.generate(),
+    material: {
+      deviceCredentialKeyPair,
+      identityKeyPair: keyPair,
+      recoveryAuthorityKeyPair,
+      rootKey: SymmetricKey.generate(),
+    },
+    secretHandle: DeviceUnlockSecretHandle.generate(),
+  } as unknown as DeviceIdentityVaultSession);
+  deviceAuthorization.synchronize.mockImplementation((session) =>
+    Promise.resolve(session),
+  );
+
+  return {
+    identityId: currentIdentity.id,
+    sessionApi: new PigeonIdentitySessionApi(
+      identities,
+      vault,
+      deviceAuthorization,
+      deviceSealedRoot,
+      recovery,
+    ),
+  };
 }
 
 describe(PigeonIdentitySessionApi.name, () => {
@@ -491,5 +543,41 @@ describe(PigeonIdentitySessionApi.name, () => {
 
     await expect(unlock).rejects.toBeInstanceOf(DeviceRemovedError);
     await expect(unlock).rejects.not.toThrow(copy.auth.invalidLogin);
+  });
+
+  it('refuses the unlock when the device sealed root cannot be opened', async () => {
+    const deviceSealedRoot = mock<DeviceSealedRootRotation>();
+    const recovery = mock<DeviceSealedRecovery>();
+    deviceSealedRoot.current.mockRejectedValue(new Error('offline'));
+    const { identityId, sessionApi } = await unlockableDevice(
+      deviceSealedRoot,
+      recovery,
+    );
+
+    await expect(sessionApi.unlock(identityId, 'password')).rejects.toThrow(
+      copy.auth.deviceRootUnavailable,
+    );
+    expect(recovery.resumeKeychainRewrap).not.toHaveBeenCalled();
+  });
+
+  it('refuses the unlock when no root opens, even after rotating a lagging entry', async () => {
+    const deviceSealedRoot = mock<DeviceSealedRootRotation>();
+    const recovery = mock<DeviceSealedRecovery>();
+    deviceSealedRoot.current.mockImplementation((session) =>
+      Promise.resolve(session),
+    );
+    recovery.rotateLaggingRoot.mockImplementation((session) =>
+      Promise.resolve(session),
+    );
+    const { identityId, sessionApi } = await unlockableDevice(
+      deviceSealedRoot,
+      recovery,
+    );
+
+    await expect(sessionApi.unlock(identityId, 'password')).rejects.toThrow(
+      copy.auth.deviceRootUnavailable,
+    );
+    expect(recovery.rotateLaggingRoot).toHaveBeenCalled();
+    expect(recovery.resumeKeychainRewrap).not.toHaveBeenCalled();
   });
 });

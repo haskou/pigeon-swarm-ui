@@ -60,6 +60,8 @@ export const en = {
       "This browser can no longer open this identity. Pair it again from a device where you are signed in, or erase this browser's copy and start over. Your account is not deleted.",
     deviceRemovedPair: 'Pair this device again',
     deviceRemovedStartOver: 'Erase local copy and start over',
+    deviceRootUnavailable:
+      'This device could not open its keys for this identity. Check your connection and try again. If it keeps failing, unlock on another of your devices first.',
     fallbackNetworksLabel: 'Networks, comma-separated',
     handleLabel: 'username',
     heroBody:

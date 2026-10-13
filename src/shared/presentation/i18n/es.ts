@@ -64,6 +64,8 @@ export const es = {
       'Este navegador ya no puede abrir esta identidad. Vuelve a vincularlo desde un dispositivo donde tengas la sesión iniciada, o borra la copia de este navegador y empieza de nuevo. Tu cuenta no se elimina.',
     deviceRemovedPair: 'Vincular este dispositivo de nuevo',
     deviceRemovedStartOver: 'Borrar la copia local y empezar de nuevo',
+    deviceRootUnavailable:
+      'Este dispositivo no ha podido abrir sus claves para esta identidad. Comprueba tu conexión e inténtalo de nuevo. Si sigue fallando, desbloquéala primero en otro de tus dispositivos.',
     fallbackNetworksLabel: 'Redes, separadas por comas',
     handleLabel: 'usuario',
     heroBody:

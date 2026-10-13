@@ -55,7 +55,8 @@ export class PigeonIdentitySessionApi {
   /**
    * Opens the root of the current generation. A session left without one has
    * an entry behind the head, so this device mints the fresh generation that
-   * a forgotten device could not publish.
+   * a forgotten device could not publish. Refuses the unlock when no root
+   * opens, so no unlocked session lacks one.
    */
   private async openDeviceSealedRoot(session: Session): Promise<Session> {
     let opened: Session;
@@ -63,16 +64,21 @@ export class PigeonIdentitySessionApi {
     try {
       opened = await this.deviceSealedRoot.current(session);
     } catch {
-      // Count-only. Reads and publishes need the root until next unlock.
       // eslint-disable-next-line no-console
       console.debug('Device sealed root could not be opened.');
 
-      return session;
+      throw new Error(copy.auth.deviceRootUnavailable);
     }
 
-    return opened.deviceSealedRootKey
+    const rooted = opened.deviceSealedRootKey
       ? opened
       : await this.recovery.rotateLaggingRoot(opened);
+
+    if (!rooted.deviceSealedRootKey) {
+      throw new Error(copy.auth.deviceRootUnavailable);
+    }
+
+    return rooted;
   }
 
   private validateKeyPair(identity: IdentityResource, keyPair: KeyPair): void {

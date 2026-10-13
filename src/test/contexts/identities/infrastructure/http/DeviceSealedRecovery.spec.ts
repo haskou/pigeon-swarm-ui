@@ -1,4 +1,10 @@
-import { EncryptedPayload, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import {
+  EncryptedPayload,
+  KeyPair,
+  PrivateKey,
+  PublicKey,
+  SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
 
 import type { DeviceSealedRootRotation } from '../../../../../contexts/identities/infrastructure/http/DeviceSealedRootRotation';
@@ -32,11 +38,20 @@ function memoryStorage(): Pick<Storage, 'getItem' | 'removeItem' | 'setItem'> {
 
 describe(DeviceSealedRecovery.name, () => {
   const masterKey = SymmetricKey.generate();
+  const device = new KeyPair(
+    new PublicKey('device-a-credential'),
+    new PrivateKey('device-a-private'),
+  );
+  const otherDevice = new KeyPair(
+    new PublicKey('device-b-credential'),
+    new PrivateKey('device-b-private'),
+  );
   const previousRoot = SymmetricKey.generate();
   const currentRoot = SymmetricKey.generate();
   const sessionAt = (revision: number, extra: Partial<Session> = {}): Session =>
     ({
       authorizationRevision: DeviceAuthorizationRevision.fromNumber(revision),
+      deviceCredentialKeyPair: device,
       identity: { id: identityId },
       masterKey,
       ...extra,
@@ -61,38 +76,27 @@ describe(DeviceSealedRecovery.name, () => {
   }
 
   describe('rememberKeychainRewrap', () => {
-    it('seals the previous root under the master key before a revoke moves the root', () => {
+    it("seals the previous root to this device's credential, not the identity root, before a revoke moves the root", () => {
       const { recovery, store } = harness();
 
       recovery.rememberKeychainRewrap(
         sessionAt(1, { deviceSealedRootKey: previousRoot }),
       );
 
-      const sealed = store.read(identityId).keychainRewrap;
+      const sealed = new EncryptedPayload(
+        store.read(identityId).keychainRewrap as string,
+      );
 
-      expect(sealed).toBeDefined();
-      expect(
-        masterKey.decrypt(new EncryptedPayload(sealed as string)).toString(),
-      ).toBe(previousRoot.toString());
-      expect(() =>
-        currentRoot.decrypt(new EncryptedPayload(sealed as string)),
-      ).toThrow();
+      expect(device.decrypt(sealed).toString()).toBe(previousRoot.toString());
+      expect(() => otherDevice.decrypt(sealed)).toThrow();
+      expect(() => masterKey.decrypt(sealed)).toThrow();
     });
 
-    it('records the master key when the head is still sealed under it', () => {
+    it('records nothing and throws when the session holds no root', () => {
       const { recovery, store } = harness();
 
-      recovery.rememberKeychainRewrap(sessionAt(1));
-
-      expect(
-        masterKey
-          .decrypt(
-            new EncryptedPayload(
-              store.read(identityId).keychainRewrap as string,
-            ),
-          )
-          .toString(),
-      ).toBe(masterKey.toString());
+      expect(() => recovery.rememberKeychainRewrap(sessionAt(1))).toThrow();
+      expect(store.read(identityId).keychainRewrap).toBeUndefined();
     });
   });
 
@@ -165,19 +169,6 @@ describe(DeviceSealedRecovery.name, () => {
       expect(store.read(identityId).keychainRewrap).toBeDefined();
     });
 
-    it('waits while the session holds no root', async () => {
-      const { keychains, recovery, store } = harness();
-
-      recovery.rememberKeychainRewrap(
-        sessionAt(1, { deviceSealedRootKey: previousRoot }),
-      );
-
-      await recovery.resumeKeychainRewrap(sessionAt(2));
-
-      expect(keychains.rewrapHeadSealedUnder).not.toHaveBeenCalled();
-      expect(store.read(identityId).keychainRewrap).toBeDefined();
-    });
-
     it('does nothing without a record', async () => {
       const { keychains, recovery } = harness();
 
@@ -225,6 +216,25 @@ describe(DeviceSealedRecovery.name, () => {
       expect(store.read(identityId).rootReseal).toMatchObject({
         authorizationRevision: 2,
       });
+    });
+
+    it("records the root sealed to this device's credential, not the identity root", async () => {
+      const { deviceSealedRoot, recovery, store } = harness();
+
+      deviceSealedRoot.reseal.mockRejectedValue(new Error('409'));
+
+      await recovery.resealAfterPairing(
+        sessionAt(2, { deviceSealedRootKey: currentRoot }),
+        currentRoot,
+      );
+
+      const sealed = new EncryptedPayload(
+        store.read(identityId).rootReseal?.rootKey as string,
+      );
+
+      expect(device.decrypt(sealed).toString()).toBe(currentRoot.toString());
+      expect(() => otherDevice.decrypt(sealed)).toThrow();
+      expect(() => masterKey.decrypt(sealed)).toThrow();
     });
   });
 
@@ -281,6 +291,24 @@ describe(DeviceSealedRecovery.name, () => {
       );
       expect(store.read(identityId).rootReseal).toBeDefined();
     });
+
+    it("keeps a record that does not open under this device's credential", async () => {
+      const { deviceSealedRoot, recovery, store } = harness();
+
+      deviceSealedRoot.reseal.mockRejectedValueOnce(new Error('offline'));
+      await recovery.resealAfterPairing(
+        sessionAt(2, { deviceSealedRootKey: currentRoot }),
+        currentRoot,
+      );
+      deviceSealedRoot.reseal.mockClear();
+
+      await recovery.resumeRootReseal(
+        sessionAt(2, { deviceCredentialKeyPair: otherDevice }),
+      );
+
+      expect(deviceSealedRoot.reseal).not.toHaveBeenCalled();
+      expect(store.read(identityId).rootReseal).toBeDefined();
+    });
   });
 
   describe('rotateLaggingRoot', () => {
@@ -323,7 +351,7 @@ describe(DeviceSealedRecovery.name, () => {
         synchronized,
       );
       expect(
-        masterKey
+        device
           .decrypt(
             new EncryptedPayload(
               store.read(identityId).keychainRewrap as string,

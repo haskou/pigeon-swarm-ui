@@ -14,9 +14,9 @@ export type PrivateBlobUploadRef = Pick<
 
 /**
  * Upload tokens of replicas this client stored and has not settled yet, sealed
- * in local storage so an abandoned send can still delete its replicas. Stored
- * entries that fail the ticket shape check are ignored and dropped on the next
- * write.
+ * in local storage under this device's credential key so an abandoned send can
+ * still delete its replicas. Stored entries that do not open or fail the ticket
+ * shape check are ignored and dropped on the next write.
  */
 export class PrivateBlobUploadLedger {
   private static readonly capacity = 200;
@@ -74,7 +74,9 @@ export class PrivateBlobUploadLedger {
 
     try {
       const parsed: unknown = JSON.parse(
-        session.masterKey.decrypt(new EncryptedPayload(raw)).toString(),
+        session.deviceCredentialKeyPair
+          .decrypt(new EncryptedPayload(raw))
+          .toString(),
       );
 
       return Array.isArray(parsed)
@@ -88,7 +90,9 @@ export class PrivateBlobUploadLedger {
   private write(session: Session, tickets: PrivateBlobUploadTicket[]): void {
     this.storage.setItem(
       this.storageKey(session),
-      session.masterKey.encrypt(JSON.stringify(tickets)).toString(),
+      session.deviceCredentialKeyPair
+        .encrypt(JSON.stringify(tickets))
+        .toString(),
     );
   }
 }

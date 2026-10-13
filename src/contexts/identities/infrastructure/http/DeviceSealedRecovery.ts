@@ -14,8 +14,9 @@ import { sessionRootKey } from '../session/sessionRootKey';
 /**
  * Completes device-sealed steps that failed after their change already took
  * effect. Each step is recorded before its change, with secrets sealed under
- * the master key, and cleared only when it succeeds. Unlock resumes whatever
- * is still recorded, so recovery needs no root to be open first.
+ * this device's credential key, and cleared only when it succeeds. Unlock
+ * resumes whatever is still recorded, so recovery needs no root to be open
+ * first. A record that does not open under the credential is never resumed.
  */
 export class DeviceSealedRecovery {
   public constructor(
@@ -51,7 +52,7 @@ export class DeviceSealedRecovery {
 
     this.store.write(identityId, {
       ...this.store.read(identityId),
-      keychainRewrap: session.masterKey
+      keychainRewrap: session.deviceCredentialKeyPair
         .encrypt(sessionRootKey(session).toString())
         .toString(),
     });
@@ -81,17 +82,17 @@ export class DeviceSealedRecovery {
 
   /**
    * Rewraps a keychain head that a revoke left sealed under the previous root.
-   * Waits while the session holds no root. Never throws.
+   * Never throws.
    */
   public async resumeKeychainRewrap(rooted: Session): Promise<void> {
     const identityId = rooted.identity.id;
     const { keychainRewrap } = this.store.read(identityId);
 
-    if (!keychainRewrap || !rooted.deviceSealedRootKey) return;
+    if (!keychainRewrap) return;
 
     try {
       const previousKey = SymmetricKey.fromBase64(
-        rooted.masterKey
+        rooted.deviceCredentialKeyPair
           .decrypt(new EncryptedPayload(keychainRewrap))
           .toString(),
       );
@@ -127,7 +128,9 @@ export class DeviceSealedRecovery {
         ...this.store.read(identityId),
         rootReseal: {
           authorizationRevision: session.authorizationRevision.valueOf(),
-          rootKey: session.masterKey.encrypt(root.toString()).toString(),
+          rootKey: session.deviceCredentialKeyPair
+            .encrypt(root.toString())
+            .toString(),
         },
       });
     } catch {
@@ -169,7 +172,7 @@ export class DeviceSealedRecovery {
 
     try {
       const root = SymmetricKey.fromBase64(
-        synchronized.masterKey
+        synchronized.deviceCredentialKeyPair
           .decrypt(new EncryptedPayload(rootReseal.rootKey))
           .toString(),
       );

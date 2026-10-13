@@ -1,4 +1,4 @@
-import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import { KeyPair, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { MessageProjectionPort } from '../../../../../contexts/messages/infrastructure/crypto/MessageProjectionPort';
@@ -7,6 +7,7 @@ import type { ChatMessage } from '../../../../../contexts/messages/presentation/
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
+import { DraftPayloadCipher } from '../../../../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
 import { PigeonMessagesApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessagesApi';
 import { RequestCache } from '../../../../../shared/infrastructure/http/RequestCache';
 import { ScopeFrontierReader } from '../../../../../shared/infrastructure/http/ScopeFrontierReader';
@@ -75,6 +76,41 @@ describe(PigeonMessagesApi.name, () => {
       ['raw-message'],
       undefined,
     );
+  });
+
+  it('lists the conversation drafts that open under the device sealed root and skips the rest', async () => {
+    const rooted = {
+      deviceSealedRootKey: SymmetricKey.generate(),
+      identity: { id: 'identity-1' },
+    } as unknown as Session;
+    const cipher = new DraftPayloadCipher();
+    const openable = {
+      conversationId: 'conversation-1',
+      encryptedPayload: cipher.encrypt(rooted, 'draft text'),
+      updatedAt: 1,
+    };
+    const unopenable = {
+      conversationId: 'conversation-2',
+      encryptedPayload: cipher.encrypt(
+        { ...rooted, deviceSealedRootKey: SymmetricKey.generate() },
+        'replaced root draft',
+      ),
+      updatedAt: 2,
+    };
+    const request = jest
+      .fn()
+      .mockResolvedValue({ drafts: [unopenable, openable] });
+    const api = new PigeonMessagesApi(
+      httpClient(request),
+      signer(jest.fn().mockResolvedValue({})),
+      new RequestCache(),
+      projection(jest.fn()),
+      publicMutationSignerAt(),
+    );
+
+    await expect(api.listConversationDrafts(rooted)).resolves.toEqual([
+      { ...openable, content: 'draft text' },
+    ]);
   });
 
   describe('signed mutations', () => {

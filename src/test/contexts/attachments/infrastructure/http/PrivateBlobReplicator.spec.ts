@@ -7,13 +7,13 @@ import { PrivateBlobUploadLedger } from '../../../../../contexts/attachments/inf
 
 describe(PrivateBlobReplicator.name, () => {
   const session = {
-    identity: { id: 'identity-1' },
-    masterKey: {
+    deviceCredentialKeyPair: {
       decrypt: (payload: { toString: () => string }) => ({
         toString: () => payload.toString().replace(/^sealed:/, ''),
       }),
       encrypt: (plain: string) => ({ toString: () => `sealed:${plain}` }),
     },
+    identity: { id: 'identity-1' },
   } as unknown as Session;
   const nodeA = 'https://node-a.example';
   const nodeB = 'https://node-b.example';

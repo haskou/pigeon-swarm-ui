@@ -1,49 +1,24 @@
 import { MailboxReaderRetention } from '../../../../contexts/mailboxes/domain/MailboxReaderRetention';
 
 describe('MailboxReaderRetention', () => {
-  const retained = ['managing', 'root', 'device', 'sealed'];
+  const retained = ['root', 'device'];
   const devices = ['device-a', 'device-b'];
-  const legacy = ['legacy-root', 'legacy-device-a', 'legacy-device-b'];
 
-  it('removes a listed reader that no retained, device or legacy set holds', () => {
+  it('removes every listed reader no retained or device set holds', () => {
     expect(
       MailboxReaderRetention.readersToRemove({
         devices,
-        legacy,
-        listed: ['managing', 'device-a', 'stale'],
+        listed: ['root', 'device-a', 'identity-root', 'stale'],
         retained,
       }),
-    ).toEqual(['stale']);
-  });
-
-  it('keeps the legacy readers while a device reader is not listed yet', () => {
-    expect(
-      MailboxReaderRetention.readersToRemove({
-        devices,
-        legacy,
-        listed: ['device-a', 'legacy-root', 'legacy-device-a', 'stale'],
-        retained,
-      }),
-    ).toEqual(['stale']);
-  });
-
-  it('drops the legacy readers once every device reader is listed', () => {
-    expect(
-      MailboxReaderRetention.readersToRemove({
-        devices,
-        legacy,
-        listed: ['device-a', 'device-b', 'legacy-root', 'legacy-device-a'],
-        retained,
-      }),
-    ).toEqual(['legacy-root', 'legacy-device-a']);
+    ).toEqual(['identity-root', 'stale']);
   });
 
   it('never removes retained or device readers', () => {
     expect(
       MailboxReaderRetention.readersToRemove({
         devices,
-        legacy,
-        listed: ['managing', 'root', 'device', 'sealed', 'device-a'],
+        listed: ['root', 'device', 'device-a', 'device-b'],
         retained,
       }),
     ).toEqual([]);

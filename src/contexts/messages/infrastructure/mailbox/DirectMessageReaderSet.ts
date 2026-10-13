@@ -28,10 +28,38 @@ export class DirectMessageReaderSet {
   ) {}
 
   /**
-   * Bridges the device-sealed root into the mailbox. The legacy root reader is
-   * added first, best effort, because only it can add the sealed root reader
-   * to an inbox created before rotation. The sealed device reader must
-   * succeed. Memoised per mailbox and root.
+   * The root reader lists and removes readers, so it is always kept, as is
+   * this device's reader while the credential list lags.
+   */
+  private async prune(
+    session: Session,
+    keys: MailboxKeys,
+    readers: MailboxReadTokens,
+  ): Promise<void> {
+    const credentials = await this.listCredentials(session);
+    const rootKey = sessionRootKey(session).getBuffer();
+    const listed = await this.channel.listReaders(keys, readers.root);
+    const removable = MailboxReaderRetention.readersToRemove({
+      devices: credentials.map((credential) =>
+        MailboxCapability.hash(
+          MailboxReadToken.deriveDevice(rootKey, keys.mailboxId, credential),
+        ),
+      ),
+      listed: listed.readers.map((reader) => reader.readTokenHash),
+      retained: [
+        MailboxCapability.hash(readers.root),
+        MailboxCapability.hash(readers.device),
+      ],
+    });
+
+    for (const readTokenHash of removable) {
+      await this.channel.removeReader(keys, readers.root, readTokenHash);
+    }
+  }
+
+  /**
+   * Enrols this device's reader under the root reader. Memoised per mailbox
+   * and root.
    */
   public enrolSealedRoot(
     session: Session,
@@ -43,13 +71,13 @@ export class DirectMessageReaderSet {
 
     if (known) return known;
 
-    const enrol = this.bridge(session, keys, readers).catch(
-      (error: unknown) => {
+    const enrol = this.channel
+      .addReader(keys, readers.root, readers.device)
+      .catch((error: unknown) => {
         this.enrolled.delete(key);
 
         throw error;
-      },
-    );
+      });
 
     this.enrolled.set(key, enrol);
 
@@ -57,10 +85,10 @@ export class DirectMessageReaderSet {
   }
 
   /**
-   * Prunes readers that no device of the identity holds. Runs only under a
-   * device-sealed session, once per mailbox and root per app session; a failed
-   * pass is retried on the next sync. Never rejects: a stale reader only delays
-   * envelope retention, so the read path does not wait on a failure here.
+   * Prunes readers that no device of the identity holds, once per mailbox and
+   * root per app session; a failed pass is retried on the next sync. Never
+   * rejects: a stale reader only delays envelope retention, so the read path
+   * does not wait on a failure here.
    */
   public reconcile(
     session: Session,
@@ -84,104 +112,5 @@ export class DirectMessageReaderSet {
     this.reconciled.set(key, pass);
 
     return pass;
-  }
-
-  /**
-   * Frees slots while a legacy inbox is not adopted yet, under a device-sealed
-   * session only (see prune). The legacy token is the only reader that can
-   * manage it. Best effort and not memoised: the adoption that follows reports
-   * a refusal, and the next sync prunes again.
-   */
-  public async pruneUnderLegacy(
-    session: Session,
-    keys: MailboxKeys,
-    readers: MailboxReadTokens,
-    legacyToken: string,
-  ): Promise<void> {
-    try {
-      await this.prune(session, keys, readers, legacyToken);
-    } catch {
-      // Count-only: no ids, content, or error details.
-      // eslint-disable-next-line no-console
-      console.debug('Direct mailbox legacy reader prune failed.');
-    }
-  }
-
-  private async bridge(
-    session: Session,
-    keys: MailboxKeys,
-    readers: MailboxReadTokens,
-  ): Promise<void> {
-    const legacyRoot = MailboxReadToken.derive(
-      session.masterKey.getBuffer(),
-      keys.mailboxId,
-    );
-
-    try {
-      await this.channel.addReader(keys, legacyRoot, readers.root);
-    } catch {
-      // Best effort: the inbox may already be past the legacy root.
-    }
-
-    await this.channel.addReader(keys, readers.root, readers.device);
-  }
-
-  /**
-   * Runs under a device-sealed session only. A masterKey-only session cannot
-   * tell a removed device's reader from a bridged device's sealed reader, so
-   * it removes nothing and never locks a bridged device out.
-   *
-   * The managing token lists and removes readers, so it is always kept, as
-   * are the root and device readers and the session's own sealed root reader.
-   * The legacy readers stay until every listed device holds its sealed device
-   * reader.
-   */
-  private async prune(
-    session: Session,
-    keys: MailboxKeys,
-    readers: MailboxReadTokens,
-    managingToken = readers.root,
-  ): Promise<void> {
-    if (!session.deviceSealedRootKey) return;
-
-    const credentials = await this.listCredentials(session);
-    const rootKey = sessionRootKey(session).getBuffer();
-    const deviceTokens = credentials.map((credential) =>
-      MailboxReadToken.deriveDevice(rootKey, keys.mailboxId, credential),
-    );
-    const legacyKey = session.masterKey.getBuffer();
-    const listed = await this.channel.listReaders(keys, managingToken);
-    const removable = MailboxReaderRetention.readersToRemove({
-      devices: deviceTokens.map((token) => MailboxCapability.hash(token)),
-      legacy: [
-        MailboxCapability.hash(
-          MailboxReadToken.derive(legacyKey, keys.mailboxId),
-        ),
-        ...credentials.map((credential) =>
-          MailboxCapability.hash(
-            MailboxReadToken.deriveDevice(
-              legacyKey,
-              keys.mailboxId,
-              credential,
-            ),
-          ),
-        ),
-      ],
-      listed: listed.readers.map((reader) => reader.readTokenHash),
-      retained: [
-        MailboxCapability.hash(managingToken),
-        MailboxCapability.hash(readers.root),
-        MailboxCapability.hash(readers.device),
-        // The session's sealed root reader stays even when prune runs on the
-        // legacy set after a refused bridge.
-        MailboxCapability.hash(
-          MailboxReadToken.derive(rootKey, keys.mailboxId),
-        ),
-      ],
-    });
-
-    for (const readTokenHash of removable) {
-      await this.channel.removeReader(keys, managingToken, readTokenHash);
-    }
   }
 }

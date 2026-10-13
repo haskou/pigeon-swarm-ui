@@ -22,13 +22,13 @@ export class DirectMessageReadSync {
     private readonly store: DirectMessageMailboxStore,
   ) {}
 
-  /** Reads only an inbox prewarm already opened, without a legacy readToken. */
+  /** Reads only an inbox prewarm already opened. */
   private readsAllowed(mailboxId: string, signal: AbortSignal): boolean {
     if (signal.aborted) return false;
 
     const stored = this.store.load(mailboxId);
 
-    return stored !== null && !stored.readToken;
+    return stored !== null;
   }
 
   /** Saves the cursor when a page moved it forward, and returns the cursor. */

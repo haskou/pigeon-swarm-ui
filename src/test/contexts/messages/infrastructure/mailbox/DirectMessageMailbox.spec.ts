@@ -76,11 +76,16 @@ describe(DirectMessageMailbox.name, () => {
   const credentialFor = (identityId: string): string =>
     `device-credential-${identityId}`;
 
+  /** The device-sealed root that tags and reader tokens derive from. */
+  const rootFor = (identityId: string): Buffer =>
+    Buffer.alloc(32, identityId === 'alice' ? 3 : 9);
+
   const session = (identityId: string): Session =>
     ({
       deviceCredentialKeyPair: {
         toPrimitives: () => ({ publicKey: credentialFor(identityId) }),
       },
+      deviceSealedRootKey: SymmetricKey.fromBuffer(rootFor(identityId)),
       identity: { id: identityId },
       keychain: {
         conversations: {
@@ -96,27 +101,17 @@ describe(DirectMessageMailbox.name, () => {
         },
         version: 1,
       },
+      /** The identity root: never a reader or tag root. */
       masterKey: {
-        getBuffer: () => Buffer.alloc(32, identityId === 'alice' ? 3 : 9),
+        getBuffer: () => Buffer.alloc(32, identityId === 'alice' ? 13 : 19),
       },
-    }) as unknown as Session;
-
-  /** The device-sealed root that tags and reads use once a device holds one. */
-  const sealedRoot = Buffer.alloc(32, 5);
-  const withSealedRoot = (base: Session): Session =>
-    ({
-      ...base,
-      deviceSealedRootKey: SymmetricKey.fromBuffer(sealedRoot),
     }) as unknown as Session;
 
   /** Alice's own inbox copy, tagged under her root key as the sender does. */
   const ownEncode = (record: DirectMessageRecord): Uint8Array =>
     DirectMessageMailboxRecord.encode(
       record,
-      DirectMessageAuthorship.tag(
-        session('alice').masterKey.getBuffer(),
-        record,
-      ),
+      DirectMessageAuthorship.tag(rootFor('alice'), record),
     );
 
   const keysFor = (identityId: string): MailboxKeys =>
@@ -133,18 +128,14 @@ describe(DirectMessageMailbox.name, () => {
   const readerTokensFor = (
     identityId: string,
     mailboxId: string,
-  ): MailboxReadTokens => {
-    const masterKey = Buffer.alloc(32, identityId === 'alice' ? 3 : 9);
-
-    return {
-      device: MailboxReadToken.deriveDevice(
-        masterKey,
-        mailboxId,
-        credentialFor(identityId),
-      ),
-      root: MailboxReadToken.derive(masterKey, mailboxId),
-    };
-  };
+  ): MailboxReadTokens => ({
+    device: MailboxReadToken.deriveDevice(
+      rootFor(identityId),
+      mailboxId,
+      credentialFor(identityId),
+    ),
+    root: MailboxReadToken.derive(rootFor(identityId), mailboxId),
+  });
 
   const memoryStore = (): DirectMessageMailboxStore => {
     const records = new Map<string, DirectMessageMailboxState>();
@@ -243,6 +234,14 @@ describe(DirectMessageMailbox.name, () => {
       mailbox.subscribeOutbox(check);
       check();
     });
+
+  // Every session holds a root, so queued sends persist between tests. The
+  // outbox store runs on IndexedDB, so fake timers must spare setImmediate.
+  beforeEach(async () => {
+    jest.useRealTimers();
+    await new DirectMessageOutboxStore().forget('alice');
+    await new DirectMessageOutboxStore().forget('bob');
+  });
 
   const pageWith = (plaintext: Uint8Array, lastCursor: number) => ({
     envelopes: [{ cursor: lastCursor, envelopeId: 'envelope', plaintext }],
@@ -383,7 +382,7 @@ describe(DirectMessageMailbox.name, () => {
     });
 
     it('retries the peer append while the recipient inbox is not open yet, then delivers and writes the own copy', async () => {
-      jest.useFakeTimers();
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
       const { channel, mailbox } = setup();
       channel.send
         .mockRejectedValueOnce(new MailboxUnavailableError())
@@ -396,7 +395,11 @@ describe(DirectMessageMailbox.name, () => {
         'hello',
         {},
       );
-      await jest.advanceTimersByTimeAsync(10_000);
+      // The outbox persists on IndexedDB in real time, so step the retry
+      // clock until the third append lands.
+      while (channel.send.mock.calls.length < 4) {
+        await jest.advanceTimersByTimeAsync(1_000);
+      }
 
       await expect(delivery).resolves.toMatchObject({ id: 'message-1' });
       expect(channel.send).toHaveBeenCalledTimes(4);
@@ -484,7 +487,7 @@ describe(DirectMessageMailbox.name, () => {
     });
 
     it('keeps the send in retry, logging nothing, while the recipient inbox stays missing', async () => {
-      jest.useFakeTimers();
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
       const { channel, mailbox } = setup();
       channel.send.mockRejectedValue(new MailboxUnavailableError());
       const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
@@ -497,20 +500,17 @@ describe(DirectMessageMailbox.name, () => {
       ]);
       expect(debug).not.toHaveBeenCalled();
       debug.mockRestore();
+      mailbox.stopOutbox('alice');
       jest.useRealTimers();
     });
 
     describe('queued sends across unlock and forget', () => {
-      beforeEach(async () => {
-        await new DirectMessageOutboxStore().forget('alice');
-      });
-
       afterEach(() => {
         jest.useRealTimers();
       });
 
       it('projects queued sends as decrypted messages', async () => {
-        jest.useFakeTimers();
+        jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
         const { channel, mailbox } = setup();
         channel.send.mockRejectedValue(new MailboxUnavailableError());
 
@@ -538,7 +538,7 @@ describe(DirectMessageMailbox.name, () => {
       });
 
       it('resumes a send stopped at logout once the identity unlocks', async () => {
-        const alice = withSealedRoot(session('alice'));
+        const alice = session('alice');
         const first = setup();
         first.channel.send.mockRejectedValue(new MailboxUnavailableError());
 
@@ -558,7 +558,7 @@ describe(DirectMessageMailbox.name, () => {
       });
 
       it('wipes the queued sends of a forgotten identity', async () => {
-        const alice = withSealedRoot(session('alice'));
+        const alice = session('alice');
         const first = setup();
         first.channel.send.mockRejectedValue(new MailboxUnavailableError());
 
@@ -909,7 +909,7 @@ describe(DirectMessageMailbox.name, () => {
     '%s rejects when the peer copy fails',
     (_label, deliverKind) => {
       it('retries while the recipient inbox is missing, then rejects with MailboxUnavailableError, and logs nothing', async () => {
-        jest.useFakeTimers();
+        jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
         const { channel, mailbox } = setup();
         channel.send.mockRejectedValue(new MailboxUnavailableError());
         const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
@@ -1035,22 +1035,20 @@ describe(DirectMessageMailbox.name, () => {
       },
     );
 
-    it('tags the own copy under the device-sealed root, not the master key', async () => {
+    it('tags the own copy under the device-sealed root, not the identity root', async () => {
       const { channel, mailbox } = setup();
       channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
 
-      await mailbox.send(
-        withSealedRoot(session('alice')),
-        conversation,
-        'hello',
-        {},
-      );
+      await mailbox.send(session('alice'), conversation, 'hello', {});
       await outboxSettled(mailbox, 'alice');
 
       const [, ownPlaintext] = channel.send.mock.calls[1];
       const { authorTag, record } = envelopeOf(ownPlaintext);
       expect(authorTag).toBe(
-        DirectMessageAuthorship.tag(sealedRoot, record as DirectMessageRecord),
+        DirectMessageAuthorship.tag(
+          rootFor('alice'),
+          record as DirectMessageRecord,
+        ),
       );
       expect(authorTag).not.toBe(
         DirectMessageAuthorship.tag(
@@ -1224,7 +1222,7 @@ describe(DirectMessageMailbox.name, () => {
         },
       );
 
-      it('drops an own copy tagged under the master key once the sealed root replaces it', async () => {
+      it('drops an own copy tagged under the identity root', async () => {
         const { channel } = setup();
         const revokedTag = DirectMessageAuthorship.tag(
           session('alice').masterKey.getBuffer(),
@@ -1237,7 +1235,7 @@ describe(DirectMessageMailbox.name, () => {
         const apply = jest.fn();
 
         await otherDevice(channel).sync(
-          withSealedRoot(session('alice')),
+          session('alice'),
           conversationId,
           new AbortController().signal,
           apply,
@@ -1248,7 +1246,7 @@ describe(DirectMessageMailbox.name, () => {
 
       it('applies an own copy tagged under the sealed root', async () => {
         const { channel } = setup();
-        const tag = DirectMessageAuthorship.tag(sealedRoot, storedRecord);
+        const tag = DirectMessageAuthorship.tag(rootFor('alice'), storedRecord);
         channel.read.mockResolvedValue(
           pageOf([DirectMessageMailboxRecord.encode(storedRecord, tag)]),
         );
@@ -1256,7 +1254,7 @@ describe(DirectMessageMailbox.name, () => {
         const apply = jest.fn();
 
         await otherDevice(channel).sync(
-          withSealedRoot(session('alice')),
+          session('alice'),
           conversationId,
           new AbortController().signal,
           apply,
@@ -1365,7 +1363,9 @@ describe(DirectMessageMailbox.name, () => {
         const { channel, mailbox } = setup();
         channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
         await mailbox.send(session('alice'), conversation, 'hello', {});
+        await outboxSettled(mailbox, 'alice');
         await mailbox.delete(session('alice'), conversation, 'message-1');
+        await outboxSettled(mailbox, 'alice');
         const ownSent = channel.send.mock.calls[1][1];
         const ownDelete = channel.send.mock.calls[3][1];
         channel.read.mockResolvedValue(pageOf([ownSent, ownDelete]));
@@ -1761,84 +1761,35 @@ describe(DirectMessageMailbox.name, () => {
       expect(store.load(keysFor('alice').mailboxId)?.cursor).toBe(0);
     });
 
-    it('adopts a legacy inbox by registering the root and device readers under its stored token', async () => {
+    it('reads through the sealed readers when the reopen bridge is refused', async () => {
       const { channel, mailbox, store } = setup();
       const keys = keysFor('alice');
-      const tokens = readerTokensFor('alice', keys.mailboxId);
-      store.save(keys.mailboxId, { cursor: 5, readToken: 'legacy-read-token' });
+      store.save(keys.mailboxId, { cursor: 5 });
+      channel.addReader.mockRejectedValue(
+        new HttpJsonError(503, 'Service Unavailable', 'refused'),
+      );
       channel.read.mockResolvedValue({
         envelopes: [],
         hasMore: false,
         lastCursor: 5,
         recreated: false,
       });
+      const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
 
-      await mailbox.sync(
-        session('alice'),
-        conversationId,
-        new AbortController().signal,
-        jest.fn(),
-      );
-
-      expect(channel.addReader).toHaveBeenCalledWith(
-        keys,
-        'legacy-read-token',
-        tokens.root,
-      );
-      expect(channel.addReader).toHaveBeenCalledWith(
-        keys,
-        'legacy-read-token',
-        tokens.device,
-      );
-      expect(channel.read.mock.calls[0][1]).toEqual(tokens);
-      expect(store.load(keys.mailboxId)).toEqual({ cursor: 5 });
-    });
-
-    it('treats a legacy inbox that no longer exists as fresh, starting from cursor zero', async () => {
-      const { channel, mailbox, store } = setup();
-      const keys = keysFor('alice');
-      const tokens = readerTokensFor('alice', keys.mailboxId);
-      store.save(keys.mailboxId, { cursor: 5, readToken: 'legacy-read-token' });
-      channel.addReader.mockRejectedValueOnce(new MailboxUnavailableError());
-      channel.read.mockResolvedValue({
-        envelopes: [],
-        hasMore: false,
-        lastCursor: 0,
-        recreated: false,
-      });
-
-      await mailbox.sync(
-        session('alice'),
-        conversationId,
-        new AbortController().signal,
-        jest.fn(),
-      );
-
-      expect(channel.createInbox).toHaveBeenCalledWith(keys, tokens.root);
-      expect(channel.read.mock.calls[0][1]).toEqual(tokens);
-      expect(store.load(keys.mailboxId)).toEqual({ cursor: 0 });
-    });
-
-    it('keeps the legacy state and surfaces the error when adoption fails for another reason', async () => {
-      const { channel, mailbox, store } = setup();
-      const keys = keysFor('alice');
-      store.save(keys.mailboxId, { cursor: 5, readToken: 'legacy-read-token' });
-      channel.addReader.mockRejectedValueOnce(new Error('offline'));
-
-      await expect(
-        mailbox.sync(
+      try {
+        await mailbox.sync(
           session('alice'),
           conversationId,
           new AbortController().signal,
           jest.fn(),
-        ),
-      ).rejects.toThrow('offline');
+        );
+      } finally {
+        debug.mockRestore();
+      }
 
-      expect(channel.read).not.toHaveBeenCalled();
-      expect(store.load(keys.mailboxId)).toEqual({
-        cursor: 5,
-        readToken: 'legacy-read-token',
-      });
+      expect(channel.read.mock.calls[0][1]).toEqual(
+        readerTokensFor('alice', keys.mailboxId),
+      );
     });
   });
 
@@ -2489,25 +2440,6 @@ describe(DirectMessageMailbox.name, () => {
       expect(apply).not.toHaveBeenCalled();
     });
 
-    it('leaves a stored legacy inbox to the sync path', async () => {
-      const { channel, mailbox, store } = setup();
-      store.save(keysFor('alice').mailboxId, {
-        cursor: 0,
-        readToken: 'legacy-token',
-      });
-      const apply = jest.fn();
-
-      await mailbox.syncReads(
-        session('alice'),
-        conversationId,
-        new AbortController().signal,
-        apply,
-      );
-
-      expect(channel.read).not.toHaveBeenCalled();
-      expect(apply).not.toHaveBeenCalled();
-    });
-
     it('reads nothing when the signal is already aborted', async () => {
       const { channel, mailbox, store } = setup();
       openedInbox(store);
@@ -2710,7 +2642,7 @@ describe(DirectMessageMailbox.name, () => {
     });
 
     it('retries a failed open only after the retry window, and stores nothing until it succeeds', async () => {
-      jest.useFakeTimers();
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
       const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
 
       try {
@@ -3016,24 +2948,8 @@ describe(DirectMessageMailbox.name, () => {
       credentials: readonly string[],
     ): string[] =>
       credentials.map((credential) =>
-        MailboxReadToken.deriveDevice(
-          Buffer.alloc(32, 9),
-          mailboxId,
-          credential,
-        ),
+        MailboxReadToken.deriveDevice(rootFor('bob'), mailboxId, credential),
       );
-
-    /** The sealed root a device-sealed session reads with. */
-    const SEALED_ROOT = Buffer.alloc(32, 5);
-
-    const sealedSessionFor = (
-      identityId: string,
-      credential = credentialFor(identityId),
-    ): Session =>
-      ({
-        ...deviceSession(identityId, credential),
-        deviceSealedRootKey: SymmetricKey.fromBuffer(SEALED_ROOT),
-      }) as unknown as Session;
 
     const syncPass = async (
       mailbox: DirectMessageMailbox,
@@ -3275,7 +3191,7 @@ describe(DirectMessageMailbox.name, () => {
       const mailbox = mailboxFor(wire, store, projection);
       const untaggable = {
         ...session('alice'),
-        masterKey: undefined,
+        deviceSealedRootKey: undefined,
       } as unknown as Session;
 
       await expect(
@@ -3333,81 +3249,7 @@ describe(DirectMessageMailbox.name, () => {
       expect(envelopeCount()).toBe(0);
     });
 
-    it('frees dead reader slots from a full legacy inbox before adopting it', async () => {
-      const { projection, store } = setup();
-      const keys = keysFor('bob');
-      const sealedRoot = MailboxReadToken.derive(SEALED_ROOT, keys.mailboxId);
-      const sealedDevice = MailboxReadToken.deriveDevice(
-        SEALED_ROOT,
-        keys.mailboxId,
-        credentialFor('bob'),
-      );
-      const legacy = 'legacy-read-token';
-      const dead = Array.from(
-        { length: 7 },
-        (_, index) => `removed-device-${index}`,
-      );
-      const { readerHashes, wire } = nodeMailboxClient(undefined, {
-        maxReaders: 8,
-        readerTokens: [legacy, ...dead],
-      });
-      const sender = mailboxFor(wire, memoryStore(), projection);
-      const mailbox = mailboxFor(wire, store, projection);
-      const applied: string[][] = [];
-      const recordApplied = (changes: DirectMessageTimelineChange[]) => {
-        applied.push(messageIds(changes));
-      };
-      store.save(keys.mailboxId, { cursor: 0, readToken: legacy });
-
-      await expect(
-        syncPass(mailbox, sealedSessionFor('bob'), recordApplied),
-      ).resolves.toBeUndefined();
-
-      expect(readerHashes().sort()).toEqual(hashed(sealedRoot, sealedDevice));
-      expect(store.load(keys.mailboxId)).toEqual({ cursor: 0 });
-
-      await sender.send(session('alice'), conversation, 'hello', {});
-      await syncPass(mailbox, sealedSessionFor('bob'), recordApplied);
-
-      expect(applied).toEqual([['message-1']]);
-    });
-
-    it('keeps the legacy state and surfaces the cap when no reader can be freed', async () => {
-      const { projection, store } = setup();
-      const keys = keysFor('bob');
-      const legacy = 'legacy-read-token';
-      const devices = Array.from(
-        { length: 7 },
-        (_, index) => `credential-${index}`,
-      );
-      const deviceTokens = deviceTokensFor(keys.mailboxId, devices);
-      const { readerHashes, wire } = nodeMailboxClient(undefined, {
-        maxReaders: 8,
-        readerTokens: [legacy, ...deviceTokens],
-      });
-      const mailbox = mailboxFor(wire, store, projection, [
-        credentialFor('bob'),
-        ...devices,
-      ]);
-      store.save(keys.mailboxId, { cursor: 0, readToken: legacy });
-
-      await expect(
-        mailbox.sync(
-          session('bob'),
-          conversationId,
-          new AbortController().signal,
-          jest.fn(),
-        ),
-      ).rejects.toMatchObject({ status: 409 });
-
-      expect(store.load(keys.mailboxId)).toEqual({
-        cursor: 0,
-        readToken: legacy,
-      });
-      expect(readerHashes().sort()).toEqual(hashed(legacy, ...deviceTokens));
-    });
-
-    it('keeps a removed device reader under a masterKey-only session', async () => {
+    it('prunes a removed device reader on the next app session', async () => {
       const { projection, store } = setup();
       const keys = keysFor('bob');
       const tokens = readerTokensFor('bob', keys.mailboxId);
@@ -3429,72 +3271,7 @@ describe(DirectMessageMailbox.name, () => {
         jest.fn(),
       );
 
-      expect(readerHashes().sort()).toEqual(
-        hashed(tokens.root, tokens.device, 'removed-device'),
-      );
-    });
-
-    it('prunes a removed device reader once the device is bridged', async () => {
-      const { projection, store } = setup();
-      const keys = keysFor('bob');
-      const tokens = readerTokensFor('bob', keys.mailboxId);
-      const sealedRoot = MailboxReadToken.derive(SEALED_ROOT, keys.mailboxId);
-      const sealedDevice = MailboxReadToken.deriveDevice(
-        SEALED_ROOT,
-        keys.mailboxId,
-        credentialFor('bob'),
-      );
-      const { readerHashes, wire } = nodeMailboxClient();
-      await syncPass(
-        mailboxFor(wire, store, projection),
-        session('bob'),
-        jest.fn(),
-      );
-      await wire.addReader(
-        keys.mailboxId,
-        tokens.root,
-        MailboxCapability.hash('removed-device'),
-      );
-
-      await syncPass(
-        mailboxFor(wire, store, projection),
-        sealedSessionFor('bob'),
-        jest.fn(),
-      );
-
-      expect(readerHashes().sort()).toEqual(hashed(sealedRoot, sealedDevice));
-    });
-
-    it('refuses the enrol at the cap under a masterKey-only session', async () => {
-      const { projection, store } = setup();
-      const keys = keysFor('bob');
-      const tokens = readerTokensFor('bob', keys.mailboxId);
-      const live = Array.from(
-        { length: 6 },
-        (_, index) => `credential-${index}`,
-      );
-      const liveTokens = deviceTokensFor(keys.mailboxId, live);
-      const { readerHashes, wire } = nodeMailboxClient(undefined, {
-        maxReaders: 8,
-        readerTokens: [tokens.root, 'removed-device', ...liveTokens],
-      });
-      const mailbox = mailboxFor(wire, store, projection, [
-        credentialFor('bob'),
-        ...live,
-      ]);
-
-      await expect(
-        mailbox.sync(
-          session('bob'),
-          conversationId,
-          new AbortController().signal,
-          jest.fn(),
-        ),
-      ).rejects.toMatchObject({ status: 409 });
-
-      expect(readerHashes().sort()).toEqual(
-        hashed(tokens.root, 'removed-device', ...liveTokens),
-      );
+      expect(readerHashes().sort()).toEqual(hashed(tokens.root, tokens.device));
     });
 
     it('surfaces the cap refusal when every reader is still a device', async () => {
@@ -3532,280 +3309,9 @@ describe(DirectMessageMailbox.name, () => {
       expect(readerHashes().sort()).toEqual(hashed(tokens.root, ...liveTokens));
     });
 
-    it('keeps the old inbox readable through the sealed root bridge, then prunes the legacy readers', async () => {
-      const { projection, store } = setup();
-      const keys = keysFor('bob');
-      const legacy = readerTokensFor('bob', keys.mailboxId);
-      const sealedRoot = MailboxReadToken.derive(SEALED_ROOT, keys.mailboxId);
-      const sealedDevice = MailboxReadToken.deriveDevice(
-        SEALED_ROOT,
-        keys.mailboxId,
-        credentialFor('bob'),
-      );
-      const { readerHashes, wire } = nodeMailboxClient();
-      const composed = composedRecords();
-      const sender = mailboxFor(
-        wire,
-        memoryStore(),
-        projection,
-        undefined,
-        composed,
-      );
-      const applied: string[][] = [];
-      const recordApplied = (changes: DirectMessageTimelineChange[]) => {
-        applied.push(messageIds(changes));
-      };
-      const second = {
-        ...sent,
-        id: 'message-2',
-        previousMessageIds: ['message-1'],
-      };
-
-      // Phase A: the legacy inbox exists with the legacy root and device
-      // readers.
-      await syncPass(
-        mailboxFor(wire, store, projection),
-        session('bob'),
-        recordApplied,
-      );
-      expect(readerHashes().sort()).toEqual(hashed(legacy.root, legacy.device));
-
-      await sender.send(session('alice'), conversation, 'hello', {});
-
-      // Phase B: the sealed root bridges in. The envelope written before it
-      // stays readable.
-      await syncPass(
-        mailboxFor(wire, store, projection),
-        sealedSessionFor('bob'),
-        recordApplied,
-      );
-      expect(applied).toEqual([['message-1']]);
-      expect(readerHashes().sort()).toEqual(hashed(sealedRoot, sealedDevice));
-
-      composed.sent = second;
-      await sender.send(session('alice'), conversation, 'hello', {});
-      await syncPass(
-        mailboxFor(wire, store, projection),
-        sealedSessionFor('bob'),
-        recordApplied,
-      );
-      expect(applied).toEqual([['message-1'], ['message-2']]);
-    });
-
-    it('reads the old inbox with the legacy device reader when the sealed device reader is refused', async () => {
-      const { projection, store } = setup();
-      const keys = keysFor('bob');
-      const legacy = readerTokensFor('bob', keys.mailboxId);
-      const sealedRoot = MailboxReadToken.derive(SEALED_ROOT, keys.mailboxId);
-      const sealedDevice = MailboxReadToken.deriveDevice(
-        SEALED_ROOT,
-        keys.mailboxId,
-        credentialFor('bob'),
-      );
-      const { readerHashes, wire } = nodeMailboxClient(undefined, {
-        refusedReaders: [sealedDevice],
-      });
-      const composed = composedRecords();
-      const sender = mailboxFor(
-        wire,
-        memoryStore(),
-        projection,
-        undefined,
-        composed,
-      );
-      const applied: string[][] = [];
-      const recordApplied = (changes: DirectMessageTimelineChange[]) => {
-        applied.push(messageIds(changes));
-      };
-      const second = {
-        ...sent,
-        id: 'message-2',
-        previousMessageIds: ['message-1'],
-      };
-
-      await syncPass(
-        mailboxFor(wire, store, projection),
-        session('bob'),
-        recordApplied,
-      );
-      await sender.send(session('alice'), conversation, 'hello', {});
-
-      // The sealed root registers, but the sealed device is refused.
-      // Reads fall back to the legacy device reader, kept until it bridges.
-      await syncPass(
-        mailboxFor(wire, store, projection),
-        sealedSessionFor('bob'),
-        recordApplied,
-      );
-      expect(applied).toEqual([['message-1']]);
-      expect(readerHashes().sort()).toEqual(
-        hashed(legacy.root, legacy.device, sealedRoot),
-      );
-
-      composed.sent = second;
-      await sender.send(session('alice'), conversation, 'hello', {});
-      await syncPass(
-        mailboxFor(wire, store, projection),
-        sealedSessionFor('bob'),
-        recordApplied,
-      );
-      expect(applied).toEqual([['message-1'], ['message-2']]);
-    });
-
-    it('keeps legacy readers until every credential is bridged, and keeps a bridged device readable meanwhile', async () => {
-      const { projection, store } = setup();
-      const keys = keysFor('bob');
-      const legacy = readerTokensFor('bob', keys.mailboxId);
-      const laptop = 'device-credential-bob-laptop';
-      const catalog = [credentialFor('bob'), laptop];
-      const laptopLegacy = MailboxReadToken.deriveDevice(
-        Buffer.alloc(32, 9),
-        keys.mailboxId,
-        laptop,
-      );
-      const sealedRoot = MailboxReadToken.derive(SEALED_ROOT, keys.mailboxId);
-      const sealedPhone = MailboxReadToken.deriveDevice(
-        SEALED_ROOT,
-        keys.mailboxId,
-        credentialFor('bob'),
-      );
-      const sealedLaptop = MailboxReadToken.deriveDevice(
-        SEALED_ROOT,
-        keys.mailboxId,
-        laptop,
-      );
-      const { readerHashes, wire } = nodeMailboxClient();
-      const composed = composedRecords();
-      const sender = mailboxFor(
-        wire,
-        memoryStore(),
-        projection,
-        catalog,
-        composed,
-      );
-      const laptopStore = memoryStore();
-      const phoneApplied: string[][] = [];
-      const laptopApplied: string[][] = [];
-      const recordPhone = (changes: DirectMessageTimelineChange[]) => {
-        phoneApplied.push(messageIds(changes));
-      };
-      const recordLaptop = (changes: DirectMessageTimelineChange[]) => {
-        laptopApplied.push(messageIds(changes));
-      };
-      const second = {
-        ...sent,
-        id: 'message-2',
-        previousMessageIds: ['message-1'],
-      };
-
-      // The phone opens the legacy inbox. The laptop's reader is added below.
-      await syncPass(
-        mailboxFor(wire, store, projection, catalog),
-        session('bob'),
-        recordPhone,
-      );
-      await wire.addReader(
-        keys.mailboxId,
-        legacy.root,
-        MailboxCapability.hash(laptopLegacy),
-      );
-      await sender.send(session('alice'), conversation, 'hello', {});
-
-      // The phone bridges. The laptop has no sealed reader, so legacy stays.
-      await syncPass(
-        mailboxFor(wire, store, projection, catalog),
-        sealedSessionFor('bob'),
-        recordPhone,
-      );
-      expect(phoneApplied).toEqual([['message-1']]);
-      expect(readerHashes().sort()).toEqual(
-        hashed(
-          legacy.root,
-          legacy.device,
-          laptopLegacy,
-          sealedRoot,
-          sealedPhone,
-        ),
-      );
-
-      // The laptop has no sealed root. It reads with its legacy reader, and the
-      // phone's sealed reader survives its sync.
-      await syncPass(
-        mailboxFor(wire, laptopStore, projection, catalog),
-        deviceSession('bob', laptop),
-        recordLaptop,
-      );
-      expect(laptopApplied).toEqual([['message-1']]);
-      expect(readerHashes().sort()).toEqual(
-        hashed(
-          legacy.root,
-          legacy.device,
-          laptopLegacy,
-          sealedRoot,
-          sealedPhone,
-        ),
-      );
-
-      // The laptop bridges too. Every listed credential now holds a sealed
-      // reader, so the legacy readers go.
-      composed.sent = second;
-      await sender.send(session('alice'), conversation, 'hello', {});
-      await syncPass(
-        mailboxFor(wire, laptopStore, projection, catalog),
-        sealedSessionFor('bob', laptop),
-        recordLaptop,
-      );
-      expect(laptopApplied).toEqual([['message-1'], ['message-2']]);
-      expect(readerHashes().sort()).toEqual(
-        hashed(sealedRoot, sealedPhone, sealedLaptop),
-      );
-
-      await syncPass(
-        mailboxFor(wire, store, projection, catalog),
-        sealedSessionFor('bob'),
-        recordPhone,
-      );
-      expect(phoneApplied).toEqual([['message-1'], ['message-2']]);
-    });
-
-    it('leaves a full legacy inbox unadopted under a masterKey-only session', async () => {
-      const { projection, store } = setup();
-      const keys = keysFor('bob');
-      const legacy = 'legacy-read-token';
-      const dead = Array.from(
-        { length: 7 },
-        (_, index) => `removed-device-${index}`,
-      );
-      const { readerHashes, wire } = nodeMailboxClient(undefined, {
-        maxReaders: 8,
-        readerTokens: [legacy, ...dead],
-      });
-      store.save(keys.mailboxId, { cursor: 0, readToken: legacy });
-
-      await expect(
-        mailboxFor(wire, store, projection).sync(
-          session('bob'),
-          conversationId,
-          new AbortController().signal,
-          jest.fn(),
-        ),
-      ).rejects.toMatchObject({ status: 409 });
-
-      expect(store.load(keys.mailboxId)).toEqual({
-        cursor: 0,
-        readToken: legacy,
-      });
-      expect(readerHashes().sort()).toEqual(hashed(legacy, ...dead));
-    });
-
     describe('retried writes', () => {
-      beforeEach(async () => {
+      beforeEach(() => {
         jest.useRealTimers();
-        await new DirectMessageOutboxStore().forget('alice');
-      });
-
-      afterEach(async () => {
-        await new DirectMessageOutboxStore().forget('alice');
       });
 
       /** Resolves once `check` holds, letting queued work run. */
@@ -3863,7 +3369,7 @@ describe(DirectMessageMailbox.name, () => {
       });
 
       it('delivers the peer copy once when a reload resumes a send whose peer write was not saved', async () => {
-        const alice = withSealedRoot(session('alice'));
+        const alice = session('alice');
         const { projection, store } = setup();
         const { envelopeCount, wire } = nodeMailboxClient();
         const save = DirectMessageOutboxStore.prototype.save;
@@ -3908,8 +3414,8 @@ describe(DirectMessageMailbox.name, () => {
       });
 
       it('does not deliver a message again when the recipient already removed its first copy', async () => {
-        const alice = withSealedRoot(session('alice'));
-        const bob = withSealedRoot(session('bob'));
+        const alice = session('alice');
+        const bob = session('bob');
         const { projection, store } = setup();
         const { envelopeCount, wire } = nodeMailboxClient();
         const save = DirectMessageOutboxStore.prototype.save;
@@ -3991,7 +3497,7 @@ describe(DirectMessageMailbox.name, () => {
     const ownSealedEncode = (record: DirectMessageRecord): Uint8Array =>
       DirectMessageMailboxRecord.encode(
         record,
-        DirectMessageAuthorship.tag(sealedRoot, record),
+        DirectMessageAuthorship.tag(rootFor('alice'), record),
       );
 
     beforeEach(async () => {
@@ -4033,7 +3539,7 @@ describe(DirectMessageMailbox.name, () => {
       });
 
       await mailbox.sync(
-        withSealedRoot(session('alice')),
+        session('alice'),
         conversationId,
         new AbortController().signal,
         jest.fn<void, [DirectMessageTimelineChange[]]>(),
@@ -4041,7 +3547,7 @@ describe(DirectMessageMailbox.name, () => {
 
       const apply = jest.fn<void, [DirectMessageTimelineChange[]]>();
       await setup().mailbox.restore(
-        withSealedRoot(session('alice')),
+        session('alice'),
         conversationId,
         new AbortController().signal,
         apply,

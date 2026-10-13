@@ -184,10 +184,8 @@ export class DirectMessageMailbox {
    * inbox. When the inbox was re-created, its cursors restart at 1, so the
    * stored cursor is reset.
    *
-   * Reader tokens are derived from the identity's root key, so a device that
-   * lost its local storage reads the inbox it created earlier. Only inboxes
-   * created before this derivation keep a stored legacy token, which the
-   * first pass adopts into the reader set.
+   * Reader tokens are derived from the device-sealed root, so a device that
+   * lost its local storage reads the inbox it created earlier.
    */
   public async sync(
     session: Session,

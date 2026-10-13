@@ -7,11 +7,6 @@ import {
 export type DirectMessageMailboxState = {
   /** Highest cursor acknowledged to the node. */
   cursor: number;
-  /**
-   * Legacy only: inboxes created before the token was derived from the root
-   * key keep their random read token here. New inboxes store none.
-   */
-  readToken?: string;
 };
 
 /**
@@ -32,9 +27,7 @@ export class DirectMessageMailboxStore {
 
     if (typeof stored.cursor !== 'number') return null;
 
-    return typeof stored.readToken === 'string'
-      ? { cursor: stored.cursor, readToken: stored.readToken }
-      : { cursor: stored.cursor };
+    return { cursor: stored.cursor };
   }
 
   public save(mailboxId: string, state: DirectMessageMailboxState): void {
