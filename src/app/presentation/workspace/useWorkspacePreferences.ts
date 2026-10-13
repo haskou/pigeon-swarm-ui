@@ -153,12 +153,18 @@ export function useWorkspacePreferenceState(
   const [drafts, setDrafts] = useState<ConversationDrafts>({});
   const [draftsHydrated, setDraftsHydrated] = useState(false);
 
+  // Only an identity switch restores the stored workspace. A replaced session
+  // of the same identity (a published keychain, for one) must keep the
+  // selection the user just made.
   useEffect(() => {
     setCommunityUnreadCountsById(loadCommunityUnreadCounts(identityId));
     setWorkspacePreference(loadWorkspacePreference(identityId));
+  }, [identityId]);
+
+  useEffect(() => {
     setDrafts(decryptStoredDrafts(session));
     setDraftsHydrated(true);
-  }, [identityId, session]);
+  }, [session]);
 
   useEffect(() => {
     setWorkspaceMode(workspacePreference.mode ?? 'messages');
