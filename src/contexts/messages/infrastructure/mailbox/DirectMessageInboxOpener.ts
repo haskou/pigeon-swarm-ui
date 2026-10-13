@@ -12,7 +12,6 @@ import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonEr
 import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
 import { DirectMailboxEligibility } from '../../../mailboxes/domain/DirectMailboxEligibility';
 import { MailboxCapability } from '../../../mailboxes/infrastructure/crypto/MailboxCapability';
-import { MailboxUnavailableError } from '../../../mailboxes/infrastructure/http/MailboxUnavailableError';
 import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageInboxKeys } from './DirectMessageInboxKeys';
 import { DirectMessageMailboxLimits } from './DirectMessageMailboxLimits';
@@ -38,9 +37,8 @@ export class DirectMessageInboxOpener {
   ) {}
 
   /**
-   * Resolves the inbox keys, reader tokens, and saved state. A stored legacy
-   * token first frees readers no device holds, then is adopted into the
-   * reader set. The derived tokens are never persisted.
+   * Resolves the inbox keys, reader tokens, and saved state. The derived
+   * tokens are never persisted.
    */
   private async openInbox(
     session: Session,
@@ -54,26 +52,8 @@ export class DirectMessageInboxOpener {
     const readers = DirectMessageInboxKeys.readersFor(session, keys);
     const stored = this.store.load(keys.mailboxId);
 
-    if (stored && !stored.readToken) {
+    if (stored) {
       return await this.reopenInbox(session, keys, readers, stored);
-    }
-
-    if (stored?.readToken) {
-      // Before adoption: a full inbox refuses the device readers.
-      await this.readerSet.pruneUnderLegacy(
-        session,
-        keys,
-        readers,
-        stored.readToken,
-      );
-
-      if (await this.adoptLegacy(keys, stored.readToken, readers)) {
-        const adopted = { cursor: stored.cursor };
-
-        this.store.save(keys.mailboxId, adopted);
-
-        return await this.reopenInbox(session, keys, readers, adopted);
-      }
     }
 
     const state = { cursor: 0 };
@@ -89,32 +69,9 @@ export class DirectMessageInboxOpener {
   }
 
   /**
-   * Registers both readers under the legacy token, which carries root
-   * authority for an inbox created before derivation. Returns false when that
-   * inbox no longer exists; other failures keep the stored state and surface.
-   */
-  private async adoptLegacy(
-    keys: MailboxKeys,
-    legacyToken: string,
-    readers: MailboxReadTokens,
-  ): Promise<boolean> {
-    try {
-      await this.channel.addReader(keys, legacyToken, readers.root);
-      await this.channel.addReader(keys, legacyToken, readers.device);
-
-      return true;
-    } catch (error: unknown) {
-      if (error instanceof MailboxUnavailableError) return false;
-
-      throw error;
-    }
-  }
-
-  /**
    * Opens an inbox that already exists under the stored state. The sealed root
-   * bridges in first. A refused bridge leaves this device's sealed reader
-   * unregistered, so reads use its legacy reader, which stays registered until
-   * every credential bridges. The bridge retries on the next pass.
+   * bridges in first. A refused bridge leaves the inbox unread by this device
+   * until the bridge succeeds on a later pass; reads keep the sealed readers.
    */
   private async reopenInbox(
     session: Session,
@@ -122,20 +79,11 @@ export class DirectMessageInboxOpener {
     readers: MailboxReadTokens,
     state: DirectMessageRecipientInbox['state'],
   ): Promise<DirectMessageRecipientInbox> {
-    if (await this.enrolSealed(session, keys, readers)) {
-      return { keys, outcome: 'open', readers, state };
-    }
+    const outcome = (await this.enrolSealed(session, keys, readers))
+      ? 'open'
+      : 'failed';
 
-    return {
-      keys,
-      outcome: 'failed',
-      readers: DirectMessageInboxKeys.readersFor(
-        session,
-        keys,
-        session.masterKey.getBuffer(),
-      ),
-      state,
-    };
+    return { keys, outcome, readers, state };
   }
 
   /**
@@ -188,10 +136,7 @@ export class DirectMessageInboxOpener {
     try {
       await this.channel.createInbox(keys, readers.root);
     } catch (error: unknown) {
-      if (
-        !(error instanceof HttpJsonError && error.status === 409) ||
-        !session.deviceSealedRootKey
-      ) {
+      if (!(error instanceof HttpJsonError && error.status === 409)) {
         throw error;
       }
       await this.readerSet.enrolSealedRoot(session, keys, readers);
@@ -201,17 +146,12 @@ export class DirectMessageInboxOpener {
     await this.channel.addReader(keys, readers.root, readers.device);
   }
 
-  /**
-   * Bridges the device-sealed root into the inbox. Without a sealed root the
-   * legacy readers still serve the device, so there is nothing to bridge.
-   */
+  /** Bridges the device-sealed root into the inbox. */
   private async enrolSealed(
     session: Session,
     keys: MailboxKeys,
     readers: MailboxReadTokens,
   ): Promise<boolean> {
-    if (!session.deviceSealedRootKey) return true;
-
     try {
       await this.readerSet.enrolSealedRoot(session, keys, readers);
 
@@ -226,8 +166,8 @@ export class DirectMessageInboxOpener {
   }
 
   /**
-   * Recipient. Opens through the shared open. A throw from the legacy adoption
-   * or the reader prune counts as a failed open, so the pass moves on.
+   * Recipient. Opens through the shared open. A throw from the open counts as
+   * a failed open, so the pass moves on.
    */
   private async openRecipientInbox(
     session: Session,
@@ -288,9 +228,7 @@ export class DirectMessageInboxOpener {
       conversationId,
       session.identity.id,
     );
-    const stored = this.store.load(keys.mailboxId);
-
-    if (stored === null || stored.readToken) return null;
+    if (this.store.load(keys.mailboxId) === null) return null;
 
     return {
       mailboxId: keys.mailboxId,

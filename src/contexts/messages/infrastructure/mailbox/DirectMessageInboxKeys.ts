@@ -36,14 +36,14 @@ export class DirectMessageInboxKeys {
 
   /**
    * The root token manages the reader set. The device token reads and acks
-   * under this device's credential. Both derive from the root key: the session
-   * root by default, the legacy master key after a refused sealed bridge.
+   * under this device's credential. Both derive from the session root.
    */
   public static readersFor(
     session: Session,
     keys: MailboxKeys,
-    rootKey = sessionRootKey(session).getBuffer(),
   ): MailboxReadTokens {
+    const rootKey = sessionRootKey(session).getBuffer();
+
     return {
       device: MailboxReadToken.deriveDevice(
         rootKey,
