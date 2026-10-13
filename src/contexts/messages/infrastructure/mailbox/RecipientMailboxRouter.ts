@@ -30,6 +30,7 @@ export class RecipientMailboxRouter {
     recipientIdentityId: string,
     keys: MailboxKeys,
     plaintext: Uint8Array,
+    envelopeId: string | undefined,
   ): Promise<RecipientMailboxAttempt<MailboxAppend>> {
     let base: string | undefined;
 
@@ -47,7 +48,7 @@ export class RecipientMailboxRouter {
     try {
       return {
         kind: 'delivered',
-        value: await this.createChannel(base).send(keys, plaintext),
+        value: await this.createChannel(base).send(keys, plaintext, envelopeId),
       };
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -62,11 +63,12 @@ export class RecipientMailboxRouter {
   private async attemptLocal(
     keys: MailboxKeys,
     plaintext: Uint8Array,
+    envelopeId: string | undefined,
   ): Promise<RecipientMailboxAttempt<MailboxAppend>> {
     try {
       return {
         kind: 'delivered',
-        value: await this.local.send(keys, plaintext),
+        value: await this.local.send(keys, plaintext, envelopeId),
       };
     } catch (error) {
       return error instanceof MailboxUnavailableError
@@ -79,14 +81,20 @@ export class RecipientMailboxRouter {
     recipientIdentityId: string,
     keys: MailboxKeys,
     plaintext: Uint8Array,
+    envelopeId?: string,
   ): Promise<MailboxAppend> {
-    const home = await this.attemptHome(recipientIdentityId, keys, plaintext);
+    const home = await this.attemptHome(
+      recipientIdentityId,
+      keys,
+      plaintext,
+      envelopeId,
+    );
 
     if (home.kind === 'delivered') return home.value;
 
     return RecipientMailboxRoutingPolicy.resolve(
       home,
-      await this.attemptLocal(keys, plaintext),
+      await this.attemptLocal(keys, plaintext, envelopeId),
     );
   }
 }

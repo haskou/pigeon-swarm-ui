@@ -30,7 +30,7 @@ describe(RecipientMailboxRouter.name, () => {
     await router.send('bob', keys, plaintext);
 
     expect(createChannel).toHaveBeenCalledWith('https://home.example');
-    expect(foreign.send).toHaveBeenCalledWith(keys, plaintext);
+    expect(foreign.send).toHaveBeenCalledWith(keys, plaintext, undefined);
     expect(local.send).not.toHaveBeenCalled();
   });
 
@@ -42,7 +42,7 @@ describe(RecipientMailboxRouter.name, () => {
     await router.send('bob', keys, plaintext);
 
     expect(createChannel).not.toHaveBeenCalled();
-    expect(local.send).toHaveBeenCalledWith(keys, plaintext);
+    expect(local.send).toHaveBeenCalledWith(keys, plaintext, undefined);
   });
 
   it('falls back to the local node when the foreign append fails', async () => {
@@ -54,7 +54,7 @@ describe(RecipientMailboxRouter.name, () => {
 
     await router.send('bob', keys, plaintext);
 
-    expect(local.send).toHaveBeenCalledWith(keys, plaintext);
+    expect(local.send).toHaveBeenCalledWith(keys, plaintext, undefined);
   });
 
   it('falls back to the local node when the home lookup fails', async () => {
@@ -64,7 +64,7 @@ describe(RecipientMailboxRouter.name, () => {
 
     await router.send('bob', keys, plaintext);
 
-    expect(local.send).toHaveBeenCalledWith(keys, plaintext);
+    expect(local.send).toHaveBeenCalledWith(keys, plaintext, undefined);
   });
 
   it('appends to a path-prefixed verified base unchanged', async () => {
@@ -75,7 +75,7 @@ describe(RecipientMailboxRouter.name, () => {
     await router.send('bob', keys, plaintext);
 
     expect(createChannel).toHaveBeenCalledWith('https://home.example/api');
-    expect(foreign.send).toHaveBeenCalledWith(keys, plaintext);
+    expect(foreign.send).toHaveBeenCalledWith(keys, plaintext, undefined);
   });
 
   it('logs one count-only line when the foreign append fails', async () => {
@@ -90,7 +90,7 @@ describe(RecipientMailboxRouter.name, () => {
 
     await router.send('bob', keys, plaintext);
 
-    expect(local.send).toHaveBeenCalledWith(keys, plaintext);
+    expect(local.send).toHaveBeenCalledWith(keys, plaintext, undefined);
     expect(debug).toHaveBeenCalledTimes(1);
     expect(debug).toHaveBeenCalledWith(
       'Recipient mailbox append failed; local node used.',
@@ -108,7 +108,7 @@ describe(RecipientMailboxRouter.name, () => {
 
     await router.send('bob', keys, plaintext);
 
-    expect(local.send).toHaveBeenCalledWith(keys, plaintext);
+    expect(local.send).toHaveBeenCalledWith(keys, plaintext, undefined);
     expect(debug).toHaveBeenCalledWith(
       'Recipient mailbox home lookup failed; local node used.',
     );
@@ -176,7 +176,25 @@ describe(RecipientMailboxRouter.name, () => {
     foreign.send.mockRejectedValueOnce(new Error('socket hang up'));
 
     await expect(router.send('bob', keys, plaintext)).resolves.toBe(appended);
-    expect(local.send).toHaveBeenCalledWith(keys, plaintext);
+    expect(local.send).toHaveBeenCalledWith(keys, plaintext, undefined);
     debug.mockRestore();
+  });
+
+  it('forwards the envelope id to the verified mailbox home', async () => {
+    const { foreign, router } = fixture(async () =>
+      Promise.resolve('https://home.example'),
+    );
+
+    await router.send('bob', keys, plaintext, 'envelope-7');
+
+    expect(foreign.send).toHaveBeenCalledWith(keys, plaintext, 'envelope-7');
+  });
+
+  it('forwards the envelope id to the local node when no home is published', async () => {
+    const { local, router } = fixture(async () => Promise.resolve(undefined));
+
+    await router.send('bob', keys, plaintext, 'envelope-7');
+
+    expect(local.send).toHaveBeenCalledWith(keys, plaintext, 'envelope-7');
   });
 });
