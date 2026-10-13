@@ -12,8 +12,10 @@ const origin = 'http://127.0.0.1:8080';
 // Each run is one Playwright invocation against the same node. Login,
 // recovery-key sign-in, pairing, 1:1 send/receive, the outbox retry flow and
 // the security audit view run on every engine and viewport CI covers; the
-// two-device revoke flow, the private-community kick and passkey unlock (which
-// needs Chromium's virtual authenticator) run on desktop Chromium.
+// call decline on page departure runs on the desktop engines, where the call
+// is started from the conversation menu; the two-device revoke flow, the
+// private-community kick and passkey unlock (which needs Chromium's virtual
+// authenticator) run on desktop Chromium.
 const runs = [
   {
     specs: [
@@ -23,6 +25,10 @@ const runs = [
       'e2e/security-audit.spec.ts',
     ],
     projects: ['desktop-chromium', 'desktop-firefox', 'mobile-chromium'],
+  },
+  {
+    specs: ['e2e/call-page-departure.spec.ts'],
+    projects: ['desktop-chromium', 'desktop-firefox'],
   },
   {
     specs: [

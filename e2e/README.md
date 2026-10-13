@@ -41,13 +41,16 @@ stays signed in, never shows a message sent after it while the surviving
 device does, at its next sign-in (from the identity the login screen
 remembers, without typing it) says it was removed and keeps its stored
 history until "Erase local copy and start over" erases it, and a forged
-removal answer for a still-authorized device erases nothing) and
+removal answer for a still-authorized device erases nothing),
 `community-mls-kick.spec.ts` (a private community shows encryption as active
 for its creator and an invited member, both exchange messages through the MLS
 group, and a message sent after the member is removed never shows in the
-removed member's page) run against a real node. Login, direct-message sync, the
-outbox spec and the security audit run on `desktop-chromium`, `desktop-firefox`
-and `mobile-chromium`; the revoke and community kick specs run on
+removed member's page) and `call-page-departure.spec.ts` (a ringing call is
+declined when the callee leaves the page) run against a real node. Login,
+direct-message sync, the outbox spec and the security audit run on
+`desktop-chromium`, `desktop-firefox` and `mobile-chromium`; the call spec runs
+on the two desktop projects, because the call is started from the desktop
+conversation menu; the revoke and community kick specs run on
 `desktop-chromium`.
 `passkey-unlock.spec.ts` (switching this device from a password to a passkey
 and unlocking with it) runs on `desktop-chromium` only: it uses a DevTools
