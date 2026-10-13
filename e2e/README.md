@@ -1,7 +1,7 @@
 # E2E tests
 
-The stale ICE candidate and call recovery tests run in CI. Other Playwright
-scenarios run on demand against a configured application backend.
+The stale ICE candidate, call recovery and real-node suites run in CI. Other
+Playwright scenarios run on demand against a configured application backend.
 
 Run all device profiles:
 
@@ -28,6 +28,55 @@ no networks, provide a fallback network id:
 ```bash
 E2E_NETWORK_ID=<network-id> yarn test:e2e
 ```
+
+## Real node suite
+
+`login-methods.spec.ts` (login choices, recovery-key sign-in and device pairing)
+and `direct-message-sync.spec.ts` (1:1 send and receive across two isolated
+browser contexts) run against a real node. The `real-node-e2e` job in
+`.github/workflows/ci.yml` builds the node image from the pins below and runs
+both specs on `desktop-chromium`. It is the check that catches UI and node
+contract breaks before merge.
+
+The pins are:
+
+- `.github/node-sha`: the pigeon-swarm-node commit the image runs.
+- `.github/wrapper-sha`: the pigeon-swarm commit whose `Dockerfile` builds the
+  image with `--target production`.
+
+The UI is always the commit under test. The image clones it by SHA from GitHub,
+so CI passes the PR head SHA as `PIGEON_SWARM_UI_SHA`. A UI commit must be
+pushed before it can be built locally.
+
+Run the suite locally against an image built from the pins and the current
+commit:
+
+```bash
+docker build --target production \
+  --build-arg PIGEON_SWARM_NODE_SHA=$(cat .github/node-sha) \
+  --build-arg PIGEON_SWARM_UI_SHA=$(git rev-parse HEAD) \
+  -t pigeon-swarm-node:local \
+  "https://github.com/haskou/pigeon-swarm.git#$(cat .github/wrapper-sha)"
+
+PIGEON_NODE_IMAGE=pigeon-swarm-node:local yarn test:e2e:real-node
+```
+
+The script starts the image on `127.0.0.1:8080`, registers a network through the
+node API, runs both specs, then removes the container. A failed run prints the
+last 200 node log lines. `yarn test:ci` runs the unit suites followed by this
+suite and needs `PIGEON_NODE_IMAGE` set.
+
+To bump the pins:
+
+1. Choose the node commit and the wrapper commit whose `Dockerfile` builds it.
+   The wrapper's `.github/workflows/validate.yml` pins are the reference for a
+   pair the wrapper already validates.
+2. Write both SHAs to `.github/node-sha` and `.github/wrapper-sha` in one commit.
+3. Let `real-node-e2e` run on the PR, or run the local build and suite above.
+4. Merge only when `real-node-e2e` is green.
+
+Only `desktop-chromium` runs here. Mobile, tablet, and Firefox are not covered
+by this suite.
 
 ## Call recovery
 

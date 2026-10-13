@@ -71,3 +71,67 @@ jobs:
 
       - name: Build independent client
         run: VITE_INDEPENDENT_CLIENT=true yarn build
+
+  # Builds the node image from the pinned node and wrapper sources, with this
+  # commit as the UI, then runs the specs that need a real node. Pins live in
+  # .github/node-sha and .github/wrapper-sha; see e2e/README.md.
+  real-node-e2e:
+    name: Real node end-to-end
+    needs: changes
+    if: always() && needs.changes.outputs.heavy != 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Read pinned node and wrapper
+        id: pins
+        run: |
+          echo "node=$(cat .github/node-sha)" >> "$GITHUB_OUTPUT"
+          echo "wrapper=$(cat .github/wrapper-sha)" >> "$GITHUB_OUTPUT"
+
+      - name: Check out wrapper recipe
+        uses: actions/checkout@v4
+        with:
+          repository: haskou/pigeon-swarm
+          ref: ${{ steps.pins.outputs.wrapper }}
+          path: pigeon-swarm
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build node image from pinned sources
+        uses: docker/build-push-action@v6
+        with:
+          context: pigeon-swarm
+          target: production
+          load: true
+          tags: pigeon-swarm-node:real-node
+          build-args: |
+            PIGEON_SWARM_NODE_SHA=${{ steps.pins.outputs.node }}
+            PIGEON_SWARM_UI_SHA=${{ github.event.pull_request.head.sha || github.sha }}
+          cache-from: type=gha,scope=real-node
+          cache-to: type=gha,mode=max,scope=real-node
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Install Chromium
+        run: yarn playwright install --with-deps chromium
+
+      - name: Verify login methods and direct messages against the real node
+        env:
+          PIGEON_NODE_IMAGE: pigeon-swarm-node:real-node
+        run: yarn test:e2e:real-node
