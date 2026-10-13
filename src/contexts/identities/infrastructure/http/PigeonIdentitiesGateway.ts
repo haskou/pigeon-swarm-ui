@@ -50,23 +50,6 @@ export class PigeonIdentitiesGateway {
     private readonly pairingHistory: DevicePairingHistory,
   ) {}
 
-  /** Opens the sealed root for the history import, or undefined. */
-  private async openRootForHistory(
-    session: Session,
-  ): Promise<Session | undefined> {
-    try {
-      const rooted = await this.deviceSealedRoot.current(session);
-
-      return rooted.deviceSealedRootKey ? rooted : undefined;
-    } catch {
-      // Count-only. The pairing completes without the history.
-      // eslint-disable-next-line no-console
-      console.debug('Pairing history skipped: device sealed root unavailable.');
-
-      return undefined;
-    }
-  }
-
   public async recover(
     identityId: string,
     password: string,
@@ -193,20 +176,27 @@ export class PigeonIdentitiesGateway {
       draft,
       completionCode,
     );
-    const result = await this.identityLogin.hydrate(paired.session, onProgress);
+    // Keychain heads open only under the device sealed root, which the
+    // authorizer resealed to this device before handing out the completion.
+    const rooted = await this.deviceSealedRoot.current(paired.session);
 
-    if (!paired.historyTransferSecret) return result;
+    if (!rooted.deviceSealedRootKey) {
+      throw new DevicePairingError(
+        'mismatch',
+        'Device sealed root is not open on the paired device.',
+      );
+    }
 
-    const rooted = await this.openRootForHistory(result.session);
+    const result = await this.identityLogin.hydrate(rooted, onProgress);
 
-    if (!rooted) return result;
+    if (paired.historyTransferSecret) {
+      await this.pairingHistory.receive(
+        result.session,
+        paired.historyTransferSecret.getBuffer(),
+      );
+    }
 
-    await this.pairingHistory.receive(
-      rooted,
-      paired.historyTransferSecret.getBuffer(),
-    );
-
-    return { ...result, session: rooted };
+    return result;
   }
 
   public async changePassword(
