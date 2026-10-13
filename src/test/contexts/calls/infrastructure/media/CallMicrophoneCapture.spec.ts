@@ -230,6 +230,74 @@ describe(CallMicrophoneCapture.name, () => {
     });
   });
 
+  it('requests the chosen microphone device', async () => {
+    const stream = mediaStreamWithAudioTrack();
+    const mediaDevices = {
+      getUserMedia: jest.fn().mockResolvedValue(stream),
+    };
+
+    await CallMicrophoneCapture.capture(mediaDevices, {
+      deviceId: 'usb-microphone',
+      noiseCancellationEnabled: false,
+    });
+
+    expect(mediaDevices.getUserMedia).toHaveBeenCalledWith({
+      audio: {
+        autoGainControl: true,
+        deviceId: { exact: 'usb-microphone' },
+        echoCancellation: true,
+        noiseSuppression: false,
+      },
+      video: false,
+    });
+  });
+
+  it.each(['NotFoundError', 'OverconstrainedError'])(
+    'falls back to an available microphone after %s for the chosen one',
+    async (name) => {
+      const stream = mediaStreamWithAudioTrack();
+      const unplugged = Object.assign(new Error('Device not found'), { name });
+      const mediaDevices = {
+        getUserMedia: jest
+          .fn()
+          .mockRejectedValueOnce(unplugged)
+          .mockResolvedValueOnce(stream),
+      };
+
+      await expect(
+        CallMicrophoneCapture.capture(mediaDevices, {
+          deviceId: 'unplugged-microphone',
+          noiseCancellationEnabled: false,
+        }),
+      ).resolves.toBe(stream);
+      expect(mediaDevices.getUserMedia).toHaveBeenNthCalledWith(2, {
+        audio: {
+          autoGainControl: true,
+          echoCancellation: true,
+          noiseSuppression: false,
+        },
+        video: false,
+      });
+    },
+  );
+
+  it('does not switch microphones when the chosen one is denied', async () => {
+    const denied = Object.assign(new Error('Permission denied'), {
+      name: 'NotAllowedError',
+    });
+    const mediaDevices = {
+      getUserMedia: jest.fn().mockRejectedValue(denied),
+    };
+
+    await expect(
+      CallMicrophoneCapture.capture(mediaDevices, {
+        deviceId: 'usb-microphone',
+        noiseCancellationEnabled: false,
+      }),
+    ).rejects.toBe(denied);
+    expect(mediaDevices.getUserMedia).toHaveBeenCalledTimes(1);
+  });
+
   it('does not retry when the user denies microphone permission', async () => {
     const denied = new Error('Permission denied');
 

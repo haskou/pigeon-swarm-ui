@@ -209,4 +209,36 @@ describe(LocalCallMedia.name, () => {
     expect(sourceAudioTrack.stop).toHaveBeenCalledTimes(1);
     expect(outputAudioTrack.stop).toHaveBeenCalledTimes(1);
   });
+
+  it('keeps the chosen microphone when noise cancellation changes', async () => {
+    const getUserMedia = jest.fn((_constraints: MediaStreamConstraints) =>
+      Promise.resolve(
+        mediaStreamWithTracks([mediaTrack('microphone', 'audio')]),
+      ),
+    );
+    const manager = new LocalCallMedia();
+
+    installMediaStreamMock();
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      value: { mediaDevices: { getUserMedia } },
+    });
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: { isSecureContext: true },
+    });
+
+    await manager.startAudio({
+      microphoneDeviceId: 'usb-microphone',
+      noiseCancellationEnabled: false,
+    });
+    await manager.setNoiseCancellationEnabled(true);
+
+    expect(
+      getUserMedia.mock.calls.map(([constraints]) => constraints.audio),
+    ).toEqual([
+      expect.objectContaining({ deviceId: { exact: 'usb-microphone' } }),
+      expect.objectContaining({ deviceId: { exact: 'usb-microphone' } }),
+    ]);
+  });
 });
