@@ -4,7 +4,7 @@ import { mock } from 'jest-mock-extended';
 import { PigeonApiGateway } from '../../../app/composition/PigeonApiGateway';
 import { AttachmentCipher } from '../../../contexts/attachments/infrastructure/crypto/AttachmentCipher';
 
-// The real worker factories use import.meta, which the real-crypto Jest config
+// The real worker factories use import.meta, which the crypto Jest project
 // cannot parse. No decrypt or mining runs in this spec.
 jest.mock(
   '../../../contexts/messages/infrastructure/crypto/createMessageDecryptWorker',

@@ -147,6 +147,8 @@ yarn preview
 
 CI runs lint, typecheck, tests, the Chromium end-to-end specs and the builds on each pull request and on pushes to `main`. A change that only touches Markdown outside `.github/`, or images under `docs/`, skips the `Test` job; its required check still reports.
 
+`yarn test` is a single `jest` run with two projects. `unit` replaces `@haskou/pigeon-swarm-crypto` with the deterministic fake in `src/test/valueObjectsMock.ts`. `crypto` runs the specs listed in `REAL_CRYPTO_SPECS` in `jest.config.cjs` (signatures, KEMs, KDFs and wire vectors) against the real library. `yarn test:unit` and `yarn test:crypto` run one project each. Mocks are cleared before every test (`clearMocks`).
+
 This repository does not currently require a `.env` file. The default node URL
 is `http://localhost:8080/`, set in `src/app/API_SERVER_URL.ts`. Set
 `VITE_API_SERVER_URL` when Vite starts to point the combined build at another

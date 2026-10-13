@@ -54,5 +54,5 @@ Client side of haskou/pigeon-swarm-node#451. Design: `docs/design/device-sealed-
 
 ## Tests
 
-- The specs use real keys, so they run in the real-crypto suite (`yarn test:crypto`), registered in `jest.real-crypto.config.cjs` and excluded from `jest.config.cjs`, like `PigeonDeviceAuthorizationApi.spec.ts`.
+- The cipher and API specs use real keys, so they are listed in `REAL_CRYPTO_SPECS` in `jest.config.cjs` and run in the `crypto` project (`yarn test:crypto`), like `PigeonDeviceAuthorizationApi.spec.ts`. `DeviceSealedRootRotation.spec.ts` stubs its collaborators and runs in the `unit` project.
 - Forget rotation (#310): the red-first unlock test in `PigeonIdentitySessionApi.spec.ts` wires the real `DeviceSealedRootRotation` and `DeviceSealedRecovery` over mocked node APIs. It checks that an entry behind the head after a forget publishes a fresh root at the head revision and rewraps the keychain head under it. `DeviceSealedRecovery.spec.ts` covers the no-lag, unreadable-head, failed-publish, and no-head cases; `DeviceSealedRootRotation.spec.ts` covers `laggingRoot`.
