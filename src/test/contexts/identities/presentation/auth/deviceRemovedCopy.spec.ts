@@ -14,13 +14,15 @@ describe('device removed copy', () => {
     );
   });
 
-  it('says that the messages saved on this browser were erased', () => {
+  it('says that the messages saved on this browser stay until the user erases them', () => {
     expect(en.auth.deviceRemovedHelp).toContain(
-      'The messages saved on this browser for this identity were erased.',
+      'The messages saved on this browser stay until you erase them.',
     );
     expect(es.auth.deviceRemovedHelp).toContain(
-      'Los mensajes guardados en este navegador para esta identidad se han borrado.',
+      'Los mensajes guardados en este navegador se conservan hasta que los borres.',
     );
+    expect(en.auth.deviceRemovedHelp).not.toMatch(/were erased/i);
+    expect(es.auth.deviceRemovedHelp).not.toMatch(/se han borrado/i);
   });
 
   it('offers re-pairing, a local start over and an erase retry in both languages', () => {
