@@ -2,73 +2,79 @@
   "description": "Group mailbox key schedule vectors (docs/design/group-mailboxes.md in haskou/pigeon-swarm-node, section Derivation). Generated with node:crypto hkdfSync, independent of the UI implementation.",
   "algorithms": {
     "hkdf": "HKDF-SHA256 (RFC 5869), empty salt, 32-byte output.",
-    "mailboxId": "base64url(HKDF(ikm = generationSecret, info = utf8(labels.mailboxId) || slot)), unpadded.",
+    "slot": "base64url(HKDF(ikm = generationSecret, info = utf8(labels.slot) || utf8(identityId))), unpadded. Decision (a) of haskou/pigeon-swarm-ui#174: the slot is derived, not random, because gen_k is member-only.",
+    "mailboxId": "base64url(HKDF(ikm = generationSecret, info = utf8(labels.mailboxId) || slot)), unpadded; slot is the 32 raw bytes.",
     "postToken": "base64url(HKDF(ikm = generationSecret, info = utf8(labels.postToken) || slot)), unpadded.",
     "envelopeKey": "hex(HKDF(ikm = generationSecret, info = utf8(labels.envelopeKey) || slot)); the AES-256-GCM key of the per-copy outer AEAD (D5).",
     "readToken": "base64url(HKDF(ikm = ownerRootKey, info = utf8(labels.readToken) || utf8(mailboxId))), unpadded; the same derivation as the one-to-one read token."
   },
   "labels": {
+    "slot": "pigeon/group-mailbox/slot/v1",
     "mailboxId": "pigeon/group-mailbox/id/v1",
     "postToken": "pigeon/group-mailbox/post/v1",
     "envelopeKey": "pigeon/group-mailbox/envelope/v1",
     "readToken": "pigeon/mailbox/read/v1"
   },
-  "inputEncoding": "generationSecret (gen_k), slot (s_Y) and ownerRootKey (rootKey_Y) are 32 bytes, hex.",
+  "inputEncoding": "generationSecret (gen_k) and ownerRootKey (rootKey_Y) are 32 bytes, hex. identityId is the normalized identity id string, UTF-8 encoded into the slot info.",
   "cases": [
     {
       "name": "fill bytes",
       "input": {
         "generationSecret": "1111111111111111111111111111111111111111111111111111111111111111",
-        "slot": "2222222222222222222222222222222222222222222222222222222222222222",
+        "identityId": "MCowBQYDK2VwAyEAzF0n0b8bJ6t0nC1p2u8o7aYyq9Qm0cS1k0zjQ5u2d4A=",
         "ownerRootKey": "3333333333333333333333333333333333333333333333333333333333333333"
       },
       "expected": {
-        "mailboxId": "pbtCIxrBaIgYBLp5X_YP1egJPy03dSLsGYxkekG3vzQ",
-        "postToken": "3XihnK4v375tvKVIRKsroFDGLa4IoelmkQdMewIfh0I",
-        "envelopeKey": "dcbb30ae28aa459074f9fc7be6fc926c372ff626f5d8319e68e0abf26ea74286",
-        "readToken": "8UDn8TkPUebRETcOM22oONQQmFlmpgFh69bU66wwk4A"
+        "slot": "pgAqQi0BWmzYB9FceeGhPYxsQqiTT38DsHsbGj_QJuE",
+        "mailboxId": "2R17FBRpwi_U3CUbJA106nvW76C-dL0essFhOPU5GDw",
+        "postToken": "CcnXMggP_rmeyujpUTEAd2pp2X_w0Is9hLtDN8kw49s",
+        "envelopeKey": "8039ec545bdde961623c36a2e78b5de3f366462b3d2d9cf8a12dd3ea1e1c08f7",
+        "readToken": "gYGRBDXZ6XuCntUVif4Rwf8vunYNUdS0LudKymwGh_s"
       }
     },
     {
-      "name": "same generation, another slot",
+      "name": "same generation, another identity",
       "input": {
         "generationSecret": "1111111111111111111111111111111111111111111111111111111111111111",
-        "slot": "4444444444444444444444444444444444444444444444444444444444444444",
+        "identityId": "MCowBQYDK2VwAyEAq4oQfVxH3wq0m6s5tYp1Q2kLr8yNn7c0aZ3eX9b1JvI=",
         "ownerRootKey": "3333333333333333333333333333333333333333333333333333333333333333"
       },
       "expected": {
-        "mailboxId": "xD-Vohv8v4IKjC1huoXoT-siCfGhxVpwcxX7uO0Jiww",
-        "postToken": "fE78vJIyf03GeKOWwxQ3074jyBv0bMbuQCfilvwGy0g",
-        "envelopeKey": "7f9120569c48e13e762ab23dcac68b711c00cb42d67ac24d6e86c592c712ceea",
-        "readToken": "JVGhBcNQaLU4Mvv1cC00_HA3Rg3YlYsTB5ERD2UTJOc"
+        "slot": "IhdelaD_hwWYdto2IcgTEKSUNL8Ebd-VkoGS81N2I_A",
+        "mailboxId": "xlV3YV5mlcA08c5BFEYJdY0vWJmC8LT3317FawH8AhI",
+        "postToken": "JcaiqPGx5QbbzobqeCC593hKZkR9SPIIfVaE1rx3eV8",
+        "envelopeKey": "dbb1112202576d574a618eace9bf5168d5f87fee5e5eb101d2f1ca6e31bfe396",
+        "readToken": "ui0lCfGOmxolxKuxWg1oYdQXy3faSnFfFZkloZI75I0"
       }
     },
     {
-      "name": "next generation, same slot",
+      "name": "next generation, same identity",
       "input": {
         "generationSecret": "5555555555555555555555555555555555555555555555555555555555555555",
-        "slot": "2222222222222222222222222222222222222222222222222222222222222222",
+        "identityId": "MCowBQYDK2VwAyEAzF0n0b8bJ6t0nC1p2u8o7aYyq9Qm0cS1k0zjQ5u2d4A=",
         "ownerRootKey": "3333333333333333333333333333333333333333333333333333333333333333"
       },
       "expected": {
-        "mailboxId": "260yDMhGPx7hsgU-Q3nFEeFcEpLRGRaE-5WtbOe3MNw",
-        "postToken": "hl9lPs7CEOCmdtQA9slwYlBIRF2fJYcaLWl-dQpCGaY",
-        "envelopeKey": "53dd5e451e4f0dc31f24242f13aca3e09e3a1fd39697d71b24357b7ece6b87b2",
-        "readToken": "FwpT-IJMmnLY4efVwyfzvuZbRjnsrv4sBZKounMw9sQ"
+        "slot": "i6be9hUQ4m_P_fJRw38RbEHnqzHjlK2LgaJIsPBF1rE",
+        "mailboxId": "x1imS2TxkxmGCV9W-f2cMmORSOjFVFG1d1nVMiMsIwU",
+        "postToken": "CdOW96f7pbNM7DlCzKk7C8XNuoG4N3B4S9W4mPvmABY",
+        "envelopeKey": "5ddf45ef7fbf9b0472fc6baef499db79bde08cd5c5b6e4261b11428be3257d71",
+        "readToken": "qy0O_o6hv0cCNtjVAmNYSGGR5D_LY7ZeDCLRkSj7oCk"
       }
     },
     {
-      "name": "sequential bytes",
+      "name": "sequential bytes, non-ascii identity",
       "input": {
         "generationSecret": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
-        "slot": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
-        "ownerRootKey": "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f"
+        "identityId": "identité-ü",
+        "ownerRootKey": "fffefdfcfbfaf9f8f7f6f5f4f3f2f1f0efeeedecebeae9e8e7e6e5e4e3e2e1e0"
       },
       "expected": {
-        "mailboxId": "-oqK5SKqaehuSZ3nQOEFOb2MXqBx5N_uMuTpQk_Bc1s",
-        "postToken": "9_O7Sp3og2FkMGSWY4cZw4UKj-jgndlDzl6aR15lY_8",
-        "envelopeKey": "799ef25c391538c0f4358fe31107751633828109d418106c60129457640ca020",
-        "readToken": "Klklc80ClxDBZa6T8M92bOjcTaKiGvCXme7ZDA4j22U"
+        "slot": "-svPCJxPZ5DZ4_z5t6RH1bXE6YoCF6ERysWXuPLQ-pE",
+        "mailboxId": "mHQSxb6R0PxAqstJpUqpUnrnJJNQB09sBnzCBZmPGWY",
+        "postToken": "xMvCvK_fT9FTUbzO3iFJwCTnP5xOf5_RuQpmOMD0EMI",
+        "envelopeKey": "757bacbda57a68b6d6c7a912341f93b48a9f7fbc927721add2f829f1226b61ef",
+        "readToken": "bx7flE-jsZ7bWC2eB5yMuFOzd7nlgtfpw018NcgI1vI"
       }
     }
   ]

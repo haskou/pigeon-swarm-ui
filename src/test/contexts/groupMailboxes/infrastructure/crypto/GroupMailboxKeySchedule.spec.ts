@@ -8,6 +8,7 @@ import { GroupMailboxPostToken } from '../../../../../contexts/groupMailboxes/do
 import { GroupMailboxReadToken } from '../../../../../contexts/groupMailboxes/domain/value-objects/GroupMailboxReadToken';
 import { GroupMailboxSlot } from '../../../../../contexts/groupMailboxes/domain/value-objects/GroupMailboxSlot';
 import { GroupMailboxKeySchedule } from '../../../../../contexts/groupMailboxes/infrastructure/crypto/GroupMailboxKeySchedule';
+import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 import vectors from '../../../../fixtures/group-mailbox-derivation-vectors.json';
 
 // The fixture is generated with node:crypto hkdfSync, independent of this
@@ -25,10 +26,37 @@ function generation(vector: Case): GroupMailboxGenerationSecret {
 }
 
 function slot(vector: Case): GroupMailboxSlot {
-  return GroupMailboxSlot.fromBytes(bytes(vector.input.slot));
+  return GroupMailboxKeySchedule.slot(
+    generation(vector),
+    IdentityId.fromString(vector.input.identityId),
+  );
 }
 
 describe(GroupMailboxKeySchedule.name, () => {
+  describe(vectors.labels.slot, () => {
+    it.each(vectors.cases)('derives the member slot for $name', (vector) => {
+      expect(
+        slot(vector).isEqual(GroupMailboxSlot.fromString(vector.expected.slot)),
+      ).toBe(true);
+    });
+
+    it('gives the same identity another slot in the next generation', () => {
+      const identityId = IdentityId.fromString(
+        vectors.cases[0].input.identityId,
+      );
+      const current = GroupMailboxKeySchedule.slot(
+        generation(vectors.cases[0]),
+        identityId,
+      );
+      const next = GroupMailboxKeySchedule.slot(
+        generation(vectors.cases[2]),
+        identityId,
+      );
+
+      expect(current.isEqual(next)).toBe(false);
+    });
+  });
+
   describe(vectors.labels.mailboxId, () => {
     it.each(vectors.cases)(
       'derives the mailbox id for $name',
