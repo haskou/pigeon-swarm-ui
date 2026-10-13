@@ -48,6 +48,7 @@ import { mergeSessionSnapshot } from './mergeSessionSnapshot';
 import { MessagesWorkspaceContent } from './MessagesWorkspaceContent';
 import { PushNotificationPrompt } from './PushNotificationPrompt';
 import { Rail, type RailProps } from './Rail';
+import { StorageNotice } from './StorageNotice';
 import { useCommunityPanelAnimation } from './useCommunityPanelAnimation';
 import { useCommunitySelection } from './useCommunitySelection';
 import { useConversationDrafts } from './useConversationDrafts';
@@ -55,6 +56,7 @@ import { useConversationMessageActions } from './useConversationMessageActions';
 import { useConversationPins } from './useConversationPins';
 import { useConversationThread } from './useConversationThread';
 import { useConversationTimeline } from './useConversationTimeline';
+import { useDeviceStorageNotice } from './useDeviceStorageNotice';
 import { useDirectMessageBackgroundReadSync } from './useDirectMessageBackgroundReadSync';
 import { useDirectMessageInboxPrewarm } from './useDirectMessageInboxPrewarm';
 import { useDirectMessageMailboxSync } from './useDirectMessageMailboxSync';
@@ -156,6 +158,7 @@ export function GlassWorkspace({
     RealtimeDomainEvent[]
   >([]);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [storageNotice, setStorageNotice] = useState<string | null>(null);
   const [attachmentProgress, setAttachmentProgress] =
     useState<AttachmentProgress | null>(null);
   const { openAttachment: downloadContextAttachment } = useAttachmentDownload({
@@ -829,6 +832,7 @@ export function GlassWorkspace({
     onMessagesChange: setMessages,
     session,
   });
+  useDeviceStorageNotice({ onNoticeChange: setStorageNotice, session });
 
   useDirectMessageInboxPrewarm({ conversations, session });
 
@@ -1152,6 +1156,11 @@ export function GlassWorkspace({
           />
         )}
       </div>
+
+      <StorageNotice
+        notice={storageNotice}
+        onDismiss={() => setStorageNotice(null)}
+      />
 
       {showPushEnablePrompt && !hasWorkspaceDialogOpen ? (
         <PushNotificationPrompt

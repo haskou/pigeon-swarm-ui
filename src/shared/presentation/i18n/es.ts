@@ -90,7 +90,7 @@ export const es = {
     invalidLogin: 'El usuario o la contraseña no son correctos.',
     loadingSubmit: 'Derivando claves y llamando a la API...',
     localDeviceMissing:
-      'Este navegador ya no tiene la clave de acceso de esta identidad. Usa tu clave de recuperación o elige "Dispositivo nuevo" y apruébalo desde un dispositivo donde tengas la sesión iniciada.',
+      'Este navegador ya no tiene la clave de acceso de esta identidad, quizá porque se borraron sus datos del sitio. Los mensajes guardados solo en este navegador se han perdido; los mensajes directos que siguen en el servidor se vuelven a descargar al iniciar sesión. Usa tu clave de recuperación o elige "Dispositivo nuevo" y apruébalo desde un dispositivo donde tengas la sesión iniciada.',
     login: 'Iniciar sesión',
     loginMethodDevice: 'Dispositivo nuevo',
     loginMethodDeviceHelp:
@@ -701,6 +701,26 @@ export const es = {
     scanFailed: 'No se pudo abrir la cámara. Pega el código.',
     scanQr: 'Escanear QR',
   },
+  deviceStorage: {
+    help: 'Qué se guarda aquí, en el servidor y en manos de otras personas.',
+    low: 'Queda poco espacio. Puede que los mensajes nuevos no se guarden aquí hasta que liberes espacio.',
+    notProtected:
+      'Sin protección: el navegador puede borrar estos datos cuando le falte espacio.',
+    onDevice: 'En este dispositivo',
+    onDeviceBody:
+      'Tus claves, mensajes y mensajes pendientes de enviar se guardan aquí cifrados. Cerrar sesión los conserva para tu próximo inicio de sesión. "Cerrar sesión y olvidar este dispositivo" los borra de este navegador, igual que borrar los datos del sitio en el navegador.',
+    onServer: 'En el servidor',
+    onServerBody:
+      'Los mensajes directos nuevos esperan cifrados en el servidor hasta que tus dispositivos los descargan, durante un máximo de 14 días. Después caducan. El servidor no puede leerlos.',
+    protected:
+      'Protegido: el navegador conserva estos datos aunque le falte espacio.',
+    title: 'Almacenamiento en este dispositivo',
+    unavailable: 'Este navegador no indica cuánto almacenamiento se usa.',
+    usage: '{usage} usados de {quota}',
+    withOthers: 'Con otras personas',
+    withOthersBody:
+      '"Eliminar para todos" pide a las aplicaciones de las demás personas que quiten el mensaje. Las copias que ya guardaron, como capturas o exportaciones, no se pueden borrar.',
+  },
   dialog: {
     addParticipant: 'Añadir',
     cancel: 'Cancelar',
@@ -895,8 +915,9 @@ export const es = {
     copy: 'Copiar texto',
     decryptFailed: '[cifrado] Este evento no se pudo descifrar.',
     delete: 'Eliminar',
-    deleteConfirm: '¿Eliminar este mensaje?',
+    deleteConfirm: '¿Eliminar este mensaje para todos?',
     deleteError: 'No se pudo eliminar el mensaje.',
+    deleteForEveryone: 'Eliminar para todos',
     edit: 'Editar',
     edited: 'Editado',
     editError: 'No se pudo editar el mensaje.',
@@ -1492,12 +1513,17 @@ export const es = {
   },
   workspace: {
     closeSidebar: 'Cerrar barra lateral',
+    deviceStorageLost:
+      'Se borraron los mensajes guardados en este dispositivo porque cambiaron las claves de tu cuenta, por ejemplo al quitar un dispositivo. Los mensajes directos que siguen en el servidor se vuelven a descargar.',
+    deviceStorageLow:
+      'A este dispositivo le queda poco almacenamiento. Puede que los mensajes nuevos no se guarden aquí hasta que liberes espacio.',
     directHistoryStorageError:
       'Los mensajes directos nuevos no se pudieron guardar en este dispositivo, quizá porque su almacenamiento está lleno. Se conservan en el servidor hasta 14 días y se guardarán aquí cuando haya espacio.',
     directMailboxReaderLimitError:
       'Los mensajes directos no se pueden sincronizar aquí: esta identidad alcanzó su límite de dispositivos. Elimina un dispositivo que ya no uses e inténtalo de nuevo.',
     directMailboxSyncError:
       'No se pudieron sincronizar los mensajes directos. Reintentando.',
+    dismissNotice: 'Descartar',
     loadMessagesError: 'No se pudieron cargar los mensajes.',
     loadOlderError: 'No se pudieron cargar mensajes antiguos.',
     newMessages: 'Nuevos mensajes',

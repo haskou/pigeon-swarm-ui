@@ -85,7 +85,7 @@ export const en = {
     invalidLogin: 'The username or password is incorrect.',
     loadingSubmit: 'Deriving keys and calling the API...',
     localDeviceMissing:
-      'This browser no longer has the sign-in key for this identity. Sign in with your recovery key, or choose "New device" and approve it from a device where you are signed in.',
+      'This browser no longer has the sign-in key for this identity, possibly because its site data was cleared. Messages saved only in this browser are gone; direct messages still on the server download again after you sign in. Sign in with your recovery key, or choose "New device" and approve it from a device where you are signed in.',
     login: 'Login',
     loginMethodDevice: 'New device',
     loginMethodDeviceHelp:
@@ -693,6 +693,25 @@ export const en = {
     scanFailed: 'Could not open the camera. Paste the code instead.',
     scanQr: 'Scan QR',
   },
+  deviceStorage: {
+    help: 'What is kept here, on the server, and with other people.',
+    low: 'Space is running low. New messages may not be saved here until you free some space.',
+    notProtected:
+      'Not protected: the browser may clear this data when space runs low.',
+    onDevice: 'On this device',
+    onDeviceBody:
+      'Your keys, messages and unsent messages are saved here, encrypted. Logging out keeps them for your next sign-in. "Log out and forget this device" erases them from this browser, and so does clearing the site data in the browser.',
+    onServer: 'On the server',
+    onServerBody:
+      'New direct messages wait on the server, encrypted, until your devices download them, for up to 14 days. After that they expire. The server cannot read them.',
+    protected: 'Protected: the browser keeps this data when space runs low.',
+    title: 'Storage on this device',
+    unavailable: 'This browser does not report how much storage is used.',
+    usage: '{usage} of {quota} used',
+    withOthers: 'With other people',
+    withOthersBody:
+      '"Delete for everyone" asks the other people\'s apps to remove the message. Copies they already kept, such as screenshots or exports, cannot be erased.',
+  },
   dialog: {
     addParticipant: 'Add',
     cancel: 'Cancel',
@@ -889,8 +908,9 @@ export const en = {
     copy: 'Copy text',
     decryptFailed: '[encrypted] This event could not be decrypted.',
     delete: 'Delete',
-    deleteConfirm: 'Delete this message?',
+    deleteConfirm: 'Delete this message for everyone?',
     deleteError: 'The message could not be deleted.',
+    deleteForEveryone: 'Delete for everyone',
     edit: 'Edit',
     edited: 'Edited',
     editError: 'The message could not be edited.',
@@ -1488,11 +1508,16 @@ export const en = {
   },
   workspace: {
     closeSidebar: 'Close sidebar',
+    deviceStorageLost:
+      'Messages saved on this device were cleared because your account keys changed, for example after a device was removed. Direct messages still on the server download again.',
+    deviceStorageLow:
+      'This device is running low on storage. New messages may not be saved here until you free some space.',
     directHistoryStorageError:
       'New direct messages could not be saved on this device, possibly because its storage is full. They stay on the server for up to 14 days and are saved here once space is free.',
     directMailboxReaderLimitError:
       'Direct messages cannot sync here: this identity has reached its device limit. Remove a device you no longer use, then try again.',
     directMailboxSyncError: 'Direct messages could not be synced. Retrying.',
+    dismissNotice: 'Dismiss',
     loadMessagesError:
       'Messages could not be loaded. Great, now we have a mystery.',
     loadOlderError: 'Older messages could not be loaded.',

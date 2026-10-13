@@ -28,10 +28,11 @@ function recordAad(
   );
 }
 
+/** Drops one identity's rows and canary. Resolves with the dropped count. */
 async function wipeIdentity(
   transaction: IDBTransaction,
   identityId: string,
-): Promise<void> {
+): Promise<number> {
   const entries = transaction.objectStore(ENTRIES_STORE);
   const keys = await indexedDbRequest(
     entries
@@ -42,6 +43,8 @@ async function wipeIdentity(
   for (const key of keys) entries.delete(key);
 
   transaction.objectStore(CANARIES_STORE).delete(identityId);
+
+  return keys.length;
 }
 
 /**
@@ -49,9 +52,11 @@ async function wipeIdentity(
  * survives logout and re-login. Each record is sealed with AES-GCM under a key
  * derived from the device-sealed root. A canary sealed under the same key
  * detects a root change; the identity's rows are then dropped, so rotating the
- * root drops the history.
+ * root drops the history. A drop is remembered until `checkDropped` reports it.
  */
 export class DirectMessageHistoryStore {
+  private readonly dropped = new Set<string>();
+
   public constructor(
     private readonly databaseName: string = scopeClientStorageKey(
       'pigeon-direct-history',
@@ -176,7 +181,9 @@ export class DirectMessageHistoryStore {
         'readwrite',
       );
 
-      await wipeIdentity(transaction, identityId);
+      if ((await wipeIdentity(transaction, identityId)) > 0) {
+        this.dropped.add(identityId);
+      }
       transaction.objectStore(CANARIES_STORE).put(sealedCanary, identityId);
       await indexedDbTransaction(transaction);
     } finally {
@@ -262,7 +269,25 @@ export class DirectMessageHistoryStore {
     }
   }
 
+  /**
+   * Whether this device dropped the identity's stored history because it no
+   * longer opens under the device-sealed root, as after a device revoke.
+   * Reports each drop once. A deliberate `forget` is not a drop. Never throws.
+   */
+  public async checkDropped(session: Session): Promise<boolean> {
+    try {
+      await this.verifiedCipher(session);
+    } catch {
+      // eslint-disable-next-line no-console
+      console.debug('Direct history check failed.');
+    }
+
+    return this.dropped.delete(session.identity.id);
+  }
+
   public async forget(identityId: string): Promise<void> {
+    this.dropped.delete(identityId);
+
     try {
       const db = await this.open();
 
