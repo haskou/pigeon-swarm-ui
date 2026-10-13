@@ -9,10 +9,8 @@ import type { PigeonMessageCommandsApi } from '../http/PigeonMessageCommandsApi'
 import type { EditMessageOptions } from '../http/resources/EditMessageOptions';
 import type { MessageCommandIdentity } from '../http/resources/MessageCommandIdentity';
 import type { SendMessageOptions } from '../http/resources/SendMessageOptions';
-import type {
-  DirectMessageOutboxEvent,
-  DirectMessageOutboxItem,
-} from './DirectMessageOutbox';
+import type { DirectMessageOutboxEvent } from './DirectMessageOutboxEvent';
+import type { DirectMessageOutboxItem } from './DirectMessageOutboxItem';
 import type { DirectMessageOutboxStore } from './DirectMessageOutboxStore';
 import type { DirectMessageOwnCopies } from './DirectMessageOwnCopies';
 import type { RecipientMailboxRouter } from './RecipientMailboxRouter';

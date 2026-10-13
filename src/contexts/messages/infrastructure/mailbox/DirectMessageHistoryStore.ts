@@ -4,17 +4,18 @@ import type { DirectMessageHistoryItem } from './DirectMessageHistoryItem';
 import type { DirectMessageHistoryRow } from './DirectMessageHistoryRow';
 
 import { scopeClientStorageKey } from '../../../../shared/infrastructure/storage/ClientStorageScope';
+import {
+  indexedDbRequest,
+  indexedDbTransaction,
+} from '../../../../shared/infrastructure/storage/indexedDbRequest';
+import { DeviceRootRowCipher } from './DeviceRootRowCipher';
 
 const DATABASE_VERSION = 1;
 const ENTRIES_STORE = 'entries';
 const CANARIES_STORE = 'canaries';
 const BY_RECORD_INDEX = 'byRecord';
 const BY_SCOPE_INDEX = 'byScope';
-const IV_BYTES = 12;
-const CANARY_PLAINTEXT = new TextEncoder().encode(
-  'pigeon-direct-history:canary',
-);
-const HKDF_SALT = new TextEncoder().encode('pigeon-direct-history:salt');
+const CIPHER_LABEL = 'pigeon-direct-history';
 
 function recordAad(
   identityId: string,
@@ -26,105 +27,12 @@ function recordAad(
   );
 }
 
-function canaryAad(identityId: string): Uint8Array<ArrayBuffer> {
-  return new TextEncoder().encode(JSON.stringify(['canary', identityId]));
-}
-
-async function deriveKey(root: Buffer, identityId: string): Promise<CryptoKey> {
-  const material = await crypto.subtle.importKey(
-    'raw',
-    new Uint8Array(root),
-    'HKDF',
-    false,
-    ['deriveKey'],
-  );
-
-  return crypto.subtle.deriveKey(
-    {
-      hash: 'SHA-256',
-      info: new TextEncoder().encode(`pigeon-direct-history:v1:${identityId}`),
-      name: 'HKDF',
-      salt: HKDF_SALT,
-    },
-    material,
-    { length: 256, name: 'AES-GCM' },
-    false,
-    ['encrypt', 'decrypt'],
-  );
-}
-
-async function seal(
-  key: CryptoKey,
-  aad: Uint8Array<ArrayBuffer>,
-  plaintext: Uint8Array,
-): Promise<Uint8Array<ArrayBuffer>> {
-  const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
-  const ciphertext = new Uint8Array(
-    await crypto.subtle.encrypt(
-      { additionalData: aad, iv, name: 'AES-GCM' },
-      key,
-      new Uint8Array(plaintext),
-    ),
-  );
-  const sealed = new Uint8Array(IV_BYTES + ciphertext.byteLength);
-
-  sealed.set(iv);
-  sealed.set(ciphertext, IV_BYTES);
-
-  return sealed;
-}
-
-async function openSealed(
-  key: CryptoKey,
-  aad: Uint8Array<ArrayBuffer>,
-  sealed: Uint8Array<ArrayBuffer>,
-): Promise<Uint8Array | undefined> {
-  try {
-    return new Uint8Array(
-      await crypto.subtle.decrypt(
-        {
-          additionalData: aad,
-          iv: sealed.subarray(0, IV_BYTES),
-          name: 'AES-GCM',
-        },
-        key,
-        sealed.subarray(IV_BYTES),
-      ),
-    );
-  } catch {
-    return undefined;
-  }
-}
-
-function request<T>(source: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    source.addEventListener('success', () => resolve(source.result), {
-      once: true,
-    });
-    source.addEventListener('error', () => reject(source.error), {
-      once: true,
-    });
-  });
-}
-
-function settle(transaction: IDBTransaction): Promise<void> {
-  return new Promise((resolve, reject) => {
-    transaction.addEventListener('complete', () => resolve(), { once: true });
-    transaction.addEventListener('error', () => reject(transaction.error), {
-      once: true,
-    });
-    transaction.addEventListener('abort', () => reject(transaction.error), {
-      once: true,
-    });
-  });
-}
-
 async function wipeIdentity(
   transaction: IDBTransaction,
   identityId: string,
 ): Promise<void> {
   const entries = transaction.objectStore(ENTRIES_STORE);
-  const keys = await request(
+  const keys = await indexedDbRequest(
     entries
       .index(BY_SCOPE_INDEX)
       .getAllKeys(IDBKeyRange.bound([identityId], [identityId, []])),
@@ -157,7 +65,7 @@ export class DirectMessageHistoryStore {
       const entries = transaction.objectStore(ENTRIES_STORE);
 
       for (const row of rows) {
-        const existing = await request(
+        const existing = await indexedDbRequest(
           entries
             .index(BY_RECORD_INDEX)
             .count(
@@ -172,7 +80,7 @@ export class DirectMessageHistoryStore {
         if (existing === 0) entries.add(row);
       }
 
-      await settle(transaction);
+      await indexedDbTransaction(transaction);
     } finally {
       db.close();
     }
@@ -186,7 +94,7 @@ export class DirectMessageHistoryStore {
 
     try {
       const transaction = db.transaction(ENTRIES_STORE, 'readonly');
-      const rows = await request<DirectMessageHistoryRow[]>(
+      const rows = await indexedDbRequest(
         transaction
           .objectStore(ENTRIES_STORE)
           .index(BY_SCOPE_INDEX)
@@ -195,7 +103,7 @@ export class DirectMessageHistoryStore {
         >,
       );
 
-      await settle(transaction);
+      await indexedDbTransaction(transaction);
 
       return rows;
     } finally {
@@ -233,7 +141,7 @@ export class DirectMessageHistoryStore {
         cursor.addEventListener('error', () => reject(cursor.error));
       });
 
-      await settle(transaction);
+      await indexedDbTransaction(transaction);
 
       return rows;
     } finally {
@@ -241,24 +149,24 @@ export class DirectMessageHistoryStore {
     }
   }
 
-  private async verifiedKey(session: Session): Promise<CryptoKey | undefined> {
+  private async verifiedCipher(
+    session: Session,
+  ): Promise<DeviceRootRowCipher | undefined> {
     const root = session.deviceSealedRootKey?.getBuffer();
 
     if (!root) return undefined;
 
     const identityId = session.identity.id;
-    const key = await deriveKey(root, identityId);
+    const cipher = await DeviceRootRowCipher.derive(
+      root,
+      CIPHER_LABEL,
+      identityId,
+    );
     const canary = await this.readCanary(identityId);
 
-    if (canary && (await openSealed(key, canaryAad(identityId), canary))) {
-      return key;
-    }
+    if (canary && (await cipher.opensCanary(canary))) return cipher;
 
-    const sealedCanary = await seal(
-      key,
-      canaryAad(identityId),
-      CANARY_PLAINTEXT,
-    );
+    const sealedCanary = await cipher.sealCanary();
     const db = await this.open();
 
     try {
@@ -269,12 +177,12 @@ export class DirectMessageHistoryStore {
 
       await wipeIdentity(transaction, identityId);
       transaction.objectStore(CANARIES_STORE).put(sealedCanary, identityId);
-      await settle(transaction);
+      await indexedDbTransaction(transaction);
     } finally {
       db.close();
     }
 
-    return key;
+    return cipher;
   }
 
   private async readCanary(
@@ -284,13 +192,13 @@ export class DirectMessageHistoryStore {
 
     try {
       const transaction = db.transaction(CANARIES_STORE, 'readonly');
-      const canary = await request<Uint8Array<ArrayBuffer> | undefined>(
+      const canary = await indexedDbRequest(
         transaction.objectStore(CANARIES_STORE).get(identityId) as IDBRequest<
           Uint8Array<ArrayBuffer> | undefined
         >,
       );
 
-      await settle(transaction);
+      await indexedDbTransaction(transaction);
 
       return canary;
     } finally {
@@ -298,29 +206,25 @@ export class DirectMessageHistoryStore {
     }
   }
 
-  private open(): Promise<IDBDatabase> {
-    return new Promise((resolve, reject) => {
-      const openRequest = indexedDB.open(this.databaseName, DATABASE_VERSION);
+  private async open(): Promise<IDBDatabase> {
+    const openRequest = indexedDB.open(this.databaseName, DATABASE_VERSION);
 
-      openRequest.addEventListener('upgradeneeded', () => {
-        const database = openRequest.result;
-        const entries = database.createObjectStore(ENTRIES_STORE, {
-          autoIncrement: true,
-        });
-
-        entries.createIndex(
-          BY_RECORD_INDEX,
-          ['identityId', 'conversationId', 'recordId'],
-          { unique: true },
-        );
-        entries.createIndex(BY_SCOPE_INDEX, ['identityId', 'conversationId']);
-        database.createObjectStore(CANARIES_STORE);
+    openRequest.addEventListener('upgradeneeded', () => {
+      const database = openRequest.result;
+      const entries = database.createObjectStore(ENTRIES_STORE, {
+        autoIncrement: true,
       });
-      openRequest.addEventListener('success', () =>
-        resolve(openRequest.result),
+
+      entries.createIndex(
+        BY_RECORD_INDEX,
+        ['identityId', 'conversationId', 'recordId'],
+        { unique: true },
       );
-      openRequest.addEventListener('error', () => reject(openRequest.error));
+      entries.createIndex(BY_SCOPE_INDEX, ['identityId', 'conversationId']);
+      database.createObjectStore(CANARIES_STORE);
     });
+
+    return indexedDbRequest(openRequest);
   }
 
   public async append(
@@ -329,9 +233,9 @@ export class DirectMessageHistoryStore {
     entries: DirectMessageHistoryEntry[],
   ): Promise<void> {
     try {
-      const key = await this.verifiedKey(session);
+      const cipher = await this.verifiedCipher(session);
 
-      if (!key || entries.length === 0) return;
+      if (!cipher || entries.length === 0) return;
 
       const identityId = session.identity.id;
       const rows = await Promise.all(
@@ -339,8 +243,7 @@ export class DirectMessageHistoryStore {
           conversationId,
           identityId,
           recordId: entry.recordId,
-          sealed: await seal(
-            key,
+          sealed: await cipher.seal(
             recordAad(identityId, conversationId, entry.recordId),
             entry.plaintext,
           ),
@@ -349,6 +252,7 @@ export class DirectMessageHistoryStore {
 
       await this.insert(rows);
     } catch {
+      // eslint-disable-next-line no-console
       console.debug(
         `Direct history append failed for ${entries.length} record(s).`,
       );
@@ -366,11 +270,12 @@ export class DirectMessageHistoryStore {
         );
 
         await wipeIdentity(transaction, identityId);
-        await settle(transaction);
+        await indexedDbTransaction(transaction);
       } finally {
         db.close();
       }
     } catch {
+      // eslint-disable-next-line no-console
       console.debug('Direct history forget failed.');
     }
   }
@@ -380,15 +285,14 @@ export class DirectMessageHistoryStore {
     conversationId: string,
   ): Promise<Uint8Array[]> {
     try {
-      const key = await this.verifiedKey(session);
+      const cipher = await this.verifiedCipher(session);
 
-      if (!key) return [];
+      if (!cipher) return [];
 
       const rows = await this.rowsFor(session.identity.id, conversationId);
       const opened = await Promise.all(
         rows.map((row) =>
-          openSealed(
-            key,
+          cipher.open(
             recordAad(row.identityId, row.conversationId, row.recordId),
             row.sealed,
           ),
@@ -399,6 +303,7 @@ export class DirectMessageHistoryStore {
         (plaintext): plaintext is Uint8Array => plaintext !== undefined,
       );
     } catch {
+      // eslint-disable-next-line no-console
       console.debug('Direct history load failed.');
 
       return [];
@@ -414,15 +319,14 @@ export class DirectMessageHistoryStore {
     limit: number,
   ): Promise<DirectMessageHistoryItem[]> {
     try {
-      const key = await this.verifiedKey(session);
+      const cipher = await this.verifiedCipher(session);
 
-      if (!key) return [];
+      if (!cipher) return [];
 
       const rows = await this.recentRows(session.identity.id, limit);
       const opened = await Promise.all(
         rows.map(async (row) => {
-          const plaintext = await openSealed(
-            key,
+          const plaintext = await cipher.open(
             recordAad(row.identityId, row.conversationId, row.recordId),
             row.sealed,
           );
@@ -437,6 +341,7 @@ export class DirectMessageHistoryStore {
         (item): item is DirectMessageHistoryItem => item !== undefined,
       );
     } catch {
+      // eslint-disable-next-line no-console
       console.debug('Direct history recent failed.');
 
       return [];

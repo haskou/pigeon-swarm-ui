@@ -11,8 +11,9 @@ import {
 import { mock } from 'jest-mock-extended';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
-import type { DirectMessageOutboxDelivery } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageOutbox';
-import type { DirectMessageOutboxRow } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageOutboxStore';
+import type { DirectMessageOutboxDelivery } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageOutboxDelivery';
+import type { DirectMessageOutboxRow } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageOutboxRow';
+import type { DirectMessageOutboxStore } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageOutboxStore';
 
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/infrastructure/http/MailboxUnavailableError';
 import { DirectMessageOutbox } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageOutbox';
@@ -20,14 +21,10 @@ import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJso
 
 const marker = 'plaintext-marker-2b7c';
 
-type Store = {
-  load(session: Session): Promise<DirectMessageOutboxRow[]>;
-  remove(identityId: string, id: string): Promise<void>;
-  save(session: Session, row: DirectMessageOutboxRow): Promise<void>;
-  forget(identityId: string): Promise<void>;
-};
-
-class MemoryOutboxStore implements Store {
+class MemoryOutboxStore implements Pick<
+  DirectMessageOutboxStore,
+  'forget' | 'load' | 'remove' | 'save'
+> {
   public readonly rows = new Map<string, DirectMessageOutboxRow>();
 
   public load(session: Session): Promise<DirectMessageOutboxRow[]> {

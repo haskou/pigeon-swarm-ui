@@ -1,85 +1,18 @@
 import type { Session } from '../../../identities/infrastructure/session/Session';
-import type { DirectSentRecord } from '../../../mailboxes/domain/DirectSentRecord';
-import type {
-  DirectMessageOutboxRow,
-  DirectMessageOutboxStore,
-} from './DirectMessageOutboxStore';
+import type { DirectMessageOutboxDelivery } from './DirectMessageOutboxDelivery';
+import type { DirectMessageOutboxDraft } from './DirectMessageOutboxDraft';
+import type { DirectMessageOutboxEvent } from './DirectMessageOutboxEvent';
+import type { DirectMessageOutboxItem } from './DirectMessageOutboxItem';
+import type { DirectMessageOutboxRow } from './DirectMessageOutboxRow';
+import type { DirectMessageOutboxState } from './DirectMessageOutboxState';
+import type { DirectMessageOutboxStore } from './DirectMessageOutboxStore';
+import type { DirectMessageOutboxTicket } from './DirectMessageOutboxTicket';
 
 import { MailboxUnavailableError } from '../../../mailboxes/infrastructure/http/MailboxUnavailableError';
-
-/**
- * Writes one copy of a queued send. Throws MailboxUnavailableError while the
- * peer inbox is absent.
- */
-export type DirectMessageOutboxDelivery = {
-  toPeer(session: Session, row: DirectMessageOutboxRow): Promise<void>;
-  toOwn(session: Session, row: DirectMessageOutboxRow): Promise<void>;
-};
-
-export type DirectMessageOutboxDraft = {
-  conversationId: string;
-  peerIdentityId: string;
-  record: DirectSentRecord;
-};
-
-export type DirectMessageOutboxTicket = {
-  delivered: Promise<void>;
-};
-
-/** `retry` is the wait after an absent peer inbox. It is in memory only. */
-export type DirectMessageOutboxState = 'failed' | 'pending' | 'retry';
-
-/**
- * What changed. `delivered` names the send that left the queue, so a view can
- * drop its pending state. `changed` is any other state change.
- */
-export type DirectMessageOutboxEvent =
-  | { kind: 'changed' }
-  | { conversationId: string; id: string; kind: 'delivered' };
-
-export type DirectMessageOutboxItem = {
-  conversationId: string;
-  id: string;
-  record: DirectSentRecord;
-  state: DirectMessageOutboxState;
-};
-
-type OutboxStore = Pick<
-  DirectMessageOutboxStore,
-  'forget' | 'load' | 'remove' | 'save'
->;
-
-type Settlement = {
-  promise: Promise<void>;
-  reject: (reason?: unknown) => void;
-  resolve: () => void;
-};
-
-type Entry = {
-  attempt: number;
-  cancelled: boolean;
-  identityId: string;
-  row: DirectMessageOutboxRow;
-  session: Session;
-  settled: Settlement;
-  startedAt: number;
-  state: DirectMessageOutboxState;
-};
-
-/** An absent peer inbox is retried quickly for this long, then slowly. */
-const FAST_RETRY_WINDOW_MS = 30_000;
-const FIRST_RETRY_MS = 250;
-const FAST_RETRY_CAP_MS = 4_000;
-const SLOW_RETRY_MS = 60_000;
+import { DirectMessageOutboxEntry } from './DirectMessageOutboxEntry';
 
 function entryKey(identityId: string, id: string): string {
   return `${identityId}\u0000${id}`;
-}
-
-function retryDelayMs(elapsedMs: number, attempt: number): number {
-  if (elapsedMs >= FAST_RETRY_WINDOW_MS) return SLOW_RETRY_MS;
-
-  return Math.min(FIRST_RETRY_MS * 2 ** attempt, FAST_RETRY_CAP_MS);
 }
 
 /**
@@ -90,13 +23,16 @@ function retryDelayMs(elapsedMs: number, attempt: number): number {
  * Counts and states are in memory; the rows are sealed in the store.
  */
 export class DirectMessageOutbox {
-  private readonly entries = new Map<string, Entry>();
+  private readonly entries = new Map<string, DirectMessageOutboxEntry>();
   private readonly listeners = new Set<
     (event: DirectMessageOutboxEvent) => void
   >();
 
   public constructor(
-    private readonly store: OutboxStore,
+    private readonly store: Pick<
+      DirectMessageOutboxStore,
+      'forget' | 'load' | 'remove' | 'save'
+    >,
     private readonly delivery: DirectMessageOutboxDelivery,
   ) {}
 
@@ -104,50 +40,29 @@ export class DirectMessageOutbox {
     for (const listener of this.listeners) listener(event);
   }
 
-  private newSettlement(): Settlement {
-    let resolve: () => void = () => undefined;
-    let reject: (reason?: unknown) => void = () => undefined;
-    const promise = new Promise<void>((done, fail) => {
-      resolve = () => done();
-      reject = (reason) => fail(reason);
-    });
-
-    // A rejected ticket is handled by its caller; this only avoids an
-    // unhandled rejection when nobody holds the ticket.
-    promise.catch(() => undefined);
-
-    return { promise, reject, resolve };
-  }
-
-  private register(session: Session, row: DirectMessageOutboxRow): Entry {
-    const entry: Entry = {
-      attempt: 0,
-      cancelled: false,
-      identityId: session.identity.id,
-      row,
-      session,
-      settled: this.newSettlement(),
-      startedAt: Date.now(),
-      state: row.state === 'failed' ? 'failed' : 'pending',
-    };
+  private register(
+    session: Session,
+    row: DirectMessageOutboxRow,
+  ): DirectMessageOutboxEntry {
+    const entry = new DirectMessageOutboxEntry(session, row);
 
     this.entries.set(entryKey(entry.identityId, row.id), entry);
 
     return entry;
   }
 
-  private setState(entry: Entry, state: DirectMessageOutboxState): void {
-    if (entry.state === state) return;
-
-    entry.state = state;
-    this.notify();
+  private setState(
+    entry: DirectMessageOutboxEntry,
+    state: DirectMessageOutboxState,
+  ): void {
+    if (entry.transition(state)) this.notify();
   }
 
   private async persist(
-    entry: Entry,
+    entry: DirectMessageOutboxEntry,
     row: DirectMessageOutboxRow,
   ): Promise<void> {
-    entry.row = row;
+    entry.replaceRow(row);
     await this.store.save(entry.session, row);
   }
 
@@ -155,7 +70,9 @@ export class DirectMessageOutbox {
    * Retries the peer copy while the peer inbox is absent. Resolves false when
    * the send was cancelled meanwhile; rejects on any other failure.
    */
-  private async deliverToPeer(entry: Entry): Promise<boolean> {
+  private async deliverToPeer(
+    entry: DirectMessageOutboxEntry,
+  ): Promise<boolean> {
     for (;;) {
       if (entry.cancelled) return false;
 
@@ -171,17 +88,15 @@ export class DirectMessageOutbox {
 
       this.setState(entry, 'retry');
 
+      const delayMs = entry.nextRetryDelayMs();
+
       await new Promise<void>((resolve) => {
-        globalThis.setTimeout(
-          resolve,
-          retryDelayMs(Date.now() - entry.startedAt, entry.attempt),
-        );
+        globalThis.setTimeout(resolve, delayMs);
       });
-      entry.attempt += 1;
     }
   }
 
-  private async drain(entry: Entry): Promise<void> {
+  private async drain(entry: DirectMessageOutboxEntry): Promise<void> {
     try {
       if (!entry.row.peerDelivered) {
         const delivered = await this.deliverToPeer(entry);
@@ -207,7 +122,7 @@ export class DirectMessageOutbox {
     } catch (error) {
       if (entry.cancelled) return;
 
-      entry.state = 'failed';
+      entry.transition('failed');
       await this.persist(entry, { ...entry.row, state: 'failed' }).catch(
         () => undefined,
       );
@@ -216,7 +131,7 @@ export class DirectMessageOutbox {
     }
   }
 
-  private forIdentity(identityId: string): Entry[] {
+  private forIdentity(identityId: string): DirectMessageOutboxEntry[] {
     return [...this.entries.values()].filter(
       (entry) => entry.identityId === identityId,
     );
@@ -263,11 +178,7 @@ export class DirectMessageOutbox {
 
     if (entry.state !== 'failed') return { delivered: entry.settled.promise };
 
-    entry.settled = this.newSettlement();
-    entry.attempt = 0;
-    entry.startedAt = Date.now();
-    entry.state = 'pending';
-    entry.row = { ...entry.row, state: 'pending' };
+    entry.restart();
     this.notify();
     void this.store.save(session, entry.row).catch(() => undefined);
     void this.drain(entry);
@@ -326,7 +237,7 @@ export class DirectMessageOutbox {
    */
   public stop(identityId: string): void {
     for (const entry of this.forIdentity(identityId)) {
-      entry.cancelled = true;
+      entry.cancel();
       this.entries.delete(entryKey(identityId, entry.row.id));
     }
 
@@ -339,7 +250,7 @@ export class DirectMessageOutbox {
    */
   public async cancel(identityId: string): Promise<void> {
     for (const entry of this.forIdentity(identityId)) {
-      entry.cancelled = true;
+      entry.cancel();
       this.entries.delete(entryKey(identityId, entry.row.id));
       entry.settled.reject(new Error('Direct outbox send cancelled.'));
     }
