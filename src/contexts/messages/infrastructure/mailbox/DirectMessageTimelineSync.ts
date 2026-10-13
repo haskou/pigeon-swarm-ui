@@ -26,6 +26,8 @@ import { DirectMessageRecordReader } from './DirectMessageRecordReader';
  * identity's inbox, maps it to timeline changes, then acknowledges it.
  */
 export class DirectMessageTimelineSync {
+  private readonly applied = new Map<string, Set<string>>();
+
   public constructor(
     private readonly opener: DirectMessageInboxOpener,
     private readonly channel: MailboxChannel,
@@ -72,10 +74,10 @@ export class DirectMessageTimelineSync {
 
   /**
    * Decodes the page, stores its records on this device, then hands the
-   * changes of records not already on screen to the caller, then acknowledges
-   * the page. The store runs before the ack, so an acked page is never missing
-   * from the history. Each step checks the signal so an aborted pass neither
-   * applies nor acks.
+   * changes of records this timeline has not applied yet to the caller, then
+   * acknowledges the page. The store runs before the ack, so an acked page is
+   * never missing from the history. Each step checks the signal so an aborted
+   * pass neither applies nor acks.
    */
   private async applyPage(
     session: Session,
@@ -118,16 +120,18 @@ export class DirectMessageTimelineSync {
         ? []
         : [record],
     );
+    const unapplied = this.unappliedRecords(conversationId, records);
     const changes = await this.changesFor(
       session,
       conversationId,
-      records,
+      unapplied,
       signal,
     );
 
     if (signal.aborted) return;
 
     apply(changes);
+    this.markApplied(conversationId, unapplied);
 
     if (signal.aborted) return;
 
@@ -140,6 +144,45 @@ export class DirectMessageTimelineSync {
       ...state,
       cursor: acked.recreated ? 0 : page.lastCursor,
     });
+  }
+
+  /**
+   * Records this timeline has not applied yet, each id once. A replayed
+   * envelope carries a record id this timeline already holds.
+   */
+  private unappliedRecords(
+    conversationId: string,
+    records: DirectMessageRecord[],
+  ): DirectMessageRecord[] {
+    const applied = this.appliedIn(conversationId);
+    const unapplied = new Map<string, DirectMessageRecord>();
+
+    for (const record of records) {
+      if (!applied.has(record.id) && !unapplied.has(record.id)) {
+        unapplied.set(record.id, record);
+      }
+    }
+
+    return [...unapplied.values()];
+  }
+
+  /** Remembers the records this timeline applied, so a replay adds nothing. */
+  private markApplied(
+    conversationId: string,
+    records: DirectMessageRecord[],
+  ): void {
+    const applied = this.appliedIn(conversationId);
+
+    for (const record of records) applied.add(record.id);
+  }
+
+  /** Record ids this timeline has applied, per conversation. */
+  private appliedIn(conversationId: string): Set<string> {
+    const applied = this.applied.get(conversationId) ?? new Set<string>();
+
+    this.applied.set(conversationId, applied);
+
+    return applied;
   }
 
   /**
@@ -257,8 +300,8 @@ export class DirectMessageTimelineSync {
    * Recipient. Reads the next page of this identity's inbox, applies its
    * changes, then acknowledges. The cursor advances only after the
    * acknowledgement succeeds, so an interrupted pass is replayed and the
-   * timeline dedupes by id. A pass superseded before its inbox is created or
-   * read leaves the inbox untouched.
+   * timeline skips records it already applied. A pass superseded before its
+   * inbox is created or read leaves the inbox untouched.
    */
   public async sync(
     session: Session,
@@ -288,6 +331,7 @@ export class DirectMessageTimelineSync {
    * changes, in the order it was stored. Read receipts are never stored, so
    * none replay. Own copies replay too: the live pass skips them only because
    * they were already on screen when it appended them.
+   * Replayed records then count as applied, so a later pass skips them.
    */
   public async restore(
     session: Session,
@@ -317,5 +361,6 @@ export class DirectMessageTimelineSync {
     if (signal.aborted) return;
 
     apply(changes);
+    this.markApplied(conversationId, records);
   }
 }
