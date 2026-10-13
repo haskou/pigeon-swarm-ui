@@ -87,6 +87,55 @@ describe(PigeonConversationRepository.name, () => {
     expect(messagesGateway.loadMessages).not.toHaveBeenCalled();
   });
 
+  it('never reads the node message list to recover one-to-one activity', async () => {
+    gateway.listConversations.mockResolvedValue([
+      {
+        adminIds: [],
+        id: 'one-to-one:a',
+        networkId: 'network-a',
+        participantIds: ['identity-a', 'identity-b'],
+        type: 'one-to-one',
+        unreadCount: 0,
+      },
+    ]);
+
+    const [conversation] = await repository.searchByIdentity(
+      ConversationParticipantId.fromString('identity-a'),
+    );
+
+    expect(messagesGateway.loadMessages).not.toHaveBeenCalled();
+    expect(conversation?.toPrimitives().latestMessageAt).toBeUndefined();
+  });
+
+  it('recovers group activity from the latest group message', async () => {
+    gateway.listConversations.mockResolvedValue([
+      {
+        adminIds: ['identity-a'],
+        id: 'group:a',
+        name: 'Group',
+        networkId: 'network-a',
+        participantIds: ['identity-a', 'identity-b', 'identity-c'],
+        type: 'group',
+        unreadCount: 0,
+      },
+    ]);
+    messagesGateway.loadMessages.mockResolvedValue({
+      messages: [{ raw: { createdAt: 250 } }],
+    } as never);
+
+    const [conversation] = await repository.searchByIdentity(
+      ConversationParticipantId.fromString('identity-a'),
+    );
+
+    expect(messagesGateway.loadMessages).toHaveBeenCalledWith(
+      expect.anything(),
+      'group:a',
+      null,
+      { limit: 1 },
+    );
+    expect(conversation?.toPrimitives().latestMessageAt).toBe(250);
+  });
+
   it('fails explicitly when a conversation cannot be found', async () => {
     gateway.listConversations.mockResolvedValue([]);
 

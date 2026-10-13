@@ -64,6 +64,8 @@ function mountSync(initialError: string | null = null) {
   const onMessagesChange =
     jest.fn<(update: SetStateAction<ChatMessage[]>) => void>();
   const onConversationRead = jest.fn<(conversationId: string) => void>();
+  const onHistoryRestored =
+    jest.fn<(conversationId: string, messages: ChatMessage[]) => void>();
   let pinned = new Set<string>();
   const setPinnedMessageIds = jest.fn((update: SetStateAction<Set<string>>) => {
     pinned = typeof update === 'function' ? update(pinned) : update;
@@ -74,6 +76,7 @@ function mountSync(initialError: string | null = null) {
     activeConversation: conversation,
     onConversationRead,
     onErrorChange,
+    onHistoryRestored,
     onMessagesChange,
     session,
     setPinnedMessageIds,
@@ -84,6 +87,7 @@ function mountSync(initialError: string | null = null) {
     cleanup,
     error: () => error,
     onConversationRead,
+    onHistoryRestored,
     onErrorChange,
     onMessagesChange,
     pinnedIds: () => pinned,
@@ -222,6 +226,28 @@ describe('useDirectMessageMailboxSync changes', () => {
     expect(restore.mock.invocationCallOrder[0]).toBeLessThan(
       sync.mock.invocationCallOrder[0],
     );
+  });
+
+  it('hands the restored timeline over so the conversation is marked read', async () => {
+    restore.mockImplementationOnce(
+      (_session, _conversationId, _signal, apply) => {
+        apply([
+          { kind: 'message', message: timelineMessage },
+          { kind: 'removed', messageId: 'gone' },
+        ]);
+
+        return Promise.resolve();
+      },
+    );
+    sync.mockResolvedValue(undefined);
+    const mounted = mountSync();
+
+    await settle();
+
+    expect(mounted.onHistoryRestored).toHaveBeenCalledWith(conversation.id, [
+      timelineMessage,
+    ]);
+    mounted.cleanup();
   });
 
   it('applies reported changes to the timeline', async () => {
