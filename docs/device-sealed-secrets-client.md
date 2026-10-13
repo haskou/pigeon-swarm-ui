@@ -6,6 +6,7 @@ Client side of haskou/pigeon-swarm-node#451. Design: `docs/design/device-sealed-
 
 - Seal, open, publish (`PUT`), and fetch the caller's own entry (`GET`).
 - Wired into the app. Unlock opens the device-sealed root (`PigeonIdentitySessionApi`) and falls back to `masterKey` when none is open. Mailbox readers and the authorship tag (`DirectMessageAuthorship.tag`) derive from `sessionRootKey(session)`: the opened root, else `masterKey`. The keychain cipher (`KeychainCipher`) opens and seals only under the opened root, with no `masterKey` fallback (#320). The node has no re-encryption endpoint for the keychain, so the client re-seals it under the root.
+- Creation mints the root. `PigeonIdentityRepository.create` opens it through `PigeonIdentitiesGateway.openDeviceSealedRoot` (`DeviceSealedRootRotation.current`) before it registers the session, so the first keychain write (for example, the first conversation) has a root under #320.
 
 ## Seal
 

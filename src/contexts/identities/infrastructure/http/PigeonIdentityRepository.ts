@@ -28,7 +28,9 @@ export class PigeonIdentityRepository implements IdentityRepository {
       material,
       protection,
     );
-    const session = {
+    // The keychain seals only under the device root, so open it before the
+    // session is registered: a fresh identity has no keychain write yet.
+    const session = await this.gateway.openDeviceSealedRoot({
       authorizationEpoch: created.authorizationEpoch,
       authorizationRevision: created.authorizationRevision,
       deviceCredentialKeyPair: created.deviceCredentialKeyPair,
@@ -38,7 +40,7 @@ export class PigeonIdentityRepository implements IdentityRepository {
       keyPair: created.keyPair,
       masterKey: created.masterKey,
       recoveryAuthorityKeyPair: created.recoveryAuthorityKeyPair,
-    };
+    });
 
     this.contexts.register(session);
 

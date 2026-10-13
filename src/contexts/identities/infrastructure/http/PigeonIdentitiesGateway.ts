@@ -219,6 +219,10 @@ export class PigeonIdentitiesGateway {
     return this.keychain.decrypt(session, keychain);
   }
 
+  public async openDeviceSealedRoot(session: Session): Promise<Session> {
+    return await this.deviceSealedRoot.current(session);
+  }
+
   public async getIdentity(identityId: string): Promise<IdentityResource> {
     return await this.identityProfile.get(identityId);
   }
