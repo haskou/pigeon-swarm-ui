@@ -66,7 +66,7 @@ describe('revokeOtherDevice', () => {
     );
   });
 
-  it('hands over the rotated session and resolves false when the cut-off fails', async () => {
+  it('hands over the rotated session and reports a failed cut-off', async () => {
     const revoke = services();
     const rotations: Session[] = [];
 
