@@ -7,7 +7,10 @@ import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { PigeonMessageCommandsApi } from '../http/PigeonMessageCommandsApi';
 import type { EditMessageOptions } from '../http/resources/EditMessageOptions';
+import type { MessageCommandIdentity } from '../http/resources/MessageCommandIdentity';
 import type { SendMessageOptions } from '../http/resources/SendMessageOptions';
+import type { DirectMessageOutboxItem } from './DirectMessageOutbox';
+import type { DirectMessageOutboxStore } from './DirectMessageOutboxStore';
 import type { DirectMessageOwnCopies } from './DirectMessageOwnCopies';
 import type { RecipientMailboxRouter } from './RecipientMailboxRouter';
 
@@ -21,6 +24,14 @@ import { MailboxUnavailableError } from '../../../mailboxes/infrastructure/http/
 import { DirectMessageAuthorship } from './DirectMessageAuthorship';
 import { DirectMessageInboxKeys } from './DirectMessageInboxKeys';
 import { DirectMessageMailboxRecord } from './DirectMessageMailboxRecord';
+import { DirectMessageOutbox } from './DirectMessageOutbox';
+
+/** Refuses a record the envelope cannot carry, before anything is written. */
+function assertWithinEnvelope(plaintext: Uint8Array): void {
+  if (plaintext.byteLength > MailboxEnvelopeCipher.MAX_PLAINTEXT_BYTES) {
+    throw new Error('Direct mailbox record exceeds the envelope bound.');
+  }
+}
 
 /** Count-only: no ids, content, or error details. */
 function logAppendFailure(): void {
@@ -41,6 +52,8 @@ const PEER_INBOX_RETRY_MAX_DELAY_MS = 4_000;
  * first, then to this identity's own inbox, so its other devices converge.
  */
 export class DirectMessageSender {
+  private readonly outbox: DirectMessageOutbox;
+
   public constructor(
     private readonly recipients: RecipientMailboxRouter,
     private readonly projection: Pick<MessageProjectionPort, 'decrypt'>,
@@ -49,7 +62,25 @@ export class DirectMessageSender {
       'composeEdit' | 'withSentRecord'
     >,
     private readonly ownCopies: DirectMessageOwnCopies,
-  ) {}
+    outboxStore: DirectMessageOutboxStore,
+  ) {
+    this.outbox = new DirectMessageOutbox(outboxStore, {
+      toPeer: (session, row) =>
+        this.writeTo(
+          session,
+          row.conversationId,
+          row.peerIdentityId,
+          row.record,
+        ),
+      toOwn: (session, row) => {
+        this.ownCopies.remember(
+          DirectMailboxOwnership.ownCopyKey(session.identity.id, row.record.id),
+        );
+
+        return this.appendOwnCopy(session, row.conversationId, row.record);
+      },
+    });
+  }
 
   /**
    * The peer of a one-to-one conversation. Throws before any write when the
@@ -181,9 +212,7 @@ export class DirectMessageSender {
   ): Promise<void> {
     const plaintext = this.encodeFor(session, recipientIdentityId, record);
 
-    if (plaintext.byteLength > MailboxEnvelopeCipher.MAX_PLAINTEXT_BYTES) {
-      throw new Error('Direct mailbox record exceeds the envelope bound.');
-    }
+    assertWithinEnvelope(plaintext);
 
     const keys = DirectMessageInboxKeys.keysFor(
       session,
@@ -194,12 +223,36 @@ export class DirectMessageSender {
     await this.recipients.send(recipientIdentityId, keys, plaintext);
   }
 
-  /** Sender. Sends a message to the peer's inbox, then to the own inbox. */
+  /**
+   * Checks that a record can be written to one inbox: it fits the envelope and
+   * its conversation key resolves. Throws before anything is persisted.
+   */
+  private assertWritable(
+    session: Session,
+    conversationId: string,
+    recipientIdentityId: string,
+    record: DirectMessageRecord,
+  ): void {
+    assertWithinEnvelope(this.encodeFor(session, recipientIdentityId, record));
+    DirectMessageInboxKeys.keysFor(
+      session,
+      conversationId,
+      recipientIdentityId,
+    );
+  }
+
+  /**
+   * Sender. Persists the built record in the outbox, then resolves: the peer
+   * copy and the own copy are written in the background. An absent peer inbox
+   * is retried; any other failure marks the send failed. Rejects before
+   * anything is persisted when the record cannot be sent.
+   */
   public async send(
     session: Session,
     conversation: ConversationResource,
     content: string,
     options: SendMessageOptions,
+    commandIdentity?: MessageCommandIdentity,
   ): Promise<ChatMessage> {
     const recipientIdentityId = this.peerOf(session, conversation);
 
@@ -217,15 +270,81 @@ export class DirectMessageSender {
         },
       },
       async (record) => {
-        await this.deliver(session, conversation.id, recipientIdentityId, () =>
-          DirectMessageMailboxRecord.fromSent(conversation.id, record),
+        const built = DirectMessageMailboxRecord.fromSent(
+          conversation.id,
+          record,
         );
+
+        this.assertWritable(
+          session,
+          conversation.id,
+          recipientIdentityId,
+          built,
+        );
+        await this.outbox.enqueue(session, {
+          conversationId: conversation.id,
+          peerIdentityId: recipientIdentityId,
+          record: built,
+        });
 
         return record;
       },
+      commandIdentity,
     );
 
     return await this.projection.decrypt(session, conversation.id, sent);
+  }
+
+  /**
+   * Sender. Re-queues a one-to-one send held in the outbox and resolves with
+   * its message. Null when the outbox holds no such send.
+   */
+  public async retry(
+    session: Session,
+    conversation: ConversationResource,
+    messageId: string,
+  ): Promise<ChatMessage | null> {
+    this.peerOf(session, conversation);
+
+    const item = this.outbox
+      .items(session.identity.id, conversation.id)
+      .find((entry) => entry.id === messageId);
+
+    if (!item || !this.outbox.retry(session, messageId)) return null;
+
+    return await this.projection.decrypt(
+      session,
+      conversation.id,
+      DirectMessageMailboxRecord.toResource(item.record),
+    );
+  }
+
+  /** Re-queues every persisted send of this identity, after unlock. */
+  public async resume(session: Session): Promise<void> {
+    await this.outbox.resume(session);
+  }
+
+  /** Queued one-to-one sends of one conversation, each with its state. */
+  public items(
+    identityId: string,
+    conversationId: string,
+  ): DirectMessageOutboxItem[] {
+    return this.outbox.items(identityId, conversationId);
+  }
+
+  /** Notifies on each outbox state change. Returns the unsubscribe function. */
+  public subscribe(listener: () => void): () => void {
+    return this.outbox.subscribe(listener);
+  }
+
+  /** Stops this identity's sends in memory, for logout. Rows are kept. */
+  public stop(identityId: string): void {
+    this.outbox.stop(identityId);
+  }
+
+  /** Cancels and wipes this identity's queued sends, for forget. */
+  public async cancel(identityId: string): Promise<void> {
+    await this.outbox.cancel(identityId);
   }
 
   /** Sender. Edits a sent message. Rejects like send. */

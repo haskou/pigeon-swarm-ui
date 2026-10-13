@@ -220,6 +220,29 @@ describe(DirectMessageMailbox.name, () => {
     };
   };
 
+  /**
+   * Resolves once no send of this identity is still being delivered in the
+   * test conversation: every queued send is written and removed, or failed.
+   */
+  const outboxSettled = (
+    mailbox: DirectMessageMailbox,
+    identityId: string,
+  ): Promise<void> =>
+    new Promise<void>((resolve) => {
+      const check = (): void => {
+        if (
+          mailbox
+            .outboxItems(identityId, conversationId)
+            .every((item) => item.state === 'failed')
+        ) {
+          resolve();
+        }
+      };
+
+      mailbox.subscribeOutbox(check);
+      check();
+    });
+
   const pageWith = (plaintext: Uint8Array, lastCursor: number) => ({
     envelopes: [{ cursor: lastCursor, envelopeId: 'envelope', plaintext }],
     hasMore: false,
@@ -291,7 +314,6 @@ describe(DirectMessageMailbox.name, () => {
       conv: ConversationResource,
     ) => Promise<unknown>,
   ][] = [
-    ['sent', (mailbox, from, conv) => mailbox.send(from, conv, 'hello', {})],
     [
       'edited',
       (mailbox, from, conv) =>
@@ -305,6 +327,11 @@ describe(DirectMessageMailbox.name, () => {
       'reaction',
       (mailbox, from, conv) => mailbox.reaction(from, conv, reaction),
     ],
+  ];
+
+  const sentDelivery: (typeof deliveries)[number] = [
+    'sent',
+    (mailbox, from, conv) => mailbox.send(from, conv, 'hello', {}),
   ];
 
   describe('send', () => {
@@ -388,13 +415,16 @@ describe(DirectMessageMailbox.name, () => {
       expect(channel.send).not.toHaveBeenCalled();
     });
 
-    it('rejects when the peer append fails and writes no own copy', async () => {
+    it('queues the send as failed when the peer append fails, and writes no own copy', async () => {
       const { channel, mailbox } = setup();
       channel.send.mockRejectedValueOnce(new Error('peer inbox down'));
 
-      await expect(
-        mailbox.send(session('alice'), conversation, 'hello', {}),
-      ).rejects.toThrow('peer inbox down');
+      await mailbox.send(session('alice'), conversation, 'hello', {});
+      await outboxSettled(mailbox, 'alice');
+
+      expect(mailbox.outboxItems('alice', conversationId)).toEqual([
+        expect.objectContaining({ id: 'message-1', state: 'failed' }),
+      ]);
       expect(channel.send).toHaveBeenCalledTimes(1);
     });
 
@@ -424,7 +454,49 @@ describe(DirectMessageMailbox.name, () => {
           },
         }),
         expect.any(Function),
+        undefined,
       );
+    });
+
+    it('queues nothing and rejects without a conversation key', async () => {
+      const { channel, mailbox } = setup();
+      const keyless = {
+        identity: { id: 'alice' },
+        keychain: { conversations: {}, version: 1 },
+      } as unknown as Session;
+
+      await expect(
+        mailbox.send(keyless, conversation, 'hello', {}),
+      ).rejects.toThrow();
+      expect(channel.send).not.toHaveBeenCalled();
+      expect(mailbox.outboxItems('alice', conversationId)).toEqual([]);
+    });
+
+    it('queues nothing and rejects for a group conversation', async () => {
+      const { channel, mailbox } = setup();
+      const group = { ...conversation, type: 'group' } as ConversationResource;
+
+      await expect(
+        mailbox.send(session('alice'), group, 'hello', {}),
+      ).rejects.toThrow();
+      expect(channel.send).not.toHaveBeenCalled();
+    });
+
+    it('keeps the send in retry, logging nothing, while the recipient inbox stays missing', async () => {
+      jest.useFakeTimers();
+      const { channel, mailbox } = setup();
+      channel.send.mockRejectedValue(new MailboxUnavailableError());
+      const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
+
+      await mailbox.send(session('alice'), conversation, 'hello', {});
+      await jest.advanceTimersByTimeAsync(60_000);
+
+      expect(mailbox.outboxItems('alice', conversationId)).toEqual([
+        expect.objectContaining({ id: 'message-1', state: 'retry' }),
+      ]);
+      expect(debug).not.toHaveBeenCalled();
+      debug.mockRestore();
+      jest.useRealTimers();
     });
 
     describe('real encrypted payloads', () => {
@@ -831,6 +903,7 @@ describe(DirectMessageMailbox.name, () => {
       messageId: 'message-1',
     });
     const everyDelivery: typeof deliveries = [
+      sentDelivery,
       ...deliveries,
       ['pin', (mailbox, from, conv) => mailbox.pin(from, conv, pinOf('pin'))],
     ];
@@ -870,6 +943,7 @@ describe(DirectMessageMailbox.name, () => {
         channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
 
         await deliver(mailbox, session('alice'), conversation);
+        await outboxSettled(mailbox, 'alice');
 
         expect(channel.send).toHaveBeenCalledTimes(2);
         const [peerKeys, peerPlaintext] = channel.send.mock.calls[0];
@@ -893,6 +967,7 @@ describe(DirectMessageMailbox.name, () => {
         'hello',
         {},
       );
+      await outboxSettled(mailbox, 'alice');
 
       const [, ownPlaintext] = channel.send.mock.calls[1];
       const { authorTag, record } = envelopeOf(ownPlaintext);
@@ -917,6 +992,7 @@ describe(DirectMessageMailbox.name, () => {
       await expect(
         mailbox.send(session('alice'), conversation, 'hello', {}),
       ).resolves.toEqual(expect.objectContaining({ id: 'message-1' }));
+      await outboxSettled(mailbox, 'alice');
       expect(debug).toHaveBeenCalledTimes(1);
       debug.mockRestore();
     });
@@ -951,6 +1027,7 @@ describe(DirectMessageMailbox.name, () => {
             envelopeId: 'envelope-1',
           });
           await deliver(mailbox, session('alice'), conversation);
+          await outboxSettled(mailbox, 'alice');
           const [, ownPlaintext] = channel.send.mock.calls[1];
 
           channel.read.mockResolvedValue(pageOf([ownPlaintext]));
@@ -1163,6 +1240,7 @@ describe(DirectMessageMailbox.name, () => {
         const { channel, mailbox } = setup();
         channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
         await mailbox.send(session('bob'), conversation, 'hello', {});
+        await outboxSettled(mailbox, 'bob');
         const [, bobOwnCopy] = channel.send.mock.calls[1];
         channel.read.mockResolvedValue(pageOf([bobOwnCopy]));
         channel.acknowledge.mockResolvedValue({ recreated: false });
@@ -1184,6 +1262,7 @@ describe(DirectMessageMailbox.name, () => {
         const { channel, mailbox } = setup();
         channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
         await mailbox.send(session('alice'), conversation, 'hello', {});
+        await outboxSettled(mailbox, 'alice');
         const [, ownPlaintext] = channel.send.mock.calls[1];
         channel.read.mockResolvedValue(pageOf([ownPlaintext]));
         channel.acknowledge.mockResolvedValue({ recreated: false });
@@ -1229,6 +1308,7 @@ describe(DirectMessageMailbox.name, () => {
         const { channel, mailbox } = setup();
         channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
         await mailbox.send(session('alice'), conversation, 'hello', {});
+        await outboxSettled(mailbox, 'alice');
         const [, ownPlaintext] = channel.send.mock.calls[1];
         const fromBob = DirectMessageMailboxRecord.encode({
           ...storedRecord,
