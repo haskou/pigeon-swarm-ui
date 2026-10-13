@@ -186,7 +186,7 @@ export class MailboxChannel {
     plaintext: Uint8Array,
     envelopeId: string = MailboxChannel.randomEnvelopeId(),
   ): Promise<MailboxAppend> {
-    const body = MailboxEnvelopeCipher.seal(
+    const body = await MailboxEnvelopeCipher.seal(
       keys.envelopeKey,
       keys.mailboxId,
       envelopeId,
@@ -219,26 +219,27 @@ export class MailboxChannel {
       readers,
       () => this.client.read(keys.mailboxId, readers.device, after, limit),
     );
-    const envelopes: OpenedMailboxEnvelope[] = [];
-
-    for (const { body, cursor, envelopeId } of page.envelopes) {
-      try {
-        envelopes.push({
-          cursor,
+    const opened = await Promise.all(
+      page.envelopes.map(({ body, cursor, envelopeId }) =>
+        MailboxEnvelopeCipher.open(
+          keys.envelopeKey,
+          keys.mailboxId,
           envelopeId,
-          plaintext: MailboxEnvelopeCipher.open(
-            keys.envelopeKey,
-            keys.mailboxId,
+          body,
+        ).then(
+          (plaintext): OpenedMailboxEnvelope => ({
+            cursor,
             envelopeId,
-            body,
-          ),
-        });
-      } catch (error: unknown) {
-        if (!(error instanceof MailboxEnvelopeError)) {
-          throw error;
-        }
-      }
-    }
+            plaintext,
+          }),
+          (error: unknown) => {
+            if (error instanceof MailboxEnvelopeError) return null;
+            throw error;
+          },
+        ),
+      ),
+    );
+    const envelopes = opened.filter((envelope) => envelope !== null);
 
     return {
       envelopes,

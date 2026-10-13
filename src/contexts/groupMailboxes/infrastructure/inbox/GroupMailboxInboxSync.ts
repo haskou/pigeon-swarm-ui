@@ -23,6 +23,7 @@ import { DirectMessageMailboxRecord } from '../../../messages/infrastructure/mai
 import { GroupMailboxControlRecord } from '../control/GroupMailboxControlRecord';
 import { GroupMailboxKeySchedule } from '../crypto/GroupMailboxKeySchedule';
 import { GroupMessageId } from '../crypto/GroupMessageId';
+import { GroupMessageAuthors } from './GroupMessageAuthors';
 
 /**
  * Recipient pass of a group conversation (node
@@ -56,50 +57,25 @@ export class GroupMailboxInboxSync {
    * or a deletion only for its own message, a message only under an id no
    * other author holds. Read receipts have no meaning in a group.
    */
-  private static authorized(
+  private static async authorized(
     record: DirectMessageRecord,
     sender: string,
-    authors: Map<string, string>,
-  ): boolean {
+    authors: GroupMessageAuthors,
+  ): Promise<boolean> {
     if (!GroupMessageId.belongsTo(record.id, sender)) return false;
 
     switch (record.type) {
       case DirectMailboxRecords.TYPE.sent:
-        return GroupMailboxInboxSync.claimed(record.id, sender, authors);
+        return authors.claim(record.id, sender);
       case DirectMailboxRecords.TYPE.edited:
       case DirectMailboxRecords.TYPE.deleted:
-        return GroupMailboxInboxSync.owns(
-          record.targetMessageId,
-          sender,
-          authors,
-        );
+        return authors.owns(record.targetMessageId, sender);
       case DirectMailboxRecords.TYPE.pin:
       case DirectMailboxRecords.TYPE.reaction:
         return true;
       case DirectMailboxRecords.TYPE.read:
         return false;
     }
-  }
-
-  /** Records `sender` as the author of `id` unless another author holds it. */
-  private static claimed(
-    id: string,
-    sender: string,
-    authors: Map<string, string>,
-  ): boolean {
-    if ((authors.get(id) ?? sender) !== sender) return false;
-    authors.set(id, sender);
-
-    return true;
-  }
-
-  /** Whether `id` is a message `sender` sent under an id it owns. */
-  private static owns(
-    id: string,
-    sender: string,
-    authors: Map<string, string>,
-  ): boolean {
-    return GroupMessageId.belongsTo(id, sender) && authors.get(id) === sender;
   }
 
   public constructor(
@@ -112,7 +88,10 @@ export class GroupMailboxInboxSync {
     private readonly channel: Pick<MailboxChannel, 'acknowledge' | 'read'>,
     private readonly client: Pick<PigeonMailboxClient, 'delete'>,
     private readonly inboxes: GroupMailboxInboxStore,
-    private readonly history: Pick<GroupMessageHistoryStore, 'append' | 'load'>,
+    private readonly history: Pick<
+      GroupMessageHistoryStore,
+      'append' | 'author'
+    >,
   ) {}
 
   /**
@@ -122,7 +101,7 @@ export class GroupMailboxInboxSync {
   private async accepted(
     conversationId: string,
     ciphertext: Uint8Array,
-    authors: Map<string, string>,
+    authors: GroupMessageAuthors,
     envelope: { envelopeId: string; mailboxId: string },
   ): Promise<DirectMessageRecord | null> {
     const opened = await this.opened(conversationId, ciphertext, envelope);
@@ -135,7 +114,8 @@ export class GroupMailboxInboxSync {
       (candidate) => candidate.authorId === sender,
     );
 
-    return record && GroupMailboxInboxSync.authorized(record, sender, authors)
+    return record &&
+      (await GroupMailboxInboxSync.authorized(record, sender, authors))
       ? record
       : null;
   }
@@ -149,24 +129,6 @@ export class GroupMailboxInboxSync {
     const { recreated } = await this.channel.acknowledge(keys, readers, upTo);
 
     this.inboxes.saveCursor(keys.mailboxId, recreated ? 0 : upTo);
-  }
-
-  /** The authors of the sent messages this device holds. */
-  private async authorsOf(
-    conversationId: string,
-  ): Promise<Map<string, string>> {
-    const authors = new Map<string, string>();
-
-    for (const record of await this.history.load(
-      this.session,
-      conversationId,
-    )) {
-      if (record.type === DirectMailboxRecords.TYPE.sent) {
-        authors.set(record.id, record.authorId);
-      }
-    }
-
-    return authors;
   }
 
   /** Deletes this identity's inboxes whose drain window has closed. */
@@ -201,7 +163,7 @@ export class GroupMailboxInboxSync {
   private async drain(
     conversationId: string,
     generation: GroupMailboxGeneration,
-    authors: Map<string, string>,
+    authors: GroupMessageAuthors,
     signal: AbortSignal,
     apply: (records: DirectMessageRecord[]) => void,
   ): Promise<boolean> {
@@ -275,7 +237,7 @@ export class GroupMailboxInboxSync {
     conversationId: string,
     mailboxId: string,
     page: OpenedMailboxPage,
-    authors: Map<string, string>,
+    authors: GroupMessageAuthors,
   ): Promise<{ accepted: DirectMessageRecord[]; applied: boolean }> {
     const accepted: (DirectMessageRecord | null)[] = [];
     let applied = false;
@@ -333,7 +295,7 @@ export class GroupMailboxInboxSync {
    */
   private async round(
     conversationId: string,
-    authors: Map<string, string>,
+    authors: GroupMessageAuthors,
     signal: AbortSignal,
     apply: (records: DirectMessageRecord[]) => void,
   ): Promise<boolean> {
@@ -364,7 +326,11 @@ export class GroupMailboxInboxSync {
     signal: AbortSignal,
     apply: (records: DirectMessageRecord[]) => void,
   ): Promise<void> {
-    const authors = await this.authorsOf(conversationId);
+    const authors = new GroupMessageAuthors(
+      this.session,
+      conversationId,
+      this.history,
+    );
     let advanced = true;
 
     for (

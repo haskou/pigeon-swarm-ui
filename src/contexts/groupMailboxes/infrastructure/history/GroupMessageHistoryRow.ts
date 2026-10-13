@@ -1,11 +1,13 @@
-import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessageRecord';
-
 /**
  * One accepted application record of a group conversation, kept on this
- * device because its inbox copy is acknowledged. `record.authorId` is the
+ * device because its inbox copy is acknowledged. `conversation` and
+ * `record` are keyed tags of the conversation and record ids, so neither id
+ * is readable at rest; `sealed` holds the record, whose `authorId` is the
  * MLS sender.
  */
 export type GroupMessageHistoryRow = {
-  readonly id: string;
-  readonly record: DirectMessageRecord;
+  readonly conversation: string;
+  readonly identityId: string;
+  readonly record: string;
+  readonly sealed: Uint8Array<ArrayBuffer>;
 };
