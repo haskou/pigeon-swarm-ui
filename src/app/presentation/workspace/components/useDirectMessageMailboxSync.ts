@@ -10,6 +10,7 @@ import type { DirectPinChange } from './DirectPinChange';
 
 import { DirectMailboxEligibility } from '../../../../contexts/mailboxes/domain/DirectMailboxEligibility';
 import { MailboxReaderLimitError } from '../../../../contexts/mailboxes/infrastructure/http/MailboxReaderLimitError';
+import { DirectMessageHistoryStorageError } from '../../../../contexts/messages/infrastructure/mailbox/DirectMessageHistoryStorageError';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
@@ -112,9 +113,15 @@ function subscribeMailboxHints(
 }
 
 function syncFailureMessage(caught: unknown): string {
-  return caught instanceof MailboxReaderLimitError
-    ? copy.workspace.directMailboxReaderLimitError
-    : toUserErrorMessage(caught, copy.workspace.directMailboxSyncError);
+  if (caught instanceof MailboxReaderLimitError) {
+    return copy.workspace.directMailboxReaderLimitError;
+  }
+
+  if (caught instanceof DirectMessageHistoryStorageError) {
+    return copy.workspace.directHistoryStorageError;
+  }
+
+  return toUserErrorMessage(caught, copy.workspace.directMailboxSyncError);
 }
 
 /**

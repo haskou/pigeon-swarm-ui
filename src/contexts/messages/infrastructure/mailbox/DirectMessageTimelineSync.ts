@@ -17,6 +17,7 @@ import type { DirectMessageRecipientInbox } from './DirectMessageRecipientInbox'
 import { DirectMailboxOwnership } from '../../../mailboxes/domain/DirectMailboxOwnership';
 import { DirectMailboxRecords } from '../../../mailboxes/domain/DirectMailboxRecords';
 import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
+import { DirectMessageHistoryStorageError } from './DirectMessageHistoryStorageError';
 import { DirectMessageMailboxLimits } from './DirectMessageMailboxLimits';
 import { DirectMessageMailboxRecord } from './DirectMessageMailboxRecord';
 import { DirectMessageRecordReader } from './DirectMessageRecordReader';
@@ -76,8 +77,10 @@ export class DirectMessageTimelineSync {
    * Decodes the page, stores its records on this device, then hands the
    * changes of records this timeline has not applied yet to the caller, then
    * acknowledges the page. The store runs before the ack, so an acked page is
-   * never missing from the history. Each step checks the signal so an aborted
-   * pass neither applies nor acks.
+   * never missing from the history. A page the store cannot hold is still
+   * shown but not acknowledged, and the pass rejects with
+   * `DirectMessageHistoryStorageError`. Each step checks the signal so an
+   * aborted pass neither applies nor acks.
    */
   private async applyPage(
     session: Session,
@@ -100,15 +103,20 @@ export class DirectMessageTimelineSync {
 
     // Keyed by record id, so a replayed envelope dedupes while each action
     // (a reaction add, its removal, a re-add) keeps its own row.
-    await this.history.append(
-      session,
-      conversationId,
-      decoded.flatMap(({ plaintext, record }) =>
-        record.type === DirectMailboxRecords.TYPE.read
-          ? []
-          : [{ plaintext, recordId: record.id }],
-      ),
-    );
+    const stored = await this.history
+      .append(
+        session,
+        conversationId,
+        decoded.flatMap(({ plaintext, record }) =>
+          record.type === DirectMailboxRecords.TYPE.read
+            ? []
+            : [{ plaintext, recordId: record.id }],
+        ),
+      )
+      .then(
+        () => true,
+        () => false,
+      );
 
     if (signal.aborted) return;
 
@@ -134,6 +142,10 @@ export class DirectMessageTimelineSync {
     this.markApplied(conversationId, unapplied);
 
     if (signal.aborted) return;
+
+    // An unstored page stays on the node: the next pass reads it again, stores
+    // it, and acks it. Its records are applied, so the replay adds no change.
+    if (!stored) throw new DirectMessageHistoryStorageError();
 
     const acked = await this.channel.acknowledge(
       keys,

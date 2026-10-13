@@ -9,6 +9,7 @@ import {
   indexedDbTransaction,
 } from '../../../../shared/infrastructure/storage/indexedDbRequest';
 import { DeviceRootRowCipher } from './DeviceRootRowCipher';
+import { DirectMessageHistoryStorageError } from './DirectMessageHistoryStorageError';
 
 const DATABASE_VERSION = 1;
 const ENTRIES_STORE = 'entries';
@@ -227,6 +228,11 @@ export class DirectMessageHistoryStore {
     return indexedDbRequest(openRequest);
   }
 
+  /**
+   * Stores the entries, deduped by record id. Without a device-sealed root
+   * nothing is stored. A failed write, such as an exhausted browser quota,
+   * rejects with `DirectMessageHistoryStorageError`, which carries no content.
+   */
   public async append(
     session: Session,
     conversationId: string,
@@ -252,10 +258,7 @@ export class DirectMessageHistoryStore {
 
       await this.insert(rows);
     } catch {
-      // eslint-disable-next-line no-console
-      console.debug(
-        `Direct history append failed for ${entries.length} record(s).`,
-      );
+      throw new DirectMessageHistoryStorageError();
     }
   }
 
