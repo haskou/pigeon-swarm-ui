@@ -159,11 +159,20 @@ describe(DirectMessageMailbox.name, () => {
 
   /** The decrypt port: a record projects to the `decrypted` stand-in. */
   const projectionDouble = () => {
-    const port = mock<Pick<MessageProjectionPort, 'decrypt' | 'decryptMany'>>();
+    const port =
+      mock<
+        Pick<
+          MessageProjectionPort,
+          'decrypt' | 'decryptMany' | 'decryptReadable'
+        >
+      >();
     port.decrypt.mockImplementation((_session, _id, message) =>
       Promise.resolve(decrypted(message)),
     );
     port.decryptMany.mockImplementation((_session, _id, records) =>
+      Promise.resolve(records.map(decrypted)),
+    );
+    port.decryptReadable.mockImplementation((_session, _id, records) =>
       Promise.resolve(records.map(decrypted)),
     );
 
@@ -1927,7 +1936,7 @@ describe(DirectMessageMailbox.name, () => {
         );
 
         expect(apply).toHaveBeenCalledWith([{ ...pinChange, action }]);
-        expect(projection.decryptMany).not.toHaveBeenCalled();
+        expect(projection.decryptReadable).not.toHaveBeenCalled();
       },
     );
 
@@ -1965,7 +1974,7 @@ describe(DirectMessageMailbox.name, () => {
       expect(apply).toHaveBeenCalledWith([
         { kind: 'removed', messageId: 'message-1' },
       ]);
-      expect(projection.decryptMany).not.toHaveBeenCalled();
+      expect(projection.decryptReadable).not.toHaveBeenCalled();
     });
 
     it('applies a reaction as a reaction change', async () => {
@@ -2013,16 +2022,12 @@ describe(DirectMessageMailbox.name, () => {
         reactionChange,
         { kind: 'removed', messageId: 'message-1' },
       ]);
-      expect(projection.decryptMany).toHaveBeenCalledTimes(1);
+      expect(projection.decryptReadable).toHaveBeenCalledTimes(1);
     });
 
     it('drops only the change of a sent record that does not decrypt', async () => {
       const { channel, mailbox, projection } = setup();
-      projection.decryptMany.mockImplementation((_session, _id, records) =>
-        Promise.resolve(
-          records.map((record) => ({ ...decrypted(record), encrypted: true })),
-        ),
-      );
+      projection.decryptReadable.mockResolvedValue([]);
       channel.read.mockResolvedValue(
         pageOf([
           ownEncode(storedRecord),
@@ -2085,7 +2090,7 @@ describe(DirectMessageMailbox.name, () => {
         expect(apply).toHaveBeenCalledWith([
           { kind: 'read', messageId: 'message-1' },
         ]);
-        expect(projection.decryptMany).not.toHaveBeenCalled();
+        expect(projection.decryptReadable).not.toHaveBeenCalled();
       });
 
       it('ignores a read authored by another identity and still acknowledges it', async () => {
@@ -2224,7 +2229,7 @@ describe(DirectMessageMailbox.name, () => {
       expect(apply).toHaveBeenCalledWith([
         { kind: 'read', messageId: 'message-1' },
       ]);
-      expect(projection.decryptMany).not.toHaveBeenCalled();
+      expect(projection.decryptReadable).not.toHaveBeenCalled();
       expect(channel.acknowledge).not.toHaveBeenCalled();
       expect(store.load(keysFor('alice').mailboxId)).toEqual({ cursor: 0 });
       expect(readCursorOf(store)).toBe(2);
@@ -2979,7 +2984,10 @@ describe(DirectMessageMailbox.name, () => {
     const mailboxFor = (
       wire: PigeonMailboxClient,
       store: DirectMessageMailboxStore,
-      projection: Pick<MessageProjectionPort, 'decrypt' | 'decryptMany'>,
+      projection: Pick<
+        MessageProjectionPort,
+        'decrypt' | 'decryptMany' | 'decryptReadable'
+      >,
       catalog: readonly string[] = [credentialFor('bob')],
       composed: ComposedRecords = composedRecords(),
     ): DirectMessageMailbox => {

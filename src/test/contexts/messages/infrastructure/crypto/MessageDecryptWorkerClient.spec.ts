@@ -7,15 +7,15 @@ class WorkerDouble {
 
   public readonly postMessage = jest.fn();
 
-  public succeed(messages: unknown[]): void {
+  public succeed(projected: unknown[]): void {
     this.onmessage?.({
-      data: { messages, requestId: 1, type: 'success' },
+      data: { projected, requestId: 1, type: 'success' },
     } as MessageEvent);
   }
 }
 
 describe(MessageDecryptWorkerClient.name, () => {
-  it('resolves the matching worker response', async () => {
+  it('resolves the matching worker response with each read outcome', async () => {
     const worker = new WorkerDouble();
     const client = new MessageDecryptWorkerClient(worker as unknown as Worker);
     const decrypted = client.decrypt({
@@ -25,10 +25,14 @@ describe(MessageDecryptWorkerClient.name, () => {
       messages: [],
       symmetricKey: 'secret',
     });
+    const projected = [
+      { message: { id: 'message-1' }, readable: true },
+      { message: { id: 'message-2' }, readable: false },
+    ];
 
-    worker.succeed([]);
+    worker.succeed(projected);
 
-    await expect(decrypted).resolves.toEqual([]);
+    await expect(decrypted).resolves.toEqual(projected);
     expect(worker.postMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         conversationId: 'conversation-a',
