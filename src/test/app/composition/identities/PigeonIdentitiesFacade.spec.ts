@@ -106,4 +106,28 @@ describe(PigeonIdentitiesFacade.name, () => {
 
     expect(gateway.hydrateSession).toHaveBeenCalledWith(session, undefined);
   });
+
+  it('forgets the current device of the registered session through the use case', async () => {
+    const contexts = new IdentityAccessContexts();
+    const useCases = mockDeep<IdentityUseCases>();
+    const session = {
+      identity: { id: 'identity-a' },
+    } as unknown as Session;
+
+    useCases.currentDeviceForgetter.forget.mockResolvedValue('only-device');
+
+    const outcome = await new PigeonIdentitiesFacade(
+      mock<PigeonIdentitiesGateway>(),
+      contexts,
+      mock<IdentityMapper>(),
+      mock<IdentityPresenceMapper>(),
+      useCases,
+    ).forgetCurrentDevice(session, false);
+
+    const [message] = useCases.currentDeviceForgetter.forget.mock.calls[0];
+
+    expect(outcome).toBe('only-device');
+    expect(contexts.find(message.getIdentityId()).session).toBe(session);
+    expect(message.getAllowOnlyDevice()).toBe(false);
+  });
 });
