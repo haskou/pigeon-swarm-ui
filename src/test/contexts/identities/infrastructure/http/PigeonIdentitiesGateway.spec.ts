@@ -1,8 +1,11 @@
 import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
+import type { DevicePairingRequestDraft } from '../../../../../contexts/identities/domain/DevicePairingRequestDraft';
 import type { DeviceCredential } from '../../../../../contexts/identities/domain/value-objects/DeviceCredential';
 import type { DevicePairingCode } from '../../../../../contexts/identities/domain/value-objects/DevicePairingCode';
+import type { IdentityPassword } from '../../../../../contexts/identities/domain/value-objects/IdentityPassword';
 import type { DevicePairingAuthorization } from '../../../../../contexts/identities/infrastructure/http/DevicePairingAuthorization';
+import type { DevicePairingHistory } from '../../../../../contexts/identities/infrastructure/http/DevicePairingHistory';
 import type { DeviceSealedRecovery } from '../../../../../contexts/identities/infrastructure/http/DeviceSealedRecovery';
 import type { DeviceSealedRootRotation } from '../../../../../contexts/identities/infrastructure/http/DeviceSealedRootRotation';
 import type { PigeonDeviceAuthorizationApi } from '../../../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
@@ -35,13 +38,20 @@ function identity(): IdentityResource {
 
 function gatewayDouble(): {
   authorization: jest.Mocked<
-    Pick<PigeonDeviceAuthorizationApi, 'authorizePairing' | 'revokeDevice'>
+    Pick<
+      PigeonDeviceAuthorizationApi,
+      'authorizePairing' | 'completePairing' | 'revokeDevice'
+    >
   >;
   gateway: PigeonIdentitiesGateway;
-  profile: jest.Mocked<Pick<IdentityProfileGateway, 'get'>>;
   keychain: jest.Mocked<
     Pick<PigeonKeychainApi, 'publishKeychain' | 'readHead'>
   >;
+  login: jest.Mocked<Pick<PigeonIdentityLoginApi, 'hydrate'>>;
+  pairingHistory: jest.Mocked<
+    Pick<DevicePairingHistory, 'publish' | 'receive'>
+  >;
+  profile: jest.Mocked<Pick<IdentityProfileGateway, 'get'>>;
   recovery: jest.Mocked<
     Pick<
       DeviceSealedRecovery,
@@ -51,7 +61,9 @@ function gatewayDouble(): {
   sealedRoot: jest.Mocked<Pick<DeviceSealedRootRotation, 'current' | 'rotate'>>;
 } {
   const commands = {} as PigeonIdentityCommandsApi;
-  const login = {} as PigeonIdentityLoginApi;
+  const login = {
+    hydrate: jest.fn(),
+  } as jest.Mocked<Pick<PigeonIdentityLoginApi, 'hydrate'>>;
   const profile = {
     get: jest.fn(),
   } as jest.Mocked<Pick<IdentityProfileGateway, 'get'>>;
@@ -61,9 +73,13 @@ function gatewayDouble(): {
   } as jest.Mocked<Pick<PigeonKeychainApi, 'publishKeychain' | 'readHead'>>;
   const authorization = {
     authorizePairing: jest.fn(),
+    completePairing: jest.fn(),
     revokeDevice: jest.fn(),
   } as jest.Mocked<
-    Pick<PigeonDeviceAuthorizationApi, 'authorizePairing' | 'revokeDevice'>
+    Pick<
+      PigeonDeviceAuthorizationApi,
+      'authorizePairing' | 'completePairing' | 'revokeDevice'
+    >
   >;
   const recovery = {
     rememberKeychainRewrap: jest.fn(),
@@ -79,21 +95,28 @@ function gatewayDouble(): {
     current: jest.fn(),
     rotate: jest.fn(),
   } as jest.Mocked<Pick<DeviceSealedRootRotation, 'current' | 'rotate'>>;
+  const pairingHistory = {
+    publish: jest.fn().mockResolvedValue(false),
+    receive: jest.fn(),
+  } as jest.Mocked<Pick<DevicePairingHistory, 'publish' | 'receive'>>;
   const presence = {} as PigeonPresenceGateway;
 
   return {
     authorization,
     gateway: new PigeonIdentitiesGateway(
       commands,
-      login,
+      login as unknown as PigeonIdentityLoginApi,
       profile as unknown as IdentityProfileGateway,
       authorization as unknown as PigeonDeviceAuthorizationApi,
       keychain as unknown as PigeonKeychainApi,
       presence,
       sealedRoot as unknown as DeviceSealedRootRotation,
       recovery as unknown as DeviceSealedRecovery,
+      pairingHistory as unknown as DevicePairingHistory,
     ),
     keychain,
+    login,
+    pairingHistory,
     profile,
     recovery,
     sealedRoot,
@@ -180,6 +203,7 @@ describe(PigeonIdentitiesGateway.name, () => {
       expect(authorization.authorizePairing).toHaveBeenCalledWith(
         rooted,
         requestCode,
+        undefined,
       );
       expect(recovery.resealAfterPairing).toHaveBeenCalledWith(next, root);
       expect(result.completionCode).toBe('completion-code');
@@ -208,6 +232,164 @@ describe(PigeonIdentitiesGateway.name, () => {
       ).rejects.toBe(failure);
       expect(authorization.authorizePairing).not.toHaveBeenCalled();
       expect(recovery.resealAfterPairing).not.toHaveBeenCalled();
+    });
+
+    it('publishes the pairing history before authorizing and hands the secret to the authorizer', async () => {
+      const { authorization, gateway, pairingHistory } = gatewayDouble();
+      const session = {
+        deviceSealedRootKey: SymmetricKey.generate(),
+        identity: { id: 'identity-1' },
+      } as unknown as Session;
+      pairingHistory.publish.mockResolvedValue(true);
+      authorization.authorizePairing.mockResolvedValue({
+        completion: { toCode: () => 'completion-code' },
+        session,
+      } as unknown as DevicePairingAuthorization);
+
+      await gateway.authorizeDevicePairing(session, requestCode);
+
+      expect(pairingHistory.publish).toHaveBeenCalledWith(
+        session,
+        expect.any(Uint8Array),
+      );
+      expect(pairingHistory.publish.mock.invocationCallOrder[0]).toBeLessThan(
+        authorization.authorizePairing.mock.invocationCallOrder[0],
+      );
+      const [, , secret] = authorization.authorizePairing.mock.calls[0];
+      expect(secret).toBeInstanceOf(SymmetricKey);
+      expect(secret?.getBuffer()).toEqual(
+        pairingHistory.publish.mock.calls[0][1],
+      );
+    });
+
+    it('withholds the history secret from the authorizer when no history was published', async () => {
+      const { authorization, gateway, pairingHistory } = gatewayDouble();
+      const session = {
+        deviceSealedRootKey: SymmetricKey.generate(),
+        identity: { id: 'identity-1' },
+      } as unknown as Session;
+      pairingHistory.publish.mockResolvedValue(false);
+      authorization.authorizePairing.mockResolvedValue({
+        completion: { toCode: () => 'completion-code' },
+        session,
+      } as unknown as DevicePairingAuthorization);
+
+      await gateway.authorizeDevicePairing(session, requestCode);
+
+      expect(authorization.authorizePairing).toHaveBeenCalledWith(
+        session,
+        requestCode,
+        undefined,
+      );
+    });
+  });
+
+  describe('completeDevicePairing', () => {
+    const password = {} as IdentityPassword;
+    const draft = {} as DevicePairingRequestDraft;
+    const completionCode = 'completion-code' as unknown as DevicePairingCode;
+
+    it('imports the pairing history once the workspace hydrates, with the sealed root open', async () => {
+      const {
+        authorization,
+        gateway,
+        login,
+        pairingHistory,
+        profile,
+        sealedRoot,
+      } = gatewayDouble();
+      const secret = SymmetricKey.generate();
+      const pending = { identity: { id: 'identity-1' } } as unknown as Session;
+      const hydrated = { ...pending, hydrated: true } as unknown as Session;
+      const rooted = {
+        ...hydrated,
+        deviceSealedRootKey: SymmetricKey.generate(),
+      } as unknown as Session;
+      profile.get.mockResolvedValue(identity());
+      authorization.completePairing.mockResolvedValue({
+        historyTransferSecret: secret,
+        session: pending,
+      });
+      login.hydrate.mockResolvedValue({ conversations: [], session: hydrated });
+      sealedRoot.current.mockResolvedValue(rooted);
+
+      const result = await gateway.completeDevicePairing(
+        'identity-1',
+        password,
+        draft,
+        completionCode,
+      );
+
+      expect(login.hydrate.mock.invocationCallOrder[0]).toBeLessThan(
+        pairingHistory.receive.mock.invocationCallOrder[0],
+      );
+      expect(sealedRoot.current).toHaveBeenCalledWith(hydrated);
+      expect(pairingHistory.receive).toHaveBeenCalledWith(
+        rooted,
+        secret.getBuffer(),
+      );
+      expect(result.session).toBe(rooted);
+    });
+
+    it('completes the pairing without importing when the completion carries no history secret', async () => {
+      const {
+        authorization,
+        gateway,
+        login,
+        pairingHistory,
+        profile,
+        sealedRoot,
+      } = gatewayDouble();
+      const pending = { identity: { id: 'identity-1' } } as unknown as Session;
+      const hydrated = { ...pending, hydrated: true } as unknown as Session;
+      const hydrateResult = { conversations: [], session: hydrated };
+      profile.get.mockResolvedValue(identity());
+      authorization.completePairing.mockResolvedValue({ session: pending });
+      login.hydrate.mockResolvedValue(hydrateResult);
+
+      await expect(
+        gateway.completeDevicePairing(
+          'identity-1',
+          password,
+          draft,
+          completionCode,
+        ),
+      ).resolves.toBe(hydrateResult);
+      expect(sealedRoot.current).not.toHaveBeenCalled();
+      expect(pairingHistory.receive).not.toHaveBeenCalled();
+    });
+
+    it('completes the pairing without importing when the sealed root cannot be opened', async () => {
+      const {
+        authorization,
+        gateway,
+        login,
+        pairingHistory,
+        profile,
+        sealedRoot,
+      } = gatewayDouble();
+      const pending = { identity: { id: 'identity-1' } } as unknown as Session;
+      const hydrated = { ...pending, hydrated: true } as unknown as Session;
+      const hydrateResult = { conversations: [], session: hydrated };
+      profile.get.mockResolvedValue(identity());
+      authorization.completePairing.mockResolvedValue({
+        historyTransferSecret: SymmetricKey.generate(),
+        session: pending,
+      });
+      login.hydrate.mockResolvedValue(hydrateResult);
+      sealedRoot.current.mockRejectedValue(
+        new Error('keychain head is unreadable'),
+      );
+
+      await expect(
+        gateway.completeDevicePairing(
+          'identity-1',
+          password,
+          draft,
+          completionCode,
+        ),
+      ).resolves.toBe(hydrateResult);
+      expect(pairingHistory.receive).not.toHaveBeenCalled();
     });
   });
 
