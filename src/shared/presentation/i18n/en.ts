@@ -118,6 +118,9 @@ export const en = {
     nodePeersLoading: 'Searching...',
     nodePeersOne: '1 peer',
     nodeSummaryTitle: 'Local node',
+    passkeyUnlockHelp:
+      'A passkey unlocks this identity on this device. If you lost it, choose Recovery key or New device.',
+    passkeyUnlockSubmit: 'Unlock with passkey',
     passwordConfirmLabel: 'Repeat password',
     passwordLabel: 'Password',
     passwordNewDeviceLabel: 'New password for this device',
@@ -1379,6 +1382,28 @@ export const en = {
     openBanner: 'Open profile banner',
     openConversation: 'Open direct message',
     openPicture: 'Open profile picture',
+    passkeyDisable: 'Use a password instead',
+    passkeyDisableConfirm: 'Confirm with passkey',
+    passkeyDisableHelp:
+      'Choose a new password for this device. Your passkey confirms the change, then stops unlocking here.',
+    passkeyEnable: 'Set up passkey',
+    passkeyEnableHelp:
+      'Enter your current password. It stops working on this device once the passkey is set up. Other devices keep their own unlock.',
+    passkeyPrfUnavailable:
+      'This passkey cannot unlock Pigeon Swarm. Try another passkey provider, or keep using your password.',
+    passkeyRequestFailed:
+      'The passkey request was cancelled or timed out. Try again.',
+    passkeyUnlock: 'Unlock with a passkey',
+    passkeyUnlockActive:
+      'A passkey unlocks this device. Your password no longer works here.',
+    passkeyUnlockDisabled:
+      'This device is unlocked with a password, not a passkey.',
+    passkeyUnlockEnabled:
+      'A passkey unlocks this device. Switch back to a password before changing it.',
+    passkeyUnlockHelp:
+      'Use your fingerprint, face or device PIN instead of a password on this device. The authenticator limits wrong attempts.',
+    passkeyUnsupported:
+      'This browser cannot unlock with a passkey, so this device keeps using your password.',
     passwordChangeRequiresRecoveryKey: 'Requires your current recovery key.',
     passwordRequirements: {
       lowercase: 'Lowercase',

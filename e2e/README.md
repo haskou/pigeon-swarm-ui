@@ -40,9 +40,13 @@ the other device revokes keeps the messages sent before the revoke, and never
 shows a message sent after it while the surviving device does) run against a
 real node. Login and direct-message sync run on `desktop-chromium`,
 `desktop-firefox` and `mobile-chromium`; the outbox spec runs on the two
-desktop projects; the revoke spec runs on `desktop-chromium`. The
-`real-node-e2e` job in `.github/workflows/ci.yml` builds the node image from the
-pins below and runs these specs. It is the check that catches UI and node
+desktop projects; the revoke spec runs on `desktop-chromium`.
+`passkey-unlock.spec.ts` (switching this device from a password to a passkey
+and unlocking with it) runs on `desktop-chromium` only: it uses a DevTools
+virtual authenticator with PRF and opens the app through `localhost`, because
+WebAuthn rejects IP addresses as relying party ids. The `real-node-e2e` job in
+`.github/workflows/ci.yml` builds the node image from the pins below and runs
+these specs. It is the check that catches UI and node
 contract breaks before merge.
 
 The pins are:

@@ -14,6 +14,7 @@ import type { IdentityCreationMaterial } from '../crypto/IdentityCreationMateria
 import type { LocalKeychain } from '../keychain/LocalKeychain';
 import type { Session } from '../session/Session';
 import type { DeviceIdentityVault } from '../storage/DeviceIdentityVault';
+import type { DeviceUnlockMethod } from '../storage/DeviceUnlockMethod';
 import type { CreatedIdentityMaterial } from './CreatedIdentityMaterial';
 import type { IdentityAdmissionProgress } from './IdentityAdmissionProgress';
 import type { IdentityAdmissionProgressListener } from './IdentityAdmissionProgressListener';
@@ -108,6 +109,45 @@ export class PigeonIdentityCommandsApi {
       currentPassword,
       nextPassword,
     );
+  }
+
+  public async disablePasskeyUnlock(
+    session: Session,
+    nextPassword: string,
+  ): Promise<void> {
+    await this.vault.disablePasskey(
+      IdentityId.fromString(session.identity.id),
+      nextPassword,
+    );
+  }
+
+  public async enablePasskeyUnlock(
+    session: Session,
+    currentPassword: string,
+  ): Promise<void> {
+    const { profile } = session.identity;
+
+    await this.vault.enablePasskey(
+      IdentityId.fromString(session.identity.id),
+      currentPassword,
+      profile.handle ?? profile.name,
+    );
+  }
+
+  public async localUnlockMethod(
+    identityId: string,
+  ): Promise<DeviceUnlockMethod | undefined> {
+    return await this.vault.unlockMethod(IdentityId.fromString(identityId));
+  }
+
+  public async passkeyUnlockSecret(identityId: string): Promise<string> {
+    return await this.vault.passkeyUnlockSecret(
+      IdentityId.fromString(identityId),
+    );
+  }
+
+  public async passkeyUnlockSupported(): Promise<boolean> {
+    return await this.vault.isPasskeySupported();
   }
 
   public async create(

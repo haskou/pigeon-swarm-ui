@@ -12,7 +12,8 @@ const origin = 'http://127.0.0.1:8080';
 // Each run is one Playwright invocation against the same node. Login,
 // recovery-key sign-in, pairing, 1:1 send/receive and the security audit view
 // run on every engine and viewport CI covers; the outbox retry flow runs on
-// the desktop engines; the two-device revoke flow runs on desktop Chromium.
+// the desktop engines; the two-device revoke flow and passkey unlock (which
+// needs Chromium's virtual authenticator) run on desktop Chromium.
 const runs = [
   {
     specs: [
@@ -27,7 +28,7 @@ const runs = [
     projects: ['desktop-chromium', 'desktop-firefox'],
   },
   {
-    specs: ['e2e/device-revoke-mailbox.spec.ts'],
+    specs: ['e2e/device-revoke-mailbox.spec.ts', 'e2e/passkey-unlock.spec.ts'],
     projects: ['desktop-chromium'],
   },
 ];

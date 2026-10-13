@@ -18,6 +18,7 @@ import type {
   LocalKeychainUpdate,
 } from '../../../contexts/identities/infrastructure/keychain/LocalKeychain';
 import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
+import type { DeviceUnlockMethod } from '../../../contexts/identities/infrastructure/storage/DeviceUnlockMethod';
 import type { IdentityUseCases } from './IdentityUseCases';
 
 import { ConversationTimeline } from '../../../contexts/conversations/presentation/view-models/ConversationTimeline';
@@ -58,6 +59,32 @@ export class PigeonIdentitiesFacade {
     nextPassword: string,
   ): Promise<void> {
     await this.gateway.changePassword(session, currentPassword, nextPassword);
+  }
+
+  /** Switches this device back to a password; the passkey confirms it. */
+  public async disablePasskeyUnlock(
+    session: Session,
+    nextPassword: string,
+  ): Promise<void> {
+    await this.gateway.disablePasskeyUnlock(session, nextPassword);
+  }
+
+  /** Replaces this device's password unlock with a user-verified passkey. */
+  public async enablePasskeyUnlock(
+    session: Session,
+    currentPassword: string,
+  ): Promise<void> {
+    await this.gateway.enablePasskeyUnlock(session, currentPassword);
+  }
+
+  public async localUnlockMethod(
+    identityId: string,
+  ): Promise<DeviceUnlockMethod | undefined> {
+    return await this.gateway.localUnlockMethod(identityId);
+  }
+
+  public async passkeyUnlockSupported(): Promise<boolean> {
+    return await this.gateway.passkeyUnlockSupported();
   }
 
   public createDevicePairingInvitation(session: Session): DevicePairingCode {
@@ -178,6 +205,18 @@ export class PigeonIdentitiesFacade {
         this.contexts.findFor(identity).session,
         onProgress,
       ),
+    );
+  }
+
+  /** The passkey output stays inside composition; the UI never sees it. */
+  public async loginWithPasskey(
+    identityId: string,
+    onProgress?: LoginIdentityProgressReporter,
+  ): Promise<LoginResult> {
+    return await this.login(
+      identityId,
+      await this.gateway.passkeyUnlockSecret(identityId),
+      onProgress,
     );
   }
 

@@ -12,6 +12,7 @@ import type {
   LocalKeychainUpdate,
 } from '../keychain/LocalKeychain';
 import type { Session } from '../session/Session';
+import type { DeviceUnlockMethod } from '../storage/DeviceUnlockMethod';
 import type { CreatedIdentityMaterial } from './CreatedIdentityMaterial';
 import type { DevicePairingHistory } from './DevicePairingHistory';
 import type { DeviceSealedRecovery } from './DeviceSealedRecovery';
@@ -216,6 +217,34 @@ export class PigeonIdentitiesGateway {
       currentPassword,
       nextPassword,
     );
+  }
+
+  public async disablePasskeyUnlock(
+    session: Session,
+    nextPassword: string,
+  ): Promise<void> {
+    await this.identityCommands.disablePasskeyUnlock(session, nextPassword);
+  }
+
+  public async enablePasskeyUnlock(
+    session: Session,
+    currentPassword: string,
+  ): Promise<void> {
+    await this.identityCommands.enablePasskeyUnlock(session, currentPassword);
+  }
+
+  public async localUnlockMethod(
+    identityId: string,
+  ): Promise<DeviceUnlockMethod | undefined> {
+    return await this.identityCommands.localUnlockMethod(identityId);
+  }
+
+  public async passkeyUnlockSecret(identityId: string): Promise<string> {
+    return await this.identityCommands.passkeyUnlockSecret(identityId);
+  }
+
+  public async passkeyUnlockSupported(): Promise<boolean> {
+    return await this.identityCommands.passkeyUnlockSupported();
   }
 
   public async createIdentity(

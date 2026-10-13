@@ -6,16 +6,42 @@ removes, and what each choice does and does not protect against.
 
 ## Modes
 
-There is one local unlock mode today: the device vault, which always requires
-the password. The client has no automatic-unlock mode.
+Each identity on this device has one local unlock mode at a time. The client
+has no automatic-unlock mode.
 
-Passkey PRF is not a local unlock mode. Its code was removed because no
-identity was created with it. Wiring it back is a product decision.
+| Mode     | Unlock requires                                                                                            | Turned on                                                                       |
+| -------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Password | The password plus the device-bound factor key (`DeviceIdentityVault.unlock`)                               | Default after creating an identity, recovery-key login or pairing               |
+| Passkey  | A user-verified passkey assertion whose PRF output replaces the password, plus the device-bound factor key | Profile, Security, "Unlock with a passkey", confirmed with the current password |
 
-| Local state                                                              | Holds                                                                                                                     | Unlock requires                                                          |
-| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Device vault (IndexedDB `pigeon-swarm-device-vault`, store `identities`) | Identity material encrypted under a root key, a scrypt-protected root-key envelope, and a non-extractable HMAC factor key | Password (`DeviceIdentityVault.unlock`) plus the device-bound factor key |
-| Session                                                                  | Keys and session state in memory                                                                                          | Gone on reload. Logging in again is required                             |
+In passkey mode the 32-byte WebAuthn PRF output (`WebAuthnPasskeyPrf`, salt
+stored next to the credential ID) is the secret for the same scrypt envelope
+the password uses. The authenticator must verify the user
+(`userVerification: 'required'`), so it enforces its own PIN or biometric
+attempt limits in hardware. A short PIN checked by JavaScript was not chosen:
+anyone who can copy the browser profile could guess it offline.
+
+Switching to a passkey rewraps the root key to the PRF secret and stores only
+the new envelope, so the password no longer unlocks this device. Switching back
+asks for a new password and a passkey assertion and stores only the password
+envelope. Other devices keep their own unlock. Changing the password is not
+offered while a passkey unlocks the device.
+
+If the browser has no WebAuthn, no secure context, or reports no PRF support,
+the option says so and the device keeps the password. An authenticator that
+creates a passkey without PRF is rejected before anything is stored. Records
+written before this change have no `passkey` field and stay in password mode;
+no migration runs.
+
+A lost passkey cannot be replaced from the login screen. Recovery-key login or
+pairing from another device registers this device again in password mode. A
+passkey created during a setup that then fails (for example, the vault write
+fails) stays in the authenticator but unlocks nothing.
+
+| Local state                                                              | Holds                                                                                                                                                                       |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Device vault (IndexedDB `pigeon-swarm-device-vault`, store `identities`) | Identity material encrypted under a root key, one scrypt-protected root-key envelope, a non-extractable HMAC factor key, and in passkey mode the credential ID and PRF salt |
+| Session                                                                  | Keys and session state in memory. Gone on reload; unlocking again is required                                                                                               |
 
 Plaintext values that stay in `localStorage` after login: the identity ID of
 the last login (`pigeon-swarm-last-login-identity-v1`). Workspace preferences
@@ -29,19 +55,26 @@ each node has its own copy.
 ## What each choice protects against
 
 - **Someone reading the browser profile on disk.** The device vault contents
-  are encrypted. Reading them needs the password and the non-extractable factor
-  key. Identity IDs and workspace preferences are not encrypted.
-- **Same-origin script (for example injected content).** A script running in
-  the page can call unlock if it knows the password, and can use the factor key
-  while the page is alive. The factor key cannot be exported. The production
-  build sends a Content Security Policy that blocks inline and eval scripts
-  (see below). A script from an allowed origin is not stopped.
-- **A compromised device or browser session.** Not protected. Unlock has no
-  user-presence step.
-- **A same-origin script while the session is alive.** It can read the in-memory
-  session, including the conversation keys and the master key. It can also call
-  the message and attachment crypto paths. Logout drops the session but does not
-  clear JavaScript memory.
+  are encrypted. In password mode, reading them needs the password and the
+  non-extractable factor key. In passkey mode, they need a user-verified
+  assertion from the passkey; the stored credential ID and salt alone do not
+  derive the secret. Identity IDs and workspace preferences are not encrypted.
+- **Same-origin script (for example injected content).** In password mode a
+  script running in the page can unlock if it knows the password, and can use
+  the factor key while the page is alive. In passkey mode it can request an
+  assertion, but the authenticator still asks the user for a PIN or biometric.
+  The factor key cannot be exported in either mode. The production build sends a
+  Content Security Policy that blocks inline and eval scripts (see below). A
+  script from an allowed origin is not stopped.
+- **A compromised device or browser session.** Not protected in either mode. A
+  compromised browser can wait for the user to unlock and read the session.
+- **A same-origin script while the session is alive.** In both modes it can read
+  the in-memory session, including the conversation keys and the master key. It
+  can also call the message and attachment crypto paths. Logout drops the
+  session but does not clear JavaScript memory.
+
+There is no separate session-only mode: the session already lives only in
+memory. On a shared computer, use "Log out and forget this device" (below).
 
 ## Logout
 
@@ -139,13 +172,11 @@ local copy changes only when the user picks the erase action.
 
 ## User-presence check before unlock
 
-A presence step (a click, a biometric prompt, or a WebAuthn assertion) before
-unlock was considered and not added. A same-origin script runs in the page
-after the user has unlocked, so it can trigger the same operations with no new
-prompt. Only a presence factor that gates the key itself, for example a passkey
-PRF wrapping the factor key, would stop that. That needs a passkey registration
-flow and settings UI, which is a product decision and out of scope here. Unlock
-still needs the password and the device-bound factor key.
+Passkey mode is the user-presence check. A click or prompt that does not gate
+the key would not stop a same-origin script, so the passkey's PRF output is the
+unlock secret itself: without a user-verified assertion the root key cannot be
+unwrapped. After unlock, the session is in memory and the check no longer
+applies (see "What each choice protects against").
 
 ## Other protections
 
@@ -156,9 +187,13 @@ still needs the password and the device-bound factor key.
   `v1.scrypt.N262144.r8.p1.hkdf-sha256.aes-256-gcm`. Other scrypt cost, block
   size, or parallelism values are rejected. Covered by
   `DeviceSecurityValueObjects.spec.ts`.
-- **Logs.** Reviewed logging call sites do not log keys, decrypted payloads, or
-  topics. The realtime gateway constructor's signed-URL log was fixed in
-  PR #246, which is on `main`.
+- **Logs and errors.** Reviewed logging call sites do not log keys, decrypted
+  payloads, or topics. The realtime gateway constructor's signed-URL log was
+  fixed in PR #246, which is on `main`. Passkey errors carry only a copy key;
+  the PRF output, salt and credential ID are never logged or shown.
+- **Diagnostics.** The only export is the call diagnostic report
+  (`callDiagnosticReport.ts`), which holds connection state, not keys or
+  message content. The client has no crash reporter.
 - **Content Security Policy.** The production build injects a
   `Content-Security-Policy` meta tag (policy in
   `src/shared/infrastructure/security/contentSecurityPolicy.ts`, applied in
@@ -175,13 +210,18 @@ still needs the password and the device-bound factor key.
 `crypto` jest project (`yarn test:crypto`), which `yarn test` runs together
 with the `unit` project. They are listed in `REAL_CRYPTO_SPECS` in
 `jest.config.cjs` because the `unit` project's `@haskou/pigeon-swarm-crypto`
-fake does not implement the device factor.
+fake does not implement the device factor. The vault spec covers switching to a
+passkey and back, that the replaced secret no longer unlocks, and that a wrong
+password creates no passkey. `WebAuthnPasskeyPrf.spec.ts` covers browsers
+without WebAuthn, without a secure context, or without PRF, and cancelled or
+aborted requests. `e2e/passkey-unlock.spec.ts` sets up a passkey and unlocks
+with it in Chromium against a real node.
 
 ## Out of scope
 
-- **User-presence check** before unlock. Decided against; see the section above.
 - **Sealed conversation keys in session memory.** Raw conversation keys stay in
   session memory while the session is alive. Sealing them at rest in memory was
   evaluated and not adopted: it does not stop a same-origin script, which can
   call the same paths.
-- **Diagnostic export and crash reports.** Not reviewed.
+- **Clickjacking.** Needs a `frame-ancestors` response header from the hosting
+  server; see "Other protections".

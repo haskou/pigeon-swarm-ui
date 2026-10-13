@@ -123,6 +123,9 @@ export const es = {
     nodePeersLoading: 'Buscando...',
     nodePeersOne: '1 par',
     nodeSummaryTitle: 'Nodo local',
+    passkeyUnlockHelp:
+      'Una passkey desbloquea esta identidad en este dispositivo. Si la perdiste, elige Clave de recuperación o Dispositivo nuevo.',
+    passkeyUnlockSubmit: 'Desbloquear con passkey',
     passwordConfirmLabel: 'Repite la contraseña',
     passwordLabel: 'Contraseña',
     passwordNewDeviceLabel: 'Contraseña nueva para este dispositivo',
@@ -1383,6 +1386,28 @@ export const es = {
     openBanner: 'Abrir banner de perfil',
     openConversation: 'Abrir mensaje directo',
     openPicture: 'Abrir imagen de perfil',
+    passkeyDisable: 'Usar una contraseña',
+    passkeyDisableConfirm: 'Confirmar con passkey',
+    passkeyDisableHelp:
+      'Elige una contraseña nueva para este dispositivo. Tu passkey confirma el cambio y deja de desbloquearlo.',
+    passkeyEnable: 'Configurar passkey',
+    passkeyEnableHelp:
+      'Introduce tu contraseña actual. Deja de funcionar en este dispositivo al configurar la passkey. Tus otros dispositivos mantienen su desbloqueo.',
+    passkeyPrfUnavailable:
+      'Esta passkey no puede desbloquear Pigeon Swarm. Prueba otro proveedor de passkeys o sigue usando tu contraseña.',
+    passkeyRequestFailed:
+      'La solicitud de passkey se canceló o caducó. Inténtalo de nuevo.',
+    passkeyUnlock: 'Desbloquear con una passkey',
+    passkeyUnlockActive:
+      'Una passkey desbloquea este dispositivo. Tu contraseña ya no funciona aquí.',
+    passkeyUnlockDisabled:
+      'Este dispositivo se desbloquea con contraseña, no con passkey.',
+    passkeyUnlockEnabled:
+      'Una passkey desbloquea este dispositivo. Vuelve a usar una contraseña antes de cambiarla.',
+    passkeyUnlockHelp:
+      'Usa tu huella, tu cara o el PIN del dispositivo en lugar de una contraseña en este dispositivo. El autenticador limita los intentos fallidos.',
+    passkeyUnsupported:
+      'Este navegador no puede desbloquear con passkey, así que este dispositivo sigue usando tu contraseña.',
     passwordChangeRequiresRecoveryKey:
       'Requiere tu clave de recuperación actual.',
     passwordRequirements: {
