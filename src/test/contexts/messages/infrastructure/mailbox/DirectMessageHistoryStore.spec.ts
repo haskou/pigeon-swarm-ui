@@ -149,6 +149,66 @@ describe(DirectMessageHistoryStore.name, () => {
     ).toEqual([`${marker}:b`]);
   });
 
+  it('reports history dropped by a device root change once', async () => {
+    const store = new DirectMessageHistoryStore(databaseName());
+    const previousRoot = Buffer.alloc(32, 5);
+    const rotatedRoot = Buffer.alloc(32, 9);
+
+    await store.append(session('identity-1', previousRoot), conversationId, [
+      entry('a'),
+    ]);
+
+    expect(await store.checkDropped(session('identity-1', previousRoot))).toBe(
+      false,
+    );
+    expect(await store.checkDropped(session('identity-1', rotatedRoot))).toBe(
+      true,
+    );
+    expect(await store.checkDropped(session('identity-1', rotatedRoot))).toBe(
+      false,
+    );
+  });
+
+  it('reports a drop that a load found before the check', async () => {
+    const store = new DirectMessageHistoryStore(databaseName());
+
+    await store.append(
+      session('identity-1', Buffer.alloc(32, 5)),
+      conversationId,
+      [entry('a')],
+    );
+    await store.load(
+      session('identity-1', Buffer.alloc(32, 9)),
+      conversationId,
+    );
+
+    expect(
+      await store.checkDropped(session('identity-1', Buffer.alloc(32, 9))),
+    ).toBe(true);
+  });
+
+  it('reports no drop when a root change finds no stored history', async () => {
+    const store = new DirectMessageHistoryStore(databaseName());
+
+    await store.load(
+      session('identity-1', Buffer.alloc(32, 5)),
+      conversationId,
+    );
+
+    expect(
+      await store.checkDropped(session('identity-1', Buffer.alloc(32, 9))),
+    ).toBe(false);
+  });
+
+  it('reports no drop after the history is forgotten on purpose', async () => {
+    const store = new DirectMessageHistoryStore(databaseName());
+
+    await store.append(session('identity-1'), conversationId, [entry('a')]);
+    await store.forget('identity-1');
+
+    expect(await store.checkDropped(session('identity-1'))).toBe(false);
+  });
+
   it('forgets one identity without touching another', async () => {
     const store = new DirectMessageHistoryStore(databaseName());
 
