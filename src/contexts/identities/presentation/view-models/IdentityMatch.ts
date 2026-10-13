@@ -3,6 +3,8 @@ import { IdentityId } from '../../domain/value-objects/IdentityId';
 /**
  * Compares identity ids held by presentation state through the IdentityId
  * value object, so the same identity in PEM and bare form is one identity.
+ * Ids come from realtime events too: an id the value object rejects is not
+ * the same identity.
  */
 export class IdentityMatch {
   public static isSame(
@@ -11,8 +13,12 @@ export class IdentityMatch {
   ): boolean {
     if (candidate === undefined) return false;
 
-    return IdentityId.fromString(candidate).isEqual(
-      IdentityId.fromString(identityId),
-    );
+    try {
+      return IdentityId.fromString(candidate).isEqual(
+        IdentityId.fromString(identityId),
+      );
+    } catch {
+      return false;
+    }
   }
 }
