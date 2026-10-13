@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
 
-import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
+import type { ProjectedMessage } from './ProjectedMessage';
 
 export type MessageDecryptResponse =
   | {
-      messages: ChatMessage[];
+      projected: ProjectedMessage[];
       requestId: number;
       type: 'success';
     }

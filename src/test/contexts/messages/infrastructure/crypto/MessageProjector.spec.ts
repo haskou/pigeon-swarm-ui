@@ -81,33 +81,48 @@ describe(MessageProjector.name, () => {
     const projector = new MessageProjector(projectorCopy);
 
     expect(
-      projector.toChatMessage(session, 'conversation-1', {
+      projector.project(session, 'conversation-1', {
         authorIdentityId: 'identity-1',
         content: 'hello',
         id: 'message-1',
         timestamp: 10,
       }),
     ).toMatchObject({
-      content: 'hello',
-      encrypted: false,
-      mine: true,
+      message: { content: 'hello', encrypted: false, mine: true },
+      readable: true,
     });
   });
 
-  it('returns a readable encrypted placeholder when the key is missing', () => {
+  it('projects a call event as readable', () => {
     const projector = new MessageProjector(projectorCopy);
 
     expect(
-      projector.toChatMessage(session, 'conversation-1', {
+      projector.project(session, 'conversation-1', {
+        authorIdentityId: 'identity-2',
+        id: 'call-1',
+        timestamp: 15,
+        type: 'call_event',
+      }),
+    ).toMatchObject({ message: { kind: 'call-event' }, readable: true });
+  });
+
+  it('reports an unreadable placeholder when the key is missing', () => {
+    const projector = new MessageProjector(projectorCopy);
+
+    expect(
+      projector.project(session, 'conversation-1', {
         authorIdentityId: 'identity-2',
         encryptedPayload: 'payload',
         id: 'message-2',
         timestamp: 20,
       }),
     ).toMatchObject({
-      content: projectorCopy.missingKey,
-      encrypted: true,
-      mine: false,
+      message: {
+        content: projectorCopy.missingKey,
+        encrypted: true,
+        mine: false,
+      },
+      readable: false,
     });
   });
 
@@ -133,15 +148,15 @@ describe(MessageProjector.name, () => {
     } as unknown as Session;
 
     expect(
-      projector.toChatMessage(hydratedSession, conversationId, {
+      projector.project(hydratedSession, conversationId, {
         authorIdentityId: 'identity-2',
         encryptedPayload: 'payload',
         id: 'message-2',
         timestamp: 20,
       }),
     ).toMatchObject({
-      content: projectorCopy.decryptFailed,
-      encrypted: true,
+      message: { content: projectorCopy.decryptFailed, encrypted: true },
+      readable: false,
     });
   });
 
@@ -159,7 +174,7 @@ describe(MessageProjector.name, () => {
         }),
       )
       .toString();
-    const projected = projector.toChatMessage(
+    const projected = projector.project(
       sessionWithConversationKey(conversationId, symmetricKey.valueOf()),
       conversationId,
       {
@@ -172,10 +187,13 @@ describe(MessageProjector.name, () => {
     );
 
     expect(projected).toMatchObject({
-      content: 'thread reply',
-      encrypted: false,
-      replyToMessageId: 'root-message',
-      threadRootMessageId: 'root-message',
+      message: {
+        content: 'thread reply',
+        encrypted: false,
+        replyToMessageId: 'root-message',
+        threadRootMessageId: 'root-message',
+      },
+      readable: true,
     });
   });
 
@@ -198,7 +216,7 @@ describe(MessageProjector.name, () => {
         }),
       )
       .toString();
-    const projected = projector.toChatMessage(
+    const { message: projected } = projector.project(
       sessionWithConversationKey(conversationId, symmetricKey.valueOf()),
       conversationId,
       {

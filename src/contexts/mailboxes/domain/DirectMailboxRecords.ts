@@ -1,3 +1,5 @@
+import { Timestamp, UUID } from '@haskou/value-objects';
+
 import type { DirectDeletedRecord } from './DirectDeletedRecord';
 import type { DirectEditedRecord } from './DirectEditedRecord';
 import type { DirectMessageRecord } from './DirectMessageRecord';
@@ -7,9 +9,11 @@ import type { DirectReadRecord } from './DirectReadRecord';
 import type { DirectSentRecord } from './DirectSentRecord';
 
 /**
- * Shape rules for direct mailbox records. The caller supplies ids and the
- * clock reading; this class fixes each record's fields and freshness.
- * Keys are listed alphabetically: their order is part of the encoded bytes.
+ * Shape rules for direct mailbox records. Sent and edited records take their
+ * ids from the message; every other record gets a fresh UUID here. Deleted
+ * and read records are stamped with the current clock; reaction and pin
+ * records keep the caller's clock reading, which also orders them. Keys are
+ * listed alphabetically: their order is part of the encoded bytes.
  */
 export class DirectMailboxRecords {
   private static readonly RECEIPT_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
@@ -55,20 +59,20 @@ export class DirectMailboxRecords {
   }
 
   public static deleted(
-    fields: Omit<DirectDeletedRecord, 'type'>,
+    fields: Omit<DirectDeletedRecord, 'createdAt' | 'id' | 'type'>,
   ): DirectDeletedRecord {
     return {
       authorId: fields.authorId,
       conversationId: fields.conversationId,
-      createdAt: fields.createdAt,
-      id: fields.id,
+      createdAt: Timestamp.now().valueOf(),
+      id: UUID.generate().toString(),
       targetMessageId: fields.targetMessageId,
       type: 'deleted',
     };
   }
 
   public static reaction(
-    fields: Omit<DirectReactionRecord, 'type'>,
+    fields: Omit<DirectReactionRecord, 'id' | 'type'>,
   ): DirectReactionRecord {
     return {
       action: fields.action,
@@ -76,30 +80,34 @@ export class DirectMailboxRecords {
       conversationId: fields.conversationId,
       createdAt: fields.createdAt,
       emoji: fields.emoji,
-      id: fields.id,
+      id: UUID.generate().toString(),
       targetMessageId: fields.targetMessageId,
       type: 'reaction',
     };
   }
 
-  public static pin(fields: Omit<DirectPinRecord, 'type'>): DirectPinRecord {
+  public static pin(
+    fields: Omit<DirectPinRecord, 'id' | 'type'>,
+  ): DirectPinRecord {
     return {
       action: fields.action,
       authorId: fields.authorId,
       conversationId: fields.conversationId,
       createdAt: fields.createdAt,
-      id: fields.id,
+      id: UUID.generate().toString(),
       targetMessageId: fields.targetMessageId,
       type: 'pin',
     };
   }
 
-  public static read(fields: Omit<DirectReadRecord, 'type'>): DirectReadRecord {
+  public static read(
+    fields: Omit<DirectReadRecord, 'createdAt' | 'id' | 'type'>,
+  ): DirectReadRecord {
     return {
       authorId: fields.authorId,
       conversationId: fields.conversationId,
-      createdAt: fields.createdAt,
-      id: fields.id,
+      createdAt: Timestamp.now().valueOf(),
+      id: UUID.generate().toString(),
       targetMessageId: fields.targetMessageId,
       type: 'read',
     };

@@ -28,6 +28,7 @@ function projection(decryptMany: jest.Mock): MessageProjectionPort {
   return {
     decrypt: jest.fn(),
     decryptMany,
+    decryptReadable: jest.fn(),
     list: jest.fn((value) => value as { messages: MessageResource[] }),
   };
 }

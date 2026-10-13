@@ -5,8 +5,3 @@ export type DeviceAuthorizationCompromisedCredential = {
   compromisedSince: DeviceAuthorizationRevision;
   credential: DeviceCredential;
 };
-
-export type DeviceAuthorizationCompromisedCredentialResource = {
-  compromisedSince: number;
-  credential: string;
-};

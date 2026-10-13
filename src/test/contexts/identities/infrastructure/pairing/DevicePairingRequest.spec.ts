@@ -1,14 +1,15 @@
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 
-import { DevicePairingInvitation } from '../../../../contexts/identities/domain/DevicePairingInvitation';
-import { DevicePairingRequest } from '../../../../contexts/identities/domain/DevicePairingRequest';
-import { DeviceAuthorizationEpoch } from '../../../../contexts/identities/domain/value-objects/DeviceAuthorizationEpoch';
-import { DeviceAuthorizationRevision } from '../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
-import { DevicePairingCode } from '../../../../contexts/identities/domain/value-objects/DevicePairingCode';
-import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
-import { PairingId } from '../../../../contexts/identities/domain/value-objects/PairingId';
-import { thrownPairingFailure } from './thrownPairingFailure';
+import { DevicePairingInvitation } from '../../../../../contexts/identities/domain/DevicePairingInvitation';
+import { DevicePairingRequest } from '../../../../../contexts/identities/domain/DevicePairingRequest';
+import { DeviceAuthorizationEpoch } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationEpoch';
+import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
+import { DevicePairingCode } from '../../../../../contexts/identities/domain/value-objects/DevicePairingCode';
+import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
+import { PairingId } from '../../../../../contexts/identities/domain/value-objects/PairingId';
+import { DevicePairingCodeReader } from '../../../../../contexts/identities/infrastructure/pairing/DevicePairingCodeReader';
+import { thrownPairingFailure } from '../../domain/thrownPairingFailure';
 
 describe(DevicePairingRequest.name, () => {
   async function invitation(expiresAt = 2_000) {
@@ -33,7 +34,7 @@ describe(DevicePairingRequest.name, () => {
 
   it('authenticates the target credential and transport key', async () => {
     const source = await draft();
-    const decoded = DevicePairingRequest.fromCode(
+    const decoded = DevicePairingCodeReader.request(
       source.getRequest().toCode(),
       new Timestamp(1_100),
     );
@@ -49,7 +50,7 @@ describe(DevicePairingRequest.name, () => {
   it('derives the same verification code on both devices and a different one per request', async () => {
     const source = await draft();
     const other = await draft();
-    const decoded = DevicePairingRequest.fromCode(
+    const decoded = DevicePairingCodeReader.request(
       source.getRequest().toCode(),
       new Timestamp(1_100),
     );
@@ -71,7 +72,7 @@ describe(DevicePairingRequest.name, () => {
 
     expect(
       thrownPairingFailure(() =>
-        DevicePairingRequest.fromCode(
+        DevicePairingCodeReader.request(
           DevicePairingCode.encode({
             ...resource,
             transportPublicKey: attacker.toPrimitives().publicKey,
@@ -87,7 +88,7 @@ describe(DevicePairingRequest.name, () => {
 
     expect(
       thrownPairingFailure(() =>
-        DevicePairingRequest.fromCode(
+        DevicePairingCodeReader.request(
           source.getRequest().toCode(),
           new Timestamp(2_001),
         ),
@@ -119,7 +120,7 @@ describe(DevicePairingRequest.name, () => {
 
     expect(
       thrownPairingFailure(() =>
-        DevicePairingRequest.fromCode(
+        DevicePairingCodeReader.request(
           source.getRequest().toCode(),
           new Timestamp(1_000),
         ),

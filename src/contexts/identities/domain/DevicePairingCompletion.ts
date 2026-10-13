@@ -8,14 +8,10 @@ import {
 import { assert } from '@haskou/value-objects';
 
 import type { DeviceAuthorizationCheckpoint } from './DeviceAuthorizationCheckpoint';
-import type { DevicePairingCompletionMaterialResource } from './DevicePairingCompletionMaterialResource';
 import type { DevicePairingCompletionPayload } from './DevicePairingCompletionPayload';
-import type { DevicePairingCompletionResource } from './DevicePairingCompletionResource';
 
 import { DevicePairingError } from './DevicePairingError';
-import { DevicePairingMaterial } from './DevicePairingMaterial';
 import { DevicePairingRequest } from './DevicePairingRequest';
-import { DevicePairingResource } from './DevicePairingResource';
 import { DeviceAuthorizationEpoch } from './value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationOperationId } from './value-objects/DeviceAuthorizationOperationId';
 import { DeviceAuthorizationRevision } from './value-objects/DeviceAuthorizationRevision';
@@ -37,27 +33,6 @@ export class DevicePairingCompletion {
   private readonly revision: DeviceAuthorizationRevision;
   private readonly signature: Signature;
 
-  private static resource(value: unknown): DevicePairingCompletionResource {
-    const resource = DevicePairingResource.fromUnknown(
-      value,
-      'Invalid device pairing completion.',
-    );
-    resource.assertProtocol(KIND, 1);
-
-    return {
-      authorCredential: resource.getString('authorCredential'),
-      encryptedMaterial: resource.getString('encryptedMaterial'),
-      epoch: resource.getString('epoch'),
-      identityId: resource.getString('identityId'),
-      kind: KIND,
-      operationId: resource.getString('operationId'),
-      pairingId: resource.getString('pairingId'),
-      revision: resource.getNumber('revision'),
-      signature: resource.getString('signature'),
-      version: 1,
-    };
-  }
-
   public static create(input: {
     author: KeyPair;
     checkpoint: DeviceAuthorizationCheckpoint;
@@ -78,7 +53,7 @@ export class DevicePairingCompletion {
             input.recoveryAuthorityKeyPair.toPrimitives(),
           rootKey: input.rootKey.valueOf(),
           version: 1,
-        } satisfies DevicePairingCompletionMaterialResource),
+        }),
       );
     const invitation = input.request.getInvitation();
     const payload: DevicePairingCompletionPayload = {
@@ -106,21 +81,17 @@ export class DevicePairingCompletion {
     });
   }
 
-  public static fromCode(code: DevicePairingCode): DevicePairingCompletion {
-    const resource = this.resource(code.decode());
-
-    return new DevicePairingCompletion({
-      authorCredential: DeviceCredential.fromString(resource.authorCredential),
-      encryptedMaterial: new EncryptedPayload(resource.encryptedMaterial),
-      epoch: DeviceAuthorizationEpoch.fromString(resource.epoch),
-      identityId: IdentityId.fromString(resource.identityId),
-      operationId: DeviceAuthorizationOperationId.fromString(
-        resource.operationId,
-      ),
-      pairingId: PairingId.fromString(resource.pairingId),
-      revision: DeviceAuthorizationRevision.fromNumber(resource.revision),
-      signature: new Signature(resource.signature),
-    });
+  public static restore(state: {
+    authorCredential: DeviceCredential;
+    encryptedMaterial: EncryptedPayload;
+    epoch: DeviceAuthorizationEpoch;
+    identityId: IdentityId;
+    operationId: DeviceAuthorizationOperationId;
+    pairingId: PairingId;
+    revision: DeviceAuthorizationRevision;
+    signature: Signature;
+  }): DevicePairingCompletion {
+    return new DevicePairingCompletion(state);
   }
 
   private constructor(state: {
@@ -156,31 +127,14 @@ export class DevicePairingCompletion {
     };
   }
 
-  private material(value: unknown): DevicePairingMaterial {
-    const resource = DevicePairingResource.fromUnknown(
-      value,
-      'Invalid encrypted device pairing material.',
-    );
-    assert(
-      resource.getNumber('version') === 1,
-      new DevicePairingError(
-        'invalid',
-        'Invalid encrypted device pairing material.',
-      ),
-    );
-
-    return new DevicePairingMaterial(
-      KeyPair.fromPrimitives(resource.getKeyPair('identityKeyPair')),
-      KeyPair.fromPrimitives(resource.getKeyPair('recoveryAuthorityKeyPair')),
-      UserRootKey.fromBase64(resource.getString('rootKey')),
-      SymmetricKey.fromBase64(resource.getString('historyTransferSecret')),
-    );
-  }
-
-  public open(
+  /**
+   * Verifies the completion against the pending request and returns the
+   * decrypted material plaintext.
+   */
+  public decryptMaterial(
     request: DevicePairingRequest,
     transport: KeyPair,
-  ): DevicePairingMaterial {
+  ): string {
     const invitation = request.getInvitation();
 
     assert(
@@ -199,9 +153,7 @@ export class DevicePairingCompletion {
       new DevicePairingError('invalid', 'Invalid device pairing completion.'),
     );
 
-    const plaintext = transport.decrypt(this.encryptedMaterial).toString();
-
-    return this.material(JSON.parse(plaintext) as unknown);
+    return transport.decrypt(this.encryptedMaterial).toString();
   }
 
   public getEpoch(): DeviceAuthorizationEpoch {

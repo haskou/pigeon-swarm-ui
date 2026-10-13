@@ -1,5 +1,5 @@
 import type { ForgetDeviceServices } from '../../../../../app/presentation/workspace/components/ForgetDeviceServices';
-import type { OwnDeviceRetirement } from '../../../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
+import type { OwnDeviceRetirement } from '../../../../../contexts/identities/infrastructure/http/OwnDeviceRetirement';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { forgetCurrentDevice } from '../../../../../app/presentation/workspace/components/forgetCurrentDevice';

@@ -2,10 +2,8 @@ import { KeyPair, Signature } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp, assert } from '@haskou/value-objects';
 
 import type { DevicePairingInvitationPayload } from './DevicePairingInvitationPayload';
-import type { DevicePairingInvitationResource } from './DevicePairingInvitationResource';
 
 import { DevicePairingError } from './DevicePairingError';
-import { DevicePairingResource } from './DevicePairingResource';
 import { DeviceAuthorizationEpoch } from './value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationRevision } from './value-objects/DeviceAuthorizationRevision';
 import { DeviceCredential } from './value-objects/DeviceCredential';
@@ -17,24 +15,32 @@ const DOMAIN = 'pigeon:device-pairing:invitation:v1';
 const KIND = 'pigeon-device-pairing-invitation';
 
 export class DevicePairingInvitation {
-  private static resource(value: unknown): DevicePairingInvitationResource {
-    const resource = DevicePairingResource.fromUnknown(
-      value,
-      'Invalid device pairing invitation.',
+  /** Restores an invitation read from a code; it must verify when accepted. */
+  public static restore(
+    state: {
+      authorCredential: DeviceCredential;
+      epoch: DeviceAuthorizationEpoch;
+      expiresAt: Timestamp;
+      identityId: IdentityId;
+      pairingId: PairingId;
+      revision: DeviceAuthorizationRevision;
+      signature: Signature;
+    },
+    acceptedAt: Timestamp,
+  ): DevicePairingInvitation {
+    const invitation = new DevicePairingInvitation(
+      state.authorCredential,
+      state.epoch,
+      state.expiresAt,
+      state.identityId,
+      state.pairingId,
+      state.revision,
+      state.signature,
     );
-    resource.assertProtocol(KIND, 1);
 
-    return {
-      authorCredential: resource.getString('authorCredential'),
-      epoch: resource.getString('epoch'),
-      expiresAt: resource.getNumber('expiresAt'),
-      identityId: resource.getString('identityId'),
-      kind: KIND,
-      pairingId: resource.getString('pairingId'),
-      revision: resource.getNumber('revision'),
-      signature: resource.getString('signature'),
-      version: 1,
-    };
+    invitation.assertValidAt(acceptedAt);
+
+    return invitation;
   }
 
   public static create(input: {
@@ -66,26 +72,6 @@ export class DevicePairingInvitation {
         JSON.stringify({ domain: DOMAIN, invitation: payload }),
       ),
     );
-  }
-
-  public static fromCode(
-    code: DevicePairingCode,
-    acceptedAt: Timestamp,
-  ): DevicePairingInvitation {
-    const resource = this.resource(code.decode());
-    const invitation = new DevicePairingInvitation(
-      DeviceCredential.fromString(resource.authorCredential),
-      DeviceAuthorizationEpoch.fromString(resource.epoch),
-      new Timestamp(resource.expiresAt),
-      IdentityId.fromString(resource.identityId),
-      PairingId.fromString(resource.pairingId),
-      DeviceAuthorizationRevision.fromNumber(resource.revision),
-      new Signature(resource.signature),
-    );
-
-    invitation.assertValidAt(acceptedAt);
-
-    return invitation;
   }
 
   private constructor(

@@ -1,12 +1,9 @@
 import { KeyPair, SHA256Hash, Signature } from '@haskou/pigeon-swarm-crypto';
 import { StringValueObject, Timestamp, assert } from '@haskou/value-objects';
 
-import type {
-  DeviceAuthorizationCompromisedCredential,
-  DeviceAuthorizationCompromisedCredentialResource,
-} from './DeviceAuthorizationCompromisedCredential';
+import type { DeviceAuthorizationCompromisedCredential } from './DeviceAuthorizationCompromisedCredential';
+import type { DeviceAuthorizationCompromisedCredentialPayload } from './DeviceAuthorizationCompromisedCredentialPayload';
 import type { DeviceAuthorizationOperation } from './DeviceAuthorizationOperation';
-import type { DeviceAuthorizationTransitionResource } from './DeviceAuthorizationTransitionResource';
 import type { DeviceAuthorizationUnsignedPayload } from './DeviceAuthorizationUnsignedPayload';
 import type { DeviceAuthorizationOperationId } from './value-objects/DeviceAuthorizationOperationId';
 import type { PairingId } from './value-objects/PairingId';
@@ -96,7 +93,7 @@ export class DeviceAuthorizationTransition {
   private static compromisedCredentialsOf(
     credentials: DeviceAuthorizationCompromisedCredential[] | undefined,
     previousRevision: DeviceAuthorizationRevision,
-  ): DeviceAuthorizationCompromisedCredentialResource[] | undefined {
+  ): DeviceAuthorizationCompromisedCredentialPayload[] | undefined {
     const sorted = [...(credentials ?? [])].sort((left, right) =>
       left.credential.valueOf() < right.credential.valueOf() ? -1 : 1,
     );
@@ -129,7 +126,7 @@ export class DeviceAuthorizationTransition {
   private static unsigned(input: {
     authorCredential?: string;
     authorizedAt?: number;
-    compromisedCredentials?: DeviceAuthorizationCompromisedCredentialResource[];
+    compromisedCredentials?: DeviceAuthorizationCompromisedCredentialPayload[];
     compromisedSince?: number;
     epoch: string;
     identityId: string;
@@ -359,7 +356,10 @@ export class DeviceAuthorizationTransition {
     return { ...this.unsigned };
   }
 
-  public toPrimitives(): DeviceAuthorizationTransitionResource {
+  public toPrimitives(): DeviceAuthorizationUnsignedPayload & {
+    proofOfPossession?: string;
+    signature: string;
+  } {
     return {
       ...this.unsigned,
       proofOfPossession: this.proofOfPossession,

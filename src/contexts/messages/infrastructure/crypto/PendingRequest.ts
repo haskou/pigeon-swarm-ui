@@ -1,6 +1,6 @@
-import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
+import type { ProjectedMessage } from './ProjectedMessage';
 
 export type PendingRequest = {
   reject: (reason?: unknown) => void;
-  resolve: (messages: ChatMessage[]) => void;
+  resolve: (projected: ProjectedMessage[]) => void;
 };

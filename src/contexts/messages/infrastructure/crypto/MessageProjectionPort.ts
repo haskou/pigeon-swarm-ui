@@ -16,6 +16,17 @@ export interface MessageProjectionPort {
     signal?: AbortSignal,
   ): Promise<ChatMessage[]>;
 
+  /**
+   * Only the messages whose payload could be read, in source order. A message
+   * with a missing conversation key or a failed decrypt is left out.
+   */
+  decryptReadable(
+    session: Session,
+    conversationId: string,
+    messages: MessageResource[],
+    signal?: AbortSignal,
+  ): Promise<ChatMessage[]>;
+
   list(value: unknown): {
     messages: MessageResource[];
     nextCursor?: null | string;

@@ -207,7 +207,13 @@ describe('DirectMessageMailbox availability servers', () => {
   };
 
   const projectionDouble = () => {
-    const port = mock<Pick<MessageProjectionPort, 'decrypt' | 'decryptMany'>>();
+    const port =
+      mock<
+        Pick<
+          MessageProjectionPort,
+          'decrypt' | 'decryptMany' | 'decryptReadable'
+        >
+      >();
     const decrypted = (message: MessageResource): ChatMessage =>
       ({
         id: message.id,
@@ -220,6 +226,9 @@ describe('DirectMessageMailbox availability servers', () => {
       Promise.resolve(decrypted(message)),
     );
     port.decryptMany.mockImplementation((_session, _id, records) =>
+      Promise.resolve(records.map(decrypted)),
+    );
+    port.decryptReadable.mockImplementation((_session, _id, records) =>
       Promise.resolve(records.map(decrypted)),
     );
 

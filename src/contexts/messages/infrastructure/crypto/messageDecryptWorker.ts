@@ -9,6 +9,7 @@ import type { MessageDecryptResponse } from './MessageDecryptResponse';
 import type { MessageReactionRecord } from './MessageReactionRecord';
 /* eslint-disable @typescript-eslint/no-use-before-define */
 import type { PlainMessage } from './PlainMessage';
+import type { ProjectedMessage } from './ProjectedMessage';
 
 import { scopeClientStorageKey } from '../../../../shared/infrastructure/storage/ClientStorageScope';
 import { PollMessageProjection } from './PollMessageProjection';
@@ -44,12 +45,12 @@ self.onmessage = async (
   }
 
   try {
-    const messages = await projectMessages(request);
+    const projected = await projectMessages(request);
 
     if (cancelledRequestIds.delete(request.requestId)) return;
 
     postResponse({
-      messages,
+      projected,
       requestId: request.requestId,
       type: 'success',
     });
@@ -67,8 +68,10 @@ self.onmessage = async (
 
 async function projectMessages(
   request: MessageDecryptRequest,
-): Promise<ChatMessage[]> {
-  const projectedMessages = new Array<ChatMessage>(request.messages.length);
+): Promise<ProjectedMessage[]> {
+  const projectedMessages = new Array<ProjectedMessage>(
+    request.messages.length,
+  );
   const symmetricKey = request.symmetricKey
     ? SymmetricKey.fromBase64(request.symmetricKey)
     : undefined;
@@ -103,33 +106,37 @@ async function projectMessage(
   request: MessageDecryptRequest,
   message: MessageResource,
   symmetricKey?: SymmetricKey,
-): Promise<ChatMessage> {
+): Promise<ProjectedMessage> {
   const pollMessage = PollMessageProjection.toChatMessage(
     message,
     request.currentIdentityId,
   );
 
-  if (pollMessage) return pollMessage;
+  if (pollMessage) return { message: pollMessage, readable: true };
 
   const cacheKey = projectedMessageCacheKey(request, message);
   const cachedMessage = await cachedProjectedMessage(cacheKey);
 
-  if (cachedMessage) return cachedMessage;
+  // Only readable projections are ever cached.
+  if (cachedMessage) return { message: cachedMessage, readable: true };
 
   const base = baseMessage(request.currentIdentityId, message);
-  let projectedMessage: ChatMessage;
+  let projected: ProjectedMessage;
 
   if (message.type === 'call_event') {
-    projectedMessage = callEventMessage(base, message);
+    projected = { message: callEventMessage(base, message), readable: true };
   } else {
     const encryptedPayload = message.encryptedPayload ?? message.payload;
 
     if (!encryptedPayload) {
-      projectedMessage = plainMessage(base, message);
+      projected = { message: plainMessage(base, message), readable: true };
     } else if (!symmetricKey) {
-      projectedMessage = encryptedError(base, message, request.copy.missingKey);
+      projected = {
+        message: encryptedError(base, message, request.copy.missingKey),
+        readable: false,
+      };
     } else {
-      projectedMessage = decryptMessage(
+      projected = decryptMessage(
         request,
         base,
         message,
@@ -139,9 +146,9 @@ async function projectMessage(
     }
   }
 
-  rememberProjectedMessage(cacheKey, projectedMessage);
+  rememberProjectedMessage(cacheKey, projected);
 
-  return projectedMessage;
+  return projected;
 }
 
 function decryptMessage(
@@ -150,7 +157,7 @@ function decryptMessage(
   message: MessageResource,
   encryptedPayload: string,
   symmetricKey: SymmetricKey,
-): ChatMessage {
+): ProjectedMessage {
   try {
     const decrypted = symmetricKey.decrypt(
       new EncryptedPayload(encryptedPayload),
@@ -160,22 +167,30 @@ function decryptMessage(
     const authorIdentityId = parsed.authorIdentityId ?? base.authorIdentityId;
 
     return {
-      ...base,
-      attachments: Array.isArray(parsed.attachments) ? parsed.attachments : [],
-      authorIdentityId,
-      content: parsed.content ?? decryptedText,
-      encrypted: false,
-      linkPreview: parsed.linkPreview,
-      mine: authorIdentityId === request.currentIdentityId,
-      raw: message,
-      replyPreview: parsed.reply,
-      replyToMessageId: base.replyToMessageId ?? parsed.reply?.messageId,
-      sticker: parsed.sticker,
-      threadRootMessageId: threadRootMessageIdFromPayload(parsed, message),
-      timestamp: parsed.timestamp ?? base.timestamp,
+      message: {
+        ...base,
+        attachments: Array.isArray(parsed.attachments)
+          ? parsed.attachments
+          : [],
+        authorIdentityId,
+        content: parsed.content ?? decryptedText,
+        encrypted: false,
+        linkPreview: parsed.linkPreview,
+        mine: authorIdentityId === request.currentIdentityId,
+        raw: message,
+        replyPreview: parsed.reply,
+        replyToMessageId: base.replyToMessageId ?? parsed.reply?.messageId,
+        sticker: parsed.sticker,
+        threadRootMessageId: threadRootMessageIdFromPayload(parsed, message),
+        timestamp: parsed.timestamp ?? base.timestamp,
+      },
+      readable: true,
     };
   } catch {
-    return encryptedError(base, message, request.copy.decryptFailed);
+    return {
+      message: encryptedError(base, message, request.copy.decryptFailed),
+      readable: false,
+    };
   }
 }
 
@@ -213,12 +228,12 @@ async function cachedProjectedMessage(
 
 function rememberProjectedMessage(
   cacheKey: string,
-  projectedMessage: ChatMessage,
+  { message, readable }: ProjectedMessage,
 ): void {
-  if (!shouldCacheProjectedMessage(projectedMessage)) return;
+  if (!readable) return;
 
-  rememberProjectedMessageInMemory(cacheKey, projectedMessage);
-  void writePersistentProjectedMessage(cacheKey, projectedMessage);
+  rememberProjectedMessageInMemory(cacheKey, message);
+  void writePersistentProjectedMessage(cacheKey, message);
 }
 
 function rememberProjectedMessageInMemory(
@@ -232,10 +247,6 @@ function rememberProjectedMessageInMemory(
   const oldestKey = projectedMessageCache.keys().next().value;
 
   if (oldestKey) projectedMessageCache.delete(oldestKey);
-}
-
-function shouldCacheProjectedMessage(message: ChatMessage): boolean {
-  return !message.encrypted;
 }
 
 function projectedMessageCacheKey(

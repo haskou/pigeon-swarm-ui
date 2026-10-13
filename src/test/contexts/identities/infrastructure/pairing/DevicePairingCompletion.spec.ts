@@ -6,16 +6,29 @@ import {
 } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 
-import { DeviceAuthorizationCheckpoint } from '../../../../contexts/identities/domain/DeviceAuthorizationCheckpoint';
-import { DevicePairingCompletion } from '../../../../contexts/identities/domain/DevicePairingCompletion';
-import { DevicePairingInvitation } from '../../../../contexts/identities/domain/DevicePairingInvitation';
-import { DevicePairingRequest } from '../../../../contexts/identities/domain/DevicePairingRequest';
-import { DeviceAuthorizationEpoch } from '../../../../contexts/identities/domain/value-objects/DeviceAuthorizationEpoch';
-import { DeviceAuthorizationRevision } from '../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
-import { DevicePairingCode } from '../../../../contexts/identities/domain/value-objects/DevicePairingCode';
-import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
-import { PairingId } from '../../../../contexts/identities/domain/value-objects/PairingId';
-import { thrownPairingFailure } from './thrownPairingFailure';
+import type { DevicePairingMaterial } from '../../../../../contexts/identities/domain/DevicePairingMaterial';
+import type { DevicePairingRequestDraft } from '../../../../../contexts/identities/domain/DevicePairingRequestDraft';
+
+import { DevicePairingCompletion } from '../../../../../contexts/identities/domain/DevicePairingCompletion';
+import { DevicePairingInvitation } from '../../../../../contexts/identities/domain/DevicePairingInvitation';
+import { DevicePairingRequest } from '../../../../../contexts/identities/domain/DevicePairingRequest';
+import { DeviceAuthorizationEpoch } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationEpoch';
+import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
+import { DevicePairingCode } from '../../../../../contexts/identities/domain/value-objects/DevicePairingCode';
+import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
+import { PairingId } from '../../../../../contexts/identities/domain/value-objects/PairingId';
+import { DeviceAuthorizationCheckpointMapper } from '../../../../../contexts/identities/infrastructure/http/DeviceAuthorizationCheckpointMapper';
+import { DevicePairingCodeReader } from '../../../../../contexts/identities/infrastructure/pairing/DevicePairingCodeReader';
+import { thrownPairingFailure } from '../../domain/thrownPairingFailure';
+
+function openMaterial(
+  completion: DevicePairingCompletion,
+  draft: DevicePairingRequestDraft,
+): DevicePairingMaterial {
+  return DevicePairingCodeReader.material(
+    completion.decryptMaterial(draft.getRequest(), draft.getTransportKeyPair()),
+  );
+}
 
 describe(DevicePairingCompletion.name, () => {
   async function fixture(
@@ -42,7 +55,7 @@ describe(DevicePairingCompletion.name, () => {
     const recoveryAuthorityKeyPair = await KeyPair.generate();
     const completion = DevicePairingCompletion.create({
       author,
-      checkpoint: DeviceAuthorizationCheckpoint.fromResource(
+      checkpoint: DeviceAuthorizationCheckpointMapper.fromResource(
         { epoch: 'genesis', identityId: identityId.valueOf(), revision: 4 },
         identityId,
       ),
@@ -58,13 +71,10 @@ describe(DevicePairingCompletion.name, () => {
 
   it('transfers identity material only to the ephemeral target transport key', async () => {
     const source = await fixture();
-    const completion = DevicePairingCompletion.fromCode(
+    const completion = DevicePairingCodeReader.completion(
       source.completion.toCode(),
     );
-    const material = completion.open(
-      source.draft.getRequest(),
-      source.draft.getTransportKeyPair(),
-    );
+    const material = openMaterial(completion, source.draft);
 
     expect(material.getIdentityKeyPair().toPrimitives()).toEqual(
       source.identityKeyPair.toPrimitives(),
@@ -75,9 +85,10 @@ describe(DevicePairingCompletion.name, () => {
   it('carries the history transfer secret inside the encrypted material', async () => {
     const historyTransferSecret = SymmetricKey.generate();
     const source = await fixture(historyTransferSecret);
-    const material = DevicePairingCompletion.fromCode(
-      source.completion.toCode(),
-    ).open(source.draft.getRequest(), source.draft.getTransportKeyPair());
+    const material = openMaterial(
+      DevicePairingCodeReader.completion(source.completion.toCode()),
+      source.draft,
+    );
 
     expect(material.getHistoryTransferSecret()?.valueOf()).toBe(
       historyTransferSecret.valueOf(),
@@ -114,7 +125,7 @@ describe(DevicePairingCompletion.name, () => {
       revision: resource.revision,
       version: 1,
     };
-    const completion = DevicePairingCompletion.fromCode(
+    const completion = DevicePairingCodeReader.completion(
       DevicePairingCode.encode({
         kind: resource.kind,
         ...payload,
@@ -130,12 +141,7 @@ describe(DevicePairingCompletion.name, () => {
     );
 
     expect(
-      thrownPairingFailure(() =>
-        completion.open(
-          source.draft.getRequest(),
-          source.draft.getTransportKeyPair(),
-        ),
-      ),
+      thrownPairingFailure(() => openMaterial(completion, source.draft)),
     ).toBe('invalid');
   });
 
@@ -145,17 +151,12 @@ describe(DevicePairingCompletion.name, () => {
       string,
       unknown
     >;
-    const completion = DevicePairingCompletion.fromCode(
+    const completion = DevicePairingCodeReader.completion(
       DevicePairingCode.encode({ ...resource, revision: 5 }),
     );
 
     expect(
-      thrownPairingFailure(() =>
-        completion.open(
-          source.draft.getRequest(),
-          source.draft.getTransportKeyPair(),
-        ),
-      ),
+      thrownPairingFailure(() => openMaterial(completion, source.draft)),
     ).toBe('invalid');
   });
 
@@ -170,7 +171,7 @@ describe(DevicePairingCompletion.name, () => {
       string,
       unknown
     >;
-    const completion = DevicePairingCompletion.fromCode(
+    const completion = DevicePairingCodeReader.completion(
       DevicePairingCode.encode({
         ...resource,
         encryptedMaterial: foreign.encryptedMaterial,
@@ -178,12 +179,7 @@ describe(DevicePairingCompletion.name, () => {
     );
 
     expect(
-      thrownPairingFailure(() =>
-        completion.open(
-          source.draft.getRequest(),
-          source.draft.getTransportKeyPair(),
-        ),
-      ),
+      thrownPairingFailure(() => openMaterial(completion, source.draft)),
     ).toBe('invalid');
   });
 
@@ -191,7 +187,7 @@ describe(DevicePairingCompletion.name, () => {
     const source = await fixture();
     const forged = DevicePairingCompletion.create({
       author: await KeyPair.generate(),
-      checkpoint: DeviceAuthorizationCheckpoint.fromResource(
+      checkpoint: DeviceAuthorizationCheckpointMapper.fromResource(
         {
           epoch: 'genesis',
           identityId: source.identityId.valueOf(),
@@ -208,9 +204,9 @@ describe(DevicePairingCompletion.name, () => {
 
     expect(
       thrownPairingFailure(() =>
-        DevicePairingCompletion.fromCode(forged.toCode()).open(
-          source.draft.getRequest(),
-          source.draft.getTransportKeyPair(),
+        openMaterial(
+          DevicePairingCodeReader.completion(forged.toCode()),
+          source.draft,
         ),
       ),
     ).toBe('invalid');

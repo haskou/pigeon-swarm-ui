@@ -81,6 +81,46 @@ describe(PigeonMessageProjection.name, () => {
     expect(projected).toMatchObject({ content: 'hello', id: 'message-a' });
   });
 
+  it('keeps only the messages it could read, in source order', async () => {
+    const projection = new PigeonMessageProjection(
+      new MessageProjector(projectionCopy),
+      projectionCopy,
+    );
+
+    const readable = await projection.decryptReadable(
+      sessionFixture(),
+      'conversation-a',
+      [
+        {
+          authorIdentityId: 'identity-b',
+          content: 'hello',
+          createdAt: 1,
+          id: 'message-a',
+          type: 'sent',
+        },
+        {
+          authorIdentityId: 'identity-b',
+          createdAt: 2,
+          encryptedPayload: 'payload',
+          id: 'message-without-key',
+          type: 'sent',
+        },
+        {
+          authorIdentityId: 'identity-b',
+          content: 'again',
+          createdAt: 3,
+          id: 'message-c',
+          type: 'sent',
+        },
+      ],
+    );
+
+    expect(readable.map((message) => message.id)).toEqual([
+      'message-a',
+      'message-c',
+    ]);
+  });
+
   describe('worker lifecycle', () => {
     const originalWorker = Object.getOwnPropertyDescriptor(
       globalThis,
@@ -104,14 +144,14 @@ describe(PigeonMessageProjection.name, () => {
       }
     });
 
-    function respondingWorker(): MockProxy<Worker> {
+    function respondingWorker(projected: unknown[] = []): MockProxy<Worker> {
       const worker = mock<Worker>();
 
       worker.postMessage.mockImplementation((request: unknown) => {
         const { requestId } = request as { requestId: number };
 
         worker.onmessage?.({
-          data: { messages: [], requestId, type: 'success' },
+          data: { projected, requestId, type: 'success' },
         } as MessageEvent);
       });
 
@@ -182,6 +222,37 @@ describe(PigeonMessageProjection.name, () => {
       expect(worker.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({ symmetricKey: 'key-a' }),
       );
+    });
+
+    it('takes each read outcome from the worker', async () => {
+      const worker = respondingWorker([
+        { message: { id: 'message-a' }, readable: true },
+        { message: { id: 'message-b' }, readable: false },
+      ]);
+
+      jest.mocked(createMessageDecryptWorker).mockReturnValue(worker);
+      const projection = new PigeonMessageProjection(
+        new MessageProjector(projectionCopy),
+        projectionCopy,
+      );
+      const messages = [sentMessage, { ...sentMessage, id: 'message-b' }];
+
+      const all = await projection.decryptMany(
+        sessionFixture(),
+        'conversation-a',
+        messages,
+      );
+      const readable = await projection.decryptReadable(
+        sessionFixture(),
+        'conversation-a',
+        messages,
+      );
+
+      expect(all.map((message) => message.id)).toEqual([
+        'message-a',
+        'message-b',
+      ]);
+      expect(readable.map((message) => message.id)).toEqual(['message-a']);
     });
 
     it('rejects decrypts still in flight when disposed', async () => {

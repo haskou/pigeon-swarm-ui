@@ -19,10 +19,8 @@ import type { DeviceSealedRecovery } from './DeviceSealedRecovery';
 import type { DeviceSealedRootRotation } from './DeviceSealedRootRotation';
 import type { IdentityAdmissionProgressListener } from './IdentityAdmissionProgressListener';
 import type { IdentityUpdateProfileInput } from './IdentitySignaturePayloadFactory';
-import type {
-  OwnDeviceRetirement,
-  PigeonDeviceAuthorizationApi,
-} from './PigeonDeviceAuthorizationApi';
+import type { OwnDeviceRetirement } from './OwnDeviceRetirement';
+import type { PigeonDeviceAuthorizationApi } from './PigeonDeviceAuthorizationApi';
 import type { PigeonIdentityCommandsApi } from './PigeonIdentityCommandsApi';
 import type { PigeonIdentityGateway } from './PigeonIdentityGateway';
 import type { PigeonIdentityLoginApi } from './PigeonIdentityLoginApi';

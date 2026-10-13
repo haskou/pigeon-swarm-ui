@@ -7,9 +7,8 @@ import { Timestamp, assert } from '@haskou/value-objects';
 
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
-import type { DeviceAuthorizationCheckpointResource } from '../../domain/DeviceAuthorizationCheckpointResource';
+import type { DeviceAuthorizationCheckpoint } from '../../domain/DeviceAuthorizationCheckpoint';
 import type { DeviceAuthorizationTransition } from '../../domain/DeviceAuthorizationTransition';
-import type { DeviceCatalogResource } from '../../domain/DeviceCatalogResource';
 import type { DevicePairingRequestDraft } from '../../domain/DevicePairingRequestDraft';
 import type { IdentityPassword } from '../../domain/value-objects/IdentityPassword';
 import type { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
@@ -17,10 +16,13 @@ import type { Session } from '../session/Session';
 import type { DeviceIdentityVault } from '../storage/DeviceIdentityVault';
 import type { CompletedDevicePairing } from './CompletedDevicePairing';
 import type { DevicePairingAuthorization } from './DevicePairingAuthorization';
+import type { OwnDeviceRetirement } from './OwnDeviceRetirement';
+import type { DeviceAuthorizationCheckpointResource } from './resources/DeviceAuthorizationCheckpointResource';
+import type { DeviceAuthorizationTransitionResource } from './resources/DeviceAuthorizationTransitionResource';
+import type { DeviceCatalogResource } from './resources/DeviceCatalogResource';
 import type { IdentityResource } from './resources/IdentityResource';
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
-import { DeviceAuthorizationCheckpoint } from '../../domain/DeviceAuthorizationCheckpoint';
 import { DeviceAuthorizationTransition as AuthorizationTransition } from '../../domain/DeviceAuthorizationTransition';
 import { DevicePairingCompletion } from '../../domain/DevicePairingCompletion';
 import { DevicePairingError } from '../../domain/DevicePairingError';
@@ -37,11 +39,11 @@ import { IdentityId } from '../../domain/value-objects/IdentityId';
 import { PairingId } from '../../domain/value-objects/PairingId';
 import { RecoveryAuthority } from '../../domain/value-objects/RecoveryAuthority';
 import { RecoveryIdentityMaterial } from '../crypto/RecoveryIdentityMaterial';
+import { DevicePairingCodeReader } from '../pairing/DevicePairingCodeReader';
+import { DeviceAuthorizationCheckpointMapper } from './DeviceAuthorizationCheckpointMapper';
 
 const emptyKeychain = { conversations: {}, version: 0 };
 const PAIRING_TTL_MS = 2 * 60 * 1000;
-
-export type OwnDeviceRetirement = 'already-revoked' | 'last-device' | 'revoked';
 
 export class PigeonDeviceAuthorizationApi {
   public constructor(
@@ -79,14 +81,18 @@ export class PigeonDeviceAuthorizationApi {
         method: 'GET',
       });
 
-    return DeviceAuthorizationCheckpoint.fromResource(resource, identityId);
+    return DeviceAuthorizationCheckpointMapper.fromResource(
+      resource,
+      identityId,
+    );
   }
 
   private async submit(
     session: Session,
     transition: DeviceAuthorizationTransition,
   ): Promise<DeviceAuthorizationCheckpoint> {
-    const body = transition.toPrimitives();
+    const body: DeviceAuthorizationTransitionResource =
+      transition.toPrimitives();
     const path = '/identity-devices/transitions';
     const resource =
       await this.http.request<DeviceAuthorizationCheckpointResource>(path, {
@@ -94,7 +100,7 @@ export class PigeonDeviceAuthorizationApi {
         headers: await this.signer.headers(session, 'POST', path, body),
         method: 'POST',
       });
-    const checkpoint = DeviceAuthorizationCheckpoint.fromResource(
+    const checkpoint = DeviceAuthorizationCheckpointMapper.fromResource(
       resource,
       transition.getIdentityId(),
     );
@@ -200,7 +206,7 @@ export class PigeonDeviceAuthorizationApi {
     invitationCode: DevicePairingCode,
   ): Promise<DevicePairingRequestDraft> {
     const acceptedAt = new Timestamp(this.clock());
-    const invitation = DevicePairingInvitation.fromCode(
+    const invitation = DevicePairingCodeReader.invitation(
       invitationCode,
       acceptedAt,
     );
@@ -211,7 +217,7 @@ export class PigeonDeviceAuthorizationApi {
   public async verifyPairingRequest(
     requestCode: DevicePairingCode,
   ): Promise<string> {
-    return await DevicePairingRequest.fromCode(
+    return await DevicePairingCodeReader.request(
       requestCode,
       new Timestamp(this.clock()),
     ).getVerificationCode();
@@ -223,7 +229,7 @@ export class PigeonDeviceAuthorizationApi {
     historyTransferSecret: SymmetricKey,
   ): Promise<DevicePairingAuthorization> {
     const acceptedAt = new Timestamp(this.clock());
-    const request = DevicePairingRequest.fromCode(requestCode, acceptedAt);
+    const request = DevicePairingCodeReader.request(requestCode, acceptedAt);
     const invitation = request.getInvitation();
     const identityId = IdentityId.fromString(session.identity.id);
 
@@ -282,10 +288,12 @@ export class PigeonDeviceAuthorizationApi {
     draft.reserve();
 
     try {
-      const completion = DevicePairingCompletion.fromCode(completionCode);
-      const material = completion.open(
-        draft.getRequest(),
-        draft.getTransportKeyPair(),
+      const completion = DevicePairingCodeReader.completion(completionCode);
+      const material = DevicePairingCodeReader.material(
+        completion.decryptMaterial(
+          draft.getRequest(),
+          draft.getTransportKeyPair(),
+        ),
       );
       const identityId = IdentityId.fromString(
         material.getIdentityKeyPair().toPrimitives().publicKey,

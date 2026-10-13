@@ -1,7 +1,7 @@
-import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
 import type { MessageDecryptWorkerRequest } from './MessageDecryptWorkerRequest';
 import type { MessageDecryptWorkerResponse } from './MessageDecryptWorkerResponse';
 import type { PendingRequest } from './PendingRequest';
+import type { ProjectedMessage } from './ProjectedMessage';
 
 function abortError(): Error {
   const error = new Error('Message decrypt aborted');
@@ -33,7 +33,7 @@ export class MessageDecryptWorkerClient {
     this.pending.delete(response.requestId);
 
     if (response.type === 'success') {
-      pendingRequest.resolve(response.messages);
+      pendingRequest.resolve(response.projected);
 
       return;
     }
@@ -57,14 +57,14 @@ export class MessageDecryptWorkerClient {
   public async decrypt(
     request: Omit<MessageDecryptWorkerRequest, 'requestId'>,
     signal?: AbortSignal,
-  ): Promise<ChatMessage[]> {
+  ): Promise<ProjectedMessage[]> {
     if (signal?.aborted) throw abortError();
 
     const requestId = this.nextRequestId + 1;
 
     this.nextRequestId = requestId;
 
-    const promise = new Promise<ChatMessage[]>((resolve, reject) => {
+    const promise = new Promise<ProjectedMessage[]>((resolve, reject) => {
       this.pending.set(requestId, { reject, resolve });
     });
     const abort = () => {

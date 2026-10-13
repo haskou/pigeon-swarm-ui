@@ -1,35 +1,33 @@
 import { assert } from '@haskou/value-objects';
 
-import type { DeviceAuthorizationCheckpointResource } from './DeviceAuthorizationCheckpointResource';
 import type { DeviceAuthorizationCompromisedCredential as CompromisedCredential } from './DeviceAuthorizationCompromisedCredential';
+import type { DeviceAuthorizationEpoch } from './value-objects/DeviceAuthorizationEpoch';
+import type { DeviceAuthorizationRevision } from './value-objects/DeviceAuthorizationRevision';
+import type { IdentityId } from './value-objects/IdentityId';
 
-import { DeviceAuthorizationEpoch } from './value-objects/DeviceAuthorizationEpoch';
-import { DeviceAuthorizationRevision } from './value-objects/DeviceAuthorizationRevision';
-import { DeviceCredential } from './value-objects/DeviceCredential';
-import { IdentityId } from './value-objects/IdentityId';
+import { DeviceAuthorizationIdentityMismatchError } from './errors/DeviceAuthorizationIdentityMismatchError';
 
 export class DeviceAuthorizationCheckpoint {
-  public static fromResource(
-    resource: DeviceAuthorizationCheckpointResource,
+  /** A checkpoint is only accepted for the identity that asked for it. */
+  public static forIdentity(
     expectedIdentityId: IdentityId,
+    state: {
+      compromisedCredentials: CompromisedCredential[];
+      epoch: DeviceAuthorizationEpoch;
+      identityId: IdentityId;
+      revision: DeviceAuthorizationRevision;
+    },
   ): DeviceAuthorizationCheckpoint {
-    const identityId = IdentityId.fromString(resource.identityId);
-
     assert(
-      identityId.isEqual(expectedIdentityId),
-      new Error('Device authorization identity does not match.'),
+      state.identityId.isEqual(expectedIdentityId),
+      new DeviceAuthorizationIdentityMismatchError(),
     );
 
     return new DeviceAuthorizationCheckpoint(
-      DeviceAuthorizationEpoch.fromString(resource.epoch),
-      identityId,
-      DeviceAuthorizationRevision.fromNumber(resource.revision),
-      (resource.compromisedCredentials ?? []).map((entry) => ({
-        compromisedSince: DeviceAuthorizationRevision.fromNumber(
-          entry.compromisedSince,
-        ),
-        credential: DeviceCredential.fromString(entry.credential),
-      })),
+      state.epoch,
+      state.identityId,
+      state.revision,
+      state.compromisedCredentials,
     );
   }
 

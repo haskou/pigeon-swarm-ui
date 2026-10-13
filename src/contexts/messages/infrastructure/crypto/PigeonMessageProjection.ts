@@ -3,6 +3,7 @@ import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
 import type { MessageResource } from '../http/MessageResource';
 import type { MessageProjectionCopy } from './MessageProjectionCopy';
 import type { MessageProjectionPort } from './MessageProjectionPort';
+import type { ProjectedMessage } from './ProjectedMessage';
 
 import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
 import { throwIfMessageLoadAborted } from '../http/throwIfMessageLoadAborted';
@@ -22,18 +23,13 @@ export class PigeonMessageProjection implements MessageProjectionPort {
     private readonly copy: MessageProjectionCopy,
   ) {}
 
-  public dispose(): void {
-    this.decryptWorker?.terminate();
-    this.decryptWorker = null;
-  }
-
   private async decryptDirectly(
     session: Session,
     conversationId: string,
     messages: MessageResource[],
     signal?: AbortSignal,
-  ): Promise<ChatMessage[]> {
-    const decrypted = new Array<ChatMessage>(messages.length);
+  ): Promise<ProjectedMessage[]> {
+    const decrypted = new Array<ProjectedMessage>(messages.length);
 
     for (
       let endIndex = messages.length;
@@ -46,7 +42,7 @@ export class PigeonMessageProjection implements MessageProjectionPort {
       const batch = messages.slice(startIndex, endIndex);
       const decryptedBatch = await Promise.all(
         batch.map((message) =>
-          this.projector.toChatMessage(session, conversationId, message),
+          this.projector.project(session, conversationId, message),
         ),
       );
 
@@ -67,24 +63,12 @@ export class PigeonMessageProjection implements MessageProjectionPort {
     return this.decryptWorker;
   }
 
-  public async decrypt(
-    session: Session,
-    conversationId: string,
-    message: MessageResource,
-  ): Promise<ChatMessage> {
-    const [projected] = await this.decryptMany(session, conversationId, [
-      message,
-    ]);
-
-    return projected;
-  }
-
-  public async decryptMany(
+  private async projectMany(
     session: Session,
     conversationId: string,
     messages: MessageResource[],
     signal?: AbortSignal,
-  ): Promise<ChatMessage[]> {
+  ): Promise<ProjectedMessage[]> {
     const pendingMessages = messages.filter(
       (message) => message.type !== 'deleted',
     );
@@ -115,6 +99,57 @@ export class PigeonMessageProjection implements MessageProjectionPort {
         symmetricKey: key?.key,
       },
       signal,
+    );
+  }
+
+  public dispose(): void {
+    this.decryptWorker?.terminate();
+    this.decryptWorker = null;
+  }
+
+  public async decrypt(
+    session: Session,
+    conversationId: string,
+    message: MessageResource,
+  ): Promise<ChatMessage> {
+    const [projected] = await this.decryptMany(session, conversationId, [
+      message,
+    ]);
+
+    return projected;
+  }
+
+  public async decryptMany(
+    session: Session,
+    conversationId: string,
+    messages: MessageResource[],
+    signal?: AbortSignal,
+  ): Promise<ChatMessage[]> {
+    const projected = await this.projectMany(
+      session,
+      conversationId,
+      messages,
+      signal,
+    );
+
+    return projected.map(({ message }) => message);
+  }
+
+  public async decryptReadable(
+    session: Session,
+    conversationId: string,
+    messages: MessageResource[],
+    signal?: AbortSignal,
+  ): Promise<ChatMessage[]> {
+    const projected = await this.projectMany(
+      session,
+      conversationId,
+      messages,
+      signal,
+    );
+
+    return projected.flatMap(({ message, readable }) =>
+      readable ? [message] : [],
     );
   }
 
