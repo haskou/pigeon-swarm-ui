@@ -4,6 +4,8 @@ export interface GroupMailboxGenerationPrimitives {
   readonly secret: string;
   /** The MLS epoch whose exporter produced the secret. */
   readonly epoch: string;
-  /** When a removal superseded this generation; absent while current. */
+  /** Digest of the leaves of that epoch's tree. */
+  readonly tree: string;
+  /** When a membership change superseded it; absent while current. */
   readonly retiredAt?: number;
 }

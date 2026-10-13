@@ -30,9 +30,10 @@ const GENERATION_LABEL = 'pigeon/group-mailbox/gen/v1';
 /**
  * MLS for group conversations on one device. Each conversation is one MLS
  * group; its mailbox generation `gen_k` is exported from the epoch of the
- * last removal, so a removed member cannot derive where the group talks next.
- * All mutation of a group goes through a per-group queue so the ratchet has
- * a single writer.
+ * last membership change, so a removed member cannot derive where the group
+ * talks next and a joiner derives the generation itself. All mutation of a
+ * group goes through a per-group queue so the ratchet has a single writer;
+ * a failed task drops the cached group so the stored state stays the truth.
  */
 export class GroupMailboxMlsEngine {
   private readonly groups = new Map<string, MlsGroup>();
@@ -50,8 +51,8 @@ export class GroupMailboxMlsEngine {
   ) {}
 
   /**
-   * Confirms a commit this device made, then advances the generation if it
-   * removed anyone. The log is written first: reapplying is idempotent.
+   * Confirms a commit this device made, then advances the generation if the
+   * tree changed. The log is written first: reapplying is idempotent.
    */
   private async commit(
     group: MlsGroup,
@@ -77,7 +78,13 @@ export class GroupMailboxMlsEngine {
     task: () => Promise<T>,
   ): Promise<T> {
     const previous = this.queues.get(conversationId) ?? Promise.resolve();
-    const next = previous.catch(() => undefined).then(task);
+    const next = previous
+      .catch(() => undefined)
+      .then(task)
+      .catch((error: unknown) => {
+        this.groups.delete(conversationId);
+        throw error;
+      });
 
     this.queues.set(conversationId, next);
 
@@ -92,7 +99,11 @@ export class GroupMailboxMlsEngine {
     );
   }
 
-  /** Moves the log along with an applied commit; saves it if it changed. */
+  /**
+   * Moves the log along with an applied commit; saves it if it changed. The
+   * generation is behind whenever the tree differs from the one it was
+   * exported for, whatever the last commit was.
+   */
   private async follow(
     group: MlsGroup,
     outcome: MlsCommitOutcome,
@@ -101,11 +112,13 @@ export class GroupMailboxMlsEngine {
   ): Promise<GroupMailboxGenerationLog> {
     if (outcome.kind !== 'applied' && outcome.kind !== 'replaced') return log;
     let next = outcome.kind === 'replaced' ? log.rewind(commitEpoch) : log;
+    const tree = this.treeOf(group);
 
-    if (outcome.removesLeaves && next.current().epoch < group.epoch) {
+    if (next.current().tree !== tree && next.current().epoch < group.epoch) {
       next = next.advance(
         await this.exportGeneration(group),
         group.epoch,
+        tree,
         this.clock(),
       );
     }
@@ -117,6 +130,20 @@ export class GroupMailboxMlsEngine {
 
   private idOf(bytes: Uint8Array): string {
     return SHA256Hash.from(encodeBase64Url(bytes)).toString();
+  }
+
+  /** Digest of the leaves (position and signature key) of the current tree. */
+  private treeOf(group: MlsGroup): string {
+    return SHA256Hash.from(
+      group
+        .leaves()
+        .map(
+          ({ index, signaturePublicKey }) =>
+            `${index}:${encodeBase64Url(signaturePublicKey)}`,
+        )
+        .sort()
+        .join(','),
+    ).toString();
   }
 
   private async load(conversationId: string): Promise<MlsGroup | undefined> {
@@ -242,6 +269,7 @@ export class GroupMailboxMlsEngine {
       const log = (await this.generations.load(conversationId)).start(
         await this.exportGeneration(group),
         group.epoch,
+        this.treeOf(group),
       );
 
       await this.generations.save(conversationId, log);
@@ -286,6 +314,19 @@ export class GroupMailboxMlsEngine {
       }
       const group = await this.requireGroup(conversationId);
       const opened = await group.open(ciphertext);
+      const { deviceId, identityId } = opened.sender;
+
+      // Once a removal is applied, its leaf's late messages are not read.
+      if (
+        !group
+          .leaves()
+          .some(
+            ({ owner }) =>
+              owner.identityId === identityId && owner.deviceId === deviceId,
+          )
+      ) {
+        throw new MlsRejectedError('The sender is no longer in the group');
+      }
 
       // Persist the message before the advanced ratchet: losing the state
       // is recoverable; a message that cannot be decrypted again is not.
@@ -334,13 +375,14 @@ export class GroupMailboxMlsEngine {
   }
 
   /**
-   * Joins from a welcome with the generation the inviter is on: a joiner
-   * cannot export it from an epoch it was not in. A welcome opens once.
+   * Joins from a welcome. Every add advances the generation, so the joiner
+   * exports `gen_k` from the welcome epoch itself; only the public index
+   * `k` comes from the inviter. A welcome opens once.
    */
   public async join(
     conversationId: string,
     welcome: Uint8Array,
-    generation: GroupMailboxGeneration,
+    index: number,
   ): Promise<void> {
     await this.exclusive(conversationId, async () => {
       if (await this.load(conversationId)) {
@@ -363,16 +405,14 @@ export class GroupMailboxMlsEngine {
           continue;
         }
 
-        if (generation.epoch > group.epoch) {
-          throw new MlsRejectedError('Generation is newer than the welcome');
-        }
         await this.store.deleteKeyPackage(stored.id);
         await this.generations.save(
           conversationId,
           (await this.generations.load(conversationId)).start(
-            generation.secret,
-            generation.epoch,
-            generation.index,
+            await this.exportGeneration(group),
+            group.epoch,
+            this.treeOf(group),
+            index,
           ),
         );
         await this.remember(group);

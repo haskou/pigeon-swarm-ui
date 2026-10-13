@@ -29,10 +29,11 @@ export class GroupMailboxGenerationLog {
     private readonly generations: readonly GroupMailboxGeneration[],
   ) {}
 
-  /** Supersedes the current generation after a removal commit. */
+  /** Supersedes the current generation after a membership change. */
   public advance(
     secret: GroupMailboxGenerationSecret,
     epoch: bigint,
+    tree: string,
     now: number,
   ): GroupMailboxGenerationLog {
     const current = this.current();
@@ -40,7 +41,7 @@ export class GroupMailboxGenerationLog {
     return new GroupMailboxGenerationLog([
       ...this.generations.slice(0, -1),
       current.retire(now),
-      new GroupMailboxGeneration(current.index + 1, secret, epoch),
+      new GroupMailboxGeneration(current.index + 1, secret, epoch, tree),
     ]);
   }
 
@@ -82,10 +83,11 @@ export class GroupMailboxGenerationLog {
     ]);
   }
 
-  /** Records gen_0, exported from the epoch this device created or joined. */
+  /** Records the first generation: the epoch this device created or joined. */
   public start(
     secret: GroupMailboxGenerationSecret,
     epoch: bigint,
+    tree: string,
     index = 0,
   ): GroupMailboxGenerationLog {
     if (!this.isEmpty()) {
@@ -93,7 +95,7 @@ export class GroupMailboxGenerationLog {
     }
 
     return new GroupMailboxGenerationLog([
-      new GroupMailboxGeneration(index, secret, epoch),
+      new GroupMailboxGeneration(index, secret, epoch, tree),
     ]);
   }
 

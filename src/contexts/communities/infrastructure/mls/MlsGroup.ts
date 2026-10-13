@@ -47,20 +47,6 @@ const suite = (): Promise<CiphersuiteImpl> => {
   return suitePromise;
 };
 
-/** Whether `after` blanked or replaced any leaf that `before` held. */
-const removesLeaves = (before: ClientState, after: ClientState): boolean =>
-  before.ratchetTree.some((node, treeIndex) => {
-    if (node?.nodeType !== 'leaf') return false;
-    const kept = after.ratchetTree[treeIndex];
-    const key = node.leaf.signaturePublicKey;
-
-    return (
-      kept?.nodeType !== 'leaf' ||
-      kept.leaf.signaturePublicKey.length !== key.length ||
-      kept.leaf.signaturePublicKey.some((byte, index) => byte !== key[index])
-    );
-  });
-
 /** The identity and device that an MLS leaf claims to be. */
 export interface MlsLeafOwner {
   readonly identityId: string;
@@ -100,13 +86,8 @@ export interface MlsOpenedMessage {
 }
 
 export type MlsCommitOutcome =
-  | { kind: 'applied'; epoch: bigint; removesLeaves: boolean }
-  | {
-      kind: 'replaced';
-      epoch: bigint;
-      discardedCommitId: string;
-      removesLeaves: boolean;
-    }
+  | { kind: 'applied'; epoch: bigint }
+  | { kind: 'replaced'; epoch: bigint; discardedCommitId: string }
   | { kind: 'ignored'; reason: 'duplicate' | 'lost-race' | 'stale' }
   | { kind: 'gap'; have: bigint; got: bigint }
   | { kind: 'removed' };
@@ -584,11 +565,7 @@ export class MlsGroup {
       return { kind: 'removed' };
     }
 
-    return {
-      epoch: result.newState.groupContext.epoch,
-      kind: 'applied',
-      removesLeaves: removesLeaves(from, result.newState),
-    };
+    return { epoch: result.newState.groupContext.epoch, kind: 'applied' };
   }
 
   private async commit(proposals: Proposal[]): Promise<MlsCommitOutput> {
@@ -645,11 +622,7 @@ export class MlsGroup {
     this.applied.set(pending.epoch, { before: pending.before, commitId });
     this.state = pending.state;
 
-    return {
-      epoch: this.state.groupContext.epoch,
-      kind: 'applied',
-      removesLeaves: removesLeaves(pending.before, pending.state),
-    };
+    return { epoch: this.state.groupContext.epoch, kind: 'applied' };
   }
 
   /** Drops a created commit, e.g. because another commit won the epoch. */

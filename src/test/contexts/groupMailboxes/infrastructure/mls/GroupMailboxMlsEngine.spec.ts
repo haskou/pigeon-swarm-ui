@@ -21,15 +21,16 @@ const engine = (
   identityId: string,
   deviceId = 'd1',
   databaseName = `group-mls-${++database}`,
-  generations: GroupMailboxGenerationRepository = new IndexedDbGroupMailboxGenerationStore(
-    `${databaseName}-generations`,
-    identityId,
-  ),
+  generations?: GroupMailboxGenerationRepository,
 ): GroupMailboxMlsEngine =>
   new GroupMailboxMlsEngine(
     { deviceId, identityId },
     new IndexedDbMlsStateStore(`${databaseName}-mls`, identityId),
-    generations,
+    generations ??
+      new IndexedDbGroupMailboxGenerationStore(
+        `${databaseName}-generations`,
+        identityId,
+      ),
     () => Promise.resolve(roster),
     () => clock,
   );
