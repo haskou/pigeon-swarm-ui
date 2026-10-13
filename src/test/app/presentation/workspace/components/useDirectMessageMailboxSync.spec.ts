@@ -87,8 +87,8 @@ function mountSync(initialError: string | null = null) {
     cleanup,
     error: () => error,
     onConversationRead,
-    onHistoryRestored,
     onErrorChange,
+    onHistoryRestored,
     onMessagesChange,
     pinnedIds: () => pinned,
     replaceError: (value: string) => {
