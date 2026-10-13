@@ -199,10 +199,11 @@ longer writes them. Covered by `deleteLegacyRememberedIdentityStorage.spec.ts`.
 
 ## Tests
 
-`DeviceIdentityVault.spec.ts` and `DeviceIdentityProtector.spec.ts` run in
-`yarn test:crypto` (`jest.real-crypto.config.cjs`), which `yarn test` runs after
-the main jest suite. The main jest config excludes them because its
-`@haskou/pigeon-swarm-crypto` mock does not implement the device factor.
+`DeviceIdentityVault.spec.ts` and `DeviceIdentityProtector.spec.ts` run in the
+`crypto` jest project (`yarn test:crypto`), which `yarn test` runs together
+with the `unit` project. They are listed in `REAL_CRYPTO_SPECS` in
+`jest.config.cjs` because the `unit` project's `@haskou/pigeon-swarm-crypto`
+fake does not implement the device factor.
 
 ## Out of scope
 

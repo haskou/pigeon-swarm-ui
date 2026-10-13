@@ -1,50 +1,90 @@
-module.exports = {
-  moduleNameMapper: {
-    '\\?url$': '<rootDir>/src/test/assetUrlMock.ts',
-    '^@haskou/pigeon-swarm-crypto$': '<rootDir>/src/test/valueObjectsMock.ts',
-  },
-  testPathIgnorePatterns: [
-    '/Attachment(Cipher|Cryptographer).spec.ts$',
-    '/DeviceIdentityProtector.spec.ts$',
-    '/DeviceIdentityVault.spec.ts$',
-    '/RecoveryAuthorityKeyPair.spec.ts$',
-    '/DeviceAuthorizationTransition.spec.ts$',
-    '/DevicePairingInvitation.spec.ts$',
-    '/DevicePairingRequest.spec.ts$',
-    '/DevicePairingCompletion.spec.ts$',
-    '/PigeonDeviceAuthorizationApi.spec.ts$',
-    '/DeviceSealedSecretCipher.spec.ts$',
-    '/PigeonDeviceSealedSecretApi.spec.ts$',
-    '/CommunityOperationSigner.spec.ts$',
-    '/ConversationOperationSigner.spec.ts$',
-    '/RequestSigner.vectors.spec.ts$',
-    '/PigeonConversationsApi.readUntilVectors.spec.ts$',
-    '/CallEventSigner.spec.ts$',
-    '/Mls(Group|CommunityEngine).spec.ts$',
-    '/IdentityAdmissionProof(\\.vectors)?.spec.ts$',
-    '/DeviceSealedRootRotation.spec.ts$',
-    '/PigeonApiGateway.spec.ts$',
-    '/PigeonIdentityCommandsApi.spec.ts$',
-    '/IdentitySignaturePayloadFactory.spec.ts$',
-    '/IdentityMailboxHomeVerifier.spec.ts$',
-    '/IdentityMailboxHomeTrust.spec.ts$',
-    '/Mailbox(Capability|Channel|CreationProof|EnvelopeCipher|KeySchedule|ReadToken).spec.ts$',
-    '/MailboxCreationProof.vectors.spec.ts$',
-    '/GroupMailboxKeySchedule.spec.ts$',
-    '/DirectMessageMailbox.spec.ts$',
-    '/DirectMessageReaderSet.spec.ts$',
-    '/DirectMessageAuthorship.spec.ts$',
-    '/DirectMessageHistoryTransfer.spec.ts$',
-  ],
+/**
+ * One `jest` run with two projects. `unit` maps `@haskou/pigeon-swarm-crypto`
+ * to the deterministic fake in `src/test/valueObjectsMock.ts`. `crypto` runs
+ * the specs below against the real library: signatures, KEMs, KDFs and wire
+ * vectors that a fake cannot exercise. Each spec belongs to exactly one
+ * project.
+ */
+const REAL_CRYPTO_SPECS = [
+  'AttachmentCipher',
+  'AttachmentCryptographer',
+  'CallEventSigner',
+  'CommunityOperationSigner',
+  'ConversationOperationSigner',
+  'DeviceAuthorizationTransition',
+  'DeviceIdentityProtector',
+  'DeviceIdentityVault',
+  'DevicePairingCompletion',
+  'DevicePairingInvitation',
+  'DevicePairingRequest',
+  'DeviceSealedSecretCipher',
+  'DirectMessageAuthorship',
+  'DirectMessageHistoryTransfer',
+  'DirectMessageMailbox',
+  'DirectMessageReaderSet',
+  'GroupMailboxKeySchedule',
+  'IdentityAdmissionProof',
+  'IdentityAdmissionProof.vectors',
+  'IdentityMailboxHomeTrust',
+  'IdentityMailboxHomeVerifier',
+  'IdentitySignaturePayloadFactory',
+  'MailboxCapability',
+  'MailboxChannel',
+  'MailboxCreationProof',
+  'MailboxCreationProof.vectors',
+  'MailboxEnvelopeCipher',
+  'MailboxKeySchedule',
+  'MailboxReadToken',
+  'MlsCommunityEngine',
+  'MlsGroup',
+  'PigeonApiGateway',
+  'PigeonConversationsApi.readUntilVectors',
+  'PigeonDeviceAuthorizationApi',
+  'PigeonDeviceSealedSecretApi',
+  'PigeonIdentityCommandsApi',
+  'RecoveryAuthorityKeyPair',
+  'RequestSigner.vectors',
+];
+
+const realCryptoSpec = `/(${REAL_CRYPTO_SPECS.join('|').replaceAll('.', '\\.')})\\.spec\\.ts$`;
+const assetUrl = { '\\?url$': '<rootDir>/src/test/assetUrlMock.ts' };
+const shared = {
+  clearMocks: true,
+  rootDir: __dirname,
   roots: ['<rootDir>/src'],
   testEnvironment: 'node',
-  testMatch: ['**/*.spec.ts'],
-  transform: {
-    '^.+\\.tsx?$': [
-      'ts-jest',
-      {
-        tsconfig: 'tsconfig.jest.json',
+};
+
+module.exports = {
+  projects: [
+    {
+      ...shared,
+      displayName: 'unit',
+      moduleNameMapper: {
+        ...assetUrl,
+        '^@haskou/pigeon-swarm-crypto$':
+          '<rootDir>/src/test/valueObjectsMock.ts',
       },
-    ],
-  },
+      testMatch: ['**/*.spec.ts'],
+      testPathIgnorePatterns: ['/node_modules/', realCryptoSpec],
+      transform: {
+        '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.jest.json' }],
+      },
+    },
+    {
+      ...shared,
+      displayName: 'crypto',
+      moduleNameMapper: assetUrl,
+      testRegex: realCryptoSpec,
+      transform: {
+        '^.+\\.[tj]s$': ['ts-jest', { tsconfig: 'tsconfig.real-crypto.json' }],
+      },
+      transformIgnorePatterns: [
+        '/node_modules/(?!@noble/|ts-mls/|@haskou/pigeon-swarm-crypto/)',
+      ],
+    },
+  ],
+  // Jest reads the timeout only at the top level. Real KDFs and signatures
+  // need more than the 5 s default when the projects share the workers.
+  testTimeout: 30000,
 };
