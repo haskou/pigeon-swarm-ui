@@ -2,6 +2,7 @@ import { Timestamp } from '@haskou/value-objects';
 
 import { ConversationId } from '../../../domain/value-objects/ConversationId';
 import { ConversationParticipantId } from '../../../domain/value-objects/ConversationParticipantId';
+import { ConversationType } from '../../../domain/value-objects/ConversationType';
 import { MessageId } from '../../../domain/value-objects/MessageId';
 
 export class MarkConversationReadUntilMessage {
@@ -10,6 +11,11 @@ export class MarkConversationReadUntilMessage {
     private readonly messageId: string,
     private readonly actorIdentityId: string,
     private readonly occurredAt: number,
+    /** The conversation the reader has open, when the client holds one. */
+    private readonly openConversation: null | {
+      id: string;
+      type: string;
+    } = null,
   ) {}
 
   public getActorIdentityId(): ConversationParticipantId {
@@ -26,5 +32,17 @@ export class MarkConversationReadUntilMessage {
 
   public getOccurredAt(): Timestamp {
     return new Timestamp(this.occurredAt);
+  }
+
+  public getOpenConversation(): null | {
+    id: ConversationId;
+    type: ConversationType;
+  } {
+    if (!this.openConversation) return null;
+
+    return {
+      id: ConversationId.fromString(this.openConversation.id),
+      type: ConversationType.fromPrimitives(this.openConversation.type),
+    };
   }
 }

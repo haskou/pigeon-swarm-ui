@@ -40,6 +40,7 @@ import { ConversationIdFactory } from '../../contexts/conversations/domain/Conve
 import { ConversationAccessContexts } from '../../contexts/conversations/infrastructure/http/ConversationAccessContexts';
 import { ConversationMapper } from '../../contexts/conversations/infrastructure/http/ConversationMapper';
 import { PigeonConversationRepository } from '../../contexts/conversations/infrastructure/http/PigeonConversationRepository';
+import { MailboxConversationReadReceiptRepository } from '../../contexts/conversations/infrastructure/mailbox/MailboxConversationReadReceiptRepository';
 import { IdentityPresenceFinder } from '../../contexts/identities/application/find-identity-presence/IdentityPresenceFinder';
 import { IdentityFinder } from '../../contexts/identities/application/find-identity/IdentityFinder';
 import { DeviceUnlockForgetter } from '../../contexts/identities/application/forget-device-unlock/DeviceUnlockForgetter';
@@ -307,7 +308,13 @@ export class PigeonApplication {
         participantRemover: new ConversationParticipantRemover(
           conversationRepository,
         ),
-        readMarker: new ConversationReadMarker(conversationRepository),
+        readMarker: new ConversationReadMarker(
+          conversationRepository,
+          new MailboxConversationReadReceiptRepository(
+            conversationContexts,
+            gateway.directMessageMailbox,
+          ),
+        ),
         searcher: new ConversationsSearcher(conversationRepository),
       },
     );
