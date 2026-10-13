@@ -52,6 +52,10 @@ export class DevicePairingResource {
     return value;
   }
 
+  public getOptionalString(name: string): string | undefined {
+    return this.values[name] === undefined ? undefined : this.getString(name);
+  }
+
   public getResource(name: string): DevicePairingResource {
     return DevicePairingResource.fromUnknown(
       this.values[name],

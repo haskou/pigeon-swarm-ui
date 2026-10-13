@@ -15,6 +15,7 @@ import type { IdentityPassword } from '../../domain/value-objects/IdentityPasswo
 import type { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
 import type { Session } from '../session/Session';
 import type { DeviceIdentityVault } from '../storage/DeviceIdentityVault';
+import type { CompletedDevicePairing } from './CompletedDevicePairing';
 import type { DevicePairingAuthorization } from './DevicePairingAuthorization';
 import type { IdentityResource } from './resources/IdentityResource';
 
@@ -219,6 +220,7 @@ export class PigeonDeviceAuthorizationApi {
   public async authorizePairing(
     session: Session,
     requestCode: DevicePairingCode,
+    historyTransferSecret?: SymmetricKey,
   ): Promise<DevicePairingAuthorization> {
     const acceptedAt = new Timestamp(this.clock());
     const request = DevicePairingRequest.fromCode(requestCode, acceptedAt);
@@ -254,6 +256,7 @@ export class PigeonDeviceAuthorizationApi {
     const completion = DevicePairingCompletion.create({
       author: session.deviceCredentialKeyPair,
       checkpoint,
+      historyTransferSecret,
       identityKeyPair: session.keyPair,
       recoveryAuthorityKeyPair: session.recoveryAuthorityKeyPair,
       request,
@@ -275,7 +278,7 @@ export class PigeonDeviceAuthorizationApi {
     password: IdentityPassword,
     draft: DevicePairingRequestDraft,
     completionCode: DevicePairingCode,
-  ): Promise<Session> {
+  ): Promise<CompletedDevicePairing> {
     draft.reserve();
 
     try {
@@ -336,8 +339,11 @@ export class PigeonDeviceAuthorizationApi {
       draft.consume();
 
       return {
-        ...pendingSession,
-        deviceId: vaultSession.deviceId,
+        historyTransferSecret: material.getHistoryTransferSecret(),
+        session: {
+          ...pendingSession,
+          deviceId: vaultSession.deviceId,
+        },
       };
     } catch (error) {
       draft.release();
