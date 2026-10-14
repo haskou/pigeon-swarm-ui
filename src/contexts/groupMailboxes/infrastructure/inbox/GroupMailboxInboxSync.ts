@@ -68,6 +68,13 @@ export class GroupMailboxInboxSync {
   public static readonly MAX_ROUNDS = 8;
   public static readonly PAGE_SIZE = 50;
 
+  /** Record types any member may send under its own id. */
+  private static readonly UNCLAIMED: ReadonlySet<string> = new Set([
+    DirectMailboxRecords.TYPE.pin,
+    DirectMailboxRecords.TYPE.pollVote,
+    DirectMailboxRecords.TYPE.reaction,
+  ]);
+
   /** Sibling readers enrolled this app session, by mailbox and reader. */
   private readonly enrolled = new Set<string>();
   /** Drained inboxes a sibling still reads, left alone this app session. */
@@ -76,8 +83,9 @@ export class GroupMailboxInboxSync {
   /**
    * Whether `sender` may send `record`: only under an id it owns; an edit
    * or a deletion only for its own message, a message or a poll only under
-   * an id no other author holds, a poll close only for its own poll. Read
-   * receipts have no meaning in a group.
+   * an id no other author holds, a poll close only for its own poll; pins,
+   * votes and reactions from any member. Read receipts have no meaning in
+   * a group, and any other type is refused.
    */
   private static async authorized(
     record: DirectMessageRecord,
@@ -95,12 +103,8 @@ export class GroupMailboxInboxSync {
         return authors.owns(record.targetMessageId, sender);
       case DirectMailboxRecords.TYPE.pollClose:
         return authors.owns(record.targetPollId, sender);
-      case DirectMailboxRecords.TYPE.pin:
-      case DirectMailboxRecords.TYPE.pollVote:
-      case DirectMailboxRecords.TYPE.reaction:
-        return true;
-      case DirectMailboxRecords.TYPE.read:
-        return false;
+      default:
+        return GroupMailboxInboxSync.UNCLAIMED.has(record.type);
     }
   }
 

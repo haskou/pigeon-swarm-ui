@@ -38,11 +38,7 @@ export function applyDirectMessageTimelineChanges(
               )
             : message,
         );
-      case 'pin':
-      case 'poll':
-      case 'poll_close':
-      case 'poll_vote':
-      case 'read':
+      default:
         return messages;
     }
   }, current);

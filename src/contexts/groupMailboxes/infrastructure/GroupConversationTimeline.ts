@@ -41,6 +41,21 @@ export class GroupConversationTimeline {
     ];
   }
 
+  private pollChanges(
+    record: DirectMessageRecord,
+  ): DirectMessageTimelineChange[] {
+    switch (record.type) {
+      case DirectMailboxRecords.TYPE.poll:
+        return [this.poll(record)];
+      case DirectMailboxRecords.TYPE.pollVote:
+        return [this.pollVote(record)];
+      case DirectMailboxRecords.TYPE.pollClose:
+        return [this.pollClose(record)];
+      default:
+        return [];
+    }
+  }
+
   public poll(
     record: DirectPollRecord,
   ): Extract<DirectMessageTimelineChange, { kind: 'poll' }> {
@@ -109,14 +124,8 @@ export class GroupConversationTimeline {
               messageId: record.targetMessageId,
             },
           ];
-        case DirectMailboxRecords.TYPE.poll:
-          return [this.poll(record)];
-        case DirectMailboxRecords.TYPE.pollVote:
-          return [this.pollVote(record)];
-        case DirectMailboxRecords.TYPE.pollClose:
-          return [this.pollClose(record)];
-        case DirectMailboxRecords.TYPE.read:
-          return [];
+        default:
+          return this.pollChanges(record);
       }
     });
   }

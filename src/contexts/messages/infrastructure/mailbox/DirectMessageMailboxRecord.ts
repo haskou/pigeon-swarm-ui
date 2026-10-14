@@ -248,6 +248,13 @@ function isDirectMessageRecord(value: unknown): value is DirectMessageRecord {
       return isReactionFields(value);
     case 'pin':
       return isPinFields(value);
+    default:
+      return isPollRecord(value);
+  }
+}
+
+function isPollRecord(value: Record<string, unknown>): boolean {
+  switch (value.type) {
     case 'poll':
       return isPollFields(value);
     case 'poll_vote':
