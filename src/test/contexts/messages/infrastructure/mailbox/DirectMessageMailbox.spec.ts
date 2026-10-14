@@ -3550,7 +3550,7 @@ describe(DirectMessageMailbox.name, () => {
       const { projection } = setup();
       const laptop = 'device-credential-bob-laptop';
       const devices = [credentialFor('bob'), laptop];
-      const { wire } = nodeMailboxClient();
+      const { appends, wire } = nodeMailboxClient();
       const phone = mailboxFor(wire, memoryStore(), projection, devices);
       const phoneApplied: string[][] = [];
       const laptopApplied: string[][] = [];
@@ -3565,6 +3565,7 @@ describe(DirectMessageMailbox.name, () => {
         'hello',
         {},
       );
+      await until(() => appends() === 1);
       await syncPass(phone, session('bob'), (changes) => {
         phoneApplied.push(messageIds(changes));
       });
@@ -3596,7 +3597,7 @@ describe(DirectMessageMailbox.name, () => {
       it('locks the revoked device out of records written once it resolves, before any read', async () => {
         const keys = keysFor('bob');
         const { projection } = setup();
-        const { readerHashes, wire } = nodeMailboxClient();
+        const { appends, readerHashes, wire } = nodeMailboxClient();
         const composed = composedRecords();
         const sender = mailboxFor(
           wire,
@@ -3625,6 +3626,7 @@ describe(DirectMessageMailbox.name, () => {
         );
         await laptopPass();
         await sender.send(session('alice'), conversation, 'hello', {});
+        await until(() => appends() === 1);
         await laptopPass();
         expect(laptopApplied).toEqual([['message-1']]);
 
@@ -3649,6 +3651,7 @@ describe(DirectMessageMailbox.name, () => {
           previousMessageIds: ['message-1'],
         };
         await sender.send(session('alice'), conversation, 'hello', {});
+        await until(() => appends() === 2);
         await laptopPass();
         expect(laptopApplied).toEqual([['message-1']]);
       });
