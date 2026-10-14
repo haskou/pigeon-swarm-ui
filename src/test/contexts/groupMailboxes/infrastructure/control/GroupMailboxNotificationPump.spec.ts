@@ -1,5 +1,7 @@
+import 'fake-indexeddb/auto';
 import { EncryptedPayload, KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
+import { randomUUID } from 'node:crypto';
 
 import type { GroupMailboxControl } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControl';
 import type { GroupMailboxControlFields } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlFields';
@@ -10,8 +12,10 @@ import type { NotificationResource } from '../../../../../contexts/notifications
 import { GroupMailboxControl as Control } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControl';
 import { GroupMailboxControlRecord } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlRecord';
 import { GroupMailboxControlSeal } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlSeal';
+import { GroupMailboxLetterClaims } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxLetterClaims';
 import { GroupMailboxNotificationPump } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxNotificationPump';
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
+import { DeviceSealedEntryStore } from '../../../../../contexts/messages/infrastructure/mailbox/DeviceSealedEntryStore';
 
 type Person = { id: string; keyPair: KeyPair; session: Session };
 type Letter = {
@@ -32,6 +36,13 @@ const REQUEST: GroupMailboxControlFields = {
   requestId: REQUEST_ID,
   type: 'key-package-request',
 };
+const RESPONSE: GroupMailboxControlFields = {
+  conversationId: CONVERSATION,
+  keyPackage: new Uint8Array([1]),
+  requestId: REQUEST_ID,
+  type: 'key-package-response',
+};
+const WINDOW = GroupMailboxNotificationPump.ANSWER_WINDOW_MS;
 
 const person = async (): Promise<Person> => {
   const keyPair = await KeyPair.generate();
@@ -40,7 +51,11 @@ const person = async (): Promise<Person> => {
   return {
     id,
     keyPair,
-    session: { identity: { id }, keyPair } as unknown as Session,
+    session: {
+      deviceSealedRootKey: { getBuffer: () => Buffer.alloc(32, 7) },
+      identity: { id },
+      keyPair,
+    } as unknown as Session,
   };
 };
 
@@ -85,9 +100,21 @@ const notification = (letter: Letter): NotificationResource => {
   };
 };
 
-const setup = (pages: NotificationResource[][]) => {
+/** This device's handled letters, in the IndexedDB database `database`. */
+const entries = (database: string) =>
+  new DeviceSealedEntryStore(database, 'pigeon-group-control');
+
+/**
+ * A pump of one session of Bob's device. Sessions given the same `database`
+ * share the device's handled letters, as after a reload or in another tab.
+ */
+const setup = (
+  pages: NotificationResource[][],
+  device: { database?: string; now?: number } = {},
+) => {
   const control = mock<Pick<GroupMailboxControl, 'receiveDirect'>>();
   const notifications = mock<GroupMailboxNotificationPages>();
+  const database = device.database ?? `group-control-${randomUUID()}`;
 
   control.receiveDirect.mockResolvedValue('applied');
   notifications.listPage.mockImplementation((_session, _limit, before) => {
@@ -106,7 +133,8 @@ const setup = (pages: NotificationResource[][]) => {
       bob.session,
       control,
       notifications,
-      () => NOW,
+      new GroupMailboxLetterClaims(entries(database), () => bob.session),
+      () => device.now ?? NOW,
     ),
   };
 };
@@ -116,6 +144,89 @@ beforeAll(async () => {
 });
 
 describe('GroupMailboxNotificationPump', () => {
+  describe('on one device across reloads and sessions', () => {
+    it.each([
+      ['request', REQUEST],
+      ['response', RESPONSE],
+    ])(
+      'does not hand a replayed %s over again within its answer window',
+      async (_kind, record) => {
+        const database = `group-control-${randomUUID()}`;
+        const before = setup(
+          [[notification({ from: alice, id: 'n1', record })]],
+          {
+            database,
+          },
+        );
+
+        await before.pump.run();
+        const reloaded = setup(
+          [
+            [
+              notification({ from: alice, id: 'n1', record }),
+              notification({ from: alice, id: 'n1-reposted', record }),
+            ],
+          ],
+          { database, now: NOW + WINDOW },
+        );
+
+        await reloaded.pump.run();
+
+        expect(before.control.receiveDirect).toHaveBeenCalledTimes(1);
+        expect(reloaded.control.receiveDirect).not.toHaveBeenCalled();
+      },
+    );
+
+    it('lets one of two concurrent sessions hand a letter over', async () => {
+      const database = `group-control-${randomUUID()}`;
+      const sessions = [
+        setup([[notification({ from: alice, id: 'n1' })]], { database }),
+        setup([[notification({ from: alice, id: 'n1' })]], { database }),
+      ];
+
+      await Promise.all(sessions.map(({ pump }) => pump.run()));
+
+      expect(
+        sessions.flatMap(({ control }) => control.receiveDirect.mock.calls),
+      ).toHaveLength(1);
+    });
+
+    it('hands a letter over after a reload when its handling failed', async () => {
+      const database = `group-control-${randomUUID()}`;
+      const failed = setup([[notification({ from: alice, id: 'n1' })]], {
+        database,
+      });
+
+      failed.control.receiveDirect.mockRejectedValueOnce(new Error('offline'));
+      await failed.pump.run();
+      const reloaded = setup([[notification({ from: alice, id: 'n1' })]], {
+        database,
+      });
+
+      await reloaded.pump.run();
+
+      expect(reloaded.control.receiveDirect).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps a handled letter until its answer window ended', async () => {
+      const database = `group-control-${randomUUID()}`;
+
+      await setup([[notification({ from: alice, id: 'n1' })]], {
+        database,
+      }).pump.run();
+      await setup([[]], { database, now: NOW + WINDOW }).pump.run();
+
+      await expect(
+        entries(database).list(bob.session, 'control-letter'),
+      ).resolves.toHaveLength(1);
+      await setup([[]], { database, now: NOW + WINDOW + 1 }).pump.run();
+
+      await expect(
+        entries(database).list(bob.session, 'control-letter'),
+      ).resolves.toEqual([]);
+    });
+  });
+
   it('hands a fresh signed record to the control as its sender', async () => {
     const { control, pump } = setup([
       [notification({ from: alice, id: 'n1' })],
