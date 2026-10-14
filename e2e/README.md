@@ -52,7 +52,12 @@ declined when the callee leaves the page) and `group-conversation.spec.ts`
 (three users share a group conversation over MLS and per-member mailboxes,
 each message reaches the other two, and after the creator removes one member a
 later message reaches the remaining member and never shows in the removed
-member's page during 90 s of polling) run against a real node. Login,
+member's page during 90 s of polling; and a member pairs a second device,
+which joins the group through its own leaf without a re-invite, so both
+devices read the group and the second device's message reaches the others
+once; after the first device revokes it, a commit removes its leaf, it never
+shows a message sent after the revoke, and the remaining device keeps reading
+after a reload) run against a real node. Login,
 direct-message sync, the outbox spec and the security audit run on
 `desktop-chromium`, `desktop-firefox` and `mobile-chromium`; the call, revoke,
 community kick and group conversation specs run on `desktop-chromium`. On
