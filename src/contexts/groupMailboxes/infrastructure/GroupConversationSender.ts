@@ -1,9 +1,11 @@
 import type { ConversationResource } from '../../conversations/infrastructure/http/ConversationResource';
 import type { DirectMessageRecord } from '../../mailboxes/domain/DirectMessageRecord';
+import type { ChatMessage } from '../../messages/domain/ChatMessage';
+import type { MessagePinChange } from '../../messages/domain/MessagePinChange';
+import type { MessageReactionChange } from '../../messages/domain/MessageReactionChange';
 import type { MessagePayloadSeal } from '../../messages/infrastructure/crypto/MessagePayloadSeal';
 import type { EditMessageOptions } from '../../messages/infrastructure/http/resources/EditMessageOptions';
 import type { SendMessageOptions } from '../../messages/infrastructure/http/resources/SendMessageOptions';
-import type { ChatMessage } from '../../messages/presentation/view-models/ChatMessage';
 import type { GroupConversationMember } from './GroupConversationMember';
 import type { GroupConversationPorts } from './GroupConversationPorts';
 import type { GroupMessageHistoryStore } from './history/GroupMessageHistoryStore';
@@ -141,22 +143,17 @@ export class GroupConversationSender {
   public async reaction(
     member: GroupConversationMember,
     conversationId: string,
-    reaction: {
-      action: 'add' | 'remove';
-      createdAt: number;
-      emoji: string;
-      messageId: string;
-    },
+    reaction: MessageReactionChange,
   ): Promise<void> {
     await this.write(
       member,
       DirectMailboxRecords.reaction({
-        action: reaction.action,
+        action: reaction.getAction().isAdd() ? 'add' : 'remove',
         authorId: member.session.identity.id,
         conversationId,
-        createdAt: reaction.createdAt,
-        emoji: reaction.emoji,
-        targetMessageId: reaction.messageId,
+        createdAt: reaction.getCreatedAt().valueOf(),
+        emoji: reaction.getEmoji().toString(),
+        targetMessageId: reaction.getMessageId().toString(),
       }),
     );
   }
@@ -164,16 +161,16 @@ export class GroupConversationSender {
   public async pin(
     member: GroupConversationMember,
     conversationId: string,
-    pin: { action: 'pin' | 'unpin'; createdAt: number; messageId: string },
+    pin: MessagePinChange,
   ): Promise<void> {
     await this.write(
       member,
       DirectMailboxRecords.pin({
-        action: pin.action,
+        action: pin.getAction().isPin() ? 'pin' : 'unpin',
         authorId: member.session.identity.id,
         conversationId,
-        createdAt: pin.createdAt,
-        targetMessageId: pin.messageId,
+        createdAt: pin.getCreatedAt().valueOf(),
+        targetMessageId: pin.getMessageId().toString(),
       }),
     );
   }

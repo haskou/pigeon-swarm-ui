@@ -12,8 +12,8 @@ import {
 import type { EditingMessage } from '../../../../../app/presentation/workspace/components/conversationThreadState';
 import type { ConversationResource } from '../../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
+import type { ChatMessage } from '../../../../../contexts/messages/domain/ChatMessage';
 import type { MessageResource } from '../../../../../contexts/messages/infrastructure/http/MessageResource';
-import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
 
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';
 import { useConversationMessageActions } from '../../../../../app/presentation/workspace/components/useConversationMessageActions';
@@ -60,7 +60,6 @@ const addReactionUseCase = jest.mocked(
 const removeReactionUseCase = jest.mocked(
   applicationContainer.messages.removeReactionFrom,
 );
-const now = 1_700_000_000_000;
 
 const session = { identity: { id: 'identity-1' } } as unknown as Session;
 const conversation = {
@@ -156,7 +155,6 @@ function mountActions({
 describe('useConversationMessageActions', () => {
   beforeEach(() => {
     jest.resetAllMocks();
-    jest.spyOn(Date, 'now').mockReturnValue(now);
   });
 
   afterEach(() => {
@@ -319,7 +317,7 @@ describe('useConversationMessageActions', () => {
 
       expect(groupReaction).toHaveBeenCalledWith(session, groupConversation, {
         action: 'add',
-        createdAt: now,
+
         emoji: '👍',
         messageId: 'message-1',
       });

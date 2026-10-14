@@ -1,6 +1,6 @@
 import type { ConversationResource } from '../../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
-import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../../../contexts/messages/domain/ChatMessage';
 
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';
 import { ConversationMessageCommands } from '../../../../../app/presentation/workspace/components/ConversationMessageCommands';
@@ -37,12 +37,10 @@ const directConversation = {
   type: 'one-to-one',
 } as unknown as ConversationResource;
 const edited = { id: 'message-1' } as unknown as ChatMessage;
-const now = 1_700_000_000_000;
 
 describe('ConversationMessageCommands', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.spyOn(Date, 'now').mockReturnValue(now);
   });
 
   afterEach(() => {
@@ -134,7 +132,6 @@ describe('ConversationMessageCommands', () => {
 
     expect(group.reaction).toHaveBeenCalledWith(session, groupConversation, {
       action: 'remove',
-      createdAt: now,
       emoji: '👍',
       messageId: 'message-1',
     });
@@ -186,7 +183,6 @@ describe('ConversationMessageCommands', () => {
 
     expect(group.pin).toHaveBeenCalledWith(session, groupConversation, {
       action: 'unpin',
-      createdAt: now,
       messageId: 'message-1',
     });
     expect(legacy.unpin).not.toHaveBeenCalled();

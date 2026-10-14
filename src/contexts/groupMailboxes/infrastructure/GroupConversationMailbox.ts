@@ -1,12 +1,18 @@
 import type { ConversationResource } from '../../conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../identities/infrastructure/session/Session';
+import type { ChatMessage } from '../../messages/domain/ChatMessage';
 import type { EditMessageOptions } from '../../messages/infrastructure/http/resources/EditMessageOptions';
 import type { SendMessageOptions } from '../../messages/infrastructure/http/resources/SendMessageOptions';
-import type { ChatMessage } from '../../messages/presentation/view-models/ChatMessage';
 import type { GroupConversationPorts } from './GroupConversationPorts';
 import type { GroupConversationSyncOutcome } from './GroupConversationSyncOutcome';
 import type { GroupTimelineApply } from './GroupTimelineApply';
 
+import { MessagePinChange } from '../../messages/domain/MessagePinChange';
+import { MessageReactionChange } from '../../messages/domain/MessageReactionChange';
+import { MessageId } from '../../messages/domain/value-objects/MessageId';
+import { MessagePinAction } from '../../messages/domain/value-objects/MessagePinAction';
+import { MessageReactionAction } from '../../messages/domain/value-objects/MessageReactionAction';
+import { MessageReactionEmoji } from '../../messages/domain/value-objects/MessageReactionEmoji';
 import { GroupConversationMember } from './GroupConversationMember';
 import { GroupConversationSender } from './GroupConversationSender';
 import { GroupConversationStores } from './GroupConversationStores';
@@ -157,23 +163,33 @@ export class GroupConversationMailbox {
   public async reaction(
     session: Session,
     conversation: ConversationResource,
-    reaction: {
-      action: 'add' | 'remove';
-      createdAt: number;
-      emoji: string;
-      messageId: string;
-    },
+    reaction: { action: 'add' | 'remove'; emoji: string; messageId: string },
   ): Promise<void> {
-    await this.sender.reaction(this.member(session), conversation.id, reaction);
+    await this.sender.reaction(
+      this.member(session),
+      conversation.id,
+      MessageReactionChange.now(
+        MessageReactionAction.fromPrimitives(reaction.action),
+        MessageReactionEmoji.fromString(reaction.emoji),
+        MessageId.fromString(reaction.messageId),
+      ),
+    );
   }
 
   /** Queues a pin or unpin. Rejects like send. */
   public async pin(
     session: Session,
     conversation: ConversationResource,
-    pin: { action: 'pin' | 'unpin'; createdAt: number; messageId: string },
+    pin: { action: 'pin' | 'unpin'; messageId: string },
   ): Promise<void> {
-    await this.sender.pin(this.member(session), conversation.id, pin);
+    await this.sender.pin(
+      this.member(session),
+      conversation.id,
+      MessagePinChange.now(
+        MessagePinAction.fromPrimitives(pin.action),
+        MessageId.fromString(pin.messageId),
+      ),
+    );
   }
 
   /** Replays the stored history. Never throws. */
