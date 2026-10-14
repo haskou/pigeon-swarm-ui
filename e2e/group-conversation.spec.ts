@@ -2,10 +2,14 @@ import { expect, test, type Page } from '@playwright/test';
 
 import {
   conversationRow,
+  loginIdentity,
   newIsolatedPage,
   openSidebar,
+  pairNewDevice,
   registerIdentity,
+  revokeOtherDevice,
   sendMessage,
+  type TestIdentity,
 } from './support/pigeonApp';
 
 // Control letters (key package request and response, welcome) are polled
@@ -154,4 +158,59 @@ test('a member removed from a group conversation stops reading it', async ({
   // Carol stays on the page and keeps polling; the plaintext must never show.
   await carol.waitForTimeout(90_000);
   await expect(carol.getByText('after removal')).toHaveCount(0);
+});
+
+test('a group keeps reading across a revoke and reload, without the revoked device', async ({
+  browser,
+}) => {
+  test.setTimeout(900_000);
+  const suffix = Date.now().toString(36);
+  const password = `P455uruD3su!${suffix}`;
+  const groupName = `Group ${suffix}`;
+  const bob: TestIdentity = {
+    handle: `bo${suffix}`,
+    name: `Bob ${suffix}`,
+    password,
+  };
+  const alice = await newIsolatedPage(browser);
+  const phone = await newIsolatedPage(browser);
+  const laptop = await newIsolatedPage(browser);
+
+  try {
+    await registerIdentity(alice, {
+      handle: `al${suffix}`,
+      name: `Alice ${suffix}`,
+      password,
+    });
+    await registerIdentity(phone, bob);
+
+    // Groups assume one device per identity (node D19), so Bob joins on the
+    // phone alone and pairs the laptop afterwards.
+    await createGroup(alice, groupName, [bob.handle]);
+    await openGroup(alice, groupName);
+    await openGroup(phone, groupName);
+    await sendUntilEveryoneReads(alice, [phone], 'hello from Alice');
+    await pairNewDevice(phone, laptop, bob);
+
+    // The revoke rotates the device-sealed root; after the reload the phone
+    // reads its group inboxes with readers of the new root.
+    await revokeOtherDevice(phone);
+    await phone.getByRole('button', { name: 'Close dialog' }).last().click();
+    await loginIdentity(phone, `@${bob.handle}`, password);
+    await openGroup(phone, groupName);
+
+    await sendMessage(alice, 'after the revoke');
+    await expect(
+      phone.getByText('after the revoke', { exact: true }),
+    ).toBeVisible({ timeout: SLOW });
+
+    // The revoked laptop keeps its old root and keeps polling; the plaintext
+    // must never show.
+    await laptop.waitForTimeout(60_000);
+    await expect(laptop.getByText('after the revoke')).toHaveCount(0);
+  } finally {
+    await alice.context().close();
+    await phone.context().close();
+    await laptop.context().close();
+  }
 });

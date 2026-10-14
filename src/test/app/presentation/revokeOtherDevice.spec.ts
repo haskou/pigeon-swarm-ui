@@ -15,15 +15,18 @@ const target = {} as DeviceCredential;
 
 function services(): {
   directMessages: MockProxy<DeviceRevokeServices['directMessages']>;
+  groupMessages: MockProxy<DeviceRevokeServices['groupMessages']>;
   identities: MockProxy<DeviceRevokeServices['identities']>;
 } {
   const directMessages = mock<DeviceRevokeServices['directMessages']>();
+  const groupMessages = mock<DeviceRevokeServices['groupMessages']>();
   const identities = mock<DeviceRevokeServices['identities']>();
 
   identities.revokeDevice.mockResolvedValue(rotated);
   directMessages.cutOffRevokedReaders.mockResolvedValue(undefined);
+  groupMessages.cutOffRevokedReaders.mockResolvedValue(undefined);
 
-  return { directMessages, identities };
+  return { directMessages, groupMessages, identities };
 }
 
 describe('revokeOtherDevice', () => {
@@ -64,6 +67,9 @@ describe('revokeOtherDevice', () => {
     expect(revoke.directMessages.cutOffRevokedReaders).toHaveBeenCalledWith(
       rotated,
     );
+    expect(revoke.groupMessages.cutOffRevokedReaders).toHaveBeenCalledWith(
+      rotated,
+    );
   });
 
   it('hands over the rotated session and reports a failed cut-off', async () => {
@@ -83,6 +89,24 @@ describe('revokeOtherDevice', () => {
     expect(rotations).toEqual([rotated]);
   });
 
+  it('reports a failed group cut-off after cutting off the direct inboxes', async () => {
+    const revoke = services();
+
+    revoke.groupMessages.cutOffRevokedReaders.mockRejectedValue(
+      new Error('node down'),
+    );
+
+    await expect(
+      revokeOtherDevice(
+        { onRotated: () => undefined, session, target },
+        revoke,
+      ),
+    ).resolves.toEqual({ cutOff: false, session: rotated });
+    expect(revoke.directMessages.cutOffRevokedReaders).toHaveBeenCalledWith(
+      rotated,
+    );
+  });
+
   it('rejects without a cut-off when the revoke fails', async () => {
     const revoke = services();
     const rotations: Session[] = [];
@@ -97,5 +121,6 @@ describe('revokeOtherDevice', () => {
     ).rejects.toThrow('refused');
     expect(rotations).toEqual([]);
     expect(revoke.directMessages.cutOffRevokedReaders).not.toHaveBeenCalled();
+    expect(revoke.groupMessages.cutOffRevokedReaders).not.toHaveBeenCalled();
   });
 });

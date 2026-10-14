@@ -19,11 +19,14 @@ import { GroupConversationMailbox } from '../../../../contexts/groupMailboxes/in
 import { GroupMessageHistoryStore } from '../../../../contexts/groupMailboxes/infrastructure/history/GroupMessageHistoryStore';
 import { GroupMailboxOutbox } from '../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutbox';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
+import { sessionRootKey } from '../../../../contexts/identities/infrastructure/session/sessionRootKey';
 import { MailboxUnavailableError } from '../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
 import { MailboxCapability } from '../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
+import { MailboxReadToken } from '../../../../contexts/mailboxes/infrastructure/crypto/MailboxReadToken';
 import { MailboxChannel } from '../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { MessageProjector } from '../../../../contexts/messages/infrastructure/crypto/MessageProjector';
 import { PigeonMessageCommandsApi } from '../../../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
+import { DirectMessageReaderSet } from '../../../../contexts/messages/infrastructure/mailbox/DirectMessageReaderSet';
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 
@@ -98,6 +101,20 @@ const fakeMailboxes = (): void => {
   wire.addReader.mockImplementation((mailboxId, token, readTokenHash) =>
     Promise.resolve().then(() => {
       readable(mailboxId, token).readers.add(readTokenHash);
+    }),
+  );
+  wire.readers.mockImplementation((mailboxId, token) =>
+    Promise.resolve().then(() => ({
+      maxReaders: 16,
+      readers: [...readable(mailboxId, token).readers].map((readTokenHash) => ({
+        ackedCursor: 0,
+        readTokenHash,
+      })),
+    })),
+  );
+  wire.removeReader.mockImplementation((mailboxId, token, readTokenHash) =>
+    Promise.resolve().then(() => {
+      readable(mailboxId, token).readers.delete(readTokenHash);
     }),
   );
   wire.append.mockImplementation((mailboxId, _postToken, input) => {
@@ -221,6 +238,9 @@ const device = (storage: string): GroupConversationMailbox =>
     },
     now: () => now,
     projector: new MessageProjector(copy.messages),
+    readerSet: new DirectMessageReaderSet(channel, (owner) =>
+      Promise.resolve([owner.deviceCredentialKeyPair.toPrimitives().publicKey]),
+    ),
     roster: (owner) =>
       Promise.resolve(
         roster.has(owner.identity.id)
@@ -714,9 +734,46 @@ describe('GroupConversationMailbox', () => {
     } as unknown as Session;
     await bob.mailbox.send(bob.session, conversation(), 'still here', {});
     await sync(alice);
+    await alice.mailbox.send(alice.session, conversation(), 'reloaded', {});
+    await sync(bob);
 
-    expect(texts(bob)).toEqual(['message:revoked']);
+    expect(texts(bob)).toEqual([
+      'message:revoked',
+      'message:still here',
+      'message:reloaded',
+    ]);
     expect(texts(alice)).toContain('message:still here');
+  });
+
+  it('cuts the replaced root off its own group inboxes after a revoke', async () => {
+    await formGroup();
+    const replacedRoot = sessionRootKey(bob.session).getBuffer();
+
+    wire.read.mockClear();
+    await sync(bob);
+    const replaced = wire.read.mock.calls.flatMap(([mailboxId, token]) => [
+      { mailboxId, token },
+      { mailboxId, token: MailboxReadToken.derive(replacedRoot, mailboxId) },
+    ]);
+
+    bob.session = {
+      ...bob.session,
+      deviceSealedRootKey: { getBuffer: () => Buffer.alloc(32, 200) },
+      previousDeviceSealedRootKey: bob.session.deviceSealedRootKey,
+    } as unknown as Session;
+    await bob.mailbox.cutOffRevokedReaders(bob.session);
+    await alice.mailbox.send(alice.session, conversation(), 'after', {});
+
+    expect(replaced).not.toHaveLength(0);
+
+    for (const { mailboxId, token } of replaced) {
+      await expect(wire.read(mailboxId, token, 0, 50)).rejects.toThrow(
+        MailboxUnavailableError,
+      );
+    }
+    await sync(bob);
+
+    expect(texts(bob)).toEqual(['message:after']);
   });
 
   it('drops the groups under a root it cannot trace back', async () => {

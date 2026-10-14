@@ -221,7 +221,9 @@ export class DeviceSealedEntryStore {
           held.result.buffer,
           held.result.byteOffset,
           held.result.byteLength,
-        ).equals(canary)
+        ).equals(
+          Buffer.from(canary.buffer, canary.byteOffset, canary.byteLength),
+        )
       ) {
         transaction.abort();
 

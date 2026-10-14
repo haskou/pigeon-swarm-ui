@@ -8,7 +8,9 @@ import type {
   MailboxReadTokens,
   OpenedMailboxPage,
 } from '../../../mailboxes/infrastructure/MailboxChannel';
+import type { DirectMessageReaderSet } from '../../../messages/infrastructure/mailbox/DirectMessageReaderSet';
 import type { GroupMailboxGeneration } from '../../domain/GroupMailboxGeneration';
+import type { GroupMailboxGenerationRepository } from '../../domain/repositories/GroupMailboxGenerationRepository';
 import type { GroupMailboxControl } from '../control/GroupMailboxControl';
 import type { GroupMessageHistoryStore } from '../history/GroupMessageHistoryStore';
 import type { GroupMailboxMlsEngine } from '../mls/GroupMailboxMlsEngine';
@@ -46,6 +48,12 @@ import { GroupMessageAuthors } from './GroupMessageAuthors';
  * adding one needs a bounded local buffer of such envelopes, acknowledged,
  * and retried after the next applied commit. Inboxes whose drain window
  * closed are deleted. Logs carry counts only.
+ *
+ * Readers derive from the session's device-sealed root, read on each pass,
+ * so a revoke's rotation applies at once. Before an inbox is read, the
+ * device reader is enrolled under the root reader, bridged through the root
+ * the revoke replaced (`DirectMessageReaderSet`), and the readers no
+ * remaining device holds are pruned.
  */
 export class GroupMailboxInboxSync {
   public static readonly MAX_FAILURES = 5;
@@ -79,7 +87,7 @@ export class GroupMailboxInboxSync {
   }
 
   public constructor(
-    private readonly session: Session,
+    private readonly session: () => Session,
     private readonly engine: Pick<
       GroupMailboxMlsEngine,
       'decrypt' | 'drainedGenerations' | 'readableGenerations'
@@ -91,6 +99,14 @@ export class GroupMailboxInboxSync {
     private readonly history: Pick<
       GroupMessageHistoryStore,
       'append' | 'author'
+    >,
+    private readonly generations: Pick<
+      GroupMailboxGenerationRepository,
+      'conversationIds'
+    >,
+    private readonly readerSet: Pick<
+      DirectMessageReaderSet,
+      'cutOff' | 'enrolSealedRoot' | 'reconcile'
     >,
   ) {}
 
@@ -133,17 +149,19 @@ export class GroupMailboxInboxSync {
 
   /** Deletes this identity's inboxes whose drain window has closed. */
   private async deleteDrained(conversationId: string): Promise<void> {
+    const session = this.session();
+
     for (const generation of await this.engine.drainedGenerations(
       conversationId,
     )) {
-      const keys = this.keysFor(generation);
+      const keys = this.keysFor(session, generation);
 
       if (this.inboxes.isDeleted(keys.mailboxId)) continue;
 
       try {
         await this.client.delete(
           keys.mailboxId,
-          DirectMessageInboxKeys.readersFor(this.session, keys).root,
+          DirectMessageInboxKeys.readersFor(session, keys).root,
         );
       } catch (error: unknown) {
         if (!(error instanceof MailboxUnavailableError)) {
@@ -157,8 +175,30 @@ export class GroupMailboxInboxSync {
   }
 
   /**
+   * Enrols the device reader under the session's root, bridged from the root
+   * a revoke replaced, then prunes the readers no remaining device holds.
+   * A missing inbox is left to the read, which creates it.
+   */
+  private async bridgeReaders(
+    session: Session,
+    keys: MailboxKeys,
+    readers: MailboxReadTokens,
+  ): Promise<void> {
+    try {
+      await this.readerSet.enrolSealedRoot(session, keys, readers);
+      await this.readerSet.reconcile(session, keys, readers);
+    } catch (error: unknown) {
+      if (!(error instanceof MailboxUnavailableError)) {
+        // Count-only: no ids, content, or error details.
+        // eslint-disable-next-line no-console
+        console.debug('Group inbox reader enrol failed; retried next sync.');
+      }
+    }
+  }
+
+  /**
    * Reads one inbox to its end. True when a commit was applied, so the
-   * generations are listed again.
+   * generations are listed again. A first read creates a missing inbox.
    */
   private async drain(
     conversationId: string,
@@ -167,9 +207,12 @@ export class GroupMailboxInboxSync {
     signal: AbortSignal,
     apply: (records: DirectMessageRecord[]) => void,
   ): Promise<boolean> {
-    const keys = this.keysFor(generation);
-    const readers = DirectMessageInboxKeys.readersFor(this.session, keys);
+    const session = this.session();
+    const keys = this.keysFor(session, generation);
+    const readers = DirectMessageInboxKeys.readersFor(session, keys);
     let advanced = false;
+
+    await this.bridgeReaders(session, keys, readers);
 
     for (;;) {
       if (signal.aborted) return advanced;
@@ -181,7 +224,7 @@ export class GroupMailboxInboxSync {
         authors,
       );
 
-      await this.history.append(this.session, accepted);
+      await this.history.append(session, accepted);
 
       if (signal.aborted) return advanced;
       apply(accepted);
@@ -192,10 +235,13 @@ export class GroupMailboxInboxSync {
     }
   }
 
-  private keysFor(generation: GroupMailboxGeneration): MailboxKeys {
+  private keysFor(
+    session: Session,
+    generation: GroupMailboxGeneration,
+  ): MailboxKeys {
     return GroupMailboxKeySchedule.inbox(
       generation.secret,
-      IdentityId.fromString(this.session.identity.id),
+      IdentityId.fromString(session.identity.id),
     );
   }
 
@@ -317,6 +363,35 @@ export class GroupMailboxInboxSync {
   }
 
   /**
+   * A revoke's cut-off of this identity's readable group inboxes: bridges
+   * the rotated root in and prunes every reader no remaining device holds,
+   * so the replaced root and the revoked device stop reading them. Tries
+   * every inbox, then rejects with the first failure.
+   */
+  public async cutOffRevokedReaders(): Promise<void> {
+    const session = this.session();
+    const failures: unknown[] = [];
+
+    for (const conversationId of await this.generations.conversationIds()) {
+      for (const generation of await this.engine.readableGenerations(
+        conversationId,
+      )) {
+        const keys = this.keysFor(session, generation);
+
+        await this.readerSet
+          .cutOff(
+            session,
+            keys,
+            DirectMessageInboxKeys.readersFor(session, keys),
+          )
+          .catch((error: unknown) => failures.push(error));
+      }
+    }
+
+    if (failures.length > 0) throw failures[0];
+  }
+
+  /**
    * One pass over the conversation. `apply` receives the accepted records
    * of each page before it is acknowledged; it may see a record again after
    * a crash, so it applies records by id.
@@ -327,7 +402,7 @@ export class GroupMailboxInboxSync {
     apply: (records: DirectMessageRecord[]) => void,
   ): Promise<void> {
     const authors = new GroupMessageAuthors(
-      this.session,
+      this.session(),
       conversationId,
       this.history,
     );
