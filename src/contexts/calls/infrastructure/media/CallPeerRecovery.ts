@@ -199,11 +199,6 @@ export class CallPeerRecovery {
     }
   }
 
-  public forget(peerIdentityId: string): void {
-    this.release(peerIdentityId);
-    this.lastRestartAt.delete(peerIdentityId);
-  }
-
   private release(peerIdentityId: string): void {
     this.cancel(peerIdentityId);
     this.inFlight.get(peerIdentityId)?.abort();
@@ -211,6 +206,25 @@ export class CallPeerRecovery {
     this.attempts.delete(peerIdentityId);
     this.exhausted.delete(peerIdentityId);
     this.retryNotBefore.delete(peerIdentityId);
+  }
+
+  private isDisruptable(
+    peerIdentityId: string,
+    peer: RTCPeerConnection,
+    isCurrent: () => boolean,
+  ): boolean {
+    return (
+      isCurrent() &&
+      peer.connectionState !== 'closed' &&
+      !this.isHealthy(peer) &&
+      Boolean(peer.localDescription && peer.remoteDescription) &&
+      !this.inFlight.has(peerIdentityId)
+    );
+  }
+
+  public forget(peerIdentityId: string): void {
+    this.release(peerIdentityId);
+    this.lastRestartAt.delete(peerIdentityId);
   }
 
   public reconcile(
@@ -245,20 +259,6 @@ export class CallPeerRecovery {
         isCurrent,
       );
     }
-  }
-
-  private isDisruptable(
-    peerIdentityId: string,
-    peer: RTCPeerConnection,
-    isCurrent: () => boolean,
-  ): boolean {
-    return (
-      isCurrent() &&
-      peer.connectionState !== 'closed' &&
-      !this.isHealthy(peer) &&
-      Boolean(peer.localDescription && peer.remoteDescription) &&
-      !this.inFlight.has(peerIdentityId)
-    );
   }
 
   /**
