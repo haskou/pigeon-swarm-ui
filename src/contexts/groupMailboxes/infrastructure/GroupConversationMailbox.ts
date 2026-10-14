@@ -79,6 +79,29 @@ export class GroupConversationMailbox {
   }
 
   /**
+   * Adds this identity's listed devices that hold no leaf yet, unless the
+   * roster no longer lists this identity. Resolves how many it added.
+   */
+  private async addMissingDevices(
+    member: GroupConversationMember,
+    conversationId: string,
+    roster: GroupMailboxRoster,
+    listed: ReadonlySet<string>,
+    leaves: readonly string[],
+  ): Promise<number> {
+    if (!roster.has(member.session.identity.id)) return 0;
+    const missing = [...listed].filter(
+      (credential) => !leaves.includes(credential),
+    );
+
+    if (missing.length > 0) {
+      await member.control.addDevices(conversationId, missing);
+    }
+
+    return missing.length;
+  }
+
+  /**
    * Commits the roster and this identity's device list into the MLS group
    * when this device is the one. Logs counts only.
    */
@@ -88,7 +111,6 @@ export class GroupConversationMailbox {
     known?: GroupMailboxRoster,
   ): Promise<void> {
     const { session } = member;
-    const self = session.identity.id;
     // A device not yet welcomed has no group and nothing to commit.
     const leaves = await member.engine.devices(conversationId);
 
@@ -105,32 +127,43 @@ export class GroupConversationMailbox {
     if (revoked.length > 0) {
       await member.control.removeDevices(conversationId, revoked);
     }
-    const current = new Set(await member.engine.members(conversationId));
+    await this.reconcileMembers(member, conversationId, roster);
+    const added = await this.addMissingDevices(
+      member,
+      conversationId,
+      roster,
+      listed,
+      leaves,
+    );
 
-    if (roster.committers(current)[0] === self) {
-      const leaving = [...current].filter((id) => !roster.has(id));
-      const joining = roster.participants().filter((id) => !current.has(id));
-
-      if (leaving.length > 0)
-        await member.control.remove(conversationId, leaving);
-
-      if (joining.length > 0) await member.control.add(conversationId, joining);
-    }
-    const missing = roster.has(self)
-      ? [...listed].filter((credential) => !leaves.includes(credential))
-      : [];
-
-    if (missing.length > 0) {
-      await member.control.addDevices(conversationId, missing);
-    }
-
-    if (revoked.length > 0 || missing.length > 0) {
+    if (revoked.length > 0 || added > 0) {
       // Count-only: no ids, credentials or keys.
       // eslint-disable-next-line no-console
       console.info(
-        `Group devices reconciled: removed ${revoked.length}, added ${missing.length}.`,
+        `Group devices reconciled: removed ${revoked.length}, added ${added}.`,
       );
     }
+  }
+
+  /**
+   * Commits the roster's removals, then its adds, when this identity is the
+   * first committer holding a leaf.
+   */
+  private async reconcileMembers(
+    member: GroupConversationMember,
+    conversationId: string,
+    roster: GroupMailboxRoster,
+  ): Promise<void> {
+    const current = new Set(await member.engine.members(conversationId));
+
+    if (roster.committers(current)[0] !== member.session.identity.id) return;
+    const leaving = [...current].filter((id) => !roster.has(id));
+    const joining = roster.participants().filter((id) => !current.has(id));
+
+    if (leaving.length > 0)
+      await member.control.remove(conversationId, leaving);
+
+    if (joining.length > 0) await member.control.add(conversationId, joining);
   }
 
   /** Runs `work` after the conversation's earlier inbox reads and replays. */

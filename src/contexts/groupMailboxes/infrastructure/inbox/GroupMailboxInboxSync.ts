@@ -177,34 +177,51 @@ export class GroupMailboxInboxSync {
       const keys = this.keysFor(session, generation);
 
       if (
-        this.inboxes.isDeleted(keys.mailboxId) ||
-        this.unsettled.has(keys.mailboxId)
+        !this.inboxes.isDeleted(keys.mailboxId) &&
+        !this.unsettled.has(keys.mailboxId) &&
+        !(await this.deleteSettled(
+          keys,
+          DirectMessageInboxKeys.readersFor(session, keys),
+        ))
       ) {
-        continue;
+        waiting += 1;
       }
-      const readers = DirectMessageInboxKeys.readersFor(session, keys);
-
-      try {
-        if (!(await this.settled(keys, readers))) {
-          this.unsettled.add(keys.mailboxId);
-          waiting += 1;
-          continue;
-        }
-        await this.client.delete(keys.mailboxId, readers.root);
-      } catch (error: unknown) {
-        if (!(error instanceof MailboxUnavailableError)) {
-          // eslint-disable-next-line no-console
-          console.debug('Group inbox delete failed.');
-          continue;
-        }
-      }
-      this.inboxes.markDeleted(keys.mailboxId);
     }
 
     if (waiting > 0) {
       // eslint-disable-next-line no-console
       console.debug(`Group inboxes left to retention: ${waiting}.`);
     }
+  }
+
+  /**
+   * Deletes a drained inbox when every reader acknowledged as far as this
+   * device. Resolves false when a reader lags, and leaves the inbox to the
+   * node's retention for this app session; a failed delete is retried on the
+   * next sync.
+   */
+  private async deleteSettled(
+    keys: MailboxKeys,
+    readers: MailboxReadTokens,
+  ): Promise<boolean> {
+    try {
+      if (!(await this.settled(keys, readers))) {
+        this.unsettled.add(keys.mailboxId);
+
+        return false;
+      }
+      await this.client.delete(keys.mailboxId, readers.root);
+    } catch (error: unknown) {
+      if (!(error instanceof MailboxUnavailableError)) {
+        // eslint-disable-next-line no-console
+        console.debug('Group inbox delete failed.');
+
+        return true;
+      }
+    }
+    this.inboxes.markDeleted(keys.mailboxId);
+
+    return true;
   }
 
   /**

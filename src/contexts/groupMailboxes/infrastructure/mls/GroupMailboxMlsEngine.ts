@@ -219,7 +219,9 @@ export class GroupMailboxMlsEngine {
   /**
    * Whether `inviter` may have welcomed this device into `group`: a member
    * the roster lets add members, or another device of this identity that
-   * holds a leaf in a group with someone else in it.
+   * holds a leaf in a group with someone else in it. Joining has already
+   * checked that the roster lists the identity of every leaf, this one's
+   * included.
    */
   private mayWelcome(
     group: MlsGroup,
