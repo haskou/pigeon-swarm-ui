@@ -120,6 +120,56 @@ describe('DeviceSealedRootRotation', () => {
       expect(rotated.previousDeviceSealedRootKey).toBeUndefined();
     });
 
+    it('seals the root it replaces with the fresh one, to the devices left at the revoke revision only', async () => {
+      const { deviceAuthorization, rotation, sealedSecrets } = setup(1_000);
+      const previous = SymmetricKey.generate();
+      const revoked = { id: 'device-revoked' } as unknown as DeviceCredential;
+      const session = {
+        ...makeSession(5),
+        deviceSealedRootKey: previous,
+      } as SessionWithRoot;
+
+      deviceAuthorization.findDevices.mockImplementation((at) =>
+        Promise.resolve(
+          at.authorizationRevision.valueOf() === 5
+            ? RECIPIENTS
+            : [...RECIPIENTS, revoked],
+        ),
+      );
+
+      const rotated = await rotation.rotate(session);
+      const [, input] = sealedSecrets.publish.mock.calls[0];
+      const [root, carried, ...rest] = input.payload.split('.');
+
+      expect(input.recipients).toEqual(RECIPIENTS);
+      expect(input.recipients).not.toContain(revoked);
+      expect(rest).toEqual([]);
+      expect(
+        rotated.deviceSealedRootKey?.getBuffer().equals(decodeBase64Url(root)),
+      ).toBe(true);
+      expect(decodeBase64Url(carried).equals(previous.getBuffer())).toBe(true);
+    });
+
+    it('still seals the replaced root when a conflicting publish is retried', async () => {
+      const { deviceAuthorization, rotation, sealedSecrets } = setup(1_000);
+      const previous = SymmetricKey.generate();
+
+      deviceAuthorization.synchronize.mockResolvedValue(makeSession(6));
+      sealedSecrets.publish
+        .mockRejectedValueOnce(new HttpJsonError(409, 'Conflict', ''))
+        .mockResolvedValueOnce(undefined);
+
+      await rotation.rotate({
+        ...makeSession(5),
+        deviceSealedRootKey: previous,
+      } as SessionWithRoot);
+
+      const [, carried] =
+        sealedSecrets.publish.mock.calls[1][1].payload.split('.');
+
+      expect(decodeBase64Url(carried).equals(previous.getBuffer())).toBe(true);
+    });
+
     it('synchronizes and retries once on a conflicting publish, against the synchronized session', async () => {
       const { deviceAuthorization, rotation, sealedSecrets } = setup(1_000);
       const stale = makeSession(4);

@@ -465,11 +465,12 @@ describe(PigeonIdentitySessionApi.name, () => {
     expect(publishedBy.authorizationRevision.valueOf()).toBe(2);
     expect(publication.generation).toBe(6);
     expect(publication.recipients).toEqual(recipients);
-    expect(publication.payload).not.toBe(
-      encodeBase64Url(laggingRoot.getBuffer()),
-    );
+    const [root, replaced] = publication.payload.split('.');
+
+    expect(replaced).toBe(encodeBase64Url(laggingRoot.getBuffer()));
+    expect(root).not.toBe(replaced);
     expect(rooted.deviceSealedRootKey?.getBuffer()).toEqual(
-      decodeBase64Url(publication.payload),
+      decodeBase64Url(root),
     );
     expect(keychains.rewrapHead).toHaveBeenCalledWith(rooted, head);
     expect(store.read(currentIdentity.id)).toEqual({});

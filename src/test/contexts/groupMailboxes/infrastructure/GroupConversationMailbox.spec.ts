@@ -48,6 +48,7 @@ type Member = {
   id: string;
   mailbox: GroupConversationMailbox;
   session: Session;
+  storage: string;
 };
 
 const CONVERSATION = 'group:conversation-mls';
@@ -206,7 +207,7 @@ const composer = (): PigeonMessageCommandsApi => {
   );
 };
 
-const device = (): GroupConversationMailbox =>
+const device = (storage: string): GroupConversationMailbox =>
   new GroupConversationMailbox({
     channel,
     client: wire,
@@ -229,7 +230,7 @@ const device = (): GroupConversationMailbox =>
       Promise.resolve(
         roster.has(owner.identity.id) ? new Set(roster) : new Set<string>(),
       ),
-    storage: `group-conversation-${++devices}`,
+    storage,
   });
 
 const person = async (): Promise<Member> => {
@@ -247,7 +248,13 @@ const person = async (): Promise<Member> => {
     keyPair,
   } as unknown as Session;
 
-  return { changes: [], id, mailbox: device(), session };
+  return {
+    changes: [],
+    id,
+    mailbox: device(`group-conversation-${seed}`),
+    session,
+    storage: `group-conversation-${seed}`,
+  };
 };
 
 const turn = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -323,6 +330,10 @@ beforeEach(async () => {
   now = NOW;
   roster = new Set();
   [alice, bob, carol] = await Promise.all([person(), person(), person()]);
+});
+
+afterEach(() => {
+  for (const member of everyone()) member.mailbox.stop(member.id);
 });
 
 describe('GroupConversationMailbox', () => {
@@ -551,6 +562,62 @@ describe('GroupConversationMailbox', () => {
         message: expect.objectContaining({ content: 'kept' }),
       }),
     ]);
+  });
+
+  it('sends a queued message after a reload while the root is open', async () => {
+    await formGroup();
+    const offline = jest
+      .spyOn(channel, 'send')
+      .mockRejectedValue(new Error('offline'));
+
+    await alice.mailbox.send(alice.session, conversation(), 'queued', {});
+    alice.mailbox.stop(alice.id);
+    offline.mockRestore();
+    now += GroupMailboxOutbox.RETRY_MAX_MS;
+
+    alice.mailbox = device(alice.storage);
+    await alice.mailbox.resume(alice.session);
+    await sync(bob);
+
+    expect(texts(bob)).toEqual(['message:queued']);
+  });
+
+  it('keeps the groups when another device of the identity is revoked', async () => {
+    await formGroup();
+    const rotated = {
+      ...bob.session,
+      deviceSealedRootKey: { getBuffer: () => Buffer.alloc(32, 200) },
+      previousDeviceSealedRootKey: bob.session.deviceSealedRootKey,
+    } as unknown as Session;
+
+    bob.session = rotated;
+    await alice.mailbox.send(alice.session, conversation(), 'revoked', {});
+    await sync(bob);
+    bob.mailbox.stop(bob.id);
+    bob.mailbox = device(bob.storage);
+    bob.session = {
+      ...rotated,
+      previousDeviceSealedRootKey: undefined,
+    } as unknown as Session;
+    await bob.mailbox.send(bob.session, conversation(), 'still here', {});
+    await sync(alice);
+
+    expect(texts(bob)).toEqual(['message:revoked']);
+    expect(texts(alice)).toContain('message:still here');
+  });
+
+  it('drops the groups under a root it cannot trace back', async () => {
+    await formGroup();
+    bob.mailbox.stop(bob.id);
+    bob.mailbox = device(bob.storage);
+    bob.session = {
+      ...bob.session,
+      deviceSealedRootKey: { getBuffer: () => Buffer.alloc(32, 201) },
+    } as unknown as Session;
+
+    await expect(
+      bob.mailbox.send(bob.session, conversation(), 'no group', {}),
+    ).rejects.toThrow();
   });
 
   it('forgets history and MLS state', async () => {
