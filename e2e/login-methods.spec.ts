@@ -1,9 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import {
+  authorizeDevicePairing,
   newIsolatedPage,
   pairNewDevice,
   registerIdentity,
+  reviewDevicePairing,
   revokeOtherDevice,
   waitForWorkspace,
   type TestIdentity,
@@ -86,6 +88,51 @@ test('adds a new device by pairing it with a signed-in device', async ({
     await registerIdentity(authorized, identity);
     await pairNewDevice(authorized, fresh, identity);
     await revokeOtherDevice(authorized, 1);
+  } finally {
+    await authorized.context().close();
+    await fresh.context().close();
+  }
+});
+
+test('authorizes no new device with a wrong password', async ({
+  browser,
+}, testInfo) => {
+  const identity = newIdentity(testInfo.project.name, 'deny');
+  const authorized = await newIsolatedPage(browser);
+  const fresh = await newIsolatedPage(browser);
+  const deviceWrites: string[] = [];
+
+  try {
+    await registerIdentity(authorized, identity);
+    await reviewDevicePairing(authorized, fresh, identity);
+
+    authorized.on('request', (request) => {
+      if (
+        request.method() !== 'GET' &&
+        new URL(request.url()).pathname.includes('/identity-devices/')
+      ) {
+        deviceWrites.push(`${request.method()} ${request.url()}`);
+      }
+    });
+    await authorized
+      .getByTestId('device-pairing-password-input')
+      .fill(`${identity.password}wrong`);
+    await authorized.getByTestId('device-pairing-submit').click();
+
+    // The password is checked with the stored key derivation, which is slow.
+    await expect(
+      authorized.getByText('Your password or passkey could not be confirmed.'),
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(
+      authorized.getByTestId('device-pairing-completion-output'),
+    ).toBeHidden();
+    await expect(
+      authorized.getByTestId('device-pairing-password-input'),
+    ).toHaveValue('');
+    expect(deviceWrites).toEqual([]);
+
+    // The refusal consumed nothing: the right password still pairs.
+    await authorizeDevicePairing(authorized, fresh, identity);
   } finally {
     await authorized.context().close();
     await fresh.context().close();

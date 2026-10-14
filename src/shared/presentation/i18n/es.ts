@@ -1381,8 +1381,6 @@ export const es = {
     discardChanges: 'Descartar',
     discardChangesBody: 'Hay cambios sin guardar. ¿Quieres descartarlos?',
     edit: 'Editar perfil',
-    encryptedMasterKey: 'Clave maestra cifrada',
-    encryptedPrivateKey: 'Clave privada cifrada',
     forgetDevice: 'Cerrar sesión y olvidar este dispositivo',
     forgetDeviceConfirm:
       'Se revoca el acceso de este dispositivo a tu cuenta, se elimina el desbloqueo local de esta identidad en este navegador y se cierra tu sesión. Para volver a entrar necesitarás tu clave de recuperación o vincular el dispositivo desde otro donde ya tengas sesión.',
