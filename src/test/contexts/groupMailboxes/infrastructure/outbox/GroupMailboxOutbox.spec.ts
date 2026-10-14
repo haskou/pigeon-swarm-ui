@@ -198,7 +198,10 @@ describe('GroupMailboxOutbox', () => {
     expect(channel.send.mock.calls.map(([keys]) => keys.mailboxId)).toEqual([
       inboxOf(0, 'alice'),
     ]);
-    expect(outbox.pending(CONVERSATION)).toEqual(['m1', 'm2']);
+    expect(outbox.items(CONVERSATION)).toEqual([
+      { reference: 'm1', state: 'retry' },
+      { reference: 'm2', state: 'pending' },
+    ]);
   });
 
   it('keeps a later message behind a held commit to the same recipient in the next generation', async () => {
@@ -217,7 +220,7 @@ describe('GroupMailboxOutbox', () => {
     expect(channel.send.mock.calls.map(([keys]) => keys.mailboxId)).toEqual([
       inboxOf(1, 'alice'),
     ]);
-    expect(outbox.pending(CONVERSATION)).toHaveLength(2);
+    expect(outbox.items(CONVERSATION)).toHaveLength(2);
   });
 
   it('resumes a queue persisted before a restart', async () => {
@@ -231,7 +234,7 @@ describe('GroupMailboxOutbox', () => {
     await outbox.resume();
 
     expect(rows.size).toBe(0);
-    expect(outbox.pending(CONVERSATION)).toEqual([]);
+    expect(outbox.items(CONVERSATION)).toEqual([]);
   });
 
   it('re-encrypts a stranded message for its pending recipients still in the group', async () => {
@@ -299,14 +302,16 @@ describe('GroupMailboxOutbox', () => {
     await outbox.resume();
 
     expect(failures).toEqual([]);
-    expect(outbox.pending(CONVERSATION)).toEqual(['m1']);
+    expect(outbox.items(CONVERSATION)).toEqual([
+      { reference: 'm1', state: 'retry' },
+    ]);
     expect([...rows.values()][0].retryAt).toBeGreaterThan(now);
 
     now += GroupMailboxOutbox.RETRY_MAX_MS;
     await outbox.resume();
 
     expect(failures).toEqual([]);
-    expect(outbox.pending(CONVERSATION)).toEqual([]);
+    expect(outbox.items(CONVERSATION)).toEqual([]);
   });
 
   it('persists a commit and sends nothing until flushed', async () => {
@@ -367,7 +372,7 @@ describe('GroupMailboxOutbox', () => {
     await outbox.forget();
 
     expect(store.forget).toHaveBeenCalledWith('alice');
-    expect(outbox.pending(CONVERSATION)).toEqual([]);
+    expect(outbox.items(CONVERSATION)).toEqual([]);
   });
 
   it('seals nothing while a member off the roster is still in the group', async () => {
@@ -377,7 +382,9 @@ describe('GroupMailboxOutbox', () => {
 
     expect(engine.encrypt).not.toHaveBeenCalled();
     expect(channel.send).not.toHaveBeenCalled();
-    expect(outbox.pending(CONVERSATION)).toEqual(['m1']);
+    expect(outbox.items(CONVERSATION)).toEqual([
+      { reference: 'm1', state: 'held' },
+    ]);
 
     current = 1;
     engine.members.mockResolvedValue(['alice']);
@@ -385,7 +392,7 @@ describe('GroupMailboxOutbox', () => {
     await outbox.resume();
 
     expect(sent).toEqual([inboxOf(1, 'alice')]);
-    expect(outbox.pending(CONVERSATION)).toEqual([]);
+    expect(outbox.items(CONVERSATION)).toEqual([]);
   });
 
   it('holds a queued message once a recipient leaves the roster', async () => {
@@ -399,7 +406,39 @@ describe('GroupMailboxOutbox', () => {
     await outbox.resume();
 
     expect(channel.send).not.toHaveBeenCalled();
-    expect(outbox.pending(CONVERSATION)).toEqual(['m1']);
+    expect(outbox.items(CONVERSATION)).toEqual([
+      { reference: 'm1', state: 'held' },
+    ]);
+  });
+
+  it('lists a queued message pending until its first pass refuses a copy', async () => {
+    let release = (): void => undefined;
+
+    channel.send.mockRejectedValue(new TypeError('offline'));
+    channel.send.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          release = () => reject(new TypeError('offline'));
+        }),
+    );
+    const queued = outbox.enqueueMessage(
+      CONVERSATION,
+      'm1',
+      new Uint8Array([1]),
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(outbox.items(CONVERSATION)).toEqual([
+      { reference: 'm1', state: 'pending' },
+    ]);
+    expect(outbox.items('conversation-2')).toEqual([]);
+    release();
+    await queued;
+
+    expect(outbox.items(CONVERSATION)).toEqual([
+      { reference: 'm1', state: 'retry' },
+    ]);
   });
 
   it('rejects a message once this identity is off the roster', async () => {

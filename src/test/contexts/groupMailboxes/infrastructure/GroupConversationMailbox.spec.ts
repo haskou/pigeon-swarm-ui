@@ -416,6 +416,121 @@ describe('GroupConversationMailbox', () => {
     expect(texts(bob)).toEqual(['message:too early']);
   });
 
+  it('marks a message held until a removal is committed, then delivered', async () => {
+    await formGroup();
+    const delivered = await alice.mailbox.send(
+      alice.session,
+      conversation(),
+      'on time',
+      {},
+    );
+
+    expect(delivered.deliveryStatus).toBeUndefined();
+    roster = new Set([alice.id, bob.id]);
+    const held = await alice.mailbox.send(
+      alice.session,
+      conversation(),
+      'too early',
+      {},
+    );
+
+    expect(held.deliveryStatus).toBe('held');
+    expect(
+      alice.mailbox.withOutboxState(alice.session, CONVERSATION, [
+        { ...held, deliveryStatus: undefined },
+      ])[0].deliveryStatus,
+    ).toBe('held');
+
+    await settle(
+      Promise.all(
+        everyone().map((member) =>
+          member.mailbox.membersChanged(member.session, CONVERSATION),
+        ),
+      ),
+      everyone(),
+    );
+    await catchUp();
+    now += GroupMailboxOutbox.RETRY_MAX_MS;
+    await alice.mailbox.membersChanged(alice.session, CONVERSATION);
+
+    expect(
+      alice.mailbox.withOutboxState(alice.session, CONVERSATION, [held])[0]
+        .deliveryStatus,
+    ).toBeUndefined();
+  });
+
+  it('leaves the state of messages that are not this identity’s group records', async () => {
+    await formGroup();
+    const message = await alice.mailbox.send(
+      alice.session,
+      conversation(),
+      'hello',
+      {},
+    );
+    const messages = [
+      { ...message, deliveryStatus: 'pending' as const, id: 'pending:1' },
+      { ...message, deliveryStatus: 'failed' as const, id: 'pending:2' },
+    ];
+
+    expect(
+      alice.mailbox.withOutboxState(alice.session, CONVERSATION, messages),
+    ).toBe(messages);
+    expect(
+      bob.mailbox.withOutboxState(bob.session, CONVERSATION, [
+        { ...message, deliveryStatus: 'pending' },
+      ])[0].deliveryStatus,
+    ).toBe('pending');
+  });
+
+  it('counts what arrives for a conversation not open, until it is read', async () => {
+    await formGroup();
+    const signal = new AbortController().signal;
+
+    await alice.mailbox.send(alice.session, conversation(), 'first', {});
+    await alice.mailbox.send(alice.session, conversation(), 'second', {});
+
+    expect(
+      await bob.mailbox.receive(bob.session, CONVERSATION, signal),
+    ).toEqual({ latestMessageAt: expect.any(Number), unreadCount: 2 });
+    expect(
+      (await alice.mailbox.activity(alice.session, CONVERSATION)).unreadCount,
+    ).toBe(0);
+    await bob.mailbox.markRead(bob.session, CONVERSATION);
+
+    expect(
+      (await bob.mailbox.activity(bob.session, CONVERSATION)).unreadCount,
+    ).toBe(0);
+    const restored: DirectMessageTimelineChange[] = [];
+
+    await bob.mailbox.restore(bob.session, CONVERSATION, signal, (changes) =>
+      restored.push(...changes),
+    );
+
+    expect(texts({ ...bob, changes: restored })).toEqual([
+      'message:first',
+      'message:second',
+    ]);
+  });
+
+  it('restores what a background receive running at the same time brought in', async () => {
+    await formGroup();
+    const signal = new AbortController().signal;
+    const restored: DirectMessageTimelineChange[] = [];
+
+    await alice.mailbox.send(alice.session, conversation(), 'meanwhile', {});
+    const receiving = bob.mailbox.receive(bob.session, CONVERSATION, signal);
+
+    await bob.mailbox.restore(bob.session, CONVERSATION, signal, (changes) =>
+      restored.push(...changes),
+    );
+    await receiving;
+    await sync(bob);
+
+    expect([...texts({ ...bob, changes: restored }), ...texts(bob)]).toEqual([
+      'message:meanwhile',
+    ]);
+  });
+
   it('rejects a send from an identity no longer on the roster', async () => {
     await formGroup();
     roster = new Set([alice.id, bob.id]);
