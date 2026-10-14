@@ -839,17 +839,35 @@ describe('GroupConversationMailbox', () => {
       'from laptop',
       {},
     );
-
     for (const member of [...everyone(), second]) await sync(member);
 
-    expect(texts(alice)).toContain('message:from laptop');
-    expect(texts(second)).toContain('message:to both');
-    for (const member of [bob, carol]) {
+    // Every sender also appends a copy to its own identity's inbox, for its
+    // other devices. The laptop opens its copy from the plaintext it kept,
+    // like the phone opens it, and its history holds the message once.
+    // Alice's own copy waits behind her copy of the group's first commit,
+    // sent before her first inbox existed and never retried here; her
+    // history holds her message from the send.
+    expect(texts(alice)).toEqual(['message:from laptop']);
+    for (const member of [bob, carol, second]) {
       expect(texts(member).sort()).toEqual([
         'message:from laptop',
         'message:to both',
       ]);
     }
+    const restored: DirectMessageTimelineChange[] = [];
+
+    await second.mailbox.restore(
+      second.session,
+      CONVERSATION,
+      new AbortController().signal,
+      (changes) => restored.push(...changes),
+    );
+    expect(
+      restored.filter(
+        (change) =>
+          change.kind === 'message' && change.message.content === 'from laptop',
+      ),
+    ).toHaveLength(1);
     expect(info).toHaveBeenCalledWith(
       'Group devices reconciled: removed 0, added 1.',
     );

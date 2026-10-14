@@ -620,6 +620,47 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
     expect(await phone.devices(CONVERSATION)).toEqual([]);
   });
 
+  it.each([
+    ['an identity the roster does not list', ['alice', 'bob']],
+    ['a roster that no longer lists its identity', ['alice', 'carol']],
+  ])(
+    'rejects a welcome of its own identity into a group holding %s',
+    async (_case, listed) => {
+      // A revoked device keeps the identity key and could add anyone; joining
+      // checks every leaf's identity against the roster before the inviter.
+      const revoked = engine('bob', { device: 'd9', rosterView: unmanaged });
+      const phone = engine('bob', {
+        device: 'd2',
+        rosterView: () =>
+          GroupMailboxRoster.of({
+            adminIds: [],
+            participantIds: listed.map(id),
+          }),
+      });
+      await revoked.createGroup(CONVERSATION);
+      await revoked.add(
+        CONVERSATION,
+        [await engine('carol').createKeyPackage()],
+        sent,
+      );
+      const forged = await revoked.add(
+        CONVERSATION,
+        [await phone.createKeyPackage()],
+        sent,
+      );
+
+      await expect(
+        phone.join(
+          CONVERSATION,
+          forged.welcome!,
+          forged.generation.index,
+          id('bob'),
+        ),
+      ).rejects.toThrow(MlsRejectedError);
+      expect(await phone.devices(CONVERSATION)).toEqual([]);
+    },
+  );
+
   it('removes a revoked device of its own identity, which cannot read on', async () => {
     const { alice, bob } = await setup(['alice', 'bob']);
     const laptop = engine('bob', { device: 'd2' });
