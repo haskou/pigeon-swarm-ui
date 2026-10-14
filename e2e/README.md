@@ -44,8 +44,9 @@ history until "Erase local copy and start over" erases it, and a forged
 removal answer for a still-authorized device erases nothing),
 `community-mls-kick.spec.ts` (a private community shows encryption as active
 for its creator and an invited member, both exchange messages through the MLS
-group, and a message sent after the member is removed never shows in the
-removed member's page), `call-page-departure.spec.ts` (a ringing call is
+group, the creator's manage dialog drops the kicked member once the kick and
+the key rotation are done, and a message sent after the removal never shows in
+the removed member's page), `call-page-departure.spec.ts` (a ringing call is
 declined when the callee leaves the page) and `group-conversation.spec.ts`
 (three users share a group conversation over MLS and per-member mailboxes,
 each message reaches the other two, and after the creator removes one member a

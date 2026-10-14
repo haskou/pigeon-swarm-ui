@@ -349,6 +349,28 @@ export class PigeonCommunitiesApi {
     );
   }
 
+  /**
+   * Sends a mutation of the community document and drops the cached detail,
+   * so the next read (the MLS roster, the management dialog) sees the change.
+   */
+  private async mutateCommunity<T>(
+    session: Session,
+    communityId: string,
+    method: 'DELETE' | 'PATCH' | 'POST' | 'PUT',
+    path: string,
+    body: unknown,
+  ): Promise<T> {
+    const result = await this.http.request<T>(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, method, path, body),
+      method,
+    });
+
+    this.invalidateCommunityDetailCache(session, communityId);
+
+    return result;
+  }
+
   private invalidateChannelListCache(
     session: Session,
     communityId: string,
@@ -645,11 +667,13 @@ export class PigeonCommunitiesApi {
       ),
     };
 
-    return await this.http.request<Community>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'PATCH', path, body),
-      method: 'PATCH',
-    });
+    return await this.mutateCommunity<Community>(
+      session,
+      communityId,
+      'PATCH',
+      path,
+      body,
+    );
   }
 
   public async inviteMember(
@@ -721,11 +745,13 @@ export class PigeonCommunitiesApi {
       ),
     };
 
-    return await this.http.request<Community>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
+    return await this.mutateCommunity<Community>(
+      session,
+      communityId,
+      'POST',
+      path,
+      body,
+    );
   }
 
   public async unbanMember(
@@ -754,11 +780,13 @@ export class PigeonCommunitiesApi {
       ),
     };
 
-    return await this.http.request<Community>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'DELETE', path, body),
-      method: 'DELETE',
-    });
+    return await this.mutateCommunity<Community>(
+      session,
+      communityId,
+      'DELETE',
+      path,
+      body,
+    );
   }
 
   public async kickMember(
@@ -787,11 +815,13 @@ export class PigeonCommunitiesApi {
       ),
     };
 
-    return await this.http.request<Community>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'DELETE', path, body),
-      method: 'DELETE',
-    });
+    return await this.mutateCommunity<Community>(
+      session,
+      communityId,
+      'DELETE',
+      path,
+      body,
+    );
   }
 
   public async createJoinRequest(
@@ -943,11 +973,13 @@ export class PigeonCommunitiesApi {
       ),
     };
 
-    return await this.http.request<Community>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'DELETE', path, body),
-      method: 'DELETE',
-    });
+    return await this.mutateCommunity<Community>(
+      session,
+      communityId,
+      'DELETE',
+      path,
+      body,
+    );
   }
 
   public async listMembers(
@@ -1010,11 +1042,13 @@ export class PigeonCommunitiesApi {
       permissions: input.permissions,
     };
 
-    return await this.http.request<CommunityRoleResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
-    });
+    return await this.mutateCommunity<CommunityRoleResource>(
+      session,
+      communityId,
+      'POST',
+      path,
+      body,
+    );
   }
 
   public async updateRole(
@@ -1046,11 +1080,13 @@ export class PigeonCommunitiesApi {
       permissions: input.permissions,
     };
 
-    return await this.http.request<CommunityRoleResource>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'PATCH', path, body),
-      method: 'PATCH',
-    });
+    return await this.mutateCommunity<CommunityRoleResource>(
+      session,
+      communityId,
+      'PATCH',
+      path,
+      body,
+    );
   }
 
   public async deleteRole(
@@ -1080,11 +1116,13 @@ export class PigeonCommunitiesApi {
       ),
     };
 
-    await this.http.request(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'DELETE', path, body),
-      method: 'DELETE',
-    });
+    await this.mutateCommunity<unknown>(
+      session,
+      communityId,
+      'DELETE',
+      path,
+      body,
+    );
   }
 
   public async assignMemberRoles(
@@ -1115,15 +1153,13 @@ export class PigeonCommunitiesApi {
       roleIds,
     };
 
-    const community = await this.http.request<Community>(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'PUT', path, body),
-      method: 'PUT',
-    });
-
-    this.invalidateCommunityDetailCache(session, communityId);
-
-    return community;
+    return await this.mutateCommunity<Community>(
+      session,
+      communityId,
+      'PUT',
+      path,
+      body,
+    );
   }
 
   public async createTextChannel(

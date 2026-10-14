@@ -160,6 +160,9 @@ export async function sendMessage(page: Page, message: string): Promise<void> {
   await page.getByTestId('message-composer-input').fill(message);
   await expect(page.getByTestId('message-send-button')).toBeVisible();
   await page.getByTestId('message-send-button').click();
+  // An accepted send clears the composer. Until then the draft itself matches
+  // the text below, so the timeline check would prove nothing.
+  await expect(page.getByTestId('message-composer-input')).toHaveValue('');
   await expect(page.getByText(message, { exact: true })).toBeVisible({
     timeout: 45_000,
   });

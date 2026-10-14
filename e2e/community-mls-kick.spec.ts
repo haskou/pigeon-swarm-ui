@@ -42,13 +42,17 @@ async function inviteAndJoin(
 }
 
 async function kickMember(alice: Page, name: string): Promise<void> {
+  const member = alice.getByRole('button', { name: new RegExp(`^B ${name}`) });
+
   await alice.getByRole('button', { name: 'Manage community' }).click();
   await alice.getByRole('button', { exact: true, name: 'Members' }).click();
-  await alice
-    .getByRole('button', { name: new RegExp(`^B ${name}`) })
-    .click({ force: true });
+  await member.click({ force: true });
   await alice.getByRole('button', { exact: true, name: 'Kick' }).click();
   await alice.getByRole('button', { name: 'Confirm kick' }).click();
+  // The row goes once the node removed the member, this device rotated the
+  // group keys and the dialog reloaded the community. Sending before that
+  // races the roster change, which briefly disables the composer.
+  await expect(member).toHaveCount(0, { timeout: SLOW });
 }
 
 test('a member removed from a private community stops reading it', async ({
