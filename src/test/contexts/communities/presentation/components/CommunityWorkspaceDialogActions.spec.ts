@@ -30,6 +30,9 @@ const community = (): Community => ({
   visibility: 'private',
 });
 
+const pem = (identityId: string): string =>
+  `-----BEGIN PUBLIC KEY-----\n${identityId}\n-----END PUBLIC KEY-----\n`;
+
 const message = (overrides: Partial<ChatMessage> = {}): ChatMessage => ({
   attachments: [],
   authorIdentityId: 'member-a',
@@ -120,6 +123,28 @@ describe(CommunityWorkspaceDialogActions.name, () => {
 
     expect(
       CommunityWorkspaceDialogActions.profileRoleNames(community(), 'member-a'),
+    ).toEqual([copy.communities.visibleToEveryone, 'Ops']);
+  });
+
+  it('recognises the own profile and the owner and member ids in PEM form', () => {
+    expect(
+      CommunityWorkspaceDialogActions.canOpenConversation({
+        currentIdentityId: 'member-a',
+        hasConversationHandler: true,
+        profileIdentityId: pem('member-a'),
+      }),
+    ).toBe(false);
+    expect(
+      CommunityWorkspaceDialogActions.profileRoleNames(
+        { ...community(), ownerIdentityId: pem('owner-a') },
+        'owner-a',
+      ),
+    ).toEqual([copy.communities.owner, copy.communities.visibleToEveryone]);
+    expect(
+      CommunityWorkspaceDialogActions.profileRoleNames(
+        { ...community(), memberIds: ['owner-a', pem('member-a')] },
+        'member-a',
+      ),
     ).toEqual([copy.communities.visibleToEveryone, 'Ops']);
   });
 

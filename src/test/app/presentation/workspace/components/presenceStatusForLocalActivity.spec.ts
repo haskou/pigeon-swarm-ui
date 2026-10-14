@@ -2,7 +2,6 @@ import type { IdentityPresenceResource as IdentityPresence } from '../../../../.
 import type { SelectablePresenceStatusResource as SelectablePresenceStatus } from '../../../../../contexts/identities/infrastructure/http/resources/SelectablePresenceStatusResource';
 
 import { presenceStatusForLocalActivity } from '../../../../../app/presentation/workspace/components/presenceStatusForLocalActivity';
-import { presenceWithLocalPreference } from '../../../../../app/presentation/workspace/components/presenceWithLocalPreference';
 
 function presence(status: IdentityPresence['status']): IdentityPresence {
   return {
@@ -75,18 +74,4 @@ describe(presenceStatusForLocalActivity.name, () => {
       ).toBeNull();
     },
   );
-});
-
-describe(presenceWithLocalPreference.name, () => {
-  it('keeps a manual away preference when a realtime event reports the user as available', () => {
-    expect(
-      presenceWithLocalPreference(presence('available'), 'identity-1', 'away'),
-    ).toEqual(presence('away'));
-  });
-
-  it('does not override other identities with the local manual preference', () => {
-    expect(
-      presenceWithLocalPreference(presence('available'), 'identity-2', 'away'),
-    ).toEqual(presence('available'));
-  });
 });

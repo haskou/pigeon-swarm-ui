@@ -7,6 +7,8 @@ import {
   shortId,
 } from '../../../../shared/presentation/formatting';
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { CommunityAccessPolicy } from '../../../communities/presentation/view-models/CommunityAccessPolicy';
+import { IdentityMatch } from '../../../identities/domain/IdentityMatch';
 import {
   identityDisplayName,
   type IdentityNames,
@@ -55,8 +57,9 @@ function canRespondToMembershipRequest({
   request: CommunityMembershipRequest;
 }): boolean {
   return request.type === 'invitation'
-    ? request.identityId === currentIdentityId
-    : community?.ownerIdentityId === currentIdentityId;
+    ? IdentityMatch.isSame(request.identityId, currentIdentityId)
+    : community !== undefined &&
+        CommunityAccessPolicy.isOwner(community, currentIdentityId);
 }
 
 function isIdentityLoading(input: {

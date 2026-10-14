@@ -165,10 +165,7 @@ export function ManageCommunityDialog({
     community,
     session.identity.id,
   );
-  const isOwner = IdentityMatch.isSame(
-    community.ownerIdentityId,
-    session.identity.id,
-  );
+  const isOwner = CommunityAccessPolicy.isOwner(community, session.identity.id);
   const canManageChannels =
     isOwner || currentPermissions.has('manage_channels');
   const canManageRoles = isOwner || currentPermissions.has('manage_roles');

@@ -7,6 +7,7 @@ import { communityRoleDisplayName } from '../view-models/communityRoleDisplayNam
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
 import { ClearableSearchInput } from '../../../../shared/presentation/components/ClearableSearchInput';
+import { IdentityMatch } from '../../../identities/domain/IdentityMatch';
 import { IdentityMemberRow } from '../../../identities/presentation/components/IdentityMemberListPanel';
 import { memberPrimaryName } from './communityMemberNames';
 
@@ -103,7 +104,10 @@ export function CommunityMembersRolesPanel({
                       item={{
                         identity: memberIdentities[identityId],
                         identityId,
-                        owner: identityId === ownerIdentityId,
+                        owner: IdentityMatch.isSame(
+                          identityId,
+                          ownerIdentityId,
+                        ),
                         pictureUrl: memberPictures[identityId] ?? null,
                       }}
                       onClick={() =>
@@ -183,34 +187,35 @@ export function CommunityMembersRolesPanel({
                     {copy.communities.noCustomRoles}
                   </div>
                 )}
-                {expanded && identityId !== ownerIdentityId && (
-                  <div className="mx-2 mb-2 flex flex-wrap gap-2">
-                    {canKickMembers && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setPendingAction({ action: 'kick', identityId })
-                        }
-                        disabled={state === 'loading'}
-                        className="ui-button disabled:cursor-not-allowed disabled:opacity-45"
-                      >
-                        {copy.communities.kickMember}
-                      </button>
-                    )}
-                    {canBanMembers && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setPendingAction({ action: 'ban', identityId })
-                        }
-                        disabled={state === 'loading'}
-                        className="ui-button border-rose-300/20 bg-rose-500/10 text-rose-100 hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-45"
-                      >
-                        {copy.communities.banMember}
-                      </button>
-                    )}
-                  </div>
-                )}
+                {expanded &&
+                  !IdentityMatch.isSame(identityId, ownerIdentityId) && (
+                    <div className="mx-2 mb-2 flex flex-wrap gap-2">
+                      {canKickMembers && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPendingAction({ action: 'kick', identityId })
+                          }
+                          disabled={state === 'loading'}
+                          className="ui-button disabled:cursor-not-allowed disabled:opacity-45"
+                        >
+                          {copy.communities.kickMember}
+                        </button>
+                      )}
+                      {canBanMembers && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPendingAction({ action: 'ban', identityId })
+                          }
+                          disabled={state === 'loading'}
+                          className="ui-button border-rose-300/20 bg-rose-500/10 text-rose-100 hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-45"
+                        >
+                          {copy.communities.banMember}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 {pendingAction && actionPendingForMember && (
                   <div className="mx-2 mb-2 flex flex-col gap-2 rounded-2xl border border-rose-300/20 bg-rose-500/10 p-3 sm:flex-row sm:items-center sm:justify-between">
                     <span className="min-w-0 text-xs font-bold text-rose-50/85">

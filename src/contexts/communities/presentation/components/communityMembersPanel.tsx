@@ -9,6 +9,7 @@ import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useClose
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
 import { type IdentityMemberListItem } from '../../../identities/presentation/components/IdentityMemberListPanel';
 import { IdentityMembersAside } from '../../../identities/presentation/components/IdentityMembersAside';
+import { CommunityAccessPolicy } from '../view-models/CommunityAccessPolicy';
 
 export type CommunityMemberListItem = {
   identity?: IdentityResource;
@@ -124,11 +125,14 @@ function MembersAside({
       animateEntries={animateEntries}
       animationScopeKey={animationScopeKey}
       emptyLabel={copy.communities.noMatchingMembers}
-      items={members.map((member) => ({
-        ...member,
-        owner: member.identityId === community.ownerIdentityId,
-        presence: presenceByIdentityId[member.identityId],
-      } satisfies IdentityMemberListItem))}
+      items={members.map(
+        (member) =>
+          ({
+            ...member,
+            owner: CommunityAccessPolicy.isOwner(community, member.identityId),
+            presence: presenceByIdentityId[member.identityId],
+          }) satisfies IdentityMemberListItem,
+      )}
       onItemClick={onMemberClick}
       ownerLabel={copy.communities.owner}
       transitionState={transitionState}
