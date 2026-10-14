@@ -1,5 +1,7 @@
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
+import { IdentitySnapshotSelection } from '../../../../contexts/identities/domain/IdentitySnapshotSelection';
+import { KeychainVersion } from '../../../../contexts/identities/domain/value-objects/KeychainVersion';
 import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
 
 /**
@@ -25,7 +27,12 @@ export function applyPublishedKeychain(
   }
 
   // Keychain versions only move forward: keep the newer keychain already held.
-  if (published.keychain.version < current.keychain.version) {
+  if (
+    IdentitySnapshotSelection.selectKeychain(
+      KeychainVersion.fromNumber(current.keychain.version),
+      KeychainVersion.fromNumber(published.keychain.version),
+    ) === 'held'
+  ) {
     return current;
   }
 
