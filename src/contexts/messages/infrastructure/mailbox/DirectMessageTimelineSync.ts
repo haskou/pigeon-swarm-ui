@@ -28,6 +28,16 @@ import { DirectMessageRecordReader } from './DirectMessageRecordReader';
  * record replicated on several is applied once.
  */
 export class DirectMessageTimelineSync {
+  /**
+   * Per source and mailbox, the cursor up to which pages past an unstored
+   * page were shown this app session. Never saved: those pages stay on the
+   * node until stored in order.
+   */
+  private readonly ahead = new Map<
+    DirectMessageInboxSource,
+    Map<string, number>
+  >();
+
   private readonly applied = new Map<string, Set<string>>();
 
   public constructor(
@@ -62,6 +72,7 @@ export class DirectMessageTimelineSync {
     }
 
     source.store.save(keys.mailboxId, { ...state, cursor: 0 });
+    this.aheadIn(source).delete(keys.mailboxId);
 
     return {
       cursor: 0,
@@ -75,15 +86,12 @@ export class DirectMessageTimelineSync {
   }
 
   /**
-   * Decodes the page, stores its records on this device, then hands the
-   * changes of records this timeline has not applied yet to the caller, then
+   * Decodes the page, stores its records on this device, shows them, then
    * acknowledges the page. The store runs before the ack, so an acked page is
    * never missing from the history. A page the store cannot hold is still
-   * shown but not acknowledged, and the pass rejects with
-   * `DirectMessageHistoryStorageError`. Each step checks the signal so an
-   * aborted pass neither applies nor acks.
-   * An envelope that is no record may be an availability announcement from
-   * the peer.
+   * shown but not acknowledged; the page after it is read ahead and shown
+   * too, and the pass rejects with `DirectMessageHistoryStorageError`. Each
+   * step checks the signal so an aborted pass neither applies nor acks.
    */
   private async applyPage(
     session: Session,
@@ -95,7 +103,111 @@ export class DirectMessageTimelineSync {
     apply: (changes: DirectMessageTimelineChange[]) => void,
   ): Promise<void> {
     const { keys, readers, state } = inbox;
-    const decoded = page.envelopes.flatMap((envelope) => {
+    const records = this.decode(session, conversationId, page);
+    const stored = await this.store(session, conversationId, records);
+
+    if (signal.aborted) return;
+
+    await this.show(session, conversationId, records, signal, apply);
+
+    if (signal.aborted) return;
+
+    // An unstored page stays on the node: the next pass reads it again, stores
+    // it, and acks it. Its records are applied, so the replay adds no change.
+    if (!stored) {
+      await this.readAhead(
+        session,
+        conversationId,
+        source,
+        inbox,
+        page,
+        signal,
+        apply,
+      ).catch(() => {
+        // eslint-disable-next-line no-console
+        console.debug('Direct mailbox read-ahead failed.');
+      });
+
+      throw new DirectMessageHistoryStorageError();
+    }
+
+    const acked = await source.channel.acknowledge(
+      keys,
+      readers,
+      page.lastCursor,
+    );
+    const cursor = acked.recreated ? 0 : page.lastCursor;
+    const ahead = this.aheadIn(source);
+
+    source.store.save(keys.mailboxId, { ...state, cursor });
+
+    if (acked.recreated || (ahead.get(keys.mailboxId) ?? 0) <= cursor) {
+      ahead.delete(keys.mailboxId);
+    }
+  }
+
+  /**
+   * Reads and shows the next page past the furthest one shown, so a page this
+   * device cannot store does not hide the messages after it. The page is
+   * neither stored nor acknowledged: the history keeps the inbox order, and
+   * the page is stored and acked in turn once the pages before it are. One
+   * page per pass, like the acknowledged read.
+   */
+  private async readAhead(
+    session: Session,
+    conversationId: string,
+    source: DirectMessageInboxSource,
+    inbox: DirectMessageRecipientInbox,
+    unstored: OpenedMailboxPage,
+    signal: AbortSignal,
+    apply: (changes: DirectMessageTimelineChange[]) => void,
+  ): Promise<void> {
+    if (!unstored.hasMore) return;
+
+    const { keys, readers } = inbox;
+    const ahead = this.aheadIn(source);
+    const after = Math.max(unstored.lastCursor, ahead.get(keys.mailboxId) ?? 0);
+    const page = await source.channel.read(
+      keys,
+      readers,
+      after,
+      DirectMessageMailboxLimits.PAGE_SIZE,
+    );
+
+    if (signal.aborted) return;
+
+    // A re-created inbox numbers from 1 again; the next pass reads it from 0.
+    if (page.recreated) {
+      ahead.delete(keys.mailboxId);
+
+      return;
+    }
+
+    if (page.lastCursor <= after) return;
+
+    await this.show(
+      session,
+      conversationId,
+      this.decode(session, conversationId, page),
+      signal,
+      apply,
+    );
+
+    if (signal.aborted) return;
+
+    ahead.set(keys.mailboxId, page.lastCursor);
+  }
+
+  /**
+   * The records of a page. An envelope that is no record may be an
+   * availability announcement from the peer.
+   */
+  private decode(
+    session: Session,
+    conversationId: string,
+    page: OpenedMailboxPage,
+  ): { plaintext: Uint8Array; record: DirectMessageRecord }[] {
+    return page.envelopes.flatMap((envelope) => {
       const record = DirectMessageRecordReader.decode(
         session,
         conversationId,
@@ -108,14 +220,24 @@ export class DirectMessageTimelineSync {
 
       return record ? [{ plaintext: envelope.plaintext, record }] : [];
     });
+  }
 
-    // Keyed by record id, so a replayed envelope dedupes while each action
-    // (a reaction add, its removal, a re-add) keeps its own row.
-    const stored = await this.history
+  /**
+   * Stores the records on this device, keyed by record id, so a replayed
+   * envelope dedupes while each action (a reaction add, its removal, a
+   * re-add) keeps its own row. Read receipts are never stored. Whether the
+   * write succeeded.
+   */
+  private store(
+    session: Session,
+    conversationId: string,
+    records: { plaintext: Uint8Array; record: DirectMessageRecord }[],
+  ): Promise<boolean> {
+    return this.history
       .append(
         session,
         conversationId,
-        decoded.flatMap(({ plaintext, record }) =>
+        records.flatMap(({ plaintext, record }) =>
           record.type === DirectMailboxRecords.TYPE.read
             ? []
             : [{ plaintext, recordId: record.id }],
@@ -125,10 +247,19 @@ export class DirectMessageTimelineSync {
         () => true,
         () => false,
       );
+  }
 
-    if (signal.aborted) return;
-
-    // An own copy this device appended is already shown locally.
+  /**
+   * Hands the changes of records this timeline has not applied yet to the
+   * caller. An own copy this device appended is already shown locally.
+   */
+  private async show(
+    session: Session,
+    conversationId: string,
+    decoded: { record: DirectMessageRecord }[],
+    signal: AbortSignal,
+    apply: (changes: DirectMessageTimelineChange[]) => void,
+  ): Promise<void> {
     const records = decoded.flatMap(({ record }) =>
       this.ownCopies.has(
         DirectMailboxOwnership.ownCopyKey(
@@ -151,22 +282,6 @@ export class DirectMessageTimelineSync {
 
     apply(changes);
     this.markApplied(conversationId, unapplied);
-
-    if (signal.aborted) return;
-
-    // An unstored page stays on the node: the next pass reads it again, stores
-    // it, and acks it. Its records are applied, so the replay adds no change.
-    if (!stored) throw new DirectMessageHistoryStorageError();
-
-    const acked = await source.channel.acknowledge(
-      keys,
-      readers,
-      page.lastCursor,
-    );
-    source.store.save(keys.mailboxId, {
-      ...state,
-      cursor: acked.recreated ? 0 : page.lastCursor,
-    });
   }
 
   /**
@@ -244,6 +359,15 @@ export class DirectMessageTimelineSync {
     this.applied.set(conversationId, applied);
 
     return applied;
+  }
+
+  /** Read-ahead cursors of one source, by mailbox id. */
+  private aheadIn(source: DirectMessageInboxSource): Map<string, number> {
+    const ahead = this.ahead.get(source) ?? new Map<string, number>();
+
+    this.ahead.set(source, ahead);
+
+    return ahead;
   }
 
   /**
