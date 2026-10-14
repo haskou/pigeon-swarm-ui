@@ -130,9 +130,13 @@ function gatewayDouble(): {
   const sealedRoot = {
     current: jest.fn(),
     handOver: jest.fn(),
+    openAfterRecovery: jest.fn(),
     rotate: jest.fn(),
   } as jest.Mocked<
-    Pick<DeviceSealedRootRotation, 'current' | 'handOver' | 'rotate'>
+    Pick<
+      DeviceSealedRootRotation,
+      'current' | 'handOver' | 'openAfterRecovery' | 'rotate'
+    >
   >;
   const pairingHistory = {
     publish: jest.fn().mockResolvedValue(false),
@@ -196,7 +200,7 @@ describe(PigeonIdentitiesGateway.name, () => {
   describe('recover', () => {
     const recoveryKey = RecoveryKey.generate().valueOf();
 
-    it('opens the sealed root before hydrating the recovered device', async () => {
+    it('opens a fresh root on the recovered device before hydrating it', async () => {
       const { authorization, gateway, login, profile, sealedRoot } =
         gatewayDouble();
       const recovered = {
@@ -209,17 +213,33 @@ describe(PigeonIdentitiesGateway.name, () => {
       const hydrateResult = { session: rooted } as unknown as LoginResult;
       profile.get.mockResolvedValue(identity());
       authorization.recover.mockResolvedValue(recovered);
-      sealedRoot.current.mockResolvedValue(rooted);
+      sealedRoot.openAfterRecovery.mockResolvedValue(rooted);
       login.hydrate.mockResolvedValue(hydrateResult);
 
       await expect(
         gateway.recover('identity-1', 'password', recoveryKey),
       ).resolves.toBe(hydrateResult);
-      expect(sealedRoot.current).toHaveBeenCalledWith(recovered);
+      expect(sealedRoot.openAfterRecovery).toHaveBeenCalledWith(recovered);
+      expect(sealedRoot.current).not.toHaveBeenCalled();
       expect(login.hydrate).toHaveBeenCalledWith(rooted, undefined);
     });
 
-    it('refuses the recovery without hydrating when no sealed root opens', async () => {
+    it('opens no root and replaces no head when the recovery key is refused', async () => {
+      const { authorization, gateway, login, profile, sealedRoot } =
+        gatewayDouble();
+      profile.get.mockResolvedValue(identity());
+      authorization.recover.mockRejectedValue(
+        new Error('Recovery kit does not belong to this identity.'),
+      );
+
+      await expect(
+        gateway.recover('identity-1', 'password', recoveryKey),
+      ).rejects.toThrow('Recovery kit does not belong to this identity.');
+      expect(sealedRoot.openAfterRecovery).not.toHaveBeenCalled();
+      expect(login.hydrate).not.toHaveBeenCalled();
+    });
+
+    it('refuses the recovery without hydrating when no fresh root opens', async () => {
       const { authorization, gateway, login, profile, sealedRoot } =
         gatewayDouble();
       const recovered = {
@@ -227,16 +247,27 @@ describe(PigeonIdentitiesGateway.name, () => {
       } as unknown as Session;
       profile.get.mockResolvedValue(identity());
       authorization.recover.mockResolvedValue(recovered);
-      sealedRoot.current.mockResolvedValue(recovered);
+      sealedRoot.openAfterRecovery.mockRejectedValue(new Error('unproven'));
 
       await expect(
         gateway.recover('identity-1', 'password', recoveryKey),
-      ).rejects.toThrow(copy.auth.deviceRootUnavailable);
+      ).rejects.toThrow('unproven');
       expect(login.hydrate).not.toHaveBeenCalled();
     });
   });
 
   describe('openDeviceSealedRoot', () => {
+    it('opens the current root and never replaces the keychain head, whatever the node serves', async () => {
+      const { gateway, sealedRoot } = gatewayDouble();
+      const session = { identity: { id: 'identity-1' } } as unknown as Session;
+      sealedRoot.current.mockRejectedValue(new Error('corrupt head'));
+
+      await expect(gateway.openDeviceSealedRoot(session)).rejects.toThrow(
+        'corrupt head',
+      );
+      expect(sealedRoot.openAfterRecovery).not.toHaveBeenCalled();
+    });
+
     it('refuses a session left without a sealed root', async () => {
       const { gateway, sealedRoot } = gatewayDouble();
       const session = { identity: { id: 'identity-1' } } as unknown as Session;
@@ -287,6 +318,18 @@ describe(PigeonIdentitiesGateway.name, () => {
       ).rejects.toBeInstanceOf(DeviceUnlockNotConfirmedError);
       expect(sealedRoot.current).not.toHaveBeenCalled();
       expect(pairingHistory.publish).not.toHaveBeenCalled();
+      expect(authorization.authorizePairing).not.toHaveBeenCalled();
+    });
+
+    it('refuses on a head it cannot read and never replaces it, so a node cannot re-root through pairing', async () => {
+      const { authorization, gateway, sealedRoot } = gatewayDouble();
+      const session = { identity: { id: 'identity-1' } } as unknown as Session;
+      sealedRoot.current.mockRejectedValue(new Error('corrupt head'));
+
+      await expect(
+        gateway.authorizeDevicePairing(session, requestCode, 'password'),
+      ).rejects.toThrow('corrupt head');
+      expect(sealedRoot.openAfterRecovery).not.toHaveBeenCalled();
       expect(authorization.authorizePairing).not.toHaveBeenCalled();
     });
 
