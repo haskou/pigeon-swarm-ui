@@ -417,8 +417,9 @@ export function useCallStartActions({
   const followSupersededCall = useCallback(
     (superseded: CallResource) => {
       const winnerCallId = superseded.supersededByCallId;
+      const { scope } = superseded;
 
-      if (!winnerCallId) return;
+      if (!winnerCallId || scope.type !== 'community_channel') return;
 
       if (callActionInProgressRef.current) {
         logCallWarning('workspace:superseded-call:ignored-action-in-progress', {
@@ -440,13 +441,16 @@ export function useCallStartActions({
         await leaveCurrentCallForSwitch();
         await cleanupJoinedCalls(winnerCallId);
 
-        logCallDebug('workspace:superseded-call:join-request', {
+        logCallDebug('workspace:superseded-call:rejoin-channel', {
           callId: superseded.id,
           supersededByCallId: winnerCallId,
         });
-        const call = await applicationContainer.calls.join(
+        // The node answers a channel start with the channel's live call and
+        // this client signs its join; members are not listed on that call.
+        const call = await applicationContainer.calls.startCommunityChannel(
           sessionRef.current,
-          winnerCallId,
+          scope.communityId,
+          scope.channelId,
         );
 
         await startLocalCallSession(call, microphone);
