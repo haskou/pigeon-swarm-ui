@@ -42,6 +42,24 @@ export function deriveInviteToken(
     .replace(/=+$/, '');
 }
 
+/**
+ * base64url(sha256("pigeon:community-invite-reference:v1\n" + token)): what
+ * a signed invite-link join names instead of the token, which every member
+ * reads and which would otherwise let any of them use the link.
+ */
+export function deriveInviteReference(inviteToken: string): string {
+  return Buffer.from(
+    SHA256Hash.from(
+      `pigeon:community-invite-reference:v1\n${inviteToken}`,
+    ).toString(),
+    'hex',
+  )
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
 /** First 24 hex chars of sha256 over a moderation log entry identity tuple. */
 export function deriveModerationLogId(
   communityId: string,

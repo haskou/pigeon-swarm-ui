@@ -5,8 +5,10 @@ import type { Session } from '../../../../../contexts/identities/infrastructure/
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
+import { CommunityOperationProof } from '../../../../../contexts/communities/infrastructure/http/CommunityOperationProof';
 import { PigeonCommunityInvitationApi } from '../../../../../contexts/communities/infrastructure/http/PigeonCommunityInvitationApi';
 import { ScopeFrontierReader } from '../../../../../shared/infrastructure/http/ScopeFrontierReader';
+import vectors from '../../../../fixtures/community-operation-vectors.json';
 import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
 beforeEach(() => {
@@ -112,7 +114,9 @@ describe(PigeonCommunityInvitationApi.name, () => {
     });
   });
 
-  it('signs invite acceptance as the acceptor use record', async () => {
+  it('signs invite acceptance with the invite reference, never the token', async () => {
+    const { reference, token } = vectors.inviteToken;
+    const seal = jest.spyOn(CommunityOperationProof, 'seal');
     const device = await KeyPair.generate();
     const http = {
       request: jest
@@ -120,7 +124,7 @@ describe(PigeonCommunityInvitationApi.name, () => {
         .mockResolvedValueOnce({
           communityId: 'community-1',
           networkId: 'network-1',
-          token: 'tok',
+          token,
         })
         .mockResolvedValueOnce({ id: 'community-1' }),
     } as unknown as HttpJsonClient;
@@ -136,7 +140,7 @@ describe(PigeonCommunityInvitationApi.name, () => {
       publicMutationSignerAt(),
     );
 
-    await api.acceptInviteLink(session, 'tok');
+    await api.acceptInviteLink(session, token);
 
     const body = JSON.parse(
       (
@@ -144,10 +148,15 @@ describe(PigeonCommunityInvitationApi.name, () => {
       )[1].body,
     ) as {
       mutation: Record<string, unknown>;
-      operation: { parents: string[]; mutation: Record<string, unknown> };
+      operation: { mutation: Record<string, unknown>; parents: string[] };
       usedAt: number;
     };
 
+    expect(seal.mock.calls[0]?.[0].args).toEqual({
+      identityId: 'identity-1',
+      method: 'invite_link',
+      reference,
+    });
     expect(body.operation.parents).toEqual(['c'.repeat(43)]);
     expect(body.operation.mutation).toMatchObject({
       sequence: 0,
@@ -158,7 +167,7 @@ describe(PigeonCommunityInvitationApi.name, () => {
     expect(body.mutation).toMatchObject({
       kind: 'put',
       predecessor: null,
-      recordId: expect.stringMatching(/^invite-use:tok:/),
+      recordId: `invite-use:${token}:identity-1`,
       store: 'requests',
     });
   });

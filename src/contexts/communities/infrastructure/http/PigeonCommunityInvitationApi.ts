@@ -15,7 +15,10 @@ import { NotificationMutationSigner } from '../../../notifications/infrastructur
 import { buildCommunityInviteLinkBody } from './buildCommunityInviteLinkBody';
 import { CommunityModerationLogSigner } from './CommunityModerationLogSigner';
 import { CommunityOperationSigner } from './CommunityOperationSigner';
-import { deriveInviteToken } from './deriveCommunityRecordId';
+import {
+  deriveInviteReference,
+  deriveInviteToken,
+} from './deriveCommunityRecordId';
 
 export class PigeonCommunityInvitationApi {
   private readonly notificationPath = '/notifications/';
@@ -223,7 +226,11 @@ export class PigeonCommunityInvitationApi {
     const networkId = invite.networkId as string;
     const operation = await this.operations.sign(session, {
       action: 'member_joined',
-      args: { identityId, method: 'invite_link', reference: token },
+      args: {
+        identityId,
+        method: 'invite_link',
+        reference: deriveInviteReference(token),
+      },
       communityId,
       createdAt: usedAt,
       networkId,
