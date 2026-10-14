@@ -78,4 +78,30 @@ describe('DirectMessageAuthorship', () => {
       DirectMessageAuthorship.isAuthentic('alice', rootKey, record, tag),
     ).toBe(true);
   });
+
+  it('treats a record whose author id the value object rejects as not own', () => {
+    expect(
+      DirectMessageAuthorship.isAuthentic(
+        'alice',
+        rootKey,
+        { ...record, authorId: 'x'.repeat(5000) },
+        undefined,
+      ),
+    ).toBe(true);
+  });
+
+  it('requires a valid tag on an own record addressed in PEM form', () => {
+    expect(
+      DirectMessageAuthorship.isAuthentic(
+        'alice',
+        rootKey,
+        {
+          ...record,
+          authorId:
+            '-----BEGIN PUBLIC KEY-----\nalice\n-----END PUBLIC KEY-----\n',
+        },
+        undefined,
+      ),
+    ).toBe(false);
+  });
 });

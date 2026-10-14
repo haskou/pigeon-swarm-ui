@@ -40,4 +40,10 @@ describe(DirectMessageAvailability.name, () => {
       availability().serversFor(session, 'MCowBQYDK2VwAyEApeer', 'mailbox-1'),
     ).toEqual(['https://peer.example']);
   });
+
+  it('uses the peer servers for a recipient id the value object rejects', () => {
+    expect(
+      availability().serversFor(session, 'x'.repeat(5000), 'mailbox-1'),
+    ).toEqual(['https://peer.example']);
+  });
 });
