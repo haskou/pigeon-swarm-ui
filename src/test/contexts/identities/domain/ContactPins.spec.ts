@@ -1,5 +1,7 @@
 import {
   checkContactKey,
+  mergeContactPins,
+  parseContactPins,
   rememberContact,
   unverifyContact,
   verifyContact,
@@ -133,5 +135,49 @@ describe('verifyContact and unverifyContact', () => {
     const pins: ContactPins = { 'identity-x': { verifiedAt } };
 
     expect(unverifyContact(pins, 'identity-x')).toEqual({});
+  });
+});
+
+describe('parseContactPins', () => {
+  it('keeps only well-formed pins', () => {
+    expect(
+      parseContactPins({
+        'identity-x': { handle: 'bob', verifiedAt: 42 },
+        'identity-y': 'not-an-object',
+        'identity-z': { verifiedAt },
+      }),
+    ).toEqual({
+      'identity-x': { handle: 'bob' },
+      'identity-z': { verifiedAt },
+    });
+    expect(parseContactPins(['identity-x'])).toEqual({});
+  });
+});
+
+describe('mergeContactPins', () => {
+  it('adds restored contacts and keeps what this device already knows', () => {
+    const local: ContactPins = { 'identity-x': { handle: 'bob' } };
+    const restored: ContactPins = {
+      'identity-x': { handle: 'robert', verifiedAt },
+      'identity-y': { handle: 'carol', verifiedAt },
+    };
+
+    expect(mergeContactPins(local, restored)).toEqual({
+      'identity-x': { handle: 'bob' },
+      'identity-y': { handle: 'carol', verifiedAt },
+    });
+  });
+
+  it('never gives a handle held here to a restored identity', () => {
+    const local: ContactPins = { 'identity-x': { handle: 'bob' } };
+    const restored: ContactPins = {
+      'identity-y': { handle: 'bob', verifiedAt },
+      'identity-z': { handle: 'bob' },
+    };
+
+    expect(mergeContactPins(local, restored)).toEqual({
+      'identity-x': { handle: 'bob' },
+      'identity-y': { verifiedAt },
+    });
   });
 });
