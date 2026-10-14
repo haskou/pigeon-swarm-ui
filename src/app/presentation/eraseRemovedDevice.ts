@@ -1,3 +1,7 @@
+import {
+  clearLastLoginIdentity,
+  loadLastLoginIdentity,
+} from '../../contexts/identities/infrastructure/storage/lastLoginIdentity';
 import { clearProjectedMessageCaches } from '../../shared/infrastructure/storage/clearProjectedMessageCaches';
 import {
   communityUnreadStorageKey,
@@ -29,10 +33,12 @@ export type RemovedDeviceServices = {
  * and group history, decrypted message projections, the MLS state of its
  * communities, pending device-sealed recovery steps, drafts and workspace
  * state, and last the vault record with the identity key material and the
- * device-sealed root. Every step runs even when one fails. The vault record
- * is erased only after every other step succeeded, so a partial erase leaves
- * the identity unlockable and the next unlock proves the removal again and
- * retries. Resolves false when any step failed. Never throws.
+ * device-sealed root, then the remembered sign-in identity when it is this
+ * one. Every step runs even when one fails. The vault record and the
+ * remembered identity are erased only after every other step succeeded, so a
+ * partial erase leaves the identity unlockable and the next unlock proves the
+ * removal again and retries. Resolves false when any step failed. Never
+ * throws.
  */
 export async function eraseRemovedDevice(
   identityId: string,
@@ -75,6 +81,8 @@ export async function eraseRemovedDevice(
   } catch {
     return false;
   }
+
+  if (loadLastLoginIdentity() === identityId) clearLastLoginIdentity();
 
   return true;
 }

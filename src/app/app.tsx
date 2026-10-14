@@ -74,22 +74,20 @@ function isNetworkCreationScreen(input: {
   );
 }
 
+function AppLoading(): ReactElement {
+  return (
+    <div className="grid min-h-dvh place-items-center">
+      <div className="text-xl">{copy.app.loading}</div>
+    </div>
+  );
+}
+
 function AppScreenSuspense({
   children,
 }: {
   children: ReactNode;
 }): ReactElement {
-  return (
-    <Suspense
-      fallback={
-        <div className="grid min-h-dvh place-items-center">
-          <div className="text-xl">{copy.app.loading}</div>
-        </div>
-      }
-    >
-      {children}
-    </Suspense>
-  );
+  return <Suspense fallback={<AppLoading />}>{children}</Suspense>;
 }
 
 function App(): ReactElement {
@@ -98,6 +96,7 @@ function App(): ReactElement {
     clearSession,
     communities,
     conversations,
+    deviceRemoval,
     handleAuthenticated,
     handleNetworkCreated,
     nodeNetworks,
@@ -146,7 +145,9 @@ function App(): ReactElement {
   return (
     <AppFrame>
       <AppScreenSuspense>
-        {screen === 'auth' || !session ? (
+        {deviceRemoval?.state === 'erasing' ? (
+          <AppLoading />
+        ) : screen === 'auth' || !session ? (
           <AuthScreen
             availableNetworks={nodeNetworks.networks}
             ipfsPeerCount={peers.ipfsPeerCount}
@@ -154,6 +155,7 @@ function App(): ReactElement {
             nodeOwnerId={nodeNetworks.node?.owner ?? null}
             onAuthenticated={handleAuthenticated}
             peersLoading={peers.loading}
+            removal={deviceRemoval}
           />
         ) : (
           <GlassWorkspace

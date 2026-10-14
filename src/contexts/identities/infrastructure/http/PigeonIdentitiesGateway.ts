@@ -143,6 +143,12 @@ export class PigeonIdentitiesGateway {
     return await this.deviceAuthorization.findDevices(session);
   }
 
+  public async synchronizeDeviceAuthorization(
+    session: Session,
+  ): Promise<Session> {
+    return await this.deviceAuthorization.synchronize(session);
+  }
+
   public async revokeDevice(
     session: Session,
     target: DeviceCredential,

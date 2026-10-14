@@ -1,9 +1,10 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { ConversationResource } from '../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../contexts/identities/infrastructure/session/Session';
+import type { DeviceRemoval } from './DeviceRemoval';
 
 import { useCommunities } from '../../contexts/communities/presentation/hooks/useCommunities';
 import {
@@ -15,12 +16,25 @@ import { useNodeNetworks } from '../../contexts/networks/presentation/hooks/useN
 import { usePeers } from '../../contexts/networks/presentation/hooks/usePeers';
 import { clearProjectedMessageCaches } from '../../shared/infrastructure/storage/clearProjectedMessageCaches';
 import { applicationContainer } from '../composition/applicationContainer';
+import { DeviceRemovalWatch } from './DeviceRemovalWatch';
+import { eraseRemovedDevice } from './eraseRemovedDevice';
 import { closeAllRealtimeConnections } from './realtime/useRealtimeEvents';
+
+/** Stops the outboxes, realtime connections and workers of an ended session. */
+function stopSessionWork(identityId: string | null): void {
+  if (identityId) {
+    applicationContainer.directMessages.stopOutbox(identityId);
+    applicationContainer.groupMessages.stop(identityId);
+  }
+  closeAllRealtimeConnections();
+  applicationContainer.disposeSessionWorkers();
+}
 
 export function useAppBootstrap(): {
   clearSession: () => void;
   communities: ReturnType<typeof useCommunities>;
   conversations: ConversationResource[];
+  deviceRemoval: DeviceRemoval | null;
   handleAuthenticated: (
     nextSession: Session,
     nextConversations: ConversationResource[],
@@ -39,6 +53,11 @@ export function useAppBootstrap(): {
   const [conversations, setConversations] = useState<ConversationResource[]>(
     [],
   );
+  const [deviceRemoval, setDeviceRemoval] = useState<DeviceRemoval | null>(
+    null,
+  );
+  const sessionRef = useRef(session);
+  const identityId = session?.identity.id ?? null;
   const nodeNetworks = useNodeNetworks(session);
   const peers = usePeers({ deferAutoLoad: true });
   const communities = useCommunities(session);
@@ -49,6 +68,7 @@ export function useAppBootstrap(): {
 
   const handleAuthenticated = useCallback(
     (nextSession: Session, nextConversations: ConversationResource[]) => {
+      setDeviceRemoval(null);
       setSession(nextSession);
       setConversations(nextConversations);
       // Persisted sends resume once their session is open. A failed load keeps
@@ -64,15 +84,59 @@ export function useAppBootstrap(): {
   );
 
   const clearSession = useCallback(() => {
-    if (session) {
-      applicationContainer.directMessages.stopOutbox(session.identity.id);
-      applicationContainer.groupMessages.stop(session.identity.id);
-    }
-    closeAllRealtimeConnections();
-    applicationContainer.disposeSessionWorkers();
+    stopSessionWork(session?.identity.id ?? null);
     void clearProjectedMessageCaches();
     setSession(null);
   }, [session]);
+
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
+
+  // While signed in, a revoke made on another device is verified from the
+  // signed transitions within DeviceRemovalWatch.CHECK_INTERVAL_MS; the
+  // session closes and this device is erased without waiting for a sign-in.
+  useEffect(() => {
+    if (!identityId) return;
+
+    const watch = new DeviceRemovalWatch(
+      () => sessionRef.current,
+      (current) =>
+        applicationContainer.identities.synchronizeDeviceAuthorization(current),
+      {
+        onAdvanced: (from, to) => {
+          setSession((current) => (current === from ? to : current));
+        },
+        onRemoved: (removedIdentityId) => {
+          stopSessionWork(removedIdentityId);
+          setSession(null);
+          setConversations([]);
+          setDeviceRemoval({ identityId: removedIdentityId, state: 'erasing' });
+        },
+      },
+    );
+
+    watch.start();
+
+    return () => watch.stop();
+  }, [identityId]);
+
+  // The erase starts once the workspace has unmounted, so nothing it tears
+  // down writes back what the erase removed.
+  useEffect(() => {
+    if (deviceRemoval?.state !== 'erasing') return;
+
+    const removedIdentityId = deviceRemoval.identityId;
+
+    void eraseRemovedDevice(removedIdentityId, applicationContainer).then(
+      (erased) => {
+        setDeviceRemoval({
+          identityId: removedIdentityId,
+          state: erased ? 'erased' : 'erase-failed',
+        });
+      },
+    );
+  }, [deviceRemoval]);
 
   const handleNetworkCreated = useCallback(() => {
     window.location.reload();
@@ -87,6 +151,7 @@ export function useAppBootstrap(): {
     clearSession,
     communities,
     conversations,
+    deviceRemoval,
     handleAuthenticated,
     handleNetworkCreated,
     nodeNetworks,
