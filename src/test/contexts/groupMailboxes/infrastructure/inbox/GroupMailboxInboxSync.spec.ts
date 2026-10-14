@@ -374,6 +374,41 @@ const deleted = (
   id: messageId,
 });
 
+const poll = (author: string, pollId: string) =>
+  DirectMailboxRecords.poll({
+    allowsMultipleVotes: false,
+    authorId: id(author),
+    conversationId: CONVERSATION,
+    createdAt: now,
+    id: pollId,
+    options: [
+      { id: 'tea', text: 'Tea' },
+      { id: 'coffee', text: 'Coffee' },
+    ],
+    question: 'Which one?',
+  });
+
+const pollVote = (author: string, voteId: string, targetPollId: string) => ({
+  ...DirectMailboxRecords.pollVote({
+    authorId: id(author),
+    conversationId: CONVERSATION,
+    createdAt: now,
+    optionIds: ['tea'],
+    targetPollId,
+  }),
+  id: voteId,
+});
+
+const pollClose = (author: string, closeId: string, targetPollId: string) => ({
+  ...DirectMailboxRecords.pollClose({
+    authorId: id(author),
+    conversationId: CONVERSATION,
+    createdAt: now,
+    targetPollId,
+  }),
+  id: closeId,
+});
+
 const send = (from: Member, record: DirectMessageRecord): Promise<void> =>
   from.outbox.enqueueMessage(
     CONVERSATION,
@@ -593,6 +628,24 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
       'sent:m1',
       'edited:e-alice',
       'deleted:d-alice',
+    ]);
+  });
+
+  it('accepts a poll and votes from their sender, a close from the poll creator only', async () => {
+    const target = mid('alice', 'p1');
+
+    await send(alice, poll('alice', target));
+    await send(bob, poll('bob', mid('alice', 'p-squatted')));
+    await send(bob, pollVote('bob', mid('bob', 'v-bob'), target));
+    await send(bob, pollVote('alice', mid('alice', 'v-forged'), target));
+    await send(bob, pollClose('bob', mid('bob', 'c-bob'), target));
+    await send(alice, pollClose('alice', mid('alice', 'c-alice'), target));
+    await sync(carol);
+
+    expect(ids(carol.received)).toEqual([
+      'poll:p1',
+      'poll_vote:v-bob',
+      'poll_close:c-alice',
     ]);
   });
 

@@ -41,12 +41,11 @@ function sentBody(http: MockProxy<HttpJsonClient>) {
   } & Record<string, unknown>;
 }
 
+const CHANNEL = { channelId: 'channel-a', communityId: 'community-a' };
+
 beforeEach(() => {
   jest
     .spyOn(ScopeFrontierReader.prototype, 'community')
-    .mockResolvedValue(['F'.repeat(43)]);
-  jest
-    .spyOn(ScopeFrontierReader.prototype, 'conversation')
     .mockResolvedValue(['F'.repeat(43)]);
 });
 
@@ -54,13 +53,7 @@ describe(PigeonPollsApi.name, () => {
   it('signs a vote as a put of the voter ballot record', async () => {
     const { api, http, session, signer } = await setup();
 
-    await api.vote(
-      session,
-      'poll/a',
-      { conversationId: 'conversation-a' },
-      ['option-a'],
-      200,
-    );
+    await api.vote(session, 'poll/a', CHANNEL, ['option-a'], 200);
 
     const body = sentBody(http);
     expect(body).toMatchObject({ createdAt: 200, optionIds: ['option-a'] });
@@ -81,9 +74,7 @@ describe(PigeonPollsApi.name, () => {
   it('signs vote removal as a delete tombstone', async () => {
     const { api, http, session } = await setup();
 
-    await api.removeVote(session, 'poll-a', {
-      conversationId: 'conversation-a',
-    });
+    await api.removeVote(session, 'poll-a', CHANNEL);
 
     expect(http.request.mock.calls[0][1]?.method).toBe('DELETE');
     expect(sentBody(http).mutation).toMatchObject({
@@ -98,7 +89,7 @@ describe(PigeonPollsApi.name, () => {
   it('signs close as a put of the close record', async () => {
     const { api, http, session } = await setup();
 
-    await api.close(session, 'poll-a', { conversationId: 'c' }, 300);
+    await api.close(session, 'poll-a', CHANNEL, 300);
 
     const body = sentBody(http);
     expect(body.createdAt).toBe(300);
@@ -113,13 +104,14 @@ describe(PigeonPollsApi.name, () => {
 
     await api.create(session, {
       allowsMultipleVotes: false,
-      conversationId: 'conversation-a',
+      channelId: 'channel-a',
+      communityId: 'community-a',
       createdAt: 100,
       expiresAt: null,
       options: [{ id: 'option-a', text: 'A' }],
       pollId: 'poll-a',
       question: 'Choose?',
-      scopeType: 'group_conversation',
+      scopeType: 'community_channel',
     });
 
     const body = sentBody(http);
@@ -147,22 +139,5 @@ describe(PigeonPollsApi.name, () => {
       recordId: `community:community-a:channel-a:poll-a:${session.identity.id}`,
       store: 'messages',
     });
-  });
-
-  it('sends no timeline record for a group poll', async () => {
-    const { api, http, session } = await setup();
-
-    await api.create(session, {
-      allowsMultipleVotes: false,
-      conversationId: 'conversation-a',
-      createdAt: 100,
-      expiresAt: null,
-      options: [{ id: 'option-a', text: 'A' }],
-      pollId: 'poll-a',
-      question: 'Choose?',
-      scopeType: 'group_conversation',
-    });
-
-    expect(sentBody(http)).not.toHaveProperty('timelineMutation');
   });
 });

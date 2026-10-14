@@ -1,6 +1,9 @@
 import type { DirectDeletedRecord } from '../../../../../contexts/mailboxes/domain/DirectDeletedRecord';
 import type { DirectEditedRecord } from '../../../../../contexts/mailboxes/domain/DirectEditedRecord';
 import type { DirectPinRecord } from '../../../../../contexts/mailboxes/domain/DirectPinRecord';
+import type { DirectPollCloseRecord } from '../../../../../contexts/mailboxes/domain/DirectPollCloseRecord';
+import type { DirectPollRecord } from '../../../../../contexts/mailboxes/domain/DirectPollRecord';
+import type { DirectPollVoteRecord } from '../../../../../contexts/mailboxes/domain/DirectPollVoteRecord';
 import type { DirectReactionRecord } from '../../../../../contexts/mailboxes/domain/DirectReactionRecord';
 import type { DirectReadRecord } from '../../../../../contexts/mailboxes/domain/DirectReadRecord';
 import type { DirectSentRecord } from '../../../../../contexts/mailboxes/domain/DirectSentRecord';
@@ -24,6 +27,10 @@ describe(DirectMessageMailboxRecord.name, () => {
     deleted: DirectDeletedRecord;
     edited: DirectEditedRecord;
     pin: DirectPinRecord;
+    poll: DirectPollRecord;
+    pollClose: DirectPollCloseRecord;
+    pollVote: DirectPollVoteRecord;
+    pollVoteRemoved: DirectPollVoteRecord;
     reactionAdd: DirectReactionRecord;
     reactionRemove: DirectReactionRecord;
     sentWithReply: DirectSentRecord;
@@ -55,6 +62,45 @@ describe(DirectMessageMailboxRecord.name, () => {
       id: 'pin-1',
       targetMessageId: 'message-1',
       type: 'pin',
+    },
+    poll: {
+      allowsMultipleVotes: false,
+      authorId: 'alice',
+      conversationId,
+      createdAt: 600,
+      id: 'poll-1',
+      options: [
+        { id: 'option-a', text: 'Tea' },
+        { id: 'option-b', text: 'Coffee' },
+      ],
+      question: 'Which one?',
+      type: 'poll',
+    },
+    pollClose: {
+      authorId: 'alice',
+      conversationId,
+      createdAt: 800,
+      id: 'poll-close-1',
+      targetPollId: 'poll-1',
+      type: 'poll_close',
+    },
+    pollVote: {
+      authorId: 'bob',
+      conversationId,
+      createdAt: 700,
+      id: 'poll-vote-1',
+      optionIds: ['option-b'],
+      targetPollId: 'poll-1',
+      type: 'poll_vote',
+    },
+    pollVoteRemoved: {
+      authorId: 'bob',
+      conversationId,
+      createdAt: 701,
+      id: 'poll-vote-2',
+      optionIds: [],
+      targetPollId: 'poll-1',
+      type: 'poll_vote',
     },
     reactionAdd: {
       action: 'add',
@@ -190,6 +236,9 @@ describe(DirectMessageMailboxRecord.name, () => {
       ['a deleted record', records.deleted],
       ['a reaction record', records.reactionAdd],
       ['a pin record', records.pin],
+      ['a poll record', records.poll],
+      ['a poll vote record', records.pollVote],
+      ['a poll close record', records.pollClose],
     ])('rejects %s that belongs to another conversation', (_label, record) => {
       expect(
         DirectMessageMailboxRecord.decode(
@@ -216,7 +265,7 @@ describe(DirectMessageMailboxRecord.name, () => {
           }),
         ),
       ],
-      ['an unknown record type', envelope({ ...sentRecord, type: 'poll' })],
+      ['an unknown record type', envelope({ ...sentRecord, type: 'survey' })],
       [
         'a sent record without a payload',
         envelope({ ...sentRecord, encryptedPayload: undefined }),
@@ -244,6 +293,34 @@ describe(DirectMessageMailboxRecord.name, () => {
       [
         'a pin without a target',
         envelope({ ...records.pin, targetMessageId: undefined }),
+      ],
+      [
+        'a poll without a question',
+        envelope({ ...records.poll, question: undefined }),
+      ],
+      [
+        'a poll whose options are not a list',
+        envelope({ ...records.poll, options: 'Tea' }),
+      ],
+      [
+        'a poll with an option without text',
+        envelope({ ...records.poll, options: [{ id: 'option-a' }] }),
+      ],
+      [
+        'a poll without its vote rule',
+        envelope({ ...records.poll, allowsMultipleVotes: 'yes' }),
+      ],
+      [
+        'a poll vote without a target',
+        envelope({ ...records.pollVote, targetPollId: undefined }),
+      ],
+      [
+        'a poll vote whose options are not strings',
+        envelope({ ...records.pollVote, optionIds: [1] }),
+      ],
+      [
+        'a poll close without a target',
+        envelope({ ...records.pollClose, targetPollId: undefined }),
       ],
     ])('returns null for %s', (_label, plaintext) => {
       expect(
