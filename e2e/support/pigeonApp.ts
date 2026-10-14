@@ -19,7 +19,19 @@ export async function loginIdentity(
   recoveryKey?: string,
 ): Promise<void> {
   await page.goto('/');
-  await page.getByTestId('auth-identity-input').fill(identity);
+  // A browser that last signed in as this identity shows it in place of the
+  // identity input.
+  const identityInput = page.getByTestId('auth-identity-input');
+  const rememberedIdentity = page.getByTestId('auth-identity-preview');
+
+  await expect(identityInput.or(rememberedIdentity).first()).toBeVisible({
+    timeout: 30_000,
+  });
+  if (await rememberedIdentity.isVisible()) {
+    await expect(rememberedIdentity).toContainText(identity.replace(/^@/, ''));
+  } else {
+    await identityInput.fill(identity, { timeout: 10_000 });
+  }
   await page.getByTestId('auth-password-input').fill(password);
 
   if (recoveryKey) {
@@ -157,11 +169,15 @@ export async function selectConversationByTitle(
   page: Page,
   title: string,
 ): Promise<Locator> {
-  await openSidebar(page);
   const conversation = conversationRow(page, title);
 
-  await expect(conversation).toBeVisible({ timeout: 30_000 });
-  await conversation.click();
+  // On a phone, creating a conversation opens it and slides the sidebar out.
+  // The sidebar can still be in view when this starts, so a click that finds
+  // the row slid away reopens the sidebar and tries again.
+  await expect(async () => {
+    await openSidebar(page);
+    await conversation.click({ timeout: 5_000 });
+  }).toPass({ timeout: 45_000 });
 
   return conversation;
 }
