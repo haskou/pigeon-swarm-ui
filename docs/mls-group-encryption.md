@@ -171,15 +171,16 @@ and attachments, and a missing group is an error, not a fallback.
 - Concurrent commits depend on the lowest-id rule and on clients retaining the
   previous epoch state. Lost records are repaired by fetching, not guessed.
 - MLS client state (leaf private keys, epoch secrets, key packages), the
-  plaintext cache and the group generation log are sealed in IndexedDB with
-  AES-256-GCM (`DeviceSealedEntryStore`, #376), each store under its own key
-  derived by HKDF-SHA256 from the device-sealed root and its label:
-  `pigeon-mls-state` (communities), `pigeon-group-mls` and
-  `pigeon-group-generations` (group conversations). A row is keyed by the
-  identity id, its kind (`group`, `key-package`, `plaintext`, `generations`)
-  and an HMAC-SHA256 tag of its kind and ids; the AAD binds identity, kind and
-  tag, and the ids are sealed with the value. At rest, only the identity id,
-  the kinds and the row count per kind are readable. Values are decrypted when
+  plaintext cache, the group generation log and the handled group control
+  letters are sealed in IndexedDB with AES-256-GCM (`DeviceSealedEntryStore`,
+  #376), each store under its own key derived by HKDF-SHA256 from the
+  device-sealed root and its label: `pigeon-mls-state` (communities),
+  `pigeon-group-mls`, `pigeon-group-generations` and `pigeon-group-control`
+  (group conversations). A row is keyed by the identity id, its kind (`group`,
+  `key-package`, `plaintext`, `generations`, `control-letter`) and an
+  HMAC-SHA256 tag of its kind and ids; the AAD binds identity, kind and tag,
+  and the ids are sealed with the value. At rest, only the identity id, the
+  kinds and the row count per kind are readable. Values are decrypted when
   read; up to 2,048 plaintexts stay decrypted in memory (LRU), dropped on
   sign-out. A per-identity canary detects a root change: a canary that opens
   only under the root the session replaced (`previousDeviceSealedRootKey`,

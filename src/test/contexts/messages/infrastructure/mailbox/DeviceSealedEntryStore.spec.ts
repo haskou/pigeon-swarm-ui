@@ -54,4 +54,30 @@ describe('DeviceSealedEntryStore with the browser Buffer', () => {
       await new DeviceSealedEntryStore(name, 'label').get(session(2), KIND, ID),
     ).toEqual(VALUE);
   });
+
+  it('adds an entry only while none is held under its id, across connections', async () => {
+    const other = new TextEncoder().encode('other-value-marker-51d7');
+    const added = await Promise.all([
+      new DeviceSealedEntryStore(name, 'label').add(
+        session(1),
+        KIND,
+        ID,
+        VALUE,
+      ),
+      new DeviceSealedEntryStore(name, 'label').add(
+        session(1),
+        KIND,
+        ID,
+        other,
+      ),
+    ]);
+    const held = await new DeviceSealedEntryStore(name, 'label').get(
+      session(1),
+      KIND,
+      ID,
+    );
+
+    expect(added.filter(Boolean)).toHaveLength(1);
+    expect(held).toEqual(added[0] ? VALUE : other);
+  });
 });
