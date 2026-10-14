@@ -79,7 +79,7 @@ describe('DirectMessageAuthorship', () => {
     ).toBe(true);
   });
 
-  it('treats a record whose author id the value object rejects as not own', () => {
+  it('rejects a record whose author id the value object rejects', () => {
     expect(
       DirectMessageAuthorship.isAuthentic(
         'alice',
@@ -87,7 +87,7 @@ describe('DirectMessageAuthorship', () => {
         { ...record, authorId: 'x'.repeat(5000) },
         undefined,
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('requires a valid tag on an own record addressed in PEM form', () => {
