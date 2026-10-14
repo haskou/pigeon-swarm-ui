@@ -186,6 +186,37 @@ export function useCallStartActions({
       startCall,
     ],
   );
+  const startLocalCallSession = useCallback(
+    async (call: CallResource, microphone: CallMicrophoneRequest) => {
+      const details = callDetailsForResource(call);
+      const mediaEncryption = await callMediaEncryptionForResource(call);
+
+      logCallDebug('workspace:call:start-local-session', {
+        callId: call.id,
+        participantCount: details.participants.length,
+      });
+      await startCall({
+        ...details,
+        call,
+        currentIdentityId: sessionRef.current.identity.id,
+        id: call.id,
+        loadIceConfig: loadCallIceConfig,
+        localStream: microphone.stream,
+        microphoneError: microphone.microphoneError,
+        ...mediaEncryption,
+        noiseCancellationEnabled: callNoiseCancellationEnabled,
+        onSignal: callSignalSender(call.id),
+      });
+    },
+    [
+      callNoiseCancellationEnabled,
+      callDetailsForResource,
+      callMediaEncryptionForResource,
+      callSignalSender,
+      loadCallIceConfig,
+      startCall,
+    ],
+  );
   const startCommunityVoiceCall = useCallback(
     (channel: {
       connectedIdentityIds?: string[];
@@ -260,26 +291,7 @@ export function useCallStartActions({
           participantCount: call.participants.length,
           status: call.status,
         });
-        const currentIdentityId = sessionRef.current.identity.id;
-        const details = callDetailsForResource(call);
-        const mediaEncryption = await callMediaEncryptionForResource(call);
-
-        logCallDebug('workspace:community-voice:start-local-session', {
-          callId: call.id,
-          participantCount: details.participants.length,
-        });
-        await startCall({
-          ...details,
-          call,
-          currentIdentityId,
-          id: call.id,
-          loadIceConfig: loadCallIceConfig,
-          localStream: microphone.stream,
-          microphoneError: microphone.microphoneError,
-          ...mediaEncryption,
-          noiseCancellationEnabled: callNoiseCancellationEnabled,
-          onSignal: callSignalSender(call.id),
-        });
+        await startLocalCallSession(call, microphone);
         logCallDebug('workspace:community-voice:start-local-session-complete', {
           callId: call.id,
         });
@@ -303,13 +315,9 @@ export function useCallStartActions({
       activeCall?.communityId,
       activeCall?.kind,
       callNoiseCancellationEnabled,
-      callDetailsForResource,
-      callMediaEncryptionForResource,
-      callSignalSender,
       cleanupJoinedCalls,
       leaveCurrentCallForSwitch,
-      loadCallIceConfig,
-      startCall,
+      startLocalCallSession,
     ],
   );
 
@@ -389,21 +397,7 @@ export function useCallStartActions({
         callId: call.id,
         participantStatuses: call.participants.map(participantStatusLog),
       });
-      const details = callDetailsForResource(call);
-      const mediaEncryption = await callMediaEncryptionForResource(call);
-
-      await startCall({
-        ...details,
-        call,
-        currentIdentityId: sessionRef.current.identity.id,
-        id: call.id,
-        loadIceConfig: loadCallIceConfig,
-        localStream: microphone.stream,
-        microphoneError: microphone.microphoneError,
-        ...mediaEncryption,
-        noiseCancellationEnabled: callNoiseCancellationEnabled,
-        onSignal: callSignalSender(call.id),
-      });
+      await startLocalCallSession(call, microphone);
     })()
       .catch((caught) => {
         stopLocalAudio(microphone.stream);
@@ -413,17 +407,69 @@ export function useCallStartActions({
         callActionInProgressRef.current = false;
       });
   }, [
-    callNoiseCancellationEnabled,
-    callDetailsForResource,
-    callMediaEncryptionForResource,
-    callSignalSender,
     cleanupJoinedCalls,
     incomingCall,
     leaveCurrentCallForSwitch,
-    loadCallIceConfig,
     requestOptionalLocalAudio,
-    startCall,
+    startLocalCallSession,
   ]);
+
+  const followSupersededCall = useCallback(
+    (superseded: CallResource) => {
+      const winnerCallId = superseded.supersededByCallId;
+
+      if (!winnerCallId) return;
+
+      if (callActionInProgressRef.current) {
+        logCallWarning('workspace:superseded-call:ignored-action-in-progress', {
+          callId: superseded.id,
+          supersededByCallId: winnerCallId,
+        });
+
+        return;
+      }
+
+      callActionInProgressRef.current = true;
+      let microphone: CallMicrophoneRequest = { stream: null };
+
+      void (async () => {
+        microphone = await requestOptionalLocalAudio(
+          'workspace:superseded-call:microphone-unavailable',
+          { callId: winnerCallId },
+        );
+        await leaveCurrentCallForSwitch();
+        await cleanupJoinedCalls(winnerCallId);
+
+        logCallDebug('workspace:superseded-call:join-request', {
+          callId: superseded.id,
+          supersededByCallId: winnerCallId,
+        });
+        const call = await applicationContainer.calls.join(
+          sessionRef.current,
+          winnerCallId,
+        );
+
+        await startLocalCallSession(call, microphone);
+      })()
+        .catch((caught) => {
+          stopLocalAudio(microphone.stream);
+          logCallError('workspace:superseded-call:failed', caught, {
+            callId: superseded.id,
+            supersededByCallId: winnerCallId,
+          });
+          setSendError(toUserErrorMessage(caught, copy.workspace.sendError));
+        })
+        .finally(() => {
+          callActionInProgressRef.current = false;
+        });
+    },
+    [
+      cleanupJoinedCalls,
+      leaveCurrentCallForSwitch,
+      requestOptionalLocalAudio,
+      startLocalCallSession,
+    ],
+  );
 
   const declineIncomingCall = useCallback(() => {
     if (!incomingCall) return;
@@ -440,6 +486,7 @@ export function useCallStartActions({
   return {
     acceptIncomingCall,
     declineIncomingCall,
+    followSupersededCall,
     isCallActionInProgress,
     startCommunityVoiceCall,
     startConversationCall,

@@ -1,5 +1,6 @@
 import { Timestamp, type PrimitiveOf } from '@haskou/value-objects';
 
+import { CallId } from './CallId';
 import { CallStatus } from './CallStatus';
 
 export class CallLifecycle {
@@ -12,6 +13,9 @@ export class CallLifecycle {
         ? undefined
         : new Timestamp(primitives.createdAt),
       primitives.endedAt ? new Timestamp(primitives.endedAt) : undefined,
+      primitives.supersededByCallId
+        ? CallId.fromString(primitives.supersededByCallId)
+        : undefined,
     );
   }
 
@@ -19,6 +23,7 @@ export class CallLifecycle {
     private readonly status: CallStatus,
     private readonly createdAt: Timestamp | undefined,
     private readonly endedAt?: Timestamp,
+    private readonly supersededByCallId?: CallId,
   ) {}
 
   public end(at: Timestamp): CallLifecycle {
@@ -38,12 +43,17 @@ export class CallLifecycle {
       createdAt?: number;
       endedAt?: number;
       status: ReturnType<CallStatus['valueOf']>;
+      supersededByCallId?: string;
     } = {
       ...(this.createdAt ? { createdAt: this.createdAt.valueOf() } : {}),
       status: this.status.valueOf(),
     };
 
     if (this.endedAt) primitives.endedAt = this.endedAt.valueOf();
+
+    if (this.supersededByCallId) {
+      primitives.supersededByCallId = this.supersededByCallId.toString();
+    }
 
     return primitives;
   }

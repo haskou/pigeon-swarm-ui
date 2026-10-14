@@ -10,6 +10,7 @@ export type CallResourceReconciliationInput = {
   callDetailsForResource: (call: CallResource) => WorkspaceCallDetails;
   currentIdentityId: string;
   endCall: () => void;
+  followSupersededCall: (call: CallResource) => void;
   reconcileCall: (call: CallResource, input: WorkspaceCallDetails) => void;
   setCommunities: Dispatch<SetStateAction<Community[]>>;
 };

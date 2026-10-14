@@ -231,6 +231,42 @@ function endCallOnUnavailableResource({
   }
 }
 
+function settleEndedCall({
+  call,
+  currentActiveCall,
+  endCall,
+  followSupersededCall,
+  incomingCallId,
+  setIncomingCall,
+}: {
+  call: CallResource;
+  currentActiveCall: CallResourceReconciliationInput['activeCall'];
+  endCall: CallResourceReconciliationInput['endCall'];
+  followSupersededCall: CallResourceReconciliationInput['followSupersededCall'];
+  incomingCallId: string | undefined;
+  setIncomingCall: Dispatch<SetStateAction<IncomingWorkspaceCall | null>>;
+}): void {
+  if (call.supersededByCallId && currentActiveCall?.id === call.id) {
+    logCallWarning('workspace:call:superseded', {
+      callId: call.id,
+      supersededByCallId: call.supersededByCallId,
+    });
+    followSupersededCall(call);
+
+    return;
+  }
+
+  endCallOnUnavailableResource({
+    call,
+    context: { callId: call.id, status: call.status },
+    currentActiveCall,
+    endCall,
+    event: 'workspace:call:ended-by-resource-status',
+    incomingCallId,
+    setIncomingCall,
+  });
+}
+
 function isJoinedOnAnotherDevice({
   call,
   currentActiveCall,
@@ -256,6 +292,7 @@ function reconcileCallLifecycle({
   currentParticipant,
   details,
   endCall,
+  followSupersededCall,
   incomingCallId,
   notifiedCallIds,
   reconcileCall,
@@ -267,18 +304,18 @@ function reconcileCallLifecycle({
   currentParticipant: CallResource['participants'][number] | undefined;
   details: WorkspaceCallDetails;
   endCall: CallResourceReconciliationInput['endCall'];
+  followSupersededCall: CallResourceReconciliationInput['followSupersededCall'];
   incomingCallId: string | undefined;
   notifiedCallIds: Set<string>;
   reconcileCall: CallResourceReconciliationInput['reconcileCall'];
   setIncomingCall: Dispatch<SetStateAction<IncomingWorkspaceCall | null>>;
 }): void {
   if (call.status !== 'active') {
-    endCallOnUnavailableResource({
+    settleEndedCall({
       call,
-      context: { callId: call.id, status: call.status },
       currentActiveCall,
       endCall,
-      event: 'workspace:call:ended-by-resource-status',
+      followSupersededCall,
       incomingCallId,
       setIncomingCall,
     });
@@ -366,6 +403,7 @@ export function useCallResourceReconciliation({
   callDetailsForResource,
   currentIdentityId,
   endCall,
+  followSupersededCall,
   reconcileCall,
   setCommunities,
 }: CallResourceReconciliationInput): {
@@ -441,6 +479,7 @@ export function useCallResourceReconciliation({
         currentParticipant,
         details,
         endCall,
+        followSupersededCall,
         incomingCallId: incomingCall?.call.id,
         notifiedCallIds: notifiedIncomingCallIdsRef.current,
         reconcileCall,
@@ -451,6 +490,7 @@ export function useCallResourceReconciliation({
       callDetailsForResource,
       currentIdentityId,
       endCall,
+      followSupersededCall,
       incomingCall?.call.id,
       reconcileCall,
       setCommunities,
