@@ -837,10 +837,14 @@ export function GlassWorkspace({
     onErrorChange: setSendError,
     onHistoryRestored: handleGroupHistoryRestored,
     onMessagesChange: setMessages,
+    refreshConversations,
     session,
     setPinnedMessageIds,
   });
-  useGroupControlReceiver(session);
+  const receiveGroupControl = useGroupControlReceiver(
+    session,
+    refreshConversations,
+  );
   useDirectMessageOutboxSync({
     activeConversation,
     onMessagesChange: setMessages,
@@ -893,6 +897,7 @@ export function GlassWorkspace({
     onNotificationSound: playNotificationSoundIfAllowed,
     onPeersReload,
     realtimeEventsOpen,
+    receiveGroupControl,
     refreshNotifications,
     refreshSession,
     rememberIdentity,

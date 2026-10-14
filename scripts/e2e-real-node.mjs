@@ -13,8 +13,8 @@ const origin = 'http://127.0.0.1:8080';
 // recovery-key sign-in, pairing, 1:1 send/receive, the outbox retry flow and
 // the security audit view run on every engine and viewport CI covers; the
 // call decline on page departure, the two-device revoke flow, the
-// private-community kick and passkey unlock (which needs Chromium's virtual
-// authenticator) run on desktop Chromium.
+// private-community kick, the group conversation removal and passkey unlock
+// (which needs Chromium's virtual authenticator) run on desktop Chromium.
 const runs = [
   {
     specs: [
@@ -30,6 +30,7 @@ const runs = [
       'e2e/call-page-departure.spec.ts',
       'e2e/device-revoke-mailbox.spec.ts',
       'e2e/community-mls-kick.spec.ts',
+      'e2e/group-conversation.spec.ts',
       'e2e/passkey-unlock.spec.ts',
     ],
     projects: ['desktop-chromium'],

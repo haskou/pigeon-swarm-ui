@@ -17,13 +17,16 @@ import { applyMailboxSyncChanges } from './applyMailboxSyncChanges';
  * one settles. A cleanup aborts the running pass and the schedule. A failing
  * streak shows one notice unless another error is already shown; the next
  * successful pass clears only that notice. Pin records apply last-writer-wins
- * per message through one MessagePinClock per effect run.
+ * per message through one MessagePinClock per effect run. The first pass
+ * that finds this identity off the roster refreshes the conversation list,
+ * once per effect run, so the group leaves the sidebar.
  */
 export function useGroupMessageMailboxSync({
   activeConversation,
   onErrorChange,
   onHistoryRestored,
   onMessagesChange,
+  refreshConversations,
   session,
   setPinnedMessageIds,
 }: GroupMessageMailboxSyncInput): void {
@@ -41,6 +44,7 @@ export function useGroupMessageMailboxSync({
     const controller = new AbortController();
     const pinClock = new MessagePinClock();
     let failing = false;
+    let removalSeen = false;
     let timer: number | undefined;
     const apply = (changes: DirectMessageTimelineChange[]): void => {
       applyMailboxSyncChanges(changes, pinClock, {
@@ -59,13 +63,19 @@ export function useGroupMessageMailboxSync({
     };
     const pass = async (): Promise<void> => {
       try {
-        await applicationContainer.groupMessages.sync(
+        const { removed } = await applicationContainer.groupMessages.sync(
           session,
           conversationId,
           controller.signal,
           apply,
         );
+
         report(false);
+
+        if (removed && !removalSeen && !controller.signal.aborted) {
+          removalSeen = true;
+          void refreshConversations().catch(() => null);
+        }
       } catch {
         if (!controller.signal.aborted) report(true);
       }
@@ -97,6 +107,7 @@ export function useGroupMessageMailboxSync({
     onErrorChange,
     onHistoryRestored,
     onMessagesChange,
+    refreshConversations,
     session,
     setPinnedMessageIds,
   ]);

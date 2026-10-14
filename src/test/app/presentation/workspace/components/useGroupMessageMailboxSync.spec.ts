@@ -73,12 +73,15 @@ function mountSync(activeConversation: ConversationResource = group) {
     pinned = typeof update === 'function' ? update(pinned) : update;
   });
 
+  const refreshConversations = jest.fn(() => Promise.resolve([]));
+
   mockEffects.length = 0;
   useGroupMessageMailboxSync({
     activeConversation,
     onErrorChange,
     onHistoryRestored,
     onMessagesChange,
+    refreshConversations,
     session,
     setPinnedMessageIds,
   });
@@ -90,6 +93,7 @@ function mountSync(activeConversation: ConversationResource = group) {
     messages: () => messages,
     onHistoryRestored,
     pinnedIds: () => pinned,
+    refreshConversations,
   };
 }
 
@@ -102,7 +106,7 @@ describe('useGroupMessageMailboxSync', () => {
         globalThis.setTimeout(callback, ms),
     });
     restore.mockReset().mockResolvedValue(undefined);
-    sync.mockReset().mockResolvedValue(undefined);
+    sync.mockReset().mockResolvedValue({ removed: false });
   });
 
   afterEach(() => {
@@ -169,7 +173,7 @@ describe('useGroupMessageMailboxSync', () => {
         },
       ]);
 
-      return Promise.resolve();
+      return Promise.resolve({ removed: false });
     });
     const mounted = mountSync();
 
@@ -183,7 +187,7 @@ describe('useGroupMessageMailboxSync', () => {
     sync
       .mockRejectedValueOnce(new TypeError('offline'))
       .mockRejectedValueOnce(new TypeError('offline'))
-      .mockResolvedValueOnce(undefined);
+      .mockResolvedValueOnce({ removed: false });
     const mounted = mountSync();
 
     await settle();
@@ -195,6 +199,28 @@ describe('useGroupMessageMailboxSync', () => {
     await settle();
 
     expect(mounted.error()).toBeNull();
+    mounted.cleanup();
+  });
+
+  it('refreshes the conversation list once after this member was removed', async () => {
+    sync.mockResolvedValue({ removed: true });
+    const mounted = mountSync();
+
+    await settle();
+    jest.advanceTimersByTime(POLL_MS);
+    await settle();
+
+    expect(sync).toHaveBeenCalledTimes(2);
+    expect(mounted.refreshConversations).toHaveBeenCalledTimes(1);
+    mounted.cleanup();
+  });
+
+  it('leaves the conversation list alone while this member stays', async () => {
+    const mounted = mountSync();
+
+    await settle();
+
+    expect(mounted.refreshConversations).not.toHaveBeenCalled();
     mounted.cleanup();
   });
 

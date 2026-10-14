@@ -1,6 +1,7 @@
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { NotificationResource } from '../../../notifications/infrastructure/http/resources/NotificationResource';
 import type { GroupMailboxControl } from './GroupMailboxControl';
+import type { GroupMailboxNotificationLetter } from './GroupMailboxNotificationLetter';
 import type { GroupMailboxNotificationPages } from './GroupMailboxNotificationPages';
 
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
@@ -15,7 +16,8 @@ import { GroupMailboxControlSeal } from './GroupMailboxControlSeal';
  * `ANSWER_WINDOW_MS` of their send time, so letters the node keeps forever
  * cannot make this device answer again after a reload; the MLS engine
  * judges a late welcome. A letter whose handling failed is retried on the
- * next run. Logs carry counts only.
+ * next run. A run resolves with the conversations a welcome joined during
+ * it. Logs carry counts only.
  */
 export class GroupMailboxNotificationPump {
   public static readonly ANSWER_WINDOW_MS = 5 * 60_000;
@@ -25,7 +27,8 @@ export class GroupMailboxNotificationPump {
 
   private again = false;
   private readonly handled = new Set<string>();
-  private running: Promise<void> | undefined;
+  private joined = new Set<string>();
+  private running: Promise<ReadonlySet<string>> | undefined;
 
   public constructor(
     private readonly session: Session,
@@ -34,11 +37,13 @@ export class GroupMailboxNotificationPump {
     private readonly now: () => number,
   ) {}
 
-  private async drain(): Promise<void> {
+  private async drain(): Promise<ReadonlySet<string>> {
     do {
       this.again = false;
       await this.scan();
     } while (this.again);
+
+    return this.joined;
   }
 
   private async handle(notification: NotificationResource): Promise<number> {
@@ -47,7 +52,14 @@ export class GroupMailboxNotificationPump {
 
     try {
       if (letter) {
-        await this.control.receiveDirect(letter.sender, letter.plaintext);
+        const outcome = await this.control.receiveDirect(
+          letter.sender,
+          letter.plaintext,
+        );
+
+        if (outcome === 'applied' && letter.welcome) {
+          this.joined.add(letter.conversationId);
+        }
       }
       this.handled.add(notification.id);
 
@@ -60,7 +72,7 @@ export class GroupMailboxNotificationPump {
   /** The record `notification` carries, if it is a valid letter. */
   private letterOf(
     notification: NotificationResource,
-  ): { plaintext: Uint8Array; sender: string } | undefined {
+  ): GroupMailboxNotificationLetter | undefined {
     if (notification.type !== 'group_conversation_invitation') {
       return undefined;
     }
@@ -74,12 +86,15 @@ export class GroupMailboxNotificationPump {
 
     if (!opened) return undefined;
     const record = GroupMailboxControlRecord.decode(opened.plaintext);
+    const welcome = record?.type === 'welcome';
 
     return record?.conversationId === conversationId &&
-      (record.type === 'welcome' || this.timely(opened.sentAt))
+      (welcome || this.timely(opened.sentAt))
       ? {
+          conversationId,
           plaintext: opened.plaintext,
           sender: IdentityId.normalize(inviterIdentityId),
+          welcome,
         }
       : undefined;
   }
@@ -87,7 +102,7 @@ export class GroupMailboxNotificationPump {
   /** Like `letterOf`, for a notification the node may have malformed. */
   private safeLetterOf(
     notification: NotificationResource,
-  ): { plaintext: Uint8Array; sender: string } | undefined {
+  ): GroupMailboxNotificationLetter | undefined {
     try {
       return this.letterOf(notification);
     } catch {
@@ -129,13 +144,17 @@ export class GroupMailboxNotificationPump {
     );
   }
 
-  /** Reads every letter; a call during a run makes that run read again. */
-  public run(): Promise<void> {
+  /**
+   * Reads every letter; a call during a run makes that run read again and
+   * shares its result.
+   */
+  public run(): Promise<ReadonlySet<string>> {
     if (this.running) {
       this.again = true;
 
       return this.running;
     }
+    this.joined = new Set();
     this.running = this.drain().finally(() => {
       this.running = undefined;
     });
