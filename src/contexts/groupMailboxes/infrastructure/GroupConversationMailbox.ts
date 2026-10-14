@@ -1,6 +1,7 @@
 import type { ConversationResource } from '../../conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../identities/infrastructure/session/Session';
 import type { ChatMessage } from '../../messages/domain/ChatMessage';
+import type { DirectMessageTimelineChange } from '../../messages/domain/DirectMessageTimelineChange';
 import type { EditMessageOptions } from '../../messages/infrastructure/http/resources/EditMessageOptions';
 import type { SendMessageOptions } from '../../messages/infrastructure/http/resources/SendMessageOptions';
 import type { GroupMailboxRoster } from '../domain/GroupMailboxRoster';
@@ -313,6 +314,59 @@ export class GroupConversationMailbox {
       MessagePinChange.now(
         MessagePinAction.fromPrimitives(pin.action),
         MessageId.fromString(pin.messageId),
+      ),
+    );
+  }
+
+  /**
+   * Queues a poll in the conversation and resolves with its change. Rejects
+   * like send, and before queuing a poll the poll rules refuse.
+   */
+  public async createPoll(
+    session: Session,
+    conversation: ConversationResource,
+    poll: {
+      allowsMultipleVotes: boolean;
+      options: { id: string; text: string }[];
+      question: string;
+    },
+  ): Promise<Extract<DirectMessageTimelineChange, { kind: 'poll' }>> {
+    return this.timeline.poll(
+      await this.sender.createPoll(this.member(session), conversation.id, poll),
+    );
+  }
+
+  /**
+   * Queues this identity's vote on a poll, or its withdrawal when no option
+   * is chosen, and resolves with its change. Rejects like send.
+   */
+  public async votePoll(
+    session: Session,
+    conversation: ConversationResource,
+    pollId: string,
+    optionIds: string[],
+  ): Promise<Extract<DirectMessageTimelineChange, { kind: 'poll_vote' }>> {
+    return this.timeline.pollVote(
+      await this.sender.votePoll(
+        this.member(session),
+        conversation.id,
+        pollId,
+        optionIds,
+      ),
+    );
+  }
+
+  /** Queues the close of this identity's poll. Rejects like send. */
+  public async closePoll(
+    session: Session,
+    conversation: ConversationResource,
+    pollId: string,
+  ): Promise<Extract<DirectMessageTimelineChange, { kind: 'poll_close' }>> {
+    return this.timeline.pollClose(
+      await this.sender.closePoll(
+        this.member(session),
+        conversation.id,
+        pollId,
       ),
     );
   }

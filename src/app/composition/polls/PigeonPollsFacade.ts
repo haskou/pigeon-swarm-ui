@@ -36,24 +36,18 @@ export class PigeonPollsFacade {
     session: Session,
     input: CreatePollInput,
   ): Promise<PollResource> {
-    const communityChannel = input.scopeType === 'community_channel';
-    const firstIdentifier = communityChannel
-      ? input.communityId
-      : input.conversationId;
-    const secondIdentifier = communityChannel ? input.channelId : undefined;
-
     return this.mapper.toResource(
       await this.useCases.creator.create(
         new CreatePollMessage({
           actorIdentityId: this.actor(session),
           allowsMultipleVotes: input.allowsMultipleVotes,
           expiresAt: input.expiresAt,
-          firstScopeIdentifier: firstIdentifier,
+          firstScopeIdentifier: input.communityId,
           occurredAt: Date.now(),
           options: input.options,
           question: input.question,
           scopeType: input.scopeType,
-          secondScopeIdentifier: secondIdentifier,
+          secondScopeIdentifier: input.channelId,
         }),
       ),
     );

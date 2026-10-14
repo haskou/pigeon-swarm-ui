@@ -15,17 +15,11 @@ export class PollMapper {
   private scopeFromResource(
     scope: PollScopeResource,
   ): PrimitiveOf<Poll>['definition']['scope'] {
-    return scope.type === 'community_channel'
-      ? {
-          firstIdentifier: scope.communityId,
-          secondIdentifier: scope.channelId,
-          type: scope.type,
-        }
-      : {
-          firstIdentifier: scope.conversationId,
-          secondIdentifier: undefined,
-          type: scope.type,
-        };
+    return {
+      firstIdentifier: scope.communityId,
+      secondIdentifier: scope.channelId,
+      type: scope.type,
+    };
   }
 
   public fromResource(resource: PollResource): Poll {
@@ -53,38 +47,27 @@ export class PollMapper {
   public toScopeFields(poll: Poll): PollScopeFields {
     const { scope } = poll.toPrimitives().definition;
 
-    return scope.type === 'community_channel'
-      ? {
-          channelId: scope.secondIdentifier ?? '',
-          communityId: scope.firstIdentifier,
-        }
-      : { conversationId: scope.firstIdentifier };
+    return {
+      channelId: scope.secondIdentifier,
+      communityId: scope.firstIdentifier,
+    };
   }
 
   public toCreateRequest(poll: Poll): CreatePollRequest {
     const primitives: PrimitiveOf<Poll> = poll.toPrimitives();
     const definition = primitives.definition;
-    const common = {
+
+    return {
       allowsMultipleVotes: definition.allowsMultipleVotes,
+      channelId: definition.scope.secondIdentifier,
+      communityId: definition.scope.firstIdentifier,
       createdAt: primitives.createdAt,
       expiresAt: definition.expiresAt,
       options: definition.options,
       pollId: primitives.id,
       question: definition.question,
+      scopeType: 'community_channel',
     };
-
-    return definition.scope.type === 'community_channel'
-      ? {
-          ...common,
-          channelId: definition.scope.secondIdentifier ?? '',
-          communityId: definition.scope.firstIdentifier,
-          scopeType: 'community_channel',
-        }
-      : {
-          ...common,
-          conversationId: definition.scope.firstIdentifier,
-          scopeType: 'group_conversation',
-        };
   }
 
   public toResource(poll: Poll): PollResource {

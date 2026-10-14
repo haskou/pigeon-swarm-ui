@@ -1,6 +1,9 @@
 import type { Session } from '../../identities/infrastructure/session/Session';
 import type { DirectEditedRecord } from '../../mailboxes/domain/DirectEditedRecord';
 import type { DirectMessageRecord } from '../../mailboxes/domain/DirectMessageRecord';
+import type { DirectPollCloseRecord } from '../../mailboxes/domain/DirectPollCloseRecord';
+import type { DirectPollRecord } from '../../mailboxes/domain/DirectPollRecord';
+import type { DirectPollVoteRecord } from '../../mailboxes/domain/DirectPollVoteRecord';
 import type { DirectSentRecord } from '../../mailboxes/domain/DirectSentRecord';
 import type { DirectMessageTimelineChange } from '../../messages/domain/DirectMessageTimelineChange';
 import type { MessageProjector } from '../../messages/infrastructure/crypto/MessageProjector';
@@ -11,8 +14,9 @@ import { DirectMessageMailboxRecord } from '../../messages/infrastructure/mailbo
 /**
  * Turns accepted group records into timeline changes, in record order. The
  * inbox already checked who may write each record; a message whose payload
- * does not read drops only its own change. Read receipts never travel in a
- * group.
+ * does not read drops only its own change. Polls, votes and closes pass
+ * through as they are; the poll board validates and folds them. Read
+ * receipts never travel in a group.
  */
 export class GroupConversationTimeline {
   public constructor(
@@ -35,6 +39,58 @@ export class GroupConversationTimeline {
         ? { kind: 'message', message }
         : { kind: 'edit', message },
     ];
+  }
+
+  private pollChanges(
+    record: DirectMessageRecord,
+  ): DirectMessageTimelineChange[] {
+    switch (record.type) {
+      case DirectMailboxRecords.TYPE.poll:
+        return [this.poll(record)];
+      case DirectMailboxRecords.TYPE.pollVote:
+        return [this.pollVote(record)];
+      case DirectMailboxRecords.TYPE.pollClose:
+        return [this.pollClose(record)];
+      default:
+        return [];
+    }
+  }
+
+  public poll(
+    record: DirectPollRecord,
+  ): Extract<DirectMessageTimelineChange, { kind: 'poll' }> {
+    return {
+      allowsMultipleVotes: record.allowsMultipleVotes,
+      createdAt: record.createdAt,
+      creatorIdentityId: record.authorId,
+      id: record.id,
+      kind: 'poll',
+      options: record.options,
+      question: record.question,
+    };
+  }
+
+  public pollVote(
+    record: DirectPollVoteRecord,
+  ): Extract<DirectMessageTimelineChange, { kind: 'poll_vote' }> {
+    return {
+      createdAt: record.createdAt,
+      kind: 'poll_vote',
+      optionIds: record.optionIds,
+      pollId: record.targetPollId,
+      voterIdentityId: record.authorId,
+    };
+  }
+
+  public pollClose(
+    record: DirectPollCloseRecord,
+  ): Extract<DirectMessageTimelineChange, { kind: 'poll_close' }> {
+    return {
+      closerIdentityId: record.authorId,
+      createdAt: record.createdAt,
+      kind: 'poll_close',
+      pollId: record.targetPollId,
+    };
   }
 
   public changes(
@@ -68,8 +124,8 @@ export class GroupConversationTimeline {
               messageId: record.targetMessageId,
             },
           ];
-        case DirectMailboxRecords.TYPE.read:
-          return [];
+        default:
+          return this.pollChanges(record);
       }
     });
   }

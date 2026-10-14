@@ -7,7 +7,7 @@ import type {
   IdentityPictures,
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
 import type { ChatMessage } from '../../../../contexts/messages/domain/ChatMessage';
-import type { PollResource } from '../../../../contexts/polls/infrastructure/http/resources/PollResource';
+import type { PollSnapshot } from '../../../../contexts/polls/domain/PollSnapshot';
 import type { StickerMessageReference } from '../../../../contexts/stickers/infrastructure/http/resources/StickerMessageReference';
 import type { LoadState } from './LoadState';
 
@@ -42,13 +42,13 @@ export interface ChatMessageTimelineProps {
   ) => void;
   onReplyReferenceClick: (messageId: string) => void;
   onRetryMessage: (message: ChatMessage) => void;
-  onPollClose?: (poll: PollResource) => Promise<void>;
-  onPollRemoveVote?: (poll: PollResource) => Promise<void>;
-  onPollVote?: (poll: PollResource, optionIds: string[]) => Promise<void>;
+  onPollClose?: (poll: PollSnapshot) => Promise<void>;
+  onPollRemoveVote?: (poll: PollSnapshot) => Promise<void>;
+  onPollVote?: (poll: PollSnapshot, optionIds: string[]) => Promise<void>;
   onStickerClick?: (sticker: StickerMessageReference) => void;
   onScroll: () => void;
   pinnedMessageIds: ReadonlySet<string>;
   reactionAuthorNames: Record<string, string>;
-  polls?: PollResource[];
+  polls?: PollSnapshot[];
   scrollerRef: RefObject<HTMLDivElement | null>;
 }

@@ -47,7 +47,7 @@ describe(PigeonPollRepository.name, () => {
     expect(api.vote).toHaveBeenCalledWith(
       session,
       'poll-a',
-      { conversationId: 'conversation-a' },
+      { channelId: 'channel-a', communityId: 'community-a' },
       ['option-a'],
       200,
     );

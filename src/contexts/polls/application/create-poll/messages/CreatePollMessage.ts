@@ -1,7 +1,6 @@
-import { Timestamp, assert } from '@haskou/value-objects';
+import { Timestamp } from '@haskou/value-objects';
 
 import { PollOption } from '../../../domain/entities/PollOption';
-import { InvalidPollScopeError } from '../../../domain/errors/InvalidPollScopeError';
 import { PollActorId } from '../../../domain/value-objects/PollActorId';
 import { PollDefinition } from '../../../domain/value-objects/PollDefinition';
 import { PollExpiration } from '../../../domain/value-objects/PollExpiration';
@@ -10,8 +9,6 @@ import { PollOptionId } from '../../../domain/value-objects/PollOptionId';
 import { PollOptionText } from '../../../domain/value-objects/PollOptionText';
 import { PollQuestion } from '../../../domain/value-objects/PollQuestion';
 import { PollScope } from '../../../domain/value-objects/PollScope';
-import { PollScopeIdentifier } from '../../../domain/value-objects/PollScopeIdentifier';
-import { PollScopeType } from '../../../domain/value-objects/PollScopeType';
 
 export class CreatePollMessage {
   public constructor(
@@ -72,20 +69,10 @@ export class CreatePollMessage {
   }
 
   public getScope(): PollScope {
-    const type = PollScopeType.fromPrimitives(this.input.scopeType);
-    const firstIdentifier = PollScopeIdentifier.fromString(
-      this.input.firstScopeIdentifier,
-    );
-
-    if (!type.isCommunityChannel()) {
-      return PollScope.groupConversation(firstIdentifier);
-    }
-
-    assert(this.input.secondScopeIdentifier, new InvalidPollScopeError());
-
-    return PollScope.communityChannel(
-      firstIdentifier,
-      PollScopeIdentifier.fromString(this.input.secondScopeIdentifier),
-    );
+    return PollScope.fromPrimitives({
+      firstIdentifier: this.input.firstScopeIdentifier,
+      secondIdentifier: this.input.secondScopeIdentifier,
+      type: this.input.scopeType,
+    });
   }
 }

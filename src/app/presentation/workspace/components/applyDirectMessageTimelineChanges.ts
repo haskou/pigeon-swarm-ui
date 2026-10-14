@@ -11,7 +11,8 @@ import { mergeConversationMessageIfTargetExists } from './conversationThreadStat
  * target is not in the timeline is ignored. Reactions are last-writer-wins per
  * message, author and emoji, so a replayed or out-of-order add cannot undo a
  * newer remove.
- * Pin changes leave the timeline untouched; the sync hook applies them.
+ * Pin and poll changes leave the timeline untouched; the sync hook applies
+ * them.
  */
 export function applyDirectMessageTimelineChanges(
   current: ChatMessage[],
@@ -37,8 +38,7 @@ export function applyDirectMessageTimelineChanges(
               )
             : message,
         );
-      case 'pin':
-      case 'read':
+      default:
         return messages;
     }
   }, current);

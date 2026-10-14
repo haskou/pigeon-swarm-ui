@@ -1,5 +1,8 @@
 import type { ConversationResource } from '../../conversations/infrastructure/http/ConversationResource';
 import type { DirectMessageRecord } from '../../mailboxes/domain/DirectMessageRecord';
+import type { DirectPollCloseRecord } from '../../mailboxes/domain/DirectPollCloseRecord';
+import type { DirectPollRecord } from '../../mailboxes/domain/DirectPollRecord';
+import type { DirectPollVoteRecord } from '../../mailboxes/domain/DirectPollVoteRecord';
 import type { ChatMessage } from '../../messages/domain/ChatMessage';
 import type { MessagePinChange } from '../../messages/domain/MessagePinChange';
 import type { MessageReactionChange } from '../../messages/domain/MessageReactionChange';
@@ -12,6 +15,7 @@ import type { GroupMessageHistoryStore } from './history/GroupMessageHistoryStor
 
 import { DirectMailboxRecords } from '../../mailboxes/domain/DirectMailboxRecords';
 import { DirectMessageMailboxRecord } from '../../messages/infrastructure/mailbox/DirectMessageMailboxRecord';
+import { PollBoard } from '../../polls/domain/PollBoard';
 import { GroupMessageId } from './crypto/GroupMessageId';
 
 /**
@@ -20,7 +24,8 @@ import { GroupMessageId } from './crypto/GroupMessageId';
  * exists. Every record id is bound to its author, as the inbox demands. MLS
  * cannot open a member's own messages, so each record is kept in this
  * device's history once it is queued. A queued record is sent even when that
- * copy fails, so a retry never sends it twice under a new id.
+ * copy fails, so a retry never sends it twice under a new id. A poll's
+ * record id is the poll id; a poll the poll rules refuse is never queued.
  */
 export class GroupConversationSender {
   private static readonly PLAIN: MessagePayloadSeal = (plainMessage) =>
@@ -173,5 +178,81 @@ export class GroupConversationSender {
         targetMessageId: pin.getMessageId().toString(),
       }),
     );
+  }
+
+  public async createPoll(
+    member: GroupConversationMember,
+    conversationId: string,
+    poll: {
+      allowsMultipleVotes: boolean;
+      options: { id: string; text: string }[];
+      question: string;
+    },
+  ): Promise<DirectPollRecord> {
+    const { createdAt, id } = this.identity(member);
+    const canonical = PollBoard.canonical({
+      ...poll,
+      createdAt,
+      creatorIdentityId: member.session.identity.id,
+      id,
+    });
+    const record = DirectMailboxRecords.poll({
+      allowsMultipleVotes: canonical.allowsMultipleVotes,
+      authorId: canonical.creatorIdentityId,
+      conversationId,
+      createdAt,
+      id,
+      options: canonical.options,
+      question: canonical.question,
+    });
+
+    await this.enqueue(member, record);
+
+    return record;
+  }
+
+  /** No option ids withdraws this identity's vote. */
+  public async votePoll(
+    member: GroupConversationMember,
+    conversationId: string,
+    pollId: string,
+    optionIds: string[],
+  ): Promise<DirectPollVoteRecord> {
+    const { createdAt, id } = this.identity(member);
+    const record = {
+      ...DirectMailboxRecords.pollVote({
+        authorId: member.session.identity.id,
+        conversationId,
+        createdAt,
+        optionIds,
+        targetPollId: pollId,
+      }),
+      id,
+    };
+
+    await this.enqueue(member, record);
+
+    return record;
+  }
+
+  public async closePoll(
+    member: GroupConversationMember,
+    conversationId: string,
+    pollId: string,
+  ): Promise<DirectPollCloseRecord> {
+    const { createdAt, id } = this.identity(member);
+    const record = {
+      ...DirectMailboxRecords.pollClose({
+        authorId: member.session.identity.id,
+        conversationId,
+        createdAt,
+        targetPollId: pollId,
+      }),
+      id,
+    };
+
+    await this.enqueue(member, record);
+
+    return record;
   }
 }

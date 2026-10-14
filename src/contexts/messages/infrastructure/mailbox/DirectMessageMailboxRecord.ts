@@ -212,6 +212,26 @@ function isPinFields(value: Record<string, unknown>): boolean {
   );
 }
 
+function isPollFields(value: Record<string, unknown>): boolean {
+  return (
+    typeof value.allowsMultipleVotes === 'boolean' &&
+    typeof value.question === 'string' &&
+    Array.isArray(value.options) &&
+    value.options.every(
+      (option) =>
+        isObject(option) &&
+        typeof option.id === 'string' &&
+        typeof option.text === 'string',
+    )
+  );
+}
+
+function isPollVoteFields(value: Record<string, unknown>): boolean {
+  return (
+    isStringArray(value.optionIds) && typeof value.targetPollId === 'string'
+  );
+}
+
 function isDirectMessageRecord(value: unknown): value is DirectMessageRecord {
   if (!hasRecordBase(value)) return false;
 
@@ -228,6 +248,19 @@ function isDirectMessageRecord(value: unknown): value is DirectMessageRecord {
       return isReactionFields(value);
     case 'pin':
       return isPinFields(value);
+    default:
+      return isPollRecord(value);
+  }
+}
+
+function isPollRecord(value: Record<string, unknown>): boolean {
+  switch (value.type) {
+    case 'poll':
+      return isPollFields(value);
+    case 'poll_vote':
+      return isPollVoteFields(value);
+    case 'poll_close':
+      return typeof value.targetPollId === 'string';
     default:
       return false;
   }

@@ -1,6 +1,9 @@
 import type { DirectDeletedRecord } from './DirectDeletedRecord';
 import type { DirectEditedRecord } from './DirectEditedRecord';
 import type { DirectPinRecord } from './DirectPinRecord';
+import type { DirectPollCloseRecord } from './DirectPollCloseRecord';
+import type { DirectPollRecord } from './DirectPollRecord';
+import type { DirectPollVoteRecord } from './DirectPollVoteRecord';
 import type { DirectReactionRecord } from './DirectReactionRecord';
 import type { DirectReadRecord } from './DirectReadRecord';
 import type { DirectSentRecord } from './DirectSentRecord';
@@ -9,6 +12,9 @@ export type DirectMessageRecord =
   | DirectDeletedRecord
   | DirectEditedRecord
   | DirectPinRecord
+  | DirectPollCloseRecord
+  | DirectPollRecord
+  | DirectPollVoteRecord
   | DirectReactionRecord
   | DirectReadRecord
   | DirectSentRecord;

@@ -720,6 +720,117 @@ describe('GroupConversationMailbox', () => {
     });
   });
 
+  it('carries a poll, its votes and its creator’s close to every member', async () => {
+    await formGroup();
+    const created = await alice.mailbox.createPoll(
+      alice.session,
+      conversation(),
+      {
+        allowsMultipleVotes: false,
+        options: [
+          { id: 'tea', text: 'Tea' },
+          { id: 'coffee', text: 'Coffee' },
+        ],
+        question: 'Which one?',
+      },
+    );
+
+    await Promise.all(everyone().map(sync));
+    const pollId = created.kind === 'poll' ? created.id : '';
+    const bobVote = await bob.mailbox.votePoll(
+      bob.session,
+      conversation(),
+      pollId,
+      ['coffee'],
+    );
+    const carolVote = await carol.mailbox.votePoll(
+      carol.session,
+      conversation(),
+      pollId,
+      [],
+    );
+    const closed = await alice.mailbox.closePoll(
+      alice.session,
+      conversation(),
+      pollId,
+    );
+
+    await Promise.all(everyone().map(sync));
+    const polls = (member: Member) =>
+      member.changes.filter(({ kind }) => kind.startsWith('poll'));
+
+    expect(created).toEqual({
+      allowsMultipleVotes: false,
+      createdAt: expect.any(Number),
+      creatorIdentityId: alice.id,
+      id: expect.any(String),
+      kind: 'poll',
+      options: [
+        { id: 'tea', text: 'Tea' },
+        { id: 'coffee', text: 'Coffee' },
+      ],
+      question: 'Which one?',
+    });
+    expect(bobVote).toEqual({
+      createdAt: expect.any(Number),
+      kind: 'poll_vote',
+      optionIds: ['coffee'],
+      pollId,
+      voterIdentityId: bob.id,
+    });
+    expect(closed).toEqual({
+      closerIdentityId: alice.id,
+      createdAt: expect.any(Number),
+      kind: 'poll_close',
+      pollId,
+    });
+    expect(polls(carol)).toEqual(
+      expect.arrayContaining([created, bobVote, closed]),
+    );
+    expect(polls(alice)).toEqual(expect.arrayContaining([bobVote, carolVote]));
+  });
+
+  it('refuses a poll the domain cannot hold before queuing it', async () => {
+    await formGroup();
+
+    await expect(
+      alice.mailbox.createPoll(alice.session, conversation(), {
+        allowsMultipleVotes: false,
+        options: [{ id: 'tea', text: 'Tea' }],
+        question: 'Which one?',
+      }),
+    ).rejects.toThrow();
+    await Promise.all(everyone().map(sync));
+
+    expect(bob.changes.some(({ kind }) => kind === 'poll')).toBe(false);
+  });
+
+  it('restores this member’s own poll from its history', async () => {
+    await formGroup();
+    const created = await alice.mailbox.createPoll(
+      alice.session,
+      conversation(),
+      {
+        allowsMultipleVotes: true,
+        options: [
+          { id: 'tea', text: 'Tea' },
+          { id: 'coffee', text: 'Coffee' },
+        ],
+        question: 'Which ones?',
+      },
+    );
+    const restored: DirectMessageTimelineChange[] = [];
+
+    await alice.mailbox.restore(
+      alice.session,
+      CONVERSATION,
+      new AbortController().signal,
+      (changes) => restored.push(...changes),
+    );
+
+    expect(restored).toEqual([created]);
+  });
+
   it('ignores a replayed welcome after a restart', async () => {
     await formGroup();
     bob.mailbox.stop(bob.id);

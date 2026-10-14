@@ -15,9 +15,10 @@ export function pollResourceFixture(
     ],
     question: 'Choose?',
     scope: {
-      conversationId: 'conversation-a',
+      channelId: 'channel-a',
+      communityId: 'community-a',
       networkId: 'network-a',
-      type: 'group_conversation',
+      type: 'community_channel',
     },
     status: 'open',
     votes: [],

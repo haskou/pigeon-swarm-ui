@@ -2,10 +2,10 @@ import type { MouseEvent, PointerEvent } from 'react';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import type { PollResource } from '../../infrastructure/http/resources/PollResource';
+import type { PollSnapshot } from '../../domain/PollSnapshot';
 
-import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 
 const TOUCH_TAP_MAX_MS = 450;
 const TOUCH_TAP_MAX_DISTANCE = 12;
@@ -19,11 +19,11 @@ export function PollCard({
   poll,
 }: {
   currentIdentityId: string;
-  onClose?: (poll: PollResource) => Promise<void>;
+  onClose?: (poll: PollSnapshot) => Promise<void>;
   onMenuOpen?: (x: number, y: number) => void;
-  onRemoveVote: (poll: PollResource) => Promise<void>;
-  onVote: (poll: PollResource, optionIds: string[]) => Promise<void>;
-  poll: PollResource;
+  onRemoveVote: (poll: PollSnapshot) => Promise<void>;
+  onVote: (poll: PollSnapshot, optionIds: string[]) => Promise<void>;
+  poll: PollSnapshot;
 }) {
   const currentVote = poll.votes.find(
     (vote) => vote.voterIdentityId === currentIdentityId,
@@ -93,6 +93,7 @@ export function PollCard({
   };
   const handleContextMenu = (event: MouseEvent) => {
     if (!onMenuOpen) return;
+
     if (isCoarsePointer()) return;
 
     event.preventDefault();
@@ -114,6 +115,7 @@ export function PollCard({
     if (event.pointerType !== 'touch') return;
 
     const touchTap = touchTapRef.current;
+
     if (!touchTap) return;
 
     if (touchDistance(touchTap, event) > TOUCH_TAP_MAX_DISTANCE) {
@@ -126,16 +128,19 @@ export function PollCard({
   const handlePointerUp = (event: PointerEvent<HTMLElement>) => {
     if (event.pointerType !== 'touch') {
       clearTouchTap();
+
       return;
     }
 
     if (!onMenuOpen || isInteractivePollTarget(event)) {
       clearTouchTap();
+
       return;
     }
 
     if (!isTouchTap(touchTapRef.current, event)) {
       clearTouchTap();
+
       return;
     }
 
@@ -268,7 +273,7 @@ export function PollCard({
   );
 }
 
-export function countPollVotes(poll: PollResource): Record<string, number> {
+export function countPollVotes(poll: PollSnapshot): Record<string, number> {
   const counts = Object.fromEntries(
     poll.options.map((option) => [option.id, 0]),
   );

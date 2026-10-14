@@ -63,7 +63,6 @@ type WorkspaceRealtimeEventRouterInput = {
   setActiveConversationId: (conversationId: null | string) => void;
   setCommunities: Dispatch<SetStateAction<Community[]>>;
   setCommunityRealtimeEvent: (event: RealtimeDomainEvent) => void;
-  setConversationRealtimeEvent: (event: RealtimeDomainEvent) => void;
   setConversations: Dispatch<SetStateAction<ConversationResource[]>>;
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
   setRealtimeEventLog: Dispatch<SetStateAction<RealtimeDomainEvent[]>>;
@@ -109,7 +108,6 @@ export function useWorkspaceRealtimeEventRouter({
   setActiveConversationId,
   setCommunities,
   setCommunityRealtimeEvent,
-  setConversationRealtimeEvent,
   setConversations,
   setMessages,
   setRealtimeEventLog,
@@ -211,17 +209,7 @@ export function useWorkspaceRealtimeEventRouter({
   const handlePollEvent = useCallback(
     (event: RealtimeDomainEvent) => {
       const poll = recordAttribute(event, 'poll') as PollResource | undefined;
-      const participantIds = event.attributes.participantIds;
       const memberIds = event.attributes.memberIds;
-
-      if (
-        poll?.scope.type === 'group_conversation' ||
-        Array.isArray(participantIds)
-      ) {
-        setConversationRealtimeEvent(event);
-
-        return;
-      }
 
       if (
         poll?.scope.type === 'community_channel' ||
@@ -230,7 +218,7 @@ export function useWorkspaceRealtimeEventRouter({
         setCommunityRealtimeEvent(event);
       }
     },
-    [setCommunityRealtimeEvent, setConversationRealtimeEvent],
+    [setCommunityRealtimeEvent],
   );
 
   const notifyCommunityMessage = useCallback(

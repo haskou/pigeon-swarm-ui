@@ -8,7 +8,7 @@ import type { Session } from '../../../identities/infrastructure/session/Session
 import type { ChatMessage } from '../../../messages/domain/ChatMessage';
 import type { MarkdownMention } from '../../../messages/presentation/components/markdownMessage';
 import type { CommunityInvitationNotificationResource } from '../../../notifications/infrastructure/http/resources/CommunityInvitationNotificationResource';
-import type { PollResource } from '../../../polls/infrastructure/http/resources/PollResource';
+import type { PollSnapshot } from '../../../polls/domain/PollSnapshot';
 import type { StickerMessageReference } from '../../../stickers/infrastructure/http/resources/StickerMessageReference';
 import type { CommunityChannelThreadSummaryResource as CommunityChannelThreadSummary } from '../../infrastructure/http/resources/CommunityChannelThreadSummaryResource';
 
@@ -68,18 +68,18 @@ interface CommunityMessageTimelineProps {
   ) => void;
   onReplyReferenceClick: (messageId: string) => void;
   onRetryMessage: (message: ChatMessage) => void;
-  onPollClose?: (poll: PollResource) => Promise<void>;
+  onPollClose?: (poll: PollSnapshot) => Promise<void>;
   canClosePolls: boolean;
   channelThreadSummaries?: CommunityChannelThreadSummary[];
-  onPollRemoveVote?: (poll: PollResource) => Promise<void>;
-  onPollVote?: (poll: PollResource, optionIds: string[]) => Promise<void>;
+  onPollRemoveVote?: (poll: PollSnapshot) => Promise<void>;
+  onPollVote?: (poll: PollSnapshot, optionIds: string[]) => Promise<void>;
   onStickerClick?: (sticker: StickerMessageReference) => void;
   onScroll: () => void;
   pinnedMessageIds: ReadonlySet<string>;
   currentRoleIds: ReadonlySet<string>;
   reactionAuthorNames: Record<string, string>;
   pendingInvitation?: CommunityInvitationNotificationResource | null;
-  polls?: PollResource[];
+  polls?: PollSnapshot[];
   scrollerRef: RefObject<HTMLDivElement | null>;
   session: Session;
   visibleMessages: ChatMessage[];
@@ -393,7 +393,7 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
 });
 
 function canCloseCommunityPoll(
-  poll: PollResource,
+  poll: PollSnapshot,
   currentIdentityId: string,
   canClosePolls: boolean,
 ): boolean {

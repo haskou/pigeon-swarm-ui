@@ -12,6 +12,7 @@ import {
 import type { ConversationResource } from '../../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { ChatMessage } from '../../../../../contexts/messages/domain/ChatMessage';
+import type { DirectMessageTimelineChange } from '../../../../../contexts/messages/domain/DirectMessageTimelineChange';
 
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';
 import { useGroupMessageMailboxSync } from '../../../../../app/presentation/workspace/components/useGroupMessageMailboxSync';
@@ -83,6 +84,8 @@ function mountSync(activeConversation: ConversationResource = group) {
   });
 
   const refreshConversations = jest.fn(() => Promise.resolve([]));
+  const onPollChanges =
+    jest.fn<(changes: DirectMessageTimelineChange[]) => void>();
 
   mockEffects.length = 0;
   useGroupMessageMailboxSync({
@@ -90,6 +93,7 @@ function mountSync(activeConversation: ConversationResource = group) {
     onErrorChange,
     onHistoryRestored,
     onMessagesChange,
+    onPollChanges,
     refreshConversations,
     session,
     setPinnedMessageIds,
@@ -101,6 +105,7 @@ function mountSync(activeConversation: ConversationResource = group) {
     error: () => error,
     messages: () => messages,
     onHistoryRestored,
+    onPollChanges,
     pinnedIds: () => pinned,
     refreshConversations,
   };
@@ -193,6 +198,45 @@ describe('useGroupMessageMailboxSync', () => {
     await settle();
 
     expect(mounted.pinnedIds()).toEqual(new Set(['group-message-1']));
+    mounted.cleanup();
+  });
+
+  it('hands restored and synced poll changes to the poll board', async () => {
+    const poll: DirectMessageTimelineChange = {
+      allowsMultipleVotes: false,
+      createdAt: 300,
+      creatorIdentityId: 'bob',
+      id: 'poll-1',
+      kind: 'poll',
+      options: [
+        { id: 'tea', text: 'Tea' },
+        { id: 'coffee', text: 'Coffee' },
+      ],
+      question: 'Which one?',
+    };
+    const vote: DirectMessageTimelineChange = {
+      createdAt: 400,
+      kind: 'poll_vote',
+      optionIds: ['tea'],
+      pollId: 'poll-1',
+      voterIdentityId: 'carol',
+    };
+    restore.mockImplementationOnce((_session, _id, _signal, apply) => {
+      apply([poll]);
+
+      return Promise.resolve();
+    });
+    sync.mockImplementationOnce((_session, _id, _signal, apply) => {
+      apply([vote]);
+
+      return Promise.resolve({ removed: false });
+    });
+    const mounted = mountSync();
+
+    await settle();
+
+    expect(mounted.onPollChanges.mock.calls).toEqual([[[poll]], [[vote]]]);
+    expect(mounted.messages()).toEqual([]);
     mounted.cleanup();
   });
 

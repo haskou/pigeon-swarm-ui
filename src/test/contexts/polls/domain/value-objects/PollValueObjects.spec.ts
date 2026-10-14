@@ -3,6 +3,7 @@ import { InvalidPollIdError } from '../../../../../contexts/polls/domain/errors/
 import { InvalidPollOptionIdError } from '../../../../../contexts/polls/domain/errors/InvalidPollOptionIdError';
 import { InvalidPollOptionTextError } from '../../../../../contexts/polls/domain/errors/InvalidPollOptionTextError';
 import { InvalidPollQuestionError } from '../../../../../contexts/polls/domain/errors/InvalidPollQuestionError';
+import { InvalidPollScopeError } from '../../../../../contexts/polls/domain/errors/InvalidPollScopeError';
 import { InvalidPollScopeIdentifierError } from '../../../../../contexts/polls/domain/errors/InvalidPollScopeIdentifierError';
 import { InvalidPollVoterIdError } from '../../../../../contexts/polls/domain/errors/InvalidPollVoterIdError';
 import { PollActorId } from '../../../../../contexts/polls/domain/value-objects/PollActorId';
@@ -11,8 +12,8 @@ import { PollMultipleVotePermission } from '../../../../../contexts/polls/domain
 import { PollOptionId } from '../../../../../contexts/polls/domain/value-objects/PollOptionId';
 import { PollOptionText } from '../../../../../contexts/polls/domain/value-objects/PollOptionText';
 import { PollQuestion } from '../../../../../contexts/polls/domain/value-objects/PollQuestion';
+import { PollScope } from '../../../../../contexts/polls/domain/value-objects/PollScope';
 import { PollScopeIdentifier } from '../../../../../contexts/polls/domain/value-objects/PollScopeIdentifier';
-import { PollScopeType } from '../../../../../contexts/polls/domain/value-objects/PollScopeType';
 import { PollVoterId } from '../../../../../contexts/polls/domain/value-objects/PollVoterId';
 
 describe('Poll value objects', () => {
@@ -43,14 +44,33 @@ describe('Poll value objects', () => {
     expect(pemVoterId.isEqual(rawVoterId)).toBe(true);
   });
 
-  it('models scope and multiple-vote behavior', () => {
+  it('models multiple-vote behavior', () => {
     const singleVote = PollMultipleVotePermission.fromBoolean(false);
     const multipleVotes = PollMultipleVotePermission.fromBoolean(true);
 
     expect(singleVote.allows(1)).toBe(true);
     expect(singleVote.allows(2)).toBe(false);
     expect(multipleVotes.allows(2)).toBe(true);
-    expect(PollScopeType.COMMUNITY_CHANNEL.isCommunityChannel()).toBe(true);
-    expect(PollScopeType.GROUP_CONVERSATION.isCommunityChannel()).toBe(false);
+  });
+
+  it('scopes a poll to a community channel only', () => {
+    const channel = PollScope.fromPrimitives({
+      firstIdentifier: 'community-a',
+      secondIdentifier: 'channel-a',
+      type: 'community_channel',
+    });
+
+    expect(channel.toPrimitives()).toEqual({
+      firstIdentifier: 'community-a',
+      secondIdentifier: 'channel-a',
+      type: 'community_channel',
+    });
+    expect(() =>
+      PollScope.fromPrimitives({
+        firstIdentifier: 'conversation-a',
+        secondIdentifier: undefined,
+        type: 'group_conversation',
+      }),
+    ).toThrow(InvalidPollScopeError);
   });
 });

@@ -5,7 +5,7 @@ import type {
   IdentityPictures,
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
 import type { ChatMessage } from '../../../../contexts/messages/domain/ChatMessage';
-import type { PollResource } from '../../../../contexts/polls/infrastructure/http/resources/PollResource';
+import type { PollSnapshot } from '../../../../contexts/polls/domain/PollSnapshot';
 import type { ChatMessageTimelineProps } from './ChatMessageTimelineProps';
 
 import {
@@ -296,11 +296,11 @@ function PollTimelineItem({
   currentIdentityId: string;
   enterOrder: number;
   message: ChatMessage;
-  onClose?: (poll: PollResource) => Promise<void>;
+  onClose?: (poll: PollSnapshot) => Promise<void>;
   onMessageMenuOpen: ChatMessageTimelineProps['onMessageMenuOpen'];
-  onRemoveVote?: (poll: PollResource) => Promise<void>;
-  onVote?: (poll: PollResource, optionIds: string[]) => Promise<void>;
-  poll: PollResource;
+  onRemoveVote?: (poll: PollSnapshot) => Promise<void>;
+  onVote?: (poll: PollSnapshot, optionIds: string[]) => Promise<void>;
+  poll: PollSnapshot;
   startsNewDay: boolean;
 }) {
   const mine = poll.creatorIdentityId === currentIdentityId;

@@ -16,9 +16,9 @@ const pollPrimitives = (overrides: Record<string, unknown> = {}) => ({
     ],
     question: 'Choose?',
     scope: {
-      firstIdentifier: 'conversation-a',
-      secondIdentifier: undefined,
-      type: 'group_conversation',
+      firstIdentifier: 'community-a',
+      secondIdentifier: 'channel-a',
+      type: 'community_channel',
     },
   },
   id: 'poll-a',

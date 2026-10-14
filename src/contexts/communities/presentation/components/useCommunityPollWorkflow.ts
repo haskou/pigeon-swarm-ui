@@ -1,7 +1,8 @@
 import { useCallback } from 'react';
 
-import type { PollResource } from '../../../polls/infrastructure/http/resources/PollResource';
 import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { PollSnapshot } from '../../../polls/domain/PollSnapshot';
+import type { PollResource } from '../../../polls/infrastructure/http/resources/PollResource';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 
@@ -26,10 +27,10 @@ export function useCommunityPollWorkflow({
   session,
   upsertPoll,
 }: CommunityPollWorkflowInput): {
-  closePoll: (poll: PollResource) => Promise<void>;
+  closePoll: (poll: PollSnapshot) => Promise<void>;
   handleCreatePoll: (input: CreateCommunityPollInput) => Promise<void>;
-  removePollVote: (poll: PollResource) => Promise<void>;
-  votePoll: (poll: PollResource, optionIds: string[]) => Promise<void>;
+  removePollVote: (poll: PollSnapshot) => Promise<void>;
+  votePoll: (poll: PollSnapshot, optionIds: string[]) => Promise<void>;
 } {
   const handleCreatePoll = useCallback(
     async (input: CreateCommunityPollInput) => {
@@ -51,7 +52,7 @@ export function useCommunityPollWorkflow({
   );
 
   const votePoll = useCallback(
-    async (poll: PollResource, optionIds: string[]) => {
+    async (poll: PollSnapshot, optionIds: string[]) => {
       upsertPoll(
         await applicationContainer.polls.vote(session, poll.id, optionIds),
       );
@@ -60,16 +61,14 @@ export function useCommunityPollWorkflow({
   );
 
   const removePollVote = useCallback(
-    async (poll: PollResource) => {
-      upsertPoll(
-        await applicationContainer.polls.removeVote(session, poll.id),
-      );
+    async (poll: PollSnapshot) => {
+      upsertPoll(await applicationContainer.polls.removeVote(session, poll.id));
     },
     [session, upsertPoll],
   );
 
   const closePoll = useCallback(
-    async (poll: PollResource) => {
+    async (poll: PollSnapshot) => {
       upsertPoll(await applicationContainer.polls.close(session, poll.id));
     },
     [session, upsertPoll],

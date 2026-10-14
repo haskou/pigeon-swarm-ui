@@ -30,7 +30,7 @@ export class PigeonPollsApi {
     fields: Record<string, unknown> = {},
   ): Promise<PollResource> {
     let response: PollResource | undefined;
-    const frontier = await this.frontierOf(session, scope);
+    const frontier = await this.frontiers.community(session, scope.communityId);
 
     await submitPublicMutation(
       PublicMutationSigner.FIRST_POSITION,
@@ -59,22 +59,13 @@ export class PigeonPollsApi {
     return response as PollResource;
   }
 
-  private async frontierOf(
-    session: Session,
-    scope: PollScopeFields,
-  ): Promise<string[]> {
-    return 'conversationId' in scope
-      ? await this.frontiers.conversation(session, scope.conversationId)
-      : await this.frontiers.community(session, scope.communityId);
-  }
-
   /**
    * Signs the channel message-timeline record that makes the poll appear in
-   * its channel. Group polls travel inside the group's MLS mailbox instead.
+   * its channel.
    */
   private async channelTimelineMutation(
     session: Session,
-    input: Extract<CreatePollRequest, { scopeType: 'community_channel' }>,
+    input: CreatePollRequest,
   ): Promise<SignedPublicMutation> {
     const authorId = this.mutations.authorOf(session);
     const id = [
@@ -113,10 +104,10 @@ export class PigeonPollsApi {
     session: Session,
     input: CreatePollRequest,
   ): Promise<PollResource> {
-    const scope =
-      input.scopeType === 'community_channel'
-        ? { channelId: input.channelId, communityId: input.communityId }
-        : { conversationId: input.conversationId };
+    const scope = {
+      channelId: input.channelId,
+      communityId: input.communityId,
+    };
     const payload = {
       allowsMultipleVotes: input.allowsMultipleVotes,
       createdAt: input.createdAt,
@@ -130,16 +121,10 @@ export class PigeonPollsApi {
       scopeType: 'poll',
       ...scope,
     };
-    const fields =
-      input.scopeType === 'community_channel'
-        ? {
-            ...input,
-            timelineMutation: await this.channelTimelineMutation(
-              session,
-              input,
-            ),
-          }
-        : { ...input };
+    const fields = {
+      ...input,
+      timelineMutation: await this.channelTimelineMutation(session, input),
+    };
 
     return await this.submit(
       session,

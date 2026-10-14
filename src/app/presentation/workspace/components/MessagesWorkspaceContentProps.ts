@@ -8,8 +8,8 @@ import type { SelectablePresenceStatusResource as SelectablePresenceStatus } fro
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { ChatMessage } from '../../../../contexts/messages/domain/ChatMessage';
 import type { NotificationScopeSettingResource as NotificationScopeSetting } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationScopeSettingResource';
-import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 import type { ChatColumn } from './ChatColumn';
+import type { ConversationPollsController } from './ConversationPollsController';
 import type { EditingMessage } from './conversationThreadState';
 import type { RailProps } from './Rail';
 import type { useConversationMessageActions } from './useConversationMessageActions';
@@ -51,7 +51,6 @@ export type MessagesWorkspaceContentProps = {
   conversationNotificationSettingFor: (
     conversation: ConversationResource,
   ) => NotificationScopeSetting;
-  conversationRealtimeEvent: RealtimeDomainEvent | null;
   conversationTypingIdentityIds: string[];
   conversationsWithUnread: ConversationWithUnread[];
   editingMessage: EditingMessage | null;
@@ -104,6 +103,7 @@ export type MessagesWorkspaceContentProps = {
   onSidebarOpen: () => void;
   pendingInvitation: Parameters<typeof ChatColumn>[0]['pendingInvitation'];
   pins: ReturnType<typeof useConversationPins>;
+  polls: ConversationPollsController;
   presenceByIdentityId: Record<string, IdentityPresence>;
   presenceSharedConversationIds: ReadonlySet<string>;
   railProps: RailProps;

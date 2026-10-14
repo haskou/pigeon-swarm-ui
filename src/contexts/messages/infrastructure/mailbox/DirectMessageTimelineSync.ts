@@ -417,6 +417,9 @@ export class DirectMessageTimelineSync {
           ];
         case DirectMailboxRecords.TYPE.read:
           return this.readChanges(session, record);
+        default:
+          // Polls exist only in group conversations.
+          return [];
       }
     });
   }

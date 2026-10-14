@@ -15,15 +15,15 @@ describe(PollCreator.name, () => {
         actorIdentityId: 'identity-a',
         allowsMultipleVotes: false,
         expiresAt: null,
-        firstScopeIdentifier: 'conversation-a',
+        firstScopeIdentifier: 'community-a',
         occurredAt: 100,
         options: [
           { id: 'a', text: 'A' },
           { id: 'b', text: 'B' },
         ],
         question: 'Choose?',
-        scopeType: 'group_conversation',
-        secondScopeIdentifier: undefined,
+        scopeType: 'community_channel',
+        secondScopeIdentifier: 'channel-a',
       }),
     );
 
