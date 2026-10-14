@@ -24,6 +24,7 @@ import { useCloseTransition } from '../../../../shared/presentation/hooks/useClo
 import { IdentityMemberRow } from '../../../identities/presentation/components/IdentityMemberListPanel';
 import { ContactChangeNotice } from '../../../identities/presentation/components/ContactChangeNotice';
 import { ConversationPeer } from '../view-models/ConversationPeer';
+import { IdentityMatch } from '../../../identities/presentation/view-models/IdentityMatch';
 import { contactKeyBlocked } from '../../../identities/presentation/view-models/contactKeyNotice';
 import {
   checkIdentityContact,
@@ -367,7 +368,7 @@ export function CreateConversationDialog({
     }
 
     if (
-      identity.id === session.identity.id ||
+      IdentityMatch.isSame(identity.id, session.identity.id) ||
       groupParticipants.some(
         (participant) => participant.identity.id === identity.id,
       )

@@ -7,6 +7,7 @@ import type { SelectablePresenceStatusResource as SelectablePresenceStatus } fro
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
 import { ConversationPeer } from '../../../../contexts/conversations/presentation/view-models/ConversationPeer';
+import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import {
   readPresencePreference,
@@ -23,8 +24,8 @@ function reconcileOwnPresence(
   preferredStatus: SelectablePresenceStatus | null,
   mergePresence: (presence: IdentityPresence) => void,
 ): void {
-  const ownPresence = presences.find(
-    (presence) => presence.identityId === session.identity.id,
+  const ownPresence = presences.find((presence) =>
+    IdentityMatch.isSame(presence.identityId, session.identity.id),
   );
   const pinnedStatus =
     preferredStatus && preferredStatus !== 'available' ? preferredStatus : null;

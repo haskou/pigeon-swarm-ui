@@ -16,6 +16,7 @@ import { LockIcon } from '../../../../app/presentation/workspace/components/Lock
 import { cx } from '../../../../shared/presentation/cx';
 import { formatDateSeparator } from '../../../../shared/presentation/formatting';
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { IdentityMatch } from '../../../identities/presentation/view-models/IdentityMatch';
 import { DateSeparator } from '../../../messages/presentation/components/DateSeparator';
 import { MessageBubble } from '../../../messages/presentation/components/MessageBubble';
 import {
@@ -194,8 +195,10 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
 
               if (entry.type === 'poll') {
                 const { item } = entry;
-                const mine =
-                  item.poll.creatorIdentityId === session.identity.id;
+                const mine = IdentityMatch.isSame(
+                  item.poll.creatorIdentityId,
+                  session.identity.id,
+                );
 
                 return (
                   <Fragment key={entry.id}>
@@ -235,9 +238,10 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
                             onMessageMenuOpen(
                               {
                                 ...item.message,
-                                mine:
-                                  item.poll.creatorIdentityId ===
+                                mine: IdentityMatch.isSame(
+                                  item.poll.creatorIdentityId,
                                   session.identity.id,
+                                ),
                               },
                               x,
                               y,

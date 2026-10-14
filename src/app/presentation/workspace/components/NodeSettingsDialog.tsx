@@ -15,6 +15,7 @@ import type { NodeSettingsSection } from './NodeSettingsSection';
 
 import { IdentityMemberRow } from '../../../../contexts/identities/presentation/components/IdentityMemberListPanel';
 import { useIdentityPreview } from '../../../../contexts/identities/presentation/hooks/useIdentityPreview';
+import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
 import { NodeRelayConfigurationForm } from '../../../../contexts/networks/presentation/components/NodeRelayConfigurationForm';
 import { defaultRelayConfiguration } from '../../../../contexts/networks/presentation/view-models/defaultRelayConfiguration';
 import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
@@ -514,7 +515,10 @@ export function NodeSettingsDialog({
   const [relayError, setRelayError] = useState<string | null>(null);
   const [relayLoading, setRelayLoading] = useState(false);
   const [relaySaving, setRelaySaving] = useState(false);
-  const isOwner = node?.owner === session.identity.id;
+  const isOwner = IdentityMatch.isSame(
+    node?.owner ?? undefined,
+    session.identity.id,
+  );
   const sections: ReadonlyArray<readonly [NodeSettingsSection, string]> = [
     ['info', copy.nodeSettings.infoTab],
     [

@@ -8,6 +8,7 @@ import type { CommunityWorkspaceProps } from './CommunityWorkspaceProps';
 import { shortId } from '../../../../shared/presentation/formatting';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { profileAnchorFromTarget } from '../../../identities/presentation/view-models/profilePopoverAnchor';
+import { IdentityMatch } from '../../../identities/presentation/view-models/IdentityMatch';
 import { NotificationSettingsPolicy } from '../../../notifications/presentation/view-models/NotificationSettingsPolicy';
 import { CommunityChannelEncryption } from '../view-models/CommunityChannelEncryption';
 import { CommunityEncryptionDetails } from '../view-models/CommunityEncryptionDetails';
@@ -197,7 +198,10 @@ export function CommunityWorkspace({
     selectedChannelId,
     session,
   });
-  const owner = community.ownerIdentityId === session.identity.id;
+  const owner = IdentityMatch.isSame(
+    community.ownerIdentityId,
+    session.identity.id,
+  );
   const network =
     nodeNetworks.find((item) => item.id === community.networkId) ?? null;
   const networkName = network?.name ?? shortId(community.networkId);

@@ -12,6 +12,7 @@ import {
   useContactVerification,
 } from '../../../../contexts/identities/presentation/hooks/useContactVerification';
 import { identityDisplayName } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
+import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
 import {
   profileAnchorFromTarget,
   type ProfilePopoverAnchor,
@@ -358,7 +359,10 @@ export function ChatColumn({
     message: ChatMessage,
     anchor?: ProfilePopoverAnchor,
   ) => {
-    if (message.mine || message.authorIdentityId === session.identity.id) {
+    if (
+      message.mine ||
+      IdentityMatch.isSame(message.authorIdentityId, session.identity.id)
+    ) {
       openOwnProfile(anchor);
 
       return;

@@ -12,6 +12,7 @@ import type { CommunityMemberListItem } from './communityMembersPanel';
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { shortId } from '../../../../shared/presentation/formatting';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
+import { IdentityMatch } from '../../../identities/presentation/view-models/IdentityMatch';
 import { identityName } from '../../../identities/presentation/view-models/identityDisplay';
 import { loadIdentityPicture } from './communityImages';
 import { memberPrimaryName } from './communityMemberNames';
@@ -75,12 +76,11 @@ export function useCommunityMembers({
     void Promise.all(
       identityIdsToLoad.map(async (identityId) => {
         try {
-          const identity =
-            identityId === session.identity.id
-              ? session.identity
-              : await applicationContainer.identities.get(
-                  IdentityId.normalize(identityId),
-                );
+          const identity = IdentityMatch.isSame(identityId, session.identity.id)
+            ? session.identity
+            : await applicationContainer.identities.get(
+                IdentityId.normalize(identityId),
+              );
           const pictureUrl = await loadIdentityPicture(identity);
 
           return [identityId, identity, pictureUrl] as const;
@@ -137,10 +137,9 @@ export function useCommunityMembers({
   );
   const callParticipantForIdentity = useCallback(
     (identityId: string): CallParticipant => {
-      const identity =
-        identityId === session.identity.id
-          ? session.identity
-          : memberIdentities[identityId];
+      const identity = IdentityMatch.isSame(identityId, session.identity.id)
+        ? session.identity
+        : memberIdentities[identityId];
 
       return {
         deafened: false,
