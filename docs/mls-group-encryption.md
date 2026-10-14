@@ -197,7 +197,11 @@ The node can still withhold operations: a member who does not receive a
 demotion keeps trusting the demoted manager until it does. Joins by
 `invitation` or `invite_link` are trusted on the joiner's signature alone,
 since the client cannot see the invitation they cite. Neither lets a node
-give anyone a right no signed operation granted.
+give anyone a right no signed operation granted. An `invite_link` join names
+the link by its reference, never by the token: every member reads the
+operations, and the token alone lets anyone join. The reference is
+`base64url(sha256("pigeon:community-invite-reference:v1\n" + token))`
+(`deriveInviteReference`).
 
 ### History policy
 
