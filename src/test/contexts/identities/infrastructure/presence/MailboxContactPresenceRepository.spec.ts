@@ -67,6 +67,7 @@ const fakeNode = () => {
   };
 
   wire.create.mockImplementation(async (mailboxId, creation) => {
+    await Promise.resolve();
     const held = inboxes.get(mailboxId);
 
     if (!held) {
@@ -85,6 +86,7 @@ const fakeNode = () => {
     }
   });
   wire.append.mockImplementation(async (mailboxId, postToken, input) => {
+    await Promise.resolve();
     const inbox = inboxes.get(mailboxId);
 
     if (inbox?.postTokenHash !== MailboxCapability.hash(postToken)) {
@@ -96,6 +98,7 @@ const fakeNode = () => {
     return { cursor: inbox.lastCursor };
   });
   wire.read.mockImplementation(async (mailboxId, token, after, limit) => {
+    await Promise.resolve();
     const pending = inboxFor(mailboxId, token).envelopes.filter(
       ({ cursor }) => cursor > after,
     );
@@ -106,25 +109,32 @@ const fakeNode = () => {
     };
   });
   wire.acknowledge.mockImplementation(async (mailboxId, token, upTo) => {
+    await Promise.resolve();
     const inbox = inboxFor(mailboxId, token);
     const hash = MailboxCapability.hash(token);
 
     inbox.readers.set(hash, Math.max(inbox.readers.get(hash) ?? 0, upTo));
     settle(inbox);
   });
-  wire.readers.mockImplementation(async (mailboxId, token) => ({
-    maxReaders: 129,
-    readers: [...inboxFor(mailboxId, token).readers].map(
-      ([readTokenHash, ackedCursor]) => ({ ackedCursor, readTokenHash }),
-    ),
-  }));
+  wire.readers.mockImplementation(async (mailboxId, token) => {
+    await Promise.resolve();
+
+    return {
+      maxReaders: 129,
+      readers: [...inboxFor(mailboxId, token).readers].map(
+        ([readTokenHash, ackedCursor]) => ({ ackedCursor, readTokenHash }),
+      ),
+    };
+  });
   wire.addReader.mockImplementation(async (mailboxId, token, readTokenHash) => {
+    await Promise.resolve();
     const { readers } = inboxFor(mailboxId, token);
 
     if (!readers.has(readTokenHash)) readers.set(readTokenHash, 0);
   });
   wire.removeReader.mockImplementation(
     async (mailboxId, token, readTokenHash) => {
+      await Promise.resolve();
       const inbox = inboxFor(mailboxId, token);
 
       if (inbox.readers.size === 1) {
@@ -135,6 +145,7 @@ const fakeNode = () => {
     },
   );
   wire.delete.mockImplementation(async (mailboxId, token) => {
+    await Promise.resolve();
     inboxFor(mailboxId, token);
     inboxes.delete(mailboxId);
   });

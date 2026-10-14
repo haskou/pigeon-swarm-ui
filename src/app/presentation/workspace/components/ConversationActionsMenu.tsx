@@ -260,6 +260,33 @@ function StartCallMenuAction({
   );
 }
 
+function PresenceSharingMenuAction({
+  onClose,
+  onToggle,
+  shared,
+}: {
+  onClose: () => void;
+  onToggle?: () => void;
+  shared: boolean;
+}) {
+  if (!onToggle) return null;
+
+  return (
+    <ConversationHeaderMenuAction
+      icon={<PresenceMenuIcon />}
+      label={
+        shared
+          ? copy.presence.stopSharingWithContact
+          : copy.presence.shareWithContact
+      }
+      onClick={() => {
+        onToggle();
+        onClose();
+      }}
+    />
+  );
+}
+
 function GroupMenuActions({
   close,
   hasConversationKey,
@@ -392,20 +419,11 @@ export function ConversationActionsMenu({
             className="sm:hidden"
           />
         ) : null}
-        {onPresenceSharingToggle ? (
-          <ConversationHeaderMenuAction
-            icon={<PresenceMenuIcon />}
-            label={
-              presenceShared
-                ? copy.presence.stopSharingWithContact
-                : copy.presence.shareWithContact
-            }
-            onClick={() => {
-              onPresenceSharingToggle();
-              close();
-            }}
-          />
-        ) : null}
+        <PresenceSharingMenuAction
+          onClose={close}
+          onToggle={onPresenceSharingToggle}
+          shared={presenceShared}
+        />
         <NotificationScopeMenuActions
           muteLabel={copy.notifications.muteConversation}
           notificationSetting={notificationSetting}
