@@ -4,7 +4,6 @@ import { readFile } from 'node:fs/promises';
 import {
   acceptLatestInvitation,
   createDirectConversation,
-  dismissPushPrompt,
   loginIdentity,
   newIsolatedPage,
   openSecurityProfile,
@@ -12,7 +11,6 @@ import {
   selectConversationByTitle,
   sendMessage,
   type TestIdentity,
-  waitForWorkspace,
 } from './support/pigeonApp';
 
 const ENVELOPES_PATH = /\/mailboxes\/[^/]+\/envelopes$/;
@@ -114,7 +112,7 @@ test('backs up after the password is confirmed again and restores on the same id
     // starts without the history. The node serves it no envelopes, as after
     // its retention expired, so only the backup can bring the history back.
     await serveNoEnvelopes(restored);
-    await signInWithRecoveryKey(restored, alice, recoveryKey);
+    await loginIdentity(restored, `@${alice.handle}`, password, recoveryKey);
     await selectConversationByTitle(restored, bob.name);
     await expect(restored.getByTestId('message-composer-input')).toBeEnabled({
       timeout: 30_000,
@@ -157,9 +155,18 @@ test('backs up after the password is confirmed again and restores on the same id
   }
 });
 
-/** Opens Profile → Security and returns the backup panel. */
+/**
+ * Opens Profile → Security, expands "Storage on this device", which starts
+ * collapsed, and returns the backup panel inside it.
+ */
 async function openHistoryBackup(page: Page): Promise<Locator> {
   await openSecurityProfile(page);
+
+  const storage = page.locator('button[aria-controls="device-storage-panel"]');
+
+  await storage.scrollIntoViewIfNeeded();
+  await storage.click();
+  await expect(storage).toHaveAttribute('aria-expanded', 'true');
 
   const panel = page.getByTestId('history-backup');
 
@@ -202,27 +209,6 @@ async function serveNoEnvelopes(page: Page): Promise<void> {
       return route.fulfill({ json: { envelopes: [], hasMore: false } });
     },
   );
-}
-
-async function signInWithRecoveryKey(
-  page: Page,
-  identity: TestIdentity,
-  recoveryKey: string,
-): Promise<void> {
-  await page.goto('/');
-  await page.getByTestId('auth-identity-input').fill(`@${identity.handle}`);
-  await page
-    .getByTestId('auth-login-method-control')
-    .getByRole('button', { name: 'Recovery key' })
-    .click();
-  await page.getByTestId('auth-recovery-key-input').fill(recoveryKey);
-  await page.getByTestId('auth-password-input').fill(identity.password);
-  await page
-    .getByTestId('auth-password-confirmation-input')
-    .fill(identity.password);
-  await page.getByTestId('auth-submit-button').click();
-  await waitForWorkspace(page);
-  await dismissPushPrompt(page);
 }
 
 function testRunToken(projectName: string): string {
