@@ -28,6 +28,7 @@ export function DeviceManagementDialog({
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<DeviceCredential | null>(null);
   const [current, setCurrent] = useState(session);
+  const [revoking, setRevoking] = useState(false);
   const { close, state } = useCloseTransition(onClose);
   const own = IdentityId.normalize(
     session.deviceCredentialKeyPair.toPrimitives().publicKey,
@@ -43,13 +44,16 @@ export function DeviceManagementDialog({
     }
   }, []);
 
+  // The rotated session reaches this dialog before the readers of the revoked
+  // device are cut off; the list waits, so the revoke shows done only after.
   useEffect(() => {
-    void load(session);
-  }, [load, session]);
+    if (!revoking) void load(session);
+  }, [load, revoking, session]);
 
   const revoke = async (compromisedSince?: number) => {
     if (!selected) return;
     setError(null);
+    setRevoking(true);
 
     try {
       const revoked = await revokeOtherDevice(
@@ -70,9 +74,10 @@ export function DeviceManagementDialog({
 
       if (!revoked.cutOff) setError(copy.profile.deviceRevokeCutOffError);
       setSelected(null);
-      await load(revoked.session);
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.profile.deviceRevokeError));
+    } finally {
+      setRevoking(false);
     }
   };
 
