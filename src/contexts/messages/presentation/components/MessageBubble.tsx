@@ -159,8 +159,10 @@ export function MessageBubble({
   const hasTextContent = message.content.trim().length > 0;
   const stickerWithReply = Boolean(sticker && hasReply);
   const canViewOriginalMessage = Boolean(message.originalContent && !sticker);
-  const awaitingDelivery =
-    message.deliveryStatus === 'pending' || message.deliveryStatus === 'retry';
+  // Every status but failed is a send still under way.
+  const awaitingDelivery = Boolean(
+    message.deliveryStatus && message.deliveryStatus !== 'failed',
+  );
   const encryptedEnvironment = Boolean(
     message.encrypted || message.raw.encryptedPayload || message.raw.payload,
   );

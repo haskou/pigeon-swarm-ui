@@ -425,7 +425,8 @@ describe('GroupConversationMailbox', () => {
       {},
     );
 
-    expect(delivered.deliveryStatus).toBeUndefined();
+    // It may still wait behind a copy queued while the group formed.
+    expect(delivered.deliveryStatus).not.toBe('held');
     roster = new Set([alice.id, bob.id]);
     const held = await alice.mailbox.send(
       alice.session,

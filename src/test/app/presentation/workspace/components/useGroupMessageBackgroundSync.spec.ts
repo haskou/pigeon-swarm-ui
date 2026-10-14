@@ -188,7 +188,7 @@ describe('useGroupMessageBackgroundSync', () => {
   });
 
   it('drops the result of a visit to a group opened meanwhile, and stops visiting it', async () => {
-    let finish = (_activity: GroupConversationActivity): void => undefined;
+    let finish: (activity: GroupConversationActivity) => void = () => undefined;
 
     // The lib targets ES2020, which predates Promise.withResolvers.
     receive.mockImplementationOnce(

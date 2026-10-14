@@ -34,6 +34,7 @@ const REAL_CRYPTO_SPECS = [
   'GroupMailboxNotificationLink',
   'GroupMailboxNotificationPump',
   'GroupMailboxOutbox',
+  'GroupMessageHistoryStore',
   'GroupMessageId',
   'IdentityAdmissionProof',
   'IdentityAdmissionProof.vectors',

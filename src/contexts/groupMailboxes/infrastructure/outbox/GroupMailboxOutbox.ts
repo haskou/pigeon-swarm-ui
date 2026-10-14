@@ -8,6 +8,7 @@ import type { GroupMailboxOutboxAttempt } from './GroupMailboxOutboxAttempt';
 import type { GroupMailboxOutboxCopy } from './GroupMailboxOutboxCopy';
 import type { GroupMailboxOutboxEngine } from './GroupMailboxOutboxEngine';
 import type { GroupMailboxOutboxFailure } from './GroupMailboxOutboxFailure';
+import type { GroupMailboxOutboxItem } from './GroupMailboxOutboxItem';
 import type { GroupMailboxOutboxRow } from './GroupMailboxOutboxRow';
 import type { GroupMailboxOutboxStore } from './GroupMailboxOutboxStore';
 
@@ -34,10 +35,11 @@ import { GroupMailboxKeySchedule } from '../crypto/GroupMailboxKeySchedule';
  * that cannot be re-encrypted for a moment is retried with backoff. While
  * the MLS group still holds a member the node's roster removed, no message
  * is encrypted or appended: that member holds the epoch secret and could
- * read any inbox of the generation. Such a message waits, unsealed or
+ * read any inbox of the generation. Such a message is held, unsealed or
  * stale, until the removal is committed. A commit belongs to its
  * generation and is never re-encrypted. A record still queued after the
- * expiry is dropped and reported. Logs carry counts only.
+ * expiry is dropped and reported. `items` lists each queued record as
+ * held, retrying or pending. Logs carry counts only.
  */
 export class GroupMailboxOutbox {
   /** The generation index of a message held before it was ever sealed. */
@@ -51,6 +53,8 @@ export class GroupMailboxOutbox {
     (failure: GroupMailboxOutboxFailure) => void
   >();
 
+  /** The ids of rows whose last pass found a removal pending. */
+  private readonly held = new Set<string>();
   private readonly rows = new Map<string, GroupMailboxOutboxRow>();
   /** The roster of each conversation, read once per pass. */
   private readonly rosters = new Map<string, Promise<GroupMailboxRoster>>();
@@ -253,7 +257,12 @@ export class GroupMailboxOutbox {
   ): Promise<GroupMailboxOutboxAttempt | undefined> {
     const current = await this.currentRow(row);
 
-    if (current === null) return { current: row, row };
+    if (current === null) {
+      this.held.add(row.id);
+
+      return { current: row, row };
+    }
+    this.held.delete(row.id);
 
     if (!current) return undefined;
     const generation = (
@@ -278,6 +287,7 @@ export class GroupMailboxOutbox {
 
   private async forgetRow(row: GroupMailboxOutboxRow): Promise<void> {
     this.rows.delete(row.id);
+    this.held.delete(row.id);
     await this.store.remove(this.session.identity.id, row.id).catch(() => {
       // eslint-disable-next-line no-console
       console.debug('Group outbox remove failed.');
@@ -610,14 +620,24 @@ export class GroupMailboxOutbox {
   public async forget(): Promise<void> {
     this.stop();
     this.rows.clear();
+    this.held.clear();
     await this.store.forget(this.session.identity.id);
   }
 
   /** The records still queued for one conversation, oldest first. */
-  public pending(conversationId: string): string[] {
+  public items(conversationId: string): GroupMailboxOutboxItem[] {
     return GroupMailboxOutbox.ordered(this.rows.values())
       .filter((row) => row.conversationId === conversationId)
-      .map(({ reference }) => reference);
+      .map((row) => ({
+        reference: row.reference,
+        state:
+          this.held.has(row.id) ||
+          row.generationIndex === GroupMailboxOutbox.UNSEALED
+            ? 'held'
+            : row.attempts > 0
+              ? 'retry'
+              : 'pending',
+      }));
   }
 
   /** Loads the persisted queue and retries it. */

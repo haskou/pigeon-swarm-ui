@@ -958,6 +958,7 @@ export const en = {
     unpinError: 'The message could not be unpinned.',
     viewPinned: 'View pins',
     viewRaw: 'View message data',
+    waitingToSend: 'Waiting to send',
   },
   network: {
     admissionRetry:

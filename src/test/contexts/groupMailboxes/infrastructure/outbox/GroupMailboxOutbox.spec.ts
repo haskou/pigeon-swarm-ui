@@ -337,7 +337,7 @@ describe('GroupMailboxOutbox', () => {
     await outbox.flush();
 
     expect(channel.send).not.toHaveBeenCalled();
-    expect(outbox.pending(CONVERSATION)).toEqual([]);
+    expect(outbox.items(CONVERSATION)).toEqual([]);
   });
 
   it('never re-encrypts a commit and drops it once its generation drained', async () => {

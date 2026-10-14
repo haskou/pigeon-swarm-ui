@@ -963,6 +963,7 @@ export const es = {
     unpinError: 'No se pudo desfijar el mensaje.',
     viewPinned: 'Ver fijados',
     viewRaw: 'Ver datos del mensaje',
+    waitingToSend: 'Esperando para enviar',
   },
   network: {
     admissionRetry:
