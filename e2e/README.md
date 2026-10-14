@@ -54,7 +54,11 @@ erases nothing),
 for its creator and an invited member, both exchange messages through the MLS
 group, the creator's manage dialog drops the kicked member once the kick and
 the key rotation are done, and a message sent after the removal never shows in
-the removed member's page), `call-page-departure.spec.ts` (a ringing call is
+the removed member's page), `community-invite-link.spec.ts` (the creator of a
+private community creates an invite link, another identity signs in through
+it, joins the community, sees encryption as active and reads the creator's
+next message; the node only accepts a link whose token commits to its limits),
+`call-page-departure.spec.ts` (a ringing call is
 declined when the callee leaves the page) and `group-conversation.spec.ts`
 (three users share a group conversation over MLS and per-member mailboxes,
 each message reaches the other two, and after the creator removes one member a

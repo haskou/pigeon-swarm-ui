@@ -8,6 +8,7 @@ import type { RequestSigner } from '../../../../../shared/infrastructure/http/Re
 
 import { CommunityModerationLogSigner } from '../../../../../contexts/communities/infrastructure/http/CommunityModerationLogSigner';
 import { CommunityOperationProof } from '../../../../../contexts/communities/infrastructure/http/CommunityOperationProof';
+import { deriveInviteToken } from '../../../../../contexts/communities/infrastructure/http/deriveCommunityRecordId';
 import { PigeonCommunityInvitationApi } from '../../../../../contexts/communities/infrastructure/http/PigeonCommunityInvitationApi';
 import { ScopeFrontierReader } from '../../../../../shared/infrastructure/http/ScopeFrontierReader';
 import vectors from '../../../../fixtures/community-operation-vectors.json';
@@ -110,7 +111,13 @@ describe(PigeonCommunityInvitationApi.name, () => {
 
     expect(body.nonce).toHaveLength(32);
     expect(body.mutation).toMatchObject({
-      recordId: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/),
+      recordId: deriveInviteToken(
+        'community-1',
+        publicMutationSignerAt().authorOf(session),
+        body.nonce,
+        3,
+        undefined,
+      ),
       sequence: 0,
       store: 'requests',
     });
