@@ -43,7 +43,7 @@ const engine = (
   name: string,
   options: {
     databaseName?: string;
-    deviceId?: string;
+    device?: string;
     generations?: GroupMailboxGenerationRepository;
     rosterView?: () => GroupMailboxRoster;
     store?: MlsStateStore;
@@ -55,7 +55,7 @@ const engine = (
   );
 
   return new GroupMailboxMlsEngine(
-    cast[name].signer(options.deviceId),
+    cast[name].signer(options.device),
     options.store ?? stores.state,
     options.generations ?? stores.generations,
     () => Promise.resolve(options.rosterView?.() ?? roster),
@@ -504,7 +504,7 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
     await alice.createGroup(CONVERSATION);
     await join(alice, [bob]);
     // Bob, who may not add anyone, makes a group of his own under the same id.
-    const forger = engine('bob', { deviceId: 'd2', rosterView: unmanaged });
+    const forger = engine('bob', { device: 'd2', rosterView: unmanaged });
     await forger.createGroup(CONVERSATION);
     const forged = await forger.add(
       CONVERSATION,
@@ -545,6 +545,122 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
     }
   });
 
+  it('lets a member who may not add anyone add its own second device, which joins from its own welcome', async () => {
+    const { alice, bob } = await setup(['alice', 'bob']);
+    const phone = engine('bob', { device: 'd2' });
+    const added = await bob.add(
+      CONVERSATION,
+      [await phone.createKeyPackage()],
+      sent,
+    );
+    await alice.applyCommit(CONVERSATION, added.commit);
+
+    await phone.join(
+      CONVERSATION,
+      added.welcome!,
+      added.generation.index,
+      id('bob'),
+    );
+    const sealed = await alice.encrypt(CONVERSATION, text.encode('to both'));
+    const fromSibling = await bob.encrypt(CONVERSATION, text.encode('mine'));
+
+    expect(read((await phone.decrypt(CONVERSATION, sealed)).plaintext)).toBe(
+      'to both',
+    );
+    expect(read((await bob.decrypt(CONVERSATION, sealed)).plaintext)).toBe(
+      'to both',
+    );
+    const opened = await phone.decrypt(CONVERSATION, fromSibling);
+    expect(read(opened.plaintext)).toBe('mine');
+    expect(opened.sender).toEqual(cast.bob.owner('d1'));
+    expect(await phone.devices(CONVERSATION)).toEqual(
+      [cast.bob.deviceCredential('d1'), cast.bob.deviceCredential('d2')].sort(),
+    );
+    expect(await alice.devices(CONVERSATION)).toEqual([
+      cast.alice.deviceCredential('d1'),
+    ]);
+  });
+
+  it('refuses to let a member add another identity with its own devices', async () => {
+    const { bob } = await setup(['alice', 'bob']);
+    const publish = jest.fn(sent);
+
+    await expect(
+      bob.add(
+        CONVERSATION,
+        [
+          await engine('bob', { device: 'd2' }).createKeyPackage(),
+          await engine('dave').createKeyPackage(),
+        ],
+        publish,
+      ),
+    ).rejects.toThrow('This member may not make this change');
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('rejects a welcome of its own identity into a group nobody else is in', async () => {
+    // A revoked device keeps the identity key and could make such a group.
+    const revoked = engine('bob', { device: 'd9', rosterView: unmanaged });
+    const phone = engine('bob', { device: 'd2' });
+    await revoked.createGroup(CONVERSATION);
+    const forged = await revoked.add(
+      CONVERSATION,
+      [await phone.createKeyPackage()],
+      sent,
+    );
+
+    await expect(
+      phone.join(
+        CONVERSATION,
+        forged.welcome!,
+        forged.generation.index,
+        id('bob'),
+      ),
+    ).rejects.toThrow('The welcome is not from a member who may add devices');
+    expect(await phone.devices(CONVERSATION)).toEqual([]);
+  });
+
+  it('removes a revoked device of its own identity, which cannot read on', async () => {
+    const { alice, bob } = await setup(['alice', 'bob']);
+    const laptop = engine('bob', { device: 'd2' });
+    const added = await bob.add(
+      CONVERSATION,
+      [await laptop.createKeyPackage()],
+      sent,
+    );
+    await alice.applyCommit(CONVERSATION, added.commit);
+    await laptop.join(
+      CONVERSATION,
+      added.welcome!,
+      added.generation.index,
+      id('bob'),
+    );
+
+    const removal = await bob.removeDevices(
+      CONVERSATION,
+      [cast.bob.deviceCredential('d2')],
+      sent,
+    );
+    await alice.applyCommit(CONVERSATION, removal!.commit);
+    await laptop.applyCommit(CONVERSATION, removal!.commit);
+    const after = await alice.encrypt(CONVERSATION, text.encode('after'));
+
+    expect(read((await bob.decrypt(CONVERSATION, after)).plaintext)).toBe(
+      'after',
+    );
+    await expect(laptop.decrypt(CONVERSATION, after)).rejects.toThrow();
+    expect(await laptop.devices(CONVERSATION)).toEqual([]);
+    expect(await bob.devices(CONVERSATION)).toEqual([
+      cast.bob.deviceCredential('d1'),
+    ]);
+    expect((await alice.generation(CONVERSATION)).index).toBe(
+      removal!.generation.index,
+    );
+    await expect(
+      bob.removeDevices(CONVERSATION, [cast.bob.deviceCredential('d2')], sent),
+    ).resolves.toBeUndefined();
+  });
+
   it('keeps a removed device out when a forged welcome of a later epoch arrives', async () => {
     const { alice, carol } = await setup(['alice', 'bob', 'carol']);
     const removal = await alice.remove(CONVERSATION, [id('carol')], sent);
@@ -552,10 +668,10 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
     // Dave, who may not add anyone, races a same-id group past carol's epoch.
     const forger = engine('dave', { rosterView: unmanaged });
     await forger.createGroup(CONVERSATION);
-    for (const deviceId of ['d2', 'd3', 'd4']) {
+    for (const device of ['d2', 'd3', 'd4']) {
       await forger.add(
         CONVERSATION,
-        [await engine('dave', { deviceId }).createKeyPackage()],
+        [await engine('dave', { device }).createKeyPackage()],
         sent,
       );
     }
@@ -586,8 +702,9 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
     // Bob's key signs a credential that claims a device of carol.
     const forged = await generateMlsKeyPackage(
       new MlsLeafSigner(
-        { deviceId: 'd9', identityId: id('carol') },
+        cast.carol.owner('d9'),
         cast.bob.keyPair,
+        cast.carol.deviceKeyPair('d9'),
       ),
     );
 
@@ -689,7 +806,7 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
     const sealed = await bob.encrypt(CONVERSATION, text.encode('from bob'));
     const opened = await alice.decrypt(CONVERSATION, sealed);
 
-    expect(opened.sender).toEqual({ deviceId: 'd1', identityId: id('bob') });
+    expect(opened.sender).toEqual(cast.bob.owner());
     expect(read(opened.plaintext)).toBe('from bob');
   });
 
@@ -721,7 +838,7 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
 
     expect(read(second.plaintext)).toBe('again');
     expect(second.sender).toEqual(first.sender);
-    expect(own.sender).toEqual({ deviceId: 'd1', identityId: id('alice') });
+    expect(own.sender).toEqual(cast.alice.owner());
     expect(read(own.plaintext)).toBe('again');
   });
 

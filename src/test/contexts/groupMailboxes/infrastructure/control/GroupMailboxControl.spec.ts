@@ -115,7 +115,10 @@ const fakeNode = (): FakeNode => {
 };
 
 let node: FakeNode;
+/** The first device of each identity, by identity id. */
 let members: Map<string, Member>;
+/** Every device; a letter reaches every device of its recipient. */
+let devices: Member[];
 
 /** An outbox over `channel` whose rows live in memory. */
 const outboxOf = (
@@ -143,14 +146,14 @@ const outboxOf = (
 /** A device of `name` that reads the roster through `rosterView`. */
 const engineOf = (
   name: string,
-  deviceId = 'd1',
+  device = 'd1',
   rosterView = (): GroupMailboxRoster => roster,
 ): GroupMailboxMlsEngine => {
   const databaseName = `group-control-${++database}`;
   const stores = sealedGroupStores(databaseName, id(name));
 
   return new GroupMailboxMlsEngine(
-    cast[name].signer(deviceId),
+    cast[name].signer(device),
     stores.state,
     stores.generations,
     () => Promise.resolve(rosterView()),
@@ -158,11 +161,11 @@ const engineOf = (
   );
 };
 
-const member = (name: string): Member => {
-  const engine = engineOf(name);
+const member = (name: string, device = 'd1'): Member => {
+  const engine = engineOf(name, device);
   const created: Member = {
     control: new GroupMailboxControl(
-      id(name),
+      cast[name].owner(device),
       engine,
       () => Promise.resolve(roster),
       {
@@ -170,9 +173,11 @@ const member = (name: string): Member => {
           if (conversationId !== CONVERSATION) {
             return Promise.reject(new Error('letter for another conversation'));
           }
-          members
-            .get(peerIdentityId)
-            ?.inbox.push({ from: id(name), plaintext });
+          for (const recipient of devices) {
+            if (recipient.id === peerIdentityId) {
+              recipient.inbox.push({ from: id(name), plaintext });
+            }
+          }
 
           return Promise.resolve();
         },
@@ -185,7 +190,9 @@ const member = (name: string): Member => {
     name,
   };
 
-  members.set(created.id, created);
+  devices.push(created);
+
+  if (device === 'd1') members.set(created.id, created);
 
   return created;
 };
@@ -280,6 +287,29 @@ const sameGeneration = async (a: Member, b: Member): Promise<void> => {
   expect(right.secret.isEqual(left.secret)).toBe(true);
 };
 
+/**
+ * Bob, already a member, adds his laptop: the laptop alone answers the key
+ * package request his identity receives, and joins from the welcome.
+ */
+const addLaptop = async (bob: Member): Promise<Member> => {
+  const laptop = member('bob', 'd2');
+  const adding = bob.control.addDevices(CONVERSATION, [
+    cast.bob.deviceCredential('d2'),
+  ]);
+
+  await until(() => laptop.inbox.length > 0);
+  // Bob's identity gets its own request; only the device it names answers.
+  await expect(drain(bob)).resolves.toEqual(['ignored']);
+  await expect(drain(laptop)).resolves.toEqual(['applied', 'ignored']);
+  await expect(drain(bob)).resolves.toEqual(['applied']);
+  await adding;
+  await expect(drain(laptop)).resolves.toEqual(['applied']);
+  // The welcome reaches bob too, who already holds the group.
+  await expect(drain(bob)).resolves.toEqual(['rejected']);
+
+  return laptop;
+};
+
 describe('GroupMailboxControl on the real ts-mls library', () => {
   let alice: Member;
   let bob: Member;
@@ -294,6 +324,7 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
     roster = rosterOf(['alice', 'bob', 'carol']);
     node = fakeNode();
     members = new Map();
+    devices = [];
     alice = member('alice');
     bob = member('bob');
     carol = member('carol');
@@ -303,7 +334,7 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
   });
 
   afterEach(() => {
-    for (const { control } of members.values()) control.close();
+    for (const { control } of devices) control.close();
   });
 
   it('adds a roster member from its key package and a welcome', async () => {
@@ -392,7 +423,7 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
     const bobKeys = await inboxKeys(bob, carol);
     let squatted: Promise<void> | undefined;
     const racing = new GroupMailboxControl(
-      alice.id,
+      cast.alice.owner(),
       alice.engine,
       () => Promise.resolve(roster),
       { send: () => Promise.resolve() },
@@ -621,8 +652,9 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
     // Mallory holds the leaf key and claims it is a device of bob.
     const forged = await generateMlsKeyPackage(
       new MlsLeafSigner(
-        { deviceId: 'd9', identityId: bob.id },
+        cast.bob.owner('d9'),
         cast.mallory.keyPair,
+        cast.bob.deviceKeyPair('d9'),
       ),
     );
 
@@ -661,6 +693,110 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
     );
     await expect(alice.engine.members(CONVERSATION)).resolves.toEqual([
       alice.id,
+    ]);
+  });
+
+  it('adds another device of its own identity without a manager, through its own welcome', async () => {
+    await add(alice, [bob]);
+    await drain(bob);
+    await openInboxes(alice);
+
+    const laptop = await addLaptop(bob);
+
+    await expect(readGroup(alice)).resolves.toEqual(['applied']);
+    await sameGeneration(alice, laptop);
+    await sameGeneration(bob, laptop);
+    await expect(laptop.engine.devices(CONVERSATION)).resolves.toEqual(
+      [cast.bob.deviceCredential('d1'), cast.bob.deviceCredential('d2')].sort(),
+    );
+    await expect(alice.engine.members(CONVERSATION)).resolves.toEqual(
+      [alice.id, bob.id].sort(),
+    );
+  });
+
+  it('removes a revoked device of its own identity from the remaining members', async () => {
+    await add(alice, [bob]);
+    await drain(bob);
+    await openInboxes(alice);
+    const laptop = await addLaptop(bob);
+    await readGroup(alice);
+    await openInboxes(alice);
+
+    await bob.control.removeDevices(CONVERSATION, [
+      cast.bob.deviceCredential('d2'),
+    ]);
+
+    await expect(readGroup(alice)).resolves.toEqual(['applied']);
+    await sameGeneration(alice, bob);
+    await expect(bob.engine.devices(CONVERSATION)).resolves.toEqual([
+      cast.bob.deviceCredential('d1'),
+    ]);
+    expect(
+      (await laptop.engine.generation(CONVERSATION)).secret.isEqual(
+        (await alice.engine.generation(CONVERSATION)).secret,
+      ),
+    ).toBe(false);
+  });
+
+  it('ignores a request of its own identity that names another device, or once it holds a leaf', async () => {
+    const request = (deviceCredential?: string) =>
+      GroupMailboxControlRecord.encode({
+        conversationId: CONVERSATION,
+        ...(deviceCredential === undefined ? {} : { deviceCredential }),
+        requestId: MailboxChannel.randomEnvelopeId(),
+        type: 'key-package-request',
+      });
+
+    for (const [peer, named] of [
+      [bob.id, cast.bob.deviceCredential('d3')],
+      [bob.id, undefined],
+      [alice.id, cast.bob.deviceCredential('d3')],
+    ] as const) {
+      await expect(
+        bob.control.receiveDirect(peer, request(named)),
+      ).resolves.toBe('ignored');
+    }
+    await add(alice, [bob]);
+    await drain(bob);
+    await expect(
+      bob.control.receiveDirect(
+        bob.id,
+        request(cast.bob.deviceCredential('d1')),
+      ),
+    ).resolves.toBe('ignored');
+    expect(bob.inbox).toEqual([]);
+    expect(alice.inbox).toEqual([]);
+  });
+
+  it('rejects a key package of another device than the one it asked its identity for', async () => {
+    await add(alice, [bob]);
+    await drain(bob);
+    const adding = bob.control.addDevices(CONVERSATION, [
+      cast.bob.deviceCredential('d2'),
+    ]);
+
+    await until(() => bob.inbox.length > 0);
+    const request = GroupMailboxControlRecord.decode(bob.inbox[0].plaintext);
+
+    if (request?.type !== 'key-package-request') {
+      throw new Error('expected a key package request');
+    }
+    expect(request.deviceCredential).toBe(cast.bob.deviceCredential('d2'));
+
+    await expect(
+      bob.control.receiveDirect(
+        bob.id,
+        GroupMailboxControlRecord.encode({
+          conversationId: CONVERSATION,
+          keyPackage: await engineOf('bob', 'd3').createKeyPackage(),
+          requestId: request.requestId,
+          type: 'key-package-response',
+        }),
+      ),
+    ).resolves.toBe('rejected');
+    await expect(adding).rejects.toBeInstanceOf(MlsRejectedError);
+    await expect(bob.engine.devices(CONVERSATION)).resolves.toEqual([
+      cast.bob.deviceCredential('d1'),
     ]);
   });
 });

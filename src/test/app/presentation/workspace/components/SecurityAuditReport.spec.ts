@@ -16,12 +16,14 @@ const PEER_ID = Buffer.from('peer-identity-key').toString('base64');
 const IMPOSTOR_ID = Buffer.from('impostor-identity-key').toString('base64');
 const OWN_DEVICE = Buffer.from('own-device-key').toString('base64');
 const OTHER_DEVICE = Buffer.from('other-device-key').toString('base64');
+const PEER_DEVICE = Buffer.from('peer-device-key').toString('base64');
 const CONVERSATION_KEY = Buffer.alloc(32, 3).toString('base64');
 const COMMUNITY_KEY = Buffer.alloc(32, 4).toString('base64');
 const ROOT_KEY = Buffer.alloc(32, 5);
 const MASTER_KEY = Buffer.alloc(32, 6);
 const SIGNATURE_KEY = new Uint8Array([1, 2, 3, 4]);
 const PEER_SIGNATURE_KEY = new Uint8Array([5, 6, 7, 8]);
+const SIBLING_SIGNATURE_KEY = new Uint8Array([9, 10, 11, 12]);
 
 const session = {
   authorizationEpoch: { valueOf: () => 'epoch-1' },
@@ -88,14 +90,15 @@ const build = () =>
         epoch: 3n,
         leaves: [
           {
-            owner: {
-              deviceId: '11111111-1111-4111-8111-111111111111',
-              identityId: OWN_ID,
-            },
+            owner: { deviceCredential: pem(OWN_DEVICE), identityId: OWN_ID },
             signaturePublicKey: SIGNATURE_KEY,
           },
           {
-            owner: { deviceId: 'peer-device', identityId: PEER_ID },
+            owner: { deviceCredential: pem(OTHER_DEVICE), identityId: OWN_ID },
+            signaturePublicKey: SIBLING_SIGNATURE_KEY,
+          },
+          {
+            owner: { deviceCredential: pem(PEER_DEVICE), identityId: PEER_ID },
             signaturePublicKey: PEER_SIGNATURE_KEY,
           },
         ],
@@ -189,21 +192,35 @@ describe(SecurityAuditReport.name, () => {
     ]);
   });
 
-  it('lists MLS credentials per community group and marks this device', () => {
+  it('lists MLS credentials per community group and marks this device, not its siblings', () => {
     expect(build().groups).toEqual([
       {
         communityId: 'community-1',
         epoch: '3',
         leaves: [
           {
-            deviceId: '11111111-1111-4111-8111-111111111111',
+            deviceCredentialFingerprint: KeyFingerprint.ofPublicKey(
+              pem(OWN_DEVICE),
+            ),
             identityId: OWN_ID,
             own: true,
             signatureKeyFingerprint:
               KeyFingerprint.ofPublicBytes(SIGNATURE_KEY),
           },
           {
-            deviceId: 'peer-device',
+            deviceCredentialFingerprint: KeyFingerprint.ofPublicKey(
+              pem(OTHER_DEVICE),
+            ),
+            identityId: OWN_ID,
+            own: false,
+            signatureKeyFingerprint: KeyFingerprint.ofPublicBytes(
+              SIBLING_SIGNATURE_KEY,
+            ),
+          },
+          {
+            deviceCredentialFingerprint: KeyFingerprint.ofPublicKey(
+              pem(PEER_DEVICE),
+            ),
             identityId: PEER_ID,
             own: false,
             signatureKeyFingerprint:

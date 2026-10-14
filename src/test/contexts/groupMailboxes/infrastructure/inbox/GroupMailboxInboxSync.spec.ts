@@ -66,7 +66,8 @@ let inboxes: Map<
   string,
   {
     envelopes: { body: string; cursor: number; envelopeId: string }[];
-    readers: Set<string>;
+    /** The acknowledged cursor of each reader, by its token hash. */
+    readers: Map<string, number>;
     root: string;
   }
 >;
@@ -76,8 +77,8 @@ let members: Map<string, Member>;
 
 /**
  * A node holding the group inboxes. Appends need the inbox and are
- * idempotent per envelope id; reads and acks need an enrolled reader;
- * deletion needs the creation token.
+ * idempotent per envelope id; reads, acks and the reader list need an
+ * enrolled reader; deletion needs the creation token.
  */
 const fakeNode = (): void => {
   inboxes = new Map();
@@ -96,7 +97,7 @@ const fakeNode = (): void => {
     if (!inboxes.has(mailboxId)) {
       inboxes.set(mailboxId, {
         envelopes: [],
-        readers: new Set([creation.readTokenHash]),
+        readers: new Map([[creation.readTokenHash, 0]]),
         root: creation.readTokenHash,
       });
     }
@@ -105,8 +106,18 @@ const fakeNode = (): void => {
   });
   wire.addReader.mockImplementation((mailboxId, token, readTokenHash) =>
     Promise.resolve().then(() => {
-      readable(mailboxId, token).readers.add(readTokenHash);
+      const { readers } = readable(mailboxId, token);
+
+      readers.set(readTokenHash, readers.get(readTokenHash) ?? 0);
     }),
+  );
+  wire.readers.mockImplementation((mailboxId, token) =>
+    Promise.resolve().then(() => ({
+      maxReaders: 16,
+      readers: [...readable(mailboxId, token).readers].map(
+        ([readTokenHash, ackedCursor]) => ({ ackedCursor, readTokenHash }),
+      ),
+    })),
   );
   wire.append.mockImplementation((mailboxId, _postToken, input) => {
     const inbox = inboxes.get(mailboxId);
@@ -135,9 +146,12 @@ const fakeNode = (): void => {
       };
     }),
   );
-  wire.acknowledge.mockImplementation((mailboxId, token) =>
+  wire.acknowledge.mockImplementation((mailboxId, token, upTo) =>
     Promise.resolve().then(() => {
-      readable(mailboxId, token);
+      const { readers } = readable(mailboxId, token);
+      const hash = MailboxCapability.hash(token);
+
+      readers.set(hash, Math.max(readers.get(hash) ?? 0, upTo));
     }),
   );
   wire.delete.mockImplementation((mailboxId, token) =>
@@ -169,9 +183,7 @@ const member = (name: string): Member => {
   const databaseName = `group-sync-${seed}`;
   const identityId = id(name);
   const session = {
-    deviceCredentialKeyPair: {
-      toPrimitives: () => ({ publicKey: `device-${name}` }),
-    },
+    deviceCredentialKeyPair: cast[name].deviceKeyPair(),
     deviceId: 'd1',
     deviceSealedRootKey: {
       getBuffer: () => Buffer.alloc(32, seed),
@@ -202,7 +214,7 @@ const member = (name: string): Member => {
   );
   const direct: Member['direct'] = [];
   const control = new GroupMailboxControl(
-    identityId,
+    cast[name].owner(),
     engine,
     () => Promise.resolve(roster),
     {
@@ -262,6 +274,39 @@ const sync = (to: Member): Promise<void> =>
   to.sync.sync(CONVERSATION, new AbortController().signal, (records) => {
     to.received.push(...records);
   });
+
+/**
+ * Passes of `to`'s inbox sync, on one sync, as if its group also held a
+ * leaf for each of `siblings`, other devices of its identity that never
+ * read.
+ */
+const syncBeside = (to: Member, siblings: string[]): (() => Promise<void>) => {
+  const beside = new GroupMailboxInboxSync(
+    () => to.session,
+    {
+      decrypt: (conversationId, ciphertext) =>
+        to.engine.decrypt(conversationId, ciphertext),
+      devices: async (conversationId) => [
+        ...(await to.engine.devices(conversationId)),
+        ...siblings,
+      ],
+      drainedGenerations: (id) => to.engine.drainedGenerations(id),
+      readableGenerations: (id) => to.engine.readableGenerations(id),
+    },
+    to.control,
+    channel,
+    wire,
+    new GroupMailboxInboxStore(),
+    new GroupMessageHistoryStore(to.history),
+    mock<GroupMailboxGenerationRepository>(),
+    mock<DirectMessageReaderSet>(),
+  );
+
+  return () =>
+    beside.sync(CONVERSATION, new AbortController().signal, (records) => {
+      to.received.push(...records);
+    });
+};
 
 /** `inviter` adds `joiners`; each joins from its welcome. */
 const add = async (inviter: Member, joiners: Member[]): Promise<void> => {
@@ -639,6 +684,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
       () => bob.session,
       {
         decrypt: () => Promise.reject(new Error('unexpected')),
+        devices: (id) => bob.engine.devices(id),
         drainedGenerations: (id) => bob.engine.drainedGenerations(id),
         readableGenerations: (id) => bob.engine.readableGenerations(id),
       },
@@ -755,6 +801,64 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
       retired,
       DirectMessageInboxKeys.readersFor(bob.session, keys).root,
     );
+  });
+
+  it('enrols the readers of its other devices once, before acknowledging', async () => {
+    const keys = GroupMailboxKeySchedule.inbox(
+      (await bob.engine.generation(CONVERSATION)).secret,
+      IdentityId.fromString(bob.id),
+    );
+    const laptop = cast.bob.deviceCredential('d2');
+    const enrolled = MailboxCapability.hash(
+      DirectMessageInboxKeys.readersFor(bob.session, keys, laptop).device,
+    );
+
+    const pass = syncBeside(bob, [laptop]);
+
+    wire.addReader.mockClear();
+    wire.acknowledge.mockClear();
+    await send(alice, sent('alice', mid('alice', 'm1')));
+    await pass();
+    await send(alice, sent('alice', mid('alice', 'm2')));
+    await pass();
+    const enrolments = wire.addReader.mock.invocationCallOrder.filter(
+      (_order, call) => wire.addReader.mock.calls[call][2] === enrolled,
+    );
+
+    expect(ids(bob.received)).toEqual(['sent:m1', 'sent:m2']);
+    expect(enrolments).toHaveLength(1);
+    expect(enrolments[0]).toBeLessThan(
+      Math.min(...wire.acknowledge.mock.invocationCallOrder),
+    );
+    expect(inboxes.get(keys.mailboxId)?.readers.get(enrolled)).toBe(0);
+  });
+
+  it('leaves a drained inbox to retention while another device lags', async () => {
+    const debug = jest
+      .spyOn(console, 'debug')
+      .mockImplementation(() => undefined);
+    const laptop = cast.bob.deviceCredential('d2');
+    const retired = GroupMailboxKeySchedule.inbox(
+      (await bob.engine.generation(CONVERSATION)).secret,
+      IdentityId.fromString(bob.id),
+    ).mailboxId;
+
+    await send(alice, sent('alice', mid('alice', 'm1')));
+    await syncBeside(bob, [laptop])();
+    await alice.control.remove(CONVERSATION, [carol.id]);
+    await sync(bob);
+    now += GroupMailboxGeneration.DRAIN_WINDOW_MS + 1;
+    await sync(bob);
+    await sync(bob);
+
+    expect(inboxes.has(retired)).toBe(true);
+    expect(wire.delete).not.toHaveBeenCalledWith(retired, expect.anything());
+    expect(
+      debug.mock.calls.filter(
+        ([line]) => line === 'Group inboxes left to retention: 1.',
+      ),
+    ).toHaveLength(1);
+    debug.mockRestore();
   });
 
   it('sends, receives and reloads a 500-message page (benchmark)', async () => {

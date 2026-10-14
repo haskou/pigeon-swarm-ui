@@ -26,8 +26,8 @@ const policy: MlsMembershipPolicy = {
 const idOf = (name: string): string => cast[name].id;
 const idsOf = (...names: string[]): string[] => names.map(idOf).sort();
 
-const device = (name: string, deviceId = 'd1') =>
-  generateMlsKeyPackage(cast[name].signer(deviceId));
+const device = (name: string, deviceName = 'd1') =>
+  generateMlsKeyPackage(cast[name].signer(deviceName));
 
 /** Only alice adds or removes; anyone may rotate their own leaf. */
 const aliceManages = ({ added, committer, removed }: MlsMembershipChange) =>
@@ -108,7 +108,7 @@ describe('MlsGroup on the real ts-mls library', () => {
 
   it('lets a second device of the same identity join and read', async () => {
     const { alice, bob } = await setup(['alice', 'bob']);
-    const phone = await device('bob', 'phone');
+    const phone = await device('bob', 'd2');
 
     const { groups } = await admit(alice.group, [phone], [bob.group]);
     const sealed = await alice.group.encrypt(text.encode('to both devices'));
@@ -166,7 +166,7 @@ describe('MlsGroup on the real ts-mls library', () => {
 
   it('removes every device of an identity at once', async () => {
     const { alice, bob } = await setup(['alice', 'bob']);
-    const phone = await device('bob', 'phone');
+    const phone = await device('bob', 'd2');
     const { groups } = await admit(alice.group, [phone], [bob.group]);
 
     const removal = (await alice.group.removeIdentities([idOf('bob')]))!;
@@ -179,15 +179,47 @@ describe('MlsGroup on the real ts-mls library', () => {
     expect(alice.group.leaves()).toHaveLength(1);
   });
 
+  it('removes only the named devices of an identity', async () => {
+    const { alice, bob } = await setup(['alice', 'bob']);
+    const phone = await device('bob', 'd2');
+    const { groups } = await admit(alice.group, [phone], [bob.group]);
+
+    const removal = (await bob.group.removeDevices(idOf('bob'), [
+      cast.bob.deviceCredential('d2'),
+    ]))!;
+    const id = nextId();
+    bob.group.confirm(id);
+    const record = { bytes: removal.commit, epoch: removal.epoch, id };
+    await alice.group.applyCommit(record);
+    const after = await alice.group.encrypt(text.encode('after'));
+
+    expect((await groups[0].applyCommit(record)).kind).toBe('removed');
+    expect(read(await bob.group.decrypt(after))).toBe('after');
+    expect(
+      alice.group.leaves().map(({ owner }) => owner.deviceCredential),
+    ).toEqual([
+      cast.alice.deviceCredential('d1'),
+      cast.bob.deviceCredential('d1'),
+    ]);
+  });
+
+  it('commits nothing when no named device holds a leaf', async () => {
+    const { alice } = await setup(['alice', 'bob']);
+
+    await expect(
+      alice.group.removeDevices(idOf('bob'), [cast.bob.deviceCredential('d2')]),
+    ).resolves.toBeUndefined();
+  });
+
   it('does not give a member of one group the secret of another group', async () => {
     const community = await setup(['alice', 'bob', 'carol']);
-    const aliceChannelKey = await device('alice', 'channel');
+    const aliceChannelKey = await device('alice', 'd3');
     const channel = await MlsGroup.create(
       'community-1:private',
       aliceChannelKey,
       policy,
     );
-    const bobChannelKey = await device('bob', 'channel');
+    const bobChannelKey = await device('bob', 'd3');
     await admit(channel, [bobChannelKey], []);
 
     const communitySecret = await community.carol.group.exportSecret(
@@ -394,8 +426,9 @@ describe('MlsGroup on the real ts-mls library', () => {
     // Mallory's key, presenting a device as bob's.
     const forged = await generateMlsKeyPackage(
       new MlsLeafSigner(
-        { deviceId: 'd9', identityId: idOf('bob') },
+        cast.bob.owner('d9'),
         cast.mallory.keyPair,
+        cast.bob.deviceKeyPair('d9'),
       ),
     );
 
@@ -404,6 +437,23 @@ describe('MlsGroup on the real ts-mls library', () => {
       'forged',
     );
     expect(alice.group.leaves()).toHaveLength(2);
+  });
+
+  it('refuses a leaf a revoked device presents as a current device of its identity', async () => {
+    const { alice } = await setup(['alice', 'bob']);
+    // Bob's identity key, kept by a revoked device, cannot sign as bob's d2.
+    const forged = await generateMlsKeyPackage(
+      new MlsLeafSigner(
+        cast.bob.owner('d2'),
+        cast.bob.keyPair,
+        cast.bob.deviceKeyPair('d9'),
+      ),
+    );
+
+    expect(() => mlsKeyPackageOwner(forged.publicBytes)).toThrow('forged');
+    await expect(alice.group.add([forged.publicBytes])).rejects.toThrow(
+      'forged',
+    );
   });
 
   it('refuses to commit an add the roster does not let this member make', async () => {

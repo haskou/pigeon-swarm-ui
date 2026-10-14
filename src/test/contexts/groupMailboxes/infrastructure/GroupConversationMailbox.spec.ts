@@ -47,6 +47,8 @@ const openDatabase = (name: string): Promise<IDBDatabase> =>
 type Member = {
   changes: DirectMessageTimelineChange[];
   id: string;
+  /** A second device's own local storage; the first devices share one. */
+  local?: Map<string, string>;
   mailbox: GroupConversationMailbox;
   session: Session;
   storage: string;
@@ -59,6 +61,9 @@ let devices = 0;
 let now = NOW;
 let roster: Set<string>;
 let letters: Map<string, NotificationResource[]>;
+/** The device credentials the node lists for each identity. */
+let listed: Map<string, string[]>;
+let local: Map<string, string>;
 let inboxes: Map<
   string,
   {
@@ -72,6 +77,8 @@ let channel: MailboxChannel;
 let alice: Member;
 let bob: Member;
 let carol: Member;
+/** Bob's second device, when a test adds one. */
+let laptop: Member | undefined;
 
 /** Group inboxes on a node: appends idempotent, reads need a reader. */
 const fakeMailboxes = (): void => {
@@ -158,14 +165,14 @@ const fakeMailboxes = (): void => {
 };
 
 const memoryStorage = (): void => {
-  const values = new Map<string, string>();
+  local = new Map();
 
   Object.defineProperty(globalThis, 'localStorage', {
     configurable: true,
     value: {
-      getItem: (key: string) => values.get(key) ?? null,
-      removeItem: (key: string) => values.delete(key),
-      setItem: (key: string, value: string) => values.set(key, value),
+      getItem: (key: string) => local.get(key) ?? null,
+      removeItem: (key: string) => local.delete(key),
+      setItem: (key: string, value: string) => local.set(key, value),
     },
   });
 };
@@ -224,6 +231,7 @@ const device = (storage: string): GroupConversationMailbox =>
     channel,
     client: wire,
     composer: composer(),
+    devices: (owner) => Promise.resolve(listed.get(owner.identity.id) ?? []),
     direct: (from) => ({
       send: (conversationId, peer, plaintext) =>
         post(from, conversationId, peer, plaintext),
@@ -239,7 +247,7 @@ const device = (storage: string): GroupConversationMailbox =>
     now: () => now,
     projector: new MessageProjector(copy.messages),
     readerSet: new DirectMessageReaderSet(channel, (owner) =>
-      Promise.resolve([owner.deviceCredentialKeyPair.toPrimitives().publicKey]),
+      Promise.resolve(listed.get(owner.identity.id) ?? []),
     ),
     roster: (owner) =>
       Promise.resolve(
@@ -250,24 +258,32 @@ const device = (storage: string): GroupConversationMailbox =>
     storage,
   });
 
-const person = async (): Promise<Member> => {
-  const keyPair = await KeyPair.generate();
+/** A new identity's first device, or another device of `of`'s identity. */
+const person = async (of?: Member): Promise<Member> => {
+  const keyPair = of ? of.session.keyPair : await KeyPair.generate();
+  const deviceKeyPair = await KeyPair.generate();
   const id = IdentityId.fromString(keyPair.toPrimitives().publicKey).valueOf();
   const seed = ++devices;
   const session = {
-    deviceCredentialKeyPair: {
-      toPrimitives: () => ({ publicKey: `device-${seed}` }),
-    },
+    deviceCredentialKeyPair: deviceKeyPair,
     deviceId: `device-${seed}`,
-    deviceSealedRootKey: { getBuffer: () => Buffer.alloc(32, seed) },
+    deviceSealedRootKey: of
+      ? of.session.deviceSealedRootKey
+      : { getBuffer: () => Buffer.alloc(32, seed) },
     identity: { id },
     keychain: { conversations: [] },
     keyPair,
   } as unknown as Session;
 
+  listed.set(id, [
+    ...(listed.get(id) ?? []),
+    deviceKeyPair.toPrimitives().publicKey,
+  ]);
+
   return {
     changes: [],
     id,
+    local: of ? new Map() : undefined,
     mailbox: device(`group-conversation-${seed}`),
     session,
     storage: `group-conversation-${seed}`,
@@ -300,13 +316,26 @@ const conversation = (): ConversationResource =>
     type: 'group',
   }) as unknown as ConversationResource;
 
-const sync = (member: Member): Promise<GroupConversationSyncOutcome> =>
-  member.mailbox.sync(
-    member.session,
-    CONVERSATION,
-    new AbortController().signal,
-    (changes) => member.changes.push(...changes),
-  );
+/**
+ * Reads the conversation's inboxes. A second device reads on its own local
+ * storage, so nothing else may run meanwhile.
+ */
+const sync = async (member: Member): Promise<GroupConversationSyncOutcome> => {
+  const shared = local;
+
+  local = member.local ?? shared;
+
+  try {
+    return await member.mailbox.sync(
+      member.session,
+      CONVERSATION,
+      new AbortController().signal,
+      (changes) => member.changes.push(...changes),
+    );
+  } finally {
+    local = shared;
+  }
+};
 
 const texts = (member: Member): string[] =>
   member.changes.flatMap((change) =>
@@ -340,17 +369,38 @@ const formGroup = async (): Promise<void> => {
   await catchUp();
 };
 
+/**
+ * The group, then a second device of bob's that bob's first device adds,
+ * every device having read the commit and opened its next inboxes.
+ */
+const formGroupWithLaptop = async (): Promise<Member> => {
+  await formGroup();
+  const added = await person(bob);
+  const all = [...everyone(), added];
+
+  laptop = added;
+  await settle(bob.mailbox.membersChanged(bob.session, CONVERSATION), all);
+  await settle(Promise.resolve(), all);
+  await catchUp(all);
+
+  return added;
+};
+
 beforeEach(async () => {
   fakeMailboxes();
   memoryStorage();
   letters = new Map();
+  listed = new Map();
   now = NOW;
   roster = new Set();
+  laptop = undefined;
   [alice, bob, carol] = await Promise.all([person(), person(), person()]);
 });
 
 afterEach(() => {
-  for (const member of everyone()) member.mailbox.stop(member.id);
+  for (const member of [...everyone(), ...(laptop ? [laptop] : [])]) {
+    member.mailbox.stop(member.id);
+  }
 });
 
 describe('GroupConversationMailbox', () => {
@@ -774,6 +824,80 @@ describe('GroupConversationMailbox', () => {
     await sync(bob);
 
     expect(texts(bob)).toEqual(['message:after']);
+  });
+
+  it('adds a second device of a member, which reads the group', async () => {
+    const info = jest
+      .spyOn(console, 'info')
+      .mockImplementation(() => undefined);
+    const second = await formGroupWithLaptop();
+
+    await alice.mailbox.send(alice.session, conversation(), 'to both', {});
+    await second.mailbox.send(
+      second.session,
+      conversation(),
+      'from laptop',
+      {},
+    );
+
+    for (const member of [...everyone(), second]) await sync(member);
+
+    expect(texts(alice)).toContain('message:from laptop');
+    expect(texts(second)).toContain('message:to both');
+    for (const member of [bob, carol]) {
+      expect(texts(member).sort()).toEqual([
+        'message:from laptop',
+        'message:to both',
+      ]);
+    }
+    expect(info).toHaveBeenCalledWith(
+      'Group devices reconciled: removed 0, added 1.',
+    );
+    info.mockRestore();
+  });
+
+  it('cuts a revoked device off what is sent after the revoke', async () => {
+    const info = jest
+      .spyOn(console, 'info')
+      .mockImplementation(() => undefined);
+    const second = await formGroupWithLaptop();
+
+    listed.set(bob.id, [
+      bob.session.deviceCredentialKeyPair.toPrimitives().publicKey,
+    ]);
+    bob.session = {
+      ...bob.session,
+      deviceSealedRootKey: { getBuffer: () => Buffer.alloc(32, 200) },
+      previousDeviceSealedRootKey: bob.session.deviceSealedRootKey,
+    } as unknown as Session;
+    await bob.mailbox.cutOffRevokedReaders(bob.session);
+    await settle(
+      bob.mailbox.membersChanged(bob.session, CONVERSATION),
+      everyone(),
+    );
+    await catchUp();
+    await alice.mailbox.send(alice.session, conversation(), 'after', {});
+
+    for (const member of everyone()) await sync(member);
+    await sync(second).catch(() => undefined);
+
+    expect(info).toHaveBeenCalledWith(
+      'Group devices reconciled: removed 1, added 0.',
+    );
+    expect(texts(bob)).toEqual(['message:after']);
+    expect(texts(second)).toEqual([]);
+
+    bob.mailbox.stop(bob.id);
+    bob.mailbox = device(bob.storage);
+    bob.session = {
+      ...bob.session,
+      previousDeviceSealedRootKey: undefined,
+    } as unknown as Session;
+    await alice.mailbox.send(alice.session, conversation(), 'reloaded', {});
+    await sync(bob);
+
+    expect(texts(bob)).toEqual(['message:after', 'message:reloaded']);
+    info.mockRestore();
   });
 
   it('drops the groups under a root it cannot trace back', async () => {
