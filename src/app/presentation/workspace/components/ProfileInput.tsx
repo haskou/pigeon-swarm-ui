@@ -7,12 +7,14 @@ export function ProfileInput({
   label,
   onChange,
   placeholder,
+  testId,
   type = 'text',
   value,
 }: {
   label: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  testId?: string;
   type?: string;
   value: string;
 }) {
@@ -24,6 +26,7 @@ export function ProfileInput({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         type={type}
+        data-testid={testId}
         className={cx(profileEditorInputClass, 'text-sm font-normal')}
       />
     </label>

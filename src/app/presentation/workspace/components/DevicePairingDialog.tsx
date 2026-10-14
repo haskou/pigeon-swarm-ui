@@ -11,6 +11,8 @@ import { DialogHeader } from '../../../../shared/presentation/components/DialogH
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { applicationContainer } from '../../../composition/applicationContainer';
+import { DevicePairingUnlockConfirmation } from './DevicePairingUnlockConfirmation';
+import { useLocalUnlockConfirmation } from './useLocalUnlockConfirmation';
 
 export function DevicePairingDialog({
   onClose,
@@ -30,6 +32,7 @@ export function DevicePairingDialog({
   const [state, setState] = useState<'idle' | 'loading'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [verificationCode, setVerificationCode] = useState<string | null>(null);
+  const confirmation = useLocalUnlockConfirmation(session.identity.id);
 
   const review = async () => {
     setState('loading');
@@ -50,6 +53,8 @@ export function DevicePairingDialog({
     }
   };
   const authorize = async () => {
+    const password = confirmation.consume();
+
     setState('loading');
     setError(null);
 
@@ -58,6 +63,7 @@ export function DevicePairingDialog({
         await applicationContainer.identities.authorizeDevicePairing(
           session,
           DevicePairingCode.fromString(requestCode),
+          password,
         );
 
       setCompletionCode(result.completionCode);
@@ -111,22 +117,30 @@ export function DevicePairingDialog({
                 value={requestCode}
               />
               {verificationCode && (
-                <div className="ui-inline-notice grid gap-1 text-center">
-                  <p className="text-xs text-white/60">
-                    {copy.profile.devicePairingVerificationHelp}
-                  </p>
-                  <p
-                    className="font-mono text-2xl tracking-widest"
-                    data-testid="device-pairing-verification-code"
-                  >
-                    {verificationCode}
-                  </p>
-                </div>
+                <>
+                  <div className="ui-inline-notice grid gap-1 text-center">
+                    <p className="text-xs text-white/60">
+                      {copy.profile.devicePairingVerificationHelp}
+                    </p>
+                    <p
+                      className="font-mono text-2xl tracking-widest"
+                      data-testid="device-pairing-verification-code"
+                    >
+                      {verificationCode}
+                    </p>
+                  </div>
+                  <DevicePairingUnlockConfirmation
+                    confirmation={confirmation}
+                  />
+                </>
               )}
               <button
                 className="ui-button ui-button-primary"
                 data-testid="device-pairing-submit"
-                disabled={!requestCode.trim() || state === 'loading'}
+                disabled={
+                  state === 'loading' ||
+                  !(verificationCode ? confirmation.ready : requestCode.trim())
+                }
                 onClick={() => void (verificationCode ? authorize() : review())}
                 type="button"
               >

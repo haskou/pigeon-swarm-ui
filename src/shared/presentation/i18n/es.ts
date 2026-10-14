@@ -1354,6 +1354,10 @@ export const es = {
     devicePairingInvitationQr: 'Invitación para emparejar dispositivo',
     devicePairingMismatch:
       'Esta solicitud está desactualizada o pertenece a otra identidad. Pide al dispositivo nuevo que cree una solicitud nueva.',
+    devicePairingPasskey:
+      'Tu passkey confirma que eres tú antes de autorizar este dispositivo.',
+    devicePairingPassword:
+      'Confirma tu contraseña para autorizar este dispositivo',
     devicePairingRequestLabel: 'Solicitud del dispositivo nuevo',
     devicePairingRequestPlaceholder:
       'Pega el código de solicitud del dispositivo nuevo, o escanea su QR',

@@ -1,4 +1,5 @@
 import { DevicePairingError } from '../../../../../contexts/identities/domain/DevicePairingError';
+import { DeviceUnlockNotConfirmedError } from '../../../../../contexts/identities/infrastructure/storage/DeviceUnlockNotConfirmedError';
 import { toDevicePairingErrorMessage } from '../../../../../contexts/identities/presentation/view-models/toDevicePairingErrorMessage';
 import { copy } from '../../../../../shared/presentation/i18n/copy';
 
@@ -16,6 +17,12 @@ describe('toDevicePairingErrorMessage', () => {
     expect(
       toDevicePairingErrorMessage(new DevicePairingError('invalid', 'x')),
     ).toBe(copy.profile.devicePairingInvalid);
+  });
+
+  it('asks again for the password or passkey when it was not confirmed', () => {
+    expect(
+      toDevicePairingErrorMessage(new DeviceUnlockNotConfirmedError()),
+    ).toBe(copy.profile.unlockNotConfirmed);
   });
 
   it('never shows raw domain text or placeholders', () => {
