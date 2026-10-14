@@ -21,8 +21,10 @@ import { DeviceSealedRootPayload } from '../crypto/DeviceSealedRootPayload';
  * read as the lagging root that a fresh one replaces. A device with no entry
  * mints only after the identity keychain head reads: a head sealed under a
  * root this device cannot open blocks the mint, so that keychain is not
- * stranded. A device that forgets itself hands a fresh root, with the root it
- * replaces, to the devices that remain, inside its own retirement.
+ * stranded. The one exception is a device a recovery kit just authorized as
+ * the only device: no one holds that root any more, so it replaces the head.
+ * A device that forgets itself hands a fresh root, with the root it replaces,
+ * to the devices that remain, inside its own retirement.
  */
 export class DeviceSealedRootRotation {
   public constructor(
@@ -39,9 +41,10 @@ export class DeviceSealedRootRotation {
   private async publishWithRetry(
     session: Session,
     roots: DeviceSealedRoots,
+    verifiedRecipients?: readonly DeviceCredential[],
   ): Promise<Session> {
     try {
-      return await this.publish(session, roots);
+      return await this.publish(session, roots, verifiedRecipients);
     } catch (error: unknown) {
       if (!(error instanceof HttpJsonError) || error.status !== 409) {
         throw error;
@@ -50,16 +53,24 @@ export class DeviceSealedRootRotation {
       return await this.publish(
         await this.deviceAuthorization.synchronize(session),
         roots,
+        verifiedRecipients,
       );
     }
   }
 
+  /**
+   * Seals the roots to the verified recipients when given, otherwise to the
+   * devices the node lists at the head.
+   */
   private async publish(
     session: Session,
     roots: DeviceSealedRoots,
+    verifiedRecipients?: readonly DeviceCredential[],
   ): Promise<Session> {
     const own = await this.sealedSecrets.fetchOwn(session);
-    const recipients = await this.deviceAuthorization.findDevices(session);
+    const recipients = verifiedRecipients
+      ? [...verifiedRecipients]
+      : await this.deviceAuthorization.findDevices(session);
 
     await this.sealedSecrets.publish(session, {
       generation: this.nextGeneration(own?.generation),
@@ -156,6 +167,42 @@ export class DeviceSealedRootRotation {
         ? { previousDeviceSealedRootKey: roots.previous }
         : {}),
     };
+  }
+
+  /**
+   * Opens a fresh root on the device a recovery kit just authorized, for
+   * recovery-key sign-in only. The recovery replaced every device, so the
+   * root the keychain head is sealed under is no longer held by any
+   * authorized device and cannot be opened. Refuses unless the signed
+   * transitions, replayed here and never taken from the node's device list,
+   * authorize this device alone, and seals the fresh root to that verified
+   * device only. Replaces a head that does not open under the fresh root with
+   * an empty keychain before publishing that root, so a failed replacement
+   * publishes nothing and the recovery runs again. Unlock and pairing use
+   * `current`, which never replaces a head.
+   */
+  public async openAfterRecovery(session: Session): Promise<Session> {
+    if (session.deviceSealedRootKey) {
+      throw new Error(
+        'A recovered session must not hold a device-sealed root.',
+      );
+    }
+
+    const devices = await this.deviceAuthorization.verifiedDevices(session);
+    const own = session.deviceCredentialKeyPair.toPrimitives().publicKey;
+
+    if (devices.length !== 1 || !devices[0].hasValue(own)) {
+      throw new Error('Recovery left another device authorized.');
+    }
+
+    const root = SymmetricKey.generate();
+
+    await this.keychains.replaceHeadAfterRecovery({
+      ...session,
+      deviceSealedRootKey: root,
+    });
+
+    return await this.publishWithRetry(session, { root }, devices);
   }
 
   /**

@@ -77,7 +77,10 @@ function gatewayDouble(): {
     >
   >;
   sealedRoot: jest.Mocked<
-    Pick<DeviceSealedRootRotation, 'current' | 'handOver' | 'rotate'>
+    Pick<
+      DeviceSealedRootRotation,
+      'current' | 'handOver' | 'openAfterRecovery' | 'rotate'
+    >
   >;
 } {
   const commands = {

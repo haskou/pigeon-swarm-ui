@@ -156,10 +156,12 @@ export const es = {
     peersLabel: 'Pares',
     profileNameLabel: 'Nombre de perfil',
     recoveryKeyCreateHelp:
-      'Guarda esta clave. Te permite volver a iniciar sesión en tu identidad desde otro nodo o navegador. Restaura el acceso, no una copia de tus mensajes: el historial vuelve solo en las conversaciones cuyas claves se guardaron en tu llavero.',
+      'Guarda esta clave. Te permite volver a iniciar sesión en tu identidad desde otro nodo o navegador si pierdes todos tus dispositivos. Restaura el acceso, no tus conversaciones: sus claves se quedan en tus dispositivos, así que tras una recuperación cada conversación tendrá que invitarte de nuevo. Exporta una copia del historial para conservar tus mensajes uno a uno.',
     recoveryKeyLabel: 'Clave de recuperación',
     recoveryKeyLoginHelp:
-      'Pega la clave de recuperación que guardaste al crear tu identidad (empieza por psrk1). Restaura el acceso a tu identidad en este dispositivo. Los dispositivos que usabas antes dejarán de funcionar. El historial vuelve solo en las conversaciones cuyas claves se guardaron en tu llavero.',
+      'Pega la clave de recuperación que guardaste al crear tu identidad (empieza por psrk1). Restaura el acceso a tu identidad en este dispositivo. Los dispositivos que usabas antes dejarán de funcionar.',
+    recoveryKeyLossWarning:
+      'Al recuperar pierdes las claves de todas tus conversaciones. Tus chats uno a uno y tus grupos tendrán que invitarte de nuevo antes de que puedas leer o escribir en ellos. Los mensajes uno a uno anteriores solo vuelven desde una copia del historial que hayas exportado antes.',
     recoveryKeyPlaceholder: 'psrk1...',
     recoveryKeyRegenerate: 'Regenerar',
     recoveryKeySaved: 'He guardado mi clave de recuperación',

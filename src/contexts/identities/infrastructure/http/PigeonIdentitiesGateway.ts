@@ -69,8 +69,10 @@ export class PigeonIdentitiesGateway {
       IdentityPassword.fromString(password),
     );
 
+    // Only after the recovery kit proved itself and replaced every device:
+    // the keychain root left with them, so this device opens a fresh one.
     return await this.identityLogin.hydrate(
-      await this.openDeviceSealedRoot(session),
+      await this.deviceSealedRoot.openAfterRecovery(session),
       onProgress,
     );
   }

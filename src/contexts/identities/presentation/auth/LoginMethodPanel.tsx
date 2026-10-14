@@ -77,6 +77,12 @@ export function LoginMethodPanel({
         <p className="mt-2 text-xs leading-relaxed text-white/50">
           {copy.auth.recoveryKeyLoginHelp}
         </p>
+        <p
+          className="mt-2 text-xs leading-relaxed text-amber-200/80"
+          data-testid="auth-recovery-key-loss"
+        >
+          {copy.auth.recoveryKeyLossWarning}
+        </p>
       </Field>
     );
   }
