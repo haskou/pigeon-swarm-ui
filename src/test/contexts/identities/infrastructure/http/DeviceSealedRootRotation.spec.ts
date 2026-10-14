@@ -8,6 +8,7 @@ import type { PigeonKeychainApi } from '../../../../../contexts/identities/infra
 import type { LocalKeychain } from '../../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
+import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
 import { DeviceSealedRootRotation } from '../../../../../contexts/identities/infrastructure/http/DeviceSealedRootRotation';
 import {
   decodeBase64Url,
@@ -25,7 +26,7 @@ const RECIPIENTS = [
 
 const makeSession = (revision: number): SessionWithRoot =>
   ({
-    authorizationRevision: { valueOf: () => revision },
+    authorizationRevision: DeviceAuthorizationRevision.fromNumber(revision),
     identity: { id: IDENTITY_ID },
     masterKey: SymmetricKey.generate(),
   }) as unknown as SessionWithRoot;
