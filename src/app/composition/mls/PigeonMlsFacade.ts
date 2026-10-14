@@ -8,6 +8,7 @@ import type { MessageResource } from '../../../contexts/messages/infrastructure/
 
 import { IndexedDbMlsStateStore } from '../../../contexts/communities/infrastructure/mls/IndexedDbMlsStateStore';
 import { MlsCommunityEngine } from '../../../contexts/communities/infrastructure/mls/MlsCommunityEngine';
+import { MlsLeafSigner } from '../../../contexts/communities/infrastructure/mls/MlsLeafSigner';
 import { SessionMlsRecordTransport } from '../../../contexts/communities/infrastructure/mls/SessionMlsRecordTransport';
 import { DeviceSealedEntryStore } from '../../../contexts/messages/infrastructure/mailbox/DeviceSealedEntryStore';
 import { scopeClientStorageKey } from '../../../shared/infrastructure/storage/ClientStorageScope';
@@ -78,7 +79,9 @@ export class PigeonMlsFacade {
     };
 
     holder.engine = new MlsCommunityEngine(
-      owner,
+      new MlsLeafSigner(owner, {
+        sign: (message) => holder.session.keyPair.sign(message),
+      }),
       new IndexedDbMlsStateStore(this.sealedState(), () => holder.session),
       (communityId) =>
         new SessionMlsRecordTransport(

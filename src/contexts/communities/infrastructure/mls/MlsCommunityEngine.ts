@@ -4,6 +4,8 @@ import { Buffer } from 'buffer';
 import type { MlsRecordResource } from '../http/resources/MlsRecordResource';
 import type { MlsKeyPackageBundle, MlsLeafOwner } from './MlsGroup';
 import type { MlsGroupCredentials } from './MlsGroupCredentials';
+import type { MlsLeafSigner } from './MlsLeafSigner';
+import type { MlsMembershipPolicy } from './MlsMembershipPolicy';
 import type { MlsRecordTransport } from './MlsRecordTransport';
 import type { MlsRoster } from './MlsRoster';
 import type { MlsStateStore } from './MlsStateStore';
@@ -26,6 +28,20 @@ const toBase64 = (bytes: Uint8Array): string =>
 const fromBase64 = (value: string): Uint8Array =>
   new Uint8Array(Buffer.from(value, 'base64'));
 
+/** The device a record's key package belongs to, if its author signed it. */
+const authoredOwnerOf = (
+  record: MlsRecordResource,
+): MlsLeafOwner | undefined => {
+  try {
+    const owner = mlsKeyPackageOwner(fromBase64(record.payload));
+
+    return owner.identityId === record.authorIdentityId ? owner : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/** Ignores key packages whose credential the author's identity did not sign. */
 const pickNewestPerDevice = (
   published: MlsRecordResource[],
   wanted: ReadonlySet<string>,
@@ -35,11 +51,11 @@ const pickNewestPerDevice = (
 
   for (const record of published) {
     if (!wanted.has(record.authorIdentityId)) continue;
-    const owner = mlsKeyPackageOwner(fromBase64(record.payload));
+    const owner = authoredOwnerOf(record);
+
+    if (!owner) continue;
     const device = `${owner.identityId}/${owner.deviceId}`;
     const known = chosen.get(device);
-
-    if (owner.identityId !== record.authorIdentityId) continue;
 
     if (present.has(device)) continue;
 
@@ -60,7 +76,7 @@ export class MlsCommunityEngine {
   private readonly rosters = new Map<string, ReadonlySet<string>>();
 
   public constructor(
-    private readonly owner: MlsLeafOwner,
+    private readonly signer: MlsLeafSigner,
     private readonly store: MlsStateStore,
     private readonly transportFor: (communityId: string) => MlsRecordTransport,
     private readonly rosterFor: (groupId: string) => MlsRoster,
@@ -340,7 +356,7 @@ export class MlsCommunityEngine {
       kind: 'welcome',
     });
     const mine = welcomes.filter(
-      (record) => record.recipientIdentityId === this.owner.identityId,
+      (record) => record.recipientIdentityId === this.signer.owner.identityId,
     );
 
     if (mine.length === 0) return undefined;
@@ -377,7 +393,7 @@ export class MlsCommunityEngine {
     const bundles: MlsKeyPackageBundle[] = [];
 
     for (let index = 0; index < count; index += 1) {
-      const bundle = await generateMlsKeyPackage(this.owner);
+      const bundle = await generateMlsKeyPackage(this.signer);
 
       if (persist) {
         await this.store.saveKeyPackage({
@@ -410,8 +426,13 @@ export class MlsCommunityEngine {
     return roster;
   }
 
-  private policyFor(groupId: string): (identityId: string) => boolean {
-    return (identityId) => this.rosters.get(groupId)?.has(identityId) ?? false;
+  /** Roster members hold leaves; any of them may change membership. */
+  private policyFor(groupId: string): MlsMembershipPolicy {
+    return {
+      admits: (identityId) =>
+        this.rosters.get(groupId)?.has(identityId) ?? false,
+      allows: () => true,
+    };
   }
 
   private async load(groupId: string): Promise<MlsGroup | undefined> {
@@ -424,7 +445,7 @@ export class MlsCommunityEngine {
     await this.currentRoster(groupId);
     const group = MlsGroup.restore(
       groupId,
-      this.owner,
+      this.signer.owner,
       this.policyFor(groupId),
       bytes,
     );

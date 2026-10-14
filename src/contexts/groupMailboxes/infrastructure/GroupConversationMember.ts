@@ -3,6 +3,7 @@ import type { GroupConversationPorts } from './GroupConversationPorts';
 import type { GroupConversationStores } from './GroupConversationStores';
 
 import { IndexedDbMlsStateStore } from '../../communities/infrastructure/mls/IndexedDbMlsStateStore';
+import { MlsLeafSigner } from '../../communities/infrastructure/mls/MlsLeafSigner';
 import { DeviceSealedEntryStore } from '../../messages/infrastructure/mailbox/DeviceSealedEntryStore';
 import { GroupMailboxControl } from './control/GroupMailboxControl';
 import { GroupMailboxNotificationPump } from './control/GroupMailboxNotificationPump';
@@ -24,7 +25,10 @@ export class GroupConversationMember {
     // Local state seals under the latest root, as after a revoke rotated it.
     const sealing = { session };
     const engine = new GroupMailboxMlsEngine(
-      { deviceId: String(session.deviceId), identityId },
+      new MlsLeafSigner(
+        { deviceId: String(session.deviceId), identityId },
+        session.keyPair,
+      ),
       new IndexedDbMlsStateStore(
         new DeviceSealedEntryStore(
           stores.database('mls', identityId),

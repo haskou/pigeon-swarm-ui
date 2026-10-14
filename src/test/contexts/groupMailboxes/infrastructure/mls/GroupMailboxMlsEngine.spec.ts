@@ -3,34 +3,65 @@ import { mock, type MockProxy } from 'jest-mock-extended';
 
 import type { MlsStateStore } from '../../../../../contexts/communities/infrastructure/mls/MlsStateStore';
 import type { GroupMailboxGenerationRepository } from '../../../../../contexts/groupMailboxes/domain/repositories/GroupMailboxGenerationRepository';
+import type { GroupMailboxCommit } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxCommit';
 
+import { generateMlsKeyPackage } from '../../../../../contexts/communities/infrastructure/mls/MlsGroup';
+import { MlsLeafSigner } from '../../../../../contexts/communities/infrastructure/mls/MlsLeafSigner';
 import { MlsRejectedError } from '../../../../../contexts/communities/infrastructure/mls/MlsRejectedError';
 import { GroupMailboxGeneration } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxGeneration';
+import { GroupMailboxRoster } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxRoster';
 import { GroupMailboxMlsEngine } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxMlsEngine';
+import { MlsTestIdentity } from '../../../communities/infrastructure/mls/MlsTestIdentity';
 import { sealedGroupStores } from '../sealedGroupStores';
 
 const text = new TextEncoder();
 const read = (bytes: Uint8Array): string => new TextDecoder().decode(bytes);
 const CONVERSATION = 'conversation-1';
+const NAMES = ['alice', 'bob', 'carol', 'dave'];
+const sent = (): Promise<void> => Promise.resolve();
 
-let roster: ReadonlySet<string> = new Set();
+let cast: Record<string, MlsTestIdentity>;
+let roster = GroupMailboxRoster.empty();
 let clock = 0;
 let database = 0;
 
+const id = (name: string): string => cast[name].id;
+
+/** Alice created the conversation and is its only manager. */
+const managedByAlice = (): GroupMailboxRoster =>
+  GroupMailboxRoster.of({
+    adminIds: [],
+    creatorId: id('alice'),
+    participantIds: NAMES.map(id),
+  });
+
+/** A roster that names no manager lets every member add devices. */
+const unmanaged = (): GroupMailboxRoster =>
+  GroupMailboxRoster.of({ adminIds: [], participantIds: NAMES.map(id) });
+
 const engine = (
-  identityId: string,
-  deviceId = 'd1',
-  databaseName = `group-mls-${++database}`,
-  generations?: GroupMailboxGenerationRepository,
-  store?: MlsStateStore,
-): GroupMailboxMlsEngine =>
-  new GroupMailboxMlsEngine(
-    { deviceId, identityId },
-    store ?? sealedGroupStores(databaseName, identityId).state,
-    generations ?? sealedGroupStores(databaseName, identityId).generations,
-    () => Promise.resolve(roster),
+  name: string,
+  options: {
+    databaseName?: string;
+    deviceId?: string;
+    generations?: GroupMailboxGenerationRepository;
+    rosterView?: () => GroupMailboxRoster;
+    store?: MlsStateStore;
+  } = {},
+): GroupMailboxMlsEngine => {
+  const stores = sealedGroupStores(
+    options.databaseName ?? `group-mls-${++database}`,
+    id(name),
+  );
+
+  return new GroupMailboxMlsEngine(
+    cast[name].signer(options.deviceId),
+    options.store ?? stores.state,
+    options.generations ?? stores.generations,
+    () => Promise.resolve(options.rosterView?.() ?? roster),
     () => clock,
   );
+};
 
 /** The real store, whose writes a test can make fail once. */
 const flakyStore = (
@@ -40,49 +71,56 @@ const flakyStore = (
   const backing = sealedGroupStores(databaseName, identityId).state;
   const store = mock<MlsStateStore>();
 
-  store.deleteKeyPackage.mockImplementation((id) =>
-    backing.deleteKeyPackage(id),
+  store.deleteKeyPackage.mockImplementation((keyPackageId) =>
+    backing.deleteKeyPackage(keyPackageId),
   );
-  store.loadGroup.mockImplementation((id) => backing.loadGroup(id));
+  store.loadGroup.mockImplementation((groupId) => backing.loadGroup(groupId));
   store.loadKeyPackages.mockImplementation(() => backing.loadKeyPackages());
-  store.loadPlaintext.mockImplementation((id, ciphertextId) =>
-    backing.loadPlaintext(id, ciphertextId),
+  store.loadPlaintext.mockImplementation((groupId, ciphertextId) =>
+    backing.loadPlaintext(groupId, ciphertextId),
   );
-  store.saveGroup.mockImplementation((id, state) =>
-    backing.saveGroup(id, state),
+  store.saveGroup.mockImplementation((groupId, state) =>
+    backing.saveGroup(groupId, state),
   );
   store.saveKeyPackage.mockImplementation((keyPackage) =>
     backing.saveKeyPackage(keyPackage),
   );
-  store.savePlaintext.mockImplementation((id, ciphertextId, plaintext) =>
-    backing.savePlaintext(id, ciphertextId, plaintext),
+  store.savePlaintext.mockImplementation((groupId, ciphertextId, plaintext) =>
+    backing.savePlaintext(groupId, ciphertextId, plaintext),
   );
 
   return store;
 };
 
+/** Alice adds the joiners in one commit and each joins from its welcome. */
 const join = async (
-  creator: GroupMailboxMlsEngine,
+  alice: GroupMailboxMlsEngine,
   joiners: GroupMailboxMlsEngine[],
 ): Promise<void> => {
-  const added = await creator.add(
+  const added = await alice.add(
     CONVERSATION,
     await Promise.all(joiners.map((joiner) => joiner.createKeyPackage())),
+    sent,
   );
   for (const joiner of joiners) {
-    await joiner.join(CONVERSATION, added.welcome!, added.generation.index);
+    await joiner.join(
+      CONVERSATION,
+      added.welcome!,
+      added.generation.index,
+      id('alice'),
+    );
   }
 };
 
+/** Alice creates the group and adds the others. */
 const setup = async (
   names: string[],
 ): Promise<Record<string, GroupMailboxMlsEngine>> => {
   const engines = Object.fromEntries(names.map((name) => [name, engine(name)]));
-  const [creator, ...joiners] = names;
-  await engines[creator].createGroup(CONVERSATION);
+  await engines.alice.createGroup(CONVERSATION);
   await join(
-    engines[creator],
-    joiners.map((name) => engines[name]),
+    engines.alice,
+    names.filter((name) => name !== 'alice').map((name) => engines[name]),
   );
 
   return engines;
@@ -92,8 +130,12 @@ const indices = async (member: GroupMailboxMlsEngine): Promise<number[]> =>
   (await member.readableGenerations(CONVERSATION)).map(({ index }) => index);
 
 describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
+  beforeAll(async () => {
+    cast = await MlsTestIdentity.cast([...NAMES, 'eve', 'mallory']);
+  });
+
   beforeEach(() => {
-    roster = new Set(['alice', 'bob', 'carol', 'dave']);
+    roster = managedByAlice();
     clock = 1_000;
   });
 
@@ -101,8 +143,17 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
     const alice = engine('alice');
     const created = await alice.createGroup(CONVERSATION);
     const bob = engine('bob');
-    const added = await alice.add(CONVERSATION, [await bob.createKeyPackage()]);
-    await bob.join(CONVERSATION, added.welcome!, added.generation.index);
+    const added = await alice.add(
+      CONVERSATION,
+      [await bob.createKeyPackage()],
+      sent,
+    );
+    await bob.join(
+      CONVERSATION,
+      added.welcome!,
+      added.generation.index,
+      id('alice'),
+    );
 
     const shared = await bob.generation(CONVERSATION);
 
@@ -119,13 +170,21 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
     const before = await bob.generation(CONVERSATION);
     const carol = engine('carol');
 
-    const added = await alice.add(CONVERSATION, [
-      await carol.createKeyPackage(),
-    ]);
+    const added = await alice.add(
+      CONVERSATION,
+      [await carol.createKeyPackage()],
+      sent,
+    );
     await bob.applyCommit(CONVERSATION, added.commit);
-    await carol.join(CONVERSATION, added.welcome!, added.generation.index);
+    await carol.join(
+      CONVERSATION,
+      added.welcome!,
+      added.generation.index,
+      id('alice'),
+    );
 
     expect(added.generation.index).toBe(before.index + 1);
+    expect(added.recipients).toEqual([id('alice'), id('bob')].sort());
     expect(
       (await bob.generation(CONVERSATION)).secret.isEqual(
         added.generation.secret,
@@ -143,7 +202,7 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
     const { alice, bob, carol } = await setup(['alice', 'bob', 'carol']);
     const before = await alice.generation(CONVERSATION);
 
-    const removal = await alice.remove(CONVERSATION, ['carol']);
+    const removal = await alice.remove(CONVERSATION, [id('carol')], sent);
     const bobOutcome = await bob.applyCommit(CONVERSATION, removal!.commit);
     const carolOutcome = await carol.applyCommit(CONVERSATION, removal!.commit);
     const sealed = await alice.encrypt(
@@ -156,6 +215,7 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
     );
     expect(removal!.generation.index).toBe(before.index + 1);
     expect(removal!.generation.secret.isEqual(before.secret)).toBe(false);
+    expect(removal!.recipients).toEqual([id('alice'), id('bob')].sort());
     expect(bobOutcome.kind).toBe('applied');
     expect(
       (await bob.generation(CONVERSATION)).secret.isEqual(
@@ -177,7 +237,7 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
     const { alice, carol } = await setup(['alice', 'bob', 'carol']);
     const late = await carol.encrypt(CONVERSATION, text.encode('still me'));
 
-    await alice.remove(CONVERSATION, ['carol']);
+    await alice.remove(CONVERSATION, [id('carol')], sent);
 
     await expect(alice.decrypt(CONVERSATION, late)).rejects.toBeInstanceOf(
       MlsRejectedError,
@@ -189,15 +249,23 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
 
   it('still advances the generation when saving the log failed the first time', async () => {
     const generations = mock<GroupMailboxGenerationRepository>();
-    const backing = sealedGroupStores(`flaky-${++database}`, 'bob').generations;
-    generations.load.mockImplementation((id) => backing.load(id));
-    generations.save.mockImplementation((id, log) => backing.save(id, log));
+    const databaseName = `flaky-bob-${++database}`;
+    const backing = sealedGroupStores(
+      `${databaseName}-log`,
+      id('bob'),
+    ).generations;
+    generations.load.mockImplementation((conversationId) =>
+      backing.load(conversationId),
+    );
+    generations.save.mockImplementation((conversationId, log) =>
+      backing.save(conversationId, log),
+    );
     const alice = engine('alice');
-    const bob = engine('bob', 'd1', `flaky-bob-${database}`, generations);
+    const bob = engine('bob', { databaseName, generations });
     const carol = engine('carol');
     await alice.createGroup(CONVERSATION);
     await join(alice, [bob, carol]);
-    const removal = await alice.remove(CONVERSATION, ['carol']);
+    const removal = await alice.remove(CONVERSATION, [id('carol')], sent);
     generations.save.mockRejectedValueOnce(new Error('quota'));
 
     await expect(
@@ -212,24 +280,77 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
     ).toBe(true);
   });
 
-  it('keeps its own removal uncommitted when saving the log fails', async () => {
+  it('publishes nothing when saving the log of its own removal fails', async () => {
     const generations = mock<GroupMailboxGenerationRepository>();
+    const databaseName = `flaky-alice-${++database}`;
     const backing = sealedGroupStores(
-      `flaky-${++database}`,
-      'alice',
+      `${databaseName}-log`,
+      id('alice'),
     ).generations;
-    generations.load.mockImplementation((id) => backing.load(id));
-    generations.save.mockImplementation((id, log) => backing.save(id, log));
-    const alice = engine('alice', 'd1', `flaky-alice-${database}`, generations);
+    generations.load.mockImplementation((conversationId) =>
+      backing.load(conversationId),
+    );
+    generations.save.mockImplementation((conversationId, log) =>
+      backing.save(conversationId, log),
+    );
+    const alice = engine('alice', { databaseName, generations });
     const bob = engine('bob');
     const carol = engine('carol');
     await alice.createGroup(CONVERSATION);
     await join(alice, [bob, carol]);
     const before = await alice.generation(CONVERSATION);
+    const publish = jest.fn(sent);
     generations.save.mockRejectedValueOnce(new Error('quota'));
 
-    await expect(alice.remove(CONVERSATION, ['carol'])).rejects.toThrow();
-    const removal = await alice.remove(CONVERSATION, ['carol']);
+    await expect(
+      alice.remove(CONVERSATION, [id('carol')], publish),
+    ).rejects.toThrow();
+    expect(publish).not.toHaveBeenCalled();
+    const removal = await alice.remove(CONVERSATION, [id('carol')], publish);
+    await bob.applyCommit(CONVERSATION, removal!.commit);
+
+    expect(publish).toHaveBeenCalledTimes(1);
+    expect(removal!.generation.index).toBe(before.index + 1);
+    expect(
+      (await bob.generation(CONVERSATION)).secret.isEqual(
+        removal!.generation.secret,
+      ),
+    ).toBe(true);
+  });
+
+  it('abandons its own commit when publishing it fails, so it stays in the epoch the others are in', async () => {
+    const databaseName = `unpublished-${++database}`;
+    const alice = engine('alice', { databaseName });
+    const bob = engine('bob');
+    const carol = engine('carol');
+    await alice.createGroup(CONVERSATION);
+    await join(alice, [bob, carol]);
+    const before = await alice.generation(CONVERSATION);
+
+    await expect(
+      alice.remove(CONVERSATION, [id('carol')], () =>
+        Promise.reject(new Error('outbox unavailable')),
+      ),
+    ).rejects.toThrow('outbox unavailable');
+    const restarted = engine('alice', { databaseName });
+
+    for (const member of [alice, restarted]) {
+      const current = await member.generation(CONVERSATION);
+
+      expect(current.index).toBe(before.index);
+      expect(current.secret.isEqual(before.secret)).toBe(true);
+    }
+    expect(
+      read(
+        (
+          await bob.decrypt(
+            CONVERSATION,
+            await alice.encrypt(CONVERSATION, text.encode('same epoch')),
+          )
+        ).plaintext,
+      ),
+    ).toBe('same epoch');
+    const removal = await alice.remove(CONVERSATION, [id('carol')], sent);
     await bob.applyCommit(CONVERSATION, removal!.commit);
 
     expect(removal!.generation.index).toBe(before.index + 1);
@@ -240,44 +361,72 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
     ).toBe(true);
   });
 
-  it('keeps the generation of the commit it publishes when saving its group failed after the log', async () => {
-    const name = `flaky-group-${++database}`;
-    const store = flakyStore(name, 'alice');
-    const alice = engine('alice', 'd1', name, undefined, store);
+  it('adopts its own published commit after stopping before it saved the group', async () => {
+    const databaseName = `crashed-${++database}`;
+    const store = flakyStore(databaseName, id('alice'));
+    const alice = engine('alice', { databaseName, store });
     const bob = engine('bob');
     const carol = engine('carol');
     await alice.createGroup(CONVERSATION);
     await join(alice, [bob, carol]);
-    store.saveGroup.mockRejectedValueOnce(new Error('quota'));
+    let published: GroupMailboxCommit | undefined;
 
-    await expect(alice.remove(CONVERSATION, ['carol'])).rejects.toThrow();
-    const removal = await alice.remove(CONVERSATION, ['carol']);
-    await bob.applyCommit(CONVERSATION, removal!.commit);
-    const published = await bob.generation(CONVERSATION);
+    await expect(
+      alice.remove(CONVERSATION, [id('carol')], (made) => {
+        published = made;
+        store.saveGroup.mockRejectedValueOnce(new Error('crash'));
 
-    expect(removal!.generation.secret.isEqual(published.secret)).toBe(true);
+        return Promise.resolve();
+      }),
+    ).rejects.toThrow('crash');
+    const restarted = engine('alice', { databaseName });
+    const outcome = await restarted.applyCommit(
+      CONVERSATION,
+      published!.commit,
+    );
+    await bob.applyCommit(CONVERSATION, published!.commit);
+    const sealed = await restarted.encrypt(
+      CONVERSATION,
+      text.encode('after the restart'),
+    );
+
+    expect(outcome.kind).toBe('applied');
     expect(
-      (await alice.generation(CONVERSATION)).secret.isEqual(published.secret),
+      (await restarted.generation(CONVERSATION)).secret.isEqual(
+        published!.generation.secret,
+      ),
     ).toBe(true);
+    expect(read((await bob.decrypt(CONVERSATION, sealed)).plaintext)).toBe(
+      'after the restart',
+    );
   });
 
   it('never exposes the generation of an add that died before its group was saved', async () => {
-    const name = `flaky-add-${++database}`;
-    const store = flakyStore(name, 'alice');
-    const alice = engine('alice', 'd1', name, undefined, store);
+    const databaseName = `flaky-add-${++database}`;
+    const store = flakyStore(databaseName, id('alice'));
+    const alice = engine('alice', { databaseName, store });
     const carol = engine('carol');
     await alice.createGroup(CONVERSATION);
     const before = await alice.generation(CONVERSATION);
     const keyPackage = await carol.createKeyPackage();
+    const publish = jest.fn(sent);
     store.saveGroup.mockRejectedValueOnce(new Error('crash'));
 
-    await expect(alice.add(CONVERSATION, [keyPackage])).rejects.toThrow();
-    const restarted = engine('alice', 'd1', name);
+    await expect(
+      alice.add(CONVERSATION, [keyPackage], publish),
+    ).rejects.toThrow();
+    expect(publish).not.toHaveBeenCalled();
+    const restarted = engine('alice', { databaseName });
     expect(
       (await restarted.generation(CONVERSATION)).secret.isEqual(before.secret),
     ).toBe(true);
-    const added = await restarted.add(CONVERSATION, [keyPackage]);
-    await carol.join(CONVERSATION, added.welcome!, added.generation.index);
+    const added = await restarted.add(CONVERSATION, [keyPackage], sent);
+    await carol.join(
+      CONVERSATION,
+      added.welcome!,
+      added.generation.index,
+      id('alice'),
+    );
 
     expect(
       (await carol.generation(CONVERSATION)).secret.isEqual(
@@ -287,18 +436,32 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
   });
 
   it('keeps the key package when saving the joined group fails', async () => {
-    const name = `flaky-join-${++database}`;
-    const store = flakyStore(name, 'bob');
+    const databaseName = `flaky-join-${++database}`;
+    const store = flakyStore(databaseName, id('bob'));
     const alice = engine('alice');
-    const bob = engine('bob', 'd1', name, undefined, store);
+    const bob = engine('bob', { databaseName, store });
     await alice.createGroup(CONVERSATION);
-    const added = await alice.add(CONVERSATION, [await bob.createKeyPackage()]);
+    const added = await alice.add(
+      CONVERSATION,
+      [await bob.createKeyPackage()],
+      sent,
+    );
     store.saveGroup.mockRejectedValueOnce(new Error('quota'));
 
     await expect(
-      bob.join(CONVERSATION, added.welcome!, added.generation.index),
+      bob.join(
+        CONVERSATION,
+        added.welcome!,
+        added.generation.index,
+        id('alice'),
+      ),
     ).rejects.toThrow();
-    await bob.join(CONVERSATION, added.welcome!, added.generation.index);
+    await bob.join(
+      CONVERSATION,
+      added.welcome!,
+      added.generation.index,
+      id('alice'),
+    );
 
     expect(
       (await bob.generation(CONVERSATION)).secret.isEqual(
@@ -311,31 +474,195 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
     const alice = engine('alice');
     await alice.createGroup(CONVERSATION);
     const bob = engine('bob');
-    const added = await alice.add(CONVERSATION, [await bob.createKeyPackage()]);
+    const added = await alice.add(
+      CONVERSATION,
+      [await bob.createKeyPackage()],
+      sent,
+    );
 
     for (const index of [-1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1]) {
       await expect(
-        bob.join(CONVERSATION, added.welcome!, index),
+        bob.join(CONVERSATION, added.welcome!, index, id('alice')),
       ).rejects.toBeInstanceOf(MlsRejectedError);
     }
-    await bob.join(CONVERSATION, added.welcome!, added.generation.index);
+    await bob.join(
+      CONVERSATION,
+      added.welcome!,
+      added.generation.index,
+      id('alice'),
+    );
 
     expect((await bob.generation(CONVERSATION)).index).toBe(
       added.generation.index,
     );
   });
 
+  it('rejects a welcome from a peer the roster does not let add devices', async () => {
+    const alice = engine('alice');
+    const bob = engine('bob', { rosterView: unmanaged });
+    const carol = engine('carol');
+    await alice.createGroup(CONVERSATION);
+    await join(alice, [bob]);
+    // Bob, who may not add anyone, makes a group of his own under the same id.
+    const forger = engine('bob', { deviceId: 'd2', rosterView: unmanaged });
+    await forger.createGroup(CONVERSATION);
+    const forged = await forger.add(
+      CONVERSATION,
+      [await carol.createKeyPackage()],
+      sent,
+    );
+
+    await expect(
+      carol.join(
+        CONVERSATION,
+        forged.welcome!,
+        forged.generation.index,
+        id('bob'),
+      ),
+    ).rejects.toThrow('The welcome is not from a member who may add devices');
+  });
+
+  it('rejects a welcome sent in the name of a manager who holds no leaf in it', async () => {
+    // Dave, who may not add anyone, invites bob and names alice as inviter.
+    const forger = engine('dave', { rosterView: unmanaged });
+    const bob = engine('bob');
+    await forger.createGroup(CONVERSATION);
+    const forged = await forger.add(
+      CONVERSATION,
+      [await bob.createKeyPackage()],
+      sent,
+    );
+
+    for (const inviter of [id('alice'), id('dave')]) {
+      await expect(
+        bob.join(
+          CONVERSATION,
+          forged.welcome!,
+          forged.generation.index,
+          inviter,
+        ),
+      ).rejects.toThrow('The welcome is not from a member who may add devices');
+    }
+  });
+
+  it('keeps a removed device out when a forged welcome of a later epoch arrives', async () => {
+    const { alice, carol } = await setup(['alice', 'bob', 'carol']);
+    const removal = await alice.remove(CONVERSATION, [id('carol')], sent);
+    await carol.applyCommit(CONVERSATION, removal!.commit);
+    // Dave, who may not add anyone, races a same-id group past carol's epoch.
+    const forger = engine('dave', { rosterView: unmanaged });
+    await forger.createGroup(CONVERSATION);
+    for (const deviceId of ['d2', 'd3', 'd4']) {
+      await forger.add(
+        CONVERSATION,
+        [await engine('dave', { deviceId }).createKeyPackage()],
+        sent,
+      );
+    }
+    const forged = await forger.add(
+      CONVERSATION,
+      [await carol.createKeyPackage()],
+      sent,
+    );
+
+    for (const inviter of [id('dave'), id('alice')]) {
+      await expect(
+        carol.join(
+          CONVERSATION,
+          forged.welcome!,
+          forged.generation.index,
+          inviter,
+        ),
+      ).rejects.toThrow('The welcome is not from a member who may add devices');
+    }
+    await expect(
+      carol.encrypt(CONVERSATION, text.encode('let me back in')),
+    ).rejects.toBeInstanceOf(MlsRejectedError);
+  });
+
+  it('refuses to add a device whose key package names another identity', async () => {
+    const alice = engine('alice');
+    await alice.createGroup(CONVERSATION);
+    // Bob's key signs a credential that claims a device of carol.
+    const forged = await generateMlsKeyPackage(
+      new MlsLeafSigner(
+        { deviceId: 'd9', identityId: id('carol') },
+        cast.bob.keyPair,
+      ),
+    );
+
+    await expect(
+      alice.add(CONVERSATION, [forged.publicBytes], sent),
+    ).rejects.toThrow('Key package credential is forged');
+    expect(await alice.members(CONVERSATION)).toEqual([id('alice')]);
+  });
+
+  it('refuses to add or remove a member when the roster does not let this member', async () => {
+    const { bob } = await setup(['alice', 'bob', 'carol']);
+    const publish = jest.fn(sent);
+
+    await expect(
+      bob.add(CONVERSATION, [await engine('dave').createKeyPackage()], publish),
+    ).rejects.toThrow('This member may not make this change');
+    await expect(
+      bob.remove(CONVERSATION, [id('carol')], publish),
+    ).rejects.toThrow('This member may not make this change');
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('rejects a removal by a member the roster does not let remove', async () => {
+    let bobView = managedByAlice();
+    const alice = engine('alice');
+    const bob = engine('bob', { rosterView: () => bobView });
+    const carol = engine('carol');
+    await alice.createGroup(CONVERSATION);
+    await join(alice, [bob, carol]);
+    const before = await alice.generation(CONVERSATION);
+    // A patched client that believes it created the conversation.
+    bobView = GroupMailboxRoster.of({
+      adminIds: [],
+      creatorId: id('bob'),
+      participantIds: NAMES.map(id),
+    });
+    const removal = await bob.remove(CONVERSATION, [id('carol')], sent);
+
+    for (const member of [alice, carol]) {
+      await expect(
+        member.applyCommit(CONVERSATION, removal!.commit),
+      ).rejects.toBeInstanceOf(MlsRejectedError);
+      expect((await member.generation(CONVERSATION)).index).toBe(before.index);
+    }
+  });
+
   it('lets a removed device join again from a new welcome only', async () => {
     const alice = engine('alice');
     await alice.createGroup(CONVERSATION);
     const bob = engine('bob');
-    const first = await alice.add(CONVERSATION, [await bob.createKeyPackage()]);
-    await bob.join(CONVERSATION, first.welcome!, first.generation.index);
-    const removal = await alice.remove(CONVERSATION, ['bob']);
+    const first = await alice.add(
+      CONVERSATION,
+      [await bob.createKeyPackage()],
+      sent,
+    );
+    await bob.join(
+      CONVERSATION,
+      first.welcome!,
+      first.generation.index,
+      id('alice'),
+    );
+    const removal = await alice.remove(CONVERSATION, [id('bob')], sent);
     await bob.applyCommit(CONVERSATION, removal!.commit);
 
-    const again = await alice.add(CONVERSATION, [await bob.createKeyPackage()]);
-    await bob.join(CONVERSATION, again.welcome!, again.generation.index);
+    const again = await alice.add(
+      CONVERSATION,
+      [await bob.createKeyPackage()],
+      sent,
+    );
+    await bob.join(
+      CONVERSATION,
+      again.welcome!,
+      again.generation.index,
+      id('alice'),
+    );
     const sealed = await alice.encrypt(CONVERSATION, text.encode('back'));
 
     expect(read((await bob.decrypt(CONVERSATION, sealed)).plaintext)).toBe(
@@ -347,7 +674,12 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
       ),
     ).toBe(true);
     await expect(
-      bob.join(CONVERSATION, first.welcome!, first.generation.index),
+      bob.join(
+        CONVERSATION,
+        first.welcome!,
+        first.generation.index,
+        id('alice'),
+      ),
     ).rejects.toBeInstanceOf(MlsRejectedError);
   });
 
@@ -357,7 +689,7 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
     const sealed = await bob.encrypt(CONVERSATION, text.encode('from bob'));
     const opened = await alice.decrypt(CONVERSATION, sealed);
 
-    expect(opened.sender).toEqual({ deviceId: 'd1', identityId: 'bob' });
+    expect(opened.sender).toEqual({ deviceId: 'd1', identityId: id('bob') });
     expect(read(opened.plaintext)).toBe('from bob');
   });
 
@@ -389,18 +721,20 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
 
     expect(read(second.plaintext)).toBe('again');
     expect(second.sender).toEqual(first.sender);
-    expect(own.sender).toEqual({ deviceId: 'd1', identityId: 'alice' });
+    expect(own.sender).toEqual({ deviceId: 'd1', identityId: id('alice') });
     expect(read(own.plaintext)).toBe('again');
   });
 
   it('rejects a commit forged in another group and keeps its generation', async () => {
     const { alice } = await setup(['alice', 'bob']);
     const before = await alice.generation(CONVERSATION);
-    const dave = engine('dave');
+    const dave = engine('dave', { rosterView: unmanaged });
     await dave.createGroup(CONVERSATION);
-    const forged = await dave.add(CONVERSATION, [
-      await engine('carol').createKeyPackage(),
-    ]);
+    const forged = await dave.add(
+      CONVERSATION,
+      [await engine('carol').createKeyPackage()],
+      sent,
+    );
 
     await expect(
       alice.applyCommit(CONVERSATION, forged.commit),
@@ -413,7 +747,7 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
   it('rejects a tampered commit', async () => {
     const { alice, bob } = await setup(['alice', 'bob', 'carol']);
     const before = await bob.generation(CONVERSATION);
-    const removal = await alice.remove(CONVERSATION, ['carol']);
+    const removal = await alice.remove(CONVERSATION, [id('carol')], sent);
     const tampered = new Uint8Array(removal!.commit);
     tampered[tampered.length - 1] = (tampered[tampered.length - 1] + 1) % 256;
 
@@ -426,12 +760,12 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
   it('keeps a removed member unable to send after a restart', async () => {
     const alice = engine('alice');
     await alice.createGroup(CONVERSATION);
-    const carol = engine('carol', 'd1', 'carol-restart');
+    const carol = engine('carol', { databaseName: 'carol-restart' });
     await join(alice, [carol]);
     const joined = await carol.generation(CONVERSATION);
-    const removal = await alice.remove(CONVERSATION, ['carol']);
+    const removal = await alice.remove(CONVERSATION, [id('carol')], sent);
     await carol.applyCommit(CONVERSATION, removal!.commit);
-    const restarted = engine('carol', 'd1', 'carol-restart');
+    const restarted = engine('carol', { databaseName: 'carol-restart' });
 
     await expect(
       restarted.encrypt(CONVERSATION, text.encode('still here?')),
@@ -443,20 +777,24 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
     const alice = engine('alice');
     await alice.createGroup(CONVERSATION);
     const bob = engine('bob');
-    const added = await alice.add(CONVERSATION, [await bob.createKeyPackage()]);
+    const added = await alice.add(
+      CONVERSATION,
+      [await bob.createKeyPackage()],
+      sent,
+    );
     const { index } = added.generation;
-    await bob.join(CONVERSATION, added.welcome!, index);
+    await bob.join(CONVERSATION, added.welcome!, index, id('alice'));
 
     await expect(
-      bob.join(CONVERSATION, added.welcome!, index),
+      bob.join(CONVERSATION, added.welcome!, index, id('alice')),
     ).rejects.toBeInstanceOf(MlsRejectedError);
-    const removal = await alice.remove(CONVERSATION, ['bob']);
+    const removal = await alice.remove(CONVERSATION, [id('bob')], sent);
     await bob.applyCommit(CONVERSATION, removal!.commit);
     await expect(
-      bob.join(CONVERSATION, added.welcome!, index),
+      bob.join(CONVERSATION, added.welcome!, index, id('alice')),
     ).rejects.toBeInstanceOf(MlsRejectedError);
     await expect(
-      engine('carol').join(CONVERSATION, added.welcome!, index),
+      engine('carol').join(CONVERSATION, added.welcome!, index, id('alice')),
     ).rejects.toBeInstanceOf(MlsRejectedError);
   });
 
@@ -465,7 +803,7 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
     await alice.createGroup(CONVERSATION);
 
     await expect(
-      alice.add(CONVERSATION, [await engine('eve').createKeyPackage()]),
+      alice.add(CONVERSATION, [await engine('eve').createKeyPackage()], sent),
     ).rejects.toBeInstanceOf(MlsRejectedError);
   });
 
@@ -473,7 +811,7 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
     const { alice, bob } = await setup(['alice', 'bob', 'carol']);
     const inFlight = await bob.encrypt(CONVERSATION, text.encode('in flight'));
 
-    await alice.remove(CONVERSATION, ['carol']);
+    await alice.remove(CONVERSATION, [id('carol')], sent);
 
     expect(read((await alice.decrypt(CONVERSATION, inFlight)).plaintext)).toBe(
       'in flight',
@@ -483,7 +821,7 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
   it('keeps retired generations readable for the drain window only', async () => {
     const { alice } = await setup(['alice', 'bob', 'carol']);
 
-    await alice.remove(CONVERSATION, ['carol']);
+    await alice.remove(CONVERSATION, [id('carol')], sent);
 
     expect(await indices(alice)).toEqual([2, 1, 0]);
     clock += GroupMailboxGeneration.DRAIN_WINDOW_MS + 1;
@@ -491,11 +829,11 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
   });
 
   it('restores group state and generations in a new engine instance', async () => {
-    const alice = engine('alice', 'd1', 'alice-restore');
+    const alice = engine('alice', { databaseName: 'alice-restore' });
     await alice.createGroup(CONVERSATION);
     const bob = engine('bob');
     await join(alice, [bob]);
-    const restored = engine('alice', 'd1', 'alice-restore');
+    const restored = engine('alice', { databaseName: 'alice-restore' });
 
     const sealed = await restored.encrypt(CONVERSATION, text.encode('back'));
 
@@ -507,6 +845,8 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
         (await bob.generation(CONVERSATION)).secret,
       ),
     ).toBe(true);
-    expect(await restored.members(CONVERSATION)).toEqual(['alice', 'bob']);
+    expect(await restored.members(CONVERSATION)).toEqual(
+      [id('alice'), id('bob')].sort(),
+    );
   });
 });

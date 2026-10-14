@@ -13,6 +13,7 @@ import type { MessageAttachmentPublisher } from '../../../../contexts/messages/i
 import type { PigeonLinkPreviewsApi } from '../../../../contexts/messages/infrastructure/http/PigeonLinkPreviewsApi';
 import type { NotificationResource } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationResource';
 
+import { GroupMailboxRoster } from '../../../../contexts/groupMailboxes/domain/GroupMailboxRoster';
 import { GroupMailboxControlSeal } from '../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlSeal';
 import { GroupConversationMailbox } from '../../../../contexts/groupMailboxes/infrastructure/GroupConversationMailbox';
 import { GroupMessageHistoryStore } from '../../../../contexts/groupMailboxes/infrastructure/history/GroupMessageHistoryStore';
@@ -222,7 +223,9 @@ const device = (storage: string): GroupConversationMailbox =>
     projector: new MessageProjector(copy.messages),
     roster: (owner) =>
       Promise.resolve(
-        roster.has(owner.identity.id) ? new Set(roster) : new Set<string>(),
+        roster.has(owner.identity.id)
+          ? GroupMailboxRoster.of({ adminIds: [], participantIds: [...roster] })
+          : GroupMailboxRoster.empty(),
       ),
     storage,
   });

@@ -2,6 +2,7 @@ import type { MockProxy } from 'jest-mock-extended';
 
 import { mock } from 'jest-mock-extended';
 
+import type { GroupMailboxCommit } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxCommit';
 import type { GroupMailboxOutboxEngine } from '../../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutboxEngine';
 import type { GroupMailboxOutboxRow } from '../../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutboxRow';
 import type { GroupMailboxOutboxStore } from '../../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutboxStore';
@@ -11,6 +12,7 @@ import type { MailboxChannel } from '../../../../../contexts/mailboxes/infrastru
 
 import { MlsRejectedError } from '../../../../../contexts/communities/infrastructure/mls/MlsRejectedError';
 import { GroupMailboxGeneration } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxGeneration';
+import { GroupMailboxRoster } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxRoster';
 import { GroupMailboxGenerationSecret } from '../../../../../contexts/groupMailboxes/domain/value-objects/GroupMailboxGenerationSecret';
 import { GroupMailboxControlRecord } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlRecord';
 import { GroupMailboxKeySchedule } from '../../../../../contexts/groupMailboxes/infrastructure/crypto/GroupMailboxKeySchedule';
@@ -35,6 +37,17 @@ const inboxOf = (index: number, identityId: string): string =>
     IdentityId.fromString(identityId),
   ).mailboxId;
 
+const rosterOf = (...participantIds: string[]): GroupMailboxRoster =>
+  GroupMailboxRoster.of({ adminIds: [], participantIds });
+
+const commitTo = (recipients: string[]): GroupMailboxCommit => ({
+  commit: new Uint8Array([9, 9]),
+  deliveryGeneration: generation(0),
+  epoch: 1n,
+  generation: generation(1),
+  recipients,
+});
+
 describe('GroupMailboxOutbox', () => {
   let now: number;
   let current: number;
@@ -46,7 +59,7 @@ describe('GroupMailboxOutbox', () => {
   >;
   let sent: string[];
   let outbox: GroupMailboxOutbox;
-  let roster: ReadonlySet<string>;
+  let roster: GroupMailboxRoster;
 
   const session = { identity: { id: 'alice' } } as unknown as Session;
 
@@ -62,7 +75,7 @@ describe('GroupMailboxOutbox', () => {
 
   beforeEach(() => {
     now = 1_000;
-    roster = new Set(['alice', 'bob', 'dave']);
+    roster = rosterOf('alice', 'bob', 'dave');
     current = 0;
     sent = [];
     rows = new Map();
@@ -194,16 +207,8 @@ describe('GroupMailboxOutbox', () => {
         ? Promise.reject(new MailboxUnavailableError())
         : Promise.resolve({ cursor: 1, envelopeId: id ?? '' }),
     );
-    await outbox.enqueueCommit(
-      CONVERSATION,
-      {
-        commit: new Uint8Array([9, 9]),
-        deliveryGeneration: generation(0),
-        epoch: 1n,
-        generation: generation(1),
-      },
-      ['bob'],
-    );
+    await outbox.enqueueCommit(CONVERSATION, commitTo(['bob']));
+    await outbox.flush();
     current = 1;
     channel.send.mockClear();
 
@@ -304,21 +309,39 @@ describe('GroupMailboxOutbox', () => {
     expect(outbox.pending(CONVERSATION)).toEqual([]);
   });
 
+  it('persists a commit and sends nothing until flushed', async () => {
+    await outbox.enqueueCommit(CONVERSATION, commitTo(['bob']));
+
+    expect(rows.size).toBe(1);
+    expect(channel.send).not.toHaveBeenCalled();
+
+    await outbox.flush();
+
+    expect(channel.send.mock.calls.map(([keys]) => keys.mailboxId)).toEqual([
+      inboxOf(0, 'bob'),
+    ]);
+    expect(rows.size).toBe(0);
+  });
+
+  it('rejects a commit it cannot persist and never sends it', async () => {
+    store.save.mockRejectedValueOnce(new Error('quota exceeded'));
+
+    await expect(
+      outbox.enqueueCommit(CONVERSATION, commitTo(['bob'])),
+    ).rejects.toThrow('quota exceeded');
+    await outbox.flush();
+
+    expect(channel.send).not.toHaveBeenCalled();
+    expect(outbox.pending(CONVERSATION)).toEqual([]);
+  });
+
   it('never re-encrypts a commit and drops it once its generation drained', async () => {
     const failures: string[] = [];
 
     outbox.subscribe(({ reference }) => failures.push(reference));
     channel.send.mockRejectedValue(new MailboxUnavailableError());
-    await outbox.enqueueCommit(
-      CONVERSATION,
-      {
-        commit: new Uint8Array([9, 9]),
-        deliveryGeneration: generation(0),
-        epoch: 1n,
-        generation: generation(1),
-      },
-      ['bob'],
-    );
+    await outbox.enqueueCommit(CONVERSATION, commitTo(['bob']));
+    await outbox.flush();
     current = 1;
     channel.send.mockClear();
     now += GroupMailboxOutbox.RETRY_MAX_MS;
@@ -348,7 +371,7 @@ describe('GroupMailboxOutbox', () => {
   });
 
   it('seals nothing while a member off the roster is still in the group', async () => {
-    roster = new Set(['alice']);
+    roster = rosterOf('alice');
 
     await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
 
@@ -368,7 +391,7 @@ describe('GroupMailboxOutbox', () => {
   it('holds a queued message once a recipient leaves the roster', async () => {
     channel.send.mockRejectedValue(new TypeError('offline'));
     await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
-    roster = new Set(['alice']);
+    roster = rosterOf('alice');
     channel.send.mockReset();
     channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'x' });
     now += GroupMailboxOutbox.RETRY_MAX_MS;
@@ -380,7 +403,7 @@ describe('GroupMailboxOutbox', () => {
   });
 
   it('rejects a message once this identity is off the roster', async () => {
-    roster = new Set(['bob']);
+    roster = rosterOf('bob');
 
     await expect(
       outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1])),
@@ -395,7 +418,7 @@ describe('GroupMailboxOutbox', () => {
     outbox.subscribe(({ reference }) => failures.push(reference));
     channel.send.mockRejectedValue(new TypeError('offline'));
     await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
-    roster = new Set(['bob']);
+    roster = rosterOf('bob');
     now += GroupMailboxOutbox.RETRY_MAX_MS;
 
     await outbox.resume();

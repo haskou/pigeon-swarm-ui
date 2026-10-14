@@ -1,3 +1,4 @@
+import type { GroupMailboxRoster } from '../../domain/GroupMailboxRoster';
 import type { GroupMailboxCommit } from '../mls/GroupMailboxCommit';
 import type { GroupMailboxOutbox } from '../outbox/GroupMailboxOutbox';
 import type { GroupMailboxControlEngine } from './GroupMailboxControlEngine';
@@ -16,13 +17,16 @@ import { GroupMailboxKeyPackageTimeoutError } from './GroupMailboxKeyPackageTime
  * Control traffic of a group conversation (node
  * `docs/design/group-mailboxes.md`, D8). An inviter asks each joiner for a
  * key package in a letter signed by its identity key and sealed to the
- * joiner (`GroupMailboxNotificationLink`), commits the add, queues the
- * commit in the durable outbox for every existing member's inbox of the
- * generation the commit was made in, and hands each joiner `{welcome, k}`
- * in another letter. A removal is delivered through the outbox to the
- * remaining members only. Only the conversation roster can request key
- * packages or send welcomes; MLS authenticates commits. Logs never carry
- * key material, welcomes or commits.
+ * joiner (`GroupMailboxNotificationLink`); the key package's credential
+ * must be signed by that joiner's identity key. The inviter commits the
+ * add, which is kept only once the durable outbox has queued it for every
+ * existing member's inbox of the generation the commit was made in, and
+ * hands each joiner `{welcome, k}` in another letter. A removal is
+ * delivered through the outbox to the remaining members only. Only the
+ * conversation roster can request key packages; a welcome counts only from
+ * a peer the roster lets add members and who holds a leaf in the welcomed
+ * group. MLS authenticates commits and the roster decides who may make
+ * them. Logs never carry key material, welcomes or commits.
  */
 export class GroupMailboxControl {
   public static readonly KEY_PACKAGE_TIMEOUT_MS = 60_000;
@@ -43,9 +47,12 @@ export class GroupMailboxControl {
     private readonly engine: GroupMailboxControlEngine,
     private readonly rosterFor: (
       conversationId: string,
-    ) => Promise<ReadonlySet<string>>,
+    ) => Promise<GroupMailboxRoster>,
     private readonly direct: GroupMailboxDirectLink,
-    private readonly outbox: Pick<GroupMailboxOutbox, 'enqueueCommit'>,
+    private readonly outbox: Pick<
+      GroupMailboxOutbox,
+      'enqueueCommit' | 'flush'
+    >,
   ) {}
 
   /** The peer and this device both belong to the conversation roster. */
@@ -129,7 +136,12 @@ export class GroupMailboxControl {
     }
 
     return this.rejecting(() =>
-      this.engine.join(record.conversationId, record.welcome, record.index),
+      this.engine.join(
+        record.conversationId,
+        record.welcome,
+        record.index,
+        peerIdentityId,
+      ),
     );
   }
 
@@ -209,10 +221,11 @@ export class GroupMailboxControl {
         this.requestKeyPackage(conversationId, identityId),
       ),
     );
-    const existing = await this.engine.members(conversationId);
-    const commit = await this.engine.add(conversationId, keyPackages);
+    const commit = await this.engine.add(conversationId, keyPackages, (made) =>
+      this.outbox.enqueueCommit(conversationId, made),
+    );
 
-    await this.outbox.enqueueCommit(conversationId, commit, existing);
+    await this.outbox.flush();
     const { welcome } = commit;
 
     if (welcome) {
@@ -294,14 +307,14 @@ export class GroupMailboxControl {
     conversationId: string,
     identityIds: readonly string[],
   ): Promise<GroupMailboxCommit | undefined> {
-    const commit = await this.engine.remove(conversationId, [...identityIds]);
+    const commit = await this.engine.remove(
+      conversationId,
+      [...identityIds],
+      (made) => this.outbox.enqueueCommit(conversationId, made),
+    );
 
     if (!commit) return undefined;
-    await this.outbox.enqueueCommit(
-      conversationId,
-      commit,
-      await this.engine.members(conversationId),
-    );
+    await this.outbox.flush();
 
     return commit;
   }

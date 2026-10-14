@@ -5,6 +5,8 @@ import { MessagePinAction } from './value-objects/MessagePinAction';
 
 /** One pin or unpin of a message, stamped with when its author made it. */
 export class MessagePinChange {
+  private static readonly MAX_FUTURE_SKEW_MS = 30_000;
+
   public static create(
     action: MessagePinAction,
     messageId: MessageId,
@@ -49,5 +51,26 @@ export class MessagePinChange {
 
   public getMessageId(): MessageId {
     return this.messageId;
+  }
+
+  /**
+   * Returns this change with its author-chosen createdAt held to at most 30 s
+   * after the time it was received, so a peer cannot date a change far ahead
+   * and win every later change. Older dates stay as they are, so late
+   * deliveries keep their order.
+   */
+  public clampedTo(receivedAt: Timestamp): MessagePinChange {
+    const createdAt = Math.min(
+      this.createdAt.valueOf(),
+      receivedAt.valueOf() + MessagePinChange.MAX_FUTURE_SKEW_MS,
+    );
+
+    return createdAt === this.createdAt.valueOf()
+      ? this
+      : new MessagePinChange(
+          this.action,
+          new Timestamp(createdAt),
+          this.messageId,
+        );
   }
 }

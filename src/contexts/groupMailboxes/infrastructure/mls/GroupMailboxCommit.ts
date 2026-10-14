@@ -17,4 +17,9 @@ export interface GroupMailboxCommit {
    * members can only learn the next generation from the commit.
    */
   readonly deliveryGeneration: GroupMailboxGeneration;
+  /**
+   * Sorted identities holding a leaf both before and after the commit: who
+   * must receive it. Joiners get the welcome; removed members get nothing.
+   */
+  readonly recipients: readonly string[];
 }

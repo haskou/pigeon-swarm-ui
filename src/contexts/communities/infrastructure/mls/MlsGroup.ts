@@ -4,6 +4,8 @@ import {
   type ClientConfig,
   type ClientState,
   type CiphersuiteImpl,
+  type IncomingMessageAction,
+  type IncomingMessageCallback,
   type KeyPackage,
   type Proposal,
   type PrivateKeyPackage,
@@ -21,7 +23,7 @@ import {
   emptyPskIndex,
   encodeGroupState,
   encodeMlsMessage,
-  generateKeyPackage,
+  generateKeyPackageWithKey,
   getCiphersuiteFromName,
   getCiphersuiteImpl,
   joinGroup,
@@ -31,12 +33,17 @@ import {
 import { decryptSenderData } from 'ts-mls/privateMessage.js';
 
 import type { MlsLeafCredential } from './MlsLeafCredential';
+import type { MlsLeafSigner } from './MlsLeafSigner';
+import type {
+  MlsMembershipChange,
+  MlsMembershipPolicy,
+} from './MlsMembershipPolicy';
 
+import { MlsIdentityCredential } from './MlsIdentityCredential';
 import { MlsRejectedError } from './MlsRejectedError';
 
 const CIPHERSUITE = 'MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519';
 const PROTOCOL_VERSION = 'mls10';
-const CREDENTIAL_SEPARATOR = '\u0000';
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
@@ -52,12 +59,6 @@ export interface MlsLeafOwner {
   readonly identityId: string;
   readonly deviceId: string;
 }
-
-/**
- * Decides whether an identity may hold a leaf. It must be answered from the
- * community roster, never from the MLS tree itself.
- */
-export type MlsMembershipPolicy = (identityId: string) => boolean;
 
 export interface MlsKeyPackageBundle {
   readonly owner: MlsLeafOwner;
@@ -92,32 +93,22 @@ export type MlsCommitOutcome =
   | { kind: 'gap'; have: bigint; got: bigint }
   | { kind: 'removed' };
 
-const encodeOwner = ({ deviceId, identityId }: MlsLeafOwner): Uint8Array =>
-  encoder.encode(`${identityId}${CREDENTIAL_SEPARATOR}${deviceId}`);
-
-export const decodeMlsLeafOwner = (identity: Uint8Array): MlsLeafOwner => {
-  const [identityId, deviceId, ...rest] = decoder
-    .decode(identity)
-    .split(CREDENTIAL_SEPARATOR);
-
-  if (!identityId || !deviceId || rest.length > 0) {
-    throw new MlsRejectedError('Malformed MLS credential');
-  }
-
-  return { deviceId, identityId };
-};
-
+/**
+ * Every leaf credential must be signed by the identity it names and that
+ * identity must be on the roster; ts-mls asks this of every key package,
+ * update path and welcome tree leaf, and of the welcome's signer.
+ */
 const clientConfig = (policy: MlsMembershipPolicy): ClientConfig => {
   const authService: AuthenticationService = {
-    validateCredential(credential) {
-      if (credential.credentialType !== 'basic') return Promise.resolve(false);
-      try {
-        const { identityId } = decodeMlsLeafOwner(credential.identity);
+    validateCredential(credential, signaturePublicKey) {
+      const owner = MlsIdentityCredential.verify(
+        credential,
+        signaturePublicKey,
+      );
 
-        return Promise.resolve(policy(identityId));
-      } catch {
-        return Promise.resolve(false);
-      }
+      return Promise.resolve(
+        owner !== undefined && policy.admits(owner.identityId),
+      );
     },
   };
 
@@ -133,20 +124,23 @@ const clientConfig = (policy: MlsMembershipPolicy): ClientConfig => {
   };
 };
 
+/** A key package whose credential the signer's identity key vouches for. */
 export const generateMlsKeyPackage = async (
-  owner: MlsLeafOwner,
+  signer: MlsLeafSigner,
 ): Promise<MlsKeyPackageBundle> => {
   const cs = await suite();
-  const { privatePackage, publicPackage } = await generateKeyPackage(
-    { credentialType: 'basic', identity: encodeOwner(owner) },
+  const signatureKeys = await cs.signature.keygen();
+  const { privatePackage, publicPackage } = await generateKeyPackageWithKey(
+    MlsIdentityCredential.issue(signer, signatureKeys.publicKey),
     defaultCapabilities(),
     defaultLifetime,
     [],
+    signatureKeys,
     cs,
   );
 
   return {
-    owner,
+    owner: signer.owner,
     privatePackage,
     publicBytes: encodeMlsMessage({
       keyPackage: publicPackage,
@@ -182,18 +176,58 @@ export const restoreMlsKeyPackage = (
   };
 };
 
-/** The identity and device a published key package belongs to. */
+/**
+ * The identity and device a published key package belongs to, only when
+ * that identity signed its credential.
+ */
 export const mlsKeyPackageOwner = (publicBytes: Uint8Array): MlsLeafOwner =>
   ownerOfKeyPackage(decodeKeyPackage(publicBytes));
 
-const ownerOfKeyPackage = (keyPackage: KeyPackage): MlsLeafOwner => {
-  const credential = keyPackage.leafNode.credential;
+const ownerOfKeyPackage = ({ leafNode }: KeyPackage): MlsLeafOwner => {
+  const owner = MlsIdentityCredential.verify(
+    leafNode.credential,
+    leafNode.signaturePublicKey,
+  );
 
-  if (credential.credentialType !== 'basic') {
-    throw new MlsRejectedError('Unsupported credential type');
+  if (!owner) throw new MlsRejectedError('Key package credential is forged');
+
+  return owner;
+};
+
+/**
+ * What a commit's proposals do to membership, by identity, judged against
+ * the tree they apply to. Only adds, removals and updates may be in it.
+ */
+const membershipChange = (
+  tree: ClientState['ratchetTree'],
+  committerLeaf: number,
+  proposals: readonly Proposal[],
+): MlsMembershipChange => {
+  const identityAt = (leafIndex: number): string => {
+    const node = tree[leafIndex * 2];
+
+    if (node?.nodeType !== 'leaf') throw new MlsRejectedError('Unknown leaf');
+
+    return MlsIdentityCredential.ownerOf(node.leaf.credential).identityId;
+  };
+  const added: string[] = [];
+  const removed: string[] = [];
+
+  for (const proposal of proposals) {
+    if (proposal.proposalType === 'add') {
+      added.push(
+        MlsIdentityCredential.ownerOf(
+          proposal.add.keyPackage.leafNode.credential,
+        ).identityId,
+      );
+    } else if (proposal.proposalType === 'remove') {
+      removed.push(identityAt(proposal.remove.removed));
+    } else if (proposal.proposalType !== 'update') {
+      throw new MlsRejectedError('Unsupported proposal');
+    }
   }
 
-  return decodeMlsLeafOwner(credential.identity);
+  return { added, committer: identityAt(committerLeaf), removed };
 };
 
 interface AppliedEpoch {
@@ -312,7 +346,7 @@ export class MlsGroup {
       }
       leaves.push({
         index: treeIndex / 2,
-        owner: decodeMlsLeafOwner(node.leaf.credential.identity),
+        owner: MlsIdentityCredential.ownerOf(node.leaf.credential),
         signaturePublicKey: node.leaf.signaturePublicKey,
       });
     });
@@ -323,7 +357,7 @@ export class MlsGroup {
   public async add(keyPackages: Uint8Array[]): Promise<MlsCommitOutput> {
     const packages = keyPackages.map(decodeKeyPackage);
     for (const keyPackage of packages) {
-      if (!this.policy(ownerOfKeyPackage(keyPackage).identityId)) {
+      if (!this.policy.admits(ownerOfKeyPackage(keyPackage).identityId)) {
         throw new MlsRejectedError('Key package owner is not a member');
       }
     }
@@ -461,7 +495,7 @@ export class MlsGroup {
 
     return {
       message,
-      owner: decodeMlsLeafOwner(leaf.leaf.credential.identity),
+      owner: MlsIdentityCredential.ownerOf(leaf.leaf.credential),
     };
   }
 
@@ -533,6 +567,43 @@ export class MlsGroup {
     return outcome;
   }
 
+  /**
+   * Accepts a commit only when it comes from a member's leaf, every
+   * proposal in it is that member's own, and the roster lets that member
+   * make the change. A standalone proposal is never applied.
+   */
+  private judge(
+    from: ClientState,
+    incoming: Parameters<IncomingMessageCallback>[0],
+  ): IncomingMessageAction {
+    if (incoming.kind !== 'commit' || incoming.senderLeafIndex === undefined) {
+      return 'reject';
+    }
+    const committer = incoming.senderLeafIndex;
+
+    if (
+      incoming.proposals.some(
+        ({ senderLeafIndex }) => senderLeafIndex !== committer,
+      )
+    ) {
+      return 'reject';
+    }
+
+    try {
+      return this.policy.allows(
+        membershipChange(
+          from.ratchetTree,
+          committer,
+          incoming.proposals.map(({ proposal }) => proposal),
+        ),
+      )
+        ? 'accept'
+        : 'reject';
+    } catch {
+      return 'reject';
+    }
+  }
+
   private async advance(
     record: MlsCommitRecord,
     from: ClientState,
@@ -551,6 +622,7 @@ export class MlsGroup {
       decoded.privateMessage,
       emptyPskIndex,
       await suite(),
+      (incoming) => this.judge(from, incoming),
     );
 
     if (result.kind !== 'newState' || result.actionTaken !== 'accept') {
@@ -570,6 +642,18 @@ export class MlsGroup {
 
   private async commit(proposals: Proposal[]): Promise<MlsCommitOutput> {
     this.assertActive();
+
+    if (
+      !this.policy.allows(
+        membershipChange(
+          this.state.ratchetTree,
+          this.state.privatePath.leafIndex,
+          proposals,
+        ),
+      )
+    ) {
+      throw new MlsRejectedError('This member may not make this change');
+    }
     const result = await createCommit(
       { cipherSuite: await suite(), state: this.state },
       { extraProposals: proposals, ratchetTreeExtension: true },

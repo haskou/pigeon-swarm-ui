@@ -3,6 +3,7 @@ import type { PigeonMailboxClient } from '../../mailboxes/infrastructure/http/Pi
 import type { MailboxChannel } from '../../mailboxes/infrastructure/MailboxChannel';
 import type { MessageProjector } from '../../messages/infrastructure/crypto/MessageProjector';
 import type { PigeonMessageCommandsApi } from '../../messages/infrastructure/http/PigeonMessageCommandsApi';
+import type { GroupMailboxRoster } from '../domain/GroupMailboxRoster';
 import type { GroupMailboxDirectLink } from './control/GroupMailboxDirectLink';
 import type { GroupMailboxNotificationPages } from './control/GroupMailboxNotificationPages';
 
@@ -20,7 +21,7 @@ export type GroupConversationPorts = {
   roster: (
     session: Session,
     conversationId: string,
-  ) => Promise<ReadonlySet<string>>;
+  ) => Promise<GroupMailboxRoster>;
   /** Prefix of every local database the group mailbox writes. */
   storage: string;
 };
