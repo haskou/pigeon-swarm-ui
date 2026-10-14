@@ -6,6 +6,7 @@ import { IndexedDbMlsStateStore } from '../../communities/infrastructure/mls/Ind
 import { MlsLeafSigner } from '../../communities/infrastructure/mls/MlsLeafSigner';
 import { DeviceSealedEntryStore } from '../../messages/infrastructure/mailbox/DeviceSealedEntryStore';
 import { GroupMailboxControl } from './control/GroupMailboxControl';
+import { GroupMailboxLetterClaims } from './control/GroupMailboxLetterClaims';
 import { GroupMailboxNotificationPump } from './control/GroupMailboxNotificationPump';
 import { GroupMailboxInboxSync } from './inbox/GroupMailboxInboxSync';
 import { IndexedDbGroupMailboxGenerationStore } from './indexeddb/IndexedDbGroupMailboxGenerationStore';
@@ -73,6 +74,13 @@ export class GroupConversationMember {
         session,
         control,
         ports.notifications,
+        new GroupMailboxLetterClaims(
+          new DeviceSealedEntryStore(
+            stores.database('control', identityId),
+            'pigeon-group-control',
+          ),
+          () => sealing.session,
+        ),
         ports.now,
       ),
       new GroupMailboxInboxSync(

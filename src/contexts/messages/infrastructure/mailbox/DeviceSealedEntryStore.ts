@@ -303,6 +303,41 @@ export class DeviceSealedEntryStore {
     return current;
   }
 
+  /**
+   * Stores the value only while no entry is held under its id, and tells
+   * whether it did. The check and the write share one transaction, and
+   * IndexedDB runs read-write transactions over a store one at a time, so
+   * of concurrent adds from any connection of this device exactly one wins.
+   */
+  public async add(
+    session: Session,
+    kind: string,
+    id: string,
+    value: Uint8Array,
+  ): Promise<boolean> {
+    const identityId = session.identity.id;
+    const keys = await this.keys(session);
+    const tag = await keys.tag([kind, id]);
+    const sealed = await keys.cipher.seal(
+      DeviceSealedEntryStore.aad(identityId, kind, tag),
+      DeviceSealedEntryStore.frame(id, value),
+    );
+    const transaction = (await this.open()).transaction(ENTRIES, 'readwrite');
+    const entries = transaction.objectStore(ENTRIES);
+    const key = [identityId, kind, tag];
+    const held = entries.count(key);
+    let added = false;
+
+    held.addEventListener('success', () => {
+      if (held.result > 0) return;
+      entries.put(sealed, key);
+      added = true;
+    });
+    await indexedDbTransaction(transaction);
+
+    return added;
+  }
+
   /** Drops the keys held in memory and closes the database, for logout. */
   public close(): void {
     const connection = this.connection;

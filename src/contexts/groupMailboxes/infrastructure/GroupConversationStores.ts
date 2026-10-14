@@ -4,8 +4,9 @@ import { GroupMailboxOutboxStore } from './outbox/GroupMailboxOutboxStore';
 
 /**
  * The local stores of group conversations. History and the outbox are
- * shared by identities and keyed by identity; MLS state and generations live
- * in one database per identity, so forgetting an identity deletes them.
+ * shared by identities and keyed by identity; MLS state, generations and
+ * the handled control letters live in one database per identity, so
+ * forgetting an identity deletes them.
  */
 export class GroupConversationStores {
   public readonly history: GroupMessageHistoryStore;
@@ -30,7 +31,10 @@ export class GroupConversationStores {
     this.outbox = new GroupMailboxOutboxStore(`${storage}-outbox`);
   }
 
-  public database(kind: 'generations' | 'mls', identityId: string): string {
+  public database(
+    kind: 'control' | 'generations' | 'mls',
+    identityId: string,
+  ): string {
     return `${this.storage}-${kind}-${identityId}`;
   }
 
@@ -43,6 +47,9 @@ export class GroupConversationStores {
       this.history.forget(identityId),
       this.outbox.forget(identityId),
       GroupConversationStores.deleteDatabase(this.database('mls', identityId)),
+      GroupConversationStores.deleteDatabase(
+        this.database('control', identityId),
+      ),
       GroupConversationStores.deleteDatabase(
         this.database('generations', identityId),
       ),
