@@ -236,10 +236,12 @@ and attachments, and a missing group is an error, not a fallback.
   its own identity joins only when the group already holds another leaf of
   that identity and an identity other than it, and the roster lists the
   identity of every leaf. Residual: until its leaf is removed, a revoked device
-  can add or remove leaves of its own identity (a denial of service, no read
-  access to later epochs once removed); other members cannot verify an
-  identity's device list; when an identity's only leaf device is revoked, a
-  manager must add the identity again.
+  can add or remove leaves of its own identity, and it can welcome a sibling
+  device that is still waiting for its leaf into a look-alike group of that
+  conversation, whose leaves hold only roster members, so it reads what the
+  sibling sends there (a confidentiality gap, not only a denial of service).
+  Other members cannot verify an identity's device list; when an identity's
+  only leaf device is revoked, a manager must add the identity again.
 - A community welcome's author is the one the node records. A node that lies
   about it can only name a manager who already holds a leaf in that group.
 - `authorIdentityId` inside a message payload is asserted by the sender. MLS
