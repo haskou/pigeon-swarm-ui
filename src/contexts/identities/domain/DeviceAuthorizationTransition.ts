@@ -1,29 +1,41 @@
-import { KeyPair, SHA256Hash, Signature } from '@haskou/pigeon-swarm-crypto';
+import {
+  KeyPair,
+  PublicKey,
+  SHA256Hash,
+  Signature,
+} from '@haskou/pigeon-swarm-crypto';
 import { StringValueObject, Timestamp, assert } from '@haskou/value-objects';
 
-import type { DeviceAuthorizationCompromisedCredential } from './DeviceAuthorizationCompromisedCredential';
+import type { DeviceAuthorizationCompromisedCredential as CompromisedCredential } from './DeviceAuthorizationCompromisedCredential';
 import type { DeviceAuthorizationCompromisedCredentialPayload } from './DeviceAuthorizationCompromisedCredentialPayload';
 import type { DeviceAuthorizationOperation } from './DeviceAuthorizationOperation';
+import type { DeviceAuthorizationTransitionPrimitives } from './DeviceAuthorizationTransitionPrimitives';
 import type { DeviceAuthorizationUnsignedPayload } from './DeviceAuthorizationUnsignedPayload';
-import type { DeviceAuthorizationOperationId } from './value-objects/DeviceAuthorizationOperationId';
-import type { PairingId } from './value-objects/PairingId';
 
 import { DeviceAuthorizationEnrollmentProof } from './DeviceAuthorizationEnrollmentProof';
+import { InvalidDeviceAuthorizationTransitionError } from './errors/InvalidDeviceAuthorizationTransitionError';
 import { DeviceAuthorizationEpoch } from './value-objects/DeviceAuthorizationEpoch';
+import { DeviceAuthorizationOperationId } from './value-objects/DeviceAuthorizationOperationId';
 import { DeviceAuthorizationRevision } from './value-objects/DeviceAuthorizationRevision';
 import { DeviceCredential } from './value-objects/DeviceCredential';
 import { IdentityId } from './value-objects/IdentityId';
+import { PairingId } from './value-objects/PairingId';
 
 const PROOF_DOMAIN = 'pigeon:device-authorization:proof-of-possession:v2';
 const SIGNATURE_DOMAIN = 'pigeon:device-authorization:transition:v3';
 const MAX_COMPROMISED_CREDENTIALS = 32;
+const OPERATIONS: readonly DeviceAuthorizationOperation[] = [
+  'enroll',
+  'recover',
+  'revoke',
+];
 
 export class DeviceAuthorizationTransition {
   private static sign(input: {
     author: KeyPair;
     authorCredential?: string;
     authorizedAt?: Timestamp;
-    compromisedCredentials?: DeviceAuthorizationCompromisedCredential[];
+    compromisedCredentials?: CompromisedCredential[];
     compromisedSince?: DeviceAuthorizationRevision;
     epoch: DeviceAuthorizationEpoch;
     identityId: IdentityId;
@@ -91,7 +103,7 @@ export class DeviceAuthorizationTransition {
   }
 
   private static compromisedCredentialsOf(
-    credentials: DeviceAuthorizationCompromisedCredential[] | undefined,
+    credentials: CompromisedCredential[] | undefined,
     previousRevision: DeviceAuthorizationRevision,
   ): DeviceAuthorizationCompromisedCredentialPayload[] | undefined {
     const sorted = [...(credentials ?? [])].sort((left, right) =>
@@ -155,6 +167,102 @@ export class DeviceAuthorizationTransition {
         new StringValueObject(input.targetCredential),
       ).valueOf(),
     };
+  }
+
+  /**
+   * Parses a transition a node served. It is rebuilt from canonical values
+   * and rejected unless it encodes back to the exact fields served, so the
+   * signature checks cover exactly what the replay reads.
+   */
+  public static fromPrimitives(
+    primitives: DeviceAuthorizationTransitionPrimitives,
+  ): DeviceAuthorizationTransition {
+    assert(
+      OPERATIONS.includes(primitives.operation),
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
+    const epoch = DeviceAuthorizationEpoch.fromString(primitives.epoch);
+    const operationId = DeviceAuthorizationOperationId.fromString(
+      primitives.operationId,
+    );
+    const unsigned = this.unsigned({
+      authorCredential:
+        primitives.authorCredential === undefined
+          ? undefined
+          : DeviceCredential.fromString(primitives.authorCredential).valueOf(),
+      authorizedAt:
+        primitives.authorizedAt === undefined
+          ? undefined
+          : new Timestamp(primitives.authorizedAt).valueOf(),
+      compromisedCredentials: primitives.compromisedCredentials?.map(
+        (entry) => ({
+          compromisedSince: DeviceAuthorizationRevision.fromNumber(
+            entry.compromisedSince,
+          ).valueOf(),
+          credential: DeviceCredential.fromString(entry.credential).valueOf(),
+        }),
+      ),
+      compromisedSince:
+        primitives.compromisedSince === undefined
+          ? undefined
+          : DeviceAuthorizationRevision.fromNumber(
+              primitives.compromisedSince,
+            ).valueOf(),
+      epoch: epoch.valueOf(),
+      identityId: IdentityId.fromString(primitives.identityId).valueOf(),
+      operation: primitives.operation,
+      operationId: operationId.valueOf(),
+      pairingExpiration:
+        primitives.pairingExpiration === undefined
+          ? undefined
+          : new Timestamp(primitives.pairingExpiration).valueOf(),
+      pairingId:
+        primitives.pairingId === undefined
+          ? undefined
+          : PairingId.fromString(primitives.pairingId).valueOf(),
+      previousRevision: DeviceAuthorizationRevision.fromNumber(
+        primitives.previousRevision,
+      ).valueOf(),
+      targetCredential: DeviceCredential.fromString(
+        primitives.targetCredential,
+      ).valueOf(),
+    });
+    const served: DeviceAuthorizationUnsignedPayload = {
+      authorCredential: primitives.authorCredential,
+      authorizedAt: primitives.authorizedAt,
+      compromisedCredentials: primitives.compromisedCredentials?.map(
+        (entry) => ({
+          compromisedSince: entry.compromisedSince,
+          credential: entry.credential,
+        }),
+      ),
+      compromisedSince: primitives.compromisedSince,
+      epoch: primitives.epoch,
+      identityId: primitives.identityId,
+      operation: primitives.operation,
+      operationId: primitives.operationId,
+      pairingExpiration: primitives.pairingExpiration,
+      pairingId: primitives.pairingId,
+      previousRevision: primitives.previousRevision,
+      revision: primitives.revision,
+      targetCredential: primitives.targetCredential,
+      targetCredentialCommitment: primitives.targetCredentialCommitment,
+    };
+    const transition = new DeviceAuthorizationTransition(
+      epoch,
+      operationId,
+      unsigned,
+      primitives.proofOfPossession,
+      primitives.signature,
+    );
+
+    assert(
+      JSON.stringify(served) === JSON.stringify(unsigned) &&
+        transition.hasValidShape(),
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
+
+    return transition;
   }
 
   public static isValidEnrollmentProof(input: {
@@ -252,7 +360,7 @@ export class DeviceAuthorizationTransition {
   }
 
   public static recovery(input: {
-    compromisedCredentials: DeviceAuthorizationCompromisedCredential[];
+    compromisedCredentials: CompromisedCredential[];
     epoch: DeviceAuthorizationEpoch;
     identityId: IdentityId;
     operationId: DeviceAuthorizationOperationId;
@@ -332,6 +440,176 @@ export class DeviceAuthorizationTransition {
     private readonly signature: string,
   ) {}
 
+  private hasSignatureShape(): boolean {
+    const proofOfPossession: unknown = this.proofOfPossession;
+    const signature: unknown = this.signature;
+    const proofShape = this.isRevocation()
+      ? proofOfPossession === undefined
+      : typeof proofOfPossession === 'string' && proofOfPossession.length > 0;
+
+    return proofShape && typeof signature === 'string' && signature.length > 0;
+  }
+
+  private getCompromisedSince(): DeviceAuthorizationRevision | undefined {
+    return this.unsigned.compromisedSince === undefined
+      ? undefined
+      : DeviceAuthorizationRevision.fromNumber(this.unsigned.compromisedSince);
+  }
+
+  /** Recoveries carry 1 to 32 caps in strict code-unit order. */
+  private hasValidCompromisedCredentials(): boolean {
+    if (this.unsigned.compromisedCredentials === undefined) return true;
+
+    const compromised = this.getCompromisedCredentials();
+    const previousRevision = this.getPreviousRevision();
+
+    return (
+      compromised.length > 0 &&
+      compromised.length <= MAX_COMPROMISED_CREDENTIALS &&
+      compromised.every(
+        (entry, index) =>
+          entry.compromisedSince.isLessOrEqualThan(previousRevision) &&
+          (index === 0 ||
+            compromised[index - 1].credential.isLessThan(entry.credential)),
+      )
+    );
+  }
+
+  private hasNoPairing(): boolean {
+    return [
+      this.unsigned.pairingId,
+      this.unsigned.pairingExpiration,
+      this.unsigned.authorizedAt,
+    ].every((field) => field === undefined);
+  }
+
+  private hasEnrollmentShape(): boolean {
+    return (
+      this.unsigned.authorCredential !== undefined &&
+      this.unsigned.pairingId !== undefined &&
+      this.unsigned.pairingExpiration !== undefined &&
+      this.unsigned.authorizedAt !== undefined &&
+      this.getCompromisedSince() === undefined &&
+      this.unsigned.compromisedCredentials === undefined
+    );
+  }
+
+  private hasRevocationShape(): boolean {
+    const compromisedSince = this.getCompromisedSince();
+
+    return (
+      this.unsigned.authorCredential !== undefined &&
+      this.hasNoPairing() &&
+      this.unsigned.compromisedCredentials === undefined &&
+      (compromisedSince === undefined ||
+        compromisedSince.isLessOrEqualThan(this.getPreviousRevision()))
+    );
+  }
+
+  private hasRecoveryShape(): boolean {
+    return (
+      this.unsigned.authorCredential === undefined &&
+      this.hasNoPairing() &&
+      this.getCompromisedSince() === undefined &&
+      this.hasValidCompromisedCredentials()
+    );
+  }
+
+  /** Each operation carries exactly the fields its policy reads. */
+  private hasValidShape(): boolean {
+    if (!this.hasSignatureShape()) return false;
+
+    if (this.isEnrollment()) return this.hasEnrollmentShape();
+
+    return this.isRevocation()
+      ? this.hasRevocationShape()
+      : this.hasRecoveryShape();
+  }
+
+  public getEpoch(): DeviceAuthorizationEpoch {
+    return this.epoch;
+  }
+
+  public getOperationId(): DeviceAuthorizationOperationId {
+    return this.operationId;
+  }
+
+  public getTargetCredential(): DeviceCredential {
+    return DeviceCredential.fromString(this.unsigned.targetCredential);
+  }
+
+  public getAuthorCredential(): DeviceCredential {
+    assert(
+      this.unsigned.authorCredential !== undefined,
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
+
+    return DeviceCredential.fromString(this.unsigned.authorCredential);
+  }
+
+  public getCompromisedCredentials(): CompromisedCredential[] {
+    return (this.unsigned.compromisedCredentials ?? []).map((entry) => ({
+      compromisedSince: DeviceAuthorizationRevision.fromNumber(
+        entry.compromisedSince,
+      ),
+      credential: DeviceCredential.fromString(entry.credential),
+    }));
+  }
+
+  public isEnrollment(): boolean {
+    return this.unsigned.operation === 'enroll';
+  }
+
+  public isRevocation(): boolean {
+    return this.unsigned.operation === 'revoke';
+  }
+
+  public isRecovery(): boolean {
+    return this.unsigned.operation === 'recover';
+  }
+
+  /** Whether the key signed this transition together with its target proof. */
+  public isSignedBy(publicKey: PublicKey): boolean {
+    return publicKey.isValidSignature(
+      JSON.stringify({
+        domain: SIGNATURE_DOMAIN,
+        proofOfPossession: this.proofOfPossession,
+        transition: this.unsigned,
+      }),
+      new Signature(this.signature),
+    );
+  }
+
+  /** Whether the target credential proved it holds its private key. */
+  public hasTargetProof(): boolean {
+    return (
+      this.proofOfPossession !== undefined &&
+      this.getTargetCredential()
+        .getPublicKey()
+        .isValidSignature(
+          JSON.stringify({ domain: PROOF_DOMAIN, transition: this.unsigned }),
+          new Signature(this.proofOfPossession),
+        )
+    );
+  }
+
+  /** Concurrent transitions with one effect replay as one. */
+  public hasSameEffectAs(other: DeviceAuthorizationTransition): boolean {
+    const compromisedSince = this.getCompromisedSince();
+    const otherCompromisedSince = other.getCompromisedSince();
+    const hasSameCompromisedSince =
+      compromisedSince === undefined || otherCompromisedSince === undefined
+        ? compromisedSince === otherCompromisedSince
+        : compromisedSince.isEqual(otherCompromisedSince);
+
+    return (
+      this.unsigned.operation === other.unsigned.operation &&
+      this.getPreviousRevision().isEqual(other.getPreviousRevision()) &&
+      this.getTargetCredential().isEqual(other.getTargetCredential()) &&
+      hasSameCompromisedSince
+    );
+  }
+
   public getResultEpoch(): DeviceAuthorizationEpoch {
     return this.unsigned.operation === 'recover'
       ? DeviceAuthorizationEpoch.fromString(this.operationId.valueOf())
@@ -356,10 +634,7 @@ export class DeviceAuthorizationTransition {
     return { ...this.unsigned };
   }
 
-  public toPrimitives(): DeviceAuthorizationUnsignedPayload & {
-    proofOfPossession?: string;
-    signature: string;
-  } {
+  public toPrimitives(): DeviceAuthorizationTransitionPrimitives {
     return {
       ...this.unsigned,
       proofOfPossession: this.proofOfPossession,

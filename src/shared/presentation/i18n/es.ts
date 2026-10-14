@@ -32,6 +32,8 @@ export const es = {
     changeIdentity: 'Cambiar identidad',
     createIdentity: 'Crear identidad',
     createIdentityShort: 'Crear',
+    deviceAuthorizationUnproven:
+      'Este nodo no ha podido demostrar que este dispositivo sigue autorizado. Inténtalo de nuevo o inicia sesión a través de otro nodo.',
     devicePairingCompletionLabel: 'Código final de tu otro dispositivo',
     devicePairingCompletionPlaceholder:
       'Pega aquí el código final, o escanea su QR',
@@ -61,11 +63,10 @@ export const es = {
       'Muestra este código al dispositivo autorizado. Debe ser idéntico allí antes de que autorice este dispositivo.',
     deviceRemoved: 'Este dispositivo fue eliminado de tu cuenta.',
     deviceRemovedEraseFailed:
-      "Este navegador ya no puede abrir esta identidad, y los mensajes guardados en este navegador no se han podido borrar. Elige 'Borrar la copia local y empezar de nuevo' para intentarlo otra vez, o vuelve a vincularlo desde un dispositivo donde tengas la sesión iniciada. Tu cuenta no se elimina.",
+      'Este navegador ya no puede abrir esta identidad, y parte de lo que guardó no se ha podido borrar. Vuelve a iniciar sesión en este navegador para terminar de borrarlo, o vuelve a vincularlo desde un dispositivo donde tengas la sesión iniciada. Tu cuenta no se elimina.',
     deviceRemovedHelp:
-      'Este navegador ya no puede abrir esta identidad. Vuelve a vincularlo desde un dispositivo donde tengas la sesión iniciada, o borra la copia de este navegador y empieza de nuevo. Los mensajes guardados en este navegador se conservan hasta que los borres. Tu cuenta no se elimina.',
+      'Este navegador ya no puede abrir esta identidad, así que sus mensajes, borradores y claves de esta identidad se han borrado de este navegador. Vuelve a vincularlo desde un dispositivo donde tengas la sesión iniciada para usarlo aquí. Tu cuenta no se elimina.',
     deviceRemovedPair: 'Vincular este dispositivo de nuevo',
-    deviceRemovedStartOver: 'Borrar la copia local y empezar de nuevo',
     deviceRootUnavailable:
       'Este dispositivo no ha podido abrir sus claves para esta identidad. Comprueba tu conexión e inténtalo de nuevo. Si sigue fallando, desbloquéala primero en otro de tus dispositivos.',
     fallbackNetworksLabel: 'Redes, separadas por comas',

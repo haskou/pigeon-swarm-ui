@@ -1,43 +1,131 @@
-import type { DeviceAuthorizationCheckpoint } from '../DeviceAuthorizationCheckpoint';
-import type { OwnDeviceAuthorizationPort } from './OwnDeviceAuthorizationPort';
+import { assert } from '@haskou/value-objects';
+
+import type { DeviceAuthorization } from '../DeviceAuthorization';
+import type { DeviceAuthorizationTransition } from '../DeviceAuthorizationTransition';
+import type { DeviceAuthorizationTransitionLog } from '../DeviceAuthorizationTransitionLog';
+import type { DeviceCredential } from '../value-objects/DeviceCredential';
+import type { DeviceAuthorizationReplay } from './DeviceAuthorizationReplay';
+import type { LocalDeviceAuthorizationCheckpoint } from './LocalDeviceAuthorizationCheckpoint';
 
 import { DeviceRemovedError } from '../DeviceRemovedError';
+import { UnprovenDeviceAuthorizationError } from '../errors/UnprovenDeviceAuthorizationError';
+import { DeviceAuthorizationPolicy } from './DeviceAuthorizationPolicy';
 
 /**
- * Decides when this device counts as removed. A rejected credential means
- * removal only when the owner's catalog no longer lists this device. Any
- * other failure, including a failed catalog check, keeps the original error.
+ * Decides from a served transition log whether this device is still
+ * authorized or was removed. Only positive signed evidence counts: the log
+ * must replay in full from the genesis this device verified, and the
+ * removal must lie above the local checkpoint. A node can withhold the log
+ * and so delay a removal, but it cannot forge one.
  */
 export class DeviceRemovalDomainService {
-  private static async isRemovedFromCatalog(
-    port: OwnDeviceAuthorizationPort,
-  ): Promise<boolean> {
+  private static replayOf(
+    genesis: DeviceAuthorization,
+    log: DeviceAuthorizationTransitionLog,
+  ): DeviceAuthorizationReplay {
     try {
-      const own = port.ownCredential();
-      const devices = await port.findCatalog();
+      assert(
+        log.getIdentityId().isEqual(genesis.getIdentityId()),
+        new UnprovenDeviceAuthorizationError(),
+      );
+      const replay = DeviceAuthorizationPolicy.replay(
+        DeviceAuthorizationPolicy.replayRecoveryLineage(
+          genesis,
+          log.getRecoveries(),
+          log.getConcurrentRecoveries(),
+        ),
+        log.getCandidates(),
+      );
 
-      return !devices.some((device) => device.isEqual(own));
+      assert(
+        replay.accepted.length === log.getCandidates().length,
+        new UnprovenDeviceAuthorizationError(),
+      );
+
+      return replay;
     } catch {
-      return false;
+      throw new UnprovenDeviceAuthorizationError();
     }
   }
 
-  /** Reads the checkpoint, or rejects with DeviceRemovedError. */
-  public static async findCheckpoint(
-    port: OwnDeviceAuthorizationPort,
-    identityId: string,
-  ): Promise<DeviceAuthorizationCheckpoint> {
-    try {
-      return await port.findCheckpoint();
-    } catch (error: unknown) {
-      if (
-        port.isCredentialRejection(error) &&
-        (await DeviceRemovalDomainService.isRemovedFromCatalog(port))
-      ) {
-        throw new DeviceRemovedError(identityId);
-      }
+  /**
+   * The signed transition that removed the reader above the local
+   * checkpoint.
+   */
+  private static removalOf(
+    log: DeviceAuthorizationTransitionLog,
+    replay: DeviceAuthorizationReplay,
+    reader: DeviceCredential,
+    local: LocalDeviceAuthorizationCheckpoint,
+  ): DeviceAuthorizationTransition | undefined {
+    const recovery = log
+      .getRecoveries()
+      .find(
+        (entry) =>
+          entry.getEpoch().isEqual(local.epoch) &&
+          !entry.getTargetCredential().isEqual(reader),
+      );
 
-      throw error;
+    if (recovery) return recovery;
+
+    const { states } = replay;
+    const removed = states.findIndex(
+      (state, index) =>
+        index > 0 &&
+        state.getRevision().isGreaterThan(local.revision) &&
+        states[index - 1].isAuthorized(reader) &&
+        !state.isAuthorized(reader),
+    );
+
+    if (removed < 0) return undefined;
+
+    const groupRevision = states[removed - 1].getRevision();
+
+    return log
+      .getCandidates()
+      .map(({ transition }) => transition)
+      .find(
+        (transition) =>
+          transition.getPreviousRevision().isEqual(groupRevision) &&
+          (transition.isRecovery() ||
+            transition.getTargetCredential().isEqual(reader)),
+      );
+  }
+
+  /**
+   * Returns the verified head when it still authorizes the reader. Rejects
+   * with DeviceRemovedError on a verified removal, and with
+   * UnprovenDeviceAuthorizationError when the log proves neither.
+   */
+  public static verify(input: {
+    genesis: DeviceAuthorization;
+    local: LocalDeviceAuthorizationCheckpoint;
+    log: DeviceAuthorizationTransitionLog;
+    reader: DeviceCredential;
+  }): DeviceAuthorization {
+    const replay = this.replayOf(input.genesis, input.log);
+    const removal = this.removalOf(
+      input.log,
+      replay,
+      input.reader,
+      input.local,
+    );
+
+    if (removal) {
+      throw new DeviceRemovedError(
+        removal.getIdentityId().valueOf(),
+        removal.getOperationId().valueOf(),
+      );
     }
+
+    const head = replay.states[replay.states.length - 1];
+
+    assert(
+      head.isAuthorized(input.reader) &&
+        head.getRevision().isGreaterOrEqualThan(input.local.revision),
+      new UnprovenDeviceAuthorizationError(),
+    );
+
+    return head;
   }
 }

@@ -1,6 +1,5 @@
 import {
   KeyPair,
-  PublicKey,
   SymmetricKey,
   UserRootKey,
 } from '@haskou/pigeon-swarm-crypto';
@@ -10,6 +9,8 @@ import type { HttpJsonClient } from '../../../../shared/infrastructure/http/Http
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { DeviceAuthorizationCheckpoint } from '../../domain/DeviceAuthorizationCheckpoint';
 import type { DeviceAuthorizationTransition } from '../../domain/DeviceAuthorizationTransition';
+import type { DeviceAuthorizationTransitionLogPrimitives } from '../../domain/DeviceAuthorizationTransitionLogPrimitives';
+import type { DeviceAuthorizationTransitionPrimitives } from '../../domain/DeviceAuthorizationTransitionPrimitives';
 import type { DevicePairingRequestDraft } from '../../domain/DevicePairingRequestDraft';
 import type { IdentityPassword } from '../../domain/value-objects/IdentityPassword';
 import type { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
@@ -19,7 +20,6 @@ import type { CompletedDevicePairing } from './CompletedDevicePairing';
 import type { DevicePairingAuthorization } from './DevicePairingAuthorization';
 import type { OwnDeviceRevocation } from './OwnDeviceRevocation';
 import type { DeviceAuthorizationCheckpointResource } from './resources/DeviceAuthorizationCheckpointResource';
-import type { DeviceAuthorizationTransitionResource } from './resources/DeviceAuthorizationTransitionResource';
 import type { DeviceCatalogResource } from './resources/DeviceCatalogResource';
 import type {
   DeviceSealedSecretHandedOverResource,
@@ -28,11 +28,16 @@ import type {
 import type { IdentityResource } from './resources/IdentityResource';
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { DeviceAuthorization } from '../../domain/DeviceAuthorization';
 import { DeviceAuthorizationTransition as AuthorizationTransition } from '../../domain/DeviceAuthorizationTransition';
+import { DeviceAuthorizationTransitionLog } from '../../domain/DeviceAuthorizationTransitionLog';
 import { DevicePairingCompletion } from '../../domain/DevicePairingCompletion';
 import { DevicePairingError } from '../../domain/DevicePairingError';
 import { DevicePairingInvitation } from '../../domain/DevicePairingInvitation';
 import { DevicePairingRequest } from '../../domain/DevicePairingRequest';
+import { DeviceRemovedError } from '../../domain/DeviceRemovedError';
+import { UnprovenDeviceAuthorizationError } from '../../domain/errors/UnprovenDeviceAuthorizationError';
 import { DeviceRemovalDomainService } from '../../domain/services/DeviceRemovalDomainService';
 import { DeviceAuthorizationEpoch } from '../../domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationOperationId } from '../../domain/value-objects/DeviceAuthorizationOperationId';
@@ -46,6 +51,7 @@ import { RecoveryAuthority } from '../../domain/value-objects/RecoveryAuthority'
 import { RecoveryIdentityMaterial } from '../crypto/RecoveryIdentityMaterial';
 import { DevicePairingCodeReader } from '../pairing/DevicePairingCodeReader';
 import { DeviceAuthorizationCheckpointMapper } from './DeviceAuthorizationCheckpointMapper';
+import { IdentityMailboxHomeVerifier } from './IdentityMailboxHomeVerifier';
 
 const emptyKeychain = { conversations: {}, version: 0 };
 const PAIRING_TTL_MS = 2 * 60 * 1000;
@@ -105,7 +111,7 @@ export class PigeonDeviceAuthorizationApi {
     checkpoint: DeviceAuthorizationCheckpoint;
     handedOver?: DeviceSealedSecretHandedOverResource;
   }> {
-    const body: DeviceAuthorizationTransitionResource & {
+    const body: DeviceAuthorizationTransitionPrimitives & {
       sealedSecrets?: DeviceSealedSecretHandOverResource;
     } = {
       ...transition.toPrimitives(),
@@ -178,23 +184,6 @@ export class PigeonDeviceAuthorizationApi {
     });
   }
 
-  /**
-   * Reads the owner's device catalog with the recovery proof, which does not
-   * depend on this device's own credential.
-   */
-  private async findDevicesWithRecoveryProof(
-    session: Session,
-  ): Promise<DeviceCredential[]> {
-    const identityId = IdentityId.fromString(session.identity.id);
-    const path = `${this.checkpointPath(identityId)}/devices`;
-
-    return this.readDevices(
-      identityId,
-      path,
-      await this.signer.headersWithRecoveryProof(session, 'GET', path),
-    );
-  }
-
   private async readDevices(
     identityId: IdentityId,
     path: string,
@@ -214,32 +203,6 @@ export class PigeonDeviceAuthorizationApi {
       DeviceCredential.fromPublicKey(
         IdentityId.fromString(credential).getPublicKey(),
       ),
-    );
-  }
-
-  /**
-   * Reads the checkpoint. DeviceRemovalDomainService decides whether a
-   * 401020 rejection of this device's signature means it was removed.
-   */
-  private findForSynchronize(
-    session: Session,
-  ): Promise<DeviceAuthorizationCheckpoint> {
-    return DeviceRemovalDomainService.findCheckpoint(
-      {
-        findCatalog: () => this.findDevicesWithRecoveryProof(session),
-        findCheckpoint: () => this.find(session),
-        isCredentialRejection: (error) =>
-          error instanceof HttpJsonError &&
-          error.status === 401 &&
-          error.code === 401020,
-        ownCredential: () =>
-          DeviceCredential.fromPublicKey(
-            PublicKey.fromPEM(
-              session.deviceCredentialKeyPair.toPrimitives().publicKey,
-            ),
-          ),
-      },
-      session.identity.id,
     );
   }
 
@@ -524,20 +487,78 @@ export class PigeonDeviceAuthorizationApi {
     );
   }
 
+  /**
+   * Verifies this device's authorization from the signed transitions the node
+   * serves, replayed from the genesis in the identity record the identity key
+   * signed. Rejects with DeviceRemovedError only on a verified removal above
+   * the local checkpoint. A record or log that proves neither rejects with
+   * the unproven-authorization message, never with a removal; so does any
+   * node error, as itself.
+   */
   public async synchronize(session: Session): Promise<Session> {
-    const checkpoint = await this.findForSynchronize(session);
+    const identityId = IdentityId.fromString(session.identity.id);
+    const path = `${this.checkpointPath(identityId)}/transitions`;
+    const resource =
+      await this.http.request<DeviceAuthorizationTransitionLogPrimitives>(
+        path,
+        {
+          headers: await this.signer.headersWithDeviceProof(
+            session,
+            'GET',
+            path,
+          ),
+          method: 'GET',
+        },
+      );
+    let head: DeviceAuthorization;
+
+    try {
+      const recoveryAuthority = RecoveryAuthority.fromString(
+        session.recoveryAuthorityKeyPair.toPrimitives().publicKey,
+      );
+
+      assert(
+        IdentityMailboxHomeVerifier.isTrusted(
+          identityId.valueOf(),
+          session.identity,
+        ) &&
+          recoveryAuthority.isEqual(
+            RecoveryAuthority.fromString(session.identity.recoveryAuthority),
+          ),
+        new UnprovenDeviceAuthorizationError(),
+      );
+      head = DeviceRemovalDomainService.verify({
+        genesis: DeviceAuthorization.genesis(
+          identityId,
+          DeviceCredential.fromString(session.identity.deviceCredential),
+          recoveryAuthority,
+        ),
+        local: {
+          epoch: session.authorizationEpoch,
+          revision: session.authorizationRevision,
+        },
+        log: DeviceAuthorizationTransitionLog.fromPrimitives(resource),
+        reader: DeviceCredential.fromString(
+          session.deviceCredentialKeyPair.toPrimitives().publicKey,
+        ),
+      });
+    } catch (error) {
+      if (error instanceof DeviceRemovedError) throw error;
+
+      throw new Error(copy.auth.deviceAuthorizationUnproven);
+    }
 
     await this.vault.synchronizeAuthorization(
-      checkpoint.getIdentityId(),
+      identityId,
       session.authorizationRevision,
-      checkpoint.getEpoch(),
-      checkpoint.getRevision(),
+      head.getEpoch(),
+      head.getRevision(),
     );
 
     return {
       ...session,
-      authorizationEpoch: checkpoint.getEpoch(),
-      authorizationRevision: checkpoint.getRevision(),
+      authorizationEpoch: head.getEpoch(),
+      authorizationRevision: head.getRevision(),
     };
   }
 

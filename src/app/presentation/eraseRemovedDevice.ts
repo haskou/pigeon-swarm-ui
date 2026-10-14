@@ -1,3 +1,11 @@
+import { clearProjectedMessageCaches } from '../../shared/infrastructure/storage/clearProjectedMessageCaches';
+import {
+  communityUnreadStorageKey,
+  draftsStorageKey,
+  lastConversationStorageKey,
+  workspaceStorageKey,
+} from './workspace/components/workspacePersistence';
+
 export type RemovedDeviceServices = {
   directMessages: {
     cancelOutbox(identityId: string): Promise<void>;
@@ -8,6 +16,7 @@ export type RemovedDeviceServices = {
   };
   identities: {
     discardDeviceSealedRecovery(identityId: string): void;
+    forgetDeviceUnlock(identityId: string): Promise<void>;
   };
   mls: {
     forget(identityId: string): Promise<void>;
@@ -15,13 +24,15 @@ export type RemovedDeviceServices = {
 };
 
 /**
- * Erases what this device stored for an identity when the user asks to start
- * over after the node reported the device as removed: unsent messages, stored
- * direct and group history, the MLS state of its communities and pending
- * device-sealed recovery steps. The node's report is not signed, so it never
- * triggers this by itself. The local unlock stays for the caller to remove.
- * Every step runs even when one fails. Resolves false when any step failed.
- * Never throws.
+ * Erases what this device stored for an identity once a signed, verified
+ * transition proved the device was removed: unsent messages, stored direct
+ * and group history, decrypted message projections, the MLS state of its
+ * communities, pending device-sealed recovery steps, drafts and workspace
+ * state, and last the vault record with the identity key material and the
+ * device-sealed root. Every step runs even when one fails. The vault record
+ * is erased only after every other step succeeded, so a partial erase leaves
+ * the identity unlockable and the next unlock proves the removal again and
+ * retries. Resolves false when any step failed. Never throws.
  */
 export async function eraseRemovedDevice(
   identityId: string,
@@ -32,8 +43,19 @@ export async function eraseRemovedDevice(
     () => services.directMessages.forgetHistory(identityId),
     () => services.groupMessages.forget(identityId),
     () => services.mls.forget(identityId),
+    () => clearProjectedMessageCaches(),
     () => {
       services.identities.discardDeviceSealedRecovery(identityId);
+    },
+    () => {
+      for (const key of [
+        draftsStorageKey(identityId),
+        lastConversationStorageKey(identityId),
+        workspaceStorageKey(identityId),
+        communityUnreadStorageKey(identityId),
+      ]) {
+        globalThis.localStorage?.removeItem(key);
+      }
     },
   ];
   let erased = true;
@@ -46,5 +68,13 @@ export async function eraseRemovedDevice(
     }
   }
 
-  return erased;
+  if (!erased) return false;
+
+  try {
+    await services.identities.forgetDeviceUnlock(identityId);
+  } catch {
+    return false;
+  }
+
+  return true;
 }

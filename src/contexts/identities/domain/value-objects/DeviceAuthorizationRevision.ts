@@ -17,4 +17,8 @@ export class DeviceAuthorizationRevision extends Integer {
   private constructor(value: number) {
     super(value);
   }
+
+  public next(): DeviceAuthorizationRevision {
+    return DeviceAuthorizationRevision.fromNumber(this.valueOf() + 1);
+  }
 }

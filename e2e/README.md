@@ -39,9 +39,10 @@ recipient accepts), `device-revoke-mailbox.spec.ts` (a paired device that
 the other device revokes keeps the messages sent before the revoke while it
 stays signed in, never shows a message sent after it while the surviving
 device does, at its next sign-in (from the identity the login screen
-remembers, without typing it) says it was removed and keeps its stored
-history until "Erase local copy and start over" erases it, and a forged
-removal answer for a still-authorized device erases nothing),
+remembers, without typing it) verifies the signed revocation, says it was
+removed and erases its stored history and the remembered identity, and a
+refused transition read or a forged revocation for a still-authorized device
+erases nothing),
 `community-mls-kick.spec.ts` (a private community shows encryption as active
 for its creator and an invited member, both exchange messages through the MLS
 group, the creator's manage dialog drops the kicked member once the kick and

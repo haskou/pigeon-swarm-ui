@@ -24,6 +24,24 @@ export class IdentityMailboxHomeVerifier {
   }
 
   /**
+   * Whether the node-served identity record is the requested identity, signed
+   * by its identity key, with the device credential its commitment binds.
+   */
+  public static isTrusted(
+    requestedId: string,
+    identity: IdentityResource,
+  ): boolean {
+    return IdentityMailboxHomeTrust.isTrusted({
+      deviceCredential: identity.deviceCredential,
+      deviceCredentialCommitment: identity.deviceCredentialCommitment,
+      requestedId,
+      servedId: identity.id,
+      signature: identity.signature,
+      signedContent: IdentityMailboxHomeVerifier.signedContent(identity),
+    });
+  }
+
+  /**
    * Returns the node-served mailbox home base only when the identity is
    * trusted for the requested id. The trust decision lives in
    * IdentityMailboxHomeTrust; this adapter parses the base and serializes the
@@ -37,15 +55,8 @@ export class IdentityMailboxHomeVerifier {
 
     if (base === undefined) return undefined;
 
-    const trusted = IdentityMailboxHomeTrust.isTrusted({
-      deviceCredential: identity.deviceCredential,
-      deviceCredentialCommitment: identity.deviceCredentialCommitment,
-      requestedId,
-      servedId: identity.id,
-      signature: identity.signature,
-      signedContent: IdentityMailboxHomeVerifier.signedContent(identity),
-    });
-
-    return trusted ? base : undefined;
+    return IdentityMailboxHomeVerifier.isTrusted(requestedId, identity)
+      ? base
+      : undefined;
   }
 }

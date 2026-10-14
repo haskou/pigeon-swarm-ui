@@ -30,4 +30,14 @@ export class DeviceCredential extends StringValueObject {
   public getPublicKey(): PublicKey {
     return PublicKey.fromPEM(this);
   }
+
+  /** Code-unit order: the strict ascending check on compromised credentials. */
+  public isLessThan(other: DeviceCredential): boolean {
+    return this.valueOf() < other.valueOf();
+  }
+
+  /** Locale order, as the node sorts and picks among credentials. */
+  public compareTo(other: DeviceCredential): number {
+    return this.valueOf().localeCompare(other.valueOf());
+  }
 }
