@@ -3,6 +3,8 @@ import type { RequestSigner } from '../../../../shared/infrastructure/http/Reque
 import type { ConversationMapper } from '../../../conversations/infrastructure/http/ConversationMapper';
 import type { Session } from '../../../identities/infrastructure/session/Session';
 
+import { GroupMailboxRoster } from '../../domain/GroupMailboxRoster';
+
 /**
  * The node's roster of one group conversation, as this identity sees it: the
  * conversations it belongs to are paged until the one asked for is found.
@@ -38,17 +40,17 @@ export class GroupConversationRoster {
   public async of(
     session: Session,
     conversationId: string,
-  ): Promise<ReadonlySet<string>> {
+  ): Promise<GroupMailboxRoster> {
     let before: string | undefined;
 
     for (let page = 0; page < GroupConversationRoster.MAX_PAGES; page += 1) {
       const conversations = await this.page(session, before);
       const found = conversations.find(({ id }) => id === conversationId);
 
-      if (found?.type === 'group') return new Set(found.participantIds);
+      if (found?.type === 'group') return GroupMailboxRoster.of(found);
 
       if (found || conversations.length < GroupConversationRoster.PAGE_SIZE) {
-        return new Set();
+        return GroupMailboxRoster.empty();
       }
       before = conversations[conversations.length - 1].id;
     }
@@ -56,6 +58,6 @@ export class GroupConversationRoster {
     // eslint-disable-next-line no-console
     console.debug('Group roster paging cap reached.');
 
-    return new Set();
+    return GroupMailboxRoster.empty();
   }
 }

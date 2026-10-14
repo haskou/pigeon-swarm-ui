@@ -31,10 +31,11 @@ mailbox generation `gen_k` is the MLS exporter
 removal, so a joiner exports it from its welcome. See "Generations from MLS" in
 `docs/opaque-mailboxes-client.md`. The engine is `GroupMailboxMlsEngine`; it
 reuses `MlsGroup` and `MlsStateStore` in a separate IndexedDB database. Its
-credentials are self-asserted and checked only against the conversation
-roster, and any member can commit an add or a removal (#375). Its state, its
-plaintext cache and its generations are sealed with the device root, like the
-community state (see "Security properties and limits").
+leaves carry the same identity-signed credential as community leaves (see
+"Identity binding"), each must be on the conversation roster, and only the
+roster's managers may commit an add or a removal. Its state, its plaintext
+cache and its generations are sealed with the device root, like the community
+state (see "Security properties and limits").
 
 Each leaf is a **device**, not an identity. An identity is in the group while
 at least one of its devices is. Removing an identity removes all its leaves.
@@ -46,13 +47,18 @@ change must be recreated.
 
 ### Identity binding
 
-A leaf credential is `basic` and carries the Pigeon identity id. That is not
-authentication by itself. A leaf is accepted only if all of these hold:
+A leaf credential is `basic`. It names the Pigeon identity and device, and
+carries the identity key's signature over the leaf's signature public key
+(domain `pigeon:mls-leaf-credential:v1`). Nobody can present a leaf as another
+identity's without that identity's key. A leaf is accepted only if all of these
+hold:
 
-1. The key package was published as a signed node record authored by the same
-   identity that the credential names (the node already verifies the signer).
+1. The identity key it names signed the leaf's signature public key. A key
+   package whose credential fails this check is skipped; a commit or welcome
+   carrying such a leaf is rejected.
 2. That identity is a current member of the community according to the
-   authoritative community operation log (not according to the MLS roster).
+   authoritative community operation log (not according to the MLS roster), or
+   on the conversation roster for a group conversation.
 3. For a channel group, the identity can see that channel.
 
 A client that receives a commit adding a leaf failing these checks rejects the
@@ -172,8 +178,12 @@ and attachments, and a missing group is an error, not a fallback.
   epochs of secrets are retained (`retainKeysForEpochs`), so older ciphertext
   this device has not decrypted yet becomes unreadable.
 - The roster, not MLS, is authoritative. Clients refuse to add identities that
-  are not on the roster, but a malicious member could still publish a commit
-  that removes others; clients do not yet reject removals of rostered members.
+  are not on the roster. In a group conversation, every add or removal commit,
+  made or received, is checked against the roster: only the creator and the
+  admins still on it (every member when it names neither) add devices or remove
+  members; a removal of someone still on the roster follows the conversation
+  rule (never the creator or the remover, an admin only by the creator). A
+  commit that only rotates the committer's own leaf needs no role.
 - `authorIdentityId` inside a message payload is asserted by the sender. MLS
   authenticates the sender's leaf, and the UI does not yet display that proof.
 - Call media keys are derived once, when the call starts. A group epoch change

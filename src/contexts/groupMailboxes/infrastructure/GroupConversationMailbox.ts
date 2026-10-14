@@ -3,6 +3,7 @@ import type { Session } from '../../identities/infrastructure/session/Session';
 import type { ChatMessage } from '../../messages/domain/ChatMessage';
 import type { EditMessageOptions } from '../../messages/infrastructure/http/resources/EditMessageOptions';
 import type { SendMessageOptions } from '../../messages/infrastructure/http/resources/SendMessageOptions';
+import type { GroupMailboxRoster } from '../domain/GroupMailboxRoster';
 import type { GroupConversationPorts } from './GroupConversationPorts';
 import type { GroupConversationSyncOutcome } from './GroupConversationSyncOutcome';
 import type { GroupTimelineApply } from './GroupTimelineApply';
@@ -20,9 +21,11 @@ import { GroupConversationTimeline } from './GroupConversationTimeline';
 
 /**
  * Group conversations over MLS and per-member mailboxes. The node keeps the
- * roster; the lowest identity id among the members still in both the roster
- * and the MLS group commits every add and removal, so members never race
- * each other's commits. A leaver is removed by that member on its next sync.
+ * roster; of the members holding a leaf whom the roster lets change
+ * membership (its creator and admins, or anyone when it names none), the
+ * lowest identity id commits every removal, then every add, so members
+ * never race each other's commits. A leaver is removed by that member on
+ * its next sync.
  */
 export class GroupConversationMailbox {
   public static readonly HISTORY_PAGE = 50;
@@ -68,7 +71,7 @@ export class GroupConversationMailbox {
   private async reconcile(
     member: GroupConversationMember,
     conversationId: string,
-    known?: ReadonlySet<string>,
+    known?: GroupMailboxRoster,
   ): Promise<void> {
     const self = member.session.identity.id;
     const roster =
@@ -77,13 +80,10 @@ export class GroupConversationMailbox {
     const current = new Set(
       await member.engine.members(conversationId).catch((): string[] => []),
     );
-    const staying = [...current]
-      .filter((id) => roster.has(id))
-      .sort((left, right) => left.localeCompare(right));
 
-    if (staying[0] !== self) return;
+    if (roster.committers(current)[0] !== self) return;
     const leaving = [...current].filter((id) => !roster.has(id));
-    const joining = [...roster].filter((id) => !current.has(id));
+    const joining = roster.participants().filter((id) => !current.has(id));
 
     if (leaving.length > 0)
       await member.control.remove(conversationId, leaving);
@@ -106,7 +106,7 @@ export class GroupConversationMailbox {
   public async membersChanged(
     session: Session,
     conversationId: string,
-    roster?: ReadonlySet<string>,
+    roster?: GroupMailboxRoster,
   ): Promise<void> {
     const key = `${session.identity.id}/${conversationId}`;
     const running = this.reconciling.get(key);

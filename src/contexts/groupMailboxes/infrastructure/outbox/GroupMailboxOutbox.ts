@@ -2,6 +2,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { GroupMailboxGeneration } from '../../domain/GroupMailboxGeneration';
+import type { GroupMailboxRoster } from '../../domain/GroupMailboxRoster';
 import type { GroupMailboxCommit } from '../mls/GroupMailboxCommit';
 import type { GroupMailboxOutboxAttempt } from './GroupMailboxOutboxAttempt';
 import type { GroupMailboxOutboxCopy } from './GroupMailboxOutboxCopy';
@@ -52,7 +53,7 @@ export class GroupMailboxOutbox {
 
   private readonly rows = new Map<string, GroupMailboxOutboxRow>();
   /** The roster of each conversation, read once per pass. */
-  private readonly rosters = new Map<string, Promise<ReadonlySet<string>>>();
+  private readonly rosters = new Map<string, Promise<GroupMailboxRoster>>();
   private lastCreatedAt = 0;
   private queue: Promise<void> = Promise.resolve();
   private stopped = false;
@@ -125,7 +126,7 @@ export class GroupMailboxOutbox {
     >,
     private readonly roster: (
       conversationId: string,
-    ) => Promise<ReadonlySet<string>>,
+    ) => Promise<GroupMailboxRoster>,
     private readonly clock: () => number = Date.now,
   ) {}
 
@@ -438,7 +439,7 @@ export class GroupMailboxOutbox {
   }
 
   /** The roster for this pass, read once per conversation. */
-  private passRoster(conversationId: string): Promise<ReadonlySet<string>> {
+  private passRoster(conversationId: string): Promise<GroupMailboxRoster> {
     const known = this.rosters.get(conversationId);
 
     if (known) return known;
@@ -455,7 +456,7 @@ export class GroupMailboxOutbox {
    */
   private async removalPending(
     conversationId: string,
-    roster: ReadonlySet<string>,
+    roster: GroupMailboxRoster,
   ): Promise<boolean> {
     if (!roster.has(this.session.identity.id)) {
       throw new MlsRejectedError('This identity is not in the group');
@@ -517,22 +518,22 @@ export class GroupMailboxOutbox {
   }
 
   /**
-   * Queues a commit for `I(Y,k)` of each recipient, `k` being the generation
-   * the commit was made in. The envelope id is seeded from the commit's hash
-   * and the recipient's inbox of the generation after it: a removed member,
-   * who can still append to `I(Y,k)` and may see one copy, cannot derive
-   * the id of another. Resolves after the first delivery attempt.
+   * Persists a commit for `I(Y,k)` of each of its recipients, `k` being the
+   * generation the commit was made in, and rejects if it cannot: a commit
+   * that is not queued must not be kept. The envelope id is seeded from the
+   * commit's hash and the recipient's inbox of the generation after it: a
+   * removed member, who can still append to `I(Y,k)` and may see one copy,
+   * cannot derive the id of another. Nothing is sent until `flush`.
    */
   public async enqueueCommit(
     conversationId: string,
     commit: GroupMailboxCommit,
-    recipients: readonly string[],
   ): Promise<void> {
     const { deliveryGeneration } = commit;
-    await this.keep({
+    const row: GroupMailboxOutboxRow = {
       attempts: 0,
       conversationId,
-      copies: recipients.map((identityId) => ({
+      copies: commit.recipients.map((identityId) => ({
         envelopeId: MailboxChannel.envelopeIdFor(
           `${GroupMailboxOutbox.commitSeed(commit, identityId)}|${
             GroupMailboxKeySchedule.inbox(
@@ -555,8 +556,10 @@ export class GroupMailboxOutbox {
       ),
       reference: encodeBase64Url(sha256(commit.commit)),
       retryAt: 0,
-    });
-    await this.pass();
+    };
+
+    await this.store.save(this.session, row);
+    this.rows.set(row.id, row);
   }
 
   /**

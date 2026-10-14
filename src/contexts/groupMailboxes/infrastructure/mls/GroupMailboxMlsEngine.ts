@@ -14,8 +14,11 @@ import type {
   MlsLeafOwner,
   MlsOpenedMessage,
 } from '../../../communities/infrastructure/mls/MlsGroup';
+import type { MlsLeafSigner } from '../../../communities/infrastructure/mls/MlsLeafSigner';
+import type { MlsMembershipPolicy } from '../../../communities/infrastructure/mls/MlsMembershipPolicy';
 import type { MlsStateStore } from '../../../communities/infrastructure/mls/MlsStateStore';
 import type { GroupMailboxGeneration } from '../../domain/GroupMailboxGeneration';
+import type { GroupMailboxRoster } from '../../domain/GroupMailboxRoster';
 import type { GroupMailboxGenerationRepository } from '../../domain/repositories/GroupMailboxGenerationRepository';
 import type { GroupMailboxCommit } from './GroupMailboxCommit';
 
@@ -50,11 +53,13 @@ const MESSAGE_ERRORS = [
  * talks next and a joiner derives the generation itself. All mutation of a
  * group goes through a per-group queue so the ratchet has a single writer;
  * a failed task drops the cached group so the stored state stays the truth.
+ * The conversation roster decides who may hold a leaf and who may add or
+ * remove members; a commit this device makes is kept only once published.
  */
 export class GroupMailboxMlsEngine {
   private readonly groups = new Map<string, MlsGroup>();
   private readonly queues = new Map<string, Promise<unknown>>();
-  private readonly rosters = new Map<string, ReadonlySet<string>>();
+  private readonly rosters = new Map<string, GroupMailboxRoster>();
 
   /** A rejection for what MLS refused; any other failure as it is. */
   private static rejection(error: unknown): unknown {
@@ -63,39 +68,85 @@ export class GroupMailboxMlsEngine {
       : error;
   }
 
+  /** Where the group a published commit leads to waits until it is saved. */
+  private static pendingKey(conversationId: string): string {
+    return `${conversationId}#pending`;
+  }
+
+  /** The epoch a commit was made in; anything but a commit is rejected. */
+  private static epochOf(bytes: Uint8Array): bigint {
+    const decoded = decodeMlsMessage(bytes, 0)?.[0];
+
+    if (decoded?.wireformat !== 'mls_private_message') {
+      throw new MlsRejectedError('Not an MLS commit');
+    }
+
+    return decoded.privateMessage.epoch;
+  }
+
   public constructor(
-    private readonly owner: MlsLeafOwner,
+    private readonly signer: MlsLeafSigner,
     private readonly store: MlsStateStore,
     private readonly generations: GroupMailboxGenerationRepository,
     private readonly rosterFor: (
       conversationId: string,
-    ) => Promise<ReadonlySet<string>>,
+    ) => Promise<GroupMailboxRoster>,
     private readonly clock: () => number,
   ) {}
 
   /**
-   * Confirms a commit this device made, then advances the generation if the
-   * tree changed. The log is written before the group; if saving the group
-   * fails, `load` rewinds the log to the stored group, so a retried commit
-   * exports its own generation.
+   * Publishes a commit this device made, then keeps it. The log is written
+   * first and the advanced group is set aside as pending; `publish` queues
+   * the commit; only then is the group saved. A commit whose publishing
+   * fails is abandoned: the stored group stays in its epoch and `load`
+   * rewinds the log. A device that stopped after publishing but before
+   * saving adopts the pending group when its own commit comes back.
    */
   private async commit(
     group: MlsGroup,
     output: MlsCommitOutput,
+    publish: (commit: GroupMailboxCommit) => Promise<void>,
   ): Promise<GroupMailboxCommit> {
+    const before = group.identities();
     const delivery = await this.generations.load(group.groupId);
-    const outcome = group.confirm(this.idOf(output.commit));
+    const commitId = this.idOf(output.commit);
+    const outcome = group.confirm(commitId);
     const log = await this.follow(group, outcome, delivery, output.epoch);
-
-    await this.remember(group);
-
-    return {
+    const after = new Set(group.identities());
+    const made: GroupMailboxCommit = {
       commit: output.commit,
       deliveryGeneration: delivery.current(),
       epoch: output.epoch,
       generation: log.current(),
+      recipients: before.filter((identityId) => after.has(identityId)).sort(),
       ...(output.welcome ? { welcome: output.welcome } : {}),
     };
+    const pendingKey = GroupMailboxMlsEngine.pendingKey(group.groupId);
+
+    await this.store.saveGroup(
+      pendingKey,
+      new TextEncoder().encode(
+        JSON.stringify({
+          commitId,
+          state: encodeBase64Url(group.serialize()),
+        } satisfies { commitId: string; state: string }),
+      ),
+    );
+
+    try {
+      await publish(made);
+    } catch (error) {
+      await this.store
+        .saveGroup(pendingKey, new Uint8Array())
+        .catch(() => undefined);
+      throw error;
+    }
+    await this.remember(group);
+    await this.store
+      .saveGroup(pendingKey, new Uint8Array())
+      .catch(() => undefined);
+
+    return made;
   }
 
   private async exclusive<T>(
@@ -193,7 +244,7 @@ export class GroupMailboxMlsEngine {
     await this.refreshRoster(conversationId);
     const group = MlsGroup.restore(
       conversationId,
-      this.owner,
+      this.signer.owner,
       this.policyFor(conversationId),
       bytes,
     );
@@ -204,12 +255,84 @@ export class GroupMailboxMlsEngine {
     return group;
   }
 
-  private policyFor(conversationId: string): (identityId: string) => boolean {
-    return (identityId) =>
-      this.rosters.get(conversationId)?.has(identityId) ?? false;
+  /**
+   * The group this device's own commit leads to, if it was kept aside for
+   * the epoch the device is still in.
+   */
+  private async pendingAt(
+    group: MlsGroup,
+    epoch: bigint,
+  ): Promise<{ commitId: string; state: Uint8Array } | undefined> {
+    if (epoch !== group.epoch || group.isRemoved) return undefined;
+    const bytes = await this.store.loadGroup(
+      GroupMailboxMlsEngine.pendingKey(group.groupId),
+    );
+
+    if (!bytes?.length) return undefined;
+    const { commitId, state } = JSON.parse(new TextDecoder().decode(bytes)) as {
+      commitId: string;
+      state: string;
+    };
+
+    return { commitId, state: new Uint8Array(decodeBase64Url(state)) };
   }
 
-  /** Groups judge credentials against the latest conversation roster. */
+  /**
+   * Applies a commit to the group, or adopts the pending group this
+   * device's own commit leads to.
+   */
+  private async process(
+    group: MlsGroup,
+    bytes: Uint8Array,
+  ): Promise<{
+    epoch: bigint;
+    group: MlsGroup;
+    outcome: MlsCommitOutcome;
+    pending: boolean;
+  }> {
+    const epoch = GroupMailboxMlsEngine.epochOf(bytes);
+    const id = this.idOf(bytes);
+    const pending = await this.pendingAt(group, epoch);
+
+    if (pending?.commitId === id) {
+      const adopted = MlsGroup.restore(
+        group.groupId,
+        this.signer.owner,
+        this.policyFor(group.groupId),
+        pending.state,
+      );
+
+      return {
+        epoch,
+        group: adopted,
+        outcome: { epoch: adopted.epoch, kind: 'applied' },
+        pending: true,
+      };
+    }
+
+    // An old epoch is not processed again; still prove it is ours.
+    if (epoch < group.epoch && !group.isRemoved) {
+      await group.authenticate(bytes);
+    }
+
+    return {
+      epoch,
+      group,
+      outcome: await group.applyCommit({ bytes, epoch, id }),
+      pending: pending !== undefined,
+    };
+  }
+
+  private policyFor(conversationId: string): MlsMembershipPolicy {
+    return {
+      admits: (identityId) =>
+        this.rosters.get(conversationId)?.has(identityId) ?? false,
+      allows: (change) =>
+        this.rosters.get(conversationId)?.allowsCommit(change) ?? false,
+    };
+  }
+
+  /** Groups judge credentials and commits against the latest roster. */
   private async refreshRoster(conversationId: string): Promise<void> {
     this.rosters.set(conversationId, await this.rosterFor(conversationId));
   }
@@ -255,57 +378,44 @@ export class GroupMailboxMlsEngine {
     return group;
   }
 
-  /** Adds devices by key package; the generation advances with the tree. */
+  /**
+   * Adds devices by key package; the generation advances with the tree.
+   * The commit is kept only once `publish` has queued it.
+   */
   public async add(
     conversationId: string,
     keyPackages: Uint8Array[],
+    publish: (commit: GroupMailboxCommit) => Promise<void>,
   ): Promise<GroupMailboxCommit> {
     return this.exclusive(conversationId, async () => {
       const group = await this.requireGroup(conversationId);
 
       await this.refreshRoster(conversationId);
 
-      return this.commit(group, await group.add(keyPackages));
+      return this.commit(group, await group.add(keyPackages), publish);
     });
   }
 
   /**
-   * Applies a commit another member made. Rejects forged and tampered
-   * commits, including ones for an epoch this device already left.
+   * Applies a commit another member made, or one this device published but
+   * had not saved. Rejects forged and tampered commits, commits the roster
+   * does not allow, and ones for an epoch this device already left.
    */
   public async applyCommit(
     conversationId: string,
     bytes: Uint8Array,
   ): Promise<MlsCommitOutcome> {
     return this.exclusive(conversationId, async () => {
-      const group = await this.requireGroup(conversationId);
-      let outcome: MlsCommitOutcome;
-      let epoch: bigint;
-
       await this.refreshRoster(conversationId);
-
-      try {
-        const decoded = decodeMlsMessage(bytes, 0)?.[0];
-
-        if (decoded?.wireformat !== 'mls_private_message') {
-          throw new MlsRejectedError('Not an MLS commit');
-        }
-        epoch = decoded.privateMessage.epoch;
-
-        // An old epoch is not processed again; still prove it is ours.
-        if (epoch < group.epoch && !group.isRemoved) {
-          await group.authenticate(bytes);
-        }
-        outcome = await group.applyCommit({
-          bytes,
-          epoch,
-          id: this.idOf(bytes),
-        });
-      } catch (error) {
+      const { epoch, group, outcome, pending } = await this.process(
+        await this.requireGroup(conversationId),
+        bytes,
+      ).catch((error: unknown) => {
         throw error instanceof MlsRejectedError
           ? error
           : new MlsRejectedError('Commit rejected');
-      }
+      });
+
       await this.follow(
         group,
         outcome,
@@ -313,6 +423,16 @@ export class GroupMailboxMlsEngine {
         epoch,
       );
       await this.remember(group);
+
+      // The epoch moved on: a pending group of this device is void now.
+      if (pending) {
+        await this.store
+          .saveGroup(
+            GroupMailboxMlsEngine.pendingKey(conversationId),
+            new Uint8Array(),
+          )
+          .catch(() => undefined);
+      }
 
       return outcome;
     });
@@ -329,7 +449,7 @@ export class GroupMailboxMlsEngine {
       await this.refreshRoster(conversationId);
       const group = await MlsGroup.create(
         conversationId,
-        await generateMlsKeyPackage(this.owner),
+        await generateMlsKeyPackage(this.signer),
         this.policyFor(conversationId),
       );
       const log = (await this.generations.load(conversationId)).start(
@@ -347,7 +467,7 @@ export class GroupMailboxMlsEngine {
 
   /** A single-use key package; its private part stays on this device. */
   public async createKeyPackage(): Promise<Uint8Array> {
-    const bundle = await generateMlsKeyPackage(this.owner);
+    const bundle = await generateMlsKeyPackage(this.signer);
 
     await this.store.saveKeyPackage({
       id: this.idOf(bundle.publicBytes),
@@ -430,7 +550,7 @@ export class GroupMailboxMlsEngine {
         this.idOf(ciphertext),
         JSON.stringify({
           plaintext: encodeBase64Url(plaintext),
-          sender: this.owner,
+          sender: this.signer.owner,
         } satisfies { plaintext: string; sender: MlsLeafOwner }),
       );
       await this.remember(group);
@@ -447,15 +567,18 @@ export class GroupMailboxMlsEngine {
   }
 
   /**
-   * Joins from a welcome. Every add advances the generation, so the joiner
-   * exports `gen_k` from the welcome epoch itself; only the public index
-   * `k` comes from the inviter. A welcome opens once; a removed device can
+   * Joins from a welcome that `inviter`, the peer who sent it, made. Every
+   * add advances the generation, so the joiner exports `gen_k` from the
+   * welcome epoch itself; only the public index `k` comes from the inviter.
+   * The inviter must hold a leaf in the welcomed group and be allowed by
+   * the roster to add members. A welcome opens once; a removed device can
    * join again from a welcome newer than its last membership.
    */
   public async join(
     conversationId: string,
     welcome: Uint8Array,
     index: number,
+    inviter: string,
   ): Promise<void> {
     if (!Number.isSafeInteger(index) || index < 0) {
       throw new MlsRejectedError('The generation index is not valid');
@@ -486,6 +609,17 @@ export class GroupMailboxMlsEngine {
         if (previous && group.epoch <= previous.epoch) {
           throw new MlsRejectedError(
             'The welcome is older than the last membership of this device',
+          );
+        }
+
+        if (
+          !this.rosters
+            .get(conversationId)
+            ?.committers(group.identities())
+            .includes(inviter)
+        ) {
+          throw new MlsRejectedError(
+            'The welcome is not from a member who may add devices',
           );
         }
         // The key package goes last: if a save fails, the welcome opens again.
@@ -531,17 +665,21 @@ export class GroupMailboxMlsEngine {
 
   /**
    * Removes every device of the given identities and advances the
-   * generation; undefined when none of them holds a leaf.
+   * generation; undefined when none of them holds a leaf. The commit is
+   * kept only once `publish` has queued it.
    */
   public async remove(
     conversationId: string,
     identityIds: string[],
+    publish: (commit: GroupMailboxCommit) => Promise<void>,
   ): Promise<GroupMailboxCommit | undefined> {
     return this.exclusive(conversationId, async () => {
       const group = await this.requireGroup(conversationId);
+
+      await this.refreshRoster(conversationId);
       const output = await group.removeIdentities(identityIds);
 
-      return output ? this.commit(group, output) : undefined;
+      return output ? this.commit(group, output, publish) : undefined;
     });
   }
 }
