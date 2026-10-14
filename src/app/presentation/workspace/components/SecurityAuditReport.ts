@@ -126,17 +126,19 @@ export class SecurityAuditReport {
   }
 
   private static groups(input: SecurityAuditInput): SecurityAudit['groups'] {
-    const deviceId = String(input.session.deviceId.valueOf());
+    const own = input.session.deviceCredentialKeyPair.toPrimitives().publicKey;
 
     return Object.entries(input.groups).map(([communityId, group]) => ({
       communityId,
       epoch: group.epoch.toString(),
       leaves: group.leaves.map(({ owner, signaturePublicKey }) => ({
-        deviceId: owner.deviceId,
+        deviceCredentialFingerprint: KeyFingerprint.ofPublicKey(
+          owner.deviceCredential,
+        ),
         identityId: owner.identityId,
         own:
           owner.identityId === input.session.identity.id &&
-          owner.deviceId === deviceId,
+          owner.deviceCredential === own,
         signatureKeyFingerprint:
           KeyFingerprint.ofPublicBytes(signaturePublicKey),
       })),

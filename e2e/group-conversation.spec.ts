@@ -160,10 +160,10 @@ test('a member removed from a group conversation stops reading it', async ({
   await expect(carol.getByText('after removal')).toHaveCount(0);
 });
 
-test('a group keeps reading across a revoke and reload, without the revoked device', async ({
+test('both devices of an identity read a group; a revoked one stops reading', async ({
   browser,
 }) => {
-  test.setTimeout(900_000);
+  test.setTimeout(1_200_000);
   const suffix = Date.now().toString(36);
   const password = `P455uruD3su!${suffix}`;
   const groupName = `Group ${suffix}`;
@@ -175,6 +175,14 @@ test('a group keeps reading across a revoke and reload, without the revoked devi
   const alice = await newIsolatedPage(browser);
   const phone = await newIsolatedPage(browser);
   const laptop = await newIsolatedPage(browser);
+  const reconciled: string[] = [];
+
+  // The phone, holding Bob's first leaf, adds and removes his other leaves.
+  phone.on('console', (message) => {
+    const text = message.text();
+
+    if (text.startsWith('Group devices reconciled:')) reconciled.push(text);
+  });
 
   try {
     await registerIdentity(alice, {
@@ -183,21 +191,43 @@ test('a group keeps reading across a revoke and reload, without the revoked devi
       password,
     });
     await registerIdentity(phone, bob);
-
-    // Groups assume one device per identity (node D19), so Bob joins on the
-    // phone alone and pairs the laptop afterwards.
     await createGroup(alice, groupName, [bob.handle]);
     await openGroup(alice, groupName);
     await openGroup(phone, groupName);
     await sendUntilEveryoneReads(alice, [phone], 'hello from Alice');
-    await pairNewDevice(phone, laptop, bob);
 
-    // The revoke rotates the device-sealed root; after the reload the phone
-    // reads its group inboxes with readers of the new root.
+    // The laptop paired after the group formed gets its own leaf from the
+    // phone, with no re-invite.
+    await pairNewDevice(phone, laptop, bob);
+    await openGroup(laptop, groupName);
+    await sendUntilEveryoneReads(alice, [phone, laptop], 'to both devices');
+    expect(reconciled).toContain(
+      'Group devices reconciled: removed 0, added 1.',
+    );
+
+    // The laptop's copy for the phone lands in the inbox both read; the
+    // laptop shows its own message once all the same.
+    await sendMessage(laptop, 'from the laptop');
+    for (const reader of [alice, phone]) {
+      await expect(
+        reader.getByText('from the laptop', { exact: true }),
+      ).toBeVisible({ timeout: SLOW });
+    }
+    await laptop.waitForTimeout(30_000);
+    await expect(
+      laptop.getByText('from the laptop', { exact: true }),
+    ).toHaveCount(1);
+
+    // The revoke rotates the device-sealed root; after signing in again the
+    // phone reads its group inboxes with readers of the new root, and its
+    // commit removes the laptop's leaf.
     await revokeOtherDevice(phone);
     await phone.getByRole('button', { name: 'Close dialog' }).last().click();
     await loginIdentity(phone, `@${bob.handle}`, password);
     await openGroup(phone, groupName);
+    await expect
+      .poll(() => reconciled, { timeout: SLOW })
+      .toContain('Group devices reconciled: removed 1, added 0.');
 
     await sendMessage(alice, 'after the revoke');
     await expect(
@@ -208,6 +238,15 @@ test('a group keeps reading across a revoke and reload, without the revoked devi
     // must never show.
     await laptop.waitForTimeout(60_000);
     await expect(laptop.getByText('after the revoke')).toHaveCount(0);
+
+    await phone.reload();
+    await loginIdentity(phone, `@${bob.handle}`, password);
+    await openGroup(phone, groupName);
+    await sendMessage(alice, 'after the reload');
+    await expect(
+      phone.getByText('after the reload', { exact: true }),
+    ).toBeVisible({ timeout: SLOW });
+    await expect(laptop.getByText('after the reload')).toHaveCount(0);
   } finally {
     await alice.context().close();
     await phone.context().close();

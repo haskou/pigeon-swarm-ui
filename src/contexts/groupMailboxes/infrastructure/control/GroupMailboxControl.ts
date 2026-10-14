@@ -1,3 +1,4 @@
+import type { MlsLeafOwner } from '../../../communities/infrastructure/mls/MlsGroup';
 import type { GroupMailboxRoster } from '../../domain/GroupMailboxRoster';
 import type { GroupMailboxCommit } from '../mls/GroupMailboxCommit';
 import type { GroupMailboxOutbox } from '../outbox/GroupMailboxOutbox';
@@ -27,23 +28,29 @@ import { GroupMailboxKeyPackageTimeoutError } from './GroupMailboxKeyPackageTime
  * a peer the roster lets add members and who holds a leaf in the welcomed
  * group. MLS authenticates commits and the roster decides who may make
  * them. Logs never carry key material, welcomes or commits.
+ *
+ * A device also adds and removes the other devices of its own identity:
+ * it sends its identity a key-package request naming one device, which
+ * only that device answers, and only while it holds no leaf; the answer's
+ * key package must be that device's. The welcome goes to the identity too,
+ * and opens only on the device whose key package it used.
  */
 export class GroupMailboxControl {
   public static readonly KEY_PACKAGE_TIMEOUT_MS = 60_000;
 
   private readonly pending = new Map<string, PendingGroupMailboxKeyPackage>();
 
-  /** The identity a key package's credential names, if it decodes. */
-  private static ownerOf(keyPackage: Uint8Array): string | undefined {
+  /** The owner a key package's credential names, if it decodes. */
+  private static ownerOf(keyPackage: Uint8Array): MlsLeafOwner | undefined {
     try {
-      return mlsKeyPackageOwner(keyPackage).identityId;
+      return mlsKeyPackageOwner(keyPackage);
     } catch {
       return undefined;
     }
   }
 
   public constructor(
-    private readonly selfIdentityId: string,
+    private readonly self: MlsLeafOwner,
     private readonly engine: GroupMailboxControlEngine,
     private readonly rosterFor: (
       conversationId: string,
@@ -62,19 +69,31 @@ export class GroupMailboxControl {
   ): Promise<boolean> {
     const roster = await this.rosterFor(conversationId);
 
-    return (
-      peerIdentityId !== this.selfIdentityId &&
-      roster.has(peerIdentityId) &&
-      roster.has(this.selfIdentityId)
-    );
+    return roster.has(peerIdentityId) && roster.has(this.self.identityId);
   }
 
+  /**
+   * Answers a peer on the roster, or another device of this identity that
+   * asks this very device while it holds no leaf in the group.
+   */
   private async receiveKeyPackageRequest(
     peerIdentityId: string,
-    conversationId: string,
-    requestId: string,
+    record: Extract<GroupMailboxControlFields, { type: 'key-package-request' }>,
   ): Promise<GroupMailboxControlOutcome> {
-    if (!(await this.bothInRoster(conversationId, peerIdentityId))) {
+    const { conversationId, deviceCredential, requestId } = record;
+    const sibling = peerIdentityId === this.self.identityId;
+
+    if (
+      (sibling || deviceCredential !== undefined) &&
+      deviceCredential !== this.self.deviceCredential
+    ) {
+      return 'ignored';
+    }
+
+    if (
+      !(await this.bothInRoster(conversationId, peerIdentityId)) ||
+      (sibling && (await this.engine.devices(conversationId)).length > 0)
+    ) {
       return 'ignored';
     }
 
@@ -94,7 +113,7 @@ export class GroupMailboxControl {
 
   /**
    * Only an answer to a request this device sent that peer counts, and its
-   * key package must be that peer's.
+   * key package must be that peer's, and that device's when one was asked.
    */
   private receiveKeyPackageResponse(
     peerIdentityId: string,
@@ -112,8 +131,13 @@ export class GroupMailboxControl {
     }
     this.pending.delete(requestId);
     clearTimeout(waiting.timer);
+    const owner = GroupMailboxControl.ownerOf(keyPackage);
 
-    if (GroupMailboxControl.ownerOf(keyPackage) !== peerIdentityId) {
+    if (
+      owner?.identityId !== peerIdentityId ||
+      (waiting.deviceCredential !== undefined &&
+        owner.deviceCredential !== waiting.deviceCredential)
+    ) {
       // eslint-disable-next-line no-console
       console.debug('Group mailbox control record rejected.');
       waiting.reject(
@@ -162,14 +186,17 @@ export class GroupMailboxControl {
     }
   }
 
+  /** Asks a peer, or one other device of this identity, for a key package. */
   private async requestKeyPackage(
     conversationId: string,
     peerIdentityId: string,
+    deviceCredential?: string,
   ): Promise<Uint8Array> {
     const requestId = MailboxChannel.randomEnvelopeId();
     const answer = new Promise<Uint8Array>((resolve, reject) => {
       this.pending.set(requestId, {
         conversationId,
+        ...(deviceCredential === undefined ? {} : { deviceCredential }),
         peerIdentityId,
         reject,
         resolve,
@@ -186,6 +213,7 @@ export class GroupMailboxControl {
         peerIdentityId,
         GroupMailboxControlRecord.encode({
           conversationId,
+          ...(deviceCredential === undefined ? {} : { deviceCredential }),
           requestId,
           type: 'key-package-request',
         }),
@@ -200,6 +228,40 @@ export class GroupMailboxControl {
     }
 
     return answer;
+  }
+
+  /**
+   * Commits the key packages, then hands `{welcome, k}` to each recipient.
+   * The commit reaches every existing member first.
+   */
+  private async welcome(
+    conversationId: string,
+    keyPackages: Uint8Array[],
+    recipients: readonly string[],
+  ): Promise<GroupMailboxCommit> {
+    const commit = await this.engine.add(conversationId, keyPackages, (made) =>
+      this.outbox.enqueueCommit(conversationId, made),
+    );
+
+    await this.outbox.flush();
+    const { welcome } = commit;
+
+    if (welcome) {
+      const plaintext = GroupMailboxControlRecord.encode({
+        conversationId,
+        index: commit.generation.index,
+        type: 'welcome',
+        welcome,
+      });
+
+      await Promise.all(
+        recipients.map((identityId) =>
+          this.direct.send(conversationId, identityId, plaintext),
+        ),
+      );
+    }
+
+    return commit;
   }
 
   /**
@@ -221,29 +283,30 @@ export class GroupMailboxControl {
         this.requestKeyPackage(conversationId, identityId),
       ),
     );
-    const commit = await this.engine.add(conversationId, keyPackages, (made) =>
-      this.outbox.enqueueCommit(conversationId, made),
+
+    return this.welcome(conversationId, keyPackages, identityIds);
+  }
+
+  /**
+   * Adds other devices of this identity, by device credential: one key
+   * package each, asked of that device. The commit reaches every existing
+   * member; the identity gets one `{welcome, k}` for all of them.
+   */
+  public async addDevices(
+    conversationId: string,
+    deviceCredentials: readonly string[],
+  ): Promise<GroupMailboxCommit> {
+    const keyPackages = await Promise.all(
+      deviceCredentials.map((deviceCredential) =>
+        this.requestKeyPackage(
+          conversationId,
+          this.self.identityId,
+          deviceCredential,
+        ),
+      ),
     );
 
-    await this.outbox.flush();
-    const { welcome } = commit;
-
-    if (welcome) {
-      const plaintext = GroupMailboxControlRecord.encode({
-        conversationId,
-        index: commit.generation.index,
-        type: 'welcome',
-        welcome,
-      });
-
-      await Promise.all(
-        identityIds.map((identityId) =>
-          this.direct.send(conversationId, identityId, plaintext),
-        ),
-      );
-    }
-
-    return commit;
+    return this.welcome(conversationId, keyPackages, [this.self.identityId]);
   }
 
   /** Drops unanswered key package requests; their adds reject. */
@@ -267,11 +330,7 @@ export class GroupMailboxControl {
 
     switch (record?.type) {
       case 'key-package-request':
-        return this.receiveKeyPackageRequest(
-          peerIdentityId,
-          record.conversationId,
-          record.requestId,
-        );
+        return this.receiveKeyPackageRequest(peerIdentityId, record);
       case 'key-package-response':
         return this.receiveKeyPackageResponse(
           peerIdentityId,
@@ -310,6 +369,26 @@ export class GroupMailboxControl {
     const commit = await this.engine.remove(
       conversationId,
       [...identityIds],
+      (made) => this.outbox.enqueueCommit(conversationId, made),
+    );
+
+    if (!commit) return undefined;
+    await this.outbox.flush();
+
+    return commit;
+  }
+
+  /**
+   * Removes the leaves of other devices of this identity, by device
+   * credential; the commit reaches the remaining members.
+   */
+  public async removeDevices(
+    conversationId: string,
+    deviceCredentials: readonly string[],
+  ): Promise<GroupMailboxCommit | undefined> {
+    const commit = await this.engine.removeDevices(
+      conversationId,
+      [...deviceCredentials],
       (made) => this.outbox.enqueueCommit(conversationId, made),
     );
 

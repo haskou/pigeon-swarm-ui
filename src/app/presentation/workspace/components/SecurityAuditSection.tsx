@@ -275,7 +275,10 @@ function AuditGroup({ group }: { group: SecurityAudit['groups'][number] }) {
         value={group.communityId}
       />
       {group.leaves.map((leaf) => (
-        <div key={`${leaf.identityId}:${leaf.deviceId}`} className="py-1">
+        <div
+          key={`${leaf.identityId}:${leaf.deviceCredentialFingerprint}`}
+          className="py-1"
+        >
           <div className="flex items-center justify-between gap-2 pt-2">
             <span className="text-xs font-black text-white/60">
               {copy.securityAudit.member}
@@ -289,8 +292,8 @@ function AuditGroup({ group }: { group: SecurityAudit['groups'][number] }) {
             value={leaf.identityId}
           />
           <CopyableIdRow
-            label={copy.securityAudit.deviceId}
-            value={leaf.deviceId}
+            label={copy.securityAudit.deviceCredential}
+            value={leaf.deviceCredentialFingerprint}
           />
           <CopyableIdRow
             label={copy.securityAudit.signatureKey}

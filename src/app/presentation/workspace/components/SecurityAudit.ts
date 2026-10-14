@@ -35,7 +35,7 @@ export type SecurityAudit = {
     communityId: string;
     epoch: string;
     leaves: {
-      deviceId: string;
+      deviceCredentialFingerprint: string;
       identityId: string;
       own: boolean;
       signatureKeyFingerprint: string;

@@ -5,11 +5,13 @@
  * Commits travel in the group inboxes `I(Y,k)`, and MLS authenticates them.
  * Application messages travel there too, as one MLS ciphertext whose sender
  * MLS authenticates. `gen_k` is never part of a record: a welcome carries
- * only the public index `k`.
+ * only the public index `k`. A key-package request a device sends its own
+ * identity names the one other device it asks (`deviceCredential`).
  */
 export type GroupMailboxControlFields =
   | {
       readonly conversationId: string;
+      readonly deviceCredential?: string;
       readonly requestId: string;
       readonly type: 'key-package-request';
     }

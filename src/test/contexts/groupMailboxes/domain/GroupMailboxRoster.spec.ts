@@ -113,6 +113,40 @@ describe('GroupMailboxRoster', () => {
     ).toBe(true);
   });
 
+  it('lets any member add or remove devices of its own identity', () => {
+    expect(
+      managed.allowsCommit({
+        added: ['member'],
+        committer: 'member',
+        removed: ['member'],
+      }),
+    ).toBe(true);
+    expect(
+      managed.allowsCommit({
+        added: [],
+        committer: 'creator',
+        removed: ['creator'],
+      }),
+    ).toBe(true);
+  });
+
+  it('rejects a commit that changes another identity next to its own devices', () => {
+    expect(
+      managed.allowsCommit({
+        added: ['member', 'other'],
+        committer: 'member',
+        removed: [],
+      }),
+    ).toBe(false);
+    expect(
+      managed.allowsCommit({
+        added: ['member'],
+        committer: 'outsider',
+        removed: [],
+      }),
+    ).toBe(false);
+  });
+
   it('ignores an admin who left when naming the managers', () => {
     expect(managed.committers(['gone-admin', 'member'])).toEqual([]);
   });

@@ -38,7 +38,11 @@ cache and its generations are sealed with the device root, like the community
 state (see "Security properties and limits").
 
 Each leaf is a **device**, not an identity. An identity is in the group while
-at least one of its devices is. Removing an identity removes all its leaves.
+at least one of its devices is. Removing an identity removes all its leaves. In
+a group conversation every device of a member holds its own leaf (#417): the
+device leading its identity's leaves adds the identity's other listed devices
+and removes the leaves of revoked ones, without a manager (see Device add and
+Reconcile in `docs/opaque-mailboxes-client.md`).
 
 The old shared `communityKey`, `EncryptedCommunityKey`, invite key envelopes and
 `Session.keychain.conversations[communityId]` community keys are removed. There
@@ -47,15 +51,18 @@ change must be recreated.
 
 ### Identity binding
 
-A leaf credential is `basic`. It names the Pigeon identity and device, and
-carries the identity key's signature over the leaf's signature public key
-(domain `pigeon:mls-leaf-credential:v1`). Nobody can present a leaf as another
-identity's without that identity's key. A leaf is accepted only if all of these
-hold:
+A leaf credential is `basic`. It names the Pigeon identity and the device
+credential, and carries two signatures over the leaf's signature public key,
+one by the identity key and one by the device key (domain
+`pigeon:mls-leaf-credential:v2\n`, over the canonical JSON of the identity id,
+the device credential and the signature public key). Nobody can present a leaf
+as another identity's without that identity's key, and a revoked device that
+still holds the identity key cannot present a leaf as a current device's
+without that device's key. A leaf is accepted only if all of these hold:
 
-1. The identity key it names signed the leaf's signature public key. A key
-   package whose credential fails this check is skipped; a commit or welcome
-   carrying such a leaf is rejected.
+1. The identity key and the device key it names signed the leaf's signature
+   public key. A key package whose credential fails this check is skipped; a
+   commit or welcome carrying such a leaf is rejected.
 2. That identity is a current member of the community according to the
    authoritative community operation log (not according to the MLS roster), or
    on the conversation roster for a group conversation.
@@ -224,7 +231,17 @@ and attachments, and a missing group is an error, not a fallback.
   still on it (every member when it names neither) add devices or remove
   members; a removal of someone still on the roster follows the conversation
   rule (never the creator or the remover, an admin only by the creator). A
-  commit that only rotates the committer's own leaf needs no role.
+  commit that only rotates the committer's own leaf, or only adds or removes
+  leaves of the committer's own identity, needs no role. A device welcomed by
+  its own identity joins only when the group already holds another leaf of
+  that identity and an identity other than it, and the roster lists the
+  identity of every leaf. Residual: until its leaf is removed, a revoked device
+  can add or remove leaves of its own identity, and it can welcome a sibling
+  device that is still waiting for its leaf into a look-alike group of that
+  conversation, whose leaves hold only roster members, so it reads what the
+  sibling sends there (a confidentiality gap, not only a denial of service).
+  Other members cannot verify an identity's device list; when an identity's
+  only leaf device is revoked, a manager must add the identity again.
 - A community welcome's author is the one the node records. A node that lies
   about it can only name a manager who already holds a leaf in that group.
 - `authorIdentityId` inside a message payload is asserted by the sender. MLS
@@ -235,3 +252,7 @@ and attachments, and a missing group is an error, not a fallback.
 - A community created before this change has no group. Its owner sees
   "awaiting group access" and must recreate the community; nothing bootstraps
   a group automatically, so two owner devices cannot fork one.
+- Leaf credentials changed from `v1` (identity signature only) to `v2`
+  (identity and device signatures, #417). There is no migration: MLS state and
+  key packages stored with `v1` leaves no longer verify, so a group or
+  community created before this change must be recreated.

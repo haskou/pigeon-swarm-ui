@@ -54,10 +54,14 @@ const suite = (): Promise<CiphersuiteImpl> => {
   return suitePromise;
 };
 
-/** The identity and device that an MLS leaf claims to be. */
+/**
+ * The identity and device that an MLS leaf claims to be. The device is its
+ * device credential (the PEM public key the node lists for the identity), so
+ * a sibling device can tell the leaves of current devices from revoked ones.
+ */
 export interface MlsLeafOwner {
+  readonly deviceCredential: string;
   readonly identityId: string;
-  readonly deviceId: string;
 }
 
 export interface MlsKeyPackageBundle {
@@ -375,17 +379,23 @@ export class MlsGroup {
     identityIds: string[],
   ): Promise<MlsCommitOutput | undefined> {
     const doomed = new Set(identityIds);
-    const indexes = this.leaves()
-      .filter(({ owner }) => doomed.has(owner.identityId))
-      .map(({ index }) => index);
 
-    if (indexes.length === 0) return undefined;
+    return this.removeLeaves(({ identityId }) => doomed.has(identityId));
+  }
 
-    return this.commit(
-      indexes.map((removed) => ({
-        proposalType: 'remove' as const,
-        remove: { removed },
-      })),
+  /**
+   * Removes the leaves of these devices of one identity; undefined when
+   * none holds a leaf.
+   */
+  public async removeDevices(
+    identityId: string,
+    deviceCredentials: string[],
+  ): Promise<MlsCommitOutput | undefined> {
+    const doomed = new Set(deviceCredentials);
+
+    return this.removeLeaves(
+      (owner) =>
+        owner.identityId === identityId && doomed.has(owner.deviceCredential),
     );
   }
 
@@ -446,6 +456,24 @@ export class MlsGroup {
     this.state = result.newState;
 
     return { plaintext: result.message, sender: owner };
+  }
+
+  /** Commits the removal of every leaf `doomed` names; undefined if none. */
+  private async removeLeaves(
+    doomed: (owner: MlsLeafOwner) => boolean,
+  ): Promise<MlsCommitOutput | undefined> {
+    const indexes = this.leaves()
+      .filter(({ owner }) => doomed(owner))
+      .map(({ index }) => index);
+
+    if (indexes.length === 0) return undefined;
+
+    return this.commit(
+      indexes.map((removed) => ({
+        proposalType: 'remove' as const,
+        remove: { removed },
+      })),
+    );
   }
 
   /** Sender-data secret and tree of the current or a retained past epoch. */

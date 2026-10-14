@@ -3,6 +3,12 @@ import type { GroupMailboxControlFields } from '../../../../../contexts/groupMai
 import { GroupMailboxControlRecord } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlRecord';
 
 const REQUEST_ID = 'AAAAAAAAAAAAAAAAAAAAAA';
+const DEVICE = [
+  '-----BEGIN PUBLIC KEY-----',
+  'MCowBQYDK2VwAyEAGb9ECWmEzf6FQbrBZ9w7lshQhqowtrbLDFw4rXAxZuE=',
+  '-----END PUBLIC KEY-----',
+  '',
+].join('\n');
 const bytes = new Uint8Array([0, 1, 250, 255]);
 const json = (value: unknown): Uint8Array =>
   new TextEncoder().encode(JSON.stringify(value));
@@ -39,6 +45,34 @@ describe('GroupMailboxControlRecord', () => {
         GroupMailboxControlRecord.encode(fields),
       ),
     ).toEqual(fields);
+  });
+
+  it('round-trips a request that asks one device of the peer', () => {
+    const fields: GroupMailboxControlFields = {
+      conversationId: 'conversation-1',
+      deviceCredential: DEVICE,
+      requestId: REQUEST_ID,
+      type: 'key-package-request',
+    };
+
+    expect(
+      GroupMailboxControlRecord.decode(
+        GroupMailboxControlRecord.encode(fields),
+      ),
+    ).toEqual(fields);
+  });
+
+  it('does not decode a request naming a malformed device', () => {
+    expect(
+      GroupMailboxControlRecord.decode(
+        json({
+          ...header,
+          deviceCredential: 'not-a-public-key',
+          requestId: REQUEST_ID,
+          type: 'key-package-request',
+        }),
+      ),
+    ).toBeNull();
   });
 
   it.each([

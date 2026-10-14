@@ -21,6 +21,8 @@ export class GroupConversationMember {
     stores: GroupConversationStores,
   ): GroupConversationMember {
     const identityId = session.identity.id;
+    const deviceCredential =
+      session.deviceCredentialKeyPair.toPrimitives().publicKey;
     const rosterFor = (conversationId: string) =>
       ports.roster(session, conversationId);
     // Local state seals under the latest root, as after a revoke rotated it.
@@ -34,8 +36,9 @@ export class GroupConversationMember {
     );
     const engine = new GroupMailboxMlsEngine(
       new MlsLeafSigner(
-        { deviceId: String(session.deviceId), identityId },
+        { deviceCredential, identityId },
         session.keyPair,
+        session.deviceCredentialKeyPair,
       ),
       new IndexedDbMlsStateStore(
         new DeviceSealedEntryStore(
@@ -57,7 +60,7 @@ export class GroupConversationMember {
       ports.now,
     );
     const control = new GroupMailboxControl(
-      identityId,
+      { deviceCredential, identityId },
       engine,
       rosterFor,
       ports.direct(session),
@@ -70,6 +73,7 @@ export class GroupConversationMember {
       engine,
       control,
       outbox,
+      generations,
       new GroupMailboxNotificationPump(
         session,
         control,
@@ -103,6 +107,11 @@ export class GroupConversationMember {
     public readonly engine: GroupMailboxMlsEngine,
     public readonly control: GroupMailboxControl,
     public readonly outbox: GroupMailboxOutbox,
+    /** The conversations this device holds group state for. */
+    public readonly generations: Pick<
+      IndexedDbGroupMailboxGenerationStore,
+      'conversationIds'
+    >,
     public readonly pump: GroupMailboxNotificationPump,
     public readonly inbox: GroupMailboxInboxSync,
   ) {}

@@ -28,6 +28,11 @@ import { GroupConversationTimeline } from './GroupConversationTimeline';
  * lowest identity id commits every removal, then every add, so members
  * never race each other's commits. A leaver is removed by that member on
  * its next sync.
+ * Each leaf is a device. Of an identity's devices, only the one with the
+ * lowest device credential among its current devices holding a leaf
+ * commits, so its devices never race each other either: it removes the
+ * leaves of devices the identity no longer lists, as after a revoke, and
+ * adds its listed devices that hold no leaf.
  * Reading a conversation's inboxes and replaying its history run one at a
  * time, so a replay never misses what a background read stored meanwhile.
  */
@@ -73,21 +78,85 @@ export class GroupConversationMailbox {
     return opened;
   }
 
-  /** Commits the roster into the MLS group when this member is the one. */
+  /**
+   * Adds this identity's listed devices that hold no leaf yet, unless the
+   * roster no longer lists this identity. Resolves how many it added.
+   */
+  private async addMissingDevices(
+    member: GroupConversationMember,
+    conversationId: string,
+    roster: GroupMailboxRoster,
+    listed: ReadonlySet<string>,
+    leaves: readonly string[],
+  ): Promise<number> {
+    if (!roster.has(member.session.identity.id)) return 0;
+    const missing = [...listed].filter(
+      (credential) => !leaves.includes(credential),
+    );
+
+    if (missing.length > 0) {
+      await member.control.addDevices(conversationId, missing);
+    }
+
+    return missing.length;
+  }
+
+  /**
+   * Commits the roster and this identity's device list into the MLS group
+   * when this device is the one. Logs counts only.
+   */
   private async reconcile(
     member: GroupConversationMember,
     conversationId: string,
     known?: GroupMailboxRoster,
   ): Promise<void> {
-    const self = member.session.identity.id;
-    const roster =
-      known ?? (await this.ports.roster(member.session, conversationId));
+    const { session } = member;
     // A device not yet welcomed has no group and nothing to commit.
-    const current = new Set(
-      await member.engine.members(conversationId).catch((): string[] => []),
+    const leaves = await member.engine.devices(conversationId);
+
+    if (leaves.length === 0) return;
+    const listed = new Set(await this.ports.devices(session));
+    const lead = leaves.find((credential) => listed.has(credential));
+
+    if (lead !== session.deviceCredentialKeyPair.toPrimitives().publicKey) {
+      return;
+    }
+    const roster = known ?? (await this.ports.roster(session, conversationId));
+    const revoked = leaves.filter((credential) => !listed.has(credential));
+
+    if (revoked.length > 0) {
+      await member.control.removeDevices(conversationId, revoked);
+    }
+    await this.reconcileMembers(member, conversationId, roster);
+    const added = await this.addMissingDevices(
+      member,
+      conversationId,
+      roster,
+      listed,
+      leaves,
     );
 
-    if (roster.committers(current)[0] !== self) return;
+    if (revoked.length > 0 || added > 0) {
+      // Count-only: no ids, credentials or keys.
+      // eslint-disable-next-line no-console
+      console.info(
+        `Group devices reconciled: removed ${revoked.length}, added ${added}.`,
+      );
+    }
+  }
+
+  /**
+   * Commits the roster's removals, then its adds, when this identity is the
+   * first committer holding a leaf.
+   */
+  private async reconcileMembers(
+    member: GroupConversationMember,
+    conversationId: string,
+    roster: GroupMailboxRoster,
+  ): Promise<void> {
+    const current = new Set(await member.engine.members(conversationId));
+
+    if (roster.committers(current)[0] !== member.session.identity.id) return;
     const leaving = [...current].filter((id) => !roster.has(id));
     const joining = roster.participants().filter((id) => !current.has(id));
 
@@ -330,10 +399,28 @@ export class GroupConversationMailbox {
 
   /**
    * After a revoke rotated the root, cuts the replaced root and the revoked
-   * device off this identity's group inboxes. Rejects when any is not cut.
+   * device off this identity's group inboxes, then, in the background,
+   * has the device that commits for this identity remove the revoked
+   * device's leaves, so it cannot decrypt what is sent next. Rejects when
+   * any inbox is not cut.
    */
   public async cutOffRevokedReaders(session: Session): Promise<void> {
-    await this.member(session).inbox.cutOffRevokedReaders();
+    const member = this.member(session);
+
+    try {
+      await member.inbox.cutOffRevokedReaders();
+    } finally {
+      void member.generations
+        .conversationIds()
+        .then((conversationIds) =>
+          Promise.all(
+            conversationIds.map((conversationId) =>
+              this.membersChanged(session, conversationId),
+            ),
+          ),
+        )
+        .catch(() => GroupConversationMailbox.fail('device removal'));
+    }
   }
 
   /** Stops this identity's background work, for logout. State is kept. */

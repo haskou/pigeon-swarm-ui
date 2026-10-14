@@ -118,11 +118,7 @@ describe('MlsCommunityEngine', () => {
   let roster: Set<string>;
   let moderators: Set<string>;
   const id = (name: string): string => cast[name].id;
-  const engineFor = (
-    name: string,
-    store = createStore(),
-    device = 'device-1',
-  ) => ({
+  const engineFor = (name: string, store = createStore(), device = 'd1') => ({
     engine: new MlsCommunityEngine(
       cast[name].signer(device),
       store,
@@ -149,7 +145,7 @@ describe('MlsCommunityEngine', () => {
   ): Promise<MlsGroup> =>
     MlsGroup.restore(
       COMMUNITY,
-      cast[name].signer('device-1').owner,
+      cast[name].signer().owner,
       anything,
       (await store.loadGroup(COMMUNITY)) as Uint8Array,
     );
@@ -355,7 +351,7 @@ describe('MlsCommunityEngine', () => {
 
   it('admits every device of a member, not only the first', async () => {
     const { alice } = await admitBob();
-    const laptop = engineFor('bob', createStore(), 'device-2');
+    const laptop = engineFor('bob', createStore(), 'd2');
 
     await laptop.engine.publishKeyPackages(COMMUNITY);
     await expect(alice.engine.reconcile(COMMUNITY)).resolves.toBe(true);
@@ -368,9 +364,11 @@ describe('MlsCommunityEngine', () => {
     expect(
       (await alice.engine.credentials(COMMUNITY))?.leaves
         .filter(({ owner }) => owner.identityId === id('bob'))
-        .map(({ owner }) => owner.deviceId)
+        .map(({ owner }) => owner.deviceCredential)
         .sort(),
-    ).toEqual(['device-1', 'device-2']);
+    ).toEqual(
+      [cast.bob.deviceCredential('d1'), cast.bob.deviceCredential('d2')].sort(),
+    );
   });
 
   it('rejects an add from a member who may not add, and its welcome', async () => {
@@ -441,7 +439,7 @@ describe('MlsCommunityEngine', () => {
   it('refuses a welcome into a look-alike group made by a member who may not add', async () => {
     const alice = engineFor('alice');
     const carol = engineFor('carol');
-    const bobKey = await generateMlsKeyPackage(cast.bob.signer('device-1'));
+    const bobKey = await generateMlsKeyPackage(cast.bob.signer());
     const lookAlike = await MlsGroup.create(COMMUNITY, bobKey, anything);
 
     await alice.engine.createGroup(COMMUNITY);
@@ -514,8 +512,9 @@ describe('MlsCommunityEngine', () => {
     // Published under bob's name, but its credential is signed by mallory.
     const forged = await generateMlsKeyPackage(
       new MlsLeafSigner(
-        { deviceId: 'device-9', identityId: id('bob') },
+        cast.bob.owner('d9'),
         cast.mallory.keyPair,
+        cast.bob.deviceKeyPair('d9'),
       ),
     );
 

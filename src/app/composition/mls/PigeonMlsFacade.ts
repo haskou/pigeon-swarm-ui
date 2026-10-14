@@ -61,10 +61,11 @@ export class PigeonMlsFacade {
 
   private engineFor(session: Session): MlsCommunityEngine {
     const owner = {
-      deviceId: String(session.deviceId),
+      deviceCredential:
+        session.deviceCredentialKeyPair.toPrimitives().publicKey,
       identityId: session.identity.id,
     };
-    const key = `${owner.identityId}/${owner.deviceId}`;
+    const key = `${owner.identityId}/${owner.deviceCredential}`;
     const known = this.engines.get(key);
 
     if (known) {
@@ -79,9 +80,14 @@ export class PigeonMlsFacade {
     };
 
     holder.engine = new MlsCommunityEngine(
-      new MlsLeafSigner(owner, {
-        sign: (message) => holder.session.keyPair.sign(message),
-      }),
+      new MlsLeafSigner(
+        owner,
+        { sign: (message) => holder.session.keyPair.sign(message) },
+        {
+          sign: (message) =>
+            holder.session.deviceCredentialKeyPair.sign(message),
+        },
+      ),
       new IndexedDbMlsStateStore(this.sealedState(), () => holder.session),
       (communityId) =>
         new SessionMlsRecordTransport(

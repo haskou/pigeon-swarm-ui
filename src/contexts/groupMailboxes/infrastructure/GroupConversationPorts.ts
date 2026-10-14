@@ -10,9 +10,14 @@ import type { GroupMailboxNotificationPages } from './control/GroupMailboxNotifi
 
 /** What the group conversation mailbox needs from the rest of the app. */
 export type GroupConversationPorts = {
-  channel: Pick<MailboxChannel, 'acknowledge' | 'read' | 'send'>;
+  channel: Pick<
+    MailboxChannel,
+    'acknowledge' | 'addReader' | 'listReaders' | 'read' | 'send'
+  >;
   client: Pick<PigeonMailboxClient, 'delete'>;
   composer: Pick<PigeonMessageCommandsApi, 'composeEdit' | 'withSentRecord'>;
+  /** The device credentials of this identity's current devices. */
+  devices: (session: Session) => Promise<readonly string[]>;
   /** The 1:1 carrier of control letters for one signed-in identity. */
   direct: (session: Session) => GroupMailboxDirectLink;
   notifications: GroupMailboxNotificationPages;
