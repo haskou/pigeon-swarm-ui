@@ -13,9 +13,9 @@ import type { NodeRelayConfigurationViewModel } from '../../../../contexts/netwo
 import type { Peer } from '../../../../contexts/networks/presentation/view-models/Peer';
 import type { NodeSettingsSection } from './NodeSettingsSection';
 
+import { IdentityMatch } from '../../../../contexts/identities/domain/IdentityMatch';
 import { IdentityMemberRow } from '../../../../contexts/identities/presentation/components/IdentityMemberListPanel';
 import { useIdentityPreview } from '../../../../contexts/identities/presentation/hooks/useIdentityPreview';
-import { IdentityMatch } from '../../../../contexts/identities/domain/IdentityMatch';
 import { NodeRelayConfigurationForm } from '../../../../contexts/networks/presentation/components/NodeRelayConfigurationForm';
 import { defaultRelayConfiguration } from '../../../../contexts/networks/presentation/view-models/defaultRelayConfiguration';
 import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';

@@ -1,6 +1,7 @@
 import type { IdentityResource } from '../../infrastructure/http/resources/IdentityResource';
 import type { ContactDirectoryEntry } from '../../infrastructure/storage/ContactDirectoryEntry';
 
+import { IdentityMatch } from '../../domain/IdentityMatch';
 import { identityName, type IdentityNames } from './identityDisplay';
 
 /**
@@ -54,17 +55,22 @@ export class ContactDirectory {
     return known;
   }
 
-  /** Records the live profiles, keyed by the ids the workspace uses. */
+  /**
+   * Records the live profiles, keyed by the ids the workspace uses. The own
+   * identity is not a contact, whichever form its id is keyed in.
+   */
   public remember(
     profiles: Readonly<Record<string, IdentityResource>>,
     seenAt: number,
+    ownIdentityId: string,
   ): ContactDirectory {
     const contacts = new Map(this.contacts);
 
     Object.entries(profiles).forEach(([identityId, profile]) => {
       const name = identityName(profile);
 
-      if (name) contacts.set(identityId, { identityId, name, seenAt });
+      if (name && !IdentityMatch.isSame(identityId, ownIdentityId))
+        contacts.set(identityId, { identityId, name, seenAt });
     });
 
     return ContactDirectory.of([...contacts.values()]);

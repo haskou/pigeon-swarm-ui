@@ -6,13 +6,13 @@ import type { ChatMessage } from '../../../../contexts/messages/domain/ChatMessa
 import type { ChatColumnProps } from './ChatColumnProps';
 import type { ChatProfileViewer } from './ChatProfileViewer';
 
+import { IdentityMatch } from '../../../../contexts/identities/domain/IdentityMatch';
 import { ContactVerificationDialog } from '../../../../contexts/identities/presentation/components/ContactVerificationDialog';
 import {
   type ContactVerification,
   useContactVerification,
 } from '../../../../contexts/identities/presentation/hooks/useContactVerification';
 import { identityDisplayName } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
-import { IdentityMatch } from '../../../../contexts/identities/domain/IdentityMatch';
 import {
   profileAnchorFromTarget,
   type ProfilePopoverAnchor,

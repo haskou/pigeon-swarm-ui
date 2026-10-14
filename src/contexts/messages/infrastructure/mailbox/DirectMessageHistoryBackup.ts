@@ -3,9 +3,8 @@ import type { DirectMessageHistoryEntry } from './DirectMessageHistoryEntry';
 import type { DirectMessageHistoryItem } from './DirectMessageHistoryItem';
 import type { DirectMessageHistoryStore } from './DirectMessageHistoryStore';
 
-import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
+import { IdentityMatch } from '../../../identities/domain/IdentityMatch';
 import { sessionRootKey } from '../../../identities/infrastructure/session/sessionRootKey';
-import { DirectMailboxOwnership } from '../../../mailboxes/domain/DirectMailboxOwnership';
 import { DirectMessageAuthorship } from './DirectMessageAuthorship';
 import { DirectMessageMailboxRecord } from './DirectMessageMailboxRecord';
 
@@ -29,7 +28,6 @@ export class DirectMessageHistoryBackup {
     items: DirectMessageHistoryItem[],
   ): Promise<void> {
     const rootKey = sessionRootKey(session).getBuffer();
-    const owner = IdentityId.fromString(session.identity.id);
     const byConversation = new Map<string, DirectMessageHistoryEntry[]>();
 
     for (const { conversationId, plaintext } of items) {
@@ -40,10 +38,7 @@ export class DirectMessageHistoryBackup {
 
       if (!record) continue;
 
-      const own = DirectMailboxOwnership.isAuthoredBy(
-        IdentityId.fromString(record.authorId),
-        owner,
-      );
+      const own = IdentityMatch.isSame(record.authorId, session.identity.id);
       const entries = byConversation.get(conversationId) ?? [];
 
       entries.push({

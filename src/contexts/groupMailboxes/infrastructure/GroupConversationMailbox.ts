@@ -9,6 +9,7 @@ import type { GroupConversationPorts } from './GroupConversationPorts';
 import type { GroupConversationSyncOutcome } from './GroupConversationSyncOutcome';
 import type { GroupTimelineApply } from './GroupTimelineApply';
 
+import { IdentityMatch } from '../../identities/domain/IdentityMatch';
 import { MessagePinChange } from '../../messages/domain/MessagePinChange';
 import { MessageReactionChange } from '../../messages/domain/MessageReactionChange';
 import { MessageId } from '../../messages/domain/value-objects/MessageId';
@@ -158,7 +159,15 @@ export class GroupConversationMailbox {
   ): Promise<void> {
     const current = new Set(await member.engine.members(conversationId));
 
-    if (roster.committers(current)[0] !== member.session.identity.id) return;
+    if (
+      !IdentityMatch.isSame(
+        roster.committers(current)[0],
+        member.session.identity.id,
+      )
+    ) {
+      return;
+    }
+
     const leaving = [...current].filter((id) => !roster.has(id));
     const joining = roster.participants().filter((id) => !current.has(id));
 

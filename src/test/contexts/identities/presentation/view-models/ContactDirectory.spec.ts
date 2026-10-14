@@ -46,7 +46,7 @@ describe(ContactDirectory.name, () => {
     expect(
       ContactDirectory.of([])
         .remember(
-          { [pem]: identity(pem, 'Me'), ada: identity('ada', 'Ada') },
+          { ada: identity('ada', 'Ada'), [pem]: identity(pem, 'Me') },
           1,
           OWN_ID,
         )

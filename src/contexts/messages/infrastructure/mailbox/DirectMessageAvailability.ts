@@ -3,7 +3,7 @@ import type { DirectMessageAvailabilityServer } from './DirectMessageAvailabilit
 import type { DirectMessageAvailabilityStore } from './DirectMessageAvailabilityStore';
 import type { RecipientMailboxRouter } from './RecipientMailboxRouter';
 
-import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
+import { IdentityMatch } from '../../../identities/domain/IdentityMatch';
 import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
 import { DirectMessageAvailabilityAnnouncement } from './DirectMessageAvailabilityAnnouncement';
 import { DirectMessageInboxKeys } from './DirectMessageInboxKeys';
@@ -31,9 +31,7 @@ export class DirectMessageAvailability {
     recipientIdentityId: string,
     mailboxId: string,
   ): string[] {
-    return IdentityId.fromString(recipientIdentityId).isEqual(
-      IdentityId.fromString(session.identity.id),
-    )
+    return IdentityMatch.isSame(recipientIdentityId, session.identity.id)
       ? this.servers.map((server) => server.base)
       : this.store.servers(mailboxId);
   }
@@ -60,10 +58,8 @@ export class DirectMessageAvailability {
     if (
       announcement === null ||
       peerIdentityId === undefined ||
-      IdentityId.fromString(peerIdentityId).isEqual(
-        IdentityId.fromString(session.identity.id),
-      ) ||
-      announcement.authorId !== peerIdentityId
+      IdentityMatch.isSame(peerIdentityId, session.identity.id) ||
+      !IdentityMatch.isSame(announcement.authorId, peerIdentityId)
     ) {
       return;
     }

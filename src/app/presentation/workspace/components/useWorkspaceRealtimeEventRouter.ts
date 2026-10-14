@@ -26,6 +26,7 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { presenceFromRealtimeEvent } from '../presenceFromRealtimeEvent';
 import { applyRefreshedIdentity } from './applyRefreshedIdentity';
+import { CommunityNotificationPolicy } from './CommunityNotificationPolicy';
 import { isBrowserPageVisible } from './isBrowserPageVisible';
 import {
   eventAggregateId,
@@ -81,13 +82,6 @@ const isActiveCommunityChannel = (
   workspaceMode === 'community' &&
   communityId === activeCommunityId &&
   channelId === activeCommunityChannelId;
-
-const shouldSuppressCommunityNotification = (
-  active: boolean,
-  allowed: boolean,
-  authorIdentityId: string | undefined,
-  currentIdentityId: string,
-): boolean => active || !allowed || authorIdentityId === currentIdentityId;
 
 export function useWorkspaceRealtimeEventRouter({
   activeCommunityChannelId,
@@ -283,7 +277,7 @@ export function useWorkspaceRealtimeEventRouter({
       );
 
       if (
-        shouldSuppressCommunityNotification(
+        CommunityNotificationPolicy.isSuppressed(
           active,
           notificationAllowed,
           authorIdentityId,

@@ -8,6 +8,7 @@ import type { Session } from '../../infrastructure/session/Session';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { ConversationPeer } from '../../../conversations/presentation/view-models/ConversationPeer';
+import { IdentityMatch } from '../../domain/IdentityMatch';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
 import { ContactDirectory } from '../view-models/ContactDirectory';
 import {
@@ -272,17 +273,18 @@ export function useIdentityDirectory({
   }, [session]);
 
   useEffect(() => {
-    if (storedContacts?.ownerIdentityId !== session.identity.id) return;
+    if (
+      !storedContacts ||
+      !IdentityMatch.isSame(storedContacts.ownerIdentityId, session.identity.id)
+    ) {
+      return;
+    }
 
-    const contactProfiles = Object.fromEntries(
-      Object.entries(identityProfiles).filter(
-        ([identityId]) => identityId !== session.identity.id,
-      ),
-    );
     const directory = storedContacts.directory.remember(
-      contactProfiles,
+      identityProfiles,
       Math.floor(Date.now() / CONTACT_SEEN_RESOLUTION_MS) *
         CONTACT_SEEN_RESOLUTION_MS,
+      session.identity.id,
     );
 
     if (directory.isSameAs(storedContacts.directory)) return;

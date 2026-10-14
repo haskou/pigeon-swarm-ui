@@ -10,7 +10,6 @@ const read = (authorId: string): DirectReadRecord => ({
   conversationId: 'conversation-1',
   createdAt: Date.now(),
   id: 'read-1',
-  previousMessageIds: [],
   targetMessageId: 'message-1',
   type: 'read',
 });

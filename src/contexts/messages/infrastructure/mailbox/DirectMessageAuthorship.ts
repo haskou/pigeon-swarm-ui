@@ -5,8 +5,7 @@ import { concatBytes } from '@noble/hashes/utils.js';
 import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessageRecord';
 
 import { encodeBase64Url } from '../../../../shared/infrastructure/encoding/base64url';
-import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
-import { DirectMailboxOwnership } from '../../../mailboxes/domain/DirectMailboxOwnership';
+import { IdentityMatch } from '../../../identities/domain/IdentityMatch';
 
 /**
  * Authorship tag for a record this identity writes to its own inbox: a
@@ -65,12 +64,7 @@ export class DirectMessageAuthorship {
     record: DirectMessageRecord,
     authorTag: string | undefined,
   ): boolean {
-    if (
-      !DirectMailboxOwnership.isAuthoredBy(
-        IdentityId.fromString(record.authorId),
-        IdentityId.fromString(identityId),
-      )
-    ) {
+    if (!IdentityMatch.isSame(record.authorId, identityId)) {
       return true;
     }
 

@@ -2,9 +2,8 @@ import type { Session } from '../../../identities/infrastructure/session/Session
 import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessageRecord';
 import type { DirectReadRecord } from '../../../mailboxes/domain/DirectReadRecord';
 
-import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
+import { IdentityMatch } from '../../../identities/domain/IdentityMatch';
 import { sessionRootKey } from '../../../identities/infrastructure/session/sessionRootKey';
-import { DirectMailboxOwnership } from '../../../mailboxes/domain/DirectMailboxOwnership';
 import { DirectMailboxRecords } from '../../../mailboxes/domain/DirectMailboxRecords';
 import { DirectMessageAuthorship } from './DirectMessageAuthorship';
 import { DirectMessageMailboxRecord } from './DirectMessageMailboxRecord';
@@ -36,10 +35,8 @@ export class DirectMessageRecordReader {
     record: DirectReadRecord,
   ): boolean {
     return (
-      DirectMailboxOwnership.isAuthoredBy(
-        IdentityId.fromString(record.authorId),
-        IdentityId.fromString(session.identity.id),
-      ) && DirectMailboxRecords.isFreshReceipt(record, Date.now())
+      IdentityMatch.isSame(record.authorId, session.identity.id) &&
+      DirectMailboxRecords.isFreshReceipt(record, Date.now())
     );
   }
 }
