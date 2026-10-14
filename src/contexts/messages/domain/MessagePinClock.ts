@@ -1,10 +1,14 @@
+import type { Timestamp } from '@haskou/value-objects';
+
 import type { MessagePinChange } from './MessagePinChange';
 import type { MessageId } from './value-objects/MessageId';
 
 /**
  * Last-writer-wins clock for message pins. Pin changes arrive out of order and
  * can be replayed, so a change is admitted only when it is newer than the last
- * change admitted for its message. The clock advances as it goes, so a later
+ * change admitted for its message. Each createdAt is first clamped to at most
+ * 30 s after the time the batch was received, so a far-future date cannot
+ * win over every later change. The clock advances as it goes, so a later
  * change in the same pass still wins. The admitted changes then pin and unpin
  * in order.
  */
@@ -52,14 +56,22 @@ export class MessagePinClock {
     }
   }
 
-  /** Returns the winning changes in order and advances the clock past them. */
-  public admit(changes: readonly MessagePinChange[]): MessagePinChange[] {
-    return changes.filter((change) => {
-      if (!this.isFresh(change)) return false;
+  /**
+   * Returns the winning changes, clamped to the receive window, in order and
+   * advances the clock past them.
+   */
+  public admit(
+    changes: readonly MessagePinChange[],
+    receivedAt: Timestamp,
+  ): MessagePinChange[] {
+    return changes
+      .map((change) => change.clampedTo(receivedAt))
+      .filter((change) => {
+        if (!this.isFresh(change)) return false;
 
-      this.advance(change);
+        this.advance(change);
 
-      return true;
-    });
+        return true;
+      });
   }
 }

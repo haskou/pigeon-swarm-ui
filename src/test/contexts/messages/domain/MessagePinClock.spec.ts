@@ -14,7 +14,6 @@ function change(
 
 const receivedAt = new Timestamp(1_000);
 const MAX_FUTURE_SKEW_MS = 30_000;
-const MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 
 describe(MessagePinClock.name, () => {
   it('admits the first change for a message', () => {
@@ -84,13 +83,13 @@ describe(MessagePinClock.name, () => {
     expect(clock.admit([unpin], new Timestamp(40_000))).toEqual([unpin]);
   });
 
-  it('clamps a change older than the window to its oldest edge', () => {
+  it('keeps the order of old changes delivered late', () => {
     const clock = new MessagePinClock();
-    const later = new Timestamp(MAX_AGE_MS + 5_000);
+    const later = new Timestamp(30 * 24 * 60 * 60 * 1000);
+    const pin = change('pin', 300);
+    const unpin = change('unpin', 400);
 
-    const [admitted] = clock.admit([change('pin', 1)], later);
-
-    expect(admitted?.getCreatedAt().valueOf()).toBe(5_000);
+    expect(clock.admit([unpin, pin], later)).toEqual([unpin]);
   });
 
   it('keeps a change inside the window unchanged', () => {

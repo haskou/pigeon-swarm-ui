@@ -1,5 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 
+import { Timestamp } from '@haskou/value-objects';
+
 import type { ChatMessage } from '../../../../contexts/messages/domain/ChatMessage';
 import type { DirectMessageTimelineChange } from '../../../../contexts/messages/domain/DirectMessageTimelineChange';
 
@@ -11,7 +13,8 @@ import { applyDirectMessageTimelineChanges } from './applyDirectMessageTimelineC
 /**
  * Applies one mailbox sync batch to the open timeline and its pinned set.
  * Pin records apply last-writer-wins per message by createdAt through the
- * given clock.
+ * given clock, each clamped to the window around the time this batch is
+ * applied.
  */
 export function applyMailboxSyncChanges(
   changes: DirectMessageTimelineChange[],
@@ -39,6 +42,7 @@ export function applyMailboxSyncChanges(
         return [];
       }
     }),
+    Timestamp.now(),
   );
 
   if (pinChanges.length > 0) {
