@@ -29,6 +29,8 @@ export const en = {
     changeIdentity: 'Change identity',
     createIdentity: 'Create identity',
     createIdentityShort: 'Create',
+    deviceAuthorizationUnproven:
+      'This node could not prove that this device is still authorized. Try again, or sign in through another node.',
     devicePairingCompletionLabel: 'Final code from your other device',
     devicePairingCompletionPlaceholder:
       'Paste the final code here, or scan its QR',
@@ -57,11 +59,10 @@ export const en = {
       'Show this code to the authorized device. It must be identical there before it authorizes this device.',
     deviceRemoved: 'This device was removed from your account.',
     deviceRemovedEraseFailed:
-      "This browser can no longer open this identity, and the messages saved on this browser could not be erased. Choose 'Erase local copy and start over' to try again, or pair it again from a device where you are signed in. Your account is not deleted.",
+      'This browser can no longer open this identity, and part of what it saved could not be erased. Sign in again on this browser to finish erasing it, or pair it again from a device where you are signed in. Your account is not deleted.',
     deviceRemovedHelp:
-      "This browser can no longer open this identity. Pair it again from a device where you are signed in, or erase this browser's copy and start over. The messages saved on this browser stay until you erase them. Your account is not deleted.",
+      'This browser can no longer open this identity, so its messages, drafts and keys for it were erased from this browser. Pair it again from a device where you are signed in to use it here. Your account is not deleted.',
     deviceRemovedPair: 'Pair this device again',
-    deviceRemovedStartOver: 'Erase local copy and start over',
     deviceRootUnavailable:
       'This device could not open its keys for this identity. Check your connection and try again. If it keeps failing, unlock on another of your devices first.',
     fallbackNetworksLabel: 'Networks, comma-separated',

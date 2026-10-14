@@ -289,7 +289,19 @@ export function AuthScreen({
       setLoginProgressStep(null);
 
       if (caught instanceof DeviceRemovedError) {
-        setRemovedEraseFailed(false);
+        const erased = await eraseRemovedDevice(
+          caught.identityId,
+          await loadApplicationContainer(),
+        );
+
+        if (erased) {
+          clearLastLoginIdentity();
+          setIdentityId('');
+          setIdentityPreviewLookup('');
+        }
+
+        setPassword('');
+        setRemovedEraseFailed(!erased);
         setRemovedIdentityId(caught.identityId);
         setState('error');
 
@@ -353,37 +365,6 @@ export function AuthScreen({
   const handlePairAgain = () => {
     handleModeChange('login');
     setLoginMethod('device');
-  };
-
-  const handleStartOver = async (identity: string) => {
-    setState('loading');
-    setError(null);
-
-    try {
-      const applicationContainer = await loadApplicationContainer();
-      const erased = await eraseRemovedDevice(identity, applicationContainer);
-
-      setRemovedEraseFailed(!erased);
-
-      if (!erased) {
-        setState('error');
-
-        return;
-      }
-
-      await applicationContainer.identities.forgetDeviceUnlock(identity);
-    } catch (caught) {
-      setState('error');
-      setError(toUserErrorMessage(caught, copy.auth.unknownError));
-
-      return;
-    }
-
-    clearLastLoginIdentity();
-    setIdentityId('');
-    setIdentityPreviewLookup('');
-    setRemovedIdentityId(null);
-    setState('idle');
   };
 
   const handleIdentityIdChange = (value: string) => {
@@ -603,7 +584,6 @@ export function AuthScreen({
               disabled={state === 'loading'}
               eraseFailed={removedEraseFailed}
               onPairAgain={handlePairAgain}
-              onStartOver={() => void handleStartOver(removedIdentityId)}
             />
           ) : null}
           {error && (

@@ -147,4 +147,27 @@ describe(IdentityMailboxHomeVerifier.name, () => {
 
     expect(IdentityMailboxHomeVerifier.verifiedBase(id, served)).toBe(HOME);
   });
+
+  describe('isTrusted', () => {
+    it('trusts an identity record without a mailbox home that the identity key signed', async () => {
+      const { id, identity } = await fixture();
+
+      expect(IdentityMailboxHomeVerifier.isTrusted(id, identity)).toBe(true);
+    });
+
+    it('distrusts a record whose genesis device changed after signing', async () => {
+      const { id, identity } = await fixture();
+      const swapped = (await KeyPair.generate()).toPrimitives().publicKey;
+
+      expect(
+        IdentityMailboxHomeVerifier.isTrusted(id, {
+          ...identity,
+          deviceCredential: swapped,
+          deviceCredentialCommitment: SHA256Hash.from(
+            new StringValueObject(swapped),
+          ).valueOf(),
+        }),
+      ).toBe(false);
+    });
+  });
 });

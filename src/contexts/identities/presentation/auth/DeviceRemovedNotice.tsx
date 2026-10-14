@@ -6,12 +6,10 @@ export function DeviceRemovedNotice({
   disabled,
   eraseFailed,
   onPairAgain,
-  onStartOver,
 }: {
   disabled: boolean;
   eraseFailed: boolean;
   onPairAgain: () => void;
-  onStartOver: () => void;
 }): ReactElement {
   return (
     <div
@@ -24,24 +22,14 @@ export function DeviceRemovedNotice({
           ? copy.auth.deviceRemovedEraseFailed
           : copy.auth.deviceRemovedHelp}
       </p>
-      <div className="mt-3 grid gap-2">
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={onPairAgain}
-          className="ui-button ui-button-primary w-full py-3 disabled:cursor-not-allowed disabled:opacity-45"
-        >
-          {copy.auth.deviceRemovedPair}
-        </button>
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={onStartOver}
-          className="ui-button ui-button-danger w-full py-3 disabled:cursor-not-allowed disabled:opacity-45"
-        >
-          {copy.auth.deviceRemovedStartOver}
-        </button>
-      </div>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={onPairAgain}
+        className="ui-button ui-button-primary mt-3 w-full py-3 disabled:cursor-not-allowed disabled:opacity-45"
+      >
+        {copy.auth.deviceRemovedPair}
+      </button>
     </div>
   );
 }

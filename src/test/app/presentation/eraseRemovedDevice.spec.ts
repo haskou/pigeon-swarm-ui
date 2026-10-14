@@ -4,6 +4,15 @@ import {
   eraseRemovedDevice,
   type RemovedDeviceServices,
 } from '../../../app/presentation/eraseRemovedDevice';
+import {
+  communityUnreadStorageKey,
+  draftsStorageKey,
+  lastConversationStorageKey,
+  workspaceStorageKey,
+} from '../../../app/presentation/workspace/components/workspacePersistence';
+import { clearProjectedMessageCaches } from '../../../shared/infrastructure/storage/clearProjectedMessageCaches';
+
+jest.mock('../../../shared/infrastructure/storage/clearProjectedMessageCaches');
 
 function services(): {
   directMessages: MockProxy<RemovedDeviceServices['directMessages']>;
@@ -20,11 +29,84 @@ function services(): {
   directMessages.forgetHistory.mockResolvedValue(undefined);
   groupMessages.forget.mockResolvedValue(undefined);
   mls.forget.mockResolvedValue(undefined);
+  identities.forgetDeviceUnlock.mockResolvedValue(undefined);
 
   return { directMessages, groupMessages, identities, mls };
 }
 
 describe('eraseRemovedDevice', () => {
+  const storage = mock<Storage>();
+
+  beforeAll(() => {
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: storage,
+    });
+  });
+
+  afterAll(() => {
+    Reflect.deleteProperty(globalThis, 'localStorage');
+  });
+
+  it('erases decrypted projections, drafts and workspace state, then the vault record with the identity keys', async () => {
+    const removed = services();
+
+    await expect(eraseRemovedDevice('identity-1', removed)).resolves.toBe(true);
+
+    expect(clearProjectedMessageCaches).toHaveBeenCalled();
+    for (const key of [
+      draftsStorageKey('identity-1'),
+      lastConversationStorageKey('identity-1'),
+      workspaceStorageKey('identity-1'),
+      communityUnreadStorageKey('identity-1'),
+    ]) {
+      expect(storage.removeItem).toHaveBeenCalledWith(key);
+    }
+    expect(removed.identities.forgetDeviceUnlock).toHaveBeenCalledWith(
+      'identity-1',
+    );
+  });
+
+  it('keeps the vault record when another step failed, so the next unlock proves the removal again', async () => {
+    const removed = services();
+
+    removed.directMessages.forgetHistory.mockRejectedValue(
+      new Error('storage'),
+    );
+
+    await expect(eraseRemovedDevice('identity-1', removed)).resolves.toBe(
+      false,
+    );
+
+    expect(removed.identities.forgetDeviceUnlock).not.toHaveBeenCalled();
+  });
+
+  it('keeps the vault record when the decrypted projections cannot be erased', async () => {
+    const removed = services();
+
+    jest
+      .mocked(clearProjectedMessageCaches)
+      .mockRejectedValueOnce(new Error('indexeddb'));
+
+    await expect(eraseRemovedDevice('identity-1', removed)).resolves.toBe(
+      false,
+    );
+
+    expect(removed.identities.forgetDeviceUnlock).not.toHaveBeenCalled();
+  });
+
+  it('reports instead of throwing when the vault record cannot be erased', async () => {
+    const removed = services();
+
+    removed.identities.forgetDeviceUnlock.mockRejectedValue(
+      new Error('storage'),
+    );
+
+    await expect(eraseRemovedDevice('identity-1', removed)).resolves.toBe(
+      false,
+    );
+  });
+
   it("erases the identity's outbox, direct and group history, community MLS state and pending device-sealed recovery", async () => {
     const removed = services();
 

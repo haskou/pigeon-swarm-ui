@@ -27,4 +27,9 @@ export class DeviceAuthorizationOperationId extends StringValueObject {
   private constructor(value: string) {
     super(value);
   }
+
+  /** Locale order, as the node replays transitions at one revision. */
+  public compareTo(other: DeviceAuthorizationOperationId): number {
+    return this.valueOf().localeCompare(other.valueOf());
+  }
 }
