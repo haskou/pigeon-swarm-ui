@@ -1,9 +1,9 @@
 import { type ReactElement, useCallback, useEffect, useState } from 'react';
 
-import type { DeviceCredential } from '../../../../contexts/identities/domain/value-objects/DeviceCredential';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
 import { DeviceAuthorizationRevision } from '../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
+import { DeviceCredential } from '../../../../contexts/identities/domain/value-objects/DeviceCredential';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { KeyFingerprint } from '../../../../contexts/identities/presentation/view-models/KeyFingerprint';
 import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
@@ -30,8 +30,10 @@ export function DeviceManagementDialog({
   const [current, setCurrent] = useState(session);
   const [revoking, setRevoking] = useState(false);
   const { close, state } = useCloseTransition(onClose);
-  const own = IdentityId.normalize(
-    session.deviceCredentialKeyPair.toPrimitives().publicKey,
+  const own = DeviceCredential.fromPublicKey(
+    IdentityId.fromString(
+      session.deviceCredentialKeyPair.toPrimitives().publicKey,
+    ).getPublicKey(),
   );
 
   useCloseOnEscape(close);
@@ -121,7 +123,7 @@ export function DeviceManagementDialog({
           )}
           <ul className="grid gap-2" data-testid="device-list">
             {devices?.map((device) => {
-              const isOwn = IdentityId.normalize(device.valueOf()) === own;
+              const isOwn = device.isEqual(own);
 
               return (
                 <li

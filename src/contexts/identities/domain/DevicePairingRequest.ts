@@ -122,12 +122,13 @@ export class DevicePairingRequest {
       new DevicePairingError('invalid', 'Invalid device pairing request.'),
     );
     assert(
-      this.authorizedAt.valueOf() <= this.invitation.getExpiration().valueOf(),
+      this.authorizedAt.isBeforeOrEqual(this.invitation.getExpiration()),
       new DevicePairingError('expired', 'Expired device pairing request.'),
     );
     assert(
-      this.authorizedAt.valueOf() <=
-        acceptedAt.valueOf() + MAX_FUTURE_SKEW_MS &&
+      this.authorizedAt.isBeforeOrEqual(
+        acceptedAt.addMilliseconds(MAX_FUTURE_SKEW_MS),
+      ) &&
         DeviceAuthorizationTransition.isValidEnrollmentProof({
           authorCredential: this.invitation.getAuthorCredential(),
           authorizedAt: this.authorizedAt,

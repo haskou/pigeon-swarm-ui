@@ -107,7 +107,7 @@ export class DevicePairingInvitation {
       new DevicePairingError('invalid', 'Invalid device pairing invitation.'),
     );
     assert(
-      acceptedAt.valueOf() <= this.expiresAt.valueOf(),
+      acceptedAt.isBeforeOrEqual(this.expiresAt),
       new DevicePairingError('expired', 'Expired device pairing invitation.'),
     );
   }

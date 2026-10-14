@@ -56,7 +56,7 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
       identityId,
       previousRevision,
       epoch,
-      DeviceAuthorizationRevision.fromNumber(previousRevision.valueOf() + 1),
+      previousRevision.next(),
     );
   }
 
@@ -85,7 +85,7 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
             !localRevision.hasValue(record.authorizationRevision) ||
             revision.isLessThan(localRevision) ||
             (revision.isEqual(localRevision) &&
-              record.authorizationEpoch !== epoch.valueOf())
+              !epoch.hasValue(record.authorizationEpoch))
           ) {
             transaction.abort();
             reject(new Error('Local authorization checkpoint changed.'));

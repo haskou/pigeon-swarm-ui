@@ -276,10 +276,8 @@ export class DeviceAuthorizationPolicy {
 
     const last =
       recoveries.length > 0 ? recoveries[recoveries.length - 1] : undefined;
-    const lowestRevisionFirst = [...concurrent].sort(
-      (left, right) =>
-        left.getResultRevision().valueOf() -
-        right.getResultRevision().valueOf(),
+    const lowestRevisionFirst = [...concurrent].sort((left, right) =>
+      left.getResultRevision().compareTo(right.getResultRevision()),
     );
 
     for (const lost of lowestRevisionFirst) {
