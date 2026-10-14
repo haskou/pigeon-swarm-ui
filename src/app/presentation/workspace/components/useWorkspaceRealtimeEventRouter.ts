@@ -11,8 +11,8 @@ import type { ConversationResource } from '../../../../contexts/conversations/in
 import type { IdentityPresenceResource as IdentityPresence } from '../../../../contexts/identities/infrastructure/http/resources/IdentityPresenceResource';
 import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
+import type { ChatMessage } from '../../../../contexts/messages/domain/ChatMessage';
 import type { MessageResource } from '../../../../contexts/messages/infrastructure/http/MessageResource';
-import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
 import type { NotificationSettingMap } from '../../../../contexts/notifications/presentation/view-models/NotificationSettingMap';
 import type { PollResource } from '../../../../contexts/polls/infrastructure/http/resources/PollResource';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
@@ -138,7 +138,13 @@ export function useWorkspaceRealtimeEventRouter({
         return;
       }
 
-      if (event.aggregate_id !== session.identity.id) return;
+      if (
+        !event.aggregate_id ||
+        !IdentityId.fromString(event.aggregate_id).isEqual(
+          IdentityId.fromString(session.identity.id),
+        )
+      )
+        return;
 
       const applyRefreshedSession = (identity: IdentityResource) =>
         setSession((current) =>

@@ -72,7 +72,7 @@ export class PigeonDeviceSealedSecretApi {
       });
 
     assert(
-      published.identityId === identityId.valueOf() &&
+      IdentityId.fromString(published.identityId).isEqual(identityId) &&
         published.generation === input.generation &&
         published.authorizationRevision === authorizationRevision,
       new Error('Unexpected device sealed secret publication.'),
