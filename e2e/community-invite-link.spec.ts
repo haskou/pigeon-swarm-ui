@@ -5,7 +5,6 @@ import {
   openSidebar,
   registerIdentity,
   sendMessage,
-  waitForWorkspace,
 } from './support/pigeonApp';
 
 const ENCRYPTED = /encryption is active/;
@@ -29,23 +28,24 @@ async function signInThrough(
   page: Page,
   url: string,
   password: string,
+  communityName: string,
 ): Promise<void> {
   await page.goto(url);
   // A reload may keep the unlocked session; otherwise the login screen shows
-  // the remembered identity.
+  // the remembered identity. Accepting the link switches to the community it
+  // opened, so the messages workspace only shows for a moment and is no sign
+  // of a finished sign-in.
   const remembered = page.getByTestId('auth-identity-preview');
+  const community = page.getByRole('button', { name: communityName }).first();
 
-  await expect(
-    remembered
-      .or(page.getByTestId('create-conversation-button'))
-      .or(page.getByTestId('workspace-sidebar-open-button'))
-      .first(),
-  ).toBeVisible({ timeout: 30_000 });
+  await expect(remembered.or(community).first()).toBeVisible({
+    timeout: SLOW,
+  });
   if (await remembered.isVisible()) {
     await page.getByTestId('auth-password-input').fill(password);
     await page.getByTestId('auth-submit-button').click();
   }
-  await waitForWorkspace(page);
+  await community.click({ timeout: SLOW });
 }
 
 test('a member joins a private community through an invite link', async ({
@@ -83,12 +83,7 @@ test('a member joins a private community through an invite link', async ({
   // created link that opens the community proves both ends agree on it.
   const url = await createInviteLink(alice);
 
-  await signInThrough(bob, url, password);
-  await openSidebar(bob);
-  await bob
-    .getByRole('button', { name: communityName })
-    .first()
-    .click({ timeout: SLOW });
+  await signInThrough(bob, url, password, communityName);
   await bob.getByRole('button', { name: ENCRYPTED }).waitFor({ timeout: SLOW });
 
   await sendMessage(alice, 'after the link join, from Alice');
