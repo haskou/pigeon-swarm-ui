@@ -49,4 +49,13 @@ export class IdentityPresenceStatus extends Enum<string> {
   public getValues(): string[] {
     return Object.values(IdentityPresenceStatusPrimitive);
   }
+
+  /** Contacts only ever see available, away or busy. */
+  public isSharedWithContacts(): boolean {
+    return [
+      IdentityPresenceStatus.AVAILABLE,
+      IdentityPresenceStatus.AWAY,
+      IdentityPresenceStatus.BUSY,
+    ].some((status) => status.isEqual(this));
+  }
 }

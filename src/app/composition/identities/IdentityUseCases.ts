@@ -3,19 +3,29 @@ import type { IdentityFinder } from '../../../contexts/identities/application/fi
 import type { CurrentDeviceForgetter } from '../../../contexts/identities/application/forget-current-device/CurrentDeviceForgetter';
 import type { DeviceUnlockForgetter } from '../../../contexts/identities/application/forget-device-unlock/DeviceUnlockForgetter';
 import type { LoginIdentity } from '../../../contexts/identities/application/login-identity/LoginIdentity';
+import type { ContactPresencePublisher } from '../../../contexts/identities/application/publish-contact-presence/ContactPresencePublisher';
+import type { ContactPresencesReceiver } from '../../../contexts/identities/application/receive-contact-presences/ContactPresencesReceiver';
 import type { IdentityRefresher } from '../../../contexts/identities/application/refresh-identity/IdentityRefresher';
 import type { RegisterIdentity } from '../../../contexts/identities/application/register-identity/RegisterIdentity';
-import type { IdentityPresencesSearcher } from '../../../contexts/identities/application/search-identity-presences/IdentityPresencesSearcher';
+import type { ContactPresencesSearcher } from '../../../contexts/identities/application/search-contact-presences/ContactPresencesSearcher';
+import type { PresenceSharingsSearcher } from '../../../contexts/identities/application/search-presence-sharings/PresenceSharingsSearcher';
+import type { ContactPresenceSharer } from '../../../contexts/identities/application/share-contact-presence/ContactPresenceSharer';
+import type { ContactPresenceSharingStopper } from '../../../contexts/identities/application/stop-sharing-contact-presence/ContactPresenceSharingStopper';
 import type { IdentityPresenceUpdater } from '../../../contexts/identities/application/update-identity-presence/IdentityPresenceUpdater';
 import type { IdentityProfileUpdater } from '../../../contexts/identities/application/update-identity-profile/IdentityProfileUpdater';
 
 export type IdentityUseCases = {
+  contactPresencePublisher: ContactPresencePublisher;
+  contactPresencesReceiver: ContactPresencesReceiver;
+  contactPresencesSearcher: ContactPresencesSearcher;
+  contactPresenceSharer: ContactPresenceSharer;
+  contactPresenceSharingStopper: ContactPresenceSharingStopper;
   currentDeviceForgetter: CurrentDeviceForgetter;
   deviceUnlockForgetter: DeviceUnlockForgetter;
   finder: IdentityFinder;
   login: LoginIdentity;
   presenceFinder: IdentityPresenceFinder;
-  presenceSearcher: IdentityPresencesSearcher;
+  presenceSharingsSearcher: PresenceSharingsSearcher;
   presenceUpdater: IdentityPresenceUpdater;
   profileUpdater: IdentityProfileUpdater;
   refresher: IdentityRefresher;

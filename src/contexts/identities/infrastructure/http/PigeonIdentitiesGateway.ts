@@ -382,25 +382,11 @@ export class PigeonIdentitiesGateway {
     return await this.presence.get(session, identityId);
   }
 
-  public async getMany(
-    session: Session,
-    identityIds: string[],
-  ): Promise<IdentityPresence[]> {
-    return await this.presence.getMany(session, identityIds);
-  }
-
   public async getPresence(
     session: Session,
     identityId: string,
   ): Promise<IdentityPresence> {
     return await this.presence.get(session, identityId);
-  }
-
-  public async getPresences(
-    session: Session,
-    identityIds: string[],
-  ): Promise<IdentityPresence[]> {
-    return await this.presence.getMany(session, identityIds);
   }
 
   public async loadRemoteKeychain(session: Session): Promise<KeychainResource> {

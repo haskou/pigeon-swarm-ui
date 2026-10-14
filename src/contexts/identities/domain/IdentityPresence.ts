@@ -46,6 +46,23 @@ export class IdentityPresence extends AggregateRoot {
     );
   }
 
+  /**
+   * A contact's presence as this device observed it over the end-to-end
+   * channel. Local only: it replicates nothing, so it records no event.
+   */
+  public static observed(
+    identityId: IdentityId,
+    status: IdentityPresenceStatus,
+    observedAt: Timestamp,
+  ): IdentityPresence {
+    return new IdentityPresence(
+      identityId,
+      status,
+      observedAt,
+      IdentityNetworkMemberships.fromPrimitives([]),
+    );
+  }
+
   private constructor(
     private readonly identityId: IdentityId,
     private status: IdentityPresenceStatus,

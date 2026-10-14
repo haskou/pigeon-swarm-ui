@@ -42,7 +42,11 @@ async function inviteAndJoin(
 }
 
 async function kickMember(alice: Page, name: string): Promise<void> {
-  const member = alice.getByRole('button', { name: new RegExp(`^B ${name}`) });
+  // The members aside lists the same member, without a status now that
+  // community members show no presence; the row to kick is the dialog's.
+  const member = alice
+    .getByRole('button', { name: new RegExp(`^B ${name}`) })
+    .and(alice.locator(':not([data-testid="identity-members-aside"] *)'));
 
   await alice.getByRole('button', { name: 'Manage community' }).click();
   await alice.getByRole('button', { exact: true, name: 'Members' }).click();

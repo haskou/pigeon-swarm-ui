@@ -10,6 +10,7 @@ export type DeviceRevokeServices = {
     cutOffRevokedReaders(session: Session): Promise<void>;
   };
   identities: {
+    cutOffRevokedPresenceReaders(session: Session): Promise<void>;
     revokeDevice(
       session: Session,
       target: DeviceCredential,
@@ -20,11 +21,12 @@ export type DeviceRevokeServices = {
 
 /**
  * Revokes another device of the identity, then cuts its readers off every
- * direct inbox and every own group inbox, so the revoke is reported done only
- * once that device opens no record written afterwards. The revoke rotated the
- * sealed root, so the rotated session reaches `onRotated` before the cut-off
- * runs and is never lost to a failed cut-off. Resolves with the rotated
- * session and whether both cut-offs succeeded; on failure the next sync of
+ * direct inbox, every own group inbox and every contact presence inbox, so
+ * the revoke is reported done only once that device opens no record written
+ * afterwards. The revoke rotated the sealed root, so the rotated session
+ * reaches `onRotated` before the cut-off runs and is never lost to a failed
+ * cut-off. Resolves with the rotated
+ * session and whether every cut-off succeeded; on failure the next sync of
  * each inbox retries it. Rejects when the revoke failed.
  */
 export async function revokeOtherDevice(
@@ -44,15 +46,14 @@ export async function revokeOtherDevice(
 
   request.onRotated(rotated);
 
-  const [direct, group] = await Promise.all(
-    [services.directMessages, services.groupMessages].map((messages) =>
-      messages
-        .cutOffRevokedReaders(rotated)
-        .then(() => true)
-        .catch(() => false),
-    ),
+  const cutOffs = await Promise.all(
+    [
+      services.directMessages.cutOffRevokedReaders(rotated),
+      services.groupMessages.cutOffRevokedReaders(rotated),
+      services.identities.cutOffRevokedPresenceReaders(rotated),
+    ].map((cuttingOff) => cuttingOff.then(() => true).catch(() => false)),
   );
-  const cutOff = direct && group;
+  const cutOff = cutOffs.every(Boolean);
 
   return { cutOff, session: rotated };
 }

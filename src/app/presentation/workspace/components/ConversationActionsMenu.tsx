@@ -28,6 +28,7 @@ interface ConversationActionsMenuProps {
   onGroupInviteOpen: () => void;
   onGroupLeave?: () => void;
   onOpenPins: () => void;
+  onPresenceSharingToggle?: () => void;
   onRealtimeEventsOpen?: () => void;
   onVerificationOpen?: () => void;
   onStartCall?: (input: {
@@ -36,6 +37,7 @@ interface ConversationActionsMenuProps {
     participants: CallParticipant[];
     title: string;
   }) => void;
+  presenceShared?: boolean;
 }
 
 function ConversationHeaderMenuAction({
@@ -61,6 +63,20 @@ function ConversationHeaderMenuAction({
       {icon}
       <span className="min-w-0 flex-1 truncate">{label}</span>
     </button>
+  );
+}
+
+function PresenceMenuIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      className="h-4 w-4 shrink-0 text-white/55"
+    >
+      <circle cx="12" cy="12" r="4" fill="currentColor" />
+      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
   );
 }
 
@@ -244,6 +260,33 @@ function StartCallMenuAction({
   );
 }
 
+function PresenceSharingMenuAction({
+  onClose,
+  onToggle,
+  shared,
+}: {
+  onClose: () => void;
+  onToggle?: () => void;
+  shared: boolean;
+}) {
+  if (!onToggle) return null;
+
+  return (
+    <ConversationHeaderMenuAction
+      icon={<PresenceMenuIcon />}
+      label={
+        shared
+          ? copy.presence.stopSharingWithContact
+          : copy.presence.shareWithContact
+      }
+      onClick={() => {
+        onToggle();
+        onClose();
+      }}
+    />
+  );
+}
+
 function GroupMenuActions({
   close,
   hasConversationKey,
@@ -302,9 +345,11 @@ export function ConversationActionsMenu({
   onNotificationMuteToggle,
   onNotificationSettingsOpen,
   onOpenPins,
+  onPresenceSharingToggle,
   onRealtimeEventsOpen,
   onStartCall,
   onVerificationOpen,
+  presenceShared = false,
 }: ConversationActionsMenuProps) {
   const { close, state } = useCloseTransition(onClose);
   const [technicalDetailsVisible] = useTechnicalDetailsPreference();
@@ -374,6 +419,11 @@ export function ConversationActionsMenu({
             className="sm:hidden"
           />
         ) : null}
+        <PresenceSharingMenuAction
+          onClose={close}
+          onToggle={onPresenceSharingToggle}
+          shared={presenceShared}
+        />
         <NotificationScopeMenuActions
           muteLabel={copy.notifications.muteConversation}
           notificationSetting={notificationSetting}

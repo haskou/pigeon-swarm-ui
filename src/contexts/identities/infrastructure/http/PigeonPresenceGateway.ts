@@ -1,39 +1,16 @@
-import type { RequestCacheOptions } from '../../../../shared/infrastructure/http/RequestCacheOptions';
 import type { Session } from '../session/Session';
+import type { PigeonPresenceApi } from './PigeonPresenceApi';
 import type { IdentityPresenceResource as IdentityPresence } from './resources/IdentityPresenceResource';
 import type { SelectablePresenceStatusResource as SelectablePresenceStatus } from './resources/SelectablePresenceStatusResource';
 
-import { RequestCache } from '../../../../shared/infrastructure/http/RequestCache';
-import { PigeonPresenceApi } from './PigeonPresenceApi';
-
-const presenceCacheTtlMs = 1500;
-
 export class PigeonPresenceGateway {
-  public constructor(
-    private readonly presence: PigeonPresenceApi,
-    private readonly requestCache: RequestCache,
-  ) {}
+  public constructor(private readonly presence: PigeonPresenceApi) {}
 
   public async get(
     session: Session,
     identityId: string,
   ): Promise<IdentityPresence> {
     return await this.presence.get(session, identityId);
-  }
-
-  public async getMany(
-    session: Session,
-    identityIds: string[],
-  ): Promise<IdentityPresence[]> {
-    const uniqueIdentityIds = [...new Set(identityIds.filter(Boolean))].sort();
-    const key = `GET /presence/ ${session.identity.id} ${uniqueIdentityIds.join('\u0000')}`;
-    const options: RequestCacheOptions = { ttlMs: presenceCacheTtlMs };
-
-    return await this.requestCache.load(
-      key,
-      () => this.presence.getMany(session, uniqueIdentityIds),
-      options,
-    );
   }
 
   public async update(

@@ -1299,6 +1299,7 @@ export const es = {
   presence: {
     error: 'No se pudo actualizar la presencia.',
     selectStatus: 'Selecciona estado',
+    shareWithContact: 'Compartir estado',
     status: 'Estado',
     statuses: {
       available: 'En línea',
@@ -1307,6 +1308,7 @@ export const es = {
       disconnected: 'Desconectado',
       invisible: 'Invisible',
     },
+    stopSharingWithContact: 'Dejar de compartir estado',
   },
   profile: {
     addNetwork: 'Añadir red',

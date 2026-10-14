@@ -20,6 +20,7 @@ export type RemovedDeviceServices = {
   };
   identities: {
     discardDeviceSealedRecovery(identityId: string): void;
+    forgetContactPresence(identityId: string): Promise<void>;
     forgetContacts(identityId: string): Promise<void>;
     forgetDeviceUnlock(identityId: string): Promise<void>;
   };
@@ -32,14 +33,15 @@ export type RemovedDeviceServices = {
  * Erases what this device stored for an identity once a signed, verified
  * transition proved the device was removed: unsent messages, stored direct
  * and group history, decrypted message projections, the MLS state of its
- * communities, the contact directory, pending device-sealed recovery steps,
- * drafts and workspace state, and last the vault record with the identity key
- * material and the device-sealed root, then the remembered sign-in identity
- * when it is this one. Every step runs even when one fails. The vault record
- * and the remembered identity are erased only after every other step
- * succeeded, so a partial erase leaves the identity unlockable and the next
- * unlock proves the removal again and retries. Resolves false when any step
- * failed. Never throws.
+ * communities, the contact directory, its contact presence state and
+ * sharing choices, pending device-sealed recovery steps, drafts and workspace
+ * state, and last the vault record with the identity key material and the
+ * device-sealed root, then the remembered sign-in identity when it is this
+ * one. Every step runs even when one fails. The vault record and the
+ * remembered identity are erased only after every other step succeeded, so a
+ * partial erase leaves the identity unlockable and the next unlock proves the
+ * removal again and retries. Resolves false when any step failed. Never
+ * throws.
  */
 export async function eraseRemovedDevice(
   identityId: string,
@@ -51,6 +53,7 @@ export async function eraseRemovedDevice(
     () => services.groupMessages.forget(identityId),
     () => services.mls.forget(identityId),
     () => services.identities.forgetContacts(identityId),
+    () => services.identities.forgetContactPresence(identityId),
     () => clearProjectedMessageCaches(),
     () => {
       services.identities.discardDeviceSealedRecovery(identityId);

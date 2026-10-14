@@ -116,7 +116,12 @@ export class PigeonApiGateway {
 
   public readonly identityVault: DeviceIdentityVault;
 
+  public readonly mailboxChannel: MailboxChannel;
+
   private readonly mailboxMiner: LazyMailboxCreationMiner;
+
+  /** Routes an append to the recipient's verified home, else this node. */
+  public readonly recipientMailboxes: RecipientMailboxRouter;
 
   public readonly conversationDrafts: PigeonConversationDraftsApi;
 
@@ -410,6 +415,8 @@ export class PigeonApiGateway {
       verifiedRecipientBase,
       remoteMailboxChannel,
     );
+    this.mailboxChannel = mailboxChannel;
+    this.recipientMailboxes = recipientMailboxes;
     this.directMessageMailbox = new DirectMessageMailbox(
       mailboxChannel,
       recipientMailboxes,
@@ -485,7 +492,6 @@ export class PigeonApiGateway {
     this.pushGateway = new PigeonPushGateway(this.pushApi);
     this.presence = new PigeonPresenceGateway(
       new PigeonPresenceApi(http, signer),
-      this.requestCache,
     );
     this.pollsApi = new PigeonPollsApi(http, signer, mutations);
     this.stickersApi = new PigeonStickersApi(

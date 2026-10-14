@@ -93,6 +93,10 @@ export type MessagesWorkspaceContentProps = {
     networkId?: string,
   ) => Promise<void>;
   onPresenceChange: (presence: IdentityPresence) => void;
+  onPresenceSharingToggle: (
+    conversationId: string,
+    contactIdentityId: string,
+  ) => void;
   onPresenceStatusSelected: (status: SelectablePresenceStatus) => void;
   onRealtimeEventsOpen: () => void;
   onSessionUpdated: (session: Session) => void;
@@ -101,6 +105,7 @@ export type MessagesWorkspaceContentProps = {
   pendingInvitation: Parameters<typeof ChatColumn>[0]['pendingInvitation'];
   pins: ReturnType<typeof useConversationPins>;
   presenceByIdentityId: Record<string, IdentityPresence>;
+  presenceSharedConversationIds: ReadonlySet<string>;
   railProps: RailProps;
   realtimeStatus: 'connected' | 'reconnecting';
   replyTarget: ChatMessage | null;

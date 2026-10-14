@@ -163,6 +163,7 @@ export function ChatColumn({
   onOpenMessageThread,
   onOpenPins,
   onOpenSidebar,
+  onPresenceSharingToggle,
   onReactionToggle,
   onRealtimeEventsOpen,
   onReplyReferenceClick,
@@ -178,6 +179,7 @@ export function ChatColumn({
   pendingInvitation,
   pinnedMessageIds,
   presenceByIdentityId = {},
+  presenceShared = false,
   progress,
   realtimeEvent,
   realtimeStatus = 'connected',
@@ -449,9 +451,13 @@ export function ChatColumn({
               })
             }
             onOpenPins={onOpenPins}
+            onPresenceSharingToggle={
+              isGroupConversation ? undefined : onPresenceSharingToggle
+            }
             onRealtimeEventsOpen={onRealtimeEventsOpen}
             onStartCall={onStartCall}
             onVerificationOpen={openContactVerification}
+            presenceShared={presenceShared}
           />
         )}
       </ChatConversationHeader>

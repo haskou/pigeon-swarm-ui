@@ -1,12 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
-import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { IdentityPresenceResource as IdentityPresence } from '../../../../contexts/identities/infrastructure/http/resources/IdentityPresenceResource';
 import type { SelectablePresenceStatusResource as SelectablePresenceStatus } from '../../../../contexts/identities/infrastructure/http/resources/SelectablePresenceStatusResource';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
-import { ConversationPeer } from '../../../../contexts/conversations/presentation/view-models/ConversationPeer';
 import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import {
@@ -15,18 +12,16 @@ import {
 } from '../presencePreferenceStorage';
 import { presenceStatusForLocalActivity } from './presenceStatusForLocalActivity';
 import { presenceWithLocalPreference } from './presenceWithLocalPreference';
+import { useContactPresence } from './useContactPresence';
 
 const localActivityPresenceRefreshThrottleMs = 30_000;
 
 function reconcileOwnPresence(
   session: Session,
-  presences: readonly IdentityPresence[],
+  ownPresence: IdentityPresence | undefined,
   preferredStatus: SelectablePresenceStatus | null,
   mergePresence: (presence: IdentityPresence) => void,
 ): void {
-  const ownPresence = presences.find((presence) =>
-    IdentityMatch.isSame(presence.identityId, session.identity.id),
-  );
   const pinnedStatus =
     preferredStatus && preferredStatus !== 'available' ? preferredStatus : null;
   const needsUpdate = pinnedStatus
@@ -43,31 +38,29 @@ function reconcileOwnPresence(
     .catch(() => undefined);
 }
 
-export function useWorkspacePresence({
-  communities,
-  conversations,
-  messageAuthorIdentityIdsKey,
-  session,
-}: {
-  communities: Community[];
-  conversations: ConversationResource[];
-  messageAuthorIdentityIdsKey: string;
-  session: Session;
-}): {
+/**
+ * The workspace presence map. This identity's own presence comes from its
+ * node; every contact's presence comes only from the end-to-end encrypted
+ * presence inboxes, so node-side presence of others is never shown.
+ */
+export function useWorkspacePresence({ session }: { session: Session }): {
   mergePresence: (presence: IdentityPresence) => void;
   notificationsMutedByPresence: boolean;
   presenceByIdentityId: Record<string, IdentityPresence>;
+  presenceSharedConversationIds: ReadonlySet<string>;
   rememberPresencePreference: (status: SelectablePresenceStatus) => void;
+  togglePresenceSharing: (
+    conversationId: string,
+    contactIdentityId: string,
+  ) => void;
 } {
-  const [presenceByIdentityId, setPresenceByIdentityId] = useState<
-    Record<string, IdentityPresence>
-  >({});
+  const [ownPresence, setOwnPresence] = useState<IdentityPresence>();
   const presencePreferenceRef = useRef<SelectablePresenceStatus | null>(
     readPresencePreference(session.identity.id),
   );
   const lastLocalActivityPresenceRefreshAtRef = useRef(0);
   const localActivityPresenceRefreshInFlightRef = useRef(false);
-  const presenceByIdentityIdRef = useRef<Record<string, IdentityPresence>>({});
+  const ownPresenceRef = useRef<IdentityPresence | undefined>(undefined);
   const sessionRef = useRef(session);
 
   useEffect(() => {
@@ -75,8 +68,8 @@ export function useWorkspacePresence({
   }, [session]);
 
   useEffect(() => {
-    presenceByIdentityIdRef.current = presenceByIdentityId;
-  }, [presenceByIdentityId]);
+    ownPresenceRef.current = ownPresence;
+  }, [ownPresence]);
 
   useEffect(() => {
     const preference = readPresencePreference(session.identity.id);
@@ -88,62 +81,19 @@ export function useWorkspacePresence({
     );
   }, [session]);
 
-  const presenceIdentityIdsKey = useMemo(
-    () =>
-      Array.from(
-        new Set([
-          session.identity.id,
-          ...conversations.flatMap((conversation) => [
-            ConversationPeer.identityId(
-              conversation,
-              session.identity.id,
-              session.keychain,
-            ),
-            ...conversation.participantIds,
-          ]),
-          ...communities.flatMap((community) => community.memberIds),
-          ...messageAuthorIdentityIdsKey.split('\u0000'),
-        ]),
-      )
-        .filter((identityId): identityId is string => !!identityId)
-        .join('\u0000'),
-    [communities, conversations, messageAuthorIdentityIdsKey, session],
-  );
-  const presenceIdentityIds = useMemo(
-    () =>
-      presenceIdentityIdsKey.length > 0
-        ? presenceIdentityIdsKey.split('\u0000')
-        : [],
-    [presenceIdentityIdsKey],
-  );
   const mergePresence = useCallback((presence: IdentityPresence) => {
-    const effectivePresence = presenceWithLocalPreference(
-      presence,
-      sessionRef.current.identity.id,
-      presencePreferenceRef.current,
+    const identityId = sessionRef.current.identity.id;
+
+    if (!IdentityMatch.isSame(presence.identityId, identityId)) return;
+
+    setOwnPresence(
+      presenceWithLocalPreference(
+        presence,
+        identityId,
+        presencePreferenceRef.current,
+      ),
     );
-
-    setPresenceByIdentityId((current) => ({
-      ...current,
-      [effectivePresence.identityId]: effectivePresence,
-    }));
   }, []);
-  const mergePresences = useCallback(
-    (presences: readonly IdentityPresence[]) => {
-      const presenceEntries = presences.map(
-        (presence): [string, IdentityPresence] => [
-          presence.identityId,
-          presence,
-        ],
-      );
-
-      setPresenceByIdentityId((current) => ({
-        ...current,
-        ...Object.fromEntries(presenceEntries),
-      }));
-    },
-    [],
-  );
   const rememberPresencePreference = useCallback(
     (status: SelectablePresenceStatus) => {
       presencePreferenceRef.current = status;
@@ -169,8 +119,7 @@ export function useWorkspacePresence({
 
       const nextStatus = presenceStatusForLocalActivity({
         force: options?.force,
-        ownPresence:
-          presenceByIdentityIdRef.current[sessionRef.current.identity.id],
+        ownPresence: ownPresenceRef.current,
         preferredStatus: presencePreferenceRef.current,
       });
 
@@ -233,19 +182,18 @@ export function useWorkspacePresence({
   }, [refreshLocalActivityPresence]);
 
   useEffect(() => {
-    if (presenceIdentityIds.length === 0) return;
-
     let cancelled = false;
 
+    setOwnPresence(undefined);
     void applicationContainer.identities
-      .getPresences(session, presenceIdentityIds)
-      .then((presences) => {
+      .getPresence(session, session.identity.id)
+      .then((presence) => {
         if (cancelled) return;
 
-        mergePresences(presences);
+        mergePresence(presence);
         reconcileOwnPresence(
           session,
-          presences,
+          presence,
           presencePreferenceRef.current,
           mergePresence,
         );
@@ -255,19 +203,32 @@ export function useWorkspacePresence({
     return () => {
       cancelled = true;
     };
-  }, [
-    mergePresence,
-    mergePresences,
-    presenceIdentityIds,
-    presenceIdentityIdsKey,
-    session,
-  ]);
+  }, [mergePresence, session]);
+
+  const {
+    contactPresences,
+    presenceSharedConversationIds,
+    togglePresenceSharing,
+  } = useContactPresence({ ownStatus: ownPresence?.status, session });
+  const presenceByIdentityId = useMemo(
+    () => ({
+      ...Object.fromEntries(
+        contactPresences.map((presence): [string, IdentityPresence] => [
+          presence.identityId,
+          presence,
+        ]),
+      ),
+      ...(ownPresence ? { [session.identity.id]: ownPresence } : {}),
+    }),
+    [contactPresences, ownPresence, session.identity.id],
+  );
 
   return {
     mergePresence,
-    notificationsMutedByPresence:
-      presenceByIdentityId[session.identity.id]?.status === 'busy',
+    notificationsMutedByPresence: ownPresence?.status === 'busy',
     presenceByIdentityId,
+    presenceSharedConversationIds,
     rememberPresencePreference,
+    togglePresenceSharing,
   };
 }
