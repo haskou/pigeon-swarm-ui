@@ -278,6 +278,19 @@ export async function pairNewDevice(
   fresh: Page,
   identity: TestIdentity,
 ): Promise<void> {
+  await reviewDevicePairing(authorized, fresh, identity);
+  await authorizeDevicePairing(authorized, fresh, identity);
+}
+
+/**
+ * Opens pairing on the signed-in device, prepares the request on the fresh
+ * one, and reviews it until both show the same verification code.
+ */
+export async function reviewDevicePairing(
+  authorized: Page,
+  fresh: Page,
+  identity: TestIdentity,
+): Promise<void> {
   await openSecurityProfile(authorized);
   await authorized.getByTestId('profile-pair-device').click();
 
@@ -310,6 +323,17 @@ export async function pairNewDevice(
   await expect(
     authorized.getByTestId('device-pairing-verification-code'),
   ).toHaveText(newDeviceCode);
+}
+
+/**
+ * Confirms the reviewed pairing with the password and signs in on the fresh
+ * device with the completion code.
+ */
+export async function authorizeDevicePairing(
+  authorized: Page,
+  fresh: Page,
+  identity: TestIdentity,
+): Promise<void> {
   await authorized
     .getByTestId('device-pairing-password-input')
     .fill(identity.password);
