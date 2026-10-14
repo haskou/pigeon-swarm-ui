@@ -423,7 +423,7 @@ describe('CallPeerRecovery', () => {
     expect(recovery.stateFor('peer')).toBe('exhausted');
     expect(restart).toHaveBeenCalledTimes(3);
 
-    recovery.disrupt('peer', peer, () => true);
+    recovery.disrupt('peer', peer, false, () => true);
     await jest.advanceTimersByTimeAsync(0);
 
     expect(restart).toHaveBeenCalledTimes(4);
@@ -436,19 +436,48 @@ describe('CallPeerRecovery', () => {
     const restart = jest.fn(() => Promise.resolve());
     const recovery = new CallPeerRecovery(restart);
     const peer = negotiated(peerConnection('disconnected', 'disconnected'));
-    recovery.disrupt('peer', peer, () => true);
+    recovery.disrupt('peer', peer, false, () => true);
     await jest.advanceTimersByTimeAsync(0);
     expect(restart).toHaveBeenCalledTimes(1);
 
-    recovery.disrupt('peer', peer, () => true);
-    recovery.disrupt('peer', peer, () => true);
+    recovery.disrupt('peer', peer, false, () => true);
+    recovery.disrupt('peer', peer, false, () => true);
     await jest.advanceTimersByTimeAsync(4_999);
     expect(restart).toHaveBeenCalledTimes(1);
 
     await jest.advanceTimersByTimeAsync(1);
-    recovery.disrupt('peer', peer, () => true);
+    recovery.disrupt('peer', peer, false, () => true);
     await jest.advanceTimersByTimeAsync(0);
     expect(restart).toHaveBeenCalledTimes(2);
+    recovery.reset();
+  });
+
+  it('lets the impolite peer drive a disruption both peers notice so their restart offers cannot collide', async () => {
+    jest.useFakeTimers();
+    const restart = jest.fn(() => Promise.resolve());
+    const recovery = new CallPeerRecovery(restart);
+    const answered = negotiated(peerConnection('disconnected', 'disconnected'));
+    const unanswered = negotiated(
+      peerConnection('disconnected', 'disconnected'),
+    );
+    recovery.disrupt('answered', answered, true, () => true);
+    recovery.disrupt('unanswered', unanswered, true, () => true);
+    await jest.advanceTimersByTimeAsync(2_999);
+    expect(restart).not.toHaveBeenCalled();
+
+    // The impolite peer's restart offer reconnects this peer meanwhile.
+    Object.assign(answered, {
+      connectionState: 'connected',
+      iceConnectionState: 'connected',
+    });
+    await jest.advanceTimersByTimeAsync(1);
+
+    expect(restart).toHaveBeenCalledTimes(1);
+    expect(restart).toHaveBeenCalledWith(
+      'unanswered',
+      unanswered,
+      expect.any(Function),
+    );
     recovery.reset();
   });
 
@@ -459,12 +488,19 @@ describe('CallPeerRecovery', () => {
     recovery.disrupt(
       'healthy',
       negotiated(peerConnection('connected', 'connected')),
+      false,
       () => true,
     );
-    recovery.disrupt('waiting', peerConnection('new', 'new'), () => true);
+    recovery.disrupt(
+      'waiting',
+      peerConnection('new', 'new'),
+      false,
+      () => true,
+    );
     recovery.disrupt(
       'replaced',
       negotiated(peerConnection('failed', 'failed')),
+      false,
       () => false,
     );
     await jest.advanceTimersByTimeAsync(60_000);

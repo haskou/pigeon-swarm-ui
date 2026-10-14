@@ -1,8 +1,8 @@
 # E2E tests
 
-The stale ICE candidate, call recovery, composer edit and real-node suites run
-in CI. Other Playwright scenarios run on demand against a configured
-application backend.
+The stale ICE candidate, call recovery, call network recovery, call microphone,
+composer edit and real-node suites run in CI. Other Playwright scenarios run on
+demand against a configured application backend.
 
 `composer-edit.spec.ts` renders the composer from a fixture page and holds
 animation frames, as a busy main thread does. When the composer enters edit
@@ -133,6 +133,45 @@ development-server hot reload while the call is active.
 Signaling delivery is controlled by the test. This is local direct-media
 coverage, not backend authorization, TURN, public NAT, or mobile-browser
 validation. Cross-node relay coverage belongs to the wrapper integration suite.
+
+## Call network recovery
+
+```bash
+yarn test:e2e e2e/call-network-recovery.spec.ts --project=desktop-chromium
+```
+
+Two Chromium browsers render the production call session hook and call bar
+from `fixtures/call-session.html`. Media flows only through a local UDP relay
+the test owns: signalled candidates are rewritten to relay ports and SDP
+candidates are stripped. One scenario changes the network path by closing the
+relay and toggling the caller offline, as a Wi-Fi to cellular switch does; the
+other stops the signalling backend for 10 s, as a restart does, and then
+recovers the realtime connection. After each, both peers must reconnect
+through a fresh relay with a new ICE username fragment, carry audio both ways,
+and keep exactly one native connection, one audio element and one participant
+entry per identity. Like the call recovery suite this is local coverage, not
+public NAT/CGNAT reachability or a restart of a real node.
+
+## Call microphone
+
+```bash
+yarn test:e2e e2e/call-microphone.spec.ts --project=desktop-chromium --project=desktop-firefox --project=desktop-webkit
+```
+
+The caller runs on the engine under test and the callee always on Chromium.
+One scenario joins with microphone permission denied, the other with no
+microphone connected. Both check that the caller still hears the callee, that
+the call bar names the cause, and that the call uses the microphone once it is
+allowed or plugged in, with no duplicated connection or participant. Chromium
+denies through its real permission model and grants at runtime. Firefox denies
+through `permissions.default.microphone`; it cannot grant at runtime, so its
+denied scenario ends after a retry that stays denied. Playwright cannot grant
+microphone access on WebKit, so there `getUserMedia` is replaced by an
+oscillator stream and denial is simulated with the `NotAllowedError` WebKit
+raises; WebKit gathers no host candidates without capture permission, so it
+connects through the candidates Chromium learns from it. A missing device is
+simulated on every engine by raising `NotFoundError` and hiding audio inputs
+from `enumerateDevices`. Mobile browsers are not covered.
 
 ## Call page departure
 

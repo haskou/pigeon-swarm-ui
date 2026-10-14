@@ -796,6 +796,36 @@ describe(CallPeerConnections.name, () => {
     expect(jest.getTimerCount()).toBe(0);
   });
 
+  it('restarts the designated offerer first after a disruption and the polite peer only if still unhealthy', async () => {
+    jest.useFakeTimers();
+    const peers: FakePeerConnection[] = [];
+    installSessionDescriptionMock();
+    installPeerConnectionMock(peers);
+    const manager = callPeerConnectionManager();
+    manager.configure(jest.fn().mockResolvedValue({ iceServers: [] }));
+    await manager.ensurePeer('answering-peer', true, () => Promise.resolve());
+    await manager.ensurePeer('offering-peer', false, () => Promise.resolve());
+    const [impolite, polite] = peers;
+    peers.forEach((peer) =>
+      Object.assign(peer, {
+        connectionState: 'disconnected',
+        iceConnectionState: 'disconnected',
+        localDescription: { sdp: 'local-sdp', type: 'offer' },
+        remoteDescription: { sdp: 'remote-sdp', type: 'answer' },
+        signalingState: 'stable',
+      }),
+    );
+
+    manager.recoverAfterDisruption();
+    await jest.advanceTimersByTimeAsync(0);
+    expect(impolite.restartIce).toHaveBeenCalledTimes(1);
+    expect(polite.restartIce).not.toHaveBeenCalled();
+
+    await jest.advanceTimersByTimeAsync(3_000);
+    expect(polite.restartIce).toHaveBeenCalledTimes(1);
+    manager.reset();
+  });
+
   it('re-sends an unanswered offer so a lost answer recovers and a retry stays effective', async () => {
     jest.useFakeTimers();
     const peers: FakePeerConnection[] = [];

@@ -3,7 +3,7 @@ import { mock } from 'jest-mock-extended';
 import type { CallStartActionsInput } from '../../../../../app/presentation/workspace/components/CallStartActionsInput';
 import type { WorkspaceCallDetails } from '../../../../../app/presentation/workspace/components/resolveWorkspaceCallDetails';
 import type { CallResource } from '../../../../../contexts/calls/infrastructure/http/resources/CallResource';
-import type { StartCallInput } from '../../../../../contexts/calls/presentation/hooks/useCallSession';
+import type { StartCallInput } from '../../../../../contexts/calls/presentation/hooks/StartCallInput';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';

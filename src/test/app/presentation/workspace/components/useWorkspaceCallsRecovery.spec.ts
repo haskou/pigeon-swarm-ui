@@ -1,4 +1,5 @@
 import type { CallResource } from '../../../../../contexts/calls/infrastructure/http/resources/CallResource';
+import type { CallSessionControls } from '../../../../../contexts/calls/presentation/hooks/CallSessionControls';
 import type { CallSession } from '../../../../../contexts/calls/presentation/view-models/CallSession';
 import type { CommunityResource as Community } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
@@ -103,7 +104,7 @@ describe('workspace terminal heartbeat denial', () => {
       const endCall = jest.fn();
       jest.mocked(useCallSession).mockReturnValue({
         endCall,
-      } as unknown as ReturnType<typeof useCallSession>);
+      } as unknown as CallSessionControls);
       let communities = [
         {
           id: 'community-a',
@@ -159,7 +160,7 @@ describe('workspace heartbeat denial of a superseded community call', () => {
     const endCall = jest.fn();
     jest.mocked(useCallSession).mockReturnValue({
       endCall,
-    } as unknown as ReturnType<typeof useCallSession>);
+    } as unknown as CallSessionControls);
     jest.mocked(applicationContainer.calls.get).mockReturnValue(snapshot);
     const session = { identity: { id: 'alice' } } as Session;
     useWorkspaceCalls({

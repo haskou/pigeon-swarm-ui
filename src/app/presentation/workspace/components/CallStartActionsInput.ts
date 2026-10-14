@@ -3,7 +3,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { CallIceServerResource as CallIceServerConfig } from '../../../../contexts/calls/infrastructure/http/resources/CallIceServerResource';
 import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
 import type { CallMicrophoneRequest } from '../../../../contexts/calls/presentation/hooks/CallMicrophoneRequest';
-import type { StartCallInput } from '../../../../contexts/calls/presentation/hooks/useCallSession';
+import type { StartCallInput } from '../../../../contexts/calls/presentation/hooks/StartCallInput';
 import type { CallSession } from '../../../../contexts/calls/presentation/view-models/CallSession';
 import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';

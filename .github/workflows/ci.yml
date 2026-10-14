@@ -57,8 +57,8 @@ jobs:
       - name: Test
         run: yarn test
 
-      - name: Install Chromium
-        run: yarn playwright install --with-deps chromium
+      - name: Install Chromium, Firefox and WebKit
+        run: yarn playwright install --with-deps chromium firefox webkit
 
       - name: Verify stale ICE recovery in Chromium
         run: yarn test:e2e e2e/stale-ice-candidates.spec.ts --project=desktop-chromium
@@ -68,6 +68,15 @@ jobs:
 
       - name: Verify the edit composer keeps input made before a late frame
         run: yarn test:e2e e2e/composer-edit.spec.ts --project=desktop-chromium
+
+      - name: Verify network-change and backend-restart call recovery
+        run: yarn test:e2e e2e/call-network-recovery.spec.ts --project=desktop-chromium
+
+      - name: Verify denied and missing microphones in Chromium, Firefox and WebKit
+        run: >-
+          yarn test:e2e e2e/call-microphone.spec.ts
+          --project=desktop-chromium --project=desktop-firefox
+          --project=desktop-webkit
 
       - name: Build
         run: yarn build
