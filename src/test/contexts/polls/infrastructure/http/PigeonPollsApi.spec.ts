@@ -148,4 +148,21 @@ describe(PigeonPollsApi.name, () => {
       store: 'messages',
     });
   });
+
+  it('sends no timeline record for a group poll', async () => {
+    const { api, http, session } = await setup();
+
+    await api.create(session, {
+      allowsMultipleVotes: false,
+      conversationId: 'conversation-a',
+      createdAt: 100,
+      expiresAt: null,
+      options: [{ id: 'option-a', text: 'A' }],
+      pollId: 'poll-a',
+      question: 'Choose?',
+      scopeType: 'group_conversation',
+    });
+
+    expect(sentBody(http)).not.toHaveProperty('timelineMutation');
+  });
 });
