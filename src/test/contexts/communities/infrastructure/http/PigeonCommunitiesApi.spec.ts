@@ -7,6 +7,7 @@ import type { RequestSigner } from '../../../../../shared/infrastructure/http/Re
 import { deriveModerationLogId } from '../../../../../contexts/communities/infrastructure/http/deriveCommunityRecordId';
 import { PigeonCommunitiesApi } from '../../../../../contexts/communities/infrastructure/http/PigeonCommunitiesApi';
 import { DraftPayloadCipher } from '../../../../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
+import { RequestCache } from '../../../../../shared/infrastructure/http/RequestCache';
 import { ScopeFrontierReader } from '../../../../../shared/infrastructure/http/ScopeFrontierReader';
 import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
@@ -718,38 +719,75 @@ describe(PigeonCommunitiesApi.name, () => {
     ]);
   });
 
-  it('invalidates the community detail cache after assigning member roles', async () => {
-    const community = { id: 'community-1' };
-    const http = {
-      request: jest.fn((path: string) =>
-        path.endsWith('/frontier') ? { frontier: [] } : community,
-      ),
-    } as unknown as HttpJsonClient;
-    const signer = {
-      headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
-    } as unknown as RequestSigner;
-    const invalidateCachedRequest = jest.fn();
-    const session = {
-      deviceCredentialKeyPair: await KeyPair.generate(),
-      identity: { id: 'identity-1' },
-    } as unknown as Session;
-    const api = new PigeonCommunitiesApi(
-      http,
-      signer,
-      async (_key, loader) => await loader(),
-      publicMutationSignerAt(),
-      undefined,
-      invalidateCachedRequest,
-    );
+  it.each<[string, (api: PigeonCommunitiesApi, session: Session) => unknown]>([
+    ['update', (api, s) => api.update(s, 'community-1', { name: 'New' })],
+    ['banMember', (api, s) => api.banMember(s, 'community-1', 'member-1')],
+    ['unbanMember', (api, s) => api.unbanMember(s, 'community-1', 'member-1')],
+    ['kickMember', (api, s) => api.kickMember(s, 'community-1', 'member-1')],
+    ['leave', (api, s) => api.leave(s, 'community-1')],
+    [
+      'createRole',
+      (api, s) =>
+        api.createRole(s, 'community-1', { name: 'Mod', permissions: [] }),
+    ],
+    [
+      'updateRole',
+      (api, s) =>
+        api.updateRole(s, 'community-1', 'role-1', {
+          name: 'Mod',
+          permissions: [],
+        }),
+    ],
+    ['deleteRole', (api, s) => api.deleteRole(s, 'community-1', 'role-1')],
+    [
+      'assignMemberRoles',
+      (api, s) =>
+        api.assignMemberRoles(s, 'community-1', 'member-1', ['role-1']),
+    ],
+  ])(
+    'reloads the community detail after %s instead of serving the cached one',
+    async (_name, mutate) => {
+      const before = { id: 'community-1', memberIds: ['member-1'] };
+      const after = { id: 'community-1', memberIds: [] };
+      let detail: object = before;
+      const http = {
+        request: jest.fn((path: string, init: { method: string }) => {
+          if (path.endsWith('/frontier')) return { frontier: [] };
 
-    await expect(
-      api.assignMemberRoles(session, 'community-1', 'member-1', ['role-1']),
-    ).resolves.toBe(community);
+          if (path === '/communities/community-1' && init.method === 'GET') {
+            return { ...detail, networkId: 'network-1' };
+          }
 
-    expect(invalidateCachedRequest).toHaveBeenCalledWith(
-      'GET /communities/community-1 identity-1',
-    );
-  });
+          return {};
+        }),
+      } as unknown as HttpJsonClient;
+      const cache = new RequestCache();
+      const session = {
+        deviceCredentialKeyPair: await KeyPair.generate(),
+        identity: { id: 'identity-1' },
+      } as unknown as Session;
+      const api = new PigeonCommunitiesApi(
+        http,
+        {
+          headers: jest.fn().mockResolvedValue({}),
+        } as unknown as RequestSigner,
+        async (key, loader, options) => await cache.load(key, loader, options),
+        publicMutationSignerAt(),
+        undefined,
+        (key) => cache.invalidate(key),
+      );
+
+      await expect(api.get(session, 'community-1')).resolves.toMatchObject(
+        before,
+      );
+      await mutate(api, session);
+      detail = after;
+
+      await expect(api.get(session, 'community-1')).resolves.toMatchObject(
+        after,
+      );
+    },
+  );
 
   describe('moderation logs', () => {
     async function setup(response: unknown = {}) {
