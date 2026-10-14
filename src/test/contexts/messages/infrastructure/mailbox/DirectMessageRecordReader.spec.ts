@@ -1,6 +1,5 @@
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { DirectReadRecord } from '../../../../../contexts/mailboxes/domain/DirectReadRecord';
-
 import type { DirectSentRecord } from '../../../../../contexts/mailboxes/domain/DirectSentRecord';
 
 import { DirectMessageMailboxRecord } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxRecord';

@@ -6,6 +6,7 @@ import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessag
 
 import { encodeBase64Url } from '../../../../shared/infrastructure/encoding/base64url';
 import { IdentityMatch } from '../../../identities/domain/IdentityMatch';
+import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 
 /**
  * Authorship tag for a record this identity writes to its own inbox: a
@@ -54,7 +55,8 @@ export class DirectMessageAuthorship {
   }
 
   /**
-   * A record authored by another identity is not checked here. A record
+   * A record whose author id is not a valid identity id is refused. A record
+   * authored by another identity is not checked here. A record
    * authored by this identity must carry a tag made under its root key, so a
    * peer that writes into the self-inbox cannot forge or replay it.
    */
@@ -64,6 +66,8 @@ export class DirectMessageAuthorship {
     record: DirectMessageRecord,
     authorTag: string | undefined,
   ): boolean {
+    if (!IdentityId.isValid(record.authorId)) return false;
+
     if (!IdentityMatch.isSame(record.authorId, identityId)) {
       return true;
     }

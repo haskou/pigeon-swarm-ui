@@ -4,6 +4,7 @@ import type { DirectMessageHistoryItem } from './DirectMessageHistoryItem';
 import type { DirectMessageHistoryStore } from './DirectMessageHistoryStore';
 
 import { IdentityMatch } from '../../../identities/domain/IdentityMatch';
+import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { sessionRootKey } from '../../../identities/infrastructure/session/sessionRootKey';
 import { DirectMessageAuthorship } from './DirectMessageAuthorship';
 import { DirectMessageMailboxRecord } from './DirectMessageMailboxRecord';
@@ -36,7 +37,7 @@ export class DirectMessageHistoryBackup {
         conversationId,
       );
 
-      if (!record) continue;
+      if (!record || !IdentityId.isValid(record.authorId)) continue;
 
       const own = IdentityMatch.isSame(record.authorId, session.identity.id);
       const entries = byConversation.get(conversationId) ?? [];
