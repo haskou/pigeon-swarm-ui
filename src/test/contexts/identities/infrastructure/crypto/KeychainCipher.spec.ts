@@ -1,4 +1,5 @@
 import { EncryptedPayload, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import { InvalidFormatError } from '@haskou/value-objects';
 
 import type { KeychainResource } from '../../../../../contexts/identities/infrastructure/http/resources/KeychainResource';
 import type { LocalKeychain } from '../../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
@@ -114,6 +115,37 @@ describe(KeychainCipher.name, () => {
       expect(() =>
         new KeychainCipher().decrypt(sessionWith(), sealedUnder(masterKey)),
       ).toThrow();
+    });
+
+    it('refuses a head whose sealed version is not a keychain version', () => {
+      const head = {
+        encryptedPayload: rootKey
+          .encrypt(JSON.stringify({ conversations: {}, version: -1 }))
+          .toString(),
+      } as KeychainResource;
+
+      expect(() =>
+        new KeychainCipher().decrypt(
+          sessionWith({ deviceSealedRootKey: rootKey }),
+          head,
+        ),
+      ).toThrow(InvalidFormatError);
+    });
+
+    it('refuses a head without a sealed version whose resource version is not a keychain version', () => {
+      const head = {
+        encryptedPayload: rootKey
+          .encrypt(JSON.stringify({ conversations: {} }))
+          .toString(),
+        version: 1.5,
+      } as KeychainResource;
+
+      expect(() =>
+        new KeychainCipher().decrypt(
+          sessionWith({ deviceSealedRootKey: rootKey }),
+          head,
+        ),
+      ).toThrow(InvalidFormatError);
     });
 
     it('refuses to publish without a device-sealed root', async () => {
