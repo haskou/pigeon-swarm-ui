@@ -383,6 +383,29 @@ describe(MailboxContactPresenceRepository.name, () => {
     ]);
   });
 
+  it('cuts the other readers off when the rotated session carries its id in PEM form', async () => {
+    const { bob, bobInbox, sessions } = setup();
+
+    await bob.receive(BOB, FROM_ALICE, new Timestamp(0));
+    bobInbox().inbox.readers.set('revoked-device-reader', 0);
+
+    const rotated = {
+      ...sessionOf(BOB, ALICE, { previous: SEALED, sealed: ROTATED }),
+      identity: {
+        id: `-----BEGIN PUBLIC KEY-----\n${BOB.toString()}\n-----END PUBLIC KEY-----\n`,
+      },
+    } as unknown as Session;
+
+    sessions.set(BOB.toString(), rotated);
+    await bob.cutOffRevokedReaders(rotated);
+
+    const { id, inbox } = bobInbox();
+
+    expect([...inbox.readers.keys()]).toEqual([
+      MailboxCapability.hash(MailboxReadToken.derive(ROTATED, id)),
+    ]);
+  });
+
   it('bridges into an inbox another device opened under the previous root', async () => {
     const { alice, bobInbox, device, sessions } = setup();
 
