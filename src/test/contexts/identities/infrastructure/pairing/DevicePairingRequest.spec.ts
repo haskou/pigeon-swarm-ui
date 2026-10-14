@@ -127,4 +127,28 @@ describe(DevicePairingRequest.name, () => {
       ),
     ).toBe('invalid');
   });
+
+  it('accepts a request at the inclusive expiration and clock skew bounds', async () => {
+    const atExpiration = await DevicePairingRequest.create(
+      await invitation(2_000),
+      new Timestamp(2_000),
+    );
+    const atSkew = await DevicePairingRequest.create(
+      await invitation(100_000),
+      new Timestamp(31_000),
+    );
+
+    expect(() =>
+      DevicePairingCodeReader.request(
+        atExpiration.getRequest().toCode(),
+        new Timestamp(2_000),
+      ),
+    ).not.toThrow();
+    expect(() =>
+      DevicePairingCodeReader.request(
+        atSkew.getRequest().toCode(),
+        new Timestamp(1_000),
+      ),
+    ).not.toThrow();
+  });
 });

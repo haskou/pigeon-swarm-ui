@@ -11,6 +11,22 @@ describe('device security value objects', () => {
     expect(DeviceAuthorizationRevision.initial().valueOf()).toBe(0);
     expect(() => DeviceAuthorizationRevision.fromNumber(-1)).toThrow();
   });
+  it('orders authorization revisions ascending', () => {
+    const revisions = [5, 0, 3].map((value) =>
+      DeviceAuthorizationRevision.fromNumber(value),
+    );
+
+    expect(
+      revisions
+        .sort((left, right) => left.compareTo(right))
+        .map((revision) => revision.valueOf()),
+    ).toEqual([0, 3, 5]);
+    expect(
+      DeviceAuthorizationRevision.fromNumber(2).compareTo(
+        DeviceAuthorizationRevision.fromNumber(2),
+      ),
+    ).toBe(0);
+  });
   it('canonicalizes device identifiers and compares by value', () => {
     const deviceId = DeviceId.fromString(
       ' 550E8400-E29B-41D4-A716-446655440000 ',
