@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 
+import type { MarkdownMentionMatcher } from './MarkdownMentionMatcher';
+
 import { cx } from '../../../../shared/presentation/cx';
 import { MESSAGE_CONTENT_MAX_LENGTH } from '../../domain/MessageContentConstraints';
 
@@ -361,13 +363,16 @@ function pushTextWithMentions(
   text: string,
   mentions: MarkdownMention[],
 ): void {
-  const pattern = mentionPattern(mentions);
+  const matcher = mentionMatcher(mentions);
 
-  if (!pattern) {
+  if (!matcher) {
     tokens.push({ text, type: 'text' });
 
     return;
   }
+
+  const { identityIds, pattern } = matcher;
+  pattern.lastIndex = 0;
 
   let cursor = 0;
   let match: RegExpExecArray | null;
@@ -377,12 +382,8 @@ function pushTextWithMentions(
       tokens.push({ text: text.slice(cursor, match.index), type: 'text' });
     }
 
-    const mention = mentions.find(
-      (candidate) => candidate.token.toLowerCase() === match![0].toLowerCase(),
-    );
-
     tokens.push({
-      identityId: mention?.identityId,
+      identityId: identityIds.get(match[0].toLowerCase()),
       text: match[0],
       type: 'mention',
     });
@@ -541,14 +542,40 @@ function renderInline(
   });
 }
 
-function mentionPattern(mentions: MarkdownMention[]): RegExp | null {
+// Built once per mention list: a long message from another client can hold
+// thousands of text segments, each scanned for every mention.
+const mentionMatchers = new WeakMap<
+  MarkdownMention[],
+  MarkdownMentionMatcher | null
+>();
+
+function mentionMatcher(
+  mentions: MarkdownMention[],
+): MarkdownMentionMatcher | null {
+  if (mentionMatchers.has(mentions)) return mentionMatchers.get(mentions)!;
+
+  const identityIds = new Map<string, string | undefined>();
+
+  mentions.forEach(({ identityId, token }) => {
+    const key = token.toLowerCase();
+
+    if (!identityIds.has(key)) identityIds.set(key, identityId);
+  });
+
   const tokens = Array.from(
     new Set(mentions.map((mention) => mention.token).filter(Boolean)),
   ).sort((left, right) => right.length - left.length);
+  const matcher =
+    tokens.length === 0
+      ? null
+      : {
+          identityIds,
+          pattern: new RegExp(tokens.map(escapeRegExp).join('|'), 'gi'),
+        };
 
-  if (tokens.length === 0) return null;
+  mentionMatchers.set(mentions, matcher);
 
-  return new RegExp(tokens.map(escapeRegExp).join('|'), 'gi');
+  return matcher;
 }
 
 function escapeRegExp(value: string): string {

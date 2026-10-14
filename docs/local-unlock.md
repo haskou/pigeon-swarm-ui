@@ -249,8 +249,10 @@ applies (see "What each choice protects against").
   raw HTML is escaped. Content longer than the composer's 4000-character
   limit (`MESSAGE_CONTENT_MAX_LENGTH`) comes from another client; it is shown
   as text with links and mentions only, so a flood of formatting delimiters
-  cannot keep the parser busy. Covered by `markdownMessage.spec.ts`, including
-  a 100,000-character delimiter flood that must render within one second.
+  cannot keep the parser busy. Mentions are matched with one pattern per
+  message, not one per text segment. Covered by `markdownMessage.spec.ts`,
+  including a 100,000-character delimiter flood and a flood of links and
+  mentions that must each render within one second.
 - **Link previews.** A preview shows only its title, description, site name
   and address. The sender-chosen preview image and the site favicon are never
   loaded, because fetching them would tell that site the reader's address and
@@ -263,7 +265,9 @@ applies (see "What each choice protects against").
 - **Attachments and notifications.** Reviewed: attachments render only as
   image, video or audio elements from decrypted blobs, or download through a
   generated link. The service worker shows the notification text the node
-  sends and opens only app routes.
+  sends, always with the app's own icon and badge (the browser fetches those
+  outside the page policy), and opens only app routes. Covered by
+  `IndependentClientServiceWorker.spec.ts`.
 - **Protected-root envelope.** The KDF is pinned to
   `v1.scrypt.N262144.r8.p1.hkdf-sha256.aes-256-gcm`. Other scrypt cost, block
   size, or parallelism values are rejected. Covered by
