@@ -216,6 +216,34 @@ export class GroupMailboxMlsEngine {
     return next;
   }
 
+  /**
+   * Whether `inviter` may have welcomed this device into `group`: a member
+   * the roster lets add members, or another device of this identity that
+   * holds a leaf in a group with someone else in it.
+   */
+  private mayWelcome(
+    group: MlsGroup,
+    conversationId: string,
+    inviter: string,
+  ): boolean {
+    const identities = group.identities();
+    const self = this.signer.owner.identityId;
+
+    if (inviter !== self) {
+      return Boolean(
+        this.rosters
+          .get(conversationId)
+          ?.committers(identities)
+          .includes(inviter),
+      );
+    }
+
+    return (
+      identities.some((identityId) => identityId !== self) &&
+      group.leaves().filter(({ owner }) => owner.identityId === self).length > 1
+    );
+  }
+
   private idOf(bytes: Uint8Array): string {
     return SHA256Hash.from(encodeBase64Url(bytes)).toString();
   }
@@ -506,7 +534,7 @@ export class GroupMailboxMlsEngine {
       const opened = await group.open(ciphertext).catch((error: unknown) => {
         throw GroupMailboxMlsEngine.rejection(error);
       });
-      const { deviceId, identityId } = opened.sender;
+      const { deviceCredential, identityId } = opened.sender;
 
       // Once a removal is applied, its leaf's late messages are not read.
       if (
@@ -514,7 +542,8 @@ export class GroupMailboxMlsEngine {
           .leaves()
           .some(
             ({ owner }) =>
-              owner.identityId === identityId && owner.deviceId === deviceId,
+              owner.identityId === identityId &&
+              owner.deviceCredential === deviceCredential,
           )
       ) {
         throw new MlsRejectedError('The sender is no longer in the group');
@@ -571,8 +600,9 @@ export class GroupMailboxMlsEngine {
    * add advances the generation, so the joiner exports `gen_k` from the
    * welcome epoch itself; only the public index `k` comes from the inviter.
    * The inviter must hold a leaf in the welcomed group and be allowed by
-   * the roster to add members. A welcome opens once; a removed device can
-   * join again from a welcome newer than its last membership.
+   * the roster to add members, or be another device of this identity in a
+   * group that holds someone else too. A welcome opens once; a removed
+   * device can join again from a welcome newer than its last membership.
    */
   public async join(
     conversationId: string,
@@ -612,12 +642,7 @@ export class GroupMailboxMlsEngine {
           );
         }
 
-        if (
-          !this.rosters
-            .get(conversationId)
-            ?.committers(group.identities())
-            .includes(inviter)
-        ) {
+        if (!this.mayWelcome(group, conversationId, inviter)) {
           throw new MlsRejectedError(
             'The welcome is not from a member who may add devices',
           );
@@ -639,6 +664,26 @@ export class GroupMailboxMlsEngine {
       }
 
       throw new MlsRejectedError('No key package of this device opens it');
+    });
+  }
+
+  /**
+   * The device credentials of this identity's leaves, this device's own
+   * included; empty when this device holds no leaf in the group.
+   */
+  public async devices(conversationId: string): Promise<string[]> {
+    return this.exclusive(conversationId, async () => {
+      const group = await this.load(conversationId);
+
+      if (!group || group.isRemoved) return [];
+
+      return group
+        .leaves()
+        .filter(
+          ({ owner }) => owner.identityId === this.signer.owner.identityId,
+        )
+        .map(({ owner }) => owner.deviceCredential)
+        .sort();
     });
   }
 
@@ -678,6 +723,29 @@ export class GroupMailboxMlsEngine {
 
       await this.refreshRoster(conversationId);
       const output = await group.removeIdentities(identityIds);
+
+      return output ? this.commit(group, output, publish) : undefined;
+    });
+  }
+
+  /**
+   * Removes the leaves of these devices of this identity and advances the
+   * generation; undefined when none of them holds a leaf. The commit is
+   * kept only once `publish` has queued it.
+   */
+  public async removeDevices(
+    conversationId: string,
+    deviceCredentials: string[],
+    publish: (commit: GroupMailboxCommit) => Promise<void>,
+  ): Promise<GroupMailboxCommit | undefined> {
+    return this.exclusive(conversationId, async () => {
+      const group = await this.requireGroup(conversationId);
+
+      await this.refreshRoster(conversationId);
+      const output = await group.removeDevices(
+        this.signer.owner.identityId,
+        deviceCredentials,
+      );
 
       return output ? this.commit(group, output, publish) : undefined;
     });

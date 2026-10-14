@@ -20,6 +20,7 @@ import { MlsRejectedError } from '../../../communities/infrastructure/mls/MlsRej
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { DirectMailboxRecords } from '../../../mailboxes/domain/DirectMailboxRecords';
 import { MailboxUnavailableError } from '../../../mailboxes/domain/errors/MailboxUnavailableError';
+import { MailboxCapability } from '../../../mailboxes/infrastructure/crypto/MailboxCapability';
 import { DirectMessageInboxKeys } from '../../../messages/infrastructure/mailbox/DirectMessageInboxKeys';
 import { DirectMessageMailboxRecord } from '../../../messages/infrastructure/mailbox/DirectMessageMailboxRecord';
 import { GroupMailboxControlRecord } from '../control/GroupMailboxControlRecord';
@@ -54,11 +55,23 @@ import { GroupMessageAuthors } from './GroupMessageAuthors';
  * device reader is enrolled under the root reader, bridged through the root
  * the revoke replaced (`DirectMessageReaderSet`), and the readers no
  * remaining device holds are pruned.
+ *
+ * All devices of this identity holding a leaf read the same inbox, each
+ * through its own reader. Before it first acknowledges the current
+ * generation's inbox, a device enrols the reader of every other device of
+ * its identity holding a leaf, so envelopes wait for each of them. A
+ * drained inbox is deleted only once every reader has acknowledged as far
+ * as this device; otherwise the node's retention expires it.
  */
 export class GroupMailboxInboxSync {
   public static readonly MAX_FAILURES = 5;
   public static readonly MAX_ROUNDS = 8;
   public static readonly PAGE_SIZE = 50;
+
+  /** Sibling readers enrolled this app session, by mailbox and reader. */
+  private readonly enrolled = new Set<string>();
+  /** Drained inboxes a sibling still reads, left alone this app session. */
+  private readonly unsettled = new Set<string>();
 
   /**
    * Whether `sender` may send `record`: only under an id it owns; an edit
@@ -90,10 +103,13 @@ export class GroupMailboxInboxSync {
     private readonly session: () => Session,
     private readonly engine: Pick<
       GroupMailboxMlsEngine,
-      'decrypt' | 'drainedGenerations' | 'readableGenerations'
+      'decrypt' | 'devices' | 'drainedGenerations' | 'readableGenerations'
     >,
     private readonly control: Pick<GroupMailboxControl, 'receiveGroup'>,
-    private readonly channel: Pick<MailboxChannel, 'acknowledge' | 'read'>,
+    private readonly channel: Pick<
+      MailboxChannel,
+      'acknowledge' | 'addReader' | 'listReaders' | 'read'
+    >,
     private readonly client: Pick<PigeonMailboxClient, 'delete'>,
     private readonly inboxes: GroupMailboxInboxStore,
     private readonly history: Pick<
@@ -147,22 +163,34 @@ export class GroupMailboxInboxSync {
     this.inboxes.saveCursor(keys.mailboxId, recreated ? 0 : upTo);
   }
 
-  /** Deletes this identity's inboxes whose drain window has closed. */
+  /**
+   * Deletes this identity's inboxes whose drain window has closed, once
+   * every reader acknowledged as far as this device. Logs counts only.
+   */
   private async deleteDrained(conversationId: string): Promise<void> {
     const session = this.session();
+    let waiting = 0;
 
     for (const generation of await this.engine.drainedGenerations(
       conversationId,
     )) {
       const keys = this.keysFor(session, generation);
 
-      if (this.inboxes.isDeleted(keys.mailboxId)) continue;
+      if (
+        this.inboxes.isDeleted(keys.mailboxId) ||
+        this.unsettled.has(keys.mailboxId)
+      ) {
+        continue;
+      }
+      const readers = DirectMessageInboxKeys.readersFor(session, keys);
 
       try {
-        await this.client.delete(
-          keys.mailboxId,
-          DirectMessageInboxKeys.readersFor(session, keys).root,
-        );
+        if (!(await this.settled(keys, readers))) {
+          this.unsettled.add(keys.mailboxId);
+          waiting += 1;
+          continue;
+        }
+        await this.client.delete(keys.mailboxId, readers.root);
       } catch (error: unknown) {
         if (!(error instanceof MailboxUnavailableError)) {
           // eslint-disable-next-line no-console
@@ -171,6 +199,11 @@ export class GroupMailboxInboxSync {
         }
       }
       this.inboxes.markDeleted(keys.mailboxId);
+    }
+
+    if (waiting > 0) {
+      // eslint-disable-next-line no-console
+      console.debug(`Group inboxes left to retention: ${waiting}.`);
     }
   }
 
@@ -199,10 +232,13 @@ export class GroupMailboxInboxSync {
   /**
    * Reads one inbox to its end. True when a commit was applied, so the
    * generations are listed again. A first read creates a missing inbox.
+   * The readers of `siblings`, other devices of this identity, are
+   * enrolled before the first acknowledgement.
    */
   private async drain(
     conversationId: string,
     generation: GroupMailboxGeneration,
+    siblings: readonly string[],
     authors: GroupMessageAuthors,
     signal: AbortSignal,
     apply: (records: DirectMessageRecord[]) => void,
@@ -228,10 +264,36 @@ export class GroupMailboxInboxSync {
 
       if (signal.aborted) return advanced;
       apply(accepted);
+      await this.enrolSiblings(session, keys, readers.root, siblings);
       await this.acknowledge(keys, readers, page.lastCursor);
       advanced = advanced || applied;
 
       if (!page.hasMore || page.envelopes.length === 0) return advanced;
+    }
+  }
+
+  /**
+   * Enrols the readers of other devices of this identity, once per mailbox
+   * and reader per app session. Rejects when one cannot be enrolled, so the
+   * page stays unacknowledged.
+   */
+  private async enrolSiblings(
+    session: Session,
+    keys: MailboxKeys,
+    rootToken: string,
+    siblings: readonly string[],
+  ): Promise<void> {
+    for (const credential of siblings) {
+      const { device } = DirectMessageInboxKeys.readersFor(
+        session,
+        keys,
+        credential,
+      );
+      const key = `${keys.mailboxId}:${MailboxCapability.hash(device)}`;
+
+      if (this.enrolled.has(key)) continue;
+      await this.channel.addReader(keys, rootToken, device);
+      this.enrolled.add(key);
     }
   }
 
@@ -337,7 +399,9 @@ export class GroupMailboxInboxSync {
 
   /**
    * Drains the readable generations oldest first. True when a commit was
-   * applied, so the generations must be listed again.
+   * applied, so the generations must be listed again. Only the current
+   * generation's inbox enrols the other devices holding a leaf: older
+   * ones predate some of them, who would never read them.
    */
   private async round(
     conversationId: string,
@@ -345,21 +409,48 @@ export class GroupMailboxInboxSync {
     signal: AbortSignal,
     apply: (records: DirectMessageRecord[]) => void,
   ): Promise<boolean> {
-    const oldestFirst = [
-      ...(await this.engine.readableGenerations(conversationId)),
-    ].reverse();
+    const readable = await this.engine.readableGenerations(conversationId);
+    const [current] = readable;
+    const own = this.session().deviceCredentialKeyPair.toPrimitives().publicKey;
+    const siblings = current
+      ? (await this.engine.devices(conversationId)).filter(
+          (credential) => credential !== own,
+        )
+      : [];
 
-    for (const generation of oldestFirst) {
+    for (const generation of [...readable].reverse()) {
       if (signal.aborted) return false;
 
       if (
-        await this.drain(conversationId, generation, authors, signal, apply)
+        await this.drain(
+          conversationId,
+          generation,
+          generation === current ? siblings : [],
+          authors,
+          signal,
+          apply,
+        )
       ) {
         return true;
       }
     }
 
     return false;
+  }
+
+  /** Whether every reader acknowledged as far as this device's reader. */
+  private async settled(
+    keys: MailboxKeys,
+    readers: MailboxReadTokens,
+  ): Promise<boolean> {
+    const listed = await this.channel.listReaders(keys, readers.root);
+    const own = MailboxCapability.hash(readers.device);
+    const mine = listed.readers.find((reader) => reader.readTokenHash === own);
+
+    return (
+      mine !== undefined &&
+      listed.readers.every((reader) => reader.ackedCursor >= mine.ackedCursor)
+    );
   }
 
   /**

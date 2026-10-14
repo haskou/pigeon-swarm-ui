@@ -74,7 +74,7 @@ const pickNewestPerDevice = (
     const owner = authoredOwnerOf(record);
 
     if (!owner) continue;
-    const device = `${owner.identityId}/${owner.deviceId}`;
+    const device = `${owner.identityId}/${owner.deviceCredential}`;
     const known = chosen.get(device);
 
     if (present.has(device)) continue;
@@ -194,7 +194,7 @@ export class MlsCommunityEngine {
       const present = new Set(
         group
           .leaves()
-          .map(({ owner }) => `${owner.identityId}/${owner.deviceId}`),
+          .map(({ owner }) => `${owner.identityId}/${owner.deviceCredential}`),
       );
       const wanted = new Set(identityIds);
       const published = await transport.list({

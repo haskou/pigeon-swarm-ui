@@ -6,7 +6,9 @@
  * someone still on the roster follows the conversation's own rule (never
  * the creator or the remover, and an admin only by the creator). A roster
  * that names no manager lets every member manage it. Anyone on the roster
- * may rotate their own leaf.
+ * may rotate their own leaf, and add or remove leaves of their own
+ * identity, which are the leaves of its other devices: a leaf is a device,
+ * and only the identity's devices sign one in its name.
  */
 export class GroupMailboxRoster {
   private readonly managers: ReadonlySet<string>;
@@ -61,9 +63,13 @@ export class GroupMailboxRoster {
     committer: string;
     removed: readonly string[];
   }): boolean {
-    const { added, committer, removed } = change;
+    const { committer } = change;
 
     if (!this.members.has(committer)) return false;
+    const added = change.added.filter((identityId) => identityId !== committer);
+    const removed = change.removed.filter(
+      (identityId) => identityId !== committer,
+    );
 
     if (added.length === 0 && removed.length === 0) return true;
 

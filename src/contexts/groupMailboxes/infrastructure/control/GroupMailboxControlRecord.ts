@@ -4,6 +4,7 @@ import {
   decodeBase64Url,
   encodeBase64Url,
 } from '../../../../shared/infrastructure/encoding/base64url';
+import { DeviceCredential } from '../../../identities/domain/value-objects/DeviceCredential';
 
 /**
  * Wire format of `GroupMailboxControlFields`: one JSON object with kind
@@ -68,9 +69,7 @@ export class GroupMailboxControlRecord {
   ): GroupMailboxControlFields | null {
     switch (value.type) {
       case 'key-package-request':
-        return GroupMailboxControlRecord.isRequestId(value.requestId)
-          ? { conversationId, requestId: value.requestId, type: value.type }
-          : null;
+        return GroupMailboxControlRecord.request(value, conversationId);
       case 'key-package-response':
         return GroupMailboxControlRecord.response(value, conversationId);
       case 'welcome':
@@ -108,6 +107,33 @@ export class GroupMailboxControlRecord {
     return keyPackage && GroupMailboxControlRecord.isRequestId(requestId)
       ? { conversationId, keyPackage, requestId, type: 'key-package-response' }
       : null;
+  }
+
+  /** A request, with the device it asks when it names one validly. */
+  private static request(
+    value: Record<string, unknown>,
+    conversationId: string,
+  ): GroupMailboxControlFields | null {
+    const { deviceCredential, requestId } = value;
+
+    if (!GroupMailboxControlRecord.isRequestId(requestId)) return null;
+
+    if (deviceCredential === undefined) {
+      return { conversationId, requestId, type: 'key-package-request' };
+    }
+
+    try {
+      return {
+        conversationId,
+        deviceCredential: DeviceCredential.fromString(
+          String(deviceCredential),
+        ).valueOf(),
+        requestId,
+        type: 'key-package-request',
+      };
+    } catch {
+      return null;
+    }
   }
 
   private static welcome(
@@ -155,6 +181,9 @@ export class GroupMailboxControlRecord {
       case 'key-package-request':
         return GroupMailboxControlRecord.json({
           ...header,
+          ...(fields.deviceCredential === undefined
+            ? {}
+            : { deviceCredential: fields.deviceCredential }),
           requestId: fields.requestId,
         });
       case 'key-package-response':

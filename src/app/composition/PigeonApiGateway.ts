@@ -449,6 +449,7 @@ export class PigeonApiGateway {
       channel: mailboxChannel,
       client: new PigeonMailboxClient(http),
       composer: this.messageCommands,
+      devices: listDeviceCredentials,
       direct: (session) =>
         new GroupMailboxNotificationLink(
           session,
