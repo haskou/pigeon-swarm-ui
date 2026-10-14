@@ -711,6 +711,18 @@ export const es = {
     scanQr: 'Escanear QR',
   },
   deviceStorage: {
+    backingUp: 'Preparando la copia...',
+    backup: 'Hacer copia del historial y los contactos',
+    backupBody:
+      'Guarda tu historial de mensajes directos y tus contactos recordados en un único archivo cifrado. Solo esta identidad puede abrirlo, en cualquiera de sus dispositivos. Quien más adelante acceda a esta identidad, por ejemplo con tu clave de recuperación, y además tenga el archivo podrá leer ese historial, así que guarda el archivo en privado. No incluye el historial de grupos ni las claves que protegen las conversaciones.',
+    backupDone: 'Copia guardada.',
+    backupFailed: 'No se pudo crear la copia.',
+    backupPassword: 'Confirma tu contraseña para hacer la copia',
+    backupTitle: 'Copia de seguridad',
+    backupUnreadable:
+      'Este archivo no es una copia de esta identidad o ha sido modificado.',
+    backupVersion:
+      'Este formato de copia no es compatible. Haz una copia nueva con esta versión de la aplicación.',
     help: 'Qué se guarda aquí, en el servidor y en manos de otras personas.',
     low: 'Queda poco espacio. Puede que los mensajes nuevos no se guarden aquí hasta que liberes espacio.',
     notProtected:
@@ -723,6 +735,10 @@ export const es = {
       'Los mensajes directos nuevos esperan cifrados en el servidor hasta que tus dispositivos los descargan, durante un máximo de 14 días. Después caducan. El servidor no puede leerlos.',
     protected:
       'Protegido: el navegador conserva estos datos aunque le falte espacio.',
+    restore: 'Restaurar desde una copia',
+    restored: 'Historial y contactos restaurados.',
+    restoreFailed: 'No se pudo restaurar la copia.',
+    restoring: 'Restaurando...',
     title: 'Almacenamiento en este dispositivo',
     unavailable: 'Este navegador no indica cuánto almacenamiento se usa.',
     usage: '{usage} usados de {quota}',
@@ -1443,6 +1459,8 @@ export const es = {
       'Muestra identificadores técnicos, versiones, metadatos de cifrado y controles de diagnóstico en toda la aplicación. Esta preferencia solo se guarda en este navegador.',
     technicalDetailsWarning:
       'Los datos técnicos pueden exponer metadatos sensibles. No los compartas si no sabes exactamente qué contienen.',
+    unlockNotConfirmed:
+      'No se pudo confirmar tu contraseña o tu llave de acceso.',
     updateError: 'No se pudo actualizar el perfil.',
     versions: 'Versiones',
   },

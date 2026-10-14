@@ -72,9 +72,9 @@ describe(DirectMessageHistoryBackup.name, () => {
 
     expect(items).toHaveLength(600);
     expect(items[0]?.conversationId).toBe(conversationId);
-    expect(ids(session(), [items[0]!.plaintext, items[599]!.plaintext])).toEqual(
-      ['m0', 'm599'],
-    );
+    expect(
+      ids(session(), [items[0]!.plaintext, items[599]!.plaintext]),
+    ).toEqual(['m0', 'm599']);
   }, 60_000);
 
   it('restores own records under the current device root, keeping peer records', async () => {

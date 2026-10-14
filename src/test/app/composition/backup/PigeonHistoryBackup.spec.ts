@@ -64,15 +64,14 @@ describe(PigeonHistoryBackup.name, () => {
 
   it('restores the exported history and contacts on the same identity', async () => {
     const { backup, contactPins, directMessages } = fixture();
+    const alice = session();
 
-    const file = await backup.export(session(), 'password');
-    await backup.restore(session(), file);
+    const file = await backup.export(alice, 'password');
+    await backup.restore(alice, file);
 
     expect(file).not.toContain('bob');
     expect(file).not.toContain('conversation-1');
-    expect(directMessages.importHistory).toHaveBeenCalledWith(session(), [
-      item,
-    ]);
+    expect(directMessages.importHistory).toHaveBeenCalledWith(alice, [item]);
     expect(contactPins.restore).toHaveBeenCalledWith('alice', {
       'identity-x': { handle: 'bob', verifiedAt },
     });

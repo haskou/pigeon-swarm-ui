@@ -684,7 +684,7 @@ function ProfileSecuritySection({
           </p>
         </div>
       </section>
-      <DeviceStorageSection />
+      <DeviceStorageSection session={session} unlockMethod={unlockMethod} />
       <SecurityAuditSection
         communities={communities}
         conversations={conversations}

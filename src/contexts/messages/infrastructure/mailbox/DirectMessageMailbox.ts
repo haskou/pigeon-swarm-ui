@@ -10,6 +10,7 @@ import type { EditMessageOptions } from '../http/resources/EditMessageOptions';
 import type { MessageCommandIdentity } from '../http/resources/MessageCommandIdentity';
 import type { SendMessageOptions } from '../http/resources/SendMessageOptions';
 import type { DirectMessageAvailabilityServer } from './DirectMessageAvailabilityServer';
+import type { DirectMessageHistoryItem } from './DirectMessageHistoryItem';
 import type { DirectMessageInboxSource } from './DirectMessageInboxSource';
 import type { DirectMessageMailboxStore } from './DirectMessageMailboxStore';
 import type { DirectMessageOutboxEvent } from './DirectMessageOutboxEvent';
@@ -20,6 +21,7 @@ import type { RecipientMailboxRouter } from './RecipientMailboxRouter';
 import { ConversationKeyRequiredError } from '../../domain/errors/ConversationKeyRequiredError';
 import { DirectMessageAvailability } from './DirectMessageAvailability';
 import { DirectMessageAvailabilityStore } from './DirectMessageAvailabilityStore';
+import { DirectMessageHistoryBackup } from './DirectMessageHistoryBackup';
 import { DirectMessageHistoryStore } from './DirectMessageHistoryStore';
 import { DirectMessageHistoryTransfer } from './DirectMessageHistoryTransfer';
 import { DirectMessageInboxKeys } from './DirectMessageInboxKeys';
@@ -49,6 +51,7 @@ export class DirectMessageMailbox {
   private readonly reads: DirectMessageReadSync;
   private readonly history: DirectMessageHistoryStore;
   private readonly transfer: DirectMessageHistoryTransfer;
+  private readonly backup: DirectMessageHistoryBackup;
 
   public constructor(
     channel: MailboxChannel,
@@ -90,6 +93,7 @@ export class DirectMessageMailbox {
     );
     this.history = new DirectMessageHistoryStore();
     this.transfer = new DirectMessageHistoryTransfer(channel, this.history);
+    this.backup = new DirectMessageHistoryBackup(this.history);
     this.timeline = new DirectMessageTimelineSync(
       { channel, opener: this.inboxes, readerSet, store },
       this.extras,
@@ -341,6 +345,22 @@ export class DirectMessageMailbox {
    */
   public checkHistoryDropped(session: Session): Promise<boolean> {
     return this.history.checkDropped(session);
+  }
+
+  /**
+   * Backup. Every stored direct record of this identity, oldest first. Rejects
+   * when the history cannot be read, so a failure never looks empty.
+   */
+  public exportHistory(session: Session): Promise<DirectMessageHistoryItem[]> {
+    return this.backup.export(session);
+  }
+
+  /** Backup. Stores restored records, skipping invalid or known ones. */
+  public importHistory(
+    session: Session,
+    items: DirectMessageHistoryItem[],
+  ): Promise<void> {
+    return this.backup.import(session, items);
   }
 
   /**

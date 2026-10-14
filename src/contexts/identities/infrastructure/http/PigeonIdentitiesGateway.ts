@@ -295,6 +295,13 @@ export class PigeonIdentitiesGateway {
     await this.identityCommands.disablePasskeyUnlock(session, nextPassword);
   }
 
+  public async confirmLocalUnlock(
+    identityId: string,
+    password?: string,
+  ): Promise<void> {
+    await this.identityCommands.confirmLocalUnlock(identityId, password);
+  }
+
   public async enablePasskeyUnlock(
     session: Session,
     currentPassword: string,

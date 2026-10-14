@@ -27,6 +27,7 @@ const REAL_CRYPTO_SPECS = [
   'DeviceRemovalDomainService',
   'DeviceSealedSecretCipher',
   'DirectMessageAuthorship',
+  'DirectMessageHistoryBackup',
   'DirectMessageHistoryTransfer',
   'DirectMessageMailbox',
   'DirectMessageMailboxAvailability',

@@ -20,6 +20,7 @@ import { DeviceIdentityProtector } from '../crypto/DeviceIdentityProtector';
 import { WebAuthnPasskeyPrf } from '../crypto/WebAuthnPasskeyPrf';
 import { DevicePasskeyUnlockDisabledError } from './DevicePasskeyUnlockDisabledError';
 import { DevicePasskeyUnlockEnabledError } from './DevicePasskeyUnlockEnabledError';
+import { DeviceUnlockNotConfirmedError } from './DeviceUnlockNotConfirmedError';
 import { IndexedDbDeviceIdentityVaultStore } from './IndexedDbDeviceIdentityVaultStore';
 import { LocalDeviceIdentityNotFoundError } from './LocalDeviceIdentityNotFoundError';
 
@@ -143,6 +144,28 @@ export class DeviceIdentityVault {
 
     assert(!current.passkey, new DevicePasskeyUnlockEnabledError());
     await this.replaceEnvelope(current, currentPassword, nextPassword);
+  }
+
+  /**
+   * Asks the person to prove they can unlock this device again, without
+   * changing anything: the passkey when enrolled, otherwise the password.
+   */
+  public async confirmUnlock(
+    identityId: IdentityId,
+    password?: string,
+  ): Promise<void> {
+    const record = await this.requiredRecord(identityId);
+
+    try {
+      const secret = record.passkey
+        ? await this.passkeys.evaluate(record.passkey)
+        : password;
+
+      assert(secret, new DeviceUnlockNotConfirmedError());
+      await this.protector.unlock(this.protectedIdentity(record), secret);
+    } catch {
+      throw new DeviceUnlockNotConfirmedError();
+    }
   }
 
   /** Turns passkey unlock off; the passkey must still confirm the change. */

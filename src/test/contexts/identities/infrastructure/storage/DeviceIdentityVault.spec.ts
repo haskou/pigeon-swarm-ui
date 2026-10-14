@@ -202,9 +202,9 @@ describe(DeviceIdentityVault.name, () => {
     await expect(
       vault.confirmUnlock(source.identityId, 'wrong password'),
     ).rejects.toBeInstanceOf(DeviceUnlockNotConfirmedError);
-    await expect(
-      vault.confirmUnlock(source.identityId),
-    ).rejects.toBeInstanceOf(DeviceUnlockNotConfirmedError);
+    await expect(vault.confirmUnlock(source.identityId)).rejects.toBeInstanceOf(
+      DeviceUnlockNotConfirmedError,
+    );
     expect(store.records.get(source.identityId.valueOf())).toBe(before);
   });
 
