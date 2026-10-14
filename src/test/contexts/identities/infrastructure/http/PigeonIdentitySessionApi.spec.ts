@@ -649,6 +649,23 @@ describe(PigeonIdentitySessionApi.name, () => {
     expect(recovery.resumeKeychainRewrap).not.toHaveBeenCalled();
   });
 
+  it('refuses the unlock on a keychain head it cannot read and never replaces that head', async () => {
+    const deviceSealedRoot = mock<DeviceSealedRootRotation>();
+    const recovery = mock<DeviceSealedRecovery>();
+    deviceSealedRoot.current.mockRejectedValue(
+      new Error('Device sealed root is not open.'),
+    );
+    const { identityId, sessionApi } = await unlockableDevice(
+      deviceSealedRoot,
+      recovery,
+    );
+
+    await expect(sessionApi.unlock(identityId, 'password')).rejects.toThrow(
+      copy.auth.deviceRootUnavailable,
+    );
+    expect(deviceSealedRoot.openAfterRecovery).not.toHaveBeenCalled();
+  });
+
   it('refuses the unlock when no root opens, even after rotating a lagging entry', async () => {
     const deviceSealedRoot = mock<DeviceSealedRootRotation>();
     const recovery = mock<DeviceSealedRecovery>();

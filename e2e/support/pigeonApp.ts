@@ -357,10 +357,7 @@ export async function authorizeDevicePairing(
   await fresh.getByTestId('auth-submit-button').click();
   await waitForWorkspace(fresh);
 
-  await authorized
-    .getByRole('button', { name: 'Close dialog' })
-    .last()
-    .click();
+  await authorized.getByRole('button', { name: 'Close dialog' }).last().click();
 }
 
 /**

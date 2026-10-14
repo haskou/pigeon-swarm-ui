@@ -234,6 +234,44 @@ Residual risks:
   and recent emoji preferences, the locally seen message ids, and the direct
   message availability records.
 
+## Recovery-key sign-in
+
+Recovery-key sign-in (`PigeonIdentitiesGateway.recover`) first proves the key:
+`PigeonDeviceAuthorizationApi.recover` derives the identity key and recovery
+authority from it, refuses a key whose identity id or recovery authority does
+not match the identity ("Recovery kit does not belong to this identity."),
+and submits a signed recovery transition that replaces every device with this
+one. Only then does `DeviceSealedRootRotation.openAfterRecovery` run:
+
+1. it replays the signed transitions (`verifiedDevices`, never the node's
+   device list) and refuses unless this device is the only authorized device;
+2. it generates a fresh device-sealed root and replaces any existing keychain
+   head, which cannot open under a root just generated, with an empty keychain
+   sealed under it, chained to the head it replaces
+   (`PigeonKeychainApi.replaceHeadAfterRecovery`);
+3. it then publishes the root sealed to this verified device only.
+
+The keychain head was sealed under the root of the replaced devices, which no
+authorized device holds any more, so its conversation keys are lost: every
+one-to-one and group conversation must invite the identity again. The login
+form says so under the recovery key input before the user confirms. A failed
+replacement publishes no root, so running the recovery again repeats both
+steps.
+
+Unlock and pairing never replace a head: they open the root with
+`DeviceSealedRootRotation.current`, which refuses to mint over a head it
+cannot read (unlock reports `deviceRootUnavailable`). A node that serves a
+corrupt or withheld head can stop an unlock or a pairing but cannot make
+either clear the keychain. During a real recovery a node can serve a fake
+head; the replacement then chains to that head and the node may accept or
+refuse it, which a node can already do to any keychain write.
+
+A history backup file exported before the recovery still opens after it: its
+key is derived from the identity root, which the recovery key rebuilds, not
+from the device-sealed root (see "History backup" below). It brings back the
+one-to-one history only; sending in those conversations still needs the new
+invitation.
+
 ## User-presence check before unlock
 
 Passkey mode is the user-presence check. A click or prompt that does not gate
@@ -357,6 +395,20 @@ screen no longer remembers the identity. It then serves a forged revocation to
 the signed-in surviving device for longer than the bound, and refuses the read
 and forges a revocation at its sign-in, and checks that none of these shows
 the removal notice or erases anything.
+
+Recovery-key sign-in: `DeviceSealedRootRotation.spec.ts` checks that
+`openAfterRecovery` refuses while the signed transitions authorize another
+device or a different one, when they do not verify, and on a session that
+already holds a root; that it replaces the head before publishing the root and
+publishes nothing when the replacement fails; and that `current` never replaces
+a corrupt or withheld head. `PigeonKeychainApi.spec.ts` checks the replacement
+chains to the unreadable head at the next version and opens under the new root,
+and leaves a readable or missing head alone. `PigeonIdentitiesGateway.spec.ts`
+and `PigeonIdentitySessionApi.spec.ts` check that a refused key opens no root,
+and that pairing and unlock over an unreadable head refuse without replacing
+it. `e2e/recovery-key-keychain.spec.ts` recovers on a new device against a
+real node after the identity saved a conversation key, checks the loss notice,
+and restores a backup exported before the recovery.
 
 ## Out of scope
 

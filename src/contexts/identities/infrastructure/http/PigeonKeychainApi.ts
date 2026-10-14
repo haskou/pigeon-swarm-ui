@@ -261,4 +261,38 @@ export class PigeonKeychainApi {
       deviceSealedRootKey: previousKey,
     });
   }
+
+  /**
+   * Replaces a head that does not open under the session's root with an empty
+   * keychain sealed under it, chained to the head it replaces. Only for a
+   * device a recovery kit authorized as the identity's only device: the root
+   * the head was sealed under left with the devices the recovery replaced, so
+   * its conversation keys cannot be read by anyone. A head already under the
+   * root, or a missing head, is left alone.
+   */
+  public async replaceHeadAfterRecovery(session: Session): Promise<void> {
+    if (!session.deviceSealedRootKey) {
+      throw new Error('Device sealed root is not open.');
+    }
+
+    await this.enqueuePublish(session.identity.id, async () => {
+      const resource = await this.undefinedWhenMissing(
+        async () => await this.fetchRemote(session),
+      );
+
+      if (!resource || this.cipher.isSealedUnderRoot(session, resource)) {
+        return;
+      }
+
+      const unreadable: KeychainHead = {
+        keychain: { conversations: {}, version: resource.version },
+        keychainExternalIdentifier: resource.keychainExternalIdentifier,
+      };
+
+      await this.postKeychain(session, unreadable, {
+        conversations: {},
+        version: resource.version,
+      });
+    });
+  }
 }

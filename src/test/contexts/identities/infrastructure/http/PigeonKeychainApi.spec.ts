@@ -663,5 +663,68 @@ describe(PigeonKeychainApi.name, () => {
         });
       });
     });
+
+    describe('replaceHeadAfterRecovery', () => {
+      it('replaces a head no root opens with an empty keychain under the session root, chained to the head it replaces', async () => {
+        const server = new FakeKeychainServer();
+        server.seedSealed(sealedUnder(otherKey), 'kc-1', 1);
+
+        await apiOver(server).replaceHeadAfterRecovery(
+          sessionWith({ deviceSealedRootKey: rootKey }),
+        );
+
+        const stored = server.handle('GET') as KeychainResource;
+
+        expect(stored).toMatchObject({
+          keychainExternalIdentifier: 'kc-2',
+          previousKeychainExternalIdentifier: 'kc-1',
+          version: 2,
+        });
+        expect(
+          JSON.parse(
+            rootKey
+              .decrypt(new EncryptedPayload(stored.encryptedPayload))
+              .toString(),
+          ),
+        ).toMatchObject({ conversations: {}, version: 2 });
+      });
+
+      it('leaves a head already sealed under the session root alone', async () => {
+        const server = new FakeKeychainServer();
+        server.seedSealed(sealedUnder(rootKey), 'kc-1', 1);
+
+        await apiOver(server).replaceHeadAfterRecovery(
+          sessionWith({ deviceSealedRootKey: rootKey }),
+        );
+
+        expect(server.handle('GET')).toMatchObject({
+          keychainExternalIdentifier: 'kc-1',
+          version: 1,
+        });
+      });
+
+      it('publishes nothing when the identity has no keychain yet', async () => {
+        const server = new FakeKeychainServer();
+
+        await apiOver(server).replaceHeadAfterRecovery(
+          sessionWith({ deviceSealedRootKey: rootKey }),
+        );
+
+        expect(() => server.handle('GET')).toThrow(HttpJsonError);
+      });
+
+      it('publishes nothing without a root', async () => {
+        const server = new FakeKeychainServer();
+        server.seedSealed(sealedUnder(otherKey), 'kc-1', 1);
+
+        await expect(
+          apiOver(server).replaceHeadAfterRecovery(sessionWith()),
+        ).rejects.toThrow();
+        expect(server.handle('GET')).toMatchObject({
+          keychainExternalIdentifier: 'kc-1',
+          version: 1,
+        });
+      });
+    });
   });
 });

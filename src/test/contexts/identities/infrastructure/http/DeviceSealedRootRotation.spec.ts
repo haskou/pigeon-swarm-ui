@@ -1,7 +1,6 @@
 import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
 
-import type { DeviceCredential } from '../../../../../contexts/identities/domain/value-objects/DeviceCredential';
 import type { PigeonDeviceAuthorizationApi } from '../../../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
 import type { PigeonDeviceSealedSecretApi } from '../../../../../contexts/identities/infrastructure/http/PigeonDeviceSealedSecretApi';
 import type { PigeonKeychainApi } from '../../../../../contexts/identities/infrastructure/http/PigeonKeychainApi';
@@ -9,6 +8,7 @@ import type { LocalKeychain } from '../../../../../contexts/identities/infrastru
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
+import { DeviceCredential } from '../../../../../contexts/identities/domain/value-objects/DeviceCredential';
 import { DeviceSealedRootRotation } from '../../../../../contexts/identities/infrastructure/http/DeviceSealedRootRotation';
 import {
   decodeBase64Url,
@@ -322,6 +322,25 @@ describe('DeviceSealedRootRotation', () => {
       expect(sealedSecrets.publish).not.toHaveBeenCalled();
     });
 
+    it('never replaces a keychain head it cannot read, so a node serving a corrupt head cannot clear it', async () => {
+      const { keychains, rotation } = setup(1_000);
+      keychains.readHead.mockRejectedValue(new Error('corrupt head'));
+
+      await expect(rotation.current(makeSession(4))).rejects.toThrow(
+        'corrupt head',
+      );
+      expect(keychains.replaceHeadAfterRecovery).not.toHaveBeenCalled();
+    });
+
+    it('never replaces a keychain head the node withholds', async () => {
+      const { keychains, rotation } = setup(1_000);
+      keychains.readHead.mockResolvedValue(undefined);
+
+      await rotation.current(makeSession(4));
+
+      expect(keychains.replaceHeadAfterRecovery).not.toHaveBeenCalled();
+    });
+
     it('mints the first entry when the identity keychain head is readable', async () => {
       const { keychains, rotation, sealedSecrets } = setup(1_000);
       keychains.readHead.mockResolvedValue({
@@ -384,6 +403,133 @@ describe('DeviceSealedRootRotation', () => {
       });
 
       await expect(rotation.current(makeSession(4))).rejects.toThrow();
+    });
+  });
+
+  describe('openAfterRecovery', () => {
+    const credential = (fill: string): string =>
+      `-----BEGIN PUBLIC KEY-----\n${fill.repeat(60)}\n-----END PUBLIC KEY-----\n`;
+    const OWN = credential('A');
+    const OTHER = credential('B');
+    const recovered = (): SessionWithRoot =>
+      ({
+        ...makeSession(7),
+        deviceCredentialKeyPair: {
+          toPrimitives: () => ({ publicKey: OWN }),
+        },
+      }) as unknown as SessionWithRoot;
+
+    it('mints a fresh root on the only device the recovery left, replacing the head no device can open before publishing the root', async () => {
+      const { deviceAuthorization, keychains, rotation, sealedSecrets } =
+        setup(1_000);
+      deviceAuthorization.verifiedDevices.mockResolvedValue([
+        DeviceCredential.fromString(OWN),
+      ]);
+
+      const opened = await rotation.openAfterRecovery(recovered());
+
+      expect(keychains.readHead).not.toHaveBeenCalled();
+      expect(sealedSecrets.publish).toHaveBeenCalledTimes(1);
+      expect(opened.deviceSealedRootKey).toBeDefined();
+      expect(keychains.replaceHeadAfterRecovery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          deviceSealedRootKey: opened.deviceSealedRootKey,
+        }),
+      );
+      // A root published over a head it does not open would let a password
+      // unlock reach a keychain it cannot read; a failed replacement leaves
+      // nothing published, so the recovery is simply run again.
+      expect(
+        keychains.replaceHeadAfterRecovery.mock.invocationCallOrder[0],
+      ).toBeLessThan(sealedSecrets.publish.mock.invocationCallOrder[0]);
+    });
+
+    it('seals the fresh root only to the verified device, never to a device the node lists', async () => {
+      const { deviceAuthorization, rotation, sealedSecrets } = setup(1_000);
+      const own = DeviceCredential.fromString(OWN);
+      deviceAuthorization.verifiedDevices.mockResolvedValue([own]);
+      deviceAuthorization.findDevices.mockResolvedValue([
+        own,
+        DeviceCredential.fromString(OTHER),
+      ]);
+
+      await rotation.openAfterRecovery(recovered());
+
+      expect(deviceAuthorization.findDevices).not.toHaveBeenCalled();
+      expect(sealedSecrets.publish).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ recipients: [own] }),
+      );
+    });
+
+    it('publishes no root when the head cannot be replaced', async () => {
+      const { deviceAuthorization, keychains, rotation, sealedSecrets } =
+        setup(1_000);
+      deviceAuthorization.verifiedDevices.mockResolvedValue([
+        DeviceCredential.fromString(OWN),
+      ]);
+      keychains.replaceHeadAfterRecovery.mockRejectedValue(new Error('409'));
+
+      await expect(rotation.openAfterRecovery(recovered())).rejects.toThrow(
+        '409',
+      );
+      expect(sealedSecrets.publish).not.toHaveBeenCalled();
+    });
+
+    it('refuses while the signed transitions authorize another device, which may still open the head', async () => {
+      const { deviceAuthorization, keychains, rotation, sealedSecrets } =
+        setup(1_000);
+      deviceAuthorization.verifiedDevices.mockResolvedValue([
+        DeviceCredential.fromString(OWN),
+        DeviceCredential.fromString(OTHER),
+      ]);
+
+      await expect(rotation.openAfterRecovery(recovered())).rejects.toThrow();
+      expect(sealedSecrets.publish).not.toHaveBeenCalled();
+      expect(keychains.replaceHeadAfterRecovery).not.toHaveBeenCalled();
+    });
+
+    it('refuses when the only authorized device is not this one', async () => {
+      const { deviceAuthorization, keychains, rotation, sealedSecrets } =
+        setup(1_000);
+      deviceAuthorization.verifiedDevices.mockResolvedValue([
+        DeviceCredential.fromString(OTHER),
+      ]);
+
+      await expect(rotation.openAfterRecovery(recovered())).rejects.toThrow();
+      expect(sealedSecrets.publish).not.toHaveBeenCalled();
+      expect(keychains.replaceHeadAfterRecovery).not.toHaveBeenCalled();
+    });
+
+    it('refuses when the served transitions do not verify', async () => {
+      const { deviceAuthorization, keychains, rotation, sealedSecrets } =
+        setup(1_000);
+      deviceAuthorization.verifiedDevices.mockRejectedValue(
+        new Error('unproven'),
+      );
+
+      await expect(rotation.openAfterRecovery(recovered())).rejects.toThrow(
+        'unproven',
+      );
+      expect(sealedSecrets.publish).not.toHaveBeenCalled();
+      expect(keychains.replaceHeadAfterRecovery).not.toHaveBeenCalled();
+    });
+
+    it('refuses a session that already holds a root', async () => {
+      const { deviceAuthorization, keychains, rotation, sealedSecrets } =
+        setup(1_000);
+      deviceAuthorization.verifiedDevices.mockResolvedValue([
+        DeviceCredential.fromString(OWN),
+      ]);
+
+      await expect(
+        rotation.openAfterRecovery({
+          ...recovered(),
+          deviceSealedRootKey: SymmetricKey.generate(),
+        }),
+      ).rejects.toThrow();
+      expect(sealedSecrets.publish).not.toHaveBeenCalled();
+      expect(keychains.replaceHeadAfterRecovery).not.toHaveBeenCalled();
     });
   });
 

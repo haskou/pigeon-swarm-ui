@@ -81,9 +81,11 @@ downloads one encrypted file that holds no message or handle in clear;
 another identity and a file with one changed character are refused; once the
 same device has lost its stored history and the node serves it no envelopes,
 the file restores the history rows, and both sides of the conversation show
-after a new sign-in) runs on `desktop-chromium`. It restores on the same
-device because recovery-key sign-in fails once the identity has a keychain
-head (#464).
+after a new sign-in) runs on `desktop-chromium`.
+`recovery-key-keychain.spec.ts` (an identity that saved a conversation key
+signs in with its recovery key on a new device, sees the notice that its
+conversations must invite it again, and restores a backup exported before the
+recovery) runs on `desktop-chromium`.
 `passkey-unlock.spec.ts` (switching this device from a password to a passkey
 and unlocking with it) runs on `desktop-chromium` only: it uses a DevTools
 virtual authenticator with PRF and opens the app through `localhost`, because

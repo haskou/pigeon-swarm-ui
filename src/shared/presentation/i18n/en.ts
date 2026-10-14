@@ -151,10 +151,12 @@ export const en = {
     peersLabel: 'Peers',
     profileNameLabel: 'Profile name',
     recoveryKeyCreateHelp:
-      'Save this key. It signs you back in to your identity from another node or browser. It restores sign-in, not a copy of your messages: history comes back only for conversations whose keys were saved in your keychain.',
+      'Save this key. It signs you back in to your identity from another node or browser if you lose every device. It restores sign-in, not your conversations: their keys stay on your devices, so after a recovery each conversation must invite you again. Export a history backup to keep your one-to-one messages.',
     recoveryKeyLabel: 'Recovery key',
     recoveryKeyLoginHelp:
-      'Paste the recovery key you saved when you created your identity (it starts with psrk1). It restores sign-in and your identity on this device. Devices you used before will stop working. Conversation history comes back only for conversations whose keys were saved in your keychain.',
+      'Paste the recovery key you saved when you created your identity (it starts with psrk1). It restores sign-in and your identity on this device. Devices you used before will stop working.',
+    recoveryKeyLossWarning:
+      'Recovering loses the keys of every conversation you had. Your one-to-one chats and groups must invite you again before you can read or send in them. Earlier one-to-one messages come back only from a history backup file you exported before.',
     recoveryKeyPlaceholder: 'psrk1...',
     recoveryKeyRegenerate: 'Regenerate',
     recoveryKeySaved: 'I saved my recovery key',
