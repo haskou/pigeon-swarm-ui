@@ -10,6 +10,7 @@ const maximumPeerRecoveryAttempts = 3;
 const peerRestartOutcomeWaitMs = 15_000;
 const credentialRefreshTimeoutMs = 15_000;
 const disruptionCooldownMs = 5_000;
+const politeDisruptionDelayMs = 3_000;
 
 export class CallPeerRecovery {
   private readonly exhausted = new Set<string>();
@@ -266,10 +267,16 @@ export class CallPeerRecovery {
    * restarted, and the restart budget is reset because the cause is external.
    * Restarts are spaced by `disruptionCooldownMs` so a flapping network cannot
    * restart a peer in a storm.
+   *
+   * A disruption usually reaches both peers at once. The impolite peer restarts
+   * immediately and the polite peer waits for that offer: had both offered,
+   * the polite peer would roll back its own ICE-restart offer, and Chromium
+   * then keeps that peer's audio sender silent for the rest of the call.
    */
   public disrupt(
     peerIdentityId: string,
     peer: RTCPeerConnection,
+    polite: boolean,
     isCurrent: () => boolean,
   ): void {
     if (!this.isDisruptable(peerIdentityId, peer, isCurrent)) return;
@@ -287,7 +294,13 @@ export class CallPeerRecovery {
 
     this.release(peerIdentityId);
     logCallWarning('peer-manager:ice-recovery:disruption');
-    this.schedule(peerIdentityId, peer, 0, 0, isCurrent);
+    this.schedule(
+      peerIdentityId,
+      peer,
+      0,
+      polite ? politeDisruptionDelayMs : 0,
+      isCurrent,
+    );
   }
 
   public stateFor(peerIdentityId: string): CallPeerRecoveryState {

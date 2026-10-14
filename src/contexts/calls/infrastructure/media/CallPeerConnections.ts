@@ -492,6 +492,7 @@ export class CallPeerConnections {
       this.recovery.disrupt(
         identityId,
         peer,
+        this.negotiation.state(identityId).polite,
         () => this.peers.get(identityId) === peer,
       );
     });
