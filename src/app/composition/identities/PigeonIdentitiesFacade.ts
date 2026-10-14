@@ -73,7 +73,6 @@ export class PigeonIdentitiesFacade {
     await this.gateway.disablePasskeyUnlock(session, nextPassword);
   }
 
-  /** Replaces this device's password unlock with a user-verified passkey. */
   /** Asks for the device password or passkey again; changes nothing. */
   public async confirmLocalUnlock(
     identityId: string,
@@ -82,6 +81,7 @@ export class PigeonIdentitiesFacade {
     await this.gateway.confirmLocalUnlock(identityId, password);
   }
 
+  /** Replaces this device's password unlock with a user-verified passkey. */
   public async enablePasskeyUnlock(
     session: Session,
     currentPassword: string,
