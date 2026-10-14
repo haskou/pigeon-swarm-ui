@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { cx } from '../../../../shared/presentation/cx';
+import { MESSAGE_CONTENT_MAX_LENGTH } from '../../domain/MessageContentConstraints';
 
 type InlineToken =
   | { children: InlineToken[]; type: 'bold' | 'italic' | 'strike' }
@@ -34,6 +35,17 @@ export function MarkdownMessage({
   mine: boolean;
   onMentionClick?: (identityId: string, target: HTMLElement) => void;
 }) {
+  // The composer caps messages at MESSAGE_CONTENT_MAX_LENGTH. Longer content
+  // comes from another client and could keep the formatting parser busy for
+  // seconds, so it is shown as text with links and mentions only.
+  if (content.length > MESSAGE_CONTENT_MAX_LENGTH) {
+    const tokens: InlineToken[] = [];
+
+    pushTextWithAutoLinks(tokens, content, mentions);
+
+    return <>{renderInline(tokens, mine, 'plain', onMentionClick)}</>;
+  }
+
   if (!hasMarkdownSyntax(content)) {
     return (
       <>
