@@ -156,11 +156,59 @@ grant `manage_members`.
   comes first, to bound post-compromise exposure.
 
 Every commit is checked against these rules both when it is made and when it
-is received; a commit that breaks them is skipped and the epoch does not
-advance. A welcome opens only when the node names a manager as its author and
-that manager holds a leaf in the welcomed group, so a member cannot welcome
-anyone into a look-alike group. A removed device rejoins only from a welcome
-newer than its last membership.
+is received, by the roster at the revision the commit binds (see "Which
+roster judges a commit"); a commit that breaks them is skipped and the epoch
+does not advance. A welcome opens only when the node names as its author a
+manager, by the roster at the revision the welcome binds, who holds a leaf in
+the welcomed group, and every leaf in its tree is a member at that revision,
+so a member cannot welcome anyone into a look-alike group. A removed device
+rejoins only from a welcome newer than its last membership.
+
+### Which roster judges a commit
+
+Members fold the signed operations at their own pace and the node may hand
+them in any order, so "the latest roster" differs between members. A commit
+is therefore judged by the roster its committer saw, not by the receiver's
+latest one, and every member reaches the same verdict whatever order it sees
+a demotion in (#420):
+
+- Each commit binds a roster revision, its frontier: the sorted digests of
+  the newest signed operations the committer had folded, standing for them
+  and everything they descend from (`CommunityRosterHistory.heads`). The
+  commit carries it as MLS authenticated data and its welcome as GroupInfo
+  extension `0xf420`, both encoded as `pigeon:community-frontier:v1\n`
+  followed by the digests, one per line, at most 256 (`MlsRosterFrontier`).
+- A receiver replays the roster from the operations the frontier stands for
+  (`CommunityRosterHistory.rosterAt`) and checks the commit against it. A
+  frontier that names an operation the receiver has not verified judges
+  nothing yet: the commit is skipped until the operation arrives.
+- A group remembers the frontier of the last commit it applied, its baseline.
+  A commit is accepted only when its frontier stands for every operation of
+  the baseline (`CommunityRosterHistory.follows`), so revisions only move
+  forward along the commit chain.
+- A manager whose group bound a revision granting other rights than the
+  latest one commits an empty update binding the latest revision on its next
+  `reconcile` (`MlsCommunityEngine.bindRoster`).
+
+What a node or a member can forge about this order:
+
+- The node cannot forge or alter an operation (signed by its author's
+  identity key) or a frontier (signed by the committer's leaf, under the
+  epoch's AEAD). It can only withhold operations or commits, which delays a
+  verdict and never changes it.
+- A committer chooses which existing revision to bind, never one that does
+  not exist. A demoted manager can backdate an add to a revision before the
+  demotion, as long as no commit has yet bound the demotion or anything after
+  it; that window closes once a manager who saw the demotion reconciles, and
+  a backdated commit that loses the race for its epoch is discarded by the
+  lowest-id rule like any other.
+- A device joining from a welcome has no baseline yet, so it cannot tell a
+  backdated welcome from an honest one. Such a welcome lands a roster member
+  on a fork no other member follows; it never admits anyone the bound roster
+  did not, and the member rejoins from the next welcome.
+- A commit or welcome that binds no revision (made before #420) is judged by
+  the roster of no operations, which admits nobody, so such a group stops
+  taking membership commits until a manager binds a revision.
 
 ### Where community roles get their trust
 
@@ -264,7 +312,8 @@ and attachments, and a missing group is an error, not a fallback.
   this device has not decrypted yet becomes unreadable.
 - The roster, not MLS, is authoritative. Clients refuse to add identities that
   are not on the roster. In a community, every add or removal commit, made or
-  received, is checked against the community roster (see "Who commits"). In a
+  received, is checked against the community roster at the revision it binds
+  (see "Which roster judges a commit"). In a
   group conversation, every add or removal commit, made or received, is
   checked against the conversation roster: only the creator and the admins
   still on it (every member when it names neither) add devices or remove

@@ -6,7 +6,7 @@ import type { MlsGroupCredentials } from '../../../contexts/communities/infrastr
 import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { MessageResource } from '../../../contexts/messages/infrastructure/http/MessageResource';
 
-import { CommunityMlsRoster } from '../../../contexts/communities/domain/CommunityMlsRoster';
+import { CommunityRosterHistory } from '../../../contexts/communities/domain/CommunityRosterHistory';
 import { IndexedDbMlsStateStore } from '../../../contexts/communities/infrastructure/mls/IndexedDbMlsStateStore';
 import { MlsCommunityEngine } from '../../../contexts/communities/infrastructure/mls/MlsCommunityEngine';
 import { MlsLeafSigner } from '../../../contexts/communities/infrastructure/mls/MlsLeafSigner';
@@ -40,12 +40,12 @@ export class PigeonMlsFacade {
     private readonly operations: PigeonCommunityOperationsApi,
   ) {}
 
-  /** Who may change the group, replayed from the community's signed history. */
-  private async roster(
+  /** Who may change the group, as the community's signed history. */
+  private async history(
     session: Session,
     communityId: string,
-  ): Promise<CommunityMlsRoster> {
-    return CommunityMlsRoster.replay(
+  ): Promise<CommunityRosterHistory> {
+    return CommunityRosterHistory.of(
       await this.operations.list(session, communityId),
     );
   }
@@ -97,7 +97,7 @@ export class PigeonMlsFacade {
           communityId,
         ),
       (groupId) => async () =>
-        await this.roster(holder.session, communityIdOf(groupId)),
+        await this.history(holder.session, communityIdOf(groupId)),
     );
     this.engines.set(key, holder);
 

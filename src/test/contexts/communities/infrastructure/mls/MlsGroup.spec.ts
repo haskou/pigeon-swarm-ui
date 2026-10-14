@@ -22,6 +22,7 @@ let allows: (change: MlsMembershipChange) => boolean;
 const policy: MlsMembershipPolicy = {
   admits: (identityId) => members.has(identityId),
   allows: (change) => allows(change),
+  frontier: () => [],
 };
 const idOf = (name: string): string => cast[name].id;
 const idsOf = (...names: string[]): string[] => names.map(idOf).sort();
@@ -417,7 +418,7 @@ describe('MlsGroup on the real ts-mls library', () => {
         epoch: output.epoch,
         id: 'c-mallory',
       }),
-    ).rejects.toThrow('validate credential');
+    ).rejects.toThrow('Commit rejected');
     expect(bob.group.identities()).not.toContain(idOf('mallory'));
   });
 
@@ -503,6 +504,7 @@ describe('MlsGroup on the real ts-mls library', () => {
       bob.key.owner,
       policy,
       bob.group.serialize(),
+      bob.group.frontier,
     );
 
     const sealed = await alice.group.encrypt(text.encode('after restart'));

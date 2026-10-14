@@ -8,7 +8,7 @@ import type { MlsRecordTransport } from '../../../../../contexts/communities/inf
 import type { MlsStateStore } from '../../../../../contexts/communities/infrastructure/mls/MlsStateStore';
 import type { StoredMlsKeyPackage } from '../../../../../contexts/communities/infrastructure/mls/StoredMlsKeyPackage';
 
-import { CommunityMlsRoster } from '../../../../../contexts/communities/domain/CommunityMlsRoster';
+import { CommunityRosterHistory } from '../../../../../contexts/communities/domain/CommunityRosterHistory';
 import { CommunityOperationProof } from '../../../../../contexts/communities/infrastructure/http/CommunityOperationProof';
 import { deriveMlsRecordId } from '../../../../../contexts/communities/infrastructure/http/deriveMlsRecordId';
 import { MlsCommunityEngine } from '../../../../../contexts/communities/infrastructure/mls/MlsCommunityEngine';
@@ -129,32 +129,81 @@ describe('MlsCommunityEngine', () => {
   let tamper: (history: CommunityOperationHistory, managers: string) => void;
   /** A key that is no member's identity key, as a node's would be. */
   let nodeKey: KeyPair;
+  /** The history so far, and the roster, moderators and tamper it holds. */
+  let signed:
+    | {
+        applied: typeof tamper;
+        history: CommunityOperationHistory;
+        managers: string;
+        members: Set<string>;
+        moderating: Set<string>;
+      }
+    | undefined;
   const id = (name: string): string => cast[name].id;
-  /**
-   * The community's signed history: the owner alice creates it and a role
-   * that may add members, adds everyone on the roster and gives the
-   * moderators that role.
-   */
-  const historyOf = (): CommunityOperationHistory => {
+  const startHistory = (): NonNullable<typeof signed> => {
     const history = new CommunityOperationHistory(cast.alice);
     const managers = history.createRole(cast.alice, ['manage_members']);
-    const others = Object.values(cast).filter(
-      (member) => member !== cast.alice,
-    );
 
-    for (const member of others) {
-      if (roster.has(member.id)) history.add(cast.alice, member);
-    }
+    return {
+      applied: () => undefined,
+      history,
+      managers,
+      members: new Set([id('alice')]),
+      moderating: new Set(),
+    };
+  };
+  /** Appends the operations that bring the history up to `roster`. */
+  const followRoster = (state: NonNullable<typeof signed>): void => {
+    for (const member of Object.values(cast)) {
+      const wanted = roster.has(member.id);
 
-    for (const member of others) {
-      if (moderators.has(member.id)) {
-        history.assign(cast.alice, member, [managers]);
+      if (wanted !== state.members.has(member.id)) {
+        if (wanted) {
+          state.history.add(cast.alice, member);
+          state.members.add(member.id);
+        } else {
+          state.history.kick(cast.alice, member);
+          state.members.delete(member.id);
+        }
       }
     }
+  };
+  /** Appends the role changes that bring the history up to `moderators`. */
+  const followModerators = (state: NonNullable<typeof signed>): void => {
+    for (const member of Object.values(cast)) {
+      const wanted = moderators.has(member.id);
 
-    tamper(history, managers);
+      if (wanted !== state.moderating.has(member.id)) {
+        state.history.assign(
+          cast.alice,
+          member,
+          wanted ? [state.managers] : [],
+        );
 
-    return history;
+        if (wanted) state.moderating.add(member.id);
+        else state.moderating.delete(member.id);
+      }
+    }
+  };
+  /**
+   * The community's signed history: the owner alice creates it and a role
+   * that may add members, then adds and kicks whoever joins or leaves the
+   * roster and gives or takes the role as moderators change. It only ever
+   * grows, as a real community's does.
+   */
+  const historyOf = (): CommunityOperationHistory => {
+    const state = signed ?? startHistory();
+
+    signed = state;
+    followRoster(state);
+    followModerators(state);
+
+    if (state.applied !== tamper) {
+      tamper(state.history, state.managers);
+      state.applied = tamper;
+    }
+
+    return state.history;
   };
   const engineFor = (name: string, store = createStore(), device = 'd1') => ({
     engine: new MlsCommunityEngine(
@@ -162,7 +211,7 @@ describe('MlsCommunityEngine', () => {
       store,
       () => node.transportFor(id(name)),
       () => () =>
-        Promise.resolve(CommunityMlsRoster.replay(historyOf().operations())),
+        Promise.resolve(CommunityRosterHistory.of(historyOf().operations())),
     ),
     store,
   });
@@ -170,13 +219,14 @@ describe('MlsCommunityEngine', () => {
   const rogueGroupOf = async (
     name: string,
     store: MlsStateStore,
-    frontier: string[] = [],
+    frontier = CommunityRosterHistory.of(historyOf().operations()).heads(),
   ): Promise<MlsGroup> =>
     MlsGroup.restore(
       COMMUNITY,
       cast[name].signer().owner,
       { ...anything, frontier: () => frontier },
       (await store.loadGroup(COMMUNITY)) as Uint8Array,
+      frontier,
     );
   const keyPackageOf = (name: string): Uint8Array =>
     Buffer.from(
@@ -223,6 +273,7 @@ describe('MlsCommunityEngine', () => {
     roster = new Set([id('alice'), id('bob'), id('carol')]);
     moderators = new Set();
     tamper = () => undefined;
+    signed = undefined;
   });
 
   const admitBob = async (): Promise<{

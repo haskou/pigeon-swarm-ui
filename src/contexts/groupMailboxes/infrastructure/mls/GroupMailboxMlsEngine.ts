@@ -277,6 +277,7 @@ export class GroupMailboxMlsEngine {
       this.signer.owner,
       this.policyFor(conversationId),
       bytes,
+      [],
     );
 
     await this.reconcile(group);
@@ -330,6 +331,7 @@ export class GroupMailboxMlsEngine {
         this.signer.owner,
         this.policyFor(group.groupId),
         pending.state,
+        [],
       );
 
       return {
@@ -353,12 +355,17 @@ export class GroupMailboxMlsEngine {
     };
   }
 
+  /**
+   * A conversation's groups judge every leaf and commit by its latest
+   * roster, so they bind no roster revision.
+   */
   private policyFor(conversationId: string): MlsMembershipPolicy {
     return {
       admits: (identityId) =>
         this.rosters.get(conversationId)?.has(identityId) ?? false,
       allows: (change) =>
         this.rosters.get(conversationId)?.allowsCommit(change) ?? false,
+      frontier: () => [],
     };
   }
 

@@ -106,6 +106,14 @@ export class CommunityOperationHistory {
     });
   }
 
+  /** `author` kicks `member` out, as a manager does. */
+  public kick(
+    author: CommunityOperationAuthor,
+    member: CommunityOperationAuthor,
+  ): void {
+    this.append(author, 'member_kicked', { identityId: member.id });
+  }
+
   /** The operations a member opens from what the node serves. */
   public operations(): CommunityOperation[] {
     return this.documents.flatMap(
