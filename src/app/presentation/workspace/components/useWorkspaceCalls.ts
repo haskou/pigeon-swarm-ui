@@ -104,6 +104,12 @@ export function useWorkspaceCalls({
   const reconcileCallResourceRef = useRef<(call: CallResource) => void>(
     () => undefined,
   );
+  const followSupersededCallRef = useRef<(call: CallResource) => void>(
+    () => undefined,
+  );
+  const followSupersededCall = useCallback((call: CallResource) => {
+    followSupersededCallRef.current(call);
+  }, []);
   const {
     activeCall,
     callMediaConnections,
@@ -211,6 +217,7 @@ export function useWorkspaceCalls({
       callDetailsForResource,
       currentIdentityId: session.identity.id,
       endCall,
+      followSupersededCall,
       reconcileCall,
       setCommunities: onCommunitiesChange,
     });
@@ -292,6 +299,7 @@ export function useWorkspaceCalls({
   const {
     acceptIncomingCall,
     declineIncomingCall,
+    followSupersededCall: followSupersededCallFromStart,
     isCallActionInProgress,
     startCommunityVoiceCall,
     startConversationCall,
@@ -313,6 +321,11 @@ export function useWorkspaceCalls({
     startCall,
     stopLocalAudio,
   });
+
+  useEffect(() => {
+    followSupersededCallRef.current = followSupersededCallFromStart;
+  }, [followSupersededCallFromStart]);
+
   const heartbeatActiveCall = useCallback(
     async (
       callId: string,
@@ -334,8 +347,26 @@ export function useWorkspaceCalls({
     onAccessDenied: (callId) => {
       if (activeCallRef.current?.id !== callId) return;
 
-      endCall();
-      removeCurrentIdentityFromVoicePresence();
+      const endDeniedCall = (): void => {
+        if (activeCallRef.current?.id !== callId) return;
+
+        endCall();
+        removeCurrentIdentityFromVoicePresence();
+      };
+
+      if (activeCallRef.current.kind !== 'community-voice') {
+        endDeniedCall();
+
+        return;
+      }
+
+      void applicationContainer.calls
+        .get(sessionRef.current, callId)
+        .then((call) => {
+          if (call.supersededByCallId) reconcileCallResource(call);
+          else endDeniedCall();
+        })
+        .catch(endDeniedCall);
     },
   });
 

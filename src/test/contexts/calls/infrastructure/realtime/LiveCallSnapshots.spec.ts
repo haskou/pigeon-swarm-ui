@@ -47,6 +47,21 @@ describe('LiveCallSnapshots', () => {
     expect(call?.participants[0]).not.toHaveProperty('joinedAt');
   });
 
+  it('keeps the winning call named by a superseded community snapshot', () => {
+    const snapshots = new LiveCallSnapshots();
+    const superseded = event(1);
+    superseded.attributes.liveCall = {
+      ...(superseded.attributes.liveCall as Record<string, unknown>),
+      status: 'ended',
+      supersededByCallId: 'call-b',
+    };
+
+    expect(snapshots.receive(superseded)).toMatchObject({
+      status: 'ended',
+      supersededByCallId: 'call-b',
+    });
+  });
+
   it('ignores duplicate and out-of-order deliveries while accepting a fresh connection counter', () => {
     const snapshots = new LiveCallSnapshots();
     snapshots.receive(event(4));

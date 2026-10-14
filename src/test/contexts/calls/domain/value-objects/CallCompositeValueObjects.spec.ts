@@ -20,6 +20,20 @@ describe('call composite value objects', () => {
     });
   });
 
+  it('keeps the winning call of a superseded lifecycle', () => {
+    const lifecycle = CallLifecycle.fromPrimitives({
+      endedAt: 200,
+      status: 'ended',
+      supersededByCallId: 'call-b',
+    });
+
+    expect(lifecycle.toPrimitives()).toEqual({
+      endedAt: 200,
+      status: 'ended',
+      supersededByCallId: 'call-b',
+    });
+  });
+
   it('returns new participant timelines for lifecycle changes', () => {
     const original = CallParticipantTimeline.fromPrimitives({});
     const joined = original.join(new Timestamp(100));

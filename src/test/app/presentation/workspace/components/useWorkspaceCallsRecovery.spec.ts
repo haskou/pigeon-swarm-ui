@@ -1,12 +1,16 @@
+import type { CallResource } from '../../../../../contexts/calls/infrastructure/http/resources/CallResource';
 import type { CallSession } from '../../../../../contexts/calls/presentation/view-models/CallSession';
 import type { CommunityResource as Community } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
+import { applicationContainer } from '../../../../../app/composition/applicationContainer';
 import { communityVoiceChannelTopologyKey } from '../../../../../app/presentation/workspace/components/communityVoicePresence';
 import { useWorkspaceCallHeartbeat } from '../../../../../app/presentation/workspace/components/useWorkspaceCallHeartbeat';
 import { useWorkspaceCalls } from '../../../../../app/presentation/workspace/components/useWorkspaceCalls';
 import { useWorkspaceRealtimeCallEvents } from '../../../../../app/presentation/workspace/components/useWorkspaceRealtimeCallEvents';
 import { useCallSession } from '../../../../../contexts/calls/presentation/hooks/useCallSession';
+
+const mockReconcileCallResource = jest.fn();
 
 jest.mock('react', () => ({
   useCallback: (callback: unknown) => callback,
@@ -14,7 +18,7 @@ jest.mock('react', () => ({
   useRef: (current: unknown) => ({ current }),
 }));
 jest.mock('../../../../../app/composition/applicationContainer', () => ({
-  applicationContainer: { calls: {} },
+  applicationContainer: { calls: { get: jest.fn() } },
 }));
 jest.mock(
   '../../../../../contexts/calls/presentation/hooks/useCallSession',
@@ -35,7 +39,10 @@ jest.mock(
 jest.mock(
   '../../../../../app/presentation/workspace/components/useCallResourceReconciliation',
   () => ({
-    useCallResourceReconciliation: () => ({ setIncomingCall: jest.fn() }),
+    useCallResourceReconciliation: () => ({
+      reconcileCallResource: mockReconcileCallResource,
+      setIncomingCall: jest.fn(),
+    }),
   }),
 );
 jest.mock(
@@ -139,6 +146,91 @@ describe('workspace terminal heartbeat denial', () => {
         expectedPresence,
       );
       expect(endCall).toHaveBeenCalledTimes(shouldEnd ? 1 : 0);
+    },
+  );
+});
+
+describe('workspace heartbeat denial of a superseded community call', () => {
+  function deniedCommunityCall(snapshot: Promise<CallResource>): {
+    endCall: jest.Mock;
+    settled: Promise<void>;
+  } {
+    jest.clearAllMocks();
+    const endCall = jest.fn();
+    jest.mocked(useCallSession).mockReturnValue({
+      endCall,
+    } as unknown as ReturnType<typeof useCallSession>);
+    jest.mocked(applicationContainer.calls.get).mockReturnValue(snapshot);
+    const session = { identity: { id: 'alice' } } as Session;
+    useWorkspaceCalls({
+      activeCommunity: null,
+      communities: [],
+      communityVoiceTopologyKey: '',
+      conversations: [],
+      identityNames: {},
+      identityPictures: {},
+      identityProfiles: {},
+      onCommunitiesChange: jest.fn(),
+      onCommunitiesReload: () => Promise.resolve(),
+      onErrorChange: jest.fn(),
+      session,
+      sessionRef: { current: session },
+    });
+    const { activeCallRef } = jest.mocked(useWorkspaceRealtimeCallEvents).mock
+      .calls[0][0];
+    activeCallRef.current = {
+      id: 'call-a',
+      kind: 'community-voice',
+    } as CallSession;
+    const { onAccessDenied } = jest.mocked(useWorkspaceCallHeartbeat).mock
+      .calls[0][0];
+
+    onAccessDenied('call-a');
+
+    return {
+      endCall,
+      settled: snapshot.then(
+        () => new Promise((resolve) => setImmediate(resolve)),
+        () => new Promise((resolve) => setImmediate(resolve)),
+      ),
+    };
+  }
+
+  it('reconciles the superseded snapshot so the client follows the winner', async () => {
+    const superseded = {
+      id: 'call-a',
+      status: 'ended',
+      supersededByCallId: 'call-b',
+    } as CallResource;
+    const { endCall, settled } = deniedCommunityCall(
+      Promise.resolve(superseded),
+    );
+
+    await settled;
+
+    expect(mockReconcileCallResource).toHaveBeenCalledWith(superseded);
+    expect(endCall).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      name: 'ended without a winner',
+      snapshot: () =>
+        Promise.resolve({ id: 'call-a', status: 'ended' } as CallResource),
+    },
+    {
+      name: 'unavailable',
+      snapshot: () => Promise.reject(new Error('Call not found')),
+    },
+  ])(
+    'ends the active call when its snapshot is $name',
+    async ({ snapshot }) => {
+      const { endCall, settled } = deniedCommunityCall(snapshot());
+
+      await settled;
+
+      expect(endCall).toHaveBeenCalledTimes(1);
+      expect(mockReconcileCallResource).not.toHaveBeenCalled();
     },
   );
 });
