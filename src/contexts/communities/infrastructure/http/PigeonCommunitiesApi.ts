@@ -32,10 +32,11 @@ import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/P
 import { ScopeFrontierReader } from '../../../../shared/infrastructure/http/ScopeFrontierReader';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 import { DraftPayloadCipher } from '../../../messages/infrastructure/crypto/DraftPayloadCipher';
+import { CommunityRoleId } from '../../domain/value-objects/CommunityRoleId';
 import { CommunityModerationLogSigner } from './CommunityModerationLogSigner';
 import { CommunityOperationSigner } from './CommunityOperationSigner';
 import {
-  deriveCommunityEntityId,
+  deriveCommunityChannelId,
   deriveCommunityId,
   deriveMembershipRequestId,
 } from './deriveCommunityRecordId';
@@ -268,8 +269,7 @@ export class PigeonCommunitiesApi {
     operation: CommunityOperationBody;
   }> {
     const createdAt = Date.now();
-    const channelId = deriveCommunityEntityId(
-      'channel',
+    const channelId = deriveCommunityChannelId(
       communityId,
       this.mutations.authorOf(session),
       createdAt,
@@ -1017,12 +1017,11 @@ export class PigeonCommunitiesApi {
   ): Promise<CommunityRoleResource> {
     const path = `/communities/${encodeURIComponent(communityId)}/roles`;
     const createdAt = Date.now();
-    const roleId = deriveCommunityEntityId(
-      'role',
+    const roleId = CommunityRoleId.derive(
       communityId,
       this.mutations.authorOf(session),
       createdAt,
-    );
+    ).valueOf();
     const body = {
       moderationLog: await this.moderationLogs.sign(session, {
         action: 'role_created',

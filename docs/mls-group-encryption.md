@@ -64,8 +64,9 @@ without that device's key. A leaf is accepted only if all of these hold:
    public key. A key package whose credential fails this check is skipped; a
    commit or welcome carrying such a leaf is rejected.
 2. That identity is a current member of the community according to the
-   authoritative community operation log (not according to the MLS roster), or
-   on the conversation roster for a group conversation.
+   community's signed operations, replayed by the client itself (see "Where
+   community roles get their trust"), not according to the MLS roster; or on
+   the conversation roster for a group conversation.
 3. For a channel group, the identity can see that channel.
 
 A client that receives a commit adding a leaf failing these checks rejects the
@@ -138,9 +139,10 @@ conversations do (#380, #418):
 
 ### Who commits
 
-The community roster (`CommunityMlsRoster`, built from the node's community)
-decides, with the node's own rule for kicking: the managers are the owner and
-the members whose roles, including `everyone`, grant `manage_members`.
+The community roster (`CommunityMlsRoster`, replayed from the community's
+signed operations, see below) decides, with the node's own rule for kicking:
+the managers are the owner and the members whose roles, including `everyone`,
+grant `manage_members`.
 
 - Add: only a manager. Every manager that sees a roster member's device
   without a leaf adds it, so each device of an identity joins, not only the
@@ -159,6 +161,43 @@ advance. A welcome opens only when the node names a manager as its author and
 that manager holds a leaf in the welcomed group, so a member cannot welcome
 anyone into a look-alike group. A removed device rejoins only from a welcome
 newer than its last membership.
+
+### Where community roles get their trust
+
+Members and roles come from the community's operation log, never from the
+community the node folds and serves. Every operation is signed by its author's
+identity key, the same key that signs the leaf credentials, so its trust goes
+back to the community's creator and to nobody else:
+
+- An operation's id is `community:<communityId>:op:<digest>`, where `digest`
+  is `base64url(sha256(canonicalJson(content)))` and `content` is the
+  operation without `id` and `identitySignature`. `identitySignature` is the
+  author's ed25519 signature, with its identity key, over
+  `pigeon:community-operation:v1\n` followed by the id
+  (`CommunityOperationProof`). Clients send it with every community change;
+  `src/test/fixtures/community-operation-vectors.json` is a copy of the node's
+  fixture and pins the same bytes.
+- `GET /communities/{communityId}/operations?after=&limit=` serves the
+  operations verbatim, by digest, to members (`PigeonCommunityOperationsApi`).
+  The client keeps only those whose content, address, community and identity
+  signature check out; the genesis must have no parents and create the very
+  id its author derives from it.
+- `CommunityOperationFold` replays them as the node does: parents first, the
+  lowest digest first among concurrent operations, each one applied only when
+  the state before it lets its author make it (`CommunityAuthority`: owner,
+  `manage_members`, `manage_roles`, `ban_members`, derived role ids, bans,
+  joins), an author's operations beyond 1,000 skipped, nothing applied once
+  the community has no members.
+- Whatever the signed history does not prove is absent. An operation the node
+  forged or altered fails its signature; one its author had no right to make
+  is skipped; one whose parents are missing proves nothing, nor does anything
+  built on it. Without a genesis no one may commit or welcome.
+
+The node can still withhold operations: a member who does not receive a
+demotion keeps trusting the demoted manager until it does. Joins by
+`invitation` or `invite_link` are trusted on the joiner's signature alone,
+since the client cannot see the invitation they cite. Neither lets a node
+give anyone a right no signed operation granted.
 
 ### History policy
 
@@ -243,7 +282,8 @@ and attachments, and a missing group is an error, not a fallback.
   Other members cannot verify an identity's device list; when an identity's
   only leaf device is revoked, a manager must add the identity again.
 - A community welcome's author is the one the node records. A node that lies
-  about it can only name a manager who already holds a leaf in that group.
+  about it can only name a manager, by the signed operations, who already
+  holds a leaf in that group.
 - `authorIdentityId` inside a message payload is asserted by the sender. MLS
   authenticates the sender's leaf, and the UI does not yet display that proof.
 - Call media keys are derived once, when the call starts. A group epoch change

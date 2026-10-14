@@ -1,56 +1,44 @@
-/** The role every member holds, as the node assigns it. */
-const EVERYONE = 'everyone';
-/** The node's permission to kick members. */
+import type { CommunityOperation } from './operations/CommunityOperation';
+
+import { CommunityOperationFold } from './operations/CommunityOperationFold';
+
+/** The community permission to add and kick members. */
 const MANAGE_MEMBERS = 'manage_members';
 
 /**
- * The node's roster of one community, as the rules for its MLS group: who
- * may hold a leaf and who may change membership. The managers are the owner
- * and the members whose roles grant `manage_members`, the node's rule for
- * kicking. Only they add members. Any member may remove an identity the
- * roster no longer has (it left, was kicked or banned); only a manager may
- * remove one still on it, and never the owner. Anyone on the roster may
- * rotate their own leaf.
+ * The roster of one community, as the rules for its MLS group: who may hold
+ * a leaf and who may change membership. It is replayed from the community's
+ * signed operations, never taken from what a node says the roster is. The
+ * managers are the owner and the members whose roles grant `manage_members`.
+ * Only they add members. Any member may remove an identity the roster no
+ * longer has (it left, was kicked or banned); only a manager may remove one
+ * still on it, and never the owner. Anyone on the roster may rotate their
+ * own leaf.
  */
 export class CommunityMlsRoster {
   public static empty(): CommunityMlsRoster {
     return new CommunityMlsRoster(new Set(), undefined, new Set());
   }
 
-  public static of(community: {
-    bannedMemberIds?: readonly string[];
-    memberIds: readonly string[];
-    memberRoles?: readonly {
-      identityId: string;
-      roleIds: readonly string[];
-    }[];
-    ownerIdentityId: string;
-    roles?: readonly { id: string; permissions: readonly string[] }[];
-  }): CommunityMlsRoster {
-    const banned = new Set(community.bannedMemberIds ?? []);
-    const members = new Set(
-      community.memberIds.filter((identityId) => !banned.has(identityId)),
-    );
-    const managing = new Set(
-      (community.roles ?? [])
-        .filter((role) => role.permissions.includes(MANAGE_MEMBERS))
-        .map((role) => role.id),
-    );
-    const rolesOf = (identityId: string): readonly string[] => [
-      EVERYONE,
-      ...(community.memberRoles?.find(
-        (assignment) => assignment.identityId === identityId,
-      )?.roleIds ?? []),
-    ];
+  /**
+   * The roster the community's verified operations prove, empty when they
+   * prove no community: what the signed history does not prove is absent.
+   */
+  public static replay(
+    operations: readonly CommunityOperation[],
+  ): CommunityMlsRoster {
+    const authority = CommunityOperationFold.fold(operations);
+
+    if (!authority) return CommunityMlsRoster.empty();
+
+    const members = authority.getMemberIds();
 
     return new CommunityMlsRoster(
-      members,
-      community.ownerIdentityId,
+      new Set(members),
+      authority.getOwnerIdentityId(),
       new Set(
-        [...members].filter(
-          (identityId) =>
-            identityId === community.ownerIdentityId ||
-            rolesOf(identityId).some((roleId) => managing.has(roleId)),
+        members.filter((identityId) =>
+          authority.hasPermission(identityId, MANAGE_MEMBERS),
         ),
       ),
     );

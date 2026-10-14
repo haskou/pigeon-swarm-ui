@@ -28,6 +28,7 @@ import { PigeonCallsApi } from '../../contexts/calls/infrastructure/http/PigeonC
 import { PigeonCommunitiesApi } from '../../contexts/communities/infrastructure/http/PigeonCommunitiesApi';
 import { PigeonCommunitiesGateway } from '../../contexts/communities/infrastructure/http/PigeonCommunitiesGateway';
 import { PigeonCommunityInvitationApi } from '../../contexts/communities/infrastructure/http/PigeonCommunityInvitationApi';
+import { PigeonCommunityOperationsApi } from '../../contexts/communities/infrastructure/http/PigeonCommunityOperationsApi';
 import { PigeonMlsRecordsApi } from '../../contexts/communities/infrastructure/http/PigeonMlsRecordsApi';
 import { ConversationIdFactory } from '../../contexts/conversations/domain/ConversationIdFactory';
 import { ConversationMapper } from '../../contexts/conversations/infrastructure/http/ConversationMapper';
@@ -100,6 +101,8 @@ export class PigeonApiGateway {
   public readonly communityGateway: PigeonCommunitiesGateway;
 
   public readonly mlsRecords: PigeonMlsRecordsApi;
+
+  public readonly communityOperations: PigeonCommunityOperationsApi;
 
   public readonly conversationsGateway: PigeonConversationsGateway;
 
@@ -358,6 +361,7 @@ export class PigeonApiGateway {
       conversationCommands,
     );
     this.mlsRecords = new PigeonMlsRecordsApi(http, signer, mutations);
+    this.communityOperations = new PigeonCommunityOperationsApi(http, signer);
     this.communityGateway = new PigeonCommunitiesGateway(
       communitiesApi,
       new PigeonCommunityInvitationApi(http, signer, communitiesApi, mutations),

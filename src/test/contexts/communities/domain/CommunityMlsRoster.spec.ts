@@ -1,25 +1,49 @@
 import { CommunityMlsRoster } from '../../../../contexts/communities/domain/CommunityMlsRoster';
+import { CommunityOperationHistory } from '../infrastructure/http/CommunityOperationHistory';
+import { MlsTestIdentity } from '../infrastructure/mls/MlsTestIdentity';
 
 describe('CommunityMlsRoster', () => {
-  const roster = CommunityMlsRoster.of({
-    bannedMemberIds: ['banned'],
-    memberIds: ['owner', 'moderator', 'helper', 'member', 'other', 'banned'],
-    memberRoles: [
-      { identityId: 'moderator', roleIds: ['moderators'] },
-      { identityId: 'helper', roleIds: ['helpers'] },
-    ],
-    ownerIdentityId: 'owner',
-    roles: [
-      { id: 'everyone', permissions: ['send_messages'] },
-      { id: 'moderators', permissions: ['manage_members'] },
-      { id: 'helpers', permissions: ['ban_members', 'approve_members'] },
-    ],
-  });
+  let cast: Record<string, MlsTestIdentity>;
+  let roster: CommunityMlsRoster;
+  const id = (name: string): string => cast[name].id;
   const commit = (
     committer: string,
     added: string[] = [],
     removed: string[] = [],
-  ): boolean => roster.allowsCommit({ added, committer, removed });
+  ): boolean =>
+    roster.allowsCommit({
+      added: added.map(id),
+      committer: id(committer),
+      removed: removed.map(id),
+    });
+
+  beforeAll(async () => {
+    cast = await MlsTestIdentity.cast([
+      'owner',
+      'moderator',
+      'helper',
+      'member',
+      'other',
+      'banned',
+      'stranger',
+    ]);
+    const { banned, helper, moderator, owner } = cast;
+    const history = new CommunityOperationHistory(owner);
+    const moderators = history.createRole(owner, ['manage_members']);
+    const helpers = history.createRole(owner, [
+      'ban_members',
+      'approve_members',
+    ]);
+
+    for (const name of ['moderator', 'helper', 'member', 'other', 'banned']) {
+      history.add(owner, cast[name]);
+    }
+
+    history.assign(owner, moderator, [moderators]);
+    history.assign(owner, helper, [helpers]);
+    history.append(owner, 'member_banned', { identityId: banned.id });
+    roster = CommunityMlsRoster.replay(history.operations());
+  });
 
   it('lets only the owner and members who may kick add members', () => {
     expect(commit('owner', ['member'])).toBe(true);
@@ -56,22 +80,41 @@ describe('CommunityMlsRoster', () => {
   });
 
   it('treats a manage_members everyone role as making every member a manager', () => {
-    const open = CommunityMlsRoster.of({
-      memberIds: ['owner', 'member'],
-      ownerIdentityId: 'owner',
-      roles: [{ id: 'everyone', permissions: ['manage_members'] }],
+    const { member, owner } = cast;
+    const history = new CommunityOperationHistory(owner);
+
+    history.add(owner, member);
+    history.append(owner, 'role_updated', {
+      name: 'everyone',
+      permissions: ['manage_members'],
+      roleId: 'everyone',
     });
 
-    expect(open.manages('member')).toBe(true);
-    expect(roster.manages('member')).toBe(false);
+    expect(
+      CommunityMlsRoster.replay(history.operations()).manages(member.id),
+    ).toBe(true);
+    expect(roster.manages(member.id)).toBe(false);
+  });
+
+  it('admits no one when the operations prove no community', () => {
+    const { owner } = cast;
+    const history = new CommunityOperationHistory(owner);
+
+    history.add(owner, cast.member);
+    const empty = CommunityMlsRoster.replay(history.operations().slice(1));
+
+    expect(empty.has(owner.id)).toBe(false);
+    expect(
+      empty.allowsCommit({ added: [], committer: owner.id, removed: [] }),
+    ).toBe(false);
   });
 
   it('admits no one and lets no one commit when empty', () => {
     const empty = CommunityMlsRoster.empty();
 
-    expect(empty.has('owner')).toBe(false);
+    expect(empty.has(id('owner'))).toBe(false);
     expect(
-      empty.allowsCommit({ added: [], committer: 'owner', removed: [] }),
+      empty.allowsCommit({ added: [], committer: id('owner'), removed: [] }),
     ).toBe(false);
   });
 });

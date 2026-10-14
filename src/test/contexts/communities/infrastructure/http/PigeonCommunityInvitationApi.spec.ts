@@ -127,6 +127,7 @@ describe(PigeonCommunityInvitationApi.name, () => {
     const session = {
       deviceCredentialKeyPair: device,
       identity: { id: 'identity-1' },
+      keyPair: device,
     } as unknown as Session;
     const api = new PigeonCommunityInvitationApi(
       http,
