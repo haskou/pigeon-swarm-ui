@@ -1349,6 +1349,9 @@ export const en = {
     devicePairingInvitationQr: 'Device pairing invitation',
     devicePairingMismatch:
       'This request is out of date or belongs to another identity. Ask the new device to create a new request.',
+    devicePairingPasskey:
+      'Your passkey confirms it is you before this device is authorized.',
+    devicePairingPassword: 'Confirm your password to authorize this device',
     devicePairingRequestLabel: 'Request from the new device',
     devicePairingRequestPlaceholder:
       'Paste the new device request code, or scan its QR',

@@ -4,6 +4,7 @@ import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonEr
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { DevicePairingError } from '../../domain/DevicePairingError';
+import { DeviceUnlockNotConfirmedError } from '../../infrastructure/storage/DeviceUnlockNotConfirmedError';
 
 /**
  * Plain-language copy for a failed pairing step. Domain messages and
@@ -15,6 +16,10 @@ export function toDevicePairingErrorMessage(
 ): string {
   if (caught instanceof DevicePairingError) {
     return pairingFailureMessage(caught.failure);
+  }
+
+  if (caught instanceof DeviceUnlockNotConfirmedError) {
+    return copy.profile.unlockNotConfirmed;
   }
 
   if (caught instanceof HttpJsonError || caught instanceof TypeError) {

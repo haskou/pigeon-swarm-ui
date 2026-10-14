@@ -94,7 +94,16 @@ export class PigeonIdentitiesGateway {
   public async authorizeDevicePairing(
     session: Session,
     requestCode: DevicePairingCode,
+    password?: string,
   ): Promise<{ completionCode: DevicePairingCode; session: Session }> {
+    // The new device receives the identity root and the history secret, so
+    // the person proves again that they can unlock this device: the passkey
+    // when it unlocks this device, otherwise the password. A refusal sends
+    // nothing.
+    await this.identityCommands.confirmLocalUnlock(
+      session.identity.id,
+      password,
+    );
     // A session that holds no root (a registered device, or one never unlocked
     // here) opens it first. `current` never mints over a keychain head it
     // cannot read, so an unreadable head refuses here instead of re-rooting.

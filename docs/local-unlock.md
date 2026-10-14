@@ -260,6 +260,14 @@ applies (see "What each choice protects against").
 - **Diagnostics.** The call diagnostic report (`callDiagnosticReport.ts`)
   holds connection state, not keys or message content. The client has no crash
   reporter.
+- **Adding a device.** Profile → Security → "Add another device" hands the
+  identity root and the history secret to the new device. Authorizing it
+  first asks again for the device password, or the passkey when one unlocks
+  this device (`PigeonIdentitiesGateway.authorizeDevicePairing`, through
+  `DeviceIdentityVault.confirmUnlock`); a refusal publishes and authorizes
+  nothing. This stops someone at an unlocked, unattended screen. It does not
+  stop a same-origin script, which holds the session already (see "What each
+  choice protects against").
 - **History backup.** Profile → device storage → Backup writes one file with
   this identity's stored one-to-one history and contact pins
   (`PigeonHistoryBackup`, `HistoryBackupFile`). Exporting first asks again for

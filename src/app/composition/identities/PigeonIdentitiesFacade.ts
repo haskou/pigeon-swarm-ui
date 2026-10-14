@@ -123,11 +123,20 @@ export class PigeonIdentitiesFacade {
     return await this.gateway.verifyDevicePairingRequest(requestCode);
   }
 
+  /**
+   * Hands the identity root to a new device once the password, or the
+   * passkey when it unlocks this device, is confirmed again.
+   */
   public async authorizeDevicePairing(
     session: Session,
     requestCode: DevicePairingCode,
+    password?: string,
   ): Promise<{ completionCode: DevicePairingCode; session: Session }> {
-    return await this.gateway.authorizeDevicePairing(session, requestCode);
+    return await this.gateway.authorizeDevicePairing(
+      session,
+      requestCode,
+      password,
+    );
   }
 
   public async listDevices(session: Session): Promise<DeviceCredential[]> {

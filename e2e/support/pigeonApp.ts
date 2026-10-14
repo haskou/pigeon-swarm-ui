@@ -310,6 +310,9 @@ export async function pairNewDevice(
   await expect(
     authorized.getByTestId('device-pairing-verification-code'),
   ).toHaveText(newDeviceCode);
+  await authorized
+    .getByTestId('device-pairing-password-input')
+    .fill(identity.password);
   await authorized.getByTestId('device-pairing-submit').click();
 
   const completionOutput = authorized.getByTestId(
