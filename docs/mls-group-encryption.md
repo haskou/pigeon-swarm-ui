@@ -276,6 +276,14 @@ operations, and the token alone lets anyone join. The reference is
 names the link by the same reference, since roles that may read the log
 need not be allowed to invite.
 
+The token itself is
+`base64url(sha256(JSON([communityId, creatorIdentityId, nonce, maxUses,
+expiresAt ?? null])))` (`deriveInviteToken`), with `maxUses` 1 and
+`expiresAt` null when the creator sets none. It commits to the limits, so the
+node refuses a link whose stored limits differ from those the creator chose.
+Only the accepting node counts uses against `maxUses`; replicas do not cap
+joins per reference, and the join operation does not carry the limits.
+
 ### History policy
 
 A new member receives a Welcome for the current epoch only. They cannot read

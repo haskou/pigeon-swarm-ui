@@ -24,15 +24,27 @@ export function deriveMembershipRequestId(
     .slice(0, 24);
 }
 
-/** base64url(sha256(JSON([communityId, creatorIdentityId, nonce]))). */
+/**
+ * base64url(sha256(JSON([communityId, creatorIdentityId, nonce, maxUses,
+ * expiresAt ?? null]))): the bearer secret of an invite link. It commits to
+ * the limits, so the node refuses a link whose stored limits were changed.
+ */
 export function deriveInviteToken(
   communityId: string,
   creatorIdentityId: string,
   nonce: string,
+  maxUses: number,
+  expiresAt: number | undefined,
 ): string {
   return Buffer.from(
     SHA256Hash.from(
-      JSON.stringify([communityId, creatorIdentityId, nonce]),
+      JSON.stringify([
+        communityId,
+        creatorIdentityId,
+        nonce,
+        maxUses,
+        expiresAt ?? null,
+      ]),
     ).toString(),
     'hex',
   )

@@ -30,6 +30,7 @@ const runs = [
       'e2e/call-page-departure.spec.ts',
       'e2e/device-revoke-mailbox.spec.ts',
       'e2e/community-mls-kick.spec.ts',
+      'e2e/community-invite-link.spec.ts',
       'e2e/group-conversation.spec.ts',
       'e2e/passkey-unlock.spec.ts',
     ],

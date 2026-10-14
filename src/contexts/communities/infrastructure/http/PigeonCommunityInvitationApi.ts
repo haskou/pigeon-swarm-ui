@@ -56,14 +56,21 @@ export class PigeonCommunityInvitationApi {
     const creatorIdentityId = this.mutations.authorOf(session);
     const nonce = this.createNonce();
     const createdAt = Date.now();
-    const token = deriveInviteToken(communityId, creatorIdentityId, nonce);
     const optional = buildCommunityInviteLinkBody(input);
+    const maxUses = input.maxUses ?? 1;
+    const token = deriveInviteToken(
+      communityId,
+      creatorIdentityId,
+      nonce,
+      maxUses,
+      optional.expiresAt,
+    );
     const record = {
       communityId,
       createdAt,
       creatorIdentityId,
       id: token,
-      maxUses: input.maxUses ?? 1,
+      maxUses,
       nonce,
       scopeType: 'community_invite',
       token,
