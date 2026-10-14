@@ -817,6 +817,20 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
         ).resolves.toBe(false);
       });
 
+      it('reports the hand-over undelivered when the node answers a null hand-over', async () => {
+        const { api, http, identityId, revocation, session } =
+          await revocable();
+
+        http.mockResolvedValueOnce({
+          ...checkpoint(4)(identityId),
+          sealedSecrets: null,
+        });
+
+        await expect(
+          api.retireOwnDevice(session, revocation, handOver),
+        ).resolves.toBe(false);
+      });
+
       it('reports the hand-over undelivered when the node confirms another generation or revision', async () => {
         const { api, http, identityId, revocation, session } =
           await revocable();
