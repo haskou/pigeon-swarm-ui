@@ -108,14 +108,27 @@ The node cannot order commits across replicas. Clients do it:
 
 ### Who commits
 
-- Add: the member that admits a newcomer (invite creator, approver, or the first
-  online member that sees a `member_joined` operation without a leaf).
-- Remove: the moderator that performs kick or ban commits immediately. Every
-  other member that notices a leaf without a roster member (kick, ban, leave)
-  waits a random 0 to 5 seconds and, if the leaf is still there, commits the
-  removal. Races are resolved by the lowest-id rule above.
-- Update: each device commits an empty update at most every 24 hours or after
-  1000 sent messages, whichever comes first, to bound post-compromise exposure.
+The community roster (`CommunityMlsRoster`, built from the node's community)
+decides, with the node's own rule for kicking: the managers are the owner and
+the members whose roles, including `everyone`, grant `manage_members`.
+
+- Add: only a manager. Every manager that sees a roster member's device
+  without a leaf adds it, so each device of an identity joins, not only the
+  first. One welcome per identity carries every new device of it; each device
+  opens it with its own key package.
+- Remove: any member removes a leaf whose identity left, was kicked or banned.
+  Only a manager removes an identity still on the roster, and nobody removes
+  the owner. Races are resolved by the lowest-id rule above.
+- Update: anyone on the roster rotates their own leaf. Each device commits an
+  empty update at most every 24 hours or after 1000 sent messages, whichever
+  comes first, to bound post-compromise exposure.
+
+Every commit is checked against these rules both when it is made and when it
+is received; a commit that breaks them is skipped and the epoch does not
+advance. A welcome opens only when the node names a manager as its author and
+that manager holds a leaf in the welcomed group, so a member cannot welcome
+anyone into a look-alike group. A removed device rejoins only from a welcome
+newer than its last membership.
 
 ### History policy
 
@@ -178,12 +191,16 @@ and attachments, and a missing group is an error, not a fallback.
   epochs of secrets are retained (`retainKeysForEpochs`), so older ciphertext
   this device has not decrypted yet becomes unreadable.
 - The roster, not MLS, is authoritative. Clients refuse to add identities that
-  are not on the roster. In a group conversation, every add or removal commit,
-  made or received, is checked against the roster: only the creator and the
-  admins still on it (every member when it names neither) add devices or remove
+  are not on the roster. In a community, every add or removal commit, made or
+  received, is checked against the community roster (see "Who commits"). In a
+  group conversation, every add or removal commit, made or received, is
+  checked against the conversation roster: only the creator and the admins
+  still on it (every member when it names neither) add devices or remove
   members; a removal of someone still on the roster follows the conversation
   rule (never the creator or the remover, an admin only by the creator). A
   commit that only rotates the committer's own leaf needs no role.
+- A community welcome's author is the one the node records. A node that lies
+  about it can only name a manager who already holds a leaf in that group.
 - `authorIdentityId` inside a message payload is asserted by the sender. MLS
   authenticates the sender's leaf, and the UI does not yet display that proof.
 - Call media keys are derived once, when the call starts. A group epoch change

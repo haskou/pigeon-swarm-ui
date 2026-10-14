@@ -6,13 +6,21 @@ import type { MlsRecordTransport } from '../../../../../contexts/communities/inf
 import type { MlsStateStore } from '../../../../../contexts/communities/infrastructure/mls/MlsStateStore';
 import type { StoredMlsKeyPackage } from '../../../../../contexts/communities/infrastructure/mls/StoredMlsKeyPackage';
 
+import { CommunityMlsRoster } from '../../../../../contexts/communities/domain/CommunityMlsRoster';
 import { deriveMlsRecordId } from '../../../../../contexts/communities/infrastructure/http/deriveMlsRecordId';
 import { MlsCommunityEngine } from '../../../../../contexts/communities/infrastructure/mls/MlsCommunityEngine';
-import { generateMlsKeyPackage } from '../../../../../contexts/communities/infrastructure/mls/MlsGroup';
+import {
+  generateMlsKeyPackage,
+  MlsGroup,
+} from '../../../../../contexts/communities/infrastructure/mls/MlsGroup';
 import { MlsLeafSigner } from '../../../../../contexts/communities/infrastructure/mls/MlsLeafSigner';
 import { MlsTestIdentity } from './MlsTestIdentity';
 
 const COMMUNITY = 'community-1';
+/** Lets a member build commits the community rules forbid. */
+const anything = { admits: () => true, allows: () => true };
+const base64 = (bytes: Uint8Array): string =>
+  Buffer.from(bytes).toString('base64');
 
 const visible = (
   record: MlsRecordResource,
@@ -92,16 +100,75 @@ describe('MlsCommunityEngine', () => {
   const node = createNode();
   let cast: Record<string, MlsTestIdentity>;
   let roster: Set<string>;
+  let moderators: Set<string>;
   const id = (name: string): string => cast[name].id;
-  const engineFor = (name: string, store = createStore()) => ({
+  const engineFor = (
+    name: string,
+    store = createStore(),
+    device = 'device-1',
+  ) => ({
     engine: new MlsCommunityEngine(
-      cast[name].signer('device-1'),
+      cast[name].signer(device),
       store,
       () => node.transportFor(id(name)),
-      () => () => Promise.resolve(roster),
+      () => () =>
+        Promise.resolve(
+          CommunityMlsRoster.of({
+            memberIds: [...roster],
+            memberRoles: [...moderators].map((identityId) => ({
+              identityId,
+              roleIds: ['moderators'],
+            })),
+            ownerIdentityId: id('alice'),
+            roles: [{ id: 'moderators', permissions: ['manage_members'] }],
+          }),
+        ),
     ),
     store,
   });
+  /** The member's group, under rules that let it commit anything. */
+  const rogueGroupOf = async (
+    name: string,
+    store: MlsStateStore,
+  ): Promise<MlsGroup> =>
+    MlsGroup.restore(
+      COMMUNITY,
+      cast[name].signer('device-1').owner,
+      anything,
+      (await store.loadGroup(COMMUNITY)) as Uint8Array,
+    );
+  const keyPackageOf = (name: string): Uint8Array =>
+    Buffer.from(
+      node.records.find(
+        (record) =>
+          record.kind === 'key_package' && record.authorIdentityId === id(name),
+      )?.payload as string,
+      'base64',
+    );
+  const publishCommit = async (
+    name: string,
+    output: { commit: Uint8Array; epoch: bigint },
+  ): Promise<void> => {
+    await node.transportFor(id(name)).publish({
+      epoch: Number(output.epoch),
+      groupId: COMMUNITY,
+      kind: 'commit',
+      payload: base64(output.commit),
+    });
+  };
+  const publishWelcome = async (
+    name: string,
+    output: { epoch: bigint; welcome?: Uint8Array },
+    recipient: string,
+  ): Promise<void> => {
+    await node.transportFor(id(name)).publish({
+      epoch: Number(output.epoch),
+      groupId: COMMUNITY,
+      kind: 'welcome',
+      payload: base64(output.welcome as Uint8Array),
+      recipientIdentityId: id(recipient),
+    });
+  };
 
   beforeAll(async () => {
     cast = await MlsTestIdentity.cast(['alice', 'bob', 'carol', 'mallory']);
@@ -110,6 +177,7 @@ describe('MlsCommunityEngine', () => {
   beforeEach(() => {
     node.records.length = 0;
     roster = new Set([id('alice'), id('bob'), id('carol')]);
+    moderators = new Set();
   });
 
   const admitBob = async (): Promise<{
@@ -182,26 +250,175 @@ describe('MlsCommunityEngine', () => {
     await expect(bob.engine.decrypt(COMMUNITY, secret)).rejects.toThrow();
   });
 
-  it('follows the roster: admits joiners and removes those who left', async () => {
+  it('lets a removed member back in only with a newer welcome', async () => {
+    const { alice, bob } = await admitBob();
+
+    roster.delete(id('bob'));
+    await alice.engine.remove(COMMUNITY, [id('bob')]);
+    await expect(bob.engine.sync(COMMUNITY)).resolves.toBe(false);
+
+    roster.add(id('bob'));
+    await expect(bob.engine.sync(COMMUNITY)).resolves.toBe(false);
+    await bob.engine.publishKeyPackages(COMMUNITY);
+    await expect(alice.engine.reconcile(COMMUNITY)).resolves.toBe(true);
+    await expect(bob.engine.sync(COMMUNITY)).resolves.toBe(true);
+    const ciphertext = await alice.engine.encrypt(COMMUNITY, 'welcome back');
+
+    await expect(bob.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
+      'welcome back',
+    );
+  });
+
+  it('follows the roster: managers admit joiners, anyone removes those who left', async () => {
     const { alice, bob } = await admitBob();
     const carol = engineFor('carol');
 
     await carol.engine.publishKeyPackages(COMMUNITY);
-    roster.add(id('carol'));
-    await expect(bob.engine.reconcile(COMMUNITY)).resolves.toBe(true);
+    await expect(alice.engine.reconcile(COMMUNITY)).resolves.toBe(true);
     await carol.engine.sync(COMMUNITY);
-    await alice.engine.sync(COMMUNITY);
+    await bob.engine.sync(COMMUNITY);
     const first = await alice.engine.encrypt(COMMUNITY, 'hello carol');
 
     await expect(carol.engine.decrypt(COMMUNITY, first)).resolves.toBe(
       'hello carol',
     );
 
-    roster.delete(id('bob'));
-    await expect(alice.engine.reconcile(COMMUNITY)).resolves.toBe(true);
-    await expect(bob.engine.reconcile(COMMUNITY)).resolves.toBe(false);
+    roster.delete(id('carol'));
+    await expect(bob.engine.reconcile(COMMUNITY)).resolves.toBe(true);
+    await expect(carol.engine.reconcile(COMMUNITY)).resolves.toBe(false);
+    await alice.engine.sync(COMMUNITY);
     await expect(alice.engine.identities(COMMUNITY)).resolves.not.toContain(
+      id('carol'),
+    );
+  });
+
+  it('leaves admission to the owner and members whose role may kick', async () => {
+    const { bob } = await admitBob();
+    const carol = engineFor('carol');
+
+    await carol.engine.publishKeyPackages(COMMUNITY);
+    await expect(bob.engine.reconcile(COMMUNITY)).resolves.toBe(true);
+    await carol.engine.sync(COMMUNITY);
+    await expect(carol.engine.hasGroup(COMMUNITY)).resolves.toBe(false);
+
+    moderators.add(id('bob'));
+    await expect(bob.engine.reconcile(COMMUNITY)).resolves.toBe(true);
+    await carol.engine.sync(COMMUNITY);
+    const ciphertext = await bob.engine.encrypt(COMMUNITY, 'from a moderator');
+
+    await expect(carol.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
+      'from a moderator',
+    );
+  });
+
+  it('admits every device of a member, not only the first', async () => {
+    const { alice } = await admitBob();
+    const laptop = engineFor('bob', createStore(), 'device-2');
+
+    await laptop.engine.publishKeyPackages(COMMUNITY);
+    await expect(alice.engine.reconcile(COMMUNITY)).resolves.toBe(true);
+    await laptop.engine.sync(COMMUNITY);
+    const ciphertext = await alice.engine.encrypt(COMMUNITY, 'both devices');
+
+    await expect(laptop.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
+      'both devices',
+    );
+    expect(
+      (await alice.engine.credentials(COMMUNITY))?.leaves
+        .filter(({ owner }) => owner.identityId === id('bob'))
+        .map(({ owner }) => owner.deviceId)
+        .sort(),
+    ).toEqual(['device-1', 'device-2']);
+  });
+
+  it('rejects an add from a member who may not add, and its welcome', async () => {
+    const { alice, bob } = await admitBob();
+    const carol = engineFor('carol');
+    const mallory = engineFor('mallory');
+
+    await carol.engine.publishKeyPackages(COMMUNITY);
+    await alice.engine.admit(COMMUNITY, [id('carol')]);
+    await carol.engine.sync(COMMUNITY);
+    await bob.engine.sync(COMMUNITY);
+    roster.add(id('mallory'));
+    await mallory.engine.publishKeyPackages(COMMUNITY);
+    const forged = await (
+      await rogueGroupOf('carol', carol.store)
+    ).add([keyPackageOf('mallory')]);
+
+    await publishCommit('carol', forged);
+    await publishWelcome('carol', forged, 'mallory');
+
+    await expect(bob.engine.sync(COMMUNITY)).resolves.toBe(true);
+    await expect(mallory.engine.sync(COMMUNITY)).resolves.toBe(true);
+    await expect(mallory.engine.hasGroup(COMMUNITY)).resolves.toBe(false);
+    await expect(bob.engine.identities(COMMUNITY)).resolves.not.toContain(
+      id('mallory'),
+    );
+
+    // The owner's own commit for the same epoch still goes through.
+    await alice.engine.sync(COMMUNITY);
+    await alice.engine.admit(COMMUNITY, [id('mallory')]);
+    await bob.engine.sync(COMMUNITY);
+    const ciphertext = await alice.engine.encrypt(COMMUNITY, 'still ours');
+
+    await expect(bob.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
+      'still ours',
+    );
+  });
+
+  it('rejects the removal of a listed member by someone who may not kick', async () => {
+    const { alice, bob } = await admitBob();
+    const carol = engineFor('carol');
+
+    await carol.engine.publishKeyPackages(COMMUNITY);
+    await alice.engine.admit(COMMUNITY, [id('carol')]);
+    await carol.engine.sync(COMMUNITY);
+    await bob.engine.sync(COMMUNITY);
+    const forged = await (
+      await rogueGroupOf('carol', carol.store)
+    ).removeIdentities([id('bob')]);
+
+    await publishCommit(
+      'carol',
+      forged as { commit: Uint8Array; epoch: bigint },
+    );
+
+    await expect(bob.engine.sync(COMMUNITY)).resolves.toBe(true);
+    await alice.engine.sync(COMMUNITY);
+    await expect(alice.engine.identities(COMMUNITY)).resolves.toContain(
       id('bob'),
+    );
+    const ciphertext = await alice.engine.encrypt(COMMUNITY, 'bob stays');
+
+    await expect(bob.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
+      'bob stays',
+    );
+  });
+
+  it('refuses a welcome into a look-alike group made by a member who may not add', async () => {
+    const alice = engineFor('alice');
+    const carol = engineFor('carol');
+    const bobKey = await generateMlsKeyPackage(cast.bob.signer('device-1'));
+    const lookAlike = await MlsGroup.create(COMMUNITY, bobKey, anything);
+
+    await alice.engine.createGroup(COMMUNITY);
+    await carol.engine.publishKeyPackages(COMMUNITY);
+    await publishWelcome(
+      'bob',
+      await lookAlike.add([keyPackageOf('carol')]),
+      'carol',
+    );
+
+    await expect(carol.engine.sync(COMMUNITY)).resolves.toBe(true);
+    await expect(carol.engine.hasGroup(COMMUNITY)).resolves.toBe(false);
+
+    await alice.engine.admit(COMMUNITY, [id('carol')]);
+    await carol.engine.sync(COMMUNITY);
+    const ciphertext = await alice.engine.encrypt(COMMUNITY, 'the real one');
+
+    await expect(carol.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
+      'the real one',
     );
   });
 

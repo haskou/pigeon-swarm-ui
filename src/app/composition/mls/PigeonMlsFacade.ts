@@ -6,6 +6,7 @@ import type { MlsGroupCredentials } from '../../../contexts/communities/infrastr
 import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { MessageResource } from '../../../contexts/messages/infrastructure/http/MessageResource';
 
+import { CommunityMlsRoster } from '../../../contexts/communities/domain/CommunityMlsRoster';
 import { IndexedDbMlsStateStore } from '../../../contexts/communities/infrastructure/mls/IndexedDbMlsStateStore';
 import { MlsCommunityEngine } from '../../../contexts/communities/infrastructure/mls/MlsCommunityEngine';
 import { MlsLeafSigner } from '../../../contexts/communities/infrastructure/mls/MlsLeafSigner';
@@ -42,11 +43,10 @@ export class PigeonMlsFacade {
   private async roster(
     session: Session,
     communityId: string,
-  ): Promise<ReadonlySet<string>> {
-    const community = await this.communities.getCommunity(session, communityId);
-    const banned = new Set(community.bannedMemberIds ?? []);
-
-    return new Set(community.memberIds.filter((id) => !banned.has(id)));
+  ): Promise<CommunityMlsRoster> {
+    return CommunityMlsRoster.of(
+      await this.communities.getCommunity(session, communityId),
+    );
   }
 
   /** Opened on first use: the database name needs the chosen node. */
