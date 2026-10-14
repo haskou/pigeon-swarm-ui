@@ -1,5 +1,12 @@
 import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
 import { decodeMlsMessage } from 'ts-mls';
+import {
+  CodecError,
+  CryptoError,
+  CryptoVerificationError,
+  InternalError,
+  ValidationError,
+} from 'ts-mls/mlsError.js';
 
 import type {
   MlsCommitOutcome,
@@ -27,6 +34,15 @@ import { GroupMailboxGenerationSecret } from '../../domain/value-objects/GroupMa
 
 const GENERATION_LABEL = 'pigeon/group-mailbox/gen/v1';
 
+/** ts-mls failures that a malformed or forged message causes. */
+const MESSAGE_ERRORS = [
+  CodecError,
+  CryptoError,
+  CryptoVerificationError,
+  InternalError,
+  ValidationError,
+];
+
 /**
  * MLS for group conversations on one device. Each conversation is one MLS
  * group; its mailbox generation `gen_k` is exported from the epoch of the
@@ -39,6 +55,13 @@ export class GroupMailboxMlsEngine {
   private readonly groups = new Map<string, MlsGroup>();
   private readonly queues = new Map<string, Promise<unknown>>();
   private readonly rosters = new Map<string, ReadonlySet<string>>();
+
+  /** A rejection for what MLS refused; any other failure as it is. */
+  private static rejection(error: unknown): unknown {
+    return MESSAGE_ERRORS.some((type) => error instanceof type)
+      ? new MlsRejectedError('Message rejected')
+      : error;
+  }
 
   public constructor(
     private readonly owner: MlsLeafOwner,
@@ -338,7 +361,7 @@ export class GroupMailboxMlsEngine {
   /**
    * Idempotent: the same ciphertext always yields the stored message. A
    * message MLS does not accept rejects with `MlsRejectedError`; a storage
-   * failure rejects with its own error.
+   * failure, a missing dependency or a misuse rejects with its own error.
    */
   public async decrypt(
     conversationId: string,
@@ -361,9 +384,7 @@ export class GroupMailboxMlsEngine {
       }
       const group = await this.requireGroup(conversationId);
       const opened = await group.open(ciphertext).catch((error: unknown) => {
-        throw error instanceof MlsRejectedError
-          ? error
-          : new MlsRejectedError('Message rejected');
+        throw GroupMailboxMlsEngine.rejection(error);
       });
       const { deviceId, identityId } = opened.sender;
 

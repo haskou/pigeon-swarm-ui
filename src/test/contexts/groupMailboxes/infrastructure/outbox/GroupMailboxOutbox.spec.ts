@@ -179,6 +179,33 @@ describe('GroupMailboxOutbox', () => {
     expect(outbox.pending(CONVERSATION)).toEqual(['m1', 'm2']);
   });
 
+  it('keeps a later message behind a held commit to the same recipient in the next generation', async () => {
+    channel.send.mockImplementation((keys: MailboxKeys, _plaintext, id) =>
+      keys.mailboxId === inboxOf(0, 'bob')
+        ? Promise.reject(new MailboxUnavailableError())
+        : Promise.resolve({ cursor: 1, envelopeId: id ?? '' }),
+    );
+    await outbox.enqueueCommit(
+      CONVERSATION,
+      {
+        commit: new Uint8Array([9, 9]),
+        deliveryGeneration: generation(0),
+        epoch: 1n,
+        generation: generation(1),
+      },
+      ['bob'],
+    );
+    current = 1;
+    channel.send.mockClear();
+
+    await outbox.enqueueMessage(CONVERSATION, 'm2', new Uint8Array([2]));
+
+    expect(channel.send.mock.calls.map(([keys]) => keys.mailboxId)).toEqual([
+      inboxOf(1, 'alice'),
+    ]);
+    expect(outbox.pending(CONVERSATION)).toHaveLength(2);
+  });
+
   it('resumes a queue persisted before a restart', async () => {
     channel.send.mockRejectedValue(new TypeError('offline'));
     await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
@@ -241,6 +268,31 @@ describe('GroupMailboxOutbox', () => {
 
     expect(failures).toEqual(['m1']);
     expect(rows.size).toBe(0);
+  });
+
+  it('keeps a stranded message whose re-encryption fails for a moment', async () => {
+    const failures: string[] = [];
+
+    outbox.subscribe(({ reference }) => failures.push(reference));
+    channel.send.mockRejectedValue(new MailboxUnavailableError());
+    await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
+    current = 1;
+    // As when the engine cannot store the plaintext it keeps for itself.
+    engine.encrypt.mockRejectedValueOnce(new Error('quota exceeded'));
+    channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'x' });
+    now += GroupMailboxOutbox.RETRY_MAX_MS;
+
+    await outbox.resume();
+
+    expect(failures).toEqual([]);
+    expect(outbox.pending(CONVERSATION)).toEqual(['m1']);
+    expect([...rows.values()][0].retryAt).toBeGreaterThan(now);
+
+    now += GroupMailboxOutbox.RETRY_MAX_MS;
+    await outbox.resume();
+
+    expect(failures).toEqual([]);
+    expect(outbox.pending(CONVERSATION)).toEqual([]);
   });
 
   it('never re-encrypts a commit and drops it once its generation drained', async () => {

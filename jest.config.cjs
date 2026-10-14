@@ -30,6 +30,7 @@ const REAL_CRYPTO_SPECS = [
   'GroupMailboxKeySchedule',
   'GroupMailboxMlsEngine',
   'GroupMailboxOutbox',
+  'GroupMessageId',
   'IdentityAdmissionProof',
   'IdentityAdmissionProof.vectors',
   'IdentityMailboxHomeTrust',
