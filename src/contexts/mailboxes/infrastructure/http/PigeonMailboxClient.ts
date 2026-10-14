@@ -2,9 +2,9 @@ import type { HttpJsonClient } from '../../../../shared/infrastructure/http/Http
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 import { requiredDifficultyBits } from '../../../../shared/infrastructure/http/requiredDifficultyBits';
-import { MailboxCreationDifficultyError } from './MailboxCreationDifficultyError';
-import { MailboxReaderLimitError } from './MailboxReaderLimitError';
-import { MailboxUnavailableError } from './MailboxUnavailableError';
+import { MailboxCreationDifficultyError } from '../../domain/errors/MailboxCreationDifficultyError';
+import { MailboxReaderLimitError } from '../../domain/errors/MailboxReaderLimitError';
+import { MailboxUnavailableError } from '../../domain/errors/MailboxUnavailableError';
 
 export type MailboxCreation = {
   creationNonce: string;

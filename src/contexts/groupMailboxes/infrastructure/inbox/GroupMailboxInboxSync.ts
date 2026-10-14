@@ -17,7 +17,7 @@ import type { GroupMailboxInboxStore } from './GroupMailboxInboxStore';
 import { MlsRejectedError } from '../../../communities/infrastructure/mls/MlsRejectedError';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { DirectMailboxRecords } from '../../../mailboxes/domain/DirectMailboxRecords';
-import { MailboxUnavailableError } from '../../../mailboxes/infrastructure/http/MailboxUnavailableError';
+import { MailboxUnavailableError } from '../../../mailboxes/domain/errors/MailboxUnavailableError';
 import { DirectMessageInboxKeys } from '../../../messages/infrastructure/mailbox/DirectMessageInboxKeys';
 import { DirectMessageMailboxRecord } from '../../../messages/infrastructure/mailbox/DirectMessageMailboxRecord';
 import { GroupMailboxControlRecord } from '../control/GroupMailboxControlRecord';

@@ -2,15 +2,14 @@ import type { MailboxKeys } from '../../../mailboxes/infrastructure/crypto/Mailb
 import type { MailboxAppend } from '../../../mailboxes/infrastructure/MailboxChannel';
 import type { RecipientMailboxAttempt } from '../../domain/RecipientMailboxAttempt';
 
-import { MailboxUnavailableError } from '../../../mailboxes/infrastructure/http/MailboxUnavailableError';
 import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
 import { RecipientMailboxRoutingPolicy } from '../../domain/RecipientMailboxRoutingPolicy';
 
 /**
  * Appends to the recipient's verified mailbox home base, falling back to the
  * local node when no home is published or the home cannot be reached. This
- * class performs the I/O and classifies each outcome; the fallback and rethrow
- * rule lives in RecipientMailboxRoutingPolicy.
+ * class performs the I/O; RecipientMailboxRoutingPolicy classifies each
+ * failure and owns the fallback and rethrow rule.
  *
  * The same envelope also goes to every availability server the recipient
  * announced, in parallel. The send lands when any server takes it, so a down
@@ -27,7 +26,7 @@ export class RecipientMailboxRouter {
     ) => Pick<MailboxChannel, 'send'>,
   ) {}
 
-  /** Logs a count-only line per home fault. A 404 is an absent inbox. */
+  /** Logs a count-only line per home fault. */
   private async attemptHome(
     recipientIdentityId: string,
     keys: MailboxKeys,
@@ -56,9 +55,7 @@ export class RecipientMailboxRouter {
       // eslint-disable-next-line no-console
       console.debug('Recipient mailbox append failed; local node used.');
 
-      return error instanceof MailboxUnavailableError
-        ? { error, kind: 'absent' }
-        : { error, kind: 'faulted' };
+      return RecipientMailboxRoutingPolicy.failed(error);
     }
   }
 
@@ -73,9 +70,7 @@ export class RecipientMailboxRouter {
         value: await this.local.send(keys, plaintext, envelopeId),
       };
     } catch (error) {
-      return error instanceof MailboxUnavailableError
-        ? { error, kind: 'absent' }
-        : { error, kind: 'faulted' };
+      return RecipientMailboxRoutingPolicy.failed(error);
     }
   }
 

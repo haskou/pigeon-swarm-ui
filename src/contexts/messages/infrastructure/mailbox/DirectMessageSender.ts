@@ -19,8 +19,8 @@ import { DirectMailboxEligibility } from '../../../mailboxes/domain/DirectMailbo
 import { DirectMailboxOwnership } from '../../../mailboxes/domain/DirectMailboxOwnership';
 import { DirectMailboxRecordError } from '../../../mailboxes/domain/DirectMailboxRecordError';
 import { DirectMailboxRecords } from '../../../mailboxes/domain/DirectMailboxRecords';
+import { MailboxUnavailableError } from '../../../mailboxes/domain/errors/MailboxUnavailableError';
 import { MailboxEnvelopeCipher } from '../../../mailboxes/infrastructure/crypto/MailboxEnvelopeCipher';
-import { MailboxUnavailableError } from '../../../mailboxes/infrastructure/http/MailboxUnavailableError';
 import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageAuthorship } from './DirectMessageAuthorship';
 import { DirectMessageInboxKeys } from './DirectMessageInboxKeys';

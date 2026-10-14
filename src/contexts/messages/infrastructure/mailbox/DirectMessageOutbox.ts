@@ -8,7 +8,7 @@ import type { DirectMessageOutboxState } from './DirectMessageOutboxState';
 import type { DirectMessageOutboxStore } from './DirectMessageOutboxStore';
 import type { DirectMessageOutboxTicket } from './DirectMessageOutboxTicket';
 
-import { MailboxUnavailableError } from '../../../mailboxes/infrastructure/http/MailboxUnavailableError';
+import { MailboxUnavailableError } from '../../../mailboxes/domain/errors/MailboxUnavailableError';
 import { DirectMessageOutboxEntry } from './DirectMessageOutboxEntry';
 
 function entryKey(identityId: string, id: string): string {

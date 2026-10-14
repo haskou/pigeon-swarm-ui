@@ -8,13 +8,12 @@ import type {
 } from './http/PigeonMailboxClient';
 
 import { encodeBase64Url } from '../../../shared/infrastructure/encoding/base64url';
-import { MailboxCreationDifficultyPolicy } from '../domain/MailboxCreationDifficultyPolicy';
+import { MailboxUnavailableError } from '../domain/errors/MailboxUnavailableError';
+import { MailboxCreationDomainService } from '../domain/services/MailboxCreationDomainService';
 import { MailboxCapability } from './crypto/MailboxCapability';
 import { MailboxCreationProof } from './crypto/MailboxCreationProof';
 import { MailboxEnvelopeCipher } from './crypto/MailboxEnvelopeCipher';
 import { MailboxEnvelopeError } from './crypto/MailboxEnvelopeError';
-import { MailboxCreationDifficultyError } from './http/MailboxCreationDifficultyError';
-import { MailboxUnavailableError } from './http/MailboxUnavailableError';
 
 export type MailboxCreationMiner = (
   mailboxId: string,
@@ -138,9 +137,8 @@ export class MailboxChannel {
   }
 
   /**
-   * Recipient only. Creates the inbox once, mining at the default difficulty.
-   * If the node names a higher difficulty the domain policy allows,
-   * re-mines once at that value. Keep the root token, which manages readers.
+   * Recipient only. Creates the inbox once; MailboxCreationDomainService
+   * negotiates the difficulty. Keep the root token, which manages readers.
    * Overlapping calls for the same inbox and token share one creation: a
    * second pass can see the inbox as missing while the first is still
    * creating it.
@@ -168,31 +166,18 @@ export class MailboxChannel {
   ): Promise<void> {
     const postTokenHash = MailboxCapability.hash(keys.postToken);
 
-    try {
-      await this.putInbox(
-        keys.mailboxId,
-        postTokenHash,
-        readTokenHash,
-        MailboxCreationProof.DEFAULT_DIFFICULTY_BITS,
-      );
-    } catch (error: unknown) {
-      if (
-        !(error instanceof MailboxCreationDifficultyError) ||
-        !MailboxCreationDifficultyPolicy.allowsRaisedDifficulty(
-          MailboxCreationProof.DEFAULT_DIFFICULTY_BITS,
-          error.requiredDifficultyBits,
-        )
-      ) {
-        throw error;
-      }
-
-      await this.putInbox(
-        keys.mailboxId,
-        postTokenHash,
-        readTokenHash,
-        error.requiredDifficultyBits,
-      );
-    }
+    await MailboxCreationDomainService.create(
+      {
+        createWithDifficulty: (difficultyBits) =>
+          this.putInbox(
+            keys.mailboxId,
+            postTokenHash,
+            readTokenHash,
+            difficultyBits,
+          ),
+      },
+      MailboxCreationProof.DEFAULT_DIFFICULTY_BITS,
+    );
   }
 
   /** Sender. Seals one plaintext under `envelopeId`, a fresh id by default. */

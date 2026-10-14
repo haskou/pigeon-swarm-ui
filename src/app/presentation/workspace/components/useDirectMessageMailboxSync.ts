@@ -8,7 +8,7 @@ import type { ChatMessage } from '../../../../contexts/messages/presentation/vie
 import type { DirectMessageTimelineChange } from '../../../../contexts/messages/presentation/view-models/DirectMessageTimelineChange';
 
 import { DirectMailboxEligibility } from '../../../../contexts/mailboxes/domain/DirectMailboxEligibility';
-import { MailboxReaderLimitError } from '../../../../contexts/mailboxes/infrastructure/http/MailboxReaderLimitError';
+import { MailboxReaderLimitError } from '../../../../contexts/mailboxes/domain/errors/MailboxReaderLimitError';
 import { MessagePinChange } from '../../../../contexts/messages/domain/MessagePinChange';
 import { MessagePinClock } from '../../../../contexts/messages/domain/MessagePinClock';
 import { MessageId } from '../../../../contexts/messages/domain/value-objects/MessageId';

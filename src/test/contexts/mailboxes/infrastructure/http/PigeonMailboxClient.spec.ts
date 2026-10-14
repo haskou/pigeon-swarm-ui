@@ -1,8 +1,8 @@
 import { mock } from 'jest-mock-extended';
 
-import { MailboxCreationDifficultyError } from '../../../../../contexts/mailboxes/infrastructure/http/MailboxCreationDifficultyError';
-import { MailboxReaderLimitError } from '../../../../../contexts/mailboxes/infrastructure/http/MailboxReaderLimitError';
-import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/infrastructure/http/MailboxUnavailableError';
+import { MailboxCreationDifficultyError } from '../../../../../contexts/mailboxes/domain/errors/MailboxCreationDifficultyError';
+import { MailboxReaderLimitError } from '../../../../../contexts/mailboxes/domain/errors/MailboxReaderLimitError';
+import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
 import { PigeonMailboxClient } from '../../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
 import { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
