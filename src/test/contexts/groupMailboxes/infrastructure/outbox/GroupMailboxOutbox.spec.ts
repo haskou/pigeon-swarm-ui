@@ -20,6 +20,7 @@ import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/domai
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 
 const CONVERSATION = 'conversation-1';
+const ROSTER: ReadonlySet<string> = new Set(['alice', 'bob']);
 
 const generation = (index: number): GroupMailboxGeneration =>
   new GroupMailboxGeneration(
@@ -112,7 +113,12 @@ describe('GroupMailboxOutbox', () => {
       return Promise.resolve({ cursor: 1, envelopeId: 'x' });
     });
 
-    await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
+    await outbox.enqueueMessage(
+      CONVERSATION,
+      'm1',
+      new Uint8Array([1]),
+      ROSTER,
+    );
 
     expect(channel.send).toHaveBeenCalledTimes(2);
     expect(rows.size).toBe(0);
@@ -132,7 +138,12 @@ describe('GroupMailboxOutbox', () => {
           : Promise.resolve({ cursor: 1, envelopeId: id ?? '' }),
       );
 
-      await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
+      await outbox.enqueueMessage(
+        CONVERSATION,
+        'm1',
+        new Uint8Array([1]),
+        ROSTER,
+      );
       const [kept] = rows.values();
 
       expect(kept.copies.map(({ identityId }) => identityId)).toEqual(['bob']);
@@ -151,7 +162,12 @@ describe('GroupMailboxOutbox', () => {
 
   it('reuses the envelope id of a copy on retry', async () => {
     channel.send.mockRejectedValueOnce(new HttpJsonError(429, 'slow down', ''));
-    await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
+    await outbox.enqueueMessage(
+      CONVERSATION,
+      'm1',
+      new Uint8Array([1]),
+      ROSTER,
+    );
     now += GroupMailboxOutbox.RETRY_MAX_MS;
     await outbox.resume();
 
@@ -169,9 +185,19 @@ describe('GroupMailboxOutbox', () => {
         ? Promise.reject(new MailboxUnavailableError())
         : Promise.resolve({ cursor: 1, envelopeId: id ?? '' }),
     );
-    await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
+    await outbox.enqueueMessage(
+      CONVERSATION,
+      'm1',
+      new Uint8Array([1]),
+      ROSTER,
+    );
     channel.send.mockClear();
-    await outbox.enqueueMessage(CONVERSATION, 'm2', new Uint8Array([2]));
+    await outbox.enqueueMessage(
+      CONVERSATION,
+      'm2',
+      new Uint8Array([2]),
+      ROSTER,
+    );
 
     expect(channel.send.mock.calls.map(([keys]) => keys.mailboxId)).toEqual([
       inboxOf(0, 'alice'),
@@ -198,7 +224,12 @@ describe('GroupMailboxOutbox', () => {
     current = 1;
     channel.send.mockClear();
 
-    await outbox.enqueueMessage(CONVERSATION, 'm2', new Uint8Array([2]));
+    await outbox.enqueueMessage(
+      CONVERSATION,
+      'm2',
+      new Uint8Array([2]),
+      ROSTER,
+    );
 
     expect(channel.send.mock.calls.map(([keys]) => keys.mailboxId)).toEqual([
       inboxOf(1, 'alice'),
@@ -208,7 +239,12 @@ describe('GroupMailboxOutbox', () => {
 
   it('resumes a queue persisted before a restart', async () => {
     channel.send.mockRejectedValue(new TypeError('offline'));
-    await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
+    await outbox.enqueueMessage(
+      CONVERSATION,
+      'm1',
+      new Uint8Array([1]),
+      ROSTER,
+    );
     outbox.stop();
     channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'x' });
     now += GroupMailboxOutbox.RETRY_MAX_MS;
@@ -226,7 +262,12 @@ describe('GroupMailboxOutbox', () => {
         ? Promise.reject(new MailboxUnavailableError())
         : Promise.resolve({ cursor: 1, envelopeId: id ?? '' }),
     );
-    await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
+    await outbox.enqueueMessage(
+      CONVERSATION,
+      'm1',
+      new Uint8Array([1]),
+      ROSTER,
+    );
     current = 1;
     engine.members.mockResolvedValue(['alice', 'bob', 'dave']);
     channel.send.mockClear();
@@ -257,7 +298,12 @@ describe('GroupMailboxOutbox', () => {
 
     outbox.subscribe(({ reference }) => failures.push(reference));
     channel.send.mockRejectedValue(new MailboxUnavailableError());
-    await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
+    await outbox.enqueueMessage(
+      CONVERSATION,
+      'm1',
+      new Uint8Array([1]),
+      ROSTER,
+    );
     current = 1;
     engine.encrypt.mockRejectedValue(
       new MlsRejectedError('This device is not in the group'),
@@ -275,7 +321,12 @@ describe('GroupMailboxOutbox', () => {
 
     outbox.subscribe(({ reference }) => failures.push(reference));
     channel.send.mockRejectedValue(new MailboxUnavailableError());
-    await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
+    await outbox.enqueueMessage(
+      CONVERSATION,
+      'm1',
+      new Uint8Array([1]),
+      ROSTER,
+    );
     current = 1;
     // As when the engine cannot store the plaintext it keeps for itself.
     engine.encrypt.mockRejectedValueOnce(new Error('quota exceeded'));
@@ -330,7 +381,12 @@ describe('GroupMailboxOutbox', () => {
 
   it('drops the queue on forget', async () => {
     channel.send.mockRejectedValue(new TypeError('offline'));
-    await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
+    await outbox.enqueueMessage(
+      CONVERSATION,
+      'm1',
+      new Uint8Array([1]),
+      ROSTER,
+    );
 
     await outbox.forget();
 

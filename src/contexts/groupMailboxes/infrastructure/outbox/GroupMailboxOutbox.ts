@@ -503,13 +503,16 @@ export class GroupMailboxOutbox {
 
   /**
    * Encrypts an application message in the current epoch and queues it for
-   * every member's inbox, this identity's included. Resolves after the first
-   * delivery attempt; rejects only when the message cannot be encrypted.
+   * the inbox of every member in `recipients`, this identity's included: a
+   * member already off the roster but not yet committed out gets no copy.
+   * Resolves after the first delivery attempt; rejects only when the
+   * message cannot be encrypted.
    */
   public async enqueueMessage(
     conversationId: string,
     reference: string,
     body: Uint8Array,
+    recipients: ReadonlySet<string>,
   ): Promise<void> {
     const row = await this.sealedMessage(
       {
@@ -522,6 +525,7 @@ export class GroupMailboxOutbox {
         retryAt: 0,
       },
       body,
+      recipients,
     );
 
     await this.keep(row);

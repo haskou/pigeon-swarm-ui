@@ -310,6 +310,7 @@ const send = (from: Member, record: DirectMessageRecord): Promise<void> =>
     CONVERSATION,
     record.id,
     DirectMessageMailboxRecord.encode(record),
+    roster,
   );
 
 const ids = (records: DirectMessageRecord[]): string[] =>
