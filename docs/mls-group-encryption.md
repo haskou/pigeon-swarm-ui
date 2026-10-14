@@ -103,10 +103,10 @@ recipientIdentityId?})))`, with an empty recipient omitted
 The node cannot order commits across replicas. Clients do it:
 
 - A commit for epoch `n` is applied when received in order. Commits for epoch
-  `n` from different authors are competing. In a community, the one binding
-  the most roster history wins (see "Which roster judges a commit"); among
-  those, and in a group conversation, the one with the **lowest record id**
-  wins. A client that applied a different commit for epoch `n` rolls back
+  `n` from different authors are competing. In a community, the roster at
+  both their revisions decides first (see "Which roster judges a commit");
+  otherwise, and in a group conversation, the one with the **lowest record
+  id** wins. A client that applied a different commit for epoch `n` rolls back
   to its retained epoch-`n` state (`ts-mls` states are immutable values) and
   applies the winner. Application messages encrypted in the losing epoch stay
   readable because that state is retained read-only.
@@ -189,12 +189,18 @@ a demotion in (#420):
   A commit is accepted only when its frontier stands for every operation of
   the baseline (`CommunityRosterHistory.follows`), so revisions only move
   forward along the commit chain.
-- Of two commits for one epoch, the one whose frontier stands for more
+- Two commits for one epoch are both judged again by the roster at the
+  union of their frontiers. One that roster allows beats one it does not.
+  When it allows both or neither, the one whose frontier stands for more
   operations wins (`CommunityRosterHistory.reach`), then the lowest record
-  id. Operations are content-addressed, so every member counts the same and
-  picks the same winner whatever order the commits arrive in. A member
-  removed by a commit that bound its removal cannot win that epoch back with
-  a commit bound to an older revision, however low its id.
+  id. Operations are content-addressed, so every member reaches the same
+  verdict whatever order the commits arrive in. A member removed by a
+  commit that bound its removal cannot win that epoch back, whatever older
+  or concurrent revision it binds and however low its id.
+- With three or more commits for one epoch the pairwise verdicts can form a
+  cycle. A member compares each arrival only with the commit it holds, so
+  members that received such commits in different orders can hold different
+  winners for that epoch (a known residual).
 - A manager whose group bound a revision granting other rights than the
   latest one commits an empty update binding the latest revision on its next
   `reconcile` (`MlsCommunityEngine.bindRoster`).

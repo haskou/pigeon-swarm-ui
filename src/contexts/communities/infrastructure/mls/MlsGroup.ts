@@ -255,15 +255,19 @@ interface AppliedEpoch {
   readonly baseline: readonly string[];
   /** The roster revision the commit bound. */
   readonly frontier: readonly string[];
+  /** What the commit changed, to judge it again against a competitor. */
+  readonly change: MlsMembershipChange;
 }
 
 /**
  * One MLS group as seen by one device. Immutable ts-mls states let the device
  * return to the state before a commit when a competing commit for the same
- * epoch wins it: the one binding more of the roster history, then the one
- * with the lower id. Every commit and welcome binds the roster revision
- * its committer judged it at (`MlsRosterFrontier`); the group remembers the
- * revision of its last commit, which the next one must not step behind.
+ * epoch wins it. Both are judged by the roster at the union of their bound
+ * revisions: one it still allows beats one it no longer does; otherwise the
+ * one binding more of the roster history wins, then the lower id. Every
+ * commit and welcome binds the roster revision its committer judged it at
+ * (`MlsRosterFrontier`); the group remembers the revision of its last
+ * commit, which the next one must not step behind.
  */
 export class MlsGroup {
   private constructor(
@@ -630,10 +634,6 @@ export class MlsGroup {
         return { kind: 'ignored', reason: 'duplicate' };
       }
 
-      if (!this.outranks(record, previous)) {
-        return { kind: 'ignored', reason: 'lost-race' };
-      }
-
       return this.replace(record, previous);
     }
 
@@ -644,15 +644,36 @@ export class MlsGroup {
     return this.advance(record, this.state, this.bound);
   }
 
+  /**
+   * Switches to a competing commit for an applied epoch when it wins
+   * (`contest`); a loser leaves the group as it was.
+   */
   private async replace(
     record: MlsCommitRecord,
     previous: AppliedEpoch,
   ): Promise<MlsCommitOutcome> {
-    const outcome = await this.advance(
-      record,
-      previous.before,
-      previous.baseline,
-    );
+    const verdict = { lost: false };
+    const contest = (
+      change: MlsMembershipChange,
+      frontier: readonly string[],
+    ): boolean => {
+      verdict.lost = !this.wins(record.id, { change, frontier }, previous);
+
+      return !verdict.lost;
+    };
+    let outcome: MlsCommitOutcome;
+
+    try {
+      outcome = await this.advance(
+        record,
+        previous.before,
+        previous.baseline,
+        contest,
+      );
+    } catch (error) {
+      if (verdict.lost) return { kind: 'ignored', reason: 'lost-race' };
+      throw error;
+    }
 
     if (outcome.kind === 'applied') {
       for (const epoch of [...this.applied.keys()]) {
@@ -670,31 +691,55 @@ export class MlsGroup {
   }
 
   /**
-   * Whether the commit wins its epoch over the one the group applied: the
+   * Whether a commit wins its epoch over the one the group applied. Both
+   * are judged by the roster at the union of their revisions, so a member
+   * removed by one cannot win the epoch back by binding a revision that
+   * leaves its removal out. When that roster allows both or neither, the
    * one binding more of the roster history wins, then the lower id. Every
-   * member picks the same, and no one wins an epoch from a newer revision
-   * by binding an older one.
+   * member picks the same whatever order the two arrive in.
    */
-  private outranks(record: MlsCommitRecord, previous: AppliedEpoch): boolean {
-    const frontier = readCommit(record.bytes)?.frontier;
+  private wins(
+    commitId: string,
+    incoming: { change: MlsMembershipChange; frontier: readonly string[] },
+    previous: AppliedEpoch,
+  ): boolean {
+    const union = [...new Set([...previous.frontier, ...incoming.frontier])];
+    const stands = this.permits(incoming.change, union, union);
 
-    if (!frontier) return false;
-    const reach = this.policy.reach(frontier);
+    if (stands !== this.permits(previous.change, union, union)) return stands;
+    const reach = this.policy.reach(incoming.frontier);
     const held = this.policy.reach(previous.frontier);
 
-    return reach === held ? record.id < previous.commitId : reach > held;
+    return reach === held ? commitId < previous.commitId : reach > held;
+  }
+
+  /**
+   * Whether the roster at `frontier` admits every identity the change adds
+   * and lets its committer make it, stepping from `baseline`.
+   */
+  private permits(
+    change: MlsMembershipChange,
+    frontier: readonly string[],
+    baseline: readonly string[],
+  ): boolean {
+    return (
+      change.added.every((id) => this.policy.admits(id, frontier)) &&
+      this.policy.allows(change, { baseline, frontier })
+    );
   }
 
   /**
    * Accepts a commit only when it comes from a member's leaf, every
    * proposal in it is that member's own, the roster at the revision the
    * commit binds admits every identity it adds and lets that member make
-   * the change. A standalone proposal is never applied.
+   * the change, and `settle` lets it take the epoch. A standalone proposal
+   * is never applied.
    */
   private judge(
     from: ClientState,
     incoming: Parameters<IncomingMessageCallback>[0],
     order: { baseline: readonly string[]; frontier: readonly string[] },
+    settle: (change: MlsMembershipChange) => boolean,
   ): IncomingMessageAction {
     if (incoming.kind !== 'commit' || incoming.senderLeafIndex === undefined) {
       return 'reject';
@@ -716,9 +761,8 @@ export class MlsGroup {
         incoming.proposals.map(({ proposal }) => proposal),
       );
 
-      return change.added.every((id) =>
-        this.policy.admits(id, order.frontier),
-      ) && this.policy.allows(change, order)
+      return this.permits(change, order.frontier, order.baseline) &&
+        settle(change)
         ? 'accept'
         : 'reject';
     } catch {
@@ -734,6 +778,10 @@ export class MlsGroup {
     record: MlsCommitRecord,
     from: ClientState,
     baseline: readonly string[],
+    contest: (
+      change: MlsMembershipChange,
+      frontier: readonly string[],
+    ) => boolean = () => true,
   ): Promise<MlsCommitOutcome> {
     const commit = readCommit(record.bytes);
 
@@ -741,20 +789,31 @@ export class MlsGroup {
       throw new MlsRejectedError('Commit does not match its record');
     }
     const { frontier, message: privateMessage } = commit;
+    const judged: { change?: MlsMembershipChange } = {};
     const result = await processPrivateMessage(
       from,
       privateMessage,
       emptyPskIndex,
       await suite(),
-      (incoming) => this.judge(from, incoming, { baseline, frontier }),
+      (incoming) =>
+        this.judge(from, incoming, { baseline, frontier }, (change) => {
+          judged.change = change;
+
+          return contest(change, frontier);
+        }),
     );
 
-    if (result.kind !== 'newState' || result.actionTaken !== 'accept') {
+    if (
+      result.kind !== 'newState' ||
+      result.actionTaken !== 'accept' ||
+      !judged.change
+    ) {
       throw new MlsRejectedError('Commit rejected');
     }
     this.applied.set(record.epoch, {
       baseline,
       before: from,
+      change: judged.change,
       commitId: record.id,
       frontier,
     });
@@ -773,17 +832,13 @@ export class MlsGroup {
   private async commit(proposals: Proposal[]): Promise<MlsCommitOutput> {
     this.assertActive();
     const frontier = this.policy.frontier();
+    const change = membershipChange(
+      this.state.ratchetTree,
+      this.state.privatePath.leafIndex,
+      proposals,
+    );
 
-    if (
-      !this.policy.allows(
-        membershipChange(
-          this.state.ratchetTree,
-          this.state.privatePath.leafIndex,
-          proposals,
-        ),
-        { baseline: this.bound, frontier },
-      )
-    ) {
+    if (!this.policy.allows(change, { baseline: this.bound, frontier })) {
       throw new MlsRejectedError('This member may not make this change');
     }
     const revision = MlsRosterFrontier.encode(frontier);
@@ -806,6 +861,7 @@ export class MlsGroup {
     // The caller publishes the commit and only then calls `confirm`.
     this.pending = {
       before: this.state,
+      change,
       commit,
       epoch,
       frontier,
@@ -828,6 +884,7 @@ export class MlsGroup {
   private pending?: {
     epoch: bigint;
     commit: Uint8Array;
+    change: MlsMembershipChange;
     frontier: readonly string[];
     state: ClientState;
     before: ClientState;
@@ -865,6 +922,7 @@ export class MlsGroup {
     this.applied.set(pending.epoch, {
       baseline: this.bound,
       before: pending.before,
+      change: pending.change,
       commitId,
       frontier: pending.frontier,
     });
