@@ -484,7 +484,7 @@ export class MlsCommunityEngine {
   /**
    * Applies the published commits in order: by epoch, then the one binding
    * the most roster history, then the lowest id; `MlsGroup` switches to a
-   * later one that wins the epoch by the roster at both revisions. A commit
+   * later one the latest verified roster allows over one it does not. A commit
    * the roster does not allow, or that does not open, is skipped: the group
    * stays at its epoch for the next commit, and
    * one member cannot stall everyone else. This device's own pending commit

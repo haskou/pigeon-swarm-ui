@@ -103,8 +103,8 @@ recipientIdentityId?})))`, with an empty recipient omitted
 The node cannot order commits across replicas. Clients do it:
 
 - A commit for epoch `n` is applied when received in order. Commits for epoch
-  `n` from different authors are competing. In a community, the roster at
-  both their revisions decides first (see "Which roster judges a commit");
+  `n` from different authors are competing. In a community, the latest
+  roster decides first (see "Which roster judges a commit");
   otherwise, and in a group conversation, the one with the **lowest record
   id** wins. A client that applied a different commit for epoch `n` rolls back
   to its retained epoch-`n` state (`ts-mls` states are immutable values) and
@@ -189,18 +189,20 @@ a demotion in (#420):
   A commit is accepted only when its frontier stands for every operation of
   the baseline (`CommunityRosterHistory.follows`), so revisions only move
   forward along the commit chain.
-- Two commits for one epoch are both judged again by the roster at the
-  union of their frontiers. One that roster allows beats one it does not.
-  When it allows both or neither, the one whose frontier stands for more
-  operations wins (`CommunityRosterHistory.reach`), then the lowest record
-  id. Operations are content-addressed, so every member reaches the same
-  verdict whatever order the commits arrive in. A member removed by a
-  commit that bound its removal cannot win that epoch back, whatever older
-  or concurrent revision it binds and however low its id.
-- With three or more commits for one epoch the pairwise verdicts can form a
-  cycle. A member compares each arrival only with the commit it holds, so
-  members that received such commits in different orders can hold different
-  winners for that epoch (a known residual).
+- Commits for one epoch rank by one key each, so any number of them
+  converge on one winner whatever order they arrive in: first whether the
+  latest roster the receiver verified, which holds every revision it can
+  judge, still allows the commit, then how many operations its frontier
+  stands for (`CommunityRosterHistory.reach`), then the lowest record id.
+  A member removed by a commit that bound its removal cannot win that epoch
+  back, whatever older or concurrent revision it binds and however low its
+  id.
+- Members that have verified different operations can rank two rivals
+  differently, e.g. when only some already see a later demotion of one
+  rival's committer, and then hold different winners for that epoch. A
+  rival is ranked again, against the operations verified by then, only
+  while sync still lists it and the device has not restarted; past that,
+  such members cannot read each other (a known residual).
 - A manager whose group bound a revision granting other rights than the
   latest one commits an empty update binding the latest revision on its next
   `reconcile` (`MlsCommunityEngine.bindRoster`).
