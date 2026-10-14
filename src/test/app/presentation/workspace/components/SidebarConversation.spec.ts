@@ -1,12 +1,12 @@
 import { describe, expect, it } from '@jest/globals';
 
-import type { ConversationResource } from '../../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { ConversationWithUnread } from '../../../../../contexts/conversations/presentation/view-models/ConversationWithUnread';
 import type { IdentityResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 
 import { SidebarConversation } from '../../../../../app/presentation/workspace/components/SidebarConversation';
 import { sessionFixture } from '../../../../contexts/conversations/ConversationFixture';
 
-const directConversation: ConversationResource = {
+const directConversation: ConversationWithUnread = {
   adminIds: [],
   id: 'one-to-one:a',
   networkId: 'network-a',

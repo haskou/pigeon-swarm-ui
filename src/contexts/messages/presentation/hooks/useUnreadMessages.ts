@@ -1,14 +1,11 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 
 import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
+import type { ConversationWithUnread } from '../../../conversations/presentation/view-models/ConversationWithUnread';
 
 import { ConversationTimeline } from '../../../conversations/presentation/view-models/ConversationTimeline';
 
 type UnreadCountsByConversation = Record<string, number>;
-
-type ConversationWithUnread = ConversationResource & {
-  unreadCount: number;
-};
 
 export function useUnreadMessages(conversations: ConversationResource[]): {
   clearUnreadMessages: (conversationId: string) => void;
@@ -25,10 +22,7 @@ export function useUnreadMessages(conversations: ConversationResource[]): {
       ConversationTimeline.sortByLatestMessage(
         conversations.map((conversation) => ({
           ...conversation,
-          unreadCount: Math.max(
-            conversation.unreadCount ?? 0,
-            unreadCounts[conversation.id] ?? 0,
-          ),
+          unreadCount: unreadCounts[conversation.id] ?? 0,
         })),
       ),
     [conversations, unreadCounts],

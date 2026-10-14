@@ -1,6 +1,7 @@
 import type { AttachmentProgress } from '../../../../contexts/attachments/application/contracts/AttachmentProgress';
 import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
 import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { ConversationWithUnread } from '../../../../contexts/conversations/presentation/view-models/ConversationWithUnread';
 import type { IdentityPresenceResource as IdentityPresence } from '../../../../contexts/identities/infrastructure/http/resources/IdentityPresenceResource';
 import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { SelectablePresenceStatusResource as SelectablePresenceStatus } from '../../../../contexts/identities/infrastructure/http/resources/SelectablePresenceStatusResource';
@@ -52,7 +53,7 @@ export type MessagesWorkspaceContentProps = {
   ) => NotificationScopeSetting;
   conversationRealtimeEvent: RealtimeDomainEvent | null;
   conversationTypingIdentityIds: string[];
-  conversationsWithUnread: ConversationResource[];
+  conversationsWithUnread: ConversationWithUnread[];
   editingMessage: EditingMessage | null;
   groupInviteRequest: number;
   identityNames: Record<string, string>;

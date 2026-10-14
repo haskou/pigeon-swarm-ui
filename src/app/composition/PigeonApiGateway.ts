@@ -63,9 +63,9 @@ import { MailboxChannel } from '../../contexts/mailboxes/infrastructure/MailboxC
 import { DraftPayloadCipher } from '../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
 import { MessageProjector } from '../../contexts/messages/infrastructure/crypto/MessageProjector';
 import { PigeonMessageProjection } from '../../contexts/messages/infrastructure/crypto/PigeonMessageProjection';
+import { PigeonConversationDraftsApi } from '../../contexts/messages/infrastructure/http/PigeonConversationDraftsApi';
+import { PigeonLinkPreviewsApi } from '../../contexts/messages/infrastructure/http/PigeonLinkPreviewsApi';
 import { PigeonMessageCommandsApi } from '../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
-import { PigeonMessagesApi } from '../../contexts/messages/infrastructure/http/PigeonMessagesApi';
-import { PigeonMessagesGateway } from '../../contexts/messages/infrastructure/http/PigeonMessagesGateway';
 import { DirectMessageMailbox } from '../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
 import { DirectMessageMailboxStore } from '../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxStore';
 import { DirectMessageReaderSet } from '../../contexts/messages/infrastructure/mailbox/DirectMessageReaderSet';
@@ -115,13 +115,13 @@ export class PigeonApiGateway {
 
   private readonly mailboxMiner: LazyMailboxCreationMiner;
 
+  public readonly conversationDrafts: PigeonConversationDraftsApi;
+
+  public readonly linkPreviews: PigeonLinkPreviewsApi;
+
   public readonly messageCommands: PigeonMessageCommandsApi;
 
   private readonly messageProjection: PigeonMessageProjection;
-
-  public readonly messagesApi: PigeonMessagesApi;
-
-  public readonly messagesGateway: PigeonMessagesGateway;
 
   public readonly node: PigeonNodeApi;
 
@@ -370,24 +370,16 @@ export class PigeonApiGateway {
       copy.messages,
     );
 
-    this.messagesApi = new PigeonMessagesApi(
+    this.conversationDrafts = new PigeonConversationDraftsApi(
       http,
       signer,
       this.requestCache,
-      this.messageProjection,
-      mutations,
     );
+    this.linkPreviews = new PigeonLinkPreviewsApi(http, signer);
     this.messageCommands = new PigeonMessageCommandsApi(
-      http,
-      signer,
-      this.messagesApi,
-      this.messageProjection,
+      this.linkPreviews,
       this.filesGateway,
       mutations,
-    );
-    this.messagesGateway = new PigeonMessagesGateway(
-      this.messagesApi,
-      this.messageCommands,
     );
     this.mailboxMiner = new LazyMailboxCreationMiner();
     const mailboxChannel = new MailboxChannel(

@@ -11,5 +11,4 @@ export type ConversationResource = {
   networkId: string;
   participantIds: string[];
   type: 'group' | 'one-to-one';
-  unreadCount: number;
 };

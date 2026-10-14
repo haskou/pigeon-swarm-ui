@@ -1,13 +1,11 @@
 import { assert } from '@haskou/value-objects';
 
 import type { LocalKeychain } from '../../../identities/infrastructure/keychain/LocalKeychain';
-import type { PigeonMessagesGateway } from '../../../messages/infrastructure/http/PigeonMessagesGateway';
 import type { Conversation } from '../../domain/Conversation';
 import type { ConversationRepository } from '../../domain/repositories/ConversationRepository';
 import type { ConversationGroupNonce } from '../../domain/value-objects/ConversationGroupNonce';
 import type { ConversationId } from '../../domain/value-objects/ConversationId';
 import type { ConversationParticipantId } from '../../domain/value-objects/ConversationParticipantId';
-import type { MessageId } from '../../domain/value-objects/MessageId';
 
 import { ConversationNotFoundError } from '../../domain/errors/ConversationNotFoundError';
 import { ConversationParticipantNotFoundError } from '../../domain/errors/ConversationParticipantNotFoundError';
@@ -19,45 +17,9 @@ import { PigeonConversationsGateway } from './PigeonConversationsGateway';
 export class PigeonConversationRepository implements ConversationRepository {
   public constructor(
     private readonly gateway: PigeonConversationsGateway,
-    private readonly messagesGateway: PigeonMessagesGateway,
     private readonly contexts: ConversationAccessContexts,
     private readonly mapper: ConversationMapper,
   ) {}
-
-  /**
-   * Only groups still keep their messages on the node. A one-to-one
-   * conversation's activity lives in its mailboxes, so it is never recovered
-   * from the node message list.
-   */
-  private async recoverLatestMessageAt(
-    conversation: Conversation,
-    actorIdentityId: ConversationParticipantId,
-  ): Promise<Conversation> {
-    const primitives = conversation.toPrimitives();
-
-    if (primitives.latestMessageAt !== undefined || !conversation.isGroup()) {
-      return conversation;
-    }
-
-    try {
-      const result = await this.messagesGateway.loadMessages(
-        this.contexts.find(actorIdentityId),
-        primitives.id,
-        null,
-        { limit: 1 },
-      );
-      const latestMessageAt = result.messages[0]?.raw.createdAt;
-
-      return latestMessageAt === undefined
-        ? conversation
-        : this.mapper.fromPrimitives({
-            ...this.mapper.toResource(conversation),
-            latestMessageAt,
-          });
-    } catch {
-      return conversation;
-    }
-  }
 
   private targetOf(conversation: Conversation): ConversationTarget {
     const { id, networkId } = this.mapper.toResource(conversation);
@@ -187,18 +149,6 @@ export class PigeonConversationRepository implements ConversationRepository {
     );
   }
 
-  public async markReadUntil(
-    conversation: Conversation,
-    messageId: MessageId,
-    actorIdentityId: ConversationParticipantId,
-  ): Promise<void> {
-    await this.gateway.markConversationReadUntil(
-      this.contexts.find(actorIdentityId),
-      this.mapper.toResource(conversation).id,
-      messageId.toString(),
-    );
-  }
-
   public async promoteAdmin(
     conversation: Conversation,
     targetIdentityId: ConversationParticipantId,
@@ -230,23 +180,16 @@ export class PigeonConversationRepository implements ConversationRepository {
   public async searchByIdentity(
     identityId: ConversationParticipantId,
   ): Promise<Conversation[]> {
-    const conversations = (
+    return (
       await this.gateway.listConversations(this.contexts.find(identityId))
-    ).map((resource) => this.mapper.fromPrimitives(resource));
+    )
+      .map((resource) => this.mapper.fromPrimitives(resource))
+      .sort((left, right) => {
+        if (left.isMoreRecentThan(right)) return -1;
 
-    const recovered = await Promise.all(
-      conversations.map(
-        async (conversation) =>
-          await this.recoverLatestMessageAt(conversation, identityId),
-      ),
-    );
+        if (right.isMoreRecentThan(left)) return 1;
 
-    return recovered.sort((left, right) => {
-      if (left.isMoreRecentThan(right)) return -1;
-
-      if (right.isMoreRecentThan(left)) return 1;
-
-      return 0;
-    });
+        return 0;
+      });
   }
 }

@@ -24,7 +24,6 @@ const openConversation: ConversationResource = {
   networkId: 'network-a',
   participantIds: ['identity-a', 'identity-b'],
   type: 'one-to-one',
-  unreadCount: 0,
 };
 const session = { identity: { id: 'identity-a' } } as Session;
 const conversationId = MessageConversationId.fromString('one-to-one:a');

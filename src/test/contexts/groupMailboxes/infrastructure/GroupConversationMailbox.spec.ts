@@ -9,12 +9,9 @@ import type { GroupConversationSyncOutcome } from '../../../../contexts/groupMai
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { PigeonMailboxClient } from '../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
 import type { DirectMessageTimelineChange } from '../../../../contexts/messages/domain/DirectMessageTimelineChange';
-import type { MessageProjectionPort } from '../../../../contexts/messages/infrastructure/crypto/MessageProjectionPort';
 import type { MessageAttachmentPublisher } from '../../../../contexts/messages/infrastructure/http/MessageAttachmentPublisher';
-import type { PigeonMessagesApi } from '../../../../contexts/messages/infrastructure/http/PigeonMessagesApi';
+import type { PigeonLinkPreviewsApi } from '../../../../contexts/messages/infrastructure/http/PigeonLinkPreviewsApi';
 import type { NotificationResource } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationResource';
-import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
-import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 
 import { GroupMailboxControlSeal } from '../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlSeal';
 import { GroupConversationMailbox } from '../../../../contexts/groupMailboxes/infrastructure/GroupConversationMailbox';
@@ -197,10 +194,7 @@ const composer = (): PigeonMessageCommandsApi => {
   mutations.authorOf.mockImplementation((session) => session.identity.id);
 
   return new PigeonMessageCommandsApi(
-    mock<HttpJsonClient>(),
-    mock<RequestSigner>(),
-    mock<PigeonMessagesApi>(),
-    mock<MessageProjectionPort>(),
+    mock<PigeonLinkPreviewsApi>(),
     attachments,
     mutations,
   );

@@ -13,32 +13,7 @@ const event = (type: string): RealtimeDomainEvent => ({
 });
 
 describe(ConversationRealtimeEvent.name, () => {
-  it.each([
-    'conversations.v1.conversation.was_created',
-    'conversations.v1.message.was_sent',
-    'conversations.v1.call.event.was_recorded',
-    'conversations.v1.messages.were_read',
-  ])('recognizes %s as a conversation event', (type) => {
-    expect(ConversationRealtimeEvent.handles(event(type))).toBe(true);
-  });
-
-  it('does not handle unrelated events', () => {
-    expect(
-      ConversationRealtimeEvent.handles(
-        event('communities.v1.channel.message.was_sent'),
-      ),
-    ).toBe(false);
-  });
-
-  it.each([
-    'conversations.v1.message.reaction.was_added',
-    'conversations.v1.message.was_edited',
-    'conversations.v1.message.was_pinned',
-  ])('does not notify for %s', (type) => {
-    expect(ConversationRealtimeEvent.shouldNotify(event(type))).toBe(false);
-  });
-
-  it('tells a recorded call apart from a message', () => {
+  it('tells a recorded call apart from a lifecycle change', () => {
     expect(
       ConversationRealtimeEvent.isCallEvent(
         event('conversations.v1.call.event.was_recorded'),
@@ -46,16 +21,26 @@ describe(ConversationRealtimeEvent.name, () => {
     ).toBe(true);
     expect(
       ConversationRealtimeEvent.isCallEvent(
-        event('conversations.v1.message.was_sent'),
+        event('conversations.v1.conversation.was_created'),
       ),
     ).toBe(false);
   });
 
-  it('notifies for newly sent messages', () => {
-    expect(
-      ConversationRealtimeEvent.shouldNotify(
-        event('conversations.v1.message.was_sent'),
-      ),
-    ).toBe(true);
+  it.each([
+    'conversations.v1.conversation.was_created',
+    'conversations.v1.conversation.member.was_added',
+  ])('recognizes %s as a conversation lifecycle change', (type) => {
+    expect(ConversationRealtimeEvent.isConversationLifecycle(event(type))).toBe(
+      true,
+    );
+  });
+
+  it.each([
+    'conversations.v1.call.event.was_recorded',
+    'communities.v1.channel.message.was_sent',
+  ])('does not treat %s as a lifecycle change', (type) => {
+    expect(ConversationRealtimeEvent.isConversationLifecycle(event(type))).toBe(
+      false,
+    );
   });
 });

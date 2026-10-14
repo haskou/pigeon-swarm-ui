@@ -1,6 +1,6 @@
 import type { ConversationResource } from '../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
-import type { PigeonMessagesGateway } from '../../../contexts/messages/infrastructure/http/PigeonMessagesGateway';
+import type { PigeonLinkPreviewsApi } from '../../../contexts/messages/infrastructure/http/PigeonLinkPreviewsApi';
 import type { ConversationDraftProjection as ConversationDraft } from '../../../contexts/messages/infrastructure/http/resources/ConversationDraftProjection';
 import type { MessageLinkPreview } from '../../../contexts/messages/infrastructure/http/resources/MessageLinkPreview';
 
@@ -15,7 +15,7 @@ export class PigeonMessagesFacade {
     private readonly drafts: PigeonConversationDrafts,
     private readonly reactions: PigeonMessageReactions,
     private readonly pins: PigeonMessagePins,
-    private readonly gateway: PigeonMessagesGateway,
+    private readonly linkPreviews: PigeonLinkPreviewsApi,
   ) {}
 
   public async addReactionTo(
@@ -31,7 +31,7 @@ export class PigeonMessagesFacade {
     session: Session,
     url: string,
   ): Promise<MessageLinkPreview> {
-    return await this.gateway.createLinkPreview(session, url);
+    return await this.linkPreviews.create(session, url);
   }
 
   public async delete(

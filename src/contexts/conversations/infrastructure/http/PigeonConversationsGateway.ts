@@ -87,12 +87,4 @@ export class PigeonConversationsGateway {
   ): Promise<ConversationResource[]> {
     return await this.conversations.list(session);
   }
-
-  public async markConversationReadUntil(
-    session: Session,
-    conversationId: string,
-    messageId: string,
-  ): Promise<void> {
-    await this.conversations.markReadUntil(session, conversationId, messageId);
-  }
 }

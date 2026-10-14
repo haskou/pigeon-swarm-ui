@@ -17,7 +17,6 @@ const oneToOne: ConversationResource = {
   networkId: 'network-a',
   participantIds: ['reader-a', 'friend-a'],
   type: 'one-to-one',
-  unreadCount: 0,
 };
 
 describe(PigeonMessagePins.name, () => {

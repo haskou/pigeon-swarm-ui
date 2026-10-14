@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import type { CallSession } from '../../../../contexts/calls/presentation/view-models/CallSession';
 import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
 import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { ConversationWithUnread } from '../../../../contexts/conversations/presentation/view-models/ConversationWithUnread';
 import type { IdentityPresenceResource as IdentityPresence } from '../../../../contexts/identities/infrastructure/http/resources/IdentityPresenceResource';
 import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { SelectablePresenceStatusResource as SelectablePresenceStatus } from '../../../../contexts/identities/infrastructure/http/resources/SelectablePresenceStatusResource';
@@ -29,7 +30,7 @@ interface SidebarProps {
   animationScopeKey?: string;
   session: Session;
   communities: Community[];
-  conversations: ConversationResource[];
+  conversations: ConversationWithUnread[];
   nodeNetworks: NodeNetwork[];
   identityNames: IdentityNames;
   identityPictures: IdentityPictures;

@@ -184,7 +184,6 @@ export class PigeonConversationsFacade {
         conversationId,
         messageId,
         this.actor(session),
-        Date.now(),
         openConversation
           ? { id: openConversation.id, type: openConversation.type }
           : null,

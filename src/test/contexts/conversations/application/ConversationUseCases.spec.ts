@@ -28,7 +28,6 @@ function conversation(
   id: string,
   latestMessageAt: number,
   type: 'group' | 'one-to-one' = 'one-to-one',
-  unreadCount = 0,
 ): Conversation {
   return Conversation.fromPrimitives({
     adminIds: [],
@@ -39,7 +38,6 @@ function conversation(
     networkId: 'network-a',
     participantIds: ['identity-a', 'identity-b'],
     type,
-    unreadCount,
   });
 }
 
@@ -206,49 +204,35 @@ describe('conversation use cases', () => {
   });
 
   it('keeps a group read on this device without any node request', async () => {
-    await new ConversationReadMarker(
-      conversationRepository,
-      readReceiptRepository,
-    ).mark(
+    await new ConversationReadMarker(readReceiptRepository).mark(
       new MarkConversationReadUntilMessage(
         'group:a',
         'message-a',
         'identity-a',
-        200,
       ),
     );
 
-    expect(conversationRepository.find).not.toHaveBeenCalled();
     expect(readReceiptRepository.markRead).not.toHaveBeenCalled();
   });
 
   it('sends nothing for a one-to-one conversation that is not open', async () => {
-    await new ConversationReadMarker(
-      conversationRepository,
-      readReceiptRepository,
-    ).mark(
+    await new ConversationReadMarker(readReceiptRepository).mark(
       new MarkConversationReadUntilMessage(
         'one-to-one:a',
         'message-a',
         'identity-a',
-        200,
       ),
     );
 
-    expect(conversationRepository.find).not.toHaveBeenCalled();
     expect(readReceiptRepository.markRead).not.toHaveBeenCalled();
   });
 
   it('sends a read of the open one-to-one conversation as a read receipt', async () => {
-    await new ConversationReadMarker(
-      conversationRepository,
-      readReceiptRepository,
-    ).mark(
+    await new ConversationReadMarker(readReceiptRepository).mark(
       new MarkConversationReadUntilMessage(
         'one-to-one:a',
         'message-a',
         'identity-a',
-        200,
         { id: 'one-to-one:a', type: 'one-to-one' },
       ),
     );
@@ -259,42 +243,31 @@ describe('conversation use cases', () => {
     expect(conversationId?.toString()).toBe('one-to-one:a');
     expect(messageId?.toString()).toBe('message-a');
     expect(actorIdentityId?.toString()).toBe('identity-a');
-    expect(conversationRepository.find).not.toHaveBeenCalled();
   });
 
   it('keeps a group read local while another conversation is open', async () => {
-    await new ConversationReadMarker(
-      conversationRepository,
-      readReceiptRepository,
-    ).mark(
+    await new ConversationReadMarker(readReceiptRepository).mark(
       new MarkConversationReadUntilMessage(
         'group:a',
         'message-a',
         'identity-a',
-        200,
         { id: 'one-to-one:a', type: 'one-to-one' },
       ),
     );
 
-    expect(conversationRepository.find).not.toHaveBeenCalled();
     expect(readReceiptRepository.markRead).not.toHaveBeenCalled();
   });
 
   it('keeps a read of the open group conversation local', async () => {
-    await new ConversationReadMarker(
-      conversationRepository,
-      readReceiptRepository,
-    ).mark(
+    await new ConversationReadMarker(readReceiptRepository).mark(
       new MarkConversationReadUntilMessage(
         'group:a',
         'message-a',
         'identity-a',
-        200,
         { id: 'group:a', type: 'group' },
       ),
     );
 
-    expect(conversationRepository.find).not.toHaveBeenCalled();
     expect(readReceiptRepository.markRead).not.toHaveBeenCalled();
   });
 

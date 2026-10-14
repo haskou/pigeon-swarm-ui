@@ -2,7 +2,6 @@ import type { Conversation } from '../Conversation';
 import type { ConversationGroupNonce } from '../value-objects/ConversationGroupNonce';
 import type { ConversationId } from '../value-objects/ConversationId';
 import type { ConversationParticipantId } from '../value-objects/ConversationParticipantId';
-import type { MessageId } from '../value-objects/MessageId';
 
 export interface ConversationRepository {
   create(
@@ -32,11 +31,6 @@ export interface ConversationRepository {
     conversation: Conversation,
     actorIdentityId: ConversationParticipantId,
   ): Promise<Conversation>;
-  markReadUntil(
-    conversation: Conversation,
-    messageId: MessageId,
-    actorIdentityId: ConversationParticipantId,
-  ): Promise<void>;
   promoteAdmin(
     conversation: Conversation,
     targetIdentityId: ConversationParticipantId,

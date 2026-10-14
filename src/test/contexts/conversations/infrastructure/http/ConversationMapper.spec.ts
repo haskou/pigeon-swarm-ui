@@ -7,7 +7,6 @@ const group = {
   networkId: 'network-a',
   participantIds: ['identity-a', 'identity-b'],
   type: 'group',
-  unreadCount: 2,
 };
 
 describe(ConversationMapper.name, () => {
@@ -31,14 +30,6 @@ describe(ConversationMapper.name, () => {
     const invalid = { ...group, participantIds: undefined };
 
     expect(() => new ConversationMapper().resource(invalid)).toThrow(TypeError);
-  });
-
-  it('parses a conversation without a node unread count', () => {
-    const { unreadCount: _unreadCount, ...withoutUnread } = group;
-
-    expect(
-      new ConversationMapper().list({ conversations: [withoutUnread] }),
-    ).toEqual([withoutUnread]);
   });
 
   it('maps resources to the aggregate and back at the HTTP boundary', () => {

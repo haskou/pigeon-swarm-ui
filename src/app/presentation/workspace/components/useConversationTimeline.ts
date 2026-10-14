@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { ChatMessage } from '../../../../contexts/messages/domain/ChatMessage';
 import type { ConversationMessageLoadState } from './ConversationMessageLoadState';
 import type { ConversationTimelineController } from './ConversationTimelineController';
@@ -18,7 +17,6 @@ export function useConversationTimeline({
   activeConversationReady,
   clearUnreadMessages,
   onCommunitiesReload,
-  onConversationsChange,
   onErrorChange,
   refreshConversations,
   sessionRef,
@@ -67,14 +65,6 @@ export function useConversationTimeline({
       if (!lastMessage) return;
 
       clearUnreadMessages(conversationId);
-
-      const clearConversationUnread = (conversation: ConversationResource) => {
-        if (conversation.id !== conversationId) return conversation;
-
-        return { ...conversation, unreadCount: 0 };
-      };
-
-      onConversationsChange((current) => current.map(clearConversationUnread));
       void applicationContainer.conversations
         .markReadUntil(
           sessionRef.current,
@@ -84,7 +74,7 @@ export function useConversationTimeline({
         )
         .catch(() => undefined);
     },
-    [clearUnreadMessages, onConversationsChange, sessionRef],
+    [clearUnreadMessages, sessionRef],
   );
   /**
    * A conversation timeline comes only from its mailboxes: the one-to-one or

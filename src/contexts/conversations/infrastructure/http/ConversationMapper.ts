@@ -21,7 +21,6 @@ const INVALID_RULES: [string, (value: unknown) => boolean][] = [
       Array.isArray(value) && value.every((id) => typeof id === 'string'),
   ],
   ['type', (value) => CONVERSATION_TYPES.includes(value as string)],
-  ['unreadCount', (value) => typeof value === 'number'],
 ];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -81,7 +80,6 @@ export class ConversationMapper {
       networkId: primitives.networkId,
       participantIds: primitives.participantIds,
       type: primitives.type,
-      unreadCount: primitives.unreadCount,
     };
   }
 }

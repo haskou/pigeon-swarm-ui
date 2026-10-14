@@ -1,89 +1,39 @@
 import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { UUID } from '@haskou/value-objects';
 
-import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
-import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+import type { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import type { MessageAttachment } from '../../../attachments/application/contracts/MessageAttachment';
 import type { Session } from '../../../identities/infrastructure/session/Session';
-import type { ChatMessage } from '../../domain/ChatMessage';
 import type { EncryptMessagePayloadInput } from '../crypto/EncryptMessagePayloadInput';
 import type { MessagePayloadSeal } from '../crypto/MessagePayloadSeal';
-import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { MessageAttachmentPublisher } from './MessageAttachmentPublisher';
 import type { MessageResource } from './MessageResource';
+import type { PigeonLinkPreviewsApi } from './PigeonLinkPreviewsApi';
 import type { EditMessageOptions } from './resources/EditMessageOptions';
 import type { MessageCommandIdentity } from './resources/MessageCommandIdentity';
 import type { SendMessageOptions } from './resources/SendMessageOptions';
 
-import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
-import { ScopeFrontierReader } from '../../../../shared/infrastructure/http/ScopeFrontierReader';
-import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
 import { ConversationKeyRequiredError } from '../../domain/errors/ConversationKeyRequiredError';
 import { MessageContent } from '../../domain/value-objects/MessageContent';
-import { PigeonMessagesApi } from './PigeonMessagesApi';
 
 type CommandRecord = MessageResource & { id: string };
 
 export class PigeonMessageCommandsApi {
   public constructor(
-    private readonly http: HttpJsonClient,
-    private readonly signer: RequestSigner,
-    private readonly messages: PigeonMessagesApi,
-    private readonly projection: MessageProjectionPort,
+    private readonly linkPreviews: PigeonLinkPreviewsApi,
     private readonly attachments: MessageAttachmentPublisher,
     private readonly mutations: PublicMutationSigner,
-    private readonly frontiers = new ScopeFrontierReader(http, signer),
   ) {}
-
-  private async submit<T>(
-    session: Session,
-    method: 'DELETE' | 'POST' | 'PUT',
-    path: string,
-    input: {
-      fields: Record<string, unknown>;
-      record: Record<string, unknown> & { id: string };
-    },
-  ): Promise<T> {
-    let response: T | undefined;
-    const frontier = await this.frontiers.ofPayload(session, input.record);
-
-    await submitPublicMutation(
-      PublicMutationSigner.FIRST_POSITION,
-      (position) =>
-        this.mutations.sign(
-          session,
-          {
-            frontier,
-            kind: 'put',
-            payload: input.record,
-            recordId: input.record.id,
-            store: 'messages',
-          },
-          position,
-        ),
-      async (mutation) => {
-        const body = { ...input.fields, mutation };
-
-        response = await this.http.request<T>(path, {
-          body: JSON.stringify(body),
-          headers: await this.signer.headers(session, method, path, body),
-          method,
-        });
-      },
-    );
-
-    return response as T;
-  }
 
   private async linkPreviewForContent(session: Session, content: string) {
     const url = MessageContent.fromString(content).findFirstLinkPreviewUrl();
 
     if (!url) return undefined;
 
-    return await this.messages
-      .createLinkPreview(session, url.toString())
+    return await this.linkPreviews
+      .create(session, url.toString())
       .catch(() => undefined);
   }
 
@@ -268,42 +218,6 @@ export class PigeonMessageCommandsApi {
     return result;
   }
 
-  public async send(
-    session: Session,
-    conversationId: string,
-    content: string,
-    options: SendMessageOptions = {},
-    commandIdentity?: MessageCommandIdentity,
-  ): Promise<ChatMessage> {
-    const created = await this.withSentRecord(
-      session,
-      conversationId,
-      content,
-      options,
-      async (sent) => {
-        const path = `/conversations/${encodeURIComponent(
-          conversationId,
-        )}/messages`;
-
-        return await this.submit<MessageResource>(session, 'POST', path, {
-          fields: {
-            createdAt: sent.createdAt,
-            encryptedPayload: sent.encryptedPayload,
-            id: sent.id,
-            previousMessageIds: sent.previousMessageIds,
-            ...(sent.replyToMessageId
-              ? { replyToMessageId: sent.replyToMessageId }
-              : {}),
-          },
-          record: { ...sent, scopeType: 'conversation' },
-        });
-      },
-      commandIdentity,
-    );
-
-    return await this.projection.decrypt(session, conversationId, created);
-  }
-
   /**
    * Builds the edit record for one message: the sealed payload and the
    * record a sender writes. Nothing is submitted here.
@@ -346,64 +260,5 @@ export class PigeonMessageCommandsApi {
       targetMessageId: messageId,
       type: 'edited',
     };
-  }
-
-  public async edit(
-    session: Session,
-    conversationId: string,
-    messageId: string,
-    content: string,
-    options: EditMessageOptions = {},
-    commandIdentity?: MessageCommandIdentity,
-  ): Promise<ChatMessage> {
-    const edited = await this.composeEdit(
-      session,
-      conversationId,
-      messageId,
-      content,
-      options,
-      commandIdentity,
-    );
-    const path = `/conversations/${encodeURIComponent(
-      conversationId,
-    )}/messages/${encodeURIComponent(messageId)}`;
-    const result = await this.submit<MessageResource>(session, 'PUT', path, {
-      fields: {
-        createdAt: edited.createdAt,
-        encryptedPayload: edited.encryptedPayload,
-        id: edited.id,
-        previousMessageIds: edited.previousMessageIds,
-      },
-      record: { ...edited, scopeType: 'conversation' },
-    });
-
-    return await this.projection.decrypt(session, conversationId, result);
-  }
-
-  public async delete(
-    session: Session,
-    conversationId: string,
-    messageId: string,
-    commandIdentity?: MessageCommandIdentity,
-  ): Promise<void> {
-    const createdAt = commandIdentity?.createdAt ?? Date.now();
-    const id = `${conversationId}:${createdAt}:${UUID.generate().toString()}:deleted`;
-    const path = `/conversations/${encodeURIComponent(
-      conversationId,
-    )}/messages/${encodeURIComponent(messageId)}`;
-
-    await this.submit<void>(session, 'DELETE', path, {
-      fields: { createdAt, id },
-      record: {
-        authorId: this.mutations.authorOf(session),
-        conversationId,
-        createdAt,
-        id,
-        previousMessageIds: [messageId],
-        scopeType: 'conversation',
-        targetMessageId: messageId,
-        type: 'deleted',
-      },
-    });
   }
 }

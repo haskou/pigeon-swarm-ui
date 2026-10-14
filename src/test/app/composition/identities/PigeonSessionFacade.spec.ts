@@ -21,7 +21,6 @@ describe(PigeonSessionFacade.name, () => {
           networkId: 'network-a',
           participantIds: ['identity-a'],
           type: 'one-to-one',
-          unreadCount: 0,
         },
         {
           adminIds: [],
@@ -30,7 +29,6 @@ describe(PigeonSessionFacade.name, () => {
           networkId: 'network-a',
           participantIds: ['identity-a'],
           type: 'one-to-one',
-          unreadCount: 0,
         },
       ],
       session,

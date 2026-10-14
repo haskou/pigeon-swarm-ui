@@ -1,7 +1,6 @@
 import { mock, type MockProxy } from 'jest-mock-extended';
 
 import type { PigeonConversationsGateway } from '../../../../../contexts/conversations/infrastructure/http/PigeonConversationsGateway';
-import type { PigeonMessagesGateway } from '../../../../../contexts/messages/infrastructure/http/PigeonMessagesGateway';
 
 import { Conversation } from '../../../../../contexts/conversations/domain/Conversation';
 import { ConversationNotFoundError } from '../../../../../contexts/conversations/domain/errors/ConversationNotFoundError';
@@ -15,16 +14,13 @@ import { sessionFixture } from '../../ConversationFixture';
 describe(PigeonConversationRepository.name, () => {
   let contexts: ConversationAccessContexts;
   let gateway: MockProxy<PigeonConversationsGateway>;
-  let messagesGateway: MockProxy<PigeonMessagesGateway>;
   let repository: PigeonConversationRepository;
 
   beforeEach(() => {
     contexts = new ConversationAccessContexts();
     gateway = mock<PigeonConversationsGateway>();
-    messagesGateway = mock<PigeonMessagesGateway>();
     repository = new PigeonConversationRepository(
       gateway,
-      messagesGateway,
       contexts,
       new ConversationMapper(),
     );
@@ -39,7 +35,6 @@ describe(PigeonConversationRepository.name, () => {
         networkId: 'network-a',
         participantIds: ['identity-a', 'identity-b'],
         type: 'one-to-one',
-        unreadCount: 0,
       },
       keychain: { conversations: {}, version: 2 },
       keychainExternalIdentifier: 'keychain-b',
@@ -55,7 +50,6 @@ describe(PigeonConversationRepository.name, () => {
         networkId: 'network-a',
         participantIds: ['identity-a', 'identity-b'],
         type: 'one-to-one',
-        unreadCount: 0,
       }),
       ConversationParticipantId.fromString('identity-a'),
     );
@@ -66,7 +60,7 @@ describe(PigeonConversationRepository.name, () => {
     ).toBe('keychain-b');
   });
 
-  it('searches and maps conversations without reloading known activity', async () => {
+  it('searches and maps conversations with their node activity', async () => {
     gateway.listConversations.mockResolvedValue([
       {
         adminIds: [],
@@ -75,27 +69,6 @@ describe(PigeonConversationRepository.name, () => {
         networkId: 'network-a',
         participantIds: ['identity-a', 'identity-b'],
         type: 'one-to-one',
-        unreadCount: 0,
-      },
-    ]);
-
-    await expect(
-      repository.searchByIdentity(
-        ConversationParticipantId.fromString('identity-a'),
-      ),
-    ).resolves.toHaveLength(1);
-    expect(messagesGateway.loadMessages).not.toHaveBeenCalled();
-  });
-
-  it('never reads the node message list to recover one-to-one activity', async () => {
-    gateway.listConversations.mockResolvedValue([
-      {
-        adminIds: [],
-        id: 'one-to-one:a',
-        networkId: 'network-a',
-        participantIds: ['identity-a', 'identity-b'],
-        type: 'one-to-one',
-        unreadCount: 0,
       },
     ]);
 
@@ -103,11 +76,10 @@ describe(PigeonConversationRepository.name, () => {
       ConversationParticipantId.fromString('identity-a'),
     );
 
-    expect(messagesGateway.loadMessages).not.toHaveBeenCalled();
-    expect(conversation?.toPrimitives().latestMessageAt).toBeUndefined();
+    expect(conversation?.toPrimitives().latestMessageAt).toBe(100);
   });
 
-  it('recovers group activity from the latest group message', async () => {
+  it('leaves group activity unknown instead of reading node messages', async () => {
     gateway.listConversations.mockResolvedValue([
       {
         adminIds: ['identity-a'],
@@ -116,24 +88,14 @@ describe(PigeonConversationRepository.name, () => {
         networkId: 'network-a',
         participantIds: ['identity-a', 'identity-b', 'identity-c'],
         type: 'group',
-        unreadCount: 0,
       },
     ]);
-    messagesGateway.loadMessages.mockResolvedValue({
-      messages: [{ raw: { createdAt: 250 } }],
-    } as never);
 
     const [conversation] = await repository.searchByIdentity(
       ConversationParticipantId.fromString('identity-a'),
     );
 
-    expect(messagesGateway.loadMessages).toHaveBeenCalledWith(
-      expect.anything(),
-      'group:a',
-      null,
-      { limit: 1 },
-    );
-    expect(conversation?.toPrimitives().latestMessageAt).toBe(250);
+    expect(conversation?.toPrimitives().latestMessageAt).toBeUndefined();
   });
 
   it('fails explicitly when a conversation cannot be found', async () => {

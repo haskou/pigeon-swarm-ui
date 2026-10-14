@@ -337,20 +337,18 @@ export function GlassWorkspace({
   const {
     communitySettingFor: communityNotificationSettingFor,
     conversationSettingFor: conversationNotificationSettingFor,
-    conversationsWithNotificationState: notificationAwareConversations,
     openCommunitySettings: openCommunityNotificationSettings,
     openConversationSettings: openConversationNotificationSettings,
     toggleCommunityMute: toggleCommunityNotificationMute,
     toggleConversationMute: toggleConversationNotificationMute,
   } = useWorkspaceNotificationActions({
-    conversations,
     nodeNetworks,
     openSettings: openNotificationSettings,
     settingsByScopeKey: notificationSettingsByScopeKey,
     toggleMute: toggleNotificationMute,
   });
   const { clearUnreadMessages, conversationsWithUnread, markUnreadMessage } =
-    useUnreadMessages(notificationAwareConversations);
+    useUnreadMessages(conversations);
   useEffect(() => {
     conversations.forEach((conversation) => {
       const setting = NotificationSettingsPolicy.resolve(
@@ -497,7 +495,6 @@ export function GlassWorkspace({
     ),
     clearUnreadMessages,
     onCommunitiesReload,
-    onConversationsChange: setConversations,
     onErrorChange: setSendError,
     refreshConversations,
     sessionRef,
@@ -794,20 +791,6 @@ export function GlassWorkspace({
     updateCommunityState,
   });
 
-  const handleMailboxConversationRead = useCallback(
-    (conversationId: string): void => {
-      clearUnreadMessages(conversationId);
-
-      const clearConversationUnread = (conversation: ConversationResource) => {
-        if (conversation.id !== conversationId) return conversation;
-
-        return { ...conversation, unreadCount: 0 };
-      };
-
-      setConversations((current) => current.map(clearConversationUnread));
-    },
-    [clearUnreadMessages, setConversations],
-  );
   const handleDirectHistoryRestored = useCallback(
     (conversationId: string, restored: ChatMessage[]): void => {
       markConversationReadUntil(conversationId, restored);
@@ -817,15 +800,15 @@ export function GlassWorkspace({
   );
   const handleGroupHistoryRestored = useCallback(
     (conversationId: string): void => {
-      handleMailboxConversationRead(conversationId);
+      clearUnreadMessages(conversationId);
       scrollMessagesToBottom('auto', true);
     },
-    [handleMailboxConversationRead, scrollMessagesToBottom],
+    [clearUnreadMessages, scrollMessagesToBottom],
   );
 
   useDirectMessageMailboxSync({
     activeConversation,
-    onConversationRead: handleMailboxConversationRead,
+    onConversationRead: clearUnreadMessages,
     onErrorChange: setSendError,
     onHistoryRestored: handleDirectHistoryRestored,
     onMessagesChange: setMessages,
@@ -856,8 +839,8 @@ export function GlassWorkspace({
 
   useDirectMessageBackgroundReadSync({
     activeConversationId: WorkspaceDerivedState.id(activeConversation),
-    conversations,
-    onConversationRead: handleMailboxConversationRead,
+    conversations: conversationsWithUnread,
+    onConversationRead: clearUnreadMessages,
     session,
   });
 

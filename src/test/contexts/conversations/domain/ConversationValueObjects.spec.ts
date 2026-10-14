@@ -5,13 +5,11 @@ import { ConversationParticipants } from '../../../../contexts/conversations/dom
 import { ConversationIdRequiredError } from '../../../../contexts/conversations/domain/errors/ConversationIdRequiredError';
 import { ConversationParticipantAlreadyExistsError } from '../../../../contexts/conversations/domain/errors/ConversationParticipantAlreadyExistsError';
 import { ConversationParticipantNotFoundError } from '../../../../contexts/conversations/domain/errors/ConversationParticipantNotFoundError';
-import { ConversationUnreadCountInvalidError } from '../../../../contexts/conversations/domain/errors/ConversationUnreadCountInvalidError';
 import { GroupConversationNameRequiredError } from '../../../../contexts/conversations/domain/errors/GroupConversationNameRequiredError';
 import { ConversationId } from '../../../../contexts/conversations/domain/value-objects/ConversationId';
 import { ConversationName } from '../../../../contexts/conversations/domain/value-objects/ConversationName';
 import { ConversationParticipantId } from '../../../../contexts/conversations/domain/value-objects/ConversationParticipantId';
 import { ConversationType } from '../../../../contexts/conversations/domain/value-objects/ConversationType';
-import { ConversationUnreadCount } from '../../../../contexts/conversations/domain/value-objects/ConversationUnreadCount';
 
 describe('conversation value objects', () => {
   it('requires a conversation id', () => {
@@ -24,12 +22,6 @@ describe('conversation value objects', () => {
     expect(() =>
       ConversationName.fromOptional().assertPresentFor(ConversationType.GROUP),
     ).toThrow(GroupConversationNameRequiredError);
-  });
-
-  it('rejects negative unread counts', () => {
-    expect(() => ConversationUnreadCount.fromNumber(-1)).toThrow(
-      ConversationUnreadCountInvalidError,
-    );
   });
 
   it('enforces participant membership and uniqueness', () => {
@@ -51,14 +43,12 @@ describe('conversation value objects', () => {
   it('records only newer activity', () => {
     const activity = ConversationActivity.fromPrimitives({
       latestMessageAt: 100,
-      unreadCount: 1,
     });
 
     activity.record(new Timestamp(200));
 
     expect(activity.toPrimitives()).toEqual({
       latestMessageAt: 200,
-      unreadCount: 1,
     });
     expect(activity.record(new Timestamp(150))).toBe(false);
   });

@@ -152,11 +152,4 @@ export class PigeonMessageProjection implements MessageProjectionPort {
       readable ? [message] : [],
     );
   }
-
-  public list(value: unknown): {
-    messages: MessageResource[];
-    nextCursor?: null | string;
-  } {
-    return this.projector.list(value);
-  }
 }
