@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { CallResource } from '../../infrastructure/http/resources/CallResource';
+import type { CallMicrophoneErrorCode } from '../view-models/CallMicrophoneErrorCode';
 import type { CallSession } from '../view-models/CallSession';
 import type { CallSessionControls } from './CallSessionControls';
 import type { ReceivedCallSignal as ReceivedSignal } from './CallSignalDispatcher';
