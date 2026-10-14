@@ -51,6 +51,7 @@ const REAL_CRYPTO_SPECS = [
   'KeychainCipher.vectors',
   'MailboxCapability',
   'MailboxChannel',
+  'MailboxContactPresenceRepository',
   'MailboxCreationProof',
   'MailboxCreationProof.vectors',
   'MailboxEnvelopeCipher',
