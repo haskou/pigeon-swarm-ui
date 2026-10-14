@@ -25,6 +25,7 @@ import type { Session } from '../../../../../contexts/identities/infrastructure/
 import { DevicePairingError } from '../../../../../contexts/identities/domain/DevicePairingError';
 import { RecoveryKey } from '../../../../../contexts/identities/domain/value-objects/RecoveryKey';
 import { PigeonIdentitiesGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
+import { DeviceUnlockNotConfirmedError } from '../../../../../contexts/identities/infrastructure/storage/DeviceUnlockNotConfirmedError';
 import { copy } from '../../../../../shared/presentation/i18n/copy';
 
 function identity(): IdentityResource {
@@ -55,6 +56,7 @@ function gatewayDouble(): {
       | 'revokeDevice'
     >
   >;
+  commands: jest.Mocked<Pick<PigeonIdentityCommandsApi, 'confirmLocalUnlock'>>;
   gateway: PigeonIdentitiesGateway;
   keychain: jest.Mocked<
     Pick<
@@ -78,7 +80,9 @@ function gatewayDouble(): {
     Pick<DeviceSealedRootRotation, 'current' | 'handOver' | 'rotate'>
   >;
 } {
-  const commands = {} as PigeonIdentityCommandsApi;
+  const commands = {
+    confirmLocalUnlock: jest.fn().mockResolvedValue(undefined),
+  } as jest.Mocked<Pick<PigeonIdentityCommandsApi, 'confirmLocalUnlock'>>;
   const login = {
     hydrate: jest.fn(),
   } as jest.Mocked<Pick<PigeonIdentityLoginApi, 'hydrate'>>;
@@ -139,8 +143,9 @@ function gatewayDouble(): {
 
   return {
     authorization,
+    commands,
     gateway: new PigeonIdentitiesGateway(
-      commands,
+      commands as unknown as PigeonIdentityCommandsApi,
       login as unknown as PigeonIdentityLoginApi,
       profile as unknown as IdentityProfileGateway,
       authorization as unknown as PigeonDeviceAuthorizationApi,
@@ -245,6 +250,45 @@ describe(PigeonIdentitiesGateway.name, () => {
 
   describe('authorizeDevicePairing', () => {
     const requestCode = 'request-code' as unknown as DevicePairingCode;
+
+    it('confirms the device password or passkey before anything leaves for the new device', async () => {
+      const { authorization, commands, gateway, pairingHistory } =
+        gatewayDouble();
+      const session = {
+        deviceSealedRootKey: SymmetricKey.generate(),
+        identity: { id: 'identity-1' },
+      } as unknown as Session;
+      authorization.authorizePairing.mockResolvedValue({
+        completion: { toCode: () => 'completion-code' },
+        session,
+      } as unknown as DevicePairingAuthorization);
+
+      await gateway.authorizeDevicePairing(session, requestCode, 'password');
+
+      expect(commands.confirmLocalUnlock).toHaveBeenCalledWith(
+        'identity-1',
+        'password',
+      );
+      expect(
+        commands.confirmLocalUnlock.mock.invocationCallOrder[0],
+      ).toBeLessThan(pairingHistory.publish.mock.invocationCallOrder[0]);
+    });
+
+    it('authorizes nothing when the password or passkey is not confirmed', async () => {
+      const { authorization, commands, gateway, pairingHistory, sealedRoot } =
+        gatewayDouble();
+      const session = { identity: { id: 'identity-1' } } as unknown as Session;
+      commands.confirmLocalUnlock.mockRejectedValue(
+        new DeviceUnlockNotConfirmedError(),
+      );
+
+      await expect(
+        gateway.authorizeDevicePairing(session, requestCode, 'wrong password'),
+      ).rejects.toBeInstanceOf(DeviceUnlockNotConfirmedError);
+      expect(sealedRoot.current).not.toHaveBeenCalled();
+      expect(pairingHistory.publish).not.toHaveBeenCalled();
+      expect(authorization.authorizePairing).not.toHaveBeenCalled();
+    });
 
     it('hands the authorizer root reseal to recovery at the new revision before returning the completion', async () => {
       const { authorization, gateway, recovery } = gatewayDouble();
