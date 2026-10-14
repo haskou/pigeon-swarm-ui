@@ -1,8 +1,8 @@
 import { Duration, Timestamp, assert } from '@haskou/value-objects';
 
-import { IdentityPresence } from './IdentityPresence';
 import { InvalidContactPresenceError } from './errors/InvalidContactPresenceError';
 import { UnshareablePresenceStatusError } from './errors/UnshareablePresenceStatusError';
+import { IdentityPresence } from './IdentityPresence';
 import { ContactPresenceSequence } from './value-objects/ContactPresenceSequence';
 import { ContactPresenceSource } from './value-objects/ContactPresenceSource';
 import { IdentityId } from './value-objects/IdentityId';
@@ -97,6 +97,10 @@ export class ContactPresence {
     const cap = receivedAt.addDuration(ContactPresence.LIFETIME);
 
     return this.expiresAt.isAfter(cap) ? this.expiresAt : cap;
+  }
+
+  public getSentAt(): Timestamp {
+    return this.sentAt;
   }
 
   public isExpiredAt(now: Timestamp): boolean {

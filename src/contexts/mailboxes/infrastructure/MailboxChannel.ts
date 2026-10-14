@@ -271,6 +271,14 @@ export class MailboxChannel {
     return { recreated };
   }
 
+  /** Deletes the inbox and its envelopes; any read token of it may. */
+  public async deleteInbox(
+    keys: MailboxKeys,
+    readToken: string,
+  ): Promise<void> {
+    await this.client.delete(keys.mailboxId, readToken);
+  }
+
   /** Lists the inbox's readers. The root token authorises the call. */
   public listReaders(
     keys: MailboxKeys,

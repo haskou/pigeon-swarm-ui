@@ -1,18 +1,13 @@
 import { Duration, type Timestamp } from '@haskou/value-objects';
 
 import type { PresenceSharing } from './PresenceSharing';
+import type { SentContactPresence } from './SentContactPresence';
 import type { ContactPresenceSource } from './value-objects/ContactPresenceSource';
 import type { IdentityId } from './value-objects/IdentityId';
 import type { IdentityPresenceStatus } from './value-objects/IdentityPresenceStatus';
 
 import { ContactPresence } from './ContactPresence';
 import { ContactPresenceSequence } from './value-objects/ContactPresenceSequence';
-
-type SentContactPresence = {
-  at: Timestamp;
-  sharing: PresenceSharing;
-  status: IdentityPresenceStatus | null;
-};
 
 /**
  * This app session's presence stream to the contacts it shares with. A
@@ -38,7 +33,9 @@ export class ContactPresenceBroadcast {
     status: IdentityPresenceStatus,
     now: Timestamp,
   ): boolean {
-    if (now.isBefore(last.at.addDuration(ContactPresenceBroadcast.MIN_INTERVAL)))
+    if (
+      now.isBefore(last.at.addDuration(ContactPresenceBroadcast.MIN_INTERVAL))
+    )
       return false;
 
     return (

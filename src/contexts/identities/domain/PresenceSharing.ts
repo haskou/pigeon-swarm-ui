@@ -37,6 +37,10 @@ export class PresenceSharing {
     );
   }
 
+  public getContactId(): IdentityId {
+    return this.contactId;
+  }
+
   public isFor(conversationId: ConversationId): boolean {
     return this.conversationId.isEqual(conversationId);
   }

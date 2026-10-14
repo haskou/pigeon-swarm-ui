@@ -1,15 +1,11 @@
 import type { Timestamp } from '@haskou/value-objects';
 
 import type { ContactPresence } from './ContactPresence';
+import type { HeldContactPresence } from './HeldContactPresence';
 import type { IdentityId } from './value-objects/IdentityId';
 
 import { IdentityPresence } from './IdentityPresence';
 import { IdentityPresenceStatus } from './value-objects/IdentityPresenceStatus';
-
-type HeldContactPresence = {
-  presence: ContactPresence;
-  receivedAt: Timestamp;
-};
 
 /**
  * What this device currently knows of its contacts' presence: the latest
