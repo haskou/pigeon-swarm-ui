@@ -1,4 +1,4 @@
-import type { PollResource } from '../../../polls/infrastructure/http/resources/PollResource';
+import type { PollSnapshot } from '../../../polls/domain/PollSnapshot';
 import type { MessagePollTimelineItem } from '../../../polls/presentation/components/messagePollTimelineItems';
 import type { ChatMessage } from '../../domain/ChatMessage';
 
@@ -36,7 +36,7 @@ export type MessageThreadSummary = {
 export class MessageTimelineEntries {
   public static build(
     messages: ChatMessage[],
-    polls: PollResource[],
+    polls: PollSnapshot[],
     threadSummaries: MessageThreadSummary[] = [],
     allowThreads = true,
   ): MessageTimelineEntry[] {

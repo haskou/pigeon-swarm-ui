@@ -1,79 +1,86 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Timestamp } from '@haskou/value-objects';
+import { useCallback, useMemo, useState } from 'react';
 
 import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
-import type { PollResource } from '../../../../contexts/polls/infrastructure/http/resources/PollResource';
-import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
+import type { DirectMessageTimelineChange } from '../../../../contexts/messages/domain/DirectMessageTimelineChange';
+import type { PollSnapshot } from '../../../../contexts/polls/domain/PollSnapshot';
+import type { ConversationPollsController } from './ConversationPollsController';
 
+import { PollBoard } from '../../../../contexts/polls/domain/PollBoard';
 import { applicationContainer } from '../../../composition/applicationContainer';
 
-export interface ConversationPollsController {
-  active: PollResource[];
-  close: (poll: PollResource) => Promise<void>;
-  create: (input: {
-    allowsMultipleVotes: boolean;
-    options: { id: string; text: string }[];
-    question: string;
-  }) => Promise<void>;
-  removeVote: (poll: PollResource) => Promise<void>;
-  vote: (poll: PollResource, optionIds: string[]) => Promise<void>;
-}
-
-function withPoll(current: PollResource[], poll: PollResource): PollResource[] {
-  return [...current.filter((item) => item.id !== poll.id), poll].sort(
-    (left, right) => left.createdAt - right.createdAt,
-  );
-}
-
+/**
+ * The polls of the active group conversation, folded on one PollBoard per
+ * conversation from the poll records its MLS mailboxes carry. Restore and
+ * sync hand their poll changes to `fold`; this identity's own poll, vote
+ * and close are folded as soon as they are queued.
+ */
 export function useConversationPolls({
   conversation,
-  realtimeEvent,
   session,
 }: {
   conversation?: ConversationResource;
-  realtimeEvent?: RealtimeDomainEvent | null;
   session: Session;
 }): ConversationPollsController {
-  const [polls, setPolls] = useState<PollResource[]>([]);
-  const upsert = useCallback((poll: PollResource) => {
-    setPolls((current) => withPoll(current, poll));
-  }, []);
+  const conversationId = conversation?.id;
+  const board = useMemo(
+    () => ({ conversationId, value: new PollBoard() }),
+    [conversationId],
+  );
+  const [shown, setShown] = useState<{
+    board: PollBoard;
+    polls: PollSnapshot[];
+  }>();
+  const fold = useCallback(
+    (changes: DirectMessageTimelineChange[]) => {
+      const receivedAt = Timestamp.now();
 
-  useEffect(() => {
-    if (!realtimeEvent?.type.startsWith('polls.v1.')) return;
+      for (const change of changes) {
+        switch (change.kind) {
+          case 'poll':
+            board.value.create({
+              allowsMultipleVotes: change.allowsMultipleVotes,
+              createdAt: change.createdAt,
+              creatorIdentityId: change.creatorIdentityId,
+              id: change.id,
+              options: change.options,
+              question: change.question,
+            });
+            break;
+          case 'poll_vote':
+            board.value.vote(
+              {
+                createdAt: change.createdAt,
+                optionIds: change.optionIds,
+                pollId: change.pollId,
+                voterIdentityId: change.voterIdentityId,
+              },
+              receivedAt,
+            );
+            break;
+          case 'poll_close':
+            board.value.close(
+              {
+                closerIdentityId: change.closerIdentityId,
+                createdAt: change.createdAt,
+                pollId: change.pollId,
+              },
+              receivedAt,
+            );
+            break;
+          default:
+            break;
+        }
+      }
 
-    const poll = realtimeEvent.attributes.poll as PollResource | undefined;
-    const pollId =
-      typeof realtimeEvent.attributes.pollId === 'string'
-        ? realtimeEvent.attributes.pollId
-        : undefined;
-
-    if (poll?.scope.type === 'group_conversation') {
-      upsert(poll);
-
-      return;
-    }
-
-    if (!pollId) return;
-
-    void applicationContainer.polls
-      .get(session, pollId)
-      .then((loadedPoll) => {
-        if (loadedPoll.scope.type === 'group_conversation') upsert(loadedPoll);
-      })
-      .catch(() => undefined);
-  }, [realtimeEvent, session, upsert]);
-
+      setShown({ board: board.value, polls: board.value.polls() });
+    },
+    [board],
+  );
   const active = useMemo(
-    () =>
-      conversation
-        ? polls.filter(
-            (poll) =>
-              poll.scope.type === 'group_conversation' &&
-              poll.scope.conversationId === conversation.id,
-          )
-        : [],
-    [conversation, polls],
+    () => (shown?.board === board.value ? shown.polls : []),
+    [board, shown],
   );
 
   const create = useCallback(
@@ -84,39 +91,49 @@ export function useConversationPolls({
     }) => {
       if (!conversation) return;
 
-      upsert(
-        await applicationContainer.polls.create(session, {
-          allowsMultipleVotes: input.allowsMultipleVotes,
-          conversationId: conversation.id,
-          options: input.options,
-          question: input.question,
-          scopeType: 'group_conversation',
-        }),
-      );
+      fold([
+        await applicationContainer.groupMessages.createPoll(
+          session,
+          conversation,
+          input,
+        ),
+      ]);
     },
-    [conversation, session, upsert],
+    [conversation, fold, session],
   );
-
   const vote = useCallback(
-    async (poll: PollResource, optionIds: string[]) => {
-      upsert(
-        await applicationContainer.polls.vote(session, poll.id, optionIds),
-      );
+    async (poll: PollSnapshot, optionIds: string[]) => {
+      if (!conversation) return;
+
+      fold([
+        await applicationContainer.groupMessages.votePoll(
+          session,
+          conversation,
+          poll.id,
+          optionIds,
+        ),
+      ]);
     },
-    [session, upsert],
+    [conversation, fold, session],
   );
   const removeVote = useCallback(
-    async (poll: PollResource) => {
-      upsert(await applicationContainer.polls.removeVote(session, poll.id));
-    },
-    [session, upsert],
+    (poll: PollSnapshot) => vote(poll, []),
+    [vote],
   );
   const close = useCallback(
-    async (poll: PollResource) => {
-      upsert(await applicationContainer.polls.close(session, poll.id));
+    async (poll: PollSnapshot) => {
+      if (!conversation) return;
+
+      fold([
+        await applicationContainer.groupMessages.closePoll(
+          session,
+          conversation,
+          poll.id,
+        ),
+      ]);
     },
-    [session, upsert],
+    [conversation, fold, session],
   );
 
-  return { active, close, create, removeVote, vote };
+  return { active, close, create, fold, removeVote, vote };
 }

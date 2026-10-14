@@ -17,6 +17,19 @@ describe(DirectMailboxRecords.name, () => {
         createdAt: 100,
         targetMessageId: 'message-1',
       }),
+    pollClose: (): DirectMessageRecord =>
+      DirectMailboxRecords.pollClose({
+        ...author,
+        createdAt: 100,
+        targetPollId: 'poll-1',
+      }),
+    pollVote: (): DirectMessageRecord =>
+      DirectMailboxRecords.pollVote({
+        ...author,
+        createdAt: 100,
+        optionIds: ['tea'],
+        targetPollId: 'poll-1',
+      }),
     reaction: (): DirectMessageRecord =>
       DirectMailboxRecords.reaction({
         ...author,
@@ -39,6 +52,17 @@ describe(DirectMailboxRecords.name, () => {
       targetMessageId: 'message-1',
     }),
     pin: generated.pin(),
+    poll: DirectMailboxRecords.poll({
+      ...base,
+      allowsMultipleVotes: false,
+      options: [
+        { id: 'tea', text: 'Tea' },
+        { id: 'coffee', text: 'Coffee' },
+      ],
+      question: 'Which one?',
+    }),
+    pollClose: generated.pollClose(),
+    pollVote: generated.pollVote(),
     reaction: generated.reaction(),
     read: generated.read(),
     sent: DirectMailboxRecords.sent({
@@ -52,16 +76,20 @@ describe(DirectMailboxRecords.name, () => {
     jest.useRealTimers();
   });
 
-  it.each(['deleted', 'pin', 'reaction', 'read'] as const)(
-    'gives each %s record a fresh UUID',
-    (type) => {
-      const first = generated[type]();
-      const second = generated[type]();
+  it.each([
+    'deleted',
+    'pin',
+    'pollClose',
+    'pollVote',
+    'reaction',
+    'read',
+  ] as const)('gives each %s record a fresh UUID', (type) => {
+    const first = generated[type]();
+    const second = generated[type]();
 
-      expect(new UUID(first.id).toString()).toBe(first.id);
-      expect(second.id).not.toBe(first.id);
-    },
-  );
+    expect(new UUID(first.id).toString()).toBe(first.id);
+    expect(second.id).not.toBe(first.id);
+  });
 
   it.each(['deleted', 'read'] as const)(
     'stamps each %s record with the current clock',
@@ -72,7 +100,7 @@ describe(DirectMailboxRecords.name, () => {
     },
   );
 
-  it.each(['pin', 'reaction'] as const)(
+  it.each(['pin', 'pollClose', 'pollVote', 'reaction'] as const)(
     'keeps the caller clock reading on %s records',
     (type) => {
       expect(records[type].createdAt).toBe(100);
@@ -104,7 +132,7 @@ describe(DirectMailboxRecords.name, () => {
     for (const type of Object.keys(
       DirectMailboxRecords.TYPE,
     ) as (keyof typeof DirectMailboxRecords.TYPE)[]) {
-      expect(records[type].type).toBe(type);
+      expect(records[type].type).toBe(DirectMailboxRecords.TYPE[type]);
     }
   });
 
@@ -113,10 +141,15 @@ describe(DirectMailboxRecords.name, () => {
     expect(DirectMailboxRecords.carriesMessage(records.edited)).toBe(true);
   });
 
-  it.each(['deleted', 'pin', 'reaction', 'read'] as const)(
-    'carries no message for %s records',
-    (type) => {
-      expect(DirectMailboxRecords.carriesMessage(records[type])).toBe(false);
-    },
-  );
+  it.each([
+    'deleted',
+    'pin',
+    'poll',
+    'pollClose',
+    'pollVote',
+    'reaction',
+    'read',
+  ] as const)('carries no message for %s records', (type) => {
+    expect(DirectMailboxRecords.carriesMessage(records[type])).toBe(false);
+  });
 });

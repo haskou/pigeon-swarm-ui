@@ -56,6 +56,7 @@ import { useCommunitySelection } from './useCommunitySelection';
 import { useConversationDrafts } from './useConversationDrafts';
 import { useConversationMessageActions } from './useConversationMessageActions';
 import { useConversationPins } from './useConversationPins';
+import { useConversationPolls } from './useConversationPolls';
 import { useConversationThread } from './useConversationThread';
 import { useConversationTimeline } from './useConversationTimeline';
 import { useDeviceStorageNotice } from './useDeviceStorageNotice';
@@ -153,8 +154,6 @@ export function GlassWorkspace({
     workspaceMode,
   } = useWorkspacePreferenceState(conversations, session);
   const [communityRealtimeEvent, setCommunityRealtimeEvent] =
-    useState<RealtimeDomainEvent | null>(null);
-  const [conversationRealtimeEvent, setConversationRealtimeEvent] =
     useState<RealtimeDomainEvent | null>(null);
   const [realtimeStatus, setRealtimeStatus] = useState<
     'connected' | 'reconnecting'
@@ -819,11 +818,16 @@ export function GlassWorkspace({
     session,
     setPinnedMessageIds,
   });
+  const conversationPolls = useConversationPolls({
+    conversation: activeConversation,
+    session,
+  });
   useGroupMessageMailboxSync({
     activeConversation,
     onErrorChange: setSendError,
     onHistoryRestored: handleGroupHistoryRestored,
     onMessagesChange: setMessages,
+    onPollChanges: conversationPolls.fold,
     refreshConversations,
     session,
     setPinnedMessageIds,
@@ -931,7 +935,6 @@ export function GlassWorkspace({
     setActiveConversationId,
     setCommunities,
     setCommunityRealtimeEvent,
-    setConversationRealtimeEvent,
     setConversations,
     setMessages,
     setRealtimeEventLog,
@@ -1072,7 +1075,6 @@ export function GlassWorkspace({
               conversationNotificationSettingFor={
                 conversationNotificationSettingFor
               }
-              conversationRealtimeEvent={conversationRealtimeEvent}
               conversationTypingIdentityIds={conversationTypingIdentityIds}
               conversationsWithUnread={conversationsWithUnread}
               editingMessage={editingMessage}
@@ -1120,6 +1122,7 @@ export function GlassWorkspace({
               onSidebarOpen={() => openTransientSurface('sidebar')}
               pendingInvitation={activeConversationInvitation}
               pins={conversationPins}
+              polls={conversationPolls}
               presenceByIdentityId={presenceByIdentityId}
               presenceSharedConversationIds={presenceSharedConversationIds}
               railProps={railProps}

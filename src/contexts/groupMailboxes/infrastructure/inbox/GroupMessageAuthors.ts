@@ -4,9 +4,9 @@ import type { GroupMessageHistoryStore } from '../history/GroupMessageHistorySto
 import { GroupMessageId } from '../crypto/GroupMessageId';
 
 /**
- * The authors of one conversation's sent messages during one sync pass:
- * those this device stored, looked up one id at a time, and those accepted
- * in this pass.
+ * The authors of one conversation's sent messages and polls during one sync
+ * pass: those this device stored, looked up one id at a time, and those
+ * accepted in this pass.
  */
 export class GroupMessageAuthors {
   private readonly known = new Map<string, string | undefined>();
@@ -36,7 +36,7 @@ export class GroupMessageAuthors {
     return true;
   }
 
-  /** Whether `id` is a message `sender` sent under an id it owns. */
+  /** Whether `id` is a message or poll `sender` sent under an id it owns. */
   public async owns(id: string, sender: string): Promise<boolean> {
     return (
       GroupMessageId.belongsTo(id, sender) &&

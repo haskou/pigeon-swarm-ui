@@ -22,7 +22,8 @@ import { applyMailboxSyncChanges } from './applyMailboxSyncChanges';
  * aborts the running pass and the schedule. A failing streak shows one
  * notice unless another error is already shown; the next successful pass
  * clears only that notice. Pin records apply last-writer-wins per message
- * through one MessagePinClock per effect run. The first pass that finds
+ * through one MessagePinClock per effect run. Restored and read poll
+ * changes go to `onPollChanges`. The first pass that finds
  * this identity off the roster refreshes the conversation list, once per
  * effect run, so the group leaves the sidebar.
  */
@@ -31,6 +32,7 @@ export function useGroupMessageMailboxSync({
   onErrorChange,
   onHistoryRestored,
   onMessagesChange,
+  onPollChanges,
   refreshConversations,
   session,
   setPinnedMessageIds,
@@ -54,6 +56,9 @@ export function useGroupMessageMailboxSync({
     let removalSeen = false;
     let timer: number | undefined;
     const apply = (changes: DirectMessageTimelineChange[]): void => {
+      const polls = changes.filter(({ kind }) => kind.startsWith('poll'));
+
+      if (polls.length > 0) onPollChanges(polls);
       applyMailboxSyncChanges(changes, pinClock, {
         onMessagesChange,
         setPinnedMessageIds,
@@ -132,6 +137,7 @@ export function useGroupMessageMailboxSync({
     onErrorChange,
     onHistoryRestored,
     onMessagesChange,
+    onPollChanges,
     refreshConversations,
     session,
     setPinnedMessageIds,

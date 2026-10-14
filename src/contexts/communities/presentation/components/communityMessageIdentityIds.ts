@@ -1,12 +1,12 @@
 import type { ChatMessage } from '../../../messages/domain/ChatMessage';
-import type { PollResource } from '../../../polls/infrastructure/http/resources/PollResource';
+import type { PollSnapshot } from '../../../polls/domain/PollSnapshot';
 
 export function communityMessageIdentityIds({
   messages = [],
   polls = [],
 }: {
   messages?: readonly ChatMessage[];
-  polls?: readonly PollResource[];
+  polls?: readonly PollSnapshot[];
 }): string[] {
   const identityIds = new Set<string>();
 
@@ -32,7 +32,7 @@ export function communityMessageIdentityIds({
 
 function collectPollIdentityIds(
   identityIds: Set<string>,
-  poll: PollResource,
+  poll: PollSnapshot,
 ): void {
   addIdentityId(identityIds, poll.creatorIdentityId);
 

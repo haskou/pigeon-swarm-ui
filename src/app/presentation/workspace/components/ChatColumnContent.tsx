@@ -6,7 +6,7 @@ import type { IdentityNames } from '../../../../contexts/identities/presentation
 import type { ChatMessage } from '../../../../contexts/messages/domain/ChatMessage';
 import type { StickerMessageReference } from '../../../../contexts/stickers/infrastructure/http/resources/StickerMessageReference';
 import type { ChatColumnProps } from './ChatColumnProps';
-import type { ConversationPollsController } from './useConversationPolls';
+import type { ConversationPollsController } from './ConversationPollsController';
 
 import { useAttachmentDownload } from '../../../../contexts/attachments/presentation/hooks/useAttachmentDownload';
 import { copy } from '../../../../shared/presentation/i18n/copy';

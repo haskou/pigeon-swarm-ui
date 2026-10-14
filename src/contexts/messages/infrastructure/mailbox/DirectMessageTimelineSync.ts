@@ -417,6 +417,11 @@ export class DirectMessageTimelineSync {
           ];
         case DirectMailboxRecords.TYPE.read:
           return this.readChanges(session, record);
+        // Polls exist only in group conversations.
+        case DirectMailboxRecords.TYPE.poll:
+        case DirectMailboxRecords.TYPE.pollVote:
+        case DirectMailboxRecords.TYPE.pollClose:
+          return [];
       }
     });
   }

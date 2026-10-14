@@ -89,7 +89,6 @@ function ConversationChatContent({
   callControls,
   closeTransientUi,
   conversationNotificationSetting,
-  conversationRealtimeEvent,
   conversationTypingIdentityIds,
   editingMessage,
   groupInviteRequest,
@@ -112,6 +111,7 @@ function ConversationChatContent({
   onSidebarOpen,
   pendingInvitation,
   pins,
+  polls,
   presenceByIdentityId,
   presenceSharedConversationIds,
   realtimeStatus,
@@ -209,7 +209,7 @@ function ConversationChatContent({
           presenceSharedConversationIds.has(activeConversation.id)
         }
         progress={attachmentProgress}
-        realtimeEvent={conversationRealtimeEvent}
+        polls={polls}
         realtimeStatus={realtimeStatus}
         replyToMessage={replyTarget}
         scrollerRef={timeline.scrollerRef}

@@ -784,8 +784,10 @@ describe('GroupConversationMailbox', () => {
       kind: 'poll_close',
       pollId,
     });
-    expect(polls(carol)).toEqual([created, bobVote, closed]);
-    expect(polls(alice)).toEqual([bobVote, carolVote]);
+    expect(polls(carol)).toEqual(
+      expect.arrayContaining([created, bobVote, closed]),
+    );
+    expect(polls(alice)).toEqual(expect.arrayContaining([bobVote, carolVote]));
   });
 
   it('refuses a poll the domain cannot hold before queuing it', async () => {

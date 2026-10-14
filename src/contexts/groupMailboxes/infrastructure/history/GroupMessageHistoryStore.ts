@@ -417,7 +417,7 @@ export class GroupMessageHistoryStore {
     });
   }
 
-  /** The author of sent message `id`, if this device stored it. */
+  /** The author of sent message or poll `id`, if this device stored it. */
   public author(
     session: Session,
     conversationId: string,
@@ -434,7 +434,8 @@ export class GroupMessageHistoryStore {
           ? undefined
           : await this.lookUp(scope, session.identity.id, conversationId, id));
 
-      return record?.type === DirectMailboxRecords.TYPE.sent
+      return record?.type === DirectMailboxRecords.TYPE.sent ||
+        record?.type === DirectMailboxRecords.TYPE.poll
         ? record.authorId
         : undefined;
     });

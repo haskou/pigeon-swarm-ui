@@ -1,16 +1,7 @@
-import type { PollOptionResource } from './PollOptionResource';
+import type { PollSnapshot } from '../../../domain/PollSnapshot';
 import type { PollScopeResource } from './PollScopeResource';
-import type { PollVoteResource } from './PollVoteResource';
 
-export type PollResource = {
-  allowsMultipleVotes: boolean;
-  createdAt: number;
-  creatorIdentityId: string;
-  expiresAt?: number | null;
-  id: string;
-  options: PollOptionResource[];
-  question: string;
+/** A node-backed poll: what it shows plus the scope it lives in. */
+export type PollResource = PollSnapshot & {
   scope: PollScopeResource;
-  status: 'closed' | 'open';
-  votes: PollVoteResource[];
 };

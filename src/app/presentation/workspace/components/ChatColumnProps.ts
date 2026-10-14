@@ -17,7 +17,7 @@ import type { NodeNetwork } from '../../../../contexts/networks/presentation/vie
 import type { ConversationInvitationNotificationResource } from '../../../../contexts/notifications/infrastructure/http/resources/ConversationInvitationNotificationResource';
 import type { NotificationScopeSettingResource as NotificationScopeSetting } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationScopeSettingResource';
 import type { StickerMessageReference } from '../../../../contexts/stickers/infrastructure/http/resources/StickerMessageReference';
-import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
+import type { ConversationPollsController } from './ConversationPollsController';
 
 export interface ChatColumnProps {
   session: Session;
@@ -41,6 +41,7 @@ export interface ChatColumnProps {
   messageState: 'idle' | 'loading' | 'error';
   nodeNetworks: NodeNetwork[];
   pinnedMessageIds: ReadonlySet<string>;
+  polls: ConversationPollsController;
   sendError: string | null;
   scrollerRef: RefObject<HTMLDivElement | null>;
   bottomRef: RefObject<HTMLDivElement | null>;
@@ -100,6 +101,5 @@ export interface ChatColumnProps {
   }) => void;
   onTypingActive?: (active: boolean) => void;
   pendingInvitation?: ConversationInvitationNotificationResource | null;
-  realtimeEvent?: RealtimeDomainEvent | null;
   typingIdentityIds?: string[];
 }

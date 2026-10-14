@@ -106,7 +106,6 @@ describe(messagePollTimelineItems.name, () => {
           poll,
           raw: {
             id: 'poll-1',
-            poll,
             pollId: 'poll-1',
             type: 'poll',
           },

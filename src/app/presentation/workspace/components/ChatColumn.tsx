@@ -26,7 +26,6 @@ import { ChatConversationHeader } from './ChatConversationHeader';
 import { ChatConversationPresentation } from './ChatConversationPresentation';
 import { ConversationActionsMenu } from './ConversationActionsMenu';
 import { useConversationKeyDialog } from './useConversationKeyDialog';
-import { useConversationPolls } from './useConversationPolls';
 import { useGroupInvitationDialog } from './useGroupInvitationDialog';
 import {
   groupRosterPermissions,
@@ -178,10 +177,10 @@ export function ChatColumn({
   peerPicture,
   pendingInvitation,
   pinnedMessageIds,
+  polls,
   presenceByIdentityId = {},
   presenceShared = false,
   progress,
-  realtimeEvent,
   realtimeStatus = 'connected',
   replyToMessage,
   scrollerRef,
@@ -277,11 +276,6 @@ export function ChatColumn({
     () => groupRosterPermissions(activeConversation, session.identity.id),
     [activeConversation, session.identity.id],
   );
-  const conversationPolls = useConversationPolls({
-    conversation: activeConversation,
-    realtimeEvent,
-    session,
-  });
   const {
     callParticipants,
     canCreatePoll,
@@ -497,7 +491,7 @@ export function ChatColumn({
         onStickerSend={onStickerSend}
         onTypingActive={onTypingActive}
         pinnedMessageIds={pinnedMessageIds}
-        polls={conversationPolls}
+        polls={polls}
         progress={progress}
         reactionAuthorNames={reactionAuthorNames}
         replyToMessage={replyToMessage}

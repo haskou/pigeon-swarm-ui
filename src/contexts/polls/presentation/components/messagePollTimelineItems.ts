@@ -1,5 +1,5 @@
 import type { ChatMessage } from '../../../messages/domain/ChatMessage';
-import type { PollResource } from '../../infrastructure/http/resources/PollResource';
+import type { PollSnapshot } from '../../domain/PollSnapshot';
 
 export type MessagePollTimelineItem =
   | {
@@ -11,20 +11,20 @@ export type MessagePollTimelineItem =
   | {
       id: string;
       message: ChatMessage;
-      poll: PollResource;
+      poll: PollSnapshot;
       timestamp: number;
       type: 'poll';
     };
 
 export function messagePollTimelineItems(
   messages: ChatMessage[],
-  polls: PollResource[],
+  polls: PollSnapshot[],
 ): MessagePollTimelineItem[] {
   const pollItems = new Map<
     string,
     {
       message: ChatMessage;
-      poll: PollResource;
+      poll: PollSnapshot;
     }
   >();
   const timelineItems: MessagePollTimelineItem[] = [];
@@ -70,7 +70,7 @@ export function messagePollTimelineItems(
 }
 
 function pollChatMessage(
-  poll: PollResource,
+  poll: PollSnapshot,
   message?: ChatMessage,
 ): ChatMessage {
   if (message) {
@@ -96,7 +96,6 @@ function pollChatMessage(
     poll,
     raw: {
       id: poll.id,
-      poll,
       pollId: poll.id,
       type: 'poll',
     },

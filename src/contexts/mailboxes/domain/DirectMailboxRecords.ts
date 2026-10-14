@@ -4,15 +4,19 @@ import type { DirectDeletedRecord } from './DirectDeletedRecord';
 import type { DirectEditedRecord } from './DirectEditedRecord';
 import type { DirectMessageRecord } from './DirectMessageRecord';
 import type { DirectPinRecord } from './DirectPinRecord';
+import type { DirectPollCloseRecord } from './DirectPollCloseRecord';
+import type { DirectPollRecord } from './DirectPollRecord';
+import type { DirectPollVoteRecord } from './DirectPollVoteRecord';
 import type { DirectReactionRecord } from './DirectReactionRecord';
 import type { DirectReadRecord } from './DirectReadRecord';
 import type { DirectSentRecord } from './DirectSentRecord';
 
 /**
  * Shape rules for direct mailbox records. Sent and edited records take their
- * ids from the message; every other record gets a fresh UUID here. Deleted
- * and read records are stamped with the current clock; reaction and pin
- * records keep the caller's clock reading, which also orders them. Keys are
+ * ids from the message and a poll from the poll; every other record gets a
+ * fresh UUID here. Deleted and read records are stamped with the current
+ * clock; reaction, pin and poll records keep the caller's clock reading,
+ * which also orders them. Keys are
  * listed alphabetically: their order is part of the encoded bytes.
  */
 export class DirectMailboxRecords {
@@ -24,6 +28,9 @@ export class DirectMailboxRecords {
     deleted: 'deleted',
     edited: 'edited',
     pin: 'pin',
+    poll: 'poll',
+    pollClose: 'poll_close',
+    pollVote: 'poll_vote',
     reaction: 'reaction',
     read: 'read',
     sent: 'sent',
@@ -97,6 +104,49 @@ export class DirectMailboxRecords {
       id: UUID.generate().toString(),
       targetMessageId: fields.targetMessageId,
       type: 'pin',
+    };
+  }
+
+  public static poll(fields: Omit<DirectPollRecord, 'type'>): DirectPollRecord {
+    return {
+      allowsMultipleVotes: fields.allowsMultipleVotes,
+      authorId: fields.authorId,
+      conversationId: fields.conversationId,
+      createdAt: fields.createdAt,
+      id: fields.id,
+      options: fields.options.map((option) => ({
+        id: option.id,
+        text: option.text,
+      })),
+      question: fields.question,
+      type: 'poll',
+    };
+  }
+
+  public static pollVote(
+    fields: Omit<DirectPollVoteRecord, 'id' | 'type'>,
+  ): DirectPollVoteRecord {
+    return {
+      authorId: fields.authorId,
+      conversationId: fields.conversationId,
+      createdAt: fields.createdAt,
+      id: UUID.generate().toString(),
+      optionIds: [...fields.optionIds],
+      targetPollId: fields.targetPollId,
+      type: 'poll_vote',
+    };
+  }
+
+  public static pollClose(
+    fields: Omit<DirectPollCloseRecord, 'id' | 'type'>,
+  ): DirectPollCloseRecord {
+    return {
+      authorId: fields.authorId,
+      conversationId: fields.conversationId,
+      createdAt: fields.createdAt,
+      id: UUID.generate().toString(),
+      targetPollId: fields.targetPollId,
+      type: 'poll_close',
     };
   }
 
