@@ -15,7 +15,9 @@ jest.mock('react', () => ({
   useRef: (current: unknown) => ({ current }),
 }));
 jest.mock('../../../../../app/composition/applicationContainer', () => ({
-  applicationContainer: { calls: { join: jest.fn() } },
+  applicationContainer: {
+    calls: { join: jest.fn(), startCommunityChannel: jest.fn() },
+  },
 }));
 jest.mock('../../../../../shared/presentation/sounds', () => ({
   playAnsweredCallSound: jest.fn(),
@@ -39,7 +41,7 @@ function communityCall(overrides: Partial<CallResource>): CallResource {
 }
 
 describe('following a superseded community voice call', () => {
-  it('leaves the superseded call and joins the winning call with a fresh local session', async () => {
+  it('leaves the superseded call and rejoins the channel live call with a fresh local session', async () => {
     const session = { identity: { id: 'alice' } } as Session;
     const winner = communityCall({ id: 'call-b' });
     const microphone = { stream: {} as MediaStream };
@@ -48,11 +50,15 @@ describe('following a superseded community voice call', () => {
     const started = new Promise<StartCallInput>((resolve) => {
       resolveStarted = resolve;
     });
-    jest.mocked(applicationContainer.calls.join).mockImplementation(() => {
-      steps.push('join');
+    // A community member is not listed on a call started by someone else, so
+    // only the channel start path signs a join for the winning call.
+    jest
+      .mocked(applicationContainer.calls.startCommunityChannel)
+      .mockImplementation(() => {
+        steps.push('rejoin-channel');
 
-      return Promise.resolve(winner);
-    });
+        return Promise.resolve(winner);
+      });
     const { followSupersededCall } = useCallStartActions(
       mock<CallStartActionsInput>({
         activeCall: null,
@@ -86,11 +92,11 @@ describe('following a superseded community voice call', () => {
     );
     const input = await started;
 
-    expect(steps).toEqual(['leave', 'join']);
-    expect(applicationContainer.calls.join).toHaveBeenCalledWith(
-      session,
-      'call-b',
-    );
+    expect(steps).toEqual(['leave', 'rejoin-channel']);
+    expect(
+      applicationContainer.calls.startCommunityChannel,
+    ).toHaveBeenCalledWith(session, 'community-a', 'voice-a');
+    expect(applicationContainer.calls.join).not.toHaveBeenCalled();
     expect(input).toMatchObject({
       call: winner,
       id: 'call-b',
