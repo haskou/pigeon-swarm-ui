@@ -60,4 +60,23 @@ describe(MarkdownMessage.name, () => {
 
     expect(performance.now() - startedAt).toBeLessThan(1_000);
   });
+
+  it('renders many links and mentions from another client quickly', () => {
+    const mentions = Array.from({ length: 5_000 }, (_, index) => ({
+      identityId: `identity-${index}`,
+      token: `@member${index}`,
+    }));
+    const startedAt = performance.now();
+
+    const html = renderToStaticMarkup(
+      createElement(MarkdownMessage, {
+        content: 'https://a.example @member4999 '.repeat(4_000),
+        mentions,
+        mine: false,
+      }),
+    );
+
+    expect(performance.now() - startedAt).toBeLessThan(1_000);
+    expect(html).toContain('@member4999');
+  });
 });
