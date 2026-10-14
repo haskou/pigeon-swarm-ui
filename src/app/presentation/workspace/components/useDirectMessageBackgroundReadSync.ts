@@ -4,6 +4,7 @@ import type { ConversationResource } from '../../../../contexts/conversations/in
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { LatestInput } from './LatestInput';
 
+import { ConversationType } from '../../../../contexts/conversations/domain/value-objects/ConversationType';
 import { DirectMailboxEligibility } from '../../../../contexts/mailboxes/domain/DirectMailboxEligibility';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { subscribeRealtimeMailboxHints } from '../../realtime/useRealtimeEvents';
@@ -34,7 +35,9 @@ function dueConversationIds(
       const lastVisitAt = lastVisit.get(conversation.id);
 
       return (
-        DirectMailboxEligibility.isEligible(conversation.type) &&
+        DirectMailboxEligibility.isEligible(
+          ConversationType.tryFromPrimitives(conversation.type),
+        ) &&
         conversation.id !== latest.activeConversationId &&
         conversation.unreadCount > 0 &&
         (lastVisitAt === undefined || now - lastVisitAt >= VISIT_INTERVAL_MS)
@@ -59,7 +62,12 @@ function subscribeHints(
   onHint: (conversationId: string) => void,
 ): void {
   conversations.forEach((conversation) => {
-    if (!DirectMailboxEligibility.isEligible(conversation.type)) return;
+    if (
+      !DirectMailboxEligibility.isEligible(
+        ConversationType.tryFromPrimitives(conversation.type),
+      )
+    )
+      return;
 
     if (subscriptions.has(conversation.id)) return;
 

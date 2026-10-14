@@ -1,7 +1,7 @@
 import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessageRecord';
-import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../domain/ChatMessage';
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { PigeonMessageCommandsApi } from '../http/PigeonMessageCommandsApi';
 import type { EditMessageOptions } from '../http/resources/EditMessageOptions';
@@ -14,6 +14,8 @@ import type { DirectMessageOutboxStore } from './DirectMessageOutboxStore';
 import type { DirectMessageOwnCopies } from './DirectMessageOwnCopies';
 import type { RecipientMailboxRouter } from './RecipientMailboxRouter';
 
+import { ConversationType } from '../../../conversations/domain/value-objects/ConversationType';
+import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { sessionRootKey } from '../../../identities/infrastructure/session/sessionRootKey';
 import { DirectMailboxEligibility } from '../../../mailboxes/domain/DirectMailboxEligibility';
 import { DirectMailboxOwnership } from '../../../mailboxes/domain/DirectMailboxOwnership';
@@ -85,7 +87,10 @@ export class DirectMessageSender {
     this.outbox = new DirectMessageOutbox(outboxStore, {
       toOwn: (session, row) => {
         this.ownCopies.remember(
-          DirectMailboxOwnership.ownCopyKey(session.identity.id, row.record.id),
+          DirectMailboxOwnership.ownCopyKey(
+            IdentityId.fromString(session.identity.id),
+            row.record.id,
+          ),
         );
 
         return this.appendOwnCopy(
@@ -115,7 +120,12 @@ export class DirectMessageSender {
       (identityId) => identityId !== session.identity.id,
     );
 
-    if (!peer || !DirectMailboxEligibility.isEligible(conversation.type)) {
+    if (
+      !peer ||
+      !DirectMailboxEligibility.isEligible(
+        ConversationType.tryFromPrimitives(conversation.type),
+      )
+    ) {
       throw new DirectMailboxRecordError(
         'Direct mailbox needs a one-to-one conversation.',
       );
@@ -145,7 +155,10 @@ export class DirectMessageSender {
     );
 
     this.ownCopies.remember(
-      DirectMailboxOwnership.ownCopyKey(session.identity.id, record.id),
+      DirectMailboxOwnership.ownCopyKey(
+        IdentityId.fromString(session.identity.id),
+        record.id,
+      ),
     );
     await this.appendOwnCopy(session, conversationId, record);
   }
@@ -506,7 +519,12 @@ export class DirectMessageSender {
     conversation: ConversationResource,
     messageId: string,
   ): Promise<void> {
-    if (!DirectMailboxEligibility.isEligible(conversation.type)) return;
+    if (
+      !DirectMailboxEligibility.isEligible(
+        ConversationType.tryFromPrimitives(conversation.type),
+      )
+    )
+      return;
 
     try {
       await this.writeTo(

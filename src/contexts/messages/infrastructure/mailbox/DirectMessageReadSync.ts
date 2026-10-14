@@ -3,9 +3,10 @@ import type {
   MailboxChannel,
   OpenedMailboxPage,
 } from '../../../mailboxes/infrastructure/MailboxChannel';
-import type { DirectMessageTimelineChange } from '../../presentation/view-models/DirectMessageTimelineChange';
+import type { DirectMessageTimelineChange } from '../../domain/DirectMessageTimelineChange';
 import type { DirectMessageMailboxStore } from './DirectMessageMailboxStore';
 
+import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { DirectMailboxOwnership } from '../../../mailboxes/domain/DirectMailboxOwnership';
 import { DirectMailboxRecords } from '../../../mailboxes/domain/DirectMailboxRecords';
 import { DirectMessageInboxKeys } from './DirectMessageInboxKeys';
@@ -80,8 +81,8 @@ export class DirectMessageReadSync {
       } else if (
         record?.type === DirectMailboxRecords.TYPE.sent &&
         !DirectMailboxOwnership.isAuthoredBy(
-          record.authorId,
-          session.identity.id,
+          IdentityId.fromString(record.authorId),
+          IdentityId.fromString(session.identity.id),
         )
       ) {
         next = null;

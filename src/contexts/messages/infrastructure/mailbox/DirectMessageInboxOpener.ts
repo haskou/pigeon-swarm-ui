@@ -9,6 +9,7 @@ import type { DirectMessageReaderSet } from './DirectMessageReaderSet';
 import type { DirectMessageRecipientInbox } from './DirectMessageRecipientInbox';
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
+import { ConversationType } from '../../../conversations/domain/value-objects/ConversationType';
 import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
 import { DirectMailboxEligibility } from '../../../mailboxes/domain/DirectMailboxEligibility';
 import { MailboxCapability } from '../../../mailboxes/infrastructure/crypto/MailboxCapability';
@@ -260,7 +261,9 @@ export class DirectMessageInboxOpener {
   ): Promise<boolean> {
     const eligible = conversations.filter(
       (conversation) =>
-        DirectMailboxEligibility.isEligible(conversation.type) &&
+        DirectMailboxEligibility.isEligible(
+          ConversationType.tryFromPrimitives(conversation.type),
+        ) &&
         ConversationKeychain.entry(
           session.keychain,
           session.identity.id,
