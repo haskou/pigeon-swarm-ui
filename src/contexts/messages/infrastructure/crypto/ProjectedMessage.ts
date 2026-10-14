@@ -1,4 +1,4 @@
-import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../domain/ChatMessage';
 
 /**
  * A message as the projection built it, with whether its payload could be

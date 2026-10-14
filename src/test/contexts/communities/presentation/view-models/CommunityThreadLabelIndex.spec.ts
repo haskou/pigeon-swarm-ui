@@ -1,5 +1,5 @@
 import type { CommunityThreadState } from '../../../../../contexts/communities/presentation/components/communityThreadState';
-import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../../../contexts/messages/domain/ChatMessage';
 
 import { CommunityThreadLabelIndex } from '../../../../../contexts/communities/presentation/view-models/CommunityThreadLabelIndex';
 

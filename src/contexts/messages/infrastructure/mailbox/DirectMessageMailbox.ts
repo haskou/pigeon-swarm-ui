@@ -2,8 +2,8 @@ import type { RealtimeMailboxSubscriptionInput } from '../../../../shared/infras
 import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
-import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
-import type { DirectMessageTimelineChange } from '../../presentation/view-models/DirectMessageTimelineChange';
+import type { ChatMessage } from '../../domain/ChatMessage';
+import type { DirectMessageTimelineChange } from '../../domain/DirectMessageTimelineChange';
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { PigeonMessageCommandsApi } from '../http/PigeonMessageCommandsApi';
 import type { EditMessageOptions } from '../http/resources/EditMessageOptions';

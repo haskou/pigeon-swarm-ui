@@ -5,8 +5,8 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { ConversationThread } from '../../../../../app/presentation/workspace/components/ConversationThread';
 import type { ConversationResource } from '../../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
+import type { ChatMessage } from '../../../../../contexts/messages/domain/ChatMessage';
 import type { MessageResource } from '../../../../../contexts/messages/infrastructure/http/MessageResource';
-import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
 import type { StickerMessageReference } from '../../../../../contexts/stickers/infrastructure/http/resources/StickerMessageReference';
 
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';

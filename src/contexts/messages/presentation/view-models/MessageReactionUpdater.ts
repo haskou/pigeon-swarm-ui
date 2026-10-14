@@ -1,9 +1,11 @@
 import { Timestamp } from '@haskou/value-objects';
 
+import type { ChatMessage } from '../../domain/ChatMessage';
+import type { MessageReactionClock } from '../../domain/MessageReactionClock';
+
 import { MessageAuthorId } from '../../domain/value-objects/MessageAuthorId';
 import { MessageReactionAction } from '../../domain/value-objects/MessageReactionAction';
 import { MessageReactionEmoji } from '../../domain/value-objects/MessageReactionEmoji';
-import type { MessageReactionClock, ChatMessage } from './ChatMessage';
 import { MessageReadModelMapper } from './MessageReadModelMapper';
 
 export class MessageReactionUpdater {

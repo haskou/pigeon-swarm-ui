@@ -2,8 +2,8 @@ import type { Session } from '../../identities/infrastructure/session/Session';
 import type { DirectEditedRecord } from '../../mailboxes/domain/DirectEditedRecord';
 import type { DirectMessageRecord } from '../../mailboxes/domain/DirectMessageRecord';
 import type { DirectSentRecord } from '../../mailboxes/domain/DirectSentRecord';
+import type { DirectMessageTimelineChange } from '../../messages/domain/DirectMessageTimelineChange';
 import type { MessageProjector } from '../../messages/infrastructure/crypto/MessageProjector';
-import type { DirectMessageTimelineChange } from '../../messages/presentation/view-models/DirectMessageTimelineChange';
 
 import { DirectMailboxRecords } from '../../mailboxes/domain/DirectMailboxRecords';
 import { DirectMessageMailboxRecord } from '../../messages/infrastructure/mailbox/DirectMessageMailboxRecord';

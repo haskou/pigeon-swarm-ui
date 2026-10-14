@@ -1,4 +1,4 @@
-import type { ChatMessage } from '../view-models/ChatMessage';
+import type { ChatMessage } from '../../domain/ChatMessage';
 
 import { cx } from '../../../../shared/presentation/cx';
 

@@ -1,9 +1,9 @@
 import { type MouseEvent, useCallback, useState } from 'react';
 
-import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
 import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { ProfilePopoverAnchor } from '../../../identities/presentation/view-models/profilePopoverAnchor';
+import type { ChatMessage } from '../../../messages/domain/ChatMessage';
 import type { CommunityProfileView } from './CommunityWorkspaceDialogs';
 
 import { profileAnchorFromTarget } from '../../../identities/presentation/view-models/profilePopoverAnchor';

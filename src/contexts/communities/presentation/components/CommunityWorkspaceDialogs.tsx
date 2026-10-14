@@ -1,20 +1,20 @@
 import { lazy, Suspense } from 'react';
 
-import type { NodeNetwork } from '../../../networks/presentation/view-models/NodeNetwork';
-import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
-import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
-import type { CommunityPermissionResource as CommunityPermission } from '../../infrastructure/http/resources/CommunityPermissionResource';
+import type { EncryptionDetails } from '../../../../app/presentation/workspace/components/EncryptionDetails';
+import type { MessageContextMenuState } from '../../../../app/presentation/workspace/components/messageContextMenu';
+import type { MessageAttachment } from '../../../attachments/application/contracts/MessageAttachment';
 import type { IdentityPresenceResource as IdentityPresence } from '../../../identities/infrastructure/http/resources/IdentityPresenceResource';
 import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
-import type { MessageAttachment } from '../../../attachments/application/contracts/MessageAttachment';
 import type { Session } from '../../../identities/infrastructure/session/Session';
-import type { MessageContextMenuState } from '../../../../app/presentation/workspace/components/messageContextMenu';
-import type { EncryptionDetails } from '../../../../app/presentation/workspace/components/EncryptionDetails';
 import type { ProfilePopoverAnchor } from '../../../identities/presentation/view-models/profilePopoverAnchor';
+import type { ChatMessage } from '../../../messages/domain/ChatMessage';
+import type { NodeNetwork } from '../../../networks/presentation/view-models/NodeNetwork';
+import type { CommunityPermissionResource as CommunityPermission } from '../../infrastructure/http/resources/CommunityPermissionResource';
+import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
+import type { CommunityMemberListItem } from './communityMembersPanel';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { memberPrimaryName } from './communityMemberNames';
-import type { CommunityMemberListItem } from './communityMembersPanel';
 import { CommunityWorkspaceDialogActions } from './CommunityWorkspaceDialogActions';
 
 const AddCommunityMemberDialog = lazy(() =>
@@ -132,19 +132,13 @@ export function CommunityWorkspaceDialogs({
   community,
   communityData,
   communityDataOpen,
-  encryptionDetails,
   currentIdentityId,
   currentPermissions,
+  encryptionDetails,
   manageOpen,
   memberOpen,
   messageContextMenu,
   nodeNetworks,
-  owner,
-  presenceByIdentityId,
-  pinnedMessageIds,
-  profileViewer,
-  rawMessage,
-  session,
   onCloseAvatarViewer,
   onCloseBannerViewer,
   onCloseCommunityData,
@@ -165,6 +159,12 @@ export function CommunityWorkspaceDialogs({
   onToggleReaction,
   onUnpinMessage,
   onViewRawMessage,
+  owner,
+  pinnedMessageIds,
+  presenceByIdentityId,
+  profileViewer,
+  rawMessage,
+  session,
 }: CommunityWorkspaceDialogsProps) {
   const contextMenuFromThread = messageContextMenu?.source === 'thread';
   const contextMenuMessagePinned = messageContextMenu
@@ -325,5 +325,7 @@ function isPinnedMessage(
   message: ChatMessage,
   pinnedMessageIds: ReadonlySet<string>,
 ): boolean {
-  return pinnedMessageIds.has(message.id) || Boolean(message.raw.pinnedByIdentityId);
+  return (
+    pinnedMessageIds.has(message.id) || Boolean(message.raw.pinnedByIdentityId)
+  );
 }

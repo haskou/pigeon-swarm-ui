@@ -16,28 +16,28 @@ import { createPortal } from 'react-dom';
 
 import type { AttachmentProgress } from '../../../attachments/application/contracts/AttachmentProgress';
 import type { AttachmentUploadOptions } from '../../../attachments/application/contracts/AttachmentUploadOptions';
-import type { ChatMessage } from '../view-models/ChatMessage';
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { StickerMessageReference } from '../../../stickers/infrastructure/http/resources/StickerMessageReference';
+import type { ChatMessage } from '../../domain/ChatMessage';
 
-import { copy } from '../../../../shared/presentation/i18n/copy';
+import { useDesktopInputFocus } from '../../../../shared/presentation/components/useDesktopInputFocus';
 import { cx } from '../../../../shared/presentation/cx';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import {
   type EmojiSuggestion,
   findEmojiTrigger,
   replaceEmojiTrigger,
   searchEmojiSuggestions,
 } from '../emoji/emojiShortcodes';
-import { ComposerMentionOverlay } from './ComposerMentionOverlay';
-import { ComposerContextBanner } from './ComposerContextBanner';
 import { ComposerAttachmentTray } from './ComposerAttachmentTray';
+import { ComposerContextBanner } from './ComposerContextBanner';
+import { ComposerMentionOverlay } from './ComposerMentionOverlay';
 import {
   AttachmentEncryptionControl,
   EmojiSuggestionPanel,
   SendArrowIcon,
   StickerPickerFallbackButton,
 } from './ComposerPresentationControls';
-import { useDesktopInputFocus } from '../../../../shared/presentation/components/useDesktopInputFocus';
 
 const MESSAGE_MAX_LENGTH = 4000;
 const COMPOSER_MAX_ROWS = 20;
@@ -89,16 +89,16 @@ export function Composer({
   error,
   focusKey,
   mentionHelper,
-  onCancelEdit,
   mentionTokens = [],
+  onCancelEdit,
   onCancelReply,
   onDraftChange,
   onEdit,
   onEscape,
-  onSend,
-  onStickerSend,
   onMentionAutocomplete,
   onPollCreate,
+  onSend,
+  onStickerSend,
   placeholder = copy.composer.placeholder,
   progress,
   replyTo,
@@ -212,6 +212,7 @@ export function Composer({
     );
     setAttachments([]);
     setAttachmentError(null);
+
     if (fileInputRef.current) fileInputRef.current.value = '';
     requestAnimationFrame(() => {
       const nextCaretIndex = textInputRef.current?.value.length ?? 0;
@@ -416,6 +417,7 @@ export function Composer({
     setAttachmentError(null);
 
     if (fileInputRef.current) fileInputRef.current.value = '';
+
     if (canAutoFocusInput) {
       window.setTimeout(() => textInputRef.current?.focus(), 0);
     }
@@ -520,6 +522,7 @@ export function Composer({
       }),
     );
   };
+
   return (
     <>
       <form

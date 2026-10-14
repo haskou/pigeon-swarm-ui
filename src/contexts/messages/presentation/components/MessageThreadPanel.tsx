@@ -4,23 +4,23 @@ import { useRef, useState } from 'react';
 
 import type { AttachmentProgress } from '../../../attachments/application/contracts/AttachmentProgress';
 import type { AttachmentUploadOptions } from '../../../attachments/application/contracts/AttachmentUploadOptions';
-import type { ChatMessage } from '../view-models/ChatMessage';
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { StickerMessageReference } from '../../../stickers/infrastructure/http/resources/StickerMessageReference';
+import type { ChatMessage } from '../../domain/ChatMessage';
 
-import { copy } from '../../../../shared/presentation/i18n/copy';
 import { DialogCloseButton } from '../../../../shared/presentation/components/DialogCloseButton';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useAttachmentDownload } from '../../../attachments/presentation/hooks/useAttachmentDownload';
-import {
-  messageReplyImage,
-  messageReplySticker,
-} from './messageTimelineHelpers';
 import {
   identityDisplayName,
   identityPrimaryDisplayName,
 } from '../../../identities/presentation/view-models/identityDisplay';
 import { Composer } from './Composer';
 import { MessageBubble } from './MessageBubble';
+import {
+  messageReplyImage,
+  messageReplySticker,
+} from './messageTimelineHelpers';
 
 export function MessageThreadPanel({
   attachmentEncryptionAvailable,
@@ -60,10 +60,7 @@ export function MessageThreadPanel({
   identityNames: Record<string, string>;
   identityPictures?: Record<string, string | undefined>;
   messages: ChatMessage[];
-  onAuthorProfileOpen?: (
-    message: ChatMessage,
-    target: HTMLElement,
-  ) => void;
+  onAuthorProfileOpen?: (message: ChatMessage, target: HTMLElement) => void;
   onCancelEdit?: () => void;
   onCancelReply?: () => void;
   onClose: () => void;
@@ -89,9 +86,9 @@ export function MessageThreadPanel({
   const threadScrollerRef = useRef<HTMLDivElement | null>(null);
   const { loadAttachmentPreview, openAttachment } = useAttachmentDownload({
     errorMessage: copy.composer.attachmentDownloadError,
-    unavailableMessage: copy.attachments.loadFailed,
     onErrorChange: setAttachmentError,
     onProgressChange: setAttachmentProgress,
+    unavailableMessage: copy.attachments.loadFailed,
   });
   const displayName = (identityId: string) =>
     identityPrimaryDisplayName(identityDisplayName(identityId, identityNames));
@@ -213,7 +210,7 @@ export function MessageThreadPanel({
                 reserveAvatarSpace={false}
                 showReplyPreview={Boolean(
                   message.replyPreview &&
-                    message.replyPreview.messageId !== rootMessage.id,
+                  message.replyPreview.messageId !== rootMessage.id,
                 )}
                 showAvatar={message.authorIdentityId !== currentIdentityId}
                 onStickerClick={() => undefined}

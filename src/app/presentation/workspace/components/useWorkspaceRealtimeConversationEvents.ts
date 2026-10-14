@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
 
 import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { ChatMessage } from '../../../../contexts/messages/domain/ChatMessage';
 import type { MessageResource } from '../../../../contexts/messages/infrastructure/http/MessageResource';
-import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 import type { RealtimeConversationEventsInput } from './RealtimeConversationEventsInput';
 

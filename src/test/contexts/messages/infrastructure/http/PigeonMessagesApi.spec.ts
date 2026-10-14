@@ -1,9 +1,9 @@
 import { KeyPair, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
+import type { ChatMessage } from '../../../../../contexts/messages/domain/ChatMessage';
 import type { MessageProjectionPort } from '../../../../../contexts/messages/infrastructure/crypto/MessageProjectionPort';
 import type { MessageResource } from '../../../../../contexts/messages/infrastructure/http/MessageResource';
-import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 

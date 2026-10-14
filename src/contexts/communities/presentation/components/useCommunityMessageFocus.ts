@@ -7,9 +7,9 @@ import {
   useRef,
 } from 'react';
 
-import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
-import type { CommunityChannelMessageLoadState } from './useCommunityChannelMessages';
+import type { ChatMessage } from '../../../messages/domain/ChatMessage';
 import type { CommunityMessageSearchResultItem } from './CommunityMessageSearchPanel';
+import type { CommunityChannelMessageLoadState } from './useCommunityChannelMessages';
 
 import { mergeChatMessages } from './communityWorkspaceHelpers';
 

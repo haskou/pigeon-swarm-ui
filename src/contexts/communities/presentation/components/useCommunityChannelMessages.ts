@@ -10,7 +10,7 @@ import {
   useState,
 } from 'react';
 
-import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../messages/domain/ChatMessage';
 
 import { MessageCollection } from '../../../messages/presentation/view-models/MessageCollection';
 import {
@@ -480,8 +480,8 @@ export function useCommunityChannelMessages({
     scrollChannelToBottom,
     scrollerRef,
     selectedChannelId,
-    setSelectedChannelId,
     setMessages,
+    setSelectedChannelId,
     visibleMessages,
   };
 }

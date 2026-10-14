@@ -1,4 +1,4 @@
-import type { ChatMessage } from './ChatMessage';
+import type { ChatMessage } from '../../domain/ChatMessage';
 
 import { attachmentIdentity } from './attachmentIdentity';
 import { MessageReactionUpdater } from './MessageReactionUpdater';

@@ -1,7 +1,7 @@
-import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
-import type { CommunityTextChannelResource as CommunityTextChannel } from '../../infrastructure/http/resources/CommunityTextChannelResource';
-import type { MessageResource } from '../../../messages/infrastructure/http/MessageResource';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
+import type { ChatMessage } from '../../../messages/domain/ChatMessage';
+import type { MessageResource } from '../../../messages/infrastructure/http/MessageResource';
+import type { CommunityTextChannelResource as CommunityTextChannel } from '../../infrastructure/http/resources/CommunityTextChannelResource';
 
 export function resolveCommunityChannelId(
   channelId: null | string | undefined,

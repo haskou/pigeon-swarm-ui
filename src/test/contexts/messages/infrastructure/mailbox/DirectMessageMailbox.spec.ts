@@ -15,12 +15,12 @@ import type { DirectSentRecord } from '../../../../../contexts/mailboxes/domain/
 import type { MailboxKeys } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxKeySchedule';
 import type { PigeonMailboxClient } from '../../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
 import type { MailboxReadTokens } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
+import type { ChatMessage } from '../../../../../contexts/messages/domain/ChatMessage';
+import type { DirectMessageTimelineChange } from '../../../../../contexts/messages/domain/DirectMessageTimelineChange';
 import type { MessageProjectionPort } from '../../../../../contexts/messages/infrastructure/crypto/MessageProjectionPort';
 import type { MessageResource } from '../../../../../contexts/messages/infrastructure/http/MessageResource';
 import type { PigeonMessageCommandsApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
 import type { DirectMessageMailboxState } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxStore';
-import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
-import type { DirectMessageTimelineChange } from '../../../../../contexts/messages/presentation/view-models/DirectMessageTimelineChange';
 
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
 import { MailboxCapability } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';

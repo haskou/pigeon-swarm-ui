@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 
 import type { ConversationThread } from '../../../../../app/presentation/workspace/components/ConversationThread';
-import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../../../contexts/messages/domain/ChatMessage';
 
 import { syncConversationThread } from '../../../../../app/presentation/workspace/components/syncConversationThread';
 

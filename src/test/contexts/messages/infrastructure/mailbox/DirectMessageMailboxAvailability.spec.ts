@@ -6,11 +6,11 @@ import { type MockProxy, mock } from 'jest-mock-extended';
 import type { ConversationResource } from '../../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { PigeonMailboxClient } from '../../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
+import type { ChatMessage } from '../../../../../contexts/messages/domain/ChatMessage';
+import type { DirectMessageTimelineChange } from '../../../../../contexts/messages/domain/DirectMessageTimelineChange';
 import type { MessageProjectionPort } from '../../../../../contexts/messages/infrastructure/crypto/MessageProjectionPort';
 import type { MessageResource } from '../../../../../contexts/messages/infrastructure/http/MessageResource';
 import type { PigeonMessageCommandsApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
-import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
-import type { DirectMessageTimelineChange } from '../../../../../contexts/messages/presentation/view-models/DirectMessageTimelineChange';
 
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
 import { MailboxCapability } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';

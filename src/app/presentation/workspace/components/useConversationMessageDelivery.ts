@@ -2,8 +2,8 @@ import { UUID } from '@haskou/value-objects';
 import { startTransition, useCallback, useRef } from 'react';
 
 import type { AttachmentUploadOptions } from '../../../../contexts/attachments/application/contracts/AttachmentUploadOptions';
+import type { ChatMessage } from '../../../../contexts/messages/domain/ChatMessage';
 import type { SendMessageOptions } from '../../../../contexts/messages/infrastructure/http/resources/SendMessageOptions';
-import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
 import type { StickerMessageReference } from '../../../../contexts/stickers/infrastructure/http/resources/StickerMessageReference';
 import type { ConversationMessageDelivery } from './ConversationMessageDelivery';
 import type { ConversationMessageDeliveryInput } from './ConversationMessageDeliveryInput';

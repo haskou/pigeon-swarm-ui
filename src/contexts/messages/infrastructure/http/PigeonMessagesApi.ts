@@ -2,7 +2,7 @@ import type { HttpJsonClient } from '../../../../shared/infrastructure/http/Http
 import type { RequestCache } from '../../../../shared/infrastructure/http/RequestCache';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { Session } from '../../../identities/infrastructure/session/Session';
-import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../domain/ChatMessage';
 import type { MessagePin } from '../../presentation/view-models/MessagePin';
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { ConversationDraftResource } from './ConversationDraftResource';

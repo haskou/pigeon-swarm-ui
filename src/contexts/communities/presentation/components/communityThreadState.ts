@@ -1,8 +1,8 @@
-import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../messages/domain/ChatMessage';
 import type { CommunityChannelThreadSummaryResource as CommunityChannelThreadSummary } from '../../infrastructure/http/resources/CommunityChannelThreadSummaryResource';
 
-import { ThreadMessageVisibility } from '../../../messages/presentation/view-models/ThreadMessageVisibility';
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { ThreadMessageVisibility } from '../../../messages/presentation/view-models/ThreadMessageVisibility';
 import { mergeChatMessages } from './communityWorkspaceHelpers';
 
 export type CommunityThreadEditingMessage = {
@@ -95,8 +95,10 @@ export function removeCommunityThreadMessage(
       ? (currentThread.editingMessage?.previousDraft ?? '')
       : currentThread.draft,
     editingMessage: deletingEditedMessage ? null : currentThread.editingMessage,
+    messages: currentThread.messages.filter(
+      (message) => message.id !== messageId,
+    ),
     replyTarget: deletingReplyTarget ? null : currentThread.replyTarget,
-    messages: currentThread.messages.filter((message) => message.id !== messageId),
   };
 }
 
@@ -136,7 +138,7 @@ export function visibleCommunityThreadSummaries({
     (thread) =>
       !hiddenThreadRootLabelKeys.has(
         threadRootLabelKey(channelId, thread.rootMessageId),
-    ),
+      ),
   );
 }
 
@@ -149,7 +151,9 @@ export function hiddenCommunityThreadSummaryKeysFromMessages({
   messages: ChatMessage[];
   threads: CommunityChannelThreadSummary[];
 }): string[] {
-  const messagesById = new Map(messages.map((message) => [message.id, message]));
+  const messagesById = new Map(
+    messages.map((message) => [message.id, message]),
+  );
 
   return threads
     .filter((thread) => {

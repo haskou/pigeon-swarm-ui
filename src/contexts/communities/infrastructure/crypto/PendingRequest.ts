@@ -1,4 +1,4 @@
-import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../messages/domain/ChatMessage';
 
 export type PendingRequest = {
   reject: (reason?: unknown) => void;

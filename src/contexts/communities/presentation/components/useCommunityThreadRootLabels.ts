@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
-import type { CommunityTextChannelResource as CommunityTextChannel } from '../../infrastructure/http/resources/CommunityTextChannelResource';
-import type { MessageResource } from '../../../messages/infrastructure/http/MessageResource';
 import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { ChatMessage } from '../../../messages/domain/ChatMessage';
+import type { MessageResource } from '../../../messages/infrastructure/http/MessageResource';
+import type { CommunityTextChannelResource as CommunityTextChannel } from '../../infrastructure/http/resources/CommunityTextChannelResource';
 
 import { CommunityChannelThreadCache } from '../view-models/CommunityChannelThreadCache';
 import { CommunityThreadRootLabelLoader } from '../view-models/CommunityThreadRootLabelLoader';

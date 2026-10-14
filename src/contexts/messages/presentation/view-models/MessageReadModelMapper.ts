@@ -1,8 +1,7 @@
-import type { ChatMessage } from './ChatMessage';
+import type { ChatMessage } from '../../domain/ChatMessage';
 import type { MessageReaction } from '../../infrastructure/http/MessageReaction';
 
 import { Message } from '../../domain/Message';
-import { MessageAuthorId } from '../../domain/value-objects/MessageAuthorId';
 
 export class MessageReadModelMapper {
   public static toAggregate(readModel: ChatMessage): Message {
@@ -52,7 +51,9 @@ export class MessageReadModelMapper {
 
   private static kindOf(readModel: ChatMessage) {
     if (readModel.kind === 'call-event') return 'call-event';
+
     if (readModel.kind === 'poll' || readModel.poll) return 'poll';
+
     if (readModel.sticker) return 'sticker';
 
     return 'message';

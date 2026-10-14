@@ -5,7 +5,7 @@ import type { HttpJsonClient } from '../../../../shared/infrastructure/http/Http
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { MessageAttachment } from '../../../attachments/application/contracts/MessageAttachment';
 import type { Session } from '../../../identities/infrastructure/session/Session';
-import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../domain/ChatMessage';
 import type { EncryptMessagePayloadInput } from '../crypto/EncryptMessagePayloadInput';
 import type { MessagePayloadSeal } from '../crypto/MessagePayloadSeal';
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';

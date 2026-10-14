@@ -1,10 +1,11 @@
 import { type Dispatch, type SetStateAction, useEffect, useRef } from 'react';
 
-import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
+import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { ChatMessage } from '../../../messages/domain/ChatMessage';
 import type { MessageResource } from '../../../messages/infrastructure/http/MessageResource';
 import type { PollResource } from '../../../polls/infrastructure/http/resources/PollResource';
-import type { Session } from '../../../identities/infrastructure/session/Session';
-import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
+import type { LoadCommunityChannelMessages } from './useCommunityChannelMessages';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { MessageReactionUpdater } from '../../../messages/presentation/view-models/MessageReactionUpdater';
@@ -14,7 +15,6 @@ import {
   realtimeMessageAttribute,
   realtimeStringAttribute,
 } from './communityWorkspaceHelpers';
-import type { LoadCommunityChannelMessages } from './useCommunityChannelMessages';
 
 type ProjectCommunityChannelMessage = (
   channelId: string,
@@ -33,7 +33,10 @@ type UseCommunityChannelRealtimeInput = {
   projectChannelMessage: ProjectCommunityChannelMessage;
   realtimeEvent?: null | RealtimeDomainEvent;
   resetNewChannelMessageCount: () => void;
-  scrollChannelToBottom: (behavior?: ScrollBehavior, keepPinned?: boolean) => void;
+  scrollChannelToBottom: (
+    behavior?: ScrollBehavior,
+    keepPinned?: boolean,
+  ) => void;
   selectedChannelId: null | string;
   session: Session;
   shouldCountNewChannelMessage: (channelId: string) => boolean;
@@ -62,8 +65,8 @@ export function useCommunityChannelRealtime({
   scrollChannelToBottom,
   selectedChannelId,
   session,
-  shouldCountNewChannelMessage,
   setMessages,
+  shouldCountNewChannelMessage,
   upsertPoll,
 }: UseCommunityChannelRealtimeInput) {
   const loadChannelMessagesRef = useRef(loadChannelMessages);
@@ -86,8 +89,8 @@ export function useCommunityChannelRealtime({
       }
 
       if (pollId) {
-        void applicationContainer
-          .polls.get(session, pollId)
+        void applicationContainer.polls
+          .get(session, pollId)
           .then(upsertPoll)
           .catch(() => undefined);
       }

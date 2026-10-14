@@ -11,17 +11,17 @@ import {
 
 import type { AttachmentProgress } from '../../../attachments/application/contracts/AttachmentProgress';
 import type { AttachmentUploadOptions } from '../../../attachments/application/contracts/AttachmentUploadOptions';
-import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
-import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
-import type { CommunityMessageMentionResource as CommunityMessageMention } from '../../infrastructure/http/resources/CommunityMessageMentionResource';
-import type { CommunityPermissionResource as CommunityPermission } from '../../infrastructure/http/resources/CommunityPermissionResource';
-import type { CommunityTextChannelResource as CommunityTextChannel } from '../../infrastructure/http/resources/CommunityTextChannelResource';
 import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { ChatMessage } from '../../../messages/domain/ChatMessage';
 import type { MessageReplyPreview } from '../../../messages/infrastructure/crypto/resources/MessageReplyPreview';
 import type { MessageResource } from '../../../messages/infrastructure/http/MessageResource';
 import type { PollResource } from '../../../polls/infrastructure/http/resources/PollResource';
-import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { StickerMessageReference } from '../../../stickers/infrastructure/http/resources/StickerMessageReference';
+import type { CommunityMessageMentionResource as CommunityMessageMention } from '../../infrastructure/http/resources/CommunityMessageMentionResource';
+import type { CommunityPermissionResource as CommunityPermission } from '../../infrastructure/http/resources/CommunityPermissionResource';
+import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
+import type { CommunityTextChannelResource as CommunityTextChannel } from '../../infrastructure/http/resources/CommunityTextChannelResource';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { runStickerUsageSideEffect } from '../../../../app/presentation/workspace/components/runStickerUsageSideEffect';
@@ -109,9 +109,9 @@ export function useCommunityMessageComposer({
 
   const { loadAttachmentPreview, openAttachment } = useAttachmentDownload({
     errorMessage: copy.composer.attachmentDownloadError,
-    unavailableMessage: copy.attachments.loadFailed,
     onErrorChange: setError,
     onProgressChange: setAttachmentProgress,
+    unavailableMessage: copy.attachments.loadFailed,
   });
 
   useEffect(
@@ -521,10 +521,10 @@ export function useCommunityMessageComposer({
           ? { plaintextPayload: serializeCommunityChannelPayload(payloadInput) }
           : {
               encryptedPayload: await applicationContainer.mls.encrypt(
-            session,
-            community.id,
-            serializeCommunityChannelPayload(payloadInput),
-          ),
+                session,
+                community.id,
+                serializeCommunityChannelPayload(payloadInput),
+              ),
             };
         const created =
           await applicationContainer.communities.createChannelMessage(

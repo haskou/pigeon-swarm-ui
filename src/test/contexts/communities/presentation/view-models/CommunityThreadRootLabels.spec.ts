@@ -1,5 +1,5 @@
 import type { CommunityTextChannelResource as CommunityTextChannel } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityTextChannelResource';
-import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../../../contexts/messages/domain/ChatMessage';
 
 import { CommunityThreadRootLabels } from '../../../../../contexts/communities/presentation/view-models/CommunityThreadRootLabels';
 

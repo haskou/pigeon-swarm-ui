@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
+import type { ChatMessage } from '../../../messages/domain/ChatMessage';
 import type { MessageReaction } from '../../../messages/infrastructure/http/MessageReaction';
 import type { MessageResource } from '../../../messages/infrastructure/http/MessageResource';
-import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
 import type { CacheDatabase } from './communityMessageDecryptWorker/CacheDatabase';
 import type { CommunityChannelPlainPayload } from './communityMessageDecryptWorker/CommunityChannelPlainPayload';
 import type { CommunityMessageDecryptCancelRequest } from './communityMessageDecryptWorker/CommunityMessageDecryptCancelRequest';

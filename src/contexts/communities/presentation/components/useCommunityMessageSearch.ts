@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react';
 
-import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
-import type { MessageResource } from '../../../messages/infrastructure/http/MessageResource';
 import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { ChatMessage } from '../../../messages/domain/ChatMessage';
+import type { MessageResource } from '../../../messages/infrastructure/http/MessageResource';
 import type {
   CommunityMessageSearchResultItem,
   CommunityMessageSearchScope,
@@ -43,8 +43,7 @@ export function useCommunityMessageSearch({
     [],
   );
   const [searched, setSearched] = useState(false);
-  const [scope, setScope] =
-    useState<CommunityMessageSearchScope>('channel');
+  const [scope, setScope] = useState<CommunityMessageSearchScope>('channel');
   const [state, setState] = useState<'idle' | 'loading'>('idle');
 
   const changeQuery = useCallback((nextQuery: string) => {
@@ -98,7 +97,9 @@ export function useCommunityMessageSearch({
         ),
       );
     } catch (caught) {
-      setError(toUserErrorMessage(caught, copy.communities.searchMessagesError));
+      setError(
+        toUserErrorMessage(caught, copy.communities.searchMessagesError),
+      );
       setResults([]);
     } finally {
       setState('idle');

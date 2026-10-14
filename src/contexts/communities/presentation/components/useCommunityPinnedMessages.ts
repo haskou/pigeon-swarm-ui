@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
-import type { MessageResource } from '../../../messages/infrastructure/http/MessageResource';
-import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { ChatMessage } from '../../../messages/domain/ChatMessage';
+import type { MessageResource } from '../../../messages/infrastructure/http/MessageResource';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { copy } from '../../../../shared/presentation/i18n/copy';
@@ -37,8 +37,9 @@ export function useCommunityPinnedMessages({
   selectedChannelId,
   session,
 }: CommunityPinnedMessagesInput) {
-  const [collection, setCollection] =
-    useState<PinnedMessageCollection | null>(null);
+  const [collection, setCollection] = useState<PinnedMessageCollection | null>(
+    null,
+  );
   const [messageIds, setMessageIds] = useState<Set<string>>(() => new Set());
 
   const close = useCallback(() => setCollection(null), []);
@@ -48,11 +49,12 @@ export function useCommunityPinnedMessages({
 
     setCollection({ error: null, messages: [], state: 'loading' });
     try {
-      const result = await applicationContainer.communities.listChannelMessagePins(
-        session,
-        communityId,
-        selectedChannelId,
-      );
+      const result =
+        await applicationContainer.communities.listChannelMessagePins(
+          session,
+          communityId,
+          selectedChannelId,
+        );
       const pinnedMessages = await projectMessages(
         selectedChannelId,
         result.pins.map((pin) => pin.message),
@@ -82,8 +84,8 @@ export function useCommunityPinnedMessages({
 
     let cancelled = false;
 
-    void applicationContainer
-      .communities.listChannelMessagePins(session, communityId, selectedChannelId)
+    void applicationContainer.communities
+      .listChannelMessagePins(session, communityId, selectedChannelId)
       .then((result) => {
         if (!cancelled) {
           setMessageIds(new Set(result.pins.map((pin) => pin.messageId)));

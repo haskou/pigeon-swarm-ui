@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState, type ReactElement } from 'react';
 
-import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../../contexts/messages/domain/ChatMessage';
 import type { WorkspaceCreationDialogs } from './WorkspaceCreationDialogs';
 import type { WorkspaceDialogSections } from './WorkspaceDialogSections';
 import type { WorkspaceIncomingCallDialog } from './WorkspaceIncomingCallDialog';

@@ -1,11 +1,11 @@
-import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
-import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
+import type { ChatMessage } from '../../../messages/domain/ChatMessage';
 import type { CommunityPermissionResource as CommunityPermission } from '../../infrastructure/http/resources/CommunityPermissionResource';
+import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
 
-import { MessageEditability } from '../../../messages/presentation/view-models/MessageEditability';
-import { communityRoleDisplayName } from '../view-models/communityRoleDisplayName';
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { MessageEditability } from '../../../messages/presentation/view-models/MessageEditability';
 import { CommunityAccessPolicy } from '../view-models/CommunityAccessPolicy';
+import { communityRoleDisplayName } from '../view-models/communityRoleDisplayName';
 
 type DeleteMessageInput = {
   currentPermissions: Set<CommunityPermission>;

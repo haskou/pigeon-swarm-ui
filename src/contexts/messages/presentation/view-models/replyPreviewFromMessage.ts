@@ -1,4 +1,4 @@
-import type { ChatMessage } from './ChatMessage';
+import type { ChatMessage } from '../../domain/ChatMessage';
 import type { MessageReplyPreview } from '../../infrastructure/crypto/resources/MessageReplyPreview';
 
 import { isBrowserPreviewImage } from '../../../../shared/presentation/isBrowserPreviewImage';

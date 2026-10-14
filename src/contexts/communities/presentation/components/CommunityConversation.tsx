@@ -1,13 +1,13 @@
 import { lazy, Suspense } from 'react';
 
-import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
+import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { ChatMessage } from '../../../messages/domain/ChatMessage';
 import type { CommunityInvitationNotificationResource } from '../../../notifications/infrastructure/http/resources/CommunityInvitationNotificationResource';
+import type { PollResource } from '../../../polls/infrastructure/http/resources/PollResource';
+import type { StickerMessageReference } from '../../../stickers/infrastructure/http/resources/StickerMessageReference';
 import type { CommunityPermissionResource as CommunityPermission } from '../../infrastructure/http/resources/CommunityPermissionResource';
 import type { CommunityTextChannelResource as CommunityTextChannel } from '../../infrastructure/http/resources/CommunityTextChannelResource';
-import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
-import type { PollResource } from '../../../polls/infrastructure/http/resources/PollResource';
-import type { Session } from '../../../identities/infrastructure/session/Session';
-import type { StickerMessageReference } from '../../../stickers/infrastructure/http/resources/StickerMessageReference';
 import type { useCommunityChannelMessages } from './useCommunityChannelMessages';
 import type { useCommunityMentions } from './useCommunityMentions';
 import type { useCommunityMessageComposer } from './useCommunityMessageComposer';
@@ -74,6 +74,7 @@ type CommunityConversationProps = {
 };
 
 export function CommunityConversation({
+  awaitingGroupAccess,
   channelMessages,
   communityIsPublic,
   currentPermissions,
@@ -87,7 +88,6 @@ export function CommunityConversation({
   memberPictures,
   mentions,
   messageComposer,
-  awaitingGroupAccess,
   onInvitationAccept,
   onMessageMenuOpen,
   onOpenThread,
@@ -98,8 +98,8 @@ export function CommunityConversation({
   pendingInvitation,
   pinnedMessageIds,
   pollDialogOpen,
-  pollWorkflow,
   polls,
+  pollWorkflow,
   profiles,
   reactionAuthorNames,
   selectedChannel,
@@ -183,7 +183,9 @@ export function CommunityConversation({
         />
       )}
       <Composer
-        attachmentEncryptionAvailable={!communityIsPublic && encryptionAvailable}
+        attachmentEncryptionAvailable={
+          !communityIsPublic && encryptionAvailable
+        }
         disabled={
           messageState === 'loading' ||
           (!communityIsPublic && !encryptionAvailable) ||

@@ -4,7 +4,7 @@ import type {
   IdentityNames,
   IdentityPictures,
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
-import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../../contexts/messages/domain/ChatMessage';
 import type { PollResource } from '../../../../contexts/polls/infrastructure/http/resources/PollResource';
 import type { ChatMessageTimelineProps } from './ChatMessageTimelineProps';
 
