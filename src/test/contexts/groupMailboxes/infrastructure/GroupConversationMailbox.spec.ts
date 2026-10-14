@@ -17,6 +17,7 @@ import type { RequestSigner } from '../../../../shared/infrastructure/http/Reque
 
 import { GroupMailboxControlSeal } from '../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlSeal';
 import { GroupConversationMailbox } from '../../../../contexts/groupMailboxes/infrastructure/GroupConversationMailbox';
+import { GroupMessageHistoryStore } from '../../../../contexts/groupMailboxes/infrastructure/history/GroupMessageHistoryStore';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { MailboxUnavailableError } from '../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
 import { MailboxCapability } from '../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
@@ -25,6 +26,20 @@ import { MessageProjector } from '../../../../contexts/messages/infrastructure/c
 import { PigeonMessageCommandsApi } from '../../../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import { copy } from '../../../../shared/presentation/i18n/copy';
+
+const databaseNames = async (): Promise<string[]> =>
+  (await indexedDB.databases()).map(({ name }) => name ?? '');
+
+const mlsDatabaseOf = async (member: { id: string }): Promise<string> =>
+  (await databaseNames()).find((name) => name.endsWith(`-mls-${member.id}`)) ??
+  '';
+
+const openDatabase = (name: string): Promise<IDBDatabase> =>
+  new Promise((resolve) => {
+    const request = indexedDB.open(name);
+
+    request.addEventListener('success', () => resolve(request.result));
+  });
 
 type Member = {
   changes: DirectMessageTimelineChange[];
@@ -480,5 +495,66 @@ describe('GroupConversationMailbox', () => {
     await expect(
       bob.mailbox.send(bob.session, conversation(), 'no group', {}),
     ).rejects.toThrow();
+  });
+
+  it('keeps a queued message sent when its local copy fails', async () => {
+    await formGroup();
+    const append = jest
+      .spyOn(GroupMessageHistoryStore.prototype, 'append')
+      .mockRejectedValueOnce(new Error('quota'));
+
+    await expect(
+      alice.mailbox.send(alice.session, conversation(), 'queued', {}),
+    ).resolves.toEqual(expect.objectContaining({ content: 'queued' }));
+    append.mockRestore();
+    await sync(bob);
+
+    expect(bob.changes).toContainEqual(
+      expect.objectContaining({
+        message: expect.objectContaining({ content: 'queued' }),
+      }),
+    );
+  });
+
+  it('erases the MLS state only once its open connections close', async () => {
+    await formGroup();
+    const name = await mlsDatabaseOf(bob);
+    const open = await openDatabase(name);
+    let erased = false;
+
+    const forgetting = bob.mailbox.forget(bob.id).then(() => {
+      erased = true;
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(erased).toBe(false);
+    open.close();
+    await forgetting;
+
+    expect(await databaseNames()).not.toContain(name);
+  });
+
+  it('rejects forget when a store fails, after erasing the others', async () => {
+    await formGroup();
+    const name = await mlsDatabaseOf(bob);
+    const forget = jest
+      .spyOn(GroupMessageHistoryStore.prototype, 'forget')
+      .mockRejectedValueOnce(new Error('disk'));
+
+    await expect(bob.mailbox.forget(bob.id)).rejects.toThrow();
+    forget.mockRestore();
+
+    expect(await databaseNames()).not.toContain(name);
+  });
+
+  it('erases the MLS state after a running membership update', async () => {
+    await formGroup();
+    const name = await mlsDatabaseOf(bob);
+    const updating = bob.mailbox.membersChanged(bob.session, CONVERSATION);
+
+    await bob.mailbox.forget(bob.id);
+    await updating;
+
+    expect(await databaseNames()).not.toContain(name);
   });
 });
