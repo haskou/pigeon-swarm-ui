@@ -7,6 +7,7 @@ import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/real
 import type { MemberEventDetails } from './MemberEventDetails';
 
 import { CommunityChannels } from '../../../../contexts/communities/presentation/view-models/CommunityChannels';
+import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
 import {
   communityAttribute,
   communityChannelAttribute,
@@ -165,7 +166,7 @@ function isSelfLeavingMember(
   identityId: string,
   leaving: boolean,
 ): boolean {
-  return leaving && identityId === input.session.identity.id;
+  return leaving && IdentityMatch.isSame(identityId, input.session.identity.id);
 }
 
 function replaceCommunity(

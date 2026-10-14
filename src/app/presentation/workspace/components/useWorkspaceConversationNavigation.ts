@@ -10,6 +10,7 @@ import type { Session } from '../../../../contexts/identities/infrastructure/ses
 import type { WorkspaceConversationNavigation } from './WorkspaceConversationNavigation';
 
 import { ConversationTimeline } from '../../../../contexts/conversations/presentation/view-models/ConversationTimeline';
+import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { applyPublishedKeychain } from './applyPublishedKeychain';
@@ -78,7 +79,7 @@ export function useWorkspaceConversationNavigation({
       identity?: IdentityResource,
       preferredNetworkId?: string,
     ): Promise<void> => {
-      if (identityId === session.identity.id) return;
+      if (IdentityMatch.isSame(identityId, session.identity.id)) return;
 
       const existingConversation =
         WorkspaceConversationTarget.existingConversation(

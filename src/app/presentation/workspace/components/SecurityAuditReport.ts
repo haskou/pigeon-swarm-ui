@@ -9,6 +9,7 @@ import {
   identityName,
   identityPrimaryDisplayName,
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
+import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
 import { KeyFingerprint } from '../../../../contexts/identities/presentation/view-models/KeyFingerprint';
 import { shortId } from '../../../../shared/presentation/formatting';
 
@@ -137,7 +138,7 @@ export class SecurityAuditReport {
         ),
         identityId: owner.identityId,
         own:
-          owner.identityId === input.session.identity.id &&
+          IdentityMatch.isSame(owner.identityId, input.session.identity.id) &&
           owner.deviceCredential === own,
         signatureKeyFingerprint:
           KeyFingerprint.ofPublicBytes(signaturePublicKey),

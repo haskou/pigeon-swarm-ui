@@ -14,6 +14,7 @@ import {
   IdentityMembersAside,
   type IdentityMembersAsideVariant,
 } from '../../../../contexts/identities/presentation/components/IdentityMembersAside';
+import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
 import { profileAnchorFromTarget } from '../../../../contexts/identities/presentation/view-models/profilePopoverAnchor';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 
@@ -170,8 +171,10 @@ export function Inspector({
             nodeNetworks={nodeNetworks}
             onClose={() => setProfileViewer(null)}
             onOpenConversation={
-              profileViewer.identityId === session.identity.id ||
-              !onOpenConversationWithIdentity
+              IdentityMatch.isSame(
+                profileViewer.identityId,
+                session.identity.id,
+              ) || !onOpenConversationWithIdentity
                 ? undefined
                 : () =>
                     onOpenConversationWithIdentity(

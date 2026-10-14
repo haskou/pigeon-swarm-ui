@@ -4,6 +4,7 @@ import type { MyStickersResource } from '../../infrastructure/http/resources/MyS
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { StickerPackResource } from '../../infrastructure/http/resources/StickerPackResource';
 
+import { IdentityMatch } from '../../../identities/presentation/view-models/IdentityMatch';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
@@ -59,12 +60,13 @@ export function StickerManagerDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ownPacks =
-    library?.savedPacks.filter(
-      (pack) => pack.ownerIdentityId === session.identity.id,
+    library?.savedPacks.filter((pack) =>
+      IdentityMatch.isSame(pack.ownerIdentityId, session.identity.id),
     ) ?? [];
   const savedPacks =
     library?.savedPacks.filter(
-      (pack) => pack.ownerIdentityId !== session.identity.id,
+      (pack) =>
+        !IdentityMatch.isSame(pack.ownerIdentityId, session.identity.id),
     ) ?? [];
 
   useEffect(() => {

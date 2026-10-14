@@ -6,6 +6,7 @@ import type { ProfilePopoverAnchor } from '../../../identities/presentation/view
 import type { ChatMessage } from '../../../messages/domain/ChatMessage';
 import type { CommunityProfileView } from './CommunityWorkspaceDialogs';
 
+import { IdentityMatch } from '../../../identities/presentation/view-models/IdentityMatch';
 import { profileAnchorFromTarget } from '../../../identities/presentation/view-models/profilePopoverAnchor';
 
 type UseCommunityProfileViewerInput = {
@@ -55,10 +56,12 @@ export function useCommunityProfileViewer({
     ) =>
       openMemberProfile(
         {
-          identity:
-            participant.identityId === session.identity.id
-              ? session.identity
-              : memberIdentities[participant.identityId],
+          identity: IdentityMatch.isSame(
+            participant.identityId,
+            session.identity.id,
+          )
+            ? session.identity
+            : memberIdentities[participant.identityId],
           identityId: participant.identityId,
           pictureUrl: participant.picture ?? null,
         },
@@ -74,10 +77,9 @@ export function useCommunityProfileViewer({
 
     openMemberProfile(
       {
-        identity:
-          identityId === session.identity.id
-            ? session.identity
-            : memberIdentities[identityId],
+        identity: IdentityMatch.isSame(identityId, session.identity.id)
+          ? session.identity
+          : memberIdentities[identityId],
         identityId,
         pictureUrl: memberPictures[identityId] ?? null,
       },
@@ -87,10 +89,9 @@ export function useCommunityProfileViewer({
   const openIdentityProfile = (identityId: string, target: HTMLElement) =>
     openMemberProfile(
       {
-        identity:
-          identityId === session.identity.id
-            ? session.identity
-            : memberIdentities[identityId],
+        identity: IdentityMatch.isSame(identityId, session.identity.id)
+          ? session.identity
+          : memberIdentities[identityId],
         identityId,
         pictureUrl: memberPictures[identityId] ?? null,
       },

@@ -6,6 +6,7 @@ import type {
   RealtimeTypingMessage,
 } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 
+import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
 import { sendRealtimeTyping } from '../../realtime/useRealtimeEvents';
 import {
   activeTypingIdentityIds,
@@ -45,7 +46,7 @@ export function useWorkspaceTyping({
 
   const receive = useCallback(
     (message: RealtimeTypingMessage) => {
-      if (message.identityId === session.identity.id) return;
+      if (IdentityMatch.isSame(message.identityId, session.identity.id)) return;
 
       const expiresAt = Date.now() + 5000;
 

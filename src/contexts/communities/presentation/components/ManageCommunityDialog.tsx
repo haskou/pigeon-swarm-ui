@@ -18,6 +18,7 @@ import { useCloseTransition } from '../../../../shared/presentation/hooks/useClo
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
+import { IdentityMatch } from '../../../identities/presentation/view-models/IdentityMatch';
 import { CommunityAccessPolicy } from '../view-models/CommunityAccessPolicy';
 import { CommunityChannels } from '../view-models/CommunityChannels';
 import { CommunityBannedMembersPanel } from './CommunityBannedMembersPanel';
@@ -164,7 +165,10 @@ export function ManageCommunityDialog({
     community,
     session.identity.id,
   );
-  const isOwner = community.ownerIdentityId === session.identity.id;
+  const isOwner = IdentityMatch.isSame(
+    community.ownerIdentityId,
+    session.identity.id,
+  );
   const canManageChannels =
     isOwner || currentPermissions.has('manage_channels');
   const canManageRoles = isOwner || currentPermissions.has('manage_roles');
@@ -263,12 +267,11 @@ export function ManageCommunityDialog({
     void Promise.all(
       community.memberIds.map(async (identityId) => {
         try {
-          const identity =
-            identityId === session.identity.id
-              ? session.identity
-              : await applicationContainer.identities.get(
-                  IdentityId.normalize(identityId),
-                );
+          const identity = IdentityMatch.isSame(identityId, session.identity.id)
+            ? session.identity
+            : await applicationContainer.identities.get(
+                IdentityId.normalize(identityId),
+              );
           const pictureUrl = await loadIdentityPicture(identity);
 
           return [identityId, identity, pictureUrl] as const;
@@ -334,12 +337,11 @@ export function ManageCommunityDialog({
     void Promise.all(
       missingIdentityIds.map(async (identityId) => {
         try {
-          const identity =
-            identityId === session.identity.id
-              ? session.identity
-              : await applicationContainer.identities.get(
-                  IdentityId.normalize(identityId),
-                );
+          const identity = IdentityMatch.isSame(identityId, session.identity.id)
+            ? session.identity
+            : await applicationContainer.identities.get(
+                IdentityId.normalize(identityId),
+              );
 
           return [identityId, identity] as const;
         } catch {

@@ -6,6 +6,7 @@ import type { NodeNetwork } from '../../../../contexts/networks/presentation/vie
 import type { NetworkAction } from './NetworkAction';
 import type { NetworkMutation } from './NetworkMutation';
 
+import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
 import { NetworkInvite } from '../../../../contexts/networks/domain/NetworkInvite';
 import { NetworkInviteCode } from '../../../../contexts/networks/domain/NetworkInviteCode';
 import { cx } from '../../../../shared/presentation/cx';
@@ -511,7 +512,10 @@ export function NodeNetworksPanel({
   const [loading, setLoading] = useState<NetworkMutation>(null);
   const [networkAction, setNetworkAction] = useState<NetworkAction>('create');
   const [notice, setNotice] = useState<string | null>(null);
-  const isOwner = node?.owner === session.identity.id;
+  const isOwner = IdentityMatch.isSame(
+    node?.owner ?? undefined,
+    session.identity.id,
+  );
   const hasPublicNetwork = networks.some(isPublicNodeNetwork);
   const canManageNetworks = !!node && (!node.owner || isOwner);
   const canCreatePublicNetwork = canManageNetworks && !hasPublicNetwork;

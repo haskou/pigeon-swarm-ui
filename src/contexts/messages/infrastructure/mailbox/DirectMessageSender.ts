@@ -117,7 +117,10 @@ export class DirectMessageSender {
    */
   private peerOf(session: Session, conversation: ConversationResource): string {
     const peer = conversation.participantIds.find(
-      (identityId) => identityId !== session.identity.id,
+      (identityId) =>
+        !IdentityId.fromString(identityId).isEqual(
+          IdentityId.fromString(session.identity.id),
+        ),
     );
 
     if (
@@ -234,7 +237,9 @@ export class DirectMessageSender {
   ): Uint8Array {
     return DirectMessageMailboxRecord.encode(
       record,
-      recipientIdentityId === session.identity.id
+      IdentityId.fromString(recipientIdentityId).isEqual(
+        IdentityId.fromString(session.identity.id),
+      )
         ? DirectMessageAuthorship.tag(
             sessionRootKey(session).getBuffer(),
             record,

@@ -14,6 +14,7 @@ import type { GroupInvitationDialogController } from './useGroupInvitationDialog
 import type { GroupRosterActionsController } from './useGroupRosterActions';
 
 import { memberPrimaryName } from '../../../../contexts/communities/presentation/components/communityMemberNames';
+import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
 import { profileAnchorFromTarget } from '../../../../contexts/identities/presentation/view-models/profilePopoverAnchor';
 
 const ConversationDataDialog = lazy(() =>
@@ -201,8 +202,10 @@ function ProfileDialogs({
             onClose={() => setProfileViewer(null)}
             presence={presenceByIdentityId[profileViewer.identityId]}
             onOpenConversation={
-              profileViewer.identityId === session.identity.id ||
-              !onOpenConversationWithIdentity
+              IdentityMatch.isSame(
+                profileViewer.identityId,
+                session.identity.id,
+              ) || !onOpenConversationWithIdentity
                 ? undefined
                 : () =>
                     onOpenConversationWithIdentity(
