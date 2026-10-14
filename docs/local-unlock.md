@@ -155,8 +155,11 @@ until this browser replays it:
 2. `DeviceRemovalDomainService.verify` replays the log from that genesis with
    `DeviceAuthorizationPolicy`, the node replay rules ported to the client.
    Every transition must carry valid signatures from keys the replayed state
-   authorizes and apply in causal order. The client and the node both pass the
-   shared vectors in
+   authorizes and apply in causal order. A recovery that lost a checkpoint
+   must apply from the one replayed state in its epoch, whether that is on the
+   lineage or another lost recovery, at no higher revision than the last
+   recovery of the lineage and only once. Otherwise the log does not replay.
+   The client and the node both pass the shared vectors in
    `src/test/fixtures/device-authorization-transition-log-vectors.json`.
 3. The device is removed only when the replay contains a transition above the
    local authorization revision that takes this device's credential out: a

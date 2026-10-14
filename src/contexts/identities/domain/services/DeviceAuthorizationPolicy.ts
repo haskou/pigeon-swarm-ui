@@ -226,41 +226,74 @@ export class DeviceAuthorizationPolicy {
   }
 
   /**
+   * The state a lost recovery recovered from: the one replayed state, on the
+   * lineage or a lost recovery replayed before it, in the epoch the lost
+   * recovery is signed in. Its own epoch must still be new, so no recovery
+   * replays twice.
+   */
+  private static lostRecoveryBase(
+    states: DeviceRecoveryLineageState[],
+    lost: DeviceAuthorizationTransition,
+  ): DeviceRecoveryLineageState {
+    const [base, ...ambiguous] = states.filter(({ authorization }) =>
+      authorization.getEpoch().isEqual(lost.getEpoch()),
+    );
+
+    assert(
+      base !== undefined &&
+        ambiguous.length === 0 &&
+        !states.some(({ authorization }) =>
+          authorization.getEpoch().isEqual(lost.getResultEpoch()),
+        ),
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
+
+    return base;
+  }
+
+  /**
    * The replay base of a recovery lineage. Every recovery must apply and
    * never loosen a cap an earlier one carried. A concurrent recovery lost
-   * the checkpoint to the last one at the same revision: it must still apply
-   * where the last one applies.
+   * the checkpoint at or below the last recovery's revision, from any earlier
+   * state: it must apply from the one replayed state in its epoch, lowest
+   * revision first, so a lost recovery chained from another one replays too.
    */
   public static replayRecoveryLineage(
     genesis: DeviceAuthorization,
     recoveries: DeviceAuthorizationTransition[],
     concurrent: DeviceAuthorizationTransition[],
   ): DeviceAuthorization {
-    let previous: DeviceRecoveryLineageState = {
+    let head: DeviceRecoveryLineageState = {
       authorization: genesis,
       compromiseCaps: DeviceCompromiseCaps.none(),
     };
-    let state = previous;
+    const states = [head];
 
     for (const recovery of recoveries) {
-      previous = state;
-      state = this.recoverLineage(previous, recovery);
+      head = this.recoverLineage(head, recovery);
+      states.push(head);
     }
 
     const last =
       recoveries.length > 0 ? recoveries[recoveries.length - 1] : undefined;
+    const lowestRevisionFirst = [...concurrent].sort(
+      (left, right) =>
+        left.getResultRevision().valueOf() -
+        right.getResultRevision().valueOf(),
+    );
 
-    for (const sibling of concurrent) {
+    for (const lost of lowestRevisionFirst) {
       assert(
         last !== undefined &&
-          sibling.getPreviousRevision().isEqual(last.getPreviousRevision()) &&
-          !sibling.getOperationId().isEqual(last.getOperationId()),
+          !lost.getResultRevision().isGreaterThan(last.getResultRevision()),
         new InvalidDeviceAuthorizationTransitionError(),
       );
-      this.recoverLineage(previous, sibling);
+      states.push(
+        this.recoverLineage(this.lostRecoveryBase(states, lost), lost),
+      );
     }
 
-    return state.authorization;
+    return head.authorization;
   }
 
   /**
