@@ -190,8 +190,8 @@ test('a group keeps reading across a revoke and reload, without the revoked devi
     await openGroup(phone, groupName);
     await sendUntilEveryoneReads(alice, [phone], 'hello from Alice');
 
-    // The revoke rotates the device-sealed root; the reload then opens the
-    // group under the new root alone, with no replaced root in the session.
+    // The revoke rotates the device-sealed root; after the reload the phone
+    // reads its group inboxes with readers of the new root.
     await revokeOtherDevice(phone);
     await phone.getByRole('button', { name: 'Close dialog' }).last().click();
     await loginIdentity(phone, `@${bob.handle}`, password);
