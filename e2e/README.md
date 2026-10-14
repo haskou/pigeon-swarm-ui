@@ -228,5 +228,6 @@ Projects: `desktop-chromium`, `desktop-firefox`, `desktop-webkit`,
 `tablet-chromium` and `mobile-chromium`. Install the extra engines with
 `yarn playwright install firefox webkit`. Login, recovery-key sign-in, device
 pairing and last-login-prefill specs pass on Chromium desktop, Chromium mobile
-and Firefox. On WebKit `last-login-prefill` failed once when run after the other
-specs and passed 5/5 on its own; it is not part of the wrapper CI run.
+and Firefox. `last-login-prefill` checks the remembered identity preview the
+login screen settles in, not the identity input it shows until the lookup
+resolves; it passes on every project and is not part of the wrapper CI run.
