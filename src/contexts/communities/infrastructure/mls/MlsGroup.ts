@@ -689,6 +689,16 @@ export class MlsGroup {
   };
 
   /**
+   * The encoded state the commit created by `add`, `removeIdentities` or
+   * `update` leads to, so it can be kept aside before it is published.
+   */
+  public pendingState(): Uint8Array {
+    if (!this.pending) throw new MlsRejectedError('No pending commit');
+
+    return encodeGroupState(this.pending.state);
+  }
+
+  /**
    * Adopts the commit created by `add`, `removeIdentities` or `update` once the
    * node has accepted its record. Pass the record id the node assigned.
    */
