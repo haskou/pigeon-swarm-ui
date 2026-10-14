@@ -70,6 +70,33 @@ describe(MessageProjector.name, () => {
     });
   });
 
+  it('marks a message as mine when its author id is the own id in PEM form', () => {
+    const projector = new MessageProjector(projectorCopy);
+
+    expect(
+      projector.project(session, 'conversation-1', {
+        authorIdentityId:
+          '-----BEGIN PUBLIC KEY-----\nidentity-1\n-----END PUBLIC KEY-----\n',
+        content: 'hello',
+        id: 'message-1',
+        timestamp: 10,
+      }),
+    ).toMatchObject({ message: { mine: true } });
+  });
+
+  it('does not mark a message as mine when its author id is rejected', () => {
+    const projector = new MessageProjector(projectorCopy);
+
+    expect(
+      projector.project(session, 'conversation-1', {
+        authorIdentityId: 'x'.repeat(5000),
+        content: 'hello',
+        id: 'message-1',
+        timestamp: 10,
+      }),
+    ).toMatchObject({ message: { mine: false } });
+  });
+
   it('projects a call event as readable', () => {
     const projector = new MessageProjector(projectorCopy);
 

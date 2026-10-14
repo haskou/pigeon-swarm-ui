@@ -78,7 +78,7 @@ const outboxItem = {
   state: 'pending',
 } satisfies DirectMessageOutboxItem;
 
-const build = () =>
+const build = (ownLeafIdentityId = OWN_ID) =>
   SecurityAuditReport.from({
     communities: [{ id: 'community-1', name: 'Pigeons' } as Community],
     conversations: [
@@ -90,7 +90,10 @@ const build = () =>
         epoch: 3n,
         leaves: [
           {
-            owner: { deviceCredential: pem(OWN_DEVICE), identityId: OWN_ID },
+            owner: {
+              deviceCredential: pem(OWN_DEVICE),
+              identityId: ownLeafIdentityId,
+            },
             signaturePublicKey: SIGNATURE_KEY,
           },
           {
@@ -230,6 +233,10 @@ describe(SecurityAuditReport.name, () => {
         title: 'Pigeons',
       },
     ]);
+  });
+
+  it('marks this device when its leaf carries the own identity id in PEM form', () => {
+    expect(build(pem(OWN_ID)).groups[0]?.leaves[0]?.own).toBe(true);
   });
 
   it('lists pending outbox envelopes by id', () => {
