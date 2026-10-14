@@ -99,7 +99,7 @@ export class PigeonCommunityInvitationApi {
               expiresAt: optional.expiresAt || undefined,
               maxUses: input.maxUses || undefined,
             },
-            target: { id: token, type: 'invite' },
+            target: { id: deriveInviteReference(token), type: 'invite' },
           }),
           mutation,
           nonce,

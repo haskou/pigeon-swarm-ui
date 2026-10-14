@@ -270,7 +270,9 @@ give anyone a right no signed operation granted. An `invite_link` join names
 the link by its reference, never by the token: every member reads the
 operations, and the token alone lets anyone join. The reference is
 `base64url(sha256("pigeon:community-invite-reference:v1\n" + token))`
-(`deriveInviteReference`).
+(`deriveInviteReference`). The `invite_link_created` moderation log entry
+names the link by the same reference, since roles that may read the log
+need not be allowed to invite.
 
 ### History policy
 
