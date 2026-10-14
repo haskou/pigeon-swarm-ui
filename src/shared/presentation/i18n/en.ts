@@ -709,7 +709,7 @@ export const en = {
       'Not protected: the browser may clear this data when space runs low.',
     onDevice: 'On this device',
     onDeviceBody:
-      'Your keys, messages and unsent messages are saved here, encrypted. Logging out keeps them for your next sign-in. "Log out and forget this device" erases them from this browser, and so does clearing the site data in the browser.',
+      'Your keys, messages, unsent messages and the names of your contacts are saved here, encrypted. Logging out keeps them for your next sign-in. "Log out and forget this device" erases them from this browser, and so does clearing the site data in the browser.',
     onServer: 'On the server',
     onServerBody:
       'New direct messages wait on the server, encrypted, until your devices download them, for up to 14 days. After that they expire. The server cannot read them.',

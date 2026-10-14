@@ -128,7 +128,9 @@ describe('eraseRemovedDevice', () => {
     );
     expect(removed.groupMessages.forget).toHaveBeenCalledWith('identity-1');
     expect(removed.mls.forget).toHaveBeenCalledWith('identity-1');
-    expect(removed.identities.forgetContacts).toHaveBeenCalledWith('identity-1');
+    expect(removed.identities.forgetContacts).toHaveBeenCalledWith(
+      'identity-1',
+    );
     expect(removed.identities.discardDeviceSealedRecovery).toHaveBeenCalledWith(
       'identity-1',
     );

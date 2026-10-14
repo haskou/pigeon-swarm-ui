@@ -1,8 +1,8 @@
 import 'fake-indexeddb/auto';
 import { randomUUID } from 'node:crypto';
 
-import type { ContactDirectoryEntry } from '../../../../../contexts/identities/infrastructure/storage/ContactDirectoryEntry';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
+import type { ContactDirectoryEntry } from '../../../../../contexts/identities/infrastructure/storage/ContactDirectoryEntry';
 
 import { ContactDirectoryStore } from '../../../../../contexts/identities/infrastructure/storage/ContactDirectoryStore';
 

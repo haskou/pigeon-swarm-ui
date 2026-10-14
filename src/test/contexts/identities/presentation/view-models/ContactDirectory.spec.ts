@@ -2,11 +2,7 @@ import type { IdentityResource } from '../../../../../contexts/identities/infras
 
 import { ContactDirectory } from '../../../../../contexts/identities/presentation/view-models/ContactDirectory';
 
-function identity(
-  id: string,
-  name: string,
-  handle?: string,
-): IdentityResource {
+function identity(id: string, name: string, handle?: string): IdentityResource {
   return { id, profile: { handle, name } } as IdentityResource;
 }
 
@@ -64,7 +60,9 @@ describe(ContactDirectory.name, () => {
       .entries();
 
     expect(entries).toHaveLength(ContactDirectory.LIMIT);
-    expect(entries[0]?.identityId).toBe(`contact-${ContactDirectory.LIMIT + 1}`);
+    expect(entries[0]?.identityId).toBe(
+      `contact-${ContactDirectory.LIMIT + 1}`,
+    );
     expect(entries.map(({ identityId }) => identityId)).not.toContain(
       'contact-0',
     );
@@ -96,7 +94,9 @@ describe(ContactDirectory.name, () => {
       true,
     );
     expect(
-      directory.isSameAs(directory.remember({ ada: identity('ada', 'Ada') }, 2)),
+      directory.isSameAs(
+        directory.remember({ ada: identity('ada', 'Ada') }, 2),
+      ),
     ).toBe(false);
   });
 });

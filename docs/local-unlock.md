@@ -115,7 +115,8 @@ identities use case `CurrentDeviceForgetter`, which:
    `DeviceMailboxRepository`. This step is best effort (see
    `opaque-mailboxes-client.md`);
 3. wipes this identity's local direct history and queued one-to-one sends
-   through `DeviceMailboxRepository`;
+   through `DeviceMailboxRepository`, then its sealed contact directory (see
+   `opaque-mailboxes-client.md`) through `ContactDirectoryRepository`;
 4. deletes the device vault record for the identity (IndexedDB
    `pigeon-swarm-device-vault`) through `IdentityUnlockRepository.forget`;
 5. runs the logout described above.
@@ -170,9 +171,10 @@ until this browser replays it:
 A verified removal rejects with `DeviceRemovedError` naming the identity and
 the operation id, and no session is returned. The sign-in screen then runs
 `eraseRemovedDevice` for the identity without asking. It erases the outbox,
-the stored one-to-one and group history, the MLS state, the decrypted message
-projections, the pending device-sealed recovery records, and the drafts and
-workspace state in localStorage. Last, `identities.forgetDeviceUnlock` deletes
+the stored one-to-one and group history, the MLS state, the contact directory,
+the decrypted message projections, the pending device-sealed recovery records,
+and the drafts and workspace state in localStorage. Last,
+`identities.forgetDeviceUnlock` deletes
 the vault record, which holds the identity key material and the device-sealed
 root, as in step 3 above. The vault record goes only when every other step
 succeeded. A partial erase keeps it, so the next unlock proves the removal

@@ -717,7 +717,7 @@ export const es = {
       'Sin protección: el navegador puede borrar estos datos cuando le falte espacio.',
     onDevice: 'En este dispositivo',
     onDeviceBody:
-      'Tus claves, mensajes y mensajes pendientes de enviar se guardan aquí cifrados. Cerrar sesión los conserva para tu próximo inicio de sesión. "Cerrar sesión y olvidar este dispositivo" los borra de este navegador, igual que borrar los datos del sitio en el navegador.',
+      'Tus claves, mensajes, mensajes pendientes de enviar y los nombres de tus contactos se guardan aquí cifrados. Cerrar sesión los conserva para tu próximo inicio de sesión. "Cerrar sesión y olvidar este dispositivo" los borra de este navegador, igual que borrar los datos del sitio en el navegador.',
     onServer: 'En el servidor',
     onServerBody:
       'Los mensajes directos nuevos esperan cifrados en el servidor hasta que tus dispositivos los descargan, durante un máximo de 14 días. Después caducan. El servidor no puede leerlos.',

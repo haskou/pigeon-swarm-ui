@@ -70,12 +70,7 @@ function forgetter({
   return {
     calls,
     mailbox,
-    useCase: new CurrentDeviceForgetter(
-      ownDevices,
-      mailbox,
-      contacts,
-      unlocks,
-    ),
+    useCase: new CurrentDeviceForgetter(ownDevices, mailbox, contacts, unlocks),
   };
 }
 

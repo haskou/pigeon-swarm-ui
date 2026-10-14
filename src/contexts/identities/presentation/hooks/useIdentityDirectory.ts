@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
 import type { CommunityMembershipRequestResource as CommunityMembershipRequest } from '../../../communities/infrastructure/http/resources/CommunityMembershipRequestResource';
-import type { IdentityResource } from '../../infrastructure/http/resources/IdentityResource';
+import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
 import type { NotificationResource } from '../../../notifications/infrastructure/http/resources/NotificationResource';
+import type { IdentityResource } from '../../infrastructure/http/resources/IdentityResource';
 import type { Session } from '../../infrastructure/session/Session';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { ConversationPeer } from '../../../conversations/presentation/view-models/ConversationPeer';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
+import { ContactDirectory } from '../view-models/ContactDirectory';
 import {
   identityName,
   identityPicture,
@@ -16,6 +17,11 @@ import {
   type IdentityNames,
   type IdentityPictures,
 } from '../view-models/identityDisplay';
+import {
+  identityIdsAwaitingResolution,
+  resolvedIdentityNames,
+  unresolvedIdentityIdsAfter,
+} from '../view-models/identityResolution';
 
 type IdentityDirectoryInput = {
   conversations: ConversationResource[];
@@ -34,6 +40,9 @@ type ResolvedIdentity = readonly [
 
 const IDENTITY_PROFILE_REFRESH_INTERVAL_MS = 5 * 60_000;
 const IDENTITY_PROFILE_FOCUS_REFRESH_THROTTLE_MS = 60_000;
+// Contacts are stamped by day, so the sealed directory is rewritten when a
+// name changes or once a day, not on every profile refresh.
+const CONTACT_SEEN_RESOLUTION_MS = 24 * 60 * 60_000;
 
 export function useIdentityDirectory({
   conversations,
@@ -64,6 +73,13 @@ export function useIdentityDirectory({
   const [resolvingIdentityIds, setResolvingIdentityIds] = useState<string[]>(
     [],
   );
+  const [unresolvedIdentityIds, setUnresolvedIdentityIds] = useState<
+    ReadonlySet<string>
+  >(() => new Set());
+  const [storedContacts, setStoredContacts] = useState<{
+    directory: ContactDirectory;
+    ownerIdentityId: string;
+  } | null>(null);
   const lastIdentityRefreshAtRef = useRef(0);
 
   const rememberIdentity = useCallback((identity: IdentityResource) => {
@@ -147,12 +163,14 @@ export function useIdentityDirectory({
 
   const applyResolvedIdentities = useCallback(
     (resolvedIdentities: ResolvedIdentity[]) => {
-      setIdentityNames((current) => ({
-        ...current,
-        ...Object.fromEntries(
-          resolvedIdentities.map(([identityId, name]) => [identityId, name]),
-        ),
-      }));
+      const lookups = resolvedIdentities.map(
+        ([identityId, , , identity]) => [identityId, identity] as const,
+      );
+
+      setIdentityNames((current) => resolvedIdentityNames(current, lookups));
+      setUnresolvedIdentityIds((current) =>
+        unresolvedIdentityIdsAfter(current, lookups),
+      );
       setIdentityProfiles((current) => ({
         ...current,
         ...Object.fromEntries(
@@ -208,19 +226,72 @@ export function useIdentityDirectory({
 
   const identityIdsToResolve = useMemo(
     () =>
-      identityIdsInUse.filter((identityId) => !identityProfiles[identityId]),
-    [identityIdsInUse, identityProfiles],
+      identityIdsAwaitingResolution(
+        identityIdsInUse,
+        identityProfiles,
+        unresolvedIdentityIds,
+      ),
+    [identityIdsInUse, identityProfiles, unresolvedIdentityIds],
   );
 
   const identityIdsToRefresh = useMemo(
     () =>
-      identityIdsInUse.filter((identityId) => !!identityProfiles[identityId]),
-    [identityIdsInUse, identityProfiles],
+      identityIdsInUse.filter(
+        (identityId) =>
+          !!identityProfiles[identityId] ||
+          unresolvedIdentityIds.has(identityId),
+      ),
+    [identityIdsInUse, identityProfiles, unresolvedIdentityIds],
   );
 
   useEffect(() => {
     rememberIdentity(session.identity);
   }, [rememberIdentity, session.identity]);
+
+  useEffect(() => {
+    let active = true;
+
+    void applicationContainer.identities
+      .knownContacts(session)
+      .catch(() => [])
+      .then((entries) => {
+        if (!active) return;
+
+        const directory = ContactDirectory.of(entries);
+
+        setIdentityNames((current) => directory.knownNames(current));
+        setStoredContacts({
+          directory,
+          ownerIdentityId: session.identity.id,
+        });
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [session]);
+
+  useEffect(() => {
+    if (storedContacts?.ownerIdentityId !== session.identity.id) return;
+
+    const contactProfiles = Object.fromEntries(
+      Object.entries(identityProfiles).filter(
+        ([identityId]) => identityId !== session.identity.id,
+      ),
+    );
+    const directory = storedContacts.directory.remember(
+      contactProfiles,
+      Math.floor(Date.now() / CONTACT_SEEN_RESOLUTION_MS) *
+        CONTACT_SEEN_RESOLUTION_MS,
+    );
+
+    if (directory.isSameAs(storedContacts.directory)) return;
+
+    setStoredContacts({ directory, ownerIdentityId: session.identity.id });
+    void applicationContainer.identities
+      .rememberContacts(session, directory.entries())
+      .catch(() => undefined);
+  }, [identityProfiles, session, storedContacts]);
 
   useEffect(() => {
     if (identityIdsToResolve.length === 0) return;
@@ -319,9 +390,8 @@ async function loadIdentityPicture(
 
   if (!pictureCid) return null;
 
-  const content = await applicationContainer.attachments.getPublicFile(
-    pictureCid,
-  );
+  const content =
+    await applicationContainer.attachments.getPublicFile(pictureCid);
 
   return publicFileObjectUrl(content);
 }
