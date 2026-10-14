@@ -7,13 +7,11 @@ import type { GroupMailboxOutboxRow } from '../../../../../contexts/groupMailbox
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { PigeonMailboxClient } from '../../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
 
-import { IndexedDbMlsStateStore } from '../../../../../contexts/communities/infrastructure/mls/IndexedDbMlsStateStore';
 import { MlsRejectedError } from '../../../../../contexts/communities/infrastructure/mls/MlsRejectedError';
 import { GroupMailboxControl } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControl';
 import { GroupMailboxControlRecord } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlRecord';
 import { GroupMailboxKeyPackageTimeoutError } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxKeyPackageTimeoutError';
 import { GroupMailboxKeySchedule } from '../../../../../contexts/groupMailboxes/infrastructure/crypto/GroupMailboxKeySchedule';
-import { IndexedDbGroupMailboxGenerationStore } from '../../../../../contexts/groupMailboxes/infrastructure/indexeddb/IndexedDbGroupMailboxGenerationStore';
 import { GroupMailboxMlsEngine } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxMlsEngine';
 import { GroupMailboxOutbox } from '../../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutbox';
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
@@ -21,6 +19,7 @@ import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/domai
 import { MailboxCapability } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { encodeBase64Url } from '../../../../../shared/infrastructure/encoding/base64url';
+import { sealedGroupStores } from '../sealedGroupStores';
 
 const CONVERSATION = 'conversation-1';
 
@@ -127,13 +126,11 @@ const outboxOf = (
 
 const member = (name: string): Member => {
   const databaseName = `group-control-${++database}`;
+  const stores = sealedGroupStores(databaseName, name);
   const engine = new GroupMailboxMlsEngine(
     { deviceId: 'd1', identityId: name },
-    new IndexedDbMlsStateStore(`${databaseName}-mls`, name),
-    new IndexedDbGroupMailboxGenerationStore(
-      `${databaseName}-generations`,
-      name,
-    ),
+    stores.state,
+    stores.generations,
     () => Promise.resolve(roster),
     () => 1_000,
   );

@@ -8,10 +8,11 @@ import {
 } from '../../../../shared/infrastructure/encoding/base64url';
 
 /**
- * The clear text of a device sealed root entry: the root, and on a hand-over
- * from a device that forgot itself, the root it replaced, as
+ * The clear text of a device sealed root entry: the root, and after a revoke
+ * or a hand-over from a device that forgot itself, the root it replaced, as
  * `<root>[.<previous>]` in base64url. The previous root is one the recipients
- * already held; it lets them move the keychain head and mailbox readers off it.
+ * already held; it lets them move the keychain head, mailbox readers and local
+ * sealed state off it.
  */
 export class DeviceSealedRootPayload {
   private static readonly SEPARATOR = '.';

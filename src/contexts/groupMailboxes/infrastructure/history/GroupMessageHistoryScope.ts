@@ -1,7 +1,7 @@
 import { Buffer } from 'buffer';
 
+import type { DeviceRootRowKeys } from '../../../messages/infrastructure/mailbox/DeviceRootRowKeys';
 import type { GroupMessageHistoryConversation } from './GroupMessageHistoryConversation';
-import type { GroupMessageHistoryKeys } from './GroupMessageHistoryKeys';
 
 /**
  * What the group history holds in memory for one identity under one
@@ -17,7 +17,7 @@ export class GroupMessageHistoryScope {
 
   public constructor(
     root: Uint8Array,
-    public readonly keys: GroupMessageHistoryKeys,
+    public readonly keys: DeviceRootRowKeys,
   ) {
     this.root = Buffer.from(root);
   }

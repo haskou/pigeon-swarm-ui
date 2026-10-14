@@ -356,6 +356,7 @@ export class PigeonApplication {
             identityContexts,
             gateway.directMessageMailbox,
             gateway.groupConversationMailbox,
+            this.mls,
           ),
           identityUnlockRepository,
         ),
@@ -578,5 +579,6 @@ export class PigeonApplication {
 
   public disposeSessionWorkers(): void {
     this.gateway.disposeSessionWorkers();
+    this.mls.close();
   }
 }

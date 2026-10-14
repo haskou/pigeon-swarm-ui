@@ -120,10 +120,11 @@ export class DeviceSealedRecovery {
   }
 
   /**
-   * Moves a keychain head still sealed under the root a hand-over replaced,
-   * as when another device forgot itself and handed this device a fresh
-   * root. A head already under the current root is left as it is. Never
-   * throws: the next unlock tries again while the hand-over is current.
+   * Moves a keychain head still sealed under the root a revoke or hand-over
+   * replaced, as when another device revoked a third one or forgot itself and
+   * this device got the fresh root. A head already under the current root is
+   * left as it is. Never throws: the next unlock tries again while that
+   * generation is current.
    */
   public async rewrapHandedOverKeychain(rooted: Session): Promise<void> {
     if (!rooted.previousDeviceSealedRootKey) return;

@@ -9,6 +9,7 @@ import type { MessageResource } from '../../../contexts/messages/infrastructure/
 import { IndexedDbMlsStateStore } from '../../../contexts/communities/infrastructure/mls/IndexedDbMlsStateStore';
 import { MlsCommunityEngine } from '../../../contexts/communities/infrastructure/mls/MlsCommunityEngine';
 import { SessionMlsRecordTransport } from '../../../contexts/communities/infrastructure/mls/SessionMlsRecordTransport';
+import { DeviceSealedEntryStore } from '../../../contexts/messages/infrastructure/mailbox/DeviceSealedEntryStore';
 import { scopeClientStorageKey } from '../../../shared/infrastructure/storage/ClientStorageScope';
 
 const stateDatabase = 'pigeon-mls-state';
@@ -30,6 +31,8 @@ export class PigeonMlsFacade {
     { at: number; result: Promise<boolean> }
   >();
 
+  private state: DeviceSealedEntryStore | undefined;
+
   public constructor(
     private readonly records: PigeonMlsRecordsApi,
     private readonly communities: PigeonCommunitiesGateway,
@@ -43,6 +46,16 @@ export class PigeonMlsFacade {
     const banned = new Set(community.bannedMemberIds ?? []);
 
     return new Set(community.memberIds.filter((id) => !banned.has(id)));
+  }
+
+  /** Opened on first use: the database name needs the chosen node. */
+  private sealedState(): DeviceSealedEntryStore {
+    this.state ??= new DeviceSealedEntryStore(
+      scopeClientStorageKey(stateDatabase),
+      stateDatabase,
+    );
+
+    return this.state;
   }
 
   private engineFor(session: Session): MlsCommunityEngine {
@@ -66,10 +79,7 @@ export class PigeonMlsFacade {
 
     holder.engine = new MlsCommunityEngine(
       owner,
-      new IndexedDbMlsStateStore(
-        scopeClientStorageKey(stateDatabase),
-        owner.identityId,
-      ),
+      new IndexedDbMlsStateStore(this.sealedState(), () => holder.session),
       (communityId) =>
         new SessionMlsRecordTransport(
           this.records,
@@ -217,5 +227,22 @@ export class PigeonMlsFacade {
     );
 
     return Buffer.from(secret).toString('base64');
+  }
+
+  /** Drops the engines and keys held in memory, for logout. State is kept. */
+  public close(): void {
+    this.engines.clear();
+    this.synchronizations.clear();
+    this.state?.close();
+  }
+
+  /** Drops the engines and the community MLS state of the identity. */
+  public async forget(identityId: string): Promise<void> {
+    for (const held of [this.engines, this.synchronizations]) {
+      for (const key of [...held.keys()]) {
+        if (key.startsWith(`${identityId}/`)) held.delete(key);
+      }
+    }
+    await this.sealedState().forget(identityId);
   }
 }

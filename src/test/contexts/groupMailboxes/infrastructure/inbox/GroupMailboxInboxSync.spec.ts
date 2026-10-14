@@ -17,7 +17,6 @@ import { GroupMessageId } from '../../../../../contexts/groupMailboxes/infrastru
 import { GroupMessageHistoryStore } from '../../../../../contexts/groupMailboxes/infrastructure/history/GroupMessageHistoryStore';
 import { GroupMailboxInboxStore } from '../../../../../contexts/groupMailboxes/infrastructure/inbox/GroupMailboxInboxStore';
 import { GroupMailboxInboxSync } from '../../../../../contexts/groupMailboxes/infrastructure/inbox/GroupMailboxInboxSync';
-import { IndexedDbGroupMailboxGenerationStore } from '../../../../../contexts/groupMailboxes/infrastructure/indexeddb/IndexedDbGroupMailboxGenerationStore';
 import { GroupMailboxMlsEngine } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxMlsEngine';
 import { GroupMailboxOutbox } from '../../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutbox';
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
@@ -27,6 +26,7 @@ import { MailboxCapability } from '../../../../../contexts/mailboxes/infrastruct
 import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageInboxKeys } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageInboxKeys';
 import { DirectMessageMailboxRecord } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxRecord';
+import { sealedGroupStores } from '../sealedGroupStores';
 
 const CONVERSATION = 'conversation-1';
 const MARKER = 'group-plaintext-4c1f';
@@ -161,13 +161,11 @@ const member = (name: string): Member => {
     },
     identity: { id: name },
   } as unknown as Session;
+  const stores = sealedGroupStores(databaseName, name);
   const engine = new GroupMailboxMlsEngine(
     { deviceId: 'd1', identityId: name },
-    new IndexedDbMlsStateStore(`${databaseName}-mls`, name),
-    new IndexedDbGroupMailboxGenerationStore(
-      `${databaseName}-generations`,
-      name,
-    ),
+    stores.state,
+    stores.generations,
     () => Promise.resolve(roster),
     () => now,
   );

@@ -4,9 +4,9 @@ import type { GroupMessageHistoryRow } from './GroupMessageHistoryRow';
 
 import { scopeClientStorageKey } from '../../../../shared/infrastructure/storage/ClientStorageScope';
 import { DirectMailboxRecords } from '../../../mailboxes/domain/DirectMailboxRecords';
+import { DeviceRootRowKeys } from '../../../messages/infrastructure/mailbox/DeviceRootRowKeys';
 import { GroupMessageHistoryConversation } from './GroupMessageHistoryConversation';
 import { GroupMessageHistoryDatabase } from './GroupMessageHistoryDatabase';
-import { GroupMessageHistoryKeys } from './GroupMessageHistoryKeys';
 import { GroupMessageHistoryScope } from './GroupMessageHistoryScope';
 
 /**
@@ -147,7 +147,11 @@ export class GroupMessageHistoryStore {
     const held = this.scopes.get(identityId);
 
     if (held?.opensUnder(root)) return held;
-    const keys = await GroupMessageHistoryKeys.derive(root, identityId);
+    const keys = await DeviceRootRowKeys.derive(
+      root,
+      'pigeon-group-history',
+      identityId,
+    );
     const canary = await this.database.canary(identityId);
 
     if (!canary || !(await keys.cipher.opensCanary(canary))) {

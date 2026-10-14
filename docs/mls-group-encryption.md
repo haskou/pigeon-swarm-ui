@@ -33,7 +33,8 @@ removal, so a joiner exports it from its welcome. See "Generations from MLS" in
 reuses `MlsGroup` and `MlsStateStore` in a separate IndexedDB database. Its
 credentials are self-asserted and checked only against the conversation
 roster, and any member can commit an add or a removal (#375). Its state, its
-plaintext cache and its generations are not sealed with the device root (#376).
+plaintext cache and its generations are sealed with the device root, like the
+community state (see "Security properties and limits").
 
 Each leaf is a **device**, not an identity. An identity is in the group while
 at least one of its devices is. Removing an identity removes all its leaves.
@@ -150,11 +151,26 @@ and attachments, and a missing group is an error, not a fallback.
   design is not audited either. The issue stays open until a specialist review.
 - Concurrent commits depend on the lowest-id rule and on clients retaining the
   previous epoch state. Lost records are repaired by fetching, not guessed.
-- MLS client state (leaf private keys, epoch secrets) is stored unencrypted in
-  the device's IndexedDB, like the other local key material. XSS or a stolen
-  profile exposes it. Only the last 8 epochs of secrets are retained
-  (`retainKeysForEpochs`), so older ciphertext this device has not decrypted
-  yet becomes unreadable.
+- MLS client state (leaf private keys, epoch secrets, key packages), the
+  plaintext cache and the group generation log are sealed in IndexedDB with
+  AES-256-GCM (`DeviceSealedEntryStore`, #376), each store under its own key
+  derived by HKDF-SHA256 from the device-sealed root and its label:
+  `pigeon-mls-state` (communities), `pigeon-group-mls` and
+  `pigeon-group-generations` (group conversations). A row is keyed by the
+  identity id, its kind (`group`, `key-package`, `plaintext`, `generations`)
+  and an HMAC-SHA256 tag of its kind and ids; the AAD binds identity, kind and
+  tag, and the ids are sealed with the value. At rest, only the identity id,
+  the kinds and the row count per kind are readable. Values are decrypted when
+  read; up to 2,048 plaintexts stay decrypted in memory (LRU), dropped on
+  sign-out. A per-identity canary detects a root change: a canary that opens
+  only under the root the session replaced (`previousDeviceSealedRootKey`,
+  after a revoke) re-seals every row of the identity under the new root in one
+  transaction, so the device keeps its groups; one that opens under neither
+  root drops the identity's rows. Forgetting the device deletes them. Rows
+  stored unsealed before #376 are dropped by the database upgrade, never read.
+  XSS in an unlocked session still reads the state in memory. Only the last 8
+  epochs of secrets are retained (`retainKeysForEpochs`), so older ciphertext
+  this device has not decrypted yet becomes unreadable.
 - The roster, not MLS, is authoritative. Clients refuse to add identities that
   are not on the roster, but a malicious member could still publish a commit
   that removes others; clients do not yet reject removals of rostered members.

@@ -1,65 +1,38 @@
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { DeviceSealedEntryStore } from '../../../messages/infrastructure/mailbox/DeviceSealedEntryStore';
 import type { GroupMailboxGenerationPrimitives } from '../../domain/GroupMailboxGenerationPrimitives';
 import type { GroupMailboxGenerationRepository } from '../../domain/repositories/GroupMailboxGenerationRepository';
 
 import { GroupMailboxGenerationLog } from '../../domain/GroupMailboxGenerationLog';
 
-const DATABASE_VERSION = 1;
-const STORE_NAME = 'generations';
-
 /**
- * Generation logs for one identity on one device, keyed per conversation.
- * Stored next to the MLS state that can already derive them.
+ * Generation logs of the session's identity on this device, one per
+ * conversation, sealed under the device-sealed root
+ * (`DeviceSealedEntryStore`). Stored next to the MLS state that can already
+ * derive them.
  */
 // eslint-disable-next-line max-len
 export class IndexedDbGroupMailboxGenerationStore implements GroupMailboxGenerationRepository {
   public constructor(
-    private readonly databaseName: string,
-    private readonly identityId: string,
+    private readonly entries: DeviceSealedEntryStore,
+    private readonly session: () => Session,
   ) {}
-
-  private open(): Promise<IDBDatabase> {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(this.databaseName, DATABASE_VERSION);
-
-      request.addEventListener('error', () => reject(request.error));
-      request.addEventListener('success', () => resolve(request.result));
-      request.addEventListener('upgradeneeded', () => {
-        request.result.createObjectStore(STORE_NAME);
-      });
-    });
-  }
-
-  private async run<T>(
-    mode: IDBTransactionMode,
-    callback: (store: IDBObjectStore) => IDBRequest,
-  ): Promise<T> {
-    const database = await this.open();
-
-    try {
-      return await new Promise<T>((resolve, reject) => {
-        const transaction = database.transaction(STORE_NAME, mode);
-        const request = callback(transaction.objectStore(STORE_NAME));
-
-        request.addEventListener('error', () => reject(request.error));
-        transaction.addEventListener('error', () => reject(transaction.error));
-        transaction.addEventListener('complete', () =>
-          resolve(request.result as T),
-        );
-      });
-    } finally {
-      database.close();
-    }
-  }
 
   public async load(
     conversationId: string,
   ): Promise<GroupMailboxGenerationLog> {
-    const stored = await this.run<
-      GroupMailboxGenerationPrimitives[] | undefined
-    >('readonly', (store) => store.get(`${this.identityId}/${conversationId}`));
+    const stored = await this.entries.get(
+      this.session(),
+      'generations',
+      conversationId,
+    );
 
     return stored
-      ? GroupMailboxGenerationLog.fromPrimitives(stored)
+      ? GroupMailboxGenerationLog.fromPrimitives(
+          JSON.parse(
+            new TextDecoder().decode(stored),
+          ) as GroupMailboxGenerationPrimitives[],
+        )
       : GroupMailboxGenerationLog.empty();
   }
 
@@ -67,8 +40,11 @@ export class IndexedDbGroupMailboxGenerationStore implements GroupMailboxGenerat
     conversationId: string,
     log: GroupMailboxGenerationLog,
   ): Promise<void> {
-    await this.run('readwrite', (store) =>
-      store.put(log.toPrimitives(), `${this.identityId}/${conversationId}`),
+    await this.entries.put(
+      this.session(),
+      'generations',
+      conversationId,
+      new TextEncoder().encode(JSON.stringify(log.toPrimitives())),
     );
   }
 }
