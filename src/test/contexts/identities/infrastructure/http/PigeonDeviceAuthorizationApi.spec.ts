@@ -1156,6 +1156,98 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
       expect(synchronized.authorizationRevision.valueOf()).toBe(1);
     });
 
+    it('names the devices the replayed transitions authorize, never the node list, and stores nothing', async () => {
+      const {
+        api,
+        enrollment,
+        genesisDevice,
+        http,
+        identityId,
+        laptop,
+        logOf,
+        path,
+        session,
+        vault,
+      } = await synchronizing();
+      const tablet = await KeyPair.generate();
+      const pairing = DeviceAuthorizationTransition.enrollment({
+        author: laptop,
+        authorizedAt: new Timestamp(300),
+        epoch: session.authorizationEpoch,
+        identityId,
+        operationId: DeviceAuthorizationOperationId.generate(),
+        pairingExpiration: new Timestamp(400),
+        pairingId: PairingId.generate(),
+        previousRevision: DeviceAuthorizationRevision.fromNumber(1),
+        target: tablet,
+      });
+      const revocation = DeviceAuthorizationTransition.revocation({
+        author: laptop,
+        epoch: session.authorizationEpoch,
+        identityId,
+        operationId: DeviceAuthorizationOperationId.generate(),
+        previousRevision: DeviceAuthorizationRevision.fromNumber(2),
+        targetCredential: DeviceCredential.fromString(
+          genesisDevice.toPrimitives().publicKey,
+        ),
+      });
+
+      http.request.mockResolvedValueOnce(
+        logOf([
+          enrollment.toPrimitives(),
+          pairing.toPrimitives(),
+          revocation.toPrimitives(),
+        ]),
+      );
+
+      const devices = await api.verifiedDevices(session);
+
+      expect(devices.map((device) => device.valueOf()).sort()).toEqual(
+        [laptop, tablet]
+          .map((device) => device.toPrimitives().publicKey)
+          .sort(),
+      );
+      expect(http.request).toHaveBeenCalledTimes(1);
+      expect(http.request).toHaveBeenCalledWith(path, {
+        headers: { 'X-Device-Signature': 'device-signed' },
+        method: 'GET',
+      });
+      expect(vault.synchronizeAuthorization).not.toHaveBeenCalled();
+    });
+
+    it('reports the removal of this device instead of naming any device', async () => {
+      const {
+        api,
+        enrollment,
+        genesisDevice,
+        http,
+        logOf,
+        removalBy,
+        session,
+      } = await synchronizing();
+
+      http.request.mockResolvedValueOnce(
+        logOf([
+          enrollment.toPrimitives(),
+          removalBy(genesisDevice).toPrimitives(),
+        ]),
+      );
+
+      await expect(api.verifiedDevices(session)).rejects.toBeInstanceOf(
+        DeviceRemovedError,
+      );
+    });
+
+    it('names no device from a log it cannot prove', async () => {
+      const { api, http, session } = await synchronizing();
+
+      http.request.mockResolvedValueOnce({ transitions: 'forged' });
+
+      await expect(api.verifiedDevices(session)).rejects.toThrow(
+        copy.auth.deviceAuthorizationUnproven,
+      );
+    });
+
     describe('never reports a removal the log does not prove', () => {
       const unprovenBy = async (
         served: (context: Awaited<ReturnType<typeof synchronizing>>) => unknown,

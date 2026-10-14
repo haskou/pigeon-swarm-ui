@@ -108,6 +108,52 @@ async function sendUntilEveryoneReads(
   }).toPass({ intervals: [0], timeout: SLOW * 2 });
 }
 
+const DEVICE_CATALOG = /\/identity-devices\/[^/]+\/devices$/;
+
+/** Every device credential the node listed to these pages, by identity. */
+function recordDeviceCatalogs(pages: Page[]): Map<string, Set<string>> {
+  const catalogs = new Map<string, Set<string>>();
+
+  for (const page of pages) {
+    page.on('response', async (response) => {
+      if (!DEVICE_CATALOG.test(new URL(response.url()).pathname)) return;
+      if (!response.ok()) return;
+      const catalog = (await response.json().catch(() => undefined)) as
+        | { credentials: string[]; identityId: string }
+        | undefined;
+
+      if (!catalog) return;
+      const known = catalogs.get(catalog.identityId) ?? new Set<string>();
+
+      for (const credential of catalog.credentials) known.add(credential);
+      catalogs.set(catalog.identityId, known);
+    });
+  }
+
+  return catalogs;
+}
+
+/**
+ * Serves the page every device its identity ever listed, revoked ones too:
+ * a revoked device still holds the identity key and can lie to itself.
+ */
+async function listEveryDeviceEverSeen(
+  page: Page,
+  catalogs: Map<string, Set<string>>,
+): Promise<void> {
+  await page.route(
+    (url) => DEVICE_CATALOG.test(url.pathname),
+    async (route) => {
+      const [identityId, credentials] = [...catalogs.entries()][0] ?? [];
+
+      if (!identityId || !credentials) return await route.fallback();
+      await route.fulfill({
+        json: { credentials: [...credentials], identityId },
+      });
+    },
+  );
+}
+
 test('a member removed from a group conversation stops reading it', async ({
   browser,
 }) => {
@@ -163,7 +209,7 @@ test('a member removed from a group conversation stops reading it', async ({
 test('both devices of an identity read a group; a revoked one stops reading', async ({
   browser,
 }) => {
-  test.setTimeout(1_200_000);
+  test.setTimeout(1_800_000);
   const suffix = Date.now().toString(36);
   const password = `P455uruD3su!${suffix}`;
   const groupName = `Group ${suffix}`;
@@ -175,7 +221,9 @@ test('both devices of an identity read a group; a revoked one stops reading', as
   const alice = await newIsolatedPage(browser);
   const phone = await newIsolatedPage(browser);
   const laptop = await newIsolatedPage(browser);
+  const tablet = await newIsolatedPage(browser);
   const reconciled: string[] = [];
+  const catalogs = recordDeviceCatalogs([phone, laptop]);
 
   // The phone, holding Bob's first leaf, adds and removes his other leaves.
   phone.on('console', (message) => {
@@ -247,9 +295,32 @@ test('both devices of an identity read a group; a revoked one stops reading', as
       phone.getByText('after the reload', { exact: true }),
     ).toBeVisible({ timeout: SLOW });
     await expect(laptop.getByText('after the reload')).toHaveCount(0);
+
+    // A tablet paired after the revoke gets its leaf in the real group from
+    // the phone.
+    await pairNewDevice(phone, tablet, bob);
+    await openGroup(tablet, groupName);
+    await sendUntilEveryoneReads(alice, [phone, tablet], 'to the tablet');
+
+    // The revoked laptop makes a look-alike group with Alice and, believing
+    // itself still listed, tries to pull the tablet in. The tablet replays
+    // Bob's signed transitions, in which the laptop is revoked, so the
+    // laptop can never welcome it and the laptop's messages never show.
+    const lookAlike = `${groupName} again`;
+
+    await listEveryDeviceEverSeen(laptop, catalogs);
+    await createGroup(laptop, lookAlike, [`al${suffix}`]);
+    await openGroup(laptop, lookAlike);
+    for (let round = 1; round <= 4; round += 1) {
+      await sendMessage(laptop, `look-alike #${round}`);
+      await laptop.waitForTimeout(45_000);
+    }
+    await expect(tablet.getByText(/^look-alike #/)).toHaveCount(0);
+    await expect(phone.getByText(/^look-alike #/)).toHaveCount(0);
   } finally {
     await alice.context().close();
     await phone.context().close();
     await laptop.context().close();
+    await tablet.context().close();
   }
 });

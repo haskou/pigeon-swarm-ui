@@ -63,6 +63,8 @@ let roster: Set<string>;
 let letters: Map<string, NotificationResource[]>;
 /** The device credentials the node lists for each identity. */
 let listed: Map<string, string[]>;
+/** The device credentials each identity's signed transitions authorize. */
+let verified: Map<string, string[]>;
 let local: Map<string, string>;
 let inboxes: Map<
   string,
@@ -231,7 +233,8 @@ const device = (storage: string): GroupConversationMailbox =>
     channel,
     client: wire,
     composer: composer(),
-    devices: (owner) => Promise.resolve(listed.get(owner.identity.id) ?? []),
+    verifiedDevices: (owner) =>
+      Promise.resolve(verified.get(owner.identity.id) ?? []),
     direct: (from) => ({
       send: (conversationId, peer, plaintext) =>
         post(from, conversationId, peer, plaintext),
@@ -275,10 +278,12 @@ const person = async (of?: Member): Promise<Member> => {
     keyPair,
   } as unknown as Session;
 
-  listed.set(id, [
-    ...(listed.get(id) ?? []),
-    deviceKeyPair.toPrimitives().publicKey,
-  ]);
+  for (const devicesOf of [listed, verified]) {
+    devicesOf.set(id, [
+      ...(devicesOf.get(id) ?? []),
+      deviceKeyPair.toPrimitives().publicKey,
+    ]);
+  }
 
   return {
     changes: [],
@@ -391,6 +396,7 @@ beforeEach(async () => {
   memoryStorage();
   letters = new Map();
   listed = new Map();
+  verified = new Map();
   now = NOW;
   roster = new Set();
   laptop = undefined;
@@ -874,15 +880,38 @@ describe('GroupConversationMailbox', () => {
     info.mockRestore();
   });
 
+  it('never asks a device only the node lists for a key package', async () => {
+    const info = jest
+      .spyOn(console, 'info')
+      .mockImplementation(() => undefined);
+    await formGroup();
+    const nodeOnly = (await KeyPair.generate()).toPrimitives().publicKey;
+    const before = letters.get(bob.id)?.length ?? 0;
+
+    listed.set(bob.id, [...(listed.get(bob.id) ?? []), nodeOnly]);
+    await settle(
+      bob.mailbox.membersChanged(bob.session, CONVERSATION),
+      everyone(),
+    );
+
+    expect(letters.get(bob.id)?.length ?? 0).toBe(before);
+    expect(info).not.toHaveBeenCalledWith(
+      'Group devices reconciled: removed 0, added 1.',
+    );
+    info.mockRestore();
+  });
+
   it('cuts a revoked device off what is sent after the revoke', async () => {
     const info = jest
       .spyOn(console, 'info')
       .mockImplementation(() => undefined);
     const second = await formGroupWithLaptop();
 
-    listed.set(bob.id, [
-      bob.session.deviceCredentialKeyPair.toPrimitives().publicKey,
-    ]);
+    for (const devicesOf of [listed, verified]) {
+      devicesOf.set(bob.id, [
+        bob.session.deviceCredentialKeyPair.toPrimitives().publicKey,
+      ]);
+    }
     bob.session = {
       ...bob.session,
       deviceSealedRootKey: { getBuffer: () => Buffer.alloc(32, 200) },
