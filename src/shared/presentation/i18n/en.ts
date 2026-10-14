@@ -1376,8 +1376,6 @@ export const en = {
     discardChangesBody:
       'There are unsaved changes. Do you want to discard them?',
     edit: 'Edit profile',
-    encryptedMasterKey: 'Encrypted master key',
-    encryptedPrivateKey: 'Encrypted private key',
     forgetDevice: 'Log out and forget this device',
     forgetDeviceConfirm:
       'Access for this device is revoked on your account, the local unlock is removed from this browser, and you are signed out. Signing in here again needs your recovery key or a device pairing from a signed-in device.',
