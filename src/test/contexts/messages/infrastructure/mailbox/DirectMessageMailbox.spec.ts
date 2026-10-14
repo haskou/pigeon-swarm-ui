@@ -1584,6 +1584,117 @@ describe(DirectMessageMailbox.name, () => {
       ).toEqual(['message-1']);
     });
 
+    it('keeps showing later pages while a page it cannot store holds the acknowledgement, then stores them in order', async () => {
+      await new DirectMessageHistoryStore().forget('alice');
+      const { channel, mailbox, store } = setup();
+      const keys = keysFor('alice');
+      const removal: DirectDeletedRecord = {
+        authorId: 'alice',
+        conversationId,
+        createdAt: 400,
+        id: 'delete-1',
+        targetMessageId: 'message-1',
+        type: 'deleted',
+      };
+      const pages = new Map([
+        [0, { ...pageWith(ownEncode(storedRecord), 1), hasMore: true }],
+        [
+          1,
+          {
+            ...pageWith(
+              ownEncode({ ...storedRecord, createdAt: 200, id: 'message-2' }),
+              2,
+            ),
+            hasMore: true,
+          },
+        ],
+        [2, pageWith(ownEncode(removal), 3)],
+      ]);
+      channel.read.mockImplementation((_keys, _readers, after) =>
+        Promise.resolve(
+          pages.get(after) ?? {
+            envelopes: [],
+            hasMore: false,
+            lastCursor: after,
+            recreated: false,
+          },
+        ),
+      );
+      channel.acknowledge.mockResolvedValue({ recreated: false });
+      // Only the first page does not fit, as when it is the largest one.
+      let full = true;
+      const append = DirectMessageHistoryStore.prototype.append;
+      const quota = jest
+        .spyOn(DirectMessageHistoryStore.prototype, 'append')
+        .mockImplementation(function (
+          this: DirectMessageHistoryStore,
+          ...args
+        ) {
+          return full &&
+            args[2].some(({ recordId }) => recordId === 'message-1')
+            ? Promise.reject(new DirectMessageHistoryStorageError())
+            : append.apply(this, args);
+        });
+      const summary = (changes: DirectMessageTimelineChange[]): string[] =>
+        changes.map((change) =>
+          change.kind === 'message'
+            ? `message:${change.message.id}`
+            : `${change.kind}:${'messageId' in change ? change.messageId : ''}`,
+        );
+      const shown = jest.fn<void, [DirectMessageTimelineChange[]]>();
+      const pass = (): Promise<void> =>
+        mailbox.sync(
+          session('alice'),
+          conversationId,
+          new AbortController().signal,
+          shown,
+        );
+
+      try {
+        await expect(pass()).rejects.toBeInstanceOf(
+          DirectMessageHistoryStorageError,
+        );
+        await expect(pass()).rejects.toBeInstanceOf(
+          DirectMessageHistoryStorageError,
+        );
+
+        expect(summary(shown.mock.calls.flat(2))).toEqual([
+          'message:message-1',
+          'message:message-2',
+          'removed:message-1',
+        ]);
+        expect(channel.acknowledge).not.toHaveBeenCalled();
+        expect(store.load(keys.mailboxId)).toEqual({ cursor: 0 });
+
+        full = false;
+        shown.mockClear();
+        await pass();
+        await pass();
+        await pass();
+      } finally {
+        quota.mockRestore();
+      }
+
+      expect(shown.mock.calls.flat(2)).toEqual([]);
+      expect(channel.acknowledge.mock.calls.map(([, , upTo]) => upTo)).toEqual([
+        1, 2, 3,
+      ]);
+      expect(store.load(keys.mailboxId)).toEqual({ cursor: 3 });
+
+      const restored = jest.fn<void, [DirectMessageTimelineChange[]]>();
+      await setup().mailbox.restore(
+        session('alice'),
+        conversationId,
+        new AbortController().signal,
+        restored,
+      );
+      expect(summary(restored.mock.calls.flat(2))).toEqual([
+        'message:message-1',
+        'message:message-2',
+        'removed:message-1',
+      ]);
+    });
+
     it('creates the root reader for a new inbox, enrols this device reader, and stores only the cursor', async () => {
       const { channel, mailbox, store } = setup();
       channel.read.mockResolvedValue({
