@@ -87,7 +87,7 @@ const served = (
 
   return structuredClone(entry.served);
 };
-const [retirement, recovery] = fixture.logs;
+const [retirement, recovery, lostRecoveries] = fixture.logs;
 const retired = served(retirement, 'the retired device proves its removal');
 const [enrollment, removal] = retired.transitions;
 
@@ -157,6 +157,24 @@ describe(DeviceRemovalDomainService.name, () => {
       ),
     )('%s', (_, entry) => {
       expect(verdictOf(entry)).toBe(entry.removedBy);
+    });
+
+    it('proves a removal behind lost recoveries served newest first', () => {
+      const name =
+        'a pre-recovery device proves the winning recovery removed it';
+      const newestFirst = served(lostRecoveries, name);
+
+      newestFirst.concurrentRecoveries.reverse();
+
+      expect(
+        verdictOf({
+          local: { epoch: 'genesis', revision: 3 },
+          name,
+          reader: 'author',
+          removedBy: null,
+          served: newestFirst,
+        }),
+      ).toBe(newestFirst.recoveries[0].operationId);
     });
   });
 
