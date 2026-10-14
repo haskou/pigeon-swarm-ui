@@ -615,7 +615,12 @@ describe(PigeonIdentitySessionApi.name, () => {
     const deviceAuthorization = {
       synchronize: jest
         .fn()
-        .mockRejectedValue(new DeviceRemovedError(currentIdentity.id)),
+        .mockRejectedValue(
+          new DeviceRemovedError(
+            currentIdentity.id,
+            '5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a51',
+          ),
+        ),
     } as unknown as PigeonDeviceAuthorizationApi;
     const unlock = new PigeonIdentitySessionApi(
       identities,

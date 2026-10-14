@@ -14,24 +14,21 @@ describe('device removed copy', () => {
     );
   });
 
-  it('says that the messages saved on this browser stay until the user erases them', () => {
-    expect(en.auth.deviceRemovedHelp).toContain(
-      'The messages saved on this browser stay until you erase them.',
-    );
-    expect(es.auth.deviceRemovedHelp).toContain(
-      'Los mensajes guardados en este navegador se conservan hasta que los borres.',
-    );
-    expect(en.auth.deviceRemovedHelp).not.toMatch(/were erased/i);
-    expect(es.auth.deviceRemovedHelp).not.toMatch(/se han borrado/i);
+  it('says that this browser erased what it saved for the identity', () => {
+    expect(en.auth.deviceRemovedHelp).toMatch(/were erased/i);
+    expect(es.auth.deviceRemovedHelp).toMatch(/se han borrado/i);
   });
 
-  it('offers re-pairing, a local start over and an erase retry in both languages', () => {
+  it('offers re-pairing and an erase retry in both languages', () => {
     for (const copy of [en.auth, es.auth]) {
-      expect(copy.deviceRemovedHelp.length).toBeGreaterThan(0);
       expect(copy.deviceRemovedEraseFailed.length).toBeGreaterThan(0);
       expect(copy.deviceRemovedPair.length).toBeGreaterThan(0);
-      expect(copy.deviceRemovedStartOver.length).toBeGreaterThan(0);
     }
+  });
+
+  it('tells the user when a node cannot prove this device is still authorized', () => {
+    expect(en.auth.deviceAuthorizationUnproven).toMatch(/another node/i);
+    expect(es.auth.deviceAuthorizationUnproven).toMatch(/otro nodo/i);
   });
 
   it('shows no request, signature, or credential details', () => {

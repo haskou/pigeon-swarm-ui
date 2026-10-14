@@ -1,6 +1,11 @@
-import { KeyPair, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
-import { Timestamp } from '@haskou/value-objects';
+import { KeyPair, SHA256Hash, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import { StringValueObject, Timestamp } from '@haskou/value-objects';
+import { mock } from 'jest-mock-extended';
 
+import type { DeviceAuthorizationTransitionLogPrimitives } from '../../../../../contexts/identities/domain/DeviceAuthorizationTransitionLogPrimitives';
+import type { DeviceAuthorizationTransitionPrimitives } from '../../../../../contexts/identities/domain/DeviceAuthorizationTransitionPrimitives';
+import type { IdentityResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
+import type { LocalKeychain } from '../../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { DeviceIdentityVault } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVault';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
@@ -19,8 +24,18 @@ import { IdentityPassword } from '../../../../../contexts/identities/domain/valu
 import { PairingId } from '../../../../../contexts/identities/domain/value-objects/PairingId';
 import { RecoveryKey } from '../../../../../contexts/identities/domain/value-objects/RecoveryKey';
 import { RecoveryIdentityMaterial } from '../../../../../contexts/identities/infrastructure/crypto/RecoveryIdentityMaterial';
+import { IdentitySignaturePayloadFactory } from '../../../../../contexts/identities/infrastructure/http/IdentitySignaturePayloadFactory';
 import { PigeonDeviceAuthorizationApi } from '../../../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
+import { copy } from '../../../../../shared/presentation/i18n/copy';
+
+function rejectionOf(status: number, code: number): HttpJsonError {
+  return new HttpJsonError(
+    status,
+    'Rejected',
+    `{"code":${code},"message":"Rejected."}`,
+  );
+}
 
 describe(PigeonDeviceAuthorizationApi.name, () => {
   async function fixture() {
@@ -926,148 +941,362 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
     });
   });
 
-  describe('synchronize on a device the node may have removed', () => {
-    const rejection = (code: number) =>
-      new HttpJsonError(
-        401,
-        'Unauthorized',
-        `{"code":${code},"message":"Invalid signed request."}`,
-      );
+  describe('synchronize from the signed transition log', () => {
     const failureOf = async (promise: Promise<unknown>): Promise<unknown> =>
       promise.then(
         () => undefined,
         (error: unknown) => error,
       );
 
+    async function publish(
+      identityKeyPair: KeyPair,
+      input: { deviceCredential: string; recoveryAuthority: string },
+    ): Promise<IdentityResource> {
+      const unsigned = await new IdentitySignaturePayloadFactory(
+        () => undefined,
+      ).createInitial({
+        deviceCredential: input.deviceCredential,
+        deviceCredentialCommitment: SHA256Hash.from(
+          new StringValueObject(input.deviceCredential),
+        ).valueOf(),
+        id: identityKeyPair.toPrimitives().publicKey,
+        networks: [],
+        profile: { name: 'Ada' },
+        recoveryAuthority: input.recoveryAuthority,
+        timestamp: 1,
+      });
+
+      return {
+        ...unsigned,
+        signature: identityKeyPair.sign(JSON.stringify(unsigned)).toString(),
+      };
+    }
+
+    /**
+     * The genesis device enrolls the laptop at revision 0 and the laptop
+     * synchronizes from its verified revision 1.
+     */
     async function synchronizing() {
-      const { identityId, session } = await fixture();
-      const http = { request: jest.fn() } as unknown as HttpJsonClient;
-      const signer = {
-        headersWithDeviceProof: jest
-          .fn()
-          .mockResolvedValue({ 'X-Device-Signature': 'device-signed' }),
-        headersWithRecoveryProof: jest
-          .fn()
-          .mockResolvedValue({ 'X-Recovery-Signature': 'recovery-signed' }),
-      } as unknown as RequestSigner;
-      const vault = {
-        synchronizeAuthorization: jest.fn(),
-      } as unknown as DeviceIdentityVault;
+      const identityKeyPair = await KeyPair.generate();
+      const identityId = IdentityId.fromString(
+        identityKeyPair.toPrimitives().publicKey,
+      );
+      const genesisDevice = await KeyPair.generate();
+      const laptop = await KeyPair.generate();
+      const recoveryAuthorityKeyPair = await KeyPair.generate();
+      const epoch = DeviceAuthorizationEpoch.genesis();
+      const identity = await publish(identityKeyPair, {
+        deviceCredential: genesisDevice.toPrimitives().publicKey,
+        recoveryAuthority: recoveryAuthorityKeyPair.toPrimitives().publicKey,
+      });
+      const enrollment = DeviceAuthorizationTransition.enrollment({
+        author: genesisDevice,
+        authorizedAt: new Timestamp(100),
+        epoch,
+        identityId,
+        operationId: DeviceAuthorizationOperationId.generate(),
+        pairingExpiration: new Timestamp(200),
+        pairingId: PairingId.generate(),
+        previousRevision: DeviceAuthorizationRevision.initial(),
+        target: laptop,
+      });
+      const removalBy = (author: KeyPair): DeviceAuthorizationTransition =>
+        DeviceAuthorizationTransition.revocation({
+          author,
+          epoch,
+          identityId,
+          operationId: DeviceAuthorizationOperationId.generate(),
+          previousRevision: DeviceAuthorizationRevision.fromNumber(1),
+          targetCredential: DeviceCredential.fromString(
+            laptop.toPrimitives().publicKey,
+          ),
+        });
+      const session: Session = {
+        authorizationEpoch: epoch,
+        authorizationRevision: DeviceAuthorizationRevision.fromNumber(1),
+        deviceCredentialKeyPair: laptop,
+        deviceId: DeviceId.generate(),
+        identity,
+        keychain: mock<LocalKeychain>(),
+        keyPair: identityKeyPair,
+        masterKey: SymmetricKey.generate(),
+        recoveryAuthorityKeyPair,
+      };
+      const http = mock<HttpJsonClient>();
+      const signer = mock<RequestSigner>();
+      const vault = mock<DeviceIdentityVault>();
+      const logOf = (
+        transitions: DeviceAuthorizationTransitionPrimitives[],
+      ): DeviceAuthorizationTransitionLogPrimitives => ({
+        concurrentRecoveries: [],
+        identityId: identityId.valueOf(),
+        recoveries: [],
+        transitions,
+      });
+
+      signer.headersWithDeviceProof.mockResolvedValue({
+        'X-Device-Signature': 'device-signed',
+      });
 
       return {
         api: new PigeonDeviceAuthorizationApi(http, signer, vault),
-        http: http.request as jest.Mock,
+        enrollment,
+        genesisDevice,
+        http,
         identityId,
+        identityKeyPair,
+        laptop,
+        logOf,
+        path: `/identity-devices/${encodeURIComponent(identityId.valueOf())}/transitions`,
+        removalBy,
         session,
         signer,
         vault,
       };
     }
 
-    it('reports the device as removed when the node rejects it and the recovery catalog no longer lists it', async () => {
-      const other = await KeyPair.generate();
-      const { api, http, identityId, session, signer, vault } =
-        await synchronizing();
+    it('reports a removal the genesis device signed above the local revision', async () => {
+      const {
+        api,
+        enrollment,
+        genesisDevice,
+        http,
+        identityId,
+        logOf,
+        path,
+        removalBy,
+        session,
+        signer,
+        vault,
+      } = await synchronizing();
+      const removal = removalBy(genesisDevice);
 
-      http.mockRejectedValueOnce(rejection(401020)).mockResolvedValueOnce({
-        credentials: [
-          IdentityId.fromString(other.toPrimitives().publicKey).valueOf(),
-        ],
-        epoch: 'genesis',
-        identityId: identityId.valueOf(),
-        revision: 3,
-      });
+      http.request.mockResolvedValueOnce(
+        logOf([enrollment.toPrimitives(), removal.toPrimitives()]),
+      );
 
       const failure = await failureOf(api.synchronize(session));
 
       expect(failure).toBeInstanceOf(DeviceRemovedError);
-      expect((failure as DeviceRemovedError).identityId).toBe(
-        identityId.valueOf(),
-      );
-      expect(signer.headersWithRecoveryProof).toHaveBeenCalledWith(
+      expect(failure).toMatchObject({
+        identityId: identityId.valueOf(),
+        operationId: removal.getOperationId().valueOf(),
+      });
+      expect(signer.headersWithDeviceProof).toHaveBeenCalledWith(
         session,
         'GET',
-        `/identity-devices/${encodeURIComponent(identityId.valueOf())}/devices`,
+        path,
       );
+      expect(http.request).toHaveBeenCalledWith(path, {
+        headers: { 'X-Device-Signature': 'device-signed' },
+        method: 'GET',
+      });
       expect(vault.synchronizeAuthorization).not.toHaveBeenCalled();
     });
 
-    it('keeps the rejection when the recovery catalog still lists this device', async () => {
-      const { api, http, identityId, session } = await synchronizing();
-      const own = session.deviceCredentialKeyPair.toPrimitives().publicKey;
-
-      http.mockRejectedValueOnce(rejection(401020)).mockResolvedValueOnce({
-        credentials: [IdentityId.fromString(own).valueOf()],
-        epoch: 'genesis',
-        identityId: identityId.valueOf(),
-        revision: 3,
+    it('advances the local authorization to a verified head that still authorizes this device', async () => {
+      const {
+        api,
+        enrollment,
+        http,
+        identityId,
+        laptop,
+        logOf,
+        session,
+        vault,
+      } = await synchronizing();
+      const later = DeviceAuthorizationTransition.enrollment({
+        author: laptop,
+        authorizedAt: new Timestamp(300),
+        epoch: session.authorizationEpoch,
+        identityId,
+        operationId: DeviceAuthorizationOperationId.generate(),
+        pairingExpiration: new Timestamp(400),
+        pairingId: PairingId.generate(),
+        previousRevision: DeviceAuthorizationRevision.fromNumber(1),
+        target: await KeyPair.generate(),
       });
 
-      const error = await failureOf(api.synchronize(session));
-
-      expect(error).toBeInstanceOf(HttpJsonError);
-      expect(error).not.toBeInstanceOf(DeviceRemovedError);
-    });
-
-    it('keeps the rejection when the recovery check cannot reach the node', async () => {
-      const { api, http, session } = await synchronizing();
-
-      http
-        .mockRejectedValueOnce(rejection(401020))
-        .mockRejectedValueOnce(new TypeError('fetch failed'));
-
-      const error = await failureOf(api.synchronize(session));
-
-      expect(error).toBeInstanceOf(HttpJsonError);
-      expect(error).not.toBeInstanceOf(DeviceRemovedError);
-    });
-
-    it('keeps the rejection when the recovery check is rejected as well', async () => {
-      const { api, http, session } = await synchronizing();
-
-      http
-        .mockRejectedValueOnce(rejection(401020))
-        .mockRejectedValueOnce(rejection(401020));
-
-      const error = await failureOf(api.synchronize(session));
-
-      expect(error).toBeInstanceOf(HttpJsonError);
-      expect(error).not.toBeInstanceOf(DeviceRemovedError);
-    });
-
-    it('does not treat another 401 code as removal', async () => {
-      const { api, http, session } = await synchronizing();
-
-      http.mockRejectedValueOnce(rejection(401021));
-
-      const error = await failureOf(api.synchronize(session));
-
-      expect(error).not.toBeInstanceOf(DeviceRemovedError);
-      expect(http).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not treat a dropped connection on the checkpoint read as removal', async () => {
-      const { api, http, session } = await synchronizing();
-
-      http.mockRejectedValueOnce(new TypeError('fetch failed'));
-
-      const error = await failureOf(api.synchronize(session));
-
-      expect(error).not.toBeInstanceOf(DeviceRemovedError);
-      expect(http).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not treat a server error on the checkpoint read as removal', async () => {
-      const { api, http, session } = await synchronizing();
-
-      http.mockRejectedValueOnce(
-        new HttpJsonError(503, 'Service Unavailable', ''),
+      http.request.mockResolvedValueOnce(
+        logOf([enrollment.toPrimitives(), later.toPrimitives()]),
       );
 
-      const error = await failureOf(api.synchronize(session));
+      const synchronized = await api.synchronize(session);
 
-      expect(error).not.toBeInstanceOf(DeviceRemovedError);
-      expect(http).toHaveBeenCalledTimes(1);
+      expect(synchronized.authorizationRevision.valueOf()).toBe(2);
+      expect(vault.synchronizeAuthorization).toHaveBeenCalledWith(
+        identityId,
+        session.authorizationRevision,
+        session.authorizationEpoch,
+        synchronized.authorizationRevision,
+      );
+    });
+
+    it('keeps a device the node withholds the revocation from: a node can only delay the removal', async () => {
+      const { api, enrollment, http, logOf, session } = await synchronizing();
+
+      http.request.mockResolvedValueOnce(logOf([enrollment.toPrimitives()]));
+
+      const synchronized = await api.synchronize(session);
+
+      expect(synchronized.authorizationRevision.valueOf()).toBe(1);
+    });
+
+    describe('never reports a removal the log does not prove', () => {
+      const unprovenBy = async (
+        served: (context: Awaited<ReturnType<typeof synchronizing>>) => unknown,
+        session?: (
+          context: Awaited<ReturnType<typeof synchronizing>>,
+        ) => Promise<Session>,
+      ): Promise<void> => {
+        const context = await synchronizing();
+
+        context.http.request.mockResolvedValueOnce(served(context));
+
+        const failure = await failureOf(
+          context.api.synchronize(
+            session ? await session(context) : context.session,
+          ),
+        );
+
+        expect(failure).not.toBeInstanceOf(DeviceRemovedError);
+        expect(failure).toEqual(
+          new Error(copy.auth.deviceAuthorizationUnproven),
+        );
+        expect(context.vault.synchronizeAuthorization).not.toHaveBeenCalled();
+      };
+
+      it('rejects a removal carrying another transition signature', async () => {
+        await unprovenBy(({ enrollment, genesisDevice, logOf, removalBy }) =>
+          logOf([
+            enrollment.toPrimitives(),
+            {
+              ...removalBy(genesisDevice).toPrimitives(),
+              signature: enrollment.toPrimitives().signature,
+            },
+          ]),
+        );
+      });
+
+      it('rejects an unsigned removal', async () => {
+        await unprovenBy(({ enrollment, genesisDevice, logOf, removalBy }) => {
+          const unsigned = removalBy(genesisDevice).toPrimitives();
+
+          Reflect.deleteProperty(unsigned, 'signature');
+
+          return {
+            ...logOf([enrollment.toPrimitives()]),
+            transitions: [enrollment.toPrimitives(), unsigned],
+          };
+        });
+      });
+
+      it('rejects a removal at or below the local revision', async () => {
+        await unprovenBy(
+          ({ enrollment, genesisDevice, logOf, removalBy }) =>
+            logOf([
+              enrollment.toPrimitives(),
+              removalBy(genesisDevice).toPrimitives(),
+            ]),
+          ({ session }) =>
+            Promise.resolve({
+              ...session,
+              authorizationRevision: DeviceAuthorizationRevision.fromNumber(2),
+            }),
+        );
+      });
+
+      it('rejects a removal signed by a key that was never authorized', async () => {
+        const attacker = await KeyPair.generate();
+
+        await unprovenBy(({ enrollment, logOf, removalBy }) =>
+          logOf([
+            enrollment.toPrimitives(),
+            removalBy(attacker).toPrimitives(),
+          ]),
+        );
+      });
+
+      it('rejects a log served for another identity', async () => {
+        const other = await KeyPair.generate();
+
+        await unprovenBy(({ enrollment, genesisDevice, logOf, removalBy }) => ({
+          ...logOf([
+            enrollment.toPrimitives(),
+            removalBy(genesisDevice).toPrimitives(),
+          ]),
+          identityId: IdentityId.fromString(
+            other.toPrimitives().publicKey,
+          ).valueOf(),
+        }));
+      });
+
+      it('rejects a genesis the identity key did not sign', async () => {
+        const attacker = await KeyPair.generate();
+
+        await unprovenBy(
+          ({ enrollment, logOf, removalBy }) =>
+            logOf([
+              enrollment.toPrimitives(),
+              removalBy(attacker).toPrimitives(),
+            ]),
+          ({ session }) =>
+            Promise.resolve({
+              ...session,
+              identity: {
+                ...session.identity,
+                deviceCredential: attacker.toPrimitives().publicKey,
+                deviceCredentialCommitment: SHA256Hash.from(
+                  new StringValueObject(attacker.toPrimitives().publicKey),
+                ).valueOf(),
+              },
+            }),
+        );
+      });
+
+      it('rejects an identity record naming another recovery authority', async () => {
+        await unprovenBy(
+          ({ enrollment, genesisDevice, logOf, removalBy }) =>
+            logOf([
+              enrollment.toPrimitives(),
+              removalBy(genesisDevice).toPrimitives(),
+            ]),
+          async ({ genesisDevice, identityKeyPair, session }) => ({
+            ...session,
+            identity: await publish(identityKeyPair, {
+              deviceCredential: genesisDevice.toPrimitives().publicKey,
+              recoveryAuthority: (await KeyPair.generate()).toPrimitives()
+                .publicKey,
+            }),
+          }),
+        );
+      });
+
+      it('rejects a malformed log', async () => {
+        await unprovenBy(({ identityId }) => ({
+          identityId: identityId.valueOf(),
+          transitions: 'removed',
+        }));
+      });
+    });
+
+    it.each([
+      ['a rejected device signature', rejectionOf(401, 401020)],
+      ['an unknown identity', rejectionOf(404, 404001)],
+      ['a conflict', rejectionOf(409, 409001)],
+      [
+        'an unavailable node',
+        new HttpJsonError(503, 'Service Unavailable', ''),
+      ],
+      ['a dropped connection', new TypeError('fetch failed')],
+    ])('propagates %s unchanged and never as a removal', async (_, error) => {
+      const { api, http, session, vault } = await synchronizing();
+
+      http.request.mockRejectedValueOnce(error);
+
+      await expect(api.synchronize(session)).rejects.toBe(error);
+      expect(http.request).toHaveBeenCalledTimes(1);
+      expect(vault.synchronizeAuthorization).not.toHaveBeenCalled();
     });
   });
 });
