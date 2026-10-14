@@ -16,15 +16,20 @@ import {
 // every 15 s and group messages every 5 s, so an add takes several rounds.
 const SLOW = 240_000;
 
+/**
+ * Add does nothing until the lookup shows its preview, and the handle may
+ * already show elsewhere on the page, so Add is clicked until it takes.
+ */
 async function addGroupParticipant(page: Page, handle: string): Promise<void> {
   const lookup = page.getByPlaceholder('@user or public ID');
 
   await lookup.fill(`@${handle}`);
-  await expect(page.getByText(`@${handle}`, { exact: true })).toBeVisible({
-    timeout: 45_000,
-  });
-  await page.getByRole('button', { exact: true, name: 'Add' }).click();
-  await expect(lookup).toHaveValue('');
+  await expect(async () => {
+    await page
+      .getByRole('button', { exact: true, name: 'Add' })
+      .click({ timeout: 5_000 });
+    await expect(lookup).toHaveValue('', { timeout: 2_000 });
+  }).toPass({ timeout: 45_000 });
 }
 
 async function createGroup(
@@ -251,8 +256,8 @@ test('both devices of an identity read a group; a revoked one stops reading', as
 
     // A tablet paired after the revoke gets its leaf in the real group from
     // the phone. The revoked laptop is signed out and wiped by its own
-    // removal check by now, so a welcome from it is refused only in
-    // GroupMailboxMlsEngine.spec and GroupConversationMailbox.spec.
+    // removal check by now; a welcome it sent before the revoke is refused
+    // in the test below.
     await pairNewDevice(phone, tablet, bob);
     await openGroup(tablet, groupName);
     await sendUntilEveryoneReads(alice, [phone, tablet], 'to the tablet');
@@ -261,5 +266,105 @@ test('both devices of an identity read a group; a revoked one stops reading', as
     await phone.context().close();
     await laptop.context().close();
     await tablet.context().close();
+  }
+});
+
+/**
+ * A revoked device's own client refuses to welcome its siblings (its gate
+ * finds it outside the verified set) and wipes itself on its next removal
+ * check, so the refusal a sibling makes is reached by a welcome sent before
+ * the revoke and read after it. The phone answers the laptop's key package
+ * request, then reads no control letters until the laptop is revoked.
+ */
+test('a welcome read after the device that sent it was revoked is refused', async ({
+  browser,
+}) => {
+  test.setTimeout(1_800_000);
+  const suffix = Date.now().toString(36);
+  const password = `P455uruD3su!${suffix}`;
+  const groupName = `Laptop group ${suffix}`;
+  const bob: TestIdentity = {
+    handle: `bo${suffix}`,
+    name: `Bob ${suffix}`,
+    password,
+  };
+  const alice = await newIsolatedPage(browser);
+  const phone = await newIsolatedPage(browser);
+  const laptop = await newIsolatedPage(browser);
+  const reconciled: string[] = [];
+  let rejected = 0;
+  let answering = false;
+  let holding = false;
+
+  laptop.on('console', (message) => {
+    const text = message.text();
+
+    if (text.startsWith('Group devices reconciled:')) reconciled.push(text);
+  });
+  phone.on('console', (message) => {
+    if (message.text() === 'Group mailbox control record rejected.') {
+      rejected += 1;
+    }
+  });
+  // Control letters to and from the phone travel through /notifications/:
+  // its key package response is a POST, and after it every read comes back
+  // empty while holding, so the laptop's welcome waits on the node.
+  await phone.route(
+    (url) => url.pathname.endsWith('/notifications/'),
+    async (route) => {
+      const method = route.request().method();
+
+      if (answering && method === 'POST') holding = true;
+      if (holding && method === 'GET') {
+        await route.fulfill({ json: { results: [] } });
+
+        return;
+      }
+      await route.fallback();
+    },
+  );
+
+  try {
+    await registerIdentity(alice, {
+      handle: `al${suffix}`,
+      name: `Alice ${suffix}`,
+      password,
+    });
+    await registerIdentity(phone, bob);
+    await pairNewDevice(phone, laptop, bob);
+
+    // The laptop holds Bob's only leaf, so it asks the phone for a key
+    // package and welcomes it.
+    answering = true;
+    await createGroup(laptop, groupName, [`al${suffix}`]);
+    await openGroup(alice, groupName);
+    await openGroup(laptop, groupName);
+    await expect
+      .poll(() => reconciled, { timeout: SLOW * 2 })
+      .toContain('Group devices reconciled: removed 0, added 1.');
+    expect(holding).toBe(true);
+    expect(rejected).toBe(0);
+
+    await revokeOtherDevice(phone);
+    await phone.getByRole('button', { name: 'Close dialog' }).last().click();
+    await loginIdentity(phone, `@${bob.handle}`, password);
+    holding = false;
+    answering = false;
+
+    // The welcome is signed by a leaf the transitions no longer authorize.
+    await expect.poll(() => rejected, { timeout: SLOW }).toBeGreaterThan(0);
+
+    // Alice and the phone's own leaf stay in the epoch the welcome opened,
+    // so anything Alice sends now the phone would read had it joined.
+    await sendMessage(alice, 'after the refused welcome');
+    await phone.waitForTimeout(60_000);
+    const row = conversationRow(phone, groupName);
+
+    if ((await row.count()) > 0) await row.first().click();
+    await expect(phone.getByText('after the refused welcome')).toHaveCount(0);
+  } finally {
+    await alice.context().close();
+    await phone.context().close();
+    await laptop.context().close();
   }
 });

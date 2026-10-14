@@ -68,7 +68,9 @@ which joins the group through its own leaf without a re-invite, so both
 devices read the group and the second device's message reaches the others
 once; after the first device revokes it, a commit removes its leaf, it never
 shows a message sent after the revoke, and the remaining device keeps reading
-after a reload) run against a real node. Login,
+after a reload; and a welcome a laptop sent its phone, read by the phone only
+after the laptop was revoked, is refused and nothing sent later shows on the
+phone) run against a real node. Login,
 direct-message sync, the outbox spec and the security audit run on
 `desktop-chromium`, `desktop-firefox` and `mobile-chromium`; the call, revoke,
 community kick and group conversation specs run on `desktop-chromium`. On
