@@ -715,4 +715,42 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
       DirectMessageInboxKeys.readersFor(bob.session, keys).root,
     );
   });
+
+  it('sends, receives and reloads a 500-message page (benchmark)', async () => {
+    const count = 500;
+    const timed = async (work: () => Promise<unknown>): Promise<number> => {
+      const started = performance.now();
+
+      await work();
+
+      return Math.round(performance.now() - started);
+    };
+    const sendMs = await timed(async () => {
+      for (let index = 0; index < count; index += 1) {
+        await send(alice, sent('alice', mid('alice', `bench-${index}`)));
+      }
+    });
+    const receiveMs = await timed(() => sync(bob));
+    const store = new GroupMessageHistoryStore(bob.history);
+    let page: DirectMessageRecord[] = [];
+    const coldMs = await timed(async () => {
+      page = await store.load(bob.session, CONVERSATION, count);
+    });
+    const decrypt = jest.spyOn(crypto.subtle, 'decrypt');
+    const warmMs = await timed(() =>
+      store.load(bob.session, CONVERSATION, count),
+    );
+
+    expect(bob.received).toHaveLength(count);
+    expect(page).toHaveLength(count);
+    expect(decrypt).not.toHaveBeenCalled();
+    // eslint-disable-next-line no-console
+    console.info('Group 500-message page (ms)', {
+      coldHistoryPage: coldMs,
+      receive: receiveMs,
+      send: sendMs,
+      warmHistoryPage: warmMs,
+    });
+    decrypt.mockRestore();
+  }, 300_000);
 });

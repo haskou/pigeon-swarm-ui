@@ -89,7 +89,7 @@ describe(MailboxChannel.name, () => {
     expect(Buffer.from(envelope.body, 'base64url').length).toBe(1024);
     expect(
       Buffer.from(
-        MailboxEnvelopeCipher.open(
+        await MailboxEnvelopeCipher.open(
           keys.envelopeKey,
           keys.mailboxId,
           envelope.envelopeId,
@@ -109,7 +109,7 @@ describe(MailboxChannel.name, () => {
     const first = await channel.send(keys, bytes('one'));
     const second = await channel.send(keys, bytes('two'));
     const forgedEnvelopeId = 'AAAAAAAAAAAAAAAAAAAAAA';
-    const forged = MailboxEnvelopeCipher.seal(
+    const forged = await MailboxEnvelopeCipher.seal(
       new Uint8Array(32).fill(9),
       keys.mailboxId,
       forgedEnvelopeId,

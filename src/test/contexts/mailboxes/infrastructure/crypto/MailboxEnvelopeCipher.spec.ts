@@ -28,8 +28,10 @@ describe(MailboxEnvelopeCipher.name, () => {
     );
   };
 
-  it('round-trips plaintext under the matching mailbox and envelope', () => {
-    const body = MailboxEnvelopeCipher.seal(
+  afterEach(() => jest.restoreAllMocks());
+
+  it('round-trips plaintext under the matching mailbox and envelope', async () => {
+    const body = await MailboxEnvelopeCipher.seal(
       envelopeKey,
       mailboxId,
       envelopeId,
@@ -38,13 +40,18 @@ describe(MailboxEnvelopeCipher.name, () => {
 
     expect(
       Buffer.from(
-        MailboxEnvelopeCipher.open(envelopeKey, mailboxId, envelopeId, body),
+        await MailboxEnvelopeCipher.open(
+          envelopeKey,
+          mailboxId,
+          envelopeId,
+          body,
+        ),
       ).toString('utf8'),
     ).toBe('hello');
   });
 
-  it('round-trips an empty plaintext', () => {
-    const body = MailboxEnvelopeCipher.seal(
+  it('round-trips an empty plaintext', async () => {
+    const body = await MailboxEnvelopeCipher.seal(
       envelopeKey,
       mailboxId,
       envelopeId,
@@ -52,7 +59,12 @@ describe(MailboxEnvelopeCipher.name, () => {
     );
 
     expect(
-      MailboxEnvelopeCipher.open(envelopeKey, mailboxId, envelopeId, body),
+      await MailboxEnvelopeCipher.open(
+        envelopeKey,
+        mailboxId,
+        envelopeId,
+        body,
+      ),
     ).toHaveLength(0);
   });
 
@@ -65,8 +77,8 @@ describe(MailboxEnvelopeCipher.name, () => {
     [65504, 65536],
   ])(
     'pads %i plaintext bytes to a %i byte bucket',
-    (plaintextLength, bucket) => {
-      const body = MailboxEnvelopeCipher.seal(
+    async (plaintextLength, bucket) => {
+      const body = await MailboxEnvelopeCipher.seal(
         envelopeKey,
         mailboxId,
         envelopeId,
@@ -77,19 +89,19 @@ describe(MailboxEnvelopeCipher.name, () => {
     },
   );
 
-  it('rejects plaintext larger than the largest bucket', () => {
-    expect(() =>
+  it('rejects plaintext larger than the largest bucket', async () => {
+    await expect(
       MailboxEnvelopeCipher.seal(
         envelopeKey,
         mailboxId,
         envelopeId,
         new Uint8Array(65505),
       ),
-    ).toThrow(MailboxEnvelopeError);
+    ).rejects.toThrow(MailboxEnvelopeError);
   });
 
-  it('matches an independent AES-256-GCM decryption of the wire layout', () => {
-    const body = MailboxEnvelopeCipher.seal(
+  it('matches an independent AES-256-GCM decryption of the wire layout', async () => {
+    const body = await MailboxEnvelopeCipher.seal(
       envelopeKey,
       mailboxId,
       envelopeId,
@@ -116,8 +128,57 @@ describe(MailboxEnvelopeCipher.name, () => {
     );
   });
 
-  it('rejects a tampered body', () => {
-    const body = MailboxEnvelopeCipher.seal(
+  it('opens a body sealed by an independent AES-256-GCM implementation', async () => {
+    const framed = Buffer.alloc(1024 - 12 - 16);
+
+    framed.writeUInt32BE(plaintext.length, 0);
+    framed.set(plaintext, 4);
+
+    expect(
+      Buffer.from(
+        await MailboxEnvelopeCipher.open(
+          envelopeKey,
+          mailboxId,
+          envelopeId,
+          sealWithNode(framed, `${mailboxId}.${envelopeId}`),
+        ),
+      ).toString('utf8'),
+    ).toBe('hello');
+  });
+
+  it('seals and opens through WebCrypto AES-256-GCM', async () => {
+    const importKey = jest.spyOn(crypto.subtle, 'importKey');
+    const encrypt = jest.spyOn(crypto.subtle, 'encrypt');
+    const decrypt = jest.spyOn(crypto.subtle, 'decrypt');
+    const aad = new TextEncoder().encode(`${mailboxId}.${envelopeId}`);
+
+    const body = await MailboxEnvelopeCipher.seal(
+      envelopeKey,
+      mailboxId,
+      envelopeId,
+      plaintext,
+    );
+
+    await MailboxEnvelopeCipher.open(envelopeKey, mailboxId, envelopeId, body);
+
+    expect(importKey).toHaveBeenCalledWith(
+      'raw',
+      expect.objectContaining({ byteLength: 32 }),
+      'AES-GCM',
+      false,
+      expect.arrayContaining(['encrypt', 'decrypt']),
+    );
+    for (const call of [encrypt, decrypt]) {
+      expect(call).toHaveBeenCalledWith(
+        expect.objectContaining({ additionalData: aad, name: 'AES-GCM' }),
+        expect.anything(),
+        expect.anything(),
+      );
+    }
+  });
+
+  it('rejects a tampered body', async () => {
+    const body = await MailboxEnvelopeCipher.seal(
       envelopeKey,
       mailboxId,
       envelopeId,
@@ -125,106 +186,114 @@ describe(MailboxEnvelopeCipher.name, () => {
     );
     const tampered = `${body[0] === 'A' ? 'B' : 'A'}${body.slice(1)}`;
 
-    expect(() =>
+    await expect(
       MailboxEnvelopeCipher.open(envelopeKey, mailboxId, envelopeId, tampered),
-    ).toThrow(new MailboxEnvelopeError('Envelope failed authentication'));
+    ).rejects.toThrow(
+      new MailboxEnvelopeError('Envelope failed authentication'),
+    );
   });
 
-  it('rejects a body opened under another mailbox', () => {
-    const body = MailboxEnvelopeCipher.seal(
+  it('rejects a body opened under another mailbox', async () => {
+    const body = await MailboxEnvelopeCipher.seal(
       envelopeKey,
       mailboxId,
       envelopeId,
       plaintext,
     );
 
-    expect(() =>
+    await expect(
       MailboxEnvelopeCipher.open(
         envelopeKey,
         'other-mailbox',
         envelopeId,
         body,
       ),
-    ).toThrow(MailboxEnvelopeError);
+    ).rejects.toThrow(MailboxEnvelopeError);
   });
 
-  it('rejects a body relabelled with another envelope id', () => {
-    const body = MailboxEnvelopeCipher.seal(
+  it('rejects a body relabelled with another envelope id', async () => {
+    const body = await MailboxEnvelopeCipher.seal(
       envelopeKey,
       mailboxId,
       envelopeId,
       plaintext,
     );
 
-    expect(() =>
+    await expect(
       MailboxEnvelopeCipher.open(
         envelopeKey,
         mailboxId,
         'other-envelope-id-000000',
         body,
       ),
-    ).toThrow(MailboxEnvelopeError);
+    ).rejects.toThrow(MailboxEnvelopeError);
   });
 
-  it('rejects a body sealed under another key', () => {
-    const body = MailboxEnvelopeCipher.seal(
+  it('rejects a body sealed under another key', async () => {
+    const body = await MailboxEnvelopeCipher.seal(
       envelopeKey,
       mailboxId,
       envelopeId,
       plaintext,
     );
 
-    expect(() =>
+    await expect(
       MailboxEnvelopeCipher.open(
         new Uint8Array(32).fill(9),
         mailboxId,
         envelopeId,
         body,
       ),
-    ).toThrow(MailboxEnvelopeError);
+    ).rejects.toThrow(MailboxEnvelopeError);
   });
 
-  it('rejects a body that is not a bucket size', () => {
-    const body = MailboxEnvelopeCipher.seal(
+  it('rejects a body that is not a bucket size', async () => {
+    const body = await MailboxEnvelopeCipher.seal(
       envelopeKey,
       mailboxId,
       envelopeId,
       plaintext,
     );
 
-    expect(() =>
+    await expect(
       MailboxEnvelopeCipher.open(
         envelopeKey,
         mailboxId,
         envelopeId,
         body.slice(0, -4),
       ),
-    ).toThrow(new MailboxEnvelopeError('Envelope body is not a bucket size'));
+    ).rejects.toThrow(
+      new MailboxEnvelopeError('Envelope body is not a bucket size'),
+    );
   });
 
-  it('rejects a body that is not base64url', () => {
-    expect(() =>
+  it('rejects a body that is not base64url', async () => {
+    await expect(
       MailboxEnvelopeCipher.open(
         envelopeKey,
         mailboxId,
         envelopeId,
         'not+base64url==',
       ),
-    ).toThrow(new MailboxEnvelopeError('Envelope body is not base64url'));
+    ).rejects.toThrow(
+      new MailboxEnvelopeError('Envelope body is not base64url'),
+    );
   });
 
-  it('rejects an authentic frame whose length prefix overruns the block', () => {
+  it('rejects an authentic frame whose length prefix overruns the block', async () => {
     const framed = Buffer.alloc(1024 - 12 - 16);
 
     framed.writeUInt32BE(99999, 0);
 
-    expect(() =>
+    await expect(
       MailboxEnvelopeCipher.open(
         envelopeKey,
         mailboxId,
         envelopeId,
         sealWithNode(framed, `${mailboxId}.${envelopeId}`),
       ),
-    ).toThrow(new MailboxEnvelopeError('Envelope length prefix is invalid'));
+    ).rejects.toThrow(
+      new MailboxEnvelopeError('Envelope length prefix is invalid'),
+    );
   });
 });

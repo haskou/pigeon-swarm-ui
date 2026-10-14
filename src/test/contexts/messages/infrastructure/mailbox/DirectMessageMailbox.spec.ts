@@ -2823,6 +2823,17 @@ describe(DirectMessageMailbox.name, () => {
   });
 
   describe('over the real channel', () => {
+    /** Resolves once `check` holds, letting queued work run. */
+    const until = async (check: () => boolean): Promise<void> => {
+      for (let turn = 0; turn < 500 && !check(); turn += 1) {
+        await new Promise<void>((resolve) => {
+          globalThis.setTimeout(resolve, 0);
+        });
+      }
+
+      if (!check()) throw new Error('condition not reached');
+    };
+
     /**
      * Mirrors the node: the inbox keeps the hash of every reader token with
      * the cursor that reader has acknowledged. An envelope is kept until the
@@ -2848,6 +2859,7 @@ describe(DirectMessageMailbox.name, () => {
       let present = true;
       const recipientInboxId = keysFor('bob').mailboxId;
       let creates = 0;
+      let appends = 0;
       let nextCursor = 1;
       let envelopes: { body: string; cursor: number; envelopeId: string }[] =
         [];
@@ -2943,6 +2955,7 @@ describe(DirectMessageMailbox.name, () => {
 
         const cursor = nextCursor;
         nextCursor += 1;
+        appends += 1;
         envelopes.push({ ...input, cursor });
 
         return Promise.resolve({ cursor });
@@ -2970,6 +2983,8 @@ describe(DirectMessageMailbox.name, () => {
       });
 
       return {
+        // A send resolves once queued; its copies are written after.
+        appends: () => appends,
         creates: () => creates,
         envelopeCount: () => envelopes.length,
         evict: () => {
@@ -3038,7 +3053,7 @@ describe(DirectMessageMailbox.name, () => {
 
     it('lets a sender deliver once the recipient has opened the inbox, before any read', async () => {
       const { projection, store } = setup();
-      const { creates, evict, wire } = nodeMailboxClient();
+      const { appends, creates, evict, wire } = nodeMailboxClient();
       evict();
       const mailbox = mailboxFor(wire, store, projection);
 
@@ -3056,6 +3071,7 @@ describe(DirectMessageMailbox.name, () => {
         ),
       ).resolves.toBe(true);
       await expect(delivery).resolves.toMatchObject({ id: 'message-1' });
+      await until(() => appends() === 1);
 
       const applied: string[][] = [];
       await mailbox.sync(
@@ -3073,7 +3089,7 @@ describe(DirectMessageMailbox.name, () => {
 
     it('delivers a message once and does not replay it after acknowledgement', async () => {
       const { projection, store } = setup();
-      const { wire } = nodeMailboxClient();
+      const { appends, wire } = nodeMailboxClient();
       const mailbox = mailboxFor(wire, store, projection);
       const applied: string[][] = [];
       const recordApplied = (changes: DirectMessageTimelineChange[]) => {
@@ -3083,6 +3099,7 @@ describe(DirectMessageMailbox.name, () => {
       await expect(
         mailbox.send(session('alice'), conversation, 'hello', {}),
       ).resolves.toMatchObject({ id: 'message-1' });
+      await until(() => appends() === 1);
 
       await mailbox.sync(
         session('bob'),
@@ -3110,11 +3127,12 @@ describe(DirectMessageMailbox.name, () => {
 
     it('shows one message when the legacy copy and the mailbox copy share an id', async () => {
       const { projection, store } = setup();
-      const { wire } = nodeMailboxClient();
+      const { appends, wire } = nodeMailboxClient();
       const mailbox = mailboxFor(wire, store, projection);
       let timeline: ChatMessage[] = [decrypted(sent)];
 
       await mailbox.send(session('alice'), conversation, 'hello', {});
+      await until(() => appends() === 1);
       await mailbox.sync(
         session('bob'),
         conversationId,
@@ -3129,7 +3147,7 @@ describe(DirectMessageMailbox.name, () => {
 
     it('delivers after the inbox was evicted and re-created under a stored cursor', async () => {
       const { projection, store } = setup();
-      const { evict, wire } = nodeMailboxClient();
+      const { appends, evict, wire } = nodeMailboxClient();
       const composed = composedRecords();
       const mailbox = mailboxFor(wire, store, projection, undefined, composed);
       const applied: string[][] = [];
@@ -3144,11 +3162,13 @@ describe(DirectMessageMailbox.name, () => {
         );
 
       await mailbox.send(session('alice'), conversation, 'hello', {});
+      await until(() => appends() === 1);
       await sync();
       evict();
       await sync();
       composed.sent = { ...sent, id: 'message-2' };
       await mailbox.send(session('alice'), conversation, 'hello', {});
+      await until(() => appends() === 2);
       await sync();
 
       expect(applied).toEqual([['message-1'], ['message-2']]);
@@ -3156,7 +3176,7 @@ describe(DirectMessageMailbox.name, () => {
 
     it('reads the inbox again after the device lost its local storage', async () => {
       const { clearStorage, projection, store } = setup();
-      const { wire } = nodeMailboxClient();
+      const { appends, wire } = nodeMailboxClient();
       const composed = composedRecords();
       const mailbox = mailboxFor(wire, store, projection, undefined, composed);
       const applied: string[][] = [];
@@ -3172,10 +3192,12 @@ describe(DirectMessageMailbox.name, () => {
 
       await sync();
       await mailbox.send(session('alice'), conversation, 'hello', {});
+      await until(() => appends() === 1);
       await sync();
       clearStorage();
       composed.sent = { ...sent, id: 'message-2' };
       await mailbox.send(session('alice'), conversation, 'hello', {});
+      await until(() => appends() === 2);
       await sync();
 
       expect(applied).toEqual([['message-1'], ['message-2']]);
@@ -3259,7 +3281,7 @@ describe(DirectMessageMailbox.name, () => {
 
     it('delivers the peer copy when the sender cannot tag its own copy', async () => {
       const { projection, store } = setup();
-      const { envelopeCount, wire } = nodeMailboxClient();
+      const { appends, envelopeCount, wire } = nodeMailboxClient();
       const mailbox = mailboxFor(wire, store, projection);
       const untaggable = {
         ...session('alice'),
@@ -3269,12 +3291,13 @@ describe(DirectMessageMailbox.name, () => {
       await expect(
         mailbox.send(untaggable, conversation, 'hello', {}),
       ).resolves.toMatchObject({ id: 'message-1' });
+      await until(() => appends() === 1);
       expect(envelopeCount()).toBe(1);
     });
 
     it('keeps an envelope until every device of the identity has acknowledged it', async () => {
       const { projection } = setup();
-      const { envelopeCount, wire } = nodeMailboxClient();
+      const { appends, envelopeCount, wire } = nodeMailboxClient();
       const catalog = ['credential-phone', 'credential-laptop'];
       const phoneStore = memoryStore();
       const laptopStore = memoryStore();
@@ -3303,6 +3326,7 @@ describe(DirectMessageMailbox.name, () => {
         recordInto(laptopApplied),
       );
       await sender.send(session('alice'), conversation, 'hello', {});
+      await until(() => appends() === 1);
       await phone.sync(
         phoneSession,
         conversationId,
@@ -3394,7 +3418,7 @@ describe(DirectMessageMailbox.name, () => {
         deviceSealedRootKey: SymmetricKey.fromBuffer(rotatedRoot),
         previousDeviceSealedRootKey: SymmetricKey.fromBuffer(rootFor('bob')),
       } as unknown as Session;
-      const { readerHashes, wire } = nodeMailboxClient();
+      const { appends, readerHashes, wire } = nodeMailboxClient();
       const composed = composedRecords();
       const sender = mailboxFor(
         wire,
@@ -3429,6 +3453,7 @@ describe(DirectMessageMailbox.name, () => {
       );
       await laptopPass(deviceSession('bob', laptop));
       await sender.send(session('alice'), conversation, 'hello', {});
+      await until(() => appends() === 1);
       await laptopPass(deviceSession('bob', laptop));
       expect(laptopApplied).toEqual([['message-1']]);
 
@@ -3456,6 +3481,7 @@ describe(DirectMessageMailbox.name, () => {
         previousMessageIds: ['message-1'],
       };
       await sender.send(session('alice'), conversation, 'hello', {});
+      await until(() => appends() === 2);
 
       // The laptop keeps the old root, which does not open the record written
       // after the revoke.
@@ -3524,7 +3550,7 @@ describe(DirectMessageMailbox.name, () => {
       const { projection } = setup();
       const laptop = 'device-credential-bob-laptop';
       const devices = [credentialFor('bob'), laptop];
-      const { wire } = nodeMailboxClient();
+      const { appends, wire } = nodeMailboxClient();
       const phone = mailboxFor(wire, memoryStore(), projection, devices);
       const phoneApplied: string[][] = [];
       const laptopApplied: string[][] = [];
@@ -3539,6 +3565,7 @@ describe(DirectMessageMailbox.name, () => {
         'hello',
         {},
       );
+      await until(() => appends() === 1);
       await syncPass(phone, session('bob'), (changes) => {
         phoneApplied.push(messageIds(changes));
       });
@@ -3570,7 +3597,7 @@ describe(DirectMessageMailbox.name, () => {
       it('locks the revoked device out of records written once it resolves, before any read', async () => {
         const keys = keysFor('bob');
         const { projection } = setup();
-        const { readerHashes, wire } = nodeMailboxClient();
+        const { appends, readerHashes, wire } = nodeMailboxClient();
         const composed = composedRecords();
         const sender = mailboxFor(
           wire,
@@ -3599,6 +3626,7 @@ describe(DirectMessageMailbox.name, () => {
         );
         await laptopPass();
         await sender.send(session('alice'), conversation, 'hello', {});
+        await until(() => appends() === 1);
         await laptopPass();
         expect(laptopApplied).toEqual([['message-1']]);
 
@@ -3623,6 +3651,7 @@ describe(DirectMessageMailbox.name, () => {
           previousMessageIds: ['message-1'],
         };
         await sender.send(session('alice'), conversation, 'hello', {});
+        await until(() => appends() === 2);
         await laptopPass();
         expect(laptopApplied).toEqual([['message-1']]);
       });
@@ -3670,17 +3699,6 @@ describe(DirectMessageMailbox.name, () => {
       beforeEach(() => {
         jest.useRealTimers();
       });
-
-      /** Resolves once `check` holds, letting queued work run. */
-      const until = async (check: () => boolean): Promise<void> => {
-        for (let turn = 0; turn < 500 && !check(); turn += 1) {
-          await new Promise<void>((resolve) => {
-            globalThis.setTimeout(resolve, 0);
-          });
-        }
-
-        if (!check()) throw new Error('condition not reached');
-      };
 
       /** Writes per mailbox; a repeated envelope id is stored once. */
       const appendLog = () => {
