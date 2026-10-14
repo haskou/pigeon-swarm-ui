@@ -18,6 +18,9 @@ import {
 // How long the revoked device keeps syncing after the surviving device has
 // shown the post-revoke message, before the test checks it never showed it.
 const REVOKED_SYNC_WINDOW_MS = 20_000;
+// How long each reader removal is held, so the cut-off of the revoked device
+// lags well behind the revoke, as on a slow link.
+const READER_REMOVAL_DELAY_MS = 8_000;
 
 test('locks a revoked device out of the direct messages sent after the revoke', async ({
   browser,
@@ -67,6 +70,10 @@ test('locks a revoked device out of the direct messages sent after the revoke', 
       timeout: 45_000,
     });
 
+    // The revoke is reported done only once the laptop is cut off, so a
+    // message sent right after it never reaches the laptop, however slow the
+    // cut-off is.
+    await slowReaderRemovals(phone);
     await revokeOtherDevice(phone);
     await phone.getByRole('button', { name: 'Close dialog' }).last().click();
     await selectConversationByTitle(phone, alice.name);
@@ -82,6 +89,7 @@ test('locks a revoked device out of the direct messages sent after the revoke', 
     await expect(laptop.getByText(beforeRevoke, { exact: true })).toBeVisible();
     await expect(laptop.getByText(afterRevoke, { exact: true })).toHaveCount(0);
     await expect.poll(() => storedHistoryRows(laptop)).toBeGreaterThan(0);
+    await phone.unrouteAll({ behavior: 'wait' });
 
     // On its next sign-in the laptop reads the signed transitions, verifies
     // the revocation the phone signed, and erases what it stored for Bob.
@@ -136,6 +144,22 @@ async function signIn(page: Page, identity: TestIdentity): Promise<void> {
   );
   await page.getByTestId('auth-password-input').fill(identity.password);
   await page.getByTestId('auth-submit-button').click();
+}
+
+const READER_PATH = /\/mailboxes\/[^/]+\/readers\/[^/]+$/;
+
+/** Holds every reader removal of the page before letting it through. */
+async function slowReaderRemovals(page: Page): Promise<void> {
+  await page.route(
+    (url) => READER_PATH.test(url.pathname),
+    async (route) => {
+      if (route.request().method() === 'DELETE') {
+        await page.waitForTimeout(READER_REMOVAL_DELAY_MS);
+      }
+
+      await route.fallback();
+    },
+  );
 }
 
 const TRANSITIONS_PATH = /\/identity-devices\/[^/]+\/transitions$/;

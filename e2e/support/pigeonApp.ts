@@ -357,7 +357,10 @@ export async function revokeOtherDevice(
   }
 
   await authorized.getByTestId('device-revoke-confirm').click();
-  await expect(authorized.getByTestId('device-row')).toHaveCount(1);
+  // The revoke is done only once every inbox of every server cut it off.
+  await expect(authorized.getByTestId('device-row')).toHaveCount(1, {
+    timeout: 60_000,
+  });
 }
 
 async function openSecurityProfile(page: Page): Promise<void> {
