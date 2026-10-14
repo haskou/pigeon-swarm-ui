@@ -17,7 +17,8 @@ import { GroupMessageId } from './crypto/GroupMessageId';
  * every record for the members of the current epoch, so no conversation key
  * exists. Every record id is bound to its author, as the inbox demands. MLS
  * cannot open a member's own messages, so each record is kept in this
- * device's history once it is queued.
+ * device's history once it is queued. A queued record is sent even when that
+ * copy fails, so a retry never sends it twice under a new id.
  */
 export class GroupConversationSender {
   private static readonly PLAIN: MessagePayloadSeal = (plainMessage) =>
@@ -47,7 +48,10 @@ export class GroupConversationSender {
       record.id,
       DirectMessageMailboxRecord.encode(record),
     );
-    await this.history.append(member.session, [record]);
+    await this.history.append(member.session, [record]).catch(() => {
+      // eslint-disable-next-line no-console
+      console.debug('Group local copy failed.');
+    });
   }
 
   private async write(

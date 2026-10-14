@@ -225,9 +225,18 @@ export class GroupConversationMailbox {
     this.members.delete(identityId);
   }
 
-  /** Deletes this identity's group state on this device. Never throws. */
+  /**
+   * Deletes this identity's group state on this device, after any running
+   * membership update of it, so none writes MLS state back. Every store is
+   * tried; rejects when any could not be deleted.
+   */
   public async forget(identityId: string): Promise<void> {
     this.stop(identityId);
+    const running = [...this.reconciling]
+      .filter(([key]) => key.startsWith(`${identityId}/`))
+      .map(([, work]) => work);
+
+    await Promise.all(running);
     await this.stores.forget(identityId);
   }
 }

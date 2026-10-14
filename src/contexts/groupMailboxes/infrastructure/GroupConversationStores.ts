@@ -12,13 +12,16 @@ export class GroupConversationStores {
   public readonly inboxes = new GroupMailboxInboxStore();
   public readonly outbox: GroupMailboxOutboxStore;
 
+  /**
+   * Resolves once the database is gone. A blocked delete stays queued until
+   * the open connections close, so it is not reported as done before that.
+   */
   private static deleteDatabase(name: string): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const request = indexedDB.deleteDatabase(name);
 
       request.addEventListener('success', () => resolve());
-      request.addEventListener('error', () => resolve());
-      request.addEventListener('blocked', () => resolve());
+      request.addEventListener('error', () => reject(request.error));
     });
   }
 
@@ -31,15 +34,22 @@ export class GroupConversationStores {
     return `${this.storage}-${kind}-${identityId}`;
   }
 
-  /** Deletes one identity's group state on this device. Never throws. */
+  /**
+   * Deletes one identity's group state on this device. Every store is tried;
+   * rejects afterwards when any of them could not be deleted.
+   */
   public async forget(identityId: string): Promise<void> {
-    await Promise.all([
+    const results = await Promise.allSettled([
       this.history.forget(identityId),
-      this.outbox.forget(identityId).catch(() => undefined),
+      this.outbox.forget(identityId),
       GroupConversationStores.deleteDatabase(this.database('mls', identityId)),
       GroupConversationStores.deleteDatabase(
         this.database('generations', identityId),
       ),
     ]);
+
+    if (results.some(({ status }) => status === 'rejected')) {
+      throw new Error('Group state could not be deleted.');
+    }
   }
 }
