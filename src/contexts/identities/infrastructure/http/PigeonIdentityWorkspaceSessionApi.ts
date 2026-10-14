@@ -6,6 +6,9 @@ import type { IdentityWorkspaceSource } from './IdentityWorkspaceSource';
 import type { KeychainResource } from './resources/KeychainResource';
 import type { LoginResult } from './resources/LoginResult';
 
+import { IdentitySnapshotSelection } from '../../domain/IdentitySnapshotSelection';
+import { KeychainVersion } from '../../domain/value-objects/KeychainVersion';
+
 const emptyKeychain: LocalKeychain = {
   conversations: {},
   version: 0,
@@ -49,7 +52,12 @@ export class PigeonIdentityWorkspaceSessionApi {
     const keychain = this.workspace.decryptKeychain(session, keychainResource);
 
     // Keychain versions only move forward; an older read is stale in-flight.
-    if (keychain.version < session.keychain.version) {
+    if (
+      IdentitySnapshotSelection.selectKeychain(
+        KeychainVersion.fromNumber(session.keychain.version),
+        KeychainVersion.fromNumber(keychain.version),
+      ) === 'held'
+    ) {
       return session;
     }
 

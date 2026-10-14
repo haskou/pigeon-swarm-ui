@@ -11,6 +11,7 @@ import type { PublishedKeychainPayload } from './PublishedKeychainPayload';
 
 import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
+import { KeychainVersion } from '../../domain/value-objects/KeychainVersion';
 
 export type KeychainHead = {
   keychain: LocalKeychain;
@@ -40,7 +41,9 @@ export class KeychainCipher {
     return {
       conversations: parsed.conversations ?? {},
       timestamp: parsed.timestamp ?? keychain.timestamp,
-      version: parsed.version ?? keychain.version ?? 0,
+      version: KeychainVersion.fromNumber(
+        parsed.version ?? keychain.version ?? 0,
+      ).valueOf(),
     };
   }
 
