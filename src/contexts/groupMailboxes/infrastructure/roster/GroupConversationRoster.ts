@@ -7,7 +7,8 @@ import type { Session } from '../../../identities/infrastructure/session/Session
  * The node's roster of one group conversation, as this identity sees it: the
  * conversations it belongs to are paged until the one asked for is found.
  * A conversation this identity is not in has an empty roster, so a removed
- * member honours no control letter and accepts no commit for it.
+ * member honours no control letter and accepts no commit for it. Past
+ * MAX_PAGES pages the roster is empty too; that is logged.
  */
 export class GroupConversationRoster {
   private static readonly MAX_PAGES = 20;
@@ -51,6 +52,9 @@ export class GroupConversationRoster {
       }
       before = conversations[conversations.length - 1].id;
     }
+
+    // eslint-disable-next-line no-console
+    console.debug('Group roster paging cap reached.');
 
     return new Set();
   }

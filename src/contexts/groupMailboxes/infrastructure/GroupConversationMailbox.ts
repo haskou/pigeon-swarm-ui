@@ -228,7 +228,9 @@ export class GroupConversationMailbox {
   /**
    * Deletes this identity's group state on this device, after any running
    * membership update of it, so none writes MLS state back. Every store is
-   * tried; rejects when any could not be deleted.
+   * tried; rejects when any could not be deleted. An outbox append or a
+   * notification pump run already in flight is not awaited: such a run that
+   * joins a group right then can write MLS state back after the delete.
    */
   public async forget(identityId: string): Promise<void> {
     this.stop(identityId);
