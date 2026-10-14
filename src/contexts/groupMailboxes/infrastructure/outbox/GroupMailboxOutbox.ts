@@ -30,12 +30,18 @@ import { GroupMailboxKeySchedule } from '../crypto/GroupMailboxKeySchedule';
  * it, so a commit reaches each member before the messages of the epoch it
  * starts. A message whose generation was superseded before every copy
  * landed is re-encrypted in the current epoch for the current members; one
- * that cannot be re-encrypted for a moment is retried with backoff. A
- * commit belongs to its generation and is never re-encrypted. A record
- * still queued after the expiry is dropped and reported. Logs carry counts
- * only.
+ * that cannot be re-encrypted for a moment is retried with backoff. While
+ * the MLS group still holds a member the node's roster removed, no message
+ * is encrypted or appended: that member holds the epoch secret and could
+ * read any inbox of the generation. Such a message waits, unsealed or
+ * stale, until the removal is committed. A commit belongs to its
+ * generation and is never re-encrypted. A record still queued after the
+ * expiry is dropped and reported. Logs carry counts only.
  */
 export class GroupMailboxOutbox {
+  /** The generation index of a message held before it was ever sealed. */
+  private static readonly UNSEALED = -1;
+
   public static readonly EXPIRY_MS = 14 * 24 * 60 * 60 * 1000;
   public static readonly RETRY_BASE_MS = 5_000;
   public static readonly RETRY_MAX_MS = 5 * 60 * 1000;
@@ -45,6 +51,8 @@ export class GroupMailboxOutbox {
   >();
 
   private readonly rows = new Map<string, GroupMailboxOutboxRow>();
+  /** The roster of each conversation, read once per pass. */
+  private readonly rosters = new Map<string, Promise<ReadonlySet<string>>>();
   private lastCreatedAt = 0;
   private queue: Promise<void> = Promise.resolve();
   private stopped = false;
@@ -98,6 +106,15 @@ export class GroupMailboxOutbox {
     );
   }
 
+  /** The recipients a stale message is re-encrypted for; all if unsealed. */
+  private static recipientsOf(
+    row: GroupMailboxOutboxRow,
+  ): ReadonlySet<string> | undefined {
+    if (row.generationIndex === GroupMailboxOutbox.UNSEALED) return undefined;
+
+    return new Set(row.copies.map(({ identityId }) => identityId));
+  }
+
   public constructor(
     private readonly session: Session,
     private readonly engine: GroupMailboxOutboxEngine,
@@ -106,6 +123,9 @@ export class GroupMailboxOutbox {
       GroupMailboxOutboxStore,
       'forget' | 'load' | 'remove' | 'save'
     >,
+    private readonly roster: (
+      conversationId: string,
+    ) => Promise<ReadonlySet<string>>,
     private readonly clock: () => number = Date.now,
   ) {}
 
@@ -119,6 +139,8 @@ export class GroupMailboxOutbox {
   private async attemptAll(): Promise<void> {
     const now = this.clock();
     const attempts: GroupMailboxOutboxAttempt[] = [];
+
+    this.rosters.clear();
 
     for (const row of GroupMailboxOutbox.ordered(this.rows.values())) {
       if (this.stopped) return;
@@ -186,27 +208,32 @@ export class GroupMailboxOutbox {
   }
 
   /**
-   * The row to deliver now: a message whose generation was superseded is
-   * re-encrypted in the current epoch for those of its pending recipients
-   * still in the group; a member who joined since never gets it. Undefined
-   * when it can no longer be encrypted, as after this identity's removal or
-   * when it outgrew the record limit; any other failure rejects, so the
-   * row is retried.
+   * The row to deliver now: a message whose generation was superseded, or
+   * one never sealed, is encrypted in the current epoch for those of its
+   * pending recipients still in the group, or for every member if never
+   * sealed; a member who joined since never gets it. Null while a removal
+   * is pending. Undefined when it can no longer be encrypted, as after this
+   * identity's removal or when it outgrew the record limit; any other
+   * failure rejects, so the row is retried.
    */
   private async currentRow(
     row: GroupMailboxOutboxRow,
-  ): Promise<GroupMailboxOutboxRow | undefined> {
+  ): Promise<GroupMailboxOutboxRow | null | undefined> {
     if (row.body === undefined) return row;
+    const { conversationId } = row;
 
     try {
-      const generation = await this.engine.generation(row.conversationId);
+      const roster = await this.passRoster(conversationId);
+
+      if (await this.removalPending(conversationId, roster)) return null;
+      const generation = await this.engine.generation(conversationId);
 
       if (generation.index === row.generationIndex) return row;
 
       return await this.sealedMessage(
         row,
         new Uint8Array(decodeBase64Url(row.body)),
-        new Set(row.copies.map(({ identityId }) => identityId)),
+        GroupMailboxOutbox.recipientsOf(row),
       );
     } catch (error: unknown) {
       if (error instanceof MlsRejectedError || error instanceof RangeError) {
@@ -224,6 +251,8 @@ export class GroupMailboxOutbox {
     row: GroupMailboxOutboxRow,
   ): Promise<GroupMailboxOutboxAttempt | undefined> {
     const current = await this.currentRow(row);
+
+    if (current === null) return { current: row, row };
 
     if (!current) return undefined;
     const generation = (
@@ -408,6 +437,35 @@ export class GroupMailboxOutbox {
     });
   }
 
+  /** The roster for this pass, read once per conversation. */
+  private passRoster(conversationId: string): Promise<ReadonlySet<string>> {
+    const known = this.rosters.get(conversationId);
+
+    if (known) return known;
+    const read = this.roster(conversationId);
+
+    this.rosters.set(conversationId, read);
+
+    return read;
+  }
+
+  /**
+   * Whether the MLS group still holds a member the roster no longer lists.
+   * Rejects once this identity is off the roster itself.
+   */
+  private async removalPending(
+    conversationId: string,
+    roster: ReadonlySet<string>,
+  ): Promise<boolean> {
+    if (!roster.has(this.session.identity.id)) {
+      throw new MlsRejectedError('This identity is not in the group');
+    }
+
+    return (await this.engine.members(conversationId)).some(
+      (identityId) => !roster.has(identityId),
+    );
+  }
+
   /**
    * Encrypts `body` in the current epoch, addressed to every current
    * member, this identity included, or to those of them in `recipients`. A
@@ -503,33 +561,46 @@ export class GroupMailboxOutbox {
 
   /**
    * Encrypts an application message in the current epoch and queues it for
-   * the inbox of every member in `recipients`, this identity's included: a
-   * member already off the roster but not yet committed out gets no copy.
-   * Resolves after the first delivery attempt; rejects only when the
-   * message cannot be encrypted.
+   * every member's inbox, this identity's included; while a removal is
+   * pending it is queued unsealed instead. Resolves after the first
+   * delivery attempt; rejects when the roster cannot be read, when this
+   * identity is off it, or when the message cannot be encrypted.
    */
   public async enqueueMessage(
     conversationId: string,
     reference: string,
     body: Uint8Array,
-    recipients: ReadonlySet<string>,
   ): Promise<void> {
-    const row = await this.sealedMessage(
-      {
-        attempts: 0,
-        body: encodeBase64Url(body),
-        conversationId,
-        createdAt: this.stamp(),
-        id: MailboxChannel.randomEnvelopeId(),
-        reference,
-        retryAt: 0,
-      },
-      body,
-      recipients,
+    const pending = await this.removalPending(
+      conversationId,
+      await this.roster(conversationId),
     );
+    const unsealed = {
+      attempts: 0,
+      body: encodeBase64Url(body),
+      conversationId,
+      createdAt: this.stamp(),
+      id: MailboxChannel.randomEnvelopeId(),
+      reference,
+      retryAt: 0,
+    };
 
-    await this.keep(row);
+    await this.keep(
+      pending
+        ? {
+            ...unsealed,
+            copies: [],
+            generationIndex: GroupMailboxOutbox.UNSEALED,
+            record: '',
+          }
+        : await this.sealedMessage(unsealed, body),
+    );
     await this.pass();
+  }
+
+  /** Retries the queue now, as after a commit changed the epoch. */
+  public flush(): Promise<void> {
+    return this.pass();
   }
 
   /** Drops this identity's queue, in memory and at rest. */

@@ -15,13 +15,10 @@ import { GroupMessageId } from './crypto/GroupMessageId';
 /**
  * Writes group records. A payload is the plain message JSON: MLS encrypts
  * every record for the members of the current epoch, so no conversation key
- * exists. Copies go only to members still on the node's roster, so one
- * removed before its removal is committed reads nothing new; an identity
- * off the roster cannot write. Every record id is bound to its author, as
- * the inbox demands. MLS cannot open a member's own messages, so each
- * record is kept in this device's history once it is queued. A queued
- * record is sent even when that copy fails, so a retry never sends it twice
- * under a new id.
+ * exists. Every record id is bound to its author, as the inbox demands. MLS
+ * cannot open a member's own messages, so each record is kept in this
+ * device's history once it is queued. A queued record is sent even when that
+ * copy fails, so a retry never sends it twice under a new id.
  */
 export class GroupConversationSender {
   private static readonly PLAIN: MessagePayloadSeal = (plainMessage) =>
@@ -30,7 +27,7 @@ export class GroupConversationSender {
   public constructor(
     private readonly ports: Pick<
       GroupConversationPorts,
-      'composer' | 'now' | 'projector' | 'roster'
+      'composer' | 'now' | 'projector'
     >,
     private readonly history: Pick<GroupMessageHistoryStore, 'append'>,
   ) {}
@@ -46,19 +43,10 @@ export class GroupConversationSender {
     member: GroupConversationMember,
     record: DirectMessageRecord,
   ): Promise<void> {
-    const roster = await this.ports.roster(
-      member.session,
-      record.conversationId,
-    );
-
-    if (!roster.has(member.session.identity.id)) {
-      throw new Error('This identity is not in the group.');
-    }
     await member.outbox.enqueueMessage(
       record.conversationId,
       record.id,
       DirectMessageMailboxRecord.encode(record),
-      roster,
     );
     await this.history.append(member.session, [record]).catch(() => {
       // eslint-disable-next-line no-console

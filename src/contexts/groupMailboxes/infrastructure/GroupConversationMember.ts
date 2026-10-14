@@ -38,6 +38,7 @@ export class GroupConversationMember {
       engine,
       ports.channel,
       stores.outbox,
+      rosterFor,
       ports.now,
     );
     const control = new GroupMailboxControl(

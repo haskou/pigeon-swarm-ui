@@ -85,8 +85,9 @@ export class GroupConversationMailbox {
   }
 
   /**
-   * Brings the MLS group in line with the node's roster; a call while one is
-   * running joins it. Never throws: a failure logs one line and the next
+   * Brings the MLS group in line with the node's roster, then retries the
+   * queue, whose messages wait while a removal is pending; a call while one
+   * is running joins it. Never throws: a failure logs one line and the next
    * sync tries again.
    */
   public async membersChanged(
@@ -97,7 +98,9 @@ export class GroupConversationMailbox {
     const running = this.reconciling.get(key);
 
     if (running) return await running;
-    const work = this.reconcile(this.member(session), conversationId)
+    const member = this.member(session);
+    const work = this.reconcile(member, conversationId)
+      .then(() => member.outbox.flush())
       .catch(() => GroupConversationMailbox.fail('membership update'))
       .finally(() => this.reconciling.delete(key));
 
