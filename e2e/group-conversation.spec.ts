@@ -183,12 +183,14 @@ test('a group keeps reading across a revoke and reload, without the revoked devi
       password,
     });
     await registerIdentity(phone, bob);
-    await pairNewDevice(phone, laptop, bob);
 
+    // Groups assume one device per identity (node D19), so Bob joins on the
+    // phone alone and pairs the laptop afterwards.
     await createGroup(alice, groupName, [bob.handle]);
     await openGroup(alice, groupName);
     await openGroup(phone, groupName);
     await sendUntilEveryoneReads(alice, [phone], 'hello from Alice');
+    await pairNewDevice(phone, laptop, bob);
 
     // The revoke rotates the device-sealed root; after the reload the phone
     // reads its group inboxes with readers of the new root.
