@@ -8,6 +8,7 @@ import {
   Suspense,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -214,12 +215,17 @@ export function Composer({
     setAttachmentError(null);
 
     if (fileInputRef.current) fileInputRef.current.value = '';
-    requestAnimationFrame(() => {
-      const nextCaretIndex = textInputRef.current?.value.length ?? 0;
+  }, [editingMessage?.id]);
+  // The commit that starts an edit also prefills its content. Focusing and
+  // placing the caret in that commit, rather than in a later frame, leaves no
+  // gap where a late caret move could undo a selection or text entered first.
+  useLayoutEffect(() => {
+    const textInput = textInputRef.current;
 
-      textInputRef.current?.focus();
-      textInputRef.current?.setSelectionRange(nextCaretIndex, nextCaretIndex);
-    });
+    if (!editingMessage?.id || !textInput) return;
+
+    textInput.focus();
+    textInput.setSelectionRange(textInput.value.length, textInput.value.length);
   }, [editingMessage?.id]);
   useEffect(() => {
     if (attachments.length === 0) setAttachmentEncryptionPreference(null);
