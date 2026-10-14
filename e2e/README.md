@@ -76,6 +76,12 @@ direct-message sync, the outbox spec and the security audit run on
 community kick and group conversation specs run on `desktop-chromium`. On
 Firefox the decline sent when the callee leaves the page did not reach the
 node in CI, so the call spec does not run there.
+`history-backup.spec.ts` (a wrong password exports nothing; the right one
+downloads one encrypted file that holds no message or handle in clear;
+another identity and a file with one changed character are refused; a new
+device of the same identity signed in with the recovery key restores the
+file, and after a new sign-in shows both sides of the conversation while the
+node serves it no envelopes) runs on `desktop-chromium`.
 `passkey-unlock.spec.ts` (switching this device from a password to a passkey
 and unlocking with it) runs on `desktop-chromium` only: it uses a DevTools
 virtual authenticator with PRF and opens the app through `localhost`, because

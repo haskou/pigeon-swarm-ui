@@ -363,7 +363,7 @@ export async function revokeOtherDevice(
   });
 }
 
-async function openSecurityProfile(page: Page): Promise<void> {
+export async function openSecurityProfile(page: Page): Promise<void> {
   await openSidebar(page);
   await page
     .locator('[data-testid="own-profile-menu-button"]:visible')
@@ -373,7 +373,7 @@ async function openSecurityProfile(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Security' }).click();
 }
 
-async function dismissPushPrompt(page: Page): Promise<void> {
+export async function dismissPushPrompt(page: Page): Promise<void> {
   const prompt = page.getByTestId('push-notification-prompt');
 
   if (!(await isVisible(prompt))) return;
