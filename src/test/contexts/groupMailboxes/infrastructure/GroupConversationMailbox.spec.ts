@@ -18,6 +18,7 @@ import type { RequestSigner } from '../../../../shared/infrastructure/http/Reque
 import { GroupMailboxControlSeal } from '../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlSeal';
 import { GroupConversationMailbox } from '../../../../contexts/groupMailboxes/infrastructure/GroupConversationMailbox';
 import { GroupMessageHistoryStore } from '../../../../contexts/groupMailboxes/infrastructure/history/GroupMessageHistoryStore';
+import { GroupMailboxOutbox } from '../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutbox';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { MailboxUnavailableError } from '../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
 import { MailboxCapability } from '../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
@@ -52,6 +53,7 @@ const CONVERSATION = 'group:conversation-mls';
 const NOW = 1_700_000_000_000;
 
 let devices = 0;
+let now = NOW;
 let roster: Set<string>;
 let letters: Map<string, NotificationResource[]>;
 let inboxes: Map<
@@ -220,7 +222,7 @@ const device = (): GroupConversationMailbox =>
             .slice(0, limit),
         ),
     },
-    now: () => NOW,
+    now: () => now,
     projector: new MessageProjector(copy.messages),
     roster: (owner) =>
       Promise.resolve(
@@ -317,6 +319,7 @@ beforeEach(async () => {
   fakeMailboxes();
   memoryStorage();
   letters = new Map();
+  now = NOW;
   roster = new Set();
   [alice, bob, carol] = await Promise.all([person(), person(), person()]);
 });
@@ -374,11 +377,29 @@ describe('GroupConversationMailbox', () => {
     expect(texts(carol)).toEqual([]);
   });
 
-  it('sends no copy to a member removed before its commit lands', async () => {
+  it('holds a message until a removal on the roster is committed', async () => {
     await formGroup();
     roster = new Set([alice.id, bob.id]);
 
     await alice.mailbox.send(alice.session, conversation(), 'too early', {});
+    await sync(carol);
+    await sync(bob);
+
+    expect(texts(carol)).toEqual([]);
+    expect(texts(bob)).toEqual([]);
+
+    await settle(
+      Promise.all(
+        everyone().map((member) =>
+          member.mailbox.membersChanged(member.session, CONVERSATION),
+        ),
+      ),
+      everyone(),
+    );
+    await catchUp();
+    // The copy for bob's new inbox waits for its retry once that inbox opens.
+    now += GroupMailboxOutbox.RETRY_MAX_MS;
+    await alice.mailbox.membersChanged(alice.session, CONVERSATION);
     await sync(carol);
     await sync(bob);
 
