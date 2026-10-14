@@ -1,5 +1,6 @@
 import { type MockProxy, mock } from 'jest-mock-extended';
 
+import type { ContactDirectoryRepository } from '../../../../../contexts/identities/domain/repositories/ContactDirectoryRepository';
 import type { DeviceMailboxRepository } from '../../../../../contexts/identities/domain/repositories/DeviceMailboxRepository';
 import type { IdentityUnlockRepository } from '../../../../../contexts/identities/domain/repositories/IdentityUnlockRepository';
 import type { OwnDeviceRepository } from '../../../../../contexts/identities/domain/repositories/OwnDeviceRepository';
@@ -26,6 +27,7 @@ function forgetter({
   const ownDevices = mock<OwnDeviceRepository>();
   const mailbox = mock<DeviceMailboxRepository>();
   const unlocks = mock<IdentityUnlockRepository>();
+  const contacts = mock<ContactDirectoryRepository>();
 
   ownDevices.retire.mockImplementation(() => {
     calls.push('retire');
@@ -52,6 +54,11 @@ function forgetter({
 
     return Promise.resolve();
   });
+  contacts.forget.mockImplementation((id) => {
+    calls.push(`contacts:${id.toString()}`);
+
+    return Promise.resolve();
+  });
   unlocks.forget.mockImplementation((id) => {
     calls.push(`unlock:${id.toString()}`);
 
@@ -63,7 +70,12 @@ function forgetter({
   return {
     calls,
     mailbox,
-    useCase: new CurrentDeviceForgetter(ownDevices, mailbox, unlocks),
+    useCase: new CurrentDeviceForgetter(
+      ownDevices,
+      mailbox,
+      contacts,
+      unlocks,
+    ),
   };
 }
 
@@ -72,7 +84,7 @@ function message(allowOnlyDevice: boolean): ForgetCurrentDeviceMessage {
 }
 
 describe(CurrentDeviceForgetter.name, () => {
-  it('revokes this device, releases its readers, wipes local direct and group state, then forgets the local unlock', async () => {
+  it('revokes this device, releases its readers, wipes local direct and group state and the contact directory, then forgets the local unlock', async () => {
     const { calls, mailbox, useCase } = forgetter({
       retirement: () => Promise.resolve(DeviceRetirement.REVOKED),
     });
@@ -84,6 +96,7 @@ describe(CurrentDeviceForgetter.name, () => {
       'history',
       'groups',
       'outbox',
+      'contacts:identity-1',
       'unlock:identity-1',
     ]);
     expect(mailbox.releaseReaders).toHaveBeenCalledWith(identityId);
@@ -104,6 +117,7 @@ describe(CurrentDeviceForgetter.name, () => {
       'history',
       'groups',
       'outbox',
+      'contacts:identity-1',
       'unlock:identity-1',
     ]);
   });
@@ -137,6 +151,7 @@ describe(CurrentDeviceForgetter.name, () => {
       'history',
       'groups',
       'outbox',
+      'contacts:identity-1',
       'unlock:identity-1',
     ]);
   });
@@ -154,6 +169,7 @@ describe(CurrentDeviceForgetter.name, () => {
       'history',
       'groups',
       'outbox',
+      'contacts:identity-1',
       'unlock:identity-1',
     ]);
   });

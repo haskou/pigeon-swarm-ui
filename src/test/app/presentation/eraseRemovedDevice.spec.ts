@@ -37,6 +37,7 @@ function services(): {
   groupMessages.forget.mockResolvedValue(undefined);
   mls.forget.mockResolvedValue(undefined);
   identities.forgetDeviceUnlock.mockResolvedValue(undefined);
+  identities.forgetContacts.mockResolvedValue(undefined);
 
   return { directMessages, groupMessages, identities, mls };
 }
@@ -114,7 +115,7 @@ describe('eraseRemovedDevice', () => {
     );
   });
 
-  it("erases the identity's outbox, direct and group history, community MLS state and pending device-sealed recovery", async () => {
+  it("erases the identity's outbox, direct and group history, community MLS state, contact directory and pending device-sealed recovery", async () => {
     const removed = services();
 
     await expect(eraseRemovedDevice('identity-1', removed)).resolves.toBe(true);
@@ -127,6 +128,7 @@ describe('eraseRemovedDevice', () => {
     );
     expect(removed.groupMessages.forget).toHaveBeenCalledWith('identity-1');
     expect(removed.mls.forget).toHaveBeenCalledWith('identity-1');
+    expect(removed.identities.forgetContacts).toHaveBeenCalledWith('identity-1');
     expect(removed.identities.discardDeviceSealedRecovery).toHaveBeenCalledWith(
       'identity-1',
     );
