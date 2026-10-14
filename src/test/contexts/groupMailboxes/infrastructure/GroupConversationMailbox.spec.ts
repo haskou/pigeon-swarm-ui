@@ -233,8 +233,6 @@ const device = (storage: string): GroupConversationMailbox =>
     channel,
     client: wire,
     composer: composer(),
-    verifiedDevices: (owner) =>
-      Promise.resolve(verified.get(owner.identity.id) ?? []),
     direct: (from) => ({
       send: (conversationId, peer, plaintext) =>
         post(from, conversationId, peer, plaintext),
@@ -259,6 +257,8 @@ const device = (storage: string): GroupConversationMailbox =>
           : GroupMailboxRoster.empty(),
       ),
     storage,
+    verifiedDevices: (owner) =>
+      Promise.resolve(verified.get(owner.identity.id) ?? []),
   });
 
 /** A new identity's first device, or another device of `of`'s identity. */

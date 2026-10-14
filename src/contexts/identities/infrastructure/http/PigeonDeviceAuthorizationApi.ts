@@ -206,6 +206,61 @@ export class PigeonDeviceAuthorizationApi {
     );
   }
 
+  /** The head the signed transitions prove for this device; see synchronize. */
+  private async verifiedHead(session: Session): Promise<DeviceAuthorization> {
+    const identityId = IdentityId.fromString(session.identity.id);
+    const path = `${this.checkpointPath(identityId)}/transitions`;
+    const resource =
+      await this.http.request<DeviceAuthorizationTransitionLogPrimitives>(
+        path,
+        {
+          headers: await this.signer.headersWithDeviceProof(
+            session,
+            'GET',
+            path,
+          ),
+          method: 'GET',
+        },
+      );
+
+    try {
+      const recoveryAuthority = RecoveryAuthority.fromString(
+        session.recoveryAuthorityKeyPair.toPrimitives().publicKey,
+      );
+
+      assert(
+        IdentityMailboxHomeVerifier.isTrusted(
+          identityId.valueOf(),
+          session.identity,
+        ) &&
+          recoveryAuthority.isEqual(
+            RecoveryAuthority.fromString(session.identity.recoveryAuthority),
+          ),
+        new UnprovenDeviceAuthorizationError(),
+      );
+
+      return DeviceRemovalDomainService.verify({
+        genesis: DeviceAuthorization.genesis(
+          identityId,
+          DeviceCredential.fromString(session.identity.deviceCredential),
+          recoveryAuthority,
+        ),
+        local: {
+          epoch: session.authorizationEpoch,
+          revision: session.authorizationRevision,
+        },
+        log: DeviceAuthorizationTransitionLog.fromPrimitives(resource),
+        reader: DeviceCredential.fromString(
+          session.deviceCredentialKeyPair.toPrimitives().publicKey,
+        ),
+      });
+    } catch (error) {
+      if (error instanceof DeviceRemovedError) throw error;
+
+      throw new Error(copy.auth.deviceAuthorizationUnproven);
+    }
+  }
+
   public invite(session: Session): DevicePairingInvitation {
     const now = this.clock();
 
@@ -498,60 +553,10 @@ export class PigeonDeviceAuthorizationApi {
    * node error, as itself.
    */
   public async synchronize(session: Session): Promise<Session> {
-    const identityId = IdentityId.fromString(session.identity.id);
-    const path = `${this.checkpointPath(identityId)}/transitions`;
-    const resource =
-      await this.http.request<DeviceAuthorizationTransitionLogPrimitives>(
-        path,
-        {
-          headers: await this.signer.headersWithDeviceProof(
-            session,
-            'GET',
-            path,
-          ),
-          method: 'GET',
-        },
-      );
-    let head: DeviceAuthorization;
-
-    try {
-      const recoveryAuthority = RecoveryAuthority.fromString(
-        session.recoveryAuthorityKeyPair.toPrimitives().publicKey,
-      );
-
-      assert(
-        IdentityMailboxHomeVerifier.isTrusted(
-          identityId.valueOf(),
-          session.identity,
-        ) &&
-          recoveryAuthority.isEqual(
-            RecoveryAuthority.fromString(session.identity.recoveryAuthority),
-          ),
-        new UnprovenDeviceAuthorizationError(),
-      );
-      head = DeviceRemovalDomainService.verify({
-        genesis: DeviceAuthorization.genesis(
-          identityId,
-          DeviceCredential.fromString(session.identity.deviceCredential),
-          recoveryAuthority,
-        ),
-        local: {
-          epoch: session.authorizationEpoch,
-          revision: session.authorizationRevision,
-        },
-        log: DeviceAuthorizationTransitionLog.fromPrimitives(resource),
-        reader: DeviceCredential.fromString(
-          session.deviceCredentialKeyPair.toPrimitives().publicKey,
-        ),
-      });
-    } catch (error) {
-      if (error instanceof DeviceRemovedError) throw error;
-
-      throw new Error(copy.auth.deviceAuthorizationUnproven);
-    }
+    const head = await this.verifiedHead(session);
 
     await this.vault.synchronizeAuthorization(
-      identityId,
+      head.getIdentityId(),
       session.authorizationRevision,
       head.getEpoch(),
       head.getRevision(),
@@ -562,6 +567,17 @@ export class PigeonDeviceAuthorizationApi {
       authorizationEpoch: head.getEpoch(),
       authorizationRevision: head.getRevision(),
     };
+  }
+
+  /**
+   * The device credentials the signed transitions authorize at their head,
+   * replayed like `synchronize` and never taken from the node's device list.
+   * Rejects as `synchronize` does; stores nothing.
+   */
+  public async verifiedDevices(
+    session: Session,
+  ): Promise<readonly DeviceCredential[]> {
+    return (await this.verifiedHead(session)).getCredentials();
   }
 
   public async apply(

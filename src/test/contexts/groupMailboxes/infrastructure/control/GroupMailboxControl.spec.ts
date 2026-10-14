@@ -157,6 +157,10 @@ const engineOf = (
     stores.state,
     stores.generations,
     () => Promise.resolve(rosterView()),
+    () =>
+      Promise.resolve(
+        ['d1', 'd2', 'd3', 'd4'].map((d) => cast[name].deviceCredential(d)),
+      ),
     () => 1_000,
   );
 };

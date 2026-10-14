@@ -60,6 +60,11 @@ export class GroupMailboxMlsEngine {
   private readonly groups = new Map<string, MlsGroup>();
   private readonly queues = new Map<string, Promise<unknown>>();
   private readonly rosters = new Map<string, GroupMailboxRoster>();
+  /**
+   * This identity's devices as its signed transitions last proved them;
+   * undefined until fetched, which refuses every change to its own leaves.
+   */
+  private verified: ReadonlySet<string> | undefined;
 
   /** A rejection for what MLS refused; any other failure as it is. */
   private static rejection(error: unknown): unknown {
@@ -91,6 +96,8 @@ export class GroupMailboxMlsEngine {
     private readonly rosterFor: (
       conversationId: string,
     ) => Promise<GroupMailboxRoster>,
+    /** See `GroupConversationPorts.verifiedDevices`. */
+    private readonly ownDevices: () => Promise<readonly string[]>,
     private readonly clock: () => number,
   ) {}
 
@@ -217,11 +224,12 @@ export class GroupMailboxMlsEngine {
   }
 
   /**
-   * Whether `inviter` may have welcomed this device into `group`: a member
-   * the roster lets add members, or another device of this identity that
-   * holds a leaf in a group with someone else in it. Joining has already
-   * checked that the roster lists the identity of every leaf, this one's
-   * included.
+   * Whether `inviter` may have welcomed this device into `group`. The leaf
+   * that signed the welcome must be the inviter's: a member the roster lets
+   * add members, or another device of this identity that its signed
+   * transitions still authorize, holding a leaf in a group with someone else
+   * in it. Joining has already checked that the roster lists the identity of
+   * every leaf, this one's included.
    */
   private mayWelcome(
     group: MlsGroup,
@@ -230,6 +238,9 @@ export class GroupMailboxMlsEngine {
   ): boolean {
     const identities = group.identities();
     const self = this.signer.owner.identityId;
+    const welcomer = group.welcomer;
+
+    if (welcomer?.identityId !== inviter) return false;
 
     if (inviter !== self) {
       return Boolean(
@@ -241,6 +252,7 @@ export class GroupMailboxMlsEngine {
     }
 
     return (
+      Boolean(this.verified?.has(welcomer.deviceCredential)) &&
       identities.some((identityId) => identityId !== self) &&
       group.leaves().filter(({ owner }) => owner.identityId === self).length > 1
     );
@@ -360,11 +372,18 @@ export class GroupMailboxMlsEngine {
    * roster, so they bind no roster revision.
    */
   private policyFor(conversationId: string): MlsMembershipPolicy {
+    const self = this.signer.owner.identityId;
+
     return {
       admits: (identityId) =>
         this.rosters.get(conversationId)?.has(identityId) ?? false,
+      // Only this identity's own transitions can be verified here: a change
+      // to its leaves must come from a device they still authorize.
       allows: (change) =>
-        this.rosters.get(conversationId)?.allowsCommit(change) ?? false,
+        (this.rosters.get(conversationId)?.allowsCommit(change) ?? false) &&
+        (change.committer !== self ||
+          ![...change.added, ...change.removed].includes(self) ||
+          Boolean(this.verified?.has(change.committerDevice))),
       frontier: () => [],
       reach: () => 0,
     };
@@ -373,6 +392,43 @@ export class GroupMailboxMlsEngine {
   /** Groups judge credentials and commits against the latest roster. */
   private async refreshRoster(conversationId: string): Promise<void> {
     this.rosters.set(conversationId, await this.rosterFor(conversationId));
+  }
+
+  /**
+   * The roster, and the devices this identity's signed transitions
+   * authorize, before judging a change to the tree. A failed fetch
+   * propagates as itself, so the change is tried again later.
+   */
+  private async refreshPolicy(conversationId: string): Promise<void> {
+    await this.refreshRoster(conversationId);
+    this.verified = new Set(await this.ownDevices());
+  }
+
+  /**
+   * The group the first stored key package opens `welcome` into, with that
+   * key package's id; undefined when none of them does.
+   */
+  private async openWelcome(
+    conversationId: string,
+    welcome: Uint8Array,
+  ): Promise<{ group: MlsGroup; keyPackageId: string } | undefined> {
+    for (const stored of await this.store.loadKeyPackages()) {
+      try {
+        return {
+          group: await MlsGroup.join(
+            conversationId,
+            restoreMlsKeyPackage(stored.publicBytes, stored.privatePackage),
+            welcome,
+            this.policyFor(conversationId),
+          ),
+          keyPackageId: stored.id,
+        };
+      } catch {
+        // Not addressed to this key package; try the next one.
+      }
+    }
+
+    return undefined;
   }
 
   /**
@@ -428,7 +484,7 @@ export class GroupMailboxMlsEngine {
     return this.exclusive(conversationId, async () => {
       const group = await this.requireGroup(conversationId);
 
-      await this.refreshRoster(conversationId);
+      await this.refreshPolicy(conversationId);
 
       return this.commit(group, await group.add(keyPackages), publish);
     });
@@ -444,7 +500,7 @@ export class GroupMailboxMlsEngine {
     bytes: Uint8Array,
   ): Promise<MlsCommitOutcome> {
     return this.exclusive(conversationId, async () => {
-      await this.refreshRoster(conversationId);
+      await this.refreshPolicy(conversationId);
       const { epoch, group, outcome, pending } = await this.process(
         await this.requireGroup(conversationId),
         bytes,
@@ -609,9 +665,10 @@ export class GroupMailboxMlsEngine {
    * Joins from a welcome that `inviter`, the peer who sent it, made. Every
    * add advances the generation, so the joiner exports `gen_k` from the
    * welcome epoch itself; only the public index `k` comes from the inviter.
-   * The inviter must hold a leaf in the welcomed group and be allowed by
-   * the roster to add members, or be another device of this identity in a
-   * group that holds someone else too. A welcome opens once; a removed
+   * The leaf that signed the welcome must be the inviter's, hold a leaf in
+   * the welcomed group and be allowed by the roster to add members, or be
+   * a device of this identity that its signed transitions still authorize,
+   * in a group that holds someone else too. A welcome opens once; a removed
    * device can join again from a welcome newer than its last membership.
    */
   public async join(
@@ -629,51 +686,39 @@ export class GroupMailboxMlsEngine {
       if (previous && !previous.isRemoved) {
         throw new MlsRejectedError('Group already exists on this device');
       }
-      await this.refreshRoster(conversationId);
+      await (inviter === this.signer.owner.identityId
+        ? this.refreshPolicy(conversationId)
+        : this.refreshRoster(conversationId));
+      const opened = await this.openWelcome(conversationId, welcome);
 
-      for (const stored of await this.store.loadKeyPackages()) {
-        let group: MlsGroup;
+      if (!opened) {
+        throw new MlsRejectedError('No key package of this device opens it');
+      }
+      const { group } = opened;
 
-        try {
-          group = await MlsGroup.join(
-            conversationId,
-            restoreMlsKeyPackage(stored.publicBytes, stored.privatePackage),
-            welcome,
-            this.policyFor(conversationId),
-          );
-        } catch {
-          // Not addressed to this key package; try the next one.
-          continue;
-        }
-
-        if (previous && group.epoch <= previous.epoch) {
-          throw new MlsRejectedError(
-            'The welcome is older than the last membership of this device',
-          );
-        }
-
-        if (!this.mayWelcome(group, conversationId, inviter)) {
-          throw new MlsRejectedError(
-            'The welcome is not from a member who may add devices',
-          );
-        }
-        // The key package goes last: if a save fails, the welcome opens again.
-        await this.generations.save(
-          conversationId,
-          GroupMailboxGenerationLog.empty().start(
-            await this.exportGeneration(group),
-            group.epoch,
-            this.treeOf(group),
-            index,
-          ),
+      if (previous && group.epoch <= previous.epoch) {
+        throw new MlsRejectedError(
+          'The welcome is older than the last membership of this device',
         );
-        await this.remember(group);
-        await this.store.deleteKeyPackage(stored.id);
-
-        return;
       }
 
-      throw new MlsRejectedError('No key package of this device opens it');
+      if (!this.mayWelcome(group, conversationId, inviter)) {
+        throw new MlsRejectedError(
+          'The welcome is not from a member who may add devices',
+        );
+      }
+      // The key package goes last: if a save fails, the welcome opens again.
+      await this.generations.save(
+        conversationId,
+        GroupMailboxGenerationLog.empty().start(
+          await this.exportGeneration(group),
+          group.epoch,
+          this.treeOf(group),
+          index,
+        ),
+      );
+      await this.remember(group);
+      await this.store.deleteKeyPackage(opened.keyPackageId);
     });
   }
 
@@ -731,7 +776,7 @@ export class GroupMailboxMlsEngine {
     return this.exclusive(conversationId, async () => {
       const group = await this.requireGroup(conversationId);
 
-      await this.refreshRoster(conversationId);
+      await this.refreshPolicy(conversationId);
       const output = await group.removeIdentities(identityIds);
 
       return output ? this.commit(group, output, publish) : undefined;
@@ -751,7 +796,7 @@ export class GroupMailboxMlsEngine {
     return this.exclusive(conversationId, async () => {
       const group = await this.requireGroup(conversationId);
 
-      await this.refreshRoster(conversationId);
+      await this.refreshPolicy(conversationId);
       const output = await group.removeDevices(
         this.signer.owner.identityId,
         deviceCredentials,

@@ -40,9 +40,11 @@ state (see "Security properties and limits").
 Each leaf is a **device**, not an identity. An identity is in the group while
 at least one of its devices is. Removing an identity removes all its leaves. In
 a group conversation every device of a member holds its own leaf (#417): the
-device leading its identity's leaves adds the identity's other listed devices
-and removes the leaves of revoked ones, without a manager (see Device add and
-Reconcile in `docs/opaque-mailboxes-client.md`).
+device leading its identity's leaves adds the identity's other devices and
+removes the leaves of revoked ones, without a manager (see Device add and
+Reconcile in `docs/opaque-mailboxes-client.md`). Which devices are current
+comes from the identity's signed device transitions, replayed and verified
+on the device, never from the node's device list (#441).
 
 The old shared `communityKey`, `EncryptedCommunityKey`, invite key envelopes and
 `Session.keychain.conversations[communityId]` community keys are removed. There
@@ -345,16 +347,28 @@ and attachments, and a missing group is an error, not a fallback.
   members; a removal of someone still on the roster follows the conversation
   rule (never the creator or the remover, an admin only by the creator). A
   commit that only rotates the committer's own leaf, or only adds or removes
-  leaves of the committer's own identity, needs no role. A device welcomed by
-  its own identity joins only when the group already holds another leaf of
-  that identity and an identity other than it, and the roster lists the
-  identity of every leaf. Residual: until its leaf is removed, a revoked device
-  can add or remove leaves of its own identity, and it can welcome a sibling
-  device that is still waiting for its leaf into a look-alike group of that
-  conversation, whose leaves hold only roster members, so it reads what the
-  sibling sends there (a confidentiality gap, not only a denial of service).
-  Other members cannot verify an identity's device list; when an identity's
-  only leaf device is revoked, a manager must add the identity again.
+  leaves of the committer's own identity, needs no role. A group conversation
+  welcome opens only when the leaf that signed it belongs to the identity the
+  welcome arrived from. A device welcomed by its own identity joins only when
+  the welcoming device is in that identity's verified device set, the group
+  already holds another leaf of that identity and an identity other than it,
+  and the roster lists the identity of every leaf. A device applies a commit
+  that adds or removes leaves of its own identity only when the committing
+  device is in that verified set. The verified set is replayed from the
+  identity's signed device transitions at their head, fetched with this
+  device's proof before each such check, so a revoked device is refused at
+  once, before its leaf is removed; a fetch that fails or does not verify
+  leaves the welcome or commit to be tried again. Residuals: the transitions
+  of another identity are readable only by that identity's own devices, so
+  other members still accept a revoked device's commits on its own
+  identity's leaves until its leaf is removed (a revoked device that keeps
+  the identity key can still sign as that identity). A legitimate welcome or
+  own-leaf commit made just before its author was revoked is refused by a
+  sibling that checks after the revoke: a refused welcome leaves the
+  sibling's leaf in the group unread by it, and a refused commit leaves the
+  sibling behind the group's epoch, a denial of service, never a read. When
+  an identity's only leaf device is revoked, a
+  manager must add the identity again.
 - A community welcome's author is the one the node records. A node that lies
   about it can only name a manager, by the signed operations, who already
   holds a leaf in that group.

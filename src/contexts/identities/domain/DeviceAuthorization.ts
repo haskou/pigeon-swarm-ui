@@ -78,6 +78,10 @@ export class DeviceAuthorization {
     return this.epoch;
   }
 
+  public getCredentials(): readonly DeviceCredential[] {
+    return this.credentials;
+  }
+
   public isAuthorized(credential: DeviceCredential): boolean {
     return this.credentials.some((authorized) =>
       authorized.isEqual(credential),

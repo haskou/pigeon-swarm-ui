@@ -31,8 +31,9 @@ import { GroupConversationTimeline } from './GroupConversationTimeline';
  * Each leaf is a device. Of an identity's devices, only the one with the
  * lowest device credential among its current devices holding a leaf
  * commits, so its devices never race each other either: it removes the
- * leaves of devices the identity no longer lists, as after a revoke, and
- * adds its listed devices that hold no leaf.
+ * leaves of devices the identity's signed transitions no longer authorize,
+ * as after a revoke, and adds the authorized devices that hold no leaf. A
+ * device only the node lists is never asked for a key package.
  * Reading a conversation's inboxes and replaying its history run one at a
  * time, so a replay never misses what a background read stored meanwhile.
  */
@@ -79,18 +80,18 @@ export class GroupConversationMailbox {
   }
 
   /**
-   * Adds this identity's listed devices that hold no leaf yet, unless the
+   * Adds this identity's verified devices that hold no leaf yet, unless the
    * roster no longer lists this identity. Resolves how many it added.
    */
   private async addMissingDevices(
     member: GroupConversationMember,
     conversationId: string,
     roster: GroupMailboxRoster,
-    listed: ReadonlySet<string>,
+    verified: ReadonlySet<string>,
     leaves: readonly string[],
   ): Promise<number> {
     if (!roster.has(member.session.identity.id)) return 0;
-    const missing = [...listed].filter(
+    const missing = [...verified].filter(
       (credential) => !leaves.includes(credential),
     );
 
@@ -102,8 +103,9 @@ export class GroupConversationMailbox {
   }
 
   /**
-   * Commits the roster and this identity's device list into the MLS group
-   * when this device is the one. Logs counts only.
+   * Commits the roster and the devices this identity's signed transitions
+   * authorize into the MLS group when this device is the one. Logs counts
+   * only.
    */
   private async reconcile(
     member: GroupConversationMember,
@@ -115,14 +117,14 @@ export class GroupConversationMailbox {
     const leaves = await member.engine.devices(conversationId);
 
     if (leaves.length === 0) return;
-    const listed = new Set(await this.ports.devices(session));
-    const lead = leaves.find((credential) => listed.has(credential));
+    const verified = new Set(await this.ports.verifiedDevices(session));
+    const lead = leaves.find((credential) => verified.has(credential));
 
     if (lead !== session.deviceCredentialKeyPair.toPrimitives().publicKey) {
       return;
     }
     const roster = known ?? (await this.ports.roster(session, conversationId));
-    const revoked = leaves.filter((credential) => !listed.has(credential));
+    const revoked = leaves.filter((credential) => !verified.has(credential));
 
     if (revoked.length > 0) {
       await member.control.removeDevices(conversationId, revoked);
@@ -132,7 +134,7 @@ export class GroupConversationMailbox {
       member,
       conversationId,
       roster,
-      listed,
+      verified,
       leaves,
     );
 
