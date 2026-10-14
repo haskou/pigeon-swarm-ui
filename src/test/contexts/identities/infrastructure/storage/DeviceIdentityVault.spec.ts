@@ -10,6 +10,7 @@ import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 import { DeviceIdentityVault } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVault';
 import { DevicePasskeyUnlockEnabledError } from '../../../../../contexts/identities/infrastructure/storage/DevicePasskeyUnlockEnabledError';
+import { DeviceUnlockNotConfirmedError } from '../../../../../contexts/identities/infrastructure/storage/DeviceUnlockNotConfirmedError';
 
 class MemoryStore implements DeviceIdentityVaultStore {
   public readonly records = new Map<string, DeviceIdentityVaultRecord>();
@@ -188,6 +189,25 @@ describe(DeviceIdentityVault.name, () => {
     expect(after?.envelope).not.toBe(before?.envelope);
   });
 
+  it('confirms the current password without changing this device', async () => {
+    const store = new MemoryStore();
+    const source = await fixture();
+    const vault = new DeviceIdentityVault(store);
+    await vault.register({ ...source, password: 'password' });
+    const before = store.records.get(source.identityId.valueOf());
+
+    await expect(
+      vault.confirmUnlock(source.identityId, 'password'),
+    ).resolves.toBeUndefined();
+    await expect(
+      vault.confirmUnlock(source.identityId, 'wrong password'),
+    ).rejects.toBeInstanceOf(DeviceUnlockNotConfirmedError);
+    await expect(vault.confirmUnlock(source.identityId)).rejects.toBeInstanceOf(
+      DeviceUnlockNotConfirmedError,
+    );
+    expect(store.records.get(source.identityId.valueOf())).toBe(before);
+  });
+
   describe('passkey unlock', () => {
     const credential = { credentialId: 'credential-id', salt: 'prf-salt' };
     const passkeySecret = 'prf-output-secret';
@@ -306,6 +326,25 @@ describe(DeviceIdentityVault.name, () => {
       expect(restored.material.rootKey.isEqual(source.material.rootKey)).toBe(
         true,
       );
+    });
+
+    it('confirms the person with the passkey, never a typed password', async () => {
+      const store = new MemoryStore();
+      const source = await fixture();
+      const authenticator = passkeys();
+      const vault = new DeviceIdentityVault(store, undefined, authenticator);
+      await vault.register({ ...source, password: 'password' });
+      await vault.enablePasskey(source.identityId, 'password', 'Alice');
+
+      await expect(
+        vault.confirmUnlock(source.identityId, 'password'),
+      ).resolves.toBeUndefined();
+      expect(authenticator.evaluate).toHaveBeenCalledWith(credential);
+
+      authenticator.evaluate.mockRejectedValueOnce(new Error('cancelled'));
+      await expect(
+        vault.confirmUnlock(source.identityId),
+      ).rejects.toBeInstanceOf(DeviceUnlockNotConfirmedError);
     });
   });
 

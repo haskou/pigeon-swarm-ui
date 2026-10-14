@@ -73,4 +73,29 @@ describe('ContactPinStore', () => {
     );
     expect(store.load('local-1')).toEqual({});
   });
+
+  it('merges restored contacts into the ones already on this device', () => {
+    const store = new ContactPinStore();
+
+    store.remember('local-1', 'identity-x', 'bob');
+    store.restore('local-1', {
+      'identity-x': { handle: 'robert' },
+      'identity-y': { handle: 'carol', verifiedAt: '2026-05-01T00:00:00.000Z' },
+    });
+
+    expect(store.load('local-1')).toEqual({
+      'identity-x': { handle: 'bob' },
+      'identity-y': { handle: 'carol', verifiedAt: '2026-05-01T00:00:00.000Z' },
+    });
+  });
+
+  it('reports restored contacts that could not be saved', () => {
+    refuseWrites = true;
+
+    expect(() =>
+      new ContactPinStore().restore('local-1', {
+        'identity-y': { handle: 'carol' },
+      }),
+    ).toThrow('QuotaExceededError');
+  });
 });

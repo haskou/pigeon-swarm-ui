@@ -325,6 +325,12 @@ Client side of haskou/pigeon-swarm-node#290: a direct inbox is kept on several n
 - Failures: a publish failure stops the export and is logged without content; the completion still carries the secret, and the new device imports whatever reached the transfer inbox (nothing when the inbox was never created). An authorize failure after a publish leaves an orphaned transfer inbox that expires with the node's retention. The secret is held in memory only, so a reload before import loses the transfer; the import does not resume after a reload. The export sends one POST per record, sequentially (up to 500); its latency is not measured.
 - Import storage full: when the new device cannot store a page (`DirectMessageHistoryStorageError`), the import stops before acknowledging that page, so the transfer inbox keeps it until the node's retention expires it. The import does not resume after a reload, so that history is not imported.
 
+## History backup file
+
+- Export: `DirectMessageMailbox.exportHistory` returns every stored one-to-one record of the identity, oldest first (`DirectMessageHistoryStore.all`). Unlike the pairing export it has no record cap, and it rejects with `DirectMessageHistoryStorageError` when the store cannot be read, so a failure never yields an empty backup. `PigeonHistoryBackup` adds the contact pins and seals the payload with `HistoryBackupFile` after the device unlock is confirmed again; key, format and guarantees are in `docs/local-unlock.md` (History backup).
+- Import: `DirectMessageMailbox.importHistory` decodes each record for its conversation and drops anything that is not a version 2 direct record of that conversation. The file is authenticated under the identity root, so own records are tagged again under the current device root (`DirectMessageAuthorship.tag`) and peer records keep their bytes. Records dedupe on the record id, so restoring twice adds nothing. A full store rejects with `DirectMessageHistoryStorageError`; records stored before it stay.
+- Not included: group history, mailbox read tokens, MLS and ratchet state, keychain entries.
+
 ## Verification
 
 - Pinned vectors and envelope/proof behavior: `src/test/contexts/mailboxes/**` under the real-crypto suite (`yarn test:crypto`).

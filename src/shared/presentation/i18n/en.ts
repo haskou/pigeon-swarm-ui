@@ -703,6 +703,18 @@ export const en = {
     scanQr: 'Scan QR',
   },
   deviceStorage: {
+    backingUp: 'Preparing backup...',
+    backup: 'Back up history and contacts',
+    backupBody:
+      'Saves your direct-message history and remembered contacts in one encrypted file. Only this identity can open it, on any of its devices. Anyone who later gets into this identity, for example with your recovery key, and also has the file can read that history, so keep the file private. Group history and the keys that protect conversations are not included.',
+    backupDone: 'Backup saved.',
+    backupFailed: 'The backup could not be created.',
+    backupPassword: 'Confirm your password to back up',
+    backupTitle: 'Backup',
+    backupUnreadable:
+      'This file is not a backup of this identity, or it was changed.',
+    backupVersion:
+      'This backup format is not supported. Create a new backup with this version of the app.',
     help: 'What is kept here, on the server, and with other people.',
     low: 'Space is running low. New messages may not be saved here until you free some space.',
     notProtected:
@@ -714,6 +726,10 @@ export const en = {
     onServerBody:
       'New direct messages wait on the server, encrypted, until your devices download them, for up to 14 days. After that they expire. The server cannot read them.',
     protected: 'Protected: the browser keeps this data when space runs low.',
+    restore: 'Restore from a backup',
+    restored: 'History and contacts restored.',
+    restoreFailed: 'The backup could not be restored.',
+    restoring: 'Restoring...',
     title: 'Storage on this device',
     unavailable: 'This browser does not report how much storage is used.',
     usage: '{usage} of {quota} used',
@@ -1438,6 +1454,7 @@ export const en = {
       'Shows technical identifiers, versions, encryption metadata and diagnostic controls throughout the app. This preference is stored only in this browser.',
     technicalDetailsWarning:
       'Technical data can expose sensitive metadata. Do not share it unless you understand what it contains.',
+    unlockNotConfirmed: 'Your password or passkey could not be confirmed.',
     updateError: 'The profile could not be updated.',
     versions: 'Versions',
   },

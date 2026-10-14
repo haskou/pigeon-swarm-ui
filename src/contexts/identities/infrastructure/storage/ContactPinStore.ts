@@ -1,6 +1,8 @@
 import { scopeClientStorageKey } from '../../../../shared/infrastructure/storage/ClientStorageScope';
 import {
   type ContactPins,
+  mergeContactPins,
+  parseContactPins,
   rememberContact,
   unverifyContact,
   verifyContact,
@@ -10,41 +12,6 @@ const storagePrefix = 'pigeon-swarm:contact-pins:v1';
 
 function storageKey(localIdentityId: string): string {
   return scopeClientStorageKey(`${storagePrefix}:${localIdentityId}`);
-}
-
-function nonEmptyString(value: unknown): string | undefined {
-  return typeof value === 'string' && value ? value : undefined;
-}
-
-function parseContactPin(entry: unknown): ContactPins[string] | null {
-  if (typeof entry !== 'object' || entry === null) return null;
-
-  const { handle, verifiedAt } = entry as Record<string, unknown>;
-  const pin: ContactPins[string] = {};
-  const parsedHandle = nonEmptyString(handle);
-  const parsedVerifiedAt = nonEmptyString(verifiedAt);
-
-  if (parsedHandle) pin.handle = parsedHandle;
-
-  if (parsedVerifiedAt) pin.verifiedAt = parsedVerifiedAt;
-
-  return parsedHandle || parsedVerifiedAt ? pin : null;
-}
-
-function parseContactPins(value: unknown): ContactPins {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return {};
-  }
-
-  const pins: ContactPins = {};
-
-  for (const [identityId, entry] of Object.entries(value)) {
-    const pin = parseContactPin(entry);
-
-    if (pin) pins[identityId] = pin;
-  }
-
-  return pins;
 }
 
 /**
@@ -109,6 +76,18 @@ export class ContactPinStore {
     if (next !== current) this.save(localIdentityId, next);
 
     return next;
+  }
+
+  /**
+   * Adds contacts from a backup. Pins already on this device win, and a
+   * restored pin never takes a handle held here. Throws when the browser
+   * refuses the write, so the UI can say so.
+   */
+  public restore(localIdentityId: string, restored: ContactPins): void {
+    this.save(
+      localIdentityId,
+      mergeContactPins(this.load(localIdentityId), restored),
+    );
   }
 
   private save(localIdentityId: string, pins: ContactPins): void {

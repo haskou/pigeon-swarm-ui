@@ -255,9 +255,31 @@ applies (see "What each choice protects against").
   payloads, or topics. The realtime gateway constructor's signed-URL log was
   fixed in PR #246, which is on `main`. Passkey errors carry only a copy key;
   the PRF output, salt and credential ID are never logged or shown.
-- **Diagnostics.** The only export is the call diagnostic report
-  (`callDiagnosticReport.ts`), which holds connection state, not keys or
-  message content. The client has no crash reporter.
+- **Diagnostics.** The call diagnostic report (`callDiagnosticReport.ts`)
+  holds connection state, not keys or message content. The client has no crash
+  reporter.
+- **History backup.** Profile → device storage → Backup writes one file with
+  this identity's stored one-to-one history and contact pins
+  (`PigeonHistoryBackup`, `HistoryBackupFile`). Exporting first asks again for
+  the device password, or the passkey when one unlocks this device
+  (`DeviceIdentityVault.confirmUnlock`, no side effects); a refusal exports
+  nothing. The file is AES-256-GCM under a key derived with HKDF-SHA256 from
+  the identity root, labelled for backups and bound to the identity id, which
+  is also authenticated as associated data and never written in clear. The
+  identity root is the one the recovery key rebuilds, so any device of the
+  identity opens the file, also after a password change, passkey change or
+  device-root rotation, and no other identity can. The file holds stored
+  records only: no private keys, keychain entries, MLS state, ratchet state or
+  session keys, and no group history. Format `pigeon-swarm-backup` version 1
+  is the only one read: another version is refused as unsupported, and a
+  wrong identity, a changed byte or a malformed payload as unreadable, before
+  anything is stored. Restore re-tags own records under the current device
+  root, skips records already stored, and merges contact pins so pins on this
+  device win and a restored pin never takes a handle held here.
+  **Guarantee change:** forward secrecy no longer covers backed-up messages.
+  Whoever holds a backup file and later steals the identity root or the
+  recovery key reads the history in it, even after it was deleted from every
+  device. Keep backup files private and delete old ones.
 - **Content Security Policy.** The production build injects a
   `Content-Security-Policy` meta tag (policy in
   `src/shared/infrastructure/security/contentSecurityPolicy.ts`, applied in

@@ -121,6 +121,13 @@ export class PigeonIdentityCommandsApi {
     );
   }
 
+  public async confirmLocalUnlock(
+    identityId: string,
+    password?: string,
+  ): Promise<void> {
+    await this.vault.confirmUnlock(IdentityId.fromString(identityId), password);
+  }
+
   public async enablePasskeyUnlock(
     session: Session,
     currentPassword: string,

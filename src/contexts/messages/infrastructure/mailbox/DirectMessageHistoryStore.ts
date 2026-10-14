@@ -232,6 +232,47 @@ export class DirectMessageHistoryStore {
     return indexedDbRequest(openRequest);
   }
 
+  private async openItems(
+    cipher: DeviceRootRowCipher,
+    rows: DirectMessageHistoryRow[],
+  ): Promise<DirectMessageHistoryItem[]> {
+    const opened = await Promise.all(
+      rows.map(async (row) => {
+        const plaintext = await cipher.open(
+          recordAad(row.identityId, row.conversationId, row.recordId),
+          row.sealed,
+        );
+
+        return plaintext === undefined
+          ? undefined
+          : { conversationId: row.conversationId, plaintext };
+      }),
+    );
+
+    return opened.filter(
+      (item): item is DirectMessageHistoryItem => item !== undefined,
+    );
+  }
+
+  /**
+   * Every record of this identity across conversations, oldest first. Feeds
+   * the backup file. Rejects with `DirectMessageHistoryStorageError` so a
+   * failed read never passes for an empty history.
+   */
+  public async all(session: Session): Promise<DirectMessageHistoryItem[]> {
+    try {
+      const cipher = await this.verifiedCipher(session);
+      const rows = await this.recentRows(
+        session.identity.id,
+        Number.POSITIVE_INFINITY,
+      );
+
+      return await this.openItems(cipher, rows.reverse());
+    } catch {
+      throw new DirectMessageHistoryStorageError();
+    }
+  }
+
   /**
    * Stores the entries, deduped by record id. A failed write, such as an
    * exhausted browser quota, rejects with `DirectMessageHistoryStorageError`,
@@ -344,22 +385,9 @@ export class DirectMessageHistoryStore {
     try {
       const cipher = await this.verifiedCipher(session);
 
-      const rows = await this.recentRows(session.identity.id, limit);
-      const opened = await Promise.all(
-        rows.map(async (row) => {
-          const plaintext = await cipher.open(
-            recordAad(row.identityId, row.conversationId, row.recordId),
-            row.sealed,
-          );
-
-          return plaintext === undefined
-            ? undefined
-            : { conversationId: row.conversationId, plaintext };
-        }),
-      );
-
-      return opened.filter(
-        (item): item is DirectMessageHistoryItem => item !== undefined,
+      return await this.openItems(
+        cipher,
+        await this.recentRows(session.identity.id, limit),
       );
     } catch {
       // eslint-disable-next-line no-console

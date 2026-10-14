@@ -104,6 +104,80 @@ export function unverifyContact(
 }
 
 /**
+ * Adds restored pins to the ones on this device. Local pins win. A restored
+ * handle already held by another identity is dropped, keeping the verification,
+ * so a backup cannot move a handle to a different key.
+ */
+export function mergeContactPins(
+  pins: ContactPins,
+  restored: ContactPins,
+): ContactPins {
+  const next: ContactPins = { ...pins };
+  const held = new Set(Object.values(pins).map((pin) => pin.handle));
+
+  for (const [identityId, pin] of Object.entries(restored)) {
+    if (next[identityId]) continue;
+
+    const merged = withoutHeldHandle(pin, held);
+
+    if (merged.handle) held.add(merged.handle);
+
+    if (merged.handle || merged.verifiedAt) next[identityId] = merged;
+  }
+
+  return next;
+}
+
+function withoutHeldHandle(
+  pin: ContactPin,
+  held: Set<string | undefined>,
+): ContactPin {
+  const merged: ContactPin = {};
+
+  if (pin.handle && !held.has(pin.handle)) merged.handle = pin.handle;
+
+  if (pin.verifiedAt) merged.verifiedAt = pin.verifiedAt;
+
+  return merged;
+}
+
+function nonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value ? value : undefined;
+}
+
+function parseContactPin(entry: unknown): ContactPin | null {
+  if (typeof entry !== 'object' || entry === null) return null;
+
+  const { handle, verifiedAt } = entry as Record<string, unknown>;
+  const pin: ContactPin = {};
+  const parsedHandle = nonEmptyString(handle);
+  const parsedVerifiedAt = nonEmptyString(verifiedAt);
+
+  if (parsedHandle) pin.handle = parsedHandle;
+
+  if (parsedVerifiedAt) pin.verifiedAt = parsedVerifiedAt;
+
+  return parsedHandle || parsedVerifiedAt ? pin : null;
+}
+
+/** Keeps only well-formed pins from untrusted stored or restored data. */
+export function parseContactPins(value: unknown): ContactPins {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return {};
+  }
+
+  const pins: ContactPins = {};
+
+  for (const [identityId, entry] of Object.entries(value)) {
+    const pin = parseContactPin(entry);
+
+    if (pin) pins[identityId] = pin;
+  }
+
+  return pins;
+}
+
+/**
  * Sets the pin for one identity. A handle belongs to exactly one identity, so
  * the claimed handle is removed from every other pin. Other pins keep their
  * verification even when their handle is released.
