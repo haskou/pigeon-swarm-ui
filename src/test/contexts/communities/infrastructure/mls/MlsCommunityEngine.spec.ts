@@ -675,6 +675,87 @@ describe('MlsCommunityEngine', () => {
         'still ours',
       );
     });
+
+    it('keeps a kicked member out when it races its removal with a backdated commit', async () => {
+      const { alice, bob, carol } = await admitCarol();
+      const mallory = engineFor('mallory');
+
+      roster.add(id('mallory'));
+      await mallory.engine.publishKeyPackages(COMMUNITY);
+      await alice.engine.reconcile(COMMUNITY);
+      await Promise.all(
+        [bob, carol, mallory].map(({ engine }) => engine.sync(COMMUNITY)),
+      );
+      const beforeKick = headsNow();
+
+      roster.delete(id('carol'));
+      await alice.engine.reconcile(COMMUNITY);
+      const removal = node.records[node.records.length - 1];
+
+      await bob.engine.sync(COMMUNITY);
+      // Carol never saw her removal; she grinds a commit for its epoch
+      // that wins on id, bound to the roster before the kick.
+      let backdated = await (
+        await rogueGroupOf('carol', carol.store, beforeKick)
+      ).update();
+
+      for (
+        let attempt = 0;
+        attempt < 64 &&
+        deriveMlsRecordId({
+          epoch: Number(backdated.epoch),
+          groupId: COMMUNITY,
+          kind: 'commit',
+          payload: base64(backdated.commit),
+        }) >= removal.recordId;
+        attempt += 1
+      ) {
+        backdated = await (
+          await rogueGroupOf('carol', carol.store, beforeKick)
+        ).update();
+      }
+      await publishCommit('carol', backdated);
+
+      for (const member of [bob, mallory]) {
+        await expect(member.engine.sync(COMMUNITY)).resolves.toBe(true);
+        await expect(
+          member.engine.identities(COMMUNITY),
+        ).resolves.not.toContain(id('carol'));
+      }
+      const ciphertext = await alice.engine.encrypt(COMMUNITY, 'without carol');
+
+      await expect(bob.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
+        'without carol',
+      );
+      await expect(mallory.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
+        'without carol',
+      );
+    });
+
+    it('refuses a welcome into a look-alike group from a demoted member', async () => {
+      moderators.add(id('carol'));
+      roster.add(id('mallory'));
+      const alice = engineFor('alice');
+      const mallory = engineFor('mallory');
+      const beforeDemotion = headsNow();
+      const lookAlike = await MlsGroup.create(
+        COMMUNITY,
+        await generateMlsKeyPackage(cast.carol.signer()),
+        { ...anything, frontier: () => beforeDemotion },
+      );
+
+      await alice.engine.createGroup(COMMUNITY);
+      await mallory.engine.publishKeyPackages(COMMUNITY);
+      await publishWelcome(
+        'carol',
+        await lookAlike.add([keyPackageOf('mallory')]),
+        'mallory',
+      );
+      demoteCarol();
+
+      await expect(mallory.engine.sync(COMMUNITY)).resolves.toBe(true);
+      await expect(mallory.engine.hasGroup(COMMUNITY)).resolves.toBe(false);
+    });
   });
 
   it('rejects the removal of a listed member by someone who may not kick', async () => {
