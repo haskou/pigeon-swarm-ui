@@ -1,6 +1,13 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
 
 import type { MessageCollectionState } from '../../../../../app/presentation/workspace/components/conversationThreadState';
 import type { ConversationResource } from '../../../../../contexts/conversations/infrastructure/http/ConversationResource';
@@ -20,7 +27,8 @@ jest.mock('react', () => ({
 jest.mock('../../../../../app/composition/applicationContainer', () => ({
   applicationContainer: {
     directMessages: { pin: jest.fn() },
-    messages: { listPins: jest.fn(), pin: jest.fn(), unpin: jest.fn() },
+    groupMessages: { pin: jest.fn() },
+    messages: { pin: jest.fn(), unpin: jest.fn() },
   },
 }));
 
@@ -37,6 +45,7 @@ const group = {
 const session = { identity: { id: 'alice' } } as unknown as Session;
 const message = { id: 'message-1' } as unknown as ChatMessage;
 const other = { id: 'message-2' } as unknown as ChatMessage;
+const now = 1_700_000_000_000;
 
 const pinnedCollection = {
   error: null,
@@ -84,6 +93,11 @@ function mountPins({
 describe('useConversationPins', () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('pins a one-to-one message through the messages use cases only', async () => {
@@ -151,31 +165,60 @@ describe('useConversationPins', () => {
     });
   });
 
-  it('builds the one-to-one pins view from pinned timeline messages without a legacy listing', async () => {
-    const { pins } = mountPins({ messages: [message, other] });
-    pins.pinnedMessageIds.add('message-1');
+  it.each([
+    ['one-to-one', oneToOne],
+    ['group', group],
+  ])(
+    'builds the %s pins view from pinned timeline messages',
+    (_type, activeConversation) => {
+      const { pins } = mountPins({
+        activeConversation,
+        messages: [message, other],
+      });
+      pins.pinnedMessageIds.add('message-1');
 
-    await pins.open();
+      pins.open();
 
-    expect(applicationContainer.messages.listPins).not.toHaveBeenCalled();
-    expect(pins.setCollection).toHaveBeenLastCalledWith({
-      error: null,
-      messages: [message],
-      state: 'ready',
-    });
-  });
+      expect(pins.setCollection).toHaveBeenLastCalledWith({
+        error: null,
+        messages: [message],
+        state: 'ready',
+      });
+    },
+  );
 
-  it('pins a group message through the messages use cases only', async () => {
-    jest.mocked(applicationContainer.messages.pin).mockResolvedValue(undefined);
+  it('pins a group message through the group mailbox only', async () => {
+    jest
+      .mocked(applicationContainer.groupMessages.pin)
+      .mockResolvedValue(undefined);
     const { pins } = mountPins({ activeConversation: group });
 
     await pins.pin(message);
 
-    expect(applicationContainer.messages.pin).toHaveBeenCalledWith(
+    expect(applicationContainer.groupMessages.pin).toHaveBeenCalledWith(
       session,
       group,
-      'message-1',
+      { action: 'pin', createdAt: now, messageId: 'message-1' },
     );
-    expect(applicationContainer.directMessages.pin).not.toHaveBeenCalled();
+    expect(applicationContainer.messages.pin).not.toHaveBeenCalled();
+    expect(pinnedUpdaterOf(pins.setPinnedMessageIds)(new Set())).toEqual(
+      new Set(['message-1']),
+    );
+  });
+
+  it('unpins a group message through the group mailbox only', async () => {
+    jest
+      .mocked(applicationContainer.groupMessages.pin)
+      .mockResolvedValue(undefined);
+    const { pins } = mountPins({ activeConversation: group });
+
+    await pins.unpin(message);
+
+    expect(applicationContainer.groupMessages.pin).toHaveBeenCalledWith(
+      session,
+      group,
+      { action: 'unpin', createdAt: now, messageId: 'message-1' },
+    );
+    expect(applicationContainer.messages.unpin).not.toHaveBeenCalled();
   });
 });

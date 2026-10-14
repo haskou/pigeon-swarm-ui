@@ -5,12 +5,10 @@ import { MessageLifecycle } from '../../../../contexts/messages/domain/entities/
 import { MessageReactions } from '../../../../contexts/messages/domain/entities/MessageReactions';
 import { MessageAuthorIdRequiredError } from '../../../../contexts/messages/domain/errors/MessageAuthorIdRequiredError';
 import { MessageLinkPreviewUrlInvalidError } from '../../../../contexts/messages/domain/errors/MessageLinkPreviewUrlInvalidError';
-import { MessagePageLimitInvalidError } from '../../../../contexts/messages/domain/errors/MessagePageLimitInvalidError';
 import { MessageAuthorId } from '../../../../contexts/messages/domain/value-objects/MessageAuthorId';
 import { MessageContent } from '../../../../contexts/messages/domain/value-objects/MessageContent';
 import { MessageKind } from '../../../../contexts/messages/domain/value-objects/MessageKind';
 import { MessageLinkPreviewUrl } from '../../../../contexts/messages/domain/value-objects/MessageLinkPreviewUrl';
-import { MessagePageLimit } from '../../../../contexts/messages/domain/value-objects/MessagePageLimit';
 import { MessageReactionEmoji } from '../../../../contexts/messages/domain/value-objects/MessageReactionEmoji';
 import { MessageVisibility } from '../../../../contexts/messages/domain/value-objects/MessageVisibility';
 
@@ -23,13 +21,6 @@ describe('message domain values', () => {
     ).toBe('identity-a');
     expect(() => MessageAuthorId.fromString(' ')).toThrow(
       MessageAuthorIdRequiredError,
-    );
-  });
-
-  it('requires a positive page limit', () => {
-    expect(MessagePageLimit.fromNumber(30).valueOf()).toBe(30);
-    expect(() => MessagePageLimit.fromNumber(0)).toThrow(
-      MessagePageLimitInvalidError,
     );
   });
 

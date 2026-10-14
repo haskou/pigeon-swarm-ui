@@ -53,6 +53,28 @@ describe('WorkspaceDerivedState', () => {
     ).toBe(conversations[0]);
   });
 
+  it('treats a group as ready without a conversation key', () => {
+    const group = { id: 'group', type: 'group' } as ConversationResource;
+    const direct = {
+      id: 'direct',
+      type: 'one-to-one',
+    } as ConversationResource;
+    const key = { conversationId: 'direct' } as Parameters<
+      typeof WorkspaceDerivedState.conversationReady
+    >[1];
+
+    expect(WorkspaceDerivedState.conversationReady(group, undefined)).toBe(
+      true,
+    );
+    expect(WorkspaceDerivedState.conversationReady(direct, undefined)).toBe(
+      false,
+    );
+    expect(WorkspaceDerivedState.conversationReady(direct, key)).toBe(true);
+    expect(WorkspaceDerivedState.conversationReady(undefined, undefined)).toBe(
+      false,
+    );
+  });
+
   it('finds pending invitations only for the active recipient and scope', () => {
     const conversationInvitation = conversationInvite();
     const communityInvitation = communityInvite();

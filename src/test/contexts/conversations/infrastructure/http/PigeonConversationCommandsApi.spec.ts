@@ -10,7 +10,6 @@ import { ConversationIdFactory } from '../../../../../contexts/conversations/dom
 import { ConversationMapper } from '../../../../../contexts/conversations/infrastructure/http/ConversationMapper';
 import { ConversationOperationSigner } from '../../../../../contexts/conversations/infrastructure/http/ConversationOperationSigner';
 import { PigeonConversationCommandsApi } from '../../../../../contexts/conversations/infrastructure/http/PigeonConversationCommandsApi';
-import { ConversationKeyRequiredError } from '../../../../../contexts/messages/domain/errors/ConversationKeyRequiredError';
 import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
 const target = { id: 'group:abc', networkId: 'network-1' };
@@ -32,6 +31,8 @@ const resource = {
 
 describe(PigeonConversationCommandsApi.name, () => {
   let http: MockProxy<HttpJsonClient>;
+  let identities: { get: jest.Mock };
+  let publishKeychain: jest.Mock;
   let operations: MockProxy<ConversationOperationSigner>;
   let requestSigner: MockProxy<RequestSigner>;
   let api: PigeonConversationCommandsApi;
@@ -46,6 +47,11 @@ describe(PigeonConversationCommandsApi.name, () => {
     requestSigner = mock<RequestSigner>();
     requestSigner.headers.mockResolvedValue({ 'x-signature': 'sig' });
     operations.sign.mockResolvedValue(operation);
+    identities = { get: jest.fn().mockResolvedValue({ id: 'identity-2' }) };
+    publishKeychain = jest.fn().mockResolvedValue({
+      keychain: { conversations: {}, version: 2 },
+      keychainExternalIdentifier: 'keychain-2',
+    });
     http.request.mockImplementation((path: string) =>
       Promise.resolve(
         path.endsWith('/frontier') ? { frontier: ['parent-1'] } : resource,
@@ -54,9 +60,9 @@ describe(PigeonConversationCommandsApi.name, () => {
     api = new PigeonConversationCommandsApi({
       conversations: new ConversationMapper(),
       http,
-      identities: { get: jest.fn() },
+      identities,
       ids: new ConversationIdFactory(),
-      keychains: { publishKeychain: jest.fn() },
+      keychains: { publishKeychain },
       mutations: publicMutationSignerAt(),
       operations,
       requestCache: mock<RequestCache>(),
@@ -64,11 +70,61 @@ describe(PigeonConversationCommandsApi.name, () => {
     });
   });
 
-  it('rejects invitations when the conversation key is not available', async () => {
+  it('adds a member with a signed operation and no conversation key', async () => {
+    await expect(api.addMember(session, target, 'identity-2')).resolves.toEqual(
+      resource,
+    );
+
+    expect(http.request).toHaveBeenCalledTimes(2);
+    expect(http.request).toHaveBeenLastCalledWith(
+      '/conversations/group%3Aabc/members',
+      {
+        body: JSON.stringify({ identityId: 'identity-2', operation }),
+        headers: { 'x-signature': 'sig' },
+        method: 'POST',
+      },
+    );
+  });
+
+  it('creates a group under the published keychain, without a group key', async () => {
+    const published = { ...session, keychainExternalIdentifier: 'keychain-1' };
+
     await expect(
-      api.addMember(session, target, 'identity-2'),
-    ).rejects.toBeInstanceOf(ConversationKeyRequiredError);
-    expect(http.request).not.toHaveBeenCalled();
+      api.createGroup(published, {
+        name: 'Friends',
+        networkId: 'network-1',
+        nonce: 'nonce-1',
+        participantIds: ['identity-2'],
+      }),
+    ).resolves.toEqual({
+      conversation: resource,
+      keychain: session.keychain,
+      keychainExternalIdentifier: 'keychain-1',
+    });
+
+    expect(publishKeychain).not.toHaveBeenCalled();
+    expect(http.request).toHaveBeenCalledTimes(1);
+    expect(http.request).toHaveBeenCalledWith(
+      '/conversations',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('publishes the unchanged keychain before a group when none is', async () => {
+    await api.createGroup(session, {
+      name: 'Friends',
+      networkId: 'network-1',
+      nonce: 'nonce-1',
+      participantIds: ['identity-2'],
+    });
+
+    const [, update] = publishKeychain.mock.calls[0] as [
+      Session,
+      (current: Session['keychain']) => Session['keychain'],
+    ];
+
+    expect(update(session.keychain)).toBe(session.keychain);
+    expect(http.request).toHaveBeenCalledTimes(1);
   });
 
   it('fetches the frontier with a signed GET', async () => {

@@ -5,12 +5,34 @@ import type { Session } from '../../../../contexts/identities/infrastructure/ses
 import type { PushNotificationServerFinder } from '../../../../contexts/notifications/application/find-push-notification-server/PushNotificationServerFinder';
 import type { PushSubscriptionRegistrar } from '../../../../contexts/notifications/application/register-push-subscription/PushSubscriptionRegistrar';
 import type { PushSubscriptionRemover } from '../../../../contexts/notifications/application/remove-push-subscription/PushSubscriptionRemover';
+import type { NotificationsSearcher } from '../../../../contexts/notifications/application/search-notifications/NotificationsSearcher';
+import type { NotificationResource } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationResource';
 
 import { PigeonNotificationsFacade } from '../../../../app/composition/notifications/PigeonNotificationsFacade';
 import { PushNotificationServer } from '../../../../contexts/notifications/domain/PushNotificationServer';
 import { NotificationAccessContexts } from '../../../../contexts/notifications/infrastructure/http/NotificationAccessContexts';
 import { NotificationMapper } from '../../../../contexts/notifications/infrastructure/http/NotificationMapper';
 import { NotificationSettingMapper } from '../../../../contexts/notifications/infrastructure/http/NotificationSettingMapper';
+
+function invitation(
+  id: string,
+  type: 'conversation_invitation' | 'group_conversation_invitation',
+): NotificationResource {
+  return {
+    id,
+    payload: {
+      conversationId: 'conversation-1',
+      encryptedConversationKey: 'sealed',
+      inviterIdentityId: 'identity-2',
+      nonce: 'nonce-1',
+      recipientIdentityId: 'identity-1',
+    },
+    recipientIdentityId: 'identity-1',
+    state: 'pending',
+    status: 'unread',
+    type,
+  };
+}
 
 describe(PigeonNotificationsFacade.name, () => {
   it('routes browser subscriptions through application use cases', async () => {
@@ -71,5 +93,46 @@ describe(PigeonNotificationsFacade.name, () => {
       enabled: true,
       publicKey: 'public-key',
     });
+  });
+
+  it('keeps group control letters out of the listed notifications', async () => {
+    const useCases = mock<NotificationUseCases>();
+    const searcher = mock<NotificationsSearcher>();
+    const mapper = new NotificationMapper();
+    useCases.notificationSearcher = searcher;
+    searcher.search.mockResolvedValue([
+      mapper.fromResource(invitation('direct', 'conversation_invitation')),
+      mapper.fromResource(
+        invitation('control', 'group_conversation_invitation'),
+      ),
+    ]);
+    const facade = new PigeonNotificationsFacade(
+      new NotificationAccessContexts(),
+      mapper,
+      new NotificationSettingMapper(),
+      useCases,
+    );
+
+    const listed = await facade.list({
+      identity: { id: 'identity-1' },
+    } as unknown as Session);
+
+    expect(listed.map(({ id }) => id)).toEqual(['direct']);
+  });
+
+  it('refuses to accept a group control letter as an invitation', async () => {
+    const facade = new PigeonNotificationsFacade(
+      new NotificationAccessContexts(),
+      new NotificationMapper(),
+      new NotificationSettingMapper(),
+      mock<NotificationUseCases>(),
+    );
+
+    await expect(
+      facade.acceptConversationInvitation(
+        { identity: { id: 'identity-1' } } as unknown as Session,
+        invitation('control', 'group_conversation_invitation'),
+      ),
+    ).rejects.toThrow('Only one-to-one invitations carry a key to accept.');
   });
 });

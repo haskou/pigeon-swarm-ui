@@ -32,11 +32,14 @@ jest.mock('../../../../../app/composition/applicationContainer', () => ({
       edit: jest.fn(),
       reaction: jest.fn(),
     },
+    groupMessages: {
+      delete: jest.fn(),
+      edit: jest.fn(),
+      reaction: jest.fn(),
+    },
     messages: {
       addReactionTo: jest.fn(),
       delete: jest.fn(),
-      edit: jest.fn(),
-      loadAround: jest.fn(),
       removeReactionFrom: jest.fn(),
     },
   },
@@ -48,14 +51,16 @@ const directReaction = jest.mocked(
   applicationContainer.directMessages.reaction,
 );
 const deleteUseCase = jest.mocked(applicationContainer.messages.delete);
-const editLegacy = jest.mocked(applicationContainer.messages.edit);
+const groupDelete = jest.mocked(applicationContainer.groupMessages.delete);
+const groupEdit = jest.mocked(applicationContainer.groupMessages.edit);
+const groupReaction = jest.mocked(applicationContainer.groupMessages.reaction);
 const addReactionUseCase = jest.mocked(
   applicationContainer.messages.addReactionTo,
 );
 const removeReactionUseCase = jest.mocked(
   applicationContainer.messages.removeReactionFrom,
 );
-const loadAroundLegacy = jest.mocked(applicationContainer.messages.loadAround);
+const now = 1_700_000_000_000;
 
 const session = { identity: { id: 'identity-1' } } as unknown as Session;
 const conversation = {
@@ -122,7 +127,6 @@ function mountActions({
   const actions = useConversationMessageActions({
     activeConversation,
     activeConversationDraft: '',
-    activeConversationKeyAvailable: true,
     editingMessage,
     messages: state.messages,
     messagesRef,
@@ -132,8 +136,6 @@ function mountActions({
     onEditingMessageChange,
     onErrorChange,
     onMessageContextMenuChange: jest.fn(),
-    onMessageCursorChange: jest.fn(),
-    onMessageLoadStateChange: jest.fn(),
     onMessagesChange,
     onReplyTargetChange: jest.fn(),
     replyTarget: null,
@@ -151,9 +153,10 @@ function mountActions({
   };
 }
 
-describe('useConversationMessageActions one-to-one mailbox', () => {
+describe('useConversationMessageActions', () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    jest.spyOn(Date, 'now').mockReturnValue(now);
   });
 
   afterEach(() => {
@@ -186,18 +189,20 @@ describe('useConversationMessageActions one-to-one mailbox', () => {
       expect(actions.state.messages).toEqual([target]);
     });
 
-    it('deletes a group message through the messages use cases only', async () => {
-      deleteUseCase.mockResolvedValue(undefined);
+    it('deletes a group message through the group mailbox only', async () => {
+      groupDelete.mockResolvedValue(undefined);
       const actions = mountActions({ activeConversation: groupConversation });
 
       await actions.deleteMessage(target);
 
-      expect(deleteUseCase).toHaveBeenCalledWith(
+      expect(groupDelete).toHaveBeenCalledWith(
         session,
         groupConversation,
         'message-1',
       );
+      expect(deleteUseCase).not.toHaveBeenCalled();
       expect(directDelete).not.toHaveBeenCalled();
+      expect(actions.state.messages).toEqual([]);
     });
   });
 
@@ -217,9 +222,29 @@ describe('useConversationMessageActions one-to-one mailbox', () => {
         'changed',
         {},
       );
-      expect(editLegacy).not.toHaveBeenCalled();
+      expect(groupEdit).not.toHaveBeenCalled();
       expect(actions.onEditingMessageChange).toHaveBeenCalledWith(null);
       expect(actions.updateActiveConversationDraft).toHaveBeenCalledWith('');
+    });
+
+    it('edits a group message through the group mailbox only', async () => {
+      groupEdit.mockResolvedValue(editEvent);
+      const actions = mountActions({
+        activeConversation: groupConversation,
+        editingMessage: { message: target, previousDraft: '' },
+      });
+
+      await actions.editMessage('changed');
+
+      expect(groupEdit).toHaveBeenCalledWith(
+        session,
+        groupConversation,
+        'message-1',
+        'changed',
+        {},
+      );
+      expect(directEdit).not.toHaveBeenCalled();
+      expect(actions.onEditingMessageChange).toHaveBeenCalledWith(null);
     });
 
     it('keeps the edit open and shows the edit error when the mailbox edit rejects', async () => {
@@ -230,7 +255,7 @@ describe('useConversationMessageActions one-to-one mailbox', () => {
 
       await actions.editMessage('changed');
 
-      expect(editLegacy).not.toHaveBeenCalled();
+      expect(groupEdit).not.toHaveBeenCalled();
       expect(actions.state.error).toBe('edit refused');
       expect(actions.onEditingMessageChange).not.toHaveBeenCalledWith(null);
     });
@@ -285,15 +310,52 @@ describe('useConversationMessageActions one-to-one mailbox', () => {
 
       expect(actions.state.error).toBe('reaction refused');
     });
+
+    it('adds a group reaction through the group mailbox only', async () => {
+      groupReaction.mockResolvedValue(undefined);
+      const actions = mountActions({ activeConversation: groupConversation });
+
+      await actions.toggleReaction(target, '👍', false);
+
+      expect(groupReaction).toHaveBeenCalledWith(session, groupConversation, {
+        action: 'add',
+        createdAt: now,
+        emoji: '👍',
+        messageId: 'message-1',
+      });
+      expect(addReactionUseCase).not.toHaveBeenCalled();
+    });
+
+    it('restores the group reaction when the group reaction rejects', async () => {
+      groupReaction.mockRejectedValue(new Error('reaction refused'));
+      const actions = mountActions({ activeConversation: groupConversation });
+
+      await actions.toggleReaction(target, '👍', false);
+
+      expect(actions.state.error).toBe('reaction refused');
+      expect(actions.state.messages).toEqual([
+        expect.objectContaining({ id: 'message-1', reactions: [] }),
+      ]);
+    });
   });
 
   describe('reply reference', () => {
-    it('does not load a one-to-one reply target from the legacy endpoint', async () => {
+    it('reports a reply target missing from the local timeline', () => {
       const actions = mountActions({ messages: [] });
 
-      await actions.openReplyReference('missing-1');
+      actions.openReplyReference('missing-1');
 
-      expect(loadAroundLegacy).not.toHaveBeenCalled();
+      expect(actions.state.error).toBe(copy.messages.replyTargetNotFound);
+    });
+
+    it('reports a group reply target missing from the local timeline', () => {
+      const actions = mountActions({
+        activeConversation: groupConversation,
+        messages: [],
+      });
+
+      actions.openReplyReference('missing-1');
+
       expect(actions.state.error).toBe(copy.messages.replyTargetNotFound);
     });
   });

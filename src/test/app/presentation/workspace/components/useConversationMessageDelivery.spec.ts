@@ -40,7 +40,7 @@ jest.mock('../../../../../app/composition/applicationContainer', () => ({
       retry: jest.fn(),
       send: jest.fn(),
     },
-    messages: { send: jest.fn() },
+    groupMessages: { send: jest.fn() },
     stickers: { markUsed: jest.fn() },
   },
 }));
@@ -50,7 +50,7 @@ const directRetry = jest.mocked(applicationContainer.directMessages.retry);
 const outboxItems = jest.mocked(
   applicationContainer.directMessages.outboxItems,
 );
-const legacySend = jest.mocked(applicationContainer.messages.send);
+const groupSend = jest.mocked(applicationContainer.groupMessages.send);
 const markUsed = jest.mocked(applicationContainer.stickers.markUsed);
 
 const session = { identity: { id: 'identity-1' } } as unknown as Session;
@@ -174,11 +174,10 @@ describe('useConversationMessageDelivery one-to-one mailbox send', () => {
     directSend.mockResolvedValue(sentMessage);
     directRetry.mockResolvedValue(null);
     outboxItems.mockReturnValue([]);
-    legacySend.mockResolvedValue(sentMessage);
     markUsed.mockResolvedValue(undefined);
   });
 
-  it('sends a one-to-one message through the mailbox and never the legacy message endpoint', async () => {
+  it('sends a one-to-one message through the mailbox', async () => {
     const delivery = mountDelivery();
 
     await delivery.sendMessage('hello', [], {});
@@ -192,7 +191,6 @@ describe('useConversationMessageDelivery one-to-one mailbox send', () => {
       expect.objectContaining({ attachments: [], previousMessageIds: [] }),
       commandIdentity,
     );
-    expect(legacySend).not.toHaveBeenCalled();
   });
 
   it('passes the one-to-one recipient identity with attachment uploads to the mailbox send', async () => {
@@ -291,7 +289,6 @@ describe('useConversationMessageDelivery one-to-one mailbox send', () => {
     expect(delivery.state.messages).toEqual([
       expect.objectContaining({ deliveryStatus: 'failed' }),
     ]);
-    expect(legacySend).not.toHaveBeenCalled();
   });
 
   it('shows a refused peer write to the composer as the user error', async () => {
@@ -305,7 +302,6 @@ describe('useConversationMessageDelivery one-to-one mailbox send', () => {
     expect(delivery.state.messages).toEqual([
       expect.objectContaining({ deliveryStatus: 'failed' }),
     ]);
-    expect(legacySend).not.toHaveBeenCalled();
   });
 
   it('retries a queued one-to-one message through the outbox without sending it again', async () => {
@@ -380,7 +376,6 @@ describe('useConversationMessageDelivery one-to-one mailbox send', () => {
       expect.objectContaining({ sticker }),
       commandIdentity,
     );
-    expect(legacySend).not.toHaveBeenCalled();
     expect(markUsed).toHaveBeenCalledWith(session, sticker);
   });
 
@@ -439,19 +434,19 @@ describe('useConversationMessageDelivery group send', () => {
     jest.resetAllMocks();
     mockRefs.length = 0;
     directSend.mockResolvedValue(sentMessage);
-    legacySend.mockResolvedValue(sentMessage);
+    groupSend.mockResolvedValue(sentMessage);
     markUsed.mockResolvedValue(undefined);
   });
 
-  it('sends group messages through the legacy message endpoint only', async () => {
+  it('sends group messages through the group mailbox only', async () => {
     const delivery = mountDelivery(groupConversation);
 
     await delivery.sendMessage('hello', [], {});
     await drain();
 
-    expect(legacySend).toHaveBeenCalledWith(
+    expect(groupSend).toHaveBeenCalledWith(
       session,
-      groupConversation.id,
+      groupConversation,
       'hello',
       expect.objectContaining({ attachments: [] }),
     );
@@ -464,14 +459,14 @@ describe('useConversationMessageDelivery group send', () => {
     await delivery.sendMessage('hello', [], {});
     await drain();
 
-    expect(legacySend).toHaveBeenCalledTimes(1);
+    expect(groupSend).toHaveBeenCalledTimes(1);
     expect(
-      legacySend.mock.calls[0]?.[3]?.attachmentUpload?.recipientIdentityId,
+      groupSend.mock.calls[0]?.[3]?.attachmentUpload?.recipientIdentityId,
     ).toBeUndefined();
   });
 
   it('shows the send error for a failed group send', async () => {
-    legacySend.mockRejectedValue(new Error('send refused'));
+    groupSend.mockRejectedValue(new Error('send refused'));
     const delivery = mountDelivery(groupConversation);
 
     await delivery.sendMessage('hello', [], {});

@@ -1,0 +1,484 @@
+import 'fake-indexeddb/auto';
+import type { MockProxy } from 'jest-mock-extended';
+
+import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import { mock } from 'jest-mock-extended';
+
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
+import type { PigeonMailboxClient } from '../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
+import type { MessageProjectionPort } from '../../../../contexts/messages/infrastructure/crypto/MessageProjectionPort';
+import type { MessageAttachmentPublisher } from '../../../../contexts/messages/infrastructure/http/MessageAttachmentPublisher';
+import type { PigeonMessagesApi } from '../../../../contexts/messages/infrastructure/http/PigeonMessagesApi';
+import type { DirectMessageTimelineChange } from '../../../../contexts/messages/presentation/view-models/DirectMessageTimelineChange';
+import type { NotificationResource } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationResource';
+import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
+import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+
+import { GroupMailboxControlSeal } from '../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlSeal';
+import { GroupConversationMailbox } from '../../../../contexts/groupMailboxes/infrastructure/GroupConversationMailbox';
+import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
+import { MailboxUnavailableError } from '../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
+import { MailboxCapability } from '../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
+import { MailboxChannel } from '../../../../contexts/mailboxes/infrastructure/MailboxChannel';
+import { MessageProjector } from '../../../../contexts/messages/infrastructure/crypto/MessageProjector';
+import { PigeonMessageCommandsApi } from '../../../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
+import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+
+type Member = {
+  changes: DirectMessageTimelineChange[];
+  id: string;
+  mailbox: GroupConversationMailbox;
+  session: Session;
+};
+
+const CONVERSATION = 'group:conversation-mls';
+const NOW = 1_700_000_000_000;
+
+let devices = 0;
+let roster: Set<string>;
+let letters: Map<string, NotificationResource[]>;
+let inboxes: Map<
+  string,
+  {
+    envelopes: { body: string; cursor: number; envelopeId: string }[];
+    readers: Set<string>;
+    root: string;
+  }
+>;
+let wire: MockProxy<PigeonMailboxClient>;
+let channel: MailboxChannel;
+let alice: Member;
+let bob: Member;
+let carol: Member;
+
+/** Group inboxes on a node: appends idempotent, reads need a reader. */
+const fakeMailboxes = (): void => {
+  inboxes = new Map();
+  wire = mock<PigeonMailboxClient>();
+  const readable = (mailboxId: string, token: string) => {
+    const inbox = inboxes.get(mailboxId);
+
+    if (!inbox?.readers.has(MailboxCapability.hash(token))) {
+      throw new MailboxUnavailableError();
+    }
+
+    return inbox;
+  };
+
+  wire.create.mockImplementation((mailboxId, creation) => {
+    if (!inboxes.has(mailboxId)) {
+      inboxes.set(mailboxId, {
+        envelopes: [],
+        readers: new Set([creation.readTokenHash]),
+        root: creation.readTokenHash,
+      });
+    }
+
+    return Promise.resolve();
+  });
+  wire.addReader.mockImplementation((mailboxId, token, readTokenHash) =>
+    Promise.resolve().then(() => {
+      readable(mailboxId, token).readers.add(readTokenHash);
+    }),
+  );
+  wire.append.mockImplementation((mailboxId, _postToken, input) => {
+    const inbox = inboxes.get(mailboxId);
+
+    if (!inbox) return Promise.reject(new MailboxUnavailableError());
+    const known = inbox.envelopes.find(
+      ({ envelopeId }) => envelopeId === input.envelopeId,
+    );
+
+    if (known) return Promise.resolve({ cursor: known.cursor });
+    const cursor = inbox.envelopes.length + 1;
+
+    inbox.envelopes.push({ ...input, cursor });
+
+    return Promise.resolve({ cursor });
+  });
+  wire.read.mockImplementation((mailboxId, token, after, limit) =>
+    Promise.resolve().then(() => {
+      const unread = readable(mailboxId, token).envelopes.filter(
+        ({ cursor }) => cursor > after,
+      );
+
+      return { envelopes: unread.slice(0, limit), hasMore: false };
+    }),
+  );
+  wire.acknowledge.mockImplementation((mailboxId, token) =>
+    Promise.resolve().then(() => {
+      readable(mailboxId, token);
+    }),
+  );
+  wire.delete.mockImplementation((mailboxId, token) =>
+    Promise.resolve().then(() => {
+      if (inboxes.get(mailboxId)?.root !== MailboxCapability.hash(token)) {
+        throw new MailboxUnavailableError();
+      }
+      inboxes.delete(mailboxId);
+    }),
+  );
+  channel = new MailboxChannel(wire, () => Promise.resolve('nonce'));
+};
+
+const memoryStorage = (): void => {
+  const values = new Map<string, string>();
+
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: (key: string) => values.get(key) ?? null,
+      removeItem: (key: string) => values.delete(key),
+      setItem: (key: string, value: string) => values.set(key, value),
+    },
+  });
+};
+
+/** A control letter as the node stores it: a sealed group notification. */
+const post = (
+  from: Session,
+  conversationId: string,
+  peer: string,
+  plaintext: Uint8Array,
+): Promise<void> => {
+  const inbox = letters.get(peer) ?? [];
+  const id = `n${String(inbox.length + 1).padStart(6, '0')}`;
+  const sealed = GroupMailboxControlSeal.seal(from, {
+    conversationId,
+    plaintext,
+    recipientIdentityId: peer,
+    sentAt: NOW,
+  });
+
+  inbox.unshift({
+    id,
+    payload: {
+      conversationId,
+      encryptedConversationKey: sealed,
+      inviterIdentityId: from.identity.id,
+      nonce: 'nonce',
+      recipientIdentityId: peer,
+    },
+    recipientIdentityId: peer,
+    state: 'pending',
+    status: 'unread',
+    type: 'group_conversation_invitation',
+  });
+  letters.set(peer, inbox);
+
+  return Promise.resolve();
+};
+
+const composer = (): PigeonMessageCommandsApi => {
+  const attachments = mock<MessageAttachmentPublisher>();
+  const mutations = mock<PublicMutationSigner>();
+
+  attachments.publishMessageAttachments.mockResolvedValue([]);
+  mutations.authorOf.mockImplementation((session) => session.identity.id);
+
+  return new PigeonMessageCommandsApi(
+    mock<HttpJsonClient>(),
+    mock<RequestSigner>(),
+    mock<PigeonMessagesApi>(),
+    mock<MessageProjectionPort>(),
+    attachments,
+    mutations,
+  );
+};
+
+const device = (): GroupConversationMailbox =>
+  new GroupConversationMailbox({
+    channel,
+    client: wire,
+    composer: composer(),
+    direct: (from) => ({
+      send: (conversationId, peer, plaintext) =>
+        post(from, conversationId, peer, plaintext),
+    }),
+    notifications: {
+      listPage: (owner, limit, before) =>
+        Promise.resolve(
+          (letters.get(owner.identity.id) ?? [])
+            .filter(({ id }) => before === undefined || id < before)
+            .slice(0, limit),
+        ),
+    },
+    now: () => NOW,
+    projector: new MessageProjector(copy.messages),
+    roster: (owner) =>
+      Promise.resolve(
+        roster.has(owner.identity.id) ? new Set(roster) : new Set<string>(),
+      ),
+    storage: `group-conversation-${++devices}`,
+  });
+
+const person = async (): Promise<Member> => {
+  const keyPair = await KeyPair.generate();
+  const id = IdentityId.fromString(keyPair.toPrimitives().publicKey).valueOf();
+  const seed = ++devices;
+  const session = {
+    deviceCredentialKeyPair: {
+      toPrimitives: () => ({ publicKey: `device-${seed}` }),
+    },
+    deviceId: `device-${seed}`,
+    deviceSealedRootKey: { getBuffer: () => Buffer.alloc(32, seed) },
+    identity: { id },
+    keychain: { conversations: [] },
+    keyPair,
+  } as unknown as Session;
+
+  return { changes: [], id, mailbox: device(), session };
+};
+
+const turn = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+/** Lets every member read its control letters until `work` settles. */
+const settle = async <T>(work: Promise<T>, everyone: Member[]): Promise<T> => {
+  let done = false;
+  const finished = work.finally(() => {
+    done = true;
+  });
+
+  for (let round = 0; round < 400 && !done; round += 1) {
+    for (const member of everyone) {
+      await member.mailbox.receiveControl(member.session);
+    }
+    await turn();
+  }
+
+  return await finished;
+};
+
+const conversation = (): ConversationResource =>
+  ({
+    id: CONVERSATION,
+    participantIds: [...roster],
+    type: 'group',
+  }) as unknown as ConversationResource;
+
+const sync = (member: Member): Promise<void> =>
+  member.mailbox.sync(
+    member.session,
+    CONVERSATION,
+    new AbortController().signal,
+    (changes) => member.changes.push(...changes),
+  );
+
+const texts = (member: Member): string[] =>
+  member.changes.flatMap((change) =>
+    change.kind === 'message' || change.kind === 'edit'
+      ? [`${change.kind}:${change.message.content}`]
+      : [],
+  );
+
+const everyone = (): Member[] => [alice, bob, carol];
+
+/**
+ * Every member reads its inboxes twice: the first pass applies pending
+ * commits, the second opens the inboxes of the epoch they lead to. A sender
+ * can only post to an inbox its owner has opened.
+ */
+const catchUp = async (members: Member[] = everyone()): Promise<void> => {
+  for (let pass = 0; pass < 2; pass += 1) {
+    for (const member of members) await sync(member);
+  }
+};
+
+/** The three of them in one group, each joined from its welcome. */
+const formGroup = async (): Promise<void> => {
+  roster = new Set([alice.id, bob.id, carol.id]);
+  await alice.mailbox.create(alice.session, CONVERSATION);
+  await settle(
+    alice.mailbox.membersChanged(alice.session, CONVERSATION),
+    everyone(),
+  );
+  await settle(Promise.resolve(), everyone());
+  await catchUp();
+};
+
+beforeEach(async () => {
+  fakeMailboxes();
+  memoryStorage();
+  letters = new Map();
+  roster = new Set();
+  [alice, bob, carol] = await Promise.all([person(), person(), person()]);
+});
+
+describe('GroupConversationMailbox', () => {
+  it('delivers a message to every member and keeps the sender’s copy', async () => {
+    await formGroup();
+
+    await alice.mailbox.send(alice.session, conversation(), 'hello group', {});
+    await Promise.all(everyone().map(sync));
+    const own: DirectMessageTimelineChange[] = [];
+
+    await alice.mailbox.restore(
+      alice.session,
+      CONVERSATION,
+      new AbortController().signal,
+      (changes) => own.push(...changes),
+    );
+
+    expect(texts(bob)).toEqual(['message:hello group']);
+    expect(texts(carol)).toEqual(['message:hello group']);
+    expect(texts({ ...alice, changes: own })).toEqual(['message:hello group']);
+  });
+
+  it('keeps plaintext off the node', async () => {
+    await formGroup();
+
+    await alice.mailbox.send(alice.session, conversation(), 'secret-4c1f', {});
+
+    const bodies = [...inboxes.values()].flatMap(({ envelopes }) =>
+      envelopes.map(({ body }) => body),
+    );
+
+    expect(bodies.length).toBeGreaterThan(0);
+    expect(bodies.join('\n')).not.toContain('secret-4c1f');
+  });
+
+  it('a removed member cannot read messages sent after removal', async () => {
+    await formGroup();
+    roster = new Set([alice.id, bob.id]);
+
+    await settle(
+      Promise.all(
+        everyone().map((member) =>
+          member.mailbox.membersChanged(member.session, CONVERSATION),
+        ),
+      ),
+      everyone(),
+    );
+    await catchUp();
+    await bob.mailbox.send(bob.session, conversation(), 'after removal', {});
+    await Promise.all(everyone().map(sync));
+
+    expect(texts(alice)).toEqual(['message:after removal']);
+    expect(texts(carol)).toEqual([]);
+  });
+
+  it('a leaver is removed by a remaining member on its next sync', async () => {
+    await formGroup();
+    roster = new Set([alice.id, carol.id]);
+
+    await settle(catchUp([alice, carol]), everyone());
+    await settle(
+      Promise.all([
+        alice.mailbox.membersChanged(alice.session, CONVERSATION),
+        carol.mailbox.membersChanged(carol.session, CONVERSATION),
+      ]),
+      everyone(),
+    );
+    await Promise.all(everyone().map(sync));
+    await alice.mailbox.send(alice.session, conversation(), 'without bob', {});
+    await Promise.all(everyone().map(sync));
+
+    expect(texts(carol)).toEqual(['message:without bob']);
+    expect(texts(bob)).toEqual([]);
+  });
+
+  it('rejects an edit or delete of another member’s message', async () => {
+    await formGroup();
+    const original = await carol.mailbox.send(
+      carol.session,
+      conversation(),
+      'carol wrote this',
+      {},
+    );
+
+    await bob.mailbox.edit(
+      bob.session,
+      conversation(),
+      original.id,
+      'bob rewrote it',
+      {},
+    );
+    await bob.mailbox.delete(bob.session, conversation(), original.id);
+    await sync(alice);
+
+    expect(texts(alice)).toEqual(['message:carol wrote this']);
+    expect(alice.changes.some(({ kind }) => kind === 'removed')).toBe(false);
+  });
+
+  it('applies an author’s own edit and delete', async () => {
+    await formGroup();
+    const original = await carol.mailbox.send(
+      carol.session,
+      conversation(),
+      'first',
+      {},
+    );
+
+    await carol.mailbox.edit(
+      carol.session,
+      conversation(),
+      original.id,
+      'second',
+      {},
+    );
+    await carol.mailbox.delete(carol.session, conversation(), original.id);
+    await sync(alice);
+
+    expect(texts(alice)).toEqual(['message:first', 'edit:second']);
+    expect(alice.changes).toContainEqual({
+      kind: 'removed',
+      messageId: original.id,
+    });
+  });
+
+  it('ignores a replayed welcome after a restart', async () => {
+    await formGroup();
+    bob.mailbox.stop(bob.id);
+
+    await bob.mailbox.receiveControl(bob.session);
+    await alice.mailbox.send(alice.session, conversation(), 'still here', {});
+    await sync(bob);
+
+    expect(texts(bob)).toEqual(['message:still here']);
+  });
+
+  it('restores history after a restart without the node', async () => {
+    await formGroup();
+    await alice.mailbox.send(alice.session, conversation(), 'kept', {});
+    await sync(bob);
+    bob.mailbox.stop(bob.id);
+    const restored: DirectMessageTimelineChange[] = [];
+
+    await bob.mailbox.restore(
+      bob.session,
+      CONVERSATION,
+      new AbortController().signal,
+      (changes) => restored.push(...changes),
+    );
+
+    expect(restored).toEqual([
+      expect.objectContaining({
+        kind: 'message',
+        message: expect.objectContaining({ content: 'kept' }),
+      }),
+    ]);
+  });
+
+  it('forgets history and MLS state', async () => {
+    await formGroup();
+    await alice.mailbox.send(alice.session, conversation(), 'gone', {});
+    await sync(bob);
+
+    await bob.mailbox.forget(bob.id);
+    const restored: DirectMessageTimelineChange[] = [];
+
+    await bob.mailbox.restore(
+      bob.session,
+      CONVERSATION,
+      new AbortController().signal,
+      (changes) => restored.push(...changes),
+    );
+
+    expect(restored).toEqual([]);
+    await expect(
+      bob.mailbox.send(bob.session, conversation(), 'no group', {}),
+    ).rejects.toThrow();
+  });
+});
