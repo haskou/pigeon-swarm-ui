@@ -1,4 +1,4 @@
-import { IdentityMatch } from '../../../../../contexts/identities/presentation/view-models/IdentityMatch';
+import { IdentityMatch } from '../../../../contexts/identities/domain/IdentityMatch';
 
 const BARE = 'MCowBQYDK2VwAyEAidentity';
 const PEM = `-----BEGIN PUBLIC KEY-----\n${BARE}\n-----END PUBLIC KEY-----\n`;

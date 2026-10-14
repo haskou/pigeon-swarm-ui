@@ -24,7 +24,7 @@ import { useCloseTransition } from '../../../../shared/presentation/hooks/useClo
 import { IdentityMemberRow } from '../../../identities/presentation/components/IdentityMemberListPanel';
 import { ContactChangeNotice } from '../../../identities/presentation/components/ContactChangeNotice';
 import { ConversationPeer } from '../view-models/ConversationPeer';
-import { IdentityMatch } from '../../../identities/presentation/view-models/IdentityMatch';
+import { IdentityMatch } from '../../../identities/domain/IdentityMatch';
 import { contactKeyBlocked } from '../../../identities/presentation/view-models/contactKeyNotice';
 import {
   checkIdentityContact,

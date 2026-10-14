@@ -15,7 +15,7 @@ import type { NodeSettingsSection } from './NodeSettingsSection';
 
 import { IdentityMemberRow } from '../../../../contexts/identities/presentation/components/IdentityMemberListPanel';
 import { useIdentityPreview } from '../../../../contexts/identities/presentation/hooks/useIdentityPreview';
-import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
+import { IdentityMatch } from '../../../../contexts/identities/domain/IdentityMatch';
 import { NodeRelayConfigurationForm } from '../../../../contexts/networks/presentation/components/NodeRelayConfigurationForm';
 import { defaultRelayConfiguration } from '../../../../contexts/networks/presentation/view-models/defaultRelayConfiguration';
 import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';

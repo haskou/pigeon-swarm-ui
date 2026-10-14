@@ -6,7 +6,7 @@ import type {
   RealtimeTypingMessage,
 } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 
-import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
+import { IdentityMatch } from '../../../../contexts/identities/domain/IdentityMatch';
 import { sendRealtimeTyping } from '../../realtime/useRealtimeEvents';
 import {
   activeTypingIdentityIds,

@@ -18,7 +18,7 @@ import { useCloseTransition } from '../../../../shared/presentation/hooks/useClo
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
-import { IdentityMatch } from '../../../identities/presentation/view-models/IdentityMatch';
+import { IdentityMatch } from '../../../identities/domain/IdentityMatch';
 import { CommunityAccessPolicy } from '../view-models/CommunityAccessPolicy';
 import { CommunityChannels } from '../view-models/CommunityChannels';
 import { CommunityBannedMembersPanel } from './CommunityBannedMembersPanel';

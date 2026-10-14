@@ -6,7 +6,7 @@ import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/real
 import type { RealtimeConversationEventsInput } from './RealtimeConversationEventsInput';
 
 import { ConversationTimeline } from '../../../../contexts/conversations/presentation/view-models/ConversationTimeline';
-import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
+import { IdentityMatch } from '../../../../contexts/identities/domain/IdentityMatch';
 import { MessageCollection } from '../../../../contexts/messages/presentation/view-models/MessageCollection';
 import { showPwaNotification } from '../../../../contexts/notifications/presentation/services/pwaNotifications';
 import { conversationNotificationPreview } from '../../../../contexts/notifications/presentation/view-models/notificationPreviews';

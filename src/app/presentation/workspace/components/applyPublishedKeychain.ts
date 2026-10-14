@@ -2,7 +2,7 @@ import type { Session } from '../../../../contexts/identities/infrastructure/ses
 
 import { IdentitySnapshotSelection } from '../../../../contexts/identities/domain/IdentitySnapshotSelection';
 import { KeychainVersion } from '../../../../contexts/identities/domain/value-objects/KeychainVersion';
-import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
+import { IdentityMatch } from '../../../../contexts/identities/domain/IdentityMatch';
 
 /**
  * Applies a keychain published for a session snapshot to the session in state.

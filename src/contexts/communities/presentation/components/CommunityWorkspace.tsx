@@ -8,7 +8,7 @@ import type { CommunityWorkspaceProps } from './CommunityWorkspaceProps';
 import { shortId } from '../../../../shared/presentation/formatting';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { profileAnchorFromTarget } from '../../../identities/presentation/view-models/profilePopoverAnchor';
-import { IdentityMatch } from '../../../identities/presentation/view-models/IdentityMatch';
+import { IdentityMatch } from '../../../identities/domain/IdentityMatch';
 import { NotificationSettingsPolicy } from '../../../notifications/presentation/view-models/NotificationSettingsPolicy';
 import { CommunityChannelEncryption } from '../view-models/CommunityChannelEncryption';
 import { CommunityEncryptionDetails } from '../view-models/CommunityEncryptionDetails';

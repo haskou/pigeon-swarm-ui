@@ -12,7 +12,7 @@ import {
   useContactVerification,
 } from '../../../../contexts/identities/presentation/hooks/useContactVerification';
 import { identityDisplayName } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
-import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
+import { IdentityMatch } from '../../../../contexts/identities/domain/IdentityMatch';
 import {
   profileAnchorFromTarget,
   type ProfilePopoverAnchor,

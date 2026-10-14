@@ -7,7 +7,7 @@ import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/real
 import type { MemberEventDetails } from './MemberEventDetails';
 
 import { CommunityChannels } from '../../../../contexts/communities/presentation/view-models/CommunityChannels';
-import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
+import { IdentityMatch } from '../../../../contexts/identities/domain/IdentityMatch';
 import {
   communityAttribute,
   communityChannelAttribute,

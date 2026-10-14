@@ -10,7 +10,7 @@ import type { Session } from '../../../../contexts/identities/infrastructure/ses
 import type { WorkspaceConversationNavigation } from './WorkspaceConversationNavigation';
 
 import { ConversationTimeline } from '../../../../contexts/conversations/presentation/view-models/ConversationTimeline';
-import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
+import { IdentityMatch } from '../../../../contexts/identities/domain/IdentityMatch';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { applyPublishedKeychain } from './applyPublishedKeychain';

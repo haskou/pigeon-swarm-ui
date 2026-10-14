@@ -14,7 +14,7 @@ import {
   IdentityMembersAside,
   type IdentityMembersAsideVariant,
 } from '../../../../contexts/identities/presentation/components/IdentityMembersAside';
-import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
+import { IdentityMatch } from '../../../../contexts/identities/domain/IdentityMatch';
 import { profileAnchorFromTarget } from '../../../../contexts/identities/presentation/view-models/profilePopoverAnchor';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 
