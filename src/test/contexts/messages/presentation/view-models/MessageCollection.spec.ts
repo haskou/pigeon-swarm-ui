@@ -1,4 +1,3 @@
-import type { ConversationResource } from '../../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
 
 import { MessageCollection } from '../../../../../contexts/messages/presentation/view-models/MessageCollection';
@@ -13,18 +12,6 @@ const message = (overrides: Partial<ChatMessage> = {}): ChatMessage => ({
   raw: { id: 'message-1', type: 'sent' },
   reactions: [],
   timestamp: 100,
-  ...overrides,
-});
-const conversation = (
-  overrides: Partial<ConversationResource> = {},
-): ConversationResource => ({
-  adminIds: [],
-  id: 'conversation-1',
-  latestMessageAt: 100,
-  networkId: 'network-1',
-  participantIds: ['identity-1'],
-  type: 'one-to-one',
-  unreadCount: 0,
   ...overrides,
 });
 
@@ -86,51 +73,6 @@ describe(MessageCollection.name, () => {
         }),
       ]),
     ).toBeUndefined();
-  });
-
-  it('finds the latest delivered timestamp independently from list order', () => {
-    expect(
-      MessageCollection.latestDeliveredTimestamp([
-        message({ id: 'message-1', timestamp: 300 }),
-        message({ id: 'message-2', timestamp: 100 }),
-        message({
-          deliveryStatus: 'pending',
-          id: 'message-3',
-          timestamp: 500,
-        }),
-        message({ id: 'message-4', timestamp: 200 }),
-      ]),
-    ).toBe(300);
-  });
-
-  it('detects whether loaded messages already include the conversation latest message', () => {
-    expect(
-      MessageCollection.isCaughtUpWithConversation(
-        [message({ timestamp: 100 })],
-        conversation({ latestMessageAt: 100 }),
-      ),
-    ).toBe(true);
-    expect(
-      MessageCollection.isCaughtUpWithConversation(
-        [message({ timestamp: 100 })],
-        conversation({ latestMessageAt: 200 }),
-      ),
-    ).toBe(false);
-    expect(
-      MessageCollection.isCaughtUpWithConversation(
-        [message({ deliveryStatus: 'pending', timestamp: 300 })],
-        conversation({ latestMessageAt: 200 }),
-      ),
-    ).toBe(false);
-  });
-
-  it('treats conversations without latest message metadata as caught up', () => {
-    expect(
-      MessageCollection.isCaughtUpWithConversation(
-        [],
-        conversation({ latestMessageAt: undefined }),
-      ),
-    ).toBe(true);
   });
 
   it('detects whether a latest-message probe matches the loaded timeline', () => {

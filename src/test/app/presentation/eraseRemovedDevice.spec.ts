@@ -7,19 +7,22 @@ import {
 
 function services(): {
   directMessages: MockProxy<RemovedDeviceServices['directMessages']>;
+  groupMessages: MockProxy<RemovedDeviceServices['groupMessages']>;
   identities: MockProxy<RemovedDeviceServices['identities']>;
 } {
   const directMessages = mock<RemovedDeviceServices['directMessages']>();
+  const groupMessages = mock<RemovedDeviceServices['groupMessages']>();
   const identities = mock<RemovedDeviceServices['identities']>();
 
   directMessages.cancelOutbox.mockResolvedValue(undefined);
   directMessages.forgetHistory.mockResolvedValue(undefined);
+  groupMessages.forget.mockResolvedValue(undefined);
 
-  return { directMessages, identities };
+  return { directMessages, groupMessages, identities };
 }
 
 describe('eraseRemovedDevice', () => {
-  it("erases the identity's outbox, stored history and pending device-sealed recovery", async () => {
+  it("erases the identity's outbox, direct and group history and pending device-sealed recovery", async () => {
     const removed = services();
 
     await expect(eraseRemovedDevice('identity-1', removed)).resolves.toBe(true);
@@ -30,6 +33,7 @@ describe('eraseRemovedDevice', () => {
     expect(removed.directMessages.forgetHistory).toHaveBeenCalledWith(
       'identity-1',
     );
+    expect(removed.groupMessages.forget).toHaveBeenCalledWith('identity-1');
     expect(removed.identities.discardDeviceSealedRecovery).toHaveBeenCalledWith(
       'identity-1',
     );
@@ -67,6 +71,20 @@ describe('eraseRemovedDevice', () => {
       'identity-1',
     );
     expect(removed.directMessages.forgetHistory).toHaveBeenCalledWith(
+      'identity-1',
+    );
+  });
+
+  it('still erases the rest and reports it when group state cannot be erased', async () => {
+    const removed = services();
+
+    removed.groupMessages.forget.mockRejectedValue(new Error('storage'));
+
+    await expect(eraseRemovedDevice('identity-1', removed)).resolves.toBe(
+      false,
+    );
+
+    expect(removed.identities.discardDeviceSealedRecovery).toHaveBeenCalledWith(
       'identity-1',
     );
   });

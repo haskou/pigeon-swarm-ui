@@ -21,10 +21,12 @@ import {
   removeConversationThreadMessage,
 } from './conversationThreadState';
 import { runStickerUsageSideEffect } from './runStickerUsageSideEffect';
+import { syncConversationThread } from './syncConversationThread';
 
 type UseConversationThreadInput = {
   activeConversation?: ConversationResource;
   closeMessageContextMenu: () => void;
+  messages: ChatMessage[];
   session: Session;
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
 };
@@ -38,8 +40,13 @@ function previousMessageIds(thread: ConversationThread): string[] {
 export function useConversationThread(
   input: UseConversationThreadInput,
 ): UseConversationThreadResult {
-  const { activeConversation, closeMessageContextMenu, session, setMessages } =
-    input;
+  const {
+    activeConversation,
+    closeMessageContextMenu,
+    messages,
+    session,
+    setMessages,
+  } = input;
   const [thread, setThread] = useState<ConversationThread | null>(null);
 
   useEffect(() => {
@@ -48,7 +55,15 @@ export function useConversationThread(
     }
   }, [activeConversation?.id, activeConversation?.type]);
 
-  const open = async (message: ChatMessage) => {
+  // Group sync keeps thread replies in the conversation timeline, so the open
+  // thread follows that timeline instead of a separate node listing.
+  useEffect(() => {
+    setThread((current) =>
+      current ? syncConversationThread(current, messages) : current,
+    );
+  }, [messages]);
+
+  const open = (message: ChatMessage) => {
     if (
       !activeConversation ||
       !conversationSupportsThreads(activeConversation)
@@ -61,44 +76,11 @@ export function useConversationThread(
       draft: '',
       editingMessage: null,
       error: null,
-      messages: [],
+      messages: ThreadMessageVisibility.forRoot(message.id, messages),
       replyTarget: null,
       root: message,
-      state: 'loading',
+      state: 'ready',
     });
-    try {
-      const result = await applicationContainer.messages.loadThread(
-        session,
-        activeConversation.id,
-        message.id,
-      );
-
-      setThread({
-        draft: '',
-        editingMessage: null,
-        error: null,
-        messages: ThreadMessageVisibility.forRoot(
-          message.id,
-          ThreadMessageVisibility.markAsThreadMessages(
-            message.id,
-            result.messages,
-          ),
-        ),
-        replyTarget: null,
-        root: message,
-        state: 'ready',
-      });
-    } catch (caught) {
-      setThread({
-        draft: '',
-        editingMessage: null,
-        error: toUserErrorMessage(caught, copy.messages.threadError),
-        messages: [],
-        replyTarget: null,
-        root: message,
-        state: 'ready',
-      });
-    }
   };
 
   const updateDraft = (draft: string) => {
@@ -159,6 +141,7 @@ export function useConversationThread(
   };
 
   const appendSentMessage = (message: ChatMessage) => {
+    setMessages((current) => MessageCollection.merge(current, [message]));
     setThread((current) =>
       current
         ? {
@@ -178,20 +161,21 @@ export function useConversationThread(
 
     setThread((current) => (current ? { ...current, error: null } : current));
     try {
-      const editEvent = await applicationContainer.messages.edit(
+      const edited = await applicationContainer.groupMessages.edit(
         session,
-        activeConversation.id,
+        activeConversation,
         targetMessage.id,
         content,
+        {},
       );
 
       setMessages((current) =>
-        mergeConversationMessageIfTargetExists(current, editEvent),
+        mergeConversationMessageIfTargetExists(current, edited),
       );
       setThread((current) =>
         current
           ? {
-              ...mergeConversationThreadMessage(current, editEvent),
+              ...mergeConversationThreadMessage(current, edited),
               draft: '',
               editingMessage: null,
               error: null,
@@ -210,7 +194,7 @@ export function useConversationThread(
     closeMessageContextMenu();
     setThread((current) => (current ? { ...current, error: null } : current));
     try {
-      await applicationContainer.messages.delete(
+      await applicationContainer.groupMessages.delete(
         session,
         activeConversation,
         message.id,
@@ -233,9 +217,9 @@ export function useConversationThread(
   ) => {
     if (!activeConversation || !thread) return;
 
-    const sent = await applicationContainer.messages.send(
+    const sent = await applicationContainer.groupMessages.send(
       session,
-      activeConversation.id,
+      activeConversation,
       content,
       {
         attachments,
@@ -256,9 +240,9 @@ export function useConversationThread(
   const sendSticker = async (sticker: StickerMessageReference) => {
     if (!activeConversation || !thread) return;
 
-    const sent = await applicationContainer.messages.send(
+    const sent = await applicationContainer.groupMessages.send(
       session,
-      activeConversation.id,
+      activeConversation,
       '',
       {
         previousMessageIds: previousMessageIds(thread),

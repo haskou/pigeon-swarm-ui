@@ -10,7 +10,6 @@ import type { Session } from '../../../identities/infrastructure/session/Session
 import type { NotificationResource } from '../../../notifications/infrastructure/http/resources/NotificationResource';
 import type { ConversationIdFactory } from '../../domain/ConversationIdFactory';
 import type { ConversationIdentityReader } from './ConversationIdentityReader';
-import type { ConversationInvitationType } from './ConversationInvitationType';
 import type { ConversationKeychainPublisher } from './ConversationKeychainPublisher';
 import type { ConversationMapper } from './ConversationMapper';
 import type { ConversationOperationBody } from './ConversationOperationBody';
@@ -21,7 +20,6 @@ import type { GroupConversationInput } from './GroupConversationInput';
 import type { PigeonConversationCommandsApiDependencies } from './PigeonConversationCommandsApiDependencies';
 
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
-import { ConversationKeyRequiredError } from '../../../messages/domain/errors/ConversationKeyRequiredError';
 import { NotificationMutationSigner } from '../../../notifications/infrastructure/http/NotificationMutationSigner';
 import { ConversationGroupNonce } from '../../domain/value-objects/ConversationGroupNonce';
 import { ConversationNetworkId } from '../../domain/value-objects/ConversationNetworkId';
@@ -55,7 +53,6 @@ export class PigeonConversationCommandsApi {
     session: Session,
     peerIdentity: IdentityResource,
     keyEntry: ConversationKeyEntry,
-    invitationType: ConversationInvitationType = 'conversation_invitation',
   ): Promise<void> {
     const path = '/notifications/';
     const recipientKeyEntry = {
@@ -70,7 +67,7 @@ export class PigeonConversationCommandsApi {
       encryptedKey: encryptedConversationKey,
       recipientIdentityId: peerIdentity.id,
       subjectId: keyEntry.conversationId,
-      type: invitationType,
+      type: 'conversation_invitation',
     });
     const body = {
       conversationId: keyEntry.conversationId,
@@ -79,7 +76,7 @@ export class PigeonConversationCommandsApi {
       mutation: invitation.mutation,
       nonce: invitation.nonce,
       recipientIdentityId: invitation.recipientIdentityId,
-      type: invitationType,
+      type: 'conversation_invitation',
     };
 
     await this.http.request<NotificationResource>(path, {
@@ -111,20 +108,6 @@ export class PigeonConversationCommandsApi {
     };
   }
 
-  private createGroupConversationKeyEntry(
-    conversationId: string,
-  ): ConversationKeyEntry {
-    return {
-      algorithm: 'aes-256-gcm',
-      conversationId,
-      createdAt: Date.now(),
-      key: SymmetricKey.generate().valueOf(),
-      kind: 'conversation',
-      peerIdentityId: '',
-      version: 2,
-    };
-  }
-
   private withConversationKey(
     keychain: LocalKeychain,
     keyEntry: ConversationKeyEntry,
@@ -152,6 +135,24 @@ export class PigeonConversationCommandsApi {
         [conversationId]: { ...keyEntry, conversationId },
       },
     };
+  }
+
+  /**
+   * The node files a conversation under a keychain its creator published. A
+   * group carries no key of its own, so the current head is enough; only a
+   * session that never published one publishes it unchanged.
+   */
+  private async publishedKeychain(
+    session: Session,
+  ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
+    if (session.keychainExternalIdentifier) {
+      return {
+        keychain: session.keychain,
+        keychainExternalIdentifier: session.keychainExternalIdentifier,
+      };
+    }
+
+    return await this.keychains.publishKeychain(session, (current) => current);
   }
 
   private async postConversation(
@@ -308,10 +309,7 @@ export class PigeonConversationCommandsApi {
         ConversationGroupNonce.fromString(input.nonce),
       )
       .toString();
-    const keyEntry = this.createGroupConversationKeyEntry(conversationId);
-    const published = await this.keychains.publishKeychain(session, (current) =>
-      this.withConversationKey(current, keyEntry),
-    );
+    const published = await this.publishedKeychain(session);
     const conversation = await this.postConversation(session, published, {
       keychainExternalIdentifier: published.keychainExternalIdentifier,
       name,
@@ -328,22 +326,6 @@ export class PigeonConversationCommandsApi {
       participantIds,
       type: 'group',
     });
-    const invitedIdentities = await Promise.all(
-      participantIds
-        .filter((identityId) => identityId !== session.identity.id)
-        .map((identityId) => this.identities.get(identityId)),
-    );
-
-    await Promise.all(
-      invitedIdentities.map((identity) =>
-        this.createInvitation(
-          session,
-          identity,
-          keyEntry,
-          'group_conversation_invitation',
-        ),
-      ),
-    );
 
     return {
       conversation,
@@ -352,35 +334,26 @@ export class PigeonConversationCommandsApi {
     };
   }
 
-  /** Signs `member_added`, then hands the new member the conversation key. */
+  /**
+   * Signs `member_added`. The group's MLS layer welcomes the member once the
+   * roster carries them.
+   */
   public async addMember(
     session: Session,
     target: ConversationTarget,
     recipientIdentityId: string,
   ): Promise<ConversationResource> {
-    const keyEntry = session.keychain.conversations[target.id];
-
-    if (!keyEntry) throw new ConversationKeyRequiredError();
-
     const recipientIdentity = await this.identities.get(
       recipientIdentityId.trim(),
     );
-    const conversation = await this.sendRosterChange(session, target, {
+
+    return await this.sendRosterChange(session, target, {
       action: 'member_added',
       args: { identityId: recipientIdentity.id },
       body: { identityId: recipientIdentity.id },
       method: 'POST',
       path: this.memberPath(target.id, 'members'),
     });
-
-    await this.createInvitation(
-      session,
-      recipientIdentity,
-      keyEntry,
-      'group_conversation_invitation',
-    );
-
-    return conversation;
   }
 
   public async demoteAdmin(

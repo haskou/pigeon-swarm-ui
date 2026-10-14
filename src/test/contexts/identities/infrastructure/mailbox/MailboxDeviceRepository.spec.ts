@@ -1,5 +1,6 @@
 import { mock } from 'jest-mock-extended';
 
+import type { GroupConversationMailbox } from '../../../../../contexts/groupMailboxes/infrastructure/GroupConversationMailbox';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { DirectMessageMailbox } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
 
@@ -10,6 +11,8 @@ import { MailboxDeviceRepository } from '../../../../../contexts/identities/infr
 const session = { identity: { id: 'identity-a' } } as unknown as Session;
 const identityId = IdentityId.fromString('identity-a');
 
+type GroupForget = Pick<GroupConversationMailbox, 'forget'>;
+
 describe(MailboxDeviceRepository.name, () => {
   it('releases the readers of the registered session', async () => {
     const contexts = new IdentityAccessContexts();
@@ -17,9 +20,11 @@ describe(MailboxDeviceRepository.name, () => {
 
     contexts.register(session);
 
-    await new MailboxDeviceRepository(contexts, mailbox).releaseReaders(
-      identityId,
-    );
+    await new MailboxDeviceRepository(
+      contexts,
+      mailbox,
+      mock<GroupForget>(),
+    ).releaseReaders(identityId);
 
     expect(mailbox.releaseDeviceReaders).toHaveBeenCalledWith(session);
   });
@@ -30,6 +35,7 @@ describe(MailboxDeviceRepository.name, () => {
     await new MailboxDeviceRepository(
       new IdentityAccessContexts(),
       mailbox,
+      mock<GroupForget>(),
     ).forgetHistory(identityId);
 
     expect(mailbox.forgetHistory).toHaveBeenCalledWith('identity-a');
@@ -41,8 +47,21 @@ describe(MailboxDeviceRepository.name, () => {
     await new MailboxDeviceRepository(
       new IdentityAccessContexts(),
       mailbox,
+      mock<GroupForget>(),
     ).cancelOutbox(identityId);
 
     expect(mailbox.cancelOutbox).toHaveBeenCalledWith('identity-a');
+  });
+
+  it('forgets the local group state of the identity', async () => {
+    const groups = mock<GroupForget>();
+
+    await new MailboxDeviceRepository(
+      new IdentityAccessContexts(),
+      mock<DirectMessageMailbox>(),
+      groups,
+    ).forgetGroups(identityId);
+
+    expect(groups.forget).toHaveBeenCalledWith('identity-a');
   });
 });

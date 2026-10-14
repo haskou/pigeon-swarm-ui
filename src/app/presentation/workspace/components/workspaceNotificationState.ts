@@ -19,8 +19,7 @@ export function isPendingConversationInvitationFor(
   return (
     notification.state === 'pending' &&
     notification.recipientIdentityId === recipientIdentityId &&
-    (notification.type === 'conversation_invitation' ||
-      notification.type === 'group_conversation_invitation') &&
+    notification.type === 'conversation_invitation' &&
     notification.payload.conversationId === conversationId
   );
 }

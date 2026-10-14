@@ -65,7 +65,6 @@ type WorkspaceRealtimeEventRouterInput = {
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
   setRealtimeEventLog: Dispatch<SetStateAction<RealtimeDomainEvent[]>>;
   setSession: Dispatch<SetStateAction<Session | null>>;
-  updateMessageCursor: (cursor: null | string) => void;
   workspaceMode: 'community' | 'messages';
 };
 
@@ -118,7 +117,6 @@ export function useWorkspaceRealtimeEventRouter({
   setMessages,
   setRealtimeEventLog,
   setSession,
-  updateMessageCursor,
   workspaceMode,
 }: WorkspaceRealtimeEventRouterInput): (event: RealtimeDomainEvent) => void {
   const handleIdentityEvent = useCallback(
@@ -169,7 +167,6 @@ export function useWorkspaceRealtimeEventRouter({
           if (activeConversationNetworkId === removedNetworkId) {
             setActiveConversationId(null);
             setMessages([]);
-            updateMessageCursor(null);
           }
 
           if (activeCommunityNetworkId === removedNetworkId) {
@@ -192,7 +189,6 @@ export function useWorkspaceRealtimeEventRouter({
       setCommunities,
       setConversations,
       setMessages,
-      updateMessageCursor,
     ],
   );
 
@@ -352,6 +348,8 @@ export function useWorkspaceRealtimeEventRouter({
       call: handleCallEvent,
       community: handleCommunityEvent,
       conversation: handleConversationEvent,
+      'group-control': () =>
+        void applicationContainer.groupMessages.receiveControl(session),
       identity: handleIdentityEvent,
       ignored: () => undefined,
       keychain: () => void refreshSession().catch(() => undefined),
@@ -368,6 +366,7 @@ export function useWorkspaceRealtimeEventRouter({
       handleNotificationEvent,
       handlePollEvent,
       refreshSession,
+      session,
     ],
   );
 

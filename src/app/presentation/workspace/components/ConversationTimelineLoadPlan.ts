@@ -8,7 +8,7 @@ export class ConversationTimelineLoadPlan {
     if (
       context.workspaceMode !== 'messages' ||
       !context.activeConversationId ||
-      !context.activeConversationKeyAvailable
+      !context.activeConversationReady
     ) {
       return 'clear';
     }

@@ -5,7 +5,7 @@ import { ConversationTimelineLoadPlan } from '../../../../../app/presentation/wo
 describe(ConversationTimelineLoadPlan.name, () => {
   const activeContext = {
     activeConversationId: 'conversation',
-    activeConversationKeyAvailable: true,
+    activeConversationReady: true,
     loadedConversationId: null,
     workspaceMode: 'messages' as const,
   };
@@ -14,7 +14,7 @@ describe(ConversationTimelineLoadPlan.name, () => {
     expect(
       ConversationTimelineLoadPlan.decide({
         ...activeContext,
-        activeConversationKeyAvailable: false,
+        activeConversationReady: false,
       }),
     ).toBe('clear');
     expect(

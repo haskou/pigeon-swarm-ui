@@ -42,6 +42,11 @@ function forgetter({
 
     return Promise.resolve();
   });
+  mailbox.forgetGroups.mockImplementation(() => {
+    calls.push('groups');
+
+    return Promise.resolve();
+  });
   mailbox.cancelOutbox.mockImplementation(() => {
     calls.push('outbox');
 
@@ -67,7 +72,7 @@ function message(allowOnlyDevice: boolean): ForgetCurrentDeviceMessage {
 }
 
 describe(CurrentDeviceForgetter.name, () => {
-  it('revokes this device, releases its readers, wipes local direct state, then forgets the local unlock', async () => {
+  it('revokes this device, releases its readers, wipes local direct and group state, then forgets the local unlock', async () => {
     const { calls, mailbox, useCase } = forgetter({
       retirement: () => Promise.resolve(DeviceRetirement.REVOKED),
     });
@@ -77,11 +82,13 @@ describe(CurrentDeviceForgetter.name, () => {
       'retire',
       'release',
       'history',
+      'groups',
       'outbox',
       'unlock:identity-1',
     ]);
     expect(mailbox.releaseReaders).toHaveBeenCalledWith(identityId);
     expect(mailbox.forgetHistory).toHaveBeenCalledWith(identityId);
+    expect(mailbox.forgetGroups).toHaveBeenCalledWith(identityId);
     expect(mailbox.cancelOutbox).toHaveBeenCalledWith(identityId);
   });
 
@@ -95,6 +102,7 @@ describe(CurrentDeviceForgetter.name, () => {
       'retire',
       'release',
       'history',
+      'groups',
       'outbox',
       'unlock:identity-1',
     ]);
@@ -124,7 +132,13 @@ describe(CurrentDeviceForgetter.name, () => {
     });
 
     await expect(useCase.forget(message(true))).resolves.toBe('forgotten');
-    expect(calls).toEqual(['retire', 'history', 'outbox', 'unlock:identity-1']);
+    expect(calls).toEqual([
+      'retire',
+      'history',
+      'groups',
+      'outbox',
+      'unlock:identity-1',
+    ]);
   });
 
   it('wipes local direct state and reports a failed local unlock removal after the device is revoked', async () => {
@@ -138,6 +152,7 @@ describe(CurrentDeviceForgetter.name, () => {
       'retire',
       'release',
       'history',
+      'groups',
       'outbox',
       'unlock:identity-1',
     ]);

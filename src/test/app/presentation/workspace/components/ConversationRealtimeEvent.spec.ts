@@ -38,6 +38,19 @@ describe(ConversationRealtimeEvent.name, () => {
     expect(ConversationRealtimeEvent.shouldNotify(event(type))).toBe(false);
   });
 
+  it('tells a recorded call apart from a message', () => {
+    expect(
+      ConversationRealtimeEvent.isCallEvent(
+        event('conversations.v1.call.event.was_recorded'),
+      ),
+    ).toBe(true);
+    expect(
+      ConversationRealtimeEvent.isCallEvent(
+        event('conversations.v1.message.was_sent'),
+      ),
+    ).toBe(false);
+  });
+
   it('notifies for newly sent messages', () => {
     expect(
       ConversationRealtimeEvent.shouldNotify(

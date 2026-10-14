@@ -7,6 +7,7 @@ import type { MessageAttachment } from '../../../attachments/application/contrac
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
 import type { EncryptMessagePayloadInput } from '../crypto/EncryptMessagePayloadInput';
+import type { MessagePayloadSeal } from '../crypto/MessagePayloadSeal';
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { MessageAttachmentPublisher } from './MessageAttachmentPublisher';
 import type { MessageResource } from './MessageResource';
@@ -96,27 +97,47 @@ export class PigeonMessageCommandsApi {
     return await this.linkPreviewForContent(session, content);
   }
 
+  /**
+   * How a payload is sealed: `seal` when given, else encryption under the
+   * conversation key, which must exist before anything is published.
+   */
+  private sealFor(
+    session: Session,
+    conversationId: string,
+    seal?: MessagePayloadSeal,
+  ): MessagePayloadSeal {
+    if (seal) return seal;
+    const key = ConversationKeychain.entry(
+      session.keychain,
+      session.identity.id,
+      conversationId,
+    );
+
+    if (!key) throw new ConversationKeyRequiredError();
+    const symmetricKey = SymmetricKey.fromBase64(key.key);
+
+    return (plainMessage) => symmetricKey.encrypt(plainMessage).toString();
+  }
+
   private encryptPayload(input: EncryptMessagePayloadInput): string {
-    return SymmetricKey.fromBase64(input.key.key)
-      .encrypt(
-        JSON.stringify({
-          attachments: input.messageAttachments,
-          authorIdentityId: input.session.identity.id,
-          content: input.sticker ? '' : input.content,
-          conversationId: input.conversationId,
-          ...(input.linkPreview ? { linkPreview: input.linkPreview } : {}),
-          ...(input.replyPreview ? { reply: input.replyPreview } : {}),
-          ...(input.sticker ? { sticker: input.sticker } : {}),
-          ...(input.threadRootMessageId
-            ? { threadRootMessageId: input.threadRootMessageId }
-            : {}),
-          timestamp: input.timestamp,
-          type:
-            input.eventType ??
-            (input.sticker ? 'StickerMessageSent' : 'MessageSent'),
-        }),
-      )
-      .toString();
+    return input.seal(
+      JSON.stringify({
+        attachments: input.messageAttachments,
+        authorIdentityId: input.session.identity.id,
+        content: input.sticker ? '' : input.content,
+        conversationId: input.conversationId,
+        ...(input.linkPreview ? { linkPreview: input.linkPreview } : {}),
+        ...(input.replyPreview ? { reply: input.replyPreview } : {}),
+        ...(input.sticker ? { sticker: input.sticker } : {}),
+        ...(input.threadRootMessageId
+          ? { threadRootMessageId: input.threadRootMessageId }
+          : {}),
+        timestamp: input.timestamp,
+        type:
+          input.eventType ??
+          (input.sticker ? 'StickerMessageSent' : 'MessageSent'),
+      }),
+    );
   }
 
   private async abandonAttachmentsOnFailure<T>(
@@ -174,14 +195,9 @@ export class PigeonMessageCommandsApi {
     options: SendMessageOptions,
     deliver: (sent: CommandRecord) => Promise<T>,
     commandIdentity?: MessageCommandIdentity,
+    seal?: MessagePayloadSeal,
   ): Promise<T> {
-    const key = ConversationKeychain.entry(
-      session.keychain,
-      session.identity.id,
-      conversationId,
-    );
-
-    if (!key) throw new ConversationKeyRequiredError();
+    const sealPayload = this.sealFor(session, conversationId, seal);
 
     const {
       attachments = [],
@@ -216,10 +232,10 @@ export class PigeonMessageCommandsApi {
               ? 'ThreadStickerMessageSent'
               : 'ThreadMessageSent'
             : undefined,
-          key,
           linkPreview,
           messageAttachments,
           replyPreview,
+          seal: sealPayload,
           session,
           sticker: options.sticker,
           threadRootMessageId,
@@ -289,7 +305,7 @@ export class PigeonMessageCommandsApi {
   }
 
   /**
-   * Builds the edit record for one message: the encrypted payload and the
+   * Builds the edit record for one message: the sealed payload and the
    * record a sender writes. Nothing is submitted here.
    */
   public async composeEdit(
@@ -299,14 +315,9 @@ export class PigeonMessageCommandsApi {
     content: string,
     options: EditMessageOptions = {},
     commandIdentity?: MessageCommandIdentity,
+    seal?: MessagePayloadSeal,
   ): Promise<CommandRecord> {
-    const key = ConversationKeychain.entry(
-      session.keychain,
-      session.identity.id,
-      conversationId,
-    );
-
-    if (!key) throw new ConversationKeyRequiredError();
+    const sealPayload = this.sealFor(session, conversationId, seal);
 
     const timestamp = commandIdentity?.createdAt ?? Date.now();
     const linkPreview =
@@ -316,9 +327,9 @@ export class PigeonMessageCommandsApi {
       content,
       conversationId,
       eventType: 'MessageEdited',
-      key,
       linkPreview,
       messageAttachments: [],
+      seal: sealPayload,
       session,
       timestamp,
     });
@@ -328,7 +339,9 @@ export class PigeonMessageCommandsApi {
       conversationId,
       createdAt: timestamp,
       encryptedPayload,
-      id: `${conversationId}:${timestamp}:${UUID.generate().toString()}:edited`,
+      id:
+        commandIdentity?.id ??
+        `${conversationId}:${timestamp}:${UUID.generate().toString()}:edited`,
       previousMessageIds: [messageId],
       targetMessageId: messageId,
       type: 'edited',

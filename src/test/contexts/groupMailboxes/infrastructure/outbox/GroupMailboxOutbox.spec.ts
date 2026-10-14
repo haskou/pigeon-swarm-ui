@@ -46,14 +46,23 @@ describe('GroupMailboxOutbox', () => {
   >;
   let sent: string[];
   let outbox: GroupMailboxOutbox;
+  let roster: ReadonlySet<string>;
 
   const session = { identity: { id: 'alice' } } as unknown as Session;
 
   const build = (): GroupMailboxOutbox =>
-    new GroupMailboxOutbox(session, engine, channel, store, () => now);
+    new GroupMailboxOutbox(
+      session,
+      engine,
+      channel,
+      store,
+      () => Promise.resolve(roster),
+      () => now,
+    );
 
   beforeEach(() => {
     now = 1_000;
+    roster = new Set(['alice', 'bob', 'dave']);
     current = 0;
     sent = [];
     rows = new Map();
@@ -336,5 +345,62 @@ describe('GroupMailboxOutbox', () => {
 
     expect(store.forget).toHaveBeenCalledWith('alice');
     expect(outbox.pending(CONVERSATION)).toEqual([]);
+  });
+
+  it('seals nothing while a member off the roster is still in the group', async () => {
+    roster = new Set(['alice']);
+
+    await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
+
+    expect(engine.encrypt).not.toHaveBeenCalled();
+    expect(channel.send).not.toHaveBeenCalled();
+    expect(outbox.pending(CONVERSATION)).toEqual(['m1']);
+
+    current = 1;
+    engine.members.mockResolvedValue(['alice']);
+    now += GroupMailboxOutbox.RETRY_MAX_MS;
+    await outbox.resume();
+
+    expect(sent).toEqual([inboxOf(1, 'alice')]);
+    expect(outbox.pending(CONVERSATION)).toEqual([]);
+  });
+
+  it('holds a queued message once a recipient leaves the roster', async () => {
+    channel.send.mockRejectedValue(new TypeError('offline'));
+    await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
+    roster = new Set(['alice']);
+    channel.send.mockReset();
+    channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'x' });
+    now += GroupMailboxOutbox.RETRY_MAX_MS;
+
+    await outbox.resume();
+
+    expect(channel.send).not.toHaveBeenCalled();
+    expect(outbox.pending(CONVERSATION)).toEqual(['m1']);
+  });
+
+  it('rejects a message once this identity is off the roster', async () => {
+    roster = new Set(['bob']);
+
+    await expect(
+      outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1])),
+    ).rejects.toThrow(MlsRejectedError);
+    expect(engine.encrypt).not.toHaveBeenCalled();
+    expect(rows.size).toBe(0);
+  });
+
+  it('drops a queued message once this identity is off the roster', async () => {
+    const failures: string[] = [];
+
+    outbox.subscribe(({ reference }) => failures.push(reference));
+    channel.send.mockRejectedValue(new TypeError('offline'));
+    await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
+    roster = new Set(['bob']);
+    now += GroupMailboxOutbox.RETRY_MAX_MS;
+
+    await outbox.resume();
+
+    expect(failures).toEqual(['m1']);
+    expect(rows.size).toBe(0);
   });
 });

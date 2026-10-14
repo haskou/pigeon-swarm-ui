@@ -57,12 +57,6 @@ export class WorkspaceDerivedState {
     );
   }
 
-  public static conversationKeyId(
-    key: Session['keychain']['conversations'][string] | undefined,
-  ): null | string {
-    return key?.conversationId ?? null;
-  }
-
   public static conversationNotificationScope(
     conversation: ConversationResource | null | undefined,
   ): NotificationSettingScope | null {
@@ -91,6 +85,17 @@ export class WorkspaceDerivedState {
       session.identity.id,
       session.keychain,
     );
+  }
+
+  /**
+   * A group conversation encrypts through its MLS group mailbox, so it is
+   * ready without a conversation key; a one-to-one conversation needs one.
+   */
+  public static conversationReady(
+    conversation: ConversationResource | null | undefined,
+    key: Session['keychain']['conversations'][string] | undefined,
+  ): boolean {
+    return conversation?.type === 'group' || Boolean(key);
   }
 
   public static hasOpenDialog(states: boolean[]): boolean {

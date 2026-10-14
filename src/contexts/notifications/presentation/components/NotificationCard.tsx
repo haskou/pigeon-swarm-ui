@@ -34,10 +34,6 @@ function notificationTitle(notification: NotificationResource): string {
     return copy.notifications.communityInvitationTitle;
   }
 
-  if (notification.type === 'group_conversation_invitation') {
-    return copy.notifications.groupInvitationTitle;
-  }
-
   return copy.notifications.invitationTitle;
 }
 

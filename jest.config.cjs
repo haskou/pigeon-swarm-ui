@@ -25,6 +25,7 @@ const REAL_CRYPTO_SPECS = [
   'DirectMessageMailbox',
   'DirectMessageMailboxAvailability',
   'DirectMessageReaderSet',
+  'GroupConversationMailbox',
   'GroupMailboxControl',
   'GroupMailboxControlSeal',
   'GroupMailboxInboxSync',

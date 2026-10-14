@@ -134,7 +134,6 @@ export function ChatColumn({
   editingMessage,
   groupInviteRequest = 0,
   hasConversationKey,
-  hasReachedMessageStart,
   identityNames,
   identityPictures,
   identityProfiles,
@@ -461,7 +460,6 @@ export function ChatColumn({
         editingMessage={editingMessage}
         hasConversationKey={hasConversationKey}
         hasPendingInvitation={hasPendingInvitation}
-        hasReachedMessageStart={hasReachedMessageStart}
         identityNames={identityNames}
         identityPictures={identityPictures}
         invitationPrompt={invitationPrompt}

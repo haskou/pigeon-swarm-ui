@@ -1,23 +1,16 @@
 import type { ConversationResource } from '../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
-import type { MessageResource } from '../../../contexts/messages/infrastructure/http/MessageResource';
 import type { PigeonMessagesGateway } from '../../../contexts/messages/infrastructure/http/PigeonMessagesGateway';
 import type { ConversationDraftProjection as ConversationDraft } from '../../../contexts/messages/infrastructure/http/resources/ConversationDraftProjection';
-import type { EditMessageOptions } from '../../../contexts/messages/infrastructure/http/resources/EditMessageOptions';
 import type { MessageLinkPreview } from '../../../contexts/messages/infrastructure/http/resources/MessageLinkPreview';
-import type { SendMessageOptions } from '../../../contexts/messages/infrastructure/http/resources/SendMessageOptions';
-import type { ChatMessage } from '../../../contexts/messages/presentation/view-models/ChatMessage';
-import type { MessagePin } from '../../../contexts/messages/presentation/view-models/MessagePin';
 
 import { PigeonConversationDrafts } from './PigeonConversationDrafts';
 import { PigeonMessagePins } from './PigeonMessagePins';
 import { PigeonMessageReactions } from './PigeonMessageReactions';
-import { PigeonMessageReader } from './PigeonMessageReader';
 import { PigeonMessageWriter } from './PigeonMessageWriter';
 
 export class PigeonMessagesFacade {
   public constructor(
-    private readonly reader: PigeonMessageReader,
     private readonly writer: PigeonMessageWriter,
     private readonly drafts: PigeonConversationDrafts,
     private readonly reactions: PigeonMessageReactions,
@@ -41,14 +34,6 @@ export class PigeonMessagesFacade {
     return await this.gateway.createLinkPreview(session, url);
   }
 
-  public async decrypt(
-    session: Session,
-    conversationId: string,
-    message: MessageResource,
-  ): Promise<ChatMessage> {
-    return await this.gateway.decryptMessage(session, conversationId, message);
-  }
-
   public async delete(
     session: Session,
     conversation: ConversationResource,
@@ -64,77 +49,8 @@ export class PigeonMessagesFacade {
     await this.drafts.delete(session, conversationId);
   }
 
-  public async edit(
-    session: Session,
-    conversationId: string,
-    messageId: string,
-    content: string,
-    options: EditMessageOptions = {},
-  ): Promise<ChatMessage> {
-    return await this.writer.edit(
-      session,
-      conversationId,
-      messageId,
-      content,
-      options,
-    );
-  }
-
   public async listDrafts(session: Session): Promise<ConversationDraft[]> {
     return await this.drafts.list(session);
-  }
-
-  public async listPins(
-    session: Session,
-    conversationId: string,
-  ): Promise<MessagePin[]> {
-    return await this.pins.list(session, conversationId);
-  }
-
-  public async load(
-    session: Session,
-    conversationId: string,
-    before?: null | string,
-    options?: { limit?: number; signal?: AbortSignal },
-  ): Promise<{ messages: ChatMessage[]; nextCursor?: null | string }> {
-    return await this.reader.load(session, conversationId, before, options);
-  }
-
-  public async loadAround(
-    session: Session,
-    conversationId: string,
-    messageId: string,
-  ): Promise<{
-    messages: ChatMessage[];
-    nextCursor?: null | string;
-    previousCursor?: null | string;
-  }> {
-    return await this.reader.loadAround(session, conversationId, messageId);
-  }
-
-  public async loadOne(
-    session: Session,
-    conversationId: string,
-    messageId: string,
-  ): Promise<ChatMessage | null> {
-    return await this.reader.loadOne(session, conversationId, messageId);
-  }
-
-  public async loadThread(
-    session: Session,
-    conversationId: string,
-    messageId: string,
-    options: { limit?: number } = {},
-  ): Promise<{
-    messages: ChatMessage[];
-    nextBeforeMessageId?: null | string;
-  }> {
-    return await this.reader.loadThread(
-      session,
-      conversationId,
-      messageId,
-      options,
-    );
   }
 
   public async pin(
@@ -161,15 +77,6 @@ export class PigeonMessagesFacade {
     updatedAt = Date.now(),
   ): Promise<ConversationDraft> {
     return await this.drafts.save(session, conversationId, content, updatedAt);
-  }
-
-  public async send(
-    session: Session,
-    conversationId: string,
-    content: string,
-    options: SendMessageOptions = {},
-  ): Promise<ChatMessage> {
-    return await this.writer.send(session, conversationId, content, options);
   }
 
   public async unpin(

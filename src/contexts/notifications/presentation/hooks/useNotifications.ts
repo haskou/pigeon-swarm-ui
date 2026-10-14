@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { CommunityResource as Community } from '../../../communities/infrastructure/http/resources/CommunityResource';
 import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
-import type { NotificationResource } from '../../infrastructure/http/resources/NotificationResource';
 import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { NotificationResource } from '../../infrastructure/http/resources/NotificationResource';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { copy } from '../../../../shared/presentation/i18n/copy';
@@ -152,16 +152,17 @@ export function useNotifications({
       setError(null);
 
       try {
+        const facade = applicationContainer.notifications;
         const result =
           notification.type === 'community_invitation'
             ? {
-                notification: await applicationContainer.notifications.update(
+                notification: await facade.update(
                   currentSession,
                   notification.id,
                   'accepted',
                 ),
               }
-            : await applicationContainer.notifications.acceptConversationInvitation(
+            : await facade.acceptConversationInvitation(
                 currentSession,
                 notification,
               );
@@ -199,8 +200,7 @@ export function useNotifications({
           communities,
           communityId,
           conversationId:
-            notification.type === 'conversation_invitation' ||
-            notification.type === 'group_conversation_invitation'
+            notification.type === 'conversation_invitation'
               ? notification.payload.conversationId
               : undefined,
           conversations,

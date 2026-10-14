@@ -6,12 +6,14 @@ import type { ChatMessage } from '../../../../../contexts/messages/presentation/
 
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';
 import { useConversationTimeline } from '../../../../../app/presentation/workspace/components/useConversationTimeline';
-import { useWorkspaceResumeSync } from '../../../../../app/presentation/workspace/components/useWorkspaceResumeSync';
+
+const mockEffects: Array<() => void> = [];
 
 jest.mock('react', () => ({
-  startTransition: (run: () => void) => run(),
   useCallback: <T>(callback: T) => callback,
-  useEffect: () => undefined,
+  useEffect: (effect: () => void) => {
+    mockEffects.push(effect);
+  },
   useRef: <T>(initial: T) => ({ current: initial }),
   useState: <T>(initial: T | (() => T)) => [
     typeof initial === 'function' ? (initial as () => T)() : initial,
@@ -47,7 +49,6 @@ jest.mock('../../../../../app/composition/applicationContainer', () => ({
   applicationContainer: {
     conversations: { markReadUntil: jest.fn() },
     directMessages: { markRead: jest.fn() },
-    messages: { load: jest.fn() },
   },
 }));
 
@@ -76,8 +77,11 @@ const message = {
 
 function mountTimeline(activeConversation = conversation) {
   const onErrorChange = jest.fn<(error: null | string) => void>();
+
+  mockEffects.length = 0;
   const timeline = useConversationTimeline({
     activeConversation,
+    activeConversationReady: true,
     clearUnreadMessages: jest.fn(),
     onCommunitiesReload: () => Promise.resolve(),
     onConversationsChange: jest.fn(),
@@ -91,13 +95,9 @@ function mountTimeline(activeConversation = conversation) {
   return { onErrorChange, timeline };
 }
 
-// The hook hands its real loadActiveMessages to the resume sync.
-function loadActiveMessagesOf() {
-  const input = jest.mocked(useWorkspaceResumeSync).mock.calls[0]?.[0];
-
-  if (!input) throw new Error('useWorkspaceResumeSync was not mounted');
-
-  return input.loadActiveMessages;
+// Runs the mount effects, as React does after the first render.
+function runEffects() {
+  mockEffects.forEach((effect) => effect());
 }
 
 describe('useConversationTimeline', () => {
@@ -106,31 +106,24 @@ describe('useConversationTimeline', () => {
     jest
       .mocked(applicationContainer.conversations.markReadUntil)
       .mockResolvedValue(undefined);
-    jest
-      .mocked(applicationContainer.messages.load)
-      .mockResolvedValue({ messages: [message], nextCursor: null } as never);
   });
 
-  it('never reads the node message list for a one-to-one conversation', async () => {
-    const { onErrorChange, timeline } = mountTimeline();
+  it.each([
+    ['one-to-one', conversation],
+    ['group', group],
+  ])(
+    'opens an empty %s timeline for its mailbox sync to fill',
+    (_type, activeConversation) => {
+      const { onErrorChange, timeline } = mountTimeline(activeConversation);
 
-    await loadActiveMessagesOf()(conversation.id);
+      runEffects();
 
-    expect(applicationContainer.messages.load).not.toHaveBeenCalled();
-    expect(timeline.setMessages).toHaveBeenCalledTimes(1);
-    expect(timeline.setMessages).toHaveBeenCalledWith([]);
-    expect(onErrorChange).not.toHaveBeenCalledWith(expect.any(String));
-  });
-
-  it('keeps the mailbox timeline of a one-to-one conversation on resume', async () => {
-    const { timeline } = mountTimeline();
-
-    await loadActiveMessagesOf()(conversation.id);
-    await loadActiveMessagesOf()(conversation.id);
-
-    expect(timeline.setMessages).toHaveBeenCalledTimes(1);
-    expect(applicationContainer.messages.load).not.toHaveBeenCalled();
-  });
+      expect(timeline.setMessages).toHaveBeenCalledTimes(1);
+      expect(timeline.setMessages).toHaveBeenCalledWith([]);
+      expect(onErrorChange).toHaveBeenCalledWith(null);
+      expect(onErrorChange).not.toHaveBeenCalledWith(expect.any(String));
+    },
+  );
 
   it('hands a one-to-one read to the read use case with the open conversation', () => {
     const { timeline } = mountTimeline();
@@ -140,24 +133,6 @@ describe('useConversationTimeline', () => {
     expect(
       applicationContainer.conversations.markReadUntil,
     ).toHaveBeenCalledWith(session, conversation.id, message.id, conversation);
-    expect(applicationContainer.directMessages.markRead).not.toHaveBeenCalled();
-  });
-
-  it('loads a group timeline from the node and marks it read-until', async () => {
-    const { timeline } = mountTimeline(group);
-
-    await loadActiveMessagesOf()(group.id);
-
-    expect(applicationContainer.messages.load).toHaveBeenCalledWith(
-      session,
-      group.id,
-      null,
-      expect.anything(),
-    );
-    expect(timeline.setMessages).toHaveBeenLastCalledWith([message]);
-    expect(
-      applicationContainer.conversations.markReadUntil,
-    ).toHaveBeenCalledWith(session, group.id, message.id, group);
     expect(applicationContainer.directMessages.markRead).not.toHaveBeenCalled();
   });
 });

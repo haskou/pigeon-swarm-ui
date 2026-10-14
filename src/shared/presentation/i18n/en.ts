@@ -1167,7 +1167,6 @@ export const en = {
     enablePushUnsupported:
       'This browser cannot register push notifications for this app.',
     error: 'Notifications could not be loaded.',
-    groupInvitationTitle: 'Group invitation',
     hideMutedChannels: 'Hide muted channels',
     hideMutedChannelsAgain: 'Hide muted channels again',
     invitationTitle: 'Conversation invitation',
@@ -1550,9 +1549,7 @@ export const en = {
       'Direct messages cannot sync here: this identity has reached its device limit. Remove a device you no longer use, then try again.',
     directMailboxSyncError: 'Direct messages could not be synced. Retrying.',
     dismissNotice: 'Dismiss',
-    loadMessagesError:
-      'Messages could not be loaded. Great, now we have a mystery.',
-    loadOlderError: 'Older messages could not be loaded.',
+    groupMailboxSyncError: 'Group messages could not be synced. Retrying.',
     newMessages: 'New messages',
     sendError: 'The message was not sent. TLS had other plans.',
   },

@@ -336,7 +336,6 @@ function WorkspaceNotificationDialog(
         communities={props.communities}
         communityAvatarUrls={props.communityAvatarUrls}
         communityPreviews={props.communityPreviews}
-        conversations={props.conversations}
         currentIdentityId={props.session.identity.id}
         error={props.error}
         identityNames={props.identityNames}

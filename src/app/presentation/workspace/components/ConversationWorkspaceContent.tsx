@@ -8,6 +8,7 @@ import { identityDisplayName } from '../../../../contexts/identities/presentatio
 import { MessageThreadPanel } from '../../../../contexts/messages/presentation/components/MessageThreadPanel';
 import { MessageCollection } from '../../../../contexts/messages/presentation/view-models/MessageCollection';
 import { ChatColumn } from './ChatColumn';
+import { WorkspaceDerivedState } from './WorkspaceDerivedState';
 
 function ConversationThreadContent({
   activeConversation,
@@ -37,12 +38,16 @@ function ConversationThreadContent({
         identityNames,
       )
     : undefined;
+  const ready = WorkspaceDerivedState.conversationReady(
+    activeConversation,
+    activeConversationKey,
+  );
 
   return (
     <MessageThreadPanel
-      attachmentEncryptionAvailable={Boolean(activeConversationKey)}
+      attachmentEncryptionAvailable={ready}
       currentIdentityId={session.identity.id}
-      disabled={!activeConversationKey}
+      disabled={!ready}
       draft={activeThread.draft}
       editingMessage={activeThread.editingMessage?.message ?? null}
       error={activeThread.error}
@@ -122,6 +127,10 @@ function ConversationChatContent({
   const peerPicture = activeConversationPeerIdentityId
     ? identityPictures[activeConversationPeerIdentityId]
     : undefined;
+  const ready = WorkspaceDerivedState.conversationReady(
+    activeConversation,
+    activeConversationKey,
+  );
 
   return (
     <Suspense fallback={null}>
@@ -132,8 +141,7 @@ function ConversationChatContent({
         draft={activeConversationDraft}
         editingMessage={editingMessage?.message ?? null}
         groupInviteRequest={groupInviteRequest}
-        hasConversationKey={Boolean(activeConversationKey)}
-        hasReachedMessageStart={!timeline.messageCursor}
+        hasConversationKey={ready}
         identityNames={identityNames}
         identityPictures={identityPictures}
         identityProfiles={identityProfiles}
@@ -165,16 +173,14 @@ function ConversationChatContent({
             activeConversation?.networkId,
           )
         }
-        onOpenMessageThread={(message) => void thread.open(message)}
-        onOpenPins={() => void pins.open()}
+        onOpenMessageThread={thread.open}
+        onOpenPins={pins.open}
         onOpenSidebar={onSidebarOpen}
         onReactionToggle={(message, emoji, reacted) =>
           void messageActions.toggleReaction(message, emoji, reacted)
         }
         onRealtimeEventsOpen={onRealtimeEventsOpen}
-        onReplyReferenceClick={(messageId) =>
-          void messageActions.openReplyReference(messageId)
-        }
+        onReplyReferenceClick={messageActions.openReplyReference}
         onRetryMessage={messageActions.retryMessage}
         onScroll={timeline.handleScroll}
         onSend={messageActions.sendMessage}

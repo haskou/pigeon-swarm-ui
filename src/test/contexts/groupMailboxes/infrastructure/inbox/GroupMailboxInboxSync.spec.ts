@@ -182,6 +182,7 @@ const member = (name: string): Member => {
       remove: (_identityId, id) => Promise.resolve(void rows.delete(id)),
       save: (_session, row) => Promise.resolve(void rows.set(row.id, row)),
     },
+    () => Promise.resolve(roster),
     () => now,
   );
   const direct: Member['direct'] = [];

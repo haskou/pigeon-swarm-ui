@@ -13,15 +13,12 @@ export type ConversationTimelineController = {
     conversationId: string,
     loadedMessages: ChatMessage[],
   ) => void;
-  messageCursor: null | string;
   messageState: ConversationMessageLoadState;
   messages: ChatMessage[];
   messagesRef: MutableRefObject<ChatMessage[]>;
   newMessageCount: number;
   scrollerRef: MessageViewport['scrollerRef'];
   scrollMessagesToBottom: MessageViewport['scrollMessagesToBottom'];
-  setMessageLoadState: (state: ConversationMessageLoadState) => void;
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
   setNewMessageCount: Dispatch<SetStateAction<number>>;
-  updateMessageCursor: (cursor: null | string) => void;
 };

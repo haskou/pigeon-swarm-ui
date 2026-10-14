@@ -56,6 +56,9 @@ export function useAppBootstrap(): {
       applicationContainer.directMessages
         .resumeOutbox(nextSession)
         .catch(() => undefined);
+      applicationContainer.groupMessages
+        .resume(nextSession)
+        .catch(() => undefined);
     },
     [],
   );
@@ -63,6 +66,7 @@ export function useAppBootstrap(): {
   const clearSession = useCallback(() => {
     if (session) {
       applicationContainer.directMessages.stopOutbox(session.identity.id);
+      applicationContainer.groupMessages.stop(session.identity.id);
     }
     closeAllRealtimeConnections();
     applicationContainer.disposeSessionWorkers();

@@ -54,11 +54,8 @@ export class PigeonNotificationsFacade {
     keychainExternalIdentifier: string;
     notification: NotificationResource;
   }> {
-    if (
-      notification.type === 'missed_call' ||
-      notification.type === 'community_invitation'
-    ) {
-      throw new Error('Only conversation invitations carry a key to accept.');
+    if (notification.type !== 'conversation_invitation') {
+      throw new Error('Only one-to-one invitations carry a key to accept.');
     }
 
     const recipientIdentityId = this.actor(session);
@@ -109,14 +106,18 @@ export class PigeonNotificationsFacade {
     return server.toPrimitives();
   }
 
+  /**
+   * Lists what the identity can act on. Group conversation invitations are
+   * the group's MLS control letters, read by the group mailboxes instead.
+   */
   public async list(session: Session): Promise<NotificationResource[]> {
     const notifications = await this.useCases.notificationSearcher.search(
       new SearchNotificationsMessage(this.actor(session)),
     );
 
-    return notifications.map((notification) =>
-      this.notificationMapper.toResource(notification),
-    );
+    return notifications
+      .map((notification) => this.notificationMapper.toResource(notification))
+      .filter(({ type }) => type !== 'group_conversation_invitation');
   }
 
   public async listNotificationSettings(

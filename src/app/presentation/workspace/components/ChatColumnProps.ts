@@ -33,7 +33,6 @@ export interface ChatColumnProps {
   draft: string;
   editingMessage?: ChatMessage | null;
   hasConversationKey: boolean;
-  hasReachedMessageStart: boolean;
   invitationAccepting?: boolean;
   invitationError?: null | string;
   invitationInviterName?: string;

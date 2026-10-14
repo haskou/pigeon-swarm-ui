@@ -63,7 +63,7 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 
 ## Group mailbox key schedule
 
-Step 2 of node `docs/design/group-mailboxes.md` (haskou/pigeon-swarm-ui#174). Module: `src/contexts/groupMailboxes/`. Group sends and receives do not use it yet; group conversations stay on their legacy endpoints until the cutover.
+Step 2 of node `docs/design/group-mailboxes.md` (haskou/pigeon-swarm-ui#174). Module: `src/contexts/groupMailboxes/`. Every group conversation runs on it (see Group conversation cutover).
 
 - `GroupMailboxKeySchedule` (`infrastructure/crypto/`) derives the material of one member inbox `I(Y,k)`. Inputs and outputs are 32-byte value objects in `domain/value-objects/`, held as unpadded canonical base64url. A rejected value is never echoed in the error.
 - HKDF-SHA256, no salt, 32-byte outputs. Input key material is the generation secret `gen_k` (`GroupMailboxGenerationSecret`). `info` = label ‖ slot `s_Y` (`GroupMailboxSlot`, 32 bytes).
@@ -89,11 +89,11 @@ Each group conversation is one MLS group (`GroupMailboxMlsEngine`, `infrastructu
 - The log is written before the MLS state, and any failed operation drops the cached group. Loading a group reconciles the log with it: generations past the stored epoch belong to a commit whose group save failed, so nobody received it; they are dropped, and the log advances if the stored tree differs. A retried add or removal therefore exports the generation of the commit it actually returns. `generation` and `readableGenerations` reconcile first. A generation advances only past the epoch it already holds, so reapplying a commit after a crash is idempotent.
 - `add` and `remove` persist the commit locally before the caller publishes it; there is no abandon path yet (#380). A crash between the two leaves this device one epoch ahead of the group until the commit is delivered.
 - A device removed before a restart restores as removed and cannot encrypt.
-- Limits: credentials are self-asserted and any member can commit an add or a removal; only the conversation roster is checked (#375). A member that has not yet processed a removal still encrypts in the old epoch, so the removed member can read what it sends until it catches up. The MLS state, the plaintext cache and the generation log are not sealed with the device root (#376).
+- Limits: credentials are self-asserted and any member can commit an add or a removal; only the conversation roster is checked (#375). A member that has not yet processed a removal holds its messages while the roster no longer lists the removed member (see Removal gap under Group conversation cutover); one that read the roster before the removal can still encrypt in the old epoch. The MLS state, the plaintext cache and the generation log are not sealed with the device root (#376).
 
 ### Control records
 
-`GroupMailboxControl` (`infrastructure/control/`) carries the membership traffic of D8. It is not wired into the app yet; the cutover does that.
+`GroupMailboxControl` (`infrastructure/control/`) carries the membership traffic of D8.
 
 - Wire format (`GroupMailboxControlRecord`): one JSON object `{kind:'group-mailbox-control', version:1, conversationId, type, ...}`, binary fields in unpadded canonical base64url, each at most 40 000 bytes. `type` is `key-package-request` (`requestId`, 22 base64url characters), `key-package-response` (`requestId`, `keyPackage`), `welcome` (`welcome`, `index`) or `commit` (`commit`). `decode` returns null for anything else, never throws, and rejects padded, standard or non-canonical base64. No record carries `gen_k`.
 - Add: the inviter checks every joiner is on the roster and asks each for a key package over the 1:1 mailbox they share (`GroupMailboxDirectLink`). It accepts only the answer to a request it sent that peer for that conversation, within 60 s, and the key package's credential must name that peer; any other key package fails the add. It commits, appends the commit to `I(Y, deliveryGeneration)` of every existing member (its own inbox included), then sends each joiner `{welcome, k}` over the 1:1 mailbox.
@@ -102,7 +102,7 @@ Each group conversation is one MLS group (`GroupMailboxMlsEngine`, `infrastructu
 
 ### Send and receive
 
-`GroupMailboxOutbox` (`infrastructure/outbox/`) sends and `GroupMailboxInboxSync` (`infrastructure/inbox/`) receives. They are not wired into the app yet; the cutover does that.
+`GroupMailboxOutbox` (`infrastructure/outbox/`) sends and `GroupMailboxInboxSync` (`infrastructure/inbox/`) receives.
 
 - Message wire format: a `message` control record (`ciphertext`) carries one MLS application message. Its plaintext is the one-to-one record envelope (`DirectMessageMailboxRecord`), so the record types match one-to-one, except `read`, which a group drops.
 - Outer layer: each copy is sealed separately by `MailboxChannel.send` with the recipient inbox's envelope key (D5). The node sees one opaque envelope per member inbox and no plaintext.
@@ -117,6 +117,20 @@ Each group conversation is one MLS group (`GroupMailboxMlsEngine`, `infrastructu
 - Single device: one device per identity is assumed until the new-device flow of node D19. All devices of an identity read the same inbox, so a second device would race the first on acknowledgement and on `deleteDrained`; D19 revisits per-device acknowledgement and deletion.
 - Limits: a removed member still holds `gen_k` and can append junk to `I(Y,k)` until it drains; the receiver rejects it. Pending key-package requests are in memory only. A crash between the MLS encrypt and the outbox save loses that send.
 - Receive: a record read from the 1:1 mailbox has the peer as its author. A key-package request is answered only when the peer and this identity are both on the roster. A welcome is joined only when the peer is on the roster; MLS then rejects a replay. A commit is applied only from this identity's inbox of that conversation, and MLS rejects a forged one. Rejections are logged without the record.
+
+### Group conversation cutover
+
+`GroupConversationMailbox` (`infrastructure/`) is the only path for a non-community group conversation: create, add, remove, leave, send, edit, delete, reaction, pin, history and sync. The app reaches it as `PigeonApplication.groupMessages`. The client neither writes nor reads the node's group message endpoints, and a group has no conversation key.
+
+- Carrier (D8 = B): key-package requests, key-package responses and welcomes travel as signed, sealed `group_conversation_invitation` notifications (`GroupMailboxNotificationLink`), read by `GroupMailboxNotificationPump` every 15 s. A record must name the conversation of its letter. A request or response older or newer than 5 min is dropped; a welcome is not time-checked, and MLS rejects a replayed one. These notifications are not shown in the notification list, and they count against the node's notification quotas (30 per minute, 10 000 stored).
+- Roster: the node keeps it (D15). `GroupConversationRoster` pages `GET /conversations/` (50 per page, at most 20 pages, uncached); a conversation this identity is not in has an empty roster.
+- Reconcile: after create, after each membership change and on every sync, the members still in both the roster and the MLS group compare the two. The lowest identity id among them commits every removal, then every add, so members never race each other's commits. A leaver is removed by that member on its next sync. Concurrent reconciles of one conversation join the run in progress.
+- Removal gap: between the roster removal and its commit, the removed member is still in the MLS epoch and holds `gen_k`, so it could open anything sealed in it. So the outbox reads the roster before it seals or appends a message, at most once per conversation per pass: while the MLS group holds an identity the roster no longer lists, it encrypts and appends nothing. A new message is queued unsealed; a queued one keeps its copies and waits. Both go out in the new epoch, for the current members, once reconcile applied the removal commit; every reconcile retries the queue. A message from an identity off the roster is refused, and a queued one is dropped and reported. Without a roster (offline, node error) nothing is sent: a new send rejects and a queued one backs off. The removed member cannot read another member's inbox: the node checks each read against the read-token hash the owner registered, and the read token comes from the owner's root key, not from `gen_k`. Residual: a sender whose roster read precedes the removal by a moment still seals in the old epoch; a node operator who shares envelopes with the removed member exposes them; messages wait as long as the committing member stays offline (#375), up to the 14-day expiry; the roster costs up to 20 pages per send and per pass with queued messages.
+- Joiner: an add waits at most 60 s (`KEY_PACKAGE_TIMEOUT_MS`) for the joiner's key package, so a joiner must be online then; otherwise the next reconcile retries. The node stores MLS key packages only for communities, so they cannot be published ahead.
+- Payload: a record's `encryptedPayload` is the plain message JSON; MLS encrypts the whole record for the current epoch. On receive, `MessageProjector.projectPlaintext` rejects a payload whose author is not the record's author. MLS cannot open a member's own messages, so the sender stores each queued record in its own history.
+- Storage: per identity, `pigeon-group-history`, `pigeon-group-outbox`, `pigeon-group-mls-<identityId>` and `pigeon-group-generations-<identityId>`, each scoped by `scopeClientStorageKey`. Forgetting this device's identity (sign-out, device removal) deletes all four.
+- No migration: a group created before the cutover is not readable and must be re-created.
+- Not carried yet: background unread counts, thread reply counts and the outbox UI of group conversations.
 
 ## Creation proof
 
@@ -148,7 +162,7 @@ Each group conversation is one MLS group (`GroupMailboxMlsEngine`, `infrastructu
 | Enrol       | `POST /mailboxes/{id}/readers` (201 added)       | root token (Bearer)           |
 | Remove      | `DELETE /mailboxes/{id}/readers/{hash}` (204)    | root token (Bearer)           |
 
-- A 404 maps to `MailboxUnavailableError`. A 400 on create that names `requiredDifficultyBits` maps to `MailboxCreationDifficultyError`. A 409 on enrol maps to `MailboxReaderLimitError`. Other 400s, 409s, and 429 propagate as `HttpJsonError`. `delete` is for a group member's retired generation inbox after the 6 h drain; nothing calls it yet.
+- A 404 maps to `MailboxUnavailableError`. A 400 on create that names `requiredDifficultyBits` maps to `MailboxCreationDifficultyError`. A 409 on enrol maps to `MailboxReaderLimitError`. Other 400s, 409s, and 429 propagate as `HttpJsonError`. `delete` is for a group member's retired generation inbox after the 6 h drain.
 - Empty success bodies (PUT 200/201, POST 204) resolve to `undefined` in `HttpJsonClient`.
 
 ## Creation difficulty and recovery
@@ -167,7 +181,7 @@ Each group conversation is one MLS group (`GroupMailboxMlsEngine`, `infrastructu
 
 ## Direct messages
 
-- Scope: one-to-one conversations only. The mailbox is the only delivery and history path for them: the client neither writes nor reads the node's one-to-one message endpoints (see Cutover below). Groups and communities keep their node endpoints and are not described here. Attachments, replies, and stickers travel as opaque encrypted payload inside the sent record.
+- Scope: one-to-one conversations only. The mailbox is the only delivery and history path for them: the client neither writes nor reads the node's one-to-one message endpoints (see Cutover below). Group conversations are under Group conversation cutover; communities keep their node endpoints. Attachments, replies, and stickers travel as opaque encrypted payload inside the sent record.
 
 | Kind                                    | Mailbox record                                    | Status                                                                                     |
 | --------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------ |

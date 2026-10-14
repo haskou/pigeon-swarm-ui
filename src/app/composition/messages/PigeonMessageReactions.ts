@@ -28,7 +28,6 @@ export class PigeonMessageReactions {
     return {
       authorIdentityId: session.identity.id,
       conversationId: conversation.id,
-      conversationType: conversation.type,
       emoji,
       messageId,
     };

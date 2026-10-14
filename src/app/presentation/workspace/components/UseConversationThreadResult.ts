@@ -10,7 +10,7 @@ export type UseConversationThreadResult = {
   cancelReplying: () => void;
   close: () => void;
   edit: (content: string) => Promise<void>;
-  open: (message: ChatMessage) => Promise<void>;
+  open: (message: ChatMessage) => void;
   remove: (message: ChatMessage) => Promise<void>;
   send: (
     content: string,

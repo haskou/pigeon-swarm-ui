@@ -17,13 +17,12 @@ import { MessageCollection } from '../../../../contexts/messages/presentation/vi
 import { MessageReactionUpdater } from '../../../../contexts/messages/presentation/view-models/MessageReactionUpdater';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
-import { applicationContainer } from '../../../composition/applicationContainer';
+import { ConversationMessageCommands } from './ConversationMessageCommands';
 import { useConversationMessageDelivery } from './useConversationMessageDelivery';
 
 type ConversationMessageActionsInput = {
   activeConversation: ConversationResource | undefined;
   activeConversationDraft: string;
-  activeConversationKeyAvailable: boolean;
   editingMessage: EditingMessage | null;
   messages: ChatMessage[];
   messagesRef: RefObject<ChatMessage[]>;
@@ -33,10 +32,8 @@ type ConversationMessageActionsInput = {
   onErrorChange: (error: string | null) => void;
   onEditingMessageChange: (message: EditingMessage | null) => void;
   onMessageContextMenuChange: (menu: MessageContextMenuState | null) => void;
-  onMessageLoadStateChange: (state: 'idle' | 'loading') => void;
   onMessagesChange: Dispatch<SetStateAction<ChatMessage[]>>;
   onReplyTargetChange: (message: ChatMessage | null) => void;
-  onMessageCursorChange: (cursor: null | string) => void;
   replyTarget: ChatMessage | null;
   scrollerRef: RefObject<HTMLDivElement | null>;
   scrollToBottom: (behavior?: ScrollBehavior) => void;
@@ -47,7 +44,6 @@ type ConversationMessageActionsInput = {
 export function useConversationMessageActions({
   activeConversation,
   activeConversationDraft,
-  activeConversationKeyAvailable,
   editingMessage,
   messages,
   messagesRef,
@@ -57,8 +53,6 @@ export function useConversationMessageActions({
   onEditingMessageChange,
   onErrorChange,
   onMessageContextMenuChange,
-  onMessageCursorChange,
-  onMessageLoadStateChange,
   onMessagesChange,
   onReplyTargetChange,
   replyTarget,
@@ -152,64 +146,16 @@ export function useConversationMessageActions({
   );
 
   const openReplyReference = useCallback(
-    async (messageId: string) => {
+    (messageId: string): void => {
+      // Conversation history lives only in the local mailbox timeline, so a
+      // reply target outside it cannot be fetched.
       if (messages.some((message) => message.id === messageId)) {
         scrollToMessage(messageId);
-
-        return;
-      }
-
-      if (!activeConversation?.id || !activeConversationKeyAvailable) return;
-
-      if (activeConversation.type === 'one-to-one') {
-        // One-to-one history lives in the mailbox; a reply target that is not
-        // in the local timeline cannot be fetched from the legacy endpoint.
+      } else if (activeConversation?.id) {
         onErrorChange(copy.messages.replyTargetNotFound);
-
-        return;
-      }
-
-      onErrorChange(null);
-      onMessageLoadStateChange('loading');
-      try {
-        const result = await applicationContainer.messages.loadAround(
-          session,
-          activeConversation.id,
-          messageId,
-        );
-
-        onMessagesChange((current) =>
-          MessageCollection.merge(current, result.messages),
-        );
-        onMessageCursorChange(result.previousCursor ?? null);
-
-        if (result.messages.some((message) => message.id === messageId)) {
-          scrollToMessage(messageId);
-
-          return;
-        }
-
-        onErrorChange(copy.messages.replyTargetNotFound);
-      } catch (caught) {
-        onErrorChange(
-          toUserErrorMessage(caught, copy.workspace.loadOlderError),
-        );
-      } finally {
-        onMessageLoadStateChange('idle');
       }
     },
-    [
-      activeConversation?.id,
-      activeConversation?.type,
-      activeConversationKeyAvailable,
-      messages,
-      onErrorChange,
-      onMessageCursorChange,
-      onMessageLoadStateChange,
-      onMessagesChange,
-      scrollToMessage,
-      session,
-    ],
+    [activeConversation?.id, messages, onErrorChange, scrollToMessage],
   );
 
   const deleteMessage = useCallback(
@@ -225,7 +171,7 @@ export function useConversationMessageActions({
       };
 
       try {
-        await applicationContainer.messages.delete(
+        await ConversationMessageCommands.delete(
           session,
           activeConversation,
           message.id,
@@ -271,21 +217,12 @@ export function useConversationMessageActions({
 
       onErrorChange(null);
       try {
-        const editEvent =
-          activeConversation.type === 'one-to-one'
-            ? await applicationContainer.directMessages.edit(
-                session,
-                activeConversation,
-                editingMessage.message.id,
-                content,
-                {},
-              )
-            : await applicationContainer.messages.edit(
-                session,
-                activeConversation.id,
-                editingMessage.message.id,
-                content,
-              );
+        const editEvent = await ConversationMessageCommands.edit(
+          session,
+          activeConversation,
+          editingMessage.message.id,
+          content,
+        );
 
         onMessagesChange((current) =>
           MessageCollection.merge(current, [editEvent]),
@@ -331,19 +268,13 @@ export function useConversationMessageActions({
       onMessagesChange(reactionUpdate(action));
 
       try {
-        await (reacted
-          ? applicationContainer.messages.removeReactionFrom(
-              session,
-              activeConversation,
-              message.id,
-              emoji,
-            )
-          : applicationContainer.messages.addReactionTo(
-              session,
-              activeConversation,
-              message.id,
-              emoji,
-            ));
+        await ConversationMessageCommands.react(
+          session,
+          activeConversation,
+          message.id,
+          emoji,
+          action,
+        );
       } catch (caught) {
         onErrorChange(toUserErrorMessage(caught, copy.messages.reactionError));
         onMessagesChange(reactionUpdate(reacted ? 'add' : 'remove'));

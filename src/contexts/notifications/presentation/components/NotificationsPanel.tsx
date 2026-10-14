@@ -1,15 +1,14 @@
 import { useState } from 'react';
 
-import type { CommunityResource as Community } from '../../../communities/infrastructure/http/resources/CommunityResource';
 import type { CommunityMembershipRequestResource as CommunityMembershipRequest } from '../../../communities/infrastructure/http/resources/CommunityMembershipRequestResource';
-import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
+import type { CommunityResource as Community } from '../../../communities/infrastructure/http/resources/CommunityResource';
 import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
-import type { NotificationResource } from '../../infrastructure/http/resources/NotificationResource';
 import type {
   IdentityNames,
   IdentityPictures,
 } from '../../../identities/presentation/view-models/identityDisplay';
 import type { NodeNetwork } from '../../../networks/presentation/view-models/NodeNetwork';
+import type { NotificationResource } from '../../infrastructure/http/resources/NotificationResource';
 import type { NotificationAction } from './NotificationAction';
 
 import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
@@ -26,7 +25,6 @@ interface NotificationsPanelProps {
   communities: Community[];
   communityAvatarUrls: Record<string, string>;
   communityPreviews: Record<string, Community>;
-  conversations: ConversationResource[];
   currentIdentityId: string;
   error: string | null;
   notifications: NotificationResource[];
@@ -50,7 +48,6 @@ export function NotificationsPanel({
   communities,
   communityAvatarUrls,
   communityPreviews,
-  conversations,
   currentIdentityId,
   error,
   identityNames,
@@ -82,7 +79,6 @@ export function NotificationsPanel({
     communities,
     communityAvatarUrls,
     communityPreviews,
-    conversations,
     identityNames,
     identityPictures,
     identityProfiles,

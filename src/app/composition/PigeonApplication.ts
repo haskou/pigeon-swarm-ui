@@ -1,3 +1,5 @@
+import type { GroupConversationMailbox } from '../../contexts/groupMailboxes/infrastructure/GroupConversationMailbox';
+
 import { CallEnder } from '../../contexts/calls/application/end-call/CallEnder';
 import { CallFinder } from '../../contexts/calls/application/find-call/CallFinder';
 import { CallParticipantHeartbeater } from '../../contexts/calls/application/heartbeat-participant/CallParticipantHeartbeater';
@@ -64,22 +66,12 @@ import { MailboxDeviceRepository } from '../../contexts/identities/infrastructur
 import { MessageReactionAdder } from '../../contexts/messages/application/add-message-reaction/MessageReactionAdder';
 import { ConversationDraftDeleter } from '../../contexts/messages/application/delete-conversation-draft/ConversationDraftDeleter';
 import { MessageDeleter } from '../../contexts/messages/application/delete-message/MessageDeleter';
-import { MessageEditor } from '../../contexts/messages/application/edit-message/MessageEditor';
 import { ConversationDraftsSearcher } from '../../contexts/messages/application/list-conversation-drafts/ConversationDraftsSearcher';
-import { PinnedMessagesSearcher } from '../../contexts/messages/application/list-message-pins/PinnedMessagesSearcher';
-import { MessageThreadSearcher } from '../../contexts/messages/application/load-message-thread/MessageThreadSearcher';
-import { MessageFinder } from '../../contexts/messages/application/load-message/MessageFinder';
-import { MessagesAroundSearcher } from '../../contexts/messages/application/load-messages-around/MessagesAroundSearcher';
-import { MessagesSearcher } from '../../contexts/messages/application/load-messages/MessagesSearcher';
 import { MessagePinner } from '../../contexts/messages/application/pin-message/MessagePinner';
 import { MessageReactionRemover } from '../../contexts/messages/application/remove-message-reaction/MessageReactionRemover';
 import { ConversationDraftSaver } from '../../contexts/messages/application/save-conversation-draft/ConversationDraftSaver';
-import { MessageSender } from '../../contexts/messages/application/send-message/MessageSender';
 import { MessageUnpinner } from '../../contexts/messages/application/unpin-message/MessageUnpinner';
-import { MessageMapper } from '../../contexts/messages/infrastructure/http/MessageMapper';
-import { MessageOperationContexts } from '../../contexts/messages/infrastructure/http/MessageOperationContexts';
 import { PigeonDraftRepository } from '../../contexts/messages/infrastructure/http/PigeonDraftRepository';
-import { PigeonMessageRepository } from '../../contexts/messages/infrastructure/http/PigeonMessageRepository';
 import { DirectMessageMailbox } from '../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
 import { MailboxDirectMessageRepository } from '../../contexts/messages/infrastructure/mailbox/MailboxDirectMessageRepository';
 import { NetworkNodeClaimer } from '../../contexts/networks/application/claim-network-node/NetworkNodeClaimer';
@@ -159,7 +151,6 @@ import { PigeonSessionFacade } from './identities/PigeonSessionFacade';
 import { PigeonConversationDrafts } from './messages/PigeonConversationDrafts';
 import { PigeonMessagePins } from './messages/PigeonMessagePins';
 import { PigeonMessageReactions } from './messages/PigeonMessageReactions';
-import { PigeonMessageReader } from './messages/PigeonMessageReader';
 import { PigeonMessagesFacade } from './messages/PigeonMessagesFacade';
 import { PigeonMessageWriter } from './messages/PigeonMessageWriter';
 import { PigeonMlsFacade } from './mls/PigeonMlsFacade';
@@ -191,6 +182,8 @@ export class PigeonApplication {
 
   public readonly directMessages: DirectMessageMailbox;
 
+  public readonly groupMessages: GroupConversationMailbox;
+
   public readonly networks: PigeonNetworksFacade;
 
   public readonly notifications: PigeonNotificationsFacade;
@@ -211,6 +204,7 @@ export class PigeonApplication {
   ) {
     this.gateway = gateway;
     this.directMessages = gateway.directMessageMailbox;
+    this.groupMessages = gateway.groupConversationMailbox;
     this.attachments = new PigeonAttachmentsFacade(gateway.filesGateway);
     const callContexts = new CallAccessContexts();
     const callMapper = new CallMapper();
@@ -321,6 +315,7 @@ export class PigeonApplication {
         ),
         searcher: new ConversationsSearcher(conversationRepository),
       },
+      gateway.groupConversationMailbox,
     );
     const identityContexts = new IdentityAccessContexts();
     const identityCreationMaterials = new IdentityCreationMaterials();
@@ -360,6 +355,7 @@ export class PigeonApplication {
           new MailboxDeviceRepository(
             identityContexts,
             gateway.directMessageMailbox,
+            gateway.groupConversationMailbox,
           ),
           identityUnlockRepository,
         ),
@@ -380,15 +376,6 @@ export class PigeonApplication {
         register: new RegisterIdentity(identityRepository, identityIdFactory),
       },
     );
-    const messageMapper = new MessageMapper();
-    const messageOperationContexts = new MessageOperationContexts();
-    const messageRepository = new PigeonMessageRepository(
-      gateway.messagesApi,
-      gateway.messageCommands,
-      identityContexts,
-      messageMapper,
-      messageOperationContexts,
-    );
     const conversationDraftRepository = new PigeonDraftRepository(
       gateway.messagesApi,
       identityContexts,
@@ -399,23 +386,10 @@ export class PigeonApplication {
       gateway.directMessageMailbox,
     );
     this.messages = new PigeonMessagesFacade(
-      new PigeonMessageReader(
-        identityContexts,
-        messageOperationContexts,
-        messageMapper,
-        new MessageFinder(messageRepository),
-        new MessagesSearcher(messageRepository),
-        new MessagesAroundSearcher(messageRepository),
-        new MessageThreadSearcher(messageRepository),
-      ),
       new PigeonMessageWriter(
         identityContexts,
         conversationContexts,
-        messageOperationContexts,
-        messageMapper,
-        new MessageSender(messageRepository),
-        new MessageEditor(messageRepository),
-        new MessageDeleter(messageRepository, directMessageRepository),
+        new MessageDeleter(directMessageRepository),
       ),
       new PigeonConversationDrafts(
         identityContexts,
@@ -426,16 +400,14 @@ export class PigeonApplication {
       new PigeonMessageReactions(
         identityContexts,
         conversationContexts,
-        new MessageReactionAdder(messageRepository, directMessageRepository),
-        new MessageReactionRemover(messageRepository, directMessageRepository),
+        new MessageReactionAdder(directMessageRepository),
+        new MessageReactionRemover(directMessageRepository),
       ),
       new PigeonMessagePins(
         identityContexts,
         conversationContexts,
-        messageMapper,
-        new PinnedMessagesSearcher(messageRepository),
-        new MessagePinner(messageRepository, directMessageRepository),
-        new MessageUnpinner(messageRepository, directMessageRepository),
+        new MessagePinner(directMessageRepository),
+        new MessageUnpinner(directMessageRepository),
       ),
       gateway.messagesGateway,
     );

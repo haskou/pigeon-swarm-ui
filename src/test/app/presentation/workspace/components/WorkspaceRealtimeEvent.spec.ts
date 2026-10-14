@@ -26,6 +26,15 @@ describe(WorkspaceRealtimeEvent.name, () => {
     expect(WorkspaceRealtimeEvent.category(event(type))).toBe(category);
   });
 
+  it('routes a notification carrying a group control letter to group-control', () => {
+    expect(
+      WorkspaceRealtimeEvent.category({
+        ...event('notifications.v1.notification.was_created'),
+        attributes: { type: 'group_conversation_invitation' },
+      }),
+    ).toBe('group-control');
+  });
+
   it('ignores unknown event families', () => {
     expect(WorkspaceRealtimeEvent.category(event('unknown.v1.event'))).toBe(
       'ignored',

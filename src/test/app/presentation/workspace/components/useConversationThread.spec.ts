@@ -39,13 +39,14 @@ jest.mock('react', () => ({
 }));
 jest.mock('../../../../../app/composition/applicationContainer', () => ({
   applicationContainer: {
-    messages: { loadThread: jest.fn(), send: jest.fn() },
+    groupMessages: { delete: jest.fn(), edit: jest.fn(), send: jest.fn() },
     stickers: { markUsed: jest.fn() },
   },
 }));
 
-const loadThread = jest.mocked(applicationContainer.messages.loadThread);
-const send = jest.mocked(applicationContainer.messages.send);
+const send = jest.mocked(applicationContainer.groupMessages.send);
+const groupEdit = jest.mocked(applicationContainer.groupMessages.edit);
+const groupDelete = jest.mocked(applicationContainer.groupMessages.delete);
 const markUsed = jest.mocked(applicationContainer.stickers.markUsed);
 
 const session = { identity: { id: 'identity-1' } } as unknown as Session;
@@ -57,7 +58,34 @@ const group = {
 const rootMessage = {
   content: 'root',
   id: 'root-1',
+  raw: {
+    conversationId: 'group-1',
+    id: 'root-1',
+    type: 'sent',
+  },
   timestamp: 1000,
+} as unknown as ChatMessage;
+const reply = {
+  content: 'reply',
+  id: 'reply-1',
+  raw: {
+    conversationId: 'group-1',
+    id: 'reply-1',
+    threadRootMessageId: 'root-1',
+    type: 'sent',
+  },
+  threadRootMessageId: 'root-1',
+  timestamp: 1500,
+} as unknown as ChatMessage;
+const unrelated = {
+  content: 'other',
+  id: 'other-1',
+  raw: {
+    conversationId: 'group-1',
+    id: 'other-1',
+    type: 'sent',
+  },
+  timestamp: 1600,
 } as unknown as ChatMessage;
 const sticker = {
   id: 'sticker-1',
@@ -80,6 +108,13 @@ const sentMessage = {
   timestamp: 2000,
 } as unknown as ChatMessage;
 
+const timeline: { messages: ChatMessage[] } = { messages: [] };
+// A plain function, so jest.resetAllMocks keeps it applying updates.
+function setMessages(update: SetStateAction<ChatMessage[]>): void {
+  timeline.messages =
+    typeof update === 'function' ? update(timeline.messages) : update;
+}
+
 // Each render re-runs the hook against the same state cells, as a mounted
 // component does. The thread state is the only useState cell.
 function render() {
@@ -88,34 +123,110 @@ function render() {
   return useConversationThread({
     activeConversation: group,
     closeMessageContextMenu: jest.fn(),
+    messages: timeline.messages,
     session,
-    setMessages: jest.fn((update: SetStateAction<ChatMessage[]>) => update),
+    setMessages,
   });
 }
 
-async function openThread() {
-  await render().open(rootMessage);
+function openThread() {
+  render().open(rootMessage);
 
   return render();
 }
 
+function currentThread(): ConversationThread | null {
+  return mockCells[0]?.value as ConversationThread | null;
+}
+
 function threadMessageIds(): string[] {
-  const thread = mockCells[0]?.value as ConversationThread | null;
+  const thread = currentThread();
 
   return thread?.messages.map((message) => message.id) ?? [];
 }
 
-describe('useConversationThread sticker sends', () => {
-  beforeEach(() => {
-    jest.resetAllMocks();
-    mockCells.length = 0;
-    loadThread.mockResolvedValue({ messages: [] } as never);
-    send.mockResolvedValue(sentMessage);
-    markUsed.mockResolvedValue(undefined);
+function resetThreadState() {
+  jest.resetAllMocks();
+  mockCells.length = 0;
+  timeline.messages = [rootMessage, reply, unrelated];
+  send.mockResolvedValue(sentMessage);
+  markUsed.mockResolvedValue(undefined);
+}
+
+describe('useConversationThread', () => {
+  beforeEach(resetThreadState);
+
+  it('opens a thread from the replies already in the timeline', () => {
+    openThread();
+
+    expect(currentThread()).toEqual(
+      expect.objectContaining({ root: rootMessage, state: 'ready' }),
+    );
+    expect(threadMessageIds()).toEqual(['reply-1']);
   });
 
+  it('sends a thread reply through the group mailbox', async () => {
+    const thread = openThread();
+
+    await thread.send('hello', [], {});
+
+    expect(send).toHaveBeenCalledWith(
+      session,
+      group,
+      'hello',
+      expect.objectContaining({
+        previousMessageIds: ['reply-1'],
+        replyToMessageId: 'root-1',
+        threadRootMessageId: 'root-1',
+      }),
+    );
+    expect(timeline.messages.map((message) => message.id)).toContain('sent-1');
+    expect(threadMessageIds()).toContain('sent-1');
+  });
+
+  it('edits a thread reply through the group mailbox', async () => {
+    const edited = {
+      ...reply,
+      content: 'changed',
+      raw: { ...sentRaw, id: 'reply-1' },
+    } as ChatMessage;
+
+    groupEdit.mockResolvedValue(edited);
+    render().open(rootMessage);
+    render().startEditing(reply);
+    const thread = render();
+
+    await thread.edit('changed');
+
+    expect(groupEdit).toHaveBeenCalledWith(
+      session,
+      group,
+      'reply-1',
+      'changed',
+      {},
+    );
+    expect(currentThread()?.editingMessage).toBeNull();
+  });
+
+  it('deletes a thread reply through the group mailbox', async () => {
+    groupDelete.mockResolvedValue(undefined);
+    const thread = openThread();
+
+    await thread.remove(reply);
+
+    expect(groupDelete).toHaveBeenCalledWith(session, group, 'reply-1');
+    expect(timeline.messages.map((message) => message.id)).not.toContain(
+      'reply-1',
+    );
+    expect(threadMessageIds()).toEqual([]);
+  });
+});
+
+describe('useConversationThread sticker sends', () => {
+  beforeEach(resetThreadState);
+
   it('records sticker usage and keeps the sent sticker in the thread', async () => {
-    const thread = await openThread();
+    const thread = openThread();
 
     await thread.sendSticker(sticker);
 
@@ -127,7 +238,7 @@ describe('useConversationThread sticker sends', () => {
     markUsed.mockImplementation(() => {
       throw new Error('usage unavailable');
     });
-    const thread = await openThread();
+    const thread = openThread();
 
     await expect(thread.sendSticker(sticker)).resolves.toBeUndefined();
 
@@ -137,7 +248,7 @@ describe('useConversationThread sticker sends', () => {
 
   it('keeps a delivered sticker send in the thread when sticker usage rejects, with no unhandled rejection', async () => {
     markUsed.mockRejectedValue(new Error('usage unavailable'));
-    const thread = await openThread();
+    const thread = openThread();
 
     const unhandled = await captureUnhandledRejections(async () => {
       await thread.sendSticker(sticker);

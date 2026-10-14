@@ -41,6 +41,7 @@ export class CurrentDeviceForgetter {
     }
 
     await this.deviceMailboxRepository.forgetHistory(identityId);
+    await this.deviceMailboxRepository.forgetGroups(identityId);
     await this.deviceMailboxRepository.cancelOutbox(identityId);
 
     try {
