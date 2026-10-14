@@ -374,6 +374,30 @@ describe('GroupConversationMailbox', () => {
     expect(texts(carol)).toEqual([]);
   });
 
+  it('sends no copy to a member removed before its commit lands', async () => {
+    await formGroup();
+    roster = new Set([alice.id, bob.id]);
+
+    await alice.mailbox.send(alice.session, conversation(), 'too early', {});
+    await sync(carol);
+    await sync(bob);
+
+    expect(texts(carol)).toEqual([]);
+    expect(texts(bob)).toEqual(['message:too early']);
+  });
+
+  it('rejects a send from an identity no longer on the roster', async () => {
+    await formGroup();
+    roster = new Set([alice.id, bob.id]);
+
+    await expect(
+      carol.mailbox.send(carol.session, conversation(), 'removed', {}),
+    ).rejects.toThrow();
+    await sync(alice);
+
+    expect(texts(alice)).toEqual([]);
+  });
+
   it('a leaver is removed by a remaining member on its next sync', async () => {
     await formGroup();
     roster = new Set([alice.id, carol.id]);
