@@ -16,6 +16,7 @@ import type { NotificationResource } from '../../../../contexts/notifications/in
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 
+import { GroupMailboxRoster } from '../../../../contexts/groupMailboxes/domain/GroupMailboxRoster';
 import { GroupMailboxControlSeal } from '../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlSeal';
 import { GroupConversationMailbox } from '../../../../contexts/groupMailboxes/infrastructure/GroupConversationMailbox';
 import { GroupMessageHistoryStore } from '../../../../contexts/groupMailboxes/infrastructure/history/GroupMessageHistoryStore';
@@ -228,7 +229,9 @@ const device = (storage: string): GroupConversationMailbox =>
     projector: new MessageProjector(copy.messages),
     roster: (owner) =>
       Promise.resolve(
-        roster.has(owner.identity.id) ? new Set(roster) : new Set<string>(),
+        roster.has(owner.identity.id)
+          ? GroupMailboxRoster.of({ adminIds: [], participantIds: [...roster] })
+          : GroupMailboxRoster.empty(),
       ),
     storage,
   });

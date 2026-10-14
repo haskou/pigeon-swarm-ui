@@ -10,6 +10,7 @@ import type { PigeonMailboxClient } from '../../../../../contexts/mailboxes/infr
 
 import { IndexedDbMlsStateStore } from '../../../../../contexts/communities/infrastructure/mls/IndexedDbMlsStateStore';
 import { GroupMailboxGeneration } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxGeneration';
+import { GroupMailboxRoster } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxRoster';
 import { GroupMailboxControl } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControl';
 import { GroupMailboxControlRecord } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlRecord';
 import { GroupMailboxKeySchedule } from '../../../../../contexts/groupMailboxes/infrastructure/crypto/GroupMailboxKeySchedule';
@@ -26,6 +27,7 @@ import { MailboxCapability } from '../../../../../contexts/mailboxes/infrastruct
 import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageInboxKeys } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageInboxKeys';
 import { DirectMessageMailboxRecord } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxRecord';
+import { MlsTestIdentity } from '../../../communities/infrastructure/mls/MlsTestIdentity';
 import { sealedGroupStores } from '../sealedGroupStores';
 
 const CONVERSATION = 'conversation-1';
@@ -36,6 +38,7 @@ type Member = {
   direct: { from: string; plaintext: Uint8Array }[];
   engine: GroupMailboxMlsEngine;
   history: string;
+  id: string;
   name: string;
   outbox: GroupMailboxOutbox;
   received: DirectMessageRecord[];
@@ -45,7 +48,18 @@ type Member = {
 
 let now = 1_000;
 let database = 0;
-let roster: ReadonlySet<string> = new Set();
+let cast: Record<string, MlsTestIdentity>;
+let roster = GroupMailboxRoster.empty();
+
+const id = (name: string): string => cast[name].id;
+
+/** The roster of a conversation whose creator is `creator`, if any. */
+const rosterOf = (names: string[], creator?: string): GroupMailboxRoster =>
+  GroupMailboxRoster.of({
+    adminIds: [],
+    creatorId: creator && id(creator),
+    participantIds: names.map(id),
+  });
 let inboxes: Map<
   string,
   {
@@ -151,6 +165,7 @@ const memoryStorage = (): void => {
 const member = (name: string): Member => {
   const seed = ++database;
   const databaseName = `group-sync-${seed}`;
+  const identityId = id(name);
   const session = {
     deviceCredentialKeyPair: {
       toPrimitives: () => ({ publicKey: `device-${name}` }),
@@ -159,11 +174,11 @@ const member = (name: string): Member => {
     deviceSealedRootKey: {
       getBuffer: () => Buffer.alloc(32, seed),
     },
-    identity: { id: name },
+    identity: { id: identityId },
   } as unknown as Session;
-  const stores = sealedGroupStores(databaseName, name);
+  const stores = sealedGroupStores(databaseName, identityId);
   const engine = new GroupMailboxMlsEngine(
-    { deviceId: 'd1', identityId: name },
+    cast[name].signer(),
     stores.state,
     stores.generations,
     () => Promise.resolve(roster),
@@ -177,7 +192,7 @@ const member = (name: string): Member => {
     {
       forget: () => Promise.resolve(rows.clear()),
       load: () => Promise.resolve([...rows.values()]),
-      remove: (_identityId, id) => Promise.resolve(void rows.delete(id)),
+      remove: (_identityId, rowId) => Promise.resolve(void rows.delete(rowId)),
       save: (_session, row) => Promise.resolve(void rows.set(row.id, row)),
     },
     () => Promise.resolve(roster),
@@ -185,12 +200,12 @@ const member = (name: string): Member => {
   );
   const direct: Member['direct'] = [];
   const control = new GroupMailboxControl(
-    name,
+    identityId,
     engine,
     () => Promise.resolve(roster),
     {
       send: (_conversationId, peer, plaintext) => {
-        members.get(peer)?.direct.push({ from: name, plaintext });
+        members.get(peer)?.direct.push({ from: identityId, plaintext });
 
         return Promise.resolve();
       },
@@ -202,6 +217,7 @@ const member = (name: string): Member => {
     direct,
     engine,
     history: `${databaseName}-history`,
+    id: identityId,
     name,
     outbox,
     received: [],
@@ -217,7 +233,7 @@ const member = (name: string): Member => {
     ),
   };
 
-  members.set(name, created);
+  members.set(identityId, created);
 
   return created;
 };
@@ -247,7 +263,7 @@ const sync = (to: Member): Promise<void> =>
 const add = async (inviter: Member, joiners: Member[]): Promise<void> => {
   const adding = inviter.control.add(
     CONVERSATION,
-    joiners.map(({ name }) => name),
+    joiners.map((joiner) => joiner.id),
   );
 
   await until(() => joiners.every(({ direct }) => direct.length > 0));
@@ -261,47 +277,51 @@ const add = async (inviter: Member, joiners: Member[]): Promise<void> => {
 const labels = new Map<string, string>();
 const made = new Map<string, string>();
 
-/** The author-bound id that `label` of `author` stands for. */
+/** The author-bound id that `label` of the member `author` stands for. */
 const mid = (author: string, label: string): string => {
   const key = `${author}/${label}`;
   const known = made.get(key);
 
   if (known) return known;
-  const id = GroupMessageId.create(author);
+  const messageId = GroupMessageId.create(id(author));
 
-  made.set(key, id);
-  labels.set(id, label);
+  made.set(key, messageId);
+  labels.set(messageId, label);
 
-  return id;
+  return messageId;
 };
 
-const sent = (author: string, id: string, text = MARKER) =>
+const sent = (author: string, messageId: string, text = MARKER) =>
   DirectMailboxRecords.sent({
-    authorId: author,
+    authorId: id(author),
     conversationId: CONVERSATION,
     createdAt: now,
     encryptedPayload: text,
-    id,
+    id: messageId,
     previousMessageIds: [],
   });
 
-const edited = (author: string, id: string, targetMessageId: string) =>
+const edited = (author: string, messageId: string, targetMessageId: string) =>
   DirectMailboxRecords.edited({
-    authorId: author,
+    authorId: id(author),
     conversationId: CONVERSATION,
     createdAt: now,
     encryptedPayload: 'edit',
-    id,
+    id: messageId,
     targetMessageId,
   });
 
-const deleted = (author: string, id: string, targetMessageId: string) => ({
+const deleted = (
+  author: string,
+  messageId: string,
+  targetMessageId: string,
+) => ({
   ...DirectMailboxRecords.deleted({
-    authorId: author,
+    authorId: id(author),
     conversationId: CONVERSATION,
     targetMessageId,
   }),
-  id,
+  id: messageId,
 });
 
 const send = (from: Member, record: DirectMessageRecord): Promise<void> =>
@@ -319,7 +339,7 @@ const inject = async (to: Member, plaintext: Uint8Array): Promise<void> => {
   await channel.send(
     GroupMailboxKeySchedule.inbox(
       (await to.engine.generation(CONVERSATION)).secret,
-      IdentityId.fromString(to.name),
+      IdentityId.fromString(to.id),
     ),
     plaintext,
   );
@@ -336,9 +356,19 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
   let bob: Member;
   let carol: Member;
 
+  beforeAll(async () => {
+    cast = await MlsTestIdentity.cast([
+      'alice',
+      'bob',
+      'carol',
+      'dave',
+      'mallory',
+    ]);
+  });
+
   beforeEach(async () => {
     now = 1_000;
-    roster = new Set(['alice', 'bob', 'carol']);
+    roster = rosterOf(['alice', 'bob', 'carol'], 'alice');
     memoryStorage();
     fakeNode();
     members = new Map();
@@ -365,7 +395,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
       await sync(reader);
       expect(ids(reader.received)).toEqual(['sent:m1']);
       expect(reader.received[0]).toMatchObject({
-        authorId: 'alice',
+        authorId: alice.id,
         encryptedPayload: MARKER,
       });
     }
@@ -388,7 +418,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
   });
 
   it('keeps a removed member from reading later messages', async () => {
-    await alice.control.remove(CONVERSATION, ['carol']);
+    await alice.control.remove(CONVERSATION, [carol.id]);
     await sync(bob);
     await sync(alice);
     await send(alice, sent('alice', mid('alice', 'after-removal')));
@@ -409,7 +439,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
       inboxes.has(
         GroupMailboxKeySchedule.inbox(
           current.secret,
-          IdentityId.fromString('carol'),
+          IdentityId.fromString(carol.id),
         ).mailboxId,
       ),
     ).toBe(false);
@@ -454,7 +484,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
     await sync(carol);
 
     expect(carol.received).toEqual([
-      expect.objectContaining({ authorId: 'alice', encryptedPayload: MARKER }),
+      expect.objectContaining({ authorId: alice.id, encryptedPayload: MARKER }),
     ]);
   });
 
@@ -469,7 +499,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
 
     expect(ids(carol.received)).toEqual(['sent:m1']);
     expect(carol.received[0]).toMatchObject({
-      authorId: 'alice',
+      authorId: alice.id,
       encryptedPayload: MARKER,
     });
   });
@@ -485,7 +515,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
     await send(bob, {
       ...DirectMailboxRecords.reaction({
         action: 'add',
-        authorId: 'bob',
+        authorId: bob.id,
         conversationId: CONVERSATION,
         createdAt: now,
         emoji: '+1',
@@ -545,11 +575,13 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
   it('drops a forged future-epoch envelope without stalling the removal behind it', async () => {
     const retired = GroupMailboxKeySchedule.inbox(
       (await bob.engine.generation(CONVERSATION)).secret,
-      IdentityId.fromString('bob'),
+      IdentityId.fromString(bob.id),
     ).mailboxId;
 
-    // Carol forks the group into an epoch only she holds.
-    await carol.engine.remove(CONVERSATION, ['bob']);
+    // A patched client of carol forks the group into an epoch only she holds.
+    roster = rosterOf(['alice', 'carol']);
+    await carol.engine.remove(CONVERSATION, [bob.id], () => Promise.resolve());
+    roster = rosterOf(['alice', 'bob', 'carol'], 'alice');
     await inject(
       bob,
       GroupMailboxControlRecord.encode({
@@ -565,7 +597,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
     );
     const forged = inboxes.get(retired)?.envelopes.length ?? 0;
 
-    await alice.control.remove(CONVERSATION, ['carol']);
+    await alice.control.remove(CONVERSATION, [carol.id]);
     await sync(bob);
     await send(alice, sent('alice', mid('alice', 'after')));
     await sync(bob);
@@ -629,7 +661,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
   it('keeps a copy whose inbox is missing and appends it on retry', async () => {
     const bobInbox = GroupMailboxKeySchedule.inbox(
       (await bob.engine.generation(CONVERSATION)).secret,
-      IdentityId.fromString('bob'),
+      IdentityId.fromString(bob.id),
     ).mailboxId;
 
     inboxes.delete(bobInbox);
@@ -645,18 +677,18 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
   });
 
   it('re-encrypts a stranded message in the next generation, never for a joiner', async () => {
-    await alice.control.remove(CONVERSATION, ['carol']);
+    await alice.control.remove(CONVERSATION, [carol.id]);
     await Promise.all([sync(alice), sync(bob)]);
     const bobInbox = GroupMailboxKeySchedule.inbox(
       (await bob.engine.generation(CONVERSATION)).secret,
-      IdentityId.fromString('bob'),
+      IdentityId.fromString(bob.id),
     ).mailboxId;
 
     inboxes.delete(bobInbox);
     await send(alice, sent('alice', mid('alice', 'stranded')));
     const stranded = (await alice.engine.generation(CONVERSATION)).index;
 
-    roster = new Set(['alice', 'bob', 'carol', 'dave']);
+    roster = rosterOf(['alice', 'bob', 'carol', 'dave'], 'alice');
     const dave = member('dave');
 
     await add(alice, [dave]);
@@ -682,7 +714,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
     inboxes.delete(
       GroupMailboxKeySchedule.inbox(
         (await bob.engine.generation(CONVERSATION)).secret,
-        IdentityId.fromString('bob'),
+        IdentityId.fromString(bob.id),
       ).mailboxId,
     );
     await send(alice, sent('alice', mid('alice', 'm1')));
@@ -697,11 +729,11 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
   it('deletes its retired inbox once the drain window closes', async () => {
     const keys = GroupMailboxKeySchedule.inbox(
       (await bob.engine.generation(CONVERSATION)).secret,
-      IdentityId.fromString('bob'),
+      IdentityId.fromString(bob.id),
     );
     const retired = keys.mailboxId;
 
-    await alice.control.remove(CONVERSATION, ['carol']);
+    await alice.control.remove(CONVERSATION, [carol.id]);
     await sync(bob);
 
     expect(inboxes.has(retired)).toBe(true);

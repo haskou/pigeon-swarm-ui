@@ -1,17 +1,37 @@
+import type {
+  MlsMembershipChange,
+  MlsMembershipPolicy,
+} from '../../../../../contexts/communities/infrastructure/mls/MlsMembershipPolicy';
+
 import {
   MlsGroup,
   type MlsCommitOutput,
   type MlsKeyPackageBundle,
   generateMlsKeyPackage,
+  mlsKeyPackageOwner,
 } from '../../../../../contexts/communities/infrastructure/mls/MlsGroup';
+import { MlsLeafSigner } from '../../../../../contexts/communities/infrastructure/mls/MlsLeafSigner';
+import { MlsTestIdentity } from './MlsTestIdentity';
 
 const text = new TextEncoder();
 const read = (bytes: Uint8Array): string => new TextDecoder().decode(bytes);
-const members = new Set(['alice', 'bob', 'carol', 'dave']);
-const policy = (identityId: string): boolean => members.has(identityId);
 
-const device = (identityId: string, deviceId = 'd1') =>
-  generateMlsKeyPackage({ deviceId, identityId });
+let cast: Record<string, MlsTestIdentity>;
+let members: Set<string>;
+let allows: (change: MlsMembershipChange) => boolean;
+const policy: MlsMembershipPolicy = {
+  admits: (identityId) => members.has(identityId),
+  allows: (change) => allows(change),
+};
+const idOf = (name: string): string => cast[name].id;
+const idsOf = (...names: string[]): string[] => names.map(idOf).sort();
+
+const device = (name: string, deviceId = 'd1') =>
+  generateMlsKeyPackage(cast[name].signer(deviceId));
+
+/** Only alice adds or removes; anyone may rotate their own leaf. */
+const aliceManages = ({ added, committer, removed }: MlsMembershipChange) =>
+  committer === idOf('alice') || (added.length === 0 && removed.length === 0);
 
 interface Seat {
   key: MlsKeyPackageBundle;
@@ -59,6 +79,21 @@ const setup = async (names: string[]): Promise<Record<string, Seat>> => {
 };
 
 describe('MlsGroup on the real ts-mls library', () => {
+  beforeAll(async () => {
+    cast = await MlsTestIdentity.cast([
+      'alice',
+      'bob',
+      'carol',
+      'dave',
+      'mallory',
+    ]);
+  });
+
+  beforeEach(() => {
+    members = new Set(['alice', 'bob', 'carol', 'dave'].map(idOf));
+    allows = () => true;
+  });
+
   it('delivers a message to every member of a multi-user group', async () => {
     const { alice, bob, carol } = await setup(['alice', 'bob', 'carol']);
 
@@ -66,7 +101,9 @@ describe('MlsGroup on the real ts-mls library', () => {
 
     expect(read(await bob.group.decrypt(sealed))).toBe('hello everyone');
     expect(read(await carol.group.decrypt(sealed))).toBe('hello everyone');
-    expect(alice.group.identities().sort()).toEqual(['alice', 'bob', 'carol']);
+    expect(alice.group.identities().sort()).toEqual(
+      idsOf('alice', 'bob', 'carol'),
+    );
   });
 
   it('lets a second device of the same identity join and read', async () => {
@@ -78,7 +115,7 @@ describe('MlsGroup on the real ts-mls library', () => {
 
     expect(read(await groups[0].decrypt(sealed))).toBe('to both devices');
     expect(read(await bob.group.decrypt(sealed))).toBe('to both devices');
-    expect(alice.group.identities().sort()).toEqual(['alice', 'bob']);
+    expect(alice.group.identities().sort()).toEqual(idsOf('alice', 'bob'));
     expect(alice.group.leaves()).toHaveLength(3);
   });
 
@@ -87,8 +124,8 @@ describe('MlsGroup on the real ts-mls library', () => {
     const leaves = alice.group.leaves();
 
     expect(leaves.map(({ owner }) => owner.identityId)).toEqual([
-      'alice',
-      'bob',
+      idOf('alice'),
+      idOf('bob'),
     ]);
     expect(leaves[0].signaturePublicKey).toEqual(
       alice.key.publicPackage.leafNode.signaturePublicKey,
@@ -103,7 +140,7 @@ describe('MlsGroup on the real ts-mls library', () => {
     const before = await alice.group.encrypt(text.encode('before'));
     expect(read(await carol.group.decrypt(before))).toBe('before');
 
-    const removal = (await alice.group.removeIdentities(['carol']))!;
+    const removal = (await alice.group.removeIdentities([idOf('carol')]))!;
     const id = nextId();
     alice.group.confirm(id);
     await bob.group.applyCommit({
@@ -124,7 +161,7 @@ describe('MlsGroup on the real ts-mls library', () => {
     await expect(carol.group.encrypt(text.encode('x'))).rejects.toThrow(
       'removed',
     );
-    expect(alice.group.identities()).not.toContain('carol');
+    expect(alice.group.identities()).not.toContain(idOf('carol'));
   });
 
   it('removes every device of an identity at once', async () => {
@@ -132,7 +169,7 @@ describe('MlsGroup on the real ts-mls library', () => {
     const phone = await device('bob', 'phone');
     const { groups } = await admit(alice.group, [phone], [bob.group]);
 
-    const removal = (await alice.group.removeIdentities(['bob']))!;
+    const removal = (await alice.group.removeIdentities([idOf('bob')]))!;
     const id = nextId();
     alice.group.confirm(id);
     const record = { bytes: removal.commit, epoch: removal.epoch, id };
@@ -255,7 +292,7 @@ describe('MlsGroup on the real ts-mls library', () => {
 
   it('converges on the lowest commit id when two members commit the same epoch', async () => {
     const { alice, bob, carol } = await setup(['alice', 'bob', 'carol']);
-    const fromAlice = (await alice.group.removeIdentities(['carol']))!;
+    const fromAlice = (await alice.group.removeIdentities([idOf('carol')]))!;
     const fromBob = await bob.group.update();
     const aliceRecord = {
       bytes: fromAlice.commit,
@@ -285,7 +322,7 @@ describe('MlsGroup on the real ts-mls library', () => {
     expect(carolThen.kind).toBe('removed');
     expect(alice.group.epoch).toBe(bob.group.epoch);
     // The winning commit was only an update, so carol is still in the group.
-    expect(alice.group.identities()).toContain('carol');
+    expect(alice.group.identities()).toContain(idOf('carol'));
     const sealed = await alice.group.encrypt(text.encode('converged'));
     expect(read(await bob.group.decrypt(sealed))).toBe('converged');
   });
@@ -293,7 +330,7 @@ describe('MlsGroup on the real ts-mls library', () => {
   it('lets a removed member rejoin with a fresh key package and read only what follows', async () => {
     const { alice, bob, carol } = await setup(['alice', 'bob', 'carol']);
     const old = await alice.group.encrypt(text.encode('old history'));
-    const removal = (await alice.group.removeIdentities(['carol']))!;
+    const removal = (await alice.group.removeIdentities([idOf('carol')]))!;
     const removalId = nextId();
     alice.group.confirm(removalId);
     await bob.group.applyCommit({
@@ -336,11 +373,11 @@ describe('MlsGroup on the real ts-mls library', () => {
 
   it('rejects a commit that adds an identity the receiver knows is not a member', async () => {
     const { alice, bob } = await setup(['alice', 'bob']);
-    members.add('mallory');
+    members.add(idOf('mallory'));
     const outsider = await device('mallory');
     const output = await alice.group.add([outsider.publicBytes]);
     alice.group.confirm('c-mallory');
-    members.delete('mallory');
+    members.delete(idOf('mallory'));
 
     await expect(
       bob.group.applyCommit({
@@ -349,7 +386,64 @@ describe('MlsGroup on the real ts-mls library', () => {
         id: 'c-mallory',
       }),
     ).rejects.toThrow('validate credential');
-    expect(bob.group.identities()).not.toContain('mallory');
+    expect(bob.group.identities()).not.toContain(idOf('mallory'));
+  });
+
+  it('refuses a key package whose credential names an identity that did not sign it', async () => {
+    const { alice } = await setup(['alice', 'bob']);
+    // Mallory's key, presenting a device as bob's.
+    const forged = await generateMlsKeyPackage(
+      new MlsLeafSigner(
+        { deviceId: 'd9', identityId: idOf('bob') },
+        cast.mallory.keyPair,
+      ),
+    );
+
+    expect(() => mlsKeyPackageOwner(forged.publicBytes)).toThrow('forged');
+    await expect(alice.group.add([forged.publicBytes])).rejects.toThrow(
+      'forged',
+    );
+    expect(alice.group.leaves()).toHaveLength(2);
+  });
+
+  it('refuses to commit an add the roster does not let this member make', async () => {
+    const { bob } = await setup(['alice', 'bob']);
+    allows = aliceManages;
+    const dave = await device('dave');
+
+    await expect(bob.group.add([dave.publicBytes])).rejects.toThrow(
+      'may not make this change',
+    );
+    expect(bob.group.identities()).not.toContain(idOf('dave'));
+  });
+
+  it('rejects a removal by a member the roster does not let remove', async () => {
+    const { alice, bob, carol } = await setup(['alice', 'bob', 'carol']);
+    // Bob's client ignores the rule; alice and carol enforce it.
+    const removal = (await bob.group.removeIdentities([idOf('carol')]))!;
+    bob.group.confirm('c-bob');
+    allows = aliceManages;
+    const record = { bytes: removal.commit, epoch: removal.epoch, id: 'c-bob' };
+
+    await expect(alice.group.applyCommit(record)).rejects.toThrow('rejected');
+    await expect(carol.group.applyCommit(record)).rejects.toThrow('rejected');
+    expect(alice.group.identities()).toContain(idOf('carol'));
+    expect(carol.group.isRemoved).toBe(false);
+  });
+
+  it('still applies a leaf rotation by a member who may not change membership', async () => {
+    const { alice, bob } = await setup(['alice', 'bob']);
+    allows = aliceManages;
+    const update = await bob.group.update();
+    bob.group.confirm('c-update');
+
+    const outcome = await alice.group.applyCommit({
+      bytes: update.commit,
+      epoch: update.epoch,
+      id: 'c-update',
+    });
+
+    expect(outcome.kind).toBe('applied');
   });
 
   it('survives serialization of the group state', async () => {

@@ -8,6 +8,9 @@ import type { StoredMlsKeyPackage } from '../../../../../contexts/communities/in
 
 import { deriveMlsRecordId } from '../../../../../contexts/communities/infrastructure/http/deriveMlsRecordId';
 import { MlsCommunityEngine } from '../../../../../contexts/communities/infrastructure/mls/MlsCommunityEngine';
+import { generateMlsKeyPackage } from '../../../../../contexts/communities/infrastructure/mls/MlsGroup';
+import { MlsLeafSigner } from '../../../../../contexts/communities/infrastructure/mls/MlsLeafSigner';
+import { MlsTestIdentity } from './MlsTestIdentity';
 
 const COMMUNITY = 'community-1';
 
@@ -87,20 +90,26 @@ const createStore = (): MlsStateStore & { plaintexts: Map<string, string> } => {
 
 describe('MlsCommunityEngine', () => {
   const node = createNode();
+  let cast: Record<string, MlsTestIdentity>;
   let roster: Set<string>;
-  const engineFor = (identityId: string, store = createStore()) => ({
+  const id = (name: string): string => cast[name].id;
+  const engineFor = (name: string, store = createStore()) => ({
     engine: new MlsCommunityEngine(
-      { deviceId: 'device-1', identityId },
+      cast[name].signer('device-1'),
       store,
-      () => node.transportFor(identityId),
+      () => node.transportFor(id(name)),
       () => () => Promise.resolve(roster),
     ),
     store,
   });
 
+  beforeAll(async () => {
+    cast = await MlsTestIdentity.cast(['alice', 'bob', 'carol', 'mallory']);
+  });
+
   beforeEach(() => {
     node.records.length = 0;
-    roster = new Set(['alice', 'bob', 'carol']);
+    roster = new Set([id('alice'), id('bob'), id('carol')]);
   });
 
   const admitBob = async (): Promise<{
@@ -112,7 +121,7 @@ describe('MlsCommunityEngine', () => {
 
     await alice.engine.createGroup(COMMUNITY);
     await bob.engine.publishKeyPackages(COMMUNITY);
-    await alice.engine.admit(COMMUNITY, ['bob']);
+    await alice.engine.admit(COMMUNITY, [id('bob')]);
     await bob.engine.sync(COMMUNITY);
 
     return { alice, bob };
@@ -157,12 +166,12 @@ describe('MlsCommunityEngine', () => {
     const carol = engineFor('carol');
 
     await carol.engine.publishKeyPackages(COMMUNITY);
-    await alice.engine.admit(COMMUNITY, ['carol']);
+    await alice.engine.admit(COMMUNITY, [id('carol')]);
     await bob.engine.sync(COMMUNITY);
     await carol.engine.sync(COMMUNITY);
 
-    roster.delete('bob');
-    await alice.engine.remove(COMMUNITY, ['bob']);
+    roster.delete(id('bob'));
+    await alice.engine.remove(COMMUNITY, [id('bob')]);
     await carol.engine.sync(COMMUNITY);
     const secret = await alice.engine.encrypt(COMMUNITY, 'bob must not read');
 
@@ -178,7 +187,7 @@ describe('MlsCommunityEngine', () => {
     const carol = engineFor('carol');
 
     await carol.engine.publishKeyPackages(COMMUNITY);
-    roster.add('carol');
+    roster.add(id('carol'));
     await expect(bob.engine.reconcile(COMMUNITY)).resolves.toBe(true);
     await carol.engine.sync(COMMUNITY);
     await alice.engine.sync(COMMUNITY);
@@ -188,21 +197,21 @@ describe('MlsCommunityEngine', () => {
       'hello carol',
     );
 
-    roster.delete('bob');
+    roster.delete(id('bob'));
     await expect(alice.engine.reconcile(COMMUNITY)).resolves.toBe(true);
     await expect(bob.engine.reconcile(COMMUNITY)).resolves.toBe(false);
     await expect(alice.engine.identities(COMMUNITY)).resolves.not.toContain(
-      'bob',
+      id('bob'),
     );
   });
 
   it('admits a member who joined the roster after the group was created', async () => {
-    roster = new Set(['alice']);
+    roster = new Set([id('alice')]);
     const alice = engineFor('alice');
     const bob = engineFor('bob');
 
     await alice.engine.createGroup(COMMUNITY);
-    roster = new Set(['alice', 'bob']);
+    roster = new Set([id('alice'), id('bob')]);
     await bob.engine.publishKeyPackages(COMMUNITY);
     await expect(alice.engine.reconcile(COMMUNITY)).resolves.toBe(true);
     await bob.engine.sync(COMMUNITY);
@@ -218,14 +227,14 @@ describe('MlsCommunityEngine', () => {
     const carol = engineFor('carol');
 
     await carol.engine.publishKeyPackages(COMMUNITY);
-    await alice.engine.admit(COMMUNITY, ['carol']);
+    await alice.engine.admit(COMMUNITY, [id('carol')]);
     const welcomeSeenByBob = await node
-      .transportFor('bob')
+      .transportFor(id('bob'))
       .list({ groupId: COMMUNITY, kind: 'welcome' });
 
-    expect(welcomeSeenByBob.every((r) => r.recipientIdentityId === 'bob')).toBe(
-      true,
-    );
+    expect(
+      welcomeSeenByBob.every((r) => r.recipientIdentityId === id('bob')),
+    ).toBe(true);
   });
 
   it('does not admit someone who is not on the roster', async () => {
@@ -235,6 +244,38 @@ describe('MlsCommunityEngine', () => {
     await alice.engine.createGroup(COMMUNITY);
     await mallory.engine.publishKeyPackages(COMMUNITY);
 
-    await expect(alice.engine.admit(COMMUNITY, ['mallory'])).rejects.toThrow();
+    await expect(
+      alice.engine.admit(COMMUNITY, [id('mallory')]),
+    ).rejects.toThrow();
+  });
+
+  it('ignores a key package whose credential the named identity did not sign', async () => {
+    const alice = engineFor('alice');
+    const bob = engineFor('bob');
+    // Published under bob's name, but its credential is signed by mallory.
+    const forged = await generateMlsKeyPackage(
+      new MlsLeafSigner(
+        { deviceId: 'device-9', identityId: id('bob') },
+        cast.mallory.keyPair,
+      ),
+    );
+
+    await alice.engine.createGroup(COMMUNITY);
+    await bob.engine.publishKeyPackages(COMMUNITY);
+    await node.transportFor(id('bob')).publish({
+      groupId: COMMUNITY,
+      kind: 'key_package',
+      payload: Buffer.from(forged.publicBytes).toString('base64'),
+    });
+    await alice.engine.admit(COMMUNITY, [id('bob')]);
+    await bob.engine.sync(COMMUNITY);
+    const ciphertext = await alice.engine.encrypt(COMMUNITY, 'genuine only');
+
+    await expect(bob.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
+      'genuine only',
+    );
+    await expect(alice.engine.identities(COMMUNITY)).resolves.toEqual(
+      expect.arrayContaining([id('alice'), id('bob')]),
+    );
   });
 });
