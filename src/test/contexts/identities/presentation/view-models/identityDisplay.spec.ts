@@ -9,14 +9,6 @@ import {
   publicFileObjectUrl,
   identityName,
 } from '../../../../../contexts/identities/presentation/view-models/identityDisplay';
-import { isIndependentClient } from '../../../../../shared/infrastructure/client/isIndependentClient';
-
-jest.mock(
-  '../../../../../shared/infrastructure/client/isIndependentClient',
-  () => ({
-    isIndependentClient: jest.fn(() => false),
-  }),
-);
 
 const identity = {
   profile: {
@@ -26,8 +18,6 @@ const identity = {
 } as IdentityResource;
 
 describe('identity display helpers', () => {
-  afterEach(() => jest.mocked(isIndependentClient).mockReturnValue(false));
-
   it.each([
     'https://tracker.example/avatar',
     'http://localhost/avatar',
@@ -35,16 +25,11 @@ describe('identity display helpers', () => {
     '/avatar',
     'data:image/png),url(https://tracker.example/avatar)',
     'data:image/svg+xml,<svg/>',
-  ])(
-    'rejects external or path-based profile references in independent mode: %s',
-    (url) => {
-      jest.mocked(isIndependentClient).mockReturnValue(true);
-      expect(profilePictureUrl(url)).toBeNull();
-    },
-  );
+  ])('rejects external or path-based profile references: %s', (url) => {
+    expect(profilePictureUrl(url)).toBeNull();
+  });
 
-  it('retains embedded profile images in independent mode', () => {
-    jest.mocked(isIndependentClient).mockReturnValue(true);
+  it('keeps embedded raster profile images', () => {
     expect(profilePictureUrl('data:image/png;base64,abc')).toBe(
       'data:image/png;base64,abc',
     );
@@ -63,15 +48,6 @@ describe('identity display helpers', () => {
     expect(isValidHandle('@al')).toBe(false);
     expect(isValidHandle('Ada_42')).toBe(true);
     expect(isValidHandle('Ada!')).toBe(false);
-  });
-
-  it('uses direct picture urls as-is', () => {
-    expect(profilePictureUrl('data:image/png;base64,abc')).toBe(
-      'data:image/png;base64,abc',
-    );
-    expect(profilePictureUrl('https://example.com/avatar.png')).toBe(
-      'https://example.com/avatar.png',
-    );
   });
 
   it('does not treat IPFS cids as image urls', () => {
