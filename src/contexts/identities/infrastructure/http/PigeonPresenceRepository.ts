@@ -25,18 +25,6 @@ export class PigeonPresenceRepository implements IdentityPresenceRepository {
     );
   }
 
-  public async search(
-    identityIds: IdentityId[],
-    actorIdentityId: IdentityId,
-  ): Promise<IdentityPresence[]> {
-    return (
-      await this.gateway.getMany(
-        this.contexts.find(actorIdentityId).session,
-        identityIds.map((identityId) => identityId.toString()),
-      )
-    ).map((resource) => this.mapper.fromResource(resource));
-  }
-
   public async update(
     presence: IdentityPresence,
     actorIdentityId: IdentityId,

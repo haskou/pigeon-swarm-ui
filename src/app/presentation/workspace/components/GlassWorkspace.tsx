@@ -657,13 +657,10 @@ export function GlassWorkspace({
     mergePresence,
     notificationsMutedByPresence,
     presenceByIdentityId,
+    presenceSharedConversationIds,
     rememberPresencePreference,
-  } = useWorkspacePresence({
-    communities,
-    conversations,
-    messageAuthorIdentityIdsKey,
-    session,
-  });
+    togglePresenceSharing,
+  } = useWorkspacePresence({ session });
   const playNotificationSoundIfAllowed = useCallback(() => {
     if (notificationsMutedByPresence) return;
 
@@ -1115,6 +1112,7 @@ export function GlassWorkspace({
                 openOrCreateConversationWithIdentity
               }
               onPresenceChange={mergePresence}
+              onPresenceSharingToggle={togglePresenceSharing}
               onPresenceStatusSelected={rememberPresencePreference}
               onRealtimeEventsOpen={openRealtimeEvents}
               onSessionUpdated={applySessionUpdate}
@@ -1123,6 +1121,7 @@ export function GlassWorkspace({
               pendingInvitation={activeConversationInvitation}
               pins={conversationPins}
               presenceByIdentityId={presenceByIdentityId}
+              presenceSharedConversationIds={presenceSharedConversationIds}
               railProps={railProps}
               realtimeStatus={realtimeStatus}
               replyTarget={replyTarget}

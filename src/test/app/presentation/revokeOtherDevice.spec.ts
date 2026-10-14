@@ -23,6 +23,7 @@ function services(): {
   const identities = mock<DeviceRevokeServices['identities']>();
 
   identities.revokeDevice.mockResolvedValue(rotated);
+  identities.cutOffRevokedPresenceReaders.mockResolvedValue(undefined);
   directMessages.cutOffRevokedReaders.mockResolvedValue(undefined);
   groupMessages.cutOffRevokedReaders.mockResolvedValue(undefined);
 
@@ -70,6 +71,24 @@ describe('revokeOtherDevice', () => {
     expect(revoke.groupMessages.cutOffRevokedReaders).toHaveBeenCalledWith(
       rotated,
     );
+    expect(revoke.identities.cutOffRevokedPresenceReaders).toHaveBeenCalledWith(
+      rotated,
+    );
+  });
+
+  it('reports a failed presence cut-off', async () => {
+    const revoke = services();
+
+    revoke.identities.cutOffRevokedPresenceReaders.mockRejectedValue(
+      new Error('node down'),
+    );
+
+    await expect(
+      revokeOtherDevice(
+        { onRotated: () => undefined, session, target },
+        revoke,
+      ),
+    ).resolves.toEqual({ cutOff: false, session: rotated });
   });
 
   it('hands over the rotated session and reports a failed cut-off', async () => {
@@ -122,5 +141,8 @@ describe('revokeOtherDevice', () => {
     expect(rotations).toEqual([]);
     expect(revoke.directMessages.cutOffRevokedReaders).not.toHaveBeenCalled();
     expect(revoke.groupMessages.cutOffRevokedReaders).not.toHaveBeenCalled();
+    expect(
+      revoke.identities.cutOffRevokedPresenceReaders,
+    ).not.toHaveBeenCalled();
   });
 });

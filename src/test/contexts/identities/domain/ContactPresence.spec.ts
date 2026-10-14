@@ -63,11 +63,9 @@ describe(ContactPresence.name, () => {
       sentAt: 410_000,
     });
 
-    expect(
-      ahead.expiresOnReceiptAt(new Timestamp(1_000)).valueOf(),
-    ).toBe(91_000);
-    expect(ahead.forgottenAfter(new Timestamp(1_000)).valueOf()).toBe(
-      500_000,
+    expect(ahead.expiresOnReceiptAt(new Timestamp(1_000)).valueOf()).toBe(
+      91_000,
     );
+    expect(ahead.forgottenAfter(new Timestamp(1_000)).valueOf()).toBe(500_000);
   });
 });

@@ -66,9 +66,9 @@ describe(ContactPresenceBoard.name, () => {
     expect(board.accept(update('away', 1, 0), new Timestamp(10_000))).toBe(
       false,
     );
-    expect(
-      board.accept(update('away', 2, 10_000), new Timestamp(20_000)),
-    ).toBe(false);
+    expect(board.accept(update('away', 2, 10_000), new Timestamp(20_000))).toBe(
+      false,
+    );
     expect(statusAt(board, 20_000)).toBe('busy');
   });
 

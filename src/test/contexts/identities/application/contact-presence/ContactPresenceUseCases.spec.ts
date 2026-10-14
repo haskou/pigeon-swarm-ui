@@ -10,8 +10,8 @@ import { ContactPresencesReceiver } from '../../../../../contexts/identities/app
 import { ReceiveContactPresencesMessage } from '../../../../../contexts/identities/application/receive-contact-presences/messages/ReceiveContactPresencesMessage';
 import { ContactPresencesSearcher } from '../../../../../contexts/identities/application/search-contact-presences/ContactPresencesSearcher';
 import { SearchContactPresencesMessage } from '../../../../../contexts/identities/application/search-contact-presences/messages/SearchContactPresencesMessage';
-import { PresenceSharingsSearcher } from '../../../../../contexts/identities/application/search-presence-sharings/PresenceSharingsSearcher';
 import { SearchPresenceSharingsMessage } from '../../../../../contexts/identities/application/search-presence-sharings/messages/SearchPresenceSharingsMessage';
+import { PresenceSharingsSearcher } from '../../../../../contexts/identities/application/search-presence-sharings/PresenceSharingsSearcher';
 import { ContactPresenceSharer } from '../../../../../contexts/identities/application/share-contact-presence/ContactPresenceSharer';
 import { ShareContactPresenceMessage } from '../../../../../contexts/identities/application/share-contact-presence/messages/ShareContactPresenceMessage';
 import { ContactPresenceSharingStopper } from '../../../../../contexts/identities/application/stop-sharing-contact-presence/ContactPresenceSharingStopper';
@@ -62,7 +62,9 @@ const setup = (sharings: PresenceSharing[] = [sharingWithB, sharingWithC]) => {
   return { board, presenceRepository, sharingRepository };
 };
 
-const statuses = (presences: { toPrimitives(): { identityId: string; status: string } }[]) =>
+const statuses = (
+  presences: { toPrimitives(): { identityId: string; status: string } }[],
+) =>
   presences.map((presence) => {
     const { identityId, status } = presence.toPrimitives();
 
@@ -161,11 +163,13 @@ describe('contact presence use cases', () => {
     );
 
     expect(
-      presenceRepository.publish.mock.calls.map(([actor, sharing, presence]) => [
-        actor.toString(),
-        sharing.toPrimitives().contactIdentityId,
-        presence.toPrimitives().status,
-      ]),
+      presenceRepository.publish.mock.calls.map(
+        ([actor, sharing, presence]) => [
+          actor.toString(),
+          sharing.toPrimitives().contactIdentityId,
+          presence.toPrimitives().status,
+        ],
+      ),
     ).toEqual([
       [ACTOR, 'identity-b', 'busy'],
       [ACTOR, 'identity-c', 'busy'],

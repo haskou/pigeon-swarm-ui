@@ -107,11 +107,13 @@ function ConversationChatContent({
   onConversationsChanged,
   onCreateConversation,
   onOpenConversationWithIdentity,
+  onPresenceSharingToggle,
   onRealtimeEventsOpen,
   onSidebarOpen,
   pendingInvitation,
   pins,
   presenceByIdentityId,
+  presenceSharedConversationIds,
   realtimeStatus,
   replyTarget,
   sendConversationTyping,
@@ -176,6 +178,15 @@ function ConversationChatContent({
         onOpenMessageThread={thread.open}
         onOpenPins={pins.open}
         onOpenSidebar={onSidebarOpen}
+        onPresenceSharingToggle={
+          activeConversation && activeConversationPeerIdentityId
+            ? () =>
+                onPresenceSharingToggle(
+                  activeConversation.id,
+                  activeConversationPeerIdentityId,
+                )
+            : undefined
+        }
         onReactionToggle={(message, emoji, reacted) =>
           void messageActions.toggleReaction(message, emoji, reacted)
         }
@@ -193,6 +204,10 @@ function ConversationChatContent({
         pendingInvitation={pendingInvitation}
         pinnedMessageIds={pins.pinnedMessageIds}
         presenceByIdentityId={presenceByIdentityId}
+        presenceShared={
+          !!activeConversation &&
+          presenceSharedConversationIds.has(activeConversation.id)
+        }
         progress={attachmentProgress}
         realtimeEvent={conversationRealtimeEvent}
         realtimeStatus={realtimeStatus}

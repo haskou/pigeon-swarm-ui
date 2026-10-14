@@ -1,5 +1,6 @@
 import { mock, mockDeep } from 'jest-mock-extended';
 
+import type { ContactPresenceStorage } from '../../../../app/composition/identities/ContactPresenceStorage';
 import type { IdentityUseCases } from '../../../../app/composition/identities/IdentityUseCases';
 import type { IdentityMapper } from '../../../../contexts/identities/infrastructure/http/IdentityMapper';
 import type { IdentityPresenceMapper } from '../../../../contexts/identities/infrastructure/http/IdentityPresenceMapper';
@@ -9,6 +10,7 @@ import type { ContactDirectoryStore } from '../../../../contexts/identities/infr
 
 import { PigeonIdentitiesFacade } from '../../../../app/composition/identities/PigeonIdentitiesFacade';
 import { Identity } from '../../../../contexts/identities/domain/Identity';
+import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { IdentityAccessContexts } from '../../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
 
 describe(PigeonIdentitiesFacade.name, () => {
@@ -63,6 +65,7 @@ describe(PigeonIdentitiesFacade.name, () => {
       mock<IdentityPresenceMapper>(),
       useCases,
       mock<ContactDirectoryStore>(),
+      mockDeep<ContactPresenceStorage>(),
     ).login('identity-a', 'Correct-Horse-Battery-9!');
 
     expect(result.conversations.map(({ id }) => id)).toEqual([
@@ -103,6 +106,7 @@ describe(PigeonIdentitiesFacade.name, () => {
       mock<IdentityPresenceMapper>(),
       useCases,
       mock<ContactDirectoryStore>(),
+      mockDeep<ContactPresenceStorage>(),
     ).login('@ada', 'Correct-Horse-Battery-9!');
 
     expect(gateway.hydrateSession).toHaveBeenCalledWith(session, undefined);
@@ -124,6 +128,7 @@ describe(PigeonIdentitiesFacade.name, () => {
       mock<IdentityPresenceMapper>(),
       useCases,
       mock<ContactDirectoryStore>(),
+      mockDeep<ContactPresenceStorage>(),
     ).forgetCurrentDevice(session, false);
 
     const [message] = useCases.currentDeviceForgetter.forget.mock.calls[0];
@@ -146,6 +151,7 @@ describe(PigeonIdentitiesFacade.name, () => {
       mock<IdentityPresenceMapper>(),
       mockDeep<IdentityUseCases>(),
       contacts,
+      mockDeep<ContactPresenceStorage>(),
     );
 
     contacts.contacts.mockResolvedValue(entries);
@@ -158,5 +164,49 @@ describe(PigeonIdentitiesFacade.name, () => {
 
     expect(contacts.replace).toHaveBeenCalledWith(session, entries);
     expect(contacts.forget).toHaveBeenCalledWith('identity-a');
+  });
+
+  it('forgets the contact presence and the sharing choices of a removed identity', async () => {
+    const contactPresence = mockDeep<ContactPresenceStorage>();
+
+    contactPresence.sharings.forget.mockResolvedValue(undefined);
+
+    await new PigeonIdentitiesFacade(
+      mock<PigeonIdentitiesGateway>(),
+      new IdentityAccessContexts(),
+      mock<IdentityMapper>(),
+      mock<IdentityPresenceMapper>(),
+      mockDeep<IdentityUseCases>(),
+      mock<ContactDirectoryStore>(),
+      contactPresence,
+    ).forgetContactPresence('identity-a');
+
+    expect(contactPresence.inboxes.forget).toHaveBeenCalledWith('identity-a');
+    expect(contactPresence.sharings.forget).toHaveBeenCalledWith('identity-a');
+  });
+
+  it('cuts revoked readers off the presence inboxes under the rotated session', async () => {
+    const contactPresence = mockDeep<ContactPresenceStorage>();
+    const contexts = new IdentityAccessContexts();
+    const session = { identity: { id: 'identity-a' } } as unknown as Session;
+
+    contactPresence.inboxes.cutOffRevokedReaders.mockResolvedValue(undefined);
+
+    await new PigeonIdentitiesFacade(
+      mock<PigeonIdentitiesGateway>(),
+      contexts,
+      mock<IdentityMapper>(),
+      mock<IdentityPresenceMapper>(),
+      mockDeep<IdentityUseCases>(),
+      mock<ContactDirectoryStore>(),
+      contactPresence,
+    ).cutOffRevokedPresenceReaders(session);
+
+    expect(contactPresence.inboxes.cutOffRevokedReaders).toHaveBeenCalledWith(
+      session,
+    );
+    expect(contexts.find(IdentityId.fromString('identity-a')).session).toBe(
+      session,
+    );
   });
 });

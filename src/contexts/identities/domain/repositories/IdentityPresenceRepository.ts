@@ -6,10 +6,6 @@ export interface IdentityPresenceRepository {
     identityId: IdentityId,
     actorIdentityId: IdentityId,
   ): Promise<IdentityPresence>;
-  search(
-    identityIds: IdentityId[],
-    actorIdentityId: IdentityId,
-  ): Promise<IdentityPresence[]>;
   update(
     presence: IdentityPresence,
     actorIdentityId: IdentityId,

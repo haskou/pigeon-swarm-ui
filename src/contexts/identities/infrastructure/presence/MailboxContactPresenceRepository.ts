@@ -284,6 +284,34 @@ export class MailboxContactPresenceRepository implements ContactPresenceReposito
     if (failures.length > 0) throw failures[0];
   }
 
+  /** Drops every contact presence and inbox state held, for logout. */
+  public dispose(): void {
+    for (const held of [
+      this.boards,
+      this.broadcasts,
+      this.cursors,
+      this.opened,
+      this.resumeAt,
+    ]) {
+      held.clear();
+    }
+  }
+
+  /** Drops what this app session holds for the identity. */
+  public forget(identityId: string): void {
+    for (const [key, { identityId: owner, keys }] of this.opened) {
+      if (owner === identityId) {
+        this.opened.delete(key);
+        this.cursors.delete(keys.mailboxId);
+      }
+    }
+    for (const key of [...this.resumeAt.keys()]) {
+      if (key.startsWith(`${identityId}|`)) this.resumeAt.delete(key);
+    }
+    this.boards.delete(identityId);
+    this.broadcasts.delete(identityId);
+  }
+
   public async publish(
     actorIdentityId: IdentityId,
     sharing: PresenceSharing,

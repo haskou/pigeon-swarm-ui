@@ -4,8 +4,6 @@ import type { IdentityPresenceRepository } from '../../../../../contexts/identit
 
 import { IdentityPresenceFinder } from '../../../../../contexts/identities/application/find-identity-presence/IdentityPresenceFinder';
 import { FindIdentityPresenceMessage } from '../../../../../contexts/identities/application/find-identity-presence/messages/FindIdentityPresenceMessage';
-import { IdentityPresencesSearcher } from '../../../../../contexts/identities/application/search-identity-presences/IdentityPresencesSearcher';
-import { SearchIdentityPresencesMessage } from '../../../../../contexts/identities/application/search-identity-presences/messages/SearchIdentityPresencesMessage';
 import { IdentityPresenceUpdater } from '../../../../../contexts/identities/application/update-identity-presence/IdentityPresenceUpdater';
 import { UpdateIdentityPresenceMessage } from '../../../../../contexts/identities/application/update-identity-presence/messages/UpdateIdentityPresenceMessage';
 import { IdentityPresence } from '../../../../../contexts/identities/domain/IdentityPresence';
@@ -31,22 +29,6 @@ describe('identity presence use cases', () => {
     await expect(
       new IdentityPresenceFinder(repository).find(
         new FindIdentityPresenceMessage('identity-a', 'actor-a'),
-      ),
-    ).resolves.toBe(result);
-  });
-
-  it('searches identity presences', async () => {
-    const repository = mock<IdentityPresenceRepository>();
-    const result = [presence(), presence('identity-b')];
-
-    repository.search.mockResolvedValue(result);
-
-    await expect(
-      new IdentityPresencesSearcher(repository).search(
-        new SearchIdentityPresencesMessage(
-          ['identity-a', 'identity-b'],
-          'actor-a',
-        ),
       ),
     ).resolves.toBe(result);
   });

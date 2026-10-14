@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-use-before-define */
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { Session } from '../session/Session';
@@ -24,27 +23,6 @@ export class PigeonPresenceApi {
     });
   }
 
-  public async getMany(
-    session: Session,
-    identityIds: string[],
-  ): Promise<IdentityPresence[]> {
-    const path = '/presence/';
-    const query = new URLSearchParams();
-    const body = {};
-
-    for (const identityId of uniqueSorted(identityIds)) {
-      query.append('identityIds', identityId);
-    }
-
-    return await this.http.request<IdentityPresence[]>(
-      `${path}?${query.toString()}`,
-      {
-        headers: await this.signer.headers(session, 'GET', path, body),
-        method: 'GET',
-      },
-    );
-  }
-
   public async update(
     session: Session,
     input: { status: SelectablePresenceStatus },
@@ -60,8 +38,4 @@ export class PigeonPresenceApi {
       method: 'PUT',
     });
   }
-}
-
-function uniqueSorted(values: string[]): string[] {
-  return [...new Set(values.filter(Boolean))].sort();
 }

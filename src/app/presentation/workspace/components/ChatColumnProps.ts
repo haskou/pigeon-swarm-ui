@@ -29,6 +29,7 @@ export interface ChatColumnProps {
   identityPictures: IdentityPictures;
   identityProfiles: Record<string, IdentityResource>;
   presenceByIdentityId?: Record<string, IdentityPresence>;
+  presenceShared?: boolean;
   conversationKey?: ConversationKeyEntry;
   draft: string;
   editingMessage?: ChatMessage | null;
@@ -84,6 +85,7 @@ export interface ChatColumnProps {
     title: string;
   }) => void;
   onNotificationMuteToggle: (scope: NotificationScopeSetting['scope']) => void;
+  onPresenceSharingToggle?: () => void;
   onRealtimeEventsOpen?: () => void;
   progress?: AttachmentProgress | null;
   realtimeStatus?: 'connected' | 'reconnecting';

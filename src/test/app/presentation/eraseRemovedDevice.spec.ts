@@ -38,6 +38,7 @@ function services(): {
   mls.forget.mockResolvedValue(undefined);
   identities.forgetDeviceUnlock.mockResolvedValue(undefined);
   identities.forgetContacts.mockResolvedValue(undefined);
+  identities.forgetContactPresence.mockResolvedValue(undefined);
 
   return { directMessages, groupMessages, identities, mls };
 }
@@ -115,7 +116,7 @@ describe('eraseRemovedDevice', () => {
     );
   });
 
-  it("erases the identity's outbox, direct and group history, community MLS state, contact directory and pending device-sealed recovery", async () => {
+  it("erases the identity's outbox, direct and group history, community MLS state, contact directory, contact presence and pending device-sealed recovery", async () => {
     const removed = services();
 
     await expect(eraseRemovedDevice('identity-1', removed)).resolves.toBe(true);
@@ -128,12 +129,29 @@ describe('eraseRemovedDevice', () => {
     );
     expect(removed.groupMessages.forget).toHaveBeenCalledWith('identity-1');
     expect(removed.mls.forget).toHaveBeenCalledWith('identity-1');
+    expect(removed.identities.forgetContactPresence).toHaveBeenCalledWith(
+      'identity-1',
+    );
     expect(removed.identities.forgetContacts).toHaveBeenCalledWith(
       'identity-1',
     );
     expect(removed.identities.discardDeviceSealedRecovery).toHaveBeenCalledWith(
       'identity-1',
     );
+  });
+
+  it('keeps the vault record when the contact presence cannot be erased', async () => {
+    const removed = services();
+
+    removed.identities.forgetContactPresence.mockRejectedValue(
+      new Error('storage'),
+    );
+
+    await expect(eraseRemovedDevice('identity-1', removed)).resolves.toBe(
+      false,
+    );
+
+    expect(removed.identities.forgetDeviceUnlock).not.toHaveBeenCalled();
   });
 
   it('still erases the rest and reports it when the outbox cannot be erased', async () => {

@@ -79,6 +79,7 @@ const fakeNode = () => {
 
       return;
     }
+
     if (!held.readers.has(creation.readTokenHash)) {
       throw new HttpJsonError(409, 'Conflict', '');
     }

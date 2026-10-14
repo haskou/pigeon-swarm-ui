@@ -48,9 +48,14 @@ import { IdentityFinder } from '../../contexts/identities/application/find-ident
 import { CurrentDeviceForgetter } from '../../contexts/identities/application/forget-current-device/CurrentDeviceForgetter';
 import { DeviceUnlockForgetter } from '../../contexts/identities/application/forget-device-unlock/DeviceUnlockForgetter';
 import { LoginIdentity } from '../../contexts/identities/application/login-identity/LoginIdentity';
+import { ContactPresencePublisher } from '../../contexts/identities/application/publish-contact-presence/ContactPresencePublisher';
+import { ContactPresencesReceiver } from '../../contexts/identities/application/receive-contact-presences/ContactPresencesReceiver';
 import { IdentityRefresher } from '../../contexts/identities/application/refresh-identity/IdentityRefresher';
 import { RegisterIdentity } from '../../contexts/identities/application/register-identity/RegisterIdentity';
-import { IdentityPresencesSearcher } from '../../contexts/identities/application/search-identity-presences/IdentityPresencesSearcher';
+import { ContactPresencesSearcher } from '../../contexts/identities/application/search-contact-presences/ContactPresencesSearcher';
+import { PresenceSharingsSearcher } from '../../contexts/identities/application/search-presence-sharings/PresenceSharingsSearcher';
+import { ContactPresenceSharer } from '../../contexts/identities/application/share-contact-presence/ContactPresenceSharer';
+import { ContactPresenceSharingStopper } from '../../contexts/identities/application/stop-sharing-contact-presence/ContactPresenceSharingStopper';
 import { IdentityPresenceUpdater } from '../../contexts/identities/application/update-identity-presence/IdentityPresenceUpdater';
 import { IdentityProfileUpdater } from '../../contexts/identities/application/update-identity-profile/IdentityProfileUpdater';
 import { IdentityCreationMaterials } from '../../contexts/identities/infrastructure/crypto/IdentityCreationMaterials';
@@ -63,8 +68,10 @@ import { PigeonIdentityUnlockRepository } from '../../contexts/identities/infras
 import { PigeonOwnDeviceRepository } from '../../contexts/identities/infrastructure/http/PigeonOwnDeviceRepository';
 import { PigeonPresenceRepository } from '../../contexts/identities/infrastructure/http/PigeonPresenceRepository';
 import { MailboxDeviceRepository } from '../../contexts/identities/infrastructure/mailbox/MailboxDeviceRepository';
+import { MailboxContactPresenceRepository } from '../../contexts/identities/infrastructure/presence/MailboxContactPresenceRepository';
 import { ContactDirectoryStore } from '../../contexts/identities/infrastructure/storage/ContactDirectoryStore';
 import { SealedContactDirectoryRepository } from '../../contexts/identities/infrastructure/storage/SealedContactDirectoryRepository';
+import { SealedPresenceSharingRepository } from '../../contexts/identities/infrastructure/storage/SealedPresenceSharingRepository';
 import { MessageReactionAdder } from '../../contexts/messages/application/add-message-reaction/MessageReactionAdder';
 import { ConversationDraftDeleter } from '../../contexts/messages/application/delete-conversation-draft/ConversationDraftDeleter';
 import { MessageDeleter } from '../../contexts/messages/application/delete-message/MessageDeleter';
@@ -342,6 +349,14 @@ export class PigeonApplication {
       identityPresenceMapper,
     );
     const contactDirectory = new ContactDirectoryStore();
+    const contactPresenceRepository = new MailboxContactPresenceRepository(
+      identityContexts,
+      gateway.mailboxChannel,
+      gateway.recipientMailboxes,
+    );
+    const presenceSharingRepository = new SealedPresenceSharingRepository(
+      identityContexts,
+    );
 
     this.identities = new PigeonIdentitiesFacade(
       gateway.identityGateway,
@@ -349,6 +364,25 @@ export class PigeonApplication {
       identityMapper,
       identityPresenceMapper,
       {
+        contactPresencePublisher: new ContactPresencePublisher(
+          presenceSharingRepository,
+          contactPresenceRepository,
+        ),
+        contactPresenceSharer: new ContactPresenceSharer(
+          presenceSharingRepository,
+        ),
+        contactPresenceSharingStopper: new ContactPresenceSharingStopper(
+          presenceSharingRepository,
+          contactPresenceRepository,
+        ),
+        contactPresencesReceiver: new ContactPresencesReceiver(
+          presenceSharingRepository,
+          contactPresenceRepository,
+        ),
+        contactPresencesSearcher: new ContactPresencesSearcher(
+          presenceSharingRepository,
+          contactPresenceRepository,
+        ),
         currentDeviceForgetter: new CurrentDeviceForgetter(
           new PigeonOwnDeviceRepository(
             gateway.identityGateway,
@@ -369,8 +403,8 @@ export class PigeonApplication {
         finder: new IdentityFinder(identityRepository),
         login: new LoginIdentity(identityUnlockRepository),
         presenceFinder: new IdentityPresenceFinder(identityPresenceRepository),
-        presenceSearcher: new IdentityPresencesSearcher(
-          identityPresenceRepository,
+        presenceSharingsSearcher: new PresenceSharingsSearcher(
+          presenceSharingRepository,
         ),
         presenceUpdater: new IdentityPresenceUpdater(
           identityPresenceRepository,
@@ -380,6 +414,10 @@ export class PigeonApplication {
         register: new RegisterIdentity(identityRepository, identityIdFactory),
       },
       contactDirectory,
+      {
+        inboxes: contactPresenceRepository,
+        sharings: presenceSharingRepository,
+      },
     );
     const conversationDraftRepository = new PigeonDraftRepository(
       gateway.conversationDrafts,
@@ -583,6 +621,7 @@ export class PigeonApplication {
 
   public disposeSessionWorkers(): void {
     this.gateway.disposeSessionWorkers();
+    this.identities.disposeContactPresence();
     this.mls.close();
   }
 }

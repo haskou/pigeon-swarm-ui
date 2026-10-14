@@ -12,6 +12,7 @@ import type { IdentityPresenceResource as IdentityPresence } from '../../../cont
 import type { IdentityResource } from '../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { IdentityUpdateProfileInput } from '../../../contexts/identities/infrastructure/http/resources/IdentityUpdateProfileInput';
 import type { LoginResult } from '../../../contexts/identities/infrastructure/http/resources/LoginResult';
+import type { PresenceStatusResource } from '../../../contexts/identities/infrastructure/http/resources/PresenceStatusResource';
 import type { SelectablePresenceStatusResource as SelectablePresenceStatus } from '../../../contexts/identities/infrastructure/http/resources/SelectablePresenceStatusResource';
 import type {
   LocalKeychain,
@@ -21,6 +22,7 @@ import type { Session } from '../../../contexts/identities/infrastructure/sessio
 import type { ContactDirectoryEntry } from '../../../contexts/identities/infrastructure/storage/ContactDirectoryEntry';
 import type { ContactDirectoryStore } from '../../../contexts/identities/infrastructure/storage/ContactDirectoryStore';
 import type { DeviceUnlockMethod } from '../../../contexts/identities/infrastructure/storage/DeviceUnlockMethod';
+import type { ContactPresenceStorage } from './ContactPresenceStorage';
 import type { IdentityUseCases } from './IdentityUseCases';
 
 import { ConversationTimeline } from '../../../contexts/conversations/presentation/view-models/ConversationTimeline';
@@ -29,9 +31,14 @@ import { FindIdentityMessage } from '../../../contexts/identities/application/fi
 import { ForgetCurrentDeviceMessage } from '../../../contexts/identities/application/forget-current-device/messages/ForgetCurrentDeviceMessage';
 import { ForgetDeviceUnlockMessage } from '../../../contexts/identities/application/forget-device-unlock/messages/ForgetDeviceUnlockMessage';
 import { LoginIdentityMessage } from '../../../contexts/identities/application/login-identity/messages/LoginIdentityMessage';
+import { PublishContactPresenceMessage } from '../../../contexts/identities/application/publish-contact-presence/messages/PublishContactPresenceMessage';
+import { ReceiveContactPresencesMessage } from '../../../contexts/identities/application/receive-contact-presences/messages/ReceiveContactPresencesMessage';
 import { RefreshIdentityMessage } from '../../../contexts/identities/application/refresh-identity/messages/RefreshIdentityMessage';
 import { RegisterIdentityMessage } from '../../../contexts/identities/application/register-identity/messages/RegisterIdentityMessage';
-import { SearchIdentityPresencesMessage } from '../../../contexts/identities/application/search-identity-presences/messages/SearchIdentityPresencesMessage';
+import { SearchContactPresencesMessage } from '../../../contexts/identities/application/search-contact-presences/messages/SearchContactPresencesMessage';
+import { SearchPresenceSharingsMessage } from '../../../contexts/identities/application/search-presence-sharings/messages/SearchPresenceSharingsMessage';
+import { ShareContactPresenceMessage } from '../../../contexts/identities/application/share-contact-presence/messages/ShareContactPresenceMessage';
+import { StopSharingContactPresenceMessage } from '../../../contexts/identities/application/stop-sharing-contact-presence/messages/StopSharingContactPresenceMessage';
 import { UpdateIdentityPresenceMessage } from '../../../contexts/identities/application/update-identity-presence/messages/UpdateIdentityPresenceMessage';
 import { UpdateIdentityProfileMessage } from '../../../contexts/identities/application/update-identity-profile/messages/UpdateIdentityProfileMessage';
 import { DevicePairingCode } from '../../../contexts/identities/domain/value-objects/DevicePairingCode';
@@ -46,6 +53,7 @@ export class PigeonIdentitiesFacade {
     private readonly presenceMapper: IdentityPresenceMapper,
     private readonly useCases: IdentityUseCases,
     private readonly contactDirectory: ContactDirectoryStore,
+    private readonly contactPresence: ContactPresenceStorage,
   ) {}
 
   private hydrateLoginResult(result: LoginResult): LoginResult {
@@ -212,17 +220,33 @@ export class PigeonIdentitiesFacade {
     );
   }
 
-  public async getPresences(
+  /**
+   * The presence of each contact this identity shares presence with, as
+   * last received; `disconnected` once an update expired.
+   */
+  public async getContactPresences(
     session: Session,
-    identityIds: string[],
   ): Promise<IdentityPresence[]> {
     this.contexts.register(session);
 
     return (
-      await this.useCases.presenceSearcher.search(
-        new SearchIdentityPresencesMessage(identityIds, session.identity.id),
+      await this.useCases.contactPresencesSearcher.search(
+        new SearchContactPresencesMessage(session.identity.id, Date.now()),
       )
     ).map((presence) => this.presenceMapper.toResource(presence));
+  }
+
+  /** Contacts this device shares presence with, by direct conversation. */
+  public async getPresenceSharings(
+    session: Session,
+  ): Promise<{ contactIdentityId: string; conversationId: string }[]> {
+    this.contexts.register(session);
+
+    return (
+      await this.useCases.presenceSharingsSearcher.search(
+        new SearchPresenceSharingsMessage(session.identity.id),
+      )
+    ).map((sharing) => sharing.toPrimitives());
   }
 
   public async login(
@@ -333,6 +357,94 @@ export class PigeonIdentitiesFacade {
   public async forgetDeviceUnlock(identityId: string): Promise<void> {
     await this.useCases.deviceUnlockForgetter.forget(
       new ForgetDeviceUnlockMessage(identityId),
+    );
+  }
+
+  /**
+   * Drops this device's presence sharings of the identity and the contact
+   * presence held for it, as when the device was removed.
+   */
+  public async forgetContactPresence(identityId: string): Promise<void> {
+    this.contactPresence.inboxes.forget(identityId);
+    await this.contactPresence.sharings.forget(identityId);
+  }
+
+  /**
+   * After a revoke rotated the sealed root, leaves it the only reader of the
+   * identity's presence inboxes. Rejects when an inbox was not cut off.
+   */
+  public async cutOffRevokedPresenceReaders(session: Session): Promise<void> {
+    this.contexts.register(session);
+    await this.contactPresence.inboxes.cutOffRevokedReaders(session);
+  }
+
+  /** Drops contact presence and sharing keys held in memory, for logout. */
+  public disposeContactPresence(): void {
+    this.contactPresence.inboxes.dispose();
+    this.contactPresence.sharings.close();
+  }
+
+  /**
+   * Sends this identity's status to every contact it shares presence with,
+   * when due; invisible and disconnected send nothing. Never rejects on a
+   * relay failure.
+   */
+  public async publishContactPresence(
+    session: Session,
+    status: PresenceStatusResource,
+  ): Promise<void> {
+    this.contexts.register(session);
+    await this.useCases.contactPresencePublisher.publish(
+      new PublishContactPresenceMessage(
+        session.identity.id,
+        status,
+        Date.now(),
+      ),
+    );
+  }
+
+  /** Reads the contacts' presence inboxes, then reports every contact. */
+  public async receiveContactPresences(
+    session: Session,
+  ): Promise<IdentityPresence[]> {
+    this.contexts.register(session);
+
+    return (
+      await this.useCases.contactPresencesReceiver.receive(
+        new ReceiveContactPresencesMessage(session.identity.id, Date.now()),
+      )
+    ).map((presence) => this.presenceMapper.toResource(presence));
+  }
+
+  /** Starts exchanging presence with the peer of a direct conversation. */
+  public async shareContactPresence(
+    session: Session,
+    conversationId: string,
+    contactIdentityId: string,
+  ): Promise<void> {
+    this.contexts.register(session);
+    await this.useCases.contactPresenceSharer.share(
+      new ShareContactPresenceMessage(
+        session.identity.id,
+        conversationId,
+        contactIdentityId,
+      ),
+    );
+  }
+
+  /** Stops the exchange and deletes this identity's inbox for the contact. */
+  public async stopSharingContactPresence(
+    session: Session,
+    conversationId: string,
+    contactIdentityId: string,
+  ): Promise<void> {
+    this.contexts.register(session);
+    await this.useCases.contactPresenceSharingStopper.stop(
+      new StopSharingContactPresenceMessage(
+        session.identity.id,
+        conversationId,
+        contactIdentityId,
+      ),
     );
   }
 

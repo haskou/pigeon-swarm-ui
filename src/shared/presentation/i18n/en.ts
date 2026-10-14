@@ -1294,6 +1294,7 @@ export const en = {
   presence: {
     error: 'Presence could not be updated.',
     selectStatus: 'Select status',
+    shareWithContact: 'Share status',
     status: 'Status',
     statuses: {
       available: 'Online',
@@ -1302,6 +1303,7 @@ export const en = {
       disconnected: 'Offline',
       invisible: 'Invisible',
     },
+    stopSharingWithContact: 'Stop sharing status',
   },
   profile: {
     addNetwork: 'Add network',

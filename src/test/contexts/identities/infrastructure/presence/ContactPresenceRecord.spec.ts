@@ -64,7 +64,10 @@ describe(ContactPresenceRecord.name, () => {
     ['a malformed source', { source: 'node-1' }],
   ])('drops a record with %s', (_case, override) => {
     expect(
-      ContactPresenceRecord.decode(bytes({ ...record, ...override }), bobSharing),
+      ContactPresenceRecord.decode(
+        bytes({ ...record, ...override }),
+        bobSharing,
+      ),
     ).toBeNull();
   });
 

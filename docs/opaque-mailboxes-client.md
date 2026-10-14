@@ -7,6 +7,7 @@ Client side of haskou/pigeon-swarm-node#289. Module: `src/contexts/mailboxes/`.
 - 1:1 channel at epoch 0 only.
 - The only delivery path for direct 1:1 messages: sent, edited, deleted, reactions, pins, and read receipts. See Direct messages below.
 - Direct inboxes can be replicated on up to three availability servers (haskou/pigeon-swarm-node#290). See Availability servers below.
+- Contact presence inboxes, one per direct conversation side. See Contact presence below.
 - No rotation announcement and no realtime hint.
 
 ## Key schedule
@@ -296,6 +297,21 @@ Client side of haskou/pigeon-swarm-node#290: a direct inbox is kept on several n
 - A peer chooses which public hosts, up to 3, receive appends to its inbox. Those hosts see the same opaque envelopes and mailbox ids as the home does.
 - There is no per-user picker: the servers are deployment config only.
 - A server that is down is retried on every sync pass and every append; only its failures are logged.
+
+## Contact presence
+
+Client side of haskou/pigeon-swarm-ui#453, built on the mailbox routes of haskou/pigeon-swarm-node#552. A contact's status travels end to end encrypted through opaque mailboxes; the node sees an inbox id and ciphertext only.
+
+- Opt-in: one switch per direct conversation in its actions menu (Share status / Stop sharing status), off by default. Sharing is mutual: turning it on sends this identity's status to the peer and opens this identity's presence inbox for that peer. Group conversations and community members have no switch, so they show no presence.
+- Choice storage: the shared conversations are kept on this device only, sealed by the device key (`SealedPresenceSharingRepository`, kind `presence-sharing`, entry id = conversation id). Other devices of the identity do not inherit the choice.
+- Keys (`ContactPresenceInboxKeys`): HKDF-SHA256 (no salt, 32 bytes) over the conversation key with info `pigeon/contact-presence/v1`, then the mailbox key schedule for the recipient identity at epoch 0. The presence inboxes share no id or key with the message inboxes.
+- Reader: the only reader is the read token derived from the identity's device-sealed root, shared by its devices. No device reader is enrolled. A revoke rotates the root; `revokeOtherDevice` then runs `identities.cutOffRevokedPresenceReaders`, which leaves the rotated root as the only reader of every presence inbox, and reports a failed cut-off like the message cut-offs. A create answered 409 by an inbox still held under the previous root is bridged through that root and pruned to the new one.
+- Record: the plaintext is `{kind:'contact-presence', version:1, authorId, conversationId, expiresAt, sentAt, sequence, source, status}` (`ContactPresenceRecord`), sealed by `MailboxChannel` under a random envelope id and appended through `RecipientMailboxRouter.send` (primary route only). `source` is a random per-app-session id that orders updates from several devices; there is no node id, network id, custom message or activity time. Decoding is strict: another field, kind or version, another conversation, or an author other than the peer drops the record.
+- Send: `ContactPresencePublisher` sends `available`, `away` or `busy` at most every 10 s on a change and refreshes every 45 s; `invisible` and `disconnected` send nothing. Each update expires 90 s after it was sent (`ContactPresence.LIFETIME`). After a 404 or 409 the sender stops writing to that contact for 2 minutes. A relay failure never rejects.
+- Receive: the workspace reads the presence inboxes every 30 s and re-evaluates the held updates every 5 s, so an expired update shows `disconnected` and a stale `available` never persists. Each device keeps its read position in memory and acknowledges only up to the first update still current, so the identity's other devices read it too.
+- Same view everywhere: the status comes only from the presence inbox, so a contact sees the same status whether both identities use the same node or not. Presence of other identities from the node is not shown: `PigeonPresenceApi` keeps only this identity's own status (`getPresence`, `updatePresence`), the multi-identity presence search is removed, and realtime presence events about other identities are ignored.
+- Stop: turning the switch off forgets the choice and deletes this identity's presence inbox for that peer (`MailboxChannel.deleteInbox`). Logout drops every held update and inbox position (`identities.disposeContactPresence`). A removed device erases its sharing choices and held presence (`identities.forgetContactPresence`, see `eraseRemovedDevice`).
+- Residuals: the choice is device-local; appends use the primary route only, not the availability servers; polling only, no realtime hint; an update can be replayed within its 90 s lifetime after a reload clears the in-memory sequence; the node keeps an expired envelope until the inbox is acknowledged or its retention runs out.
 
 ## Open questions (not decided, not implemented)
 

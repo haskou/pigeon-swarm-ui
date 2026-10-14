@@ -226,6 +226,8 @@ Residual risks:
   different collation could order them differently.
 - The strict parsing turns a record the policy does not expect into a sign-in
   error rather than a removal.
+- Also erased: the contact presence sharing choices and the contact presence
+  held in memory.
 - Not erased: contact pins, archived notification ids, call audio, presence
   and recent emoji preferences, the locally seen message ids, and the direct
   message availability records.
