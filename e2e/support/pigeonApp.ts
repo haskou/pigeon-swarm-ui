@@ -363,7 +363,7 @@ export async function revokeOtherDevice(
   });
 }
 
-async function openSecurityProfile(page: Page): Promise<void> {
+export async function openSecurityProfile(page: Page): Promise<void> {
   await openSidebar(page);
   await page
     .locator('[data-testid="own-profile-menu-button"]:visible')
