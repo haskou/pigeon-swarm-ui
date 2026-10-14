@@ -1,5 +1,6 @@
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessageRecord';
+import type { GroupConversationActivity } from '../GroupConversationActivity';
 import type { GroupMessageHistoryRow } from './GroupMessageHistoryRow';
 
 import { scopeClientStorageKey } from '../../../../shared/infrastructure/storage/ClientStorageScope';
@@ -8,6 +9,7 @@ import { DeviceRootRowKeys } from '../../../messages/infrastructure/mailbox/Devi
 import { GroupMessageHistoryConversation } from './GroupMessageHistoryConversation';
 import { GroupMessageHistoryDatabase } from './GroupMessageHistoryDatabase';
 import { GroupMessageHistoryScope } from './GroupMessageHistoryScope';
+import { GroupMessageReadMarker } from './GroupMessageReadMarker';
 
 /**
  * The accepted records of this identity's group conversations, each sealed
@@ -21,8 +23,18 @@ import { GroupMessageHistoryScope } from './GroupMessageHistoryScope';
  * conversation decrypts nothing again. A canary detects a root change; the
  * identity's rows are then dropped. Without a device-sealed root the store
  * keeps nothing. Calls run one at a time, so memory follows the database.
+ *
+ * Each conversation keeps a sealed read marker: the last row sequence it
+ * accounted, the messages of other members since the last read on this
+ * device, and the newest message time. Appending accounts the new records
+ * without opening stored rows; rows stored after the marker, as after a
+ * crash in between, are opened and accounted on the next call. History
+ * stored before any marker counts as read.
  */
 export class GroupMessageHistoryStore {
+  /** How many stored rows a first marker opens to find the newest message. */
+  private static readonly LATEST_LOOKBACK = 50;
+
   private readonly database: GroupMessageHistoryDatabase;
   private queue: Promise<unknown> = Promise.resolve();
   private readonly scopes = new Map<string, GroupMessageHistoryScope>();
@@ -33,6 +45,15 @@ export class GroupMessageHistoryStore {
   ): Uint8Array<ArrayBuffer> {
     return new TextEncoder().encode(
       JSON.stringify(['record', identityId, row.conversation, row.record]),
+    );
+  }
+
+  private static readAad(
+    identityId: string,
+    conversation: string,
+  ): Uint8Array<ArrayBuffer> {
+    return new TextEncoder().encode(
+      JSON.stringify(['read', identityId, conversation]),
     );
   }
 
@@ -65,6 +86,40 @@ export class GroupMessageHistoryStore {
     this.queue = result.catch(() => undefined);
 
     return result;
+  }
+
+  /**
+   * The marker of a conversation stored before any marker: every row not in
+   * `known` counts as read, and the newest message time comes from opening
+   * at most LATEST_LOOKBACK of those rows, newest first.
+   */
+  private async firstMarker(
+    scope: GroupMessageHistoryScope,
+    identityId: string,
+    sequences: readonly number[],
+    known: ReadonlyMap<number, DirectMessageRecord>,
+  ): Promise<GroupMessageReadMarker> {
+    const read = sequences.filter((sequence) => !known.has(sequence));
+    const through = read[read.length - 1] ?? 0;
+    const now = Date.now();
+
+    for (const sequence of read
+      .slice(-GroupMessageHistoryStore.LATEST_LOOKBACK)
+      .reverse()) {
+      const [row] = await this.database.rows([sequence]);
+      const record = row
+        ? await this.openRow(scope, identityId, row)
+        : undefined;
+
+      if (record?.type === DirectMailboxRecords.TYPE.sent) {
+        return GroupMessageReadMarker.fresh(
+          through,
+          Math.min(record.createdAt, now),
+        );
+      }
+    }
+
+    return GroupMessageReadMarker.fresh(through, 0);
   }
 
   /** Opens and reads one record of `conversation` on its own. */
@@ -111,29 +166,56 @@ export class GroupMessageHistoryStore {
     );
   }
 
+  /** The stored read marker of one conversation tag, if it opens. */
+  private async marker(
+    scope: GroupMessageHistoryScope,
+    identityId: string,
+    conversation: string,
+  ): Promise<GroupMessageReadMarker | undefined> {
+    const sealed = await this.database.read(identityId, conversation);
+    const plaintext = sealed
+      ? await scope.keys.cipher.open(
+          GroupMessageHistoryStore.readAad(identityId, conversation),
+          sealed,
+        )
+      : undefined;
+
+    if (!plaintext) return undefined;
+
+    try {
+      return GroupMessageReadMarker.parse(
+        JSON.parse(new TextDecoder().decode(plaintext)),
+      );
+    } catch {
+      return undefined;
+    }
+  }
+
   /** The records of the rows that open under this scope, in row order. */
   private async opened(
     scope: GroupMessageHistoryScope,
     identityId: string,
     rows: readonly GroupMessageHistoryRow[],
   ): Promise<DirectMessageRecord[]> {
-    const plaintexts = await Promise.all(
-      rows.map((row) =>
-        scope.keys.cipher.open(
-          GroupMessageHistoryStore.aad(identityId, row),
-          row.sealed,
-        ),
-      ),
+    return (
+      await Promise.all(rows.map((row) => this.openRow(scope, identityId, row)))
+    ).filter((record) => record !== undefined);
+  }
+
+  /** The record of one row; undefined when it does not open. */
+  private async openRow(
+    scope: GroupMessageHistoryScope,
+    identityId: string,
+    row: GroupMessageHistoryRow,
+  ): Promise<DirectMessageRecord | undefined> {
+    const plaintext = await scope.keys.cipher.open(
+      GroupMessageHistoryStore.aad(identityId, row),
+      row.sealed,
     );
 
-    return plaintexts
-      .filter((plaintext) => plaintext !== undefined)
-      .map(
-        (plaintext) =>
-          JSON.parse(
-            new TextDecoder().decode(plaintext),
-          ) as DirectMessageRecord,
-      );
+    return plaintext
+      ? (JSON.parse(new TextDecoder().decode(plaintext)) as DirectMessageRecord)
+      : undefined;
   }
 
   /** The identity's scope under the session's root; undefined without one. */
@@ -191,7 +273,100 @@ export class GroupMessageHistoryStore {
     };
   }
 
-  /** Stores the records, once per id. Rejects on failure. */
+  /**
+   * Accounts the conversation's rows after its read marker, then applies
+   * `change` and stores the marker if it differs. `known` holds the records
+   * of rows this call just stored, so they are not opened again. Without a
+   * marker, every row not in `known` counts as read.
+   */
+  private async settle(
+    scope: GroupMessageHistoryScope,
+    identityId: string,
+    conversationId: string,
+    known: ReadonlyMap<number, DirectMessageRecord>,
+    change: (
+      marker: GroupMessageReadMarker,
+      lastSequence: number,
+    ) => GroupMessageReadMarker = (marker) => marker,
+  ): Promise<GroupMessageReadMarker> {
+    const tag =
+      scope.conversations.get(conversationId)?.tag ??
+      (await scope.keys.tag(['conversation', conversationId]));
+    const stored = await this.marker(scope, identityId, tag);
+    const sequences = await this.database.sequences(identityId, tag);
+    // Sequences come in arrival order, so the last one is the highest.
+    const lastSequence = sequences[sequences.length - 1] ?? 0;
+    const base =
+      stored ?? (await this.firstMarker(scope, identityId, sequences, known));
+    const after = sequences.filter(
+      (sequence) => sequence > base.lastSequence(),
+    );
+    const unknown = after.filter((sequence) => !known.has(sequence));
+    const unknownRows = await this.database.rows(unknown);
+    const openedRecords = new Map<number, DirectMessageRecord>();
+
+    await Promise.all(
+      unknownRows.map(async (row, index) => {
+        const record = row
+          ? await this.openRow(scope, identityId, row)
+          : undefined;
+
+        if (record) openedRecords.set(unknown[index], record);
+      }),
+    );
+    const records = after
+      .map((sequence) => known.get(sequence) ?? openedRecords.get(sequence))
+      .filter((record) => record !== undefined);
+    const next = change(
+      base.accounted(lastSequence, records, identityId, Date.now()),
+      lastSequence,
+    );
+
+    if (!next.equals(stored)) {
+      await this.database.putRead(
+        identityId,
+        tag,
+        await scope.keys.cipher.seal(
+          GroupMessageHistoryStore.readAad(identityId, tag),
+          new TextEncoder().encode(JSON.stringify(next.toPrimitives())),
+        ),
+      );
+    }
+
+    return next;
+  }
+
+  /**
+   * The newest message time and unread count of one conversation on this
+   * device. Rejects on failure.
+   */
+  public activity(
+    session: Session,
+    conversationId: string,
+  ): Promise<GroupConversationActivity> {
+    return this.exclusive(async () => {
+      const scope = await this.scope(session);
+
+      if (!scope) return { latestMessageAt: undefined, unreadCount: 0 };
+      const marker = await this.settle(
+        scope,
+        session.identity.id,
+        conversationId,
+        new Map(),
+      );
+
+      return {
+        latestMessageAt: marker.latestMessageAt(),
+        unreadCount: marker.unreadCount(),
+      };
+    });
+  }
+
+  /**
+   * Stores the records, once per id, and accounts them in their
+   * conversations' read markers. Rejects when the records are not stored; a
+   * failed count is logged and caught up by the next call.
+   */
   public append(
     session: Session,
     records: readonly DirectMessageRecord[],
@@ -201,6 +376,7 @@ export class GroupMessageHistoryStore {
 
       if (!scope || records.length === 0) return;
       const identityId = session.identity.id;
+      const stored = new Map<string, Map<number, DirectMessageRecord>>();
 
       try {
         const sequences = await this.database.insert(
@@ -216,12 +392,27 @@ export class GroupMessageHistoryStore {
           scope.conversations
             .get(record.conversationId)
             ?.addNewer(record, sequence);
+          const known =
+            stored.get(record.conversationId) ??
+            new Map<number, DirectMessageRecord>();
+
+          known.set(sequence, record);
+          stored.set(record.conversationId, known);
         });
       } catch (error) {
         // eslint-disable-next-line no-console
         console.debug('Group history save failed.', { count: records.length });
 
         throw error;
+      }
+
+      for (const [conversationId, known] of stored) {
+        try {
+          await this.settle(scope, identityId, conversationId, known);
+        } catch {
+          // eslint-disable-next-line no-console
+          console.debug('Group unread count failed.', { count: known.size });
+        }
       }
     });
   }
@@ -284,6 +475,22 @@ export class GroupMessageHistoryStore {
       }
 
       return conversation.latest(limit);
+    });
+  }
+
+  /** Marks every stored message of one conversation read on this device. */
+  public markRead(session: Session, conversationId: string): Promise<void> {
+    return this.exclusive(async () => {
+      const scope = await this.scope(session);
+
+      if (!scope) return;
+      await this.settle(
+        scope,
+        session.identity.id,
+        conversationId,
+        new Map(),
+        (marker, lastSequence) => marker.read(lastSequence),
+      );
     });
   }
 }

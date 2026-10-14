@@ -13,6 +13,7 @@ import type { AttachmentProgress } from '../../../../contexts/attachments/applic
 import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
 import type { PendingCommunityInviteLink } from '../../../../contexts/communities/presentation/view-models/communityInviteLink';
 import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { GroupConversationActivity } from '../../../../contexts/groupMailboxes/infrastructure/GroupConversationActivity';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { ChatMessage } from '../../../../contexts/messages/domain/ChatMessage';
 import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
@@ -24,6 +25,7 @@ import type { MessageContextMenuState } from './messageContextMenu';
 
 import { useRealtimeEvents } from '../../../../app/presentation/realtime/useRealtimeEvents';
 import { useAttachmentDownload } from '../../../../contexts/attachments/presentation/hooks/useAttachmentDownload';
+import { ConversationTimeline } from '../../../../contexts/conversations/presentation/view-models/ConversationTimeline';
 import { useIdentityDirectory } from '../../../../contexts/identities/presentation/hooks/useIdentityDirectory';
 import { MessageCollectionDialog } from '../../../../contexts/messages/presentation/components/MessageCollectionDialog';
 import { useUnreadMessages } from '../../../../contexts/messages/presentation/hooks/useUnreadMessages';
@@ -62,6 +64,7 @@ import { useDirectMessageInboxPrewarm } from './useDirectMessageInboxPrewarm';
 import { useDirectMessageMailboxSync } from './useDirectMessageMailboxSync';
 import { useDirectMessageOutboxSync } from './useDirectMessageOutboxSync';
 import { useGroupControlReceiver } from './useGroupControlReceiver';
+import { useGroupMessageBackgroundSync } from './useGroupMessageBackgroundSync';
 import { useGroupMessageMailboxSync } from './useGroupMessageMailboxSync';
 import { usePendingCommunityInvite } from './usePendingCommunityInvite';
 import { useSidebarGesture } from './useSidebarGesture';
@@ -347,8 +350,12 @@ export function GlassWorkspace({
     settingsByScopeKey: notificationSettingsByScopeKey,
     toggleMute: toggleNotificationMute,
   });
-  const { clearUnreadMessages, conversationsWithUnread, markUnreadMessage } =
-    useUnreadMessages(conversations);
+  const {
+    clearUnreadMessages,
+    conversationsWithUnread,
+    markUnreadMessage,
+    setGroupUnread,
+  } = useUnreadMessages(conversations);
   useEffect(() => {
     conversations.forEach((conversation) => {
       const setting = NotificationSettingsPolicy.resolve(
@@ -841,6 +848,44 @@ export function GlassWorkspace({
     activeConversationId: WorkspaceDerivedState.id(activeConversation),
     conversations: conversationsWithUnread,
     onConversationRead: clearUnreadMessages,
+    session,
+  });
+  const handleGroupActivity = useCallback(
+    (
+      conversationId: string,
+      { latestMessageAt, unreadCount }: GroupConversationActivity,
+    ): void => {
+      const muted = NotificationSettingsPolicy.isMuted(
+        NotificationSettingsPolicy.resolve(notificationSettingsRef.current, {
+          conversationId,
+          type: 'conversation',
+        }),
+      );
+      const known = conversations.find(({ id }) => id === conversationId);
+
+      setGroupUnread(conversationId, muted ? 0 : unreadCount);
+
+      // Only a newer message touches the list, so a refresh is not dropped.
+      if (
+        known &&
+        latestMessageAt !== undefined &&
+        latestMessageAt > (known.latestMessageAt ?? 0)
+      ) {
+        setConversations((current) =>
+          ConversationTimeline.bumpActivity(
+            current,
+            conversationId,
+            latestMessageAt,
+          ),
+        );
+      }
+    },
+    [conversations, notificationSettingsRef, setConversations, setGroupUnread],
+  );
+  useGroupMessageBackgroundSync({
+    activeConversationId: WorkspaceDerivedState.id(activeConversation),
+    conversations,
+    onActivity: handleGroupActivity,
     session,
   });
 

@@ -16,7 +16,7 @@ export type ChatMessage = {
   attachments: MessageAttachment[];
   authorIdentityId: string;
   content: string;
-  deliveryStatus?: 'failed' | 'pending' | 'retry';
+  deliveryStatus?: 'failed' | 'held' | 'pending' | 'retry';
   edited?: boolean;
   editedAt?: number;
   editMessageId?: string;

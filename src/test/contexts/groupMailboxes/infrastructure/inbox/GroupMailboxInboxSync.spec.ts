@@ -667,12 +667,14 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
     inboxes.delete(bobInbox);
     await send(alice, sent('alice', mid('alice', 'm1')));
 
-    expect(alice.outbox.pending(CONVERSATION)).toEqual([mid('alice', 'm1')]);
+    expect(
+      alice.outbox.items(CONVERSATION).map(({ reference }) => reference),
+    ).toEqual([mid('alice', 'm1')]);
     await sync(bob);
     await retry(alice);
     await sync(bob);
 
-    expect(alice.outbox.pending(CONVERSATION)).toEqual([]);
+    expect(alice.outbox.items(CONVERSATION)).toEqual([]);
     expect(ids(bob.received)).toEqual(['sent:m1']);
   });
 
@@ -704,7 +706,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
     );
     expect(ids(bob.received)).toEqual(['sent:stranded']);
     expect(dave.received).toEqual([]);
-    expect(alice.outbox.pending(CONVERSATION)).toEqual([]);
+    expect(alice.outbox.items(CONVERSATION)).toEqual([]);
   });
 
   it('drops a record still queued after the expiry and reports it', async () => {
@@ -723,7 +725,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
     await alice.outbox.resume();
 
     expect(failures).toEqual([mid('alice', 'm1')]);
-    expect(alice.outbox.pending(CONVERSATION)).toEqual([]);
+    expect(alice.outbox.items(CONVERSATION)).toEqual([]);
   });
 
   it('deletes its retired inbox once the drain window closes', async () => {

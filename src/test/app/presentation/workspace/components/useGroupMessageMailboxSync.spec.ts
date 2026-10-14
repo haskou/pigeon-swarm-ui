@@ -28,13 +28,22 @@ jest.mock('react', () => ({
 }));
 jest.mock('../../../../../app/composition/applicationContainer', () => ({
   applicationContainer: {
-    groupMessages: { restore: jest.fn(), sync: jest.fn() },
+    groupMessages: {
+      markRead: jest.fn(),
+      restore: jest.fn(),
+      sync: jest.fn(),
+      withOutboxState: jest.fn(),
+    },
   },
 }));
 
 const POLL_MS = 5000;
 const sync = jest.mocked(applicationContainer.groupMessages.sync);
 const restore = jest.mocked(applicationContainer.groupMessages.restore);
+const markRead = jest.mocked(applicationContainer.groupMessages.markRead);
+const withOutboxState = jest.mocked(
+  applicationContainer.groupMessages.withOutboxState,
+);
 const group = {
   id: 'group-1',
   type: 'group',
@@ -107,6 +116,10 @@ describe('useGroupMessageMailboxSync', () => {
     });
     restore.mockReset().mockResolvedValue(undefined);
     sync.mockReset().mockResolvedValue({ removed: false });
+    markRead.mockReset().mockResolvedValue(undefined);
+    withOutboxState
+      .mockReset()
+      .mockImplementation((_session, _id, messages) => [...messages]);
   });
 
   afterEach(() => {
@@ -233,5 +246,57 @@ describe('useGroupMessageMailboxSync', () => {
     await settle();
 
     expect(sync).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks the open group read after the restore and after each pass', async () => {
+    const mounted = mountSync();
+
+    await settle();
+    expect(markRead).toHaveBeenCalledTimes(2);
+    expect(markRead).toHaveBeenCalledWith(session, 'group-1');
+    expect(restore.mock.invocationCallOrder[0]).toBeLessThan(
+      markRead.mock.invocationCallOrder[0],
+    );
+
+    jest.advanceTimersByTime(POLL_MS);
+    await settle();
+
+    expect(markRead).toHaveBeenCalledTimes(3);
+    mounted.cleanup();
+  });
+
+  it('keeps polling when the read marker cannot be stored', async () => {
+    markRead.mockRejectedValue(new Error('quota exceeded'));
+    const mounted = mountSync();
+
+    await settle();
+    jest.advanceTimersByTime(POLL_MS);
+    await settle();
+
+    expect(sync).toHaveBeenCalledTimes(2);
+    expect(mounted.error()).toBeNull();
+    mounted.cleanup();
+  });
+
+  it('shows the outbox state of sent messages after each pass', async () => {
+    restore.mockImplementationOnce((_session, _id, _signal, apply) => {
+      apply([{ kind: 'message', message: { ...message, mine: true } }]);
+
+      return Promise.resolve();
+    });
+    withOutboxState.mockImplementation((_session, _id, messages) =>
+      messages.map((current) => ({ ...current, deliveryStatus: 'held' })),
+    );
+    const mounted = mountSync();
+
+    await settle();
+
+    expect(withOutboxState).toHaveBeenCalledWith(
+      session,
+      'group-1',
+      expect.any(Array),
+    );
+    expect(mounted.messages()[0].deliveryStatus).toBe('held');
+    mounted.cleanup();
   });
 });

@@ -11,8 +11,9 @@ export class MessageReadModelMapper {
       conversationId: readModel.raw.conversationId ?? readModel.id,
       createdAt: readModel.timestamp,
       deleted: readModel.raw.type === 'deleted',
-      // A send waiting to retry is still undelivered.
+      // A send held or waiting to retry is still undelivered.
       deliveryState:
+        readModel.deliveryStatus === 'held' ||
         readModel.deliveryStatus === 'retry'
           ? 'pending'
           : (readModel.deliveryStatus ?? 'delivered'),

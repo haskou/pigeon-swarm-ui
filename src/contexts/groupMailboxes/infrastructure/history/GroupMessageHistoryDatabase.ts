@@ -5,16 +5,19 @@ import {
   indexedDbTransaction,
 } from '../../../../shared/infrastructure/storage/indexedDbRequest';
 
-const DATABASE_VERSION = 2;
+const DATABASE_VERSION = 3;
 const ENTRIES_STORE = 'entries';
 const CANARIES_STORE = 'canaries';
+const READS_STORE = 'reads';
 const BY_RECORD_INDEX = 'byRecord';
 const BY_CONVERSATION_INDEX = 'byConversation';
 
 /**
  * The IndexedDB tables of the group history. Rows get increasing sequence
  * numbers in arrival order, are indexed by their tags, and are unique per
- * record tag. Opening the database drops tables of an earlier version.
+ * record tag. `reads` keeps one sealed read marker per identity and
+ * conversation tag. Opening the database drops the tables of a version
+ * before 2 and adds `reads` to a version 2 database, keeping its history.
  */
 export class GroupMessageHistoryDatabase {
   private connection: Promise<IDBDatabase> | undefined;
@@ -30,26 +33,32 @@ export class GroupMessageHistoryDatabase {
   private async connect(): Promise<IDBDatabase> {
     const opening = indexedDB.open(this.name, DATABASE_VERSION);
 
-    opening.addEventListener('upgradeneeded', () => {
+    opening.addEventListener('upgradeneeded', (event) => {
       const database = opening.result;
 
-      for (const store of [...database.objectStoreNames]) {
-        database.deleteObjectStore(store);
-      }
-      const entries = database.createObjectStore(ENTRIES_STORE, {
-        autoIncrement: true,
-      });
+      if (event.oldVersion < 2) {
+        for (const store of [...database.objectStoreNames]) {
+          database.deleteObjectStore(store);
+        }
+        const entries = database.createObjectStore(ENTRIES_STORE, {
+          autoIncrement: true,
+        });
 
-      entries.createIndex(
-        BY_RECORD_INDEX,
-        ['identityId', 'conversation', 'record'],
-        { unique: true },
-      );
-      entries.createIndex(BY_CONVERSATION_INDEX, [
-        'identityId',
-        'conversation',
-      ]);
-      database.createObjectStore(CANARIES_STORE);
+        entries.createIndex(
+          BY_RECORD_INDEX,
+          ['identityId', 'conversation', 'record'],
+          { unique: true },
+        );
+        entries.createIndex(BY_CONVERSATION_INDEX, [
+          'identityId',
+          'conversation',
+        ]);
+        database.createObjectStore(CANARIES_STORE);
+      }
+
+      if (!database.objectStoreNames.contains(READS_STORE)) {
+        database.createObjectStore(READS_STORE);
+      }
     });
 
     try {
@@ -81,19 +90,19 @@ export class GroupMessageHistoryDatabase {
     return result;
   }
 
-  /** Drops one identity's rows and canary within `transaction`. */
+  /** Drops one identity's rows, read markers and canary in `transaction`. */
   private async wipeWithin(
     transaction: IDBTransaction,
     identityId: string,
   ): Promise<void> {
     const entries = transaction.objectStore(ENTRIES_STORE);
+    const ofIdentity = IDBKeyRange.bound([identityId], [identityId, []]);
     const sequences = await indexedDbRequest(
-      entries
-        .index(BY_CONVERSATION_INDEX)
-        .getAllKeys(IDBKeyRange.bound([identityId], [identityId, []])),
+      entries.index(BY_CONVERSATION_INDEX).getAllKeys(ofIdentity),
     );
 
     for (const sequence of sequences) entries.delete(sequence);
+    transaction.objectStore(READS_STORE).delete(ofIdentity);
     transaction.objectStore(CANARIES_STORE).delete(identityId);
   }
 
@@ -140,13 +149,44 @@ export class GroupMessageHistoryDatabase {
     });
   }
 
+  /** Stores the sealed read marker of one conversation tag. */
+  public putRead(
+    identityId: string,
+    conversation: string,
+    sealed: Uint8Array<ArrayBuffer>,
+  ): Promise<void> {
+    return this.within([READS_STORE], 'readwrite', async (transaction) => {
+      await indexedDbRequest(
+        transaction
+          .objectStore(READS_STORE)
+          .put(sealed, [identityId, conversation]),
+      );
+    });
+  }
+
+  /** The sealed read marker of one conversation tag. */
+  public read(
+    identityId: string,
+    conversation: string,
+  ): Promise<Uint8Array<ArrayBuffer> | undefined> {
+    return this.within([READS_STORE], 'readonly', (transaction) =>
+      indexedDbRequest(
+        transaction
+          .objectStore(READS_STORE)
+          .get([identityId, conversation]) as IDBRequest<
+          Uint8Array<ArrayBuffer> | undefined
+        >,
+      ),
+    );
+  }
+
   /** Drops one identity's rows and stores its new canary. */
   public reset(
     identityId: string,
     canary: Uint8Array<ArrayBuffer>,
   ): Promise<void> {
     return this.within(
-      [ENTRIES_STORE, CANARIES_STORE],
+      [ENTRIES_STORE, CANARIES_STORE, READS_STORE],
       'readwrite',
       async (transaction) => {
         await this.wipeWithin(transaction, identityId);
@@ -211,7 +251,7 @@ export class GroupMessageHistoryDatabase {
 
   public wipe(identityId: string): Promise<void> {
     return this.within(
-      [ENTRIES_STORE, CANARIES_STORE],
+      [ENTRIES_STORE, CANARIES_STORE, READS_STORE],
       'readwrite',
       (transaction) => this.wipeWithin(transaction, identityId),
     );

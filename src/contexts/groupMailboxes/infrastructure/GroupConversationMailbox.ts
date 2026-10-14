@@ -4,6 +4,7 @@ import type { ChatMessage } from '../../messages/domain/ChatMessage';
 import type { EditMessageOptions } from '../../messages/infrastructure/http/resources/EditMessageOptions';
 import type { SendMessageOptions } from '../../messages/infrastructure/http/resources/SendMessageOptions';
 import type { GroupMailboxRoster } from '../domain/GroupMailboxRoster';
+import type { GroupConversationActivity } from './GroupConversationActivity';
 import type { GroupConversationPorts } from './GroupConversationPorts';
 import type { GroupConversationSyncOutcome } from './GroupConversationSyncOutcome';
 import type { GroupTimelineApply } from './GroupTimelineApply';
@@ -14,6 +15,7 @@ import { MessageId } from '../../messages/domain/value-objects/MessageId';
 import { MessagePinAction } from '../../messages/domain/value-objects/MessagePinAction';
 import { MessageReactionAction } from '../../messages/domain/value-objects/MessageReactionAction';
 import { MessageReactionEmoji } from '../../messages/domain/value-objects/MessageReactionEmoji';
+import { GroupMessageId } from './crypto/GroupMessageId';
 import { GroupConversationMember } from './GroupConversationMember';
 import { GroupConversationSender } from './GroupConversationSender';
 import { GroupConversationStores } from './GroupConversationStores';
@@ -26,6 +28,8 @@ import { GroupConversationTimeline } from './GroupConversationTimeline';
  * lowest identity id commits every removal, then every add, so members
  * never race each other's commits. A leaver is removed by that member on
  * its next sync.
+ * Reading a conversation's inboxes and replaying its history run one at a
+ * time, so a replay never misses what a background read stored meanwhile.
  */
 export class GroupConversationMailbox {
   public static readonly HISTORY_PAGE = 50;
@@ -33,6 +37,8 @@ export class GroupConversationMailbox {
   private readonly members = new Map<string, GroupConversationMember>();
   private readonly reconciling = new Map<string, Promise<void>>();
   private readonly sender: GroupConversationSender;
+  /** The tail of each conversation's inbox reads and replays. */
+  private readonly serial = new Map<string, Promise<unknown>>();
   private readonly stores: GroupConversationStores;
   private readonly timeline: GroupConversationTimeline;
 
@@ -91,6 +97,35 @@ export class GroupConversationMailbox {
     if (joining.length > 0) await member.control.add(conversationId, joining);
   }
 
+  /** Runs `work` after the conversation's earlier inbox reads and replays. */
+  private serially<T>(
+    session: Session,
+    conversationId: string,
+    work: () => Promise<T>,
+  ): Promise<T> {
+    const key = `${session.identity.id}/${conversationId}`;
+    const result = (this.serial.get(key) ?? Promise.resolve()).then(work);
+    const tail = result.catch(() => undefined);
+
+    this.serial.set(key, tail);
+    void tail.then(() => {
+      if (this.serial.get(key) === tail) this.serial.delete(key);
+    });
+
+    return result;
+  }
+
+  /**
+   * The newest message time and unread count of a conversation on this
+   * device, from its stored history. Rejects on failure.
+   */
+  public async activity(
+    session: Session,
+    conversationId: string,
+  ): Promise<GroupConversationActivity> {
+    return await this.stores.history.activity(session, conversationId);
+  }
+
   /** Starts the MLS group with this device alone, then adds the roster. */
   public async create(session: Session, conversationId: string): Promise<void> {
     await this.member(session).engine.createGroup(conversationId);
@@ -122,19 +157,25 @@ export class GroupConversationMailbox {
     await work;
   }
 
-  /** Queues a message for every member. Rejects before anything is queued. */
+  /**
+   * Queues a message for every member. Rejects before anything is queued.
+   * The message carries its outbox state, as `held` while a removal is
+   * pending.
+   */
   public async send(
     session: Session,
     conversation: ConversationResource,
     content: string,
     options: SendMessageOptions,
   ): Promise<ChatMessage> {
-    return await this.sender.send(
+    const message = await this.sender.send(
       this.member(session),
       conversation,
       content,
       options,
     );
+
+    return this.withOutboxState(session, conversation.id, [message])[0];
   }
 
   /** Queues an edit of this identity's message. Rejects like send. */
@@ -196,6 +237,30 @@ export class GroupConversationMailbox {
     );
   }
 
+  /** Marks the conversation's stored history read on this device. */
+  public async markRead(
+    session: Session,
+    conversationId: string,
+  ): Promise<void> {
+    await this.stores.history.markRead(session, conversationId);
+  }
+
+  /**
+   * Reads every inbox of a conversation that is not open into its stored
+   * history, then resolves with its activity. Rejects on failure.
+   */
+  public async receive(
+    session: Session,
+    conversationId: string,
+    signal: AbortSignal,
+  ): Promise<GroupConversationActivity> {
+    await this.serially(session, conversationId, () =>
+      this.member(session).inbox.sync(conversationId, signal, () => undefined),
+    );
+
+    return await this.stores.history.activity(session, conversationId);
+  }
+
   /** Replays the stored history. Never throws. */
   public async restore(
     session: Session,
@@ -204,10 +269,12 @@ export class GroupConversationMailbox {
     apply: GroupTimelineApply,
   ): Promise<void> {
     try {
-      const records = await this.stores.history.load(
-        session,
-        conversationId,
-        GroupConversationMailbox.HISTORY_PAGE,
+      const records = await this.serially(session, conversationId, () =>
+        this.stores.history.load(
+          session,
+          conversationId,
+          GroupConversationMailbox.HISTORY_PAGE,
+        ),
       );
 
       if (!signal.aborted) apply(this.timeline.changes(session, records));
@@ -228,8 +295,10 @@ export class GroupConversationMailbox {
     signal: AbortSignal,
     apply: GroupTimelineApply,
   ): Promise<GroupConversationSyncOutcome> {
-    await this.member(session).inbox.sync(conversationId, signal, (records) =>
-      apply(this.timeline.changes(session, records)),
+    await this.serially(session, conversationId, () =>
+      this.member(session).inbox.sync(conversationId, signal, (records) =>
+        apply(this.timeline.changes(session, records)),
+      ),
     );
     const roster = await this.ports
       .roster(session, conversationId)
@@ -280,5 +349,40 @@ export class GroupConversationMailbox {
 
     await Promise.all(running);
     await this.stores.forget(identityId);
+  }
+
+  /**
+   * The messages with this identity's queued group messages stamped with
+   * their outbox state, and delivered ones cleared; the same array when
+   * nothing changes. Optimistic sends and others' messages are untouched.
+   */
+  public withOutboxState(
+    session: Session,
+    conversationId: string,
+    messages: ChatMessage[],
+  ): ChatMessage[] {
+    const self = session.identity.id;
+    const states = new Map(
+      this.member(session)
+        .outbox.items(conversationId)
+        .map(({ reference, state }) => [reference, state]),
+    );
+    let changed = false;
+    const stamped = messages.map((message) => {
+      const state = states.get(message.id);
+
+      if (
+        message.deliveryStatus === state ||
+        !message.mine ||
+        !GroupMessageId.belongsTo(message.id, self)
+      ) {
+        return message;
+      }
+      changed = true;
+
+      return { ...message, deliveryStatus: state };
+    });
+
+    return changed ? stamped : messages;
   }
 }

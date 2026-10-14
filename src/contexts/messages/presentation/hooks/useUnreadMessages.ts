@@ -1,19 +1,20 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 
 import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
-import type { ConversationWithUnread } from '../../../conversations/presentation/view-models/ConversationWithUnread';
+import type { UnreadMessages } from './UnreadMessages';
 
 import { ConversationTimeline } from '../../../conversations/presentation/view-models/ConversationTimeline';
 
 type UnreadCountsByConversation = Record<string, number>;
 
-export function useUnreadMessages(conversations: ConversationResource[]): {
-  clearUnreadMessages: (conversationId: string) => void;
-  conversationsWithUnread: ConversationWithUnread[];
-  markUnreadMessage: (conversationId: string, messageId: string) => void;
-} {
+export function useUnreadMessages(
+  conversations: ConversationResource[],
+): UnreadMessages {
   const seenUnreadMessageIdsRef = useRef<Record<string, Set<string>>>({});
   const [unreadCounts, setUnreadCounts] = useState<UnreadCountsByConversation>(
+    {},
+  );
+  const [groupCounts, setGroupCounts] = useState<UnreadCountsByConversation>(
     {},
   );
 
@@ -22,15 +23,17 @@ export function useUnreadMessages(conversations: ConversationResource[]): {
       ConversationTimeline.sortByLatestMessage(
         conversations.map((conversation) => ({
           ...conversation,
-          unreadCount: unreadCounts[conversation.id] ?? 0,
+          unreadCount:
+            (unreadCounts[conversation.id] ?? 0) +
+            (groupCounts[conversation.id] ?? 0),
         })),
       ),
-    [conversations, unreadCounts],
+    [conversations, groupCounts, unreadCounts],
   );
 
   const clearUnreadMessages = useCallback((conversationId: string) => {
     delete seenUnreadMessageIdsRef.current[conversationId];
-    setUnreadCounts((current) => {
+    const without = (current: UnreadCountsByConversation) => {
       if (!current[conversationId]) return current;
 
       const next = { ...current };
@@ -38,7 +41,10 @@ export function useUnreadMessages(conversations: ConversationResource[]): {
       delete next[conversationId];
 
       return next;
-    });
+    };
+
+    setUnreadCounts(without);
+    setGroupCounts(without);
   }, []);
 
   const markUnreadMessage = useCallback(
@@ -60,9 +66,26 @@ export function useUnreadMessages(conversations: ConversationResource[]): {
     [],
   );
 
+  const setGroupUnread = useCallback(
+    (conversationId: string, count: number) => {
+      setGroupCounts((current) => {
+        if ((current[conversationId] ?? 0) === count) return current;
+
+        const next = { ...current };
+
+        if (count > 0) next[conversationId] = count;
+        else delete next[conversationId];
+
+        return next;
+      });
+    },
+    [],
+  );
+
   return {
     clearUnreadMessages,
     conversationsWithUnread,
     markUnreadMessage,
+    setGroupUnread,
   };
 }
