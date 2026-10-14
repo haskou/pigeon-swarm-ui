@@ -22,7 +22,11 @@ import { MlsTestIdentity } from './MlsTestIdentity';
 
 const COMMUNITY = 'community-1';
 /** Lets a member build commits the community rules forbid. */
-const anything = { admits: () => true, allows: () => true };
+const anything = {
+  admits: () => true,
+  allows: () => true,
+  frontier: (): string[] => [],
+};
 const base64 = (bytes: Uint8Array): string =>
   Buffer.from(bytes).toString('base64');
 
@@ -166,11 +170,12 @@ describe('MlsCommunityEngine', () => {
   const rogueGroupOf = async (
     name: string,
     store: MlsStateStore,
+    frontier: string[] = [],
   ): Promise<MlsGroup> =>
     MlsGroup.restore(
       COMMUNITY,
       cast[name].signer().owner,
-      anything,
+      { ...anything, frontier: () => frontier },
       (await store.loadGroup(COMMUNITY)) as Uint8Array,
     );
   const keyPackageOf = (name: string): Uint8Array =>
@@ -534,6 +539,90 @@ describe('MlsCommunityEngine', () => {
         committed: false,
         welcomed: false,
       });
+    });
+  });
+
+  describe('judges a commit by the roster revision it binds', () => {
+    /** The head of the signed history as it stands now. */
+    const headsNow = (): string[] => {
+      const { documents } = historyOf();
+
+      return [
+        CommunityOperationHistory.digestOf(documents[documents.length - 1]),
+      ];
+    };
+    /** Alice, bob and carol share the group; carol may add members. */
+    const carolManages = async () => {
+      moderators.add(id('carol'));
+      roster.add(id('mallory'));
+
+      return { ...(await admitCarol()), mallory: engineFor('mallory') };
+    };
+    const demoteCarol = (): void => {
+      tamper = (history) => history.assign(cast.alice, cast.carol, []);
+    };
+
+    it('accepts an add made before the demotion by a member who saw the demotion first', async () => {
+      const { bob, carol, mallory } = await carolManages();
+
+      await mallory.engine.publishKeyPackages(COMMUNITY);
+      await carol.engine.admit(COMMUNITY, [id('mallory')]);
+      demoteCarol();
+
+      await expect(bob.engine.sync(COMMUNITY)).resolves.toBe(true);
+      await expect(mallory.engine.sync(COMMUNITY)).resolves.toBe(true);
+      await expect(bob.engine.identities(COMMUNITY)).resolves.toContain(
+        id('mallory'),
+      );
+      const ciphertext = await bob.engine.encrypt(COMMUNITY, 'welcome');
+
+      await expect(mallory.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
+        'welcome',
+      );
+    });
+
+    it('rejects an add a demoted member makes after the demotion', async () => {
+      const { bob, carol, mallory } = await carolManages();
+
+      await mallory.engine.publishKeyPackages(COMMUNITY);
+      demoteCarol();
+      const added = await (
+        await rogueGroupOf('carol', carol.store, headsNow())
+      ).add([keyPackageOf('mallory')]);
+
+      await publishCommit('carol', added);
+
+      await expect(bob.engine.sync(COMMUNITY)).resolves.toBe(true);
+      await expect(bob.engine.identities(COMMUNITY)).resolves.not.toContain(
+        id('mallory'),
+      );
+    });
+
+    it('rejects an add a demoted member backdates to before the demotion', async () => {
+      const { alice, bob, carol, mallory } = await carolManages();
+      const beforeDemotion = headsNow();
+
+      demoteCarol();
+      // The owner binds the demotion into the group as soon as she sees it.
+      await alice.engine.reconcile(COMMUNITY);
+      await bob.engine.sync(COMMUNITY);
+      await carol.engine.sync(COMMUNITY);
+      await mallory.engine.publishKeyPackages(COMMUNITY);
+      const backdated = await (
+        await rogueGroupOf('carol', carol.store, beforeDemotion)
+      ).add([keyPackageOf('mallory')]);
+
+      await publishCommit('carol', backdated);
+
+      await expect(bob.engine.sync(COMMUNITY)).resolves.toBe(true);
+      await expect(bob.engine.identities(COMMUNITY)).resolves.not.toContain(
+        id('mallory'),
+      );
+      const ciphertext = await alice.engine.encrypt(COMMUNITY, 'still ours');
+
+      await expect(bob.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
+        'still ours',
+      );
     });
   });
 
