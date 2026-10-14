@@ -1,29 +1,26 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
 
-import type { AttachmentUploadOptions } from '../../../attachments/application/contracts/AttachmentUploadOptions';
-import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
-import type { CommunityChannelThreadSummaryResource as CommunityChannelThreadSummary } from '../../infrastructure/http/resources/CommunityChannelThreadSummaryResource';
-import type { StickerMessageReference } from '../../../stickers/infrastructure/http/resources/StickerMessageReference';
 import type { MessageContextMenuState } from '../../../../app/presentation/workspace/components/messageContextMenu';
-import type { useCommunityMessageComposer } from './useCommunityMessageComposer';
+import type { AttachmentUploadOptions } from '../../../attachments/application/contracts/AttachmentUploadOptions';
+import type { ChatMessage } from '../../../messages/domain/ChatMessage';
+import type { StickerMessageReference } from '../../../stickers/infrastructure/http/resources/StickerMessageReference';
+import type { CommunityChannelThreadSummaryResource as CommunityChannelThreadSummary } from '../../infrastructure/http/resources/CommunityChannelThreadSummaryResource';
 import type { CommunityThreadState } from './communityThreadState';
+import type { useCommunityMessageComposer } from './useCommunityMessageComposer';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { ThreadMessageVisibility } from '../../../messages/presentation/view-models/ThreadMessageVisibility';
-import { mergeChatMessages } from './communityWorkspaceHelpers';
 import {
   mergeCommunityThreadMessage,
   removeCommunityThreadMessage,
 } from './communityThreadState';
+import { mergeChatMessages } from './communityWorkspaceHelpers';
 
 type CommunityMessageComposer = ReturnType<typeof useCommunityMessageComposer>;
 
 type CommunityThreadActionsInput = {
-  channelThreadsByChannelId: Record<
-    string,
-    CommunityChannelThreadSummary[]
-  >;
+  channelThreadsByChannelId: Record<string, CommunityChannelThreadSummary[]>;
   messageComposer: CommunityMessageComposer;
   selectedChannelId: null | string;
   setMessageContextMenu: Dispatch<
@@ -173,9 +170,7 @@ export function useCommunityThreadActions({
           current.filter((item) => item.id !== message.id),
         );
         setThreadPanel((current) =>
-          current
-            ? removeCommunityThreadMessage(current, message.id)
-            : current,
+          current ? removeCommunityThreadMessage(current, message.id) : current,
         );
       } catch (caught) {
         setThreadPanel((current) =>

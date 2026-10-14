@@ -1,20 +1,15 @@
 import type {
   AttachmentProgress,
   MessageAttachment,
-} from '../../../attachments/infrastructure/attachmentResources.types';
-import type { CommunityMessageMentionResource as CommunityMessageMention } from '../../../communities/infrastructure/http/resources/CommunityMessageMentionResource';
-import type { PollResource } from '../../../polls/infrastructure/http/resources/PollResource';
-import type { StickerMessageReference } from '../../../stickers/infrastructure/http/resources/StickerMessageReference';
-import type { MessageLinkPreview } from '../../infrastructure/http/resources/MessageLinkPreview';
-import type { MessageReplyPreview } from '../../infrastructure/crypto/resources/MessageReplyPreview';
-import type { MessageReaction } from '../../infrastructure/http/MessageReaction';
-import type { MessageResource } from '../../infrastructure/http/MessageResource';
-
-export type MessageReactionClock = {
-  authorIdentityId: string;
-  emoji: string;
-  updatedAt: number;
-};
+} from '../../attachments/infrastructure/attachmentResources.types';
+import type { CommunityMessageMentionResource as CommunityMessageMention } from '../../communities/infrastructure/http/resources/CommunityMessageMentionResource';
+import type { PollResource } from '../../polls/infrastructure/http/resources/PollResource';
+import type { StickerMessageReference } from '../../stickers/infrastructure/http/resources/StickerMessageReference';
+import type { MessageReplyPreview } from '../infrastructure/crypto/resources/MessageReplyPreview';
+import type { MessageReaction } from '../infrastructure/http/MessageReaction';
+import type { MessageResource } from '../infrastructure/http/MessageResource';
+import type { MessageLinkPreview } from '../infrastructure/http/resources/MessageLinkPreview';
+import type { MessageReactionClock } from './MessageReactionClock';
 
 export type ChatMessage = {
   attachmentProgress?: AttachmentProgress;

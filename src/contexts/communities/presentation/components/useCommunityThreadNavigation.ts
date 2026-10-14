@@ -1,10 +1,10 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
 
-import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
-import type { CommunityChannelThreadSummaryResource as CommunityChannelThreadSummary } from '../../infrastructure/http/resources/CommunityChannelThreadSummaryResource';
-import type { MessageResource } from '../../../messages/infrastructure/http/MessageResource';
-import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { MessageContextMenuState } from '../../../../app/presentation/workspace/components/messageContextMenu';
+import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { ChatMessage } from '../../../messages/domain/ChatMessage';
+import type { MessageResource } from '../../../messages/infrastructure/http/MessageResource';
+import type { CommunityChannelThreadSummaryResource as CommunityChannelThreadSummary } from '../../infrastructure/http/resources/CommunityChannelThreadSummaryResource';
 import type { CommunityThreadState } from './communityThreadState';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
@@ -117,12 +117,13 @@ export function useCommunityThreadNavigation({
       let beforeMessageId: null | string | undefined;
 
       for (let page = 0; page < 8; page += 1) {
-        const result = await applicationContainer.communities.listChannelMessages(
-          session,
-          communityId,
-          channelId,
-          { beforeMessageId: beforeMessageId ?? undefined },
-        );
+        const result =
+          await applicationContainer.communities.listChannelMessages(
+            session,
+            communityId,
+            channelId,
+            { beforeMessageId: beforeMessageId ?? undefined },
+          );
         const loadedMessages = await projectMessages(
           channelId,
           result.messages,
@@ -132,6 +133,7 @@ export function useCommunityThreadNavigation({
         );
 
         if (root) return root;
+
         if (!result.nextBeforeMessageId) break;
 
         beforeMessageId = result.nextBeforeMessageId;

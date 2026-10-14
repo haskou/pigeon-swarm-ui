@@ -1,6 +1,6 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 
-import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../../contexts/messages/domain/ChatMessage';
 import type { ConversationMessageLoadState } from './ConversationMessageLoadState';
 import type { MessageViewport } from './MessageViewport';
 

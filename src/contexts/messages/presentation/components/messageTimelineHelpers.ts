@@ -1,9 +1,9 @@
-import type { ChatMessage } from '../view-models/ChatMessage';
 import type { MessageAttachment } from '../../../attachments/application/contracts/MessageAttachment';
 import type { StickerMessageReference } from '../../../stickers/infrastructure/http/resources/StickerMessageReference';
+import type { ChatMessage } from '../../domain/ChatMessage';
 
-import { isBrowserPreviewImage } from '../../../../shared/presentation/isBrowserPreviewImage';
 import { isSameDay } from '../../../../shared/presentation/formatting';
+import { isBrowserPreviewImage } from '../../../../shared/presentation/isBrowserPreviewImage';
 
 export function startsMessageDay(
   previousMessage: ChatMessage | undefined,

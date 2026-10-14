@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
 
-import type { DirectMessageTimelineChange } from '../../../../contexts/messages/presentation/view-models/DirectMessageTimelineChange';
+import type { DirectMessageTimelineChange } from '../../../../contexts/messages/domain/DirectMessageTimelineChange';
 import type { GroupMessageMailboxSyncInput } from './GroupMessageMailboxSyncInput';
 
+import { ConversationType } from '../../../../contexts/conversations/domain/value-objects/ConversationType';
 import { GroupMailboxEligibility } from '../../../../contexts/mailboxes/domain/GroupMailboxEligibility';
 import { MessagePinClock } from '../../../../contexts/messages/domain/MessagePinClock';
 import { copy } from '../../../../shared/presentation/i18n/copy';
@@ -32,7 +33,9 @@ export function useGroupMessageMailboxSync({
 }: GroupMessageMailboxSyncInput): void {
   const conversationId =
     activeConversation &&
-    GroupMailboxEligibility.isEligible(activeConversation.type)
+    GroupMailboxEligibility.isEligible(
+      ConversationType.tryFromPrimitives(activeConversation.type),
+    )
       ? activeConversation.id
       : undefined;
 

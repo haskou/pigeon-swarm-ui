@@ -1,4 +1,4 @@
-import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../../../contexts/messages/domain/ChatMessage';
 
 import { mergeChatMessages } from '../../../../../contexts/communities/presentation/components/communityWorkspaceHelpers';
 

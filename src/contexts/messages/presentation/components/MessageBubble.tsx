@@ -4,23 +4,23 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import type { AttachmentProgress } from '../../../attachments/application/contracts/AttachmentProgress';
-import type { ChatMessage } from '../view-models/ChatMessage';
 import type { MessageAttachment } from '../../../attachments/application/contracts/MessageAttachment';
 import type { StickerMessageReference } from '../../../stickers/infrastructure/http/resources/StickerMessageReference';
+import type { ChatMessage } from '../../domain/ChatMessage';
+import type { LightboxImage } from './imageLightbox';
 
 import { cx } from '../../../../shared/presentation/cx';
 import { formatTime } from '../../../../shared/presentation/formatting';
-import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { attachmentIdentity } from '../view-models/attachmentIdentity';
+import { EmojiOnlyMessage } from '../view-models/EmojiOnlyMessage';
 import { Avatar } from './Avatar';
 import { CallEventMessage } from './CallEventMessage';
-import type { LightboxImage } from './imageLightbox';
 import { LazyImageLightbox } from './LazyImageLightbox';
 import { LinkPreviewCard } from './LinkPreviewCard';
 import { MarkdownMessage, type MarkdownMention } from './markdownMessage';
 import { PinIcon, ThreadIcon } from './messageActionIcons';
-import { attachmentIdentity } from '../view-models/attachmentIdentity';
-import { EmojiOnlyMessage } from '../view-models/EmojiOnlyMessage';
 import {
   AttachmentCard,
   imageAttachmentAlbumWidthClass,
@@ -83,13 +83,15 @@ export function MessageBubble({
   authorName,
   authorPicture,
   currentIdentityId,
+  mentionHighlighted = false,
+  mentionTokens = [],
   message,
   onAttachmentOpen,
   onAttachmentPreview,
   onAvatarClick,
+  onMentionClick,
   onMessageClick,
   onMessageMenuOpen,
-  onMentionClick,
   onReactionToggle,
   onReplyReferenceClick,
   onRetryMessage,
@@ -97,15 +99,13 @@ export function MessageBubble({
   onThreadOpen,
   pinned = false,
   reactionAuthorNames = {},
-  mentionTokens = [],
-  mentionHighlighted = false,
   replyAuthorName,
   replyImage,
   replyPreview,
   replySticker,
   reserveAvatarSpace = true,
-  showReplyPreview = true,
   showAvatar,
+  showReplyPreview = true,
   threadAuthorName,
   threadAuthorPicture,
   threadCount = 0,
@@ -217,11 +217,13 @@ export function MessageBubble({
       ignoreNextClickRef.current = false;
       event.preventDefault();
       event.stopPropagation();
+
       return;
     }
 
     if (isInteractiveMessageTarget(event)) {
       clearTouchTap();
+
       return;
     }
 
@@ -231,6 +233,7 @@ export function MessageBubble({
   const handlePointerDown = (event: PointerEvent) => {
     if (event.pointerType !== 'touch') {
       clearTouchTap();
+
       return;
     }
 
@@ -244,6 +247,7 @@ export function MessageBubble({
     if (event.pointerType !== 'touch') return;
 
     const touchTap = touchTapRef.current;
+
     if (!touchTap) return;
 
     if (touchDistance(touchTap, event) > TOUCH_TAP_MAX_DISTANCE) {
@@ -256,11 +260,13 @@ export function MessageBubble({
   const handlePointerUp = (event: PointerEvent<HTMLElement>) => {
     if (event.pointerType !== 'touch') {
       clearTouchTap();
+
       return;
     }
 
     if (isInteractiveMessageTarget(event)) {
       clearTouchTap();
+
       return;
     }
 
@@ -273,6 +279,7 @@ export function MessageBubble({
 
       event.preventDefault();
       onMessageMenuOpen(message, event.clientX, event.clientY);
+
       return;
     }
 

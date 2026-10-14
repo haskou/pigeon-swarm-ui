@@ -5,7 +5,7 @@ import type { IdentityPresenceResource as IdentityPresence } from '../../../../c
 import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { SelectablePresenceStatusResource as SelectablePresenceStatus } from '../../../../contexts/identities/infrastructure/http/resources/SelectablePresenceStatusResource';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
-import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../../contexts/messages/domain/ChatMessage';
 import type { NotificationScopeSettingResource as NotificationScopeSetting } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationScopeSettingResource';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 import type { ChatColumn } from './ChatColumn';

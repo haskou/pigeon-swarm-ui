@@ -3,7 +3,7 @@ import type { CSSProperties, ReactNode, RefObject } from 'react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { MessageAttachment } from '../../../../contexts/attachments/application/contracts/MessageAttachment';
-import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../../contexts/messages/domain/ChatMessage';
 
 import {
   CopyIcon,

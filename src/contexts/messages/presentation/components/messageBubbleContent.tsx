@@ -1,5 +1,5 @@
-import type { ChatMessage } from '../view-models/ChatMessage';
 import type { StickerMessageReference } from '../../../stickers/infrastructure/http/resources/StickerMessageReference';
+import type { ChatMessage } from '../../domain/ChatMessage';
 
 import { cx } from '../../../../shared/presentation/cx';
 import { copy } from '../../../../shared/presentation/i18n/copy';

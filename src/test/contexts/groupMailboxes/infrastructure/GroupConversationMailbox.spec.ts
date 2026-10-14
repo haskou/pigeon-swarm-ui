@@ -8,10 +8,10 @@ import type { ConversationResource } from '../../../../contexts/conversations/in
 import type { GroupConversationSyncOutcome } from '../../../../contexts/groupMailboxes/infrastructure/GroupConversationSyncOutcome';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { PigeonMailboxClient } from '../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
+import type { DirectMessageTimelineChange } from '../../../../contexts/messages/domain/DirectMessageTimelineChange';
 import type { MessageProjectionPort } from '../../../../contexts/messages/infrastructure/crypto/MessageProjectionPort';
 import type { MessageAttachmentPublisher } from '../../../../contexts/messages/infrastructure/http/MessageAttachmentPublisher';
 import type { PigeonMessagesApi } from '../../../../contexts/messages/infrastructure/http/PigeonMessagesApi';
-import type { DirectMessageTimelineChange } from '../../../../contexts/messages/presentation/view-models/DirectMessageTimelineChange';
 import type { NotificationResource } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationResource';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';

@@ -15,6 +15,15 @@ export class MessageReactionChange {
     return new MessageReactionChange(action, createdAt, emoji, messageId);
   }
 
+  /** A reaction add or remove made now. */
+  public static now(
+    action: MessageReactionAction,
+    emoji: MessageReactionEmoji,
+    messageId: MessageId,
+  ): MessageReactionChange {
+    return new MessageReactionChange(action, Timestamp.now(), emoji, messageId);
+  }
+
   private constructor(
     private readonly action: MessageReactionAction,
     private readonly createdAt: Timestamp,

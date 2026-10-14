@@ -1,4 +1,4 @@
-import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../messages/domain/ChatMessage';
 import type { PollResource } from '../../../polls/infrastructure/http/resources/PollResource';
 
 export function communityMessageIdentityIds({

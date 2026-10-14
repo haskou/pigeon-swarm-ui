@@ -1,4 +1,4 @@
-import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../../contexts/messages/domain/ChatMessage';
 import type { PendingConversationMessageInput } from './PendingConversationMessageInput';
 
 import { PendingMessageAttachments } from '../../../../contexts/attachments/presentation/view-models/PendingMessageAttachments';

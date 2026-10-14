@@ -8,7 +8,7 @@ import {
 import type { AttachmentProgress } from '../../../../contexts/attachments/application/contracts/AttachmentProgress';
 import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
-import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../../contexts/messages/domain/ChatMessage';
 import type { ConversationMessageActions } from './ConversationMessageActions';
 import type { EditingMessage } from './conversationThreadState';
 import type { MessageContextMenuState } from './messageContextMenu';

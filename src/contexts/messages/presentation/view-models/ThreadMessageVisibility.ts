@@ -1,4 +1,4 @@
-import type { ChatMessage } from './ChatMessage';
+import type { ChatMessage } from '../../domain/ChatMessage';
 
 export class ThreadMessageVisibility {
   public static forRoot(

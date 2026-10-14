@@ -1,6 +1,6 @@
-import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
-import type { MessageResource } from '../../../messages/infrastructure/http/MessageResource';
 import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { ChatMessage } from '../../../messages/domain/ChatMessage';
+import type { MessageResource } from '../../../messages/infrastructure/http/MessageResource';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { threadRootLabelKey } from '../components/communityThreadState';

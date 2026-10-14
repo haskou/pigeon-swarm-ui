@@ -1,7 +1,7 @@
-import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../messages/domain/ChatMessage';
 
-import { copy } from '../../../../shared/presentation/i18n/copy';
 import { cx } from '../../../../shared/presentation/cx';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 
 export type CommunityMessageSearchScope = 'channel' | 'community';
 
@@ -36,8 +36,8 @@ export function CommunityMessageSearchPanel({
   onSubmit,
   query,
   results,
-  searched,
   scope,
+  searched,
   state,
 }: CommunityMessageSearchPanelProps) {
   const canSearch = query.trim().length > 0 && state !== 'loading' && !disabled;
@@ -48,6 +48,7 @@ export function CommunityMessageSearchPanel({
         className="mx-auto flex max-w-5xl flex-col gap-3"
         onSubmit={(event) => {
           event.preventDefault();
+
           if (canSearch) onSubmit();
         }}
       >

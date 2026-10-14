@@ -12,7 +12,7 @@ import type {
   IdentityNames,
   IdentityPictures,
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
-import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../../contexts/messages/domain/ChatMessage';
 import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
 import type { ConversationInvitationNotificationResource } from '../../../../contexts/notifications/infrastructure/http/resources/ConversationInvitationNotificationResource';
 import type { NotificationScopeSettingResource as NotificationScopeSetting } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationScopeSettingResource';

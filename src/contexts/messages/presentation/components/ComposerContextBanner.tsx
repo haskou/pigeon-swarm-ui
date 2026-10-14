@@ -1,4 +1,4 @@
-import type { ChatMessage } from '../view-models/ChatMessage';
+import type { ChatMessage } from '../../domain/ChatMessage';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { StickerImage } from '../../../stickers/presentation/components/StickerImage';

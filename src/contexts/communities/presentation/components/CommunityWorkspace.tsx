@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { MessageContextMenuState } from '../../../../app/presentation/workspace/components/messageContextMenu';
-import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../messages/domain/ChatMessage';
 import type { StickerMessageReference } from '../../../stickers/infrastructure/http/resources/StickerMessageReference';
 import type { CommunityWorkspaceProps } from './CommunityWorkspaceProps';
 
-import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { shortId } from '../../../../shared/presentation/formatting';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { profileAnchorFromTarget } from '../../../identities/presentation/view-models/profilePopoverAnchor';
@@ -21,18 +20,18 @@ import { CommunityMessageSearchPanel } from './CommunityMessageSearchPanel';
 import { CommunityNoChannelSelected } from './CommunityNoChannelSelected';
 import { CommunityPinnedMessagesDialog } from './CommunityPinnedMessagesDialog';
 import { CommunitySidebar } from './CommunitySidebar';
-import { type CommunityThreadState } from './communityThreadState';
 import { CommunityThreadPane } from './CommunityThreadPane';
+import { type CommunityThreadState } from './communityThreadState';
 import { CommunityWorkspaceDialogs } from './CommunityWorkspaceDialogs';
 import { CommunityWorkspaceHeader } from './CommunityWorkspaceHeader';
 import { mergeChatMessages } from './communityWorkspaceHelpers';
 import { useCommunityChannelAccess } from './useCommunityChannelAccess';
-import { useCommunityEncryption } from './useCommunityEncryption';
 import { useCommunityChannelMessages } from './useCommunityChannelMessages';
 import { useCommunityChannelPolls } from './useCommunityChannelPolls';
 import { useCommunityChannelRealtime } from './useCommunityChannelRealtime';
 import { useCommunityChannelThreads } from './useCommunityChannelThreads';
 import { useCommunityDrafts } from './useCommunityDrafts';
+import { useCommunityEncryption } from './useCommunityEncryption';
 import { useCommunityLeave } from './useCommunityLeave';
 import { useCommunityMembers } from './useCommunityMembers';
 import { useCommunityMentions } from './useCommunityMentions';
@@ -67,8 +66,8 @@ export function CommunityWorkspace({
   onCallEnd,
   onCallParticipantScreenShareVolumeChange,
   onCallParticipantVolumeChange,
-  onCallRetryMicrophone,
   onCallRetryConnection,
+  onCallRetryMicrophone,
   onCallScreenShareQualityChange,
   onCallToggleCamera,
   onCallToggleDeafen,
@@ -365,7 +364,8 @@ export function CommunityWorkspace({
     encryptionState,
     ready: channelEncryptionReady,
   });
-  const awaitingGroupAccess = CommunityChannelEncryption.awaitingGroupAccess(encryptionState);
+  const awaitingGroupAccess =
+    CommunityChannelEncryption.awaitingGroupAccess(encryptionState);
   const profiles = useCommunityProfileViewer({
     memberIdentities,
     memberPictures,

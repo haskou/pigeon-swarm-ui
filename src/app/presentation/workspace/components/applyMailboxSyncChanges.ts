@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
-import type { DirectMessageTimelineChange } from '../../../../contexts/messages/presentation/view-models/DirectMessageTimelineChange';
+import type { ChatMessage } from '../../../../contexts/messages/domain/ChatMessage';
+import type { DirectMessageTimelineChange } from '../../../../contexts/messages/domain/DirectMessageTimelineChange';
 
 import { MessagePinChange } from '../../../../contexts/messages/domain/MessagePinChange';
 import { MessagePinClock } from '../../../../contexts/messages/domain/MessagePinClock';

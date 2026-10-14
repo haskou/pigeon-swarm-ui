@@ -11,7 +11,7 @@ import {
 
 import type { ConversationResource } from '../../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
-import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../../../contexts/messages/domain/ChatMessage';
 
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';
 import { useGroupMessageMailboxSync } from '../../../../../app/presentation/workspace/components/useGroupMessageMailboxSync';

@@ -1,4 +1,4 @@
-import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../messages/domain/ChatMessage';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { MessageCollectionDialog } from '../../../messages/presentation/components/MessageCollectionDialog';

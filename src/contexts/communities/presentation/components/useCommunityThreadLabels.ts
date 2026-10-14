@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 
-import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../messages/domain/ChatMessage';
 import type { CommunityMessageSearchResultItem } from './CommunityMessageSearchPanel';
 import type { CommunityThreadState } from './communityThreadState';
 

@@ -3,7 +3,7 @@ import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
-import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../../contexts/messages/domain/ChatMessage';
 import type { NotificationSettingMap } from '../../../../contexts/notifications/presentation/view-models/NotificationSettingMap';
 import type { WorkspaceMode } from './WorkspaceMode';
 

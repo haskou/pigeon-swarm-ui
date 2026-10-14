@@ -2,6 +2,7 @@ import type { Session } from '../../../identities/infrastructure/session/Session
 import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessageRecord';
 import type { DirectReadRecord } from '../../../mailboxes/domain/DirectReadRecord';
 
+import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { sessionRootKey } from '../../../identities/infrastructure/session/sessionRootKey';
 import { DirectMailboxOwnership } from '../../../mailboxes/domain/DirectMailboxOwnership';
 import { DirectMailboxRecords } from '../../../mailboxes/domain/DirectMailboxRecords';
@@ -36,8 +37,8 @@ export class DirectMessageRecordReader {
   ): boolean {
     return (
       DirectMailboxOwnership.isAuthoredBy(
-        record.authorId,
-        session.identity.id,
+        IdentityId.fromString(record.authorId),
+        IdentityId.fromString(session.identity.id),
       ) && DirectMailboxRecords.isFreshReceipt(record, Date.now())
     );
   }

@@ -1,4 +1,4 @@
-import type { DirectMessageTimelineChange } from '../../messages/presentation/view-models/DirectMessageTimelineChange';
+import type { DirectMessageTimelineChange } from '../../messages/domain/DirectMessageTimelineChange';
 
 /** Receives the timeline changes a group read produced. */
 export type GroupTimelineApply = (

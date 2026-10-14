@@ -1,5 +1,5 @@
 import type { CommunityResource as Community } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
-import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../../../contexts/messages/domain/ChatMessage';
 
 import { CommunityWorkspaceDialogActions } from '../../../../../contexts/communities/presentation/components/CommunityWorkspaceDialogActions';
 import { copy } from '../../../../../shared/presentation/i18n/copy';

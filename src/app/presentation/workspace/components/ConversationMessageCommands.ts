@@ -1,6 +1,6 @@
 import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
-import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../../contexts/messages/domain/ChatMessage';
 
 import { applicationContainer } from '../../../composition/applicationContainer';
 
@@ -58,7 +58,6 @@ export class ConversationMessageCommands {
     if (ConversationMessageCommands.isGroup(conversation)) {
       await applicationContainer.groupMessages.pin(session, conversation, {
         action,
-        createdAt: Date.now(),
         messageId,
       });
 
@@ -80,7 +79,6 @@ export class ConversationMessageCommands {
     if (ConversationMessageCommands.isGroup(conversation)) {
       await applicationContainer.groupMessages.reaction(session, conversation, {
         action,
-        createdAt: Date.now(),
         emoji,
         messageId,
       });

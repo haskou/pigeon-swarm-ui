@@ -1,7 +1,7 @@
-import type { ChatMessage } from './ChatMessage';
 import type { PollResource } from '../../../polls/infrastructure/http/resources/PollResource';
-
 import type { MessagePollTimelineItem } from '../../../polls/presentation/components/messagePollTimelineItems';
+import type { ChatMessage } from '../../domain/ChatMessage';
+
 import { messagePollTimelineItems } from '../../../polls/presentation/components/messagePollTimelineItems';
 import {
   endsAuthorRun,
@@ -45,17 +45,16 @@ export class MessageTimelineEntries {
           MessageTimelineEntries.isVisibleThreadSummary(summary),
         )
       : [];
-    const knownThreadMessageIds =
-      MessageTimelineEntries.knownThreadMessageIds(visibleThreadSummaries);
+    const knownThreadMessageIds = MessageTimelineEntries.knownThreadMessageIds(
+      visibleThreadSummaries,
+    );
     const threadSummariesByRootMessageId = new Map(
-      visibleThreadSummaries.map((summary) => [
-        summary.rootMessageId,
-        summary,
-      ]),
+      visibleThreadSummaries.map((summary) => [summary.rootMessageId, summary]),
     );
     const rootMessages = messages.filter(
       (message) =>
-        (!allowThreads || !MessageTimelineEntries.threadRootMessageId(message)) &&
+        (!allowThreads ||
+          !MessageTimelineEntries.threadRootMessageId(message)) &&
         !knownThreadMessageIds.has(message.id),
     );
     const items = messagePollTimelineItems(rootMessages, polls);
@@ -143,9 +142,7 @@ export class MessageTimelineEntries {
     return MessageTimelineEntries.isUnmarkedThreadReply(summary);
   }
 
-  private static isUnmarkedThreadReply(
-    summary: MessageThreadSummary,
-  ): boolean {
+  private static isUnmarkedThreadReply(summary: MessageThreadSummary): boolean {
     const lastMessage = summary.lastMessage;
 
     if (!lastMessage?.replyPreview) return false;

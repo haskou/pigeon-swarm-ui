@@ -13,6 +13,14 @@ export class MessagePinChange {
     return new MessagePinChange(action, createdAt, messageId);
   }
 
+  /** A pin or unpin made now. */
+  public static now(
+    action: MessagePinAction,
+    messageId: MessageId,
+  ): MessagePinChange {
+    return new MessagePinChange(action, Timestamp.now(), messageId);
+  }
+
   public static fromPrimitives(primitives: {
     action: string;
     createdAt: number;

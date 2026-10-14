@@ -1,5 +1,5 @@
 import type { Session } from '../../../identities/infrastructure/session/Session';
-import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../domain/ChatMessage';
 import type { MessagePin } from '../../presentation/view-models/MessagePin';
 import type { MessageLoadOptions } from './MessageLoadOptions';
 import type { ConversationDraftProjection as ConversationDraft } from './resources/ConversationDraftProjection';

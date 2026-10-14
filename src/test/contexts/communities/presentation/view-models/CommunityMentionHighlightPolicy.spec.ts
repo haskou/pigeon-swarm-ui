@@ -1,4 +1,4 @@
-import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../../../contexts/messages/domain/ChatMessage';
 
 import { CommunityMentionHighlightPolicy } from '../../../../../contexts/communities/presentation/view-models/CommunityMentionHighlightPolicy';
 

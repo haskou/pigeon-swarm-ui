@@ -1,4 +1,4 @@
-import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../messages/domain/ChatMessage';
 import type { CommunityMessageDecryptWorkerRequest } from './CommunityMessageDecryptWorkerRequest';
 import type { CommunityMessageDecryptWorkerResponse } from './CommunityMessageDecryptWorkerResponse';
 import type { PendingRequest } from './PendingRequest';

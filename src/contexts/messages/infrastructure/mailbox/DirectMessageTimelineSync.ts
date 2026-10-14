@@ -4,8 +4,8 @@ import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessag
 import type { DirectReadRecord } from '../../../mailboxes/domain/DirectReadRecord';
 import type { DirectSentRecord } from '../../../mailboxes/domain/DirectSentRecord';
 import type { OpenedMailboxPage } from '../../../mailboxes/infrastructure/MailboxChannel';
-import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
-import type { DirectMessageTimelineChange } from '../../presentation/view-models/DirectMessageTimelineChange';
+import type { ChatMessage } from '../../domain/ChatMessage';
+import type { DirectMessageTimelineChange } from '../../domain/DirectMessageTimelineChange';
 import type { MessageProjectionPort } from '../crypto/MessageProjectionPort';
 import type { DirectMessageAvailability } from './DirectMessageAvailability';
 import type { DirectMessageHistoryStore } from './DirectMessageHistoryStore';
@@ -13,6 +13,7 @@ import type { DirectMessageInboxSource } from './DirectMessageInboxSource';
 import type { DirectMessageOwnCopies } from './DirectMessageOwnCopies';
 import type { DirectMessageRecipientInbox } from './DirectMessageRecipientInbox';
 
+import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { DirectMailboxOwnership } from '../../../mailboxes/domain/DirectMailboxOwnership';
 import { DirectMailboxRecords } from '../../../mailboxes/domain/DirectMailboxRecords';
 import { DirectMessageHistoryStorageError } from './DirectMessageHistoryStorageError';
@@ -130,7 +131,10 @@ export class DirectMessageTimelineSync {
     // An own copy this device appended is already shown locally.
     const records = decoded.flatMap(({ record }) =>
       this.ownCopies.has(
-        DirectMailboxOwnership.ownCopyKey(session.identity.id, record.id),
+        DirectMailboxOwnership.ownCopyKey(
+          IdentityId.fromString(session.identity.id),
+          record.id,
+        ),
       )
         ? []
         : [record],

@@ -2,24 +2,22 @@
 import { Fragment, memo, type RefObject, useMemo } from 'react';
 
 import type { AttachmentProgress } from '../../../attachments/application/contracts/AttachmentProgress';
-import type { ChatMessage } from '../../../messages/presentation/view-models/ChatMessage';
-import type { CommunityChannelThreadSummaryResource as CommunityChannelThreadSummary } from '../../infrastructure/http/resources/CommunityChannelThreadSummaryResource';
-import type { CommunityInvitationNotificationResource } from '../../../notifications/infrastructure/http/resources/CommunityInvitationNotificationResource';
-import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
 import type { MessageAttachment } from '../../../attachments/application/contracts/MessageAttachment';
-import type { PollResource } from '../../../polls/infrastructure/http/resources/PollResource';
+import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
 import type { Session } from '../../../identities/infrastructure/session/Session';
-import type { StickerMessageReference } from '../../../stickers/infrastructure/http/resources/StickerMessageReference';
+import type { ChatMessage } from '../../../messages/domain/ChatMessage';
 import type { MarkdownMention } from '../../../messages/presentation/components/markdownMessage';
+import type { CommunityInvitationNotificationResource } from '../../../notifications/infrastructure/http/resources/CommunityInvitationNotificationResource';
+import type { PollResource } from '../../../polls/infrastructure/http/resources/PollResource';
+import type { StickerMessageReference } from '../../../stickers/infrastructure/http/resources/StickerMessageReference';
+import type { CommunityChannelThreadSummaryResource as CommunityChannelThreadSummary } from '../../infrastructure/http/resources/CommunityChannelThreadSummaryResource';
 
-import { copy } from '../../../../shared/presentation/i18n/copy';
-import { formatDateSeparator } from '../../../../shared/presentation/formatting';
+import { LockIcon } from '../../../../app/presentation/workspace/components/LockIcon';
 import { cx } from '../../../../shared/presentation/cx';
+import { formatDateSeparator } from '../../../../shared/presentation/formatting';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import { DateSeparator } from '../../../messages/presentation/components/DateSeparator';
 import { MessageBubble } from '../../../messages/presentation/components/MessageBubble';
-import { TimelineJumpButton } from '../../../messages/presentation/components/TimelineJumpButton';
-import { InvitationKeyPrompt } from '../../../notifications/presentation/components/InvitationKeyPrompt';
-import { CommunityMentionHighlightPolicy } from '../view-models/CommunityMentionHighlightPolicy';
 import {
   messageReplyImage,
   messageReplySticker,
@@ -28,9 +26,11 @@ import {
   messageTimelineEnterClassName,
   messageTimelineEnterStyle,
 } from '../../../messages/presentation/components/messageTimelineMotion';
+import { TimelineJumpButton } from '../../../messages/presentation/components/TimelineJumpButton';
 import { MessageTimelineEntries } from '../../../messages/presentation/view-models/MessageTimelineEntries';
+import { InvitationKeyPrompt } from '../../../notifications/presentation/components/InvitationKeyPrompt';
 import { PollCard } from '../../../polls/presentation/components/pollCard';
-import { LockIcon } from '../../../../app/presentation/workspace/components/LockIcon';
+import { CommunityMentionHighlightPolicy } from '../view-models/CommunityMentionHighlightPolicy';
 import { memberDisplayName, memberPrimaryName } from './communityMemberNames';
 
 type LoadState = 'error' | 'idle' | 'loading';
@@ -85,27 +85,29 @@ interface CommunityMessageTimelineProps {
 }
 
 export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
+  awaitingGroupAccess,
   bottomRef,
+  canClosePolls,
+  channelThreadSummaries = [],
+  currentRoleIds,
+  invitationAccepting = false,
+  invitationError,
+  invitationInviterName,
   isAwayFromBottom,
   loadAttachmentPreview,
   memberIdentities,
   memberPictures,
   messageCursor,
   messageState,
-  awaitingGroupAccess,
-  invitationAccepting = false,
-  invitationError,
-  invitationInviterName,
   newChannelMessageCount,
-  onInvitationAccept,
   onAttachmentOpen,
   onAuthorProfileOpen,
   onIdentityProfileOpen,
+  onInvitationAccept,
   onJumpToLatest,
   onMessageMenuOpen,
   onOpenThread,
   onPollClose,
-  canClosePolls,
   onPollRemoveVote,
   onPollVote,
   onReactionToggle,
@@ -113,11 +115,9 @@ export const CommunityMessageTimeline = memo(function CommunityMessageTimeline({
   onRetryMessage,
   onScroll,
   onStickerClick,
-  channelThreadSummaries = [],
-  pinnedMessageIds,
   pendingInvitation,
+  pinnedMessageIds,
   polls = [],
-  currentRoleIds,
   reactionAuthorNames,
   scrollerRef,
   session,

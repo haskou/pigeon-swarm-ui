@@ -4,9 +4,10 @@ import { useEffect } from 'react';
 
 import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
-import type { ChatMessage } from '../../../../contexts/messages/presentation/view-models/ChatMessage';
-import type { DirectMessageTimelineChange } from '../../../../contexts/messages/presentation/view-models/DirectMessageTimelineChange';
+import type { ChatMessage } from '../../../../contexts/messages/domain/ChatMessage';
+import type { DirectMessageTimelineChange } from '../../../../contexts/messages/domain/DirectMessageTimelineChange';
 
+import { ConversationType } from '../../../../contexts/conversations/domain/value-objects/ConversationType';
 import { DirectMailboxEligibility } from '../../../../contexts/mailboxes/domain/DirectMailboxEligibility';
 import { MailboxReaderLimitError } from '../../../../contexts/mailboxes/domain/errors/MailboxReaderLimitError';
 import { MessagePinClock } from '../../../../contexts/messages/domain/MessagePinClock';
@@ -101,7 +102,9 @@ export function useDirectMessageMailboxSync({
 }: DirectMessageMailboxSyncInput): void {
   const conversationId =
     activeConversation &&
-    DirectMailboxEligibility.isEligible(activeConversation.type)
+    DirectMailboxEligibility.isEligible(
+      ConversationType.tryFromPrimitives(activeConversation.type),
+    )
       ? activeConversation.id
       : undefined;
 

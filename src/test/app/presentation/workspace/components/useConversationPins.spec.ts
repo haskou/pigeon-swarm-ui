@@ -12,7 +12,7 @@ import {
 import type { MessageCollectionState } from '../../../../../app/presentation/workspace/components/conversationThreadState';
 import type { ConversationResource } from '../../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
-import type { ChatMessage } from '../../../../../contexts/messages/presentation/view-models/ChatMessage';
+import type { ChatMessage } from '../../../../../contexts/messages/domain/ChatMessage';
 
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';
 import { useConversationPins } from '../../../../../app/presentation/workspace/components/useConversationPins';
@@ -45,7 +45,6 @@ const group = {
 const session = { identity: { id: 'alice' } } as unknown as Session;
 const message = { id: 'message-1' } as unknown as ChatMessage;
 const other = { id: 'message-2' } as unknown as ChatMessage;
-const now = 1_700_000_000_000;
 
 const pinnedCollection = {
   error: null,
@@ -93,7 +92,6 @@ function mountPins({
 describe('useConversationPins', () => {
   beforeEach(() => {
     jest.resetAllMocks();
-    jest.spyOn(Date, 'now').mockReturnValue(now);
   });
 
   afterEach(() => {
@@ -198,7 +196,7 @@ describe('useConversationPins', () => {
     expect(applicationContainer.groupMessages.pin).toHaveBeenCalledWith(
       session,
       group,
-      { action: 'pin', createdAt: now, messageId: 'message-1' },
+      { action: 'pin', messageId: 'message-1' },
     );
     expect(applicationContainer.messages.pin).not.toHaveBeenCalled();
     expect(pinnedUpdaterOf(pins.setPinnedMessageIds)(new Set())).toEqual(
@@ -217,7 +215,7 @@ describe('useConversationPins', () => {
     expect(applicationContainer.groupMessages.pin).toHaveBeenCalledWith(
       session,
       group,
-      { action: 'unpin', createdAt: now, messageId: 'message-1' },
+      { action: 'unpin', messageId: 'message-1' },
     );
     expect(applicationContainer.messages.unpin).not.toHaveBeenCalled();
   });
