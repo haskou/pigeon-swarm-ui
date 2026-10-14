@@ -59,7 +59,6 @@ export class Conversation extends AggregateRoot {
         : ConversationParticipantId.fromString(primitives.creatorId),
       ConversationActivity.fromPrimitives({
         latestMessageAt: primitives.latestMessageAt,
-        unreadCount: primitives.unreadCount,
       }),
     );
   }
@@ -204,14 +203,6 @@ export class Conversation extends AggregateRoot {
         ConversationEventType.PARTICIPANT_LEFT,
         occurredAt,
       ),
-    );
-  }
-
-  public markRead(occurredAt: Timestamp): void {
-    if (!this.activity.markRead()) return;
-
-    this.record(
-      this.metadata.identifyEvent(ConversationEventType.READ, occurredAt),
     );
   }
 

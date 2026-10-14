@@ -84,7 +84,6 @@ function mountTimeline(activeConversation = conversation) {
     activeConversationReady: true,
     clearUnreadMessages: jest.fn(),
     onCommunitiesReload: () => Promise.resolve(),
-    onConversationsChange: jest.fn(),
     onErrorChange,
     refreshConversations: () => Promise.resolve([]),
     sessionRef: { current: session },

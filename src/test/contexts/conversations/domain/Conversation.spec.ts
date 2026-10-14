@@ -8,7 +8,6 @@ import { ConversationParticipantId } from '../../../../contexts/conversations/do
 function conversation(
   latestMessageAt = 100,
   type: 'group' | 'one-to-one' = 'one-to-one',
-  unreadCount = 2,
   roster: { adminIds?: string[]; participantIds?: string[] } = {},
 ): Conversation {
   return Conversation.fromPrimitives({
@@ -20,7 +19,6 @@ function conversation(
     networkId: 'network-a',
     participantIds: roster.participantIds ?? ['identity-a', 'identity-b'],
     type,
-    unreadCount,
   });
 }
 
@@ -76,26 +74,6 @@ describe(Conversation.name, () => {
     ).toThrow(DirectConversationInvitationNotAllowedError);
   });
 
-  it('records when the conversation is marked as read', () => {
-    const aggregate = conversation();
-
-    aggregate.markRead(new Timestamp(200));
-
-    expect(aggregate.pullDomainEvents()[0]).toEqual({
-      aggregateId: 'one-to-one:a',
-      occurredAt: 200,
-      type: 'ConversationRead',
-    });
-  });
-
-  it('does not record a read mutation when it was already read', () => {
-    const aggregate = conversation(100, 'one-to-one', 0);
-
-    aggregate.markRead(new Timestamp(200));
-
-    expect(aggregate.pullDomainEvents()).toHaveLength(0);
-  });
-
   describe('roster', () => {
     const roster = {
       adminIds: ['identity-b'],
@@ -103,7 +81,7 @@ describe(Conversation.name, () => {
     };
 
     it('lets the creator and admins invite but not plain members', () => {
-      const group = conversation(100, 'group', 0, roster);
+      const group = conversation(100, 'group', roster);
 
       expect(group.canInvite(member('identity-a'))).toBe(true);
       expect(group.canInvite(member('identity-b'))).toBe(true);
@@ -112,7 +90,7 @@ describe(Conversation.name, () => {
 
     it('rejects an invitation from a plain member', () => {
       expect(() =>
-        conversation(100, 'group', 0, roster).invite(
+        conversation(100, 'group', roster).invite(
           member('identity-e'),
           member('identity-c'),
           new Timestamp(200),
@@ -121,7 +99,7 @@ describe(Conversation.name, () => {
     });
 
     it('keeps admins and the creator out of admin removal by admins', () => {
-      const group = conversation(100, 'group', 0, roster);
+      const group = conversation(100, 'group', roster);
 
       expect(group.canRemove(member('identity-c'), member('identity-b'))).toBe(
         true,
@@ -141,7 +119,7 @@ describe(Conversation.name, () => {
     });
 
     it('removes a participant and its admin role', () => {
-      const group = conversation(100, 'group', 0, roster);
+      const group = conversation(100, 'group', roster);
 
       group.removeParticipant(
         member('identity-b'),
@@ -158,7 +136,7 @@ describe(Conversation.name, () => {
     });
 
     it('lets only the creator promote and demote', () => {
-      const group = conversation(100, 'group', 0, roster);
+      const group = conversation(100, 'group', roster);
 
       expect(group.canPromote(member('identity-c'), member('identity-a'))).toBe(
         true,
@@ -194,7 +172,7 @@ describe(Conversation.name, () => {
     });
 
     it('lets every member but the creator leave', () => {
-      const group = conversation(100, 'group', 0, roster);
+      const group = conversation(100, 'group', roster);
 
       expect(group.canLeave(member('identity-a'))).toBe(false);
       expect(group.canLeave(member('identity-c'))).toBe(true);

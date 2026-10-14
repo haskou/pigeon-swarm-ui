@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { ConversationWithUnread } from '../../../../contexts/conversations/presentation/view-models/ConversationWithUnread';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { LatestInput } from './LatestInput';
 
@@ -15,7 +15,7 @@ const VISITS_PER_TICK = 2;
 
 export type DirectMessageBackgroundReadSyncInput = {
   activeConversationId: string | null;
-  conversations: ConversationResource[];
+  conversations: ConversationWithUnread[];
   onConversationRead: (conversationId: string) => void;
   session: Session;
 };
@@ -57,7 +57,7 @@ function dueConversationIds(
  */
 function subscribeHints(
   session: Session,
-  conversations: ConversationResource[],
+  conversations: ConversationWithUnread[],
   subscriptions: Map<string, () => void>,
   onHint: (conversationId: string) => void,
 ): void {

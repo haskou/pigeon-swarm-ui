@@ -1,6 +1,5 @@
 import { useCallback } from 'react';
 
-import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { ChatMessage } from '../../../../contexts/messages/domain/ChatMessage';
 import type { MessageResource } from '../../../../contexts/messages/infrastructure/http/MessageResource';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
@@ -21,7 +20,7 @@ import {
 } from './realtimeEventAttributes';
 import { notificationMentionContext } from './workspaceNotificationState';
 
-const conversationMessageEventDetails = (event: RealtimeDomainEvent) => {
+const callEventDetails = (event: RealtimeDomainEvent) => {
   const conversationId = eventAggregateId(event);
   const messageId = stringAttribute(event, 'messageId', 'message_id');
   const timelineMessage = recordAttribute(event, 'message') as
@@ -157,10 +156,10 @@ export function useWorkspaceRealtimeConversationEvents({
     ],
   );
 
-  const handleMessageEvent = useCallback(
+  const handleCallEvent = useCallback(
     (event: RealtimeDomainEvent): boolean => {
       void refreshConversations().catch(() => undefined);
-      const details = conversationMessageEventDetails(event);
+      const details = callEventDetails(event);
 
       if (!details) return true;
 
@@ -178,17 +177,13 @@ export function useWorkspaceRealtimeConversationEvents({
         conversationId,
       );
 
-      if (!active && ConversationRealtimeEvent.shouldNotify(event)) {
-        notify(event, conversationId, messageId, timelineMessage);
-      }
+      if (!active) notify(event, conversationId, messageId, timelineMessage);
 
       if (!selected) return true;
 
       if (active) clearUnreadMessages(conversationId);
 
-      // Only call records still come from the node; group and one-to-one
-      // messages arrive through their mailbox syncs.
-      if (ConversationRealtimeEvent.isCallEvent(event) && timelineMessage) {
+      if (timelineMessage) {
         mergeCallEvent(event, timelineMessage, isScrolledNearBottom());
       }
 
@@ -206,35 +201,11 @@ export function useWorkspaceRealtimeConversationEvents({
     ],
   );
 
-  const handleReadReceipt = useCallback(
-    (event: RealtimeDomainEvent): boolean => {
-      const conversationId = eventAggregateId(event);
-      const readerIdentityId = stringAttribute(
-        event,
-        'readerIdentityId',
-        'reader_identity_id',
-      );
-
-      if (
-        !conversationId ||
-        !IdentityMatch.isSame(readerIdentityId, session.identity.id)
-      ) {
-        return true;
-      }
-
-      clearUnreadMessages(conversationId);
-      const markConversationRead = (conversation: ConversationResource) =>
-        conversation.id === conversationId
-          ? { ...conversation, unreadCount: 0 }
-          : conversation;
-
-      setConversations((current) => current.map(markConversationRead));
-
-      return true;
-    },
-    [clearUnreadMessages, session.identity.id, setConversations],
-  );
-
+  /**
+   * Messages, reactions, pins and read state never come from the node: they
+   * arrive through the mailbox syncs. Only conversation lifecycle changes and
+   * recorded call events are handled here.
+   */
   return useCallback(
     (event: RealtimeDomainEvent): boolean => {
       if (ConversationRealtimeEvent.isConversationLifecycle(event)) {
@@ -243,16 +214,12 @@ export function useWorkspaceRealtimeConversationEvents({
         return true;
       }
 
-      if (ConversationRealtimeEvent.isMessageTimeline(event)) {
-        return handleMessageEvent(event);
-      }
-
-      if (ConversationRealtimeEvent.isReadReceipt(event)) {
-        return handleReadReceipt(event);
+      if (ConversationRealtimeEvent.isCallEvent(event)) {
+        return handleCallEvent(event);
       }
 
       return false;
     },
-    [handleMessageEvent, handleReadReceipt, refreshConversations],
+    [handleCallEvent, refreshConversations],
   );
 }

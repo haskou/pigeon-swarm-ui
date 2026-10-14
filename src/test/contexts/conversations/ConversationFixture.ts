@@ -16,7 +16,6 @@ export function conversationFixture(
     networkId: 'network-a',
     participantIds: ['identity-a', 'identity-b'],
     type,
-    unreadCount: 1,
     ...overrides,
   });
 }

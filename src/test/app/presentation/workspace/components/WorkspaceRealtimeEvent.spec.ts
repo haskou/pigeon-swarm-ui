@@ -16,7 +16,7 @@ describe(WorkspaceRealtimeEvent.name, () => {
   it.each([
     ['calls.v1.call.started', 'call'],
     ['communities.v1.channel.message.was_sent', 'community'],
-    ['conversations.v1.message.was_sent', 'conversation'],
+    ['conversations.v1.conversation.was_created', 'conversation'],
     ['identities.v1.identity.was_updated', 'identity'],
     ['keychains.v1.keychain.was_updated', 'keychain'],
     ['nodes.v1.node.network.was_removed', 'node'],

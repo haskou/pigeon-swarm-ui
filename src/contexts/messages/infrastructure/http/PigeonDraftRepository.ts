@@ -3,7 +3,7 @@ import type { Session } from '../../../identities/infrastructure/session/Session
 import type { ConversationDraft } from '../../domain/ConversationDraft';
 import type { ConversationDraftRepository } from '../../domain/repositories/ConversationDraftRepository';
 import type { MessageConversationId } from '../../domain/value-objects/MessageConversationId';
-import type { PigeonMessagesApi } from './PigeonMessagesApi';
+import type { PigeonConversationDraftsApi } from './PigeonConversationDraftsApi';
 
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { ConversationDraft as DomainConversationDraft } from '../../domain/ConversationDraft';
@@ -11,7 +11,7 @@ import { MessageAuthorId } from '../../domain/value-objects/MessageAuthorId';
 
 export class PigeonDraftRepository implements ConversationDraftRepository {
   public constructor(
-    private readonly messages: PigeonMessagesApi,
+    private readonly drafts: PigeonConversationDraftsApi,
     private readonly identities: IdentityAccessContexts,
   ) {}
 
@@ -22,7 +22,7 @@ export class PigeonDraftRepository implements ConversationDraftRepository {
 
   public async create(draft: ConversationDraft): Promise<ConversationDraft> {
     const primitives = draft.toPrimitives();
-    const saved = await this.messages.saveConversationDraft(
+    const saved = await this.drafts.saveConversationDraft(
       this.session(MessageAuthorId.fromString(primitives.authorId)),
       primitives.conversationId,
       primitives.content,
@@ -43,7 +43,7 @@ export class PigeonDraftRepository implements ConversationDraftRepository {
     conversationId: MessageConversationId,
     actorIdentityId: MessageAuthorId,
   ): Promise<void> {
-    await this.messages.deleteConversationDraft(
+    await this.drafts.deleteConversationDraft(
       this.session(actorIdentityId),
       conversationId.toString(),
     );
@@ -52,7 +52,7 @@ export class PigeonDraftRepository implements ConversationDraftRepository {
   public async search(
     actorIdentityId: MessageAuthorId,
   ): Promise<ConversationDraft[]> {
-    const drafts = await this.messages.listConversationDrafts(
+    const drafts = await this.drafts.listConversationDrafts(
       this.session(actorIdentityId),
     );
 

@@ -157,7 +157,6 @@ describe(resolveWorkspaceCallDetails.name, () => {
             networkId: 'network-1',
             participantIds: ['identity-1', 'identity-2'],
             type: 'group',
-            unreadCount: 0,
           },
         ],
         currentIdentity,

@@ -78,26 +78,4 @@ describe(PigeonConversationsApi.name, () => {
     expect(await api.list(session)).toEqual(created);
     expect(http.request).toHaveBeenCalledTimes(3);
   });
-
-  it('marks a conversation read until the requested message', async () => {
-    const http = mock<HttpJsonClient>();
-    const signer = mock<RequestSigner>();
-    signer.headers.mockResolvedValue({ signature: 'signature' });
-    const api = new PigeonConversationsApi(
-      http,
-      signer,
-      new ConversationMapper(),
-    );
-
-    await api.markReadUntil(session, 'conversation-1', 'message-1');
-
-    expect(http.request).toHaveBeenCalledWith(
-      '/conversations/conversation-1/messages/read-until',
-      {
-        body: JSON.stringify({ messageId: 'message-1' }),
-        headers: { signature: 'signature' },
-        method: 'PUT',
-      },
-    );
-  });
 });

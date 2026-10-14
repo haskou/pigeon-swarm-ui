@@ -1,14 +1,15 @@
 import { Timestamp, type PrimitiveOf } from '@haskou/value-objects';
 
 import { ConversationLatestMessageAt } from '../value-objects/ConversationLatestMessageAt';
-import { ConversationUnreadCount } from '../value-objects/ConversationUnreadCount';
 
+/**
+ * The latest activity of a conversation. Unread state is not part of it: the
+ * node cannot know the read state of sealed content, so each device keeps its
+ * own unread counts.
+ */
 export class ConversationActivity {
   public static empty(): ConversationActivity {
-    return new ConversationActivity(
-      ConversationLatestMessageAt.empty(),
-      ConversationUnreadCount.fromNumber(0),
-    );
+    return new ConversationActivity(ConversationLatestMessageAt.empty());
   }
 
   public static fromPrimitives(
@@ -16,25 +17,15 @@ export class ConversationActivity {
   ): ConversationActivity {
     return new ConversationActivity(
       ConversationLatestMessageAt.fromOptional(primitives.latestMessageAt),
-      ConversationUnreadCount.fromNumber(primitives.unreadCount),
     );
   }
 
   private constructor(
     private readonly latestMessageAt: ConversationLatestMessageAt,
-    private unreadCount: ConversationUnreadCount,
   ) {}
 
   public isMoreRecentThan(activity: ConversationActivity): boolean {
     return this.latestMessageAt.isAfter(activity.latestMessageAt);
-  }
-
-  public markRead(): boolean {
-    if (this.unreadCount.isZero()) return false;
-
-    this.unreadCount = this.unreadCount.clear();
-
-    return true;
   }
 
   public record(occurredAt: Timestamp): boolean {
@@ -44,7 +35,6 @@ export class ConversationActivity {
   public toPrimitives() {
     return {
       latestMessageAt: this.latestMessageAt.toPrimitives(),
-      unreadCount: this.unreadCount.valueOf(),
     };
   }
 }

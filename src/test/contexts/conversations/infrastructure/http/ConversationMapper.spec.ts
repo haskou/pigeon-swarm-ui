@@ -7,7 +7,6 @@ const group = {
   networkId: 'network-a',
   participantIds: ['identity-a', 'identity-b'],
   type: 'group',
-  unreadCount: 2,
 };
 
 describe(ConversationMapper.name, () => {

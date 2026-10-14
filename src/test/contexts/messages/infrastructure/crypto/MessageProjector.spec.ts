@@ -54,29 +54,6 @@ function sessionWithConversationKey(
 }
 
 describe(MessageProjector.name, () => {
-  it('reads the messages list and its next cursor', () => {
-    const projector = new MessageProjector(projectorCopy);
-
-    expect(
-      projector.list({
-        messages: [{ id: 'message-1' }],
-        nextBeforeMessageId: 'older-message',
-      }),
-    ).toEqual({
-      messages: [{ id: 'message-1' }],
-      nextCursor: 'older-message',
-    });
-  });
-
-  it.each([[[{ id: 'message-1' }]], [{ items: [{ id: 'message-1' }] }]])(
-    'rejects a list response without a messages list',
-    (response) => {
-      expect(() => new MessageProjector(projectorCopy).list(response)).toThrow(
-        TypeError,
-      );
-    },
-  );
-
   it('projects plain messages without requiring a keychain entry', () => {
     const projector = new MessageProjector(projectorCopy);
 

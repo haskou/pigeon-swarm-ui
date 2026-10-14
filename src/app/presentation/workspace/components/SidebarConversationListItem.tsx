@@ -3,6 +3,7 @@ import type { CSSProperties, MouseEvent, PointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 
 import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { ConversationWithUnread } from '../../../../contexts/conversations/presentation/view-models/ConversationWithUnread';
 import type { IdentityPresenceResource as IdentityPresence } from '../../../../contexts/identities/infrastructure/http/resources/IdentityPresenceResource';
 import type { NotificationScopeSettingResource as NotificationScopeSetting } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationScopeSettingResource';
 import type { SidebarConversationLoadingState } from './SidebarConversationLoadingState';
@@ -26,7 +27,7 @@ export interface SidebarConversationListItemProps {
   animateEntries: boolean;
   bannerUrl?: string;
   canOpenMenu: boolean;
-  conversation: ConversationResource;
+  conversation: ConversationWithUnread;
   conversationMenu: SidebarConversationMenuState | null;
   handle: string;
   index: number;

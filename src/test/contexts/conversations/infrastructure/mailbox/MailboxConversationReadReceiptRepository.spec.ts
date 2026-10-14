@@ -17,7 +17,6 @@ const openConversation: ConversationResource = {
   networkId: 'network-a',
   participantIds: ['identity-a', 'identity-b'],
   type: 'one-to-one',
-  unreadCount: 2,
 };
 
 describe(MailboxConversationReadReceiptRepository.name, () => {

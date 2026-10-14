@@ -1,7 +1,7 @@
 import { mock } from 'jest-mock-extended';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
-import type { PigeonMessagesApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessagesApi';
+import type { PigeonConversationDraftsApi } from '../../../../../contexts/messages/infrastructure/http/PigeonConversationDraftsApi';
 
 import { IdentityAccessContexts } from '../../../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
 import { ConversationDraft } from '../../../../../contexts/messages/domain/ConversationDraft';
@@ -10,7 +10,7 @@ import { PigeonDraftRepository } from '../../../../../contexts/messages/infrastr
 
 describe(PigeonDraftRepository.name, () => {
   it('hydrates decrypted draft projections returned by the API', async () => {
-    const messages = mock<PigeonMessagesApi>();
+    const messages = mock<PigeonConversationDraftsApi>();
     const identities = new IdentityAccessContexts();
     const repository = new PigeonDraftRepository(messages, identities);
     const session = { identity: { id: 'author-a' } } as Session;

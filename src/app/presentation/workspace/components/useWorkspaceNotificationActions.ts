@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 
 import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
 import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
@@ -14,7 +14,6 @@ import { NotificationSettingsPolicy } from '../../../../contexts/notifications/p
 import { copy } from '../../../../shared/presentation/i18n/copy';
 
 type WorkspaceNotificationActionsInput = {
-  conversations: ConversationResource[];
   nodeNetworks: NodeNetwork[];
   openSettings: Dispatch<
     SetStateAction<NotificationScopeSettingsTarget | null>
@@ -24,7 +23,6 @@ type WorkspaceNotificationActionsInput = {
 };
 
 export function useWorkspaceNotificationActions({
-  conversations,
   nodeNetworks,
   openSettings,
   settingsByScopeKey,
@@ -36,7 +34,6 @@ export function useWorkspaceNotificationActions({
   conversationSettingFor: (
     conversation: ConversationResource,
   ) => NotificationScopeSettingResource;
-  conversationsWithNotificationState: ConversationResource[];
   openCommunitySettings: (community: Community) => void;
   openConversationSettings: (
     conversation: ConversationResource,
@@ -45,21 +42,6 @@ export function useWorkspaceNotificationActions({
   toggleCommunityMute: (community: Community) => void;
   toggleConversationMute: (conversation: ConversationResource) => void;
 } {
-  const conversationsWithNotificationState = useMemo(
-    () =>
-      conversations.map((conversation) => {
-        const setting = NotificationSettingsPolicy.resolve(settingsByScopeKey, {
-          conversationId: conversation.id,
-          type: 'conversation',
-        });
-
-        return NotificationSettingsPolicy.isMuted(setting)
-          ? { ...conversation, unreadCount: 0 }
-          : conversation;
-      }),
-    [conversations, settingsByScopeKey],
-  );
-
   const conversationSettingFor = useCallback(
     (conversation: ConversationResource) =>
       NotificationSettingsPolicy.resolve(settingsByScopeKey, {
@@ -138,7 +120,6 @@ export function useWorkspaceNotificationActions({
   return {
     communitySettingFor,
     conversationSettingFor,
-    conversationsWithNotificationState,
     openCommunitySettings,
     openConversationSettings,
     toggleCommunityMute,

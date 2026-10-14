@@ -1,4 +1,4 @@
-import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { ConversationWithUnread } from '../../../../contexts/conversations/presentation/view-models/ConversationWithUnread';
 import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { SidebarConversationLoadingState } from './SidebarConversationLoadingState';
@@ -27,7 +27,7 @@ export class SidebarConversation {
   public readonly title: string;
 
   public constructor(
-    public readonly resource: ConversationResource,
+    public readonly resource: ConversationWithUnread,
     currentIdentityId: string,
     keychain: Session['keychain'],
     identityNames: IdentityNames,

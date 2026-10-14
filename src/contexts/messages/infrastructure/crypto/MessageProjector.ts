@@ -1,4 +1,3 @@
-import type { MessageListEnvelope } from '../http/MessageListEnvelope';
 import type { MessageProjectionCopy } from './MessageProjectionCopy';
 import type { MessageReactionRecord } from './MessageReactionRecord';
 import type { PlainMessage } from './PlainMessage';
@@ -225,22 +224,6 @@ export class MessageProjector {
     } catch {
       return unreadable;
     }
-  }
-
-  public list(value: unknown): {
-    messages: MessageResource[];
-    nextCursor?: null | string;
-  } {
-    const envelope = value as Partial<MessageListEnvelope> | null;
-
-    if (!Array.isArray(envelope?.messages)) {
-      throw new TypeError('Messages response requires a messages list.');
-    }
-
-    return {
-      messages: envelope.messages,
-      nextCursor: envelope.nextBeforeMessageId ?? null,
-    };
   }
 
   /** Projects one resource and reports whether its payload could be read. */

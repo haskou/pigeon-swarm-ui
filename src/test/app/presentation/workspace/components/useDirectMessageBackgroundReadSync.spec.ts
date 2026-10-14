@@ -7,7 +7,7 @@ import {
   jest,
 } from '@jest/globals';
 
-import type { ConversationResource } from '../../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { ConversationWithUnread } from '../../../../../contexts/conversations/presentation/view-models/ConversationWithUnread';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';
@@ -42,8 +42,8 @@ function conversation(
   id: string,
   type: 'group' | 'one-to-one' = 'one-to-one',
   unreadCount = 1,
-): ConversationResource {
-  return { id, type, unreadCount } as unknown as ConversationResource;
+): ConversationWithUnread {
+  return { id, type, unreadCount } as unknown as ConversationWithUnread;
 }
 
 async function settle(): Promise<void> {
@@ -58,7 +58,7 @@ async function advance(ms: number): Promise<void> {
 }
 
 function mountBackgroundReadSync(
-  conversations: ConversationResource[],
+  conversations: ConversationWithUnread[],
   activeConversationId: string | null = null,
 ) {
   const onConversationRead = jest.fn<(conversationId: string) => void>();

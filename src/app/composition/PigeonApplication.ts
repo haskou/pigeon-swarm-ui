@@ -281,7 +281,6 @@ export class PigeonApplication {
     const conversationMapper = new ConversationMapper();
     const conversationRepository = new PigeonConversationRepository(
       gateway.conversationsGateway,
-      gateway.messagesGateway,
       conversationContexts,
       conversationMapper,
     );
@@ -307,7 +306,6 @@ export class PigeonApplication {
           conversationRepository,
         ),
         readMarker: new ConversationReadMarker(
-          conversationRepository,
           new MailboxConversationReadReceiptRepository(
             conversationContexts,
             gateway.directMessageMailbox,
@@ -378,7 +376,7 @@ export class PigeonApplication {
       },
     );
     const conversationDraftRepository = new PigeonDraftRepository(
-      gateway.messagesApi,
+      gateway.conversationDrafts,
       identityContexts,
     );
     const directMessageRepository = new MailboxDirectMessageRepository(
@@ -410,7 +408,7 @@ export class PigeonApplication {
         new MessagePinner(directMessageRepository),
         new MessageUnpinner(directMessageRepository),
       ),
-      gateway.messagesGateway,
+      gateway.linkPreviews,
     );
     const networkRepository = new PigeonNetworkRepository(
       gateway.node,

@@ -20,21 +20,4 @@ export class PigeonConversationsApi {
 
     return this.mapper.list(raw);
   }
-
-  public async markReadUntil(
-    session: Session,
-    conversationId: string,
-    messageId: string,
-  ): Promise<void> {
-    const path = `/conversations/${encodeURIComponent(
-      conversationId,
-    )}/messages/read-until`;
-    const body = { messageId };
-
-    await this.http.request(path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'PUT', path, body),
-      method: 'PUT',
-    });
-  }
 }

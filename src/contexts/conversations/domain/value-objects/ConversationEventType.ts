@@ -8,7 +8,6 @@ const values = [
   'ConversationParticipantInvited',
   'ConversationParticipantLeft',
   'ConversationParticipantRemoved',
-  'ConversationRead',
 ] as const;
 
 export class ConversationEventType extends Enum<(typeof values)[number]> {
@@ -39,8 +38,6 @@ export class ConversationEventType extends Enum<(typeof values)[number]> {
   public static readonly PARTICIPANT_REMOVED = new ConversationEventType(
     'ConversationParticipantRemoved',
   );
-
-  public static readonly READ = new ConversationEventType('ConversationRead');
 
   public static fromPrimitives(value: string): ConversationEventType {
     const type = values.find((candidate) => candidate === value);

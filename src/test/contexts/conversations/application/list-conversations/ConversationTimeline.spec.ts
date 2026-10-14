@@ -4,7 +4,6 @@ const base = {
   adminIds: [],
   participantIds: ['identity-a'],
   type: 'one-to-one' as const,
-  unreadCount: 0,
 };
 
 describe('conversation ordering', () => {

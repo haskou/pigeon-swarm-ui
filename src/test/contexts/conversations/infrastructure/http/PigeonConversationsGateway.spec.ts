@@ -26,14 +26,11 @@ function conversationsDouble(): {
     >
   >;
   gateway: PigeonConversationsGateway;
-  conversations: jest.Mocked<
-    Pick<PigeonConversationsApi, 'list' | 'markReadUntil'>
-  >;
+  conversations: jest.Mocked<Pick<PigeonConversationsApi, 'list'>>;
 } {
   const conversations = {
     list: jest.fn(),
-    markReadUntil: jest.fn(),
-  } as jest.Mocked<Pick<PigeonConversationsApi, 'list' | 'markReadUntil'>>;
+  } as jest.Mocked<Pick<PigeonConversationsApi, 'list'>>;
   const commands = {
     addMember: jest.fn(),
     create: jest.fn(),

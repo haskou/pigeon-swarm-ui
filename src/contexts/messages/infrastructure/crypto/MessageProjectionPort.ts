@@ -26,9 +26,4 @@ export interface MessageProjectionPort {
     messages: MessageResource[],
     signal?: AbortSignal,
   ): Promise<ChatMessage[]>;
-
-  list(value: unknown): {
-    messages: MessageResource[];
-    nextCursor?: null | string;
-  };
 }
