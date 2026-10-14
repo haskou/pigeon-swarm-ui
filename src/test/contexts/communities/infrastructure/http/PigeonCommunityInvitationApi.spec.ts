@@ -1,10 +1,12 @@
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import { createHash } from 'crypto';
 
 import type { CommunityResource as Community } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
+import { CommunityModerationLogSigner } from '../../../../../contexts/communities/infrastructure/http/CommunityModerationLogSigner';
 import { CommunityOperationProof } from '../../../../../contexts/communities/infrastructure/http/CommunityOperationProof';
 import { PigeonCommunityInvitationApi } from '../../../../../contexts/communities/infrastructure/http/PigeonCommunityInvitationApi';
 import { ScopeFrontierReader } from '../../../../../shared/infrastructure/http/ScopeFrontierReader';
@@ -112,6 +114,40 @@ describe(PigeonCommunityInvitationApi.name, () => {
       sequence: 0,
       store: 'requests',
     });
+  });
+
+  it('logs a created invite link by its reference, never the token', async () => {
+    const log = jest.spyOn(CommunityModerationLogSigner.prototype, 'sign');
+    const request = jest
+      .fn<Promise<unknown>, [string, { body: string }]>()
+      .mockResolvedValue({});
+    const http = { request } as unknown as HttpJsonClient;
+    const session = {
+      deviceCredentialKeyPair: await KeyPair.generate(),
+      identity: { id: 'identity-1' },
+    } as unknown as Session;
+    const api = new PigeonCommunityInvitationApi(
+      http,
+      { headers: jest.fn().mockResolvedValue({}) } as unknown as RequestSigner,
+      {} as never,
+      publicMutationSignerAt(),
+    );
+
+    await api.createInviteLink(session, 'community-1');
+
+    const sent: { mutation: { recordId: string } } = JSON.parse(
+      request.mock.calls[0]?.[1].body ?? '{}',
+    );
+    const token = sent.mutation.recordId;
+    const reference = createHash('sha256')
+      .update(`pigeon:community-invite-reference:v1\n${token}`)
+      .digest('base64url');
+
+    expect(log.mock.calls[0]?.[1].target).toEqual({
+      id: reference,
+      type: 'invite',
+    });
+    expect(JSON.stringify(log.mock.calls[0]?.[1])).not.toContain(token);
   });
 
   it('signs invite acceptance with the invite reference, never the token', async () => {
