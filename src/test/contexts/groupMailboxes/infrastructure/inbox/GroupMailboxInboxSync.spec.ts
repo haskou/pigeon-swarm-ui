@@ -196,6 +196,7 @@ const member = (name: string): Member => {
     stores.state,
     stores.generations,
     () => Promise.resolve(roster),
+    () => Promise.resolve([cast[name].deviceCredential()]),
     () => now,
   );
   const rows = new Map<string, GroupMailboxOutboxRow>();

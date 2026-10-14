@@ -453,7 +453,6 @@ export class PigeonApiGateway {
       channel: mailboxChannel,
       client: new PigeonMailboxClient(http),
       composer: this.messageCommands,
-      devices: listDeviceCredentials,
       direct: (session) =>
         new GroupMailboxNotificationLink(
           session,
@@ -469,6 +468,10 @@ export class PigeonApiGateway {
       roster: (session, conversationId) =>
         groupRoster.of(session, conversationId),
       storage: scopeClientStorageKey('pigeon-group'),
+      verifiedDevices: async (session) =>
+        (await deviceAuthorization.verifiedDevices(session)).map((device) =>
+          device.valueOf(),
+        ),
     });
     this.notificationsGateway = new PigeonNotificationsGateway(
       notificationsApi,

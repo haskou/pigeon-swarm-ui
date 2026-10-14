@@ -2,6 +2,8 @@
 export interface MlsMembershipChange {
   /** The identity whose leaf made the commit. */
   readonly committer: string;
+  /** The device credential of the leaf that made the commit. */
+  readonly committerDevice: string;
   readonly added: readonly string[];
   readonly removed: readonly string[];
 }

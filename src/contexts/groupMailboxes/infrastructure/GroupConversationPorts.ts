@@ -16,8 +16,6 @@ export type GroupConversationPorts = {
   >;
   client: Pick<PigeonMailboxClient, 'delete'>;
   composer: Pick<PigeonMessageCommandsApi, 'composeEdit' | 'withSentRecord'>;
-  /** The device credentials of this identity's current devices. */
-  devices: (session: Session) => Promise<readonly string[]>;
   /** The 1:1 carrier of control letters for one signed-in identity. */
   direct: (session: Session) => GroupMailboxDirectLink;
   notifications: GroupMailboxNotificationPages;
@@ -35,4 +33,9 @@ export type GroupConversationPorts = {
   ) => Promise<GroupMailboxRoster>;
   /** Prefix of every local database the group mailbox writes. */
   storage: string;
+  /**
+   * Credentials this identity's signed transitions authorize at their head,
+   * never the node's device list; rejects when unproven or removed.
+   */
+  verifiedDevices: (session: Session) => Promise<readonly string[]>;
 };

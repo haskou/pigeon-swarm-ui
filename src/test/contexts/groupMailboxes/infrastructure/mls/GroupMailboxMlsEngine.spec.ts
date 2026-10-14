@@ -39,6 +39,9 @@ const managedByAlice = (): GroupMailboxRoster =>
 const unmanaged = (): GroupMailboxRoster =>
   GroupMailboxRoster.of({ adminIds: [], participantIds: NAMES.map(id) });
 
+/** The devices of an identity its signed transitions authorize: not d9. */
+const CURRENT_DEVICES = ['d1', 'd2', 'd3', 'd4'];
+
 const engine = (
   name: string,
   options: {
@@ -47,6 +50,8 @@ const engine = (
     generations?: GroupMailboxGenerationRepository;
     rosterView?: () => GroupMailboxRoster;
     store?: MlsStateStore;
+    /** The devices of its identity this engine verified, by name. */
+    verified?: () => readonly string[];
   } = {},
 ): GroupMailboxMlsEngine => {
   const stores = sealedGroupStores(
@@ -59,6 +64,12 @@ const engine = (
     options.store ?? stores.state,
     options.generations ?? stores.generations,
     () => Promise.resolve(options.rosterView?.() ?? roster),
+    () =>
+      Promise.resolve(
+        (options.verified?.() ?? CURRENT_DEVICES).map((device) =>
+          cast[name].deviceCredential(device),
+        ),
+      ),
     () => clock,
   );
 };
@@ -600,7 +611,11 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
 
   it('rejects a welcome of its own identity into a group nobody else is in', async () => {
     // A revoked device keeps the identity key and could make such a group.
-    const revoked = engine('bob', { device: 'd9', rosterView: unmanaged });
+    const revoked = engine('bob', {
+      device: 'd9',
+      rosterView: unmanaged,
+      verified: () => ['d2', 'd9'],
+    });
     const phone = engine('bob', { device: 'd2' });
     await revoked.createGroup(CONVERSATION);
     const forged = await revoked.add(
@@ -628,7 +643,11 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
     async (_case, listed) => {
       // A revoked device keeps the identity key and could add anyone; joining
       // checks every leaf's identity against the roster before the inviter.
-      const revoked = engine('bob', { device: 'd9', rosterView: unmanaged });
+      const revoked = engine('bob', {
+        device: 'd9',
+        rosterView: unmanaged,
+        verified: () => ['d2', 'd9'],
+      });
       const phone = engine('bob', {
         device: 'd2',
         rosterView: () =>
@@ -658,6 +677,128 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
         ),
       ).rejects.toThrow(MlsRejectedError);
       expect(await phone.devices(CONVERSATION)).toEqual([]);
+    },
+  );
+
+  it('rejects a welcome of its own identity from a device its signed transitions no longer authorize', async () => {
+    // The revoked laptop still holds the identity key and still believes
+    // itself current; it builds a look-alike group with someone else in it.
+    const revoked = engine('bob', {
+      device: 'd9',
+      rosterView: unmanaged,
+      verified: () => ['d2', 'd9'],
+    });
+    const phone = engine('bob', { device: 'd2', rosterView: unmanaged });
+    await revoked.createGroup(CONVERSATION);
+    await revoked.add(
+      CONVERSATION,
+      [await engine('alice').createKeyPackage()],
+      sent,
+    );
+    const forged = await revoked.add(
+      CONVERSATION,
+      [await phone.createKeyPackage()],
+      sent,
+    );
+
+    await expect(
+      phone.join(
+        CONVERSATION,
+        forged.welcome!,
+        forged.generation.index,
+        id('bob'),
+      ),
+    ).rejects.toThrow('The welcome is not from a member who may add devices');
+    expect(await phone.devices(CONVERSATION)).toEqual([]);
+  });
+
+  it('rejects a welcome another member signed in the name of the inviter the node names', async () => {
+    // Dave may not add anyone; the node claims Alice, who holds a leaf.
+    const forger = engine('dave', { rosterView: unmanaged });
+    const carol = engine('carol');
+    await forger.createGroup(CONVERSATION);
+    await forger.add(
+      CONVERSATION,
+      [await engine('alice').createKeyPackage()],
+      sent,
+    );
+    const forged = await forger.add(
+      CONVERSATION,
+      [await carol.createKeyPackage()],
+      sent,
+    );
+
+    await expect(
+      carol.join(
+        CONVERSATION,
+        forged.welcome!,
+        forged.generation.index,
+        id('alice'),
+      ),
+    ).rejects.toThrow('The welcome is not from a member who may add devices');
+    expect(await carol.devices(CONVERSATION)).toEqual([]);
+  });
+
+  it.each([
+    [
+      'adds a device',
+      async (laptop: GroupMailboxMlsEngine) =>
+        laptop.add(
+          CONVERSATION,
+          [await engine('bob', { device: 'd2' }).createKeyPackage()],
+          sent,
+        ),
+    ],
+    [
+      'removes a device',
+      async (laptop: GroupMailboxMlsEngine) =>
+        (await laptop.removeDevices(
+          CONVERSATION,
+          [cast.bob.deviceCredential('d1')],
+          sent,
+        ))!,
+    ],
+  ])(
+    'rejects a commit that %s of its own identity from a device its signed transitions no longer authorize',
+    async (_case, change) => {
+      let current = ['d1', 'd9'];
+      const alice = engine('alice');
+      const bob = engine('bob', { verified: () => current });
+      const laptop = engine('bob', {
+        device: 'd9',
+        verified: () => ['d1', 'd2', 'd9'],
+      });
+      await alice.createGroup(CONVERSATION);
+      await join(alice, [bob]);
+      const added = await bob.add(
+        CONVERSATION,
+        [await laptop.createKeyPackage()],
+        sent,
+      );
+      await alice.applyCommit(CONVERSATION, added.commit);
+      await laptop.join(
+        CONVERSATION,
+        added.welcome!,
+        added.generation.index,
+        id('bob'),
+      );
+      // The phone revokes the laptop before the laptop's leaf is removed.
+      current = ['d1'];
+      const made = await change(laptop);
+
+      await expect(
+        bob.applyCommit(CONVERSATION, made.commit),
+      ).rejects.toBeInstanceOf(MlsRejectedError);
+      expect(await bob.devices(CONVERSATION)).toEqual(
+        [
+          cast.bob.deviceCredential('d1'),
+          cast.bob.deviceCredential('d9'),
+        ].sort(),
+      );
+      // Another identity cannot read Bob's transitions and follows the roster.
+      await expect(
+        alice.applyCommit(CONVERSATION, made.commit),
+      ).resolves.toMatchObject({ kind: 'applied' });
     },
   );
 

@@ -9,6 +9,8 @@ import {
   type KeyPackage,
   type Proposal,
   type PrivateKeyPackage,
+  type RatchetTree,
+  type Welcome,
   createApplicationMessage,
   createCommit,
   createGroup,
@@ -30,7 +32,10 @@ import {
   mlsExporter,
   processPrivateMessage,
 } from 'ts-mls';
+import { makeKeyPackageRef } from 'ts-mls/keyPackage.js';
 import { decryptSenderData } from 'ts-mls/privateMessage.js';
+import { accumulatePskSecret } from 'ts-mls/pskIndex.js';
+import { decryptGroupInfo, decryptGroupSecrets } from 'ts-mls/welcome.js';
 
 import type { MlsLeafCredential } from './MlsLeafCredential';
 import type { MlsLeafSigner } from './MlsLeafSigner';
@@ -202,12 +207,12 @@ const membershipChange = (
   committerLeaf: number,
   proposals: readonly Proposal[],
 ): MlsMembershipChange => {
-  const identityAt = (leafIndex: number): string => {
+  const ownerAt = (leafIndex: number): MlsLeafOwner => {
     const node = tree[leafIndex * 2];
 
     if (node?.nodeType !== 'leaf') throw new MlsRejectedError('Unknown leaf');
 
-    return MlsIdentityCredential.ownerOf(node.leaf.credential).identityId;
+    return MlsIdentityCredential.ownerOf(node.leaf.credential);
   };
   const added: string[] = [];
   const removed: string[] = [];
@@ -220,13 +225,19 @@ const membershipChange = (
         ).identityId,
       );
     } else if (proposal.proposalType === 'remove') {
-      removed.push(identityAt(proposal.remove.removed));
+      removed.push(ownerAt(proposal.remove.removed).identityId);
     } else if (proposal.proposalType !== 'update') {
       throw new MlsRejectedError('Unsupported proposal');
     }
   }
+  const committer = ownerAt(committerLeaf);
 
-  return { added, committer: identityAt(committerLeaf), removed };
+  return {
+    added,
+    committer: committer.identityId,
+    committerDevice: committer.deviceCredential,
+    removed,
+  };
 };
 
 /** A published commit and the roster revision its committer bound. */
@@ -245,6 +256,46 @@ const readCommit = (
   } catch {
     return undefined;
   }
+};
+
+/**
+ * The leaf that signed a welcome. The join verified the GroupInfo signature
+ * but does not say whose it is; the same secrets open it again to name the
+ * signing leaf.
+ */
+const welcomeSigner = async (
+  welcome: Welcome,
+  key: MlsKeyPackageBundle,
+  tree: RatchetTree,
+  cs: CiphersuiteImpl,
+): Promise<MlsLeafOwner> => {
+  const secrets = await decryptGroupSecrets(
+    await cs.hpke.importPrivateKey(key.privatePackage.initPrivateKey),
+    await makeKeyPackageRef(key.publicPackage, cs.hash),
+    welcome,
+    cs.hpke,
+  );
+
+  if (!secrets) throw new MlsRejectedError('Welcome secrets do not open');
+  const [pskSecret] = await accumulatePskSecret(
+    secrets.psks,
+    emptyPskIndex,
+    cs,
+    new Uint8Array(cs.kdf.size),
+  );
+  const info = await decryptGroupInfo(
+    welcome,
+    secrets.joinerSecret,
+    pskSecret,
+    cs,
+  );
+  const signer = info && tree[Number(info.signer) * 2];
+
+  if (signer?.nodeType !== 'leaf') {
+    throw new MlsRejectedError('Welcome signer is unknown');
+  }
+
+  return MlsIdentityCredential.ownerOf(signer.leaf.credential);
 };
 
 interface AppliedEpoch {
@@ -278,6 +329,11 @@ export class MlsGroup {
     private readonly applied: Map<bigint, AppliedEpoch>,
     private removed: boolean,
     private bound: readonly string[],
+    /**
+     * The leaf that signed the welcome this group was joined from; undefined
+     * for a group this device created or restored.
+     */
+    public readonly welcomer: MlsLeafOwner | undefined,
   ) {}
 
   public static async create(
@@ -302,6 +358,7 @@ export class MlsGroup {
       new Map(),
       false,
       policy.frontier(),
+      undefined,
     );
   }
 
@@ -320,12 +377,13 @@ export class MlsGroup {
     if (!decoded || decoded.wireformat !== 'mls_welcome') {
       throw new MlsRejectedError('Not an MLS welcome');
     }
+    const cs = await suite();
     const [state, extensions] = await joinGroupWithExtensions(
       decoded.welcome,
       key.publicPackage,
       key.privatePackage,
       emptyPskIndex,
-      await suite(),
+      cs,
       undefined,
       undefined,
       clientConfig,
@@ -342,6 +400,12 @@ export class MlsGroup {
     );
 
     if (!frontier) throw new MlsRejectedError('Welcome binds no revision');
+    const welcomer = await welcomeSigner(
+      decoded.welcome,
+      key,
+      state.ratchetTree,
+      cs,
+    );
     const group = new MlsGroup(
       groupId,
       key.owner,
@@ -350,6 +414,7 @@ export class MlsGroup {
       new Map(),
       false,
       frontier,
+      welcomer,
     );
 
     if (!group.identities().every((id) => policy.admits(id, frontier))) {
@@ -380,6 +445,7 @@ export class MlsGroup {
       // A device removed before a restart must stay unable to send.
       decoded.groupActiveState.kind !== 'active',
       frontier,
+      undefined,
     );
   }
 

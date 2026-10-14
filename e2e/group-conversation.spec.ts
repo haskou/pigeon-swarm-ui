@@ -163,7 +163,7 @@ test('a member removed from a group conversation stops reading it', async ({
 test('both devices of an identity read a group; a revoked one stops reading', async ({
   browser,
 }) => {
-  test.setTimeout(1_200_000);
+  test.setTimeout(1_800_000);
   const suffix = Date.now().toString(36);
   const password = `P455uruD3su!${suffix}`;
   const groupName = `Group ${suffix}`;
@@ -175,6 +175,7 @@ test('both devices of an identity read a group; a revoked one stops reading', as
   const alice = await newIsolatedPage(browser);
   const phone = await newIsolatedPage(browser);
   const laptop = await newIsolatedPage(browser);
+  const tablet = await newIsolatedPage(browser);
   const reconciled: string[] = [];
 
   // The phone, holding Bob's first leaf, adds and removes his other leaves.
@@ -247,9 +248,18 @@ test('both devices of an identity read a group; a revoked one stops reading', as
       phone.getByText('after the reload', { exact: true }),
     ).toBeVisible({ timeout: SLOW });
     await expect(laptop.getByText('after the reload')).toHaveCount(0);
+
+    // A tablet paired after the revoke gets its leaf in the real group from
+    // the phone. The revoked laptop is signed out and wiped by its own
+    // removal check by now, so a welcome from it is refused only in
+    // GroupMailboxMlsEngine.spec and GroupConversationMailbox.spec.
+    await pairNewDevice(phone, tablet, bob);
+    await openGroup(tablet, groupName);
+    await sendUntilEveryoneReads(alice, [phone, tablet], 'to the tablet');
   } finally {
     await alice.context().close();
     await phone.context().close();
     await laptop.context().close();
+    await tablet.context().close();
   }
 });
