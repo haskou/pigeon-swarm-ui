@@ -18,6 +18,11 @@ export class DeviceAuthorizationRevision extends Integer {
     super(value);
   }
 
+  /** Ascending numeric order, for sorting transitions by revision. */
+  public compareTo(other: DeviceAuthorizationRevision): number {
+    return this.valueOf() - other.valueOf();
+  }
+
   public next(): DeviceAuthorizationRevision {
     return DeviceAuthorizationRevision.fromNumber(this.valueOf() + 1);
   }

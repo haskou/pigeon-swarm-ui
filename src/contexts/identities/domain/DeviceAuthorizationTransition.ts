@@ -107,7 +107,7 @@ export class DeviceAuthorizationTransition {
     previousRevision: DeviceAuthorizationRevision,
   ): DeviceAuthorizationCompromisedCredentialPayload[] | undefined {
     const sorted = [...(credentials ?? [])].sort((left, right) =>
-      left.credential.valueOf() < right.credential.valueOf() ? -1 : 1,
+      left.credential.isLessThan(right.credential) ? -1 : 1,
     );
 
     if (sorted.length === 0) return undefined;
@@ -117,14 +117,17 @@ export class DeviceAuthorizationTransition {
       new Error('Too many compromised credentials.'),
     );
     assert(
-      new Set(sorted.map((entry) => entry.credential.valueOf())).size ===
-        sorted.length,
+      sorted.every(
+        (entry, index) =>
+          index === 0 ||
+          sorted[index - 1].credential.isLessThan(entry.credential),
+      ),
       new Error('Duplicate compromised credential.'),
     );
 
     return sorted.map((entry) => {
       assert(
-        entry.compromisedSince.valueOf() <= previousRevision.valueOf(),
+        entry.compromisedSince.isLessOrEqualThan(previousRevision),
         new Error('Compromise follows the previous revision.'),
       );
 

@@ -35,6 +35,14 @@ describe(DevicePairingInvitation.name, () => {
     expect(decoded.getRevision().valueOf()).toBe(3);
   });
 
+  it('accepts an invitation at its exact expiration', async () => {
+    const source = await invitation();
+
+    expect(() =>
+      DevicePairingCodeReader.invitation(source.toCode(), new Timestamp(2_000)),
+    ).not.toThrow();
+  });
+
   it('rejects expiration and tampering', async () => {
     const source = await invitation();
 
