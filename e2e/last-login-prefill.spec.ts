@@ -22,6 +22,10 @@ test('prefills the last login identity after reload and still requires the passw
     await registerIdentity(page, identity);
     await page.reload();
 
+    await expect(page.getByTestId('auth-identity-preview')).toContainText(
+      `@${identity.handle}`,
+      { timeout: 30_000 },
+    );
     await expect(page.getByTestId('auth-identity-input')).not.toHaveValue('');
     await page.getByTestId('auth-password-input').fill(identity.password);
     await page.getByTestId('auth-submit-button').click();
