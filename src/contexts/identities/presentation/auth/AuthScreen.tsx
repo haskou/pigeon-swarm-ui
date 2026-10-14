@@ -1,5 +1,6 @@
 import { FormEvent, type ReactElement, useEffect, useState } from 'react';
 
+import type { DeviceRemoval } from '../../../../app/presentation/DeviceRemoval';
 import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
 import type { NetworkSynchronizationStatus } from '../../../networks/presentation/view-models/NetworkSynchronizationStatus';
 import type { NodeNetwork } from '../../../networks/presentation/view-models/NodeNetwork';
@@ -57,6 +58,8 @@ interface AuthScreenProps {
     conversations: ConversationResource[],
   ) => void;
   peersLoading: boolean;
+  /** A removal of this device verified while it was signed in. */
+  removal: DeviceRemoval | null;
 }
 
 export function AuthScreen({
@@ -66,6 +69,7 @@ export function AuthScreen({
   nodeOwnerId,
   onAuthenticated,
   peersLoading,
+  removal,
 }: AuthScreenProps): ReactElement {
   const [mode, setMode] = useState<AuthMode>('login');
   const [identityId, setIdentityId] = useState(loadLastLoginIdentity);
@@ -89,9 +93,11 @@ export function AuthScreen({
   const [state, setState] = useState<LoadState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [removedIdentityId, setRemovedIdentityId] = useState<string | null>(
-    null,
+    removal?.identityId ?? null,
   );
-  const [removedEraseFailed, setRemovedEraseFailed] = useState(false);
+  const [removedEraseFailed, setRemovedEraseFailed] = useState(
+    removal?.state === 'erase-failed',
+  );
   const [loginProgressStep, setLoginProgressStep] =
     useState<LoginIdentityProgressStep | null>(null);
   const [admissionNotice, setAdmissionNotice] = useState<string | null>(null);
@@ -295,7 +301,6 @@ export function AuthScreen({
         );
 
         if (erased) {
-          clearLastLoginIdentity();
           setIdentityId('');
           setIdentityPreviewLookup('');
         }

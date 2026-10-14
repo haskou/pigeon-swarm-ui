@@ -178,9 +178,21 @@ root, as in step 3 above. The vault record goes only when every other step
 succeeded. A partial erase keeps it, so the next unlock proves the removal
 again and retries. The screen says "This device was removed from your
 account." and that the saved messages were erased, forgets the remembered
-identity, and offers "Pair this device again". When the erase failed, it says
+identity (only after the vault record is gone, and only when it is this
+identity), and offers "Pair this device again". When the erase failed, it says
 so instead. Nothing is revoked on the node, and the identity stays recoverable
 with the recovery key.
+
+A device that stays signed in makes the same read every 30 seconds
+(`DeviceRemovalWatch.CHECK_INTERVAL_MS`), counted from sign-in or from the
+last change of its session, one read at a time. A revoke made on another
+device is therefore verified within 30 seconds plus one transitions read. On
+a verified removal the session stops its outboxes, realtime connections and
+workers and closes; once the workspace has unmounted, `eraseRemovedDevice`
+runs as above, and the login screen shows the same notice. A newer head that
+still authorizes the device is stored and replaces the session's checkpoint.
+Every other outcome of an in-session read, listed below, is ignored: the
+session stays open, nothing is erased, and the next read tries again.
 
 Anything else is not a removal and erases nothing:
 
@@ -196,9 +208,10 @@ Residual risks:
 
 - A node can delay the wipe or suppress it. It can withhold the log, refuse
   the read, or serve the history only up to before the removal; the device
-  then keeps signing in while the node lets it, or fails sign-in, and keeps its
-  data. A node cannot forge a removal: that needs a signature from a key the
-  replayed state authorizes.
+  then keeps signing in and stays signed in while the node lets it, or fails
+  sign-in, and keeps its data. The 30-second bound holds only while the node
+  serves the log. A node cannot forge a removal: that needs a signature from a
+  key the replayed state authorizes.
 - The verdict depends on the transitions the node serves. Leaving out a
   concurrent sibling transition, or choosing which of several genuine
   competing recoveries to serve, can change which device a log removes.
@@ -273,12 +286,20 @@ retargeted, unsigned, stale or foreign removal, an untrusted identity record, a
 recovery authority mismatch and every HTTP or network failure never yield
 `DeviceRemovedError`. `eraseRemovedDevice.spec.ts` and
 `deviceRemovedCopy.spec.ts` (`yarn test`) cover the erase steps, the vault
-record kept after a failed step, the failure result, and the sign-in copy.
-`e2e/device-revoke-mailbox.spec.ts` signs the revoked device in again against
-a real node and checks the message, that no history row is left and that the
-login screen no longer remembers the identity. It then refuses the transition
-read and serves a forged revocation for a device that is still authorized, and
-checks that neither shows the removal notice nor erases anything.
+record kept after a failed step, the remembered identity forgotten only after
+a full erase, the failure result, and the sign-in copy.
+`DeviceRemovalWatch.spec.ts` (`yarn test`) covers the 30-second interval,
+that only `DeviceRemovedError` closes the session while HTTP, network and
+unproven-log failures are ignored, no overlapping reads, the advanced head,
+and nothing after stop. `e2e/device-revoke-mailbox.spec.ts` keeps the revoked
+device signed in on a real node while its transition reads are refused, and
+checks that it stays signed in, keeps its rows and never shows a message sent
+after the revoke. Once the reads go through, the still signed-in device shows
+the removal notice within the bound, no history row is left and the login
+screen no longer remembers the identity. It then serves a forged revocation to
+the signed-in surviving device for longer than the bound, and refuses the read
+and forges a revocation at its sign-in, and checks that none of these shows
+the removal notice or erases anything.
 
 ## Out of scope
 

@@ -115,6 +115,17 @@ export class PigeonIdentitiesFacade {
     return await this.gateway.listDevices(session);
   }
 
+  /**
+   * Replays the signed device transitions against the local checkpoint:
+   * resolves the advanced session, or throws DeviceRemovedError on a verified
+   * removal of this device.
+   */
+  public async synchronizeDeviceAuthorization(
+    session: Session,
+  ): Promise<Session> {
+    return await this.gateway.synchronizeDeviceAuthorization(session);
+  }
+
   public async deviceSealedRootGeneration(
     session: Session,
   ): Promise<number | null> {
