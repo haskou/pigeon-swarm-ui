@@ -15,6 +15,7 @@ import type { DirectMessageOwnCopies } from './DirectMessageOwnCopies';
 import type { RecipientMailboxRouter } from './RecipientMailboxRouter';
 
 import { ConversationType } from '../../../conversations/domain/value-objects/ConversationType';
+import { IdentityMatch } from '../../../identities/domain/IdentityMatch';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { sessionRootKey } from '../../../identities/infrastructure/session/sessionRootKey';
 import { DirectMailboxEligibility } from '../../../mailboxes/domain/DirectMailboxEligibility';
@@ -117,10 +118,7 @@ export class DirectMessageSender {
    */
   private peerOf(session: Session, conversation: ConversationResource): string {
     const peer = conversation.participantIds.find(
-      (identityId) =>
-        !IdentityId.fromString(identityId).isEqual(
-          IdentityId.fromString(session.identity.id),
-        ),
+      (identityId) => !IdentityMatch.isSame(identityId, session.identity.id),
     );
 
     if (
@@ -237,9 +235,7 @@ export class DirectMessageSender {
   ): Uint8Array {
     return DirectMessageMailboxRecord.encode(
       record,
-      IdentityId.fromString(recipientIdentityId).isEqual(
-        IdentityId.fromString(session.identity.id),
-      )
+      IdentityMatch.isSame(recipientIdentityId, session.identity.id)
         ? DirectMessageAuthorship.tag(
             sessionRootKey(session).getBuffer(),
             record,

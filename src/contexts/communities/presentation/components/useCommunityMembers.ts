@@ -12,7 +12,7 @@ import type { CommunityMemberListItem } from './communityMembersPanel';
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import { shortId } from '../../../../shared/presentation/formatting';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
-import { IdentityMatch } from '../../../identities/presentation/view-models/IdentityMatch';
+import { IdentityMatch } from '../../../identities/domain/IdentityMatch';
 import { identityName } from '../../../identities/presentation/view-models/identityDisplay';
 import { loadIdentityPicture } from './communityImages';
 import { memberPrimaryName } from './communityMemberNames';

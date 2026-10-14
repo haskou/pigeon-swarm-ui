@@ -14,7 +14,7 @@ import type { GroupInvitationDialogController } from './useGroupInvitationDialog
 import type { GroupRosterActionsController } from './useGroupRosterActions';
 
 import { memberPrimaryName } from '../../../../contexts/communities/presentation/components/communityMemberNames';
-import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
+import { IdentityMatch } from '../../../../contexts/identities/domain/IdentityMatch';
 import { profileAnchorFromTarget } from '../../../../contexts/identities/presentation/view-models/profilePopoverAnchor';
 
 const ConversationDataDialog = lazy(() =>

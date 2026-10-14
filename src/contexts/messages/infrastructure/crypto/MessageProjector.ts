@@ -12,7 +12,7 @@ import type { ChatMessage } from '../../domain/ChatMessage';
 import type { MessageReaction } from '../http/MessageReaction';
 import type { MessageResource } from '../http/MessageResource';
 
-import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
+import { IdentityMatch } from '../../../identities/domain/IdentityMatch';
 import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
 import { PollMessageProjection } from './PollMessageProjection';
 
@@ -32,23 +32,12 @@ export class MessageProjector {
       attachments: [],
       authorIdentityId,
       id: this.messageId(message),
-      mine: this.isOwn(session, authorIdentityId),
+      mine: IdentityMatch.isSame(authorIdentityId, session.identity.id),
       raw: { ...message, reactions },
       reactions,
       replyToMessageId: message.replyToMessageId,
       timestamp: this.messageTimestamp(message),
     };
-  }
-
-  /** Author ids come from the server: a rejected id is never own. */
-  private isOwn(session: Session, authorIdentityId: string): boolean {
-    try {
-      return IdentityId.fromString(authorIdentityId).isEqual(
-        IdentityId.fromString(session.identity.id),
-      );
-    } catch {
-      return false;
-    }
   }
 
   private authorIdentityId(message: MessageResource): string {
@@ -175,7 +164,7 @@ export class MessageProjector {
       encrypted: false,
       linkPreview: parsed.linkPreview,
       mentions: parsed.mentions ?? message.mentions,
-      mine: authorIdentityId === currentIdentityId,
+      mine: IdentityMatch.isSame(authorIdentityId, currentIdentityId),
       raw: message,
       replyPreview: parsed.reply,
       replyToMessageId: base.replyToMessageId ?? parsed.reply?.messageId,
@@ -221,7 +210,8 @@ export class MessageProjector {
       const text = message.encryptedPayload ?? '';
       const parsed = JSON.parse(text) as PlainMessage;
 
-      if (parsed.authorIdentityId !== base.authorIdentityId) return unreadable;
+      if (!IdentityMatch.isSame(parsed.authorIdentityId, base.authorIdentityId))
+        return unreadable;
 
       return {
         message: this.projectDecrypted(

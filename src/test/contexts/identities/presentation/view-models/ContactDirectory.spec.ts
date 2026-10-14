@@ -2,6 +2,8 @@ import type { IdentityResource } from '../../../../../contexts/identities/infras
 
 import { ContactDirectory } from '../../../../../contexts/identities/presentation/view-models/ContactDirectory';
 
+const OWN_ID = 'MCowBQYDK2VwAyEAown';
+
 function identity(id: string, name: string, handle?: string): IdentityResource {
   return { id, profile: { handle, name } } as IdentityResource;
 }
@@ -9,8 +11,8 @@ function identity(id: string, name: string, handle?: string): IdentityResource {
 describe(ContactDirectory.name, () => {
   it('remembers the display name of resolved contacts, newest first', () => {
     const directory = ContactDirectory.of([])
-      .remember({ ada: identity('ada', 'Ada') }, 1)
-      .remember({ grace: identity('grace', '', 'grace_h') }, 2);
+      .remember({ ada: identity('ada', 'Ada') }, 1, OWN_ID)
+      .remember({ grace: identity('grace', '', 'grace_h') }, 2, OWN_ID);
 
     expect(directory.entries()).toEqual([
       { identityId: 'grace', name: '@grace_h', seenAt: 2 },
@@ -22,7 +24,7 @@ describe(ContactDirectory.name, () => {
     const directory = ContactDirectory.of([
       { identityId: 'ada', name: 'Old Ada', seenAt: 1 },
       { identityId: 'grace', name: 'Grace', seenAt: 2 },
-    ]).remember({ ada: identity('ada', 'Ada Lovelace') }, 3);
+    ]).remember({ ada: identity('ada', 'Ada Lovelace') }, 3, OWN_ID);
 
     expect(directory.entries()).toEqual([
       { identityId: 'ada', name: 'Ada Lovelace', seenAt: 3 },
@@ -33,15 +35,29 @@ describe(ContactDirectory.name, () => {
   it('keys contacts by the id the workspace knows them by', () => {
     expect(
       ContactDirectory.of([])
-        .remember({ 'bare-ada': identity('pem-ada', 'Ada') }, 1)
+        .remember({ 'bare-ada': identity('pem-ada', 'Ada') }, 1, OWN_ID)
         .entries(),
     ).toEqual([{ identityId: 'bare-ada', name: 'Ada', seenAt: 1 }]);
+  });
+
+  it('never remembers the own identity, even keyed in PEM form', () => {
+    const pem = `-----BEGIN PUBLIC KEY-----\n${OWN_ID}\n-----END PUBLIC KEY-----\n`;
+
+    expect(
+      ContactDirectory.of([])
+        .remember(
+          { ada: identity('ada', 'Ada'), [pem]: identity(pem, 'Me') },
+          1,
+          OWN_ID,
+        )
+        .entries(),
+    ).toEqual([{ identityId: 'ada', name: 'Ada', seenAt: 1 }]);
   });
 
   it('skips profiles with neither a name nor a handle', () => {
     expect(
       ContactDirectory.of([])
-        .remember({ anonymous: identity('anonymous', ' ') }, 1)
+        .remember({ anonymous: identity('anonymous', ' ') }, 1, OWN_ID)
         .entries(),
     ).toEqual([]);
   });
@@ -54,7 +70,7 @@ describe(ContactDirectory.name, () => {
     const entries = identities
       .reduce(
         (directory, contact, index) =>
-          directory.remember({ [contact.id]: contact }, index),
+          directory.remember({ [contact.id]: contact }, index, OWN_ID),
         ContactDirectory.of([]),
       )
       .entries();
@@ -95,7 +111,7 @@ describe(ContactDirectory.name, () => {
     );
     expect(
       directory.isSameAs(
-        directory.remember({ ada: identity('ada', 'Ada') }, 2),
+        directory.remember({ ada: identity('ada', 'Ada') }, 2, OWN_ID),
       ),
     ).toBe(false);
   });

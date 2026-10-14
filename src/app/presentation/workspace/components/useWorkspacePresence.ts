@@ -4,7 +4,7 @@ import type { IdentityPresenceResource as IdentityPresence } from '../../../../c
 import type { SelectablePresenceStatusResource as SelectablePresenceStatus } from '../../../../contexts/identities/infrastructure/http/resources/SelectablePresenceStatusResource';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
-import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
+import { IdentityMatch } from '../../../../contexts/identities/domain/IdentityMatch';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import {
   readPresencePreference,

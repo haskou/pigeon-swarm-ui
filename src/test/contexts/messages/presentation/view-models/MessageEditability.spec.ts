@@ -37,4 +37,20 @@ describe(MessageEditability.name, () => {
       MessageEditability.canEdit(message({ content: '   ' }), 'identity-1'),
     ).toBe(false);
   });
+
+  it('lets the author delete a message addressed with the id in PEM form', () => {
+    expect(
+      MessageEditability.canDelete(
+        message(),
+        '-----BEGIN PUBLIC KEY-----\nidentity-1\n-----END PUBLIC KEY-----\n',
+      ),
+    ).toBe(true);
+  });
+
+  it('refuses deleting polls and messages by another author', () => {
+    expect(
+      MessageEditability.canDelete(message({ kind: 'poll' }), 'identity-1'),
+    ).toBe(false);
+    expect(MessageEditability.canDelete(message(), 'identity-2')).toBe(false);
+  });
 });

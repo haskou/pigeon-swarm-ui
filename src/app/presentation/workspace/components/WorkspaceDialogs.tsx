@@ -168,7 +168,7 @@ function ownerMessageActions(
     onCopy: messageAction(message, Boolean(message.content), props.onCopy),
     onDelete: messageAction(
       message,
-      message.kind !== 'poll' && message.authorIdentityId === identityId,
+      MessageEditability.canDelete(message, identityId),
       props.onDelete,
     ),
     onEdit: messageAction(

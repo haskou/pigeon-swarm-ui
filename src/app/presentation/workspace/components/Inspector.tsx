@@ -9,12 +9,12 @@ import type { Session } from '../../../../contexts/identities/infrastructure/ses
 import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
 
 import { memberPrimaryName } from '../../../../contexts/communities/presentation/components/communityMemberNames';
+import { IdentityMatch } from '../../../../contexts/identities/domain/IdentityMatch';
 import { type IdentityMemberListItem } from '../../../../contexts/identities/presentation/components/IdentityMemberListPanel';
 import {
   IdentityMembersAside,
   type IdentityMembersAsideVariant,
 } from '../../../../contexts/identities/presentation/components/IdentityMembersAside';
-import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
 import { profileAnchorFromTarget } from '../../../../contexts/identities/presentation/view-models/profilePopoverAnchor';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 

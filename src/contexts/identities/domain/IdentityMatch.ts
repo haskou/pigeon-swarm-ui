@@ -1,10 +1,9 @@
-import { IdentityId } from '../../domain/value-objects/IdentityId';
+import { IdentityId } from './value-objects/IdentityId';
 
 /**
- * Compares identity ids held by presentation state through the IdentityId
- * value object, so the same identity in PEM and bare form is one identity.
- * Ids come from realtime events too: an id the value object rejects is not
- * the same identity.
+ * Compares identity ids through the IdentityId value object, so the same
+ * identity in PEM and bare form is one identity. Ids come from the network
+ * too: an id the value object rejects is not the same identity.
  */
 export class IdentityMatch {
   public static isSame(

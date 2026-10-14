@@ -4,7 +4,7 @@ import type { MyStickersResource } from '../../infrastructure/http/resources/MyS
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { StickerPackResource } from '../../infrastructure/http/resources/StickerPackResource';
 
-import { IdentityMatch } from '../../../identities/presentation/view-models/IdentityMatch';
+import { IdentityMatch } from '../../../identities/domain/IdentityMatch';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';

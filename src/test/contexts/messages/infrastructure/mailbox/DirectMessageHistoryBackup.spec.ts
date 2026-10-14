@@ -118,6 +118,24 @@ describe(DirectMessageHistoryBackup.name, () => {
     expect(await history.load(session(), conversationId)).toHaveLength(1);
   });
 
+  it('skips records whose author id the value object rejects', async () => {
+    const history = store();
+
+    await new DirectMessageHistoryBackup(history).import(session(), [
+      {
+        conversationId,
+        plaintext: DirectMessageMailboxRecord.encode(
+          sent('p1', 50, 'x'.repeat(5000)),
+        ),
+      },
+      { conversationId, plaintext: own(sent('m1', 100)) },
+    ]);
+
+    expect(
+      ids(session(), await history.load(session(), conversationId)),
+    ).toEqual(['m1']);
+  });
+
   it('skips entries that are not direct-message records', async () => {
     const history = store();
 

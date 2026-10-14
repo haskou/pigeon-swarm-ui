@@ -6,7 +6,7 @@ import type { NodeNetwork } from '../../../../contexts/networks/presentation/vie
 import type { NetworkAction } from './NetworkAction';
 import type { NetworkMutation } from './NetworkMutation';
 
-import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
+import { IdentityMatch } from '../../../../contexts/identities/domain/IdentityMatch';
 import { NetworkInvite } from '../../../../contexts/networks/domain/NetworkInvite';
 import { NetworkInviteCode } from '../../../../contexts/networks/domain/NetworkInviteCode';
 import { cx } from '../../../../shared/presentation/cx';

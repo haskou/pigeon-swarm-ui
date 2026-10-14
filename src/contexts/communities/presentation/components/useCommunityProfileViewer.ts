@@ -6,7 +6,7 @@ import type { ProfilePopoverAnchor } from '../../../identities/presentation/view
 import type { ChatMessage } from '../../../messages/domain/ChatMessage';
 import type { CommunityProfileView } from './CommunityWorkspaceDialogs';
 
-import { IdentityMatch } from '../../../identities/presentation/view-models/IdentityMatch';
+import { IdentityMatch } from '../../../identities/domain/IdentityMatch';
 import { profileAnchorFromTarget } from '../../../identities/presentation/view-models/profilePopoverAnchor';
 
 type UseCommunityProfileViewerInput = {

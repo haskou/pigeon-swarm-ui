@@ -6,6 +6,17 @@ export class IdentityId extends StringValueObject {
     return new IdentityId(value);
   }
 
+  /** Whether `value` is an id the value object accepts. */
+  public static isValid(value: string): boolean {
+    try {
+      IdentityId.fromString(value);
+
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   public static normalize(value: string): string {
     const trimmed = value.trim();
 

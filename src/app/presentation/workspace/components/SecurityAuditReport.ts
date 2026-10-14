@@ -4,12 +4,12 @@ import type { ConversationKeyEntry } from '../../../../contexts/identities/infra
 import type { SecurityAudit } from './SecurityAudit';
 import type { SecurityAuditInput } from './SecurityAuditInput';
 
+import { IdentityMatch } from '../../../../contexts/identities/domain/IdentityMatch';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import {
   identityName,
   identityPrimaryDisplayName,
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
-import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
 import { KeyFingerprint } from '../../../../contexts/identities/presentation/view-models/KeyFingerprint';
 import { shortId } from '../../../../shared/presentation/formatting';
 

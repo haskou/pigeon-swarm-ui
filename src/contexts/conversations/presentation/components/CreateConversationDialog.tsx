@@ -24,7 +24,8 @@ import { useCloseTransition } from '../../../../shared/presentation/hooks/useClo
 import { IdentityMemberRow } from '../../../identities/presentation/components/IdentityMemberListPanel';
 import { ContactChangeNotice } from '../../../identities/presentation/components/ContactChangeNotice';
 import { ConversationPeer } from '../view-models/ConversationPeer';
-import { IdentityMatch } from '../../../identities/presentation/view-models/IdentityMatch';
+import { GroupParticipantSelection } from '../view-models/GroupParticipantSelection';
+import { IdentityMatch } from '../../../identities/domain/IdentityMatch';
 import { contactKeyBlocked } from '../../../identities/presentation/view-models/contactKeyNotice';
 import {
   checkIdentityContact,
@@ -369,9 +370,7 @@ export function CreateConversationDialog({
 
     if (
       IdentityMatch.isSame(identity.id, session.identity.id) ||
-      groupParticipants.some(
-        (participant) => participant.identity.id === identity.id,
-      )
+      GroupParticipantSelection.includes(groupParticipants, identity.id)
     ) {
       setGroupIdentityInput('');
 
@@ -381,8 +380,9 @@ export function CreateConversationDialog({
     setState('loading');
     setError(null);
     try {
-      const alreadyAdded = groupParticipants.some(
-        (participant) => participant.identity.id === identity.id,
+      const alreadyAdded = GroupParticipantSelection.includes(
+        groupParticipants,
+        identity.id,
       );
 
       if (!alreadyAdded) {
@@ -402,7 +402,7 @@ export function CreateConversationDialog({
 
   const removeGroupParticipant = (identityId: string) => {
     setGroupParticipants((participants) =>
-      participants.filter(({ identity }) => identity.id !== identityId),
+      GroupParticipantSelection.without(participants, identityId),
     );
   };
 
