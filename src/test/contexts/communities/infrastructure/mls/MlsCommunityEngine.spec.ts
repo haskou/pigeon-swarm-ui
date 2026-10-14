@@ -683,7 +683,15 @@ describe('MlsCommunityEngine', () => {
       );
     });
 
-    it('keeps a kicked member out when it races its removal with a backdated commit', async () => {
+    /**
+     * Alice kicks carol, who never sees it: she races the commit removing
+     * her with an update for its epoch that wins on id, bound to the
+     * revision `bind` picks from the one before the kick. Bob had applied
+     * the removal; mallory sees both commits at once.
+     */
+    const raceRemoval = async (
+      bind: (beforeKick: string[]) => string[],
+    ): Promise<void> => {
       const { alice, bob, carol } = await admitCarol();
       const mallory = engineFor('mallory');
 
@@ -700,28 +708,27 @@ describe('MlsCommunityEngine', () => {
       const removal = node.records[node.records.length - 1];
 
       await bob.engine.sync(COMMUNITY);
-      // Carol never saw her removal; she grinds a commit for its epoch
-      // that wins on id, bound to the roster before the kick.
-      let backdated = await (
-        await rogueGroupOf('carol', carol.store, beforeKick)
+      const frontier = bind(beforeKick);
+      let raced = await (
+        await rogueGroupOf('carol', carol.store, frontier)
       ).update();
 
       for (
         let attempt = 0;
         attempt < 64 &&
         deriveMlsRecordId({
-          epoch: Number(backdated.epoch),
+          epoch: Number(raced.epoch),
           groupId: COMMUNITY,
           kind: 'commit',
-          payload: base64(backdated.commit),
+          payload: base64(raced.commit),
         }) >= removal.recordId;
         attempt += 1
       ) {
-        backdated = await (
-          await rogueGroupOf('carol', carol.store, beforeKick)
+        raced = await (
+          await rogueGroupOf('carol', carol.store, frontier)
         ).update();
       }
-      await publishCommit('carol', backdated);
+      await publishCommit('carol', raced);
 
       for (const member of [bob, mallory]) {
         await expect(member.engine.sync(COMMUNITY)).resolves.toBe(true);
@@ -737,6 +744,20 @@ describe('MlsCommunityEngine', () => {
       await expect(mallory.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
         'without carol',
       );
+    };
+
+    it('keeps a kicked member out when it races its removal with a backdated commit', async () => {
+      await raceRemoval((beforeKick) => beforeKick);
+    });
+
+    it('keeps a kicked member out when it outreaches its removal with a concurrent branch', async () => {
+      await raceRemoval((beforeKick) => {
+        const history = historyOf();
+
+        return [
+          history.branch(cast.alice, [history.branch(cast.alice, beforeKick)]),
+        ];
+      });
     });
 
     it('refuses a welcome into a look-alike group from a demoted member', async () => {

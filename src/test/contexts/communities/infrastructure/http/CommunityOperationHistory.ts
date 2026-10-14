@@ -38,16 +38,23 @@ export class CommunityOperationHistory {
     });
   }
 
-  /** Seals the next operation; `keyPair` other than the author's forges it. */
+  /**
+   * Seals the next operation on top of `parents`, the latest one unless
+   * given; `keyPair` other than the author's forges it.
+   */
   public append(
     author: CommunityOperationAuthor,
     action: string,
     args: Record<string, unknown>,
     keyPair: KeyPair = author.keyPair,
+    parents?: readonly string[],
   ): CommunityOperationDocument {
     const previous = this.documents[this.documents.length - 1] as
       | CommunityOperationDocument
       | undefined;
+    const latest = previous
+      ? [CommunityOperationHistory.digestOf(previous)]
+      : [];
     const document = CommunityOperationProof.seal(
       {
         action,
@@ -56,7 +63,7 @@ export class CommunityOperationHistory {
         communityId: this.communityId,
         createdAt: this.documents.length + 1,
         networkId: NETWORK,
-        parents: previous ? [CommunityOperationHistory.digestOf(previous)] : [],
+        parents: [...(parents ?? latest)],
         scopeType: 'community_operation',
       },
       keyPair,
@@ -92,6 +99,31 @@ export class CommunityOperationHistory {
     this.append(author, 'role_created', { name: 'Role', permissions, roleId });
 
     return roleId;
+  }
+
+  /**
+   * `author` creates a role on top of `parents`, concurrent with whatever
+   * else descends from them; returns the operation's digest.
+   */
+  public branch(
+    author: CommunityOperationAuthor,
+    parents: readonly string[],
+  ): string {
+    const roleId = CommunityRoleId.derive(
+      this.communityId,
+      author.id,
+      this.documents.length + 1,
+    ).valueOf();
+
+    return CommunityOperationHistory.digestOf(
+      this.append(
+        author,
+        'role_created',
+        { name: 'Branch', permissions: [], roleId },
+        author.keyPair,
+        parents,
+      ),
+    );
   }
 
   /** `author` gives `member` exactly these roles. */
