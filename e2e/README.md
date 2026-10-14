@@ -45,13 +45,17 @@ removal answer for a still-authorized device erases nothing),
 `community-mls-kick.spec.ts` (a private community shows encryption as active
 for its creator and an invited member, both exchange messages through the MLS
 group, and a message sent after the member is removed never shows in the
-removed member's page) and `call-page-departure.spec.ts` (a ringing call is
-declined when the callee leaves the page) run against a real node. Login,
+removed member's page), `call-page-departure.spec.ts` (a ringing call is
+declined when the callee leaves the page) and `group-conversation.spec.ts`
+(three users share a group conversation over MLS and per-member mailboxes,
+each message reaches the other two, and after the creator removes one member a
+later message reaches the remaining member and never shows in the removed
+member's page during 90 s of polling) run against a real node. Login,
 direct-message sync, the outbox spec and the security audit run on
-`desktop-chromium`, `desktop-firefox` and `mobile-chromium`; the call, revoke
-and community kick specs run on `desktop-chromium`. On Firefox the decline sent
-when the callee leaves the page did not reach the node in CI, so the call spec
-does not run there.
+`desktop-chromium`, `desktop-firefox` and `mobile-chromium`; the call, revoke,
+community kick and group conversation specs run on `desktop-chromium`. On
+Firefox the decline sent when the callee leaves the page did not reach the
+node in CI, so the call spec does not run there.
 `passkey-unlock.spec.ts` (switching this device from a password to a passkey
 and unlocking with it) runs on `desktop-chromium` only: it uses a DevTools
 virtual authenticator with PRF and opens the app through `localhost`, because
