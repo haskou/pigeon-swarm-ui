@@ -21,6 +21,7 @@ import { MailboxCapability } from '../../../mailboxes/infrastructure/crypto/Mail
 import { MailboxReadToken } from '../../../mailboxes/infrastructure/crypto/MailboxReadToken';
 import { ContactPresenceBoard } from '../../domain/ContactPresenceBoard';
 import { ContactPresenceBroadcast } from '../../domain/ContactPresenceBroadcast';
+import { IdentityMatch } from '../../domain/IdentityMatch';
 import { ContactPresenceSource } from '../../domain/value-objects/ContactPresenceSource';
 import { ContactPresenceInboxCursor } from './ContactPresenceInboxCursor';
 import { ContactPresenceInboxKeys } from './ContactPresenceInboxKeys';
@@ -267,7 +268,9 @@ export class MailboxContactPresenceRepository implements ContactPresenceReposito
   public async cutOffRevokedReaders(session: Session): Promise<void> {
     const failures: unknown[] = [];
     const inboxes = [...this.opened]
-      .filter(([, { identityId }]) => identityId === session.identity.id)
+      .filter(([, { identityId }]) =>
+        IdentityMatch.isSame(identityId, session.identity.id),
+      )
       .map(([key, { keys }]) => ({ key, keys }));
 
     for (const { key, keys } of inboxes) {

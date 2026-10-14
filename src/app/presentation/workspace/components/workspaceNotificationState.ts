@@ -7,6 +7,9 @@ import type { NotificationResource } from '../../../../contexts/notifications/in
 import type { NotificationMentionContext } from '../../../../contexts/notifications/presentation/view-models/NotificationMentionContext';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 
+import { CommunityAccessPolicy } from '../../../../contexts/communities/presentation/view-models/CommunityAccessPolicy';
+import { IdentityMatch } from '../../../../contexts/identities/domain/IdentityMatch';
+
 export function stableUniqueKey(values: string[]): string {
   return [...new Set(values.filter(Boolean))].sort().join('\u0000');
 }
@@ -18,7 +21,10 @@ export function isPendingConversationInvitationFor(
 ): notification is ConversationInvitationNotificationResource {
   return (
     notification.state === 'pending' &&
-    notification.recipientIdentityId === recipientIdentityId &&
+    IdentityMatch.isSame(
+      notification.recipientIdentityId,
+      recipientIdentityId,
+    ) &&
     notification.type === 'conversation_invitation' &&
     notification.payload.conversationId === conversationId
   );
@@ -31,7 +37,10 @@ export function isPendingCommunityInvitationFor(
 ): notification is CommunityInvitationNotificationResource {
   return (
     notification.state === 'pending' &&
-    notification.recipientIdentityId === recipientIdentityId &&
+    IdentityMatch.isSame(
+      notification.recipientIdentityId,
+      recipientIdentityId,
+    ) &&
     notification.type === 'community_invitation' &&
     notification.payload.communityId === communityId
   );
@@ -67,13 +76,13 @@ export function canActOnMembershipRequest(
   if (request.status !== 'pending') return false;
 
   if (request.type === 'invitation') {
-    return request.identityId === currentIdentityId;
+    return IdentityMatch.isSame(request.identityId, currentIdentityId);
   }
 
   return communities.some(
     (community) =>
       community.id === request.communityId &&
-      community.ownerIdentityId === currentIdentityId,
+      CommunityAccessPolicy.isOwner(community, currentIdentityId),
   );
 }
 

@@ -4,14 +4,13 @@ import type { IdentityPresenceResource as IdentityPresence } from '../../../../c
 import type { SelectablePresenceStatusResource as SelectablePresenceStatus } from '../../../../contexts/identities/infrastructure/http/resources/SelectablePresenceStatusResource';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
-import { IdentityMatch } from '../../../../contexts/identities/domain/IdentityMatch';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import {
   readPresencePreference,
   writePresencePreference,
 } from '../presencePreferenceStorage';
+import { ownPresenceWithLocalPreference } from './ownPresenceWithLocalPreference';
 import { presenceStatusForLocalActivity } from './presenceStatusForLocalActivity';
-import { presenceWithLocalPreference } from './presenceWithLocalPreference';
 import { useContactPresence } from './useContactPresence';
 
 const localActivityPresenceRefreshThrottleMs = 30_000;
@@ -82,17 +81,13 @@ export function useWorkspacePresence({ session }: { session: Session }): {
   }, [session]);
 
   const mergePresence = useCallback((presence: IdentityPresence) => {
-    const identityId = sessionRef.current.identity.id;
-
-    if (!IdentityMatch.isSame(presence.identityId, identityId)) return;
-
-    setOwnPresence(
-      presenceWithLocalPreference(
-        presence,
-        identityId,
-        presencePreferenceRef.current,
-      ),
+    const own = ownPresenceWithLocalPreference(
+      presence,
+      sessionRef.current.identity.id,
+      presencePreferenceRef.current,
     );
+
+    if (own) setOwnPresence(own);
   }, []);
   const rememberPresencePreference = useCallback(
     (status: SelectablePresenceStatus) => {

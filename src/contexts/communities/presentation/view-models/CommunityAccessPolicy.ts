@@ -4,6 +4,8 @@ import type { CommunityChannelResource as CommunityChannel } from '../../infrast
 import type { CommunityPermissionResource as CommunityPermission } from '../../infrastructure/http/resources/CommunityPermissionResource';
 import type { CommunityRoleResource } from '../../infrastructure/http/resources/CommunityRoleResource';
 
+import { IdentityMatch } from '../../../identities/domain/IdentityMatch';
+
 export const ALL_COMMUNITY_PERMISSIONS: CommunityPermission[] = [
   'view_channels',
   'manage_channels',
@@ -31,8 +33,8 @@ export class CommunityAccessPolicy {
     identityId: string,
   ): Set<string> {
     const roleIds = new Set<string>(['everyone']);
-    const assignment = community.memberRoles?.find(
-      (memberRole) => memberRole.identityId === identityId,
+    const assignment = community.memberRoles?.find((memberRole) =>
+      IdentityMatch.isSame(memberRole.identityId, identityId),
     );
 
     assignment?.roleIds.forEach((roleId) => roleIds.add(roleId));
@@ -57,7 +59,7 @@ export class CommunityAccessPolicy {
     channel: CommunityChannel,
     identityId: string,
   ): boolean {
-    if (community.ownerIdentityId === identityId) return true;
+    if (CommunityAccessPolicy.isOwner(community, identityId)) return true;
 
     const visibleRoleIds = channel.permissions?.visibleRoleIds;
 
@@ -81,6 +83,11 @@ export class CommunityAccessPolicy {
     );
   }
 
+  /** The owner id is stored as the node reported it, in either id form. */
+  public static isOwner(community: Community, identityId: string): boolean {
+    return IdentityMatch.isSame(community.ownerIdentityId, identityId);
+  }
+
   public static membersWithChannelAccess(
     community: Community,
     channel: CommunityChannel,
@@ -98,7 +105,7 @@ export class CommunityAccessPolicy {
     community: Community,
     identityId: string,
   ): Set<CommunityPermission> {
-    if (community.ownerIdentityId === identityId) {
+    if (CommunityAccessPolicy.isOwner(community, identityId)) {
       return new Set(ALL_COMMUNITY_PERMISSIONS);
     }
 

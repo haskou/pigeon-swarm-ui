@@ -3,6 +3,7 @@ import type { CommunityPermissionResource as CommunityPermission } from '../../i
 import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { IdentityMatch } from '../../../identities/domain/IdentityMatch';
 import { MessageEditability } from '../../../messages/presentation/view-models/MessageEditability';
 import { CommunityAccessPolicy } from '../view-models/CommunityAccessPolicy';
 import { communityRoleDisplayName } from '../view-models/communityRoleDisplayName';
@@ -43,15 +44,20 @@ export class CommunityWorkspaceDialogActions {
     hasConversationHandler,
     profileIdentityId,
   }: OpenConversationInput): boolean {
-    return hasConversationHandler && profileIdentityId !== currentIdentityId;
+    return (
+      hasConversationHandler &&
+      !IdentityMatch.isSame(profileIdentityId, currentIdentityId)
+    );
   }
 
   public static profileRoleNames(
     community: Community,
     identityId: string,
   ): string[] {
-    const isOwner = community.ownerIdentityId === identityId;
-    const isMember = community.memberIds.includes(identityId);
+    const isOwner = CommunityAccessPolicy.isOwner(community, identityId);
+    const isMember = community.memberIds.some((memberId) =>
+      IdentityMatch.isSame(memberId, identityId),
+    );
 
     if (!isOwner && !isMember) return [];
 
