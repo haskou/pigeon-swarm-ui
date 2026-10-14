@@ -1,17 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { CallIceServerResource as CallIceServerConfig } from '../../infrastructure/http/resources/CallIceServerResource';
-import type { CallParticipantMediaConnectionResource as CallParticipantMediaConnection } from '../../infrastructure/http/resources/CallParticipantMediaConnectionResource';
 import type { CallResource } from '../../infrastructure/http/resources/CallResource';
-import type { ScreenShareQualityPreset } from '../../infrastructure/media/ScreenShareQualityPreset';
-import type { CallMediaEncryptionUnavailableReason } from '../view-models/CallMediaEncryptionUnavailableReason';
-import type { CallMicrophoneErrorCode } from '../view-models/CallMicrophoneErrorCode';
-import type { CallParticipant } from '../view-models/CallParticipant';
 import type { CallSession } from '../view-models/CallSession';
-import type {
-  CallSignalSender as SignalSender,
-  ReceivedCallSignal as ReceivedSignal,
-} from './CallSignalDispatcher';
+import type { CallSessionControls } from './CallSessionControls';
+import type { ReceivedCallSignal as ReceivedSignal } from './CallSignalDispatcher';
+import type { ReconcileCallInput } from './ReconcileCallInput';
+import type { StartCallInput } from './StartCallInput';
 
 import { BrowserRemoteAudioElementHost } from '../../infrastructure/media/BrowserRemoteAudioElementHost';
 import {
@@ -37,63 +31,7 @@ import { reconciledCallParticipants } from './reconciledCallParticipants';
 import { useCallMediaControls } from './useCallMediaControls';
 import { useCallStatsRefresh } from './useCallStatsRefresh';
 
-export type StartCallInput = {
-  call?: CallResource;
-  currentIdentityId: string;
-  id: string;
-  communityId?: string;
-  channelId?: string;
-  conversationId?: string;
-  kind: CallSession['kind'];
-  loadIceConfig: () => Promise<CallIceServerConfig>;
-  localStream?: MediaStream | null;
-  microphoneError?: CallMicrophoneErrorCode;
-  mediaEncryptionEnabled: boolean;
-  mediaEncryptionKey?: string;
-  mediaEncryptionUnavailableReason?: CallMediaEncryptionUnavailableReason;
-  noiseCancellationEnabled: boolean;
-  onSignal: SignalSender;
-  participants: CallParticipant[];
-  subtitle?: string;
-  title: string;
-};
-
-type ReconcileCallInput = Omit<
-  StartCallInput,
-  | 'call'
-  | 'currentIdentityId'
-  | 'id'
-  | 'loadIceConfig'
-  | 'mediaEncryptionEnabled'
-  | 'mediaEncryptionKey'
-  | 'mediaEncryptionUnavailableReason'
-  | 'noiseCancellationEnabled'
-  | 'onSignal'
->;
-
-export function useCallSession(): {
-  activeCall: CallSession | null;
-  callMediaConnections: () => CallParticipantMediaConnection[];
-  endCall: () => void;
-  receiveSignal: (input: ReceivedSignal) => Promise<void>;
-  reconcileCall: (call: CallResource, input: ReconcileCallInput) => void;
-  startCall: (input: StartCallInput) => Promise<void>;
-  setParticipantVolume: (identityId: string, volumePercent: number) => void;
-  setParticipantScreenShareVolume: (
-    identityId: string,
-    volumePercent: number,
-  ) => void;
-  setScreenShareQuality: (quality: ScreenShareQualityPreset) => Promise<void>;
-  toggleCamera: () => Promise<void>;
-  toggleDeafen: () => void;
-  toggleMute: () => void;
-  toggleMediaEncryption: () => void;
-  toggleNoiseCancellation: (enabled: boolean) => Promise<void>;
-  retryMicrophone: (deviceId?: string) => Promise<void>;
-  retryConnection: () => void;
-  recoverAfterDisruption: () => void;
-  toggleScreenShare: () => Promise<void>;
-} {
+export function useCallSession(): CallSessionControls {
   const mediaManager = useMemo(() => new LocalCallMedia(), []);
   const peerManager = useMemo(
     () =>
@@ -393,8 +331,8 @@ export function useCallSession(): {
     endCall,
     receiveSignal,
     reconcileCall,
-    retryConnection,
     recoverAfterDisruption,
+    retryConnection,
     startCall,
     ...mediaControls,
   };
