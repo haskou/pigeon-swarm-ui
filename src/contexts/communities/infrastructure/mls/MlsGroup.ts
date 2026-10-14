@@ -26,7 +26,7 @@ import {
   generateKeyPackageWithKey,
   getCiphersuiteFromName,
   getCiphersuiteImpl,
-  joinGroup,
+  joinGroupWithExtensions,
   mlsExporter,
   processPrivateMessage,
 } from 'ts-mls';
@@ -41,6 +41,7 @@ import type {
 
 import { MlsIdentityCredential } from './MlsIdentityCredential';
 import { MlsRejectedError } from './MlsRejectedError';
+import { MlsRosterFrontier } from './MlsRosterFrontier';
 
 const CIPHERSUITE = 'MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519';
 const PROTOCOL_VERSION = 'mls10';
@@ -98,34 +99,28 @@ export type MlsCommitOutcome =
   | { kind: 'removed' };
 
 /**
- * Every leaf credential must be signed by the identity it names and that
- * identity must be on the roster; ts-mls asks this of every key package,
- * update path and welcome tree leaf, and of the welcome's signer.
+ * Every leaf credential must be signed by the identity it names; ts-mls asks
+ * this of every key package, update path and welcome tree leaf, and of the
+ * welcome's signer. Whether that identity may hold a leaf is the roster's
+ * call at the revision the commit or welcome binds: see `judge` and `join`.
  */
-const clientConfig = (policy: MlsMembershipPolicy): ClientConfig => {
-  const authService: AuthenticationService = {
-    validateCredential(credential, signaturePublicKey) {
-      const owner = MlsIdentityCredential.verify(
-        credential,
-        signaturePublicKey,
-      );
-
-      return Promise.resolve(
-        owner !== undefined && policy.admits(owner.identityId),
-      );
-    },
-  };
-
-  return {
-    authService,
-    keyPackageEqualityConfig: defaultKeyPackageEqualityConfig,
-    keyRetentionConfig: {
-      ...defaultKeyRetentionConfig,
-      retainKeysForEpochs: 8,
-    },
-    lifetimeConfig: defaultLifetimeConfig,
-    paddingConfig: defaultPaddingConfig,
-  };
+const authService: AuthenticationService = {
+  validateCredential(credential, signaturePublicKey) {
+    return Promise.resolve(
+      MlsIdentityCredential.verify(credential, signaturePublicKey) !==
+        undefined,
+    );
+  },
+};
+const clientConfig: ClientConfig = {
+  authService,
+  keyPackageEqualityConfig: defaultKeyPackageEqualityConfig,
+  keyRetentionConfig: {
+    ...defaultKeyRetentionConfig,
+    retainKeysForEpochs: 8,
+  },
+  lifetimeConfig: defaultLifetimeConfig,
+  paddingConfig: defaultPaddingConfig,
 };
 
 /** A key package whose credential the signer's identity key vouches for. */
@@ -234,16 +229,45 @@ const membershipChange = (
   return { added, committer: identityAt(committerLeaf), removed };
 };
 
+/** A published commit and the roster revision its committer bound. */
+const readCommit = (
+  bytes: Uint8Array,
+): { frontier: readonly string[]; message: PrivateMessage } | undefined => {
+  try {
+    const decoded = decodeMlsMessage(bytes, 0)?.[0];
+
+    if (decoded?.wireformat !== 'mls_private_message') return undefined;
+    const frontier = MlsRosterFrontier.decode(
+      decoded.privateMessage.authenticatedData,
+    );
+
+    return frontier && { frontier, message: decoded.privateMessage };
+  } catch {
+    return undefined;
+  }
+};
+
 interface AppliedEpoch {
   readonly commitId: string;
   /** State before the commit; kept to switch to a competing commit. */
   readonly before: ClientState;
+  /** The roster revision the group had bound before the commit. */
+  readonly baseline: readonly string[];
+  /** The roster revision the commit bound. */
+  readonly frontier: readonly string[];
+  /** What the commit changed, to judge it again against a competitor. */
+  readonly change: MlsMembershipChange;
 }
 
 /**
  * One MLS group as seen by one device. Immutable ts-mls states let the device
  * return to the state before a commit when a competing commit for the same
- * epoch has a lower id.
+ * epoch wins it. Rivals rank by one key each: whether the roster this device
+ * has verified up to still allows the commit, then how much of the roster
+ * history it binds, then the lower id. Every
+ * commit and welcome binds the roster revision its committer judged it at
+ * (`MlsRosterFrontier`); the group remembers the revision of its last
+ * commit, which the next one must not step behind.
  */
 export class MlsGroup {
   private constructor(
@@ -253,6 +277,7 @@ export class MlsGroup {
     private state: ClientState,
     private readonly applied: Map<bigint, AppliedEpoch>,
     private removed: boolean,
+    private bound: readonly string[],
   ) {}
 
   public static async create(
@@ -266,12 +291,24 @@ export class MlsGroup {
       key.privatePackage,
       [],
       await suite(),
-      clientConfig(policy),
+      clientConfig,
     );
 
-    return new MlsGroup(groupId, key.owner, policy, state, new Map(), false);
+    return new MlsGroup(
+      groupId,
+      key.owner,
+      policy,
+      state,
+      new Map(),
+      false,
+      policy.frontier(),
+    );
   }
 
+  /**
+   * Joins from a welcome whose tree holds only leaves the roster admits at
+   * the revision the welcome binds.
+   */
   public static async join(
     groupId: string,
     key: MlsKeyPackageBundle,
@@ -283,7 +320,7 @@ export class MlsGroup {
     if (!decoded || decoded.wireformat !== 'mls_welcome') {
       throw new MlsRejectedError('Not an MLS welcome');
     }
-    const state = await joinGroup(
+    const [state, extensions] = await joinGroupWithExtensions(
       decoded.welcome,
       key.publicPackage,
       key.privatePackage,
@@ -291,21 +328,44 @@ export class MlsGroup {
       await suite(),
       undefined,
       undefined,
-      clientConfig(policy),
+      clientConfig,
     );
 
     if (decoder.decode(state.groupContext.groupId) !== groupId) {
       throw new MlsRejectedError('Welcome is for a different group');
     }
+    const frontier = MlsRosterFrontier.decode(
+      extensions.find(
+        ({ extensionType }) =>
+          extensionType === MlsRosterFrontier.EXTENSION_TYPE,
+      )?.extensionData ?? new Uint8Array(),
+    );
 
-    return new MlsGroup(groupId, key.owner, policy, state, new Map(), false);
+    if (!frontier) throw new MlsRejectedError('Welcome binds no revision');
+    const group = new MlsGroup(
+      groupId,
+      key.owner,
+      policy,
+      state,
+      new Map(),
+      false,
+      frontier,
+    );
+
+    if (!group.identities().every((id) => policy.admits(id, frontier))) {
+      throw new MlsRejectedError('Welcome tree holds a non-member');
+    }
+
+    return group;
   }
 
+  /** Restores a stored state and the roster revision it had bound. */
   public static restore(
     groupId: string,
     owner: MlsLeafOwner,
     policy: MlsMembershipPolicy,
     encoded: Uint8Array,
+    frontier: readonly string[],
   ): MlsGroup {
     const decoded = decodeGroupState(encoded, 0)?.[0];
 
@@ -315,11 +375,22 @@ export class MlsGroup {
       groupId,
       owner,
       policy,
-      { ...decoded, clientConfig: clientConfig(policy) },
+      { ...decoded, clientConfig },
       new Map(),
       // A device removed before a restart must stay unable to send.
       decoded.groupActiveState.kind !== 'active',
+      frontier,
     );
+  }
+
+  /** The roster revision a published commit binds, if it is one. */
+  public static frontierOf(bytes: Uint8Array): readonly string[] | undefined {
+    return readCommit(bytes)?.frontier;
+  }
+
+  /** The roster revision the group's last commit or welcome bound. */
+  public get frontier(): readonly string[] {
+    return this.bound;
   }
 
   public get epoch(): bigint {
@@ -360,8 +431,11 @@ export class MlsGroup {
 
   public async add(keyPackages: Uint8Array[]): Promise<MlsCommitOutput> {
     const packages = keyPackages.map(decodeKeyPackage);
+    const frontier = this.policy.frontier();
     for (const keyPackage of packages) {
-      if (!this.policy.admits(ownerOfKeyPackage(keyPackage).identityId)) {
+      const owner = ownerOfKeyPackage(keyPackage).identityId;
+
+      if (!this.policy.admits(owner, frontier)) {
         throw new MlsRejectedError('Key package owner is not a member');
       }
     }
@@ -560,10 +634,6 @@ export class MlsGroup {
         return { kind: 'ignored', reason: 'duplicate' };
       }
 
-      if (record.id > previous.commitId) {
-        return { kind: 'ignored', reason: 'lost-race' };
-      }
-
       return this.replace(record, previous);
     }
 
@@ -571,14 +641,39 @@ export class MlsGroup {
       return { kind: 'ignored', reason: 'duplicate' };
     }
 
-    return this.advance(record, this.state);
+    return this.advance(record, this.state, this.bound);
   }
 
+  /**
+   * Switches to a competing commit for an applied epoch when it wins
+   * (`contest`); a loser leaves the group as it was.
+   */
   private async replace(
     record: MlsCommitRecord,
     previous: AppliedEpoch,
   ): Promise<MlsCommitOutcome> {
-    const outcome = await this.advance(record, previous.before);
+    const verdict = { lost: false };
+    const contest = (
+      change: MlsMembershipChange,
+      frontier: readonly string[],
+    ): boolean => {
+      verdict.lost = !this.wins(record.id, { change, frontier }, previous);
+
+      return !verdict.lost;
+    };
+    let outcome: MlsCommitOutcome;
+
+    try {
+      outcome = await this.advance(
+        record,
+        previous.before,
+        previous.baseline,
+        contest,
+      );
+    } catch (error) {
+      if (verdict.lost) return { kind: 'ignored', reason: 'lost-race' };
+      throw error;
+    }
 
     if (outcome.kind === 'applied') {
       for (const epoch of [...this.applied.keys()]) {
@@ -596,13 +691,56 @@ export class MlsGroup {
   }
 
   /**
+   * Whether a commit wins its epoch over the one the group applied. Each
+   * ranks by its own key: whether the latest roster this device verified,
+   * which holds both their revisions, still allows it, then how much of the
+   * roster history it binds, then the lower id. A member removed by one
+   * cannot win the epoch back by binding a revision that leaves its removal
+   * out, and a total order converges on the same winner whatever order any
+   * number of rivals arrive in.
+   */
+  private wins(
+    commitId: string,
+    incoming: { change: MlsMembershipChange; frontier: readonly string[] },
+    previous: AppliedEpoch,
+  ): boolean {
+    const latest = this.policy.frontier();
+    const stands = this.permits(incoming.change, latest, latest);
+
+    if (stands !== this.permits(previous.change, latest, latest)) return stands;
+    const reach = this.policy.reach(incoming.frontier);
+    const held = this.policy.reach(previous.frontier);
+
+    return reach === held ? commitId < previous.commitId : reach > held;
+  }
+
+  /**
+   * Whether the roster at `frontier` admits every identity the change adds
+   * and lets its committer make it, stepping from `baseline`.
+   */
+  private permits(
+    change: MlsMembershipChange,
+    frontier: readonly string[],
+    baseline: readonly string[],
+  ): boolean {
+    return (
+      change.added.every((id) => this.policy.admits(id, frontier)) &&
+      this.policy.allows(change, { baseline, frontier })
+    );
+  }
+
+  /**
    * Accepts a commit only when it comes from a member's leaf, every
-   * proposal in it is that member's own, and the roster lets that member
-   * make the change. A standalone proposal is never applied.
+   * proposal in it is that member's own, the roster at the revision the
+   * commit binds admits every identity it adds and lets that member make
+   * the change, and `settle` lets it take the epoch. A standalone proposal
+   * is never applied.
    */
   private judge(
     from: ClientState,
     incoming: Parameters<IncomingMessageCallback>[0],
+    order: { baseline: readonly string[]; frontier: readonly string[] },
+    settle: (change: MlsMembershipChange) => boolean,
   ): IncomingMessageAction {
     if (incoming.kind !== 'commit' || incoming.senderLeafIndex === undefined) {
       return 'reject';
@@ -618,13 +756,14 @@ export class MlsGroup {
     }
 
     try {
-      return this.policy.allows(
-        membershipChange(
-          from.ratchetTree,
-          committer,
-          incoming.proposals.map(({ proposal }) => proposal),
-        ),
-      )
+      const change = membershipChange(
+        from.ratchetTree,
+        committer,
+        incoming.proposals.map(({ proposal }) => proposal),
+      );
+
+      return this.permits(change, order.frontier, order.baseline) &&
+        settle(change)
         ? 'accept'
         : 'reject';
     } catch {
@@ -632,32 +771,55 @@ export class MlsGroup {
     }
   }
 
+  /**
+   * The commit's authenticated data is the revision it binds; its sender's
+   * leaf signs it, so neither the node nor another member can change it.
+   */
   private async advance(
     record: MlsCommitRecord,
     from: ClientState,
+    baseline: readonly string[],
+    contest: (
+      change: MlsMembershipChange,
+      frontier: readonly string[],
+    ) => boolean = () => true,
   ): Promise<MlsCommitOutcome> {
-    const decoded = decodeMlsMessage(record.bytes, 0)?.[0];
+    const commit = readCommit(record.bytes);
 
-    if (!decoded || decoded.wireformat !== 'mls_private_message') {
-      throw new MlsRejectedError('Not an MLS commit');
+    if (!commit || commit.message.epoch !== record.epoch) {
+      throw new MlsRejectedError('Commit does not match its record');
     }
-
-    if (decoded.privateMessage.epoch !== record.epoch) {
-      throw new MlsRejectedError('Commit epoch does not match its record');
-    }
+    const { frontier, message: privateMessage } = commit;
+    const judged: { change?: MlsMembershipChange } = {};
     const result = await processPrivateMessage(
       from,
-      decoded.privateMessage,
+      privateMessage,
       emptyPskIndex,
       await suite(),
-      (incoming) => this.judge(from, incoming),
+      (incoming) =>
+        this.judge(from, incoming, { baseline, frontier }, (change) => {
+          judged.change = change;
+
+          return contest(change, frontier);
+        }),
     );
 
-    if (result.kind !== 'newState' || result.actionTaken !== 'accept') {
+    if (
+      result.kind !== 'newState' ||
+      result.actionTaken !== 'accept' ||
+      !judged.change
+    ) {
       throw new MlsRejectedError('Commit rejected');
     }
-    this.applied.set(record.epoch, { before: from, commitId: record.id });
+    this.applied.set(record.epoch, {
+      baseline,
+      before: from,
+      change: judged.change,
+      commitId: record.id,
+      frontier,
+    });
     this.state = result.newState;
+    this.bound = frontier;
 
     if (result.newState.groupActiveState.kind !== 'active') {
       this.removed = true;
@@ -670,29 +832,40 @@ export class MlsGroup {
 
   private async commit(proposals: Proposal[]): Promise<MlsCommitOutput> {
     this.assertActive();
+    const frontier = this.policy.frontier();
+    const change = membershipChange(
+      this.state.ratchetTree,
+      this.state.privatePath.leafIndex,
+      proposals,
+    );
 
-    if (
-      !this.policy.allows(
-        membershipChange(
-          this.state.ratchetTree,
-          this.state.privatePath.leafIndex,
-          proposals,
-        ),
-      )
-    ) {
+    if (!this.policy.allows(change, { baseline: this.bound, frontier })) {
       throw new MlsRejectedError('This member may not make this change');
     }
+    const revision = MlsRosterFrontier.encode(frontier);
     const result = await createCommit(
       { cipherSuite: await suite(), state: this.state },
-      { extraProposals: proposals, ratchetTreeExtension: true },
+      {
+        authenticatedData: revision,
+        extraProposals: proposals,
+        groupInfoExtensions: [
+          {
+            extensionData: revision,
+            extensionType: MlsRosterFrontier.EXTENSION_TYPE,
+          },
+        ],
+        ratchetTreeExtension: true,
+      },
     );
     const epoch = this.state.groupContext.epoch;
     const commit = encodeMlsMessage(result.commit);
     // The caller publishes the commit and only then calls `confirm`.
     this.pending = {
       before: this.state,
+      change,
       commit,
       epoch,
+      frontier,
       state: result.newState,
     };
 
@@ -712,18 +885,24 @@ export class MlsGroup {
   private pending?: {
     epoch: bigint;
     commit: Uint8Array;
+    change: MlsMembershipChange;
+    frontier: readonly string[];
     state: ClientState;
     before: ClientState;
   };
 
   /**
    * The encoded state the commit created by `add`, `removeIdentities` or
-   * `update` leads to, so it can be kept aside before it is published.
+   * `update` leads to and the revision it binds, so both can be kept aside
+   * before it is published.
    */
-  public pendingState(): Uint8Array {
+  public pendingState(): { frontier: readonly string[]; state: Uint8Array } {
     if (!this.pending) throw new MlsRejectedError('No pending commit');
 
-    return encodeGroupState(this.pending.state);
+    return {
+      frontier: this.pending.frontier,
+      state: encodeGroupState(this.pending.state),
+    };
   }
 
   /**
@@ -741,8 +920,15 @@ export class MlsGroup {
         'Group moved on before the commit was confirmed',
       );
     }
-    this.applied.set(pending.epoch, { before: pending.before, commitId });
+    this.applied.set(pending.epoch, {
+      baseline: this.bound,
+      before: pending.before,
+      change: pending.change,
+      commitId,
+      frontier: pending.frontier,
+    });
     this.state = pending.state;
+    this.bound = pending.frontier;
 
     return { epoch: this.state.groupContext.epoch, kind: 'applied' };
   }

@@ -14,7 +14,7 @@ import type { MlsRecordTransport } from './MlsRecordTransport';
 import type { MlsRoster } from './MlsRoster';
 import type { MlsStateStore } from './MlsStateStore';
 
-import { CommunityMlsRoster } from '../../domain/CommunityMlsRoster';
+import { CommunityRosterHistory } from '../../domain/CommunityRosterHistory';
 import { deriveMlsRecordId } from '../http/deriveMlsRecordId';
 import {
   generateMlsKeyPackage,
@@ -44,6 +44,8 @@ interface PendingCommit {
   epoch: number;
   /** Base64 group state the commit leads to. */
   state: string;
+  /** The roster revision the commit binds. */
+  frontier: string[];
   /** The welcome for the devices the commit adds, and who gets it. */
   welcome?: { payload: string; recipientIdentityIds: string[] };
 }
@@ -93,11 +95,16 @@ const pickNewestPerDevice = (
 export class MlsCommunityEngine {
   private readonly groups = new Map<string, MlsGroup>();
   private readonly queues = new Map<string, Promise<unknown>>();
-  private readonly rosters = new Map<string, CommunityMlsRoster>();
+  private readonly histories = new Map<string, CommunityRosterHistory>();
 
   /** Where the commit this device is publishing waits until it settles. */
   private static pendingKey(groupId: string): string {
     return `${groupId}#pending`;
+  }
+
+  /** Where the roster revision the stored group bound is kept. */
+  private static frontierKey(groupId: string): string {
+    return `${groupId}#frontier`;
   }
 
   public constructor(
@@ -113,7 +120,7 @@ export class MlsCommunityEngine {
       if (await this.load(groupId)) {
         throw new MlsRejectedError('Group already exists on this device');
       }
-      await this.currentRoster(groupId);
+      await this.currentHistory(groupId);
       const [key] = await this.makeKeyPackages(1, false);
       const group = await MlsGroup.create(
         groupId,
@@ -159,13 +166,13 @@ export class MlsCommunityEngine {
       const communityId = this.communityOf(groupId);
       const previous = await this.load(groupId);
 
-      const roster = await this.currentRoster(groupId);
+      const history = await this.currentHistory(groupId);
       const group =
         previous && !previous.isRemoved
           ? previous
           : ((await this.joinFromWelcome(groupId, communityId, {
+              history,
               previous,
-              roster,
             })) ?? previous);
 
       if (!group) return true;
@@ -229,16 +236,17 @@ export class MlsCommunityEngine {
   /**
    * Makes the group follow the signed roster: removes leaves whose identity
    * left, was kicked or banned, and, when this identity may add members,
-   * admits every device of the roster that published a key package. Safe to
-   * run on every member; duplicates resolve by commit id. Returns false once
-   * this device is no longer in the group.
+   * admits every device of the roster that published a key package and
+   * binds the latest roster revision (`bindRoster`). Safe to run on every
+   * member; duplicates resolve by commit id. Returns false once this device
+   * is no longer in the group.
    */
   public async reconcile(groupId: string): Promise<boolean> {
     if (!(await this.sync(groupId))) return false;
 
     if (!(await this.hasGroup(groupId))) return true;
 
-    const roster = await this.currentRoster(groupId);
+    const roster = (await this.currentHistory(groupId)).latest();
     const me = this.signer.owner.identityId;
 
     if (roster.has(me)) {
@@ -248,7 +256,10 @@ export class MlsCommunityEngine {
 
       if (stale.length > 0) await this.remove(groupId, stale);
 
-      if (roster.manages(me)) await this.admit(groupId, roster.participants());
+      if (roster.manages(me)) {
+        await this.admit(groupId, roster.participants());
+        await this.bindRoster(groupId);
+      }
     }
 
     return this.sync(groupId);
@@ -323,6 +334,24 @@ export class MlsCommunityEngine {
   }
 
   /**
+   * Commits a leaf update when the roster revision the group bound grants
+   * other rights than the latest one. Until a commit binds a demotion, the
+   * demoted member can still bind an older revision; this closes that
+   * window as soon as a manager sees the demotion.
+   */
+  private async bindRoster(groupId: string): Promise<void> {
+    await this.exclusive(groupId, async () => {
+      const group = await this.requireGroup(groupId);
+      const history = await this.currentHistory(groupId);
+      const bound = history.rosterAt(group.frontier);
+
+      // A revision this device cannot resolve is one it cannot follow yet.
+      if (!bound || bound.sameAuthorityAs(history.latest())) return;
+      await this.commit(group, await group.update(), []);
+    });
+  }
+
+  /**
    * Publishes a commit this device made, then keeps it. The group the
    * commit leads to is set aside as pending while the stored group stays
    * in its epoch; only once the node holds the commit is the group
@@ -345,10 +374,12 @@ export class MlsCommunityEngine {
       kind: 'commit' as const,
       payload: toBase64(output.commit),
     };
+    const { frontier, state } = group.pendingState();
     const pending: PendingCommit = {
       commitId: deriveMlsRecordId(input),
       epoch: input.epoch,
-      state: toBase64(group.pendingState()),
+      frontier: [...frontier],
+      state: toBase64(state),
       ...(output.welcome &&
         recipientIdentityIds.length > 0 && {
           welcome: { payload: toBase64(output.welcome), recipientIdentityIds },
@@ -451,11 +482,14 @@ export class MlsCommunityEngine {
   }
 
   /**
-   * Applies the published commits in order. A commit the roster does not
-   * allow, or that does not open, is skipped: the group stays at its epoch
-   * for the next commit, and one member cannot stall everyone else. This
-   * device's own pending commit is adopted rather than applied. Returns
-   * the group and the id of the commit it took in the pending's epoch.
+   * Applies the published commits in order: by epoch, then the one binding
+   * the most roster history, then the lowest id; `MlsGroup` switches to a
+   * later one the latest verified roster allows over one it does not. A commit
+   * the roster does not allow, or that does not open, is skipped: the group
+   * stays at its epoch for the next commit, and
+   * one member cannot stall everyone else. This device's own pending commit
+   * is adopted rather than applied. Returns the group and the id of the
+   * commit it took in the pending's epoch.
    */
   private async applyCommits(
     group: MlsGroup,
@@ -468,13 +502,7 @@ export class MlsCommunityEngine {
       groupId: group.groupId,
       kind: 'commit',
     });
-    const ordered = records
-      .filter((record) => record.epoch !== undefined)
-      .sort(
-        (a, b) =>
-          (a.epoch as number) - (b.epoch as number) ||
-          a.recordId.localeCompare(b.recordId),
-      );
+    const ordered = this.ordered(group.groupId, records);
     let current = group;
     let taken: string | undefined;
 
@@ -490,6 +518,32 @@ export class MlsCommunityEngine {
     }
 
     return { group: current, taken };
+  }
+
+  /** Commits by epoch, the one binding most roster history, then by id. */
+  private ordered(
+    groupId: string,
+    records: readonly MlsRecordResource[],
+  ): MlsRecordResource[] {
+    const history =
+      this.histories.get(groupId) ?? CommunityRosterHistory.of([]);
+    const reach = new Map(
+      records.map((record) => [
+        record.recordId,
+        history.reach(MlsGroup.frontierOf(fromBase64(record.payload)) ?? []),
+      ]),
+    );
+    const reachOf = (record: MlsRecordResource): number =>
+      reach.get(record.recordId) ?? 0;
+
+    return records
+      .filter((record) => record.epoch !== undefined)
+      .sort(
+        (a, b) =>
+          (a.epoch as number) - (b.epoch as number) ||
+          reachOf(b) - reachOf(a) ||
+          a.recordId.localeCompare(b.recordId),
+      );
   }
 
   /**
@@ -512,6 +566,7 @@ export class MlsCommunityEngine {
           this.signer.owner,
           this.policyFor(group.groupId),
           fromBase64(pending.state),
+          pending.frontier,
         ),
         took: true,
       };
@@ -534,30 +589,29 @@ export class MlsCommunityEngine {
   /**
    * Joins from the newest welcome for this identity that one of this
    * device's key packages opens. The node names the welcome's author; it
-   * must hold a leaf in the welcomed group and be allowed to add members,
-   * so nobody else can welcome a member into a look-alike group. A removed
-   * device only joins an epoch newer than its last membership.
+   * must hold a leaf in the welcomed group and be allowed to add members in
+   * the roster at the revision the welcome binds, so nobody else can
+   * welcome a member into a look-alike group. A removed device only joins
+   * an epoch newer than its last membership.
    */
   private async joinFromWelcome(
     groupId: string,
     communityId: string,
-    context: { previous?: MlsGroup; roster: CommunityMlsRoster },
+    context: { history: CommunityRosterHistory; previous?: MlsGroup },
   ): Promise<MlsGroup | undefined> {
-    const { previous, roster } = context;
+    const { history, previous } = context;
     const welcomes = await this.transportFor(communityId).list({
       groupId,
       kind: 'welcome',
     });
     const mine = welcomes.filter(
-      (record) =>
-        record.recipientIdentityId === this.signer.owner.identityId &&
-        roster.manages(record.authorIdentityId),
+      (record) => record.recipientIdentityId === this.signer.owner.identityId,
     );
     const keys = mine.length > 0 ? await this.storedBundles() : [];
 
     for (const record of mine.sort((a, b) => b.createdAt - a.createdAt)) {
       for (const { bundle, id } of keys) {
-        const group = await this.open(groupId, bundle, record);
+        const group = await this.open(groupId, bundle, record, history);
 
         if (!group || (previous && group.epoch <= previous.epoch)) continue;
         await this.store.deleteKeyPackage(id);
@@ -570,12 +624,19 @@ export class MlsCommunityEngine {
     return undefined;
   }
 
-  /** The group a welcome opens with the key package, if its author is in it. */
+  /**
+   * The group a welcome opens with the key package, if its author is in it,
+   * may add members in the roster the welcome binds and still may in the
+   * latest one: a demoted manager's welcome opens nothing.
+   */
   private async open(
     groupId: string,
     bundle: MlsKeyPackageBundle,
     record: MlsRecordResource,
+    history: CommunityRosterHistory,
   ): Promise<MlsGroup | undefined> {
+    const author = record.authorIdentityId;
+
     try {
       const group = await MlsGroup.join(
         groupId,
@@ -584,11 +645,13 @@ export class MlsCommunityEngine {
         this.policyFor(groupId),
       );
 
-      return group.identities().includes(record.authorIdentityId)
+      return history.rosterAt(group.frontier)?.manages(author) &&
+        history.latest().manages(author) &&
+        group.identities().includes(author)
         ? group
         : undefined;
     } catch {
-      // Not addressed to this key package.
+      // Not addressed to this key package, or not a member's welcome.
       return undefined;
     }
   }
@@ -624,26 +687,34 @@ export class MlsCommunityEngine {
     }));
   }
 
-  /** Reads the roster again; groups judge leaves and commits by the latest. */
-  private async currentRoster(groupId: string): Promise<CommunityMlsRoster> {
-    const roster = await this.rosterFor(groupId)();
+  /** Reads the signed roster history again; groups judge by it. */
+  private async currentHistory(
+    groupId: string,
+  ): Promise<CommunityRosterHistory> {
+    const history = await this.rosterFor(groupId)();
 
-    this.rosters.set(groupId, roster);
+    this.histories.set(groupId, history);
 
-    return roster;
+    return history;
   }
 
   /**
-   * Roster members hold leaves; the roster decides who may add and remove
-   * them (see `CommunityMlsRoster`).
+   * Roster members hold leaves; the roster at the revision a commit or
+   * welcome binds decides who may add and remove them (see
+   * `CommunityMlsRoster`). This device binds everything it has verified.
    */
   private policyFor(groupId: string): MlsMembershipPolicy {
-    const roster = (): CommunityMlsRoster =>
-      this.rosters.get(groupId) ?? CommunityMlsRoster.empty();
+    const history = (): CommunityRosterHistory =>
+      this.histories.get(groupId) ?? CommunityRosterHistory.of([]);
 
     return {
-      admits: (identityId) => roster().has(identityId),
-      allows: (change) => roster().allowsCommit(change),
+      admits: (identityId, frontier) =>
+        history().rosterAt(frontier)?.has(identityId) ?? false,
+      allows: (change, { baseline, frontier }) =>
+        history().follows(frontier, baseline) &&
+        (history().rosterAt(frontier)?.allowsCommit(change) ?? false),
+      frontier: () => history().heads(),
+      reach: (frontier) => history().reach(frontier),
     };
   }
 
@@ -654,12 +725,16 @@ export class MlsCommunityEngine {
     const bytes = await this.store.loadGroup(groupId);
 
     if (!bytes) return undefined;
-    await this.currentRoster(groupId);
+    await this.currentHistory(groupId);
+    const frontier = await this.store.loadGroup(
+      MlsCommunityEngine.frontierKey(groupId),
+    );
     const group = MlsGroup.restore(
       groupId,
       this.signer.owner,
       this.policyFor(groupId),
       bytes,
+      frontier ? (JSON.parse(decoder.decode(frontier)) as string[]) : [],
     );
 
     this.groups.set(groupId, group);
@@ -678,6 +753,10 @@ export class MlsCommunityEngine {
   private async remember(group: MlsGroup): Promise<void> {
     this.groups.set(group.groupId, group);
     await this.store.saveGroup(group.groupId, group.serialize());
+    await this.store.saveGroup(
+      MlsCommunityEngine.frontierKey(group.groupId),
+      encoder.encode(JSON.stringify(group.frontier)),
+    );
   }
 
   private communityOf(groupId: string): string {

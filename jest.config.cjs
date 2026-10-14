@@ -15,6 +15,7 @@ const REAL_CRYPTO_SPECS = [
   'CommunityOperationFold',
   'CommunityOperationProof',
   'CommunityOperationSigner',
+  'CommunityRosterHistory',
   'ConversationOperationSigner',
   'DeviceAuthorizationTransition',
   'DeviceAuthorizationTransition.vectors',

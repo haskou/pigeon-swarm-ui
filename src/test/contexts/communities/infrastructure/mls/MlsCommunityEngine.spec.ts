@@ -8,7 +8,7 @@ import type { MlsRecordTransport } from '../../../../../contexts/communities/inf
 import type { MlsStateStore } from '../../../../../contexts/communities/infrastructure/mls/MlsStateStore';
 import type { StoredMlsKeyPackage } from '../../../../../contexts/communities/infrastructure/mls/StoredMlsKeyPackage';
 
-import { CommunityMlsRoster } from '../../../../../contexts/communities/domain/CommunityMlsRoster';
+import { CommunityRosterHistory } from '../../../../../contexts/communities/domain/CommunityRosterHistory';
 import { CommunityOperationProof } from '../../../../../contexts/communities/infrastructure/http/CommunityOperationProof';
 import { deriveMlsRecordId } from '../../../../../contexts/communities/infrastructure/http/deriveMlsRecordId';
 import { MlsCommunityEngine } from '../../../../../contexts/communities/infrastructure/mls/MlsCommunityEngine';
@@ -22,7 +22,12 @@ import { MlsTestIdentity } from './MlsTestIdentity';
 
 const COMMUNITY = 'community-1';
 /** Lets a member build commits the community rules forbid. */
-const anything = { admits: () => true, allows: () => true };
+const anything = {
+  admits: () => true,
+  allows: () => true,
+  frontier: (): string[] => [],
+  reach: () => 0,
+};
 const base64 = (bytes: Uint8Array): string =>
   Buffer.from(bytes).toString('base64');
 
@@ -125,32 +130,81 @@ describe('MlsCommunityEngine', () => {
   let tamper: (history: CommunityOperationHistory, managers: string) => void;
   /** A key that is no member's identity key, as a node's would be. */
   let nodeKey: KeyPair;
+  /** The history so far, and the roster, moderators and tamper it holds. */
+  let signed:
+    | {
+        applied: typeof tamper;
+        history: CommunityOperationHistory;
+        managers: string;
+        members: Set<string>;
+        moderating: Set<string>;
+      }
+    | undefined;
   const id = (name: string): string => cast[name].id;
-  /**
-   * The community's signed history: the owner alice creates it and a role
-   * that may add members, adds everyone on the roster and gives the
-   * moderators that role.
-   */
-  const historyOf = (): CommunityOperationHistory => {
+  const startHistory = (): NonNullable<typeof signed> => {
     const history = new CommunityOperationHistory(cast.alice);
     const managers = history.createRole(cast.alice, ['manage_members']);
-    const others = Object.values(cast).filter(
-      (member) => member !== cast.alice,
-    );
 
-    for (const member of others) {
-      if (roster.has(member.id)) history.add(cast.alice, member);
-    }
+    return {
+      applied: () => undefined,
+      history,
+      managers,
+      members: new Set([id('alice')]),
+      moderating: new Set(),
+    };
+  };
+  /** Appends the operations that bring the history up to `roster`. */
+  const followRoster = (state: NonNullable<typeof signed>): void => {
+    for (const member of Object.values(cast)) {
+      const wanted = roster.has(member.id);
 
-    for (const member of others) {
-      if (moderators.has(member.id)) {
-        history.assign(cast.alice, member, [managers]);
+      if (wanted !== state.members.has(member.id)) {
+        if (wanted) {
+          state.history.add(cast.alice, member);
+          state.members.add(member.id);
+        } else {
+          state.history.kick(cast.alice, member);
+          state.members.delete(member.id);
+        }
       }
     }
+  };
+  /** Appends the role changes that bring the history up to `moderators`. */
+  const followModerators = (state: NonNullable<typeof signed>): void => {
+    for (const member of Object.values(cast)) {
+      const wanted = moderators.has(member.id);
 
-    tamper(history, managers);
+      if (wanted !== state.moderating.has(member.id)) {
+        state.history.assign(
+          cast.alice,
+          member,
+          wanted ? [state.managers] : [],
+        );
 
-    return history;
+        if (wanted) state.moderating.add(member.id);
+        else state.moderating.delete(member.id);
+      }
+    }
+  };
+  /**
+   * The community's signed history: the owner alice creates it and a role
+   * that may add members, then adds and kicks whoever joins or leaves the
+   * roster and gives or takes the role as moderators change. It only ever
+   * grows, as a real community's does.
+   */
+  const historyOf = (): CommunityOperationHistory => {
+    const state = signed ?? startHistory();
+
+    signed = state;
+    followRoster(state);
+    followModerators(state);
+
+    if (state.applied !== tamper) {
+      tamper(state.history, state.managers);
+      state.applied = tamper;
+    }
+
+    return state.history;
   };
   const engineFor = (name: string, store = createStore(), device = 'd1') => ({
     engine: new MlsCommunityEngine(
@@ -158,7 +212,7 @@ describe('MlsCommunityEngine', () => {
       store,
       () => node.transportFor(id(name)),
       () => () =>
-        Promise.resolve(CommunityMlsRoster.replay(historyOf().operations())),
+        Promise.resolve(CommunityRosterHistory.of(historyOf().operations())),
     ),
     store,
   });
@@ -166,12 +220,14 @@ describe('MlsCommunityEngine', () => {
   const rogueGroupOf = async (
     name: string,
     store: MlsStateStore,
+    frontier = CommunityRosterHistory.of(historyOf().operations()).heads(),
   ): Promise<MlsGroup> =>
     MlsGroup.restore(
       COMMUNITY,
       cast[name].signer().owner,
-      anything,
+      { ...anything, frontier: () => frontier },
       (await store.loadGroup(COMMUNITY)) as Uint8Array,
+      frontier,
     );
   const keyPackageOf = (name: string): Uint8Array =>
     Buffer.from(
@@ -218,6 +274,7 @@ describe('MlsCommunityEngine', () => {
     roster = new Set([id('alice'), id('bob'), id('carol')]);
     moderators = new Set();
     tamper = () => undefined;
+    signed = undefined;
   });
 
   const admitBob = async (): Promise<{
@@ -534,6 +591,198 @@ describe('MlsCommunityEngine', () => {
         committed: false,
         welcomed: false,
       });
+    });
+  });
+
+  describe('judges a commit by the roster revision it binds', () => {
+    /** The head of the signed history as it stands now. */
+    const headsNow = (): string[] => {
+      const { documents } = historyOf();
+
+      return [
+        CommunityOperationHistory.digestOf(documents[documents.length - 1]),
+      ];
+    };
+    /** Alice, bob and carol share the group; carol may add members. */
+    const carolManages = async () => {
+      moderators.add(id('carol'));
+      roster.add(id('mallory'));
+
+      return { ...(await admitCarol()), mallory: engineFor('mallory') };
+    };
+    const demoteCarol = (): void => {
+      tamper = (history) => history.assign(cast.alice, cast.carol, []);
+    };
+
+    it('accepts an add made before the demotion by a member who saw the demotion first', async () => {
+      const { alice, bob, carol, mallory } = await carolManages();
+
+      await mallory.engine.publishKeyPackages(COMMUNITY);
+      await carol.engine.admit(COMMUNITY, [id('mallory')]);
+      demoteCarol();
+
+      await expect(bob.engine.sync(COMMUNITY)).resolves.toBe(true);
+      await expect(alice.engine.sync(COMMUNITY)).resolves.toBe(true);
+      await expect(bob.engine.identities(COMMUNITY)).resolves.toContain(
+        id('mallory'),
+      );
+      const ciphertext = await bob.engine.encrypt(COMMUNITY, 'same epoch');
+
+      await expect(alice.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
+        'same epoch',
+      );
+      await expect(carol.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
+        'same epoch',
+      );
+      // A welcome opens only from a manager the joiner still sees as one.
+      await expect(mallory.engine.sync(COMMUNITY)).resolves.toBe(true);
+      await expect(mallory.engine.hasGroup(COMMUNITY)).resolves.toBe(false);
+    });
+
+    it('rejects an add a demoted member makes after the demotion', async () => {
+      const { bob, carol, mallory } = await carolManages();
+
+      await mallory.engine.publishKeyPackages(COMMUNITY);
+      demoteCarol();
+      const added = await (
+        await rogueGroupOf('carol', carol.store, headsNow())
+      ).add([keyPackageOf('mallory')]);
+
+      await publishCommit('carol', added);
+
+      await expect(bob.engine.sync(COMMUNITY)).resolves.toBe(true);
+      await expect(bob.engine.identities(COMMUNITY)).resolves.not.toContain(
+        id('mallory'),
+      );
+    });
+
+    it('rejects an add a demoted member backdates to before the demotion', async () => {
+      const { alice, bob, carol, mallory } = await carolManages();
+      const beforeDemotion = headsNow();
+
+      demoteCarol();
+      // The owner binds the demotion into the group as soon as she sees it.
+      await alice.engine.reconcile(COMMUNITY);
+      await bob.engine.sync(COMMUNITY);
+      await carol.engine.sync(COMMUNITY);
+      await mallory.engine.publishKeyPackages(COMMUNITY);
+      const backdated = await (
+        await rogueGroupOf('carol', carol.store, beforeDemotion)
+      ).add([keyPackageOf('mallory')]);
+
+      await publishCommit('carol', backdated);
+
+      await expect(bob.engine.sync(COMMUNITY)).resolves.toBe(true);
+      await expect(bob.engine.identities(COMMUNITY)).resolves.not.toContain(
+        id('mallory'),
+      );
+      const ciphertext = await alice.engine.encrypt(COMMUNITY, 'still ours');
+
+      await expect(bob.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
+        'still ours',
+      );
+    });
+
+    /**
+     * Alice kicks carol, who never sees it: she races the commit removing
+     * her with an update for its epoch that wins on id, bound to the
+     * revision `bind` picks from the one before the kick. Bob had applied
+     * the removal; mallory sees both commits at once.
+     */
+    const raceRemoval = async (
+      bind: (beforeKick: string[]) => string[],
+    ): Promise<void> => {
+      const { alice, bob, carol } = await admitCarol();
+      const mallory = engineFor('mallory');
+
+      roster.add(id('mallory'));
+      await mallory.engine.publishKeyPackages(COMMUNITY);
+      await alice.engine.reconcile(COMMUNITY);
+      await Promise.all(
+        [bob, carol, mallory].map(({ engine }) => engine.sync(COMMUNITY)),
+      );
+      const beforeKick = headsNow();
+
+      roster.delete(id('carol'));
+      await alice.engine.reconcile(COMMUNITY);
+      const removal = node.records[node.records.length - 1];
+
+      await bob.engine.sync(COMMUNITY);
+      const frontier = bind(beforeKick);
+      let raced = await (
+        await rogueGroupOf('carol', carol.store, frontier)
+      ).update();
+
+      for (
+        let attempt = 0;
+        attempt < 64 &&
+        deriveMlsRecordId({
+          epoch: Number(raced.epoch),
+          groupId: COMMUNITY,
+          kind: 'commit',
+          payload: base64(raced.commit),
+        }) >= removal.recordId;
+        attempt += 1
+      ) {
+        raced = await (
+          await rogueGroupOf('carol', carol.store, frontier)
+        ).update();
+      }
+      await publishCommit('carol', raced);
+
+      for (const member of [bob, mallory]) {
+        await expect(member.engine.sync(COMMUNITY)).resolves.toBe(true);
+        await expect(
+          member.engine.identities(COMMUNITY),
+        ).resolves.not.toContain(id('carol'));
+      }
+      const ciphertext = await alice.engine.encrypt(COMMUNITY, 'without carol');
+
+      await expect(bob.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
+        'without carol',
+      );
+      await expect(mallory.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
+        'without carol',
+      );
+    };
+
+    it('keeps a kicked member out when it races its removal with a backdated commit', async () => {
+      await raceRemoval((beforeKick) => beforeKick);
+    });
+
+    it('keeps a kicked member out when it outreaches its removal with a concurrent branch', async () => {
+      await raceRemoval((beforeKick) => {
+        const history = historyOf();
+
+        return [
+          history.branch(cast.alice, [history.branch(cast.alice, beforeKick)]),
+        ];
+      });
+    });
+
+    it('refuses a welcome into a look-alike group from a demoted member', async () => {
+      moderators.add(id('carol'));
+      roster.add(id('mallory'));
+      const alice = engineFor('alice');
+      const mallory = engineFor('mallory');
+      const beforeDemotion = headsNow();
+      const lookAlike = await MlsGroup.create(
+        COMMUNITY,
+        await generateMlsKeyPackage(cast.carol.signer()),
+        { ...anything, frontier: () => beforeDemotion },
+      );
+
+      await alice.engine.createGroup(COMMUNITY);
+      await mallory.engine.publishKeyPackages(COMMUNITY);
+      await publishWelcome(
+        'carol',
+        await lookAlike.add([keyPackageOf('mallory')]),
+        'mallory',
+      );
+      demoteCarol();
+
+      await expect(mallory.engine.sync(COMMUNITY)).resolves.toBe(true);
+      await expect(mallory.engine.hasGroup(COMMUNITY)).resolves.toBe(false);
     });
   });
 

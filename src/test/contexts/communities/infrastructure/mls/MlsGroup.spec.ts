@@ -18,10 +18,18 @@ const read = (bytes: Uint8Array): string => new TextDecoder().decode(bytes);
 
 let cast: Record<string, MlsTestIdentity>;
 let members: Set<string>;
-let allows: (change: MlsMembershipChange) => boolean;
+let allows: (
+  change: MlsMembershipChange,
+  order: { frontier: readonly string[] },
+) => boolean;
+/** The revision this device has verified up to; it commits bound to it. */
+let latest: string[];
+let reach: (frontier: readonly string[]) => number;
 const policy: MlsMembershipPolicy = {
   admits: (identityId) => members.has(identityId),
-  allows: (change) => allows(change),
+  allows: (change, order) => allows(change, order),
+  frontier: () => latest,
+  reach: (frontier) => reach(frontier),
 };
 const idOf = (name: string): string => cast[name].id;
 const idsOf = (...names: string[]): string[] => names.map(idOf).sort();
@@ -32,6 +40,47 @@ const device = (name: string, deviceName = 'd1') =>
 /** Only alice adds or removes; anyone may rotate their own leaf. */
 const aliceManages = ({ added, committer, removed }: MlsMembershipChange) =>
   committer === idOf('alice') || (added.length === 0 && removed.length === 0);
+
+/**
+ * A roster history: alice kicks carol, while concurrent operations b1, b2
+ * and b3 descend from before the kick.
+ */
+const parentsOf: Record<string, string[]> = {
+  b1: ['base'],
+  b2: ['b1'],
+  b3: ['b2'],
+  base: [],
+  kick: ['base'],
+};
+/** A digest-shaped stand-in for the operation `name`. */
+const op = (name: string): string => name.padEnd(43, '-');
+const closureOf = (frontier: readonly string[]): Set<string> => {
+  const seen = new Set<string>();
+  const pending = frontier.map((digest) => digest.replace(/-+$/, ''));
+
+  for (let name = pending.pop(); name !== undefined; name = pending.pop()) {
+    if (!seen.has(name)) pending.push(...parentsOf[name]);
+    seen.add(name);
+  }
+
+  return seen;
+};
+/** Carol commits nothing once the revision holds her kick. */
+const carolKicked = (
+  { committer }: MlsMembershipChange,
+  { frontier }: { frontier: readonly string[] },
+): boolean => committer !== idOf('carol') || !closureOf(frontier).has('kick');
+
+/** Every order the commits can arrive in. */
+const ordersOf = <T>(items: T[]): T[][] =>
+  items.length <= 1
+    ? [items]
+    : items.flatMap((item, index) =>
+        ordersOf(items.filter((_, other) => other !== index)).map((rest) => [
+          item,
+          ...rest,
+        ]),
+      );
 
 interface Seat {
   key: MlsKeyPackageBundle;
@@ -92,6 +141,8 @@ describe('MlsGroup on the real ts-mls library', () => {
   beforeEach(() => {
     members = new Set(['alice', 'bob', 'carol', 'dave'].map(idOf));
     allows = () => true;
+    latest = [];
+    reach = () => 0;
   });
 
   it('delivers a message to every member of a multi-user group', async () => {
@@ -359,6 +410,57 @@ describe('MlsGroup on the real ts-mls library', () => {
     expect(read(await bob.group.decrypt(sealed))).toBe('converged');
   });
 
+  it('converges on one rival, never the kicked one, in every arrival order', async () => {
+    const { alice, bob, carol, dave } = await setup([
+      'alice',
+      'bob',
+      'carol',
+      'dave',
+    ]);
+    const before = dave.group.serialize();
+    const commitAt = async (
+      frontier: string[],
+      id: string,
+      make: () => Promise<MlsCommitOutput | undefined>,
+    ) => {
+      latest = frontier.map(op);
+      const output = (await make())!;
+
+      return { bytes: output.commit, epoch: output.epoch, id };
+    };
+    // Alice removes carol bound to the kick; bob rotates his leaf bound to
+    // a concurrent branch; carol, kicked, rotates hers bound to more of
+    // that branch, with the lowest id.
+    const removal = await commitAt(['kick'], 'c-alice', () =>
+      alice.group.removeIdentities([idOf('carol')]),
+    );
+    const honest = await commitAt(['b2'], 'b-bob', () => bob.group.update());
+    const kicked = await commitAt(['b3'], 'a-carol', () =>
+      carol.group.update(),
+    );
+    bob.group.confirm(honest.id);
+    allows = carolKicked;
+    reach = (frontier) => closureOf(frontier).size;
+    latest = [op('kick'), op('b3')];
+    const sealed = await bob.group.encrypt(text.encode('bob won'));
+
+    for (const order of ordersOf([removal, honest, kicked])) {
+      const receiver = MlsGroup.restore(
+        'community-1',
+        dave.key.owner,
+        policy,
+        before,
+        [],
+      );
+
+      for (const record of order) {
+        await receiver.applyCommit(record).catch(() => undefined);
+      }
+
+      expect(read(await receiver.decrypt(sealed))).toBe('bob won');
+    }
+  });
+
   it('lets a removed member rejoin with a fresh key package and read only what follows', async () => {
     const { alice, bob, carol } = await setup(['alice', 'bob', 'carol']);
     const old = await alice.group.encrypt(text.encode('old history'));
@@ -417,7 +519,7 @@ describe('MlsGroup on the real ts-mls library', () => {
         epoch: output.epoch,
         id: 'c-mallory',
       }),
-    ).rejects.toThrow('validate credential');
+    ).rejects.toThrow('Commit rejected');
     expect(bob.group.identities()).not.toContain(idOf('mallory'));
   });
 
@@ -503,6 +605,7 @@ describe('MlsGroup on the real ts-mls library', () => {
       bob.key.owner,
       policy,
       bob.group.serialize(),
+      bob.group.frontier,
     );
 
     const sealed = await alice.group.encrypt(text.encode('after restart'));
