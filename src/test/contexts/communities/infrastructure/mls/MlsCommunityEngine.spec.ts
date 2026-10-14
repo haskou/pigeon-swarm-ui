@@ -33,15 +33,30 @@ const visible = (
   (record.kind !== 'welcome' ||
     [record.recipientIdentityId, record.authorIdentityId].includes(viewer));
 
+/**
+ * An in-memory node. `beforePublish` and `afterPublish` may throw to stand
+ * for a node that is unreachable, or a device that stopped once a record
+ * had been stored.
+ */
 const createNode = () => {
   const records: MlsRecordResource[] = [];
+  const hooks: {
+    afterPublish?: (record: MlsRecordResource) => void;
+    beforePublish?: (input: MlsRecordInput) => void;
+  } = {};
 
   return {
+    hooks,
     records,
     transportFor: (identityId: string): MlsRecordTransport => ({
       list: (query) =>
         Promise.resolve(records.filter((r) => visible(r, query, identityId))),
       publish: (input: MlsRecordInput) => {
+        try {
+          hooks.beforePublish?.(input);
+        } catch (error) {
+          return Promise.reject(error);
+        }
         const recordId = deriveMlsRecordId(input);
         const existing = records.find((r) => r.recordId === recordId);
 
@@ -55,6 +70,7 @@ const createNode = () => {
         };
 
         records.push(record);
+        hooks.afterPublish?.(record);
 
         return Promise.resolve(record);
       },
@@ -176,6 +192,8 @@ describe('MlsCommunityEngine', () => {
 
   beforeEach(() => {
     node.records.length = 0;
+    delete node.hooks.afterPublish;
+    delete node.hooks.beforePublish;
     roster = new Set([id('alice'), id('bob'), id('carol')]);
     moderators = new Set();
   });
@@ -193,6 +211,30 @@ describe('MlsCommunityEngine', () => {
     await bob.engine.sync(COMMUNITY);
 
     return { alice, bob };
+  };
+
+  /** Alice, bob and carol share the group in the same epoch. */
+  const admitCarol = async (): Promise<{
+    alice: ReturnType<typeof engineFor>;
+    bob: ReturnType<typeof engineFor>;
+    carol: ReturnType<typeof engineFor>;
+  }> => {
+    const { alice, bob } = await admitBob();
+    const carol = engineFor('carol');
+
+    await carol.engine.publishKeyPackages(COMMUNITY);
+    await alice.engine.admit(COMMUNITY, [id('carol')]);
+    await bob.engine.sync(COMMUNITY);
+    await carol.engine.sync(COMMUNITY);
+
+    return { alice, bob, carol };
+  };
+  const secretOf = (member: ReturnType<typeof engineFor>) =>
+    member.engine.exportSecret(COMMUNITY, 'test', 'epoch');
+  const failCommits = (error: Error): void => {
+    node.hooks.beforePublish = (input) => {
+      if (input.kind === 'commit') throw error;
+    };
   };
 
   it('lets an admitted member read what the group sends', async () => {
@@ -493,6 +535,120 @@ describe('MlsCommunityEngine', () => {
     );
     await expect(alice.engine.identities(COMMUNITY)).resolves.toEqual(
       expect.arrayContaining([id('alice'), id('bob')]),
+    );
+  });
+
+  it('abandons its own commit when publishing it fails, so it stays in the epoch the others are in', async () => {
+    const { alice, bob, carol } = await admitCarol();
+    const before = await secretOf(bob);
+
+    roster.delete(id('carol'));
+    failCommits(new Error('node unavailable'));
+    await expect(alice.engine.remove(COMMUNITY, [id('carol')])).rejects.toThrow(
+      'node unavailable',
+    );
+    delete node.hooks.beforePublish;
+    const restarted = engineFor('alice', alice.store);
+
+    for (const member of [alice, restarted]) {
+      await expect(secretOf(member)).resolves.toEqual(before);
+    }
+    const sameEpoch = await alice.engine.encrypt(COMMUNITY, 'same epoch');
+
+    await expect(bob.engine.decrypt(COMMUNITY, sameEpoch)).resolves.toBe(
+      'same epoch',
+    );
+    await alice.engine.remove(COMMUNITY, [id('carol')]);
+    await bob.engine.sync(COMMUNITY);
+
+    await expect(secretOf(bob)).resolves.not.toEqual(before);
+    await expect(secretOf(bob)).resolves.toEqual(await secretOf(alice));
+    await expect(carol.engine.sync(COMMUNITY)).resolves.toBe(false);
+  });
+
+  it('adopts its own published commit after stopping before it saved the group', async () => {
+    const { alice, bob, carol } = await admitCarol();
+    const saveGroup = alice.store.saveGroup.bind(alice.store);
+    let published = false;
+
+    node.hooks.afterPublish = (record) => {
+      published ||= record.kind === 'commit';
+    };
+    jest
+      .spyOn(alice.store, 'saveGroup')
+      .mockImplementation((groupId, state) =>
+        published && groupId === COMMUNITY
+          ? Promise.reject(new Error('crash'))
+          : saveGroup(groupId, state),
+      );
+    roster.delete(id('carol'));
+
+    await expect(alice.engine.remove(COMMUNITY, [id('carol')])).rejects.toThrow(
+      'crash',
+    );
+    jest.mocked(alice.store.saveGroup).mockRestore();
+    const restarted = engineFor('alice', alice.store);
+
+    await expect(restarted.engine.sync(COMMUNITY)).resolves.toBe(true);
+    await bob.engine.sync(COMMUNITY);
+    await expect(secretOf(restarted)).resolves.toEqual(await secretOf(bob));
+    const sealed = await restarted.engine.encrypt(
+      COMMUNITY,
+      'after the restart',
+    );
+
+    await expect(bob.engine.decrypt(COMMUNITY, sealed)).resolves.toBe(
+      'after the restart',
+    );
+    await expect(carol.engine.sync(COMMUNITY)).resolves.toBe(false);
+  });
+
+  it('stays in its epoch after stopping before it published, and makes the change again', async () => {
+    const { alice, bob, carol } = await admitCarol();
+    const before = await secretOf(bob);
+
+    roster.delete(id('carol'));
+    failCommits(new Error('crash'));
+    await expect(alice.engine.remove(COMMUNITY, [id('carol')])).rejects.toThrow(
+      'crash',
+    );
+    delete node.hooks.beforePublish;
+    const restarted = engineFor('alice', alice.store);
+
+    await expect(restarted.engine.sync(COMMUNITY)).resolves.toBe(true);
+    await expect(secretOf(restarted)).resolves.toEqual(before);
+    await expect(restarted.engine.reconcile(COMMUNITY)).resolves.toBe(true);
+    await bob.engine.sync(COMMUNITY);
+
+    await expect(secretOf(restarted)).resolves.not.toEqual(before);
+    await expect(secretOf(bob)).resolves.toEqual(await secretOf(restarted));
+    await expect(carol.engine.sync(COMMUNITY)).resolves.toBe(false);
+  });
+
+  it('sends the welcome of an admission again after stopping before it was published', async () => {
+    const { alice, bob } = await admitBob();
+    const carol = engineFor('carol');
+
+    await carol.engine.publishKeyPackages(COMMUNITY);
+    node.hooks.beforePublish = (input) => {
+      if (input.kind === 'welcome') throw new Error('crash');
+    };
+    await expect(alice.engine.admit(COMMUNITY, [id('carol')])).rejects.toThrow(
+      'crash',
+    );
+    delete node.hooks.beforePublish;
+    const restarted = engineFor('alice', alice.store);
+
+    await expect(restarted.engine.sync(COMMUNITY)).resolves.toBe(true);
+    await bob.engine.sync(COMMUNITY);
+    await expect(carol.engine.sync(COMMUNITY)).resolves.toBe(true);
+    const sealed = await restarted.engine.encrypt(COMMUNITY, 'welcome carol');
+
+    await expect(carol.engine.decrypt(COMMUNITY, sealed)).resolves.toBe(
+      'welcome carol',
+    );
+    await expect(bob.engine.decrypt(COMMUNITY, sealed)).resolves.toBe(
+      'welcome carol',
     );
   });
 });

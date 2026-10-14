@@ -106,6 +106,29 @@ The node cannot order commits across replicas. Clients do it:
   it cannot get them, asks to be re-added with a fresh key package. Rejoin uses
   the same Add and Welcome path.
 
+A client keeps its own commit pending until the node holds it, as group
+conversations do (#380, #418):
+
+- Before publishing, it saves the group the commit leads to under
+  `<groupId>#pending`, with the record id, the epoch and the welcome with its
+  recipients. The stored group stays in its epoch.
+- If publishing fails, the commit is abandoned: the group, its stored state
+  and every secret derived from it stay in the epoch the other members are in.
+  The pending stays, because the answer may have been lost after the node
+  stored the commit.
+- Once the node returns the record, the group advances and is saved, the
+  welcomes are published, and only then is the pending cleared.
+- On sync, a device that stopped after publishing adopts its pending group
+  when the node lists that exact record id at that epoch, instead of trying to
+  open its own commit. While the group stays in the pending's epoch the pending
+  is kept. Once the group moved on, the welcome is sent again (welcome record
+  ids are idempotent) if the group took this device's commit, and the pending
+  is dropped.
+- A commit that never reached the node is not re-sent. The device stays in the
+  previous epoch and `reconcile` makes the change again from the roster. It
+  syncs first, so a commit that did land is adopted before a new commit
+  replaces the pending.
+
 ### Who commits
 
 The community roster (`CommunityMlsRoster`, built from the node's community)
