@@ -135,6 +135,7 @@ describe(PigeonCommunitiesApi.name, () => {
       const session = {
         deviceCredentialKeyPair: device,
         identity: { id: 'identity-1' },
+        keyPair: device,
       } as unknown as Session;
       const api = new PigeonCommunitiesApi(
         http,
@@ -403,6 +404,7 @@ describe(PigeonCommunitiesApi.name, () => {
     const session = {
       deviceCredentialKeyPair: device,
       identity: { id: 'identity-1' },
+      keyPair: device,
     } as unknown as Session;
     const api = new PigeonCommunitiesApi(
       http,
@@ -472,6 +474,7 @@ describe(PigeonCommunitiesApi.name, () => {
     const session = {
       deviceCredentialKeyPair: device,
       identity: { id: 'identity-1' },
+      keyPair: device,
     } as unknown as Session;
     const api = new PigeonCommunitiesApi(
       http,
@@ -508,6 +511,7 @@ describe(PigeonCommunitiesApi.name, () => {
     const session = {
       deviceCredentialKeyPair: device,
       identity: { id: 'identity-1' },
+      keyPair: device,
     } as unknown as Session;
     const api = new PigeonCommunitiesApi(
       http,
@@ -585,6 +589,7 @@ describe(PigeonCommunitiesApi.name, () => {
     const session = {
       deviceCredentialKeyPair: device,
       identity: { id: 'identity-1' },
+      keyPair: device,
     } as unknown as Session;
     const api = new PigeonCommunitiesApi(
       http,
@@ -765,6 +770,7 @@ describe(PigeonCommunitiesApi.name, () => {
       const session = {
         deviceCredentialKeyPair: await KeyPair.generate(),
         identity: { id: 'identity-1' },
+        keyPair: await KeyPair.generate(),
       } as unknown as Session;
       const api = new PigeonCommunitiesApi(
         http,
@@ -809,6 +815,7 @@ describe(PigeonCommunitiesApi.name, () => {
       const session = {
         deviceCredentialKeyPair: await KeyPair.generate(),
         identity: { id: 'identity-1' },
+        keyPair: await KeyPair.generate(),
       } as unknown as Session;
       const api = new PigeonCommunitiesApi(
         http,
@@ -893,6 +900,12 @@ describe(PigeonCommunitiesApi.name, () => {
         },
         parents: [parent],
       });
+      expect(Object.keys(lastBody().operation).sort()).toEqual([
+        'createdAt',
+        'identitySignature',
+        'mutation',
+        'parents',
+      ]);
       await api.kickMember(session, 'community-1', 'member-1');
       expect(Object.keys(lastBody()).sort()).toEqual([
         'moderationLog',

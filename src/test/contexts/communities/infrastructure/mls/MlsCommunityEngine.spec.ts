@@ -1,5 +1,7 @@
 import type { PrivateKeyPackage } from 'ts-mls';
 
+import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+
 import type { MlsRecordInput } from '../../../../../contexts/communities/infrastructure/http/MlsRecordInput';
 import type { MlsRecordResource } from '../../../../../contexts/communities/infrastructure/http/resources/MlsRecordResource';
 import type { MlsRecordTransport } from '../../../../../contexts/communities/infrastructure/mls/MlsRecordTransport';
@@ -7,6 +9,7 @@ import type { MlsStateStore } from '../../../../../contexts/communities/infrastr
 import type { StoredMlsKeyPackage } from '../../../../../contexts/communities/infrastructure/mls/StoredMlsKeyPackage';
 
 import { CommunityMlsRoster } from '../../../../../contexts/communities/domain/CommunityMlsRoster';
+import { CommunityOperationProof } from '../../../../../contexts/communities/infrastructure/http/CommunityOperationProof';
 import { deriveMlsRecordId } from '../../../../../contexts/communities/infrastructure/http/deriveMlsRecordId';
 import { MlsCommunityEngine } from '../../../../../contexts/communities/infrastructure/mls/MlsCommunityEngine';
 import {
@@ -14,6 +17,7 @@ import {
   MlsGroup,
 } from '../../../../../contexts/communities/infrastructure/mls/MlsGroup';
 import { MlsLeafSigner } from '../../../../../contexts/communities/infrastructure/mls/MlsLeafSigner';
+import { CommunityOperationHistory } from '../http/CommunityOperationHistory';
 import { MlsTestIdentity } from './MlsTestIdentity';
 
 const COMMUNITY = 'community-1';
@@ -117,24 +121,44 @@ describe('MlsCommunityEngine', () => {
   let cast: Record<string, MlsTestIdentity>;
   let roster: Set<string>;
   let moderators: Set<string>;
+  /** What a node or a member adds to the honest history, per spec. */
+  let tamper: (history: CommunityOperationHistory, managers: string) => void;
+  /** A key that is no member's identity key, as a node's would be. */
+  let nodeKey: KeyPair;
   const id = (name: string): string => cast[name].id;
+  /**
+   * The community's signed history: the owner alice creates it and a role
+   * that may add members, adds everyone on the roster and gives the
+   * moderators that role.
+   */
+  const historyOf = (): CommunityOperationHistory => {
+    const history = new CommunityOperationHistory(cast.alice);
+    const managers = history.createRole(cast.alice, ['manage_members']);
+    const others = Object.values(cast).filter(
+      (member) => member !== cast.alice,
+    );
+
+    for (const member of others) {
+      if (roster.has(member.id)) history.add(cast.alice, member);
+    }
+
+    for (const member of others) {
+      if (moderators.has(member.id)) {
+        history.assign(cast.alice, member, [managers]);
+      }
+    }
+
+    tamper(history, managers);
+
+    return history;
+  };
   const engineFor = (name: string, store = createStore(), device = 'd1') => ({
     engine: new MlsCommunityEngine(
       cast[name].signer(device),
       store,
       () => node.transportFor(id(name)),
       () => () =>
-        Promise.resolve(
-          CommunityMlsRoster.of({
-            memberIds: [...roster],
-            memberRoles: [...moderators].map((identityId) => ({
-              identityId,
-              roleIds: ['moderators'],
-            })),
-            ownerIdentityId: id('alice'),
-            roles: [{ id: 'moderators', permissions: ['manage_members'] }],
-          }),
-        ),
+        Promise.resolve(CommunityMlsRoster.replay(historyOf().operations())),
     ),
     store,
   });
@@ -184,6 +208,7 @@ describe('MlsCommunityEngine', () => {
 
   beforeAll(async () => {
     cast = await MlsTestIdentity.cast(['alice', 'bob', 'carol', 'mallory']);
+    nodeKey = await KeyPair.generate();
   });
 
   beforeEach(() => {
@@ -192,6 +217,7 @@ describe('MlsCommunityEngine', () => {
     delete node.hooks.beforePublish;
     roster = new Set([id('alice'), id('bob'), id('carol')]);
     moderators = new Set();
+    tamper = () => undefined;
   });
 
   const admitBob = async (): Promise<{
@@ -405,6 +431,110 @@ describe('MlsCommunityEngine', () => {
     await expect(bob.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
       'still ours',
     );
+  });
+
+  describe('trusts only the signed role history', () => {
+    /** Carol adds mallory to the group, which only a manager may do. */
+    const carolAddsMallory = async () => {
+      const { alice, bob } = await admitBob();
+      const carol = engineFor('carol');
+      const mallory = engineFor('mallory');
+
+      await carol.engine.publishKeyPackages(COMMUNITY);
+      await alice.engine.admit(COMMUNITY, [id('carol')]);
+      await carol.engine.sync(COMMUNITY);
+      await bob.engine.sync(COMMUNITY);
+      roster.add(id('mallory'));
+      await mallory.engine.publishKeyPackages(COMMUNITY);
+      const added = await (
+        await rogueGroupOf('carol', carol.store)
+      ).add([keyPackageOf('mallory')]);
+
+      await publishCommit('carol', added);
+      await publishWelcome('carol', added, 'mallory');
+      await expect(bob.engine.sync(COMMUNITY)).resolves.toBe(true);
+      await expect(mallory.engine.sync(COMMUNITY)).resolves.toBe(true);
+
+      return {
+        committed: (await bob.engine.identities(COMMUNITY)).includes(
+          id('mallory'),
+        ),
+        welcomed: await mallory.engine.hasGroup(COMMUNITY),
+      };
+    };
+
+    it('accepts the add and its welcome when the owner made carol a manager', async () => {
+      tamper = (history, managers) =>
+        history.assign(cast.alice, cast.carol, [managers]);
+
+      await expect(carolAddsMallory()).resolves.toEqual({
+        committed: true,
+        welcomed: true,
+      });
+    });
+
+    it('rejects the add and its welcome when the node forges a role assignment', async () => {
+      tamper = (history, managers) =>
+        history.append(
+          cast.alice,
+          'member_roles_updated',
+          { identityId: id('carol'), roleIds: [managers] },
+          nodeKey,
+        );
+
+      await expect(carolAddsMallory()).resolves.toEqual({
+        committed: false,
+        welcomed: false,
+      });
+    });
+
+    it('rejects the add and its welcome when the node adds manage_members to a role', async () => {
+      tamper = (history) => {
+        const helpers = history.createRole(cast.alice, ['send_messages']);
+
+        history.assign(cast.alice, cast.carol, [helpers]);
+        const honest = history.append(cast.alice, 'role_updated', {
+          name: 'Role',
+          permissions: ['send_messages'],
+          roleId: helpers,
+        });
+        const content = CommunityOperationProof.contentOf(honest);
+        const altered = CommunityOperationProof.seal(
+          {
+            ...content,
+            args: {
+              ...content.args,
+              permissions: ['send_messages', 'manage_members'],
+            },
+          },
+          nodeKey,
+        );
+
+        // Re-addressed to its new content, still under alice's signature.
+        history.documents.splice(-1, 1, {
+          ...altered,
+          identitySignature: honest.identitySignature,
+        });
+      };
+
+      await expect(carolAddsMallory()).resolves.toEqual({
+        committed: false,
+        welcomed: false,
+      });
+    });
+
+    it('rejects the add and its welcome when a member without manage_roles grants the role', async () => {
+      tamper = (history, managers) => {
+        const granted = history.createRole(cast.bob, ['manage_members']);
+
+        history.assign(cast.bob, cast.carol, [granted, managers]);
+      };
+
+      await expect(carolAddsMallory()).resolves.toEqual({
+        committed: false,
+        welcomed: false,
+      });
+    });
   });
 
   it('rejects the removal of a listed member by someone who may not kick', async () => {
