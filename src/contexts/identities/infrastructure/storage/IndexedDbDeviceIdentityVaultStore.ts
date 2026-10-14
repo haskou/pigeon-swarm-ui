@@ -82,8 +82,8 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
 
           if (
             record?.version !== 2 ||
-            record.authorizationRevision !== localRevision.valueOf() ||
-            revision.valueOf() < localRevision.valueOf() ||
+            !localRevision.hasValue(record.authorizationRevision) ||
+            revision.isLessThan(localRevision) ||
             (revision.isEqual(localRevision) &&
               record.authorizationEpoch !== epoch.valueOf())
           ) {

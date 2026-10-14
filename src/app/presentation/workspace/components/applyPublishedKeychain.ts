@@ -1,5 +1,6 @@
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
+import { KeychainVersion } from '../../../../contexts/identities/domain/value-objects/KeychainVersion';
 import { IdentityMatch } from '../../../../contexts/identities/presentation/view-models/IdentityMatch';
 
 /**
@@ -25,7 +26,11 @@ export function applyPublishedKeychain(
   }
 
   // Keychain versions only move forward: keep the newer keychain already held.
-  if (published.keychain.version < current.keychain.version) {
+  if (
+    KeychainVersion.fromNumber(current.keychain.version).isGreaterThan(
+      published.keychain.version,
+    )
+  ) {
     return current;
   }
 

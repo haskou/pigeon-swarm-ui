@@ -109,7 +109,7 @@ export class DeviceSealedRootRotation {
 
     if (
       !own ||
-      own.authorizationRevision >= session.authorizationRevision.valueOf()
+      session.authorizationRevision.isLessOrEqualThan(own.authorizationRevision)
     ) {
       return null;
     }
@@ -133,12 +133,13 @@ export class DeviceSealedRootRotation {
 
     let opening = { entry: own, session };
 
-    if (own.authorizationRevision !== session.authorizationRevision.valueOf()) {
+    if (!session.authorizationRevision.hasValue(own.authorizationRevision)) {
       const synced = await this.deviceAuthorization.synchronize(session);
       const fresh = await this.sealedSecrets.fetchOwn(synced);
 
       if (
-        fresh?.authorizationRevision !== synced.authorizationRevision.valueOf()
+        !fresh ||
+        !synced.authorizationRevision.hasValue(fresh.authorizationRevision)
       ) {
         return synced;
       }
