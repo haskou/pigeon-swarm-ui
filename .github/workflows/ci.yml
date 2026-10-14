@@ -66,6 +66,9 @@ jobs:
       - name: Verify bounded recovery and real browser audio
         run: yarn test:e2e e2e/call-recovery.spec.ts --project=desktop-chromium
 
+      - name: Verify the edit composer keeps input made before a late frame
+        run: yarn test:e2e e2e/composer-edit.spec.ts --project=desktop-chromium
+
       - name: Build
         run: yarn build
 

@@ -1,7 +1,14 @@
 # E2E tests
 
-The stale ICE candidate, call recovery and real-node suites run in CI. Other
-Playwright scenarios run on demand against a configured application backend.
+The stale ICE candidate, call recovery, composer edit and real-node suites run
+in CI. Other Playwright scenarios run on demand against a configured
+application backend.
+
+`composer-edit.spec.ts` renders the composer from a fixture page and holds
+animation frames, as a busy main thread does. When the composer enters edit
+mode it is focused with the caret after the original text before the next
+frame. A late frame never collapses a selection made over that text, so the
+typed text replaces the original instead of being appended to it.
 
 Run all device profiles:
 
