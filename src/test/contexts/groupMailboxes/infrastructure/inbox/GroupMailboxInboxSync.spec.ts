@@ -3,10 +3,12 @@ import type { MockProxy } from 'jest-mock-extended';
 
 import { mock } from 'jest-mock-extended';
 
+import type { GroupMailboxGenerationRepository } from '../../../../../contexts/groupMailboxes/domain/repositories/GroupMailboxGenerationRepository';
 import type { GroupMailboxOutboxRow } from '../../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutboxRow';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { DirectMessageRecord } from '../../../../../contexts/mailboxes/domain/DirectMessageRecord';
 import type { PigeonMailboxClient } from '../../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
+import type { DirectMessageReaderSet } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageReaderSet';
 
 import { IndexedDbMlsStateStore } from '../../../../../contexts/communities/infrastructure/mls/IndexedDbMlsStateStore';
 import { GroupMailboxGeneration } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxGeneration';
@@ -223,13 +225,15 @@ const member = (name: string): Member => {
     received: [],
     session,
     sync: new GroupMailboxInboxSync(
-      session,
+      () => session,
       engine,
       control,
       channel,
       wire,
       new GroupMailboxInboxStore(),
       new GroupMessageHistoryStore(`${databaseName}-history`),
+      mock<GroupMailboxGenerationRepository>(),
+      mock<DirectMessageReaderSet>(),
     ),
   };
 
@@ -550,13 +554,15 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
     await send(alice, sent('alice', mid('alice', 'm1')));
     await sync(carol);
     const restarted = new GroupMailboxInboxSync(
-      carol.session,
+      () => carol.session,
       carol.engine,
       carol.control,
       channel,
       wire,
       new GroupMailboxInboxStore(),
       new GroupMessageHistoryStore(carol.history),
+      mock<GroupMailboxGenerationRepository>(),
+      mock<DirectMessageReaderSet>(),
     );
 
     await send(
@@ -630,7 +636,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
 
   it('drops an envelope that keeps failing to open and reads on', async () => {
     const failing = new GroupMailboxInboxSync(
-      bob.session,
+      () => bob.session,
       {
         decrypt: () => Promise.reject(new Error('unexpected')),
         drainedGenerations: (id) => bob.engine.drainedGenerations(id),
@@ -641,6 +647,8 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
       wire,
       new GroupMailboxInboxStore(),
       new GroupMessageHistoryStore(bob.history),
+      mock<GroupMailboxGenerationRepository>(),
+      mock<DirectMessageReaderSet>(),
     );
     const pass = () =>
       failing.sync(CONVERSATION, new AbortController().signal, (records) => {

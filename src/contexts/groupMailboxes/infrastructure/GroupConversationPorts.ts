@@ -3,6 +3,7 @@ import type { PigeonMailboxClient } from '../../mailboxes/infrastructure/http/Pi
 import type { MailboxChannel } from '../../mailboxes/infrastructure/MailboxChannel';
 import type { MessageProjector } from '../../messages/infrastructure/crypto/MessageProjector';
 import type { PigeonMessageCommandsApi } from '../../messages/infrastructure/http/PigeonMessageCommandsApi';
+import type { DirectMessageReaderSet } from '../../messages/infrastructure/mailbox/DirectMessageReaderSet';
 import type { GroupMailboxRoster } from '../domain/GroupMailboxRoster';
 import type { GroupMailboxDirectLink } from './control/GroupMailboxDirectLink';
 import type { GroupMailboxNotificationPages } from './control/GroupMailboxNotificationPages';
@@ -17,6 +18,11 @@ export type GroupConversationPorts = {
   notifications: GroupMailboxNotificationPages;
   now: () => number;
   projector: Pick<MessageProjector, 'projectPlaintext'>;
+  /** Enrols, bridges and prunes the readers of this identity's inboxes. */
+  readerSet: Pick<
+    DirectMessageReaderSet,
+    'cutOff' | 'enrolSealedRoot' | 'reconcile'
+  >;
   /** The node's roster of a conversation, as `session` sees it. */
   roster: (
     session: Session,

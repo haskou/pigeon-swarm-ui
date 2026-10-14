@@ -397,6 +397,10 @@ export class PigeonApiGateway {
       (await this.identityGateway.listDevices(session)).map((device) =>
         device.valueOf(),
       );
+    const readerSet = new DirectMessageReaderSet(
+      mailboxChannel,
+      listDeviceCredentials,
+    );
     const recipientMailboxes = new RecipientMailboxRouter(
       mailboxChannel,
       verifiedRecipientBase,
@@ -407,7 +411,7 @@ export class PigeonApiGateway {
       recipientMailboxes,
       new DirectMessageMailboxStore(),
       this.messageProjection,
-      new DirectMessageReaderSet(mailboxChannel, listDeviceCredentials),
+      readerSet,
       this.messageCommands,
       MailboxAvailabilityServers.pick(
         MAILBOX_AVAILABILITY_SERVERS,
@@ -456,6 +460,7 @@ export class PigeonApiGateway {
       notifications: notificationsApi,
       now: Date.now,
       projector: messageProjector,
+      readerSet,
       roster: (session, conversationId) =>
         groupRoster.of(session, conversationId),
       storage: scopeClientStorageKey('pigeon-group'),

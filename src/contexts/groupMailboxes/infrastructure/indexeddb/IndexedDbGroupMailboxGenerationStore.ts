@@ -18,6 +18,12 @@ export class IndexedDbGroupMailboxGenerationStore implements GroupMailboxGenerat
     private readonly session: () => Session,
   ) {}
 
+  public async conversationIds(): Promise<string[]> {
+    return (await this.entries.list(this.session(), 'generations')).map(
+      ({ id }) => id,
+    );
+  }
+
   public async load(
     conversationId: string,
   ): Promise<GroupMailboxGenerationLog> {

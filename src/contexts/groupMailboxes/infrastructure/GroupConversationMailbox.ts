@@ -328,6 +328,14 @@ export class GroupConversationMailbox {
     await this.member(session).outbox.resume();
   }
 
+  /**
+   * After a revoke rotated the root, cuts the replaced root and the revoked
+   * device off this identity's group inboxes. Rejects when any is not cut.
+   */
+  public async cutOffRevokedReaders(session: Session): Promise<void> {
+    await this.member(session).inbox.cutOffRevokedReaders();
+  }
+
   /** Stops this identity's background work, for logout. State is kept. */
   public stop(identityId: string): void {
     this.members.get(identityId)?.close();

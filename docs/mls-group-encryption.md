@@ -184,7 +184,9 @@ and attachments, and a missing group is an error, not a fallback.
   sign-out. A per-identity canary detects a root change: a canary that opens
   only under the root the session replaced (`previousDeviceSealedRootKey`,
   after a revoke) re-seals every row of the identity under the new root in one
-  transaction, so the device keeps its groups; one that opens under neither
+  transaction, so the device keeps its groups, and its group generation
+  inboxes bridge their readers to the new root (#405, see
+  `opaque-mailboxes-client.md`, Group readers); one that opens under neither
   root drops the identity's rows. Forgetting the device deletes them. Rows
   stored unsealed before #376 are dropped by the database upgrade, never read.
   XSS in an unlocked session still reads the state in memory. Only the last 8

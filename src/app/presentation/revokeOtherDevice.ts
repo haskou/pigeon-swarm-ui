@@ -6,6 +6,9 @@ export type DeviceRevokeServices = {
   directMessages: {
     cutOffRevokedReaders(session: Session): Promise<void>;
   };
+  groupMessages: {
+    cutOffRevokedReaders(session: Session): Promise<void>;
+  };
   identities: {
     revokeDevice(
       session: Session,
@@ -17,12 +20,12 @@ export type DeviceRevokeServices = {
 
 /**
  * Revokes another device of the identity, then cuts its readers off every
- * direct inbox, so the revoke is reported done only once that device opens no
- * record written afterwards. The revoke rotated the sealed root, so the
- * rotated session reaches `onRotated` before the cut-off runs and is never
- * lost to a failed cut-off. Resolves with the rotated session and whether the
- * cut-off succeeded; on failure the next sync of each inbox retries it.
- * Rejects when the revoke failed.
+ * direct inbox and every own group inbox, so the revoke is reported done only
+ * once that device opens no record written afterwards. The revoke rotated the
+ * sealed root, so the rotated session reaches `onRotated` before the cut-off
+ * runs and is never lost to a failed cut-off. Resolves with the rotated
+ * session and whether both cut-offs succeeded; on failure the next sync of
+ * each inbox retries it. Rejects when the revoke failed.
  */
 export async function revokeOtherDevice(
   request: {
@@ -41,10 +44,15 @@ export async function revokeOtherDevice(
 
   request.onRotated(rotated);
 
-  const cutOff = await services.directMessages
-    .cutOffRevokedReaders(rotated)
-    .then(() => true)
-    .catch(() => false);
+  const [direct, group] = await Promise.all(
+    [services.directMessages, services.groupMessages].map((messages) =>
+      messages
+        .cutOffRevokedReaders(rotated)
+        .then(() => true)
+        .catch(() => false),
+    ),
+  );
+  const cutOff = direct && group;
 
   return { cutOff, session: rotated };
 }

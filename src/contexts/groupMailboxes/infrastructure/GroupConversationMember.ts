@@ -24,6 +24,13 @@ export class GroupConversationMember {
       ports.roster(session, conversationId);
     // Local state seals under the latest root, as after a revoke rotated it.
     const sealing = { session };
+    const generations = new IndexedDbGroupMailboxGenerationStore(
+      new DeviceSealedEntryStore(
+        stores.database('generations', identityId),
+        'pigeon-group-generations',
+      ),
+      () => sealing.session,
+    );
     const engine = new GroupMailboxMlsEngine(
       new MlsLeafSigner(
         { deviceId: String(session.deviceId), identityId },
@@ -36,13 +43,7 @@ export class GroupConversationMember {
         ),
         () => sealing.session,
       ),
-      new IndexedDbGroupMailboxGenerationStore(
-        new DeviceSealedEntryStore(
-          stores.database('generations', identityId),
-          'pigeon-group-generations',
-        ),
-        () => sealing.session,
-      ),
+      generations,
       rosterFor,
       ports.now,
     );
@@ -75,13 +76,15 @@ export class GroupConversationMember {
         ports.now,
       ),
       new GroupMailboxInboxSync(
-        session,
+        () => sealing.session,
         engine,
         control,
         ports.channel,
         ports.client,
         stores.inboxes,
         stores.history,
+        generations,
+        ports.readerSet,
       ),
     );
   }
