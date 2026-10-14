@@ -51,6 +51,8 @@ type WorkspaceRealtimeEventRouterInput = {
   onNotificationSound: () => void;
   onNodeNetworksReload: () => Promise<void>;
   onPeersReload: () => Promise<void>;
+  /** Reads the group control letters now, as a notification announced one. */
+  receiveGroupControl: () => void;
   refreshNotifications: () => Promise<unknown>;
   refreshSession: () => Promise<unknown>;
   rememberIdentity: (identity: Session['identity']) => void;
@@ -104,6 +106,7 @@ export function useWorkspaceRealtimeEventRouter({
   onNotificationSound,
   onPeersReload,
   realtimeEventsOpen,
+  receiveGroupControl,
   refreshNotifications,
   refreshSession,
   rememberIdentity,
@@ -348,8 +351,7 @@ export function useWorkspaceRealtimeEventRouter({
       call: handleCallEvent,
       community: handleCommunityEvent,
       conversation: handleConversationEvent,
-      'group-control': () =>
-        void applicationContainer.groupMessages.receiveControl(session),
+      'group-control': receiveGroupControl,
       identity: handleIdentityEvent,
       ignored: () => undefined,
       keychain: () => void refreshSession().catch(() => undefined),
@@ -365,8 +367,8 @@ export function useWorkspaceRealtimeEventRouter({
       handleNodeEvent,
       handleNotificationEvent,
       handlePollEvent,
+      receiveGroupControl,
       refreshSession,
-      session,
     ],
   );
 

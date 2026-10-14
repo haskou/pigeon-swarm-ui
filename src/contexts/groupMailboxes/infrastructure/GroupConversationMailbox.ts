@@ -4,6 +4,7 @@ import type { EditMessageOptions } from '../../messages/infrastructure/http/reso
 import type { SendMessageOptions } from '../../messages/infrastructure/http/resources/SendMessageOptions';
 import type { ChatMessage } from '../../messages/presentation/view-models/ChatMessage';
 import type { GroupConversationPorts } from './GroupConversationPorts';
+import type { GroupConversationSyncOutcome } from './GroupConversationSyncOutcome';
 import type { GroupTimelineApply } from './GroupTimelineApply';
 
 import { GroupConversationMember } from './GroupConversationMember';
@@ -57,9 +58,11 @@ export class GroupConversationMailbox {
   private async reconcile(
     member: GroupConversationMember,
     conversationId: string,
+    known?: ReadonlySet<string>,
   ): Promise<void> {
     const self = member.session.identity.id;
-    const roster = await this.ports.roster(member.session, conversationId);
+    const roster =
+      known ?? (await this.ports.roster(member.session, conversationId));
     // A device not yet welcomed has no group and nothing to commit.
     const current = new Set(
       await member.engine.members(conversationId).catch((): string[] => []),
@@ -93,13 +96,14 @@ export class GroupConversationMailbox {
   public async membersChanged(
     session: Session,
     conversationId: string,
+    roster?: ReadonlySet<string>,
   ): Promise<void> {
     const key = `${session.identity.id}/${conversationId}`;
     const running = this.reconciling.get(key);
 
     if (running) return await running;
     const member = this.member(session);
-    const work = this.reconcile(member, conversationId)
+    const work = this.reconcile(member, conversationId, roster)
       .then(() => member.outbox.flush())
       .catch(() => GroupConversationMailbox.fail('membership update'))
       .finally(() => this.reconciling.delete(key));
@@ -193,27 +197,40 @@ export class GroupConversationMailbox {
   }
 
   /**
-   * Reads every inbox of the conversation once, then reconciles the roster
-   * in the background. Rejects when the inboxes cannot be read.
+   * Reads every inbox of the conversation once, then reads the roster and
+   * reconciles it in the background. Resolves whether this identity has
+   * left the roster; a roster that cannot be read counts as staying.
+   * Rejects when the inboxes cannot be read.
    */
   public async sync(
     session: Session,
     conversationId: string,
     signal: AbortSignal,
     apply: GroupTimelineApply,
-  ): Promise<void> {
+  ): Promise<GroupConversationSyncOutcome> {
     await this.member(session).inbox.sync(conversationId, signal, (records) =>
       apply(this.timeline.changes(session, records)),
     );
-    void this.membersChanged(session, conversationId);
+    const roster = await this.ports
+      .roster(session, conversationId)
+      .catch(() => undefined);
+
+    void this.membersChanged(session, conversationId, roster);
+
+    return { removed: roster?.has(session.identity.id) === false };
   }
 
-  /** Reads pending control letters: key packages, welcomes. Never throws. */
-  public async receiveControl(session: Session): Promise<void> {
+  /**
+   * Reads pending control letters: key packages, welcomes. Resolves with
+   * the conversations a welcome joined. Never throws.
+   */
+  public async receiveControl(session: Session): Promise<string[]> {
     try {
-      await this.member(session).pump.run();
+      return [...(await this.member(session).pump.run())];
     } catch {
       GroupConversationMailbox.fail('control receive');
+
+      return [];
     }
   }
 
