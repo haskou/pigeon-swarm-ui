@@ -205,11 +205,7 @@ describe('conversation use cases', () => {
     expect(group.pullDomainEvents()).toHaveLength(1);
   });
 
-  it('marks a group conversation read through the aggregate', async () => {
-    const group = conversation('group:a', 0, 'group', 1);
-
-    conversationRepository.find.mockResolvedValue(group);
-
+  it('keeps a group read on this device without any node request', async () => {
     await new ConversationReadMarker(
       conversationRepository,
       readReceiptRepository,
@@ -222,19 +218,11 @@ describe('conversation use cases', () => {
       ),
     );
 
-    expect(conversationRepository.markReadUntil).toHaveBeenCalledWith(
-      group,
-      expect.anything(),
-      expect.anything(),
-    );
-    expect(group.pullDomainEvents()).toHaveLength(1);
+    expect(conversationRepository.find).not.toHaveBeenCalled();
+    expect(readReceiptRepository.markRead).not.toHaveBeenCalled();
   });
 
-  it('never sends a one-to-one read to the conversation read-until endpoint', async () => {
-    const direct = conversation('one-to-one:a', 0, 'one-to-one', 1);
-
-    conversationRepository.find.mockResolvedValue(direct);
-
+  it('sends nothing for a one-to-one conversation that is not open', async () => {
     await new ConversationReadMarker(
       conversationRepository,
       readReceiptRepository,
@@ -247,8 +235,8 @@ describe('conversation use cases', () => {
       ),
     );
 
-    expect(conversationRepository.markReadUntil).not.toHaveBeenCalled();
-    expect(direct.pullDomainEvents()).toHaveLength(0);
+    expect(conversationRepository.find).not.toHaveBeenCalled();
+    expect(readReceiptRepository.markRead).not.toHaveBeenCalled();
   });
 
   it('sends a read of the open one-to-one conversation as a read receipt', async () => {
@@ -272,14 +260,9 @@ describe('conversation use cases', () => {
     expect(messageId?.toString()).toBe('message-a');
     expect(actorIdentityId?.toString()).toBe('identity-a');
     expect(conversationRepository.find).not.toHaveBeenCalled();
-    expect(conversationRepository.markReadUntil).not.toHaveBeenCalled();
   });
 
-  it('reads through the aggregate when the open conversation is another one', async () => {
-    const group = conversation('group:a', 0, 'group', 1);
-
-    conversationRepository.find.mockResolvedValue(group);
-
+  it('keeps a group read local while another conversation is open', async () => {
     await new ConversationReadMarker(
       conversationRepository,
       readReceiptRepository,
@@ -293,19 +276,11 @@ describe('conversation use cases', () => {
       ),
     );
 
+    expect(conversationRepository.find).not.toHaveBeenCalled();
     expect(readReceiptRepository.markRead).not.toHaveBeenCalled();
-    expect(conversationRepository.markReadUntil).toHaveBeenCalledWith(
-      group,
-      expect.anything(),
-      expect.anything(),
-    );
   });
 
-  it('never sends a read receipt for an open group conversation', async () => {
-    const group = conversation('group:a', 0, 'group', 1);
-
-    conversationRepository.find.mockResolvedValue(group);
-
+  it('keeps a read of the open group conversation local', async () => {
     await new ConversationReadMarker(
       conversationRepository,
       readReceiptRepository,
@@ -319,8 +294,8 @@ describe('conversation use cases', () => {
       ),
     );
 
+    expect(conversationRepository.find).not.toHaveBeenCalled();
     expect(readReceiptRepository.markRead).not.toHaveBeenCalled();
-    expect(conversationRepository.markReadUntil).toHaveBeenCalled();
   });
 
   it('returns conversations ordered by latest activity', async () => {
