@@ -176,10 +176,10 @@ export class DeviceSealedRootRotation {
    * authorized device and cannot be opened. Refuses unless the signed
    * transitions, replayed here and never taken from the node's device list,
    * authorize this device alone, and seals the fresh root to that verified
-   * device only. Replaces a head that does not open under the fresh root with
-   * an empty keychain before publishing that root, so a failed replacement
-   * publishes nothing and the recovery runs again. Unlock and pairing use
-   * `current`, which never replaces a head.
+   * device only. Always replaces an existing head, which cannot open under the
+   * fresh root, with an empty keychain before publishing that root, so a
+   * failed replacement publishes nothing and the recovery runs again. Unlock
+   * and pairing use `current`, which never replaces a head.
    */
   public async openAfterRecovery(session: Session): Promise<Session> {
     if (session.deviceSealedRootKey) {

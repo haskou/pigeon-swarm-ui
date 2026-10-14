@@ -245,9 +245,10 @@ one. Only then does `DeviceSealedRootRotation.openAfterRecovery` run:
 
 1. it replays the signed transitions (`verifiedDevices`, never the node's
    device list) and refuses unless this device is the only authorized device;
-2. it generates a fresh device-sealed root and, when the keychain head does
-   not open under it, publishes an empty keychain sealed under it, chained to
-   the head it replaces (`PigeonKeychainApi.replaceHeadAfterRecovery`);
+2. it generates a fresh device-sealed root and replaces any existing keychain
+   head, which cannot open under a root just generated, with an empty keychain
+   sealed under it, chained to the head it replaces
+   (`PigeonKeychainApi.replaceHeadAfterRecovery`);
 3. it then publishes the root sealed to this verified device only.
 
 The keychain head was sealed under the root of the replaced devices, which no
