@@ -5,6 +5,7 @@ import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
 
 import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { GroupConversationSyncOutcome } from '../../../../contexts/groupMailboxes/infrastructure/GroupConversationSyncOutcome';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { PigeonMailboxClient } from '../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
 import type { MessageProjectionPort } from '../../../../contexts/messages/infrastructure/crypto/MessageProjectionPort';
@@ -275,7 +276,7 @@ const conversation = (): ConversationResource =>
     type: 'group',
   }) as unknown as ConversationResource;
 
-const sync = (member: Member): Promise<void> =>
+const sync = (member: Member): Promise<GroupConversationSyncOutcome> =>
   member.mailbox.sync(
     member.session,
     CONVERSATION,
@@ -437,6 +438,37 @@ describe('GroupConversationMailbox', () => {
 
     expect(texts(carol)).toEqual(['message:without bob']);
     expect(texts(bob)).toEqual([]);
+  });
+
+  it('reports the conversation a welcome joined, once', async () => {
+    roster = new Set([alice.id, bob.id]);
+    await alice.mailbox.create(alice.session, CONVERSATION);
+    const joined: string[] = [];
+    let done = false;
+    const work = alice.mailbox
+      .membersChanged(alice.session, CONVERSATION)
+      .finally(() => {
+        done = true;
+      });
+
+    for (let round = 0; round < 400 && !done; round += 1) {
+      await alice.mailbox.receiveControl(alice.session);
+      joined.push(...(await bob.mailbox.receiveControl(bob.session)));
+      await turn();
+    }
+    await work;
+    joined.push(...(await bob.mailbox.receiveControl(bob.session)));
+
+    expect(joined).toEqual([CONVERSATION]);
+    expect(await alice.mailbox.receiveControl(alice.session)).toEqual([]);
+  });
+
+  it('a sync tells a removed member it left the roster', async () => {
+    await formGroup();
+    roster = new Set([alice.id, bob.id]);
+
+    await expect(sync(carol)).resolves.toEqual({ removed: true });
+    await expect(sync(bob)).resolves.toEqual({ removed: false });
   });
 
   it('rejects an edit or delete of another member’s message', async () => {

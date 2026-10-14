@@ -17,6 +17,7 @@ type MockEffect = () => void | (() => void);
 const mockEffects: MockEffect[] = [];
 
 jest.mock('react', () => ({
+  useCallback: <T>(callback: T) => callback,
   useEffect: (effect: MockEffect) => {
     mockEffects.push(effect);
   },
@@ -30,6 +31,7 @@ const receiveControl = jest.mocked(
   applicationContainer.groupMessages.receiveControl,
 );
 const session = { identity: { id: 'alice' } } as unknown as Session;
+const refreshConversations = jest.fn<() => Promise<unknown>>();
 
 async function settle(): Promise<void> {
   for (let tick = 0; tick < 5; tick += 1) {
@@ -37,11 +39,11 @@ async function settle(): Promise<void> {
   }
 }
 
-function mountReceiver(): () => void {
+function mountReceiver(): { cleanup: () => void; receiveNow: () => void } {
   mockEffects.length = 0;
-  useGroupControlReceiver(session);
+  const receiveNow = useGroupControlReceiver(session, refreshConversations);
 
-  return mockEffects[0]() as () => void;
+  return { cleanup: mockEffects[0]() as () => void, receiveNow };
 }
 
 describe('useGroupControlReceiver', () => {
@@ -52,7 +54,8 @@ describe('useGroupControlReceiver', () => {
       setTimeout: (callback: () => void, ms: number) =>
         globalThis.setTimeout(callback, ms),
     });
-    receiveControl.mockReset().mockResolvedValue(undefined);
+    receiveControl.mockReset().mockResolvedValue([]);
+    refreshConversations.mockReset().mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -61,7 +64,7 @@ describe('useGroupControlReceiver', () => {
   });
 
   it('reads the control letters at once and again after each settled run', async () => {
-    const cleanup = mountReceiver();
+    const { cleanup } = mountReceiver();
 
     await settle();
     expect(receiveControl).toHaveBeenCalledWith(session);
@@ -74,7 +77,7 @@ describe('useGroupControlReceiver', () => {
   });
 
   it('stops reading once cleaned up', async () => {
-    const cleanup = mountReceiver();
+    const { cleanup } = mountReceiver();
 
     await settle();
     cleanup();
@@ -82,5 +85,42 @@ describe('useGroupControlReceiver', () => {
     await settle();
 
     expect(receiveControl).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes the conversation list when a welcome joined a group', async () => {
+    receiveControl.mockResolvedValueOnce(['group:1']);
+    const { cleanup } = mountReceiver();
+
+    await settle();
+    expect(refreshConversations).toHaveBeenCalledTimes(1);
+
+    jest.advanceTimersByTime(RECEIVE_MS);
+    await settle();
+
+    expect(receiveControl).toHaveBeenCalledTimes(2);
+    expect(refreshConversations).toHaveBeenCalledTimes(1);
+    cleanup();
+  });
+
+  it('leaves the list alone when no group was joined', async () => {
+    const { cleanup } = mountReceiver();
+
+    await settle();
+
+    expect(refreshConversations).not.toHaveBeenCalled();
+    cleanup();
+  });
+
+  it('reads at once on demand and refreshes on a join', async () => {
+    const { cleanup, receiveNow } = mountReceiver();
+
+    await settle();
+    receiveControl.mockResolvedValueOnce(['group:1']);
+    receiveNow();
+    await settle();
+
+    expect(receiveControl).toHaveBeenCalledTimes(2);
+    expect(refreshConversations).toHaveBeenCalledTimes(1);
+    cleanup();
   });
 });
