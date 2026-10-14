@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-import { MESSAGE_CONTENT_MAX_LENGTH } from '../../../../../contexts/messages/domain/MessageContentConstraints';
+import { MESSAGE_CONTENT_MAX_LENGTH } from '../../../../../contexts/messages/domain/MESSAGE_CONTENT_MAX_LENGTH';
 import { MarkdownMessage } from '../../../../../contexts/messages/presentation/components/markdownMessage';
 
 function render(content: string): string {

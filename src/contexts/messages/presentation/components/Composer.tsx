@@ -24,7 +24,7 @@ import type { ChatMessage } from '../../domain/ChatMessage';
 import { useDesktopInputFocus } from '../../../../shared/presentation/components/useDesktopInputFocus';
 import { cx } from '../../../../shared/presentation/cx';
 import { copy } from '../../../../shared/presentation/i18n/copy';
-import { MESSAGE_CONTENT_MAX_LENGTH } from '../../domain/MessageContentConstraints';
+import { MESSAGE_CONTENT_MAX_LENGTH } from '../../domain/MESSAGE_CONTENT_MAX_LENGTH';
 import {
   type EmojiSuggestion,
   findEmojiTrigger,

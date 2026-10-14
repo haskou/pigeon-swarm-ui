@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { MarkdownMentionMatcher } from './MarkdownMentionMatcher';
 
 import { cx } from '../../../../shared/presentation/cx';
-import { MESSAGE_CONTENT_MAX_LENGTH } from '../../domain/MessageContentConstraints';
+import { MESSAGE_CONTENT_MAX_LENGTH } from '../../domain/MESSAGE_CONTENT_MAX_LENGTH';
 
 type InlineToken =
   | { children: InlineToken[]; type: 'bold' | 'italic' | 'strike' }
