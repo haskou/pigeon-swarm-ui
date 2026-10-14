@@ -18,6 +18,8 @@ import type {
   LocalKeychainUpdate,
 } from '../../../contexts/identities/infrastructure/keychain/LocalKeychain';
 import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
+import type { ContactDirectoryEntry } from '../../../contexts/identities/infrastructure/storage/ContactDirectoryEntry';
+import type { ContactDirectoryStore } from '../../../contexts/identities/infrastructure/storage/ContactDirectoryStore';
 import type { DeviceUnlockMethod } from '../../../contexts/identities/infrastructure/storage/DeviceUnlockMethod';
 import type { IdentityUseCases } from './IdentityUseCases';
 
@@ -43,6 +45,7 @@ export class PigeonIdentitiesFacade {
     private readonly mapper: IdentityMapper,
     private readonly presenceMapper: IdentityPresenceMapper,
     private readonly useCases: IdentityUseCases,
+    private readonly contactDirectory: ContactDirectoryStore,
   ) {}
 
   private hydrateLoginResult(result: LoginResult): LoginResult {
@@ -298,6 +301,25 @@ export class PigeonIdentitiesFacade {
     return this.hydrateLoginResult(
       await this.gateway.hydrateSession(this.contexts.find(identityId).session),
     );
+  }
+
+  /** The sealed contact directory of the session's identity. */
+  public async knownContacts(
+    session: Session,
+  ): Promise<readonly ContactDirectoryEntry[]> {
+    return await this.contactDirectory.contacts(session);
+  }
+
+  public async rememberContacts(
+    session: Session,
+    contacts: readonly ContactDirectoryEntry[],
+  ): Promise<void> {
+    await this.contactDirectory.replace(session, contacts);
+  }
+
+  /** Never throws. */
+  public async forgetContacts(identityId: string): Promise<void> {
+    await this.contactDirectory.forget(identityId);
   }
 
   public async forgetDeviceUnlock(identityId: string): Promise<void> {

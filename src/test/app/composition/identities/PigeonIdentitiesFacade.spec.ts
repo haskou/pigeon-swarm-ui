@@ -5,6 +5,7 @@ import type { IdentityMapper } from '../../../../contexts/identities/infrastruct
 import type { IdentityPresenceMapper } from '../../../../contexts/identities/infrastructure/http/IdentityPresenceMapper';
 import type { PigeonIdentitiesGateway } from '../../../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
+import type { ContactDirectoryStore } from '../../../../contexts/identities/infrastructure/storage/ContactDirectoryStore';
 
 import { PigeonIdentitiesFacade } from '../../../../app/composition/identities/PigeonIdentitiesFacade';
 import { Identity } from '../../../../contexts/identities/domain/Identity';
@@ -61,6 +62,7 @@ describe(PigeonIdentitiesFacade.name, () => {
       mock<IdentityMapper>(),
       mock<IdentityPresenceMapper>(),
       useCases,
+      mock<ContactDirectoryStore>(),
     ).login('identity-a', 'Correct-Horse-Battery-9!');
 
     expect(result.conversations.map(({ id }) => id)).toEqual([
@@ -100,6 +102,7 @@ describe(PigeonIdentitiesFacade.name, () => {
       mock<IdentityMapper>(),
       mock<IdentityPresenceMapper>(),
       useCases,
+      mock<ContactDirectoryStore>(),
     ).login('@ada', 'Correct-Horse-Battery-9!');
 
     expect(gateway.hydrateSession).toHaveBeenCalledWith(session, undefined);
@@ -120,6 +123,7 @@ describe(PigeonIdentitiesFacade.name, () => {
       mock<IdentityMapper>(),
       mock<IdentityPresenceMapper>(),
       useCases,
+      mock<ContactDirectoryStore>(),
     ).forgetCurrentDevice(session, false);
 
     const [message] = useCases.currentDeviceForgetter.forget.mock.calls[0];
@@ -127,5 +131,32 @@ describe(PigeonIdentitiesFacade.name, () => {
     expect(outcome).toBe('only-device');
     expect(contexts.find(message.getIdentityId()).session).toBe(session);
     expect(message.getAllowOnlyDevice()).toBe(false);
+  });
+
+  it('reads, stores and forgets the sealed contact directory of a session', async () => {
+    const contacts = mock<ContactDirectoryStore>();
+    const session = {
+      identity: { id: 'identity-a' },
+    } as unknown as Session;
+    const entries = [{ identityId: 'identity-b', name: 'Grace', seenAt: 1 }];
+    const facade = new PigeonIdentitiesFacade(
+      mock<PigeonIdentitiesGateway>(),
+      new IdentityAccessContexts(),
+      mock<IdentityMapper>(),
+      mock<IdentityPresenceMapper>(),
+      mockDeep<IdentityUseCases>(),
+      contacts,
+    );
+
+    contacts.contacts.mockResolvedValue(entries);
+    contacts.replace.mockResolvedValue(undefined);
+    contacts.forget.mockResolvedValue(undefined);
+
+    await expect(facade.knownContacts(session)).resolves.toEqual(entries);
+    await facade.rememberContacts(session, entries);
+    await facade.forgetContacts('identity-a');
+
+    expect(contacts.replace).toHaveBeenCalledWith(session, entries);
+    expect(contacts.forget).toHaveBeenCalledWith('identity-a');
   });
 });

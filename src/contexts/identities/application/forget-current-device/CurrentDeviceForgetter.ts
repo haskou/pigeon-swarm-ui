@@ -1,3 +1,4 @@
+import type { ContactDirectoryRepository } from '../../domain/repositories/ContactDirectoryRepository';
 import type { DeviceMailboxRepository } from '../../domain/repositories/DeviceMailboxRepository';
 import type { IdentityUnlockRepository } from '../../domain/repositories/IdentityUnlockRepository';
 import type { OwnDeviceRepository } from '../../domain/repositories/OwnDeviceRepository';
@@ -12,13 +13,14 @@ import type { ForgetCurrentDeviceMessage } from './messages/ForgetCurrentDeviceM
  * changed, unless the user already confirmed. A confirmed forget of the only
  * device removes the local state alone, and keeps the device authorized and
  * its reader in place.
- * Local direct history and queued one-to-one sends are wiped once the gate
- * passes, even when the unlock removal fails.
+ * Local direct history, queued one-to-one sends and the contact directory are
+ * wiped once the gate passes, even when the unlock removal fails.
  */
 export class CurrentDeviceForgetter {
   public constructor(
     private readonly ownDeviceRepository: OwnDeviceRepository,
     private readonly deviceMailboxRepository: DeviceMailboxRepository,
+    private readonly contactDirectoryRepository: ContactDirectoryRepository,
     private readonly identityUnlockRepository: IdentityUnlockRepository,
   ) {}
 
@@ -43,6 +45,7 @@ export class CurrentDeviceForgetter {
     await this.deviceMailboxRepository.forgetHistory(identityId);
     await this.deviceMailboxRepository.forgetGroups(identityId);
     await this.deviceMailboxRepository.cancelOutbox(identityId);
+    await this.contactDirectoryRepository.forget(identityId);
 
     try {
       await this.identityUnlockRepository.forget(identityId);

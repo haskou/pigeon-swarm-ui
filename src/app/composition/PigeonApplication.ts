@@ -63,6 +63,8 @@ import { PigeonIdentityUnlockRepository } from '../../contexts/identities/infras
 import { PigeonOwnDeviceRepository } from '../../contexts/identities/infrastructure/http/PigeonOwnDeviceRepository';
 import { PigeonPresenceRepository } from '../../contexts/identities/infrastructure/http/PigeonPresenceRepository';
 import { MailboxDeviceRepository } from '../../contexts/identities/infrastructure/mailbox/MailboxDeviceRepository';
+import { ContactDirectoryStore } from '../../contexts/identities/infrastructure/storage/ContactDirectoryStore';
+import { SealedContactDirectoryRepository } from '../../contexts/identities/infrastructure/storage/SealedContactDirectoryRepository';
 import { MessageReactionAdder } from '../../contexts/messages/application/add-message-reaction/MessageReactionAdder';
 import { ConversationDraftDeleter } from '../../contexts/messages/application/delete-conversation-draft/ConversationDraftDeleter';
 import { MessageDeleter } from '../../contexts/messages/application/delete-message/MessageDeleter';
@@ -339,6 +341,8 @@ export class PigeonApplication {
       identityContexts,
       identityPresenceMapper,
     );
+    const contactDirectory = new ContactDirectoryStore();
+
     this.identities = new PigeonIdentitiesFacade(
       gateway.identityGateway,
       identityContexts,
@@ -356,6 +360,7 @@ export class PigeonApplication {
             gateway.groupConversationMailbox,
             this.mls,
           ),
+          new SealedContactDirectoryRepository(contactDirectory),
           identityUnlockRepository,
         ),
         deviceUnlockForgetter: new DeviceUnlockForgetter(
@@ -374,6 +379,7 @@ export class PigeonApplication {
         refresher: new IdentityRefresher(identityRepository),
         register: new RegisterIdentity(identityRepository, identityIdFactory),
       },
+      contactDirectory,
     );
     const conversationDraftRepository = new PigeonDraftRepository(
       gateway.conversationDrafts,
