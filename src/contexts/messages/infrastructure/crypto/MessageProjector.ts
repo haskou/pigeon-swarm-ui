@@ -190,6 +190,43 @@ export class MessageProjector {
     return undefined;
   }
 
+  /**
+   * Projects a record whose payload is the plain message JSON, as it travels
+   * inside an MLS application message. The record's author, whom MLS
+   * authenticated, is the only author: a payload naming another identity, or
+   * one that does not parse, is unreadable.
+   */
+  public projectPlaintext(
+    session: Session,
+    message: MessageResource,
+  ): ProjectedMessage {
+    const base = this.baseMessage(session, message);
+    const unreadable: ProjectedMessage = {
+      message: this.encryptedError(base, message, 'decrypt-failed'),
+      readable: false,
+    };
+
+    try {
+      const text = message.encryptedPayload ?? '';
+      const parsed = JSON.parse(text) as PlainMessage;
+
+      if (parsed.authorIdentityId !== base.authorIdentityId) return unreadable;
+
+      return {
+        message: this.projectDecrypted(
+          base,
+          message,
+          text,
+          parsed,
+          session.identity.id,
+        ),
+        readable: true,
+      };
+    } catch {
+      return unreadable;
+    }
+  }
+
   public list(value: unknown): {
     messages: MessageResource[];
     nextCursor?: null | string;

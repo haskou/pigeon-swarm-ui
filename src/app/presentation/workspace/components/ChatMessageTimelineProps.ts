@@ -16,7 +16,6 @@ export interface ChatMessageTimelineProps {
   currentIdentityId: string;
   currentIdentityName: string;
   hasConversationKey: boolean;
-  hasReachedMessageStart: boolean;
   identityNames: IdentityNames;
   identityPictures: IdentityPictures;
   isGroupConversation: boolean;

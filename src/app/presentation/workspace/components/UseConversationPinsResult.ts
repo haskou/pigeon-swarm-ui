@@ -4,7 +4,7 @@ import type { MessageCollectionState } from './conversationThreadState';
 export type UseConversationPinsResult = {
   close: () => void;
   collection: MessageCollectionState | null;
-  open: () => Promise<void>;
+  open: () => void;
   pin: (message: ChatMessage) => Promise<void>;
   pinnedMessageIds: Set<string>;
   setCollection: React.Dispatch<

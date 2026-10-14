@@ -2,7 +2,6 @@ import type { Session } from '../../../identities/infrastructure/session/Session
 import type { ChatMessage } from '../../presentation/view-models/ChatMessage';
 import type { MessagePin } from '../../presentation/view-models/MessagePin';
 import type { MessageLoadOptions } from './MessageLoadOptions';
-import type { MessageResource } from './MessageResource';
 import type { ConversationDraftProjection as ConversationDraft } from './resources/ConversationDraftProjection';
 import type { EditMessageOptions } from './resources/EditMessageOptions';
 import type { MessageLinkPreview } from './resources/MessageLinkPreview';
@@ -36,14 +35,6 @@ export class PigeonMessagesGateway {
     url: string,
   ): Promise<MessageLinkPreview> {
     return await this.messages.createLinkPreview(session, url);
-  }
-
-  public async decryptMessage(
-    session: Session,
-    conversationId: string,
-    message: MessageResource,
-  ): Promise<ChatMessage> {
-    return await this.messages.decryptMessage(session, conversationId, message);
   }
 
   public async deleteConversationDraft(

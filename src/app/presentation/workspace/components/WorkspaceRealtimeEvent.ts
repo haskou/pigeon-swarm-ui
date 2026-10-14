@@ -18,6 +18,7 @@ export class WorkspaceRealtimeEvent {
     | 'call'
     | 'community'
     | 'conversation'
+    | 'group-control'
     | 'identity'
     | 'ignored'
     | 'keychain'
@@ -25,6 +26,15 @@ export class WorkspaceRealtimeEvent {
     | 'notification'
     | 'poll' {
     const prefix = event.type.split('.')[0];
+
+    // Group control letters (key packages, welcomes) travel as notifications
+    // of this type; they are protocol traffic, never shown to the user.
+    if (
+      prefix === 'notifications' &&
+      event.attributes.type === 'group_conversation_invitation'
+    ) {
+      return 'group-control';
+    }
 
     return this.categories[prefix as keyof typeof this.categories] ?? 'ignored';
   }

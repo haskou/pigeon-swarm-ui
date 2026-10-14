@@ -3,6 +3,9 @@ export type RemovedDeviceServices = {
     cancelOutbox(identityId: string): Promise<void>;
     forgetHistory(identityId: string): Promise<void>;
   };
+  groupMessages: {
+    forget(identityId: string): Promise<void>;
+  };
   identities: {
     discardDeviceSealedRecovery(identityId: string): void;
   };
@@ -11,10 +14,10 @@ export type RemovedDeviceServices = {
 /**
  * Erases what this device stored for an identity when the user asks to start
  * over after the node reported the device as removed: unsent messages, stored
- * history and pending device-sealed recovery steps. The node's report is not
- * signed, so it never triggers this by itself. The local unlock stays for the
- * caller to remove. Every step runs even when one fails. Resolves false when
- * any step failed. Never throws.
+ * direct and group history and pending device-sealed recovery steps. The
+ * node's report is not signed, so it never triggers this by itself. The local
+ * unlock stays for the caller to remove. Every step runs even when one fails.
+ * Resolves false when any step failed. Never throws.
  */
 export async function eraseRemovedDevice(
   identityId: string,
@@ -23,6 +26,7 @@ export async function eraseRemovedDevice(
   const steps = [
     () => services.directMessages.cancelOutbox(identityId),
     () => services.directMessages.forgetHistory(identityId),
+    () => services.groupMessages.forget(identityId),
     () => {
       services.identities.discardDeviceSealedRecovery(identityId);
     },

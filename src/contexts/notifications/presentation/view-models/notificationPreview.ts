@@ -1,6 +1,5 @@
-import type { NotificationResource } from '../../infrastructure/http/resources/NotificationResource';
 import type { CommunityInvitationNotificationResource } from '../../infrastructure/http/resources/CommunityInvitationNotificationResource';
-import type { ConversationInvitationNotificationResource } from '../../infrastructure/http/resources/ConversationInvitationNotificationResource';
+import type { NotificationResource } from '../../infrastructure/http/resources/NotificationResource';
 import type {
   NotificationPreview,
   NotificationPreviewContext,
@@ -22,8 +21,6 @@ export function notificationPreview(
         notification.payload.inviterIdentityId,
         context,
       );
-    case 'group_conversation_invitation':
-      return groupConversationInvitationPreview(notification, context);
     case 'missed_call':
       return identityNotificationPreview(
         notification.payload.callerIdentityId,
@@ -52,20 +49,6 @@ function communityInvitationPreview(
     title:
       community?.name ??
       `${copy.notifications.community} ${shortId(notification.payload.communityId)}`,
-  };
-}
-
-function groupConversationInvitationPreview(
-  notification: ConversationInvitationNotificationResource,
-  context: NotificationPreviewContext,
-): NotificationPreview {
-  const conversation = context.conversations.find(
-    (item) => item.id === notification.payload.conversationId,
-  );
-
-  return {
-    subtitle: shortId(notification.payload.conversationId),
-    title: conversation?.name ?? copy.notifications.groupInvitationTitle,
   };
 }
 

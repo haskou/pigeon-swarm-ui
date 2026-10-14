@@ -1,5 +1,6 @@
 import type { Conversation } from '../../../contexts/conversations/domain/Conversation';
 import type { ConversationResource } from '../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { GroupConversationMailbox } from '../../../contexts/groupMailboxes/infrastructure/GroupConversationMailbox';
 import type { LocalKeychain } from '../../../contexts/identities/infrastructure/keychain/LocalKeychain';
 import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { ConversationUseCases } from './ConversationUseCases';
@@ -23,6 +24,10 @@ export class PigeonConversationsFacade {
     private readonly contexts: ConversationAccessContexts,
     private readonly mapper: ConversationMapper,
     private readonly useCases: ConversationUseCases,
+    private readonly groups: Pick<
+      GroupConversationMailbox,
+      'create' | 'membersChanged'
+    >,
   ) {}
 
   private actor(session: Session): string {
@@ -95,6 +100,8 @@ export class PigeonConversationsFacade {
       ),
     );
 
+    await this.groups.create(session, conversation.toPrimitives().id);
+
     return this.creationResult(actorIdentityId, conversation);
   }
 
@@ -120,16 +127,18 @@ export class PigeonConversationsFacade {
     conversationId: string,
     recipientIdentityId: string,
   ): Promise<ConversationResource> {
-    return this.mapper.toResource(
-      await this.useCases.participantInviter.invite(
-        new InviteConversationParticipantMessage(
-          conversationId,
-          recipientIdentityId,
-          this.actor(session),
-          Date.now(),
-        ),
+    const conversation = await this.useCases.participantInviter.invite(
+      new InviteConversationParticipantMessage(
+        conversationId,
+        recipientIdentityId,
+        this.actor(session),
+        Date.now(),
       ),
     );
+
+    void this.groups.membersChanged(session, conversationId);
+
+    return this.mapper.toResource(conversation);
   }
 
   public async leave(
@@ -205,15 +214,17 @@ export class PigeonConversationsFacade {
     conversationId: string,
     identityId: string,
   ): Promise<ConversationResource> {
-    return this.mapper.toResource(
-      await this.useCases.participantRemover.remove(
-        new RemoveConversationParticipantMessage(
-          conversationId,
-          identityId,
-          this.actor(session),
-          Date.now(),
-        ),
+    const conversation = await this.useCases.participantRemover.remove(
+      new RemoveConversationParticipantMessage(
+        conversationId,
+        identityId,
+        this.actor(session),
+        Date.now(),
       ),
     );
+
+    void this.groups.membersChanged(session, conversationId);
+
+    return this.mapper.toResource(conversation);
   }
 }

@@ -1,6 +1,6 @@
 export type ConversationTimelineLoadContext = {
   activeConversationId?: string;
-  activeConversationKeyAvailable: boolean;
+  activeConversationReady: boolean;
   loadedConversationId: null | string;
   workspaceMode: 'community' | 'messages';
 };

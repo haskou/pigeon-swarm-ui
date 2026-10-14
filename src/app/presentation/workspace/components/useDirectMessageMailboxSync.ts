@@ -9,15 +9,14 @@ import type { DirectMessageTimelineChange } from '../../../../contexts/messages/
 
 import { DirectMailboxEligibility } from '../../../../contexts/mailboxes/domain/DirectMailboxEligibility';
 import { MailboxReaderLimitError } from '../../../../contexts/mailboxes/domain/errors/MailboxReaderLimitError';
-import { MessagePinChange } from '../../../../contexts/messages/domain/MessagePinChange';
 import { MessagePinClock } from '../../../../contexts/messages/domain/MessagePinClock';
-import { MessageId } from '../../../../contexts/messages/domain/value-objects/MessageId';
 import { DirectMessageHistoryStorageError } from '../../../../contexts/messages/infrastructure/mailbox/DirectMessageHistoryStorageError';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { subscribeRealtimeMailboxHints } from '../../realtime/useRealtimeEvents';
 import { applyDirectMessageTimelineChanges } from './applyDirectMessageTimelineChanges';
+import { applyMailboxSyncChanges } from './applyMailboxSyncChanges';
 
 const SYNC_INTERVAL_MS = 5000;
 
@@ -40,37 +39,7 @@ function applySyncChanges(
     'onConversationRead' | 'onMessagesChange' | 'setPinnedMessageIds'
   >,
 ): void {
-  if (changes.length > 0) {
-    handlers.onMessagesChange((current) =>
-      applyDirectMessageTimelineChanges(current, changes),
-    );
-  }
-
-  // A peer can write a pin the domain cannot hold (an empty or over-long id):
-  // skip it, so one bad record does not stall the sync of the whole page.
-  const pinChanges = pinClock.admit(
-    changes.flatMap((change) => {
-      if (change.kind !== 'pin') return [];
-
-      try {
-        return [MessagePinChange.fromPrimitives(change)];
-      } catch {
-        return [];
-      }
-    }),
-  );
-
-  if (pinChanges.length > 0) {
-    handlers.setPinnedMessageIds(
-      (current) =>
-        new Set(
-          MessagePinClock.applyTo(
-            [...current].map((messageId) => MessageId.fromString(messageId)),
-            pinChanges,
-          ).map((messageId) => messageId.valueOf()),
-        ),
-    );
-  }
+  applyMailboxSyncChanges(changes, pinClock, handlers);
 
   if (changes.some((change) => change.kind === 'read')) {
     handlers.onConversationRead(conversationId);

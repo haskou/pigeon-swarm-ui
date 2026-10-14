@@ -1,6 +1,5 @@
 import type { CommunityMembershipRequestResource as CommunityMembershipRequest } from '../../../../contexts/communities/infrastructure/http/resources/CommunityMembershipRequestResource';
 import type { CommunityResource as Community } from '../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
-import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
@@ -12,7 +11,6 @@ export type WorkspaceNotificationsDialog = {
   communities: Community[];
   communityAvatarUrls: Record<string, string>;
   communityPreviews: Record<string, Community>;
-  conversations: ConversationResource[];
   error: string | null;
   identityNames: Record<string, string>;
   identityPictures: Record<string, string>;

@@ -1,19 +1,6 @@
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 
 export class ConversationRealtimeEvent {
-  public static projection(
-    event: RealtimeDomainEvent,
-    hasTimelineMessage: boolean,
-  ): 'delete' | 'fetch' | 'pin' | 'reaction' | 'timeline' {
-    if (this.isDeletion(event)) return 'delete';
-
-    if (this.isReaction(event)) return 'reaction';
-
-    if (this.isPin(event)) return 'pin';
-
-    return hasTimelineMessage ? 'timeline' : 'fetch';
-  }
-
   public static handles(event: RealtimeDomainEvent): boolean {
     return (
       this.isConversationLifecycle(event) ||
@@ -28,10 +15,6 @@ export class ConversationRealtimeEvent {
 
   public static isConversationLifecycle(event: RealtimeDomainEvent): boolean {
     return event.type.startsWith('conversations.v1.conversation.');
-  }
-
-  public static isDeletion(event: RealtimeDomainEvent): boolean {
-    return event.type.endsWith('.was_deleted');
   }
 
   public static isEdit(event: RealtimeDomainEvent): boolean {

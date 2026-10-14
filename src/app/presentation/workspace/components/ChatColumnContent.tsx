@@ -34,7 +34,6 @@ export function ChatColumnContent({
   editingMessage,
   hasConversationKey,
   hasPendingInvitation,
-  hasReachedMessageStart,
   identityNames,
   identityPictures,
   invitationPrompt,
@@ -75,7 +74,6 @@ export function ChatColumnContent({
   | 'draft'
   | 'editingMessage'
   | 'hasConversationKey'
-  | 'hasReachedMessageStart'
   | 'identityNames'
   | 'identityPictures'
   | 'messageState'
@@ -138,7 +136,6 @@ export function ChatColumnContent({
         currentIdentityId={session.identity.id}
         currentIdentityName={session.identity.profile.name}
         hasConversationKey={hasConversationKey}
-        hasReachedMessageStart={hasReachedMessageStart}
         identityNames={identityNames}
         identityPictures={identityPictures}
         isGroupConversation={isGroupConversation}

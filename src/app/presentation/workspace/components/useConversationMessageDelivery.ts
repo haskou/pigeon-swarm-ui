@@ -133,8 +133,8 @@ export function useConversationMessageDelivery({
             replyToMessageId: payload.replyTarget?.id,
             sticker: payload.sticker,
           };
-          // One-to-one traffic goes only through the mailbox; groups keep the
-          // legacy message endpoint.
+          // One-to-one traffic goes through the direct mailbox; groups go
+          // through the MLS group mailbox.
           const sent = direct
             ? await applicationContainer.directMessages.send(
                 session,
@@ -143,9 +143,9 @@ export function useConversationMessageDelivery({
                 sendOptions,
                 { createdAt: optimisticTimestamp, id: optimisticId },
               )
-            : await applicationContainer.messages.send(
+            : await applicationContainer.groupMessages.send(
                 session,
-                conversationId,
+                activeConversation,
                 payload.content,
                 sendOptions,
               );

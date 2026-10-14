@@ -1172,7 +1172,6 @@ export const es = {
     enablePushUnsupported:
       'Este navegador no puede registrar notificaciones push para esta app.',
     error: 'No se pudieron cargar las notificaciones.',
-    groupInvitationTitle: 'Invitación de grupo',
     hideMutedChannels: 'Ocultar canales silenciados',
     hideMutedChannelsAgain: 'Volver a ocultar canales silenciados',
     invitationTitle: 'Invitación de conversación',
@@ -1556,8 +1555,8 @@ export const es = {
     directMailboxSyncError:
       'No se pudieron sincronizar los mensajes directos. Reintentando.',
     dismissNotice: 'Descartar',
-    loadMessagesError: 'No se pudieron cargar los mensajes.',
-    loadOlderError: 'No se pudieron cargar mensajes antiguos.',
+    groupMailboxSyncError:
+      'No se pudieron sincronizar los mensajes del grupo. Reintentando.',
     newMessages: 'Nuevos mensajes',
     sendError: 'No se envió el mensaje.',
   },

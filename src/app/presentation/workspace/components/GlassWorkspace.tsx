@@ -61,6 +61,8 @@ import { useDirectMessageBackgroundReadSync } from './useDirectMessageBackground
 import { useDirectMessageInboxPrewarm } from './useDirectMessageInboxPrewarm';
 import { useDirectMessageMailboxSync } from './useDirectMessageMailboxSync';
 import { useDirectMessageOutboxSync } from './useDirectMessageOutboxSync';
+import { useGroupControlReceiver } from './useGroupControlReceiver';
+import { useGroupMessageMailboxSync } from './useGroupMessageMailboxSync';
 import { usePendingCommunityInvite } from './usePendingCommunityInvite';
 import { useSidebarGesture } from './useSidebarGesture';
 import { useWorkspaceCalls } from './useWorkspaceCalls';
@@ -468,9 +470,6 @@ export function GlassWorkspace({
     session,
     activeConversation,
   );
-  const activeConversationKeyId = WorkspaceDerivedState.conversationKeyId(
-    activeConversationKey,
-  );
   const latestConversationRefreshRef = useRef<Promise<
     ConversationResource[]
   > | null>(null);
@@ -492,7 +491,10 @@ export function GlassWorkspace({
   }, [session, setConversations]);
   const timeline = useConversationTimeline({
     activeConversation,
-    activeConversationKey,
+    activeConversationReady: WorkspaceDerivedState.conversationReady(
+      activeConversation,
+      activeConversationKey,
+    ),
     clearUnreadMessages,
     onCommunitiesReload,
     onConversationsChange: setConversations,
@@ -509,14 +511,13 @@ export function GlassWorkspace({
     messagesRef,
     scrollerRef,
     scrollMessagesToBottom,
-    setMessageLoadState,
     setMessages,
     setNewMessageCount,
-    updateMessageCursor,
   } = timeline;
   const conversationThreadController = useConversationThread({
     activeConversation,
     closeMessageContextMenu: () => setMessageContextMenu(null),
+    messages,
     session,
     setMessages,
   });
@@ -731,7 +732,6 @@ export function GlassWorkspace({
   const messageActions = useConversationMessageActions({
     activeConversation,
     activeConversationDraft,
-    activeConversationKeyAvailable: Boolean(activeConversationKey),
     editingMessage,
     messages,
     messagesRef,
@@ -741,8 +741,6 @@ export function GlassWorkspace({
     onEditingMessageChange: setEditingMessage,
     onErrorChange: setSendError,
     onMessageContextMenuChange: setMessageContextMenu,
-    onMessageCursorChange: updateMessageCursor,
-    onMessageLoadStateChange: setMessageLoadState,
     onMessagesChange: setMessages,
     onReplyTargetChange: setReplyTarget,
     replyTarget,
@@ -817,6 +815,13 @@ export function GlassWorkspace({
     },
     [markConversationReadUntil, scrollMessagesToBottom],
   );
+  const handleGroupHistoryRestored = useCallback(
+    (conversationId: string): void => {
+      handleMailboxConversationRead(conversationId);
+      scrollMessagesToBottom('auto', true);
+    },
+    [handleMailboxConversationRead, scrollMessagesToBottom],
+  );
 
   useDirectMessageMailboxSync({
     activeConversation,
@@ -827,6 +832,15 @@ export function GlassWorkspace({
     session,
     setPinnedMessageIds,
   });
+  useGroupMessageMailboxSync({
+    activeConversation,
+    onErrorChange: setSendError,
+    onHistoryRestored: handleGroupHistoryRestored,
+    onMessagesChange: setMessages,
+    session,
+    setPinnedMessageIds,
+  });
+  useGroupControlReceiver(session);
   useDirectMessageOutboxSync({
     activeConversation,
     onMessagesChange: setMessages,
@@ -846,26 +860,19 @@ export function GlassWorkspace({
   const handleRealtimeConversationEvent =
     useWorkspaceRealtimeConversationEvents({
       activeConversationId: WorkspaceDerivedState.id(activeConversation),
-      activeConversationKeyId,
       clearUnreadMessages,
       conversations,
       identityNames,
       identityProfiles,
       isScrolledNearBottom,
-      markConversationReadUntil,
       markUnreadMessage,
-      messagesRef,
       notificationSettingsRef,
-      onErrorChange: setSendError,
       onNotificationSound: playNotificationSoundIfAllowed,
       refreshConversations,
       scrollMessagesToBottom,
       session,
       setConversations,
-      setConversationThread,
       setMessages,
-      setNewMessageCount,
-      setPinnedMessageIds,
       workspaceMode,
     });
   const handleRealtimeEvent = useWorkspaceRealtimeEventRouter({
@@ -899,7 +906,6 @@ export function GlassWorkspace({
     setMessages,
     setRealtimeEventLog,
     setSession,
-    updateMessageCursor,
     workspaceMode,
   });
 
@@ -1253,7 +1259,7 @@ export function GlassWorkspace({
                 messageContextMenu?.source === 'thread'
                   ? startEditingConversationThreadMessage(message)
                   : startEditingMessage(message),
-              onOpenThread: (message) => void openMessageThread(message),
+              onOpenThread: openMessageThread,
               onPin: (message) => void pinMessage(message),
               onReply: handleDialogMessageReply,
               onToggleReaction: (message, emoji, reacted) =>
@@ -1292,7 +1298,6 @@ export function GlassWorkspace({
               communities,
               communityAvatarUrls: notificationCommunityAvatarUrls,
               communityPreviews: notificationCommunityPreviews,
-              conversations,
               error: notificationError,
               identityNames,
               identityPictures,

@@ -349,7 +349,6 @@ function MessageTimelineContent({
   currentIdentityId,
   currentIdentityName,
   hasConversationKey,
-  hasReachedMessageStart,
   identityNames,
   identityPictures,
   isGroupConversation,
@@ -385,9 +384,9 @@ function MessageTimelineContent({
     <>
       {messageState === 'loading' && <LoadingOlderMessages />}
       <div>
-        {hasReachedMessageStart &&
-          messages.length > 0 &&
-          messageState !== 'loading' && <ReachedMessageStart />}
+        {messages.length > 0 && messageState !== 'loading' && (
+          <ReachedMessageStart />
+        )}
         {timelineEntries.map((entry, index) =>
           entry.type === 'poll' ? (
             <PollTimelineItem
@@ -447,7 +446,6 @@ export function ChatMessageTimeline({
   currentIdentityId,
   currentIdentityName,
   hasConversationKey,
-  hasReachedMessageStart,
   identityNames,
   identityPictures,
   isGroupConversation,
@@ -485,7 +483,6 @@ export function ChatMessageTimeline({
         currentIdentityId={currentIdentityId}
         currentIdentityName={currentIdentityName}
         hasConversationKey={hasConversationKey}
-        hasReachedMessageStart={hasReachedMessageStart}
         identityNames={identityNames}
         identityPictures={identityPictures}
         isGroupConversation={isGroupConversation}

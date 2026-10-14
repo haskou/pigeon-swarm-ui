@@ -1,5 +1,5 @@
 import type { ChatMessage } from './ChatMessage';
-import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
+
 import { attachmentIdentity } from './attachmentIdentity';
 import { MessageReactionUpdater } from './MessageReactionUpdater';
 
@@ -124,32 +124,6 @@ export class MessageCollection {
     }
 
     return undefined;
-  }
-
-  public static latestDeliveredTimestamp(
-    messages: readonly ChatMessage[],
-  ): number | undefined {
-    return messages.reduce<number | undefined>((latestTimestamp, message) => {
-      if (message.deliveryStatus) return latestTimestamp;
-
-      return latestTimestamp === undefined
-        ? message.timestamp
-        : Math.max(latestTimestamp, message.timestamp);
-    }, undefined);
-  }
-
-  public static isCaughtUpWithConversation(
-    messages: readonly ChatMessage[],
-    conversation: ConversationResource,
-  ): boolean {
-    if (conversation.latestMessageAt === undefined) return true;
-
-    const latestDeliveredTimestamp = this.latestDeliveredTimestamp(messages);
-
-    return (
-      latestDeliveredTimestamp !== undefined &&
-      latestDeliveredTimestamp >= conversation.latestMessageAt
-    );
   }
 
   public static hasSameLatestDeliveredMessage(

@@ -35,6 +35,9 @@ import { ConversationOperationSigner } from '../../contexts/conversations/infras
 import { PigeonConversationCommandsApi } from '../../contexts/conversations/infrastructure/http/PigeonConversationCommandsApi';
 import { PigeonConversationsApi } from '../../contexts/conversations/infrastructure/http/PigeonConversationsApi';
 import { PigeonConversationsGateway } from '../../contexts/conversations/infrastructure/http/PigeonConversationsGateway';
+import { GroupMailboxNotificationLink } from '../../contexts/groupMailboxes/infrastructure/control/GroupMailboxNotificationLink';
+import { GroupConversationMailbox } from '../../contexts/groupMailboxes/infrastructure/GroupConversationMailbox';
+import { GroupConversationRoster } from '../../contexts/groupMailboxes/infrastructure/roster/GroupConversationRoster';
 import { KeychainCipher } from '../../contexts/identities/infrastructure/crypto/KeychainCipher';
 import { DeviceAuthorizationRevisionSource } from '../../contexts/identities/infrastructure/http/DeviceAuthorizationRevisionSource';
 import { DeviceSealedRecovery } from '../../contexts/identities/infrastructure/http/DeviceSealedRecovery';
@@ -68,6 +71,7 @@ import { DirectMessageMailboxStore } from '../../contexts/messages/infrastructur
 import { DirectMessageReaderSet } from '../../contexts/messages/infrastructure/mailbox/DirectMessageReaderSet';
 import { RecipientMailboxRouter } from '../../contexts/messages/infrastructure/mailbox/RecipientMailboxRouter';
 import { PigeonNodeApi } from '../../contexts/networks/infrastructure/http/PigeonNodeApi';
+import { NotificationMutationSigner } from '../../contexts/notifications/infrastructure/http/NotificationMutationSigner';
 import { PigeonNotificationsApi } from '../../contexts/notifications/infrastructure/http/PigeonNotificationsApi';
 import { PigeonNotificationsGateway } from '../../contexts/notifications/infrastructure/http/PigeonNotificationsGateway';
 import { PigeonPushApi } from '../../contexts/notifications/infrastructure/http/PigeonPushApi';
@@ -102,6 +106,8 @@ export class PigeonApiGateway {
   public readonly filesGateway: PigeonFilesGateway;
 
   public readonly directMessageMailbox: DirectMessageMailbox;
+
+  public readonly groupConversationMailbox: GroupConversationMailbox;
 
   public readonly identityGateway: PigeonIdentitiesGateway;
 
@@ -427,17 +433,43 @@ export class PigeonApiGateway {
       }),
     );
     this.node = new PigeonNodeApi(http, signer);
+    const notificationsApi = new PigeonNotificationsApi(
+      http,
+      signer,
+      <T>(
+        key: string,
+        loader: () => Promise<T>,
+        options?: RequestCacheOptions,
+      ) => this.requestCache.load(key, loader, options),
+      mutations,
+    );
+    const groupRoster = new GroupConversationRoster(
+      http,
+      signer,
+      conversationMapper,
+    );
+
+    this.groupConversationMailbox = new GroupConversationMailbox({
+      channel: mailboxChannel,
+      client: new PigeonMailboxClient(http),
+      composer: this.messageCommands,
+      direct: (session) =>
+        new GroupMailboxNotificationLink(
+          session,
+          http,
+          signer,
+          new NotificationMutationSigner(mutations),
+          Date.now,
+        ),
+      notifications: notificationsApi,
+      now: Date.now,
+      projector: messageProjector,
+      roster: (session, conversationId) =>
+        groupRoster.of(session, conversationId),
+      storage: scopeClientStorageKey('pigeon-group'),
+    });
     this.notificationsGateway = new PigeonNotificationsGateway(
-      new PigeonNotificationsApi(
-        http,
-        signer,
-        <T>(
-          key: string,
-          loader: () => Promise<T>,
-          options?: RequestCacheOptions,
-        ) => this.requestCache.load(key, loader, options),
-        mutations,
-      ),
+      notificationsApi,
       (session) =>
         this.requestCache.invalidateForSession(
           '/notification-settings/',

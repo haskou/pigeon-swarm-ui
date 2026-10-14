@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useRef } from 'react';
 
-import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { UseWorkspaceResumeSyncInput } from './UseWorkspaceResumeSyncInput';
 import type { WorkspaceMode } from './WorkspaceMode';
 import type { WorkspaceResumeSyncPlan } from './WorkspaceResumeSyncPlan';
 
-import { MessageCollection } from '../../../../contexts/messages/presentation/view-models/MessageCollection';
 import { isBrowserPageVisible } from './isBrowserPageVisible';
 
 const MIN_RESUME_SYNC_INTERVAL_MS = 1500;
@@ -23,35 +21,6 @@ export function workspaceResumeSyncPlan({
   };
 }
 
-async function reloadActiveMessageIfBehind(
-  input: UseWorkspaceResumeSyncInput,
-  conversations: ConversationResource[],
-): Promise<void> {
-  const { activeConversationId, activeConversationKeyId } = input;
-
-  if (
-    input.workspaceMode !== 'messages' ||
-    !activeConversationId ||
-    !activeConversationKeyId
-  ) {
-    return;
-  }
-
-  const nextActiveConversation = conversations.find(
-    (conversation) => conversation.id === activeConversationId,
-  );
-
-  if (
-    nextActiveConversation &&
-    !MessageCollection.isCaughtUpWithConversation(
-      input.loadedMessages.current,
-      nextActiveConversation,
-    )
-  ) {
-    await input.loadActiveMessages(activeConversationId);
-  }
-}
-
 async function syncWorkspaceAfterResume(
   input: UseWorkspaceResumeSyncInput,
   workspaceWasHidden: boolean,
@@ -60,12 +29,9 @@ async function syncWorkspaceAfterResume(
     workspaceMode: input.workspaceMode,
     workspaceWasHidden,
   });
-  const nextConversations = plan.refreshConversations
-    ? await input.refreshConversations().catch(() => null)
-    : null;
 
-  if (nextConversations) {
-    await reloadActiveMessageIfBehind(input, nextConversations);
+  if (plan.refreshConversations) {
+    await input.refreshConversations().catch(() => null);
   }
 
   if (plan.reloadCommunities) {
@@ -74,10 +40,6 @@ async function syncWorkspaceAfterResume(
 }
 
 export function useWorkspaceResumeSync({
-  activeConversationId,
-  activeConversationKeyId,
-  loadActiveMessages,
-  loadedMessages,
   onCommunitiesReload,
   refreshConversations,
   workspaceMode,
@@ -104,26 +66,10 @@ export function useWorkspaceResumeSync({
     workspaceResumeSyncAtRef.current = now;
 
     void syncWorkspaceAfterResume(
-      {
-        activeConversationId,
-        activeConversationKeyId,
-        loadActiveMessages,
-        loadedMessages,
-        onCommunitiesReload,
-        refreshConversations,
-        workspaceMode,
-      },
+      { onCommunitiesReload, refreshConversations, workspaceMode },
       workspaceWasHidden,
     );
-  }, [
-    activeConversationId,
-    activeConversationKeyId,
-    loadActiveMessages,
-    loadedMessages,
-    onCommunitiesReload,
-    refreshConversations,
-    workspaceMode,
-  ]);
+  }, [onCommunitiesReload, refreshConversations, workspaceMode]);
 
   const markWorkspaceHidden = useCallback(() => {
     workspaceWasHiddenRef.current = true;

@@ -1,17 +1,23 @@
+import type { GroupConversationMailbox } from '../../../groupMailboxes/infrastructure/GroupConversationMailbox';
 import type { DirectMessageMailbox } from '../../../messages/infrastructure/mailbox/DirectMessageMailbox';
 import type { DeviceMailboxRepository } from '../../domain/repositories/DeviceMailboxRepository';
 import type { IdentityId } from '../../domain/value-objects/IdentityId';
 import type { IdentityAccessContexts } from '../http/IdentityAccessContexts';
 
-/** This device's direct-mailbox readers, history and outbox. */
+/** This device's direct-mailbox readers, history and outbox; its groups. */
 export class MailboxDeviceRepository implements DeviceMailboxRepository {
   public constructor(
     private readonly contexts: IdentityAccessContexts,
     private readonly mailbox: DirectMessageMailbox,
+    private readonly groups: Pick<GroupConversationMailbox, 'forget'>,
   ) {}
 
   public async cancelOutbox(identityId: IdentityId): Promise<void> {
     await this.mailbox.cancelOutbox(identityId.toString());
+  }
+
+  public async forgetGroups(identityId: IdentityId): Promise<void> {
+    await this.groups.forget(identityId.toString());
   }
 
   public async forgetHistory(identityId: IdentityId): Promise<void> {
