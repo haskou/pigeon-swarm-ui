@@ -470,7 +470,6 @@ export function MessageBubble({
                   <LinkPreviewCard
                     description={linkPreview.description}
                     finalUrl={linkPreview.finalUrl}
-                    image={linkPreview.image}
                     mine={mine}
                     siteName={linkPreview.siteName}
                     title={linkPreview.title}

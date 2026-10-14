@@ -156,19 +156,17 @@ self.addEventListener('push', (event) => {
   event.waitUntil(showPushNotification(payload));
 });
 
+// Notification images are always the app's own: the browser fetches them
+// outside the page's Content Security Policy.
 async function showPushNotification(payload) {
   await self.registration.showNotification(payload.title, {
-    badge: independentClient
-      ? notificationBadge
-      : payload.badge || notificationBadge,
+    badge: notificationBadge,
     body: payload.body,
     data: {
       ...payload.data,
       url: payload.url || '/',
     },
-    icon: independentClient
-      ? '/favicon/android-chrome-192x192.png'
-      : payload.icon || '/favicon/android-chrome-192x192.png',
+    icon: '/favicon/android-chrome-192x192.png',
     tag: payload.tag,
   });
 }
@@ -193,10 +191,8 @@ function pushPayload(data) {
       typeof payload.body === 'string' ? payload.body : '';
 
     return {
-      badge: typeof payload.badge === 'string' ? payload.badge : undefined,
       body: notificationBody(payload, payloadDataValue, body),
       data: payloadDataValue,
-      icon: typeof payload.icon === 'string' ? payload.icon : undefined,
       tag: notificationTag(payload, payloadDataValue),
       title: notificationTitle(payload, payloadDataValue, title),
       url: typeof payload.url === 'string' ? payload.url : '/',

@@ -91,11 +91,13 @@ It keeps, on purpose:
 - the last-login identity ID, workspace preferences, and
   community unread counts.
 
-Logout also closes realtime sockets, terminates the message decrypt worker, and
-terminates the attachment cipher worker. In-flight decrypts and attachment
-encrypt or decrypt calls reject; a new worker starts on the next use. Removing a
-push subscription always unsubscribes in the browser, even if the backend
-delete fails.
+Logout also stops the direct and group message outboxes, closes realtime
+sockets, and terminates the message decrypt, attachment cipher and mailbox
+miner workers (`stopSessionWork`). It drops the contact presence held in
+memory and closes the MLS state. In-flight decrypts and attachment encrypt or
+decrypt calls reject; a new worker starts on the next use. The workspace
+deletes this device's push subscription, which always unsubscribes in the
+browser, even if the backend delete fails.
 
 This document does not claim that JavaScript memory is cleared.
 
@@ -232,10 +234,6 @@ Residual risks:
   and recent emoji preferences, the locally seen message ids, and the direct
   message availability records.
 
-Residual: detection runs only at unlock. A revoked device that stays signed in
-keeps its session until its next sign-in, and its stored history until the
-user erases it.
-
 ## User-presence check before unlock
 
 Passkey mode is the user-presence check. A click or prompt that does not gate
@@ -248,7 +246,28 @@ applies (see "What each choice protects against").
 
 - **Links in messages.** Only `http`, `https`, and `www.` targets become
   anchors. `javascript:`, `data:`, and `vbscript:` targets stay plain text, and
-  raw HTML is escaped. Covered by `markdownMessage.spec.ts`.
+  raw HTML is escaped. Content longer than the composer's 4000-character
+  limit (`MESSAGE_CONTENT_MAX_LENGTH`) comes from another client; it is shown
+  as text with links and mentions only, so a flood of formatting delimiters
+  cannot keep the parser busy. Mentions are matched with one pattern per
+  message, not one per text segment. Covered by `markdownMessage.spec.ts`,
+  including a 100,000-character delimiter flood and a flood of links and
+  mentions that must each render within one second.
+- **Link previews.** A preview shows only its title, description, site name
+  and address. The sender-chosen preview image and the site favicon are never
+  loaded, because fetching them would tell that site the reader's address and
+  when the message was read. Only `http` and `https` targets render, and the
+  text is escaped. Covered by `LinkPreviewCard.spec.ts`.
+- **Profile pictures and banners.** Anyone can set them, so only embedded
+  base64 PNG, JPEG, GIF, WebP and AVIF images render directly. Remote, path
+  and SVG references are ignored; content IDs load through the node. Covered
+  by `identityDisplay.spec.ts`.
+- **Attachments and notifications.** Reviewed: attachments render only as
+  image, video or audio elements from decrypted blobs, or download through a
+  generated link. The service worker shows the notification text the node
+  sends, always with the app's own icon and badge (the browser fetches those
+  outside the page policy), and opens only app routes. Covered by
+  `IndependentClientServiceWorker.spec.ts`.
 - **Protected-root envelope.** The KDF is pinned to
   `v1.scrypt.N262144.r8.p1.hkdf-sha256.aes-256-gcm`. Other scrypt cost, block
   size, or parallelism values are rejected. Covered by
@@ -295,10 +314,14 @@ applies (see "What each choice protects against").
   `src/shared/infrastructure/security/contentSecurityPolicy.ts`, applied in
   `vite.config.ts`). Scripts come only from the app origin and
   `'wasm-unsafe-eval'`. Inline scripts and `eval` are blocked. Styles allow
-  `'unsafe-inline'`. Objects, base URIs, and frames are blocked. The dev server
-  sends no policy. `frame-ancestors` is ignored in a meta tag, so clickjacking
-  protection must come from the hosting server's response header. Covered by
-  `contentSecurityPolicy.spec.ts`.
+  `'unsafe-inline'`. Objects, base URIs, and frames are blocked. Images load
+  only from the app origin, `data:` and `blob:` URLs, and, in builds whose
+  `VITE_API_SERVER_URL` is on another origin, that API origin (stickers). The
+  dev server sends no policy. `frame-ancestors` is ignored in a meta tag: the
+  node serving the client (`PublicStaticContent`) sends
+  `frame-ancestors 'none'` and `X-Frame-Options: DENY`, and the independent
+  client server (`client/server.mjs` in pigeon-swarm) sends
+  `frame-ancestors 'none'`. Covered by `contentSecurityPolicy.spec.ts`.
 
 ## Tests
 
@@ -341,5 +364,6 @@ the removal notice or erases anything.
   session memory while the session is alive. Sealing them at rest in memory was
   evaluated and not adopted: it does not stop a same-origin script, which can
   call the same paths.
-- **Clickjacking.** Needs a `frame-ancestors` response header from the hosting
-  server; see "Other protections".
+- **Clickjacking on other hosting.** Serving the built client from anything
+  other than the node or the independent client server needs its own
+  `frame-ancestors` response header.

@@ -24,6 +24,7 @@ import type { ChatMessage } from '../../domain/ChatMessage';
 import { useDesktopInputFocus } from '../../../../shared/presentation/components/useDesktopInputFocus';
 import { cx } from '../../../../shared/presentation/cx';
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { MESSAGE_CONTENT_MAX_LENGTH } from '../../domain/MESSAGE_CONTENT_MAX_LENGTH';
 import {
   type EmojiSuggestion,
   findEmojiTrigger,
@@ -40,7 +41,6 @@ import {
   StickerPickerFallbackButton,
 } from './ComposerPresentationControls';
 
-const MESSAGE_MAX_LENGTH = 4000;
 const COMPOSER_MAX_ROWS = 20;
 const LARGE_ATTACHMENT_BYTES = 50 * 1024 * 1024;
 const StickerPicker = lazy(() =>
@@ -138,7 +138,7 @@ export function Composer({
     (isEditing
       ? hasDraftText && trimmedDraft !== editingMessage.content.trim()
       : hasDraftText || attachments.length > 0) &&
-    trimmedDraft.length <= MESSAGE_MAX_LENGTH &&
+    trimmedDraft.length <= MESSAGE_CONTENT_MAX_LENGTH &&
     !disabled;
   const emojiTrigger = useMemo(
     () => findEmojiTrigger(draft, caretIndex),
@@ -300,7 +300,7 @@ export function Composer({
 
       const next = replaceEmojiTrigger(draft, emojiTrigger, suggestion.emoji);
 
-      if (next.value.length > MESSAGE_MAX_LENGTH) return;
+      if (next.value.length > MESSAGE_CONTENT_MAX_LENGTH) return;
 
       onDraftChange(next.value);
       setDismissedEmojiTrigger(null);
@@ -322,7 +322,7 @@ export function Composer({
       const nextValue = `${draft.slice(0, start)}${emoji}${draft.slice(end)}`;
       const nextCaretIndex = start + emoji.length;
 
-      if (nextValue.length > MESSAGE_MAX_LENGTH) return;
+      if (nextValue.length > MESSAGE_CONTENT_MAX_LENGTH) return;
 
       onDraftChange(nextValue);
       setCaretIndex(nextCaretIndex);
@@ -708,7 +708,7 @@ export function Composer({
               data-gramm="false"
               data-gramm_editor="false"
               disabled={disabled}
-              maxLength={MESSAGE_MAX_LENGTH}
+              maxLength={MESSAGE_CONTENT_MAX_LENGTH}
               rows={1}
               spellCheck={false}
               className={cx(
@@ -722,7 +722,7 @@ export function Composer({
             />
           </div>
           <span className="hidden min-w-12 text-right text-xs font-black text-white/35 sm:block">
-            {draft.length}/{MESSAGE_MAX_LENGTH}
+            {draft.length}/{MESSAGE_CONTENT_MAX_LENGTH}
           </span>
           <button
             type="submit"

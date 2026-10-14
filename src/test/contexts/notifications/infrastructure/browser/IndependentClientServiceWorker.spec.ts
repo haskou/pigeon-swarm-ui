@@ -183,7 +183,7 @@ describe('independent client service worker', () => {
 });
 
 describe('combined client service worker compatibility', () => {
-  it('preserves combined-mode custom notification images', async () => {
+  it('ignores backend-selected notification image URLs', async () => {
     const worker = serviceWorker(false);
 
     await worker.dispatch('push', {
@@ -199,8 +199,8 @@ describe('combined client service worker compatibility', () => {
     expect(worker.showNotification).toHaveBeenCalledWith(
       'Invitation',
       expect.objectContaining({
-        badge: '/custom-badge.png',
-        icon: 'https://backend.example/icon',
+        badge: '/favicon/notification-badge.png',
+        icon: '/favicon/android-chrome-192x192.png',
       }),
     );
   });

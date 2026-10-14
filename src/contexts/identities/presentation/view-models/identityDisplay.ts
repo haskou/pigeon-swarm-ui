@@ -1,6 +1,5 @@
 import type { IdentityResource } from '../../infrastructure/http/resources/IdentityResource';
 
-import { isIndependentClient } from '../../../../shared/infrastructure/client/isIndependentClient';
 import { shortId } from '../../../../shared/presentation/formatting';
 import {
   isValidHandle as isValidCredentialHandle,
@@ -50,27 +49,17 @@ export function identityBanner(identity: IdentityResource): string | null {
   return banner ? profilePictureUrl(banner) : null;
 }
 
+// Anyone can set their profile picture. A remote or path URL would make every
+// viewer's browser request it, so only embedded raster images render directly;
+// anything else is an IPFS content ID loaded through the node.
 export function profilePictureUrl(value: string): string | null {
   const picture = value.trim();
 
-  if (
-    isIndependentClient() &&
-    !/^data:image\/(?:png|jpeg|gif|webp|avif);base64,[a-z0-9+/]*={0,2}$/i.test(
-      picture,
-    )
+  return /^data:image\/(?:png|jpeg|gif|webp|avif);base64,[a-z0-9+/]*={0,2}$/i.test(
+    picture,
   )
-    return null;
-
-  return isDirectProfilePictureUrl(picture) ? picture : null;
-}
-
-export function isDirectProfilePictureUrl(value: string): boolean {
-  return (
-    value.startsWith('data:') ||
-    value.startsWith('http://') ||
-    value.startsWith('https://') ||
-    value.startsWith('/')
-  );
+    ? picture
+    : null;
 }
 
 export function profilePictureDataUrl(input: {
