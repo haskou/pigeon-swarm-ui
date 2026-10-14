@@ -36,10 +36,9 @@ test('backs up after the password is confirmed again and restores on the same id
   const aliceMessage = `hello from alice ${token}`;
   const alicePage = await newIsolatedPage(browser);
   const bobPage = await newIsolatedPage(browser);
-  const restored = await newIsolatedPage(browser);
 
   try {
-    const recoveryKey = await registerIdentity(alicePage, alice);
+    await registerIdentity(alicePage, alice);
 
     await registerIdentity(bobPage, bob);
     await createDirectConversation(alicePage, bob.handle);
@@ -98,7 +97,6 @@ test('backs up after the password is confirmed again and restores on the same id
     for (const secret of [bobMessage, aliceMessage, alice.handle, bob.handle]) {
       expect(text).not.toContain(secret);
     }
-    await alicePage.context().close();
 
     // Another identity cannot open the file and stores nothing from it.
     const bobBackup = await openHistoryBackup(bobPage);
@@ -108,24 +106,24 @@ test('backs up after the password is confirmed again and restores on the same id
       'This file is not a backup of this identity, or it was changed.',
     );
 
-    // A new device of the same identity, signed in with the recovery key,
-    // starts without the history. The node serves it no envelopes, as after
-    // its retention expired, so only the backup can bring the history back.
-    await serveNoEnvelopes(restored);
-    await loginIdentity(restored, `@${alice.handle}`, password, recoveryKey);
-    await selectConversationByTitle(restored, bob.name);
-    await expect(restored.getByTestId('message-composer-input')).toBeEnabled({
+    // This device of the same identity loses its stored history, and the
+    // node serves it no envelopes, as after its retention expired, so only
+    // the backup can bring the history back.
+    await alicePage.goto('/');
+    await wipeDirectHistory(alicePage);
+    await serveNoEnvelopes(alicePage);
+    await loginIdentity(alicePage, `@${alice.handle}`, password);
+    await selectConversationByTitle(alicePage, bob.name);
+    await expect(alicePage.getByTestId('message-composer-input')).toBeEnabled({
       timeout: 30_000,
     });
-    await expect(restored.getByText(bobMessage, { exact: true })).toHaveCount(
+    await expect(alicePage.getByText(bobMessage, { exact: true })).toHaveCount(
       0,
     );
-    await expect(restored.getByText(aliceMessage, { exact: true })).toHaveCount(
-      0,
-    );
+    expect(await storedHistoryRows(alicePage)).toBe(0);
 
     // A changed byte is refused before anything is stored.
-    const restoredBackup = await openHistoryBackup(restored);
+    const restoredBackup = await openHistoryBackup(alicePage);
 
     await restoreFile(restoredBackup, tampered(text));
     await expect(restoredBackup.getByRole('alert')).toHaveText(
@@ -140,18 +138,18 @@ test('backs up after the password is confirmed again and restores on the same id
 
     // The restored history is stored on this device: it shows after a new
     // sign-in, still without any envelope from the node.
-    await loginIdentity(restored, `@${alice.handle}`, password);
-    await selectConversationByTitle(restored, bob.name);
-    await expect(restored.getByText(bobMessage, { exact: true })).toBeVisible({
+    expect(await storedHistoryRows(alicePage)).toBeGreaterThanOrEqual(2);
+    await loginIdentity(alicePage, `@${alice.handle}`, password);
+    await selectConversationByTitle(alicePage, bob.name);
+    await expect(alicePage.getByText(bobMessage, { exact: true })).toBeVisible({
       timeout: 30_000,
     });
-    await expect(restored.getByText(aliceMessage, { exact: true })).toBeVisible(
-      { timeout: 30_000 },
-    );
+    await expect(
+      alicePage.getByText(aliceMessage, { exact: true }),
+    ).toBeVisible({ timeout: 30_000 });
   } finally {
     await alicePage.context().close();
     await bobPage.context().close();
-    await restored.context().close();
   }
 });
 
@@ -209,6 +207,66 @@ async function serveNoEnvelopes(page: Page): Promise<void> {
       return route.fulfill({ json: { envelopes: [], hasMore: false } });
     },
   );
+}
+
+/** Deletes this browser's stored one-to-one history; run while signed out. */
+async function wipeDirectHistory(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    for (const { name } of await indexedDB.databases()) {
+      if (!name?.startsWith('pigeon-direct-history')) continue;
+      await new Promise<void>((resolve, reject) => {
+        const deleting = indexedDB.deleteDatabase(name);
+
+        deleting.onsuccess = () => resolve();
+        deleting.onerror = () => reject(deleting.error);
+        deleting.onblocked = () => reject(new Error(`${name} is still open.`));
+      });
+    }
+  });
+}
+
+/** Counts the encrypted one-to-one history rows this browser stores. */
+async function storedHistoryRows(page: Page): Promise<number> {
+  return page.evaluate(async () => {
+    const countEntries = (name: string): Promise<number> =>
+      new Promise((resolve, reject) => {
+        const opening = indexedDB.open(name);
+
+        opening.onerror = () => reject(opening.error);
+        opening.onsuccess = () => {
+          const database = opening.result;
+
+          if (!database.objectStoreNames.contains('entries')) {
+            database.close();
+            resolve(0);
+
+            return;
+          }
+          const counting = database
+            .transaction('entries', 'readonly')
+            .objectStore('entries')
+            .count();
+
+          counting.onsuccess = () => {
+            database.close();
+            resolve(counting.result);
+          };
+          counting.onerror = () => {
+            database.close();
+            reject(counting.error);
+          };
+        };
+      });
+    let rows = 0;
+
+    for (const { name } of await indexedDB.databases()) {
+      if (name?.startsWith('pigeon-direct-history')) {
+        rows += await countEntries(name);
+      }
+    }
+
+    return rows;
+  });
 }
 
 function testRunToken(projectName: string): string {

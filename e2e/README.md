@@ -78,10 +78,12 @@ Firefox the decline sent when the callee leaves the page did not reach the
 node in CI, so the call spec does not run there.
 `history-backup.spec.ts` (a wrong password exports nothing; the right one
 downloads one encrypted file that holds no message or handle in clear;
-another identity and a file with one changed character are refused; a new
-device of the same identity signed in with the recovery key restores the
-file, and after a new sign-in shows both sides of the conversation while the
-node serves it no envelopes) runs on `desktop-chromium`.
+another identity and a file with one changed character are refused; once the
+same device has lost its stored history and the node serves it no envelopes,
+the file restores the history rows, and both sides of the conversation show
+after a new sign-in) runs on `desktop-chromium`. It restores on the same
+device because recovery-key sign-in fails once the identity has a keychain
+head (#464).
 `passkey-unlock.spec.ts` (switching this device from a password to a passkey
 and unlocking with it) runs on `desktop-chromium` only: it uses a DevTools
 virtual authenticator with PRF and opens the app through `localhost`, because
