@@ -481,7 +481,7 @@ export class PigeonDeviceAuthorizationApi {
 
     return (
       sealedSecrets !== undefined &&
-      handedOver !== undefined &&
+      handedOver != null &&
       revocation.transition
         .getResultRevision()
         .hasValue(handedOver.authorizationRevision) &&
