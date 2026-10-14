@@ -1,6 +1,6 @@
 import { Buffer } from 'buffer';
 
-import type { PigeonCommunitiesGateway } from '../../../contexts/communities/infrastructure/http/PigeonCommunitiesGateway';
+import type { PigeonCommunityOperationsApi } from '../../../contexts/communities/infrastructure/http/PigeonCommunityOperationsApi';
 import type { PigeonMlsRecordsApi } from '../../../contexts/communities/infrastructure/http/PigeonMlsRecordsApi';
 import type { MlsGroupCredentials } from '../../../contexts/communities/infrastructure/mls/MlsGroupCredentials';
 import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
@@ -37,15 +37,16 @@ export class PigeonMlsFacade {
 
   public constructor(
     private readonly records: PigeonMlsRecordsApi,
-    private readonly communities: PigeonCommunitiesGateway,
+    private readonly operations: PigeonCommunityOperationsApi,
   ) {}
 
+  /** Who may change the group, replayed from the community's signed history. */
   private async roster(
     session: Session,
     communityId: string,
   ): Promise<CommunityMlsRoster> {
-    return CommunityMlsRoster.of(
-      await this.communities.getCommunity(session, communityId),
+    return CommunityMlsRoster.replay(
+      await this.operations.list(session, communityId),
     );
   }
 

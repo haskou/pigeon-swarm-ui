@@ -246,7 +246,7 @@ export class PigeonApplication {
     );
     this.mls = new PigeonMlsFacade(
       gateway.mlsRecords,
-      gateway.communityGateway,
+      gateway.communityOperations,
     );
     const communityContexts = new CommunityAccessContexts();
     const communityMapper = new CommunityMapper();
