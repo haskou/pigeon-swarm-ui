@@ -126,4 +126,13 @@ export class CommunityRosterHistory {
       operations !== undefined && baseline.every((hash) => operations.has(hash))
     );
   }
+
+  /**
+   * How many operations the frontier stands for, 0 while part of it is
+   * unknown. Operations are content-addressed, so every member counts the
+   * same for the same frontier.
+   */
+  public reach(frontier: readonly string[]): number {
+    return this.closureOf(frontier)?.size ?? 0;
+  }
 }

@@ -103,8 +103,10 @@ recipientIdentityId?})))`, with an empty recipient omitted
 The node cannot order commits across replicas. Clients do it:
 
 - A commit for epoch `n` is applied when received in order. Commits for epoch
-  `n` from different authors are competing. The one with the **lowest record
-  id** wins. A client that applied a different commit for epoch `n` rolls back
+  `n` from different authors are competing. In a community, the one binding
+  the most roster history wins (see "Which roster judges a commit"); among
+  those, and in a group conversation, the one with the **lowest record id**
+  wins. A client that applied a different commit for epoch `n` rolls back
   to its retained epoch-`n` state (`ts-mls` states are immutable values) and
   applies the winner. Application messages encrypted in the losing epoch stay
   readable because that state is retained read-only.
@@ -150,7 +152,7 @@ grant `manage_members`.
   opens it with its own key package.
 - Remove: any member removes a leaf whose identity left, was kicked or banned.
   Only a manager removes an identity still on the roster, and nobody removes
-  the owner. Races are resolved by the lowest-id rule above.
+  the owner. Races are resolved by the epoch rule above.
 - Update: anyone on the roster rotates their own leaf. Each device commits an
   empty update at most every 24 hours or after 1000 sent messages, whichever
   comes first, to bound post-compromise exposure.
@@ -159,10 +161,11 @@ Every commit is checked against these rules both when it is made and when it
 is received, by the roster at the revision the commit binds (see "Which
 roster judges a commit"); a commit that breaks them is skipped and the epoch
 does not advance. A welcome opens only when the node names as its author a
-manager, by the roster at the revision the welcome binds, who holds a leaf in
-the welcomed group, and every leaf in its tree is a member at that revision,
-so a member cannot welcome anyone into a look-alike group. A removed device
-rejoins only from a welcome newer than its last membership.
+manager, by the roster at the revision the welcome binds and by the joiner's
+latest roster, who holds a leaf in the welcomed group, and every leaf in its
+tree is a member at that revision, so neither a member nor a demoted manager
+can welcome anyone into a look-alike group. A removed device rejoins only
+from a welcome newer than its last membership.
 
 ### Which roster judges a commit
 
@@ -186,6 +189,12 @@ a demotion in (#420):
   A commit is accepted only when its frontier stands for every operation of
   the baseline (`CommunityRosterHistory.follows`), so revisions only move
   forward along the commit chain.
+- Of two commits for one epoch, the one whose frontier stands for more
+  operations wins (`CommunityRosterHistory.reach`), then the lowest record
+  id. Operations are content-addressed, so every member counts the same and
+  picks the same winner whatever order the commits arrive in. A member
+  removed by a commit that bound its removal cannot win that epoch back with
+  a commit bound to an older revision, however low its id.
 - A manager whose group bound a revision granting other rights than the
   latest one commits an empty update binding the latest revision on its next
   `reconcile` (`MlsCommunityEngine.bindRoster`).
@@ -200,12 +209,16 @@ What a node or a member can forge about this order:
   not exist. A demoted manager can backdate an add to a revision before the
   demotion, as long as no commit has yet bound the demotion or anything after
   it; that window closes once a manager who saw the demotion reconciles, and
-  a backdated commit that loses the race for its epoch is discarded by the
-  lowest-id rule like any other.
+  a backdated commit that loses the race for its epoch is discarded like
+  any other.
 - A device joining from a welcome has no baseline yet, so it cannot tell a
   backdated welcome from an honest one. Such a welcome lands a roster member
   on a fork no other member follows; it never admits anyone the bound roster
   did not, and the member rejoins from the next welcome.
+- A welcome whose author the joiner already sees demoted opens nothing, even
+  when the add it belongs to was made while the author was allowed and every
+  member accepted it. The joiner's leaf stays in the group unused until a
+  manager removes it; no path re-welcomes it.
 - A commit or welcome that binds no revision (made before #420) is judged by
   the roster of no operations, which admits nobody, so such a group stops
   taking membership commits until a manager binds a revision.
@@ -285,7 +298,7 @@ and attachments, and a missing group is an error, not a fallback.
   X.509 chain.
 - `ts-mls` has not had a formal external audit (its README says so). This
   design is not audited either. The issue stays open until a specialist review.
-- Concurrent commits depend on the lowest-id rule and on clients retaining the
+- Concurrent commits depend on the epoch rule and on clients retaining the
   previous epoch state. Lost records are repaired by fetching, not guessed.
 - MLS client state (leaf private keys, epoch secrets, key packages), the
   plaintext cache, the group generation log and the handled group control

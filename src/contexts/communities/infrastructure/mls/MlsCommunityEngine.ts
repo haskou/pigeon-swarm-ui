@@ -482,11 +482,13 @@ export class MlsCommunityEngine {
   }
 
   /**
-   * Applies the published commits in order. A commit the roster does not
-   * allow, or that does not open, is skipped: the group stays at its epoch
-   * for the next commit, and one member cannot stall everyone else. This
-   * device's own pending commit is adopted rather than applied. Returns
-   * the group and the id of the commit it took in the pending's epoch.
+   * Applies the published commits in order: by epoch, then the one that
+   * wins its epoch first (`MlsGroup`: the most roster history bound, then
+   * the lowest id). A commit the roster does not allow, or that does not
+   * open, is skipped: the group stays at its epoch for the next commit, and
+   * one member cannot stall everyone else. This device's own pending commit
+   * is adopted rather than applied. Returns the group and the id of the
+   * commit it took in the pending's epoch.
    */
   private async applyCommits(
     group: MlsGroup,
@@ -499,13 +501,7 @@ export class MlsCommunityEngine {
       groupId: group.groupId,
       kind: 'commit',
     });
-    const ordered = records
-      .filter((record) => record.epoch !== undefined)
-      .sort(
-        (a, b) =>
-          (a.epoch as number) - (b.epoch as number) ||
-          a.recordId.localeCompare(b.recordId),
-      );
+    const ordered = this.ordered(group.groupId, records);
     let current = group;
     let taken: string | undefined;
 
@@ -521,6 +517,32 @@ export class MlsCommunityEngine {
     }
 
     return { group: current, taken };
+  }
+
+  /** Commits by epoch, the one binding most roster history, then by id. */
+  private ordered(
+    groupId: string,
+    records: readonly MlsRecordResource[],
+  ): MlsRecordResource[] {
+    const history =
+      this.histories.get(groupId) ?? CommunityRosterHistory.of([]);
+    const reach = new Map(
+      records.map((record) => [
+        record.recordId,
+        history.reach(MlsGroup.frontierOf(fromBase64(record.payload)) ?? []),
+      ]),
+    );
+    const reachOf = (record: MlsRecordResource): number =>
+      reach.get(record.recordId) ?? 0;
+
+    return records
+      .filter((record) => record.epoch !== undefined)
+      .sort(
+        (a, b) =>
+          (a.epoch as number) - (b.epoch as number) ||
+          reachOf(b) - reachOf(a) ||
+          a.recordId.localeCompare(b.recordId),
+      );
   }
 
   /**
@@ -602,8 +624,9 @@ export class MlsCommunityEngine {
   }
 
   /**
-   * The group a welcome opens with the key package, if its author is in it
-   * and may add members in the roster the welcome binds.
+   * The group a welcome opens with the key package, if its author is in it,
+   * may add members in the roster the welcome binds and still may in the
+   * latest one: a demoted manager's welcome opens nothing.
    */
   private async open(
     groupId: string,
@@ -622,6 +645,7 @@ export class MlsCommunityEngine {
       );
 
       return history.rosterAt(group.frontier)?.manages(author) &&
+        history.latest().manages(author) &&
         group.identities().includes(author)
         ? group
         : undefined;
@@ -689,6 +713,7 @@ export class MlsCommunityEngine {
         history().follows(frontier, baseline) &&
         (history().rosterAt(frontier)?.allowsCommit(change) ?? false),
       frontier: () => history().heads(),
+      reach: (frontier) => history().reach(frontier),
     };
   }
 

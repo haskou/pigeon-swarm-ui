@@ -229,18 +229,39 @@ const membershipChange = (
   return { added, committer: identityAt(committerLeaf), removed };
 };
 
+/** A published commit and the roster revision its committer bound. */
+const readCommit = (
+  bytes: Uint8Array,
+): { frontier: readonly string[]; message: PrivateMessage } | undefined => {
+  try {
+    const decoded = decodeMlsMessage(bytes, 0)?.[0];
+
+    if (decoded?.wireformat !== 'mls_private_message') return undefined;
+    const frontier = MlsRosterFrontier.decode(
+      decoded.privateMessage.authenticatedData,
+    );
+
+    return frontier && { frontier, message: decoded.privateMessage };
+  } catch {
+    return undefined;
+  }
+};
+
 interface AppliedEpoch {
   readonly commitId: string;
   /** State before the commit; kept to switch to a competing commit. */
   readonly before: ClientState;
   /** The roster revision the group had bound before the commit. */
+  readonly baseline: readonly string[];
+  /** The roster revision the commit bound. */
   readonly frontier: readonly string[];
 }
 
 /**
  * One MLS group as seen by one device. Immutable ts-mls states let the device
  * return to the state before a commit when a competing commit for the same
- * epoch has a lower id. Every commit and welcome binds the roster revision
+ * epoch wins it: the one binding more of the roster history, then the one
+ * with the lower id. Every commit and welcome binds the roster revision
  * its committer judged it at (`MlsRosterFrontier`); the group remembers the
  * revision of its last commit, which the next one must not step behind.
  */
@@ -356,6 +377,11 @@ export class MlsGroup {
       decoded.groupActiveState.kind !== 'active',
       frontier,
     );
+  }
+
+  /** The roster revision a published commit binds, if it is one. */
+  public static frontierOf(bytes: Uint8Array): readonly string[] | undefined {
+    return readCommit(bytes)?.frontier;
   }
 
   /** The roster revision the group's last commit or welcome bound. */
@@ -604,7 +630,7 @@ export class MlsGroup {
         return { kind: 'ignored', reason: 'duplicate' };
       }
 
-      if (record.id > previous.commitId) {
+      if (!this.outranks(record, previous)) {
         return { kind: 'ignored', reason: 'lost-race' };
       }
 
@@ -625,7 +651,7 @@ export class MlsGroup {
     const outcome = await this.advance(
       record,
       previous.before,
-      previous.frontier,
+      previous.baseline,
     );
 
     if (outcome.kind === 'applied') {
@@ -641,6 +667,22 @@ export class MlsGroup {
     }
 
     return outcome;
+  }
+
+  /**
+   * Whether the commit wins its epoch over the one the group applied: the
+   * one binding more of the roster history wins, then the lower id. Every
+   * member picks the same, and no one wins an epoch from a newer revision
+   * by binding an older one.
+   */
+  private outranks(record: MlsCommitRecord, previous: AppliedEpoch): boolean {
+    const frontier = readCommit(record.bytes)?.frontier;
+
+    if (!frontier) return false;
+    const reach = this.policy.reach(frontier);
+    const held = this.policy.reach(previous.frontier);
+
+    return reach === held ? record.id < previous.commitId : reach > held;
   }
 
   /**
@@ -693,17 +735,12 @@ export class MlsGroup {
     from: ClientState,
     baseline: readonly string[],
   ): Promise<MlsCommitOutcome> {
-    const decoded = decodeMlsMessage(record.bytes, 0)?.[0];
+    const commit = readCommit(record.bytes);
 
-    if (!decoded || decoded.wireformat !== 'mls_private_message') {
-      throw new MlsRejectedError('Not an MLS commit');
-    }
-    const { privateMessage } = decoded;
-    const frontier = MlsRosterFrontier.decode(privateMessage.authenticatedData);
-
-    if (privateMessage.epoch !== record.epoch || !frontier) {
+    if (!commit || commit.message.epoch !== record.epoch) {
       throw new MlsRejectedError('Commit does not match its record');
     }
+    const { frontier, message: privateMessage } = commit;
     const result = await processPrivateMessage(
       from,
       privateMessage,
@@ -716,9 +753,10 @@ export class MlsGroup {
       throw new MlsRejectedError('Commit rejected');
     }
     this.applied.set(record.epoch, {
+      baseline,
       before: from,
       commitId: record.id,
-      frontier: baseline,
+      frontier,
     });
     this.state = result.newState;
     this.bound = frontier;
@@ -825,9 +863,10 @@ export class MlsGroup {
       );
     }
     this.applied.set(pending.epoch, {
+      baseline: this.bound,
       before: pending.before,
       commitId,
-      frontier: this.bound,
+      frontier: pending.frontier,
     });
     this.state = pending.state;
     this.bound = pending.frontier;

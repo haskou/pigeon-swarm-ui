@@ -19,6 +19,12 @@ export interface MlsMembershipPolicy {
   /** Whether the identity may hold a leaf in the roster at the revision. */
   admits(identityId: string, frontier: readonly string[]): boolean;
   /**
+   * How much of the roster history the revision stands for, the same on
+   * every member. Of two commits for one epoch, the one binding more wins,
+   * so a member cannot outrun a newer revision with an older one.
+   */
+  reach(frontier: readonly string[]): number;
+  /**
    * Whether the committer may make this change in the roster at the
    * revision the commit binds (`frontier`). That revision must include the
    * one the group bound before (`baseline`), so no commit is judged by a

@@ -67,4 +67,12 @@ describe('CommunityRosterHistory', () => {
     expect(history.follows(promoted, promoted)).toBe(true);
     expect(history.follows(promoted, demoted)).toBe(false);
   });
+
+  it('reaches every operation a frontier stands for, none while unknown', () => {
+    const history = CommunityRosterHistory.of(signed.operations());
+
+    expect(history.reach(demoted)).toBe(signed.operations().length);
+    expect(history.reach(promoted)).toBe(signed.operations().length - 1);
+    expect(history.reach(['x'.repeat(43)])).toBe(0);
+  });
 });

@@ -366,6 +366,7 @@ export class GroupMailboxMlsEngine {
       allows: (change) =>
         this.rosters.get(conversationId)?.allowsCommit(change) ?? false,
       frontier: () => [],
+      reach: () => 0,
     };
   }
 

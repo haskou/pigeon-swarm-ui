@@ -26,6 +26,7 @@ const anything = {
   admits: () => true,
   allows: () => true,
   frontier: (): string[] => [],
+  reach: () => 0,
 };
 const base64 = (bytes: Uint8Array): string =>
   Buffer.from(bytes).toString('base64');
@@ -614,22 +615,28 @@ describe('MlsCommunityEngine', () => {
     };
 
     it('accepts an add made before the demotion by a member who saw the demotion first', async () => {
-      const { bob, carol, mallory } = await carolManages();
+      const { alice, bob, carol, mallory } = await carolManages();
 
       await mallory.engine.publishKeyPackages(COMMUNITY);
       await carol.engine.admit(COMMUNITY, [id('mallory')]);
       demoteCarol();
 
       await expect(bob.engine.sync(COMMUNITY)).resolves.toBe(true);
-      await expect(mallory.engine.sync(COMMUNITY)).resolves.toBe(true);
+      await expect(alice.engine.sync(COMMUNITY)).resolves.toBe(true);
       await expect(bob.engine.identities(COMMUNITY)).resolves.toContain(
         id('mallory'),
       );
-      const ciphertext = await bob.engine.encrypt(COMMUNITY, 'welcome');
+      const ciphertext = await bob.engine.encrypt(COMMUNITY, 'same epoch');
 
-      await expect(mallory.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
-        'welcome',
+      await expect(alice.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
+        'same epoch',
       );
+      await expect(carol.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
+        'same epoch',
+      );
+      // A welcome opens only from a manager the joiner still sees as one.
+      await expect(mallory.engine.sync(COMMUNITY)).resolves.toBe(true);
+      await expect(mallory.engine.hasGroup(COMMUNITY)).resolves.toBe(false);
     });
 
     it('rejects an add a demoted member makes after the demotion', async () => {

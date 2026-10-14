@@ -23,6 +23,7 @@ const policy: MlsMembershipPolicy = {
   admits: (identityId) => members.has(identityId),
   allows: (change) => allows(change),
   frontier: () => [],
+  reach: () => 0,
 };
 const idOf = (name: string): string => cast[name].id;
 const idsOf = (...names: string[]): string[] => names.map(idOf).sort();
