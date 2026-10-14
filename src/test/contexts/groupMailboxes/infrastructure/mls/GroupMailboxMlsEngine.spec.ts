@@ -4,11 +4,10 @@ import { mock, type MockProxy } from 'jest-mock-extended';
 import type { MlsStateStore } from '../../../../../contexts/communities/infrastructure/mls/MlsStateStore';
 import type { GroupMailboxGenerationRepository } from '../../../../../contexts/groupMailboxes/domain/repositories/GroupMailboxGenerationRepository';
 
-import { IndexedDbMlsStateStore } from '../../../../../contexts/communities/infrastructure/mls/IndexedDbMlsStateStore';
 import { MlsRejectedError } from '../../../../../contexts/communities/infrastructure/mls/MlsRejectedError';
 import { GroupMailboxGeneration } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxGeneration';
-import { IndexedDbGroupMailboxGenerationStore } from '../../../../../contexts/groupMailboxes/infrastructure/indexeddb/IndexedDbGroupMailboxGenerationStore';
 import { GroupMailboxMlsEngine } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxMlsEngine';
+import { sealedGroupStores } from '../sealedGroupStores';
 
 const text = new TextEncoder();
 const read = (bytes: Uint8Array): string => new TextDecoder().decode(bytes);
@@ -27,12 +26,8 @@ const engine = (
 ): GroupMailboxMlsEngine =>
   new GroupMailboxMlsEngine(
     { deviceId, identityId },
-    store ?? new IndexedDbMlsStateStore(`${databaseName}-mls`, identityId),
-    generations ??
-      new IndexedDbGroupMailboxGenerationStore(
-        `${databaseName}-generations`,
-        identityId,
-      ),
+    store ?? sealedGroupStores(databaseName, identityId).state,
+    generations ?? sealedGroupStores(databaseName, identityId).generations,
     () => Promise.resolve(roster),
     () => clock,
   );
@@ -42,7 +37,7 @@ const flakyStore = (
   databaseName: string,
   identityId: string,
 ): MockProxy<MlsStateStore> => {
-  const backing = new IndexedDbMlsStateStore(`${databaseName}-mls`, identityId);
+  const backing = sealedGroupStores(databaseName, identityId).state;
   const store = mock<MlsStateStore>();
 
   store.deleteKeyPackage.mockImplementation((id) =>
@@ -194,10 +189,7 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
 
   it('still advances the generation when saving the log failed the first time', async () => {
     const generations = mock<GroupMailboxGenerationRepository>();
-    const backing = new IndexedDbGroupMailboxGenerationStore(
-      `flaky-${++database}`,
-      'bob',
-    );
+    const backing = sealedGroupStores(`flaky-${++database}`, 'bob').generations;
     generations.load.mockImplementation((id) => backing.load(id));
     generations.save.mockImplementation((id, log) => backing.save(id, log));
     const alice = engine('alice');
@@ -222,10 +214,10 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
 
   it('keeps its own removal uncommitted when saving the log fails', async () => {
     const generations = mock<GroupMailboxGenerationRepository>();
-    const backing = new IndexedDbGroupMailboxGenerationStore(
+    const backing = sealedGroupStores(
       `flaky-${++database}`,
       'alice',
-    );
+    ).generations;
     generations.load.mockImplementation((id) => backing.load(id));
     generations.save.mockImplementation((id, log) => backing.save(id, log));
     const alice = engine('alice', 'd1', `flaky-alice-${database}`, generations);

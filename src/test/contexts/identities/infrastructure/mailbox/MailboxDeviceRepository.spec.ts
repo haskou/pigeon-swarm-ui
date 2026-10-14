@@ -12,6 +12,7 @@ const session = { identity: { id: 'identity-a' } } as unknown as Session;
 const identityId = IdentityId.fromString('identity-a');
 
 type GroupForget = Pick<GroupConversationMailbox, 'forget'>;
+type CommunityForget = { forget(identityId: string): Promise<void> };
 
 describe(MailboxDeviceRepository.name, () => {
   it('releases the readers of the registered session', async () => {
@@ -24,6 +25,7 @@ describe(MailboxDeviceRepository.name, () => {
       contexts,
       mailbox,
       mock<GroupForget>(),
+      mock<CommunityForget>(),
     ).releaseReaders(identityId);
 
     expect(mailbox.releaseDeviceReaders).toHaveBeenCalledWith(session);
@@ -36,6 +38,7 @@ describe(MailboxDeviceRepository.name, () => {
       new IdentityAccessContexts(),
       mailbox,
       mock<GroupForget>(),
+      mock<CommunityForget>(),
     ).forgetHistory(identityId);
 
     expect(mailbox.forgetHistory).toHaveBeenCalledWith('identity-a');
@@ -48,20 +51,42 @@ describe(MailboxDeviceRepository.name, () => {
       new IdentityAccessContexts(),
       mailbox,
       mock<GroupForget>(),
+      mock<CommunityForget>(),
     ).cancelOutbox(identityId);
 
     expect(mailbox.cancelOutbox).toHaveBeenCalledWith('identity-a');
   });
 
-  it('forgets the local group state of the identity', async () => {
+  it('forgets the local group state and community MLS state of the identity', async () => {
     const groups = mock<GroupForget>();
+    const communities = mock<CommunityForget>();
 
     await new MailboxDeviceRepository(
       new IdentityAccessContexts(),
       mock<DirectMessageMailbox>(),
       groups,
+      communities,
     ).forgetGroups(identityId);
 
     expect(groups.forget).toHaveBeenCalledWith('identity-a');
+    expect(communities.forget).toHaveBeenCalledWith('identity-a');
+  });
+
+  it('still forgets the community MLS state, then rejects, when the group state cannot be deleted', async () => {
+    const groups = mock<GroupForget>();
+    const communities = mock<CommunityForget>();
+
+    groups.forget.mockRejectedValue(new Error('storage'));
+
+    await expect(
+      new MailboxDeviceRepository(
+        new IdentityAccessContexts(),
+        mock<DirectMessageMailbox>(),
+        groups,
+        communities,
+      ).forgetGroups(identityId),
+    ).rejects.toThrow('Group state could not be deleted.');
+
+    expect(communities.forget).toHaveBeenCalledWith('identity-a');
   });
 });

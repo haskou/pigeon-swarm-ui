@@ -1,20 +1,19 @@
 import { encodeBase64Url } from '../../../../shared/infrastructure/encoding/base64url';
-import { DeviceRootRowCipher } from '../../../messages/infrastructure/mailbox/DeviceRootRowCipher';
+import { DeviceRootRowCipher } from './DeviceRootRowCipher';
 
 /**
- * The keys of one identity's group history, derived by HKDF-SHA256 from the
- * device-sealed root: the row cipher, and an HMAC-SHA256 key whose tags
- * stand in for conversation and record ids at rest.
+ * The keys of one identity's rows in one local store, derived by HKDF-SHA256
+ * from the device-sealed root: the row cipher, and an HMAC-SHA256 key whose
+ * tags stand in for ids at rest.
  */
-export class GroupMessageHistoryKeys {
-  private static readonly LABEL = 'pigeon-group-history';
-
+export class DeviceRootRowKeys {
+  /** `label` names the store, e.g. `pigeon-group-history`. */
   public static async derive(
     root: Uint8Array,
+    label: string,
     identityId: string,
-  ): Promise<GroupMessageHistoryKeys> {
+  ): Promise<DeviceRootRowKeys> {
     const encoder = new TextEncoder();
-    const label = GroupMessageHistoryKeys.LABEL;
     const material = await crypto.subtle.importKey(
       'raw',
       new Uint8Array(root),
@@ -35,7 +34,7 @@ export class GroupMessageHistoryKeys {
       ['sign'],
     );
 
-    return new GroupMessageHistoryKeys(
+    return new DeviceRootRowKeys(
       await DeviceRootRowCipher.derive(root, label, identityId),
       tagKey,
     );

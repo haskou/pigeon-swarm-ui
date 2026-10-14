@@ -1,6 +1,7 @@
 import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
 import type { DeviceCredential } from '../../domain/value-objects/DeviceCredential';
+import type { DeviceSealedRoots } from '../crypto/DeviceSealedRoots';
 import type { Session } from '../session/Session';
 import type { DeviceSealedRootHandOver } from './DeviceSealedRootHandOver';
 import type { PigeonDeviceAuthorizationApi } from './PigeonDeviceAuthorizationApi';
@@ -13,14 +14,15 @@ import { DeviceSealedRootPayload } from '../crypto/DeviceSealedRootPayload';
 /**
  * Publishes and opens the device-sealed root of one identity. A generation
  * carries one root, sealed to every device at the head. Enrolment reseals the
- * same root; a revoke mints a fresh one. A device opens its own entry while it
- * matches its authorization revision. A stale session re-syncs once and never
- * mints a root itself: an entry still behind the head is only read as the
- * lagging root that a fresh one replaces. A device with no entry mints only
- * after the identity keychain head reads: a head sealed under a root this
- * device cannot open blocks the mint, so that keychain is not stranded. A
- * device that forgets itself hands a fresh root, with the root it replaces,
- * to the devices that remain, inside its own retirement.
+ * same root; a revoke mints a fresh one and carries the root it replaces, so
+ * the devices left move their local state off it. A device opens its own
+ * entry while it matches its authorization revision. A stale session re-syncs
+ * once and never mints a root itself: an entry still behind the head is only
+ * read as the lagging root that a fresh one replaces. A device with no entry
+ * mints only after the identity keychain head reads: a head sealed under a
+ * root this device cannot open blocks the mint, so that keychain is not
+ * stranded. A device that forgets itself hands a fresh root, with the root it
+ * replaces, to the devices that remain, inside its own retirement.
  */
 export class DeviceSealedRootRotation {
   public constructor(
@@ -36,10 +38,10 @@ export class DeviceSealedRootRotation {
 
   private async publishWithRetry(
     session: Session,
-    root: SymmetricKey,
+    roots: DeviceSealedRoots,
   ): Promise<Session> {
     try {
-      return await this.publish(session, root);
+      return await this.publish(session, roots);
     } catch (error: unknown) {
       if (!(error instanceof HttpJsonError) || error.status !== 409) {
         throw error;
@@ -47,37 +49,39 @@ export class DeviceSealedRootRotation {
 
       return await this.publish(
         await this.deviceAuthorization.synchronize(session),
-        root,
+        roots,
       );
     }
   }
 
   private async publish(
     session: Session,
-    root: SymmetricKey,
+    roots: DeviceSealedRoots,
   ): Promise<Session> {
     const own = await this.sealedSecrets.fetchOwn(session);
     const recipients = await this.deviceAuthorization.findDevices(session);
 
     await this.sealedSecrets.publish(session, {
       generation: this.nextGeneration(own?.generation),
-      payload: DeviceSealedRootPayload.encode({ root }),
+      payload: DeviceSealedRootPayload.encode(roots),
       recipients,
     });
 
-    return { ...session, deviceSealedRootKey: root };
+    return { ...session, deviceSealedRootKey: roots.root };
   }
 
   /**
    * Publishes a new generation with a fresh root and returns the session
-   * holding it, with the root it replaces kept as the previous root. A
-   * conflicting publish refetches the head once and publishes again.
+   * holding it, with the root it replaces kept as the previous root. The
+   * replaced root rides sealed to the devices at the session's revision, which
+   * all held it; a revoked device is no longer among them. A conflicting
+   * publish refetches the head once and publishes again.
    */
   public async rotate(session: Session): Promise<Session> {
-    const rotated = await this.publishWithRetry(
-      session,
-      SymmetricKey.generate(),
-    );
+    const rotated = await this.publishWithRetry(session, {
+      previous: session.deviceSealedRootKey,
+      root: SymmetricKey.generate(),
+    });
 
     return {
       ...rotated,
@@ -87,10 +91,11 @@ export class DeviceSealedRootRotation {
 
   /**
    * Publishes an existing root at a new generation, so enrolment keeps the
-   * keychain readable under the same root.
+   * keychain readable under the same root. No previous root rides along: the
+   * enrolled device never held it.
    */
   public async reseal(session: Session, root: SymmetricKey): Promise<void> {
-    await this.publishWithRetry(session, root);
+    await this.publishWithRetry(session, { root });
   }
 
   /**

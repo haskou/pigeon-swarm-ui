@@ -3,6 +3,7 @@ import type { GroupConversationPorts } from './GroupConversationPorts';
 import type { GroupConversationStores } from './GroupConversationStores';
 
 import { IndexedDbMlsStateStore } from '../../communities/infrastructure/mls/IndexedDbMlsStateStore';
+import { DeviceSealedEntryStore } from '../../messages/infrastructure/mailbox/DeviceSealedEntryStore';
 import { GroupMailboxControl } from './control/GroupMailboxControl';
 import { GroupMailboxNotificationPump } from './control/GroupMailboxNotificationPump';
 import { GroupMailboxInboxSync } from './inbox/GroupMailboxInboxSync';
@@ -20,15 +21,23 @@ export class GroupConversationMember {
     const identityId = session.identity.id;
     const rosterFor = (conversationId: string) =>
       ports.roster(session, conversationId);
+    // Local state seals under the latest root, as after a revoke rotated it.
+    const sealing = { session };
     const engine = new GroupMailboxMlsEngine(
       { deviceId: String(session.deviceId), identityId },
       new IndexedDbMlsStateStore(
-        stores.database('mls', identityId),
-        identityId,
+        new DeviceSealedEntryStore(
+          stores.database('mls', identityId),
+          'pigeon-group-mls',
+        ),
+        () => sealing.session,
       ),
       new IndexedDbGroupMailboxGenerationStore(
-        stores.database('generations', identityId),
-        identityId,
+        new DeviceSealedEntryStore(
+          stores.database('generations', identityId),
+          'pigeon-group-generations',
+        ),
+        () => sealing.session,
       ),
       rosterFor,
       ports.now,
@@ -51,6 +60,7 @@ export class GroupConversationMember {
 
     return new GroupConversationMember(
       session,
+      sealing,
       engine,
       control,
       outbox,
@@ -74,12 +84,18 @@ export class GroupConversationMember {
 
   private constructor(
     public readonly session: Session,
+    private readonly sealing: { session: Session },
     public readonly engine: GroupMailboxMlsEngine,
     public readonly control: GroupMailboxControl,
     public readonly outbox: GroupMailboxOutbox,
     public readonly pump: GroupMailboxNotificationPump,
     public readonly inbox: GroupMailboxInboxSync,
   ) {}
+
+  /** Seals the local state under this session's root from now on. */
+  public follow(session: Session): void {
+    this.sealing.session = session;
+  }
 
   /** Stops background delivery and pending key package requests. */
   public close(): void {

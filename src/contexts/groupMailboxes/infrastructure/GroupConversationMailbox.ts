@@ -48,7 +48,11 @@ export class GroupConversationMailbox {
     const identityId = session.identity.id;
     const known = this.members.get(identityId);
 
-    if (known) return known;
+    if (known) {
+      known.follow(session);
+
+      return known;
+    }
     const opened = GroupConversationMember.open(
       session,
       this.ports,
