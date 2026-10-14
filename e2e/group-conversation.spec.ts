@@ -234,8 +234,8 @@ test('both devices of an identity read a group; a revoked one stops reading', as
       phone.getByText('after the revoke', { exact: true }),
     ).toBeVisible({ timeout: SLOW });
 
-    // The revoked laptop keeps its old root and keeps polling; the plaintext
-    // must never show.
+    // The revoked laptop keeps its old root and keeps polling until its own
+    // removal check signs it out; the plaintext must never show.
     await laptop.waitForTimeout(60_000);
     await expect(laptop.getByText('after the revoke')).toHaveCount(0);
 

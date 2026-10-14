@@ -15,9 +15,10 @@ import {
   type TestIdentity,
 } from './support/pigeonApp';
 
-// How long the revoked device keeps syncing after the surviving device has
-// shown the post-revoke message, before the test checks it never showed it.
-const REVOKED_SYNC_WINDOW_MS = 20_000;
+// How often a signed-in device re-reads its signed transitions, as
+// DeviceRemovalWatch.CHECK_INTERVAL_MS, plus slack for the read itself.
+const REMOVAL_CHECK_BOUND_MS = 30_000;
+const REMOVAL_CHECK_SLACK_MS = 15_000;
 // How long each reader removal is held, so the cut-off of the revoked device
 // lags well behind the revoke, as on a slow link.
 const READER_REMOVAL_DELAY_MS = 8_000;
@@ -70,9 +71,11 @@ test('locks a revoked device out of the direct messages sent after the revoke', 
       timeout: 45_000,
     });
 
-    // The revoke is reported done only once the laptop is cut off, so a
-    // message sent right after it never reaches the laptop, however slow the
-    // cut-off is.
+    // While its transition reads are refused, the revoked laptop cannot prove
+    // the revoke, so it stays signed in and keeps syncing, yet the revoke is
+    // reported done only once the laptop is cut off, so a message sent right
+    // after it never reaches the laptop, however slow the cut-off is.
+    const refusedReads = await refuseTransitions(laptop);
     await slowReaderRemovals(phone);
     await revokeOtherDevice(phone);
     await phone.getByRole('button', { name: 'Close dialog' }).last().click();
@@ -83,20 +86,26 @@ test('locks a revoked device out of the direct messages sent after the revoke', 
       timeout: 45_000,
     });
 
-    // The revoked laptop keeps its old root and the conversation secret, and
-    // keeps syncing the open conversation, yet never shows the new message.
-    await laptop.waitForTimeout(REVOKED_SYNC_WINDOW_MS);
+    const refusedBefore = refusedReads.count;
+    await laptop.waitForTimeout(
+      REMOVAL_CHECK_BOUND_MS + REMOVAL_CHECK_SLACK_MS,
+    );
+    expect(refusedReads.count).toBeGreaterThan(refusedBefore);
     await expect(laptop.getByText(beforeRevoke, { exact: true })).toBeVisible();
     await expect(laptop.getByText(afterRevoke, { exact: true })).toHaveCount(0);
+    await expect(
+      laptop.getByText('This device was removed from your account.'),
+    ).toHaveCount(0);
     await expect.poll(() => storedHistoryRows(laptop)).toBeGreaterThan(0);
     await phone.unrouteAll({ behavior: 'wait' });
 
-    // On its next sign-in the laptop reads the signed transitions, verifies
-    // the revocation the phone signed, and erases what it stored for Bob.
-    await signIn(laptop, bob);
+    // Once the read goes through, the still signed-in laptop verifies the
+    // revocation the phone signed within the bound, erases what it stored
+    // for Bob, and falls back to the login screen.
+    await laptop.unrouteAll({ behavior: 'wait' });
     await expect(
       laptop.getByText('This device was removed from your account.'),
-    ).toBeVisible({ timeout: 45_000 });
+    ).toBeVisible({ timeout: REMOVAL_CHECK_BOUND_MS + REMOVAL_CHECK_SLACK_MS });
     await expect(
       laptop.getByText('were erased from this browser', { exact: false }),
     ).toBeVisible();
@@ -105,8 +114,19 @@ test('locks a revoked device out of the direct messages sent after the revoke', 
     await expect(laptop.getByTestId('auth-identity-preview')).toHaveCount(0);
 
     // A node can refuse the read or forge a removal of a device that is still
-    // authorized. Neither is a signed removal, so the phone erases nothing.
+    // authorized. Neither is a signed removal, so the phone erases nothing,
+    // whether it is signed in or signing in.
     await expect.poll(() => storedHistoryRows(phone)).toBeGreaterThan(0);
+    const forgedReads = await forgeRevocation(phone);
+    await phone.waitForTimeout(REMOVAL_CHECK_BOUND_MS + REMOVAL_CHECK_SLACK_MS);
+    expect(forgedReads.count).toBeGreaterThan(0);
+    await expect(
+      phone.getByText('This device was removed from your account.'),
+    ).toHaveCount(0);
+    await expect(phone.getByText(afterRevoke, { exact: true })).toBeVisible();
+    expect(await storedHistoryRows(phone)).toBeGreaterThan(0);
+    await phone.unrouteAll({ behavior: 'wait' });
+
     for (const [forgery, refusal] of [
       [refuseTransitions, 'The signed request was rejected.'],
       [
@@ -164,26 +184,41 @@ async function slowReaderRemovals(page: Page): Promise<void> {
 
 const TRANSITIONS_PATH = /\/identity-devices\/[^/]+\/transitions$/;
 
-/** Rejects the device-signed transition read, as a lying node could. */
-async function refuseTransitions(page: Page): Promise<void> {
+/**
+ * Rejects the device-signed transition read, as a lying node could. Counts
+ * the reads it rejected.
+ */
+async function refuseTransitions(page: Page): Promise<{ count: number }> {
+  const reads = { count: 0 };
+
   await page.route(
     (url) => TRANSITIONS_PATH.test(url.pathname),
-    (route) =>
-      route.fulfill({
+    (route) => {
+      reads.count += 1;
+
+      return route.fulfill({
         json: { code: 401020, message: 'Invalid signed request' },
         status: 401,
-      }),
+      });
+    },
   );
+
+  return reads;
 }
 
 /**
  * Serves the genuine transitions plus a revocation of this device that reuses
  * the signature of the real revocation: a removal no authorized key signed.
+ * Counts the reads it forged.
  */
-async function forgeRevocation(page: Page): Promise<void> {
+async function forgeRevocation(page: Page): Promise<{ count: number }> {
+  const reads = { count: 0 };
+
   await page.route(
     (url) => TRANSITIONS_PATH.test(url.pathname),
     async (route) => {
+      reads.count += 1;
+
       const response = await route.fetch();
       const log = (await response.json()) as {
         transitions: Array<Record<string, unknown>>;
@@ -218,6 +253,8 @@ async function forgeRevocation(page: Page): Promise<void> {
       });
     },
   );
+
+  return reads;
 }
 
 function testRunToken(projectName: string): string {

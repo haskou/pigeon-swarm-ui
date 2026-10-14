@@ -10,9 +10,16 @@ import {
   lastConversationStorageKey,
   workspaceStorageKey,
 } from '../../../app/presentation/workspace/components/workspacePersistence';
+import {
+  clearLastLoginIdentity,
+  loadLastLoginIdentity,
+} from '../../../contexts/identities/infrastructure/storage/lastLoginIdentity';
 import { clearProjectedMessageCaches } from '../../../shared/infrastructure/storage/clearProjectedMessageCaches';
 
 jest.mock('../../../shared/infrastructure/storage/clearProjectedMessageCaches');
+jest.mock(
+  '../../../contexts/identities/infrastructure/storage/lastLoginIdentity',
+);
 
 function services(): {
   directMessages: MockProxy<RemovedDeviceServices['directMessages']>;
@@ -188,5 +195,40 @@ describe('eraseRemovedDevice', () => {
     expect(removed.identities.discardDeviceSealedRecovery).toHaveBeenCalledWith(
       'identity-1',
     );
+  });
+
+  it('forgets the removed identity as the one this browser signs in to, once everything else is erased', async () => {
+    jest.mocked(loadLastLoginIdentity).mockReturnValue('identity-1');
+
+    await expect(eraseRemovedDevice('identity-1', services())).resolves.toBe(
+      true,
+    );
+
+    expect(clearLastLoginIdentity).toHaveBeenCalled();
+  });
+
+  it('keeps the removed identity remembered when the erase failed, so the next sign-in proves the removal again', async () => {
+    const removed = services();
+
+    jest.mocked(loadLastLoginIdentity).mockReturnValue('identity-1');
+    removed.identities.forgetDeviceUnlock.mockRejectedValue(
+      new Error('storage'),
+    );
+
+    await expect(eraseRemovedDevice('identity-1', removed)).resolves.toBe(
+      false,
+    );
+
+    expect(clearLastLoginIdentity).not.toHaveBeenCalled();
+  });
+
+  it('keeps another identity remembered', async () => {
+    jest.mocked(loadLastLoginIdentity).mockReturnValue('identity-2');
+
+    await expect(eraseRemovedDevice('identity-1', services())).resolves.toBe(
+      true,
+    );
+
+    expect(clearLastLoginIdentity).not.toHaveBeenCalled();
   });
 });
