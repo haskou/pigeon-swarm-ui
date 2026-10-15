@@ -436,8 +436,11 @@ private. There is no switch to turn call E2EE off.
   answer a private call: the check runs before the microphone prompt and
   before the node is asked, and an incoming call is declined. The refusal
   asks to update the browser or use another one; it names no browser.
-- A frame transform that cannot be attached stops that sender's or receiver's
-  media instead of letting it through unencrypted.
+- If a frame transform cannot be attached, or the encryption worker fails,
+  the call's media cipher fails for good. That sender's or receiver's media
+  is stopped instead of passing unencrypted, and no local track is added to
+  a peer again. The call then announces no encrypted media and admits no
+  peer, and its remote tiles stop showing E2EE as active.
 - A device with no key for the call (no conversation key, or no community
   group) finds out only once the node has created or joined the call. It
   leaves the call at once and shows the reason. Until the leave lands, the

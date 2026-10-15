@@ -3,6 +3,7 @@ import type { EncodedCallMediaFrame } from './EncodedCallMediaFrame';
 import type { EncodedCallMediaFrameStreams } from './EncodedCallMediaFrameStreams';
 import type { EncodedCallMediaStreamOwner } from './EncodedCallMediaStreamOwner';
 
+import { logCallError } from './callDebugLogger';
 import { CallMediaFrameCodec } from './CallMediaFrameCodec';
 
 function isEncodedStreamOwner(
@@ -27,16 +28,21 @@ export class EncodedStreamsCallMediaCipher implements CallMediaCipher {
 
   private readonly configuredSenders = new WeakSet<RTCRtpSender>();
 
-  private static configureEncodedStreams(
-    owner: EncodedCallMediaStreamOwner,
+  private hasFailed = false;
+
+  /** Pipes `owner`'s encoded frames through `transform`, if it lets it. */
+  private static pipeEncodedStreams(
+    owner: unknown,
     transform: TransformStream<EncodedCallMediaFrame, EncodedCallMediaFrame>,
   ): boolean {
     let streams: EncodedCallMediaFrameStreams | undefined;
 
     try {
-      streams = owner.createEncodedStreams?.();
-    } catch {
-      return false;
+      streams = isEncodedStreamOwner(owner)
+        ? owner.createEncodedStreams?.()
+        : undefined;
+    } catch (error) {
+      logCallError('peer-manager:media-encryption:transform-failed', error);
     }
 
     if (!streams) return false;
@@ -67,30 +73,43 @@ export class EncodedStreamsCallMediaCipher implements CallMediaCipher {
     );
   }
 
-  public configureReceiver(receiver: RTCRtpReceiver): void {
-    if (this.configuredReceivers.has(receiver)) return;
+  private pipe<Owner extends object>(
+    owner: Owner,
+    configured: WeakSet<Owner>,
+    transform: () => TransformStream<
+      EncodedCallMediaFrame,
+      EncodedCallMediaFrame
+    >,
+  ): boolean {
+    if (this.hasFailed) return false;
 
-    if (!isEncodedStreamOwner(receiver)) return;
+    if (configured.has(owner)) return true;
 
-    const configured = EncodedStreamsCallMediaCipher.configureEncodedStreams(
-      receiver,
-      this.codec.receiverTransform(),
-    );
+    if (!EncodedStreamsCallMediaCipher.pipeEncodedStreams(owner, transform())) {
+      this.hasFailed = true;
 
-    if (configured) this.configuredReceivers.add(receiver);
+      return false;
+    }
+
+    configured.add(owner);
+
+    return true;
   }
 
-  public configureSender(sender: RTCRtpSender): void {
-    if (this.configuredSenders.has(sender)) return;
+  public get failed(): boolean {
+    return this.hasFailed;
+  }
 
-    if (!isEncodedStreamOwner(sender)) return;
+  public configureReceiver(receiver: RTCRtpReceiver): boolean {
+    return this.pipe(receiver, this.configuredReceivers, () =>
+      this.codec.receiverTransform(),
+    );
+  }
 
-    const configured = EncodedStreamsCallMediaCipher.configureEncodedStreams(
-      sender,
+  public configureSender(sender: RTCRtpSender): boolean {
+    return this.pipe(sender, this.configuredSenders, () =>
       this.codec.senderTransform(),
     );
-
-    if (configured) this.configuredSenders.add(sender);
   }
 
   public dispose(): void {

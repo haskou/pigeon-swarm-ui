@@ -4,6 +4,13 @@ import { EncodedStreamsCallMediaCipher } from '../../../../../contexts/calls/inf
 
 type EncodedFrame = RTCEncodedAudioFrame | RTCEncodedVideoFrame;
 
+function emptyEncodedStreams(): {
+  readable: ReadableStream<EncodedFrame>;
+  writable: WritableStream<EncodedFrame>;
+} {
+  return { readable: new ReadableStream(), writable: new WritableStream() };
+}
+
 /** The frames `configure` lets through `frames`, once all are handled. */
 async function piped(
   frames: readonly Uint8Array[],
@@ -94,16 +101,44 @@ describe(EncodedStreamsCallMediaCipher.name, () => {
     ).toEqual({ encodedInsertableStreams: true, iceServers: [] });
   });
 
-  it('does not throw when encoded streams are rejected by the browser', () => {
+  it.each([
+    [
+      'rejects encoded streams',
+      {
+        createEncodedStreams: () => {
+          throw new Error('Encoded insertable streams are disabled.');
+        },
+      },
+    ],
+    ['has no encoded streams', {}],
+  ])('fails when the browser %s', (_case, sender) => {
+    const cipher = new EncodedStreamsCallMediaCipher(
+      SymmetricKey.generate().valueOf(),
+    );
+
+    expect(cipher.failed).toBe(false);
+    expect(cipher.configureSender(sender as RTCRtpSender)).toBe(false);
+    expect(cipher.failed).toBe(true);
+  });
+
+  it('encrypts nothing once it has failed, not even what it already did', () => {
     const cipher = new EncodedStreamsCallMediaCipher(
       SymmetricKey.generate().valueOf(),
     );
     const sender = {
-      createEncodedStreams: jest.fn(() => {
-        throw new Error('Encoded insertable streams are disabled.');
-      }),
+      createEncodedStreams: jest.fn(emptyEncodedStreams),
     } as unknown as RTCRtpSender;
+    const createReceiverStreams = jest.fn(emptyEncodedStreams);
 
-    expect(() => cipher.configureSender(sender)).not.toThrow();
+    expect(cipher.configureSender(sender)).toBe(true);
+    cipher.configureReceiver({} as RTCRtpReceiver);
+
+    expect(cipher.configureSender(sender)).toBe(false);
+    expect(
+      cipher.configureReceiver({
+        createEncodedStreams: createReceiverStreams,
+      } as unknown as RTCRtpReceiver),
+    ).toBe(false);
+    expect(createReceiverStreams).not.toHaveBeenCalled();
   });
 });

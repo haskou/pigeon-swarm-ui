@@ -29,6 +29,13 @@ export class CallLocalTracks {
       return;
     }
 
+    this.addTrack(peer, track);
+  }
+
+  private addTrack(peer: RTCPeerConnection, track: MediaStreamTrack): void {
+    // A private call this browser failed to encrypt sends nothing more.
+    if (this.encryption.failed) return;
+
     this.configureSender(
       peer.addTrack(
         track,
@@ -155,12 +162,7 @@ export class CallLocalTracks {
         readyState: track.readyState,
       });
 
-      this.configureSender(
-        peer.addTrack(
-          track,
-          this.screenShareStreams.localStreamFor(track, this.localStream),
-        ),
-      );
+      this.addTrack(peer, track);
     });
   }
 

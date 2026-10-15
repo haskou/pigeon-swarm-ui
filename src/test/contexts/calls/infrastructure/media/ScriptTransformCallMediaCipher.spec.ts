@@ -56,17 +56,22 @@ function installScriptTransformSupport(): ScriptTransformSupport {
 }
 
 function fakeSender(): RTCRtpSender {
-  return {
-    replaceTrack: jest.fn(() => Promise.resolve()),
-    transform: null,
-  } as unknown as RTCRtpSender;
+  return { transform: null } as unknown as RTCRtpSender;
 }
 
 function fakeReceiver(): RTCRtpReceiver {
-  return {
-    track: { stop: jest.fn() },
-    transform: null,
-  } as unknown as RTCRtpReceiver;
+  return { transform: null } as unknown as RTCRtpReceiver;
+}
+
+/** `owner` as the browser hands it over when it will not transform it. */
+function refusingTransform<Owner extends RTCRtpReceiver | RTCRtpSender>(
+  owner: Owner,
+): Owner {
+  return Object.defineProperty(owner, 'transform', {
+    set(): void {
+      throw new DOMException('Transform in use.', 'InvalidStateError');
+    },
+  });
 }
 
 function workerErrorListener(worker: MockProxy<Worker>): EventListener {
@@ -150,8 +155,7 @@ describe(ScriptTransformCallMediaCipher.name, () => {
     );
     const sender = fakeSender();
 
-    cipher.configureSender(sender);
-
+    expect(cipher.configureSender(sender)).toBe(true);
     expect(ScriptTransform).toHaveBeenCalledWith(worker, { side: 'send' });
     expect(sender.transform).toBe(ScriptTransform.mock.results[0].value);
   });
@@ -163,8 +167,7 @@ describe(ScriptTransformCallMediaCipher.name, () => {
     );
     const receiver = fakeReceiver();
 
-    cipher.configureReceiver(receiver);
-
+    expect(cipher.configureReceiver(receiver)).toBe(true);
     expect(ScriptTransform).toHaveBeenCalledWith(worker, { side: 'receive' });
     expect(receiver.transform).toBe(ScriptTransform.mock.results[0].value);
   });
@@ -185,38 +188,56 @@ describe(ScriptTransformCallMediaCipher.name, () => {
     expect(ScriptTransform).toHaveBeenCalledTimes(2);
   });
 
-  it('stops sending media the browser will not encrypt', () => {
+  it('fails when the browser will not encrypt a sender', () => {
     installScriptTransformSupport();
+    const cipher = new ScriptTransformCallMediaCipher(
+      SymmetricKey.generate().valueOf(),
+    );
+
+    expect(cipher.configureSender(refusingTransform(fakeSender()))).toBe(false);
+    expect(cipher.failed).toBe(true);
+  });
+
+  it('fails when the browser will not decrypt a receiver', () => {
+    installScriptTransformSupport();
+    const cipher = new ScriptTransformCallMediaCipher(
+      SymmetricKey.generate().valueOf(),
+    );
+
+    expect(cipher.configureReceiver(refusingTransform(fakeReceiver()))).toBe(
+      false,
+    );
+    expect(cipher.failed).toBe(true);
+  });
+
+  it('encrypts nothing once it has failed, not even what it already did', () => {
+    const { ScriptTransform } = installScriptTransformSupport();
     const cipher = new ScriptTransformCallMediaCipher(
       SymmetricKey.generate().valueOf(),
     );
     const sender = fakeSender();
 
-    Object.defineProperty(sender, 'transform', {
-      set(): void {
-        throw new DOMException('Transform in use.', 'InvalidStateError');
-      },
-    });
+    cipher.configureSender(sender);
+    cipher.configureSender(refusingTransform(fakeSender()));
 
-    expect(() => cipher.configureSender(sender)).not.toThrow();
-    expect(sender.replaceTrack).toHaveBeenCalledWith(null);
+    expect(cipher.configureSender(sender)).toBe(false);
+    expect(cipher.configureSender(fakeSender())).toBe(false);
+    expect(cipher.configureReceiver(fakeReceiver())).toBe(false);
+    expect(ScriptTransform).toHaveBeenCalledTimes(2);
   });
 
-  it('stops playing media the browser will not decrypt', () => {
-    installScriptTransformSupport();
+  it('fails when its worker fails', () => {
+    const { ScriptTransform, worker } = installScriptTransformSupport();
     const cipher = new ScriptTransformCallMediaCipher(
       SymmetricKey.generate().valueOf(),
     );
-    const receiver = fakeReceiver();
 
-    Object.defineProperty(receiver, 'transform', {
-      set(): void {
-        throw new DOMException('Transform in use.', 'InvalidStateError');
-      },
-    });
+    expect(cipher.failed).toBe(false);
+    workerErrorListener(worker)(new Event('error'));
 
-    expect(() => cipher.configureReceiver(receiver)).not.toThrow();
-    expect(receiver.track.stop).toHaveBeenCalled();
+    expect(cipher.failed).toBe(true);
+    expect(cipher.configureSender(fakeSender())).toBe(false);
+    expect(ScriptTransform).not.toHaveBeenCalled();
   });
 
   it('terminates its worker when disposed', () => {
