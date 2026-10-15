@@ -4,6 +4,7 @@ import type { PigeonCallsApi } from '../../../../../contexts/calls/infrastructur
 import type { CallResource } from '../../../../../contexts/calls/infrastructure/http/resources/CallResource';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
+import { GroupCallCannotBeStartedError } from '../../../../../contexts/calls/domain/errors/GroupCallCannotBeStartedError';
 import { CallId } from '../../../../../contexts/calls/domain/value-objects/CallId';
 import { CallIdentityId } from '../../../../../contexts/calls/domain/value-objects/CallIdentityId';
 import { CallScope } from '../../../../../contexts/calls/domain/value-objects/CallScope';
@@ -103,5 +104,32 @@ describe(PigeonCallRepository.name, () => {
       'channel-a',
       10,
     );
+  });
+
+  it('refuses to start a group-capability call, which this client does not offer', async () => {
+    const session = { identity: { id: 'identity-a' } } as Session;
+    const api = {
+      startCommunityChannel: jest.fn(),
+      startConversation: jest.fn(),
+    } as unknown as jest.Mocked<PigeonCallsApi>;
+    const contexts = new CallAccessContexts();
+    contexts.register(session);
+    const repository = new PigeonCallRepository(
+      api,
+      contexts,
+      new CallMapper(),
+    );
+
+    await expect(
+      repository.create(
+        CallScope.groupCapability(
+          CallScopeIdentifier.fromString('a'.repeat(64)),
+        ),
+        CallIdentityId.fromString('identity-a'),
+        new Timestamp(10),
+      ),
+    ).rejects.toThrow(new GroupCallCannotBeStartedError());
+    expect(api.startConversation).not.toHaveBeenCalled();
+    expect(api.startCommunityChannel).not.toHaveBeenCalled();
   });
 });
