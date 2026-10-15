@@ -99,7 +99,7 @@ describe(confirmRecoveredCallAbsence.name, () => {
     expect(onEnded).toHaveBeenCalledTimes(1);
   });
 
-  it('ends the call when the current identity is no longer joined', async () => {
+  it('ends the call when the current identity has left it', async () => {
     const { onEnded } = start(
       jest.fn().mockResolvedValue(callWith('active', 'left')),
     );

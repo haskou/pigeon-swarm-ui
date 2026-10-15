@@ -23,21 +23,32 @@ function provesCallIsGone(caught: unknown): boolean {
   );
 }
 
-function stillJoined(call: CallResource, identityId: string): boolean {
-  return (
-    call.status !== 'ended' &&
-    call.participants.some(
-      (participant) =>
-        participant.identityId === identityId &&
-        participant.status === 'joined',
-    )
-  );
+/**
+ * Only an ended call or an explicit departure of the current identity proves
+ * the call is gone. This device holds the call, so it had joined it: a node
+ * that still reads the identity as ringing, or does not list it, has not
+ * replayed or heard that join yet after a restart.
+ */
+function recoveredCallState(
+  call: CallResource,
+  identityId: string,
+): 'gone' | 'joined' | 'pending' {
+  if (call.status === 'ended') return 'gone';
+
+  const status = call.participants.find(
+    (participant) => participant.identityId === identityId,
+  )?.status;
+
+  if (status === 'joined') return 'joined';
+
+  return status === undefined || status === 'ringing' ? 'pending' : 'gone';
 }
 
 /**
  * A recovered call list is only a snapshot: after a node restart it can omit
  * a call whose records are still pending. Confirm the absence by id before
- * ending the call. Not-ready and transient errors keep the call and retry with
+ * ending the call. Not-ready and transient errors, and a call that does not
+ * show the current identity as joined yet, keep the call and retry with
  * backoff. Retries are bounded: once confirmation has been pending longer
  * than `maxPendingMs`, a call whose media is no longer alive is ended, so a
  * peer that keeps the records pending cannot hold a dead call open.
@@ -66,12 +77,27 @@ export function confirmRecoveredCallAbsence({
   function check(): void {
     if (stopped) return;
 
+    const retryOrEnd = (proofOfGone: boolean): void => {
+      if (
+        proofOfGone ||
+        (Date.now() - startedAt >= maxPendingMs && !isMediaAlive())
+      ) {
+        end();
+
+        return;
+      }
+      retryTimer = setTimeout(check, retryDelayMs);
+      retryDelayMs = Math.min(retryDelayMs * 2, maxRetryDelayMs);
+    };
+
     getCall(callId).then(
       (call) => {
         if (stopped) return;
 
-        if (!stillJoined(call, currentIdentityId)) {
-          end();
+        const state = recoveredCallState(call, currentIdentityId);
+
+        if (state !== 'joined') {
+          retryOrEnd(state === 'gone');
 
           return;
         }
@@ -81,16 +107,7 @@ export function confirmRecoveredCallAbsence({
       (caught: unknown) => {
         if (stopped) return;
 
-        if (
-          provesCallIsGone(caught) ||
-          (Date.now() - startedAt >= maxPendingMs && !isMediaAlive())
-        ) {
-          end();
-
-          return;
-        }
-        retryTimer = setTimeout(check, retryDelayMs);
-        retryDelayMs = Math.min(retryDelayMs * 2, maxRetryDelayMs);
+        retryOrEnd(provesCallIsGone(caught));
       },
     );
   }
