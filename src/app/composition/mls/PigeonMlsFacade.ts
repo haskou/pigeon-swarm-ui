@@ -379,15 +379,6 @@ export class PigeonMlsFacade {
     return await this.engineFor(session).credentials(groupId);
   }
 
-  public async exportSecret(
-    session: Session,
-    groupId: string,
-    label: string,
-    context: string,
-  ): Promise<Uint8Array> {
-    return await this.engineFor(session).exportSecret(groupId, label, context);
-  }
-
   /** The community's operations, each verified against its author's key. */
   public async communityOperations(
     session: Session,
