@@ -11,7 +11,12 @@ import type { PigeonMailboxClient } from '../../../../../contexts/mailboxes/infr
 import type { DirectMessageReaderSet } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageReaderSet';
 
 import { IndexedDbMlsStateStore } from '../../../../../contexts/communities/infrastructure/mls/IndexedDbMlsStateStore';
+import { ConversationIdFactory } from '../../../../../contexts/conversations/domain/ConversationIdFactory';
+import { ConversationGroupNonce } from '../../../../../contexts/conversations/domain/value-objects/ConversationGroupNonce';
+import { ConversationNetworkId } from '../../../../../contexts/conversations/domain/value-objects/ConversationNetworkId';
+import { ConversationParticipantId } from '../../../../../contexts/conversations/domain/value-objects/ConversationParticipantId';
 import { GroupMailboxGeneration } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxGeneration';
+import { GroupMailboxGenesis } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxGenesis';
 import { GroupMailboxRoster } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxRoster';
 import { GroupMailboxControl } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControl';
 import { GroupMailboxControlRecord } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlRecord';
@@ -32,8 +37,12 @@ import { DirectMessageMailboxRecord } from '../../../../../contexts/messages/inf
 import { MlsTestIdentity } from '../../../communities/infrastructure/mls/MlsTestIdentity';
 import { sealedGroupStores } from '../sealedGroupStores';
 
-const CONVERSATION = 'conversation-1';
+const NETWORK = 'network-1';
+const NONCE = 'AAAAAAAAAAAAAAAAAAAAAA';
 const MARKER = 'group-plaintext-4c1f';
+
+/** The group id alice creates from the genesis naming her. */
+let CONVERSATION: string;
 
 type Member = {
   control: GroupMailboxControl;
@@ -197,6 +206,7 @@ const member = (name: string): Member => {
     stores.generations,
     () => Promise.resolve(roster),
     () => Promise.resolve([cast[name].deviceCredential()]),
+    () => [],
     () => now,
   );
   const rows = new Map<string, GroupMailboxOutboxRow>();
@@ -440,6 +450,8 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
   let alice: Member;
   let bob: Member;
   let carol: Member;
+  /** The preimage of the group id alice creates. */
+  let genesis: GroupMailboxGenesis;
 
   beforeAll(async () => {
     cast = await MlsTestIdentity.cast([
@@ -449,6 +461,18 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
       'dave',
       'mallory',
     ]);
+    CONVERSATION = new ConversationIdFactory()
+      .createGroup(
+        ConversationParticipantId.fromString(id('alice')),
+        ConversationNetworkId.fromString(NETWORK),
+        ConversationGroupNonce.fromString(NONCE),
+      )
+      .toString();
+    genesis = GroupMailboxGenesis.of(CONVERSATION, {
+      creatorIdentityId: id('alice'),
+      networkId: NETWORK,
+      nonce: NONCE,
+    })!;
   });
 
   beforeEach(async () => {
@@ -460,6 +484,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
     alice = member('alice');
     bob = member('bob');
     carol = member('carol');
+    await alice.engine.learnGenesis(genesis);
     await alice.engine.createGroup(CONVERSATION);
     await sync(alice);
     await add(alice, [bob, carol]);

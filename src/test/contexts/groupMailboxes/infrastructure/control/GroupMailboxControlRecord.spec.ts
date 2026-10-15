@@ -1,5 +1,10 @@
 import type { GroupMailboxControlFields } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlFields';
 
+import { ConversationIdFactory } from '../../../../../contexts/conversations/domain/ConversationIdFactory';
+import { ConversationGroupNonce } from '../../../../../contexts/conversations/domain/value-objects/ConversationGroupNonce';
+import { ConversationNetworkId } from '../../../../../contexts/conversations/domain/value-objects/ConversationNetworkId';
+import { ConversationParticipantId } from '../../../../../contexts/conversations/domain/value-objects/ConversationParticipantId';
+import { GroupMailboxGenesis } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxGenesis';
 import { GroupMailboxControlRecord } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlRecord';
 
 const REQUEST_ID = 'AAAAAAAAAAAAAAAAAAAAAA';
@@ -151,5 +156,57 @@ describe('GroupMailboxControlRecord', () => {
       'version',
       'welcome',
     ]);
+  });
+
+  describe('the genesis of a key package request', () => {
+    const genesis = {
+      creatorIdentityId: 'creator',
+      networkId: 'network-1',
+      nonce: REQUEST_ID,
+    };
+    const conversationId = new ConversationIdFactory()
+      .createGroup(
+        ConversationParticipantId.fromString(genesis.creatorIdentityId),
+        ConversationNetworkId.fromString(genesis.networkId),
+        ConversationGroupNonce.fromString(genesis.nonce),
+      )
+      .toString();
+
+    it('round-trips the genesis that derives the conversation id', () => {
+      const fields: GroupMailboxControlFields = {
+        conversationId,
+        genesis: GroupMailboxGenesis.of(conversationId, genesis)!,
+        requestId: REQUEST_ID,
+        type: 'key-package-request',
+      };
+
+      expect(
+        GroupMailboxControlRecord.decode(
+          GroupMailboxControlRecord.encode(fields),
+        ),
+      ).toEqual(fields);
+    });
+
+    it.each([
+      [
+        'names another creator',
+        conversationId,
+        { ...genesis, creatorIdentityId: 'mallory' },
+      ],
+      ['derives another conversation id', 'conversation-1', genesis],
+      ['is not an object', conversationId, 'creator'],
+    ])('does not decode a request whose genesis %s', (_name, id, value) => {
+      expect(
+        GroupMailboxControlRecord.decode(
+          json({
+            ...header,
+            conversationId: id,
+            genesis: value,
+            requestId: REQUEST_ID,
+            type: 'key-package-request',
+          }),
+        ),
+      ).toBeNull();
+    });
   });
 });

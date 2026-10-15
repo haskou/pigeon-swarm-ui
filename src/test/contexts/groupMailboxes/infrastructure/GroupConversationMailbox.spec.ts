@@ -5,6 +5,7 @@ import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
 
 import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
+import type { GroupMailboxGenesisFields } from '../../../../contexts/groupMailboxes/domain/GroupMailboxGenesisFields';
 import type { GroupConversationSyncOutcome } from '../../../../contexts/groupMailboxes/infrastructure/GroupConversationSyncOutcome';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { PigeonMailboxClient } from '../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
@@ -13,6 +14,10 @@ import type { MessageAttachmentPublisher } from '../../../../contexts/messages/i
 import type { PigeonLinkPreviewsApi } from '../../../../contexts/messages/infrastructure/http/PigeonLinkPreviewsApi';
 import type { NotificationResource } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationResource';
 
+import { ConversationIdFactory } from '../../../../contexts/conversations/domain/ConversationIdFactory';
+import { ConversationGroupNonce } from '../../../../contexts/conversations/domain/value-objects/ConversationGroupNonce';
+import { ConversationNetworkId } from '../../../../contexts/conversations/domain/value-objects/ConversationNetworkId';
+import { ConversationParticipantId } from '../../../../contexts/conversations/domain/value-objects/ConversationParticipantId';
 import { GroupMailboxRoster } from '../../../../contexts/groupMailboxes/domain/GroupMailboxRoster';
 import { GroupMailboxControlSeal } from '../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlSeal';
 import { GroupConversationMailbox } from '../../../../contexts/groupMailboxes/infrastructure/GroupConversationMailbox';
@@ -54,10 +59,13 @@ type Member = {
   storage: string;
 };
 
-const CONVERSATION = 'group:conversation-mls';
+const NETWORK = 'network-1';
+const NONCE = 'AAAAAAAAAAAAAAAAAAAAAA';
 const NOW = 1_700_000_000_000;
 
 let devices = 0;
+/** The group id alice creates: the hash of `genesis()`. */
+let CONVERSATION: string;
 let now = NOW;
 let roster: Set<string>;
 let letters: Map<string, NotificationResource[]>;
@@ -233,6 +241,7 @@ const device = (storage: string): GroupConversationMailbox =>
     channel,
     client: wire,
     composer: composer(),
+    contacts: () => [],
     direct: (from) => ({
       send: (conversationId, peer, plaintext) =>
         post(from, conversationId, peer, plaintext),
@@ -351,6 +360,13 @@ const texts = (member: Member): string[] =>
 
 const everyone = (): Member[] => [alice, bob, carol];
 
+/** The preimage of the group id alice creates. */
+const genesis = (): GroupMailboxGenesisFields => ({
+  creatorIdentityId: alice.id,
+  networkId: NETWORK,
+  nonce: NONCE,
+});
+
 /**
  * Every member reads its inboxes twice: the first pass applies pending
  * commits, the second opens the inboxes of the epoch they lead to. A sender
@@ -365,7 +381,7 @@ const catchUp = async (members: Member[] = everyone()): Promise<void> => {
 /** The three of them in one group, each joined from its welcome. */
 const formGroup = async (): Promise<void> => {
   roster = new Set([alice.id, bob.id, carol.id]);
-  await alice.mailbox.create(alice.session, CONVERSATION);
+  await alice.mailbox.create(alice.session, CONVERSATION, genesis());
   await settle(
     alice.mailbox.membersChanged(alice.session, CONVERSATION),
     everyone(),
@@ -401,6 +417,13 @@ beforeEach(async () => {
   roster = new Set();
   laptop = undefined;
   [alice, bob, carol] = await Promise.all([person(), person(), person()]);
+  CONVERSATION = new ConversationIdFactory()
+    .createGroup(
+      ConversationParticipantId.fromString(alice.id),
+      ConversationNetworkId.fromString(NETWORK),
+      ConversationGroupNonce.fromString(NONCE),
+    )
+    .toString();
 });
 
 afterEach(() => {
@@ -647,7 +670,7 @@ describe('GroupConversationMailbox', () => {
 
   it('reports the conversation a welcome joined, once', async () => {
     roster = new Set([alice.id, bob.id]);
-    await alice.mailbox.create(alice.session, CONVERSATION);
+    await alice.mailbox.create(alice.session, CONVERSATION, genesis());
     const joined: string[] = [];
     let done = false;
     const work = alice.mailbox
@@ -672,8 +695,59 @@ describe('GroupConversationMailbox', () => {
     await formGroup();
     roster = new Set([alice.id, bob.id]);
 
-    await expect(sync(carol)).resolves.toEqual({ removed: true });
-    await expect(sync(bob)).resolves.toEqual({ removed: false });
+    await expect(sync(carol)).resolves.toEqual({
+      removed: true,
+      unconfirmed: false,
+    });
+    await expect(sync(bob)).resolves.toEqual({
+      removed: false,
+      unconfirmed: false,
+    });
+  });
+
+  it('creates no group from a genesis that does not derive its id', async () => {
+    await expect(
+      alice.mailbox.create(alice.session, CONVERSATION, {
+        ...genesis(),
+        nonce: 'BBBBBBBBBBBBBBBBBBBBBB',
+      }),
+    ).rejects.toThrow('The genesis does not derive the group id');
+  });
+
+  it('holds what a member welcomed by a non-creator sends until the creator speaks', async () => {
+    await formGroup();
+    const dave = await person();
+    const all = [...everyone(), dave];
+
+    try {
+      roster.add(dave.id);
+      await settle(bob.mailbox.membersChanged(bob.session, CONVERSATION), all);
+      await settle(Promise.resolve(), all);
+      await catchUp(all);
+
+      await expect(sync(dave)).resolves.toEqual({
+        removed: false,
+        unconfirmed: true,
+      });
+      await dave.mailbox.send(dave.session, conversation(), 'early', {});
+      await catchUp(everyone());
+
+      expect(texts(carol)).toEqual([]);
+
+      await alice.mailbox.send(alice.session, conversation(), 'welcome', {});
+
+      await expect(sync(dave)).resolves.toEqual({
+        removed: false,
+        unconfirmed: false,
+      });
+      await dave.mailbox.membersChanged(dave.session, CONVERSATION);
+      await catchUp(everyone());
+
+      expect(texts(dave)).toEqual(['message:welcome']);
+      expect(texts(carol)).toEqual(['message:welcome', 'message:early']);
+    } finally {
+      dave.mailbox.stop(dave.id);
+    }
   });
 
   it('rejects an edit or delete of another member’s message', async () => {
