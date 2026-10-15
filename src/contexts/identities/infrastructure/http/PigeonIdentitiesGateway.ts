@@ -6,6 +6,7 @@ import type { Identity } from '../../domain/Identity';
 import type { DeviceAuthorizationRevision } from '../../domain/value-objects/DeviceAuthorizationRevision';
 import type { DeviceCredential } from '../../domain/value-objects/DeviceCredential';
 import type { IdentityMasterKeyProtection } from '../../domain/value-objects/IdentityMasterKeyProtection';
+import type { IdentityRegistrationCode } from '../../domain/value-objects/IdentityRegistrationCode';
 import type { IdentityCreationMaterial } from '../crypto/IdentityCreationMaterial';
 import type {
   LocalKeychain,
@@ -322,11 +323,13 @@ export class PigeonIdentitiesGateway {
     identity: Identity,
     material: IdentityCreationMaterial,
     protection: IdentityMasterKeyProtection,
+    registrationCode: IdentityRegistrationCode | null,
   ): Promise<CreatedIdentityMaterial> {
     return await this.identityCommands.createIdentity(
       identity,
       material,
       protection,
+      registrationCode,
     );
   }
 

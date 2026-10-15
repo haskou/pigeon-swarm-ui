@@ -129,7 +129,7 @@ describe(toUserErrorMessage.name, () => {
     );
   });
 
-  it.each([403011, 403012])(
+  it.each([403011, 403012] as const)(
     'explains node access refusal %s',
     (code) => {
       const error = new HttpJsonError(

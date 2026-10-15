@@ -2,10 +2,10 @@ import type { ReactElement } from 'react';
 
 import type { DevicePairingRequestDraft } from '../../domain/DevicePairingRequestDraft';
 
+import { QrCode } from '../../../../shared/presentation/components/QrCode';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { DevicePairingCodeField } from '../device-pairing/DevicePairingCodeField';
 import { DevicePairingCodeOutput } from '../device-pairing/DevicePairingCodeOutput';
-import { DevicePairingQrCode } from '../device-pairing/DevicePairingQrCode';
 import { Field } from './Field';
 
 export type LoginMethod = 'password' | 'recovery' | 'device';
@@ -121,8 +121,8 @@ export function LoginMethodPanel({
             <p className="text-xs leading-relaxed text-white/50">
               {copy.auth.devicePairingRequestHelp}
             </p>
-            <DevicePairingQrCode
-              code={draft.getRequest().toCode()}
+            <QrCode
+              value={draft.getRequest().toCode().valueOf()}
               label={copy.auth.devicePairingRequestQr}
             />
             <DevicePairingCodeOutput

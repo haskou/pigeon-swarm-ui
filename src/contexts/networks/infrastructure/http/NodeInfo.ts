@@ -7,6 +7,9 @@ export type NodeInfo = {
   };
   nodeType?: 'leaf' | 'reachable' | 'relay' | 'unknown';
   owner?: null | string;
+  registration?: {
+    mode: 'closed' | 'codes' | 'open';
+  };
   relay?: {
     advertised: boolean;
     autoEnabled: boolean;

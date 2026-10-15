@@ -72,6 +72,7 @@ import { DirectMessageMailboxStore } from '../../contexts/messages/infrastructur
 import { DirectMessageReaderSet } from '../../contexts/messages/infrastructure/mailbox/DirectMessageReaderSet';
 import { RecipientMailboxRouter } from '../../contexts/messages/infrastructure/mailbox/RecipientMailboxRouter';
 import { PigeonNodeApi } from '../../contexts/networks/infrastructure/http/PigeonNodeApi';
+import { PigeonNodeAccessApi } from '../../contexts/nodeAccess/infrastructure/http/PigeonNodeAccessApi';
 import { NotificationMutationSigner } from '../../contexts/notifications/infrastructure/http/NotificationMutationSigner';
 import { PigeonNotificationsApi } from '../../contexts/notifications/infrastructure/http/PigeonNotificationsApi';
 import { PigeonNotificationsGateway } from '../../contexts/notifications/infrastructure/http/PigeonNotificationsGateway';
@@ -132,6 +133,8 @@ export class PigeonApiGateway {
   private readonly messageProjection: PigeonMessageProjection;
 
   public readonly node: PigeonNodeApi;
+
+  public readonly nodeAccess: PigeonNodeAccessApi;
 
   public readonly notificationsGateway: PigeonNotificationsGateway;
 
@@ -440,6 +443,7 @@ export class PigeonApiGateway {
       }),
     );
     this.node = new PigeonNodeApi(http, signer);
+    this.nodeAccess = new PigeonNodeAccessApi(http, signer);
     const notificationsApi = new PigeonNotificationsApi(
       http,
       signer,

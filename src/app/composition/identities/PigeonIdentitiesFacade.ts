@@ -286,7 +286,7 @@ export class PigeonIdentitiesFacade {
     password: string,
     networks: string[],
     handle?: string,
-    options: { recoveryKey?: string } = {},
+    options: { recoveryKey?: string; registrationCode?: string } = {},
   ): Promise<LoginResult> {
     const identity = await this.useCases.register.register(
       new RegisterIdentityMessage({
@@ -296,6 +296,7 @@ export class PigeonIdentitiesFacade {
         occurredAt: Date.now(),
         password,
         recoveryKey: options.recoveryKey,
+        registrationCode: options.registrationCode,
       }),
     );
     const identityId = IdentityId.fromString(identity.toPrimitives().id);

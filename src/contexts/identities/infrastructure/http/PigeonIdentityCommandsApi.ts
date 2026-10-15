@@ -14,6 +14,7 @@ import type { HttpJsonClient } from '../../../../shared/infrastructure/http/Http
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { Identity } from '../../domain/Identity';
 import type { IdentityMasterKeyProtection } from '../../domain/value-objects/IdentityMasterKeyProtection';
+import type { IdentityRegistrationCode } from '../../domain/value-objects/IdentityRegistrationCode';
 import type { IdentityCreationMaterial } from '../crypto/IdentityCreationMaterial';
 import type { LocalKeychain } from '../keychain/LocalKeychain';
 import type { Session } from '../session/Session';
@@ -32,6 +33,7 @@ import { IdentityId } from '../../domain/value-objects/IdentityId';
 import { IdentityAdmissionProof } from '../crypto/IdentityAdmissionProof';
 import { IdentitySignaturePayloadFactory } from './IdentitySignaturePayloadFactory';
 
+const REGISTRATION_CODE_HEADER = 'X-Registration-Code';
 const emptyKeychain: LocalKeychain = {
   conversations: {},
   version: 0,
@@ -219,6 +221,7 @@ export class PigeonIdentityCommandsApi {
     identity: Identity,
     material: IdentityCreationMaterial,
     protection: IdentityMasterKeyProtection,
+    registrationCode: IdentityRegistrationCode | null,
   ): Promise<CreatedIdentityMaterial> {
     const primitives = identity.toPrimitives();
     const options = protection.toPrimitives();
@@ -235,49 +238,62 @@ export class PigeonIdentityCommandsApi {
       password: options.password,
     });
     const path = '/identities/';
-    const persistedIdentity = await this.publishAdmitted(
-      async (admissionDifficultyBits) => {
-        const unsigned = await this.signatures.createInitial({
-          admissionDifficultyBits,
-          deviceCredential:
-            material.deviceCredentialKeyPair.toPrimitives().publicKey,
-          deviceCredentialCommitment: this.credentialCommitment(
-            material.deviceCredentialKeyPair,
-          ),
-          id: primitives.id,
-          networks: primitives.networkIds,
-          profile: primitives.profile,
-          recoveryAuthority: recoveryAuthorityKeyPair.toPrimitives().publicKey,
-          timestamp: primitives.createdAt,
-        });
-        const body = {
-          ...unsigned,
-          signature: this.signIdentity(unsigned, material.keyPair),
-        };
-        const signingSession = {
-          authorizationEpoch: vaultSession.authorizationEpoch,
-          authorizationRevision: vaultSession.authorizationRevision,
-          deviceCredentialKeyPair: material.deviceCredentialKeyPair,
-          deviceId: vaultSession.deviceId,
-          identity: body,
-          keychain: emptyKeychain,
-          keyPair: material.keyPair,
-          masterKey: material.masterKey,
-          recoveryAuthorityKeyPair,
-        } as Session;
+    let persistedIdentity: IdentityResource;
 
-        return await this.http.request<IdentityResource>(path, {
-          body: JSON.stringify(body),
-          headers: await this.signer.headers(
-            signingSession,
-            'POST',
-            path,
-            body,
-          ),
-          method: 'POST',
-        });
-      },
-    );
+    try {
+      persistedIdentity = await this.publishAdmitted(
+        async (admissionDifficultyBits) => {
+          const unsigned = await this.signatures.createInitial({
+            admissionDifficultyBits,
+            deviceCredential:
+              material.deviceCredentialKeyPair.toPrimitives().publicKey,
+            deviceCredentialCommitment: this.credentialCommitment(
+              material.deviceCredentialKeyPair,
+            ),
+            id: primitives.id,
+            networks: primitives.networkIds,
+            profile: primitives.profile,
+            recoveryAuthority:
+              recoveryAuthorityKeyPair.toPrimitives().publicKey,
+            timestamp: primitives.createdAt,
+          });
+          const body = {
+            ...unsigned,
+            signature: this.signIdentity(unsigned, material.keyPair),
+          };
+          const signingSession = {
+            authorizationEpoch: vaultSession.authorizationEpoch,
+            authorizationRevision: vaultSession.authorizationRevision,
+            deviceCredentialKeyPair: material.deviceCredentialKeyPair,
+            deviceId: vaultSession.deviceId,
+            identity: body,
+            keychain: emptyKeychain,
+            keyPair: material.keyPair,
+            masterKey: material.masterKey,
+            recoveryAuthorityKeyPair,
+          } as Session;
+
+          return await this.http.request<IdentityResource>(path, {
+            body: JSON.stringify(body),
+            headers: {
+              ...(await this.signer.headers(
+                signingSession,
+                'POST',
+                path,
+                body,
+              )),
+              ...(registrationCode && {
+                [REGISTRATION_CODE_HEADER]: registrationCode.valueOf(),
+              }),
+            },
+            method: 'POST',
+          });
+        },
+      );
+    } catch (error) {
+      await this.vault.delete(IdentityId.fromString(primitives.id));
+      throw error;
+    }
 
     return {
       authorizationEpoch: vaultSession.authorizationEpoch,

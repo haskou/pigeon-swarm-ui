@@ -161,6 +161,13 @@ export const en = {
     recoveryKeySaved: 'I saved my recovery key',
     recoveryKeyTitle: 'Recovery key',
     recoveryKeyUnlockFailed: 'The password or recovery key is incorrect.',
+    registrationClosed: 'This node does not accept new accounts right now.',
+    registrationLinkNotice:
+      'You are signing up with a registration link from this node’s owner.',
+    registrationLinkOtherNode:
+      'This registration link is for another node ({node}). Open it in a client connected to that node.',
+    registrationNeedsLink:
+      'This node only accepts new accounts through a registration link from its owner.',
     title: 'Pigeon Swarm',
     unknownError: 'Unknown error. Poetic, but not useful.',
   },
@@ -803,14 +810,22 @@ export const en = {
   },
   errors: {
     backend: {
+      400070:
+        'The node refused that registration code. Allow 1 to 100 uses and pick an expiry in the future within the node’s limit.',
       401020: 'The signed request was rejected. Please reload and try again.',
       401021:
         'The request was missing authentication headers. Please reload and try again.',
       403010: 'Only the node owner can do that.',
+      403011:
+        'This node needs a valid registration link to create an account. Ask the node owner for a new link.',
+      403012:
+        'This node has blocked your identity. Ask its owner or use another node.',
       403020: 'Only the notification inviter can do that.',
       422030: 'That file is too large for the node to accept.',
       429040:
         'Too many profile updates in a short time. Wait a minute and try again.',
+      429060:
+        'Another block list change is being saved. Wait a moment and try again.',
       503020: 'The node is synchronizing. Wait a few minutes and try again.',
       AuthenticatedIdentityIsNotInviterError:
         'Only the notification inviter can do that.',
@@ -840,7 +855,13 @@ export const en = {
       InvalidKeychainVersionError: 'The keychain version is not valid.',
       InvalidMessageSignatureError:
         'The message signature is not valid. Please reload the chat and try again.',
+      InvalidNodeBlockListError: 'The block list is not valid.',
+      InvalidNodeBlockSourceApprovalError:
+        'Approve all entries, or pick at least one entry to approve.',
+      InvalidNodeBlockSourceOriginError:
+        'The source address must be an HTTPS origin, such as https://node.example.org.',
       InvalidNodeIdError: 'The node identifier is not valid.',
+      InvalidNodePeerIdError: 'That node peer id is not valid.',
       InvalidPasswordError:
         'Use 12 to 256 characters with uppercase, lowercase, number and symbol.',
       InvalidProfileHandleError:
@@ -875,6 +896,18 @@ export const en = {
         'The message you are trying to reference could not be found.',
       MissingSignedRequestHeaderError:
         'The request was missing authentication headers. Please reload and try again.',
+      NodeBlockEntriesAreNotListedBySourceError:
+        'Those entries are no longer listed by that source. Reload the review queue.',
+      NodeBlockListMustBeSignedByCurrentOwnerError:
+        'Only the current node owner can sign the block list.',
+      NodeBlockListSignatureIsNotValidError:
+        'The block list signature is not valid. Reload and try again.',
+      NodeBlockListVersionIsNotNewerError:
+        'The block list changed elsewhere. Reload it and try again.',
+      NodeBlockSourceNotFoundError:
+        'That block list source is no longer followed.',
+      NodeBlockSourceVersionHasChangedError:
+        'That source published a newer list. Review the updated entries.',
       NodeCannotHaveMoreThanOnePublicNetworkError:
         'A node cannot have more than one public network.',
       NodeOwnerCanOnlyBeChangedByCurrentOwnerError:

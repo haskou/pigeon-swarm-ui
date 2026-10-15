@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 
 import './index.css';
 import { IndependentClient } from './app/presentation/client/IndependentClient';
+import { captureRegistrationLink } from './contexts/nodeAccess/presentation/view-models/registrationLink';
 import { ClientNodeSelection } from './shared/infrastructure/client/ClientNodeSelection';
 import { isIndependentClient } from './shared/infrastructure/client/isIndependentClient';
 import { captureInstallPromptEvents } from './shared/infrastructure/pwa/captureInstallPromptEvents';
@@ -29,6 +30,7 @@ function preventMobileZoom(): void {
   });
 }
 
+captureRegistrationLink();
 preventMobileZoom();
 captureInstallPromptEvents();
 

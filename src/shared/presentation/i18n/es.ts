@@ -167,6 +167,13 @@ export const es = {
     recoveryKeyTitle: 'Clave de recuperación',
     recoveryKeyUnlockFailed:
       'La contraseña o la clave de recuperación no son correctas.',
+    registrationClosed: 'Este nodo no acepta cuentas nuevas por ahora.',
+    registrationLinkNotice:
+      'Te estás registrando con un enlace de registro del propietario de este nodo.',
+    registrationLinkOtherNode:
+      'Este enlace de registro es para otro nodo ({node}). Ábrelo en un cliente conectado a ese nodo.',
+    registrationNeedsLink:
+      'Este nodo solo acepta cuentas nuevas mediante un enlace de registro de su propietario.',
     title: 'Pigeon Swarm',
     unknownError: 'Error desconocido. Poético, pero poco útil.',
   },
@@ -811,15 +818,23 @@ export const es = {
   },
   errors: {
     backend: {
+      400070:
+        'El nodo rechazó ese código de registro. Permite entre 1 y 100 usos y elige una caducidad futura dentro del límite del nodo.',
       401020:
         'La solicitud firmada fue rechazada. Recarga e inténtalo de nuevo.',
       401021:
         'Faltan las cabeceras de autenticación. Recarga e inténtalo de nuevo.',
       403010: 'Solo el propietario del nodo puede hacer eso.',
+      403011:
+        'Este nodo necesita un enlace de registro válido para crear una cuenta. Pide un enlace nuevo al propietario del nodo.',
+      403012:
+        'Este nodo ha bloqueado tu identidad. Habla con su propietario o usa otro nodo.',
       403020: 'Solo quien envió la notificación puede hacer eso.',
       422030: 'El archivo es demasiado grande para el nodo.',
       429040:
         'Demasiadas actualizaciones de perfil en poco tiempo. Espera un minuto e inténtalo de nuevo.',
+      429060:
+        'Se está guardando otro cambio de la lista de bloqueos. Espera un momento y vuelve a intentarlo.',
       503020:
         'El nodo está sincronizando, espera unos minutos e inténtalo de nuevo.',
       AuthenticatedIdentityIsNotInviterError:
@@ -850,7 +865,13 @@ export const es = {
       InvalidKeychainVersionError: 'La versión del llavero no es válida.',
       InvalidMessageSignatureError:
         'La firma del mensaje no es válida. Recarga el chat e inténtalo de nuevo.',
+      InvalidNodeBlockListError: 'La lista de bloqueos no es válida.',
+      InvalidNodeBlockSourceApprovalError:
+        'Aprueba todas las entradas o elige al menos una entrada para aprobar.',
+      InvalidNodeBlockSourceOriginError:
+        'La dirección de la fuente debe ser un origen HTTPS, como https://nodo.example.org.',
       InvalidNodeIdError: 'El identificador del nodo no es válido.',
+      InvalidNodePeerIdError: 'Ese id de par de nodo no es válido.',
       InvalidPasswordError:
         'Usa de 12 a 256 caracteres con mayúscula, minúscula, número y símbolo.',
       InvalidProfileHandleError:
@@ -882,6 +903,18 @@ export const es = {
         'No se encontró el mensaje al que intentas hacer referencia.',
       MissingSignedRequestHeaderError:
         'Faltan las cabeceras de autenticación. Recarga e inténtalo de nuevo.',
+      NodeBlockEntriesAreNotListedBySourceError:
+        'Esa fuente ya no incluye esas entradas. Recarga la cola de revisión.',
+      NodeBlockListMustBeSignedByCurrentOwnerError:
+        'Solo el propietario actual del nodo puede firmar la lista de bloqueos.',
+      NodeBlockListSignatureIsNotValidError:
+        'La firma de la lista de bloqueos no es válida. Recarga e inténtalo de nuevo.',
+      NodeBlockListVersionIsNotNewerError:
+        'La lista de bloqueos cambió en otro lugar. Recárgala e inténtalo de nuevo.',
+      NodeBlockSourceNotFoundError:
+        'Ya no sigues esa fuente de lista de bloqueos.',
+      NodeBlockSourceVersionHasChangedError:
+        'Esa fuente publicó una lista más nueva. Revisa las entradas actualizadas.',
       NodeCannotHaveMoreThanOnePublicNetworkError:
         'Un nodo no puede tener más de una red pública.',
       NodeOwnerCanOnlyBeChangedByCurrentOwnerError:
