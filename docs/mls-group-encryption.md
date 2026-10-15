@@ -574,9 +574,13 @@ public community exception.
   removes another identity, then the rest. A commit id is derived from the
   commit bytes, which the committer chooses, so it can grind a low id; that
   only wins among equal ranks, so a member cannot win back the epoch of its
-  own removal, nor an admin one the creator commits. Residuals: two devices
-  of one identity rank alike, so a revoked device that races the removal of
-  its own leaf by a sibling device wins on a lower id wherever its commit is
+  own removal, nor an admin one the creator commits. Residuals: rivals of
+  equal rank still fall to the id, so an admin that grinds a low id wins
+  against another admin's removal, and any commit by the creator, also one
+  that only adds a device, displaces an admin's removal; the displaced
+  removal waits for the next reconcile to commit it again. Two devices of
+  one identity rank alike, so a revoked device that races the removal of its
+  own leaf by a sibling device wins on a lower id wherever its commit is
   still accepted (see the residual above), until the sibling's next
   reconcile removes it again. A member that was offline may adopt the losing
   commit first and switches when the winner arrives; one offline for longer
