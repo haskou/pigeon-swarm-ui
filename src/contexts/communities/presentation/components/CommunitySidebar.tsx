@@ -49,7 +49,6 @@ type CommunitySidebarProps = {
   onCallToggleCamera?: () => void;
   onCallToggleDeafen?: () => void;
   onCallToggleMicrophone?: () => void;
-  onCallToggleMediaEncryption?: () => void;
   onCallToggleNoiseCancellation?: () => void;
   onCallToggleScreenShare?: () => void;
   onChannelSearchChange: (value: string) => void;
@@ -116,7 +115,6 @@ export function CommunitySidebar({
   onCallToggleCamera,
   onCallToggleDeafen,
   onCallToggleMicrophone,
-  onCallToggleMediaEncryption,
   onCallToggleNoiseCancellation,
   onCallToggleScreenShare,
   onChannelSearchChange,
@@ -253,7 +251,6 @@ export function CommunitySidebar({
               onCallToggleCamera={onCallToggleCamera}
               onCallToggleDeafen={onCallToggleDeafen}
               onCallToggleMute={onCallToggleMicrophone}
-              onCallToggleMediaEncryption={onCallToggleMediaEncryption}
               onCallToggleNoiseCancellation={onCallToggleNoiseCancellation}
               onCallRetryMicrophone={onCallRetryMicrophone}
               onCallRetryConnection={onCallRetryConnection}

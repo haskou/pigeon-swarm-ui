@@ -10,6 +10,7 @@ import { CommunityName } from '../value-objects/CommunityName';
 import { CommunityPermission } from '../value-objects/CommunityPermission';
 import { CommunityRoleId } from '../value-objects/CommunityRoleId';
 import { CommunityRoleName } from '../value-objects/CommunityRoleName';
+import { CommunityVisibility } from '../value-objects/CommunityVisibility';
 
 const EVERYONE = 'everyone';
 /** What the built-in `everyone` role allows until a manager changes it. */
@@ -136,7 +137,9 @@ export class CommunityAuthority {
     CommunityDescription.fromString(CommunityAuthority.text(args.description));
     CommunityAuthority.flag(args.discoverable);
     CommunityAuthority.text(args.nonce);
-    CommunityAuthority.text(args.visibility);
+    const visibility = CommunityVisibility.fromPrimitives(
+      CommunityAuthority.text(args.visibility),
+    );
 
     for (const key of ['avatar', 'banner'] as const) {
       if (args[key] !== undefined) CommunityAuthority.text(args[key]);
@@ -145,12 +148,14 @@ export class CommunityAuthority {
     return new CommunityAuthority(
       genesis,
       CommunityAuthority.flag(args.autoJoinEnabled),
+      visibility,
     );
   }
 
   private constructor(
     genesis: CommunityOperation,
     private autoJoinEnabled: boolean,
+    private readonly visibility: CommunityVisibility,
   ) {
     this.communityId = genesis.getCommunityId();
     this.networkId = genesis.getNetworkId();
@@ -412,6 +417,11 @@ export class CommunityAuthority {
   /** The members; a banned identity is never one. */
   public getMemberIds(): string[] {
     return [...this.members];
+  }
+
+  /** The visibility its genesis signs; no operation changes it. */
+  public getVisibility(): CommunityVisibility {
+    return this.visibility;
   }
 
   /**

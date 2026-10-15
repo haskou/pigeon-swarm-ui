@@ -1,3 +1,5 @@
+import { DomainError } from '@haskou/value-objects';
+
 import { CommunityOperationRejectedError } from '../../../../../contexts/communities/domain/errors/CommunityOperationRejectedError';
 import { CommunityAuthority } from '../../../../../contexts/communities/domain/operations/CommunityAuthority';
 import { CommunityOperation } from '../../../../../contexts/communities/domain/operations/CommunityOperation';
@@ -93,6 +95,32 @@ describe(CommunityAuthority.name, () => {
     expect(authority.hasPermission(id('member'), 'manage_members')).toBe(false);
     expect(authority.hasPermission(id('member'), 'send_messages')).toBe(true);
     expect(authority.hasPermission(id('other'), 'send_messages')).toBe(false);
+  });
+
+  it('holds the visibility its genesis signs, which no update changes', () => {
+    expect(() =>
+      apply('owner', 'community_updated', {
+        description: '',
+        name: 'Community',
+        visibility: 'private',
+      }),
+    ).toThrow(CommunityOperationRejectedError);
+    expect(authority.getVisibility().isPublic()).toBe(true);
+  });
+
+  it('rejects a genesis whose visibility is neither public nor private', () => {
+    expect(() =>
+      CommunityAuthority.create(
+        operation('owner', CommunityOperation.GENESIS, {
+          autoJoinEnabled: false,
+          description: '',
+          discoverable: false,
+          name: 'Community',
+          nonce: 'nonce-2',
+          visibility: 'unlisted',
+        }),
+      ),
+    ).toThrow(DomainError);
   });
 
   it('lets a manager add members, and rejects a member who may not', () => {

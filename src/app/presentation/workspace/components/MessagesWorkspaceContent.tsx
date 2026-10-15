@@ -87,9 +87,6 @@ export function MessagesWorkspaceContent(
               }
               onCallToggleCamera={callControls.toggleCamera}
               onCallToggleDeafen={callControls.toggleDeafen}
-              onCallToggleMediaEncryption={
-                callControls.toggleCallMediaEncryption
-              }
               onCallToggleMute={callControls.toggleMute}
               onCallToggleNoiseCancellation={
                 callControls.toggleCallNoiseCancellation

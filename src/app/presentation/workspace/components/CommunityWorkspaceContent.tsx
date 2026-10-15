@@ -29,7 +29,6 @@ type CommunityWorkspaceContentProps = {
     | 'setParticipantVolume'
     | 'setScreenShareQuality'
     | 'startCommunityVoiceCall'
-    | 'toggleCallMediaEncryption'
     | 'toggleCallNoiseCancellation'
     | 'toggleCamera'
     | 'toggleDeafen'
@@ -184,7 +183,6 @@ export function CommunityWorkspaceContent({
         onCallScreenShareQualityChange={callControls.setScreenShareQuality}
         onCallToggleCamera={callControls.toggleCamera}
         onCallToggleDeafen={callControls.toggleDeafen}
-        onCallToggleMediaEncryption={callControls.toggleCallMediaEncryption}
         onCallToggleMute={callControls.toggleMute}
         onCallToggleNoiseCancellation={callControls.toggleCallNoiseCancellation}
         onCallToggleScreenShare={callControls.toggleScreenShare}

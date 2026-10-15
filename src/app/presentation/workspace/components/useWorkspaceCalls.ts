@@ -125,22 +125,18 @@ export function useWorkspaceCalls({
     startCall,
     toggleCamera,
     toggleDeafen,
-    toggleMediaEncryption,
     toggleMute,
     toggleNoiseCancellation,
     toggleScreenShare,
   } = useCallSession();
   const {
-    mediaEncryptionEnabled,
     noiseCancellationEnabled,
     requestOptionalLocalAudio,
     stopLocalAudio,
-    toggleCallMediaEncryption,
     toggleCallNoiseCancellation,
   } = useCallMediaAccess({
     identityId: session.identity.id,
     onError: onErrorChange,
-    toggleMediaEncryption,
     toggleNoiseCancellation,
   });
 
@@ -198,18 +194,21 @@ export function useWorkspaceCalls({
     async (call: CallResource) =>
       await resolveWorkspaceCallMediaEncryption({
         call,
-        communities,
         communityCallKey: async (communityId, callId) =>
           await applicationContainer.mls.callMediaKey(
             session,
             communityId,
             callId,
           ),
+        communityOperations: async (communityId) =>
+          await applicationContainer.mls.communityOperations(
+            session,
+            communityId,
+          ),
         currentIdentityId: session.identity.id,
-        enabled: mediaEncryptionEnabled,
         keychain: session.keychain,
       }),
-    [mediaEncryptionEnabled, communities, session],
+    [session],
   );
   const { incomingCall, reconcileCallResource, setIncomingCall } =
     useCallResourceReconciliation({
@@ -451,7 +450,6 @@ export function useWorkspaceCalls({
     setScreenShareQuality,
     startCommunityVoiceCall,
     startConversationCall,
-    toggleCallMediaEncryption,
     toggleCallNoiseCancellation,
     toggleCamera,
     toggleDeafen,

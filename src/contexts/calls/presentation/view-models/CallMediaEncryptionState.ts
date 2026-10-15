@@ -2,7 +2,5 @@ import type { CallMediaEncryptionUnavailableReason } from './CallMediaEncryption
 
 export type CallMediaEncryptionState = {
   active: boolean;
-  available: boolean;
-  enabled: boolean;
   reason?: CallMediaEncryptionUnavailableReason;
 };

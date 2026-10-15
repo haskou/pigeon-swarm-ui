@@ -47,7 +47,7 @@ export function callSessionForJoinedPeerConnection(
     hasMicrophone: activeCall?.hasMicrophone ?? false,
     id: call.id,
     localPreviewStream: activeCall?.localPreviewStream,
-    mediaEncryption: activeCall?.mediaEncryption ?? disabledMediaEncryption(),
+    mediaEncryption: activeCall?.mediaEncryption ?? inactiveMediaEncryption(),
     muted: activeCall?.muted ?? false,
     noiseCancellationEnabled: activeCall?.noiseCancellationEnabled ?? true,
     participants,
@@ -61,48 +61,25 @@ export function callSessionForJoinedPeerConnection(
   };
 }
 
-export function disabledMediaEncryption(): CallMediaEncryptionState {
-  return {
-    active: false,
-    available: false,
-    enabled: false,
-    reason: 'missing-key',
-  };
+export function inactiveMediaEncryption(): CallMediaEncryptionState {
+  return { active: false, reason: 'missing-key' };
 }
 
+/** A call with a key always encrypts its media; there is no switch. */
 export function callMediaEncryptionState({
-  enabled,
   key,
   reason,
 }: {
-  enabled: boolean;
   key?: string;
   reason?: CallMediaEncryptionUnavailableReason;
 }): CallMediaEncryptionState {
-  if (!key) {
-    return {
-      active: false,
-      available: false,
-      enabled: false,
-      reason: reason ?? 'missing-key',
-    };
-  }
+  if (!key) return { active: false, reason: reason ?? 'missing-key' };
 
   if (!CallPeerConnections.mediaEncryptionSupported()) {
-    return {
-      active: false,
-      available: false,
-      enabled: false,
-      reason: 'unsupported',
-    };
+    return { active: false, reason: 'unsupported' };
   }
 
-  return {
-    active: enabled,
-    available: true,
-    enabled,
-    reason: enabled ? undefined : 'disabled',
-  };
+  return { active: true };
 }
 
 function hasVideoTrack(stream?: MediaStream): boolean {

@@ -326,32 +326,14 @@ export class CallPeerConnections {
     this.remoteAudio.removePeer(peerIdentityId);
   }
 
-  private async renegotiateMediaEncryption(): Promise<void> {
-    await Promise.all(
-      [...this.peers.entries()].map(async ([peerIdentityId, peer]) => {
-        const sendSignal = this.peerSignalSenders.get(peerIdentityId);
-
-        if (!sendSignal) return;
-
-        await this.negotiation.sendRenegotiationOffer(
-          peerIdentityId,
-          peer,
-          sendSignal,
-        );
-      }),
-    );
-  }
-
   public configure(rtcConfigurationProvider: RtcConfigurationProvider): void {
     this.rtcConfigurationProvider = rtcConfigurationProvider;
     logCallDebug('peer-manager:configure');
   }
 
-  public configureMediaEncryption(
-    base64Key: null | string,
-    enabled: boolean,
-  ): void {
-    this.mediaEncryption.configure(base64Key, enabled);
+  /** A private call has `base64Key`; a public one has none. */
+  public configureMediaEncryption(base64Key: null | string): void {
+    this.mediaEncryption.configure(base64Key);
     this.mediaEncryption.syncPeers(this.peers);
   }
 
@@ -408,6 +390,22 @@ export class CallPeerConnections {
         currentIdentityId > senderIdentityId,
       );
     }
+
+    if (
+      signalType !== 'ice_candidate' &&
+      !this.mediaEncryption.admits(
+        payload as unknown as DescriptionSignalPayload,
+      )
+    ) {
+      logCallWarning('peer-manager:media-encryption:refused-peer', {
+        senderIdentityId,
+        signalType,
+      });
+      this.removePeer(senderIdentityId);
+
+      return;
+    }
+
     this.peerSignalSenders.set(senderIdentityId, sendSignal);
     const peer = await this.getOrCreatePeer(senderIdentityId, sendSignal);
     const state = this.negotiation.state(senderIdentityId);
@@ -504,15 +502,6 @@ export class CallPeerConnections {
 
   public setLocalStream(stream: MediaStream | null): void {
     this.localTracks.setStream(stream, this.peers);
-  }
-
-  public setMediaEncryptionEnabled(enabled: boolean): void {
-    this.mediaEncryption.setEnabled(enabled);
-    void this.renegotiateMediaEncryption().catch((error: unknown) => {
-      logCallWarning('peer-manager:media-encryption:renegotiate-failed', {
-        error,
-      });
-    });
   }
 
   public setPeerScreenShareVolume(

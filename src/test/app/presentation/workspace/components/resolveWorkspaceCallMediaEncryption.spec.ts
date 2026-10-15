@@ -1,27 +1,37 @@
 import type { CallResource } from '../../../../../contexts/calls/infrastructure/http/resources/CallResource';
-import type { CommunityResource as Community } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
 import type { LocalKeychain } from '../../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
 
 import { resolveWorkspaceCallMediaEncryption } from '../../../../../app/presentation/workspace/components/resolveWorkspaceCallMediaEncryption';
 import { CallPeerConnections } from '../../../../../contexts/calls/infrastructure/media/CallPeerConnections';
 import { CallMediaEncryptionUnavailableError } from '../../../../../contexts/calls/presentation/errors/CallMediaEncryptionUnavailableError';
+import { CommunityOperation } from '../../../../../contexts/communities/domain/operations/CommunityOperation';
 import { copy } from '../../../../../shared/presentation/i18n/copy';
 
-function community(visibility: Community['visibility']): Community {
-  return {
-    autoJoinEnabled: false,
-    createdAt: 1,
-    description: '',
-    discoverable: true,
-    id: 'community-1',
-    memberIds: [],
-    name: 'Community',
-    networkId: 'network-1',
-    ownerIdentityId: 'identity-1',
-    textChannels: [],
-    visibility,
-    voiceChannels: [],
-  };
+/** The signed operations of a community its genesis made `visibility`. */
+function operationsOf(
+  visibility: string,
+): jest.Mock<Promise<readonly CommunityOperation[]>, [string]> {
+  return jest
+    .fn<Promise<readonly CommunityOperation[]>, [string]>()
+    .mockResolvedValue([
+      CommunityOperation.fromPrimitives({
+        action: CommunityOperation.GENESIS,
+        args: {
+          autoJoinEnabled: false,
+          description: '',
+          discoverable: true,
+          name: 'Community',
+          nonce: 'nonce-1',
+          visibility,
+        },
+        authorIdentityId: 'identity-1',
+        communityId: 'community-1',
+        createdAt: 1,
+        hash: 'genesis-hash',
+        networkId: 'network-1',
+        parents: [],
+      }),
+    ]);
 }
 
 function call(scope: CallResource['scope']): CallResource {
@@ -85,14 +95,12 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
     await expect(
       resolveWorkspaceCallMediaEncryption({
         call: communityCall(),
-        communities: [community('public')],
+        communityOperations: operationsOf('public'),
         communityCallKey: jest.fn(),
         currentIdentityId: 'identity-1',
-        enabled: true,
         keychain: emptyKeychain(),
       }),
     ).resolves.toEqual({
-      mediaEncryptionEnabled: true,
       mediaEncryptionUnavailableReason: 'public-community',
     });
   });
@@ -105,14 +113,12 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
     await expect(
       resolveWorkspaceCallMediaEncryption({
         call: communityCall(),
-        communities: [community('public')],
+        communityOperations: operationsOf('public'),
         communityCallKey: jest.fn(),
         currentIdentityId: 'identity-1',
-        enabled: true,
         keychain: emptyKeychain(),
       }),
     ).resolves.toEqual({
-      mediaEncryptionEnabled: true,
       mediaEncryptionUnavailableReason: 'public-community',
     });
   });
@@ -123,16 +129,12 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
     await expect(
       resolveWorkspaceCallMediaEncryption({
         call: communityCall(),
-        communities: [community('private')],
+        communityOperations: operationsOf('private'),
         communityCallKey,
         currentIdentityId: 'identity-1',
-        enabled: true,
         keychain: emptyKeychain(),
       }),
-    ).resolves.toEqual({
-      mediaEncryptionEnabled: true,
-      mediaEncryptionKey: 'derived-key',
-    });
+    ).resolves.toEqual({ mediaEncryptionKey: 'derived-key' });
     expect(communityCallKey).toHaveBeenCalledWith('community-1', 'call-1');
   });
 
@@ -140,10 +142,9 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
     await expect(
       resolveWorkspaceCallMediaEncryption({
         call: communityCall(),
-        communities: [community('private')],
+        communityOperations: operationsOf('private'),
         communityCallKey: jest.fn().mockRejectedValue(new Error('no group')),
         currentIdentityId: 'identity-1',
-        enabled: true,
         keychain: emptyKeychain(),
       }),
     ).rejects.toThrow(new CallMediaEncryptionUnavailableError('missing-key'));
@@ -155,10 +156,9 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
     await expect(
       resolveWorkspaceCallMediaEncryption({
         call: communityCall(),
-        communities: [],
+        communityOperations: jest.fn().mockResolvedValue([]),
         communityCallKey,
         currentIdentityId: 'identity-1',
-        enabled: true,
         keychain: emptyKeychain(),
       }),
     ).rejects.toThrow(copy.calls.mediaEncryptionMissingKey);
@@ -169,37 +169,46 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
     await expect(
       resolveWorkspaceCallMediaEncryption({
         call: conversationCall(),
-        communities: [],
+        communityOperations: jest.fn().mockResolvedValue([]),
         communityCallKey: jest.fn(),
         currentIdentityId: 'identity-1',
-        enabled: true,
         keychain: keychainWithConversationKey(),
       }),
-    ).resolves.toEqual({
-      mediaEncryptionEnabled: true,
-      mediaEncryptionKey: 'conversation-key',
-    });
+    ).resolves.toEqual({ mediaEncryptionKey: 'conversation-key' });
   });
 
   it('refuses a direct call without a conversation key', async () => {
     await expect(
       resolveWorkspaceCallMediaEncryption({
         call: conversationCall(),
-        communities: [],
+        communityOperations: jest.fn().mockResolvedValue([]),
         communityCallKey: jest.fn(),
         currentIdentityId: 'identity-1',
-        enabled: false,
         keychain: emptyKeychain(),
       }),
     ).rejects.toThrow(copy.calls.mediaEncryptionMissingKey);
   });
 
+  it('treats a community as private when its signed operations cannot be read', async () => {
+    const communityCallKey = jest.fn().mockResolvedValue('derived-key');
+
+    await expect(
+      resolveWorkspaceCallMediaEncryption({
+        call: communityCall(),
+        communityOperations: jest.fn().mockRejectedValue(new Error('offline')),
+        communityCallKey,
+        currentIdentityId: 'identity-1',
+        keychain: emptyKeychain(),
+      }),
+    ).resolves.toEqual({ mediaEncryptionKey: 'derived-key' });
+  });
+
   it.each([
-    ['a direct call', conversationCall(), []],
-    ['a private community call', communityCall(), [community('private')]],
+    ['a direct call', conversationCall()],
+    ['a private community call', communityCall()],
   ])(
     'refuses %s in a browser that cannot encrypt media',
-    async (_label, refusedCall, communities) => {
+    async (_label, refusedCall) => {
       jest
         .spyOn(CallPeerConnections, 'mediaEncryptionSupported')
         .mockReturnValue(false);
@@ -208,10 +217,9 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
       await expect(
         resolveWorkspaceCallMediaEncryption({
           call: refusedCall,
-          communities,
+          communityOperations: operationsOf('private'),
           communityCallKey,
           currentIdentityId: 'identity-1',
-          enabled: true,
           keychain: keychainWithConversationKey(),
         }),
       ).rejects.toThrow(copy.calls.mediaEncryptionUnsupported);

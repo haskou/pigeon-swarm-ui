@@ -19,8 +19,6 @@ function callSession(input: {
     kind: input.kind,
     mediaEncryption: {
       active: false,
-      available: false,
-      enabled: false,
       reason: 'missing-key',
     },
     muted: false,

@@ -19,7 +19,6 @@ export function CallStageDialog({
   onToggleCamera,
   onToggleDeafen,
   onToggleMute,
-  onToggleMediaEncryption,
   onToggleNoiseCancellation,
   onRetryMicrophone,
   onRetryConnection,
@@ -45,7 +44,6 @@ export function CallStageDialog({
   onToggleCamera: () => void;
   onToggleDeafen: () => void;
   onToggleMute: () => void;
-  onToggleMediaEncryption: () => void;
   onToggleNoiseCancellation: () => void;
   onRetryMicrophone: (deviceId?: string) => void;
   onRetryConnection: () => void;
@@ -94,7 +92,6 @@ export function CallStageDialog({
           onToggleCamera={onToggleCamera}
           onToggleDeafen={onToggleDeafen}
           onToggleMute={onToggleMute}
-          onToggleMediaEncryption={onToggleMediaEncryption}
           onToggleNoiseCancellation={onToggleNoiseCancellation}
           onToggleScreenShare={onToggleScreenShare}
         />

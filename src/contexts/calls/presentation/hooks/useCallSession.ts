@@ -121,7 +121,6 @@ export function useCallSession(): CallSessionControls {
     });
     signals.begin(input.currentIdentityId, input.onSignal, input.id);
     const mediaEncryption = callMediaEncryptionState({
-      enabled: input.mediaEncryptionEnabled,
       key: input.mediaEncryptionKey,
       reason: input.mediaEncryptionUnavailableReason,
     });
@@ -210,10 +209,7 @@ export function useCallSession(): CallSessionControls {
         hasStream: Boolean(stream),
       });
       peerManager.configure(input.loadIceConfig);
-      peerManager.configureMediaEncryption(
-        input.mediaEncryptionKey ?? null,
-        mediaEncryption.active,
-      );
+      peerManager.configureMediaEncryption(input.mediaEncryptionKey ?? null);
       peerManager.setLocalStream(stream);
       setActiveCall((current) =>
         current?.id === nextCall.id

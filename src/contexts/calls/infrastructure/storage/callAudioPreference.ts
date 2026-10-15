@@ -5,7 +5,6 @@ import {
 } from '../../../../shared/infrastructure/storage/jsonLocalStorage';
 
 type CallAudioPreference = {
-  mediaEncryptionEnabled?: boolean;
   microphoneDeviceId?: string;
   noiseCancellationEnabled?: boolean;
 };
@@ -36,10 +35,6 @@ export function loadCallNoiseCancellationEnabled(identityId: string): boolean {
   return preference.noiseCancellationEnabled ?? true;
 }
 
-export function loadCallMediaEncryptionEnabled(identityId: string): boolean {
-  return loadCallAudioPreference(identityId).mediaEncryptionEnabled ?? true;
-}
-
 export function loadCallMicrophoneDeviceId(
   identityId: string,
 ): string | undefined {
@@ -60,14 +55,5 @@ export function saveCallNoiseCancellationEnabled(
 ): void {
   saveCallAudioPreference(identityId, {
     noiseCancellationEnabled: enabled,
-  });
-}
-
-export function saveCallMediaEncryptionEnabled(
-  identityId: string,
-  enabled: boolean,
-): void {
-  saveCallAudioPreference(identityId, {
-    mediaEncryptionEnabled: enabled,
   });
 }

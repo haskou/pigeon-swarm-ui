@@ -1,5 +1,6 @@
 import { Buffer } from 'buffer';
 
+import type { CommunityOperation } from '../../../contexts/communities/domain/operations/CommunityOperation';
 import type { PigeonCommunityOperationsApi } from '../../../contexts/communities/infrastructure/http/PigeonCommunityOperationsApi';
 import type { PigeonMlsRecordsApi } from '../../../contexts/communities/infrastructure/http/PigeonMlsRecordsApi';
 import type { MlsGroupCredentials } from '../../../contexts/communities/infrastructure/mls/MlsGroupCredentials';
@@ -46,7 +47,7 @@ export class PigeonMlsFacade {
     communityId: string,
   ): Promise<CommunityRosterHistory> {
     return CommunityRosterHistory.of(
-      await this.operations.list(session, communityId),
+      await this.communityOperations(session, communityId),
     );
   }
 
@@ -222,6 +223,14 @@ export class PigeonMlsFacade {
     context: string,
   ): Promise<Uint8Array> {
     return await this.engineFor(session).exportSecret(groupId, label, context);
+  }
+
+  /** The community's operations, each verified against its author's key. */
+  public async communityOperations(
+    session: Session,
+    communityId: string,
+  ): Promise<CommunityOperation[]> {
+    return await this.operations.list(session, communityId);
   }
 
   public async callMediaKey(

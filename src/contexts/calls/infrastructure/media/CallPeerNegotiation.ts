@@ -112,8 +112,6 @@ export class CallPeerNegotiation {
   ): Promise<void> {
     const description = new RTCSessionDescription(payload);
     const offerCollision = this.isOfferCollision(description, state, peer);
-    const wasSendingEncryptedMedia =
-      this.encryption.outboundEnabled(senderIdentityId);
 
     if (
       !this.acceptRemoteDescription(senderIdentityId, peer, state, description)
@@ -128,11 +126,7 @@ export class CallPeerNegotiation {
       return;
     }
 
-    this.encryption.rememberRemoteMetadata(
-      senderIdentityId,
-      payload,
-      this.peerFor(senderIdentityId),
-    );
+    this.encryption.admit(senderIdentityId, this.peerFor(senderIdentityId));
     this.screenShareStreams.rememberRemoteMetadata(senderIdentityId, payload);
     await peer.setRemoteDescription(description);
     logCallDebug('peer-manager:handle-signal:remote-description-set', {
@@ -143,16 +137,7 @@ export class CallPeerNegotiation {
     });
     await this.iceCandidates.flush(senderIdentityId, peer);
 
-    if (description.type !== 'offer') {
-      if (
-        !wasSendingEncryptedMedia &&
-        this.encryption.outboundEnabled(senderIdentityId)
-      ) {
-        await this.sendRenegotiationOffer(senderIdentityId, peer, sendSignal);
-      }
-
-      return;
-    }
+    if (description.type !== 'offer') return;
 
     const answer = await peer.createAnswer();
 
@@ -206,7 +191,7 @@ export class CallPeerNegotiation {
             this.screenShareStreams.localVideoStreamIds(
               this.localTracks.stream,
             ),
-            this.encryption.localMetadata(peerIdentityId),
+            this.encryption.localMetadata(),
           ),
         ),
       () =>
