@@ -10,9 +10,8 @@ export type NodeRegistrationModeViewModel = NodeRegistrationModeValue;
 export type NodeRegistrationCodeViewModel = NodeRegistrationCodePrimitives;
 
 /** Holds the secret code, which the node returns only once. */
-export interface IssuedNodeRegistrationCodeViewModel extends NodeRegistrationCodeViewModel {
-  code: string;
-}
+export type IssuedNodeRegistrationCodeViewModel =
+  NodeRegistrationCodeViewModel & { code: string };
 
 export type NodeBlockListViewModel = NodeBlockListPrimitives;
 

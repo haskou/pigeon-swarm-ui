@@ -19,7 +19,7 @@ export interface IssuedNodeRegistrationCodeResource {
   maxUses: number;
 }
 
-/** The node owner's block list document, signed over everything but the signature. */
+/** The owner's block list document, signed over all but the signature. */
 export interface SignedNodeBlockListResource {
   blockedIdentityIds: string[];
   blockedNodePeerIds: string[];
@@ -30,11 +30,22 @@ export interface SignedNodeBlockListResource {
   version: number;
 }
 
+export type NodeBlockSourceFetchOutcomeResource =
+  | 'accepted'
+  | 'invalid-document'
+  | 'invalid-signature'
+  | 'not-newer'
+  | 'redirected'
+  | 'refused-address'
+  | 'too-large'
+  | 'unreachable'
+  | 'wrong-signer';
+
 export interface NodeBlockSourceResource {
   appliedCount: number;
   autoApply: boolean;
   lastFetchedAt: number | null;
-  lastFetchOutcome: string | null;
+  lastFetchOutcome: NodeBlockSourceFetchOutcomeResource | null;
   origin: string;
   ownerIdentityId: string;
   pendingCount: number;

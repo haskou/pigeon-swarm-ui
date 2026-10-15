@@ -5,13 +5,8 @@ import { InvalidNodeBlockSourceOriginError } from '../errors/InvalidNodeBlockSou
 function originOf(value: string): string | null {
   try {
     const url = new URL(value.trim());
-    const isOrigin =
-      url.protocol === 'https:' &&
-      !url.username &&
-      !url.password &&
-      (url.pathname === '/' || url.pathname === '') &&
-      !url.search &&
-      !url.hash;
+    // Credentials, a path, a query or a fragment make href differ from origin.
+    const isOrigin = url.protocol === 'https:' && url.href === `${url.origin}/`;
 
     return isOrigin ? url.origin : null;
   } catch {

@@ -1,5 +1,8 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 
+import type { PendingRegistrationLink } from '../../../contexts/nodeAccess/presentation/view-models/registrationLink';
+import type { SelectedClientNode } from '../../../shared/infrastructure/client/SelectedClientNode';
+
 import {
   forgetRegistrationLink,
   pendingRegistrationLink,
@@ -75,6 +78,81 @@ function resumeClientAfterSelection(): void {
   }
 }
 
+/** The node a pending registration link asks this browser to switch to. */
+function registrationNodeFor(
+  registration: null | PendingRegistrationLink,
+  choosing: boolean,
+  selected: SelectedClientNode | undefined,
+): null | string {
+  if (!registration || choosing || registration.node === selected?.url)
+    return null;
+
+  return registration.node;
+}
+
+/** A registration link for another node, while this browser uses a node. */
+function registrationSwitchFor(
+  node: null | string,
+  selected: SelectedClientNode | undefined,
+): null | { current: string; node: string } {
+  if (!node || !selected) return null;
+
+  return { current: selected.url, node };
+}
+
+function RegistrationSwitchPrompt({
+  checking,
+  current,
+  error,
+  node,
+  onConfirm,
+  onKeep,
+}: {
+  checking: boolean;
+  current: string;
+  error: string;
+  node: string;
+  onConfirm: () => void;
+  onKeep: () => void;
+}) {
+  return (
+    <main className="flex min-h-dvh items-center justify-center bg-slate-950 px-5 text-slate-100">
+      <section className="w-full max-w-lg space-y-5 rounded-2xl border border-slate-700 bg-slate-900 p-7 shadow-xl">
+        <img src="/logo.png" alt="Pigeon Swarm" className="h-14 w-14" />
+        <h1 className="text-2xl font-semibold">
+          {copy.registrationSwitchTitle}
+        </h1>
+        <p className="text-sm break-all text-slate-300">
+          {copy.registrationSwitchBody
+            .replace('{node}', node)
+            .replace('{current}', current)}
+        </p>
+        {error && (
+          <p role="alert" className="text-sm text-red-300">
+            {error}
+          </p>
+        )}
+        <button
+          type="button"
+          disabled={checking}
+          onClick={onConfirm}
+          className="w-full rounded-lg bg-indigo-600 px-4 py-3 font-medium text-white disabled:opacity-50"
+        >
+          {checking ? copy.checking : copy.registrationSwitchConfirm}
+        </button>
+        <button
+          type="button"
+          disabled={checking}
+          onClick={onKeep}
+          className="w-full rounded-lg border border-slate-600 px-4 py-3 font-medium text-white disabled:opacity-50"
+        >
+          {copy.registrationSwitchKeep}
+        </button>
+      </section>
+    </main>
+  );
+}
+
 export function IndependentClient() {
   const [selected, setSelected] = useState(clientNodeForDocument);
   const [registration, setRegistration] = useState(pendingRegistrationLink);
@@ -88,14 +166,16 @@ export function IndependentClient() {
   )
     ? nodeChoiceUrl.href
     : '/connect';
-  const registrationNode =
-    registration && !choosing && registration.node !== selected?.url
-      ? registration.node
-      : null;
+  const registrationNode = registrationNodeFor(
+    registration,
+    choosing,
+    selected,
+  );
   const [endpoint, setEndpoint] = useState(selected?.url ?? '');
   const [ready, setReady] = useState(false);
+  // A registration link without a chosen node is adopted right away.
   const [checking, setChecking] = useState(
-    !choosing && Boolean(registrationNode ? !selected : selected),
+    () => !choosing && Boolean(registrationNode ? !selected : selected),
   );
   const [error, setError] = useState('');
 
@@ -231,42 +311,18 @@ export function IndependentClient() {
       </>
     );
 
-  if (registrationNode && selected)
+  const registrationSwitch = registrationSwitchFor(registrationNode, selected);
+
+  if (registrationSwitch)
     return (
-      <main className="flex min-h-dvh items-center justify-center bg-slate-950 px-5 text-slate-100">
-        <section className="w-full max-w-lg space-y-5 rounded-2xl border border-slate-700 bg-slate-900 p-7 shadow-xl">
-          <img src="/logo.png" alt="Pigeon Swarm" className="h-14 w-14" />
-          <h1 className="text-2xl font-semibold">
-            {copy.registrationSwitchTitle}
-          </h1>
-          <p className="text-sm break-all text-slate-300">
-            {copy.registrationSwitchBody
-              .replace('{node}', registrationNode)
-              .replace('{current}', selected.url)}
-          </p>
-          {error && (
-            <p role="alert" className="text-sm text-red-300">
-              {error}
-            </p>
-          )}
-          <button
-            type="button"
-            disabled={checking}
-            onClick={() => void adoptRegistrationNode(registrationNode)}
-            className="w-full rounded-lg bg-indigo-600 px-4 py-3 font-medium text-white disabled:opacity-50"
-          >
-            {checking ? copy.checking : copy.registrationSwitchConfirm}
-          </button>
-          <button
-            type="button"
-            disabled={checking}
-            onClick={keepCurrentNode}
-            className="w-full rounded-lg border border-slate-600 px-4 py-3 font-medium text-white disabled:opacity-50"
-          >
-            {copy.registrationSwitchKeep}
-          </button>
-        </section>
-      </main>
+      <RegistrationSwitchPrompt
+        checking={checking}
+        current={registrationSwitch.current}
+        error={error}
+        node={registrationSwitch.node}
+        onConfirm={() => void adoptRegistrationNode(registrationSwitch.node)}
+        onKeep={keepCurrentNode}
+      />
     );
 
   return (

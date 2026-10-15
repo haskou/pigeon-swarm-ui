@@ -4,7 +4,7 @@ import type { NodeAccessActorId } from '../../../domain/value-objects/NodeAccess
 
 import { IdentityId } from '../../../../identities/domain/value-objects/IdentityId';
 
-/** Resolves the signed-in session that signs the actor's node owner requests. */
+/** Resolves the signed-in session that signs the actor's owner requests. */
 export class NodeAccessSessions {
   public constructor(private readonly identities: IdentityAccessContexts) {}
 

@@ -3,7 +3,7 @@ import type { Timestamp } from '@haskou/value-objects';
 import type { DomainEvent } from '../../../../shared/domain/DomainEvent';
 import type { NodeAccessIdentityId } from '../value-objects/NodeAccessIdentityId';
 
-/** The node owner followed or reconfigured another node owner's shared block list. */
+/** The node owner followed, or reconfigured, another owner's block list. */
 export class NodeBlockSourceFollowed implements DomainEvent {
   public readonly aggregateId: string;
 

@@ -5,6 +5,7 @@ import type {
   NodeRegistrationCodeViewModel,
   NodeRegistrationModeViewModel,
 } from '../../../../contexts/nodeAccess/presentation/view-models/NodeAccessViewModels';
+import type { NodeAccessAction } from './useNodeAccessAction';
 
 import { Field } from '../../../../contexts/identities/presentation/auth/Field';
 import { createRegistrationUrl } from '../../../../contexts/nodeAccess/presentation/view-models/registrationLink';
@@ -129,14 +130,16 @@ function RegistrationCodeRow({
   );
 }
 
-export function NodeRegistrationPanel({
+function CreateRegistrationLink({
+  action,
+  onIssued,
   session,
 }: {
+  action: NodeAccessAction;
+  onIssued: (codes: NodeRegistrationCodeViewModel[]) => void;
   session: Session;
 }): ReactElement {
-  const { busy, error, notice, run } = useNodeAccessAction();
-  const [mode, setMode] = useState<NodeRegistrationModeViewModel | null>(null);
-  const [codes, setCodes] = useState<NodeRegistrationCodeViewModel[]>([]);
+  const { busy, run } = action;
   const [uses, setUses] = useState('1');
   const [expiry, setExpiry] = useState(DEFAULT_EXPIRY);
   const [issuedLink, setIssuedLink] = useState<null | string>(null);
@@ -144,6 +147,87 @@ export function NodeRegistrationPanel({
   const usesValid =
     Number.isInteger(maxUses) && maxUses >= 1 && maxUses <= MAX_CODE_USES;
 
+  const issueCode = (event: FormEvent) => {
+    event.preventDefault();
+
+    if (!usesValid || busy) return;
+
+    void run('issue', async () => {
+      const issued =
+        await applicationContainer.nodeAccess.issueRegistrationCode(
+          { expiresAt: Date.now() + expiry, maxUses },
+          session,
+        );
+
+      setIssuedLink(
+        createRegistrationUrl({ code: issued.code, node: API_SERVER_URL }),
+      );
+      onIssued(
+        await applicationContainer.nodeAccess.getRegistrationCodes(session),
+      );
+    });
+  };
+
+  return (
+    <NodeAccessSection title={copy.nodeAccess.createLinkTitle}>
+      {issuedLink ? (
+        <IssuedRegistrationLink
+          link={issuedLink}
+          onDone={() => setIssuedLink(null)}
+        />
+      ) : (
+        <form
+          className="grid gap-3 sm:grid-cols-[8rem_minmax(0,1fr)_auto] sm:items-end"
+          onSubmit={issueCode}
+        >
+          <Field label={copy.nodeAccess.uses}>
+            <input
+              type="number"
+              min={1}
+              max={MAX_CODE_USES}
+              step={1}
+              required
+              value={uses}
+              onChange={(event) => setUses(event.target.value)}
+              className="ui-field-control px-3 py-2 text-sm"
+              title={copy.nodeAccess.usesHelp}
+            />
+          </Field>
+          <Field label={copy.nodeAccess.expiresIn}>
+            <select
+              value={expiry}
+              onChange={(event) => setExpiry(Number(event.target.value))}
+              className="ui-field-control px-3 py-2 text-sm"
+            >
+              {expiryOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <button
+            type="submit"
+            className="ui-button ui-button-primary"
+            disabled={!usesValid || busy !== null}
+          >
+            {copy.nodeAccess.createLink}
+          </button>
+        </form>
+      )}
+    </NodeAccessSection>
+  );
+}
+
+export function NodeRegistrationPanel({
+  session,
+}: {
+  session: Session;
+}): ReactElement {
+  const action = useNodeAccessAction();
+  const { busy, error, notice, run } = action;
+  const [mode, setMode] = useState<NodeRegistrationModeViewModel | null>(null);
+  const [codes, setCodes] = useState<NodeRegistrationCodeViewModel[]>([]);
   useEffect(() => {
     void run(
       'load',
@@ -175,27 +259,6 @@ export function NodeRegistrationPanel({
       },
       { success: copy.nodeAccess.modeSaved },
     );
-  };
-
-  const issueCode = (event: FormEvent) => {
-    event.preventDefault();
-
-    if (!usesValid || busy) return;
-
-    void run('issue', async () => {
-      const issued =
-        await applicationContainer.nodeAccess.issueRegistrationCode(
-          { expiresAt: Date.now() + expiry, maxUses },
-          session,
-        );
-
-      setIssuedLink(
-        createRegistrationUrl({ code: issued.code, node: API_SERVER_URL }),
-      );
-      setCodes(
-        await applicationContainer.nodeAccess.getRegistrationCodes(session),
-      );
-    });
   };
 
   const revokeCode = (codeId: string) => {
@@ -244,53 +307,11 @@ export function NodeRegistrationPanel({
       </NodeAccessSection>
 
       {mode === 'codes' && (
-        <NodeAccessSection title={copy.nodeAccess.createLinkTitle}>
-          {issuedLink ? (
-            <IssuedRegistrationLink
-              link={issuedLink}
-              onDone={() => setIssuedLink(null)}
-            />
-          ) : (
-            <form
-              className="grid gap-3 sm:grid-cols-[8rem_minmax(0,1fr)_auto] sm:items-end"
-              onSubmit={issueCode}
-            >
-              <Field label={copy.nodeAccess.uses}>
-                <input
-                  type="number"
-                  min={1}
-                  max={MAX_CODE_USES}
-                  step={1}
-                  required
-                  value={uses}
-                  onChange={(event) => setUses(event.target.value)}
-                  className="ui-field-control px-3 py-2 text-sm"
-                  title={copy.nodeAccess.usesHelp}
-                />
-              </Field>
-              <Field label={copy.nodeAccess.expiresIn}>
-                <select
-                  value={expiry}
-                  onChange={(event) => setExpiry(Number(event.target.value))}
-                  className="ui-field-control px-3 py-2 text-sm"
-                >
-                  {expiryOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <button
-                type="submit"
-                className="ui-button ui-button-primary"
-                disabled={!usesValid || busy !== null}
-              >
-                {copy.nodeAccess.createLink}
-              </button>
-            </form>
-          )}
-        </NodeAccessSection>
+        <CreateRegistrationLink
+          action={action}
+          onIssued={setCodes}
+          session={session}
+        />
       )}
 
       {(mode === 'codes' || codes.length > 0) && (

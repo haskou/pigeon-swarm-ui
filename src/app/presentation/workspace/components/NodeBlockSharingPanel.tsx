@@ -249,6 +249,306 @@ function BlockSourceRow({
   );
 }
 
+function PublicationSection({
+  action,
+  onChange,
+  published,
+  session,
+}: {
+  action: NodeAccessAction;
+  onChange: (published: boolean) => void;
+  published: boolean | null;
+  session: Session;
+}): ReactElement {
+  const { busy, run } = action;
+
+  const togglePublication = () => {
+    if (busy || published === null) return;
+
+    void run(
+      'publication',
+      async () => {
+        onChange(
+          await applicationContainer.nodeAccess.changePublication(
+            !published,
+            session,
+          ),
+        );
+      },
+      { success: copy.nodeAccess.sourceUpdated },
+    );
+  };
+
+  return (
+    <NodeAccessSection
+      body={copy.nodeAccess.publicationBody}
+      title={copy.nodeAccess.publicationTitle}
+    >
+      {published === null ? null : (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="text-sm text-white/70">
+            {published
+              ? copy.nodeAccess.publicationOn
+              : copy.nodeAccess.publicationOff}
+          </span>
+          <button
+            type="button"
+            className={published ? 'ui-button' : 'ui-button ui-button-primary'}
+            disabled={busy !== null}
+            onClick={togglePublication}
+          >
+            {published
+              ? copy.nodeAccess.stopPublishing
+              : copy.nodeAccess.publish}
+          </button>
+        </div>
+      )}
+    </NodeAccessSection>
+  );
+}
+
+function FollowSourceForm({
+  action,
+  onFollowed,
+  session,
+}: {
+  action: NodeAccessAction;
+  onFollowed: (source: NodeBlockSourceViewModel) => void;
+  session: Session;
+}): ReactElement {
+  const { busy, run } = action;
+  const [owner, setOwner] = useState('');
+  const [origin, setOrigin] = useState('');
+  const [autoApply, setAutoApply] = useState(false);
+  const incomplete = !owner.trim() || !origin.trim();
+
+  const followSource = (event: FormEvent) => {
+    event.preventDefault();
+
+    if (busy || incomplete) return;
+
+    void run(
+      'follow',
+      async () => {
+        onFollowed(
+          await applicationContainer.nodeAccess.followSource(
+            {
+              autoApply,
+              origin: origin.trim(),
+              ownerIdentityId: await nodeAccessIdentityId(owner),
+            },
+            session,
+          ),
+        );
+        setOwner('');
+        setOrigin('');
+        setAutoApply(false);
+      },
+      { success: copy.nodeAccess.followed },
+    );
+  };
+
+  return (
+    <NodeAccessSection title={copy.nodeAccess.followTitle}>
+      <form className="grid gap-3" onSubmit={followSource}>
+        <Field label={copy.nodeAccess.owner}>
+          <input
+            value={owner}
+            onChange={(event) => setOwner(event.target.value)}
+            className="ui-field-control px-3 py-2 text-sm placeholder:text-white/30"
+            placeholder={copy.identityLookup.placeholder}
+            title={copy.identityLookup.help}
+          />
+        </Field>
+        <Field label={copy.nodeAccess.origin}>
+          <input
+            type="url"
+            inputMode="url"
+            value={origin}
+            onChange={(event) => setOrigin(event.target.value)}
+            className="ui-field-control px-3 py-2 text-sm placeholder:text-white/30"
+            placeholder={copy.nodeAccess.originPlaceholder}
+          />
+        </Field>
+        <label className="flex items-start gap-3 text-sm text-white/70">
+          <input
+            type="checkbox"
+            checked={autoApply}
+            onChange={(event) => setAutoApply(event.target.checked)}
+            className="mt-1"
+          />
+          <span>
+            {copy.nodeAccess.autoApply}
+            <span className="block text-xs text-white/45">
+              {copy.nodeAccess.autoApplyHelp}
+            </span>
+          </span>
+        </label>
+        <button
+          type="submit"
+          className="ui-button ui-button-primary justify-self-end"
+          disabled={incomplete || busy !== null}
+        >
+          {copy.nodeAccess.follow}
+        </button>
+      </form>
+    </NodeAccessSection>
+  );
+}
+
+function ExceptionList({
+  exceptions,
+  onRemove,
+  removing,
+}: {
+  exceptions: NodeBlockExceptionsViewModel | null;
+  onRemove: (target: NodeBlockTargetViewModel) => void;
+  removing: boolean;
+}): ReactElement {
+  const identityIds = exceptions?.identityIds ?? [];
+  const nodePeerIds = exceptions?.nodePeerIds ?? [];
+
+  if (identityIds.length === 0 && nodePeerIds.length === 0) {
+    return <NodeAccessEmpty text={copy.nodeAccess.exceptionsEmpty} />;
+  }
+
+  const removeButton = (target: NodeBlockTargetViewModel) => (
+    <button
+      type="button"
+      className="ui-button"
+      disabled={removing}
+      onClick={() => onRemove(target)}
+    >
+      {copy.nodeAccess.remove}
+    </button>
+  );
+
+  return (
+    <div>
+      {identityIds.map((identityId) => (
+        <NodeAccessIdentityRow
+          key={identityId}
+          identityId={identityId}
+          action={removeButton({ identityId })}
+        />
+      ))}
+      {nodePeerIds.map((nodePeerId) => (
+        <NodeAccessPeerRow
+          key={nodePeerId}
+          peerId={nodePeerId}
+          action={removeButton({ nodePeerId })}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ExceptionsSection({
+  action,
+  exceptions,
+  onChange,
+  session,
+}: {
+  action: NodeAccessAction;
+  exceptions: NodeBlockExceptionsViewModel | null;
+  onChange: (exceptions: NodeBlockExceptionsViewModel) => void;
+  session: Session;
+}): ReactElement {
+  const { busy, run } = action;
+  const [kind, setKind] = useState<NodeBlockTargetKind>('identity');
+  const [input, setInput] = useState('');
+  const isIdentity = kind === 'identity';
+
+  const changeException = (
+    target: () => NodeBlockTargetViewModel | Promise<NodeBlockTargetViewModel>,
+    excepted: boolean,
+    after?: () => void,
+  ) => {
+    if (busy) return;
+
+    void run(
+      'exception',
+      async () => {
+        const resolved = await target();
+
+        onChange(
+          excepted
+            ? await applicationContainer.nodeAccess.except(resolved, session)
+            : await applicationContainer.nodeAccess.removeException(
+                resolved,
+                session,
+              ),
+        );
+        after?.();
+      },
+      { success: copy.nodeAccess.exceptionsUpdated },
+    );
+  };
+
+  const addException = (event: FormEvent) => {
+    event.preventDefault();
+
+    if (!input.trim()) return;
+
+    changeException(
+      async () =>
+        isIdentity
+          ? { identityId: await nodeAccessIdentityId(input) }
+          : { nodePeerId: input.trim() },
+      true,
+      () => setInput(''),
+    );
+  };
+
+  return (
+    <NodeAccessSection
+      body={copy.nodeAccess.exceptionsBody}
+      title={copy.nodeAccess.exceptionsTitle}
+    >
+      <ExceptionList
+        exceptions={exceptions}
+        onRemove={(target) => changeException(() => target, false)}
+        removing={busy !== null}
+      />
+      <form className="grid gap-2" onSubmit={addException}>
+        <SegmentedControl
+          dense
+          onChange={setKind}
+          options={[
+            { label: copy.nodeAccess.identity, value: 'identity' },
+            { label: copy.nodeAccess.node, value: 'node' },
+          ]}
+          value={kind}
+        />
+        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <input
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            aria-label={
+              isIdentity
+                ? copy.identityLookup.label
+                : copy.nodeAccess.nodePeerLabel
+            }
+            className="ui-field-control px-3 py-2 text-sm placeholder:text-white/30"
+            placeholder={
+              isIdentity
+                ? copy.identityLookup.placeholder
+                : copy.nodeAccess.nodePeerPlaceholder
+            }
+          />
+          <button
+            type="submit"
+            className="ui-button"
+            disabled={!input.trim() || busy !== null}
+          >
+            {copy.nodeAccess.exceptionsTitle}
+          </button>
+        </div>
+      </form>
+    </NodeAccessSection>
+  );
+}
+
 export function NodeBlockSharingPanel({
   session,
 }: {
@@ -260,12 +560,6 @@ export function NodeBlockSharingPanel({
   const [sources, setSources] = useState<NodeBlockSourceViewModel[]>([]);
   const [exceptions, setExceptions] =
     useState<NodeBlockExceptionsViewModel | null>(null);
-  const [sourceOwner, setSourceOwner] = useState('');
-  const [sourceOrigin, setSourceOrigin] = useState('');
-  const [sourceAutoApply, setSourceAutoApply] = useState(false);
-  const [exceptionKind, setExceptionKind] =
-    useState<NodeBlockTargetKind>('identity');
-  const [exceptionInput, setExceptionInput] = useState('');
 
   useEffect(() => {
     void run(
@@ -295,49 +589,6 @@ export function NodeBlockSharingPanel({
     ]);
   };
 
-  const togglePublication = () => {
-    if (busy || published === null) return;
-
-    void run(
-      'publication',
-      async () => {
-        setPublished(
-          await applicationContainer.nodeAccess.changePublication(
-            !published,
-            session,
-          ),
-        );
-      },
-      { success: copy.nodeAccess.sourceUpdated },
-    );
-  };
-
-  const followSource = (event: FormEvent) => {
-    event.preventDefault();
-
-    if (busy || !sourceOwner.trim() || !sourceOrigin.trim()) return;
-
-    void run(
-      'follow',
-      async () => {
-        replaceSource(
-          await applicationContainer.nodeAccess.followSource(
-            {
-              autoApply: sourceAutoApply,
-              origin: sourceOrigin.trim(),
-              ownerIdentityId: await nodeAccessIdentityId(sourceOwner),
-            },
-            session,
-          ),
-        );
-        setSourceOwner('');
-        setSourceOrigin('');
-        setSourceAutoApply(false);
-      },
-      { success: copy.nodeAccess.followed },
-    );
-  };
-
   const unfollowSource = (ownerIdentityId: string) => {
     if (busy || !window.confirm(copy.nodeAccess.unfollowConfirm)) return;
 
@@ -355,91 +606,16 @@ export function NodeBlockSharingPanel({
     );
   };
 
-  const changeException = (
-    target: () => Promise<NodeBlockTargetViewModel>,
-    excepted: boolean,
-    after?: () => void,
-  ) => {
-    if (busy) return;
-
-    void run(
-      'exception',
-      async () => {
-        const resolved = await target();
-
-        setExceptions(
-          excepted
-            ? await applicationContainer.nodeAccess.except(resolved, session)
-            : await applicationContainer.nodeAccess.removeException(
-                resolved,
-                session,
-              ),
-        );
-        after?.();
-      },
-      { success: copy.nodeAccess.exceptionsUpdated },
-    );
-  };
-
-  const addException = (event: FormEvent) => {
-    event.preventDefault();
-
-    if (!exceptionInput.trim()) return;
-
-    changeException(
-      async () =>
-        exceptionKind === 'identity'
-          ? { identityId: await nodeAccessIdentityId(exceptionInput) }
-          : { nodePeerId: exceptionInput.trim() },
-      true,
-      () => setExceptionInput(''),
-    );
-  };
-
-  const removeExceptionButton = (target: NodeBlockTargetViewModel) => (
-    <button
-      type="button"
-      className="ui-button"
-      disabled={busy !== null}
-      onClick={() => changeException(async () => target, false)}
-    >
-      {copy.nodeAccess.remove}
-    </button>
-  );
-  const hasExceptions =
-    !!exceptions &&
-    (exceptions.identityIds.length > 0 || exceptions.nodePeerIds.length > 0);
-
   return (
     <div className="grid content-start gap-6" data-testid="node-sharing-panel">
       <NodeAccessStatus error={error} notice={notice} />
 
-      <NodeAccessSection
-        body={copy.nodeAccess.publicationBody}
-        title={copy.nodeAccess.publicationTitle}
-      >
-        {published === null ? null : (
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="text-sm text-white/70">
-              {published
-                ? copy.nodeAccess.publicationOn
-                : copy.nodeAccess.publicationOff}
-            </span>
-            <button
-              type="button"
-              className={
-                published ? 'ui-button' : 'ui-button ui-button-primary'
-              }
-              disabled={busy !== null}
-              onClick={togglePublication}
-            >
-              {published
-                ? copy.nodeAccess.stopPublishing
-                : copy.nodeAccess.publish}
-            </button>
-          </div>
-        )}
-      </NodeAccessSection>
+      <PublicationSection
+        action={action}
+        onChange={setPublished}
+        published={published}
+        session={session}
+      />
 
       <NodeAccessSection title={copy.nodeAccess.sourcesTitle}>
         {sources.length === 0 ? (
@@ -460,113 +636,18 @@ export function NodeBlockSharingPanel({
         )}
       </NodeAccessSection>
 
-      <NodeAccessSection title={copy.nodeAccess.followTitle}>
-        <form className="grid gap-3" onSubmit={followSource}>
-          <Field label={copy.nodeAccess.owner}>
-            <input
-              value={sourceOwner}
-              onChange={(event) => setSourceOwner(event.target.value)}
-              className="ui-field-control px-3 py-2 text-sm placeholder:text-white/30"
-              placeholder={copy.identityLookup.placeholder}
-              title={copy.identityLookup.help}
-            />
-          </Field>
-          <Field label={copy.nodeAccess.origin}>
-            <input
-              type="url"
-              inputMode="url"
-              value={sourceOrigin}
-              onChange={(event) => setSourceOrigin(event.target.value)}
-              className="ui-field-control px-3 py-2 text-sm placeholder:text-white/30"
-              placeholder={copy.nodeAccess.originPlaceholder}
-            />
-          </Field>
-          <label className="flex items-start gap-3 text-sm text-white/70">
-            <input
-              type="checkbox"
-              checked={sourceAutoApply}
-              onChange={(event) => setSourceAutoApply(event.target.checked)}
-              className="mt-1"
-            />
-            <span>
-              {copy.nodeAccess.autoApply}
-              <span className="block text-xs text-white/45">
-                {copy.nodeAccess.autoApplyHelp}
-              </span>
-            </span>
-          </label>
-          <button
-            type="submit"
-            className="ui-button ui-button-primary justify-self-end"
-            disabled={
-              !sourceOwner.trim() || !sourceOrigin.trim() || busy !== null
-            }
-          >
-            {copy.nodeAccess.follow}
-          </button>
-        </form>
-      </NodeAccessSection>
+      <FollowSourceForm
+        action={action}
+        onFollowed={replaceSource}
+        session={session}
+      />
 
-      <NodeAccessSection
-        body={copy.nodeAccess.exceptionsBody}
-        title={copy.nodeAccess.exceptionsTitle}
-      >
-        {hasExceptions ? (
-          <div>
-            {exceptions.identityIds.map((identityId) => (
-              <NodeAccessIdentityRow
-                key={identityId}
-                identityId={identityId}
-                action={removeExceptionButton({ identityId })}
-              />
-            ))}
-            {exceptions.nodePeerIds.map((nodePeerId) => (
-              <NodeAccessPeerRow
-                key={nodePeerId}
-                peerId={nodePeerId}
-                action={removeExceptionButton({ nodePeerId })}
-              />
-            ))}
-          </div>
-        ) : (
-          <NodeAccessEmpty text={copy.nodeAccess.exceptionsEmpty} />
-        )}
-        <form className="grid gap-2" onSubmit={addException}>
-          <SegmentedControl
-            dense
-            onChange={setExceptionKind}
-            options={[
-              { label: copy.nodeAccess.identity, value: 'identity' },
-              { label: copy.nodeAccess.node, value: 'node' },
-            ]}
-            value={exceptionKind}
-          />
-          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-            <input
-              value={exceptionInput}
-              onChange={(event) => setExceptionInput(event.target.value)}
-              aria-label={
-                exceptionKind === 'identity'
-                  ? copy.identityLookup.label
-                  : copy.nodeAccess.nodePeerLabel
-              }
-              className="ui-field-control px-3 py-2 text-sm placeholder:text-white/30"
-              placeholder={
-                exceptionKind === 'identity'
-                  ? copy.identityLookup.placeholder
-                  : copy.nodeAccess.nodePeerPlaceholder
-              }
-            />
-            <button
-              type="submit"
-              className="ui-button"
-              disabled={!exceptionInput.trim() || busy !== null}
-            >
-              {copy.nodeAccess.exceptionsTitle}
-            </button>
-          </div>
-        </form>
-      </NodeAccessSection>
+      <ExceptionsSection
+        action={action}
+        exceptions={exceptions}
+        onChange={setExceptions}
+        session={session}
+      />
     </div>
   );
 }

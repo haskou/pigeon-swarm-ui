@@ -39,7 +39,7 @@ function approverWith(pending: {
 } {
   const api = mock<PigeonNodeAccessApi>();
   const sessions = mock<NodeAccessSessions>();
-  sessions.find.mockReturnValue(mock<Session>());
+  sessions.find.mockReturnValue({} as Session);
   api.getPendingEntries.mockResolvedValue({
     ...pending,
     ownerIdentityId: sourceOwner,

@@ -28,10 +28,11 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
-import { NodeBlockSharingPanel } from './NodeBlockSharingPanel';
-import { NodeBlocksPanel } from './NodeBlocksPanel';
 import { NodeNetworksPanel } from './NodeNetworksPanel';
-import { NodeRegistrationPanel } from './NodeRegistrationPanel';
+import {
+  NodeOwnerSectionPanel,
+  nodeOwnerSectionTabs,
+} from './NodeOwnerSections';
 import {
   NetworkSynchronizationPanel,
   ReplicationStatusPanel,
@@ -533,13 +534,7 @@ export function NodeSettingsDialog({
       'peers',
       copy.nodeSettings.peersTab.replace('{count}', String(peers.length)),
     ],
-    ...(isOwner
-      ? ([
-          ['registration', copy.nodeAccess.registrationTab],
-          ['blocks', copy.nodeAccess.blocksTab],
-          ['sharing', copy.nodeAccess.sharingTab],
-        ] as const)
-      : []),
+    ...nodeOwnerSectionTabs(isOwner),
   ];
 
   useEffect(() => {
@@ -768,17 +763,11 @@ export function NodeSettingsDialog({
                 />
               )}
 
-              {isOwner && activeSection === 'registration' && (
-                <NodeRegistrationPanel session={session} />
-              )}
-
-              {isOwner && activeSection === 'blocks' && (
-                <NodeBlocksPanel node={node} session={session} />
-              )}
-
-              {isOwner && activeSection === 'sharing' && (
-                <NodeBlockSharingPanel session={session} />
-              )}
+              <NodeOwnerSectionPanel
+                isOwner={isOwner}
+                section={activeSection}
+                session={session}
+              />
             </div>
           </div>
         </div>
