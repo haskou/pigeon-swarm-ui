@@ -184,6 +184,20 @@ describe('CommunityMlsRoster', () => {
       expect(channel().has(id('other'))).toBe(false);
     });
 
+    it('ignores channel permissions the node forges or a member without manage_channels signs', () => {
+      history.append(
+        cast.owner,
+        'channel_permissions_updated',
+        { channelId, visibleRoleIds: [] },
+        cast.stranger.keyPair,
+      );
+      history.restrictChannel(cast.moderator, channelId, [moderators]);
+
+      expect(channel().has(id('other'))).toBe(false);
+      expect(channel().has(id('moderator'))).toBe(false);
+      expect(channel().has(id('member'))).toBe(true);
+    });
+
     it('admits no one to a channel the signed history lacks or deleted', () => {
       expect(
         CommunityMlsRoster.replay(history.operations(), 'missing').has(
