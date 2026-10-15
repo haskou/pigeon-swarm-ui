@@ -40,12 +40,22 @@ import { GroupMailboxKeySchedule } from '../crypto/GroupMailboxKeySchedule';
  * generation and is never re-encrypted. A record still queued after the
  * expiry is dropped and reported. `items` lists each queued record as
  * held, retrying or pending. An ephemeral record (`sendEphemeral`) is never
- * queued: it is appended once or dropped. Logs carry counts only.
+ * queued: it is appended once or dropped, and none is sealed in a
+ * conversation whose queue has held a record past `EPHEMERAL_HOLD_MS`.
+ * Logs carry counts only.
  */
 export class GroupMailboxOutbox {
   /** The generation index of a message held before it was ever sealed. */
   private static readonly UNSEALED = -1;
 
+  /**
+   * How long a queued record may wait for its recipient before no ephemeral
+   * record is sealed in its conversation. Each ephemeral record skipped for
+   * that recipient still advances this sender's MLS ratchet, and a receiver
+   * ratchets at most 200 generations forward: at one typing notice per
+   * 10 seconds, 15 minutes keep the gap below 100.
+   */
+  public static readonly EPHEMERAL_HOLD_MS = 15 * 60 * 1000;
   public static readonly EXPIRY_MS = 14 * 24 * 60 * 60 * 1000;
   public static readonly RETRY_BASE_MS = 5_000;
   public static readonly RETRY_MAX_MS = 5 * 60 * 1000;
@@ -293,6 +303,15 @@ export class GroupMailboxOutbox {
       // eslint-disable-next-line no-console
       console.debug('Group outbox remove failed.');
     });
+  }
+
+  /** Whether a record of the conversation waited past the ephemeral hold. */
+  private heldTooLong(conversationId: string): boolean {
+    const cutoff = this.clock() - GroupMailboxOutbox.EPHEMERAL_HOLD_MS;
+
+    return [...this.rows.values()].some(
+      (row) => row.conversationId === conversationId && row.createdAt < cutoff,
+    );
   }
 
   /** Keeps the row in memory; persists it, or runs from memory alone. */
@@ -666,7 +685,7 @@ export class GroupMailboxOutbox {
     body: Uint8Array,
   ): Promise<void> {
     try {
-      if (this.stopped) return;
+      if (this.stopped || this.heldTooLong(conversationId)) return;
 
       if (
         await this.removalPending(
