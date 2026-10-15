@@ -670,6 +670,29 @@ describe('MlsCommunityEngine', () => {
     const demoteCarol = (): void => {
       tamper = (history) => history.assign(cast.alice, cast.carol, []);
     };
+    /**
+     * The member's engine behind a node that withholds one operation of the
+     * signed history, and everything built on it, from it.
+     */
+    const withholding = (
+      name: string,
+      store: MlsStateStore,
+      withheld: string,
+    ): MlsCommunityEngine =>
+      new MlsCommunityEngine(
+        cast[name].signer(),
+        store,
+        () => node.transportFor(id(name)),
+        (groupId) => () =>
+          Promise.resolve(
+            CommunityRosterHistory.of(
+              historyOf()
+                .operations()
+                .filter((operation) => operation.getHash() !== withheld),
+              groupId.split(':')[1],
+            ),
+          ),
+      );
 
     it('accepts an add made before the demotion by a member who saw the demotion first', async () => {
       const { alice, bob, carol, mallory } = await carolManages();
@@ -691,9 +714,46 @@ describe('MlsCommunityEngine', () => {
       await expect(carol.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
         'same epoch',
       );
-      // A welcome opens only from a manager the joiner still sees as one.
+      // Nobody the joiner sees as a manager has committed on top of the add.
       await expect(mallory.engine.sync(COMMUNITY)).resolves.toBe(true);
       await expect(mallory.engine.hasGroup(COMMUNITY)).resolves.toBe(false);
+    });
+
+    it('lets a joiner who sees its welcomer demoted in once a manager commits on top of the add', async () => {
+      const { alice, carol, mallory } = await carolManages();
+
+      await mallory.engine.publishKeyPackages(COMMUNITY);
+      await carol.engine.admit(COMMUNITY, [id('mallory')]);
+      demoteCarol();
+      // The owner takes the add, then binds the demotion on top of it.
+      await alice.engine.reconcile(COMMUNITY);
+
+      await expect(mallory.engine.sync(COMMUNITY)).resolves.toBe(true);
+      await expect(mallory.engine.hasGroup(COMMUNITY)).resolves.toBe(true);
+      const ciphertext = await alice.engine.encrypt(COMMUNITY, 'welcome');
+
+      await expect(mallory.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
+        'welcome',
+      );
+    });
+
+    it('lets a joiner whose welcomer was kicked in once a manager commits after another member bound the kick', async () => {
+      const { alice, bob, carol, mallory } = await carolManages();
+
+      await mallory.engine.publishKeyPackages(COMMUNITY);
+      await carol.engine.admit(COMMUNITY, [id('mallory')]);
+      roster.delete(id('carol'));
+      // Bob takes the add and removes the kicked carol, binding the kick.
+      await bob.engine.reconcile(COMMUNITY);
+      await alice.engine.reconcile(COMMUNITY);
+
+      await expect(mallory.engine.sync(COMMUNITY)).resolves.toBe(true);
+      await expect(mallory.engine.hasGroup(COMMUNITY)).resolves.toBe(true);
+      const ciphertext = await alice.engine.encrypt(COMMUNITY, 'welcome');
+
+      await expect(mallory.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
+        'welcome',
+      );
     });
 
     it('rejects an add a demoted member makes after the demotion', async () => {
@@ -737,6 +797,69 @@ describe('MlsCommunityEngine', () => {
 
       await expect(bob.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
         'still ours',
+      );
+    });
+
+    it('stops trusting a demoted manager once a manager commit binds a demotion the node withholds', async () => {
+      const { alice, bob, carol, mallory } = await carolManages();
+      const beforeDemotion = headsNow();
+
+      demoteCarol();
+      const withheld = withholding('bob', bob.store, headsNow()[0]);
+
+      // The owner binds the demotion into the group as soon as she sees it.
+      await alice.engine.reconcile(COMMUNITY);
+      await mallory.engine.publishKeyPackages(COMMUNITY);
+      await publishCommit(
+        'carol',
+        await (
+          await rogueGroupOf('carol', carol.store, beforeDemotion)
+        ).add([keyPackageOf('mallory')]),
+      );
+
+      await expect(withheld.reconcile(COMMUNITY)).resolves.toBe(true);
+      await expect(withheld.identities(COMMUNITY)).resolves.not.toContain(
+        id('mallory'),
+      );
+      // Once the node serves the demotion, bob follows the owner.
+      await expect(bob.engine.sync(COMMUNITY)).resolves.toBe(true);
+      const ciphertext = await alice.engine.encrypt(COMMUNITY, 'still ours');
+
+      await expect(bob.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
+        'still ours',
+      );
+      await expect(bob.engine.identities(COMMUNITY)).resolves.not.toContain(
+        id('mallory'),
+      );
+    });
+
+    it('steps back from a demoted manager add once a manager commit binds a demotion the node withholds', async () => {
+      const { alice, bob, carol, mallory } = await carolManages();
+      const beforeDemotion = headsNow();
+
+      demoteCarol();
+      const withheld = withholding('bob', bob.store, headsNow()[0]);
+
+      await alice.engine.reconcile(COMMUNITY);
+      // The node serves carol's add before the owner's commit.
+      const binding = node.records.pop() as MlsRecordResource;
+
+      await mallory.engine.publishKeyPackages(COMMUNITY);
+      await publishCommit(
+        'carol',
+        await (
+          await rogueGroupOf('carol', carol.store, beforeDemotion)
+        ).add([keyPackageOf('mallory')]),
+      );
+      await expect(withheld.sync(COMMUNITY)).resolves.toBe(true);
+      await expect(withheld.identities(COMMUNITY)).resolves.toContain(
+        id('mallory'),
+      );
+      node.records.push(binding);
+
+      await expect(withheld.sync(COMMUNITY)).resolves.toBe(true);
+      await expect(withheld.identities(COMMUNITY)).resolves.not.toContain(
+        id('mallory'),
       );
     });
 
