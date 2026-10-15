@@ -26,6 +26,7 @@ import type { MessageContextMenuState } from './messageContextMenu';
 import { useRealtimeEvents } from '../../../../app/presentation/realtime/useRealtimeEvents';
 import { useAttachmentDownload } from '../../../../contexts/attachments/presentation/hooks/useAttachmentDownload';
 import { ConversationTimeline } from '../../../../contexts/conversations/presentation/view-models/ConversationTimeline';
+import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { useIdentityDirectory } from '../../../../contexts/identities/presentation/hooks/useIdentityDirectory';
 import { MessageCollectionDialog } from '../../../../contexts/messages/presentation/components/MessageCollectionDialog';
 import { useUnreadMessages } from '../../../../contexts/messages/presentation/hooks/useUnreadMessages';
@@ -808,6 +809,15 @@ export function GlassWorkspace({
     },
     [clearUnreadMessages, scrollMessagesToBottom],
   );
+  const refreshGroupMemberIdentity = useCallback(
+    (identityId: string): void => {
+      void applicationContainer.identities
+        .refresh(IdentityId.normalize(identityId))
+        .then(rememberIdentity)
+        .catch(() => undefined);
+    },
+    [rememberIdentity],
+  );
 
   useDirectMessageMailboxSync({
     activeConversation,
@@ -839,6 +849,7 @@ export function GlassWorkspace({
     activeConversation,
     onErrorChange: setSendError,
     onHistoryRestored: handleGroupHistoryRestored,
+    onIdentityUpdated: refreshGroupMemberIdentity,
     onMessagesChange: setMessages,
     onPollChanges: conversationPolls.fold,
     onTypingChanges: receiveGroupTyping,
@@ -901,6 +912,7 @@ export function GlassWorkspace({
     activeConversationId: WorkspaceDerivedState.id(activeConversation),
     conversations,
     onActivity: handleGroupActivity,
+    onIdentityUpdated: refreshGroupMemberIdentity,
     session,
   });
 

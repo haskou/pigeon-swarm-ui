@@ -1,5 +1,6 @@
 import type { DirectDeletedRecord } from '../../../../../contexts/mailboxes/domain/DirectDeletedRecord';
 import type { DirectEditedRecord } from '../../../../../contexts/mailboxes/domain/DirectEditedRecord';
+import type { DirectIdentityUpdatedRecord } from '../../../../../contexts/mailboxes/domain/DirectIdentityUpdatedRecord';
 import type { DirectPinRecord } from '../../../../../contexts/mailboxes/domain/DirectPinRecord';
 import type { DirectPollCloseRecord } from '../../../../../contexts/mailboxes/domain/DirectPollCloseRecord';
 import type { DirectPollRecord } from '../../../../../contexts/mailboxes/domain/DirectPollRecord';
@@ -27,6 +28,7 @@ describe(DirectMessageMailboxRecord.name, () => {
   const records: {
     deleted: DirectDeletedRecord;
     edited: DirectEditedRecord;
+    identityUpdated: DirectIdentityUpdatedRecord;
     pin: DirectPinRecord;
     poll: DirectPollRecord;
     pollClose: DirectPollCloseRecord;
@@ -55,6 +57,13 @@ describe(DirectMessageMailboxRecord.name, () => {
       previousMessageIds: ['message-1'],
       targetMessageId: 'message-1',
       type: 'edited',
+    },
+    identityUpdated: {
+      authorId: 'bob',
+      conversationId,
+      createdAt: 950,
+      id: 'identity-updated-1',
+      type: 'identity_updated',
     },
     pin: {
       action: 'pin',
@@ -249,6 +258,7 @@ describe(DirectMessageMailboxRecord.name, () => {
       ['a poll vote record', records.pollVote],
       ['a poll close record', records.pollClose],
       ['a typing record', records.typing],
+      ['an identity update record', records.identityUpdated],
     ])('rejects %s that belongs to another conversation', (_label, record) => {
       expect(
         DirectMessageMailboxRecord.decode(

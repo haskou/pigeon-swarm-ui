@@ -16,8 +16,9 @@ import { DirectMessageMailboxRecord } from '../../messages/infrastructure/mailbo
  * inbox already checked who may write each record; a message whose payload
  * does not read drops only its own change. Polls, votes and closes pass
  * through as they are; the poll board validates and folds them. A typing
- * notice becomes a typing change for its author. Read receipts never travel
- * in a group.
+ * notice becomes a typing change for its author, and an identity update an
+ * identity update change for its author. Read receipts never travel in a
+ * group.
  */
 export class GroupConversationTimeline {
   public constructor(
@@ -60,6 +61,8 @@ export class GroupConversationTimeline {
             kind: 'typing',
           },
         ];
+      case DirectMailboxRecords.TYPE.identityUpdated:
+        return [{ identityId: record.authorId, kind: 'identity_updated' }];
       default:
         return [];
     }

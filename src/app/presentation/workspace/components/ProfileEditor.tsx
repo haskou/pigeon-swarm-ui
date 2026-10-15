@@ -49,6 +49,7 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
+import { announceIdentityUpdate } from '../announceIdentityUpdate';
 import { DeviceManagementDialog } from './DeviceManagementDialog';
 import { DevicePairingDialog } from './DevicePairingDialog';
 import { DeviceStorageSection } from './DeviceStorageSection';
@@ -1032,6 +1033,7 @@ export function ProfileEditor({
           normalizedHandle,
           pictureFile,
         });
+        announceIdentityUpdate(session, conversations);
       }
 
       if (wantsPasswordChange) {

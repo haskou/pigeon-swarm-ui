@@ -253,7 +253,10 @@ function isDirectMessageRecord(value: unknown): value is DirectMessageRecord {
   }
 }
 
-/** The records only group conversations write: polls and typing. */
+/**
+ * The records only group conversations write: polls, typing and identity
+ * updates.
+ */
 function isGroupRecord(value: Record<string, unknown>): boolean {
   switch (value.type) {
     case 'poll':
@@ -263,6 +266,7 @@ function isGroupRecord(value: Record<string, unknown>): boolean {
     case 'poll_close':
       return typeof value.targetPollId === 'string';
     case 'typing':
+    case 'identity_updated':
       return true;
     default:
       return false;

@@ -9,6 +9,8 @@ export type GroupMessageMailboxSyncInput = {
   activeConversation: ConversationResource | undefined;
   onErrorChange: Dispatch<SetStateAction<string | null>>;
   onHistoryRestored: (conversationId: string) => void;
+  /** Receives each member that announced an identity update. */
+  onIdentityUpdated: (identityId: string) => void;
   onMessagesChange: Dispatch<SetStateAction<ChatMessage[]>>;
   /** Receives the poll changes of each restore and pass, when any. */
   onPollChanges: (changes: DirectMessageTimelineChange[]) => void;

@@ -51,6 +51,7 @@ describe(DirectMailboxRecords.name, () => {
       encryptedPayload: 'ciphertext-2',
       targetMessageId: 'message-1',
     }),
+    identityUpdated: DirectMailboxRecords.identityUpdated(base),
     pin: generated.pin(),
     poll: DirectMailboxRecords.poll({
       ...base,
@@ -144,6 +145,7 @@ describe(DirectMailboxRecords.name, () => {
 
   it.each([
     'deleted',
+    'identityUpdated',
     'pin',
     'poll',
     'pollClose',

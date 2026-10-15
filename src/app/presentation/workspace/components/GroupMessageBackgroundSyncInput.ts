@@ -9,5 +9,7 @@ export type GroupMessageBackgroundSyncInput = {
     conversationId: string,
     activity: GroupConversationActivity,
   ) => void;
+  /** Receives each member that announced an identity update. */
+  onIdentityUpdated: (identityId: string) => void;
   session: Session;
 };

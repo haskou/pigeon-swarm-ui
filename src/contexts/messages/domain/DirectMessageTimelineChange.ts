@@ -42,4 +42,5 @@ export type DirectMessageTimelineChange =
     }
   | { kind: 'read'; messageId: string }
   | { kind: 'removed'; messageId: string }
-  | { createdAt: number; identityId: string; kind: 'typing' };
+  | { createdAt: number; identityId: string; kind: 'typing' }
+  | { identityId: string; kind: 'identity_updated' };
