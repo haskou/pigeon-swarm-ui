@@ -1,4 +1,5 @@
 import 'fake-indexeddb/auto';
+import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
 import { mock, type MockProxy } from 'jest-mock-extended';
 
 import type { MlsStateStore } from '../../../../../contexts/communities/infrastructure/mls/MlsStateStore';
@@ -17,6 +18,7 @@ import { GroupMailboxGenesis } from '../../../../../contexts/groupMailboxes/doma
 import { GroupMailboxRoster } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxRoster';
 import { GroupMailboxMlsEngine } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxMlsEngine';
 import { GroupMailboxUnconfirmedError } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxUnconfirmedError';
+import { encodeBase64Url } from '../../../../../shared/infrastructure/encoding/base64url';
 import { MlsTestIdentity } from '../../../communities/infrastructure/mls/MlsTestIdentity';
 import { sealedGroupStores } from '../sealedGroupStores';
 
@@ -43,6 +45,14 @@ const managedByAlice = (): GroupMailboxRoster =>
     adminIds: [],
     creatorId: id('alice'),
     participantIds: NAMES.map(id),
+  });
+
+/** Alice created the conversation and made bob an admin; eve is listed too. */
+const bobAdministers = (): GroupMailboxRoster =>
+  GroupMailboxRoster.of({
+    adminIds: [id('bob')],
+    creatorId: id('alice'),
+    participantIds: [...NAMES, 'eve'].map(id),
   });
 
 /** A roster that names no manager lets every member add devices. */
@@ -156,6 +166,53 @@ const setup = async (
 
 const indices = async (member: GroupMailboxMlsEngine): Promise<number[]> =>
   (await member.readableGenerations(CONVERSATION)).map(({ index }) => index);
+
+/** A commit's id as every member derives it from the commit bytes. */
+const commitIdOf = (bytes: Uint8Array): string =>
+  SHA256Hash.from(encodeBase64Url(bytes)).toString();
+
+const UNWANTED_ID = new Error('Commit id not wanted');
+
+/**
+ * Commits with `make` until the commit id is `wanted`, as a member grinding
+ * for a low id would: a commit whose publishing fails is abandoned, so its
+ * committer stays in the epoch and commits again.
+ */
+const ground = async (
+  make: (
+    publish: (commit: GroupMailboxCommit) => Promise<void>,
+  ) => Promise<GroupMailboxCommit | undefined>,
+  wanted: (commitId: string) => boolean,
+): Promise<{ commit: Uint8Array; id: string }> => {
+  for (let attempt = 0; attempt < 64; attempt += 1) {
+    try {
+      const made = await make(({ commit }) =>
+        wanted(commitIdOf(commit))
+          ? Promise.resolve()
+          : Promise.reject(UNWANTED_ID),
+      );
+
+      return { commit: made!.commit, id: commitIdOf(made!.commit) };
+    } catch (error) {
+      if (error !== UNWANTED_ID) throw error;
+    }
+  }
+  throw new Error('No commit id was wanted');
+};
+
+/** An id in the upper half, so a rival grinds below it in a few tries. */
+const high = (commitId: string): boolean => commitId >= '8';
+
+/** Every order the commits can arrive in. */
+const ordersOf = <T>(items: T[]): T[][] =>
+  items.length <= 1
+    ? [items]
+    : items.flatMap((item, index) =>
+        ordersOf(items.filter((_, other) => other !== index)).map((rest) => [
+          item,
+          ...rest,
+        ]),
+      );
 
 describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
   beforeAll(async () => {
@@ -1049,6 +1106,226 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
         member.applyCommit(CONVERSATION, removal!.commit),
       ).rejects.toBeInstanceOf(MlsRejectedError);
       expect((await member.generation(CONVERSATION)).index).toBe(before.index);
+    }
+  });
+
+  it("lets an admin's removal of a member win the epoch over that member's own commit with a lower id", async () => {
+    roster = bobAdministers();
+    const { alice, bob, carol, dave } = await setup([
+      'alice',
+      'bob',
+      'carol',
+      'dave',
+    ]);
+    const phone = await engine('carol', { device: 'd2' }).createKeyPackage();
+    const removal = await ground(
+      (publish) => bob.remove(CONVERSATION, [id('carol')], publish),
+      high,
+    );
+    // Carol, about to be removed, grinds her own commit below the removal.
+    const own = await ground(
+      (publish) => carol.add(CONVERSATION, [phone], publish),
+      (commitId) => commitId < removal.id,
+    );
+
+    expect((await alice.applyCommit(CONVERSATION, own.commit)).kind).toBe(
+      'applied',
+    );
+    expect(await alice.applyCommit(CONVERSATION, removal.commit)).toMatchObject(
+      { discardedCommitId: own.id, kind: 'replaced' },
+    );
+    expect((await dave.applyCommit(CONVERSATION, removal.commit)).kind).toBe(
+      'applied',
+    );
+    expect(await dave.applyCommit(CONVERSATION, own.commit)).toEqual({
+      kind: 'ignored',
+      reason: 'lost-race',
+    });
+    expect((await carol.applyCommit(CONVERSATION, removal.commit)).kind).toBe(
+      'removed',
+    );
+    for (const member of [alice, bob, dave]) {
+      expect(await member.members(CONVERSATION)).toEqual(
+        ['alice', 'bob', 'dave'].map(id).sort(),
+      );
+    }
+  });
+
+  it("lets the creator's commit win the epoch over an admin's with a lower id", async () => {
+    roster = bobAdministers();
+    const { alice, bob, carol } = await setup(['alice', 'bob', 'carol']);
+    const eve = await engine('eve').createKeyPackage();
+    const dave = await engine('dave').createKeyPackage();
+    const fromAlice = await ground(
+      (publish) => alice.add(CONVERSATION, [eve], publish),
+      high,
+    );
+    const fromBob = await ground(
+      (publish) => bob.add(CONVERSATION, [dave], publish),
+      (commitId) => commitId < fromAlice.id,
+    );
+
+    expect(await alice.applyCommit(CONVERSATION, fromBob.commit)).toEqual({
+      kind: 'ignored',
+      reason: 'lost-race',
+    });
+    expect(await bob.applyCommit(CONVERSATION, fromAlice.commit)).toMatchObject(
+      { discardedCommitId: fromBob.id, kind: 'replaced' },
+    );
+    await carol.applyCommit(CONVERSATION, fromBob.commit);
+    expect(
+      await carol.applyCommit(CONVERSATION, fromAlice.commit),
+    ).toMatchObject({ discardedCommitId: fromBob.id, kind: 'replaced' });
+    for (const member of [alice, bob, carol]) {
+      expect(await member.members(CONVERSATION)).toEqual(
+        ['alice', 'bob', 'carol', 'eve'].map(id).sort(),
+      );
+    }
+  });
+
+  it('settles a mutual removal by the roster: the creator removes an admin, never the reverse', async () => {
+    roster = bobAdministers();
+    let bobView = bobAdministers();
+    const alice = engine('alice');
+    const bob = engine('bob', { rosterView: () => bobView });
+    const carol = engine('carol');
+    const dave = engine('dave');
+    await alice.createGroup(CONVERSATION);
+    await join(alice, [bob, carol, dave]);
+    const fromAlice = await ground(
+      (publish) => alice.remove(CONVERSATION, [id('bob')], publish),
+      high,
+    );
+    // A patched client that believes it created the conversation.
+    bobView = GroupMailboxRoster.of({
+      adminIds: [],
+      creatorId: id('bob'),
+      participantIds: [...NAMES, 'eve'].map(id),
+    });
+    const fromBob = await ground(
+      (publish) => bob.remove(CONVERSATION, [id('alice')], publish),
+      (commitId) => commitId < fromAlice.id,
+    );
+
+    expect((await carol.applyCommit(CONVERSATION, fromAlice.commit)).kind).toBe(
+      'applied',
+    );
+    for (const member of [carol, dave]) {
+      await expect(
+        member.applyCommit(CONVERSATION, fromBob.commit),
+      ).rejects.toBeInstanceOf(MlsRejectedError);
+    }
+    expect((await dave.applyCommit(CONVERSATION, fromAlice.commit)).kind).toBe(
+      'applied',
+    );
+    for (const member of [alice, carol, dave]) {
+      expect(await member.members(CONVERSATION)).toEqual(
+        ['alice', 'carol', 'dave'].map(id).sort(),
+      );
+    }
+  });
+
+  it('lets the lower commit id win between rivals of equal rank, also over an admin', async () => {
+    roster = bobAdministers();
+    const { alice, bob, carol, dave } = await setup([
+      'alice',
+      'bob',
+      'carol',
+      'dave',
+    ]);
+    const bobPhone = await engine('bob', { device: 'd2' }).createKeyPackage();
+    const carolPhone = await engine('carol', {
+      device: 'd2',
+    }).createKeyPackage();
+    const fromBob = await ground(
+      (publish) => bob.add(CONVERSATION, [bobPhone], publish),
+      high,
+    );
+    const fromCarol = await ground(
+      (publish) => carol.add(CONVERSATION, [carolPhone], publish),
+      (commitId) => commitId < fromBob.id,
+    );
+
+    await alice.applyCommit(CONVERSATION, fromBob.commit);
+    expect(
+      await alice.applyCommit(CONVERSATION, fromCarol.commit),
+    ).toMatchObject({ discardedCommitId: fromBob.id, kind: 'replaced' });
+    await dave.applyCommit(CONVERSATION, fromCarol.commit);
+    expect(await dave.applyCommit(CONVERSATION, fromBob.commit)).toEqual({
+      kind: 'ignored',
+      reason: 'lost-race',
+    });
+    expect(await bob.applyCommit(CONVERSATION, fromCarol.commit)).toMatchObject(
+      { discardedCommitId: fromBob.id, kind: 'replaced' },
+    );
+    expect(await bob.devices(CONVERSATION)).toEqual([
+      cast.bob.deviceCredential('d1'),
+    ]);
+    expect(await carol.devices(CONVERSATION)).toEqual(
+      [
+        cast.carol.deviceCredential('d1'),
+        cast.carol.deviceCredential('d2'),
+      ].sort(),
+    );
+    const sealed = await carol.encrypt(CONVERSATION, text.encode('carol won'));
+
+    for (const member of [alice, bob, dave]) {
+      expect(read((await member.decrypt(CONVERSATION, sealed)).plaintext)).toBe(
+        'carol won',
+      );
+    }
+  });
+
+  it('converges on the removal among three rivals in every arrival order', async () => {
+    roster = bobAdministers();
+    const alice = engine('alice');
+    const bob = engine('bob');
+    const carol = engine('carol');
+    const dave = engine('dave');
+    // Eve's devices only receive; with alice, one per arrival order.
+    const receivers = [
+      alice,
+      ...['d1', 'd2', 'd3', 'd4', 'd9'].map((device) =>
+        engine('eve', { device }),
+      ),
+    ];
+    await alice.createGroup(CONVERSATION);
+    await join(alice, [bob, carol, dave, ...receivers.slice(1)]);
+    const carolPhone = await engine('carol', {
+      device: 'd2',
+    }).createKeyPackage();
+    const davePhone = await engine('dave', { device: 'd2' }).createKeyPackage();
+    const removal = await ground(
+      (publish) => bob.remove(CONVERSATION, [id('carol')], publish),
+      high,
+    );
+    // Both rivals hold lower ids than the removal.
+    const rivals = [
+      removal,
+      await ground(
+        (publish) => carol.add(CONVERSATION, [carolPhone], publish),
+        (commitId) => commitId < removal.id,
+      ),
+      await ground(
+        (publish) => dave.add(CONVERSATION, [davePhone], publish),
+        (commitId) => commitId < removal.id,
+      ),
+    ];
+    const sealed = await bob.encrypt(CONVERSATION, text.encode('bob won'));
+    const orders = ordersOf(rivals);
+
+    expect(orders).toHaveLength(receivers.length);
+    for (const [index, receiver] of receivers.entries()) {
+      for (const { commit } of orders[index]) {
+        await receiver.applyCommit(CONVERSATION, commit);
+      }
+
+      expect(await receiver.members(CONVERSATION)).toEqual(
+        ['alice', 'bob', 'dave', 'eve'].map(id).sort(),
+      );
+      expect(
+        read((await receiver.decrypt(CONVERSATION, sealed)).plaintext),
+      ).toBe('bob won');
     }
   });
 

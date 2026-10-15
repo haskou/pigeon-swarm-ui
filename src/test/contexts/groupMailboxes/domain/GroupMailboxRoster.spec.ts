@@ -11,6 +11,10 @@ const unmanaged = GroupMailboxRoster.of({
   participantIds: ['member', 'other'],
 });
 
+/** A commit's rank against its same-epoch rivals in the managed roster. */
+const rankOf = (committer: string, removed: string[] = []): number =>
+  managed.priorityOf({ committer, removed });
+
 describe('GroupMailboxRoster', () => {
   it('lets the creator and an admin add a roster member', () => {
     for (const committer of ['creator', 'admin']) {
@@ -187,5 +191,30 @@ describe('GroupMailboxRoster', () => {
         removed: [],
       }),
     ).toBe(false);
+  });
+
+  it('ranks a removal above every commit of the member it removes, a removal of its own devices included', () => {
+    const removal = rankOf('admin', ['member']);
+
+    expect(removal).toBeGreaterThan(rankOf('member'));
+    expect(removal).toBeGreaterThan(rankOf('member', ['member']));
+  });
+
+  it('ranks a commit by the creator above one by an admin, a removal included', () => {
+    expect(rankOf('creator')).toBeGreaterThan(rankOf('admin'));
+    expect(rankOf('creator')).toBeGreaterThan(rankOf('admin', ['member']));
+  });
+
+  it('settles a mutual removal by who may remove whom', () => {
+    // Only the creator may remove an admin; nobody may remove the creator.
+    expect(rankOf('creator', ['admin'])).toBeGreaterThan(
+      rankOf('admin', ['creator']),
+    );
+  });
+
+  it('ranks alike, leaving the commit id to decide, commits that remove nobody else by anyone but the creator, and any two by the creator', () => {
+    expect(rankOf('admin')).toBe(rankOf('member'));
+    expect(rankOf('member', ['member'])).toBe(rankOf('other'));
+    expect(rankOf('creator', ['admin'])).toBe(rankOf('creator'));
   });
 });
