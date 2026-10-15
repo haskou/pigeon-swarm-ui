@@ -179,6 +179,8 @@ export const en = {
     callMetricPeerId: 'Peer ID',
     callMetricStatus: 'Status',
     callMetricTransport: 'Transport',
+    callsUnsupported:
+      'This browser cannot make calls because WebRTC is turned off or missing. Turn WebRTC back on, or open Pigeon in a current Chrome or Edge.',
     camera: 'Start camera',
     connectionConnecting: 'Connecting call audio…',
     connectionQuality: 'Connection quality',

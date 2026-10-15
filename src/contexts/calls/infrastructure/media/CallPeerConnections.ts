@@ -44,6 +44,11 @@ export class CallPeerConnections {
   private readonly screenShareStreams: CallScreenShareStreams;
   private rtcConfigurationProvider: RtcConfigurationProvider | null = null;
 
+  /** Browsers with WebRTC turned off, such as Tor Browser, expose no peers. */
+  public static supported(): boolean {
+    return typeof RTCPeerConnection !== 'undefined';
+  }
+
   public static mediaEncryptionSupported(): boolean {
     return CallMediaEncryption.supported();
   }

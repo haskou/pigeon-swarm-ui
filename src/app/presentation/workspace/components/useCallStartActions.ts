@@ -52,13 +52,23 @@ function fetchLatestCall(
 }
 
 /**
- * A private call is refused before the microphone or the node is asked when
- * this browser cannot encrypt call media; it never falls back to plaintext.
+ * A call this browser cannot make is refused before the microphone or the
+ * node is asked, with the reason: no WebRTC at all, or, for a private call,
+ * no way to encrypt its media. A private call never falls back to plaintext.
  */
-function refusedWithoutMediaEncryption(
+function refusedOnThisBrowser(
   setSendError: CallStartActionsInput['setSendError'],
+  privateCall: boolean,
 ): boolean {
-  if (CallPeerConnections.mediaEncryptionSupported()) return false;
+  if (!CallPeerConnections.supported()) {
+    logCallWarning('workspace:call:refused-without-webrtc', {});
+    setSendError(copy.calls.callsUnsupported);
+
+    return true;
+  }
+
+  if (!privateCall || CallPeerConnections.mediaEncryptionSupported())
+    return false;
 
   logCallWarning('workspace:call:refused-without-media-encryption', {
     reason: 'unsupported',
@@ -143,7 +153,7 @@ export function useCallStartActions({
         return;
       }
 
-      if (refusedWithoutMediaEncryption(setSendError)) return;
+      if (refusedOnThisBrowser(setSendError, true)) return;
 
       let microphone: CallMicrophoneRequest = { stream: null };
 
@@ -293,8 +303,10 @@ export function useCallStartActions({
       }
 
       if (
-        activeCommunity.visibility !== 'public' &&
-        refusedWithoutMediaEncryption(setSendError)
+        refusedOnThisBrowser(
+          setSendError,
+          activeCommunity.visibility !== 'public',
+        )
       )
         return;
 
@@ -390,7 +402,7 @@ export function useCallStartActions({
     }
 
     // Only direct calls ring, and every direct call is private.
-    if (refusedWithoutMediaEncryption(setSendError)) {
+    if (refusedOnThisBrowser(setSendError, true)) {
       declineIncomingCall();
 
       return;
