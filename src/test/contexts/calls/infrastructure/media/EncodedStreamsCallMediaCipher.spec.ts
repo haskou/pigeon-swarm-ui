@@ -1,6 +1,6 @@
 import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
-import { EncodedCallMediaCipher } from '../../../../../contexts/calls/infrastructure/media/EncodedCallMediaCipher';
+import { EncodedStreamsCallMediaCipher } from '../../../../../contexts/calls/infrastructure/media/EncodedStreamsCallMediaCipher';
 
 type EncodedFrame = RTCEncodedAudioFrame | RTCEncodedVideoFrame;
 
@@ -44,18 +44,18 @@ async function piped(
   return written;
 }
 
-describe(EncodedCallMediaCipher.name, () => {
+describe(EncodedStreamsCallMediaCipher.name, () => {
   const media = new Uint8Array([1, 2, 3, 4, 5, 6]);
 
   it('restores the media another member encrypted with the call key', async () => {
     const key = SymmetricKey.generate().valueOf();
     const encrypted = await piped([media], (sender) =>
-      new EncodedCallMediaCipher(key).configureSender(sender),
+      new EncodedStreamsCallMediaCipher(key).configureSender(sender),
     );
 
     await expect(
       piped(encrypted, (receiver) =>
-        new EncodedCallMediaCipher(key).configureReceiver(receiver),
+        new EncodedStreamsCallMediaCipher(key).configureReceiver(receiver),
       ),
     ).resolves.toEqual([media]);
   });
@@ -63,7 +63,7 @@ describe(EncodedCallMediaCipher.name, () => {
   it('drops inbound frames that are not encrypted', async () => {
     await expect(
       piped([media], (receiver) =>
-        new EncodedCallMediaCipher(
+        new EncodedStreamsCallMediaCipher(
           SymmetricKey.generate().valueOf(),
         ).configureReceiver(receiver),
       ),
@@ -72,17 +72,38 @@ describe(EncodedCallMediaCipher.name, () => {
 
   it('drops inbound frames encrypted with another key', async () => {
     const encrypted = await piped([media], (sender) =>
-      new EncodedCallMediaCipher(
+      new EncodedStreamsCallMediaCipher(
         SymmetricKey.generate().valueOf(),
       ).configureSender(sender),
     );
 
     await expect(
       piped(encrypted, (receiver) =>
-        new EncodedCallMediaCipher(
+        new EncodedStreamsCallMediaCipher(
           SymmetricKey.generate().valueOf(),
         ).configureReceiver(receiver),
       ),
     ).resolves.toEqual([]);
+  });
+
+  it('asks the peer connection for encoded insertable streams', () => {
+    expect(
+      new EncodedStreamsCallMediaCipher(
+        SymmetricKey.generate().valueOf(),
+      ).peerConfiguration({ iceServers: [] }),
+    ).toEqual({ encodedInsertableStreams: true, iceServers: [] });
+  });
+
+  it('does not throw when encoded streams are rejected by the browser', () => {
+    const cipher = new EncodedStreamsCallMediaCipher(
+      SymmetricKey.generate().valueOf(),
+    );
+    const sender = {
+      createEncodedStreams: jest.fn(() => {
+        throw new Error('Encoded insertable streams are disabled.');
+      }),
+    } as unknown as RTCRtpSender;
+
+    expect(() => cipher.configureSender(sender)).not.toThrow();
   });
 });
