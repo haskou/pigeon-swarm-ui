@@ -36,4 +36,11 @@ export interface MlsMembershipPolicy {
     change: MlsMembershipChange,
     order: { baseline: readonly string[]; frontier: readonly string[] },
   ): boolean;
+  /**
+   * Whether a commit proves roster operations the node has not served this
+   * device: it binds a revision naming one this device has not verified,
+   * and its committer may add members in the latest roster this device has
+   * verified. The node may be withholding a demotion that revision holds.
+   */
+  withheld(committer: string, frontier: readonly string[]): boolean;
 }

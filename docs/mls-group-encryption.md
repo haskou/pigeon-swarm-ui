@@ -111,7 +111,9 @@ The node cannot order commits across replicas. Clients do it:
   id** wins. A client that applied a different commit for epoch `n` rolls back
   to its retained epoch-`n` state (`ts-mls` states are immutable values) and
   applies the winner. Application messages encrypted in the losing epoch stay
-  readable because that state is retained read-only.
+  readable because that state is retained read-only. A group in epoch `m`
+  lists commits with `afterEpoch = m - 2` and drops any older one the node
+  lists anyway, so a rival only ever displaces the last commit it took.
 - The loser re-issues its proposals on top of the winning epoch. Removals are
   idempotent: the client first checks whether the leaf is still in the group.
 - A client never applies a commit with a gap. It fetches missing epochs and, if
@@ -157,18 +159,22 @@ grant `manage_members`.
   the owner. Races are resolved by the epoch rule above.
 - Update: anyone on the roster rotates their own leaf. There is no periodic
   update yet (#478): only a manager's device commits one, when the roster
-  revision the group bound grants other rights than the latest
-  (`bindRoster`). Group conversations never update.
+  revision the group bound grants other rights than the latest, or when the
+  group took an add by a member the latest roster no longer lets add members
+  and no member it lets add members has committed since (`bindRoster`).
+  Group conversations never update.
 
 Every commit is checked against these rules both when it is made and when it
 is received, by the roster at the revision the commit binds (see "Which
 roster judges a commit"); a commit that breaks them is skipped and the epoch
-does not advance. A welcome opens only when the node names as its author a
-manager, by the roster at the revision the welcome binds and by the joiner's
-latest roster, who holds a leaf in the welcomed group, and every leaf in its
-tree is a member at that revision, so neither a member nor a demoted manager
-can welcome anyone into a look-alike group. A removed device rejoins only
-from a welcome newer than its last membership.
+does not advance. A welcome opens only when the leaf that signed it, whoever
+the node names as its author, is a manager by the roster at the revision the
+welcome binds, and every leaf in its tree is a member at that revision, so a
+member cannot welcome anyone into a look-alike group. When the joiner's
+latest roster no longer lets that signer add members, the welcome opens only
+once a member that roster lets add members has committed in the group after
+it, so a demoted manager cannot either. A removed device rejoins
+only from a welcome newer than its last membership.
 
 ### Which roster judges a commit
 
@@ -187,7 +193,11 @@ a demotion in (#420):
 - A receiver replays the roster from the operations the frontier stands for
   (`CommunityRosterHistory.rosterAt`) and checks the commit against it. A
   frontier that names an operation the receiver has not verified judges
-  nothing yet: the commit is skipped until the operation arrives.
+  nothing yet: the commit is skipped until the operation arrives. When the
+  latest roster the receiver verified lets the committer add members, the
+  commit also proves the node holds operations it has not served, which may
+  demote a manager the receiver still trusts (see "Where community roles get
+  their trust").
 - A group remembers the frontier of the last commit it applied, its baseline.
   A commit is accepted only when its frontier stands for every operation of
   the baseline (`CommunityRosterHistory.follows`), so revisions only move
@@ -207,15 +217,19 @@ a demotion in (#420):
   while sync still lists it and the device has not restarted; past that,
   such members cannot read each other (a known residual).
 - A manager whose group bound a revision granting other rights than the
-  latest one commits an empty update binding the latest revision on its next
-  `reconcile` (`MlsCommunityEngine.bindRoster`).
+  latest one, or took an add by a member the latest roster no longer lets add
+  members with no commit since by one it does, commits an empty update
+  binding the latest revision on its next `reconcile`
+  (`MlsCommunityEngine.bindRoster`).
 
 What a node or a member can forge about this order:
 
 - The node cannot forge or alter an operation (signed by its author's
   identity key) or a frontier (signed by the committer's leaf, under the
-  epoch's AEAD). It can only withhold operations or commits, which delays a
-  verdict and never changes it.
+  epoch's AEAD). It can only withhold operations or commits. Withholding a
+  commit delays a verdict and never changes it; withholding an operation a
+  served commit binds stops the group until it arrives (see "Where
+  community roles get their trust").
 - A committer chooses which existing revision to bind, never one that does
   not exist. A demoted manager can backdate an add to a revision before the
   demotion, as long as no commit has yet bound the demotion or anything after
@@ -225,11 +239,22 @@ What a node or a member can forge about this order:
 - A device joining from a welcome has no baseline yet, so it cannot tell a
   backdated welcome from an honest one. Such a welcome lands a roster member
   on a fork no other member follows; it never admits anyone the bound roster
-  did not, and the member rejoins from the next welcome.
-- A welcome whose author the joiner already sees demoted opens nothing, even
-  when the add it belongs to was made while the author was allowed and every
-  member accepted it. The joiner's leaf stays in the group unused until a
-  manager removes it; no path re-welcomes it.
+  did not. Nothing welcomes the member into the real group while this device
+  holds the fork: what it sends there reaches only the fork's leaves (a known
+  residual).
+- A joiner that already sees a welcome's author demoted cannot tell an add
+  every member took while the author was allowed from a backdated one. It
+  keeps its key package and opens the welcome only once a member its latest
+  roster lets add members has committed in the group after the add
+  (`MlsCommunityEngine.open`). Every manager that sees the demotion commits
+  one on its next `reconcile` (`bindRoster`), so the joiner gets in on its
+  next sync without anyone welcoming it again. That commit proves a manager
+  the joiner trusts took the add; a demoted manager's look-alike group, or
+  an add no such manager took, never gets one from a manager's device the
+  demotion was served to. A manager's device the node withholds the
+  demotion from may still commit there, or welcome the joiner itself, as
+  long as the node keeps withholding it from that device (see the bounds
+  below).
 - A commit or welcome that binds no revision (made before #420) is judged by
   the roster of no operations, which admits nobody, so such a group stops
   taking membership commits until a manager binds a revision.
@@ -265,13 +290,49 @@ back to the community's creator and to nobody else:
   is skipped; one whose parents are missing proves nothing, nor does anything
   built on it. Without a genesis no one may commit or welcome.
 
-The node can still withhold operations: a member who does not receive a
-demotion keeps trusting the demoted manager until it does. Joins by
-`invitation` or `invite_link` are trusted on the joiner's signature alone,
-since the client cannot see the invitation they cite. Neither lets a node
-give anyone a right no signed operation granted. An `invite_link` join names
-the link by its reference, never by the token: every member reads the
-operations, and the token alone lets anyone join. The reference is
+The node can still withhold operations, but a member detects a demotion it
+withholds as soon as it is served a commit that binds it. A commit whose
+frontier names an operation the member has not verified, made by someone the
+latest roster the member verified lets add members, is a witness
+(`MlsGroup.waiting`). Until the operations it names arrive, the group takes
+no commit and makes none, and it steps back to before the first add by
+another leaf that it took in or after the witness's epoch: whoever a manager
+the withheld operations may demote added is out again. Messages are still
+sent and read in the epoch it stays in, and once the operations arrive it
+takes again the commits that still hold, resuming the epochs it left, so its
+sending generations there go on. A step back never undoes a commit this
+device made, which the node could not have withheld from it. Since sync
+takes no commit from before the epoch preceding the group's, one step back
+undoes at most the last commit the device took; a node serving older
+witnesses sync after sync walks it back one commit at a time, and a removal
+in what it undoes is undone with it. Any state it steps back to is one the
+node could already keep the member in by withholding commits. A
+member the latest roster does not let add members cannot stop a group this
+way; a manager binding a digest of no operation stops it until that manager
+is demoted, and what it keeps readable meanwhile it could forward anyway.
+The node can still delay distrust:
+
+- until a manager's commit that binds the demotion is served: an add the
+  demoted manager made before any such commit stands, as any backdated add
+  does;
+- by withholding those commits too, or serving one only once the member has
+  moved more than one epoch past it, beyond what sync takes;
+- across a restart, which forgets the commits a group took and the epochs it
+  left: it then steps back from nothing, a manager no longer commits for a
+  joiner left waiting, who waits for the next manager commit instead, and a
+  commit taken again after a step back starts this device's sending
+  generations in that epoch over, so members refuse its messages there up to
+  the generations they already read (MLS's reuse guard keeps the nonces
+  apart);
+- for a joiner's welcome, which has no earlier epoch to step back to; and
+- while replication lags, which only delays.
+
+Joins by `invitation` or `invite_link` are trusted on the joiner's signature
+alone, since the client cannot see the invitation they cite. Neither they
+nor withheld operations let a node give anyone a right no signed operation
+granted. An `invite_link` join names the link by its reference, never by the
+token: every member reads the operations, and the token alone lets anyone
+join. The reference is
 `base64url(sha256("pigeon:community-invite-reference:v1\n" + token))`
 (`deriveInviteReference`). The `invite_link_created` moderation log entry
 names the link by the same reference, since roles that may read the log
