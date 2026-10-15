@@ -5,6 +5,8 @@ import type { DevicePasskeyAuthenticator } from '../../../../../contexts/identit
 import type { DeviceIdentityVaultRecord } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVaultRecord';
 import type { DeviceIdentityVaultStore } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVaultStore';
 
+import { IdentityPasswordSymbolRequiredError } from '../../../../../contexts/identities/domain/errors/IdentityPasswordSymbolRequiredError';
+import { IdentityPasswordTooShortError } from '../../../../../contexts/identities/domain/errors/IdentityPasswordTooShortError';
 import { DeviceAuthorizationEpoch } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
@@ -97,6 +99,9 @@ class MemoryStore implements DeviceIdentityVaultStore {
 }
 
 describe(DeviceIdentityVault.name, () => {
+  const password = 'Correct-Horse-Battery-Staple-9';
+  const nextPassword = 'Paper-Lantern-Over-Rivers-4';
+
   async function fixture() {
     const identityKeyPair = await KeyPair.generate();
     const identityId = IdentityId.fromString(
@@ -119,12 +124,12 @@ describe(DeviceIdentityVault.name, () => {
     const source = await fixture();
     const registered = await new DeviceIdentityVault(store).register({
       ...source,
-      password: 'password',
+      password,
     });
 
     const restored = await new DeviceIdentityVault(store).unlock(
       source.identityId,
-      'password',
+      password,
     );
 
     expect(restored.authorizationEpoch.valueOf()).toBe('genesis');
@@ -139,7 +144,7 @@ describe(DeviceIdentityVault.name, () => {
     const store = new MemoryStore();
     const source = await fixture();
     const vault = new DeviceIdentityVault(store);
-    await vault.register({ ...source, password: 'old password' });
+    await vault.register({ ...source, password });
     const find = store.find.bind(store);
     store.find = async (identityId) => {
       const record = await find(identityId);
@@ -155,7 +160,7 @@ describe(DeviceIdentityVault.name, () => {
     };
 
     await expect(
-      vault.changePassword(source.identityId, 'old password', 'new password'),
+      vault.changePassword(source.identityId, password, nextPassword),
     ).rejects.toThrow('Local authorization checkpoint changed.');
     expect(
       store.records.get(source.identityId.valueOf())?.authorizationRevision,
@@ -166,19 +171,13 @@ describe(DeviceIdentityVault.name, () => {
     const store = new MemoryStore();
     const source = await fixture();
     const vault = new DeviceIdentityVault(store);
-    await vault.register({ ...source, password: 'old password' });
+    await vault.register({ ...source, password });
     const before = store.records.get(source.identityId.valueOf());
 
-    await vault.changePassword(
-      source.identityId,
-      'old password',
-      'new password',
-    );
+    await vault.changePassword(source.identityId, password, nextPassword);
 
-    await expect(
-      vault.unlock(source.identityId, 'old password'),
-    ).rejects.toThrow();
-    const restored = await vault.unlock(source.identityId, 'new password');
+    await expect(vault.unlock(source.identityId, password)).rejects.toThrow();
+    const restored = await vault.unlock(source.identityId, nextPassword);
     const after = store.records.get(source.identityId.valueOf());
     expect(restored.material.rootKey.isEqual(source.material.rootKey)).toBe(
       true,
@@ -189,18 +188,45 @@ describe(DeviceIdentityVault.name, () => {
     expect(after?.envelope).not.toBe(before?.envelope);
   });
 
+  it('refuses to protect a new device with a password below the policy', async () => {
+    const store = new MemoryStore();
+    const source = await fixture();
+    const vault = new DeviceIdentityVault(store);
+
+    await expect(
+      vault.register({ ...source, password: 'Short-Pass-9' }),
+    ).rejects.toBeInstanceOf(IdentityPasswordTooShortError);
+    await expect(
+      vault.register({ ...source, password: 'NoSymbolsAtAllButLong12' }),
+    ).rejects.toBeInstanceOf(IdentityPasswordSymbolRequiredError);
+    expect(store.records.size).toBe(0);
+  });
+
+  it('keeps the current password when the next one is below the policy', async () => {
+    const store = new MemoryStore();
+    const source = await fixture();
+    const vault = new DeviceIdentityVault(store);
+    await vault.register({ ...source, password });
+    const before = store.records.get(source.identityId.valueOf());
+
+    await expect(
+      vault.changePassword(source.identityId, password, 'Short-Pass-9'),
+    ).rejects.toBeInstanceOf(IdentityPasswordTooShortError);
+    expect(store.records.get(source.identityId.valueOf())).toBe(before);
+  });
+
   it('confirms the current password without changing this device', async () => {
     const store = new MemoryStore();
     const source = await fixture();
     const vault = new DeviceIdentityVault(store);
-    await vault.register({ ...source, password: 'password' });
+    await vault.register({ ...source, password });
     const before = store.records.get(source.identityId.valueOf());
 
     await expect(
-      vault.confirmUnlock(source.identityId, 'password'),
+      vault.confirmUnlock(source.identityId, password),
     ).resolves.toBeUndefined();
     await expect(
-      vault.confirmUnlock(source.identityId, 'wrong password'),
+      vault.confirmUnlock(source.identityId, nextPassword),
     ).rejects.toBeInstanceOf(DeviceUnlockNotConfirmedError);
     await expect(vault.confirmUnlock(source.identityId)).rejects.toBeInstanceOf(
       DeviceUnlockNotConfirmedError,
@@ -352,7 +378,7 @@ describe(DeviceIdentityVault.name, () => {
     const store = new MemoryStore();
     const source = await fixture();
     const vault = new DeviceIdentityVault(store);
-    await vault.register({ ...source, password: 'password' });
+    await vault.register({ ...source, password });
     const epoch = DeviceAuthorizationEpoch.fromString(
       '018fe2f4-a872-49ce-8dba-bcac3b2e4187',
     );
@@ -365,7 +391,7 @@ describe(DeviceIdentityVault.name, () => {
 
     const restored = await new DeviceIdentityVault(store).unlock(
       source.identityId,
-      'password',
+      password,
     );
     expect(restored.authorizationEpoch.isEqual(epoch)).toBe(true);
     expect(restored.authorizationRevision.valueOf()).toBe(1);
@@ -375,7 +401,7 @@ describe(DeviceIdentityVault.name, () => {
     const store = new MemoryStore();
     const source = await fixture();
     const vault = new DeviceIdentityVault(store);
-    await vault.register({ ...source, password: 'password' });
+    await vault.register({ ...source, password });
 
     await expect(
       vault.advanceAuthorization(
@@ -399,10 +425,10 @@ describe(DeviceIdentityVault.name, () => {
       ...source,
       authorizationEpoch: epoch,
       authorizationRevision: revision,
-      password: 'password',
+      password,
     });
 
-    const restored = await vault.unlock(source.identityId, 'password');
+    const restored = await vault.unlock(source.identityId, password);
     expect(restored.authorizationEpoch.isEqual(epoch)).toBe(true);
     expect(restored.authorizationRevision.isEqual(revision)).toBe(true);
   });
@@ -411,7 +437,7 @@ describe(DeviceIdentityVault.name, () => {
     const store = new MemoryStore();
     const source = await fixture();
     const vault = new DeviceIdentityVault(store);
-    await vault.register({ ...source, password: 'password' });
+    await vault.register({ ...source, password });
 
     await vault.synchronizeAuthorization(
       source.identityId,
@@ -420,7 +446,7 @@ describe(DeviceIdentityVault.name, () => {
       DeviceAuthorizationRevision.fromNumber(4),
     );
 
-    const restored = await vault.unlock(source.identityId, 'password');
+    const restored = await vault.unlock(source.identityId, password);
     expect(restored.authorizationRevision.valueOf()).toBe(4);
   });
 });
