@@ -43,6 +43,7 @@ export function useCommunityMessageProjection({
       const opened = await applicationContainer.mls.openMessages(
         session,
         communityId,
+        channelId,
         rawMessages,
       );
 

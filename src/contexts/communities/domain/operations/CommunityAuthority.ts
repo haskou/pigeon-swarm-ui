@@ -470,6 +470,23 @@ export class CommunityAuthority {
   }
 
   /**
+   * Whether the identity would see a channel only `visibleRoleIds` may see:
+   * the owner always, a member when `everyone` or one of its roles is there.
+   */
+  private canSeeRoles(
+    identityId: string,
+    visibleRoleIds: readonly string[],
+  ): boolean {
+    return (
+      this.isMember(identityId) &&
+      (identityId === this.ownerId ||
+        [EVERYONE, ...(this.assignments.get(identityId) ?? [])].some((roleId) =>
+          visibleRoleIds.includes(roleId),
+        ))
+    );
+  }
+
+  /**
    * Applies one operation of this community, or throws and changes nothing
    * when the state does not allow its author to make it.
    */
@@ -520,21 +537,30 @@ export class CommunityAuthority {
   }
 
   /**
-   * Whether the identity may see the channel: the owner always, a member
-   * when `everyone` or one of its roles is visible there, no one in a
-   * channel the signed operations do not hold.
+   * Whether the identity may key a channel only `visibleRoleIds` may see:
+   * its own group needs a first member that may add the others and keeps
+   * seeing it. Opening a channel to everyone (or to no role) needs no key.
+   */
+  public canKeyRestrictedChannel(
+    identityId: string,
+    visibleRoleIds: readonly string[],
+  ): boolean {
+    return (
+      visibleRoleIds.length === 0 ||
+      visibleRoleIds.includes(EVERYONE) ||
+      (this.hasPermission(identityId, 'manage_members') &&
+        this.canSeeRoles(identityId, visibleRoleIds))
+    );
+  }
+
+  /**
+   * Whether the identity may see the channel, as `canSeeRoles`; no one sees
+   * a channel the signed operations do not hold.
    */
   public canAccessChannel(identityId: string, channelId: string): boolean {
     const channel = this.channel(channelId);
 
-    return (
-      !!channel &&
-      this.isMember(identityId) &&
-      (identityId === this.ownerId ||
-        [EVERYONE, ...(this.assignments.get(identityId) ?? [])].some(
-          (roleId) => channel.visibleRoleIds.includes(roleId),
-        ))
-    );
+    return !!channel && this.canSeeRoles(identityId, channel.visibleRoleIds);
   }
 
   public hasChannel(channelId: string): boolean {

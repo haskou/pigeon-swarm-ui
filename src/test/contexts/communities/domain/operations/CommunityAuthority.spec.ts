@@ -14,6 +14,7 @@ describe(CommunityAuthority.name, () => {
   let cast: Record<string, MlsTestIdentity>;
   let authority: CommunityAuthority;
   let createdAt: number;
+  let managerRoleId: string;
   const id = (name: string): string => cast[name].id;
   const operation = (
     author: string,
@@ -99,7 +100,8 @@ describe(CommunityAuthority.name, () => {
     );
     add('owner', 'manager');
     add('owner', 'member');
-    assign('owner', 'manager', [createRole('owner', ['manage_members'])]);
+    managerRoleId = createRole('owner', ['manage_members']);
+    assign('owner', 'manager', [managerRoleId]);
   });
 
   it('derives role ids like the node', () => {
@@ -293,6 +295,22 @@ describe(CommunityAuthority.name, () => {
     apply('owner', 'member_kicked', { identityId: id('manager') });
 
     expect(access(channelId)).toEqual([true, false, false, false]);
+  });
+
+  it('lets only those who can add the members and keep seeing it key a restricted channel', () => {
+    // 'manager' holds `managerRoleId`, which may add members.
+    const roleId = createRole('owner', []);
+    const keying = (visibleRoleIds: string[]): boolean[] =>
+      ['owner', 'manager', 'member', 'other'].map((name) =>
+        authority.canKeyRestrictedChannel(id(name), visibleRoleIds),
+      );
+
+    assign('owner', 'member', [roleId]);
+
+    expect(keying([roleId])).toEqual([true, false, false, false]);
+    expect(keying([managerRoleId])).toEqual([true, true, false, false]);
+    expect(keying([])).toEqual([true, true, true, true]);
+    expect(keying(['everyone'])).toEqual([true, true, true, true]);
   });
 
   it('rejects channel changes made without manage_channels, changing nothing', () => {

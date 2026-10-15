@@ -55,7 +55,11 @@ export async function resolveWorkspaceCallMediaEncryption({
 
     try {
       return {
-        mediaEncryptionKey: await communityCallKey(communityId, call.id),
+        mediaEncryptionKey: await communityCallKey(
+          communityId,
+          call.scope.channelId,
+          call.id,
+        ),
       };
     } catch {
       throw new CallMediaEncryptionUnavailableError('missing-key');

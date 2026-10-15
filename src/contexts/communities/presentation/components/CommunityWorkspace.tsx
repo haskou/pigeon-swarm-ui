@@ -143,12 +143,6 @@ export function CommunityWorkspace({
 
   useCloseOnEscape(onMobileSidebarClose, mobileSidebarOpen);
   const communityIsPublic = community.visibility === 'public';
-  const encryptionState = useCommunityEncryption({
-    communityId: community.id,
-    isPublic: communityIsPublic,
-    memberKey: community.memberIds.join(','),
-    session,
-  });
   const { loadChannelMessages, projectChannelMessage, projectChannelMessages } =
     useCommunityMessageProjection({
       communityId: community.id,
@@ -204,6 +198,21 @@ export function CommunityWorkspace({
   const selectedChannel = textChannelsWithThreads.find(
     (channel) => channel.id === selectedChannelId,
   );
+  const shownChannelId = threadPanel?.channelId ?? selectedChannelId;
+  const shownChannel = textChannelsWithThreads.find(
+    (channel) => channel.id === shownChannelId,
+  );
+  const encryptionState = useCommunityEncryption({
+    channelId: shownChannelId,
+    communityId: community.id,
+    isPublic: communityIsPublic,
+    // Who may see the channel decides its group: a change re-checks it.
+    memberKey: [
+      community.memberIds.join(','),
+      shownChannel?.permissions?.visibleRoleIds.join(',') ?? '',
+    ].join('|'),
+    session,
+  });
   const canManageMessages = currentPermissions.has('manage_messages');
   const closeMessageContextMenu = useCallback(
     () => setMessageContextMenu(null),

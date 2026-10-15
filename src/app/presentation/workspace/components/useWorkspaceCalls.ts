@@ -194,10 +194,11 @@ export function useWorkspaceCalls({
     async (call: CallResource) =>
       await resolveWorkspaceCallMediaEncryption({
         call,
-        communityCallKey: async (communityId, callId) =>
+        communityCallKey: async (communityId, channelId, callId) =>
           await applicationContainer.mls.callMediaKey(
             session,
             communityId,
+            channelId,
             callId,
           ),
         communityOperations: async (communityId) =>
