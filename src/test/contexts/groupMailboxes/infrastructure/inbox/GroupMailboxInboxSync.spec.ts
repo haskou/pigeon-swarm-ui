@@ -649,6 +649,29 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
     ]);
   });
 
+  it('hands over a typing notice from its sender only, never storing it', async () => {
+    const typing = (author: string, typingId: string) =>
+      DirectMailboxRecords.typing({
+        authorId: id(author),
+        conversationId: CONVERSATION,
+        createdAt: now,
+        id: typingId,
+      });
+
+    await send(bob, typing('bob', mid('bob', 't-bob')));
+    await send(bob, typing('alice', mid('alice', 't-forged')));
+    await sync(carol);
+
+    expect(ids(carol.received)).toEqual(['typing:t-bob']);
+    expect(
+      await new GroupMessageHistoryStore(carol.history).load(
+        carol.session,
+        CONVERSATION,
+        50,
+      ),
+    ).toEqual([]);
+  });
+
   it('accepts an edit after a restart from the stored history', async () => {
     await send(alice, sent('alice', mid('alice', 'm1')));
     await sync(carol);
