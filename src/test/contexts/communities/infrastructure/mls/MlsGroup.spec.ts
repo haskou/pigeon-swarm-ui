@@ -127,6 +127,26 @@ const setup = async (names: string[]): Promise<Record<string, Seat>> => {
   return seats;
 };
 
+/** Commits a leaf update of `committer` that every one of `others` applies. */
+const rotate = async (committer: MlsGroup, others: MlsGroup[]) => {
+  const update = await committer.update();
+  const record = { bytes: update.commit, epoch: update.epoch, id: nextId() };
+  committer.confirm(record.id);
+  for (const other of others) await other.applyCommit(record);
+
+  return record;
+};
+
+/** What someone who copied a member's stored group state holds. */
+const copyOf = ({ group, key }: Seat): MlsGroup =>
+  MlsGroup.restore(
+    group.groupId,
+    key.owner,
+    policy,
+    group.serialize(),
+    group.frontier,
+  );
+
 describe('MlsGroup on the real ts-mls library', () => {
   beforeAll(async () => {
     cast = await MlsTestIdentity.cast([
@@ -611,5 +631,81 @@ describe('MlsGroup on the real ts-mls library', () => {
     const sealed = await alice.group.encrypt(text.encode('after restart'));
 
     expect(read(await restored.decrypt(sealed))).toBe('after restart');
+  });
+
+  describe('forward secrecy and post-compromise recovery', () => {
+    it('deletes a message key once it is used, also from the stored state', async () => {
+      const { alice, bob } = await setup(['alice', 'bob']);
+      const sealed = await alice.group.encrypt(text.encode('read once'));
+      const copiedBeforeReading = copyOf(bob);
+
+      expect(read(await bob.group.decrypt(sealed))).toBe('read once');
+
+      await expect(bob.group.decrypt(sealed)).rejects.toThrow(
+        'Desired gen in the past',
+      );
+      await expect(copyOf(bob).decrypt(sealed)).rejects.toThrow(
+        'Desired gen in the past',
+      );
+      await expect(alice.group.decrypt(sealed)).rejects.toThrow(
+        'Desired gen in the past',
+      );
+      expect(read(await copiedBeforeReading.decrypt(sealed))).toBe('read once');
+    });
+
+    it('forgets epoch secrets older than the current epoch and the 8 before it', async () => {
+      const { alice, bob } = await setup(['alice', 'bob']);
+      const kept = await alice.group.encrypt(text.encode('kept'));
+      const lost = await alice.group.encrypt(text.encode('lost'));
+
+      for (let step = 0; step < 8; step++) {
+        await rotate(alice.group, [bob.group]);
+      }
+      expect(read(await bob.group.decrypt(kept))).toBe('kept');
+      await rotate(alice.group, [bob.group]);
+
+      await expect(bob.group.decrypt(lost)).rejects.toThrow(
+        'Message epoch is not retained',
+      );
+      await expect(copyOf(bob).decrypt(lost)).rejects.toThrow(
+        'Message epoch is not retained',
+      );
+    });
+
+    it('heals a copied member state only once that member commits its own update', async () => {
+      const { alice, bob } = await setup(['alice', 'bob']);
+      const copy = copyOf(bob);
+      const callKey = (group: MlsGroup) =>
+        group.exportSecret('pigeon/call-media/v1', text.encode('call-1'));
+      const signatureKeys = (group: MlsGroup) =>
+        group.leaves().map(({ signaturePublicKey }) => signaturePublicKey);
+
+      // Another member's update does not heal it: the copy follows it.
+      const aliceUpdate = await rotate(alice.group, [bob.group]);
+      expect((await copy.applyCommit(aliceUpdate)).kind).toBe('applied');
+      const exposed = await alice.group.encrypt(text.encode('still exposed'));
+      expect(read(await copy.decrypt(exposed))).toBe('still exposed');
+      expect(await callKey(copy)).toEqual(await callKey(alice.group));
+
+      // Bob's own update encrypts its path secrets to alice's keys only: a
+      // copy of alice's state follows it, the copy of bob's holds none of them.
+      const aliceCopy = copyOf(alice);
+      const signedBefore = signatureKeys(alice.group);
+      const bobUpdate = await rotate(bob.group, [alice.group]);
+      expect((await aliceCopy.applyCommit(bobUpdate)).kind).toBe('applied');
+      await expect(copy.applyCommit(bobUpdate)).rejects.toThrow(
+        'No overlap between provided private keys and update path',
+      );
+      const healed = await alice.group.encrypt(text.encode('healed'));
+
+      expect(read(await bob.group.decrypt(healed))).toBe('healed');
+      await expect(copy.decrypt(healed)).rejects.toThrow(
+        'Message epoch is not retained',
+      );
+      expect(await callKey(aliceCopy)).toEqual(await callKey(alice.group));
+      expect(await callKey(copy)).not.toEqual(await callKey(alice.group));
+      // The update replaces bob's encryption key, not his signature key.
+      expect(signatureKeys(alice.group)).toEqual(signedBefore);
+    });
   });
 });
