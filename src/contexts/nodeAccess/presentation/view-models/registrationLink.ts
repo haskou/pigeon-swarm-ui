@@ -12,7 +12,7 @@ const codePattern = /^[A-Za-z0-9_-]{43}$/;
 
 /**
  * The registration link lives in memory only: it is captured and wiped from
- * the address bar before anything else runs, and forgotten once sign-up no
+ * the address bar before the application renders, and forgotten once sign-up no
  * longer needs it. The code never reaches storage, logs or a request URL.
  */
 let pending: PendingRegistrationLink | null = null;

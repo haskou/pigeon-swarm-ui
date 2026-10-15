@@ -13,6 +13,7 @@ import { loadApplicationContainer } from '../../../../app/composition/loadApplic
 import { eraseRemovedDevice } from '../../../../app/presentation/eraseRemovedDevice';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
 import { cx } from '../../../../shared/presentation/cx';
+import { fillPlaceholders } from '../../../../shared/presentation/fillPlaceholders';
 import { useInstallPrompt } from '../../../../shared/presentation/hooks/useInstallPrompt';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
@@ -188,10 +189,9 @@ export function AuthScreen({
     mode !== 'create'
       ? null
       : registrationLinkForOtherNode
-        ? copy.auth.registrationLinkOtherNode.replace(
-            '{node}',
-            registrationLinkForOtherNode,
-          )
+        ? fillPlaceholders(copy.auth.registrationLinkOtherNode, {
+            node: registrationLinkForOtherNode,
+          })
         : registrationMode === 'closed'
           ? copy.auth.registrationClosed
           : registrationCode

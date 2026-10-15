@@ -1142,6 +1142,7 @@ export const es = {
     node: 'Nodo',
     nodePeerHelp: 'Pega el id de par libp2p del nodo, por ejemplo 12D3KooW….',
     nodePeerLabel: 'Id de par del nodo',
+    nodePeerPlaceholder: '12D3KooW…',
     origin: 'Dirección del nodo',
     originPlaceholder: 'https://nodo.example.org',
     owner: 'Identidad del propietario',

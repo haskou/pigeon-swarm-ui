@@ -1,8 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 
-import type { PendingRegistrationLink } from '../../../contexts/nodeAccess/presentation/view-models/registrationLink';
-import type { SelectedClientNode } from '../../../shared/infrastructure/client/SelectedClientNode';
-
 import {
   forgetRegistrationLink,
   pendingRegistrationLink,
@@ -16,6 +13,11 @@ import {
 } from '../../../shared/infrastructure/client/clientNodeForDocument';
 import { ClientNodeSelection } from '../../../shared/infrastructure/client/ClientNodeSelection';
 import { retireClientNodeNotifications } from '../../../shared/infrastructure/client/retireClientNodeNotifications';
+import { fillPlaceholders } from '../../../shared/presentation/fillPlaceholders';
+import {
+  type RegistrationSwitch,
+  registrationSwitchFor,
+} from './registrationSwitch';
 
 const App = lazy(() => import('../../app'));
 const copy = navigator.language.toLowerCase().startsWith('es')
@@ -31,6 +33,11 @@ const copy = navigator.language.toLowerCase().startsWith('es')
       label: 'Dirección del nodo',
       notifications:
         'No se pudieron desconectar las notificaciones del nodo anterior. Vuelve a intentarlo antes de cambiar de nodo.',
+      registrationAdoptBody:
+        'Este enlace de registro es para {node}. Continúa solo si confías en ese nodo: guardará tu identidad y tus datos.',
+      registrationAdoptConfirm: 'Usar este nodo y registrarme',
+      registrationAdoptKeep: 'Elegir otro nodo',
+      registrationAdoptTitle: '¿Registrarte en este nodo?',
       registrationSwitchBody:
         'Este enlace de registro es para {node}. Este navegador está conectado a {current}. Tus identidades en el nodo actual se quedan allí; puedes volver con «Cambiar de nodo».',
       registrationSwitchConfirm: 'Cambiar de nodo y registrarme',
@@ -54,6 +61,11 @@ const copy = navigator.language.toLowerCase().startsWith('es')
       label: 'Node address',
       notifications:
         'Could not disconnect notifications from the previous node. Retry before switching nodes.',
+      registrationAdoptBody:
+        'This registration link is for {node}. Continue only if you trust that node: it will store your identity and your data.',
+      registrationAdoptConfirm: 'Use this node and sign up',
+      registrationAdoptKeep: 'Choose another node',
+      registrationAdoptTitle: 'Sign up on this node?',
       registrationSwitchBody:
         'This registration link is for {node}. This browser is connected to {current}. Your identities on the current node stay there; you can come back with “Change node”.',
       registrationSwitchConfirm: 'Switch node and sign up',
@@ -78,55 +90,49 @@ function resumeClientAfterSelection(): void {
   }
 }
 
-/** The node a pending registration link asks this browser to switch to. */
-function registrationNodeFor(
-  registration: null | PendingRegistrationLink,
-  choosing: boolean,
-  selected: SelectedClientNode | undefined,
-): null | string {
-  if (!registration || choosing || registration.node === selected?.url)
-    return null;
+function registrationPromptText({ current, node }: RegistrationSwitch): {
+  body: string;
+  confirm: string;
+  keep: string;
+  title: string;
+} {
+  if (current === null)
+    return {
+      body: fillPlaceholders(copy.registrationAdoptBody, { node }),
+      confirm: copy.registrationAdoptConfirm,
+      keep: copy.registrationAdoptKeep,
+      title: copy.registrationAdoptTitle,
+    };
 
-  return registration.node;
-}
-
-/** A registration link for another node, while this browser uses a node. */
-function registrationSwitchFor(
-  node: null | string,
-  selected: SelectedClientNode | undefined,
-): null | { current: string; node: string } {
-  if (!node || !selected) return null;
-
-  return { current: selected.url, node };
+  return {
+    body: fillPlaceholders(copy.registrationSwitchBody, { current, node }),
+    confirm: copy.registrationSwitchConfirm,
+    keep: copy.registrationSwitchKeep,
+    title: copy.registrationSwitchTitle,
+  };
 }
 
 function RegistrationSwitchPrompt({
   checking,
-  current,
   error,
-  node,
   onConfirm,
   onKeep,
+  registrationSwitch,
 }: {
   checking: boolean;
-  current: string;
   error: string;
-  node: string;
   onConfirm: () => void;
   onKeep: () => void;
+  registrationSwitch: RegistrationSwitch;
 }) {
+  const text = registrationPromptText(registrationSwitch);
+
   return (
     <main className="flex min-h-dvh items-center justify-center bg-slate-950 px-5 text-slate-100">
       <section className="w-full max-w-lg space-y-5 rounded-2xl border border-slate-700 bg-slate-900 p-7 shadow-xl">
         <img src="/logo.png" alt="Pigeon Swarm" className="h-14 w-14" />
-        <h1 className="text-2xl font-semibold">
-          {copy.registrationSwitchTitle}
-        </h1>
-        <p className="text-sm break-all text-slate-300">
-          {copy.registrationSwitchBody
-            .replace('{node}', node)
-            .replace('{current}', current)}
-        </p>
+        <h1 className="text-2xl font-semibold">{text.title}</h1>
+        <p className="text-sm break-all text-slate-300">{text.body}</p>
         {error && (
           <p role="alert" className="text-sm text-red-300">
             {error}
@@ -138,7 +144,7 @@ function RegistrationSwitchPrompt({
           onClick={onConfirm}
           className="w-full rounded-lg bg-indigo-600 px-4 py-3 font-medium text-white disabled:opacity-50"
         >
-          {checking ? copy.checking : copy.registrationSwitchConfirm}
+          {checking ? copy.checking : text.confirm}
         </button>
         <button
           type="button"
@@ -146,7 +152,7 @@ function RegistrationSwitchPrompt({
           onClick={onKeep}
           className="w-full rounded-lg border border-slate-600 px-4 py-3 font-medium text-white disabled:opacity-50"
         >
-          {copy.registrationSwitchKeep}
+          {text.keep}
         </button>
       </section>
     </main>
@@ -166,21 +172,26 @@ export function IndependentClient() {
   )
     ? nodeChoiceUrl.href
     : '/connect';
-  const registrationNode = registrationNodeFor(
+  const registrationSwitch = registrationSwitchFor(
     registration,
     choosing,
     selected,
   );
   const [endpoint, setEndpoint] = useState(selected?.url ?? '');
   const [ready, setReady] = useState(false);
-  // A registration link without a chosen node is adopted right away.
   const [checking, setChecking] = useState(
-    () => !choosing && Boolean(registrationNode ? !selected : selected),
+    () => !choosing && !registrationSwitch && Boolean(selected),
   );
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!selected || choosing || registrationNode || ready) return;
+    if (
+      !selected ||
+      ready ||
+      choosing ||
+      registrationSwitchFor(registration, choosing, selected)
+    )
+      return;
     const controller = new AbortController();
 
     void new ClientCompatibilityProbe()
@@ -201,7 +212,7 @@ export function IndependentClient() {
       });
 
     return () => controller.abort();
-  }, [selected, choosing, registrationNode, ready]);
+  }, [selected, choosing, registration, ready]);
 
   async function adoptRegistrationNode(node: string): Promise<void> {
     setError('');
@@ -243,13 +254,8 @@ export function IndependentClient() {
   function keepCurrentNode(): void {
     forgetRegistrationLink();
     setRegistration(null);
-    setChecking(true);
+    setChecking(Boolean(selected));
   }
-
-  useEffect(() => {
-    if (registrationNode && !selected)
-      void adoptRegistrationNode(registrationNode);
-  }, [registrationNode, selected]);
 
   async function connect(event: React.FormEvent): Promise<void> {
     event.preventDefault();
@@ -311,17 +317,14 @@ export function IndependentClient() {
       </>
     );
 
-  const registrationSwitch = registrationSwitchFor(registrationNode, selected);
-
   if (registrationSwitch)
     return (
       <RegistrationSwitchPrompt
         checking={checking}
-        current={registrationSwitch.current}
         error={error}
-        node={registrationSwitch.node}
         onConfirm={() => void adoptRegistrationNode(registrationSwitch.node)}
         onKeep={keepCurrentNode}
+        registrationSwitch={registrationSwitch}
       />
     );
 
