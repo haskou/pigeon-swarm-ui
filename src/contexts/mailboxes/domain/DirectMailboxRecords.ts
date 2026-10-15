@@ -2,6 +2,7 @@ import { Timestamp, UUID } from '@haskou/value-objects';
 
 import type { DirectDeletedRecord } from './DirectDeletedRecord';
 import type { DirectEditedRecord } from './DirectEditedRecord';
+import type { DirectIdentityUpdatedRecord } from './DirectIdentityUpdatedRecord';
 import type { DirectMessageRecord } from './DirectMessageRecord';
 import type { DirectPinRecord } from './DirectPinRecord';
 import type { DirectPollCloseRecord } from './DirectPollCloseRecord';
@@ -14,10 +15,11 @@ import type { DirectTypingRecord } from './DirectTypingRecord';
 
 /**
  * Shape rules for direct mailbox records. Sent and edited records take their
- * ids from the message, a poll from the poll and a typing notice from its
- * caller; every other record gets a fresh UUID here. Deleted and read
- * records are stamped with the current clock; reaction, pin, poll and
- * typing records keep the caller's clock reading, which also orders them.
+ * ids from the message, a poll from the poll and a typing notice or an
+ * identity update from its caller; every other record gets a fresh UUID
+ * here. Deleted and read records are stamped with the current clock;
+ * reaction, pin, poll, typing and identity update records keep the caller's
+ * clock reading, which also orders them.
  * Keys are listed alphabetically: their order is part of the encoded bytes.
  */
 export class DirectMailboxRecords {
@@ -28,6 +30,7 @@ export class DirectMailboxRecords {
   public static readonly TYPE = {
     deleted: 'deleted',
     edited: 'edited',
+    identityUpdated: 'identity_updated',
     pin: 'pin',
     poll: 'poll',
     pollClose: 'poll_close',
@@ -175,6 +178,19 @@ export class DirectMailboxRecords {
       createdAt: fields.createdAt,
       id: fields.id,
       type: 'typing',
+    };
+  }
+
+  /** An ephemeral notice that its author updated its identity; never stored. */
+  public static identityUpdated(
+    fields: Omit<DirectIdentityUpdatedRecord, 'type'>,
+  ): DirectIdentityUpdatedRecord {
+    return {
+      authorId: fields.authorId,
+      conversationId: fields.conversationId,
+      createdAt: fields.createdAt,
+      id: fields.id,
+      type: 'identity_updated',
     };
   }
 

@@ -51,6 +51,7 @@ describe(DirectMailboxRecords.name, () => {
       encryptedPayload: 'ciphertext-2',
       targetMessageId: 'message-1',
     }),
+    identityUpdated: DirectMailboxRecords.identityUpdated(base),
     pin: generated.pin(),
     poll: DirectMailboxRecords.poll({
       ...base,
@@ -61,7 +62,6 @@ describe(DirectMailboxRecords.name, () => {
       ],
       question: 'Which one?',
     }),
-    identityUpdated: DirectMailboxRecords.identityUpdated(base),
     pollClose: generated.pollClose(),
     pollVote: generated.pollVote(),
     reaction: generated.reaction(),

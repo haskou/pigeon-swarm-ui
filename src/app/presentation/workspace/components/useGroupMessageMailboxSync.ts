@@ -24,7 +24,8 @@ import { applyMailboxSyncChanges } from './applyMailboxSyncChanges';
  * clears only that notice. Pin records apply last-writer-wins per message
  * through one MessagePinClock per effect run. Restored and read poll
  * changes go to `onPollChanges`; typing changes, with the message changes
- * that end them, go to `onTypingChanges`. The first pass that finds
+ * that end them, go to `onTypingChanges`; each member that announced an
+ * identity update goes to `onIdentityUpdated`. The first pass that finds
  * this identity off the roster refreshes the conversation list, once per
  * effect run, so the group leaves the sidebar.
  */
@@ -32,6 +33,7 @@ export function useGroupMessageMailboxSync({
   activeConversation,
   onErrorChange,
   onHistoryRestored,
+  onIdentityUpdated,
   onMessagesChange,
   onPollChanges,
   onTypingChanges,
@@ -66,6 +68,12 @@ export function useGroupMessageMailboxSync({
       if (polls.length > 0) onPollChanges(polls);
 
       if (typing.length > 0) onTypingChanges(conversationId, typing);
+
+      for (const change of changes) {
+        if (change.kind === 'identity_updated') {
+          onIdentityUpdated(change.identityId);
+        }
+      }
       applyMailboxSyncChanges(changes, pinClock, {
         onMessagesChange,
         setPinnedMessageIds,
@@ -143,6 +151,7 @@ export function useGroupMessageMailboxSync({
     conversationId,
     onErrorChange,
     onHistoryRestored,
+    onIdentityUpdated,
     onMessagesChange,
     onPollChanges,
     onTypingChanges,

@@ -53,20 +53,29 @@ function dueGroupIds(
  * without network; then each tick reads the inboxes of at most
  * VISITS_PER_TICK groups into that history, a group at most once per
  * VISIT_INTERVAL_MS. A result for a group opened meanwhile is dropped: the
- * open conversation reads its own inboxes and marks them read.
+ * open conversation reads its own inboxes and marks them read. Each member
+ * that announced an identity update during a visit goes to
+ * `onIdentityUpdated`.
  */
 export function useGroupMessageBackgroundSync({
   activeConversationId,
   conversations,
   onActivity,
+  onIdentityUpdated,
   session,
 }: GroupMessageBackgroundSyncInput): void {
   const latestRef = useRef<LatestGroupInput>({
     activeConversationId,
     conversations,
     onActivity,
+    onIdentityUpdated,
   });
-  latestRef.current = { activeConversationId, conversations, onActivity };
+  latestRef.current = {
+    activeConversationId,
+    conversations,
+    onActivity,
+    onIdentityUpdated,
+  };
   const lastVisitRef = useRef(new Map<string, number>());
 
   useEffect(() => {
@@ -119,6 +128,7 @@ export function useGroupMessageBackgroundSync({
             session,
             conversationId,
             controller.signal,
+            (identityId) => latestRef.current.onIdentityUpdated(identityId),
           ),
         );
       }

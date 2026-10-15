@@ -28,7 +28,8 @@ import { GroupMessageId } from './crypto/GroupMessageId';
  * record id is the poll id; a poll the poll rules refuse is never queued. A
  * typing notice is ephemeral: never queued nor kept, and sent at most once
  * per `TYPING_INTERVAL_MS` per member and conversation, counting attempts
- * that were dropped.
+ * that were dropped. An identity update is ephemeral too, sent on every
+ * update.
  */
 export class GroupConversationSender {
   private static readonly TYPING_INTERVAL_MS = 10_000;
@@ -286,6 +287,26 @@ export class GroupConversationSender {
       DirectMessageMailboxRecord.encode(
         DirectMailboxRecords.typing({
           authorId,
+          conversationId,
+          createdAt,
+          id,
+        }),
+      ),
+    );
+  }
+
+  /** Tells the other members this one updated its identity. */
+  public async identityUpdated(
+    member: GroupConversationMember,
+    conversationId: string,
+  ): Promise<void> {
+    const { createdAt, id } = this.identity(member);
+
+    await member.outbox.sendEphemeral(
+      conversationId,
+      DirectMessageMailboxRecord.encode(
+        DirectMailboxRecords.identityUpdated({
+          authorId: member.session.identity.id,
           conversationId,
           createdAt,
           id,

@@ -11,6 +11,7 @@ import type { GroupConversationSyncOutcome } from './GroupConversationSyncOutcom
 import type { GroupTimelineApply } from './GroupTimelineApply';
 
 import { IdentityMatch } from '../../identities/domain/IdentityMatch';
+import { DirectMailboxRecords } from '../../mailboxes/domain/DirectMailboxRecords';
 import { MessagePinChange } from '../../messages/domain/MessagePinChange';
 import { MessageReactionChange } from '../../messages/domain/MessageReactionChange';
 import { MessageId } from '../../messages/domain/value-objects/MessageId';
@@ -379,6 +380,17 @@ export class GroupConversationMailbox {
     await this.sender.typing(this.member(session), conversationId);
   }
 
+  /**
+   * Tells the other members this identity updated its profile, so they
+   * fetch it again. Ephemeral: never queued, kept or retried.
+   */
+  public async identityUpdated(
+    session: Session,
+    conversationId: string,
+  ): Promise<void> {
+    await this.sender.identityUpdated(this.member(session), conversationId);
+  }
+
   /** Marks the conversation's stored history read on this device. */
   public async markRead(
     session: Session,
@@ -389,15 +401,24 @@ export class GroupConversationMailbox {
 
   /**
    * Reads every inbox of a conversation that is not open into its stored
-   * history, then resolves with its activity. Rejects on failure.
+   * history, hands the author of each identity update to
+   * `onIdentityUpdated`, then resolves with its activity. Rejects on
+   * failure.
    */
   public async receive(
     session: Session,
     conversationId: string,
     signal: AbortSignal,
+    onIdentityUpdated: (identityId: string) => void,
   ): Promise<GroupConversationActivity> {
     await this.serially(session, conversationId, () =>
-      this.member(session).inbox.sync(conversationId, signal, () => undefined),
+      this.member(session).inbox.sync(conversationId, signal, (records) => {
+        for (const record of records) {
+          if (record.type === DirectMailboxRecords.TYPE.identityUpdated) {
+            onIdentityUpdated(record.authorId);
+          }
+        }
+      }),
     );
 
     return await this.stores.history.activity(session, conversationId);
