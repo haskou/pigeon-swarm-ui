@@ -30,10 +30,7 @@ const callNotFound = new HttpJsonError(
   JSON.stringify({ code: 'CallNotFoundError' }),
 );
 
-function start(
-  getCall: jest.Mock,
-  mediaAlive: () => boolean = () => true,
-) {
+function start(getCall: jest.Mock, mediaAlive: () => boolean = () => true) {
   const onEnded = jest.fn();
   const onConfirmed = jest.fn();
   const cancel = confirmRecoveredCallAbsence({

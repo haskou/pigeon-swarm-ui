@@ -23,6 +23,7 @@ import { useCallSession } from '../../../../contexts/calls/presentation/hooks/us
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { communitiesWithCallVoicePresence } from './communityVoicePresence';
+import { confirmRecoveredCallAbsence } from './confirmRecoveredCallAbsence';
 import { loadWorkspaceCallIceConfig } from './loadWorkspaceCallIceConfig';
 import { resolveWorkspaceCallDetails } from './resolveWorkspaceCallDetails';
 import { resolveWorkspaceCallMediaEncryption } from './resolveWorkspaceCallMediaEncryption';
@@ -101,6 +102,9 @@ export function useWorkspaceCalls({
   const activeCallRef = useRef<CallSession | null>(null);
   const startupSyncIdentityRef = useRef<string | null>(null);
   const callListRequestRef = useRef<Promise<CallResource[]> | null>(null);
+  const cancelRecoveredCallConfirmationRef = useRef<() => void>(
+    () => undefined,
+  );
   const reconcileCallResourceRef = useRef<(call: CallResource) => void>(
     () => undefined,
   );
@@ -143,6 +147,13 @@ export function useWorkspaceCalls({
   useEffect(() => {
     activeCallRef.current = activeCall;
   }, [activeCall]);
+
+  useEffect(
+    () => () => {
+      cancelRecoveredCallConfirmationRef.current();
+    },
+    [],
+  );
 
   const listCalls = useCallback(() => {
     const activeRequest = callListRequestRef.current;
@@ -226,12 +237,38 @@ export function useWorkspaceCalls({
       onRecoveredCalls: (calls, previousActiveCallId) => {
         onCommunitiesChange(communityVoicePresenceUpdate(calls));
 
+        cancelRecoveredCallConfirmationRef.current();
+        cancelRecoveredCallConfirmationRef.current = () => undefined;
+
         if (
           previousActiveCallId &&
           activeCallRef.current?.id === previousActiveCallId &&
           !calls.some((call) => call.id === previousActiveCallId)
         )
-          endCall();
+          cancelRecoveredCallConfirmationRef.current =
+            confirmRecoveredCallAbsence({
+              callId: previousActiveCallId,
+              currentIdentityId: sessionRef.current.identity.id,
+              getCall: async (callId) =>
+                await applicationContainer.calls.get(
+                  sessionRef.current,
+                  callId,
+                ),
+              isMediaAlive: () =>
+                callMediaConnections().some(
+                  (connection) =>
+                    connection.state !== 'failed' &&
+                    connection.state !== 'closed',
+                ),
+              onConfirmed: (call) => {
+                if (activeCallRef.current?.id === call.id)
+                  reconcileCallResource(call);
+              },
+              onEnded: () => {
+                if (activeCallRef.current?.id === previousActiveCallId)
+                  endCall();
+              },
+            });
         setIncomingCall((current) =>
           current && !calls.some((call) => call.id === current.call.id)
             ? null
