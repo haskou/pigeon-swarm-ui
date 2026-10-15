@@ -12,7 +12,6 @@ import type {
   LocalKeychainUpdate,
 } from '../keychain/LocalKeychain';
 import type { Session } from '../session/Session';
-import type { DeviceUnlockMethod } from '../storage/DeviceUnlockMethod';
 import type { CreatedIdentityMaterial } from './CreatedIdentityMaterial';
 import type { DevicePairingHistory } from './DevicePairingHistory';
 import type { DevicePairingReaders } from './DevicePairingReaders';
@@ -96,11 +95,10 @@ export class PigeonIdentitiesGateway {
   public async authorizeDevicePairing(
     session: Session,
     requestCode: DevicePairingCode,
-    password?: string,
+    password: string,
   ): Promise<{ completionCode: DevicePairingCode; session: Session }> {
     // The new device receives the identity root and the history secret, so
-    // the person proves again that they can unlock this device: the passkey
-    // when it unlocks this device, otherwise the password. A refusal sends
+    // the person types the password for this device again. A refusal sends
     // nothing.
     await this.identityCommands.confirmLocalUnlock(
       session.identity.id,
@@ -299,39 +297,11 @@ export class PigeonIdentitiesGateway {
     );
   }
 
-  public async disablePasskeyUnlock(
-    session: Session,
-    nextPassword: string,
-  ): Promise<void> {
-    await this.identityCommands.disablePasskeyUnlock(session, nextPassword);
-  }
-
   public async confirmLocalUnlock(
     identityId: string,
-    password?: string,
+    password: string,
   ): Promise<void> {
     await this.identityCommands.confirmLocalUnlock(identityId, password);
-  }
-
-  public async enablePasskeyUnlock(
-    session: Session,
-    currentPassword: string,
-  ): Promise<void> {
-    await this.identityCommands.enablePasskeyUnlock(session, currentPassword);
-  }
-
-  public async localUnlockMethod(
-    identityId: string,
-  ): Promise<DeviceUnlockMethod | undefined> {
-    return await this.identityCommands.localUnlockMethod(identityId);
-  }
-
-  public async passkeyUnlockSecret(identityId: string): Promise<string> {
-    return await this.identityCommands.passkeyUnlockSecret(identityId);
-  }
-
-  public async passkeyUnlockSupported(): Promise<boolean> {
-    return await this.identityCommands.passkeyUnlockSupported();
   }
 
   public async createIdentity(

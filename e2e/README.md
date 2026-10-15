@@ -93,10 +93,7 @@ Offline when the last update expires, within its 90-second lifetime plus the
 30-second read interval, and never shows Invisible) runs on
 `desktop-chromium`. The harness runs one node, so the spec does not cover
 contacts whose mailboxes live on different nodes.
-`passkey-unlock.spec.ts` (switching this device from a password to a passkey
-and unlocking with it) runs on `desktop-chromium` only: it uses a DevTools
-virtual authenticator with PRF and opens the app through `localhost`, because
-WebAuthn rejects IP addresses as relying party ids. The `real-node-e2e` job in
+The `real-node-e2e` job in
 `.github/workflows/ci.yml` builds the node image from the pins below and runs
 these specs. It is the check that catches UI and node
 contract breaks before merge.

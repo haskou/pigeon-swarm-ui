@@ -57,19 +57,6 @@ export async function newIsolatedPage(
   await context.addInitScript(() => {
     window.localStorage.setItem('pigeon-swarm-language-v2', 'en');
     window.localStorage.setItem('pigeon-swarm-language-explicit-v3', 'true');
-
-    const publicKeyCredential = window.PublicKeyCredential as
-      | (typeof PublicKeyCredential & {
-          getClientCapabilities?: () => Promise<Record<string, boolean>>;
-        })
-      | undefined;
-
-    if (publicKeyCredential?.getClientCapabilities) {
-      Object.defineProperty(publicKeyCredential, 'getClientCapabilities', {
-        configurable: true,
-        value: undefined,
-      });
-    }
   });
 
   return context.newPage();

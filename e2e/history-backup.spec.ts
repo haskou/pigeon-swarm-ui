@@ -70,7 +70,7 @@ test('backs up after the password is confirmed again and restores on the same id
       .fill(`${password}wrong`);
     await aliceBackup.getByTestId('history-backup-export').click();
     await expect(aliceBackup.getByRole('alert')).toHaveText(
-      'Your password or passkey could not be confirmed.',
+      'Your password could not be confirmed.',
     );
     expect(downloads).toEqual([]);
 

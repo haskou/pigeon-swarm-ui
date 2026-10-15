@@ -121,7 +121,7 @@ test('authorizes no new device with a wrong password', async ({
 
     // The password is checked with the stored key derivation, which is slow.
     await expect(
-      authorized.getByText('Your password or passkey could not be confirmed.'),
+      authorized.getByText('Your password could not be confirmed.'),
     ).toBeVisible({ timeout: 30_000 });
     await expect(
       authorized.getByTestId('device-pairing-completion-output'),

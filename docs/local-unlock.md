@@ -4,44 +4,50 @@ This document describes the browser client (`pigeon-swarm-ui`) as it behaves
 on `main`. It covers what is stored locally, what unlocks it, what logout
 removes, and what each choice does and does not protect against.
 
-## Modes
+## Unlock
 
-Each identity on this device has one local unlock mode at a time. The client
-has no automatic-unlock mode.
+Each identity on this device unlocks with its device password plus the
+device-bound factor key (`DeviceIdentityVault.unlock`). The client has no
+automatic-unlock mode and no passkey or WebAuthn unlock: every browser gets
+the same password unlock, so none falls back to a weaker one.
 
-| Mode     | Unlock requires                                                                                            | Turned on                                                                       |
-| -------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| Password | The password plus the device-bound factor key (`DeviceIdentityVault.unlock`)                               | Default after creating an identity, recovery-key login or pairing               |
-| Passkey  | A user-verified passkey assertion whose PRF output replaces the password, plus the device-bound factor key | Profile, Security, "Unlock with a passkey", confirmed with the current password |
+The password is the only secret a person types, so `DeviceIdentityVault`
+enforces the password policy (`IdentityPassword.assertStrong`: 20 to 256
+characters with uppercase, lowercase, number and symbol) every time it wraps
+the root key: creating an identity, recovery-key login, pairing a new device
+and changing the password. A caller that skips the form check still cannot
+store a weak envelope. Recovery-key login also checks the policy before it
+asks the node to replace the lost devices, so a weak password cannot leave the
+identity with no usable device. The password form also shows non-blocking
+guidance: a long phrase of four or more unrelated words, not reused elsewhere.
 
-In passkey mode the 32-byte WebAuthn PRF output (`WebAuthnPasskeyPrf`, salt
-stored next to the credential ID) is the secret for the same scrypt envelope
-the password uses. The authenticator must verify the user
-(`userVerification: 'required'`), so it enforces its own PIN or biometric
-attempt limits in hardware. A short PIN checked by JavaScript was not chosen:
-anyone who can copy the browser profile could guess it offline.
+Re-authentication before sensitive actions (authorizing a new device,
+exporting a history backup) types the device password again
+(`DeviceIdentityVault.confirmUnlock`).
 
-Switching to a passkey rewraps the root key to the PRF secret and stores only
-the new envelope, so the password no longer unlocks this device. Switching back
-asks for a new password and a passkey assertion and stores only the password
-envelope. Other devices keep their own unlock. Changing the password is not
-offered while a passkey unlocks the device.
+### Offline guessing
 
-If the browser has no WebAuthn, no secure context, or reports no PRF support,
-the option says so and the device keeps the password. An authenticator that
-creates a passkey without PRF is rejected before anything is stored. Records
-written before this change have no `passkey` field and stay in password mode;
-no migration runs.
+The root-key envelope is scrypt (N = 2^18, r = 8, p = 1) plus HKDF and
+AES-GCM. One guess costs about 0.3 s and 256 MiB on one desktop core, so an
+attacker who copied the browser profile pays that per guess with no attempt
+limit. Assuming an attacker who runs about a thousand guesses per second, a
+password chosen at random from 2^40 possibilities lasts about 35 years, and
+four words drawn at random from a 7,776-word list (about 2^51) far longer; a
+compliant but predictable password (a known phrase, a reused password) can
+still fall to a dictionary.
+The envelope never leaves this browser: the node stores no password-wrapped
+key, and the root key reaches another device only encrypted to that device
+during pairing.
 
-A lost passkey cannot be replaced from the login screen. Recovery-key login or
-pairing from another device registers this device again in password mode. A
-passkey created during a setup that then fails (for example, the vault write
-fails) stays in the authenticator but unlocks nothing.
+A person who loses the password signs in again with the recovery key or pairs
+this browser from another signed-in device; both register the device with a
+new password. A device that an earlier build switched to passkey unlock holds
+an envelope no password opens; it signs in the same way. No migration runs.
 
-| Local state                                                              | Holds                                                                                                                                                                       |
-| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Device vault (IndexedDB `pigeon-swarm-device-vault`, store `identities`) | Identity material encrypted under a root key, one scrypt-protected root-key envelope, a non-extractable HMAC factor key, and in passkey mode the credential ID and PRF salt |
-| Session                                                                  | Keys and session state in memory. Gone on reload; unlocking again is required                                                                                               |
+| Local state                                                              | Holds                                                                                                                       |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| Device vault (IndexedDB `pigeon-swarm-device-vault`, store `identities`) | Identity material encrypted under a root key, one scrypt-protected root-key envelope, and a non-extractable HMAC factor key |
+| Session                                                                  | Keys and session state in memory. Gone on reload; unlocking again is required                                               |
 
 Plaintext values that stay in `localStorage` after login: the identity ID of
 the last login (`pigeon-swarm-last-login-identity-v1`). Workspace preferences
@@ -55,20 +61,17 @@ each node has its own copy.
 ## What each choice protects against
 
 - **Someone reading the browser profile on disk.** The device vault contents
-  are encrypted. In password mode, reading them needs the password and the
-  non-extractable factor key. In passkey mode, they need a user-verified
-  assertion from the passkey; the stored credential ID and salt alone do not
-  derive the secret. Identity IDs and workspace preferences are not encrypted.
-- **Same-origin script (for example injected content).** In password mode a
-  script running in the page can unlock if it knows the password, and can use
-  the factor key while the page is alive. In passkey mode it can request an
-  assertion, but the authenticator still asks the user for a PIN or biometric.
-  The factor key cannot be exported in either mode. The production build sends a
-  Content Security Policy that blocks inline and eval scripts (see below). A
-  script from an allowed origin is not stopped.
-- **A compromised device or browser session.** Not protected in either mode. A
-  compromised browser can wait for the user to unlock and read the session.
-- **A same-origin script while the session is alive.** In both modes it can read
+  are encrypted. Reading them needs the password and the non-extractable factor
+  key; with a copy of both, the password can be guessed offline (see Offline
+  guessing). Identity IDs and workspace preferences are not encrypted.
+- **Same-origin script (for example injected content).** A script running in
+  the page can unlock if it knows the password, and can use the factor key
+  while the page is alive. The factor key cannot be exported. The production
+  build sends a Content Security Policy that blocks inline and eval scripts
+  (see below). A script from an allowed origin is not stopped.
+- **A compromised device or browser session.** Not protected. A compromised
+  browser can wait for the user to unlock and read the session.
+- **A same-origin script while the session is alive.** It can read
   the in-memory session, including the conversation keys and the master key. It
   can also call the message and attachment crypto paths. Logout drops the
   session but does not clear JavaScript memory.
@@ -274,11 +277,11 @@ invitation.
 
 ## User-presence check before unlock
 
-Passkey mode is the user-presence check. A click or prompt that does not gate
-the key would not stop a same-origin script, so the passkey's PRF output is the
-unlock secret itself: without a user-verified assertion the root key cannot be
-unwrapped. After unlock, the session is in memory and the check no longer
-applies (see "What each choice protects against").
+The typed password is the only user-presence check. A click or prompt that
+does not gate the key would not stop a same-origin script, so the client adds
+none: without the password the root key cannot be unwrapped. After unlock, the
+session is in memory and the check no longer applies (see "What each choice
+protects against").
 
 ## Other protections
 
@@ -312,15 +315,14 @@ applies (see "What each choice protects against").
   `DeviceSecurityValueObjects.spec.ts`.
 - **Logs and errors.** Reviewed logging call sites do not log keys, decrypted
   payloads, or topics. The realtime gateway constructor's signed-URL log was
-  fixed in PR #246, which is on `main`. Passkey errors carry only a copy key;
-  the PRF output, salt and credential ID are never logged or shown.
+  fixed in PR #246, which is on `main`.
 - **Diagnostics.** The call diagnostic report (`callDiagnosticReport.ts`)
   holds connection state, not keys or message content. The client has no crash
   reporter.
 - **Adding a device.** Profile → Security → "Add another device" hands the
   identity root and the history secret to the new device. Authorizing it
-  first asks again for the device password, or the passkey when one unlocks
-  this device (`PigeonIdentitiesGateway.authorizeDevicePairing`, through
+  first asks again for the device password
+  (`PigeonIdentitiesGateway.authorizeDevicePairing`, through
   `DeviceIdentityVault.confirmUnlock`); a refusal publishes and authorizes
   nothing. This stops someone at an unlocked, unattended screen. It does not
   stop a same-origin script, which holds the session already (see "What each
@@ -328,13 +330,12 @@ applies (see "What each choice protects against").
 - **History backup.** Profile → device storage → Backup writes one file with
   this identity's stored one-to-one history and contact pins
   (`PigeonHistoryBackup`, `HistoryBackupFile`). Exporting first asks again for
-  the device password, or the passkey when one unlocks this device
-  (`DeviceIdentityVault.confirmUnlock`, no side effects); a refusal exports
-  nothing. The file is AES-256-GCM under a key derived with HKDF-SHA256 from
-  the identity root, labelled for backups and bound to the identity id, which
-  is also authenticated as associated data and never written in clear. The
-  identity root is the one the recovery key rebuilds, so any device of the
-  identity opens the file, also after a password change, passkey change or
+  the device password (`DeviceIdentityVault.confirmUnlock`, no side effects);
+  a refusal exports nothing. The file is AES-256-GCM under a key derived with
+  HKDF-SHA256 from the identity root, labelled for backups and bound to the
+  identity id, which is also authenticated as associated data and never
+  written in clear. The identity root is the one the recovery key rebuilds, so
+  any device of the identity opens the file, also after a password change or
   device-root rotation, and no other identity can. The file holds stored
   records only: no private keys, keychain entries, MLS state, ratchet state or
   session keys, and no group history. Format `pigeon-swarm-backup` version 1
@@ -395,12 +396,10 @@ Covered by `deleteLegacyLocalDeviceUnlockStore.spec.ts`.
 `crypto` jest project (`yarn test:crypto`), which `yarn test` runs together
 with the `unit` project. They are listed in `REAL_CRYPTO_SPECS` in
 `jest.config.cjs` because the `unit` project's `@haskou/pigeon-swarm-crypto`
-fake does not implement the device factor. The vault spec covers switching to a
-passkey and back, that the replaced secret no longer unlocks, and that a wrong
-password creates no passkey. `WebAuthnPasskeyPrf.spec.ts` covers browsers
-without WebAuthn, without a secure context, or without PRF, and cancelled or
-aborted requests. `e2e/passkey-unlock.spec.ts` sets up a passkey and unlocks
-with it in Chromium against a real node.
+fake does not implement the device factor. The vault spec covers that a
+password change replaces the old password, that confirming the password
+changes nothing, and that every path that wraps the root key (creating,
+registering, changing the password) refuses a password below the policy.
 
 Revoked device: `DeviceRemovalDomainService.spec.ts` and
 `PigeonDeviceAuthorizationApi.spec.ts` (`yarn test:crypto`) replay the shared

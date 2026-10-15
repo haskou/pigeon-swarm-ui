@@ -13,6 +13,7 @@ import type { RequestSigner } from '../../../../../shared/infrastructure/http/Re
 
 import { DeviceAuthorizationTransition } from '../../../../../contexts/identities/domain/DeviceAuthorizationTransition';
 import { DeviceRemovedError } from '../../../../../contexts/identities/domain/DeviceRemovedError';
+import { IdentityPasswordTooShortError } from '../../../../../contexts/identities/domain/errors/IdentityPasswordTooShortError';
 import { DeviceAuthorizationEpoch } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationOperationId } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationOperationId';
 import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
@@ -328,6 +329,41 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
     expect(JSON.parse(String(post[1].body))).toEqual(
       expect.objectContaining({ operation: 'recover', previousRevision: 4 }),
     );
+  });
+
+  it('refuses a weak password before the recovery reaches the node', async () => {
+    const recoveryKey = RecoveryKey.generate();
+    const material = await RecoveryIdentityMaterial.derive(recoveryKey);
+    const identityId = IdentityId.fromString(
+      material.identityKeyPair.toPrimitives().publicKey,
+    );
+    const http = { request: jest.fn() } as unknown as HttpJsonClient;
+    const vault = { register: jest.fn() } as unknown as DeviceIdentityVault;
+    const api = new PigeonDeviceAuthorizationApi(
+      http,
+      mock<RequestSigner>(),
+      vault,
+    );
+    const identity = {
+      admissionNonce: '0',
+      authorizationRevision: 0,
+      deviceCredential: 'retired-device',
+      deviceCredentialCommitment: 'retired-commitment',
+      id: identityId.valueOf(),
+      networks: [],
+      profile: { name: 'Ada' },
+      recoveryAuthority:
+        material.recoveryAuthorityKeyPair.toPrimitives().publicKey,
+      signature: 'signature',
+      timestamp: 1,
+      version: 1,
+    };
+
+    await expect(
+      api.recover(identity, recoveryKey, IdentityPassword.fromString('short')),
+    ).rejects.toBeInstanceOf(IdentityPasswordTooShortError);
+    expect(http.request).not.toHaveBeenCalled();
+    expect(vault.register).not.toHaveBeenCalled();
   });
 
   describe('recovery compromise caps', () => {

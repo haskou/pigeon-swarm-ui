@@ -285,7 +285,7 @@ describe(PigeonIdentitiesGateway.name, () => {
   describe('authorizeDevicePairing', () => {
     const requestCode = 'request-code' as unknown as DevicePairingCode;
 
-    it('confirms the device password or passkey before anything leaves for the new device', async () => {
+    it('confirms the device password before anything leaves for the new device', async () => {
       const { authorization, commands, gateway, pairingHistory } =
         gatewayDouble();
       const session = {
@@ -308,7 +308,7 @@ describe(PigeonIdentitiesGateway.name, () => {
       ).toBeLessThan(pairingHistory.publish.mock.invocationCallOrder[0]);
     });
 
-    it('authorizes nothing when the password or passkey is not confirmed', async () => {
+    it('authorizes nothing when the password is not confirmed', async () => {
       const { authorization, commands, gateway, pairingHistory, sealedRoot } =
         gatewayDouble();
       const session = { identity: { id: 'identity-1' } } as unknown as Session;
@@ -352,7 +352,11 @@ describe(PigeonIdentitiesGateway.name, () => {
         session: next,
       } as unknown as DevicePairingAuthorization);
 
-      const result = await gateway.authorizeDevicePairing(session, requestCode);
+      const result = await gateway.authorizeDevicePairing(
+        session,
+        requestCode,
+        'password',
+      );
 
       expect(
         authorization.authorizePairing.mock.invocationCallOrder[0],
@@ -379,7 +383,11 @@ describe(PigeonIdentitiesGateway.name, () => {
         session: next,
       } as unknown as DevicePairingAuthorization);
 
-      const result = await gateway.authorizeDevicePairing(session, requestCode);
+      const result = await gateway.authorizeDevicePairing(
+        session,
+        requestCode,
+        'password',
+      );
 
       expect(pairingReaders.enrol).toHaveBeenCalledWith(next, credential);
       expect(
@@ -406,7 +414,11 @@ describe(PigeonIdentitiesGateway.name, () => {
         session: next,
       } as unknown as DevicePairingAuthorization);
 
-      const result = await gateway.authorizeDevicePairing(session, requestCode);
+      const result = await gateway.authorizeDevicePairing(
+        session,
+        requestCode,
+        'password',
+      );
 
       expect(sealedRoot.current).toHaveBeenCalledWith(session);
       expect(authorization.authorizePairing).toHaveBeenCalledWith(
@@ -424,7 +436,7 @@ describe(PigeonIdentitiesGateway.name, () => {
       sealedRoot.current.mockResolvedValue(session);
 
       await expect(
-        gateway.authorizeDevicePairing(session, requestCode),
+        gateway.authorizeDevicePairing(session, requestCode, 'password'),
       ).rejects.toMatchObject({ failure: 'mismatch' });
       expect(authorization.authorizePairing).not.toHaveBeenCalled();
       expect(recovery.resealAfterPairing).not.toHaveBeenCalled();
@@ -437,7 +449,7 @@ describe(PigeonIdentitiesGateway.name, () => {
       sealedRoot.current.mockRejectedValue(failure);
 
       await expect(
-        gateway.authorizeDevicePairing(session, requestCode),
+        gateway.authorizeDevicePairing(session, requestCode, 'password'),
       ).rejects.toBe(failure);
       expect(authorization.authorizePairing).not.toHaveBeenCalled();
       expect(recovery.resealAfterPairing).not.toHaveBeenCalled();
@@ -455,7 +467,7 @@ describe(PigeonIdentitiesGateway.name, () => {
         session,
       } as unknown as DevicePairingAuthorization);
 
-      await gateway.authorizeDevicePairing(session, requestCode);
+      await gateway.authorizeDevicePairing(session, requestCode, 'password');
 
       expect(pairingHistory.publish).toHaveBeenCalledWith(
         session,

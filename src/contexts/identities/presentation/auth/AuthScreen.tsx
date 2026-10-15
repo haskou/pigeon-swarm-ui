@@ -123,39 +123,6 @@ export function AuthScreen({
   const loginIdentityPreview = useIdentityPreview(
     mode === 'login' ? identityPreviewLookup || undefined : undefined,
   );
-  const previewIdentityId = loginIdentityPreview.identity?.id;
-  const [passkeyIdentityId, setPasskeyIdentityId] = useState<string | null>(
-    null,
-  );
-  const usePasskeyUnlock =
-    mode === 'login' &&
-    loginMethod === 'password' &&
-    Boolean(previewIdentityId) &&
-    passkeyIdentityId === previewIdentityId;
-
-  useEffect(() => {
-    if (!previewIdentityId) return undefined;
-
-    let active = true;
-
-    void loadApplicationContainer()
-      .then((container) =>
-        container.identities.localUnlockMethod(previewIdentityId),
-      )
-      .then(
-        (method) => {
-          if (active && method === 'passkey') {
-            setPasskeyIdentityId(previewIdentityId);
-          }
-        },
-        () => undefined,
-      );
-
-    return () => {
-      active = false;
-    };
-  }, [previewIdentityId]);
-
   useEffect(() => {
     if (availableNetworks.length > 0 && !selectedNetwork) {
       setSelectedNetwork(availableNetworks[0].id);
@@ -211,7 +178,7 @@ export function AuthScreen({
       )
     : useRecoveryKey
       ? ordinaryCanSubmit && localDevicePasswordValid
-      : usePasskeyUnlock || ordinaryCanSubmit;
+      : ordinaryCanSubmit;
   const canShowInstallButton = installState !== 'installed';
   const installButtonDisabled =
     installState === 'checking' || installState === 'prompting';
@@ -264,16 +231,11 @@ export function AuthScreen({
                   loginRecoveryKey.trim(),
                   setLoginProgressStep,
                 )
-              : usePasskeyUnlock && previewIdentityId
-                ? await applicationContainer.identities.loginWithPasskey(
-                    previewIdentityId,
-                    setLoginProgressStep,
-                  )
-                : await applicationContainer.identities.login(
-                    normalizeIdentityLogin(identityId),
-                    password,
-                    setLoginProgressStep,
-                  )
+              : await applicationContainer.identities.login(
+                  normalizeIdentityLogin(identityId),
+                  password,
+                  setLoginProgressStep,
+                )
           : await applicationContainer.identities.register(
               name,
               password,
@@ -503,34 +465,25 @@ export function AuthScreen({
               </div>
             )}
 
-            {usePasskeyUnlock ? (
-              <p
-                className="ui-inline-notice text-xs leading-relaxed text-white/60"
-                data-testid="auth-passkey-unlock-help"
-              >
-                {copy.auth.passkeyUnlockHelp}
-              </p>
-            ) : (
-              <Field
-                label={
-                  useRecoveryKey || useDevicePairing
-                    ? copy.auth.passwordNewDeviceLabel
-                    : copy.auth.passwordLabel
+            <Field
+              label={
+                useRecoveryKey || useDevicePairing
+                  ? copy.auth.passwordNewDeviceLabel
+                  : copy.auth.passwordLabel
+              }
+            >
+              <input
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="ui-field-control px-4 py-3 text-sm placeholder:text-white/30"
+                placeholder="••••••••••••"
+                type="password"
+                autoComplete={
+                  mode === 'login' ? 'current-password' : 'new-password'
                 }
-              >
-                <input
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className="ui-field-control px-4 py-3 text-sm placeholder:text-white/30"
-                  placeholder="••••••••••••"
-                  type="password"
-                  autoComplete={
-                    mode === 'login' ? 'current-password' : 'new-password'
-                  }
-                  data-testid="auth-password-input"
-                />
-              </Field>
-            )}
+                data-testid="auth-password-input"
+              />
+            </Field>
             {mode === 'login' && (
               <>
                 <LoginMethodPanel
@@ -612,11 +565,9 @@ export function AuthScreen({
                 (mode === 'login' && loginProgressStep
                   ? loginProgressLabel(loginProgressStep)
                   : copy.auth.loadingSubmit))
-              : usePasskeyUnlock
-                ? copy.auth.passkeyUnlockSubmit
-                : mode === 'login'
-                  ? copy.auth.loginSubmit
-                  : copy.auth.createIdentity}
+              : mode === 'login'
+                ? copy.auth.loginSubmit
+                : copy.auth.createIdentity}
           </button>
           {mode === 'login' && (
             <p className="mt-2 text-center text-xs leading-snug text-white/45">

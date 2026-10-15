@@ -592,6 +592,8 @@ export class PigeonDeviceAuthorizationApi {
     recoveryKey: RecoveryKey,
     password: IdentityPassword,
   ): Promise<Session> {
+    password.assertStrong();
+
     const material = await RecoveryIdentityMaterial.derive(recoveryKey);
     const identityId = IdentityId.fromString(
       material.identityKeyPair.toPrimitives().publicKey,
