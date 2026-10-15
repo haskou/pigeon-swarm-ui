@@ -255,6 +255,19 @@ const device = (storage: string): GroupConversationMailbox =>
             .filter(({ id }) => before === undefined || id < before)
             .slice(0, limit),
         ),
+      /** Like the node: the first resolution of a notification stays. */
+      update: (owner, notificationId, state) => {
+        const inbox = letters.get(owner.identity.id) ?? [];
+        const index = inbox.findIndex(({ id }) => id === notificationId);
+
+        if (index < 0) return Promise.reject(new Error('Not found'));
+
+        if (inbox[index].state === 'pending') {
+          inbox[index] = { ...inbox[index], state };
+        }
+
+        return Promise.resolve(inbox[index]);
+      },
     },
     now: () => now,
     projector: new MessageProjector(copy.messages),

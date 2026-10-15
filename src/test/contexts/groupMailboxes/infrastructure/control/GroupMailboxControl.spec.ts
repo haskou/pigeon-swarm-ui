@@ -319,8 +319,8 @@ const addLaptop = async (bob: Member): Promise<Member> => {
   await expect(drain(bob)).resolves.toEqual(['applied']);
   await adding;
   await expect(drain(laptop)).resolves.toEqual(['applied']);
-  // The welcome reaches bob too, who already holds the group.
-  await expect(drain(bob)).resolves.toEqual(['rejected']);
+  // The welcome names the laptop; bob's identity gets it too and leaves it.
+  await expect(drain(bob)).resolves.toEqual(['ignored']);
 
   return laptop;
 };
@@ -382,7 +382,11 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
     const welcome = GroupMailboxControlRecord.decode(plaintext);
     const generation = await alice.engine.generation(CONVERSATION);
 
-    expect(welcome).toMatchObject({ index: generation.index, type: 'welcome' });
+    expect(welcome).toMatchObject({
+      deviceCredential: cast.bob.deviceCredential('d1'),
+      index: generation.index,
+      type: 'welcome',
+    });
     expect(new TextDecoder().decode(plaintext)).not.toContain(
       generation.secret.valueOf(),
     );
@@ -516,6 +520,26 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
     ).resolves.toBe('applied');
   });
 
+  it('ignores a welcome that names another device of its identity', async () => {
+    await add(alice, [bob]);
+    const [{ plaintext }] = bob.inbox;
+    const welcome = GroupMailboxControlRecord.decode(plaintext);
+
+    if (welcome?.type !== 'welcome') throw new Error('expected a welcome');
+
+    await expect(
+      bob.control.receiveDirect(
+        alice.id,
+        GroupMailboxControlRecord.encode({
+          ...welcome,
+          deviceCredential: cast.bob.deviceCredential('d2'),
+        }),
+      ),
+    ).resolves.toBe('ignored');
+    await expect(bob.engine.members(CONVERSATION)).rejects.toThrow();
+    await expect(drain(bob)).resolves.toEqual(['applied']);
+  });
+
   it('rejects a welcome from a roster member the roster does not let add devices', async () => {
     // Carol may not add anyone; a patched client of hers forges a group anyway.
     const forger = engineOf('carol', 'd2', () =>
@@ -536,6 +560,7 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
         carol.id,
         GroupMailboxControlRecord.encode({
           conversationId: CONVERSATION,
+          deviceCredential: cast.bob.deviceCredential('d1'),
           index: forged.generation.index,
           type: 'welcome',
           welcome: forged.welcome!,
@@ -596,7 +621,7 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
     ).resolves.toBe('ignored');
   });
 
-  it('answers key package requests from roster members only', async () => {
+  it('refuses key package requests from outside the roster', async () => {
     const request = GroupMailboxControlRecord.encode({
       conversationId: CONVERSATION,
       requestId: MailboxChannel.randomEnvelopeId(),
@@ -604,12 +629,12 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
     });
 
     await expect(bob.control.receiveDirect(mallory.id, request)).resolves.toBe(
-      'ignored',
+      'rejected',
     );
     expect(mallory.inbox).toEqual([]);
     roster = rosterOf(['alice', 'carol', 'mallory']);
     await expect(bob.control.receiveDirect(mallory.id, request)).resolves.toBe(
-      'ignored',
+      'rejected',
     );
     expect(mallory.inbox).toEqual([]);
   });
@@ -767,7 +792,7 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
     ).toBe(false);
   });
 
-  it('ignores a request of its own identity that names another device, or once it holds a leaf', async () => {
+  it('ignores a request naming another device, and refuses one of its own identity naming none or once it holds a leaf', async () => {
     const request = (deviceCredential?: string) =>
       GroupMailboxControlRecord.encode({
         conversationId: CONVERSATION,
@@ -776,15 +801,17 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
         type: 'key-package-request',
       });
 
-    for (const [peer, named] of [
-      [bob.id, cast.bob.deviceCredential('d3')],
-      [bob.id, undefined],
-      [alice.id, cast.bob.deviceCredential('d3')],
-    ] as const) {
+    for (const peer of [bob.id, alice.id]) {
       await expect(
-        bob.control.receiveDirect(peer, request(named)),
+        bob.control.receiveDirect(
+          peer,
+          request(cast.bob.deviceCredential('d3')),
+        ),
       ).resolves.toBe('ignored');
     }
+    await expect(bob.control.receiveDirect(bob.id, request())).resolves.toBe(
+      'rejected',
+    );
     await add(alice, [bob]);
     await drain(bob);
     await expect(
@@ -792,7 +819,7 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
         bob.id,
         request(cast.bob.deviceCredential('d1')),
       ),
-    ).resolves.toBe('ignored');
+    ).resolves.toBe('rejected');
     expect(bob.inbox).toEqual([]);
     expect(alice.inbox).toEqual([]);
   });

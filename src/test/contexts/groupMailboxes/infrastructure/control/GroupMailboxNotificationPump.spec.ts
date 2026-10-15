@@ -5,14 +5,14 @@ import { randomUUID } from 'node:crypto';
 
 import type { GroupMailboxControl } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControl';
 import type { GroupMailboxControlFields } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlFields';
-import type { GroupMailboxNotificationPages } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxNotificationPages';
+import type { GroupMailboxNotificationInbox } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxNotificationInbox';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { NotificationResource } from '../../../../../contexts/notifications/infrastructure/http/resources/NotificationResource';
 
 import { GroupMailboxControl as Control } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControl';
 import { GroupMailboxControlRecord } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlRecord';
 import { GroupMailboxControlSeal } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlSeal';
-import { GroupMailboxLetterClaims } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxLetterClaims';
+import { GroupMailboxHandledLetters } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxHandledLetters';
 import { GroupMailboxNotificationPump } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxNotificationPump';
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 import { DeviceSealedEntryStore } from '../../../../../contexts/messages/infrastructure/mailbox/DeviceSealedEntryStore';
@@ -26,11 +26,25 @@ type Letter = {
   record?: GroupMailboxControlFields;
   reseal?: Record<string, unknown>;
   sentAt?: number;
+  state?: NotificationResource['state'];
 };
 
 const CONVERSATION = 'group:control-pump';
+const DEVICE = [
+  '-----BEGIN PUBLIC KEY-----',
+  'MCowBQYDK2VwAyEAGb9ECWmEzf6FQbrBZ9w7lshQhqowtrbLDFw4rXAxZuE=',
+  '-----END PUBLIC KEY-----',
+  '',
+].join('\n');
+const OTHER_DEVICE = [
+  '-----BEGIN PUBLIC KEY-----',
+  'MCowBQYDK2VwAyEAucH5A2i1h+Bsy/pxTGlQgcT+UNN16/hpX4Ss8tNxHwo=',
+  '-----END PUBLIC KEY-----',
+  '',
+].join('\n');
 const NOW = 1_700_000_000_000;
 const REQUEST_ID = 'abcdefghijklmnopqrstuv';
+const OTHER_REQUEST_ID = 'ABCDEFGHIJKLMNOPQRSTUV';
 const REQUEST: GroupMailboxControlFields = {
   conversationId: CONVERSATION,
   requestId: REQUEST_ID,
@@ -42,7 +56,20 @@ const RESPONSE: GroupMailboxControlFields = {
   requestId: REQUEST_ID,
   type: 'key-package-response',
 };
+const WELCOME: GroupMailboxControlFields = {
+  conversationId: CONVERSATION,
+  deviceCredential: DEVICE,
+  index: 4,
+  type: 'welcome',
+  welcome: new Uint8Array([1]),
+};
+const KINDS: [string, GroupMailboxControlFields][] = [
+  ['request', REQUEST],
+  ['response', RESPONSE],
+  ['welcome', WELCOME],
+];
 const WINDOW = GroupMailboxNotificationPump.ANSWER_WINDOW_MS;
+const WELCOME_WINDOW = GroupMailboxNotificationPump.WELCOME_WINDOW_MS;
 
 const person = async (): Promise<Person> => {
   const keyPair = await KeyPair.generate();
@@ -94,11 +121,21 @@ const notification = (letter: Letter): NotificationResource => {
       recipientIdentityId: bob.id,
     },
     recipientIdentityId: bob.id,
-    state: 'pending',
+    state: letter.state ?? 'pending',
     status: 'unread',
     type: 'group_conversation_invitation',
   };
 };
+
+const other = (id: string): NotificationResource =>
+  ({
+    id,
+    payload: { communityId: 'c', inviterIdentityId: alice.id },
+    recipientIdentityId: bob.id,
+    state: 'pending',
+    status: 'unread',
+    type: 'community_invitation',
+  }) as NotificationResource;
 
 /** This device's handled letters, in the IndexedDB database `database`. */
 const entries = (database: string) =>
@@ -113,7 +150,7 @@ const setup = (
   device: { database?: string; now?: number } = {},
 ) => {
   const control = mock<Pick<GroupMailboxControl, 'receiveDirect'>>();
-  const notifications = mock<GroupMailboxNotificationPages>();
+  const notifications = mock<GroupMailboxNotificationInbox>();
   const database = device.database ?? `group-control-${randomUUID()}`;
 
   control.receiveDirect.mockResolvedValue('applied');
@@ -125,17 +162,28 @@ const setup = (
 
     return Promise.resolve(pages[index] ?? []);
   });
+  notifications.update.mockImplementation((_session, id) =>
+    Promise.resolve(other(id)),
+  );
 
   return {
     control,
+    database,
     notifications,
     pump: new GroupMailboxNotificationPump(
       bob.session,
       control,
       notifications,
-      new GroupMailboxLetterClaims(entries(database), () => bob.session),
+      new GroupMailboxHandledLetters(entries(database), () => bob.session),
       () => device.now ?? NOW,
     ),
+    /** The state records signed, as `[notification id, state]`. */
+    signed: () =>
+      notifications.update.mock.calls.map(([session, id, state]) => {
+        expect(session).toBe(bob.session);
+
+        return [id, state];
+      }),
   };
 };
 
@@ -144,76 +192,303 @@ beforeAll(async () => {
 });
 
 describe('GroupMailboxNotificationPump', () => {
-  describe('on one device across reloads and sessions', () => {
-    it.each([
-      ['request', REQUEST],
-      ['response', RESPONSE],
-    ])(
-      'does not hand a replayed %s over again within its answer window',
+  describe('signs a state record for each letter it decides', () => {
+    it.each(KINDS)(
+      'accepts a %s the control applied',
       async (_kind, record) => {
-        const database = `group-control-${randomUUID()}`;
-        const before = setup(
-          [[notification({ from: alice, id: 'n1', record })]],
+        const { control, pump, signed } = setup([
+          [notification({ from: alice, id: 'n1', record })],
+        ]);
+
+        await pump.run();
+
+        expect(control.receiveDirect).toHaveBeenCalledTimes(1);
+        expect(signed()).toEqual([['n1', 'accepted']]);
+      },
+    );
+
+    it.each(KINDS)(
+      'declines a %s the control refused',
+      async (_kind, record) => {
+        const { control, pump, signed } = setup([
+          [notification({ from: alice, id: 'n1', record })],
+        ]);
+
+        control.receiveDirect.mockResolvedValue('rejected');
+        await pump.run();
+
+        expect(signed()).toEqual([['n1', 'declined']]);
+      },
+    );
+
+    it.each(KINDS)(
+      'leaves a %s for another device or session pending, and reads it again',
+      async (_kind, record) => {
+        const { control, pump, signed } = setup([
+          [notification({ from: alice, id: 'n1', record })],
+        ]);
+
+        control.receiveDirect.mockResolvedValue('ignored');
+        await pump.run();
+        await pump.run();
+
+        expect(control.receiveDirect).toHaveBeenCalledTimes(2);
+        expect(signed()).toEqual([]);
+      },
+    );
+
+    it('resolves a run with the conversations a welcome joined', async () => {
+      const { pump } = setup([
+        [
+          notification({ from: alice, id: 'n1', record: WELCOME }),
+          notification({ from: alice, id: 'n2' }),
+        ],
+      ]);
+
+      await expect(pump.run()).resolves.toEqual(new Set([CONVERSATION]));
+    });
+
+    it('declines, without handing it over, a letter that fails validation', async () => {
+      const broken = notification({ from: alice, id: 'n6' });
+      const { control, pump, signed } = setup([
+        [
+          notification({
+            from: alice,
+            id: 'n1',
+            reseal: { signature: undefined },
+          }),
+          notification({ from: alice, id: 'n2', inviter: mallory }),
+          notification({
+            from: mallory,
+            id: 'n3',
+            inviter: alice,
+            reseal: { senderIdentityId: alice.id },
+          }),
+          notification({
+            from: alice,
+            id: 'n4',
+            record: { ...REQUEST, conversationId: 'group:other' },
+          }),
+          notification({
+            from: alice,
+            id: 'n5',
+            record: {
+              commit: new Uint8Array([1]),
+              conversationId: CONVERSATION,
+              type: 'commit',
+            },
+          }),
           {
-            database,
-          },
-        );
+            ...broken,
+            payload: { ...broken.payload, inviterIdentityId: undefined },
+          } as unknown as NotificationResource,
+        ],
+      ]);
+
+      await pump.run();
+
+      expect(control.receiveDirect).not.toHaveBeenCalled();
+      expect(signed()).toEqual(
+        ['n1', 'n2', 'n3', 'n4', 'n5', 'n6'].map((id) => [id, 'declined']),
+      );
+    });
+
+    it('declines, without handing it over, a letter outside its window', async () => {
+      const { control, pump, signed } = setup([
+        [
+          notification({ from: alice, id: 'n1', sentAt: NOW - WINDOW - 1 }),
+          notification({
+            from: alice,
+            id: 'n2',
+            record: RESPONSE,
+            sentAt: NOW - WINDOW - 1,
+          }),
+          notification({ from: alice, id: 'n3', sentAt: NOW + WINDOW + 1 }),
+          notification({
+            from: alice,
+            id: 'n4',
+            record: WELCOME,
+            sentAt: NOW - WELCOME_WINDOW - 1,
+          }),
+          notification({
+            from: alice,
+            id: 'n5',
+            record: WELCOME,
+            sentAt: NOW + WINDOW + 1,
+          }),
+        ],
+      ]);
+
+      await pump.run();
+
+      expect(WINDOW).toBeGreaterThan(Control.KEY_PACKAGE_TIMEOUT_MS);
+      expect(control.receiveDirect).not.toHaveBeenCalled();
+      expect(signed()).toEqual(
+        ['n1', 'n2', 'n3', 'n4', 'n5'].map((id) => [id, 'declined']),
+      );
+    });
+
+    it('hands a late welcome within its window over for the engine to judge', async () => {
+      const { control, pump } = setup([
+        [
+          notification({
+            from: alice,
+            id: 'n1',
+            record: WELCOME,
+            sentAt: NOW - WELCOME_WINDOW,
+          }),
+        ],
+      ]);
+
+      await pump.run();
+
+      expect(control.receiveDirect).toHaveBeenCalledTimes(1);
+    });
+
+    it('reads no letter the node holds as accepted or declined', async () => {
+      const { control, pump, signed } = setup([
+        [
+          notification({ from: alice, id: 'n1', state: 'accepted' }),
+          notification({
+            from: alice,
+            id: 'n2',
+            reseal: { signature: undefined },
+            state: 'declined',
+          }),
+        ],
+      ]);
+
+      await pump.run();
+
+      expect(control.receiveDirect).not.toHaveBeenCalled();
+      expect(signed()).toEqual([]);
+    });
+
+    it('signs nothing for notifications that are not group control letters', async () => {
+      const letter = notification({ from: alice, id: 'n1' });
+      const { control, pump, signed } = setup([
+        [
+          {
+            ...letter,
+            type: 'conversation_invitation',
+          } as NotificationResource,
+          other('n2'),
+        ],
+      ]);
+
+      await pump.run();
+
+      expect(control.receiveDirect).not.toHaveBeenCalled();
+      expect(signed()).toEqual([]);
+    });
+  });
+
+  describe('drops a letter whose sealed key this device already holds', () => {
+    it.each(KINDS)(
+      'declines a %s replayed under another notification id, with no second answer',
+      async (_kind, record) => {
+        const { control, pump, signed } = setup([
+          [
+            notification({ from: alice, id: 'n1', record }),
+            notification({ from: alice, id: 'n2', record, sentAt: NOW + 1 }),
+          ],
+        ]);
+
+        await pump.run();
+
+        expect(control.receiveDirect).toHaveBeenCalledTimes(1);
+        expect(signed()).toEqual([
+          ['n1', 'accepted'],
+          ['n2', 'declined'],
+        ]);
+      },
+    );
+
+    it.each(KINDS)(
+      'declines a %s replayed after a reload, with no second answer',
+      async (_kind, record) => {
+        const before = setup([
+          [notification({ from: alice, id: 'n1', record })],
+        ]);
 
         await before.pump.run();
         const reloaded = setup(
           [
             [
-              notification({ from: alice, id: 'n1', record }),
-              notification({ from: alice, id: 'n1-reposted', record }),
+              notification({
+                from: alice,
+                id: 'n1',
+                record,
+                state: 'accepted',
+              }),
+              notification({ from: alice, id: 'n2', record }),
             ],
           ],
-          { database, now: NOW + WINDOW },
+          { database: before.database, now: NOW + WINDOW },
         );
 
         await reloaded.pump.run();
 
-        expect(before.control.receiveDirect).toHaveBeenCalledTimes(1);
         expect(reloaded.control.receiveDirect).not.toHaveBeenCalled();
+        expect(reloaded.signed()).toEqual([['n2', 'declined']]);
       },
     );
 
-    it('lets one of two concurrent sessions hand a letter over', async () => {
-      const database = `group-control-${randomUUID()}`;
-      const sessions = [
-        setup([[notification({ from: alice, id: 'n1' })]], { database }),
-        setup([[notification({ from: alice, id: 'n1' })]], { database }),
-      ];
+    it('keys a response by its key package, whatever request id it names', async () => {
+      const { control, pump, signed } = setup([
+        [
+          notification({ from: alice, id: 'n1', record: RESPONSE }),
+          notification({
+            from: alice,
+            id: 'n2',
+            record: { ...RESPONSE, requestId: OTHER_REQUEST_ID },
+          }),
+        ],
+      ]);
 
-      await Promise.all(sessions.map(({ pump }) => pump.run()));
+      await pump.run();
 
-      expect(
-        sessions.flatMap(({ control }) => control.receiveDirect.mock.calls),
-      ).toHaveLength(1);
+      expect(control.receiveDirect).toHaveBeenCalledTimes(1);
+      expect(signed()).toEqual([
+        ['n1', 'accepted'],
+        ['n2', 'declined'],
+      ]);
     });
 
-    it('hands a letter over after a reload when its handling failed', async () => {
-      const database = `group-control-${randomUUID()}`;
-      const failed = setup([[notification({ from: alice, id: 'n1' })]], {
-        database,
+    it('keys a welcome by its epoch and the device it names', async () => {
+      const { control, pump, signed } = setup([
+        [
+          notification({ from: alice, id: 'n1', record: WELCOME }),
+          notification({
+            from: alice,
+            id: 'n2',
+            record: { ...WELCOME, deviceCredential: OTHER_DEVICE },
+          }),
+        ],
+      ]);
+
+      control.receiveDirect.mockImplementation((_sender, plaintext) => {
+        const record = GroupMailboxControlRecord.decode(plaintext);
+
+        return Promise.resolve(
+          record?.type === 'welcome' && record.deviceCredential === DEVICE
+            ? 'applied'
+            : 'ignored',
+        );
       });
+      await pump.run();
 
-      failed.control.receiveDirect.mockRejectedValueOnce(new Error('offline'));
-      await failed.pump.run();
-      const reloaded = setup([[notification({ from: alice, id: 'n1' })]], {
-        database,
-      });
-
-      await reloaded.pump.run();
-
-      expect(reloaded.control.receiveDirect).toHaveBeenCalledTimes(1);
+      // The welcome of the identity's other device stays pending for it.
+      expect(control.receiveDirect).toHaveBeenCalledTimes(2);
+      expect(signed()).toEqual([['n1', 'accepted']]);
     });
 
-    it('keeps a handled letter until its answer window ended', async () => {
-      const database = `group-control-${randomUUID()}`;
+    it('keeps a request or response through its answer window only', async () => {
+      const { database, pump } = setup([
+        [notification({ from: alice, id: 'n1' })],
+      ]);
 
-      await setup([[notification({ from: alice, id: 'n1' })]], {
-        database,
-      }).pump.run();
+      await pump.run();
       await setup([[]], { database, now: NOW + WINDOW }).pump.run();
 
       await expect(
@@ -224,6 +499,122 @@ describe('GroupMailboxNotificationPump', () => {
       await expect(
         entries(database).list(bob.session, 'control-letter'),
       ).resolves.toEqual([]);
+    });
+
+    it('keeps a welcome through its welcome window only', async () => {
+      const { database, pump } = setup([
+        [notification({ from: alice, id: 'n1', record: WELCOME })],
+      ]);
+
+      await pump.run();
+      await setup([[]], { database, now: NOW + WELCOME_WINDOW }).pump.run();
+
+      await expect(
+        entries(database).list(bob.session, 'control-letter'),
+      ).resolves.toHaveLength(1);
+      await setup([[]], {
+        database,
+        now: NOW + WELCOME_WINDOW + 1,
+      }).pump.run();
+
+      await expect(
+        entries(database).list(bob.session, 'control-letter'),
+      ).resolves.toEqual([]);
+    });
+  });
+
+  describe('across failures and sessions', () => {
+    it('signs nothing when the handling throws, and hands the letter over again', async () => {
+      const { control, pump, signed } = setup([
+        [notification({ from: alice, id: 'n1' })],
+      ]);
+
+      control.receiveDirect.mockRejectedValueOnce(new Error('offline'));
+      await pump.run();
+
+      expect(signed()).toEqual([]);
+      await pump.run();
+
+      expect(control.receiveDirect).toHaveBeenCalledTimes(2);
+      expect(signed()).toEqual([['n1', 'accepted']]);
+    });
+
+    it('hands a letter over after a reload when its handling threw', async () => {
+      const failed = setup([[notification({ from: alice, id: 'n1' })]]);
+
+      failed.control.receiveDirect.mockRejectedValueOnce(new Error('offline'));
+      await failed.pump.run();
+      const reloaded = setup([[notification({ from: alice, id: 'n1' })]], {
+        database: failed.database,
+      });
+
+      await reloaded.pump.run();
+
+      expect(reloaded.control.receiveDirect).toHaveBeenCalledTimes(1);
+      expect(reloaded.signed()).toEqual([['n1', 'accepted']]);
+    });
+
+    it('signs the decided state again when signing failed, without handling again', async () => {
+      const { control, notifications, pump, signed } = setup([
+        [notification({ from: alice, id: 'n1' })],
+      ]);
+
+      control.receiveDirect.mockResolvedValue('rejected');
+      notifications.update.mockRejectedValueOnce(new Error('offline'));
+      await pump.run();
+      control.receiveDirect.mockResolvedValue('applied');
+      await pump.run();
+
+      expect(control.receiveDirect).toHaveBeenCalledTimes(1);
+      expect(signed()).toEqual([
+        ['n1', 'declined'],
+        ['n1', 'declined'],
+      ]);
+    });
+
+    it('lets one of two concurrent sessions hand a letter over', async () => {
+      const first = setup([[notification({ from: alice, id: 'n1' })]]);
+      const sessions = [
+        first,
+        setup([[notification({ from: alice, id: 'n1' })]], {
+          database: first.database,
+        }),
+      ];
+
+      await Promise.all(sessions.map(({ pump }) => pump.run()));
+
+      expect(
+        sessions.flatMap(({ control }) => control.receiveDirect.mock.calls),
+      ).toHaveLength(1);
+      const records = sessions.flatMap(({ signed }) => signed());
+
+      expect(records.length).toBeGreaterThan(0);
+      expect(new Set(records.map(String))).toEqual(new Set(['n1,accepted']));
+    });
+
+    it('never hands a letter over twice once a session stopped half-way', async () => {
+      const stopped = setup([[notification({ from: alice, id: 'n1' })]]);
+
+      stopped.control.receiveDirect.mockReturnValue(new Promise(() => {}));
+      void stopped.pump.run();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      const reloaded = setup([[notification({ from: alice, id: 'n1' })]], {
+        database: stopped.database,
+      });
+
+      await reloaded.pump.run();
+
+      expect(reloaded.control.receiveDirect).not.toHaveBeenCalled();
+      expect(reloaded.signed()).toEqual([]);
+      const late = setup([[notification({ from: alice, id: 'n1' })]], {
+        database: stopped.database,
+        now: NOW + WINDOW + 1,
+      });
+
+      await late.pump.run();
+
+      expect(late.control.receiveDirect).not.toHaveBeenCalled();
+      expect(late.signed()).toEqual([['n1', 'declined']]);
     });
   });
 
@@ -241,139 +632,11 @@ describe('GroupMailboxNotificationPump', () => {
     expect(GroupMailboxControlRecord.decode(plaintext)).toEqual(REQUEST);
   });
 
-  it('ignores a record its sender did not sign', async () => {
-    const { control, pump } = setup([
-      [
-        notification({
-          from: alice,
-          id: 'n1',
-          reseal: { signature: undefined },
-        }),
-      ],
-    ]);
-
-    await pump.run();
-
-    expect(control.receiveDirect).not.toHaveBeenCalled();
-  });
-
-  it('ignores a record signed by someone other than the node author', async () => {
-    const { control, pump } = setup([
-      [
-        notification({ from: alice, id: 'n1', inviter: mallory }),
-        notification({
-          from: mallory,
-          id: 'n2',
-          inviter: alice,
-          reseal: { senderIdentityId: alice.id },
-        }),
-      ],
-    ]);
-
-    await pump.run();
-
-    expect(control.receiveDirect).not.toHaveBeenCalled();
-  });
-
-  it('ignores a record for another conversation than its letter', async () => {
-    const { control, pump } = setup([
-      [
-        notification({
-          from: alice,
-          id: 'n1',
-          record: { ...REQUEST, conversationId: 'group:other' },
-        }),
-      ],
-    ]);
-
-    await pump.run();
-
-    expect(control.receiveDirect).not.toHaveBeenCalled();
-  });
-
-  it('ignores a key package exchange outside its answer window', async () => {
-    const window = GroupMailboxNotificationPump.ANSWER_WINDOW_MS;
-    const response: GroupMailboxControlFields = {
-      conversationId: CONVERSATION,
-      keyPackage: new Uint8Array([1]),
-      requestId: REQUEST_ID,
-      type: 'key-package-response',
-    };
-    const { control, pump } = setup([
-      [
-        notification({ from: alice, id: 'n1', sentAt: NOW - window - 1 }),
-        notification({
-          from: alice,
-          id: 'n2',
-          record: response,
-          sentAt: NOW - window - 1,
-        }),
-        notification({ from: alice, id: 'n3', sentAt: NOW + window + 1 }),
-      ],
-    ]);
-
-    await pump.run();
-
-    expect(window).toBeGreaterThan(Control.KEY_PACKAGE_TIMEOUT_MS);
-    expect(control.receiveDirect).not.toHaveBeenCalled();
-  });
-
-  it('hands a late welcome over for the engine to judge', async () => {
-    const welcome: GroupMailboxControlFields = {
-      conversationId: CONVERSATION,
-      index: 0,
-      type: 'welcome',
-      welcome: new Uint8Array([1]),
-    };
-    const { control, pump } = setup([
-      [
-        notification({
-          from: alice,
-          id: 'n1',
-          record: welcome,
-          sentAt: NOW - 86_400_000,
-        }),
-      ],
-    ]);
-
-    await pump.run();
-
-    expect(control.receiveDirect).toHaveBeenCalledTimes(1);
-  });
-
-  it('hands each notification over once', async () => {
-    const { control, pump } = setup([
-      [notification({ from: alice, id: 'n1' })],
-    ]);
-
-    await pump.run();
-    await pump.run();
-
-    expect(control.receiveDirect).toHaveBeenCalledTimes(1);
-  });
-
-  it('hands a notification over again after its handling failed', async () => {
-    const { control, pump } = setup([
-      [notification({ from: alice, id: 'n1' })],
-    ]);
-
-    control.receiveDirect.mockRejectedValueOnce(new Error('offline'));
-    await pump.run();
-    await pump.run();
-
-    expect(control.receiveDirect).toHaveBeenCalledTimes(2);
-  });
-
   it('reads every page of notifications', async () => {
     const size = GroupMailboxNotificationPump.PAGE_SIZE;
-    const first = Array.from({ length: size }, (_, index) => ({
-      id: `other-${index}`,
-      payload: { communityId: 'c', inviterIdentityId: alice.id },
-      recipientIdentityId: bob.id,
-      state: 'pending',
-      status: 'unread',
-      type: 'community_invitation',
-    })) as NotificationResource[];
+    const first = Array.from({ length: size }, (_, index) =>
+      other(`other-${index}`),
+    );
     const { control, notifications, pump } = setup([
       first,
       [notification({ from: alice, id: 'n1' })],
@@ -392,7 +655,7 @@ describe('GroupMailboxNotificationPump', () => {
   it('stops when the node does not move past the cursor', async () => {
     const size = GroupMailboxNotificationPump.PAGE_SIZE;
     const page = Array.from({ length: size }, (_, index) =>
-      notification({ from: alice, id: `n-${index}` }),
+      other(`other-${index}`),
     );
     const { notifications, pump } = setup([page]);
 
@@ -406,54 +669,20 @@ describe('GroupMailboxNotificationPump', () => {
     const size = GroupMailboxNotificationPump.PAGE_SIZE;
     const { notifications, pump } = setup([]);
     let next = 1_000_000_000;
-    const other = (): NotificationResource => {
-      next -= 1;
-
-      return {
-        id: `other-${next}`,
-        payload: { communityId: 'c', inviterIdentityId: alice.id },
-        recipientIdentityId: bob.id,
-        state: 'pending',
-        status: 'unread',
-        type: 'community_invitation',
-      } as NotificationResource;
-    };
 
     notifications.listPage.mockImplementation(() =>
-      Promise.resolve(Array.from({ length: size }, other)),
+      Promise.resolve(
+        Array.from({ length: size }, () => {
+          next -= 1;
+
+          return other(`other-${next}`);
+        }),
+      ),
     );
     await pump.run();
 
     expect(notifications.listPage).toHaveBeenCalledTimes(
       GroupMailboxNotificationPump.MAX_PAGES,
     );
-  });
-
-  it('ignores notifications that are not group control letters', async () => {
-    const letter = notification({ from: alice, id: 'n1' });
-    const { control, pump } = setup([
-      [{ ...letter, type: 'conversation_invitation' } as NotificationResource],
-    ]);
-
-    await pump.run();
-
-    expect(control.receiveDirect).not.toHaveBeenCalled();
-  });
-
-  it('skips a malformed notification and reads the rest', async () => {
-    const broken = notification({ from: alice, id: 'n1' });
-    const { control, pump } = setup([
-      [
-        {
-          ...broken,
-          payload: { ...broken.payload, inviterIdentityId: undefined },
-        } as unknown as NotificationResource,
-        notification({ from: alice, id: 'n2' }),
-      ],
-    ]);
-
-    await pump.run();
-
-    expect(control.receiveDirect).toHaveBeenCalledTimes(1);
   });
 });
