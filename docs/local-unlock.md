@@ -16,8 +16,10 @@ enforces the password policy (`IdentityPassword.assertStrong`: 20 to 256
 characters with uppercase, lowercase, number and symbol) every time it wraps
 the root key: creating an identity, recovery-key login, pairing a new device
 and changing the password. A caller that skips the form check still cannot
-store a weak envelope. The password form also shows non-blocking guidance: a
-long phrase of four or more unrelated words, not reused elsewhere.
+store a weak envelope. Recovery-key login also checks the policy before it
+asks the node to replace the lost devices, so a weak password cannot leave the
+identity with no usable device. The password form also shows non-blocking
+guidance: a long phrase of four or more unrelated words, not reused elsewhere.
 
 Re-authentication before sensitive actions (authorizing a new device,
 exporting a history backup) types the device password again
