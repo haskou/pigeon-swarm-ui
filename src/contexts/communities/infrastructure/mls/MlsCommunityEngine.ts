@@ -803,7 +803,8 @@ export class MlsCommunityEngine {
    * `CommunityMlsRoster`). This device binds everything it has verified. A
    * revision naming operations it has not verified, bound by a member the
    * latest verified roster lets add members, proves the node withholds
-   * them (`MlsGroup.waiting`).
+   * them (`MlsGroup.waiting`). Rivals for an epoch rank alike, so the lower
+   * commit id decides them.
    */
   private policyFor(groupId: string): MlsMembershipPolicy {
     const history = (): CommunityRosterHistory =>
@@ -816,6 +817,7 @@ export class MlsCommunityEngine {
         history().follows(frontier, baseline) &&
         (history().rosterAt(frontier)?.allowsCommit(change) ?? false),
       frontier: () => history().heads(),
+      priority: () => 0,
       reach: (frontier) => history().reach(frontier),
       withheld: (committer, frontier) =>
         history().rosterAt(frontier) === undefined &&

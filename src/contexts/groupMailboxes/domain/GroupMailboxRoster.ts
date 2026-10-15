@@ -91,6 +91,33 @@ export class GroupMailboxRoster {
       .sort((left, right) => left.localeCompare(right));
   }
 
+  /**
+   * How a commit ranks against its rivals for one MLS epoch; the higher
+   * wins and equal ranks leave it to the lower commit id. The creator's
+   * commits rank first, then any commit removing another identity, then
+   * the rest. The rank depends on the commit alone, so rivals form one
+   * total order and converge whatever order they arrive in. Of two rivals
+   * this roster both allows, one removing the other's committer always
+   * ranks higher: only the creator removes an admin, and a member who is
+   * no manager can change only its own leaves, which ranks it last. That
+   * a committer chooses the bytes, and so grinds its commit id low, never
+   * lets it beat a commit that removes it. A removal of the committer's
+   * own devices ranks with the rest: a member about to be removed could
+   * otherwise match the removal and win it back on the id.
+   */
+  public priorityOf(change: {
+    committer: string;
+    removed: readonly string[];
+  }): number {
+    const { committer } = change;
+
+    if (committer === this.creatorId) return 2;
+
+    return change.removed.some((identityId) => identityId !== committer)
+      ? 1
+      : 0;
+  }
+
   public has(identityId: string): boolean {
     return this.members.has(identityId);
   }

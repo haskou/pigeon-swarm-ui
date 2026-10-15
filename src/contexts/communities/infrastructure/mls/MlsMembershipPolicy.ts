@@ -27,6 +27,14 @@ export interface MlsMembershipPolicy {
    */
   reach(frontier: readonly string[]): number;
   /**
+   * How a commit ranks against a rival for its epoch once the roster
+   * allows both and they bind revisions that reach equally far: the higher
+   * wins, and only equal ranks fall back to the lower commit id. It depends
+   * on the change alone, judged by this device's latest roster, so rivals
+   * form one total order on every member.
+   */
+  priority(change: MlsMembershipChange): number;
+  /**
    * Whether the committer may make this change in the roster at the
    * revision the commit binds (`frontier`). That revision must include the
    * one the group bound before (`baseline`), so no commit is judged by a

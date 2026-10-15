@@ -35,10 +35,12 @@ let latest: string[];
 let reach: (frontier: readonly string[]) => number;
 /** Whether the node withholds the roster operations a commit binds. */
 let withheld: (committer: string, frontier: readonly string[]) => boolean;
+let priority: (change: MlsMembershipChange) => number;
 const policy: MlsMembershipPolicy = {
   admits: (identityId) => members.has(identityId),
   allows: (change, order) => allows(change, order),
   frontier: () => latest,
+  priority: (change) => priority(change),
   reach: (frontier) => reach(frontier),
   withheld: (committer, frontier) => withheld(committer, frontier),
 };
@@ -209,6 +211,7 @@ describe('MlsGroup on the real ts-mls library', () => {
     latest = [];
     reach = () => 0;
     withheld = () => false;
+    priority = () => 0;
   });
 
   it('delivers a message to every member of a multi-user group', async () => {
@@ -579,6 +582,79 @@ describe('MlsGroup on the real ts-mls library', () => {
     });
 
     expect(bob.group.epoch).toBe(rotated.epoch + 1n);
+  });
+
+  it('lets a rival the policy ranks higher win its epoch over a lower commit id', async () => {
+    const { alice, bob, carol } = await setup(['alice', 'bob', 'carol']);
+    const fromAlice = (await alice.group.removeIdentities([idOf('carol')]))!;
+    const fromBob = await bob.group.update();
+    const aliceRecord = {
+      bytes: fromAlice.commit,
+      epoch: fromAlice.epoch,
+      id: 'b-alice',
+    };
+    const bobRecord = {
+      bytes: fromBob.commit,
+      epoch: fromBob.epoch,
+      id: 'a-bob',
+    };
+    priority = ({ removed }) => removed.length;
+
+    alice.group.confirm(aliceRecord.id);
+    bob.group.confirm(bobRecord.id);
+    const aliceSees = await alice.group.applyCommit(bobRecord);
+    const bobSees = await bob.group.applyCommit(aliceRecord);
+    const carolFirst = await carol.group.applyCommit(bobRecord);
+    const carolThen = await carol.group.applyCommit(aliceRecord);
+
+    expect(aliceSees).toEqual({ kind: 'ignored', reason: 'lost-race' });
+    expect(bobSees).toMatchObject({
+      discardedCommitId: 'a-bob',
+      kind: 'replaced',
+    });
+    expect(carolFirst.kind).toBe('applied');
+    expect(carolThen.kind).toBe('removed');
+    expect(bob.group.identities()).not.toContain(idOf('carol'));
+    const sealed = await alice.group.encrypt(text.encode('converged'));
+    expect(read(await bob.group.decrypt(sealed))).toBe('converged');
+  });
+
+  it('converges on the highest priority, then the lowest commit id, in every arrival order', async () => {
+    const { alice, bob, carol, dave } = await setup([
+      'alice',
+      'bob',
+      'carol',
+      'dave',
+    ]);
+    const before = dave.group.serialize();
+    const rotation = async (seat: Seat, id: string) => {
+      const output = await seat.group.update();
+
+      return { bytes: output.commit, epoch: output.epoch, id };
+    };
+    // Alice and bob rank above carol, who holds the lowest id.
+    const rivals = [
+      await rotation(alice, 'c-alice'),
+      await rotation(bob, 'b-bob'),
+      await rotation(carol, 'a-carol'),
+    ];
+    bob.group.confirm('b-bob');
+    priority = ({ committer }) => (committer === idOf('carol') ? 0 : 1);
+    const sealed = await bob.group.encrypt(text.encode('bob won'));
+
+    for (const order of ordersOf(rivals)) {
+      const receiver = MlsGroup.restore(
+        'community-1',
+        dave.key.owner,
+        policy,
+        before,
+        [],
+      );
+
+      for (const record of order) await receiver.applyCommit(record);
+
+      expect(read(await receiver.decrypt(sealed))).toBe('bob won');
+    }
   });
 
   it('lets a removed member rejoin with a fresh key package and read only what follows', async () => {
