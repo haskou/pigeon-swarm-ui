@@ -11,9 +11,11 @@ import type { CallSession } from '../../src/contexts/calls/presentation/view-mod
 
 // Renders the production call session hook so microphone, network-change and
 // realtime-reconnect handling run exactly as in the workspace.
-const identity =
-  new URLSearchParams(location.search).get('identity') ?? 'alice';
+const params = new URLSearchParams(location.search);
+const identity = params.get('identity') ?? 'alice';
 const remote = identity === 'alice' ? 'bob' : 'alice';
+// A private call has a media key; without one the call is public.
+const mediaEncryptionKey = params.get('mediaKey') ?? undefined;
 const callId = 'private-call-id';
 const nativePeers: RTCPeerConnection[] = [];
 const NativePeerConnection = window.RTCPeerConnection;
@@ -72,17 +74,38 @@ function App() {
   );
 }
 
-async function audioBytes(peer: RTCPeerConnection) {
+async function audioStats(peer: RTCPeerConnection) {
+  let energy = 0;
   let received = 0;
   let sent = 0;
 
   (await peer.getStats()).forEach((report) => {
     if (report.kind !== 'audio') return;
-    if (report.type === 'inbound-rtp') received += report.bytesReceived ?? 0;
+    if (report.type === 'inbound-rtp') {
+      received += report.bytesReceived ?? 0;
+      // Energy of the decoded audio: only frames that decrypted reach it.
+      energy += report.totalAudioEnergy ?? 0;
+    }
     if (report.type === 'outbound-rtp') sent += report.bytesSent ?? 0;
   });
 
-  return { received, sent };
+  return { energy, received, sent };
+}
+
+function transformName(endpoint: RTCRtpReceiver | RTCRtpSender | undefined) {
+  return endpoint?.transform?.constructor.name ?? null;
+}
+
+// The transforms the browser runs on the audio this peer sends and receives.
+function audioTransforms(peer: RTCPeerConnection) {
+  return {
+    receiver: transformName(
+      peer.getReceivers().find(({ track }) => track.kind === 'audio'),
+    ),
+    sender: transformName(
+      peer.getSenders().find(({ track }) => track?.kind === 'audio'),
+    ),
+  };
 }
 
 function activeSession(): CallSessionControls {
@@ -114,7 +137,7 @@ window.callSessionTest = {
         return { iceServers: [] };
       },
       localStream: microphone.stream,
-      mediaEncryptionEnabled: false,
+      mediaEncryptionKey,
       mediaEncryptionUnavailableReason: 'missing-key',
       microphoneError: microphone.microphoneError,
       noiseCancellationEnabled: false,
@@ -152,7 +175,12 @@ window.callSessionTest = {
     return {
       call: call
         ? {
+            // Peers whose media this side encrypts and decrypts.
+            encryptedWith: call.participants
+              .filter((participant) => participant.mediaEncryptionActive)
+              .map((participant) => participant.identityId),
             hasMicrophone: call.hasMicrophone,
+            mediaEncryption: call.mediaEncryption,
             microphoneError: call.microphoneError,
             // Join order differs per side; identity is what must not repeat.
             participantIds: call.participants
@@ -165,7 +193,8 @@ window.callSessionTest = {
       nativePeers: nativePeers.length,
       peers: await Promise.all(
         open.map(async (peer) => ({
-          ...(await audioBytes(peer)),
+          ...(await audioStats(peer)),
+          audioTransforms: audioTransforms(peer),
           connectionState: peer.connectionState,
           iceUfrag:
             peer.localDescription?.sdp.match(/^a=ice-ufrag:(\S+)/m)?.[1] ??
@@ -196,7 +225,9 @@ declare global {
       recoverRealtime: () => void;
       inspect: () => Promise<{
         call: {
+          encryptedWith: string[];
           hasMicrophone: boolean;
+          mediaEncryption: CallSession['mediaEncryption'];
           microphoneError: CallSession['microphoneError'];
           participantIds: string[];
           status: CallSession['status'];
@@ -204,7 +235,12 @@ declare global {
         configurationRequests: number;
         nativePeers: number;
         peers: Array<{
+          audioTransforms: {
+            receiver: string | null;
+            sender: string | null;
+          };
           connectionState: RTCPeerConnectionState;
+          energy: number;
           iceUfrag: string | null;
           received: number;
           sent: number;

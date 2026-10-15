@@ -204,6 +204,24 @@ simulated on every engine by raising `NotFoundError` and hiding audio inputs
 from `enumerateDevices`. Mobile browsers are not covered; see
 [calls: browser support](../docs/calls-browser-support.md).
 
+## Call media encryption
+
+```bash
+yarn test:e2e e2e/call-media-encryption.spec.ts --project=desktop-chromium --project=desktop-firefox
+```
+
+The caller runs on the engine under test and the callee always on Chromium,
+both rendering `fixtures/call-session.html` as a private call with a call key.
+With the same key on both ends, each end must decode audio from the other
+(`totalAudioEnergy` of its inbound audio grows), report media E2EE active with
+the other identity, and run an `RTCRtpScriptTransform` on its audio sender and
+receiver. With a different key on each end, audio packets still arrive but
+decode to nothing, which shows the audio is encrypted and that frames the key
+does not decrypt are dropped. The encoded streams path of Chromium builds
+without `RTCRtpScriptTransform` is not exercised: every engine in CI has it.
+WebKit is skipped because Playwright cannot grant it a microphone, so Safari
+support is not proven here.
+
 ## Call page departure
 
 `call-page-departure.spec.ts` registers two identities on a real node, rings the
