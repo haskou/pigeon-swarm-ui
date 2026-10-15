@@ -516,6 +516,29 @@ describe('MlsGroup on the real ts-mls library', () => {
     expect(read(await alice.group.decrypt(second))).toBe('after the operation');
   });
 
+  it('never steps back past a commit of its own', async () => {
+    const { alice, bob, carol } = await setup(['alice', 'bob', 'carol']);
+    const add = await alice.group.add([(await device('dave')).publicBytes]);
+    const record = { bytes: add.commit, epoch: add.epoch, id: nextId() };
+
+    alice.group.confirm(record.id);
+    latest = [op('kick')];
+    const rival = await carol.group.update();
+    latest = [];
+    await bob.group.applyCommit(record);
+    const rotated = await bob.group.update();
+
+    bob.group.confirm(nextId());
+    withheld = (_committer, frontier) => frontier.includes(op('kick'));
+    await bob.group.applyCommit({
+      bytes: rival.commit,
+      epoch: rival.epoch,
+      id: nextId(),
+    });
+
+    expect(bob.group.epoch).toBe(rotated.epoch + 1n);
+  });
+
   it('lets a removed member rejoin with a fresh key package and read only what follows', async () => {
     const { alice, bob, carol } = await setup(['alice', 'bob', 'carol']);
     const old = await alice.group.encrypt(text.encode('old history'));
