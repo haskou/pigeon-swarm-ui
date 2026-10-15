@@ -25,8 +25,8 @@ Use MLS (RFC 9420) through `ts-mls` with the cipher suite
 | Direct conversations                | out of scope: opaque 1:1 mailboxes            |
 
 Group conversations do not use the node record transport. Their commits,
-welcomes, messages and polls travel through per-member group mailboxes, and the
-mailbox generation `gen_k` is the MLS exporter
+welcomes, messages, polls and typing notices travel through per-member group
+mailboxes, and the mailbox generation `gen_k` is the MLS exporter
 `("pigeon/group-mailbox/gen/v1", "", 32)` of the epoch after the last add or
 removal, so a joiner exports it from its welcome. See "Generations from MLS" in
 `docs/opaque-mailboxes-client.md`. The engine is `GroupMailboxMlsEngine`; it
