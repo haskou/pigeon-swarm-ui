@@ -11,6 +11,16 @@ import {
 // A browser that cannot make a call says why before it asks for the
 // microphone or creates a call on the node, so nobody is left ringing.
 
+// Firefox grants its fake microphone; other engines ignore these preferences.
+test.use({
+  launchOptions: {
+    firefoxUserPrefs: {
+      'media.navigator.streams.fake': true,
+      'permissions.default.microphone': 1,
+    },
+  },
+});
+
 test('refuses a call with a clear reason in a browser without WebRTC', async ({
   browser,
 }, testInfo) => {
@@ -68,38 +78,29 @@ test('refuses a private call in a browser that cannot encrypt call media', async
   );
 });
 
-test.describe('in Firefox', () => {
-  test.use({
-    launchOptions: {
-      firefoxUserPrefs: {
-        'media.navigator.streams.fake': true,
-        'permissions.default.microphone': 1,
-      },
-    },
+test('rings the callee of a private call started in Firefox', async ({
+  browser,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== 'desktop-firefox',
+    'Firefox encrypts call media through RTCRtpScriptTransform.',
+  );
+  test.slow();
+
+  const [caller, callee] = await directConversation(
+    browser,
+    async () => undefined,
+  );
+  const callCreated = caller.waitForRequest(isCallCreation);
+
+  await startCall(caller);
+  await callCreated;
+  await expect(callee.getByText('Incoming call')).toBeVisible({
+    timeout: 60_000,
   });
-
-  test('rings the callee of a private call', async ({ browser }, testInfo) => {
-    test.skip(
-      testInfo.project.name !== 'desktop-firefox',
-      'Firefox encrypts call media through RTCRtpScriptTransform.',
-    );
-    test.slow();
-
-    const [caller, callee] = await directConversation(
-      browser,
-      async () => undefined,
-    );
-    const callCreated = caller.waitForRequest(isCallCreation);
-
-    await startCall(caller);
-    await callCreated;
-    await expect(callee.getByText('Incoming call')).toBeVisible({
-      timeout: 60_000,
-    });
-    await expect(
-      caller.getByText(/This browser cannot encrypt call audio and video/),
-    ).toHaveCount(0);
-  });
+  await expect(
+    caller.getByText(/This browser cannot encrypt call audio and video/),
+  ).toHaveCount(0);
 });
 
 async function directConversation(
