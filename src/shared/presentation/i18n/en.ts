@@ -848,6 +848,8 @@ export const en = {
         'Only the identity owner can publish profile updates.',
       InvalidIdentityCandidateError:
         'The identity data is not valid. Please review the profile and try again.',
+      InvalidIdentityRegistrationCodeError:
+        'That registration link is not valid. Ask the node owner for a new one.',
       InvalidIdentitySignatureError: 'The identity signature is not valid.',
       InvalidIdentityVersionError: 'The identity version is not valid.',
       InvalidKeychainCandidateError:
@@ -855,13 +857,24 @@ export const en = {
       InvalidKeychainVersionError: 'The keychain version is not valid.',
       InvalidMessageSignatureError:
         'The message signature is not valid. Please reload the chat and try again.',
+      InvalidNodeAccessIdentityIdError:
+        'That identity id is not valid. Paste the id or an @handle.',
+      InvalidNodeBlockApprovalError:
+        'Approve all entries, or pick at least one entry to approve.',
       InvalidNodeBlockListError: 'The block list is not valid.',
+      InvalidNodeBlockListVersionError: 'The block list version is not valid.',
       InvalidNodeBlockSourceApprovalError:
         'Approve all entries, or pick at least one entry to approve.',
       InvalidNodeBlockSourceOriginError:
         'The source address must be an HTTPS origin, such as https://node.example.org.',
       InvalidNodeIdError: 'The node identifier is not valid.',
       InvalidNodePeerIdError: 'That node peer id is not valid.',
+      InvalidNodeRegistrationCodeExpiryError:
+        'A registration link must expire in the future.',
+      InvalidNodeRegistrationCodeIdError:
+        'That registration link could not be found.',
+      InvalidNodeRegistrationCodeUsesError:
+        'A registration link allows between 1 and 100 uses.',
       InvalidPasswordError:
         'Use 12 to 256 characters with uppercase, lowercase, number and symbol.',
       InvalidProfileHandleError:
@@ -898,12 +911,18 @@ export const en = {
         'The request was missing authentication headers. Please reload and try again.',
       NodeBlockEntriesAreNotListedBySourceError:
         'Those entries are no longer listed by that source. Reload the review queue.',
+      NodeBlockEntryAlreadyBlockedError: 'That entry is already blocked.',
+      NodeBlockEntryNotBlockedError: 'That entry is not blocked.',
       NodeBlockListMustBeSignedByCurrentOwnerError:
         'Only the current node owner can sign the block list.',
+      NodeBlockListNotIssuedError:
+        'The block list has no new version to sign. Reload and try again.',
       NodeBlockListSignatureIsNotValidError:
         'The block list signature is not valid. Reload and try again.',
       NodeBlockListVersionIsNotNewerError:
         'The block list changed elsewhere. Reload it and try again.',
+      NodeBlockSourceHasNothingPendingError:
+        'That source has no entries waiting for review.',
       NodeBlockSourceNotFoundError:
         'That block list source is no longer followed.',
       NodeBlockSourceVersionHasChangedError:
@@ -912,6 +931,8 @@ export const en = {
         'A node cannot have more than one public network.',
       NodeOwnerCanOnlyBeChangedByCurrentOwnerError:
         'Only the current owner can transfer this node.',
+      NodeOwnerIdentityCannotBeBlockedError:
+        'You cannot block your own identity.',
       NotificationNotFoundError: 'That notification could not be found.',
       NotificationRecipientMismatchError:
         'This notification belongs to another identity.',
@@ -1060,7 +1081,6 @@ export const en = {
     blocksTab: 'Blocks',
     blocksTitle: 'Blocked identities and nodes',
     blocksUpdated: 'Block list saved.',
-    cannotBlockOwnNode: 'You cannot block your own identity or this node.',
     codeExpired: 'Expired',
     codeExpires: 'Expires {date}',
     codesEmpty: 'No registration links yet.',

@@ -1,13 +1,11 @@
 import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
 
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
-import type { NodeInfo } from '../../../../contexts/networks/infrastructure/http/NodeInfo';
 import type {
   NodeBlockListViewModel,
   NodeBlockTargetViewModel,
 } from '../../../../contexts/nodeAccess/presentation/view-models/NodeAccessViewModels';
 
-import { IdentityMatch } from '../../../../contexts/identities/domain/IdentityMatch';
 import { Field } from '../../../../contexts/identities/presentation/auth/Field';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { applicationContainer } from '../../../composition/applicationContainer';
@@ -22,17 +20,9 @@ import {
 } from './NodeAccessParts';
 import { useNodeAccessAction } from './useNodeAccessAction';
 
-class OwnNodeCannotBeBlockedError extends Error {
-  public constructor() {
-    super(copy.nodeAccess.cannotBlockOwnNode);
-  }
-}
-
 export function NodeBlocksPanel({
-  node,
   session,
 }: {
-  node: NodeInfo | null;
   session: Session;
 }): ReactElement {
   const { busy, error, notice, run } = useNodeAccessAction();
@@ -42,10 +32,9 @@ export function NodeBlocksPanel({
   const [connectedPeerIds, setConnectedPeerIds] = useState<string[]>([]);
   const [identityInput, setIdentityInput] = useState('');
   const [peerInput, setPeerInput] = useState('');
-  const ownPeerId = node?.relay?.peerId;
   const blockedPeerIds = new Set(blockList?.blockedNodePeerIds ?? []);
   const blockablePeerIds = connectedPeerIds.filter(
-    (peerId) => peerId !== ownPeerId && !blockedPeerIds.has(peerId),
+    (peerId) => !blockedPeerIds.has(peerId),
   );
 
   useEffect(() => {
@@ -80,7 +69,7 @@ export function NodeBlocksPanel({
 
   const change = (
     name: string,
-    target: () => Promise<NodeBlockTargetViewModel>,
+    target: () => NodeBlockTargetViewModel | Promise<NodeBlockTargetViewModel>,
     blocked: boolean,
     after?: () => void,
   ) => {
@@ -90,15 +79,6 @@ export function NodeBlocksPanel({
       name,
       async () => {
         const resolved = await target();
-
-        if (
-          blocked &&
-          (IdentityMatch.isSame(resolved.identityId, session.identity.id) ||
-            (resolved.nodePeerId !== undefined &&
-              resolved.nodePeerId === ownPeerId))
-        ) {
-          throw new OwnNodeCannotBeBlockedError();
-        }
 
         setBlockList(
           blocked
@@ -133,7 +113,7 @@ export function NodeBlocksPanel({
 
     change(
       'block-node',
-      async () => ({ nodePeerId }),
+      () => ({ nodePeerId }),
       true,
       () => setPeerInput(''),
     );
@@ -144,7 +124,7 @@ export function NodeBlocksPanel({
       type="button"
       className="ui-button"
       disabled={busy !== null}
-      onClick={() => change('unblock', async () => target, false)}
+      onClick={() => change('unblock', () => target, false)}
     >
       {copy.nodeAccess.unblock}
     </button>
@@ -234,7 +214,7 @@ export function NodeBlocksPanel({
                     className="ui-button ui-button-danger"
                     disabled={busy !== null}
                     onClick={() =>
-                      change('block-node', async () => ({ nodePeerId }), true)
+                      change('block-node', () => ({ nodePeerId }), true)
                     }
                   >
                     {copy.nodeAccess.block}

@@ -858,6 +858,8 @@ export const es = {
         'Solo el propietario de la identidad puede publicar cambios de perfil.',
       InvalidIdentityCandidateError:
         'Los datos de la identidad no son válidos. Revisa el perfil e inténtalo de nuevo.',
+      InvalidIdentityRegistrationCodeError:
+        'Ese enlace de registro no es válido. Pide uno nuevo al propietario del nodo.',
       InvalidIdentitySignatureError: 'La firma de la identidad no es válida.',
       InvalidIdentityVersionError: 'La versión de la identidad no es válida.',
       InvalidKeychainCandidateError:
@@ -865,13 +867,25 @@ export const es = {
       InvalidKeychainVersionError: 'La versión del llavero no es válida.',
       InvalidMessageSignatureError:
         'La firma del mensaje no es válida. Recarga el chat e inténtalo de nuevo.',
+      InvalidNodeAccessIdentityIdError:
+        'Ese id de identidad no es válido. Pega el id o un @usuario.',
+      InvalidNodeBlockApprovalError:
+        'Aprueba todas las entradas o elige al menos una entrada para aprobar.',
       InvalidNodeBlockListError: 'La lista de bloqueos no es válida.',
+      InvalidNodeBlockListVersionError:
+        'La versión de la lista de bloqueos no es válida.',
       InvalidNodeBlockSourceApprovalError:
         'Aprueba todas las entradas o elige al menos una entrada para aprobar.',
       InvalidNodeBlockSourceOriginError:
         'La dirección de la fuente debe ser un origen HTTPS, como https://nodo.example.org.',
       InvalidNodeIdError: 'El identificador del nodo no es válido.',
       InvalidNodePeerIdError: 'Ese id de par de nodo no es válido.',
+      InvalidNodeRegistrationCodeExpiryError:
+        'Un enlace de registro debe caducar en el futuro.',
+      InvalidNodeRegistrationCodeIdError:
+        'No se encontró ese enlace de registro.',
+      InvalidNodeRegistrationCodeUsesError:
+        'Un enlace de registro admite entre 1 y 100 usos.',
       InvalidPasswordError:
         'Usa de 12 a 256 caracteres con mayúscula, minúscula, número y símbolo.',
       InvalidProfileHandleError:
@@ -905,12 +919,18 @@ export const es = {
         'Faltan las cabeceras de autenticación. Recarga e inténtalo de nuevo.',
       NodeBlockEntriesAreNotListedBySourceError:
         'Esa fuente ya no incluye esas entradas. Recarga la cola de revisión.',
+      NodeBlockEntryAlreadyBlockedError: 'Esa entrada ya está bloqueada.',
+      NodeBlockEntryNotBlockedError: 'Esa entrada no está bloqueada.',
       NodeBlockListMustBeSignedByCurrentOwnerError:
         'Solo el propietario actual del nodo puede firmar la lista de bloqueos.',
+      NodeBlockListNotIssuedError:
+        'La lista de bloqueos no tiene una versión nueva que firmar. Recarga e inténtalo de nuevo.',
       NodeBlockListSignatureIsNotValidError:
         'La firma de la lista de bloqueos no es válida. Recarga e inténtalo de nuevo.',
       NodeBlockListVersionIsNotNewerError:
         'La lista de bloqueos cambió en otro lugar. Recárgala e inténtalo de nuevo.',
+      NodeBlockSourceHasNothingPendingError:
+        'Esa fuente no tiene entradas pendientes de revisión.',
       NodeBlockSourceNotFoundError:
         'Ya no sigues esa fuente de lista de bloqueos.',
       NodeBlockSourceVersionHasChangedError:
@@ -919,6 +939,8 @@ export const es = {
         'Un nodo no puede tener más de una red pública.',
       NodeOwnerCanOnlyBeChangedByCurrentOwnerError:
         'Solo el propietario actual puede transferir este nodo.',
+      NodeOwnerIdentityCannotBeBlockedError:
+        'No puedes bloquear tu propia identidad.',
       NotificationNotFoundError: 'No se encontró esa notificación.',
       NotificationRecipientMismatchError:
         'Esta notificación pertenece a otra identidad.',
@@ -1064,7 +1086,6 @@ export const es = {
     blocksTab: 'Bloqueos',
     blocksTitle: 'Identidades y nodos bloqueados',
     blocksUpdated: 'Lista de bloqueos guardada.',
-    cannotBlockOwnNode: 'No puedes bloquear tu propia identidad ni este nodo.',
     codeExpired: 'Caducado',
     codeExpires: 'Caduca el {date}',
     codesEmpty: 'Todavía no hay enlaces de registro.',
