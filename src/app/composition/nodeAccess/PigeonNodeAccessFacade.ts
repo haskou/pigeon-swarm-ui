@@ -137,13 +137,12 @@ export class PigeonNodeAccessFacade {
     mode: NodeRegistrationModeViewModel,
     session: Session,
   ): Promise<NodeRegistrationModeViewModel> {
-    const registration =
-      await this.useCases.nodeRegistrationModeChanger.change(
-        new ChangeNodeRegistrationModeMessage({
-          actorIdentityId: this.actorIdentityId(session),
-          mode,
-        }),
-      );
+    const registration = await this.useCases.nodeRegistrationModeChanger.change(
+      new ChangeNodeRegistrationModeMessage({
+        actorIdentityId: this.actorIdentityId(session),
+        mode,
+      }),
+    );
 
     return registration.toPrimitives().mode;
   }

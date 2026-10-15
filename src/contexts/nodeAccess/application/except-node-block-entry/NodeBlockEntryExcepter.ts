@@ -10,7 +10,9 @@ export class NodeBlockEntryExcepter {
     private readonly exceptions: NodeBlockExceptionsRepository,
   ) {}
 
-  public async except(message: ExceptNodeBlockEntryMessage): Promise<NodeBlockExceptions> {
+  public async except(
+    message: ExceptNodeBlockEntryMessage,
+  ): Promise<NodeBlockExceptions> {
     const actorId = message.getActorId();
     const exceptions = await this.exceptions.find(actorId);
 

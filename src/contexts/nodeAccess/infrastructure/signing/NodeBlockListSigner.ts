@@ -1,5 +1,5 @@
-import type { NodeBlockListPrimitives } from '../../domain/NodeBlockList';
 import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { NodeBlockListPrimitives } from '../../domain/NodeBlockList';
 import type { SignedNodeBlockListResource } from '../http/resources/NodeAccessResources';
 
 import { canonicalJson } from '../../../../shared/infrastructure/crypto/canonicalJson';

@@ -45,7 +45,10 @@ describe(NodeEntryBlocker.name, () => {
 
     await expect(
       new NodeEntryBlocker(repository).block(
-        new BlockNodeEntryMessage({ actorIdentityId: owner, identityId: owner }),
+        new BlockNodeEntryMessage({
+          actorIdentityId: owner,
+          identityId: owner,
+        }),
       ),
     ).rejects.toThrow(NodeOwnerIdentityCannotBeBlockedError);
     expect(repository.save).not.toHaveBeenCalled();

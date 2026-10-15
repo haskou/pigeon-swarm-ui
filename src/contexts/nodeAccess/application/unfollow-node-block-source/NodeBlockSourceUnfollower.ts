@@ -6,7 +6,9 @@ import { UnfollowNodeBlockSourceMessage } from './messages/UnfollowNodeBlockSour
 export class NodeBlockSourceUnfollower {
   public constructor(private readonly sources: NodeBlockSourceRepository) {}
 
-  public async unfollow(message: UnfollowNodeBlockSourceMessage): Promise<NodeBlockSource[]> {
+  public async unfollow(
+    message: UnfollowNodeBlockSourceMessage,
+  ): Promise<NodeBlockSource[]> {
     return await this.sources.remove(
       message.getSourceOwnerIdentityId(),
       message.getActorId(),

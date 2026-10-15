@@ -4,9 +4,13 @@ import type { NodeRegistrationRepository } from '../../domain/repositories/NodeR
 import { FindNodeRegistrationMessage } from './messages/FindNodeRegistrationMessage';
 
 export class NodeRegistrationFinder {
-  public constructor(private readonly registrations: NodeRegistrationRepository) {}
+  public constructor(
+    private readonly registrations: NodeRegistrationRepository,
+  ) {}
 
-  public async find(message: FindNodeRegistrationMessage): Promise<NodeRegistration> {
+  public async find(
+    message: FindNodeRegistrationMessage,
+  ): Promise<NodeRegistration> {
     return await this.registrations.find(message.getActorId());
   }
 }

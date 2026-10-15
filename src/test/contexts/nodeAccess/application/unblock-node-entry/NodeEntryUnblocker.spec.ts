@@ -24,7 +24,10 @@ describe(NodeEntryUnblocker.name, () => {
     repository.save.mockImplementation((list) => Promise.resolve(list));
 
     const saved = await new NodeEntryUnblocker(repository).unblock(
-      new UnblockNodeEntryMessage({ actorIdentityId: owner, identityId: alice }),
+      new UnblockNodeEntryMessage({
+        actorIdentityId: owner,
+        identityId: alice,
+      }),
     );
 
     expect(saved.toPrimitives()).toMatchObject({

@@ -4,9 +4,13 @@ import type { NodeBlockExceptionsRepository } from '../../domain/repositories/No
 import { FindNodeBlockExceptionsMessage } from './messages/FindNodeBlockExceptionsMessage';
 
 export class NodeBlockExceptionsFinder {
-  public constructor(private readonly exceptions: NodeBlockExceptionsRepository) {}
+  public constructor(
+    private readonly exceptions: NodeBlockExceptionsRepository,
+  ) {}
 
-  public async find(message: FindNodeBlockExceptionsMessage): Promise<NodeBlockExceptions> {
+  public async find(
+    message: FindNodeBlockExceptionsMessage,
+  ): Promise<NodeBlockExceptions> {
     return await this.exceptions.find(message.getActorId());
   }
 }

@@ -5,7 +5,9 @@ import { RevokeNodeRegistrationCodeMessage } from './messages/RevokeNodeRegistra
 export class NodeRegistrationCodeRevoker {
   public constructor(private readonly codes: NodeRegistrationCodeRepository) {}
 
-  public async revoke(message: RevokeNodeRegistrationCodeMessage): Promise<void> {
+  public async revoke(
+    message: RevokeNodeRegistrationCodeMessage,
+  ): Promise<void> {
     await this.codes.revoke(message.getCodeId(), message.getActorId());
   }
 }

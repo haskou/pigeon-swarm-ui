@@ -1,6 +1,6 @@
 import type { NodeBlockListRepository } from '../../../domain/repositories/NodeBlockListRepository';
-import type { NodeBlockListSigner } from '../../signing/NodeBlockListSigner';
 import type { NodeAccessActorId } from '../../../domain/value-objects/NodeAccessActorId';
+import type { NodeBlockListSigner } from '../../signing/NodeBlockListSigner';
 import type { PigeonNodeAccessApi } from '../PigeonNodeAccessApi';
 import type { NodeAccessSessions } from './NodeAccessSessions';
 

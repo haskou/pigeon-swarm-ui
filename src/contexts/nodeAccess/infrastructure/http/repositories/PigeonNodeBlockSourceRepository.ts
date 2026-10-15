@@ -1,9 +1,9 @@
 import type { NodeBlockSourceRepository } from '../../../domain/repositories/NodeBlockSourceRepository';
+import type { NodeAccessActorId } from '../../../domain/value-objects/NodeAccessActorId';
 import type { NodeAccessIdentityId } from '../../../domain/value-objects/NodeAccessIdentityId';
 import type { NodeBlockApproval } from '../../../domain/value-objects/NodeBlockApproval';
-import type { NodeBlockApprovalResource } from '../resources/NodeAccessResources';
-import type { NodeAccessActorId } from '../../../domain/value-objects/NodeAccessActorId';
 import type { PigeonNodeAccessApi } from '../PigeonNodeAccessApi';
+import type { NodeBlockApprovalResource } from '../resources/NodeAccessResources';
 import type { NodeAccessSessions } from './NodeAccessSessions';
 
 import { NodeBlockSource } from '../../../domain/NodeBlockSource';

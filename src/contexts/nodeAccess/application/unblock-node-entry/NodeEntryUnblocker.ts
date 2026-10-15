@@ -8,7 +8,9 @@ import { UnblockNodeEntryMessage } from './messages/UnblockNodeEntryMessage';
 export class NodeEntryUnblocker {
   public constructor(private readonly blockLists: NodeBlockListRepository) {}
 
-  public async unblock(message: UnblockNodeEntryMessage): Promise<NodeBlockList> {
+  public async unblock(
+    message: UnblockNodeEntryMessage,
+  ): Promise<NodeBlockList> {
     const actorId = message.getActorId();
     const list = NodeBlockList.continuing(
       await this.blockLists.find(actorId),

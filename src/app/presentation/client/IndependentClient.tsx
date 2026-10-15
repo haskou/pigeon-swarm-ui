@@ -1,12 +1,12 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 
-import { ClientCompatibilityProbe } from '../../../shared/infrastructure/client/ClientCompatibilityProbe';
-import { ClientConnectionError } from '../../../shared/infrastructure/client/ClientConnectionError';
-import { ClientNodeEndpoint } from '../../../shared/infrastructure/client/ClientNodeEndpoint';
 import {
   forgetRegistrationLink,
   pendingRegistrationLink,
 } from '../../../contexts/nodeAccess/presentation/view-models/registrationLink';
+import { ClientCompatibilityProbe } from '../../../shared/infrastructure/client/ClientCompatibilityProbe';
+import { ClientConnectionError } from '../../../shared/infrastructure/client/ClientConnectionError';
+import { ClientNodeEndpoint } from '../../../shared/infrastructure/client/ClientNodeEndpoint';
 import {
   clientNodeForDocument,
   selectClientNodeForDocument,

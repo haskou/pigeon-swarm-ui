@@ -1,1 +1,8 @@
-export type NodeSettingsSection = 'info' | 'networks' | 'peers' | 'relay';
+export type NodeSettingsSection =
+  | 'blocks'
+  | 'info'
+  | 'networks'
+  | 'peers'
+  | 'registration'
+  | 'relay'
+  | 'sharing';

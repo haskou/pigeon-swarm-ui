@@ -10,7 +10,9 @@ export class NodeBlockExceptionRemover {
     private readonly exceptions: NodeBlockExceptionsRepository,
   ) {}
 
-  public async remove(message: RemoveNodeBlockExceptionMessage): Promise<NodeBlockExceptions> {
+  public async remove(
+    message: RemoveNodeBlockExceptionMessage,
+  ): Promise<NodeBlockExceptions> {
     const actorId = message.getActorId();
     const exceptions = await this.exceptions.find(actorId);
 

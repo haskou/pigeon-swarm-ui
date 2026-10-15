@@ -1,10 +1,10 @@
 import type { NodeRegistrationCodeRepository } from '../../../domain/repositories/NodeRegistrationCodeRepository';
 import type { NodeAccessActorId } from '../../../domain/value-objects/NodeAccessActorId';
-import type { PigeonNodeAccessApi } from '../PigeonNodeAccessApi';
-import type { NodeAccessSessions } from './NodeAccessSessions';
 import type { NodeRegistrationCodeExpiry } from '../../../domain/value-objects/NodeRegistrationCodeExpiry';
 import type { NodeRegistrationCodeId } from '../../../domain/value-objects/NodeRegistrationCodeId';
 import type { NodeRegistrationCodeUses } from '../../../domain/value-objects/NodeRegistrationCodeUses';
+import type { PigeonNodeAccessApi } from '../PigeonNodeAccessApi';
+import type { NodeAccessSessions } from './NodeAccessSessions';
 
 import { IssuedNodeRegistrationCode } from '../../../domain/IssuedNodeRegistrationCode';
 import { NodeRegistrationCode } from '../../../domain/NodeRegistrationCode';

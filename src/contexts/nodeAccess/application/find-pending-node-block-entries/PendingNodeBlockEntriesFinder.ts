@@ -6,7 +6,9 @@ import { FindPendingNodeBlockEntriesMessage } from './messages/FindPendingNodeBl
 export class PendingNodeBlockEntriesFinder {
   public constructor(private readonly sources: NodeBlockSourceRepository) {}
 
-  public async find(message: FindPendingNodeBlockEntriesMessage): Promise<PendingNodeBlockEntries> {
+  public async find(
+    message: FindPendingNodeBlockEntriesMessage,
+  ): Promise<PendingNodeBlockEntries> {
     return await this.sources.findPending(
       message.getSourceOwnerIdentityId(),
       message.getActorId(),

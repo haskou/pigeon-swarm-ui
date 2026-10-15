@@ -88,9 +88,9 @@ describe(NodeBlockList.name, () => {
       NodeAccessIdentityId.fromString(owner),
     );
 
-    expect(() =>
-      list.block(NodeBlockTarget.identity(alice), issuedAt),
-    ).toThrow(NodeBlockEntryAlreadyBlockedError);
+    expect(() => list.block(NodeBlockTarget.identity(alice), issuedAt)).toThrow(
+      NodeBlockEntryAlreadyBlockedError,
+    );
     expect(() => list.unblock(NodeBlockTarget.identity(bob), issuedAt)).toThrow(
       NodeBlockEntryNotBlockedError,
     );

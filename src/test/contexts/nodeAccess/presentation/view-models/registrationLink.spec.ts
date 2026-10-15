@@ -84,11 +84,23 @@ describe('registration links', () => {
   });
 
   it.each([
-    ['another path', `https://pigeon.example/messages#node=https%3A%2F%2Fnode.example&code=${code}`],
-    ['a short code', 'https://pigeon.example/register#node=https%3A%2F%2Fnode.example&code=abc'],
-    ['an insecure node', `https://pigeon.example/register#node=http%3A%2F%2Fnode.example&code=${code}`],
+    [
+      'another path',
+      `https://pigeon.example/messages#node=https%3A%2F%2Fnode.example&code=${code}`,
+    ],
+    [
+      'a short code',
+      'https://pigeon.example/register#node=https%3A%2F%2Fnode.example&code=abc',
+    ],
+    [
+      'an insecure node',
+      `https://pigeon.example/register#node=http%3A%2F%2Fnode.example&code=${code}`,
+    ],
     ['a missing node', `https://pigeon.example/register#code=${code}`],
-    ['malformed encoding', `https://pigeon.example/register#node=%E0%A4%A&code=${code}`],
+    [
+      'malformed encoding',
+      `https://pigeon.example/register#node=%E0%A4%A&code=${code}`,
+    ],
   ])('ignores a link with %s', (_case, href) => {
     installLocation(href);
 

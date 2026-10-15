@@ -6,7 +6,9 @@ import { SearchNodeRegistrationCodesMessage } from './messages/SearchNodeRegistr
 export class NodeRegistrationCodesSearcher {
   public constructor(private readonly codes: NodeRegistrationCodeRepository) {}
 
-  public async search(message: SearchNodeRegistrationCodesMessage): Promise<NodeRegistrationCode[]> {
+  public async search(
+    message: SearchNodeRegistrationCodesMessage,
+  ): Promise<NodeRegistrationCode[]> {
     return await this.codes.search(message.getActorId());
   }
 }

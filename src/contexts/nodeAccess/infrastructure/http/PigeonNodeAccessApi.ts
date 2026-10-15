@@ -130,7 +130,9 @@ export class PigeonNodeAccessApi {
     return result.published;
   }
 
-  public async getSources(session: Session): Promise<NodeBlockSourceResource[]> {
+  public async getSources(
+    session: Session,
+  ): Promise<NodeBlockSourceResource[]> {
     const result = await this.signed<{ sources: NodeBlockSourceResource[] }>(
       session,
       'GET',

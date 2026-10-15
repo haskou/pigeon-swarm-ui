@@ -18,7 +18,10 @@ export class PigeonNodeBlockExceptionsRepository implements NodeBlockExceptionsR
       this.api.getExceptions(this.sessions.find(actorId)),
     ]);
 
-    return NodeBlockExceptions.fromPrimitives({ ...exceptions, nodeId: node.id });
+    return NodeBlockExceptions.fromPrimitives({
+      ...exceptions,
+      nodeId: node.id,
+    });
   }
 
   public async save(
