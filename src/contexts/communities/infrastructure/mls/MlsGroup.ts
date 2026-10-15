@@ -202,38 +202,70 @@ const ownerOfKeyPackage = ({ leafNode }: KeyPackage): MlsLeafOwner => {
 };
 
 /**
+ * The owner of the leaf at `leafIndex`, only when the identity and the
+ * device its credential names both signed that leaf's key, so the device
+ * chains to the identity (#375, #441). The name alone counts for nothing.
+ */
+const verifiedOwnerAt = (
+  tree: RatchetTree,
+  leafIndex: number | undefined,
+): MlsLeafOwner => {
+  const node = leafIndex === undefined ? undefined : tree[leafIndex * 2];
+
+  if (node?.nodeType !== 'leaf') throw new MlsRejectedError('Unknown leaf');
+  const owner = MlsIdentityCredential.verify(
+    node.leaf.credential,
+    node.leaf.signaturePublicKey,
+  );
+
+  if (!owner) throw new MlsRejectedError('Leaf credential is forged');
+
+  return owner;
+};
+
+/**
+ * Rejects a commit whose update path left the committer's leaf, validated
+ * only after the judgement, to another identity or device than judged.
+ */
+const assertCommitterKept = (
+  tree: RatchetTree,
+  committerLeaf: number | undefined,
+  { committer, committerDevice }: MlsMembershipChange,
+): void => {
+  const owner = verifiedOwnerAt(tree, committerLeaf);
+
+  if (
+    owner.identityId !== committer ||
+    owner.deviceCredential !== committerDevice
+  ) {
+    throw new MlsRejectedError('Commit rejected');
+  }
+};
+
+/**
  * What a commit's proposals do to membership, by identity, judged against
  * the tree they apply to. Only adds, removals and updates may be in it.
+ * Every owner it names, the committer first, comes from a credential that
+ * verifies; one that does not rejects the commit, whatever it carries.
  */
 const membershipChange = (
-  tree: ClientState['ratchetTree'],
+  tree: RatchetTree,
   committerLeaf: number,
   proposals: readonly Proposal[],
 ): MlsMembershipChange => {
-  const ownerAt = (leafIndex: number): MlsLeafOwner => {
-    const node = tree[leafIndex * 2];
-
-    if (node?.nodeType !== 'leaf') throw new MlsRejectedError('Unknown leaf');
-
-    return MlsIdentityCredential.ownerOf(node.leaf.credential);
-  };
+  const committer = verifiedOwnerAt(tree, committerLeaf);
   const added: string[] = [];
   const removed: string[] = [];
 
   for (const proposal of proposals) {
     if (proposal.proposalType === 'add') {
-      added.push(
-        MlsIdentityCredential.ownerOf(
-          proposal.add.keyPackage.leafNode.credential,
-        ).identityId,
-      );
+      added.push(ownerOfKeyPackage(proposal.add.keyPackage).identityId);
     } else if (proposal.proposalType === 'remove') {
-      removed.push(ownerAt(proposal.remove.removed).identityId);
+      removed.push(verifiedOwnerAt(tree, proposal.remove.removed).identityId);
     } else if (proposal.proposalType !== 'update') {
       throw new MlsRejectedError('Unsupported proposal');
     }
   }
-  const committer = ownerAt(committerLeaf);
 
   return {
     added,
@@ -879,14 +911,16 @@ export class MlsGroup {
   }
 
   /**
-   * Accepts a commit only when it comes from a member's leaf, every
-   * proposal in it is that member's own, and `settle` accepts the change it
-   * makes to membership. A standalone proposal is never applied.
+   * Accepts a commit only when it comes from a member's leaf whose
+   * credential verifies, every proposal in it is that member's own, and
+   * `settle` accepts the change it makes to membership; `settle` learns the
+   * committer's leaf index with the change. A standalone proposal is never
+   * applied.
    */
   private judge(
     from: ClientState,
     incoming: Parameters<IncomingMessageCallback>[0],
-    settle: (change: MlsMembershipChange) => boolean,
+    settle: (change: MlsMembershipChange, committerLeaf: number) => boolean,
   ): IncomingMessageAction {
     if (incoming.kind !== 'commit' || incoming.senderLeafIndex === undefined) {
       return 'reject';
@@ -908,7 +942,7 @@ export class MlsGroup {
         incoming.proposals.map(({ proposal }) => proposal),
       );
 
-      return settle(change) ? 'accept' : 'reject';
+      return settle(change, committer) ? 'accept' : 'reject';
     } catch {
       return 'reject';
     }
@@ -991,7 +1025,9 @@ export class MlsGroup {
    * and let its committer make the change, stepping from `baseline`, and
    * `contest` must let it take the epoch. While the group waits (`witness`)
    * it takes nothing and steps back from adds (`stepBack`), without
-   * throwing.
+   * throwing. The commit's update path replaces the committer's leaf only
+   * after the judgement, so the new leaf must verify as the same identity
+   * and device.
    */
   private async advance(
     record: MlsCommitRecord,
@@ -1008,16 +1044,17 @@ export class MlsGroup {
       throw new MlsRejectedError('Commit does not match its record');
     }
     const { frontier, message: privateMessage } = commit;
-    const judged: { change?: MlsMembershipChange } = {};
+    const judged: { change?: MlsMembershipChange; leaf?: number } = {};
     const result = await processPrivateMessage(
       from,
       privateMessage,
       emptyPskIndex,
       await suite(),
       (incoming) =>
-        this.judge(from, incoming, (change) => {
+        this.judge(from, incoming, (change, committerLeaf) => {
           if (this.witness(record, change.committer, frontier)) return false;
           judged.change = change;
+          judged.leaf = committerLeaf;
 
           return (
             this.permits(change, frontier, baseline) &&
@@ -1039,6 +1076,11 @@ export class MlsGroup {
     ) {
       throw new MlsRejectedError('Commit rejected');
     }
+    assertCommitterKept(
+      result.newState.ratchetTree,
+      judged.leaf,
+      judged.change,
+    );
     this.witnesses.clear();
     this.applied.set(record.epoch, {
       baseline,

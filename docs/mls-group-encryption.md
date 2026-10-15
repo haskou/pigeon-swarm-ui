@@ -523,9 +523,18 @@ public community exception.
   XSS in an unlocked session still reads the state in memory, including the
   states before earlier commits (#479).
 - The roster, not MLS, is authoritative. Clients refuse to add identities that
-  are not on the roster. In a community, every add or removal commit, made or
-  received, is checked against the community roster at the revision it binds
-  (see "Which roster judges a commit"). In a
+  are not on the roster. Every commit, made or received, in a community or a
+  group conversation, is judged by verified leaf owners only: the committer's
+  leaf, every removed leaf and every added key package must carry a
+  credential that both the identity and the device it names signed for that
+  leaf's key, so the device chains to the identity (#375, #441). The identity
+  in the credential alone counts for nothing; a commit whose committer leaf
+  does not verify is rejected, whatever it carries. The commit's update path
+  must leave the committer's leaf verified as the same identity and device,
+  so a committer cannot hand its leaf to another identity. In a community,
+  every add or removal commit, made or received, is checked against the
+  community roster at the revision it binds (see "Which roster judges a
+  commit"). In a
   group conversation, every add or removal commit, made or received, is
   checked against the conversation roster: only the creator and the admins
   still on it (every member when it names neither) add devices or remove
@@ -537,18 +546,21 @@ public community exception.
   welcome arrived from. A device welcomed by its own identity joins only when
   the welcoming device is in that identity's verified device set, the group
   already holds another leaf of that identity and an identity other than it,
-  and the roster lists the identity of every leaf. A device applies a commit
-  that adds or removes leaves of its own identity only when the committing
-  device is in that verified set. The verified set is replayed from the
+  and the roster lists the identity of every leaf. A device makes or applies
+  a commit by its own identity, whatever it changes, only when the committing
+  device is in that verified set; until the set is known, it accepts none.
+  The verified set is replayed from the
   identity's signed device transitions at their head, fetched with this
   device's proof before each such check, so a revoked device is refused at
   once, before its leaf is removed; a fetch that fails or does not verify
   leaves the welcome or commit to be tried again. Residuals: the transitions
   of another identity are readable only by that identity's own devices, so
-  other members still accept a revoked device's commits on its own
-  identity's leaves until its leaf is removed (a revoked device that keeps
-  the identity key can still sign as that identity). A legitimate welcome or
-  own-leaf commit made just before its author was revoked is refused by a
+  for a peer's commit the only device chain a member checks is the leaf
+  credential. A revoked device that keeps the identity key can still sign
+  credentials as that identity, so other members accept its commits, with
+  whatever the roster lets that identity do, until its leaf is removed. A
+  legitimate welcome or commit made just before its author was revoked is
+  refused by a
   sibling that checks after the revoke: a refused welcome leaves the
   sibling's leaf in the group unread by it, and a refused commit leaves the
   sibling behind the group's epoch, a denial of service, never a read. When

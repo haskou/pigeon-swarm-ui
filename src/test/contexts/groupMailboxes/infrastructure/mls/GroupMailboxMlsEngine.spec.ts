@@ -802,6 +802,96 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
     },
   );
 
+  /**
+   * Alice's phone creates the group with bob and carol and adds her laptop;
+   * the phone checks her commits against `verified`.
+   */
+  const aliceWithLaptop = async (
+    verified: () => readonly string[],
+  ): Promise<Record<string, GroupMailboxMlsEngine>> => {
+    const phone = engine('alice', { verified });
+    const laptop = engine('alice', {
+      device: 'd9',
+      verified: () => ['d1', 'd9'],
+    });
+    const bob = engine('bob');
+    const carol = engine('carol');
+    await phone.createGroup(CONVERSATION);
+    await join(phone, [bob, carol]);
+    const added = await phone.add(
+      CONVERSATION,
+      [await laptop.createKeyPackage()],
+      sent,
+    );
+    for (const member of [bob, carol]) {
+      await member.applyCommit(CONVERSATION, added.commit);
+    }
+    await laptop.join(
+      CONVERSATION,
+      added.welcome!,
+      added.generation.index,
+      id('alice'),
+    );
+
+    return { bob, carol, laptop, phone };
+  };
+
+  it('rejects any commit of its own identity from a device its signed transitions no longer authorize, also one that leaves its own leaves alone', async () => {
+    let current = ['d1', 'd9'];
+    const { bob, laptop, phone } = await aliceWithLaptop(() => current);
+    const before = await phone.generation(CONVERSATION);
+    // The phone revokes the laptop, which still holds the identity key and
+    // removes carol in the name of the creator.
+    current = ['d1'];
+    const removal = await laptop.remove(CONVERSATION, [id('carol')], sent);
+
+    await expect(
+      phone.applyCommit(CONVERSATION, removal!.commit),
+    ).rejects.toBeInstanceOf(MlsRejectedError);
+    expect(await phone.members(CONVERSATION)).toContain(id('carol'));
+    expect((await phone.generation(CONVERSATION)).index).toBe(before.index);
+    // Another identity cannot read Alice's transitions and follows the roster.
+    await expect(
+      bob.applyCommit(CONVERSATION, removal!.commit),
+    ).resolves.toMatchObject({ kind: 'applied' });
+  });
+
+  it('judges no commit of its own identity while its signed transitions are unproven, and leaves it to be retried', async () => {
+    let unproven = false;
+    const { laptop, phone } = await aliceWithLaptop(() => {
+      if (unproven) throw new Error('Transitions unproven');
+
+      return ['d1', 'd9'];
+    });
+    unproven = true;
+    const removal = await laptop.remove(CONVERSATION, [id('carol')], sent);
+
+    const failed = phone.applyCommit(CONVERSATION, removal!.commit);
+
+    await expect(failed).rejects.toThrow('Transitions unproven');
+    await expect(failed).rejects.not.toBeInstanceOf(MlsRejectedError);
+    expect(await phone.members(CONVERSATION)).toContain(id('carol'));
+    unproven = false;
+    await expect(
+      phone.applyCommit(CONVERSATION, removal!.commit),
+    ).resolves.toMatchObject({ kind: 'applied' });
+    expect(await phone.members(CONVERSATION)).not.toContain(id('carol'));
+  });
+
+  it('refuses to commit from a device its own signed transitions no longer authorize', async () => {
+    let current = ['d1', 'd9'];
+    const laptop = engine('alice', { device: 'd9', verified: () => current });
+    await laptop.createGroup(CONVERSATION);
+    await join(laptop, [engine('bob'), engine('carol')]);
+    const publish = jest.fn(sent);
+    current = ['d1'];
+
+    await expect(
+      laptop.remove(CONVERSATION, [id('carol')], publish),
+    ).rejects.toThrow('This member may not make this change');
+    expect(publish).not.toHaveBeenCalled();
+  });
+
   it('removes a revoked device of its own identity, which cannot read on', async () => {
     const { alice, bob } = await setup(['alice', 'bob']);
     const laptop = engine('bob', { device: 'd2' });

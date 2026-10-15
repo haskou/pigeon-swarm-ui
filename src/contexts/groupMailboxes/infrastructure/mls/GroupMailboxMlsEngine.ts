@@ -62,7 +62,7 @@ export class GroupMailboxMlsEngine {
   private readonly rosters = new Map<string, GroupMailboxRoster>();
   /**
    * This identity's devices as its signed transitions last proved them;
-   * undefined until fetched, which refuses every change to its own leaves.
+   * undefined until fetched, which refuses every commit by this identity.
    */
   private verified: ReadonlySet<string> | undefined;
 
@@ -377,12 +377,12 @@ export class GroupMailboxMlsEngine {
     return {
       admits: (identityId) =>
         this.rosters.get(conversationId)?.has(identityId) ?? false,
-      // Only this identity's own transitions can be verified here: a change
-      // to its leaves must come from a device they still authorize.
+      // Only this identity's own transitions can be verified here: every
+      // commit by it must come from a device they still authorize. A
+      // peer's device chains to its identity through its credential only.
       allows: (change) =>
         (this.rosters.get(conversationId)?.allowsCommit(change) ?? false) &&
         (change.committer !== self ||
-          ![...change.added, ...change.removed].includes(self) ||
           Boolean(this.verified?.has(change.committerDevice))),
       frontier: () => [],
       reach: () => 0,
