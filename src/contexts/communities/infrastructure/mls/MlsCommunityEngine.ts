@@ -529,21 +529,29 @@ export class MlsCommunityEngine {
    * the roster does not allow, or that does not open, is skipped: the group
    * stays at its epoch for the next commit, and
    * one member cannot stall everyone else. This device's own pending commit
-   * is adopted rather than applied. Returns the group and the id of the
-   * commit it took in the pending's epoch.
+   * is adopted rather than applied. Commits from before the epoch preceding
+   * the group's are dropped even when the node lists them, so a rival or a
+   * step back (`MlsGroup.waiting`) undoes at most the last commit taken.
+   * Returns the group and the id of the commit it took in the pending's
+   * epoch.
    */
   private async applyCommits(
     group: MlsGroup,
     communityId: string,
     pending: PendingCommit | undefined,
   ): Promise<{ group: MlsGroup; taken?: string }> {
-    const epoch = Number(group.epoch);
+    const after = Number(group.epoch) - 2;
     const records = await this.transportFor(communityId).list({
-      ...(epoch >= 2 && { afterEpoch: epoch - 2 }),
+      ...(after >= 0 && { afterEpoch: after }),
       groupId: group.groupId,
       kind: 'commit',
     });
-    const ordered = this.ordered(group.groupId, records);
+    const ordered = this.ordered(
+      group.groupId,
+      records.filter(
+        (record) => record.epoch !== undefined && record.epoch > after,
+      ),
+    );
     let current = group;
     let taken: string | undefined;
 
@@ -649,10 +657,10 @@ export class MlsCommunityEngine {
 
   /**
    * Joins from the newest welcome for this identity that one of this
-   * device's key packages opens (`open`). The node names the welcome's
-   * author; it must hold a leaf in the welcomed group and be allowed to add
-   * members in the roster at the revision the welcome binds, so nobody else
-   * can welcome a member into a look-alike group. The key package is kept
+   * device's key packages opens (`open`). The leaf that signed the welcome
+   * must be allowed to add members in the roster at the revision the
+   * welcome binds, whoever the node names as its author, so nobody else can
+   * welcome a member into a look-alike group. The key package is kept
    * until a welcome opens, so one waiting for a manager's commit is tried
    * again on the next sync. A removed device only joins an epoch newer than
    * its last membership.
@@ -688,12 +696,13 @@ export class MlsCommunityEngine {
   }
 
   /**
-   * The group a welcome opens with the key package, if its author is in it
-   * and may add members in the roster the welcome binds. When the latest
-   * roster no longer lets the author add members, it opens only once a
+   * The group a welcome opens with the key package, if the leaf that signed
+   * it may add members in the roster the welcome binds. When the latest
+   * roster no longer lets that member add members, it opens only once a
    * member that roster lets add members has committed in the group after
    * the welcome (`vouched`): every member took the add then, while a
-   * demoted manager's look-alike group or late add never gets such a commit.
+   * demoted manager's look-alike group or late add never gets such a commit
+   * from a device the demotion was served to.
    */
   private async open(
     groupId: string,
@@ -701,7 +710,6 @@ export class MlsCommunityEngine {
     record: MlsRecordResource,
     history: CommunityRosterHistory,
   ): Promise<MlsGroup | undefined> {
-    const author = record.authorIdentityId;
     let group: MlsGroup;
 
     try {
@@ -716,10 +724,9 @@ export class MlsCommunityEngine {
       return undefined;
     }
 
-    if (
-      !history.rosterAt(group.frontier)?.manages(author) ||
-      !group.identities().includes(author)
-    ) {
+    const author = group.welcomer?.identityId;
+
+    if (!author || !history.rosterAt(group.frontier)?.manages(author)) {
       return undefined;
     }
 

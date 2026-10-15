@@ -301,6 +301,32 @@ const welcomeSigner = async (
   return MlsIdentityCredential.ownerOf(signer.leaf.credential);
 };
 
+const sameBytes = (left: Uint8Array, right: Uint8Array): boolean =>
+  left.length === right.length &&
+  left.every((byte, index) => right[index] === byte);
+
+/**
+ * The state this device left at the epoch `state` is in, when it stepped
+ * back from that very epoch: the same epoch authenticator means the same
+ * epoch secret. Left states up to that epoch are dropped from `left`.
+ */
+const resume = (left: ClientState[], state: ClientState): ClientState => {
+  const epoch = state.groupContext.epoch;
+  const match = left.find(
+    (stashed) =>
+      stashed.groupContext.epoch === epoch &&
+      sameBytes(
+        stashed.keySchedule.epochAuthenticator,
+        state.keySchedule.epochAuthenticator,
+      ),
+  );
+  const later = left.filter((stashed) => stashed.groupContext.epoch > epoch);
+
+  left.splice(0, left.length, ...later);
+
+  return match ?? state;
+};
+
 interface AppliedEpoch {
   readonly commitId: string;
   /** State before the commit; kept to switch to a competing commit. */
@@ -335,6 +361,13 @@ export class MlsGroup {
     string,
     { committer: string; epoch: bigint; frontier: readonly string[] }
   >();
+
+  /**
+   * The states this device left when it stepped back (`stepBack`). Taking
+   * the same commit again resumes the matching one, so the sending
+   * generations it used go on and members do not refuse its next messages.
+   */
+  private readonly resumable: ClientState[] = [];
 
   private constructor(
     public readonly groupId: string,
@@ -902,13 +935,15 @@ export class MlsGroup {
   }
 
   /**
-   * Steps back to before the first commit by another leaf adding leaves
-   * that the group took in or after the epoch of a witness it waits on,
-   * dropping it and every later one: those leaves may rest on rights the
-   * withheld operations revoke. The state it returns to is one the node
-   * could have kept this device in by withholding those commits. Commits
-   * that only remove or update are not stepped back from, so they hold
-   * without such an add before them.
+   * Steps back to before the first commit adding leaves that the group took
+   * in or after the epoch of a witness it waits on, and after this device's
+   * own last commit, dropping it and every later one: those leaves may rest
+   * on rights the withheld operations revoke. The state it returns to is one
+   * the node could have kept this device in by withholding those commits;
+   * the node cannot undo a commit this device made, so those always stand.
+   * Commits that only remove or update are not stepped back from, so they
+   * hold without such an add before them. The states it leaves are kept for
+   * `resume`.
    */
   private stepBack(): void {
     const since = [...this.witnesses.values()]
@@ -919,19 +954,29 @@ export class MlsGroup {
         (earliest, { epoch }) => (epoch < earliest ? epoch : earliest),
         this.state.groupContext.epoch,
       );
-    const [first] = [...this.applied.entries()]
-      .filter(
-        ([epoch, { change }]) =>
-          epoch >= since &&
-          change.added.length > 0 &&
-          (change.committer !== this.owner.identityId ||
-            change.committerDevice !== this.owner.deviceCredential),
+    const taken = [...this.applied.entries()].sort(([a], [b]) =>
+      a < b ? -1 : 1,
+    );
+    const ownLast = taken
+      .map(
+        ([, { change }]) =>
+          change.committer === this.owner.identityId &&
+          change.committerDevice === this.owner.deviceCredential,
       )
-      .sort(([a], [b]) => (a < b ? -1 : 1));
+      .lastIndexOf(true);
+    const first = taken
+      .slice(ownLast + 1)
+      .find(([epoch, { change }]) => epoch >= since && change.added.length > 0);
 
     if (!first) return;
     const [from, { baseline, before }] = first;
 
+    this.resumable.push(
+      this.state,
+      ...[...this.applied.entries()]
+        .filter(([epoch]) => epoch > from)
+        .map(([, left]) => left.before),
+    );
     this.state = before;
     this.bound = baseline;
     for (const epoch of [...this.applied.keys()]) {
@@ -1002,7 +1047,7 @@ export class MlsGroup {
       commitId: record.id,
       frontier,
     });
-    this.state = result.newState;
+    this.state = resume(this.resumable, result.newState);
     this.bound = frontier;
 
     if (result.newState.groupActiveState.kind !== 'active') {
