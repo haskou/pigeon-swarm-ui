@@ -1,7 +1,9 @@
+import type { CallMediaCipher } from './CallMediaCipher';
 import type { DescriptionSignalPayload } from './DescriptionSignalPayload';
 
 import { logCallDebug } from './callDebugLogger';
-import { EncodedCallMediaCipher } from './EncodedCallMediaCipher';
+import { EncodedStreamsCallMediaCipher } from './EncodedStreamsCallMediaCipher';
+import { ScriptTransformCallMediaCipher } from './ScriptTransformCallMediaCipher';
 
 /**
  * The end-to-end encryption of one call's media. A private call has a key:
@@ -11,14 +13,31 @@ import { EncodedCallMediaCipher } from './EncodedCallMediaCipher';
  * has no key and its media is not encrypted.
  */
 export class CallMediaEncryption {
-  private cipher: EncodedCallMediaCipher | null = null;
+  private cipher: CallMediaCipher | null = null;
 
   private required = false;
 
   private readonly admittedPeers = new Set<string>();
 
+  /**
+   * The cipher this browser encrypts with: a worker transform where it has
+   * one, the encoded streams of older Chromium builds otherwise.
+   */
+  private static cipherFor(base64Key: string): CallMediaCipher | null {
+    if (ScriptTransformCallMediaCipher.isSupported())
+      return new ScriptTransformCallMediaCipher(base64Key);
+
+    if (EncodedStreamsCallMediaCipher.isSupported())
+      return new EncodedStreamsCallMediaCipher(base64Key);
+
+    return null;
+  }
+
   public static supported(): boolean {
-    return EncodedCallMediaCipher.isSupported();
+    return (
+      ScriptTransformCallMediaCipher.isSupported() ||
+      EncodedStreamsCallMediaCipher.isSupported()
+    );
   }
 
   /** Records that `peerIdentityId` described itself as `admits` requires. */
@@ -48,14 +67,12 @@ export class CallMediaEncryption {
 
   /** A private call has `base64Key`; a public one has none. */
   public configure(base64Key: null | string): void {
-    const supported = EncodedCallMediaCipher.isSupported();
-
+    this.cipher?.dispose();
     this.required = Boolean(base64Key);
-    this.cipher =
-      base64Key && supported ? new EncodedCallMediaCipher(base64Key) : null;
+    this.cipher = base64Key ? CallMediaEncryption.cipherFor(base64Key) : null;
     logCallDebug('peer-manager:media-encryption:configure', {
+      encrypted: Boolean(this.cipher),
       hasKey: this.required,
-      supported,
     });
   }
 
@@ -84,16 +101,12 @@ export class CallMediaEncryption {
   public peerConfiguration(
     rtcConfiguration: RTCConfiguration,
   ): RTCConfiguration {
-    if (!this.cipher) return rtcConfiguration;
-
-    return {
-      ...rtcConfiguration,
-      encodedInsertableStreams: true,
-    } as RTCConfiguration;
+    return this.cipher?.peerConfiguration(rtcConfiguration) ?? rtcConfiguration;
   }
 
   public reset(): void {
     this.admittedPeers.clear();
+    this.cipher?.dispose();
     this.cipher = null;
     this.required = false;
   }

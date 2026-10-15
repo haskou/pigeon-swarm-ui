@@ -17,7 +17,7 @@ function rawKey(base64Key: string): ArrayBuffer {
 /** `media` in the PSCE1 frame format: marker, 12-byte nonce, AES-GCM. */
 async function encryptedFrame(
   base64Key: string,
-  media: Uint8Array,
+  media: Uint8Array<ArrayBuffer>,
 ): Promise<Uint8Array> {
   const nonce = crypto.getRandomValues(new Uint8Array(nonceLength));
   const ciphertext = await crypto.subtle.encrypt(

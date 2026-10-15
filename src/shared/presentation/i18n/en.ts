@@ -216,7 +216,7 @@ export const en = {
       'This device has no key to encrypt this call end to end yet, so Pigeon did not connect it. Try again once this device has synced the conversation or community.',
     mediaEncryptionPublicCommunity: 'Public community calls do not use E2EE.',
     mediaEncryptionUnsupported:
-      'This browser cannot encrypt call audio and video end to end, so Pigeon does not start or join private calls here. Encrypted calls currently need a Chromium-based browser, such as Chrome or Edge.',
+      'This browser cannot encrypt call audio and video end to end, so Pigeon does not start or join private calls here. Update it to its latest version, or use another up-to-date browser.',
     microphoneAllow: 'Allow microphone',
     microphoneBlockedTitle: 'Cannot use microphone',
     microphoneConstraint:

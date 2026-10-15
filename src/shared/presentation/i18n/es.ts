@@ -223,7 +223,7 @@ export const es = {
     mediaEncryptionPublicCommunity:
       'Las llamadas de comunidades públicas no usan E2EE.',
     mediaEncryptionUnsupported:
-      'Este navegador no puede cifrar de extremo a extremo el audio y el vídeo de las llamadas, así que Pigeon no inicia ni se une a llamadas privadas aquí. Por ahora, las llamadas cifradas necesitan un navegador basado en Chromium, como Chrome o Edge.',
+      'Este navegador no puede cifrar de extremo a extremo el audio y el vídeo de las llamadas, así que Pigeon no inicia ni se une a llamadas privadas aquí. Actualízalo a su última versión o usa otro navegador actualizado.',
     microphoneAllow: 'Permitir micrófono',
     microphoneBlockedTitle: 'No se puede usar el micrófono',
     microphoneConstraint:
