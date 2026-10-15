@@ -268,10 +268,19 @@ test.describe('call microphone availability', () => {
       (await caller.evaluate(() => window.callSessionTest.inspect())).call,
     ).toMatchObject({ hasMicrophone: false, microphoneError: 'denied' });
     expect(await received(callee)).toBe(0);
+    // A denial offers one action, the one that asks the browser again.
+    await expect(
+      caller.getByRole('button', { name: 'Retry', exact: true }),
+    ).toHaveCount(0);
+
+    const allow = caller.getByRole('button', {
+      exact: true,
+      name: 'Allow microphone',
+    });
 
     if (engine === 'firefox') {
-      // A blocked site permission stays blocked: retrying keeps the reason.
-      await caller.getByRole('button', { name: 'Retry', exact: true }).click();
+      // A blocked site permission stays blocked: asking again keeps the reason.
+      await allow.click();
       await expectMicrophoneNotice(caller, deniedText);
 
       return;
@@ -286,7 +295,7 @@ test.describe('call microphone availability', () => {
       await setMicrophoneFailure(caller, null);
     } else {
       await setMicrophoneFailure(caller, null);
-      await caller.getByRole('button', { name: 'Retry', exact: true }).click();
+      await allow.click();
     }
 
     await expectNoMicrophoneNotice(caller);

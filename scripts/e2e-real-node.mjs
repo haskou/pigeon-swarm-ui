@@ -12,11 +12,12 @@ const origin = 'http://127.0.0.1:8080';
 // Each run is one Playwright invocation against the same node. Login,
 // recovery-key sign-in, pairing, 1:1 send/receive, the outbox retry flow and
 // the security audit view run on every engine and viewport CI covers; the
-// call decline on page departure, the two-device revoke flow, the
-// private-community kick, the group conversation removal, the history backup
-// and restore, recovery-key sign-in over a saved keychain, and a contact's
-// shared status and its expiry once the contact goes invisible run on desktop
-// Chromium.
+// call refusals in browsers that cannot make or encrypt a call run on the
+// desktop engine each one targets; the call decline on page departure, the
+// two-device revoke flow, the private-community kick, the group conversation
+// removal, the history backup and restore, recovery-key sign-in over a saved
+// keychain, and a contact's shared status and its expiry once the contact
+// goes invisible run on desktop Chromium.
 const runs = [
   {
     specs: [
@@ -24,6 +25,7 @@ const runs = [
       'e2e/direct-message-sync.spec.ts',
       'e2e/direct-message-outbox.spec.ts',
       'e2e/security-audit.spec.ts',
+      'e2e/call-browser-support.spec.ts',
     ],
     projects: ['desktop-chromium', 'desktop-firefox', 'mobile-chromium'],
   },
