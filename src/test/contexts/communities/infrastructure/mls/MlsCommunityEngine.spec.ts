@@ -27,6 +27,7 @@ const anything = {
   allows: () => true,
   frontier: (): string[] => [],
   reach: () => 0,
+  withheld: () => false,
 };
 const base64 = (bytes: Uint8Array): string =>
   Buffer.from(bytes).toString('base64');

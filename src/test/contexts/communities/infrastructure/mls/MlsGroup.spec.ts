@@ -30,6 +30,7 @@ const policy: MlsMembershipPolicy = {
   allows: (change, order) => allows(change, order),
   frontier: () => latest,
   reach: (frontier) => reach(frontier),
+  withheld: () => false,
 };
 const idOf = (name: string): string => cast[name].id;
 const idsOf = (...names: string[]): string[] => names.map(idOf).sort();

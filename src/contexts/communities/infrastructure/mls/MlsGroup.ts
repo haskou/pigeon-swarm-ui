@@ -99,7 +99,10 @@ export interface MlsOpenedMessage {
 export type MlsCommitOutcome =
   | { kind: 'applied'; epoch: bigint }
   | { kind: 'replaced'; epoch: bigint; discardedCommitId: string }
-  | { kind: 'ignored'; reason: 'duplicate' | 'lost-race' | 'stale' }
+  | {
+      kind: 'ignored';
+      reason: 'duplicate' | 'lost-race' | 'stale' | 'withheld';
+    }
   | { kind: 'gap'; have: bigint; got: bigint }
   | { kind: 'removed' };
 
@@ -318,9 +321,21 @@ interface AppliedEpoch {
  * history it binds, then the lower id. Every
  * commit and welcome binds the roster revision its committer judged it at
  * (`MlsRosterFrontier`); the group remembers the revision of its last
- * commit, which the next one must not step behind.
+ * commit, which the next one must not step behind. A commit by a manager
+ * that binds operations the node has not served this device stops the
+ * group until they arrive (`waiting`).
  */
 export class MlsGroup {
+  /**
+   * Commits, by id, whose committer may add members and that bound roster
+   * operations this device has not verified (`MlsMembershipPolicy.withheld`),
+   * with the epoch each was made in.
+   */
+  private readonly witnesses = new Map<
+    string,
+    { committer: string; epoch: bigint; frontier: readonly string[] }
+  >();
+
   private constructor(
     public readonly groupId: string,
     private readonly owner: MlsLeafOwner,
@@ -480,6 +495,18 @@ export class MlsGroup {
     return this.removed;
   }
 
+  /**
+   * Whether the group waits for roster operations a manager's commit bound
+   * and the node has not served this device yet: they may demote a manager
+   * whose commits the group would otherwise take. Meanwhile it takes no
+   * commit and makes none.
+   */
+  public get waiting(): boolean {
+    return [...this.witnesses.values()].some(({ committer, frontier }) =>
+      this.policy.withheld(committer, frontier),
+    );
+  }
+
   public serialize(): Uint8Array {
     return encodeGroupState(this.state);
   }
@@ -487,6 +514,16 @@ export class MlsGroup {
   /** Identities that currently hold at least one leaf. */
   public identities(): string[] {
     return [...new Set(this.leaves().map(({ owner }) => owner.identityId))];
+  }
+
+  /**
+   * What each commit the group took since this device created, joined or
+   * restored it changed, oldest first.
+   */
+  public changes(): MlsMembershipChange[] {
+    return [...this.applied.entries()]
+      .sort(([a], [b]) => (a < b ? -1 : 1))
+      .map(([, { change }]) => change);
   }
 
   public leaves(): (MlsLeafCredential & { index: number })[] {
@@ -810,15 +847,12 @@ export class MlsGroup {
 
   /**
    * Accepts a commit only when it comes from a member's leaf, every
-   * proposal in it is that member's own, the roster at the revision the
-   * commit binds admits every identity it adds and lets that member make
-   * the change, and `settle` lets it take the epoch. A standalone proposal
-   * is never applied.
+   * proposal in it is that member's own, and `settle` accepts the change it
+   * makes to membership. A standalone proposal is never applied.
    */
   private judge(
     from: ClientState,
     incoming: Parameters<IncomingMessageCallback>[0],
-    order: { baseline: readonly string[]; frontier: readonly string[] },
     settle: (change: MlsMembershipChange) => boolean,
   ): IncomingMessageAction {
     if (incoming.kind !== 'commit' || incoming.senderLeafIndex === undefined) {
@@ -841,18 +875,78 @@ export class MlsGroup {
         incoming.proposals.map(({ proposal }) => proposal),
       );
 
-      return this.permits(change, order.frontier, order.baseline) &&
-        settle(change)
-        ? 'accept'
-        : 'reject';
+      return settle(change) ? 'accept' : 'reject';
     } catch {
       return 'reject';
     }
   }
 
   /**
+   * Keeps the commit as a witness when it proves roster operations this
+   * device has not verified, and tells whether the group now waits.
+   */
+  private witness(
+    record: MlsCommitRecord,
+    committer: string,
+    frontier: readonly string[],
+  ): boolean {
+    if (this.policy.withheld(committer, frontier)) {
+      this.witnesses.set(record.id, {
+        committer,
+        epoch: record.epoch,
+        frontier,
+      });
+    }
+
+    return this.waiting;
+  }
+
+  /**
+   * Steps back to before the first commit by another leaf adding leaves
+   * that the group took in or after the epoch of a witness it waits on,
+   * dropping it and every later one: those leaves may rest on rights the
+   * withheld operations revoke. The state it returns to is one the node
+   * could have kept this device in by withholding those commits. Commits
+   * that only remove or update are not stepped back from, so they hold
+   * without such an add before them.
+   */
+  private stepBack(): void {
+    const since = [...this.witnesses.values()]
+      .filter(({ committer, frontier }) =>
+        this.policy.withheld(committer, frontier),
+      )
+      .reduce(
+        (earliest, { epoch }) => (epoch < earliest ? epoch : earliest),
+        this.state.groupContext.epoch,
+      );
+    const [first] = [...this.applied.entries()]
+      .filter(
+        ([epoch, { change }]) =>
+          epoch >= since &&
+          change.added.length > 0 &&
+          (change.committer !== this.owner.identityId ||
+            change.committerDevice !== this.owner.deviceCredential),
+      )
+      .sort(([a], [b]) => (a < b ? -1 : 1));
+
+    if (!first) return;
+    const [from, { baseline, before }] = first;
+
+    this.state = before;
+    this.bound = baseline;
+    for (const epoch of [...this.applied.keys()]) {
+      if (epoch >= from) this.applied.delete(epoch);
+    }
+  }
+
+  /**
    * The commit's authenticated data is the revision it binds; its sender's
    * leaf signs it, so neither the node nor another member can change it.
+   * The roster at that revision must admit every identity the commit adds
+   * and let its committer make the change, stepping from `baseline`, and
+   * `contest` must let it take the epoch. While the group waits (`witness`)
+   * it takes nothing and steps back from adds (`stepBack`), without
+   * throwing.
    */
   private async advance(
     record: MlsCommitRecord,
@@ -876,12 +970,22 @@ export class MlsGroup {
       emptyPskIndex,
       await suite(),
       (incoming) =>
-        this.judge(from, incoming, { baseline, frontier }, (change) => {
+        this.judge(from, incoming, (change) => {
+          if (this.witness(record, change.committer, frontier)) return false;
           judged.change = change;
 
-          return contest(change, frontier);
+          return (
+            this.permits(change, frontier, baseline) &&
+            contest(change, frontier)
+          );
         }),
     );
+
+    if (this.waiting) {
+      this.stepBack();
+
+      return { kind: 'ignored', reason: 'withheld' };
+    }
 
     if (
       result.kind !== 'newState' ||
@@ -890,6 +994,7 @@ export class MlsGroup {
     ) {
       throw new MlsRejectedError('Commit rejected');
     }
+    this.witnesses.clear();
     this.applied.set(record.epoch, {
       baseline,
       before: from,
@@ -911,6 +1016,12 @@ export class MlsGroup {
 
   private async commit(proposals: Proposal[]): Promise<MlsCommitOutput> {
     this.assertActive();
+
+    if (this.waiting) {
+      throw new MlsRejectedError(
+        'The group waits for roster operations this device has not verified',
+      );
+    }
     const frontier = this.policy.frontier();
     const change = membershipChange(
       this.state.ratchetTree,
@@ -999,6 +1110,7 @@ export class MlsGroup {
         'Group moved on before the commit was confirmed',
       );
     }
+    this.witnesses.clear();
     this.applied.set(pending.epoch, {
       baseline: this.bound,
       before: pending.before,

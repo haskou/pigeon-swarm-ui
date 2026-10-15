@@ -369,7 +369,7 @@ export class GroupMailboxMlsEngine {
 
   /**
    * A conversation's groups judge every leaf and commit by its latest
-   * roster, so they bind no roster revision.
+   * roster, so they bind no roster revision and none can be withheld.
    */
   private policyFor(conversationId: string): MlsMembershipPolicy {
     const self = this.signer.owner.identityId;
@@ -386,6 +386,7 @@ export class GroupMailboxMlsEngine {
           Boolean(this.verified?.has(change.committerDevice))),
       frontier: () => [],
       reach: () => 0,
+      withheld: () => false,
     };
   }
 

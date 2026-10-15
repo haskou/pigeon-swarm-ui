@@ -1,6 +1,7 @@
 import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 
+import type { CommunityMlsRoster } from '../../domain/CommunityMlsRoster';
 import type { MlsRecordResource } from '../http/resources/MlsRecordResource';
 import type {
   MlsCommitOutput,
@@ -251,14 +252,16 @@ export class MlsCommunityEngine {
    * Makes the group follow the signed roster: removes leaves whose identity
    * left, was kicked or banned, and, when this identity may add members,
    * admits every device of the roster that published a key package and
-   * binds the latest roster revision (`bindRoster`). Safe to run on every
-   * member; duplicates resolve by commit id. Returns false once this device
-   * is no longer in the group.
+   * binds the latest roster revision (`bindRoster`). A group waiting for
+   * roster operations the node withholds (`MlsGroup.waiting`) commits
+   * nothing. Safe to run on every member; duplicates resolve by commit id.
+   * Returns false once this device is no longer in the group.
    */
   public async reconcile(groupId: string): Promise<boolean> {
     if (!(await this.sync(groupId))) return false;
+    const group = await this.exclusive(groupId, () => this.load(groupId));
 
-    if (!(await this.hasGroup(groupId))) return true;
+    if (!group || group.waiting) return true;
 
     const roster = (await this.currentHistory(groupId)).latest();
     const me = this.signer.owner.identityId;
@@ -349,20 +352,43 @@ export class MlsCommunityEngine {
 
   /**
    * Commits a leaf update when the roster revision the group bound grants
-   * other rights than the latest one. Until a commit binds a demotion, the
-   * demoted member can still bind an older revision; this closes that
-   * window as soon as a manager sees the demotion.
+   * other rights than the latest one, or when the group took leaves a
+   * member added that the latest roster no longer lets add members and no
+   * member it does has committed since (`unvouched`). Until a commit binds a
+   * demotion, the demoted member can still bind an older revision, and
+   * whoever it added cannot open its welcome (`open`); this closes both as
+   * soon as a manager sees the demotion.
    */
   private async bindRoster(groupId: string): Promise<void> {
     await this.exclusive(groupId, async () => {
       const group = await this.requireGroup(groupId);
       const history = await this.currentHistory(groupId);
       const bound = history.rosterAt(group.frontier);
+      const latest = history.latest();
 
       // A revision this device cannot resolve is one it cannot follow yet.
-      if (!bound || bound.sameAuthorityAs(history.latest())) return;
+      if (!bound) return;
+
+      if (bound.sameAuthorityAs(latest) && !this.unvouched(group, latest)) {
+        return;
+      }
       await this.commit(group, await group.update(), []);
     });
+  }
+
+  /**
+   * Whether leaves the group took since it was loaded were added by a
+   * member the latest roster does not let add members, with no commit
+   * since by one it does.
+   */
+  private unvouched(group: MlsGroup, latest: CommunityMlsRoster): boolean {
+    return group
+      .changes()
+      .reduce<boolean>(
+        (stranded, { added, committer }) =>
+          !latest.manages(committer) && (stranded || added.length > 0),
+        false,
+      );
   }
 
   /**
@@ -496,9 +522,10 @@ export class MlsCommunityEngine {
   }
 
   /**
-   * Applies the published commits in order: by epoch, then the one binding
-   * the most roster history, then the lowest id; `MlsGroup` switches to a
-   * later one the latest verified roster allows over one it does not. A commit
+   * Applies the published commits in order (`ordered`); `MlsGroup` switches
+   * to a later one the latest verified roster allows over one it does not,
+   * and stops while a manager's commit proves operations the node has not
+   * served (`MlsGroup.waiting`). A commit
    * the roster does not allow, or that does not open, is skipped: the group
    * stays at its epoch for the next commit, and
    * one member cannot stall everyone else. This device's own pending commit
@@ -534,35 +561,54 @@ export class MlsCommunityEngine {
     return { group: current, taken };
   }
 
-  /** Commits by epoch, the one binding most roster history, then by id. */
+  /**
+   * Commits by epoch; in an epoch, one binding roster operations this
+   * device has not verified first, then the one binding most roster
+   * history, then by id. Commits binding unverified operations are also
+   * tried once before every other: a manager's proves the node withholds
+   * them, so the group stops before taking a rival in that epoch or a
+   * later one.
+   */
   private ordered(
     groupId: string,
     records: readonly MlsRecordResource[],
   ): MlsRecordResource[] {
     const history =
       this.histories.get(groupId) ?? CommunityRosterHistory.of([]);
-    const reach = new Map(
-      records.map((record) => [
-        record.recordId,
-        history.reach(MlsGroup.frontierOf(fromBase64(record.payload)) ?? []),
-      ]),
-    );
-    const reachOf = (record: MlsRecordResource): number =>
-      reach.get(record.recordId) ?? 0;
+    const ranks = new Map(
+      records.map((record) => {
+        const frontier = MlsGroup.frontierOf(fromBase64(record.payload)) ?? [];
 
-    return records
+        return [
+          record.recordId,
+          {
+            reach: history.reach(frontier),
+            unverified: history.rosterAt(frontier) === undefined,
+          },
+        ];
+      }),
+    );
+    const rankOf = (
+      record: MlsRecordResource,
+    ): { reach: number; unverified: boolean } =>
+      ranks.get(record.recordId) ?? { reach: 0, unverified: false };
+    const sorted = records
       .filter((record) => record.epoch !== undefined)
       .sort(
         (a, b) =>
           (a.epoch as number) - (b.epoch as number) ||
-          reachOf(b) - reachOf(a) ||
+          Number(rankOf(b).unverified) - Number(rankOf(a).unverified) ||
+          rankOf(b).reach - rankOf(a).reach ||
           a.recordId.localeCompare(b.recordId),
       );
+
+    return [...sorted.filter((record) => rankOf(record).unverified), ...sorted];
   }
 
   /**
-   * Adopts the group this device's own pending commit leads to, or
-   * applies the commit. `took` tells whether the group took it.
+   * Adopts the group this device's own pending commit leads to, unless the
+   * group waits for withheld roster operations, or applies the commit.
+   * `took` tells whether the group took it.
    */
   private async take(
     group: MlsGroup,
@@ -570,6 +616,7 @@ export class MlsCommunityEngine {
     pending: PendingCommit | undefined,
   ): Promise<{ group: MlsGroup; took: boolean }> {
     if (
+      !group.waiting &&
       record.recordId === pending?.commitId &&
       record.epoch === pending.epoch &&
       group.epoch === BigInt(pending.epoch)
@@ -602,11 +649,13 @@ export class MlsCommunityEngine {
 
   /**
    * Joins from the newest welcome for this identity that one of this
-   * device's key packages opens. The node names the welcome's author; it
-   * must hold a leaf in the welcomed group and be allowed to add members in
-   * the roster at the revision the welcome binds, so nobody else can
-   * welcome a member into a look-alike group. A removed device only joins
-   * an epoch newer than its last membership.
+   * device's key packages opens (`open`). The node names the welcome's
+   * author; it must hold a leaf in the welcomed group and be allowed to add
+   * members in the roster at the revision the welcome binds, so nobody else
+   * can welcome a member into a look-alike group. The key package is kept
+   * until a welcome opens, so one waiting for a manager's commit is tried
+   * again on the next sync. A removed device only joins an epoch newer than
+   * its last membership.
    */
   private async joinFromWelcome(
     groupId: string,
@@ -639,9 +688,12 @@ export class MlsCommunityEngine {
   }
 
   /**
-   * The group a welcome opens with the key package, if its author is in it,
-   * may add members in the roster the welcome binds and still may in the
-   * latest one: a demoted manager's welcome opens nothing.
+   * The group a welcome opens with the key package, if its author is in it
+   * and may add members in the roster the welcome binds. When the latest
+   * roster no longer lets the author add members, it opens only once a
+   * member that roster lets add members has committed in the group after
+   * the welcome (`vouched`): every member took the add then, while a
+   * demoted manager's look-alike group or late add never gets such a commit.
    */
   private async open(
     groupId: string,
@@ -650,24 +702,50 @@ export class MlsCommunityEngine {
     history: CommunityRosterHistory,
   ): Promise<MlsGroup | undefined> {
     const author = record.authorIdentityId;
+    let group: MlsGroup;
 
     try {
-      const group = await MlsGroup.join(
+      group = await MlsGroup.join(
         groupId,
         bundle,
         fromBase64(record.payload),
         this.policyFor(groupId),
       );
-
-      return history.rosterAt(group.frontier)?.manages(author) &&
-        history.latest().manages(author) &&
-        group.identities().includes(author)
-        ? group
-        : undefined;
     } catch {
       // Not addressed to this key package, or not a member's welcome.
       return undefined;
     }
+
+    if (
+      !history.rosterAt(group.frontier)?.manages(author) ||
+      !group.identities().includes(author)
+    ) {
+      return undefined;
+    }
+
+    return history.latest().manages(author)
+      ? group
+      : this.vouched(group, history);
+  }
+
+  /**
+   * The joined group with the commits published after its welcome, if one
+   * of them is by a member the latest roster lets add members.
+   */
+  private async vouched(
+    group: MlsGroup,
+    history: CommunityRosterHistory,
+  ): Promise<MlsGroup | undefined> {
+    const { group: synced } = await this.applyCommits(
+      group,
+      this.communityOf(group.groupId),
+      undefined,
+    );
+    const latest = history.latest();
+
+    return synced.changes().some(({ committer }) => latest.manages(committer))
+      ? synced
+      : undefined;
   }
 
   /** Key packages kept on this device for the group they are published in. */
@@ -715,7 +793,10 @@ export class MlsCommunityEngine {
   /**
    * Roster members hold leaves; the roster at the revision a commit or
    * welcome binds decides who may add and remove them (see
-   * `CommunityMlsRoster`). This device binds everything it has verified.
+   * `CommunityMlsRoster`). This device binds everything it has verified. A
+   * revision naming operations it has not verified, bound by a member the
+   * latest verified roster lets add members, proves the node withholds
+   * them (`MlsGroup.waiting`).
    */
   private policyFor(groupId: string): MlsMembershipPolicy {
     const history = (): CommunityRosterHistory =>
@@ -729,6 +810,9 @@ export class MlsCommunityEngine {
         (history().rosterAt(frontier)?.allowsCommit(change) ?? false),
       frontier: () => history().heads(),
       reach: (frontier) => history().reach(frontier),
+      withheld: (committer, frontier) =>
+        history().rosterAt(frontier) === undefined &&
+        history().latest().manages(committer),
     };
   }
 
