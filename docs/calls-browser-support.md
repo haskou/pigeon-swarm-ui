@@ -5,23 +5,26 @@ listed is not tested and not claimed.
 
 ## Which calls work where
 
-| Browser                                       | Direct and private community calls | Public community voice calls | What checks it                                                                                                                          |
-| --------------------------------------------- | ---------------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Chromium on desktop (Chrome, Edge)            | Yes, media encrypted end to end    | Yes                          | Unit specs check the media encryption; the call recovery, network recovery, page departure and microphone specs run on desktop Chromium |
-| Firefox on desktop                            | Refused with a reason              | Not tested in the app        | `call-browser-support.spec.ts` checks the refusal; `call-microphone.spec.ts` exchanges audio with Chromium                              |
-| Safari / WebKit on desktop                    | Refused with a reason              | Not tested in the app        | Unit specs check the refusal; `call-microphone.spec.ts` exchanges audio with Chromium                                                   |
-| Any browser without WebRTC (e.g. Tor Browser) | Refused with a reason              | Refused with a reason        | `call-browser-support.spec.ts` removes WebRTC from Chromium                                                                             |
-| Mobile browsers                               | Not tested                         | Not tested                   | Nothing yet; real devices are tracked in haskou/pigeon-swarm-node#387                                                                   |
+| Browser                                       | Direct and private community calls | Public community voice calls | What checks it                                                                                                                                                           |
+| --------------------------------------------- | ---------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Chromium on desktop (Chrome, Edge)            | Yes, media encrypted end to end    | Yes                          | `call-media-encryption.spec.ts` decodes audio only with the call key; the call recovery, network recovery, page departure and microphone specs run on desktop Chromium   |
+| Firefox on desktop                            | Yes, media encrypted end to end    | Not tested in the app        | `call-media-encryption.spec.ts` decodes audio with Chromium only with the call key; `call-browser-support.spec.ts` rings the callee of a private call started in the app |
+| Safari / WebKit on desktop                    | Not tested                         | Not tested in the app        | Playwright cannot grant WebKit a microphone, so no spec covers private calls; `call-microphone.spec.ts` exchanges unencrypted audio with Chromium                        |
+| Any browser without WebRTC (e.g. Tor Browser) | Refused with a reason              | Refused with a reason        | `call-browser-support.spec.ts` removes WebRTC from Chromium                                                                                                              |
+| Mobile browsers                               | Not tested                         | Not tested                   | Nothing yet; real devices are tracked in haskou/pigeon-swarm-node#387                                                                                                    |
 
-A private call (direct, or in a private community) encrypts its media with the
-encoded streams API, which only Chromium has. A browser without it refuses the
-call before it asks for the microphone or tells the node, and says that
-encrypted calls need Chrome or Edge. It never falls back to unencrypted media.
-Firefox and Safari support is haskou/pigeon-swarm-ui#474.
+A private call (direct, or in a private community) encrypts every audio and
+video frame with the call key. A browser with `RTCRtpScriptTransform` does so
+in a dedicated worker; a Chromium build without it uses encoded streams. A
+browser with neither refuses the call before it asks for the microphone or
+tells the node, and asks to update the browser or use another one;
+`call-browser-support.spec.ts` checks this on Chromium with both removed. It
+never falls back to unencrypted media. See
+[`mls-group-encryption.md`](mls-group-encryption.md) for the frame format.
 
-A public community voice call is not encrypted end to end, so it does not need
-encoded streams. Firefox and WebKit exchange audio with Chromium in the
-microphone spec, which uses a test page instead of the full app.
+A public community voice call is not encrypted end to end, so it needs neither
+cipher. Firefox and WebKit exchange audio with Chromium in the microphone spec,
+which uses a test page instead of the full app.
 
 A browser without `RTCPeerConnection` (WebRTC turned off, or Tor Browser)
 refuses every call, public ones too, and asks to turn WebRTC back on or to use

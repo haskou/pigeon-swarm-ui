@@ -60,9 +60,10 @@ it, joins the community, sees encryption as active and reads the creator's
 next message; the node only accepts a link whose token commits to its limits),
 `call-page-departure.spec.ts` (a ringing call is
 declined when the callee leaves the page), `call-browser-support.spec.ts` (a
-Chromium without WebRTC and a Firefox without call media encryption both
+Chromium without WebRTC and a Chromium with neither call media cipher both
 refuse a direct call with the reason, before the microphone or the node is
-asked) and `group-conversation.spec.ts`
+asked, while Firefox starts a private call that rings the callee) and
+`group-conversation.spec.ts`
 (three users share a group conversation over MLS and per-member mailboxes,
 each message reaches the other two, and after the creator removes one member a
 later message reaches the remaining member and never shows in the removed
