@@ -46,6 +46,7 @@ const stateStore = (name: string, current: Session) =>
   opened(name, () => current).store;
 
 const keyPackage = () => ({
+  groupId: GROUP_ID,
   id: KEY_PACKAGE_ID,
   privatePackage: {
     hpkePrivateKey: HPKE_PRIVATE_KEY,
@@ -139,6 +140,29 @@ describe('IndexedDbMlsStateStore', () => {
     expect(
       await stateStore(name, session('alice', 1)).loadKeyPackages(),
     ).toEqual([]);
+  });
+
+  it('names no group for a key package stored before packages named theirs', async () => {
+    const current = session('alice', 1);
+    const { entries, store } = opened(name, () => current);
+
+    await entries.put(
+      current,
+      'key-package',
+      KEY_PACKAGE_ID,
+      new TextEncoder().encode(
+        JSON.stringify({
+          hpkePrivateKey: encodeBase64Url(HPKE_PRIVATE_KEY),
+          initPrivateKey: encodeBase64Url(new Uint8Array([1, 2, 3])),
+          publicBytes: encodeBase64Url(new Uint8Array([7, 8, 9])),
+          signaturePrivateKey: encodeBase64Url(new Uint8Array([4, 5, 6])),
+        }),
+      ),
+    );
+
+    expect(await store.loadKeyPackages()).toEqual([
+      { ...keyPackage(), groupId: undefined },
+    ]);
   });
 
   it('keeps each identity apart', async () => {

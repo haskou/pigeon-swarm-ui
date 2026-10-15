@@ -3,6 +3,7 @@ import { DomainError } from '@haskou/value-objects';
 import { CommunityOperationRejectedError } from '../../../../../contexts/communities/domain/errors/CommunityOperationRejectedError';
 import { CommunityAuthority } from '../../../../../contexts/communities/domain/operations/CommunityAuthority';
 import { CommunityOperation } from '../../../../../contexts/communities/domain/operations/CommunityOperation';
+import { CommunityChannelId } from '../../../../../contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityRoleId } from '../../../../../contexts/communities/domain/value-objects/CommunityRoleId';
 import { MlsTestIdentity } from '../../infrastructure/mls/MlsTestIdentity';
 
@@ -53,6 +54,32 @@ describe(CommunityAuthority.name, () => {
   };
   const assign = (author: string, member: string, roleIds: string[]): void =>
     apply(author, 'member_roles_updated', { identityId: id(member), roleIds });
+  /** `author` creates a text channel; returns its id. */
+  const createChannel = (author: string): string => {
+    const channelId = CommunityChannelId.derive(
+      COMMUNITY,
+      id(author),
+      createdAt + 1,
+    ).valueOf();
+
+    apply(author, 'channel_created', {
+      channelId,
+      name: 'Channel',
+      type: 'text',
+    });
+
+    return channelId;
+  };
+  const restrict = (
+    author: string,
+    channelId: string,
+    visibleRoleIds: string[],
+  ): void =>
+    apply(author, 'channel_permissions_updated', { channelId, visibleRoleIds });
+  const access = (channelId: string): boolean[] =>
+    ['owner', 'manager', 'member', 'other'].map((name) =>
+      authority.canAccessChannel(id(name), channelId),
+    );
 
   beforeAll(async () => {
     cast = await MlsTestIdentity.cast(['owner', 'manager', 'member', 'other']);
@@ -221,6 +248,123 @@ describe(CommunityAuthority.name, () => {
       }),
     ).toThrow(CommunityOperationRejectedError);
     expect(() => apply('owner', 'constructor', {})).toThrow(
+      CommunityOperationRejectedError,
+    );
+  });
+
+  it('derives channel ids like the node', () => {
+    expect(
+      CommunityChannelId.derive(
+        'community-1',
+        'MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=',
+        1773848829055,
+      ).valueOf(),
+    ).toBe('0d906d967047c86809549941');
+  });
+
+  it('lets only the owner and members of a visible role into a restricted channel', () => {
+    const channelId = createChannel('owner');
+    const roleId = createRole('owner', []);
+
+    expect(authority.isChannelRestricted(channelId)).toBe(false);
+    expect(access(channelId)).toEqual([true, true, true, false]);
+
+    assign('owner', 'member', [roleId]);
+    restrict('owner', channelId, [roleId]);
+
+    expect(authority.isChannelRestricted(channelId)).toBe(true);
+    expect(authority.getRestrictedChannelIds()).toEqual([channelId]);
+    expect(access(channelId)).toEqual([true, false, true, false]);
+
+    restrict('owner', channelId, []);
+
+    expect(authority.isChannelRestricted(channelId)).toBe(false);
+    expect(access(channelId)).toEqual([true, true, true, false]);
+  });
+
+  it('takes a restricted channel away from a member who loses the role or leaves', () => {
+    const channelId = createChannel('owner');
+    const roleId = createRole('owner', []);
+
+    assign('owner', 'member', [roleId]);
+    assign('owner', 'manager', [roleId]);
+    restrict('owner', channelId, [roleId]);
+    assign('owner', 'member', []);
+    apply('owner', 'member_kicked', { identityId: id('manager') });
+
+    expect(access(channelId)).toEqual([true, false, false, false]);
+  });
+
+  it('rejects channel changes made without manage_channels, changing nothing', () => {
+    const channelId = createChannel('owner');
+    const roleId = createRole('owner', []);
+
+    expect(() => createChannel('manager')).toThrow(
+      CommunityOperationRejectedError,
+    );
+    expect(() => restrict('manager', channelId, [roleId])).toThrow(
+      CommunityOperationRejectedError,
+    );
+    expect(() => apply('member', 'channel_deleted', { channelId })).toThrow(
+      CommunityOperationRejectedError,
+    );
+    expect(authority.isChannelRestricted(channelId)).toBe(false);
+    expect(access(channelId)).toEqual([true, true, true, false]);
+
+    assign('owner', 'member', [createRole('owner', ['manage_channels'])]);
+    restrict('member', channelId, [roleId]);
+
+    expect(authority.isChannelRestricted(channelId)).toBe(true);
+  });
+
+  it('rejects a channel whose id its creator did not derive, and changes to channels that do not exist', () => {
+    expect(() =>
+      apply('owner', 'channel_created', {
+        channelId: 'chosen-by-the-node',
+        name: 'Channel',
+        type: 'text',
+      }),
+    ).toThrow(CommunityOperationRejectedError);
+    expect(() =>
+      apply('owner', 'channel_created', {
+        channelId: CommunityChannelId.derive(
+          COMMUNITY,
+          id('owner'),
+          createdAt + 1,
+        ).valueOf(),
+        name: 'Channel',
+        type: 'stage',
+      }),
+    ).toThrow(CommunityOperationRejectedError);
+    expect(() => restrict('owner', 'missing', [])).toThrow(
+      CommunityOperationRejectedError,
+    );
+    expect(() =>
+      apply('owner', 'channel_renamed', { channelId: 'missing', name: 'x' }),
+    ).toThrow(CommunityOperationRejectedError);
+    expect(access('missing')).toEqual([false, false, false, false]);
+    expect(authority.isChannelRestricted('missing')).toBe(false);
+  });
+
+  it('accepts the channel names the node accepts', () => {
+    const channelId = createChannel('owner');
+
+    apply('owner', 'channel_renamed', { channelId, name: '' });
+
+    expect(() =>
+      apply('owner', 'channel_renamed', { channelId, name: 'x'.repeat(81) }),
+    ).toThrow(CommunityOperationRejectedError);
+  });
+
+  it('shuts a deleted channel to everyone', () => {
+    const channelId = createChannel('owner');
+
+    restrict('owner', channelId, [createRole('owner', [])]);
+    apply('owner', 'channel_deleted', { channelId });
+
+    expect(access(channelId)).toEqual([false, false, false, false]);
+    expect(authority.getRestrictedChannelIds()).toEqual([]);
+    expect(() => restrict('owner', channelId, [])).toThrow(
       CommunityOperationRejectedError,
     );
   });

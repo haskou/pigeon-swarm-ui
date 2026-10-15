@@ -4,6 +4,7 @@ import type { CommunityOperation } from '../../../../../contexts/communities/dom
 import type { CommunityOperationDocument } from '../../../../../contexts/communities/infrastructure/http/CommunityOperationDocument';
 import type { CommunityOperationAuthor } from './CommunityOperationAuthor';
 
+import { CommunityChannelId } from '../../../../../contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityRoleId } from '../../../../../contexts/communities/domain/value-objects/CommunityRoleId';
 import { CommunityOperationProof } from '../../../../../contexts/communities/infrastructure/http/CommunityOperationProof';
 import { deriveCommunityId } from '../../../../../contexts/communities/infrastructure/http/deriveCommunityRecordId';
@@ -99,6 +100,35 @@ export class CommunityOperationHistory {
     this.append(author, 'role_created', { name: 'Role', permissions, roleId });
 
     return roleId;
+  }
+
+  /** `author` creates a text channel, visible to everyone; returns its id. */
+  public createChannel(author: CommunityOperationAuthor): string {
+    const channelId = CommunityChannelId.derive(
+      this.communityId,
+      author.id,
+      this.documents.length + 1,
+    ).valueOf();
+
+    this.append(author, 'channel_created', {
+      channelId,
+      name: 'Channel',
+      type: 'text',
+    });
+
+    return channelId;
+  }
+
+  /** `author` makes the channel visible to these roles only. */
+  public restrictChannel(
+    author: CommunityOperationAuthor,
+    channelId: string,
+    visibleRoleIds: string[],
+  ): void {
+    this.append(author, 'channel_permissions_updated', {
+      channelId,
+      visibleRoleIds,
+    });
   }
 
   /**

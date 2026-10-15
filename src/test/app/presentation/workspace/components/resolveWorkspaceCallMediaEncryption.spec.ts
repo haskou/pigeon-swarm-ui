@@ -123,7 +123,7 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
     });
   });
 
-  it('derives private community keys from the group, scoped to the call', async () => {
+  it("derives private community keys from the group of the call's channel, scoped to the call", async () => {
     const communityCallKey = jest.fn().mockResolvedValue('derived-key');
 
     await expect(
@@ -135,7 +135,11 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
         keychain: emptyKeychain(),
       }),
     ).resolves.toEqual({ mediaEncryptionKey: 'derived-key' });
-    expect(communityCallKey).toHaveBeenCalledWith('community-1', 'call-1');
+    expect(communityCallKey).toHaveBeenCalledWith(
+      'community-1',
+      'voice-1',
+      'call-1',
+    );
   });
 
   it('refuses a private community call when this device is not in the group', async () => {
@@ -162,7 +166,11 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
         keychain: emptyKeychain(),
       }),
     ).rejects.toThrow(copy.calls.mediaEncryptionMissingKey);
-    expect(communityCallKey).toHaveBeenCalledWith('community-1', 'call-1');
+    expect(communityCallKey).toHaveBeenCalledWith(
+      'community-1',
+      'voice-1',
+      'call-1',
+    );
   });
 
   it('encrypts a direct call with the conversation key', async () => {

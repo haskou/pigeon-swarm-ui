@@ -75,4 +75,22 @@ describe('CommunityRosterHistory', () => {
     expect(history.reach(promoted)).toBe(signed.operations().length - 1);
     expect(history.reach(['x'.repeat(43)])).toBe(0);
   });
+
+  it("replays a channel's roster as it stood at each frontier", () => {
+    const { carol, owner } = cast;
+    const channels = new CommunityOperationHistory(owner);
+    const viewers = channels.createRole(owner, []);
+
+    channels.add(owner, carol);
+    const channelId = channels.createChannel(owner);
+    const open = headOf(channels);
+
+    channels.restrictChannel(owner, channelId, [viewers]);
+    const history = CommunityRosterHistory.of(channels.operations(), channelId);
+
+    expect(history.rosterAt(open)?.has(carol.id)).toBe(true);
+    expect(history.latest().has(carol.id)).toBe(false);
+    expect(history.latest().has(owner.id)).toBe(true);
+    expect(history.heads()).toEqual(headOf(channels));
+  });
 });

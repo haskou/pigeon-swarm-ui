@@ -211,8 +211,13 @@ describe('MlsCommunityEngine', () => {
       cast[name].signer(device),
       store,
       () => node.transportFor(id(name)),
-      () => () =>
-        Promise.resolve(CommunityRosterHistory.of(historyOf().operations())),
+      (groupId) => () =>
+        Promise.resolve(
+          CommunityRosterHistory.of(
+            historyOf().operations(),
+            groupId.split(':')[1],
+          ),
+        ),
     ),
     store,
   });
@@ -314,6 +319,45 @@ describe('MlsCommunityEngine', () => {
     node.hooks.beforePublish = (input) => {
       if (input.kind === 'commit') throw error;
     };
+  };
+  /**
+   * Alice creates a channel and restricts it to a role the viewers hold;
+   * returns the MLS group id of the channel.
+   */
+  const restrictChannel = (viewers: string[]): string => {
+    let groupId = '';
+
+    tamper = (history) => {
+      const role = history.createRole(cast.alice, []);
+      const channelId = history.createChannel(cast.alice);
+
+      for (const viewer of viewers) {
+        history.assign(cast.alice, cast[viewer], [role]);
+      }
+
+      history.restrictChannel(cast.alice, channelId, [role]);
+      groupId = `${COMMUNITY}:${channelId}`;
+    };
+    historyOf();
+
+    return groupId;
+  };
+  /** Alice starts the channel's group and admits who may see it. */
+  const openChannel = async (groupId: string) => {
+    const members = {
+      alice: engineFor('alice'),
+      bob: engineFor('bob'),
+      carol: engineFor('carol'),
+    };
+
+    await members.alice.engine.createGroup(groupId);
+    await members.bob.engine.publishKeyPackages(groupId);
+    await members.carol.engine.publishKeyPackages(groupId);
+    await members.alice.engine.reconcile(groupId);
+    await members.bob.engine.sync(groupId);
+    await members.carol.engine.sync(groupId);
+
+    return members;
   };
 
   it('lets an admitted member read what the group sends', async () => {
@@ -1040,6 +1084,75 @@ describe('MlsCommunityEngine', () => {
     );
     await expect(bob.engine.decrypt(COMMUNITY, sealed)).resolves.toBe(
       'welcome carol',
+    );
+  });
+
+  it('keeps a restricted channel group to the members who may see the channel', async () => {
+    const group = restrictChannel(['bob']);
+    const { alice, bob, carol } = await openChannel(group);
+    const ciphertext = await alice.engine.encrypt(group, 'for viewers');
+
+    await expect(alice.engine.identities(group)).resolves.toEqual([
+      id('alice'),
+      id('bob'),
+    ]);
+    await expect(carol.engine.hasGroup(group)).resolves.toBe(false);
+    await expect(bob.engine.decrypt(group, ciphertext)).resolves.toBe(
+      'for viewers',
+    );
+    await expect(carol.engine.decrypt(group, ciphertext)).rejects.toThrow();
+    await expect(
+      carol.engine.exportSecret(group, 'pigeon/call-media/v1', 'call-1'),
+    ).rejects.toThrow();
+    expect(MlsCommunityEngine.groupOf(ciphertext)).toBe(group);
+  });
+
+  it('removes a member who loses the channel role from every later epoch', async () => {
+    const group = restrictChannel(['bob', 'carol']);
+    const { alice, bob, carol } = await openChannel(group);
+
+    await expect(alice.engine.identities(group)).resolves.toContain(
+      id('carol'),
+    );
+
+    historyOf().assign(cast.alice, cast.carol, []);
+    await expect(bob.engine.reconcile(group)).resolves.toBe(true);
+    await expect(carol.engine.sync(group)).resolves.toBe(false);
+    await alice.engine.sync(group);
+    const ciphertext = await alice.engine.encrypt(group, 'carol must not read');
+
+    await expect(bob.engine.decrypt(group, ciphertext)).resolves.toBe(
+      'carol must not read',
+    );
+    await expect(carol.engine.decrypt(group, ciphertext)).rejects.toThrow();
+    await expect(
+      carol.engine.exportSecret(group, 'pigeon/call-media/v1', 'call-1'),
+    ).rejects.toThrow();
+  });
+
+  it('keeps a stock of key packages for each group it publishes them to', async () => {
+    const group = restrictChannel(['bob']);
+    const { engine } = engineFor('bob');
+    const published = (groupId: string): number =>
+      node.records.filter(
+        (record) => record.kind === 'key_package' && record.groupId === groupId,
+      ).length;
+
+    await engine.publishKeyPackages(COMMUNITY);
+    await engine.publishKeyPackages(group);
+    await engine.publishKeyPackages(group);
+
+    expect([published(COMMUNITY), published(group)]).toEqual([4, 4]);
+  });
+
+  it('names the group a ciphertext was sent in, and none for anything else', async () => {
+    const { alice } = await admitBob();
+
+    expect(
+      MlsCommunityEngine.groupOf(await alice.engine.encrypt(COMMUNITY, 'hi')),
+    ).toBe(COMMUNITY);
+    expect(MlsCommunityEngine.groupOf(base64(new Uint8Array([1, 2])))).toBe(
+      undefined,
     );
   });
 });
