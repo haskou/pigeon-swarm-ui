@@ -33,7 +33,8 @@ async function isPublicCommunity(
 
 /**
  * Public community calls never use media E2EE. Every other call is private
- * and is refused, never downgraded, when this device cannot encrypt it.
+ * and is refused, never downgraded, when this device cannot encrypt it. This
+ * device derives no key for a group-capability call, so it refuses every one.
  */
 export async function resolveWorkspaceCallMediaEncryption({
   call,
@@ -42,6 +43,10 @@ export async function resolveWorkspaceCallMediaEncryption({
   currentIdentityId,
   keychain,
 }: WorkspaceCallMediaEncryptionInput): Promise<WorkspaceCallMediaEncryption> {
+  if (call.scope.type === 'group_capability') {
+    throw new CallMediaEncryptionUnavailableError('missing-key');
+  }
+
   if (call.scope.type === 'community_channel') {
     const communityId = call.scope.communityId;
 

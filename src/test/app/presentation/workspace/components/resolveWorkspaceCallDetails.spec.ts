@@ -140,25 +140,22 @@ describe(resolveWorkspaceCallDetails.name, () => {
     });
   });
 
-  it('keeps group conversation titles', () => {
+  it('resolves a group-capability call as a group call from its lease roster, naming no conversation', () => {
     const call = callResource({
-      scope: { conversationId: 'conversation-1', type: 'conversation' },
+      participantIds: [],
+      participants: [
+        { connected: true, identityId: 'identity-1', status: 'joined' },
+        { connected: true, identityId: 'identity-2', status: 'joined' },
+        { connected: false, identityId: 'identity-3', status: 'joined' },
+      ],
+      scope: { capabilityHash: 'a'.repeat(64), type: 'group_capability' },
     });
 
     expect(
       resolveWorkspaceCallDetails({
         call,
         communities: [],
-        conversations: [
-          {
-            adminIds: [],
-            id: 'conversation-1',
-            name: 'Study group',
-            networkId: 'network-1',
-            participantIds: ['identity-1', 'identity-2'],
-            type: 'group',
-          },
-        ],
+        conversations: [],
         currentIdentity,
         fallbackLabels,
         identityNames: { 'identity-1': 'Hasko', 'identity-2': 'Den' },
@@ -166,10 +163,14 @@ describe(resolveWorkspaceCallDetails.name, () => {
         identityProfiles: {},
         keychain: emptyKeychain(),
       }),
-    ).toMatchObject({
-      conversationId: 'conversation-1',
+    ).toEqual({
       kind: 'group' satisfies CallSession['kind'],
-      title: 'Study group',
+      participants: [
+        expect.objectContaining({ identityId: 'identity-1' }),
+        expect.objectContaining({ identityId: 'identity-2' }),
+      ],
+      subtitle: undefined,
+      title: 'No conversation',
     });
   });
 });

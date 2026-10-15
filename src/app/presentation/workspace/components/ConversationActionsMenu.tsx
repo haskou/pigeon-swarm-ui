@@ -33,7 +33,6 @@ interface ConversationActionsMenuProps {
   onVerificationOpen?: () => void;
   onStartCall?: (input: {
     conversationId: string;
-    kind: 'group' | 'one-to-one';
     participants: CallParticipant[];
     title: string;
   }) => void;
@@ -247,7 +246,6 @@ function StartCallMenuAction({
       onClick={() => {
         onStartCall({
           conversationId: activeConversation.id,
-          kind: 'one-to-one',
           participants: callParticipants,
           title:
             activeConversationTitle ??

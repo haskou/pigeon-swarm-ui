@@ -55,4 +55,15 @@ describe('call composite value objects', () => {
       type: 'community_channel',
     });
   });
+
+  it('hydrates a group-capability scope naming only its capability hash', () => {
+    const primitives = {
+      capabilityHash: 'a'.repeat(64),
+      type: 'group_capability',
+    } as const;
+
+    expect(CallScope.fromPrimitives(primitives).toPrimitives()).toEqual(
+      primitives,
+    );
+  });
 });

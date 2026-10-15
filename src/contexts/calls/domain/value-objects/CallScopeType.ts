@@ -1,8 +1,13 @@
 import { Enum, ValueNotInEnumError } from '@haskou/value-objects';
 
-export class CallScopeType extends Enum<'community_channel' | 'conversation'> {
-  private static readonly values: Array<'community_channel' | 'conversation'> =
-    ['community_channel', 'conversation'];
+import type { CallScopeTypeValue } from './CallScopeTypeValue';
+
+export class CallScopeType extends Enum<CallScopeTypeValue> {
+  private static readonly values: CallScopeTypeValue[] = [
+    'community_channel',
+    'conversation',
+    'group_capability',
+  ];
 
   public static readonly COMMUNITY_CHANNEL = new CallScopeType(
     'community_channel',
@@ -10,9 +15,11 @@ export class CallScopeType extends Enum<'community_channel' | 'conversation'> {
 
   public static readonly CONVERSATION = new CallScopeType('conversation');
 
-  private static isScopeType(
-    value: string,
-  ): value is 'community_channel' | 'conversation' {
+  public static readonly GROUP_CAPABILITY = new CallScopeType(
+    'group_capability',
+  );
+
+  private static isScopeType(value: string): value is CallScopeTypeValue {
     return CallScopeType.values.some((type) => type === value);
   }
 
@@ -24,15 +31,19 @@ export class CallScopeType extends Enum<'community_channel' | 'conversation'> {
     return new CallScopeType(value);
   }
 
-  private constructor(value: 'community_channel' | 'conversation') {
+  private constructor(value: CallScopeTypeValue) {
     super(value);
   }
 
-  public getValues(): Array<'community_channel' | 'conversation'> {
+  public getValues(): CallScopeTypeValue[] {
     return CallScopeType.values;
   }
 
   public isCommunityChannel(): boolean {
     return this.isEqual(CallScopeType.COMMUNITY_CHANNEL);
+  }
+
+  public isGroupCapability(): boolean {
+    return this.isEqual(CallScopeType.GROUP_CAPABILITY);
   }
 }

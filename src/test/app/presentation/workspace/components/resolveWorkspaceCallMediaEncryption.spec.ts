@@ -197,6 +197,21 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
     ).rejects.toThrow(copy.calls.mediaEncryptionMissingKey);
   });
 
+  it('refuses a group-capability call, for which this device derives no media key', async () => {
+    await expect(
+      resolveWorkspaceCallMediaEncryption({
+        call: call({
+          capabilityHash: 'a'.repeat(64),
+          type: 'group_capability',
+        }),
+        communityOperations: jest.fn().mockResolvedValue([]),
+        communityCallKey: jest.fn(),
+        currentIdentityId: 'identity-1',
+        keychain: keychainWithConversationKey(),
+      }),
+    ).rejects.toThrow(new CallMediaEncryptionUnavailableError('missing-key'));
+  });
+
   it('treats a community as private when its signed operations cannot be read', async () => {
     const communityCallKey = jest.fn().mockResolvedValue('derived-key');
 

@@ -228,7 +228,6 @@ describe('refusing private calls this device cannot encrypt', () => {
 
     useCallStartActions(input).startConversationCall({
       conversationId: 'conversation-a',
-      kind: 'one-to-one',
       participants: [],
       title: 'Bob',
     });
@@ -331,7 +330,6 @@ describe('refusing private calls this device cannot encrypt', () => {
 
     useCallStartActions(input).startConversationCall({
       conversationId: 'conversation-a',
-      kind: 'one-to-one',
       participants: [],
       title: 'Bob',
     });
