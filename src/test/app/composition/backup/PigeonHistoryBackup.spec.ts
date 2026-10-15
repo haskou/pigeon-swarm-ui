@@ -11,6 +11,7 @@ import { HistoryBackupUnreadableError } from '../../../../app/composition/backup
 import { HistoryBackupVersionError } from '../../../../app/composition/backup/HistoryBackupVersionError';
 import { PigeonHistoryBackup } from '../../../../app/composition/backup/PigeonHistoryBackup';
 import { DeviceUnlockNotConfirmedError } from '../../../../contexts/identities/infrastructure/storage/DeviceUnlockNotConfirmedError';
+import { encodeBase64Url } from '../../../../shared/infrastructure/encoding/base64url';
 
 describe(PigeonHistoryBackup.name, () => {
   const verifiedAt = '2026-05-01T00:00:00.000Z';
@@ -75,6 +76,26 @@ describe(PigeonHistoryBackup.name, () => {
     expect(contactPins.restore).toHaveBeenCalledWith('alice', {
       'identity-x': { handle: 'bob', verifiedAt },
     });
+  });
+
+  it('lets whoever holds the identity root read the exported history, with no key in the file', async () => {
+    const { backup } = fixture();
+    const file = await backup.export(session(), 'password');
+
+    // Neither this device, its password nor its stored history is needed.
+    const content = JSON.parse(
+      new TextDecoder().decode(
+        await HistoryBackupFile.open(Buffer.alloc(32, 7), 'alice', file),
+      ),
+    ) as Record<string, unknown>;
+
+    expect(Object.keys(content).sort()).toEqual(['contacts', 'history']);
+    expect(content.history).toEqual([
+      {
+        conversationId: item.conversationId,
+        plaintext: encodeBase64Url(item.plaintext),
+      },
+    ]);
   });
 
   it('restores nothing from a backup made by another identity', async () => {

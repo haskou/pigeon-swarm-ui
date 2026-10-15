@@ -340,6 +340,19 @@ describe('MlsCommunityEngine', () => {
     );
   });
 
+  it('keeps what it read in its store after the message key is gone', async () => {
+    const { alice, bob } = await admitBob();
+    const ciphertext = await alice.engine.encrypt(COMMUNITY, 'kept at rest');
+    await bob.engine.decrypt(COMMUNITY, ciphertext);
+
+    // The stored group no longer holds the key; the stored plaintext does.
+    const restarted = engineFor('bob', bob.store);
+
+    await expect(restarted.engine.decrypt(COMMUNITY, ciphertext)).resolves.toBe(
+      'kept at rest',
+    );
+  });
+
   it('resumes from device-local state after a restart', async () => {
     const { alice, bob } = await admitBob();
     const restarted = engineFor('bob', bob.store);

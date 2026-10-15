@@ -346,7 +346,10 @@ applies (see "What each choice protects against").
   **Guarantee change:** forward secrecy no longer covers backed-up messages.
   Whoever holds a backup file and later steals the identity root or the
   recovery key reads the history in it, even after it was deleted from every
-  device. Keep backup files private and delete old ones.
+  device (`PigeonHistoryBackup.spec.ts` opens a file with the identity root
+  alone). Keep backup files private and delete old ones. Group forward
+  secrecy is described in `mls-group-encryption.md`, Security properties and
+  limits.
 - **Content Security Policy.** The production build injects a
   `Content-Security-Policy` meta tag (policy in
   `src/shared/infrastructure/security/contentSecurityPolicy.ts`, applied in

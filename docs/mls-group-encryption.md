@@ -155,9 +155,10 @@ grant `manage_members`.
 - Remove: any member removes a leaf whose identity left, was kicked or banned.
   Only a manager removes an identity still on the roster, and nobody removes
   the owner. Races are resolved by the epoch rule above.
-- Update: anyone on the roster rotates their own leaf. Each device commits an
-  empty update at most every 24 hours or after 1000 sent messages, whichever
-  comes first, to bound post-compromise exposure.
+- Update: anyone on the roster rotates their own leaf. There is no periodic
+  update yet (#478): only a manager's device commits one, when the roster
+  revision the group bound grants other rights than the latest
+  (`bindRoster`). Group conversations never update.
 
 Every commit is checked against these rules both when it is made and when it
 is received, by the roster at the revision the commit binds (see "Which
@@ -312,8 +313,39 @@ and attachments, and a missing group is an error, not a fallback.
 
 ## Security properties and limits
 
-- Forward secrecy and post-compromise security are those of MLS with the
-  update cadence above. They hold only while every member updates.
+- Forward secrecy and post-compromise recovery are those of MLS, limited as
+  follows (`MlsGroup.spec.ts`, "forward secrecy and post-compromise
+  recovery"; `MlsCommunityEngine.spec.ts`; `yarn test:crypto`):
+  - A message key is deleted once it is used. The reader cannot open the
+    message again, also not from its stored state, and the sender keeps no
+    key for its own message. A copy of the state taken before the read still
+    opens it.
+  - Epoch secrets are kept for the last 8 epochs (`retainKeysForEpochs`) and
+    then deleted. A message of an older epoch that this device has not read
+    stays unreadable, also from the stored state. Within those epochs, ts-mls
+    keeps the keys of up to 10 skipped messages per sender
+    (`retainKeysForGenerations`).
+  - In memory, a group also keeps the state before every commit it applied
+    in this app session, so that it can switch to a competing commit. Those
+    states hold older epoch secrets, call-media exporters included, until the
+    app reloads (#479).
+  - Forward secrecy covers keys, not what was read. The community engine
+    keeps every plaintext it sent or decrypted (the plaintext cache, sealed
+    as below), so a restarted device reads a message again after its key is
+    gone. Group conversation histories keep their records too. Whoever opens
+    the device's state reads whatever it still stores.
+  - Post-compromise recovery is per device. A device whose state leaked
+    recovers only when it commits its own update. By ts-mls
+    (`needsUpdatePath`), a removal it commits carries an update path too and
+    a commit that only adds carries none; no spec covers those two cases.
+    Commits by other members, their updates included, do not heal it: a copy
+    of its state follows them and keeps reading messages and call-media keys
+    until the device commits an update or a removal, or is removed. Given
+    the update rule above, a device that never commits stays exposed until
+    it is removed (#478).
+  - History backups hold one-to-one records and contact pins only, never MLS
+    state or group history. Forward secrecy does not cover them (see
+    `local-unlock.md`, History backup; `PigeonHistoryBackup.spec.ts`).
 - A member that is removed can read everything up to the epoch that removed
   them, including that commit. Messages sent after it are unreadable for them.
 - The node and replicas see group ids, epochs, record sizes, authors and times,
@@ -344,9 +376,8 @@ and attachments, and a missing group is an error, not a fallback.
   `opaque-mailboxes-client.md`, Group readers); one that opens under neither
   root drops the identity's rows. Forgetting the device deletes them. Rows
   stored unsealed before #376 are dropped by the database upgrade, never read.
-  XSS in an unlocked session still reads the state in memory. Only the last 8
-  epochs of secrets are retained (`retainKeysForEpochs`), so older ciphertext
-  this device has not decrypted yet becomes unreadable.
+  XSS in an unlocked session still reads the state in memory, including the
+  states before earlier commits (#479).
 - The roster, not MLS, is authoritative. Clients refuse to add identities that
   are not on the roster. In a community, every add or removal commit, made or
   received, is checked against the community roster at the revision it binds
