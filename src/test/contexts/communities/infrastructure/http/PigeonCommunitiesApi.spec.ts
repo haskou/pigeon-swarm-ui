@@ -21,9 +21,6 @@ beforeEach(() => {
   jest
     .spyOn(ScopeFrontierReader.prototype, 'community')
     .mockResolvedValue(['F'.repeat(43)]);
-  jest
-    .spyOn(ScopeFrontierReader.prototype, 'conversation')
-    .mockResolvedValue(['F'.repeat(43)]);
 });
 
 describe(PigeonCommunitiesApi.name, () => {
