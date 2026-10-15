@@ -76,10 +76,12 @@ function mountBackgroundSync(
     jest.fn<
       (conversationId: string, activity: GroupConversationActivity) => void
     >();
+  const onIdentityUpdated = jest.fn<(identityId: string) => void>();
   const input = {
     activeConversationId,
     conversations,
     onActivity,
+    onIdentityUpdated,
     session,
   };
 
@@ -92,6 +94,7 @@ function mountBackgroundSync(
   return {
     cleanup,
     onActivity,
+    onIdentityUpdated,
     /** Renders again, as after the user opened another conversation. */
     rerender: (next: null | string) => {
       mockEffects.length = 0;
@@ -184,6 +187,22 @@ describe('useGroupMessageBackgroundSync', () => {
       latestMessageAt: 900,
       unreadCount: 2,
     });
+    mounted.cleanup();
+  });
+
+  it('hands each identity update a visit brings in to the identity refresh', async () => {
+    receive.mockImplementation(
+      (_session, _conversationId, _signal, onIdentityUpdated) => {
+        onIdentityUpdated('bob');
+
+        return Promise.resolve(quiet);
+      },
+    );
+    const mounted = mountBackgroundSync([conversation('team')]);
+
+    await settle();
+
+    expect(mounted.onIdentityUpdated.mock.calls).toEqual([['bob']]);
     mounted.cleanup();
   });
 

@@ -567,7 +567,7 @@ describe('GroupConversationMailbox', () => {
     await alice.mailbox.send(alice.session, conversation(), 'second', {});
 
     expect(
-      await bob.mailbox.receive(bob.session, CONVERSATION, signal),
+      await bob.mailbox.receive(bob.session, CONVERSATION, signal, () => {}),
     ).toEqual({ latestMessageAt: expect.any(Number), unreadCount: 2 });
     expect(
       (await alice.mailbox.activity(alice.session, CONVERSATION)).unreadCount,
@@ -595,7 +595,12 @@ describe('GroupConversationMailbox', () => {
     const restored: DirectMessageTimelineChange[] = [];
 
     await alice.mailbox.send(alice.session, conversation(), 'meanwhile', {});
-    const receiving = bob.mailbox.receive(bob.session, CONVERSATION, signal);
+    const receiving = bob.mailbox.receive(
+      bob.session,
+      CONVERSATION,
+      signal,
+      () => {},
+    );
 
     await bob.mailbox.restore(bob.session, CONVERSATION, signal, (changes) =>
       restored.push(...changes),
@@ -906,6 +911,21 @@ describe('GroupConversationMailbox', () => {
     expect(
       (await bob.mailbox.activity(bob.session, CONVERSATION)).unreadCount,
     ).toBe(0);
+  });
+
+  it('hands each identity update a background receive brings in to the caller', async () => {
+    await formGroup();
+    const signal = new AbortController().signal;
+    const updated: string[] = [];
+
+    await alice.mailbox.identityUpdated(alice.session, CONVERSATION);
+
+    expect(
+      await bob.mailbox.receive(bob.session, CONVERSATION, signal, (id) =>
+        updated.push(id),
+      ),
+    ).toEqual({ latestMessageAt: undefined, unreadCount: 0 });
+    expect(updated).toEqual([alice.id]);
   });
 
   it('ignores a replayed welcome after a restart', async () => {
