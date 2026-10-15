@@ -97,8 +97,8 @@ export function useCallStartActions({
     () => callActionInProgressRef.current,
     [],
   );
-  // A call this device cannot encrypt is left on the node, so it neither
-  // rings the other side nor shows this identity in a channel it never joins.
+  // A call this device cannot encrypt is left on the node at once; no media
+  // is sent. The other side may see it ring until the leave lands.
   const callMediaEncryptionOrLeave = useCallback(
     async (call: CallResource) => {
       try {

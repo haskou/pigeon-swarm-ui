@@ -323,7 +323,7 @@ describe('refusing private calls this device cannot encrypt', () => {
     expect(input.stopLocalAudio).toHaveBeenCalledWith(aliceMicrophone.stream);
   });
 
-  it('ends a direct call it has no key for instead of ringing unencrypted', async () => {
+  it('leaves a direct call it has no key for instead of connecting it unencrypted', async () => {
     jest
       .spyOn(CallPeerConnections, 'mediaEncryptionSupported')
       .mockReturnValue(true);

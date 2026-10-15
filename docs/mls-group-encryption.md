@@ -320,8 +320,10 @@ not know as public) never falls back to plaintext media
   incoming call is declined. Encrypted calls currently need a Chromium-based
   browser; Firefox and Safari support is tracked in #474.
 - A device with no key for the call (no conversation key, or no community
-  group) leaves the call it just started or joined on the node and shows the
-  reason, so it neither rings the other side nor appears in the channel.
+  group) finds out only once the node has created or joined the call. It
+  leaves the call at once and shows the reason. Until the leave lands, the
+  other side may see the call ring, or this identity in the channel; no media
+  is sent.
 - Public community calls never use media E2EE and stay open to every browser.
 
 `resolveWorkspaceCallMediaEncryption.spec.ts` and `useCallStartActions.spec.ts`
@@ -405,9 +407,11 @@ not know as public) never falls back to plaintext media
   during a call (member join or leave) does not rekey it. Devices that derive
   the key in different epochs cannot decrypt each other's media.
 - The refusal covers this device only. A peer whose signalling advertises no
-  media encryption still receives plaintext media, and inbound frames without
-  the encrypted-frame marker are still played (#472). The per-user switch that
-  turns call E2EE off still exists (#473).
+  media encryption still receives plaintext media, inbound frames without the
+  encrypted-frame marker are still played, and a node that reports a private
+  community as public gets its calls unencrypted, since visibility comes from
+  the node's community list, not the signed genesis (#472). The per-user
+  switch that turns call E2EE off still exists (#473).
 - A community created before this change has no group. Its owner sees
   "awaiting group access" and must recreate the community; nothing bootstraps
   a group automatically, so two owner devices cannot fork one.
