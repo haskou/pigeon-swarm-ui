@@ -501,6 +501,20 @@ public community exception.
   X.509 chain.
 - `ts-mls` has not had a formal external audit (its README says so). This
   design is not audited either. The issue stays open until a specialist review.
+- `ts-mls` 1.6.4 is patched (`patches/ts-mls+1.6.4.patch`, applied by
+  `patch-package` on `postinstall` and again before `build`). Its
+  `createCommit` encrypts the UpdatePath under the old GroupContext, while its
+  `processCommit`, as RFC 9420 §12.4.2 requires, decrypts it under the new
+  one, with the extensions a GroupContextExtensions proposal sets. A commit
+  that changes the context and removes a member at once, as a group
+  conversation's roster removal does, then failed for every receiver. The
+  patch computes the new context first and encrypts under it; nothing else
+  changes. Upstream fixed it in 2.0.0-rc; the patch goes when `ts-mls` moves
+  to 2.0 or later. `build` applies the patch itself because the wrapper image
+  installs dependencies before it copies `patches/`, so the patch is missing at
+  `postinstall` there. `patch-package` skips a patch that is already applied
+  and fails the build if it no longer fits. Installs with `--ignore-scripts`
+  must run `npx patch-package` by hand before tests.
 - Concurrent commits depend on the epoch rule and on clients retaining the
   previous epoch state. Lost records are repaired by fetching, not guessed.
 - MLS client state (leaf private keys, epoch secrets, key packages), the
