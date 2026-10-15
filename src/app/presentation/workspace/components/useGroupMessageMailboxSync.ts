@@ -23,7 +23,8 @@ import { applyMailboxSyncChanges } from './applyMailboxSyncChanges';
  * notice unless another error is already shown; the next successful pass
  * clears only that notice. Pin records apply last-writer-wins per message
  * through one MessagePinClock per effect run. Restored and read poll
- * changes go to `onPollChanges`. The first pass that finds
+ * changes go to `onPollChanges`; typing changes, with the message changes
+ * that end them, go to `onTypingChanges`. The first pass that finds
  * this identity off the roster refreshes the conversation list, once per
  * effect run, so the group leaves the sidebar.
  */
@@ -33,6 +34,7 @@ export function useGroupMessageMailboxSync({
   onHistoryRestored,
   onMessagesChange,
   onPollChanges,
+  onTypingChanges,
   refreshConversations,
   session,
   setPinnedMessageIds,
@@ -57,8 +59,13 @@ export function useGroupMessageMailboxSync({
     let timer: number | undefined;
     const apply = (changes: DirectMessageTimelineChange[]): void => {
       const polls = changes.filter(({ kind }) => kind.startsWith('poll'));
+      const typing = changes.filter(
+        ({ kind }) => kind === 'typing' || kind === 'message',
+      );
 
       if (polls.length > 0) onPollChanges(polls);
+
+      if (typing.length > 0) onTypingChanges(conversationId, typing);
       applyMailboxSyncChanges(changes, pinClock, {
         onMessagesChange,
         setPinnedMessageIds,
@@ -138,6 +145,7 @@ export function useGroupMessageMailboxSync({
     onHistoryRestored,
     onMessagesChange,
     onPollChanges,
+    onTypingChanges,
     refreshConversations,
     session,
     setPinnedMessageIds,

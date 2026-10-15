@@ -15,8 +15,9 @@ import { DirectMessageMailboxRecord } from '../../messages/infrastructure/mailbo
  * Turns accepted group records into timeline changes, in record order. The
  * inbox already checked who may write each record; a message whose payload
  * does not read drops only its own change. Polls, votes and closes pass
- * through as they are; the poll board validates and folds them. Read
- * receipts never travel in a group.
+ * through as they are; the poll board validates and folds them. A typing
+ * notice becomes a typing change for its author. Read receipts never travel
+ * in a group.
  */
 export class GroupConversationTimeline {
   public constructor(
@@ -41,7 +42,7 @@ export class GroupConversationTimeline {
     ];
   }
 
-  private pollChanges(
+  private groupOnlyChanges(
     record: DirectMessageRecord,
   ): DirectMessageTimelineChange[] {
     switch (record.type) {
@@ -51,6 +52,14 @@ export class GroupConversationTimeline {
         return [this.pollVote(record)];
       case DirectMailboxRecords.TYPE.pollClose:
         return [this.pollClose(record)];
+      case DirectMailboxRecords.TYPE.typing:
+        return [
+          {
+            createdAt: record.createdAt,
+            identityId: record.authorId,
+            kind: 'typing',
+          },
+        ];
       default:
         return [];
     }
@@ -125,7 +134,7 @@ export class GroupConversationTimeline {
             },
           ];
         default:
-          return this.pollChanges(record);
+          return this.groupOnlyChanges(record);
       }
     });
   }

@@ -12,6 +12,14 @@ export type GroupMessageMailboxSyncInput = {
   onMessagesChange: Dispatch<SetStateAction<ChatMessage[]>>;
   /** Receives the poll changes of each restore and pass, when any. */
   onPollChanges: (changes: DirectMessageTimelineChange[]) => void;
+  /**
+   * Receives the typing changes of each restore and pass, with the message
+   * changes that end them, when any.
+   */
+  onTypingChanges: (
+    conversationId: string,
+    changes: DirectMessageTimelineChange[],
+  ) => void;
   refreshConversations: () => Promise<unknown>;
   session: Session;
   setPinnedMessageIds: Dispatch<SetStateAction<Set<string>>>;

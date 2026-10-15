@@ -70,6 +70,7 @@ describe(DirectMailboxRecords.name, () => {
       encryptedPayload: 'ciphertext-1',
       previousMessageIds: [],
     }),
+    typing: DirectMailboxRecords.typing(base),
   };
 
   afterEach(() => {
@@ -149,6 +150,7 @@ describe(DirectMailboxRecords.name, () => {
     'pollVote',
     'reaction',
     'read',
+    'typing',
   ] as const)('carries no message for %s records', (type) => {
     expect(DirectMailboxRecords.carriesMessage(records[type])).toBe(false);
   });

@@ -7,6 +7,7 @@ import type { DirectPollVoteRecord } from './DirectPollVoteRecord';
 import type { DirectReactionRecord } from './DirectReactionRecord';
 import type { DirectReadRecord } from './DirectReadRecord';
 import type { DirectSentRecord } from './DirectSentRecord';
+import type { DirectTypingRecord } from './DirectTypingRecord';
 
 export type DirectMessageRecord =
   | DirectDeletedRecord
@@ -17,4 +18,5 @@ export type DirectMessageRecord =
   | DirectPollVoteRecord
   | DirectReactionRecord
   | DirectReadRecord
-  | DirectSentRecord;
+  | DirectSentRecord
+  | DirectTypingRecord;

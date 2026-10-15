@@ -831,6 +831,59 @@ describe('GroupConversationMailbox', () => {
     expect(restored).toEqual([created]);
   });
 
+  it('shows a member’s typing to the others, never in history or unread', async () => {
+    await formGroup();
+    const signal = new AbortController().signal;
+    const typing = (member: Member) =>
+      member.changes.filter(({ kind }) => kind === 'typing');
+    const restored: DirectMessageTimelineChange[] = [];
+
+    await alice.mailbox.typing(alice.session, CONVERSATION);
+    await Promise.all(everyone().map(sync));
+    await bob.mailbox.restore(bob.session, CONVERSATION, signal, (changes) =>
+      restored.push(...changes),
+    );
+
+    expect(typing(bob)).toEqual([
+      { createdAt: NOW, identityId: alice.id, kind: 'typing' },
+    ]);
+    expect(typing(carol)).toEqual(typing(bob));
+    expect(typing(alice)).toEqual([]);
+    expect(restored).toEqual([]);
+    expect(
+      (await bob.mailbox.activity(bob.session, CONVERSATION)).unreadCount,
+    ).toBe(0);
+  });
+
+  it('sends a member’s typing at most once per 10 seconds', async () => {
+    await formGroup();
+    const typed = (member: Member) =>
+      member.changes.flatMap((change) =>
+        change.kind === 'typing' ? [change.createdAt] : [],
+      );
+
+    await alice.mailbox.typing(alice.session, CONVERSATION);
+    now = NOW + 9_999;
+    await alice.mailbox.typing(alice.session, CONVERSATION);
+    await sync(bob);
+    now = NOW + 10_000;
+    await alice.mailbox.typing(alice.session, CONVERSATION);
+    await sync(bob);
+
+    expect(typed(bob)).toEqual([NOW, NOW + 10_000]);
+  });
+
+  it('sends no typing while a removal on the roster is pending', async () => {
+    await formGroup();
+    roster = new Set([alice.id, bob.id]);
+
+    await alice.mailbox.typing(alice.session, CONVERSATION);
+    await Promise.all(everyone().map(sync));
+
+    expect(carol.changes.some(({ kind }) => kind === 'typing')).toBe(false);
+    expect(bob.changes.some(({ kind }) => kind === 'typing')).toBe(false);
+  });
+
   it('ignores a replayed welcome after a restart', async () => {
     await formGroup();
     bob.mailbox.stop(bob.id);

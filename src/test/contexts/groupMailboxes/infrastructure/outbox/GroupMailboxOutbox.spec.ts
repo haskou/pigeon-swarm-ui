@@ -465,4 +465,85 @@ describe('GroupMailboxOutbox', () => {
     expect(failures).toEqual(['m1']);
     expect(rows.size).toBe(0);
   });
+
+  describe('sendEphemeral', () => {
+    it('appends once to every other member’s inbox and keeps nothing', async () => {
+      engine.members.mockResolvedValue(['alice', 'bob', 'dave']);
+
+      await outbox.sendEphemeral(CONVERSATION, new Uint8Array([1]));
+
+      expect(sent).toEqual([inboxOf(0, 'bob'), inboxOf(0, 'dave')]);
+      expect(store.save).not.toHaveBeenCalled();
+      expect(outbox.items(CONVERSATION)).toEqual([]);
+    });
+
+    it('drops a copy it cannot append and never retries it', async () => {
+      const failures: string[] = [];
+
+      outbox.subscribe(({ reference }) => failures.push(reference));
+      channel.send.mockRejectedValue(new TypeError('offline'));
+
+      await outbox.sendEphemeral(CONVERSATION, new Uint8Array([1]));
+      now += GroupMailboxOutbox.RETRY_MAX_MS;
+      await outbox.resume();
+
+      expect(channel.send).toHaveBeenCalledTimes(1);
+      expect(store.save).not.toHaveBeenCalled();
+      expect(failures).toEqual([]);
+    });
+
+    it('skips a recipient a queued record still waits for', async () => {
+      engine.members.mockResolvedValue(['alice', 'bob', 'dave']);
+      channel.send.mockImplementation((keys: MailboxKeys, _plaintext, id) =>
+        keys.mailboxId === inboxOf(0, 'bob')
+          ? Promise.reject(new MailboxUnavailableError())
+          : Promise.resolve({ cursor: 1, envelopeId: id ?? '' }),
+      );
+      await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
+      channel.send.mockClear();
+
+      await outbox.sendEphemeral(CONVERSATION, new Uint8Array([2]));
+
+      expect(channel.send.mock.calls.map(([keys]) => keys.mailboxId)).toEqual([
+        inboxOf(0, 'dave'),
+      ]);
+    });
+
+    it('seals nothing once a queued record has waited longer than the ephemeral hold', async () => {
+      engine.members.mockResolvedValue(['alice', 'bob', 'dave']);
+      channel.send.mockImplementation((keys: MailboxKeys, _plaintext, id) =>
+        keys.mailboxId === inboxOf(0, 'bob')
+          ? Promise.reject(new MailboxUnavailableError())
+          : Promise.resolve({ cursor: 1, envelopeId: id ?? '' }),
+      );
+      await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
+      engine.encrypt.mockClear();
+      channel.send.mockClear();
+      now += GroupMailboxOutbox.EPHEMERAL_HOLD_MS + 1;
+
+      await outbox.sendEphemeral(CONVERSATION, new Uint8Array([2]));
+
+      expect(engine.encrypt).not.toHaveBeenCalled();
+      expect(channel.send).not.toHaveBeenCalled();
+    });
+
+    it('seals nothing while a member off the roster is still in the group', async () => {
+      roster = rosterOf('alice');
+
+      await outbox.sendEphemeral(CONVERSATION, new Uint8Array([1]));
+
+      expect(engine.encrypt).not.toHaveBeenCalled();
+      expect(channel.send).not.toHaveBeenCalled();
+    });
+
+    it('sends nothing once this identity is off the roster', async () => {
+      roster = rosterOf('bob');
+
+      await expect(
+        outbox.sendEphemeral(CONVERSATION, new Uint8Array([1])),
+      ).resolves.toBeUndefined();
+      expect(engine.encrypt).not.toHaveBeenCalled();
+      expect(channel.send).not.toHaveBeenCalled();
+    });
+  });
 });

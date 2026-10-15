@@ -1,3 +1,4 @@
+import type { DirectMessageTimelineChange } from '../../../contexts/messages/domain/DirectMessageTimelineChange';
 import type { RealtimeTypingInput } from '../../../shared/infrastructure/realtime/RealtimeGateway';
 
 export type TypingEntries = Record<string, Record<string, number>>;
@@ -76,4 +77,41 @@ export function typingInputKey(input: RealtimeTypingInput): string {
   return input.scope === 'conversation'
     ? `conversation:${input.conversationId}`
     : communityTypingKey(input.communityId, input.channelId);
+}
+
+const GROUP_TYPING_MS = 15_000;
+
+/**
+ * Folds a group conversation's synced changes into the typing entries, in
+ * inbox order: a typing notice shows its author until 15 seconds after it
+ * was written, never longer than 15 seconds from now; a message from the
+ * author ends it.
+ */
+export function applyGroupTypingChanges(
+  entries: TypingEntries,
+  conversationId: string,
+  changes: DirectMessageTimelineChange[],
+  now: number,
+): TypingEntries {
+  return changes.reduce((current, change) => {
+    if (change.kind === 'message') {
+      const { authorIdentityId } = change.message;
+
+      return current[conversationId]?.[authorIdentityId] === undefined
+        ? current
+        : updateTypingEntries(current, conversationId, authorIdentityId, null);
+    }
+
+    if (change.kind !== 'typing') return current;
+    const expiresAt = Math.min(change.createdAt, now) + GROUP_TYPING_MS;
+
+    return expiresAt > now
+      ? updateTypingEntries(
+          current,
+          conversationId,
+          change.identityId,
+          expiresAt,
+        )
+      : current;
+  }, entries);
 }

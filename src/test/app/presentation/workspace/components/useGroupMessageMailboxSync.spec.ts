@@ -86,6 +86,10 @@ function mountSync(activeConversation: ConversationResource = group) {
   const refreshConversations = jest.fn(() => Promise.resolve([]));
   const onPollChanges =
     jest.fn<(changes: DirectMessageTimelineChange[]) => void>();
+  const onTypingChanges =
+    jest.fn<
+      (conversationId: string, changes: DirectMessageTimelineChange[]) => void
+    >();
 
   mockEffects.length = 0;
   useGroupMessageMailboxSync({
@@ -94,6 +98,7 @@ function mountSync(activeConversation: ConversationResource = group) {
     onHistoryRestored,
     onMessagesChange,
     onPollChanges,
+    onTypingChanges,
     refreshConversations,
     session,
     setPinnedMessageIds,
@@ -106,6 +111,7 @@ function mountSync(activeConversation: ConversationResource = group) {
     messages: () => messages,
     onHistoryRestored,
     onPollChanges,
+    onTypingChanges,
     pinnedIds: () => pinned,
     refreshConversations,
   };
@@ -237,6 +243,38 @@ describe('useGroupMessageMailboxSync', () => {
 
     expect(mounted.onPollChanges.mock.calls).toEqual([[[poll]], [[vote]]]);
     expect(mounted.messages()).toEqual([]);
+    mounted.cleanup();
+  });
+
+  it('hands synced typing and the messages that end it to the typing board', async () => {
+    const typing: DirectMessageTimelineChange = {
+      createdAt: 300,
+      identityId: 'bob',
+      kind: 'typing',
+    };
+    const sent: DirectMessageTimelineChange = { kind: 'message', message };
+    const vote: DirectMessageTimelineChange = {
+      createdAt: 400,
+      kind: 'poll_vote',
+      optionIds: ['tea'],
+      pollId: 'poll-1',
+      voterIdentityId: 'carol',
+    };
+
+    sync.mockImplementationOnce((_session, _id, _signal, apply) => {
+      apply([typing, vote, sent]);
+      apply([vote]);
+
+      return Promise.resolve({ removed: false });
+    });
+    const mounted = mountSync();
+
+    await settle();
+
+    expect(mounted.onTypingChanges.mock.calls).toEqual([
+      ['group-1', [typing, sent]],
+    ]);
+    expect(mounted.messages()).toEqual([message]);
     mounted.cleanup();
   });
 

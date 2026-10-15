@@ -7,6 +7,7 @@ import type { DirectPollVoteRecord } from '../../../../../contexts/mailboxes/dom
 import type { DirectReactionRecord } from '../../../../../contexts/mailboxes/domain/DirectReactionRecord';
 import type { DirectReadRecord } from '../../../../../contexts/mailboxes/domain/DirectReadRecord';
 import type { DirectSentRecord } from '../../../../../contexts/mailboxes/domain/DirectSentRecord';
+import type { DirectTypingRecord } from '../../../../../contexts/mailboxes/domain/DirectTypingRecord';
 import type { MessageResource } from '../../../../../contexts/messages/infrastructure/http/MessageResource';
 
 import { DirectMailboxRecords } from '../../../../../contexts/mailboxes/domain/DirectMailboxRecords';
@@ -34,6 +35,7 @@ describe(DirectMessageMailboxRecord.name, () => {
     reactionAdd: DirectReactionRecord;
     reactionRemove: DirectReactionRecord;
     sentWithReply: DirectSentRecord;
+    typing: DirectTypingRecord;
     unpin: DirectPinRecord;
   } = {
     deleted: {
@@ -126,6 +128,13 @@ describe(DirectMessageMailboxRecord.name, () => {
       ...sentRecord,
       id: 'message-2',
       replyToMessageId: 'message-1',
+    },
+    typing: {
+      authorId: 'bob',
+      conversationId,
+      createdAt: 900,
+      id: 'typing-1',
+      type: 'typing',
     },
     unpin: {
       action: 'unpin',
@@ -239,6 +248,7 @@ describe(DirectMessageMailboxRecord.name, () => {
       ['a poll record', records.poll],
       ['a poll vote record', records.pollVote],
       ['a poll close record', records.pollClose],
+      ['a typing record', records.typing],
     ])('rejects %s that belongs to another conversation', (_label, record) => {
       expect(
         DirectMessageMailboxRecord.decode(

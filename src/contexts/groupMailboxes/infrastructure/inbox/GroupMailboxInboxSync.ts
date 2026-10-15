@@ -37,7 +37,8 @@ import { GroupMessageAuthors } from './GroupMessageAuthors';
  * is decrypted by MLS, whose sender must be the record's author and must
  * own the record's id (`GroupMessageId`). An edit or a deletion counts only
  * from the author of its target message. Accepted records are stored on
- * this device, handed to the caller, then the page is acknowledged; a
+ * this device, except typing notices, which are only handed on; every
+ * accepted record is handed to the caller, then the page is acknowledged; a
  * rejected envelope is acknowledged too, so it cannot stall the inbox, and
  * so is an envelope that failed to open `MAX_FAILURES` times.
  *
@@ -73,6 +74,7 @@ export class GroupMailboxInboxSync {
     DirectMailboxRecords.TYPE.pin,
     DirectMailboxRecords.TYPE.pollVote,
     DirectMailboxRecords.TYPE.reaction,
+    DirectMailboxRecords.TYPE.typing,
   ]);
 
   /** Sibling readers enrolled this app session, by mailbox and reader. */
@@ -84,8 +86,8 @@ export class GroupMailboxInboxSync {
    * Whether `sender` may send `record`: only under an id it owns; an edit
    * or a deletion only for its own message, a message or a poll only under
    * an id no other author holds, a poll close only for its own poll; pins,
-   * votes and reactions from any member. Read receipts have no meaning in
-   * a group, and any other type is refused.
+   * votes, reactions and typing notices from any member. Read receipts have
+   * no meaning in a group, and any other type is refused.
    */
   private static async authorized(
     record: DirectMessageRecord,
@@ -286,7 +288,12 @@ export class GroupMailboxInboxSync {
         authors,
       );
 
-      await this.history.append(session, accepted);
+      await this.history.append(
+        session,
+        accepted.filter(
+          ({ type }) => type !== DirectMailboxRecords.TYPE.typing,
+        ),
+      );
 
       if (signal.aborted) return advanced;
       apply(accepted);

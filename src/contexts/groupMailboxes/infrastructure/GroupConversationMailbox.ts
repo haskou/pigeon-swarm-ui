@@ -371,6 +371,14 @@ export class GroupConversationMailbox {
     );
   }
 
+  /**
+   * Tells the other members this identity is typing, at most once per 10
+   * seconds per conversation. Ephemeral: never queued, kept or retried.
+   */
+  public async typing(session: Session, conversationId: string): Promise<void> {
+    await this.sender.typing(this.member(session), conversationId);
+  }
+
   /** Marks the conversation's stored history read on this device. */
   public async markRead(
     session: Session,
