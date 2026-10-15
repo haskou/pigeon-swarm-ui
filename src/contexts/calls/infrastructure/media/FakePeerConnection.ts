@@ -4,6 +4,7 @@ export type FakePeerConnection = Pick<
   | 'addTrack'
   | 'addTransceiver'
   | 'close'
+  | 'getReceivers'
   | 'getSenders'
   | 'getConfiguration'
   | 'setConfiguration'
@@ -18,6 +19,7 @@ export type FakePeerConnection = Pick<
   createOffer: () => Promise<RTCSessionDescriptionInit>;
   iceConnectionState: RTCIceConnectionState;
   localDescription: RTCSessionDescriptionInit | null;
+  receivers: RTCRtpReceiver[];
   remoteDescription: RTCSessionDescriptionInit | null;
   senders: RTCRtpSender[];
   setLocalDescription: (

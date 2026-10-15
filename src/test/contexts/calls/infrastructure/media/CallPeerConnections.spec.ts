@@ -1,4 +1,5 @@
 import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import { mock, type MockProxy } from 'jest-mock-extended';
 
 import type { SignalSender } from '../../../../../contexts/calls/infrastructure/media/descriptionPayload';
 import type { FakePeerConnection } from '../../../../../contexts/calls/infrastructure/media/FakePeerConnection';
@@ -10,7 +11,6 @@ import {
   stopCallDiagnostics,
 } from '../../../../../contexts/calls/infrastructure/media/callDebugLogger';
 import { CallPeerConnections } from '../../../../../contexts/calls/infrastructure/media/CallPeerConnections';
-import { EncodedCallMediaCipher } from '../../../../../contexts/calls/infrastructure/media/EncodedCallMediaCipher';
 import { RemoteCallAudio } from '../../../../../contexts/calls/infrastructure/media/RemoteCallAudio';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 
@@ -38,6 +38,11 @@ const originalIceCandidate = Object.getOwnPropertyDescriptor(
   globalThis,
   'RTCIceCandidate',
 );
+const originalScriptTransform = Object.getOwnPropertyDescriptor(
+  globalThis,
+  'RTCRtpScriptTransform',
+);
+const originalWorker = Object.getOwnPropertyDescriptor(globalThis, 'Worker');
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
 
 type RtcConfigurationWithEncodedInsertableStreams = RTCConfiguration & {
@@ -131,7 +136,7 @@ function encodedFrameStreams(): {
   };
 }
 
-function createFakeSender(track: MediaStreamTrack): FakeSender {
+function createFakeSender(track: MediaStreamTrack | null): FakeSender {
   let currentTrack: MediaStreamTrack | null = track;
 
   return {
@@ -145,6 +150,26 @@ function createFakeSender(track: MediaStreamTrack): FakeSender {
       return currentTrack;
     },
   };
+}
+
+function createFakeReceiver(kind: string): RTCRtpReceiver {
+  return {
+    createEncodedStreams: jest.fn(() => encodedFrameStreams()),
+    track: mediaTrack(`remote-${kind}-track`, kind),
+  } as unknown as RTCRtpReceiver;
+}
+
+/**
+ * The senders and receivers of `peer` with no frame transform. Chromium hands
+ * the frames of one still without a transform once the task that created it
+ * ends to the network or the decoder untouched, even if one is set later.
+ */
+function untransformed(
+  peer: FakePeerConnection,
+): (RTCRtpReceiver | RTCRtpSender)[] {
+  return [...peer.getSenders(), ...peer.getReceivers()].filter(
+    ({ transform }) => !transform,
+  );
 }
 
 function installEncodedStreamSupport(): void {
@@ -169,21 +194,74 @@ function installEncodedStreamSupport(): void {
   });
 }
 
+/**
+ * Lets the senders and receivers `installEncodedStreamSupport` faked take an
+ * RTCRtpScriptTransform too, as Chromium 141+ does; Firefox and Safari only
+ * have this one. Returns the transforms the browser was asked for.
+ */
+function installScriptTransformSupport(): jest.Mock<
+  { side: unknown },
+  [Worker, { side: unknown }]
+> {
+  const scriptTransform = jest.fn(
+    (_worker: Worker, options: { side: unknown }) => ({
+      side: options.side,
+    }),
+  );
+
+  for (const owner of [RTCRtpSender, RTCRtpReceiver]) {
+    Object.defineProperty(owner.prototype, 'transform', {
+      configurable: true,
+      value: null,
+      writable: true,
+    });
+  }
+  Object.defineProperty(globalThis, 'RTCRtpScriptTransform', {
+    configurable: true,
+    value: scriptTransform,
+  });
+  Object.defineProperty(globalThis, 'Worker', {
+    configurable: true,
+    value: jest.fn(() => mock<Worker>()),
+  });
+
+  return scriptTransform;
+}
+
+/** The worker the last RTCRtpScriptTransform cipher started. */
+function lastCipherWorker(): MockProxy<Worker> {
+  const { results } = (Worker as unknown as jest.Mock<MockProxy<Worker>>).mock;
+
+  return results[results.length - 1].value as MockProxy<Worker>;
+}
+
 function createFakePeerConnection(): FakePeerConnection {
   const senders: RTCRtpSender[] = [];
+  const receivers: RTCRtpReceiver[] = [];
   let offerCount = 0;
   let answerCount = 0;
   const peer: FakePeerConnection = {
     addEventListener: jest.fn(),
     addIceCandidate: jest.fn(() => Promise.resolve()),
     addTrack: jest.fn((track: MediaStreamTrack) => {
-      const sender = createFakeSender(track);
+      const sender = createFakeSender(track) as unknown as RTCRtpSender;
 
-      senders.push(sender as unknown as RTCRtpSender);
+      senders.push(sender);
+      receivers.push(createFakeReceiver(track.kind));
 
-      return sender as unknown as RTCRtpSender;
+      return sender;
     }),
-    addTransceiver: jest.fn(),
+    addTransceiver: jest.fn((kind: string) => {
+      const transceiver = {
+        receiver: createFakeReceiver(kind),
+        sender: createFakeSender(null) as unknown as RTCRtpSender,
+      };
+
+      senders.push(transceiver.sender);
+      receivers.push(transceiver.receiver);
+
+      return transceiver as RTCRtpTransceiver;
+    }),
     close: jest.fn(),
     connectionState: 'new',
     createAnswer: jest.fn(() => {
@@ -203,9 +281,11 @@ function createFakePeerConnection(): FakePeerConnection {
       } as RTCSessionDescriptionInit);
     }),
     getConfiguration: jest.fn(() => ({ iceTransportPolicy: 'relay' })),
+    getReceivers: jest.fn(() => receivers),
     getSenders: jest.fn(() => senders),
     iceConnectionState: 'new',
     localDescription: null,
+    receivers,
     remoteDescription: null,
     removeTrack: jest.fn((sender: RTCRtpSender) => {
       const senderIndex = senders.indexOf(sender);
@@ -261,6 +341,21 @@ function registeredPeerEventListener(
   return listener;
 }
 
+/**
+ * What the browser does when a remote description brings a media section no
+ * transceiver has yet: it creates one, then reports the new signaling state.
+ */
+function createRemoteTransceiver(peer: FakePeerConnection, kind: string): void {
+  peer.senders.push(createFakeSender(null) as unknown as RTCRtpSender);
+  peer.receivers.push(createFakeReceiver(kind));
+  // eslint-disable-next-line no-param-reassign -- the browser moves its state
+  peer.signalingState = 'have-remote-offer';
+  registeredPeerEventListener(
+    peer,
+    'signalingstatechange',
+  )(new Event('signalingstatechange'));
+}
+
 function installMediaStreamMock(): void {
   Object.defineProperty(globalThis, 'MediaStream', {
     configurable: true,
@@ -301,7 +396,9 @@ function restoreGlobalProperty(
     | 'RTCPeerConnection'
     | 'RTCSessionDescription'
     | 'RTCRtpReceiver'
+    | 'RTCRtpScriptTransform'
     | 'RTCRtpSender'
+    | 'Worker'
     | 'window',
   descriptor: PropertyDescriptor | undefined,
 ): void {
@@ -378,6 +475,8 @@ describe(CallPeerConnections.name, () => {
     restoreGlobalProperty('RTCSessionDescription', originalSessionDescription);
     restoreGlobalProperty('RTCRtpReceiver', originalRtpReceiver);
     restoreGlobalProperty('RTCRtpSender', originalRtpSender);
+    restoreGlobalProperty('RTCRtpScriptTransform', originalScriptTransform);
+    restoreGlobalProperty('Worker', originalWorker);
     restoreGlobalProperty('window', originalWindow);
   });
 
@@ -1606,7 +1705,7 @@ describe(CallPeerConnections.name, () => {
     },
   );
 
-  it('configures encoded streams for encrypted local media senders', async () => {
+  it('falls back to encoded streams on a Chromium without RTCRtpScriptTransform', async () => {
     const peers: FakePeerConnection[] = [];
     const configurations: RtcConfigurationWithEncodedInsertableStreams[] = [];
 
@@ -1628,6 +1727,106 @@ describe(CallPeerConnections.name, () => {
 
     expect(configurations[0]?.encodedInsertableStreams).toBe(true);
     expect(sender.createEncodedStreams).toHaveBeenCalledTimes(1);
+  });
+
+  it('encrypts media in a worker where the browser takes an RTCRtpScriptTransform, even with encoded streams too', async () => {
+    const peers: FakePeerConnection[] = [];
+    const configurations: RtcConfigurationWithEncodedInsertableStreams[] = [];
+
+    installEncodedStreamSupport();
+    const scriptTransform = installScriptTransformSupport();
+
+    installPeerConnectionMock(peers, configurations);
+    const manager = callPeerConnectionManager();
+
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
+    manager.configureMediaEncryption(SymmetricKey.generate().valueOf());
+    manager.setLocalStream(
+      mediaStreamWithTracks([mediaTrack('microphone-1', 'audio')]),
+    );
+
+    await manager.ensurePeer('peer-identity-id', false, () =>
+      Promise.resolve(),
+    );
+
+    const [sender] = peers[0].senders as unknown as Array<
+      FakeSender & { transform?: unknown }
+    >;
+    const [receiver] = peers[0].receivers;
+
+    expect(configurations[0]?.encodedInsertableStreams).toBeUndefined();
+    expect(sender.createEncodedStreams).not.toHaveBeenCalled();
+    expect(sender.transform).toEqual({ side: 'send' });
+    expect(receiver.transform).toEqual({ side: 'receive' });
+    expect(scriptTransform).toHaveBeenCalledTimes(2);
+    manager.reset();
+  });
+
+  it('transforms both ends of a local track in the task that adds it', async () => {
+    const peers: FakePeerConnection[] = [];
+
+    installEncodedStreamSupport();
+    installScriptTransformSupport();
+    installPeerConnectionMock(peers);
+    const manager = callPeerConnectionManager();
+
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
+    manager.configureMediaEncryption(SymmetricKey.generate().valueOf());
+    manager.setLocalStream(
+      mediaStreamWithTracks([mediaTrack('microphone', 'audio')]),
+    );
+    await manager.ensurePeer('peer-identity-id', false, () =>
+      Promise.resolve(),
+    );
+
+    expect(peers[0].receivers).toHaveLength(1);
+    expect(untransformed(peers[0])).toEqual([]);
+    manager.reset();
+  });
+
+  it('transforms the receive-only transceiver of a peer without local media', async () => {
+    const peers: FakePeerConnection[] = [];
+
+    installEncodedStreamSupport();
+    installScriptTransformSupport();
+    installPeerConnectionMock(peers);
+    const manager = callPeerConnectionManager();
+
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
+    manager.configureMediaEncryption(SymmetricKey.generate().valueOf());
+    await manager.ensurePeer('peer-identity-id', false, () =>
+      Promise.resolve(),
+    );
+
+    expect(peers[0].addTransceiver).toHaveBeenCalledWith('audio', {
+      direction: 'recvonly',
+    });
+    expect(untransformed(peers[0])).toEqual([]);
+    manager.reset();
+  });
+
+  it('transforms a transceiver a remote description creates as the signaling state changes', async () => {
+    jest.useFakeTimers();
+    const peers: FakePeerConnection[] = [];
+
+    installEncodedStreamSupport();
+    installScriptTransformSupport();
+    installPeerConnectionMock(peers);
+    const manager = callPeerConnectionManager();
+
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
+    manager.configureMediaEncryption(SymmetricKey.generate().valueOf());
+    manager.setLocalStream(
+      mediaStreamWithTracks([mediaTrack('microphone', 'audio')]),
+    );
+    await manager.ensurePeer('peer-identity-id', false, () =>
+      Promise.resolve(),
+    );
+    createRemoteTransceiver(peers[0], 'video');
+
+    expect(peers[0].receivers).toHaveLength(2);
+    expect(untransformed(peers[0])).toEqual([]);
+    manager.reset();
   });
 
   it('announces encrypted media in its first offer, before the peer describes itself', async () => {
@@ -1794,6 +1993,25 @@ describe(CallPeerConnections.name, () => {
     expect(sendSignal).not.toHaveBeenCalled();
   });
 
+  it('adds no local media to a peer of a private call this browser cannot encrypt', async () => {
+    const peers: FakePeerConnection[] = [];
+
+    installPeerConnectionMock(peers);
+    const manager = callPeerConnectionManager();
+
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
+    manager.configureMediaEncryption(SymmetricKey.generate().valueOf());
+    manager.setLocalStream(
+      mediaStreamWithTracks([mediaTrack('microphone', 'audio')]),
+    );
+    await manager.ensurePeer('peer-identity-id', false, () =>
+      Promise.resolve(),
+    );
+
+    expect(peers[0].addTrack).not.toHaveBeenCalled();
+    manager.reset();
+  });
+
   it('answers a peer of a private call that announces encrypted media', async () => {
     const peers: FakePeerConnection[] = [];
 
@@ -1830,6 +2048,135 @@ describe(CallPeerConnections.name, () => {
     expect(manager.isMediaEncryptionActiveWith('peer-identity-id')).toBe(true);
   });
 
+  it('stops sending media of a private call this browser fails to encrypt', async () => {
+    const peers: FakePeerConnection[] = [];
+    const localStream = mediaStreamWithTracks([mediaTrack('audio', 'audio')]);
+
+    installEncodedStreamSupport();
+    installScriptTransformSupport().mockImplementation(() => {
+      throw new DOMException('Transform in use.', 'InvalidStateError');
+    });
+    installPeerConnectionMock(peers);
+    const manager = callPeerConnectionManager();
+    const sendSignal = jest.fn(() =>
+      Promise.resolve(),
+    ) as unknown as jest.MockedFunction<SignalSender>;
+
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
+    manager.configureMediaEncryption(SymmetricKey.generate().valueOf());
+    manager.setLocalStream(localStream);
+    await manager.ensurePeer('peer-identity-id', true, sendSignal);
+    manager.setLocalStream(localStream);
+
+    const [sender] = peers[0].senders as unknown as FakeSender[];
+
+    expect(sender.replaceTrack).toHaveBeenCalledWith(null);
+    expect(sender.createEncodedStreams).not.toHaveBeenCalled();
+    expect(peers[0].addTrack).toHaveBeenCalledTimes(1);
+    expect(sendSignal).toHaveBeenCalledWith(
+      'peer-identity-id',
+      'offer',
+      expect.objectContaining({
+        mediaEncryption: {
+          acceptsEncrypted: false,
+          enabled: false,
+          version: 1,
+        },
+      }),
+    );
+    manager.reset();
+  });
+
+  it('stops playing media of a private call this browser fails to decrypt', async () => {
+    const peers: FakePeerConnection[] = [];
+    const remoteTrack = mediaTrack('remote-audio-track', 'audio');
+
+    installEncodedStreamSupport();
+    installMediaStreamMock();
+    installPeerConnectionMock(peers);
+    const manager = callPeerConnectionManager();
+
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
+    manager.configureMediaEncryption(SymmetricKey.generate().valueOf());
+    await manager.ensurePeer('peer-identity-id', false, () =>
+      Promise.resolve(),
+    );
+    registeredPeerEventListener(
+      peers[0]!,
+      'track',
+    )({
+      receiver: { track: remoteTrack },
+      streams: [mediaStreamWithTracks([remoteTrack])],
+      track: remoteTrack,
+    } as unknown as Event);
+
+    expect(remoteTrack.stop).toHaveBeenCalled();
+    manager.reset();
+  });
+
+  it('stops reporting and admitting encrypted media once its worker fails', async () => {
+    const peers: FakePeerConnection[] = [];
+
+    installEncodedStreamSupport();
+    installScriptTransformSupport();
+    installSessionDescriptionMock();
+    installPeerConnectionMock(peers);
+    const manager = callPeerConnectionManager();
+    const sendSignal = jest.fn(() =>
+      Promise.resolve(),
+    ) as unknown as jest.MockedFunction<SignalSender>;
+    const encryptedOffer = {
+      mediaEncryption: encryptedMedia,
+      sdp: 'encrypted-offer',
+      type: 'offer',
+    };
+
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
+    manager.configureMediaEncryption(SymmetricKey.generate().valueOf());
+    await manager.ensurePeer('peer-identity-id', false, sendSignal);
+    await manager.handleSignal(
+      'peer-identity-id',
+      'offer',
+      encryptedOffer,
+      sendSignal,
+      'current-identity-id',
+    );
+    const workerFailed = lastCipherWorker().addEventListener.mock.calls.find(
+      ([type]) => type === 'error',
+    )?.[1] as EventListener;
+
+    expect(manager.isMediaEncryptionActiveWith('peer-identity-id')).toBe(true);
+    workerFailed(new Event('error'));
+    await manager.ensurePeer('other-identity-id', false, sendSignal);
+    await manager.handleSignal(
+      'other-identity-id',
+      'offer',
+      encryptedOffer,
+      sendSignal,
+      'current-identity-id',
+    );
+
+    expect(manager.isMediaEncryptionActiveWith('peer-identity-id')).toBe(false);
+    expect(peers[1].setRemoteDescription).not.toHaveBeenCalled();
+    expect(peers[1].close).toHaveBeenCalled();
+    manager.reset();
+  });
+
+  it('keeps its cipher when handed a call key it cannot read', () => {
+    installEncodedStreamSupport();
+    installScriptTransformSupport();
+    const manager = callPeerConnectionManager();
+
+    manager.configureMediaEncryption(SymmetricKey.generate().valueOf());
+    const worker = lastCipherWorker();
+
+    expect(() => manager.configureMediaEncryption('not a key!')).toThrow();
+    expect(worker.terminate).not.toHaveBeenCalled();
+    manager.reset();
+
+    expect(worker.terminate).toHaveBeenCalledTimes(1);
+  });
+
   it('answers a peer of a public call that sends no encryption metadata', async () => {
     const peers: FakePeerConnection[] = [];
 
@@ -1857,19 +2204,6 @@ describe(CallPeerConnections.name, () => {
       'answer',
       expect.anything(),
     );
-  });
-
-  it('does not throw when encoded streams are rejected by the browser', () => {
-    const cipher = new EncodedCallMediaCipher(
-      SymmetricKey.generate().valueOf(),
-    );
-    const sender = {
-      createEncodedStreams: jest.fn(() => {
-        throw new Error('Encoded insertable streams are disabled.');
-      }),
-    } as unknown as RTCRtpSender;
-
-    expect(() => cipher.configureSender(sender)).not.toThrow();
   });
 
   it('serializes concurrent peer creation for the same identity', async () => {

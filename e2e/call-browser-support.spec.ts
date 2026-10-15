@@ -1,4 +1,4 @@
-import { type Page, expect, test } from '@playwright/test';
+import { type Page, type Request, expect, test } from '@playwright/test';
 
 import {
   acceptLatestInvitation,
@@ -10,6 +10,16 @@ import {
 
 // A browser that cannot make a call says why before it asks for the
 // microphone or creates a call on the node, so nobody is left ringing.
+
+// Firefox grants its fake microphone; other engines ignore these preferences.
+test.use({
+  launchOptions: {
+    firefoxUserPrefs: {
+      'media.navigator.streams.fake': true,
+      'permissions.default.microphone': 1,
+    },
+  },
+});
 
 test('refuses a call with a clear reason in a browser without WebRTC', async ({
   browser,
@@ -41,24 +51,56 @@ test('refuses a call with a clear reason in a browser without WebRTC', async ({
   );
 });
 
-// Until haskou/pigeon-swarm-ui#474 encrypts call media with
-// RTCRtpScriptTransform, Firefox refuses private calls instead of sending
-// unencrypted media.
 test('refuses a private call in a browser that cannot encrypt call media', async ({
   browser,
 }, testInfo) => {
   test.skip(
-    testInfo.project.name !== 'desktop-firefox',
-    'Only Firefox lacks the encoded streams used for call encryption here.',
+    testInfo.project.name !== 'desktop-chromium',
+    'Both call media ciphers are removed from desktop Chromium.',
   );
   test.slow();
 
-  const [caller] = await directConversation(browser, async () => undefined);
+  const [caller] = await directConversation(browser, async (page) => {
+    // A browser with neither RTCRtpScriptTransform nor encoded streams.
+    await page.addInitScript(() => {
+      Reflect.deleteProperty(window, 'RTCRtpScriptTransform');
+      for (const prototype of [
+        RTCRtpSender.prototype,
+        RTCRtpReceiver.prototype,
+      ])
+        Reflect.deleteProperty(prototype, 'createEncodedStreams');
+    });
+  });
 
   await expectRefusedCall(
     caller,
     /This browser cannot encrypt call audio and video end to end/,
   );
+});
+
+test('rings the callee of a private call started in Firefox', async ({
+  browser,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== 'desktop-firefox',
+    'Firefox encrypts call media through RTCRtpScriptTransform.',
+  );
+  test.slow();
+
+  const [caller, callee] = await directConversation(
+    browser,
+    async () => undefined,
+  );
+  const callCreated = caller.waitForRequest(isCallCreation);
+
+  await startCall(caller);
+  await callCreated;
+  await expect(callee.getByText('Incoming call')).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(
+    caller.getByText(/This browser cannot encrypt call audio and video/),
+  ).toHaveCount(0);
 });
 
 async function directConversation(
@@ -89,22 +131,29 @@ async function directConversation(
   return [callerPage, calleePage];
 }
 
-async function expectRefusedCall(caller: Page, reason: RegExp) {
-  const callRequests: string[] = [];
+function isCallCreation(request: Request): boolean {
+  return (
+    request.method() === 'POST' &&
+    /\/calls\/?$/.test(new URL(request.url()).pathname)
+  );
+}
 
-  caller.on('request', (request) => {
-    if (
-      request.method() === 'POST' &&
-      /\/calls\/?$/.test(new URL(request.url()).pathname)
-    )
-      callRequests.push(request.url());
-  });
-
+async function startCall(caller: Page) {
   await caller
     .getByRole('button', { name: 'Open conversation menu' })
     .first()
     .click();
   await caller.getByText('Start call', { exact: true }).click();
+}
+
+async function expectRefusedCall(caller: Page, reason: RegExp) {
+  const callRequests: string[] = [];
+
+  caller.on('request', (request) => {
+    if (isCallCreation(request)) callRequests.push(request.url());
+  });
+
+  await startCall(caller);
 
   await expect(caller.getByText(reason).first()).toBeVisible();
   await expect(caller.getByTestId('compact-call-bar')).toHaveCount(0);

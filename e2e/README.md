@@ -60,9 +60,10 @@ it, joins the community, sees encryption as active and reads the creator's
 next message; the node only accepts a link whose token commits to its limits),
 `call-page-departure.spec.ts` (a ringing call is
 declined when the callee leaves the page), `call-browser-support.spec.ts` (a
-Chromium without WebRTC and a Firefox without call media encryption both
+Chromium without WebRTC and a Chromium with neither call media cipher both
 refuse a direct call with the reason, before the microphone or the node is
-asked) and `group-conversation.spec.ts`
+asked, while Firefox starts a private call that rings the callee) and
+`group-conversation.spec.ts`
 (three users share a group conversation over MLS and per-member mailboxes,
 each invitee, not a contact of the creator, accepts the invitation from its
 notifications before it joins, each message reaches the other two, and after
@@ -205,6 +206,24 @@ connects through the candidates Chromium learns from it. A missing device is
 simulated on every engine by raising `NotFoundError` and hiding audio inputs
 from `enumerateDevices`. Mobile browsers are not covered; see
 [calls: browser support](../docs/calls-browser-support.md).
+
+## Call media encryption
+
+```bash
+yarn test:e2e e2e/call-media-encryption.spec.ts --project=desktop-chromium --project=desktop-firefox
+```
+
+The caller runs on the engine under test and the callee always on Chromium,
+both rendering `fixtures/call-session.html` as a private call with a call key.
+With the same key on both ends, each end must decode audio from the other
+(`totalAudioEnergy` of its inbound audio grows), report media E2EE active with
+the other identity, and run an `RTCRtpScriptTransform` on its audio sender and
+receiver. With a different key on each end, audio packets still arrive but
+decode to nothing, which shows the audio is encrypted and that frames the key
+does not decrypt are dropped. The encoded streams path of Chromium builds
+without `RTCRtpScriptTransform` is not exercised: every engine in CI has it.
+WebKit is skipped because Playwright cannot grant it a microphone, so Safari
+support is not proven here.
 
 ## Call page departure
 

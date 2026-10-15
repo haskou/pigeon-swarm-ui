@@ -107,6 +107,9 @@ export class CallPeerConnections {
       });
       peer.addTransceiver('audio', { direction: 'recvonly' });
     }
+    // Chromium passes the frames of a sender or receiver that has no
+    // transform once the task creating it ends, even if one comes later.
+    this.mediaEncryption.syncPeer(peer);
     peer.addEventListener('connectionstatechange', () => {
       logCallDebug('peer-manager:connection-state-change', {
         connectionState: peer.connectionState,
@@ -130,6 +133,8 @@ export class CallPeerConnections {
       );
     });
     peer.addEventListener('signalingstatechange', () => {
+      // A remote description has just created any transceiver it needs.
+      this.mediaEncryption.syncPeer(peer);
       logCallDebug('peer-manager:signaling-state-change', {
         peerIdentityId,
         signalingState: peer.signalingState,

@@ -78,6 +78,11 @@ jobs:
           --project=desktop-chromium --project=desktop-firefox
           --project=desktop-webkit
 
+      - name: Verify encrypted private call media in Chromium and Firefox
+        run: >-
+          yarn test:e2e e2e/call-media-encryption.spec.ts
+          --project=desktop-chromium --project=desktop-firefox
+
       - name: Build
         run: yarn build
 

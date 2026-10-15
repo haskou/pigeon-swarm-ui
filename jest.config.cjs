@@ -75,7 +75,7 @@ const REAL_CRYPTO_SPECS = [
 ];
 
 const realCryptoSpec = `/(${REAL_CRYPTO_SPECS.join('|').replaceAll('.', '\\.')})\\.spec\\.ts$`;
-const assetUrl = { '\\?url$': '<rootDir>/src/test/assetUrlMock.ts' };
+const assetUrl = { '[?&]url$': '<rootDir>/src/test/assetUrlMock.ts' };
 const shared = {
   clearMocks: true,
   rootDir: __dirname,

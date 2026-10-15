@@ -19,6 +19,8 @@ const allowedEvents = new Set([
   'peer-manager:ice-recovery:restart-failed',
   'peer-manager:create-peer',
   'peer-manager:track-received',
+  'peer-manager:media-encryption:transform-failed',
+  'peer-manager:media-encryption:worker-failed',
   'peer-manager:reset',
 ]);
 const allowedStates: Record<string, readonly string[]> = {
