@@ -424,11 +424,20 @@ from folding the community's signed operations (`CommunityOperationFold`), not
 from the node's community list; operations that fail to load or fold count as
 private. There is no switch to turn call E2EE off.
 
-- A browser without encoded insertable streams (`createEncodedStreams`) cannot
-  encrypt call media. It does not start, join or answer a private call: the
-  check runs before the microphone prompt and before the node is asked, and an
-  incoming call is declined. Encrypted calls currently need a Chromium-based
-  browser; Firefox and Safari support is tracked in #474.
+- Each audio and video frame is encrypted with AES-GCM under the call key:
+  the `PSCE1` marker, a random 12-byte nonce, then the ciphertext
+  (`CallMediaFrameCodec`). A browser with `RTCRtpScriptTransform` runs the
+  codec in a dedicated worker: the raw key is transferred to that worker, and
+  the media cipher on the page keeps no copy of it. A Chromium build without
+  `RTCRtpScriptTransform` runs the same codec on encoded insertable streams
+  (`createEncodedStreams`) with a non-extractable key. Both produce the same
+  frames, so members on either path hear each other.
+- A browser with neither cannot encrypt call media. It does not start, join or
+  answer a private call: the check runs before the microphone prompt and
+  before the node is asked, and an incoming call is declined. The refusal
+  asks to update the browser or use another one; it names no browser.
+- A frame transform that cannot be attached stops that sender's or receiver's
+  media instead of letting it through unencrypted.
 - A device with no key for the call (no conversation key, or no community
   group) finds out only once the node has created or joined the call. It
   leaves the call at once and shows the reason. Until the leave lands, the
@@ -448,9 +457,13 @@ private. There is no switch to turn call E2EE off.
   to decrypt, are dropped rather than played.
 
 `resolveWorkspaceCallMediaEncryption.spec.ts`, `useCallStartActions.spec.ts`,
-`PigeonCallRepository.spec.ts`, `CallPeerConnections.spec.ts` and
-`EncodedCallMediaCipher.spec.ts` (`yarn test`) cover the refusals and the
-public community exception.
+`PigeonCallRepository.spec.ts`, `CallPeerConnections.spec.ts`,
+`ScriptTransformCallMediaCipher.spec.ts`, `serveCallMediaEncryption.spec.ts`
+and `EncodedStreamsCallMediaCipher.spec.ts` (`yarn test`) cover the refusals,
+the frame format and the public community exception.
+`e2e/call-media-encryption.spec.ts` proves in CI that a private call between
+Firefox or Chromium and Chromium decodes audio only when both ends hold the
+call key. Safari is not covered by CI.
 
 ## Security properties and limits
 
