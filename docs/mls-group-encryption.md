@@ -111,7 +111,9 @@ The node cannot order commits across replicas. Clients do it:
   id** wins. A client that applied a different commit for epoch `n` rolls back
   to its retained epoch-`n` state (`ts-mls` states are immutable values) and
   applies the winner. Application messages encrypted in the losing epoch stay
-  readable because that state is retained read-only.
+  readable because that state is retained read-only. A group in epoch `m`
+  lists commits with `afterEpoch = m - 2` and drops any older one the node
+  lists anyway, so a rival only ever displaces the last commit it took.
 - The loser re-issues its proposals on top of the winning epoch. Removals are
   idempotent: the client first checks whether the leaf is still in the group.
 - A client never applies a commit with a gap. It fetches missing epochs and, if
@@ -165,13 +167,13 @@ grant `manage_members`.
 Every commit is checked against these rules both when it is made and when it
 is received, by the roster at the revision the commit binds (see "Which
 roster judges a commit"); a commit that breaks them is skipped and the epoch
-does not advance. A welcome opens only when the node names as its author a
-manager, by the roster at the revision the welcome binds, who holds a leaf
-in the welcomed group, and every leaf in its tree is a member at that
-revision, so a member cannot welcome anyone into a look-alike group. When the
-joiner's latest roster no longer lets the author add members, the welcome
-opens only once a member that roster lets add members has committed in the
-group after it, so a demoted manager cannot either. A removed device rejoins
+does not advance. A welcome opens only when the leaf that signed it, whoever
+the node names as its author, is a manager by the roster at the revision the
+welcome binds, and every leaf in its tree is a member at that revision, so a
+member cannot welcome anyone into a look-alike group. When the joiner's
+latest roster no longer lets that signer add members, the welcome opens only
+once a member that roster lets add members has committed in the group after
+it, so a demoted manager cannot either. A removed device rejoins
 only from a welcome newer than its last membership.
 
 ### Which roster judges a commit
@@ -237,7 +239,9 @@ What a node or a member can forge about this order:
 - A device joining from a welcome has no baseline yet, so it cannot tell a
   backdated welcome from an honest one. Such a welcome lands a roster member
   on a fork no other member follows; it never admits anyone the bound roster
-  did not, and the member rejoins from the next welcome.
+  did not. Nothing welcomes the member into the real group while this device
+  holds the fork: what it sends there reaches only the fork's leaves (a known
+  residual).
 - A joiner that already sees a welcome's author demoted cannot tell an add
   every member took while the author was allowed from a backdated one. It
   keeps its key package and opens the welcome only once a member its latest
@@ -246,7 +250,11 @@ What a node or a member can forge about this order:
   one on its next `reconcile` (`bindRoster`), so the joiner gets in on its
   next sync without anyone welcoming it again. That commit proves a manager
   the joiner trusts took the add; a demoted manager's look-alike group, or
-  an add no such manager took, never gets one.
+  an add no such manager took, never gets one from a manager's device the
+  demotion was served to. A manager's device the node withholds the
+  demotion from may still commit there, or welcome the joiner itself, as
+  long as the node keeps withholding it from that device (see the bounds
+  below).
 - A commit or welcome that binds no revision (made before #420) is judged by
   the roster of no operations, which admits nobody, so such a group stops
   taking membership commits until a manager binds a revision.
@@ -291,21 +299,31 @@ no commit and makes none, and it steps back to before the first add by
 another leaf that it took in or after the witness's epoch: whoever a manager
 the withheld operations may demote added is out again. Messages are still
 sent and read in the epoch it stays in, and once the operations arrive it
-takes again the commits that still hold. Any state it steps back to is one
-the node could already keep the member in by withholding commits. A member
-the latest roster does not let add members cannot stop a group this way; a
-manager binding a digest of no operation stops it until that manager is
-demoted, and what it keeps readable meanwhile it could forward anyway. The
-node can still delay distrust:
+takes again the commits that still hold, resuming the epochs it left, so its
+sending generations there go on. A step back never undoes a commit this
+device made, which the node could not have withheld from it. Since sync
+takes no commit from before the epoch preceding the group's, one step back
+undoes at most the last commit the device took; a node serving older
+witnesses sync after sync walks it back one commit at a time, and a removal
+in what it undoes is undone with it. Any state it steps back to is one the
+node could already keep the member in by withholding commits. A
+member the latest roster does not let add members cannot stop a group this
+way; a manager binding a digest of no operation stops it until that manager
+is demoted, and what it keeps readable meanwhile it could forward anyway.
+The node can still delay distrust:
 
 - until a manager's commit that binds the demotion is served: an add the
   demoted manager made before any such commit stands, as any backdated add
   does;
 - by withholding those commits too, or serving one only once the member has
-  moved more than one epoch past it, beyond what sync lists;
-- across a restart, which forgets the commits a group took: it then steps
-  back from nothing, and a manager no longer commits for a joiner left
-  waiting, who waits for the next manager commit instead;
+  moved more than one epoch past it, beyond what sync takes;
+- across a restart, which forgets the commits a group took and the epochs it
+  left: it then steps back from nothing, a manager no longer commits for a
+  joiner left waiting, who waits for the next manager commit instead, and a
+  commit taken again after a step back starts this device's sending
+  generations in that epoch over, so members refuse its messages there up to
+  the generations they already read (MLS's reuse guard keeps the nonces
+  apart);
 - for a joiner's welcome, which has no earlier epoch to step back to; and
 - while replication lags, which only delays.
 
