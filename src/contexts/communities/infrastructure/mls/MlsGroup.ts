@@ -591,6 +591,29 @@ export class MlsGroup {
       .map(([, { change }]) => change);
   }
 
+  /**
+   * Identities holding a leaf that one of their own commits or updates
+   * wrote. A leaf only ever added still carries the key package its adder
+   * chose, so an identity added by the commit a welcome came from is never
+   * among them.
+   */
+  public committedIdentities(): string[] {
+    const identities = new Set<string>();
+    this.state.ratchetTree.forEach((node) => {
+      if (
+        node?.nodeType === 'leaf' &&
+        node.leaf.credential.credentialType === 'basic' &&
+        node.leaf.leafNodeSource !== 'key_package'
+      ) {
+        identities.add(
+          MlsIdentityCredential.ownerOf(node.leaf.credential).identityId,
+        );
+      }
+    });
+
+    return [...identities];
+  }
+
   public leaves(): (MlsLeafCredential & { index: number })[] {
     const leaves: (MlsLeafCredential & { index: number })[] = [];
     this.state.ratchetTree.forEach((node, treeIndex) => {

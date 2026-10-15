@@ -8,19 +8,29 @@ import type { GroupMailboxCommit } from '../../../../../contexts/groupMailboxes/
 import { generateMlsKeyPackage } from '../../../../../contexts/communities/infrastructure/mls/MlsGroup';
 import { MlsLeafSigner } from '../../../../../contexts/communities/infrastructure/mls/MlsLeafSigner';
 import { MlsRejectedError } from '../../../../../contexts/communities/infrastructure/mls/MlsRejectedError';
+import { ConversationIdFactory } from '../../../../../contexts/conversations/domain/ConversationIdFactory';
+import { ConversationGroupNonce } from '../../../../../contexts/conversations/domain/value-objects/ConversationGroupNonce';
+import { ConversationNetworkId } from '../../../../../contexts/conversations/domain/value-objects/ConversationNetworkId';
+import { ConversationParticipantId } from '../../../../../contexts/conversations/domain/value-objects/ConversationParticipantId';
 import { GroupMailboxGeneration } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxGeneration';
+import { GroupMailboxGenesis } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxGenesis';
 import { GroupMailboxRoster } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxRoster';
 import { GroupMailboxMlsEngine } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxMlsEngine';
+import { GroupMailboxUnconfirmedError } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxUnconfirmedError';
 import { MlsTestIdentity } from '../../../communities/infrastructure/mls/MlsTestIdentity';
 import { sealedGroupStores } from '../sealedGroupStores';
 
 const text = new TextEncoder();
 const read = (bytes: Uint8Array): string => new TextDecoder().decode(bytes);
-const CONVERSATION = 'conversation-1';
+const NETWORK = 'network-1';
+const NONCE = 'nonce-1';
 const NAMES = ['alice', 'bob', 'carol', 'dave'];
 const sent = (): Promise<void> => Promise.resolve();
 
 let cast: Record<string, MlsTestIdentity>;
+/** The group alice created, its id derived from its genesis. */
+let CONVERSATION = '';
+let GENESIS: GroupMailboxGenesis;
 let roster = GroupMailboxRoster.empty();
 let clock = 0;
 let database = 0;
@@ -50,6 +60,8 @@ const engine = (
     generations?: GroupMailboxGenerationRepository;
     rosterView?: () => GroupMailboxRoster;
     store?: MlsStateStore;
+    /** The identities this engine's owner pinned as contacts, by id. */
+    contacts?: () => readonly string[];
     /** The devices of its identity this engine verified, by name. */
     verified?: () => readonly string[];
   } = {},
@@ -70,6 +82,7 @@ const engine = (
           cast[name].deviceCredential(device),
         ),
       ),
+    () => options.contacts?.() ?? [],
     () => clock,
   );
 };
@@ -103,7 +116,10 @@ const flakyStore = (
   return store;
 };
 
-/** Alice adds the joiners in one commit and each joins from its welcome. */
+/**
+ * Alice adds the joiners in one commit and each, knowing the genesis that
+ * names alice as creator, joins from its welcome.
+ */
 const join = async (
   alice: GroupMailboxMlsEngine,
   joiners: GroupMailboxMlsEngine[],
@@ -114,6 +130,7 @@ const join = async (
     sent,
   );
   for (const joiner of joiners) {
+    await joiner.learnGenesis(GENESIS);
     await joiner.join(
       CONVERSATION,
       added.welcome!,
@@ -143,6 +160,18 @@ const indices = async (member: GroupMailboxMlsEngine): Promise<number[]> =>
 describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
   beforeAll(async () => {
     cast = await MlsTestIdentity.cast([...NAMES, 'eve', 'mallory']);
+    CONVERSATION = new ConversationIdFactory()
+      .createGroup(
+        ConversationParticipantId.fromString(id('alice')),
+        ConversationNetworkId.fromString(NETWORK),
+        ConversationGroupNonce.fromString(NONCE),
+      )
+      .toString();
+    GENESIS = GroupMailboxGenesis.of(CONVERSATION, {
+      creatorIdentityId: id('alice'),
+      networkId: NETWORK,
+      nonce: NONCE,
+    })!;
   });
 
   beforeEach(() => {
@@ -1237,5 +1266,299 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
     expect(await restored.members(CONVERSATION)).toEqual(
       [id('alice'), id('bob')].sort(),
     );
+  });
+
+  describe('confirming a welcomed group', () => {
+    /**
+     * Alice creates the group under a roster that lets every member add,
+     * bob joins from alice knowing the genesis, and bob then welcomes
+     * carol, who knows only what `carol` brings.
+     */
+    const welcomedByBob = async (carol: GroupMailboxMlsEngine) => {
+      roster = unmanaged();
+      const alice = engine('alice');
+      const bob = engine('bob');
+      await alice.createGroup(CONVERSATION);
+      await join(alice, [bob]);
+      const added = await bob.add(
+        CONVERSATION,
+        [await carol.createKeyPackage()],
+        sent,
+      );
+      await alice.applyCommit(CONVERSATION, added.commit);
+      await carol.join(
+        CONVERSATION,
+        added.welcome!,
+        added.generation.index,
+        id('bob'),
+      );
+
+      return { alice, bob };
+    };
+
+    it('confirms a group it created and one the creator its genesis names welcomed it into', async () => {
+      const alice = engine('alice');
+      const bob = engine('bob');
+      await alice.createGroup(CONVERSATION);
+
+      expect(await alice.awaitsConfirmation(CONVERSATION)).toBe(false);
+      await join(alice, [bob]);
+
+      expect(await bob.awaitsConfirmation(CONVERSATION)).toBe(false);
+      expect(
+        read(
+          (
+            await alice.decrypt(
+              CONVERSATION,
+              await bob.encrypt(CONVERSATION, text.encode('hi')),
+            )
+          ).plaintext,
+        ),
+      ).toBe('hi');
+    });
+
+    it('holds a welcome from the creator unconfirmed when this device does not know the genesis', async () => {
+      const alice = engine('alice');
+      const bob = engine('bob');
+      await alice.createGroup(CONVERSATION);
+      const added = await alice.add(
+        CONVERSATION,
+        [await bob.createKeyPackage()],
+        sent,
+      );
+      await bob.join(
+        CONVERSATION,
+        added.welcome!,
+        added.generation.index,
+        id('alice'),
+      );
+
+      expect(await bob.awaitsConfirmation(CONVERSATION)).toBe(true);
+      await expect(
+        bob.encrypt(CONVERSATION, text.encode('early')),
+      ).rejects.toBeInstanceOf(GroupMailboxUnconfirmedError);
+    });
+
+    it('sends nothing into a group a non-creator welcomed it into until the creator speaks', async () => {
+      const carol = engine('carol');
+      await carol.learnGenesis(GENESIS);
+      const { alice, bob } = await welcomedByBob(carol);
+      const publish = jest.fn(sent);
+
+      expect(await carol.awaitsConfirmation(CONVERSATION)).toBe(true);
+      await expect(
+        carol.encrypt(CONVERSATION, text.encode('early')),
+      ).rejects.toBeInstanceOf(GroupMailboxUnconfirmedError);
+      await expect(
+        carol.add(
+          CONVERSATION,
+          [await engine('dave').createKeyPackage()],
+          publish,
+        ),
+      ).rejects.toBeInstanceOf(GroupMailboxUnconfirmedError);
+      await expect(
+        carol.remove(CONVERSATION, [id('bob')], publish),
+      ).rejects.toBeInstanceOf(GroupMailboxUnconfirmedError);
+      await expect(
+        carol.removeDevices(
+          CONVERSATION,
+          [cast.carol.deviceCredential('d2')],
+          publish,
+        ),
+      ).rejects.toBeInstanceOf(GroupMailboxUnconfirmedError);
+      expect(publish).not.toHaveBeenCalled();
+
+      // The welcomer itself never confirms the group it made.
+      await carol.decrypt(
+        CONVERSATION,
+        await bob.encrypt(CONVERSATION, text.encode('trust me')),
+      );
+      expect(await carol.awaitsConfirmation(CONVERSATION)).toBe(true);
+
+      await carol.decrypt(
+        CONVERSATION,
+        await alice.encrypt(CONVERSATION, text.encode('welcome')),
+      );
+
+      expect(await carol.awaitsConfirmation(CONVERSATION)).toBe(false);
+      expect(
+        read(
+          (
+            await bob.decrypt(
+              CONVERSATION,
+              await carol.encrypt(CONVERSATION, text.encode('now')),
+            )
+          ).plaintext,
+        ),
+      ).toBe('now');
+    });
+
+    it('is confirmed by a commit of the creator', async () => {
+      const carol = engine('carol');
+      await carol.learnGenesis(GENESIS);
+      const { alice } = await welcomedByBob(carol);
+      const phoneAdded = await alice.add(
+        CONVERSATION,
+        [await engine('alice', { device: 'd2' }).createKeyPackage()],
+        sent,
+      );
+
+      await carol.applyCommit(CONVERSATION, phoneAdded.commit);
+
+      expect(await carol.awaitsConfirmation(CONVERSATION)).toBe(false);
+    });
+
+    it('is confirmed by a contact pinned before the welcome whose leaf its own commit wrote', async () => {
+      roster = unmanaged();
+      const alice = engine('alice');
+      const bob = engine('bob');
+      const dave = engine('dave');
+      const davePhone = engine('dave', { device: 'd2' });
+      const carol = engine('carol', { contacts: () => [id('dave')] });
+      await alice.createGroup(CONVERSATION);
+      await join(alice, [bob, dave]);
+      // Dave adds and removes a device of his own: the removal's path
+      // rewrites his leaf.
+      const phoneAdded = await dave.add(
+        CONVERSATION,
+        [await davePhone.createKeyPackage()],
+        sent,
+      );
+      await alice.applyCommit(CONVERSATION, phoneAdded.commit);
+      await bob.applyCommit(CONVERSATION, phoneAdded.commit);
+      const phoneRemoved = await dave.removeDevices(
+        CONVERSATION,
+        [cast.dave.deviceCredential('d2')],
+        sent,
+      );
+      await alice.applyCommit(CONVERSATION, phoneRemoved!.commit);
+      await bob.applyCommit(CONVERSATION, phoneRemoved!.commit);
+      const added = await bob.add(
+        CONVERSATION,
+        [await carol.createKeyPackage()],
+        sent,
+      );
+      await alice.applyCommit(CONVERSATION, added.commit);
+      await dave.applyCommit(CONVERSATION, added.commit);
+      await carol.join(
+        CONVERSATION,
+        added.welcome!,
+        added.generation.index,
+        id('bob'),
+      );
+
+      expect(await carol.awaitsConfirmation(CONVERSATION)).toBe(true);
+      await carol.decrypt(
+        CONVERSATION,
+        await dave.encrypt(CONVERSATION, text.encode('it is me')),
+      );
+
+      expect(await carol.awaitsConfirmation(CONVERSATION)).toBe(false);
+    });
+
+    it('is never confirmed by a contact whose leaf only an add wrote, nor by the welcomer as a contact', async () => {
+      roster = unmanaged();
+      const alice = engine('alice');
+      const bob = engine('bob');
+      const dave = engine('dave');
+      const carol = engine('carol', {
+        contacts: () => [id('bob'), id('dave')],
+      });
+      await alice.createGroup(CONVERSATION);
+      await join(alice, [bob]);
+      // Bob adds dave's published key package and carol in one commit.
+      const added = await bob.add(
+        CONVERSATION,
+        [await dave.createKeyPackage(), await carol.createKeyPackage()],
+        sent,
+      );
+      await alice.applyCommit(CONVERSATION, added.commit);
+      await dave.join(
+        CONVERSATION,
+        added.welcome!,
+        added.generation.index,
+        id('bob'),
+      );
+      await carol.join(
+        CONVERSATION,
+        added.welcome!,
+        added.generation.index,
+        id('bob'),
+      );
+      // Alice is not a contact and carol never learned the genesis.
+      for (const speaker of [alice, bob]) {
+        await carol.decrypt(
+          CONVERSATION,
+          await speaker.encrypt(CONVERSATION, text.encode('hello')),
+        );
+      }
+
+      expect(await carol.awaitsConfirmation(CONVERSATION)).toBe(true);
+      expect(await dave.awaitsConfirmation(CONVERSATION)).toBe(true);
+    });
+
+    it('keeps the confirmation state across a restart', async () => {
+      const databaseName = `confirm-restart-${++database}`;
+      const carol = engine('carol', { databaseName });
+      await carol.learnGenesis(GENESIS);
+      const { alice } = await welcomedByBob(carol);
+
+      expect(
+        await engine('carol', { databaseName }).awaitsConfirmation(
+          CONVERSATION,
+        ),
+      ).toBe(true);
+      await carol.decrypt(
+        CONVERSATION,
+        await alice.encrypt(CONVERSATION, text.encode('welcome')),
+      );
+
+      expect(
+        await engine('carol', { databaseName }).awaitsConfirmation(
+          CONVERSATION,
+        ),
+      ).toBe(false);
+    });
+
+    it('confirms a welcome from another device of its own identity', async () => {
+      const { alice, bob } = await setup(['alice', 'bob']);
+      const phone = engine('bob', { device: 'd2' });
+      const added = await bob.add(
+        CONVERSATION,
+        [await phone.createKeyPackage()],
+        sent,
+      );
+      await alice.applyCommit(CONVERSATION, added.commit);
+
+      await phone.join(
+        CONVERSATION,
+        added.welcome!,
+        added.generation.index,
+        id('bob'),
+      );
+
+      expect(await phone.awaitsConfirmation(CONVERSATION)).toBe(false);
+    });
+
+    it('holds a group without a confirmation record unconfirmed, as one kept before the rule', async () => {
+      const databaseName = `confirm-missing-${++database}`;
+      const store = flakyStore(databaseName, id('alice'));
+      const backing = sealedGroupStores(databaseName, id('alice')).state;
+
+      // A store from before the rule never held a confirmation record.
+      store.saveGroup.mockImplementation((groupId, state) =>
+        groupId.endsWith('#confirmation')
+          ? Promise.resolve()
+          : backing.saveGroup(groupId, state),
+      );
+      const alice = engine('alice', { databaseName, store });
+      await alice.createGroup(CONVERSATION);
+      const restarted = engine('alice', { databaseName });
+
+      expect(await restarted.awaitsConfirmation(CONVERSATION)).toBe(true);
+      await expect(
+        restarted.encrypt(CONVERSATION, text.encode('old group')),
+      ).rejects.toBeInstanceOf(GroupMailboxUnconfirmedError);
+    });
   });
 });

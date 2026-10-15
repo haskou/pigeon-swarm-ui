@@ -23,6 +23,9 @@ import { ConversationsSearcher } from '../../../../contexts/conversations/applic
 import { SearchConversationsMessage } from '../../../../contexts/conversations/application/search-conversations/messages/SearchConversationsMessage';
 import { Conversation } from '../../../../contexts/conversations/domain/Conversation';
 import { ConversationIdFactory } from '../../../../contexts/conversations/domain/ConversationIdFactory';
+import { ConversationGroupNonce } from '../../../../contexts/conversations/domain/value-objects/ConversationGroupNonce';
+import { ConversationNetworkId } from '../../../../contexts/conversations/domain/value-objects/ConversationNetworkId';
+import { ConversationParticipantId } from '../../../../contexts/conversations/domain/value-objects/ConversationParticipantId';
 
 function conversation(
   id: string,
@@ -77,7 +80,7 @@ describe('conversation use cases', () => {
     ]);
   });
 
-  it('creates a group conversation through its repository', async () => {
+  it('creates a group conversation from the nonce it is given', async () => {
     const created = conversation('group:a', 0, 'group');
 
     conversationRepository.createGroup.mockResolvedValue(created);
@@ -92,6 +95,7 @@ describe('conversation use cases', () => {
           'network-a',
           ['identity-b'],
           'identity-a',
+          'AAAAAAAAAAAAAAAAAAAAAA',
           100,
         ),
       ),
@@ -109,7 +113,16 @@ describe('conversation use cases', () => {
         participantIds: ['identity-a', 'identity-b'],
       }),
     );
-    expect(nonce?.toString()).toMatch(/^[\w-]{22}$/);
+    expect(nonce?.toString()).toBe('AAAAAAAAAAAAAAAAAAAAAA');
+    expect(aggregate?.toPrimitives().id).toBe(
+      new ConversationIdFactory()
+        .createGroup(
+          ConversationParticipantId.fromString('identity-a'),
+          ConversationNetworkId.fromString('network-a'),
+          ConversationGroupNonce.fromString('AAAAAAAAAAAAAAAAAAAAAA'),
+        )
+        .toString(),
+    );
   });
 
   it('removes a participant through the aggregate', async () => {

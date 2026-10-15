@@ -1548,6 +1548,8 @@ export const en = {
     directMailboxSyncError: 'Direct messages could not be synced. Retrying.',
     dismissNotice: 'Dismiss',
     groupMailboxSyncError: 'Group messages could not be synced. Retrying.',
+    groupUnconfirmed:
+      'This group is not yet verified: no member this device already knows has confirmed it since you were added. Your messages wait here and are sent once a known member does. You can wait or leave the group; time alone never verifies it. Groups joined before this check stay unverified.',
     newMessages: 'New messages',
     sendError: 'The message was not sent. TLS had other plans.',
   },

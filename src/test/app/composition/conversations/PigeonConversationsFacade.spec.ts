@@ -54,7 +54,7 @@ describe(PigeonConversationsFacade.name, () => {
     });
   });
 
-  it('starts the MLS group of a group it creates', async () => {
+  it('starts the MLS group of a group it creates from the genesis of its id', async () => {
     const groups = mock<GroupMembership>();
     const useCases = mockDeep<ConversationUseCases>();
     const session = sessionFixture();
@@ -74,7 +74,14 @@ describe(PigeonConversationsFacade.name, () => {
       participantIds: ['identity-b'],
     });
 
-    expect(groups.create).toHaveBeenCalledWith(session, 'group:a');
+    const [message] = useCases.groupCreator.create.mock.calls[0];
+
+    expect(message.getNonce().toString()).toMatch(/^[\w-]{22}$/);
+    expect(groups.create).toHaveBeenCalledWith(session, 'group:a', {
+      creatorIdentityId: session.identity.id,
+      networkId: 'network-a',
+      nonce: message.getNonce().toString(),
+    });
   });
 
   it.each([

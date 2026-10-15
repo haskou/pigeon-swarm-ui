@@ -50,6 +50,7 @@ export class GroupConversationMember {
       generations,
       rosterFor,
       () => ports.verifiedDevices(sealing.session),
+      () => ports.contacts(sealing.session),
       ports.now,
     );
     const outbox = new GroupMailboxOutbox(

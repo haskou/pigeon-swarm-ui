@@ -5,6 +5,7 @@ import {
   encodeBase64Url,
 } from '../../../../shared/infrastructure/encoding/base64url';
 import { DeviceCredential } from '../../../identities/domain/value-objects/DeviceCredential';
+import { GroupMailboxGenesis } from '../../domain/GroupMailboxGenesis';
 
 /**
  * Wire format of `GroupMailboxControlFields`: one JSON object with kind
@@ -109,25 +110,38 @@ export class GroupMailboxControlRecord {
       : null;
   }
 
-  /** A request, with the device it asks when it names one validly. */
+  /**
+   * A request, with the device it asks and the group's genesis when it
+   * names them; null when it names either invalidly.
+   */
   private static request(
     value: Record<string, unknown>,
     conversationId: string,
   ): GroupMailboxControlFields | null {
     const { deviceCredential, requestId } = value;
+    const genesis =
+      value.genesis === undefined
+        ? undefined
+        : GroupMailboxGenesis.of(conversationId, value.genesis);
 
-    if (!GroupMailboxControlRecord.isRequestId(requestId)) return null;
-
-    if (deviceCredential === undefined) {
-      return { conversationId, requestId, type: 'key-package-request' };
+    if (
+      !GroupMailboxControlRecord.isRequestId(requestId) ||
+      (genesis === undefined && value.genesis !== undefined)
+    ) {
+      return null;
     }
 
     try {
       return {
         conversationId,
-        deviceCredential: DeviceCredential.fromString(
-          String(deviceCredential),
-        ).valueOf(),
+        ...(deviceCredential === undefined
+          ? {}
+          : {
+              deviceCredential: DeviceCredential.fromString(
+                String(deviceCredential),
+              ).valueOf(),
+            }),
+        ...(genesis === undefined ? {} : { genesis }),
         requestId,
         type: 'key-package-request',
       };
@@ -184,6 +198,9 @@ export class GroupMailboxControlRecord {
           ...(fields.deviceCredential === undefined
             ? {}
             : { deviceCredential: fields.deviceCredential }),
+          ...(fields.genesis === undefined
+            ? {}
+            : { genesis: fields.genesis.toPrimitives() }),
           requestId: fields.requestId,
         });
       case 'key-package-response':

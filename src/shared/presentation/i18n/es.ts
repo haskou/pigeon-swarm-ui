@@ -1555,6 +1555,8 @@ export const es = {
     dismissNotice: 'Descartar',
     groupMailboxSyncError:
       'No se pudieron sincronizar los mensajes del grupo. Reintentando.',
+    groupUnconfirmed:
+      'Este grupo aún no está verificado: ningún miembro que este dispositivo ya conoce lo ha confirmado desde que te añadieron. Tus mensajes esperan aquí y se envían cuando lo haga un miembro conocido. Puedes esperar o salir del grupo; el tiempo por sí solo nunca lo verifica. Los grupos a los que te uniste antes de esta comprobación siguen sin verificar.',
     newMessages: 'Nuevos mensajes',
     sendError: 'No se envió el mensaje.',
   },

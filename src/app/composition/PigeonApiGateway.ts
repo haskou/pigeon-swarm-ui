@@ -56,6 +56,7 @@ import { PigeonIdentityWorkspaceSessionApi } from '../../contexts/identities/inf
 import { PigeonKeychainApi } from '../../contexts/identities/infrastructure/http/PigeonKeychainApi';
 import { PigeonPresenceApi } from '../../contexts/identities/infrastructure/http/PigeonPresenceApi';
 import { PigeonPresenceGateway } from '../../contexts/identities/infrastructure/http/PigeonPresenceGateway';
+import { ContactPinStore } from '../../contexts/identities/infrastructure/storage/ContactPinStore';
 import { DeviceIdentityVault } from '../../contexts/identities/infrastructure/storage/DeviceIdentityVault';
 import { DeviceSealedRecoveryStore } from '../../contexts/identities/infrastructure/storage/DeviceSealedRecoveryStore';
 import { LazyMailboxCreationMiner } from '../../contexts/mailboxes/infrastructure/crypto/LazyMailboxCreationMiner';
@@ -455,11 +456,13 @@ export class PigeonApiGateway {
       signer,
       conversationMapper,
     );
+    const contactPins = new ContactPinStore();
 
     this.groupConversationMailbox = new GroupConversationMailbox({
       channel: mailboxChannel,
       client: new PigeonMailboxClient(http),
       composer: this.messageCommands,
+      contacts: (session) => Object.keys(contactPins.load(session.identity.id)),
       direct: (session) =>
         new GroupMailboxNotificationLink(
           session,

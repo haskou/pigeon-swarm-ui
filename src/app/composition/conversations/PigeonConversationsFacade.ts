@@ -14,6 +14,7 @@ import { MarkConversationReadUntilMessage } from '../../../contexts/conversation
 import { PromoteConversationAdminMessage } from '../../../contexts/conversations/application/promote-conversation-admin/messages/PromoteConversationAdminMessage';
 import { RemoveConversationParticipantMessage } from '../../../contexts/conversations/application/remove-conversation-participant/messages/RemoveConversationParticipantMessage';
 import { SearchConversationsMessage } from '../../../contexts/conversations/application/search-conversations/messages/SearchConversationsMessage';
+import { ConversationGroupNonce } from '../../../contexts/conversations/domain/value-objects/ConversationGroupNonce';
 import { ConversationParticipantId } from '../../../contexts/conversations/domain/value-objects/ConversationParticipantId';
 import { ConversationAccessContexts } from '../../../contexts/conversations/infrastructure/http/ConversationAccessContexts';
 import { ConversationMapper } from '../../../contexts/conversations/infrastructure/http/ConversationMapper';
@@ -90,17 +91,22 @@ export class PigeonConversationsFacade {
     keychainExternalIdentifier: string;
   }> {
     const actorIdentityId = this.actor(session);
-    const conversation = await this.useCases.groupCreator.create(
-      new CreateGroupConversationMessage(
-        input.name,
-        input.networkId,
-        input.participantIds,
-        actorIdentityId,
-        Date.now(),
-      ),
+    const message = new CreateGroupConversationMessage(
+      input.name,
+      input.networkId,
+      input.participantIds,
+      actorIdentityId,
+      ConversationGroupNonce.generate().toString(),
+      Date.now(),
     );
+    const conversation = await this.useCases.groupCreator.create(message);
 
-    await this.groups.create(session, conversation.toPrimitives().id);
+    // The genesis the id derives from names this identity as creator.
+    await this.groups.create(session, conversation.toPrimitives().id, {
+      creatorIdentityId: message.getActorIdentityId().toString(),
+      networkId: message.getNetworkId().toString(),
+      nonce: message.getNonce().toString(),
+    });
 
     return this.creationResult(actorIdentityId, conversation);
   }

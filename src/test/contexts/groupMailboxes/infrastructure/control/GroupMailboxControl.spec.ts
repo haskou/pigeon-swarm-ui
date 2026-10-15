@@ -10,12 +10,18 @@ import type { PigeonMailboxClient } from '../../../../../contexts/mailboxes/infr
 import { generateMlsKeyPackage } from '../../../../../contexts/communities/infrastructure/mls/MlsGroup';
 import { MlsLeafSigner } from '../../../../../contexts/communities/infrastructure/mls/MlsLeafSigner';
 import { MlsRejectedError } from '../../../../../contexts/communities/infrastructure/mls/MlsRejectedError';
+import { ConversationIdFactory } from '../../../../../contexts/conversations/domain/ConversationIdFactory';
+import { ConversationGroupNonce } from '../../../../../contexts/conversations/domain/value-objects/ConversationGroupNonce';
+import { ConversationNetworkId } from '../../../../../contexts/conversations/domain/value-objects/ConversationNetworkId';
+import { ConversationParticipantId } from '../../../../../contexts/conversations/domain/value-objects/ConversationParticipantId';
+import { GroupMailboxGenesis } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxGenesis';
 import { GroupMailboxRoster } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxRoster';
 import { GroupMailboxControl } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControl';
 import { GroupMailboxControlRecord } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlRecord';
 import { GroupMailboxKeyPackageTimeoutError } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxKeyPackageTimeoutError';
 import { GroupMailboxKeySchedule } from '../../../../../contexts/groupMailboxes/infrastructure/crypto/GroupMailboxKeySchedule';
 import { GroupMailboxMlsEngine } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxMlsEngine';
+import { GroupMailboxUnconfirmedError } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxUnconfirmedError';
 import { GroupMailboxOutbox } from '../../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutbox';
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
@@ -25,7 +31,8 @@ import { encodeBase64Url } from '../../../../../shared/infrastructure/encoding/b
 import { MlsTestIdentity } from '../../../communities/infrastructure/mls/MlsTestIdentity';
 import { sealedGroupStores } from '../sealedGroupStores';
 
-const CONVERSATION = 'conversation-1';
+const NETWORK = 'network-1';
+const NONCE = 'nonce-1';
 
 type DirectRecord = { from: string; plaintext: Uint8Array };
 
@@ -38,6 +45,9 @@ type Member = {
 };
 
 let cast: Record<string, MlsTestIdentity>;
+/** The group alice created, its id derived from its genesis. */
+let CONVERSATION = '';
+let GENESIS: GroupMailboxGenesis;
 let roster = GroupMailboxRoster.empty();
 let database = 0;
 
@@ -161,6 +171,7 @@ const engineOf = (
       Promise.resolve(
         ['d1', 'd2', 'd3', 'd4'].map((d) => cast[name].deviceCredential(d)),
       ),
+    () => [],
     () => 1_000,
   );
 };
@@ -322,6 +333,18 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
 
   beforeAll(async () => {
     cast = await MlsTestIdentity.cast(['alice', 'bob', 'carol', 'mallory']);
+    CONVERSATION = new ConversationIdFactory()
+      .createGroup(
+        ConversationParticipantId.fromString(id('alice')),
+        ConversationNetworkId.fromString(NETWORK),
+        ConversationGroupNonce.fromString(NONCE),
+      )
+      .toString();
+    GENESIS = GroupMailboxGenesis.of(CONVERSATION, {
+      creatorIdentityId: id('alice'),
+      networkId: NETWORK,
+      nonce: NONCE,
+    })!;
   });
 
   beforeEach(async () => {
@@ -333,6 +356,8 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
     bob = member('bob');
     carol = member('carol');
     mallory = member('mallory');
+    // As the mailbox does on create: the genesis first, then the group.
+    await alice.engine.learnGenesis(GENESIS);
     await alice.engine.createGroup(CONVERSATION);
     await openInboxes(alice);
   });
@@ -802,5 +827,94 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
     await expect(bob.engine.devices(CONVERSATION)).resolves.toEqual([
       cast.bob.deviceCredential('d1'),
     ]);
+  });
+
+  describe('confirming the group', () => {
+    /**
+     * Alice adds bob; `strip` drops the genesis from the request bob gets,
+     * as a sender that does not know it would.
+     */
+    const welcome = async (strip: boolean) => {
+      await openInboxes(alice);
+      const adding = alice.control.add(CONVERSATION, [bob.id]);
+
+      await until(() => bob.inbox.length > 0);
+      const request = GroupMailboxControlRecord.decode(bob.inbox[0].plaintext);
+
+      if (request?.type !== 'key-package-request') {
+        throw new Error('expected a key package request');
+      }
+
+      if (strip) {
+        bob.inbox[0] = {
+          from: alice.id,
+          plaintext: GroupMailboxControlRecord.encode({
+            conversationId: CONVERSATION,
+            requestId: request.requestId,
+            type: 'key-package-request',
+          }),
+        };
+      }
+      await expect(drain(bob)).resolves.toEqual(['applied']);
+      await until(() => alice.inbox.length > 0);
+      await drain(alice);
+      await adding;
+      await expect(drain(bob)).resolves.toEqual(['applied']);
+
+      return request;
+    };
+
+    it('carries the genesis in its key package request, so the creator welcomes a confirmed member', async () => {
+      const request = await welcome(false);
+
+      expect(request.genesis?.toPrimitives()).toEqual(GENESIS.toPrimitives());
+      await expect(bob.engine.genesis(CONVERSATION)).resolves.toEqual(GENESIS);
+      await expect(bob.engine.awaitsConfirmation(CONVERSATION)).resolves.toBe(
+        false,
+      );
+    });
+
+    it('neither asks for nor hands out key packages for a group it has not confirmed', async () => {
+      await welcome(true);
+
+      await expect(bob.engine.awaitsConfirmation(CONVERSATION)).resolves.toBe(
+        true,
+      );
+      await expect(
+        bob.control.addDevices(CONVERSATION, [cast.bob.deviceCredential('d2')]),
+      ).rejects.toBeInstanceOf(GroupMailboxUnconfirmedError);
+      await expect(
+        bob.control.receiveDirect(
+          alice.id,
+          GroupMailboxControlRecord.encode({
+            conversationId: CONVERSATION,
+            requestId: MailboxChannel.randomEnvelopeId(),
+            type: 'key-package-request',
+          }),
+        ),
+      ).resolves.toBe('ignored');
+      expect(bob.inbox).toEqual([]);
+      expect(alice.inbox).toEqual([]);
+    });
+
+    it('learns the genesis a later request carries without confirming the group', async () => {
+      await welcome(true);
+
+      await expect(
+        bob.control.receiveDirect(
+          alice.id,
+          GroupMailboxControlRecord.encode({
+            conversationId: CONVERSATION,
+            genesis: GENESIS,
+            requestId: MailboxChannel.randomEnvelopeId(),
+            type: 'key-package-request',
+          }),
+        ),
+      ).resolves.toBe('ignored');
+      await expect(bob.engine.genesis(CONVERSATION)).resolves.toEqual(GENESIS);
+      await expect(bob.engine.awaitsConfirmation(CONVERSATION)).resolves.toBe(
+        true,
+      );
+    });
   });
 });

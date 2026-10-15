@@ -89,6 +89,7 @@ describe('GroupMailboxOutbox', () => {
       ),
     );
     engine.members.mockResolvedValue(['alice', 'bob']);
+    engine.awaitsConfirmation.mockResolvedValue(false);
     engine.encrypt.mockImplementation(() =>
       Promise.resolve(new Uint8Array([current, 7])),
     );
@@ -395,6 +396,42 @@ describe('GroupMailboxOutbox', () => {
     expect(outbox.items(CONVERSATION)).toEqual([]);
   });
 
+  it('holds a message unsealed until this device confirms the group, then sends it', async () => {
+    engine.awaitsConfirmation.mockResolvedValue(true);
+
+    await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
+
+    expect(engine.encrypt).not.toHaveBeenCalled();
+    expect(channel.send).not.toHaveBeenCalled();
+    expect(outbox.items(CONVERSATION)).toEqual([
+      { reference: 'm1', state: 'held' },
+    ]);
+
+    engine.awaitsConfirmation.mockResolvedValue(false);
+    await outbox.flush();
+
+    expect(sent.sort()).toEqual(
+      [inboxOf(0, 'alice'), inboxOf(0, 'bob')].sort(),
+    );
+    expect(outbox.items(CONVERSATION)).toEqual([]);
+  });
+
+  it('holds a commit while this device awaits the group’s confirmation', async () => {
+    await outbox.enqueueCommit(CONVERSATION, commitTo(['bob']));
+    engine.awaitsConfirmation.mockResolvedValue(true);
+
+    await outbox.flush();
+
+    expect(channel.send).not.toHaveBeenCalled();
+    expect(rows.size).toBe(1);
+
+    engine.awaitsConfirmation.mockResolvedValue(false);
+    await outbox.flush();
+
+    expect(sent).toEqual([inboxOf(0, 'bob')]);
+    expect(rows.size).toBe(0);
+  });
+
   it('holds a queued message once a recipient leaves the roster', async () => {
     channel.send.mockRejectedValue(new TypeError('offline'));
     await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
@@ -529,6 +566,15 @@ describe('GroupMailboxOutbox', () => {
 
     it('seals nothing while a member off the roster is still in the group', async () => {
       roster = rosterOf('alice');
+
+      await outbox.sendEphemeral(CONVERSATION, new Uint8Array([1]));
+
+      expect(engine.encrypt).not.toHaveBeenCalled();
+      expect(channel.send).not.toHaveBeenCalled();
+    });
+
+    it('seals nothing while this device awaits the group’s confirmation', async () => {
+      engine.awaitsConfirmation.mockResolvedValue(true);
 
       await outbox.sendEphemeral(CONVERSATION, new Uint8Array([1]));
 

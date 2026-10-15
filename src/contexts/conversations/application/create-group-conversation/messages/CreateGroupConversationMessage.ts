@@ -1,5 +1,6 @@
 import { Timestamp } from '@haskou/value-objects';
 
+import { ConversationGroupNonce } from '../../../domain/value-objects/ConversationGroupNonce';
 import { ConversationName } from '../../../domain/value-objects/ConversationName';
 import { ConversationNetworkId } from '../../../domain/value-objects/ConversationNetworkId';
 import { ConversationParticipantId } from '../../../domain/value-objects/ConversationParticipantId';
@@ -10,6 +11,7 @@ export class CreateGroupConversationMessage {
     private readonly networkId: string,
     private readonly participantIds: string[],
     private readonly actorIdentityId: string,
+    private readonly nonce: string,
     private readonly occurredAt: number,
   ) {}
 
@@ -23,6 +25,11 @@ export class CreateGroupConversationMessage {
 
   public getNetworkId(): ConversationNetworkId {
     return ConversationNetworkId.fromString(this.networkId);
+  }
+
+  /** The nonce the group id derives from with its creator and network. */
+  public getNonce(): ConversationGroupNonce {
+    return ConversationGroupNonce.fromString(this.nonce);
   }
 
   public getParticipantIds(): ConversationParticipantId[] {

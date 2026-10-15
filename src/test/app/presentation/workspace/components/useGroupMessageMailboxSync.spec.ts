@@ -39,6 +39,8 @@ jest.mock('../../../../../app/composition/applicationContainer', () => ({
 }));
 
 const POLL_MS = 5000;
+/** A pass that finds this identity on the roster and the group confirmed. */
+const STAYS = { removed: false, unconfirmed: false };
 const sync = jest.mocked(applicationContainer.groupMessages.sync);
 const restore = jest.mocked(applicationContainer.groupMessages.restore);
 const markRead = jest.mocked(applicationContainer.groupMessages.markRead);
@@ -117,6 +119,9 @@ function mountSync(activeConversation: ConversationResource = group) {
     onTypingChanges,
     pinnedIds: () => pinned,
     refreshConversations,
+    setError: (value: string) => {
+      error = value;
+    },
   };
 }
 
@@ -129,7 +134,7 @@ describe('useGroupMessageMailboxSync', () => {
         globalThis.setTimeout(callback, ms),
     });
     restore.mockReset().mockResolvedValue(undefined);
-    sync.mockReset().mockResolvedValue({ removed: false });
+    sync.mockReset().mockResolvedValue(STAYS);
     markRead.mockReset().mockResolvedValue(undefined);
     withOutboxState
       .mockReset()
@@ -200,7 +205,7 @@ describe('useGroupMessageMailboxSync', () => {
         },
       ]);
 
-      return Promise.resolve({ removed: false });
+      return Promise.resolve(STAYS);
     });
     const mounted = mountSync();
 
@@ -238,7 +243,7 @@ describe('useGroupMessageMailboxSync', () => {
     sync.mockImplementationOnce((_session, _id, _signal, apply) => {
       apply([vote]);
 
-      return Promise.resolve({ removed: false });
+      return Promise.resolve(STAYS);
     });
     const mounted = mountSync();
 
@@ -268,7 +273,7 @@ describe('useGroupMessageMailboxSync', () => {
       apply([typing, vote, sent]);
       apply([vote]);
 
-      return Promise.resolve({ removed: false });
+      return Promise.resolve(STAYS);
     });
     const mounted = mountSync();
 
@@ -294,7 +299,7 @@ describe('useGroupMessageMailboxSync', () => {
     sync.mockImplementationOnce((_session, _id, _signal, apply) => {
       apply([bobUpdated, { kind: 'message', message }, carolUpdated]);
 
-      return Promise.resolve({ removed: false });
+      return Promise.resolve(STAYS);
     });
     const mounted = mountSync();
 
@@ -309,7 +314,7 @@ describe('useGroupMessageMailboxSync', () => {
     sync
       .mockRejectedValueOnce(new TypeError('offline'))
       .mockRejectedValueOnce(new TypeError('offline'))
-      .mockResolvedValueOnce({ removed: false });
+      .mockResolvedValueOnce(STAYS);
     const mounted = mountSync();
 
     await settle();
@@ -324,8 +329,52 @@ describe('useGroupMessageMailboxSync', () => {
     mounted.cleanup();
   });
 
+  it('says the group is not yet verified while this device awaits its confirmation', async () => {
+    sync
+      .mockResolvedValueOnce({ removed: false, unconfirmed: true })
+      .mockResolvedValueOnce({ removed: false, unconfirmed: true })
+      .mockResolvedValueOnce(STAYS);
+    const mounted = mountSync();
+
+    await settle();
+    expect(mounted.error()).toBe(copy.workspace.groupUnconfirmed);
+
+    jest.advanceTimersByTime(POLL_MS);
+    await settle();
+    expect(mounted.error()).toBe(copy.workspace.groupUnconfirmed);
+
+    jest.advanceTimersByTime(POLL_MS);
+    await settle();
+
+    expect(mounted.error()).toBeNull();
+    mounted.cleanup();
+  });
+
+  it('clears the not-yet-verified notice on cleanup', async () => {
+    sync.mockResolvedValue({ removed: false, unconfirmed: true });
+    const mounted = mountSync();
+
+    await settle();
+    mounted.cleanup();
+
+    expect(mounted.error()).toBeNull();
+  });
+
+  it('never replaces another error with the not-yet-verified notice', async () => {
+    sync.mockResolvedValue({ removed: false, unconfirmed: true });
+    const mounted = mountSync();
+
+    mounted.setError('Something else');
+    await settle();
+    expect(mounted.error()).toBe('Something else');
+
+    mounted.cleanup();
+
+    expect(mounted.error()).toBe('Something else');
+  });
+
   it('refreshes the conversation list once after this member was removed', async () => {
-    sync.mockResolvedValue({ removed: true });
+    sync.mockResolvedValue({ removed: true, unconfirmed: false });
     const mounted = mountSync();
 
     await settle();
