@@ -33,8 +33,12 @@ import { GroupMailboxKeyPackageTimeoutError } from './GroupMailboxKeyPackageTime
  * A device also adds and removes the other devices of its own identity:
  * it sends its identity a key-package request naming one device, which
  * only that device answers, and only while it holds no leaf; the answer's
- * key package must be that device's. The welcome goes to the identity too,
- * and opens only on the device whose key package it used.
+ * key package must be that device's.
+ *
+ * Each welcome names the device whose key package it used and goes to that
+ * device's identity; the identity's other devices leave it. A record that is
+ * not for this device or session is `ignored`; one this device refuses for
+ * its whole identity is `rejected`.
  *
  * Each key-package request carries the group's genesis when its sender
  * knows it, so a joiner learns the creator before any welcome and a
@@ -99,6 +103,37 @@ export class GroupMailboxControl {
   }
 
   /**
+   * Why a key-package request goes unanswered, if it does: ignored when it
+   * asks another device; rejected from outside the roster, from another
+   * device of this identity that names no device, or by one while this
+   * device already holds a leaf; else as `heldBack` decides.
+   */
+  private async refusal(
+    peerIdentityId: string,
+    record: Extract<GroupMailboxControlFields, { type: 'key-package-request' }>,
+  ): Promise<GroupMailboxControlOutcome | undefined> {
+    const { conversationId, deviceCredential } = record;
+    const sibling = peerIdentityId === this.self.identityId;
+
+    if (
+      deviceCredential !== undefined &&
+      deviceCredential !== this.self.deviceCredential
+    ) {
+      return 'ignored';
+    }
+
+    if (
+      (sibling && deviceCredential === undefined) ||
+      !(await this.bothInRoster(conversationId, peerIdentityId)) ||
+      (sibling && (await this.engine.devices(conversationId)).length > 0)
+    ) {
+      return 'rejected';
+    }
+
+    return this.heldBack(record);
+  }
+
+  /**
    * Answers a peer on the roster, or another device of this identity that
    * asks this very device while it holds no leaf in the group. Keeps the
    * genesis the request carries. A device awaiting the group's
@@ -108,26 +143,10 @@ export class GroupMailboxControl {
     peerIdentityId: string,
     record: Extract<GroupMailboxControlFields, { type: 'key-package-request' }>,
   ): Promise<GroupMailboxControlOutcome> {
-    const { conversationId, deviceCredential, requestId } = record;
-    const sibling = peerIdentityId === this.self.identityId;
+    const { conversationId, requestId } = record;
+    const refused = await this.refusal(peerIdentityId, record);
 
-    if (
-      (sibling || deviceCredential !== undefined) &&
-      deviceCredential !== this.self.deviceCredential
-    ) {
-      return 'ignored';
-    }
-
-    if (
-      !(await this.bothInRoster(conversationId, peerIdentityId)) ||
-      (sibling && (await this.engine.devices(conversationId)).length > 0)
-    ) {
-      return 'ignored';
-    }
-
-    const held = await this.heldBack(record);
-
-    if (held) return held;
+    if (refused) return refused;
 
     await this.direct.send(
       conversationId,
@@ -183,10 +202,15 @@ export class GroupMailboxControl {
     return 'applied';
   }
 
+  /** Joins from a welcome naming this device, sent by a roster member. */
   private async receiveWelcome(
     peerIdentityId: string,
     record: Extract<GroupMailboxControlFields, { type: 'welcome' }>,
   ): Promise<GroupMailboxControlOutcome> {
+    if (record.deviceCredential !== this.self.deviceCredential) {
+      return 'ignored';
+    }
+
     if (!(await this.bothInRoster(record.conversationId, peerIdentityId))) {
       return 'rejected';
     }
@@ -272,13 +296,14 @@ export class GroupMailboxControl {
   }
 
   /**
-   * Commits the key packages, then hands `{welcome, k}` to each recipient.
-   * The commit reaches every existing member first.
+   * Commits the key packages, then hands `{welcome, k}` to the device of
+   * each, in a letter to its identity that names it. The commit reaches
+   * every existing member first. Every key package was checked to be its
+   * requested owner's when it arrived.
    */
   private async welcome(
     conversationId: string,
     keyPackages: Uint8Array[],
-    recipients: readonly string[],
   ): Promise<GroupMailboxCommit> {
     const commit = await this.engine.add(conversationId, keyPackages, (made) =>
       this.outbox.enqueueCommit(conversationId, made),
@@ -288,17 +313,23 @@ export class GroupMailboxControl {
     const { welcome } = commit;
 
     if (welcome) {
-      const plaintext = GroupMailboxControlRecord.encode({
-        conversationId,
-        index: commit.generation.index,
-        type: 'welcome',
-        welcome,
-      });
-
       await Promise.all(
-        recipients.map((identityId) =>
-          this.direct.send(conversationId, identityId, plaintext),
-        ),
+        keyPackages.map((keyPackage) => {
+          const { deviceCredential, identityId } =
+            mlsKeyPackageOwner(keyPackage);
+
+          return this.direct.send(
+            conversationId,
+            identityId,
+            GroupMailboxControlRecord.encode({
+              conversationId,
+              deviceCredential,
+              index: commit.generation.index,
+              type: 'welcome',
+              welcome,
+            }),
+          );
+        }),
       );
     }
 
@@ -325,13 +356,13 @@ export class GroupMailboxControl {
       ),
     );
 
-    return this.welcome(conversationId, keyPackages, identityIds);
+    return this.welcome(conversationId, keyPackages);
   }
 
   /**
    * Adds other devices of this identity, by device credential: one key
    * package each, asked of that device. The commit reaches every existing
-   * member; the identity gets one `{welcome, k}` for all of them.
+   * member; each device gets a `{welcome, k}` naming it.
    */
   public async addDevices(
     conversationId: string,
@@ -347,7 +378,7 @@ export class GroupMailboxControl {
       ),
     );
 
-    return this.welcome(conversationId, keyPackages, [this.self.identityId]);
+    return this.welcome(conversationId, keyPackages);
   }
 
   /** Drops unanswered key package requests; their adds reject. */

@@ -6,7 +6,7 @@ import type { PigeonMessageCommandsApi } from '../../messages/infrastructure/htt
 import type { DirectMessageReaderSet } from '../../messages/infrastructure/mailbox/DirectMessageReaderSet';
 import type { GroupMailboxRoster } from '../domain/GroupMailboxRoster';
 import type { GroupMailboxDirectLink } from './control/GroupMailboxDirectLink';
-import type { GroupMailboxNotificationPages } from './control/GroupMailboxNotificationPages';
+import type { GroupMailboxNotificationInbox } from './control/GroupMailboxNotificationInbox';
 
 /** What the group conversation mailbox needs from the rest of the app. */
 export type GroupConversationPorts = {
@@ -23,7 +23,8 @@ export type GroupConversationPorts = {
   contacts: (session: Session) => readonly string[];
   /** The 1:1 carrier of control letters for one signed-in identity. */
   direct: (session: Session) => GroupMailboxDirectLink;
-  notifications: GroupMailboxNotificationPages;
+  /** This identity's notifications, and the state records resolving them. */
+  notifications: GroupMailboxNotificationInbox;
   now: () => number;
   projector: Pick<MessageProjector, 'projectPlaintext'>;
   /** Enrols, bridges and prunes the readers of this identity's inboxes. */

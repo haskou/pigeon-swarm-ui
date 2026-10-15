@@ -150,16 +150,34 @@ export class GroupMailboxControlRecord {
     }
   }
 
+  /** A welcome, which names the one device whose key package it opens. */
   private static welcome(
     value: Record<string, unknown>,
     conversationId: string,
   ): GroupMailboxControlFields | null {
     const welcome = GroupMailboxControlRecord.binary(value.welcome);
-    const { index } = value;
+    const { deviceCredential, index } = value;
 
-    return welcome && GroupMailboxControlRecord.isIndex(index)
-      ? { conversationId, index, type: 'welcome', welcome }
-      : null;
+    if (
+      !welcome ||
+      !GroupMailboxControlRecord.isIndex(index) ||
+      typeof deviceCredential !== 'string'
+    ) {
+      return null;
+    }
+
+    try {
+      return {
+        conversationId,
+        deviceCredential:
+          DeviceCredential.fromString(deviceCredential).valueOf(),
+        index,
+        type: 'welcome',
+        welcome,
+      };
+    } catch {
+      return null;
+    }
   }
 
   /** Null unless the plaintext is a valid control record. */
@@ -212,6 +230,7 @@ export class GroupMailboxControlRecord {
       case 'welcome':
         return GroupMailboxControlRecord.json({
           ...header,
+          deviceCredential: fields.deviceCredential,
           index: fields.index,
           welcome: encodeBase64Url(fields.welcome),
         });

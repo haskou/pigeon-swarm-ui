@@ -8,10 +8,11 @@ import type { GroupMailboxGenesis } from '../../domain/GroupMailboxGenesis';
  * Application messages travel there too, as one MLS ciphertext whose sender
  * MLS authenticates. `gen_k` is never part of a record: a welcome carries
  * only the public index `k`. A key-package request a device sends its own
- * identity names the one other device it asks (`deviceCredential`). A
- * key-package request carries the group's genesis when its sender knows it,
- * so the joiner learns the creator; only its derivation of the conversation
- * id vouches for it.
+ * identity names the one other device it asks (`deviceCredential`); a
+ * welcome names the one device whose key package it opens. A key-package
+ * request carries the group's genesis when its sender knows it, so the joiner
+ * learns the creator; only its derivation of the conversation id vouches for
+ * it.
  */
 export type GroupMailboxControlFields =
   | {
@@ -29,6 +30,7 @@ export type GroupMailboxControlFields =
     }
   | {
       readonly conversationId: string;
+      readonly deviceCredential: string;
       readonly index: number;
       readonly type: 'welcome';
       readonly welcome: Uint8Array;
