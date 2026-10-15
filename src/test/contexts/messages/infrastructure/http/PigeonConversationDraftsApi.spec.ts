@@ -69,21 +69,18 @@ describe(PigeonConversationDraftsApi.name, () => {
     );
   });
 
-  it('saves a draft under its opaque key, never under the conversation id', async () => {
+  it('saves a draft under its opaque key and keeps what it sent, not what the node echoes', async () => {
     const session = rooted();
     const draftKey = cipher.draftKey(session, conversationId);
     const path = `/conversations/me/drafts/${draftKey}`;
-    const request = jest.fn((_path: string, init: { body: string }) => {
-      const body = JSON.parse(init.body) as {
-        encryptedPayload: string;
-        updatedAt: number;
-      };
-
-      return Promise.resolve({ draftKey, ...body });
+    const request = jest.fn().mockResolvedValue({
+      draftKey,
+      encryptedPayload: 'node-substituted-payload',
+      updatedAt: 99,
     });
     const headers = jest.fn().mockResolvedValue({});
     const api = new PigeonConversationDraftsApi(
-      httpClient(request as unknown as jest.Mock),
+      httpClient(request),
       signer(headers),
       new RequestCache(),
     );
@@ -94,7 +91,10 @@ describe(PigeonConversationDraftsApi.name, () => {
       'draft text',
       7,
     );
-    const [requestPath, init] = request.mock.calls[0];
+    const [requestPath, init] = request.mock.calls[0] as [
+      string,
+      { body: string },
+    ];
     const sent = JSON.parse(init.body) as { encryptedPayload: string };
 
     expect(requestPath).toBe(path);
