@@ -34,6 +34,10 @@ function notificationTitle(notification: NotificationResource): string {
     return copy.notifications.communityInvitationTitle;
   }
 
+  if (notification.type === 'group_conversation_invitation') {
+    return copy.notifications.groupInvitationTitle;
+  }
+
   return copy.notifications.invitationTitle;
 }
 
@@ -52,6 +56,14 @@ function notificationTarget(notification: NotificationResource): {
     return {
       label: copy.notifications.call,
       value: notification.payload.callId,
+    };
+  }
+
+  // A group invitation names no conversation outside its seal.
+  if (notification.type === 'group_conversation_invitation') {
+    return {
+      label: copy.notifications.invitedBy,
+      value: notification.payload.inviterIdentityId,
     };
   }
 
@@ -147,7 +159,8 @@ export function NotificationCard({
       : notification.payload.inviterIdentityId;
   const previewIdentityId =
     notification.type === 'missed_call' ||
-    notification.type === 'conversation_invitation'
+    notification.type === 'conversation_invitation' ||
+    notification.type === 'group_conversation_invitation'
       ? inviterIdentityId
       : null;
   const canRespond =

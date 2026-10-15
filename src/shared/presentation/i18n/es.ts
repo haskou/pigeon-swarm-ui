@@ -834,7 +834,6 @@ export const es = {
         'El propietario de la comunidad no puede abandonarla.',
       ConversationMustHaveTwoDifferentParticipantsError:
         'Las conversaciones directas necesitan dos identidades distintas.',
-      ConversationNotFoundError: 'No se encontró esa conversación.',
       ConversationParticipantNotFoundError:
         'Solo los participantes de la conversación pueden enviar mensajes aquí.',
       IdentityMustHaveAtLeastOneNetworkError:
@@ -1189,6 +1188,7 @@ export const es = {
     enablePushUnsupported:
       'Este navegador no puede registrar notificaciones push para esta app.',
     error: 'No se pudieron cargar las notificaciones.',
+    groupInvitationTitle: 'Invitación a un grupo',
     hideMutedChannels: 'Ocultar canales silenciados',
     hideMutedChannelsAgain: 'Volver a ocultar canales silenciados',
     invitationTitle: 'Invitación de conversación',

@@ -38,7 +38,6 @@ import { PigeonConversationsApi } from '../../contexts/conversations/infrastruct
 import { PigeonConversationsGateway } from '../../contexts/conversations/infrastructure/http/PigeonConversationsGateway';
 import { GroupMailboxNotificationLink } from '../../contexts/groupMailboxes/infrastructure/control/GroupMailboxNotificationLink';
 import { GroupConversationMailbox } from '../../contexts/groupMailboxes/infrastructure/GroupConversationMailbox';
-import { GroupConversationRoster } from '../../contexts/groupMailboxes/infrastructure/roster/GroupConversationRoster';
 import { KeychainCipher } from '../../contexts/identities/infrastructure/crypto/KeychainCipher';
 import { DeviceAuthorizationRevisionSource } from '../../contexts/identities/infrastructure/http/DeviceAuthorizationRevisionSource';
 import { DeviceSealedRecovery } from '../../contexts/identities/infrastructure/http/DeviceSealedRecovery';
@@ -451,11 +450,6 @@ export class PigeonApiGateway {
       ) => this.requestCache.load(key, loader, options),
       mutations,
     );
-    const groupRoster = new GroupConversationRoster(
-      http,
-      signer,
-      conversationMapper,
-    );
     const contactPins = new ContactPinStore();
 
     this.groupConversationMailbox = new GroupConversationMailbox({
@@ -475,8 +469,6 @@ export class PigeonApiGateway {
       now: Date.now,
       projector: messageProjector,
       readerSet,
-      roster: (session, conversationId) =>
-        groupRoster.of(session, conversationId),
       storage: scopeClientStorageKey('pigeon-group'),
       verifiedDevices: async (session) =>
         (await deviceAuthorization.verifiedDevices(session)).map((device) =>

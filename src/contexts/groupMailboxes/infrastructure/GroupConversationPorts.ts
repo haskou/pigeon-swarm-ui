@@ -4,7 +4,6 @@ import type { MailboxChannel } from '../../mailboxes/infrastructure/MailboxChann
 import type { MessageProjector } from '../../messages/infrastructure/crypto/MessageProjector';
 import type { PigeonMessageCommandsApi } from '../../messages/infrastructure/http/PigeonMessageCommandsApi';
 import type { DirectMessageReaderSet } from '../../messages/infrastructure/mailbox/DirectMessageReaderSet';
-import type { GroupMailboxRoster } from '../domain/GroupMailboxRoster';
 import type { GroupMailboxDirectLink } from './control/GroupMailboxDirectLink';
 import type { GroupMailboxNotificationInbox } from './control/GroupMailboxNotificationInbox';
 
@@ -32,11 +31,6 @@ export type GroupConversationPorts = {
     DirectMessageReaderSet,
     'cutOff' | 'enrolSealedRoot' | 'reconcile'
   >;
-  /** The node's roster of a conversation, as `session` sees it. */
-  roster: (
-    session: Session,
-    conversationId: string,
-  ) => Promise<GroupMailboxRoster>;
   /** Prefix of every local database the group mailbox writes. */
   storage: string;
   /**

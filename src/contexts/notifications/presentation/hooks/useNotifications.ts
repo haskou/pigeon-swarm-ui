@@ -162,10 +162,17 @@ export function useNotifications({
                   'accepted',
                 ),
               }
-            : await facade.acceptConversationInvitation(
-                currentSession,
-                notification,
-              );
+            : notification.type === 'group_conversation_invitation'
+              ? {
+                  notification: await facade.acceptGroupInvitation(
+                    currentSession,
+                    notification,
+                  ),
+                }
+              : await facade.acceptConversationInvitation(
+                  currentSession,
+                  notification,
+                );
         const nextSession =
           'keychain' in result
             ? {
@@ -174,10 +181,11 @@ export function useNotifications({
                 keychainExternalIdentifier: result.keychainExternalIdentifier,
               }
             : currentSession;
+        // A group joined by its welcome shows once the welcome arrives.
         const conversations =
-          notification.type === 'community_invitation'
-            ? undefined
-            : await applicationContainer.conversations.list(nextSession);
+          notification.type === 'conversation_invitation'
+            ? await applicationContainer.conversations.list(nextSession)
+            : undefined;
         const communityId =
           notification.type === 'community_invitation'
             ? notification.payload.communityId
@@ -223,19 +231,22 @@ export function useNotifications({
       setError(null);
 
       try {
+        const facade = applicationContainer.notifications;
+        const notification = notifications.find(
+          ({ id }) => id === notificationId,
+        );
+
         replaceNotification(
-          await applicationContainer.notifications.update(
-            currentSession,
-            notificationId,
-            'declined',
-          ),
+          notification?.type === 'group_conversation_invitation'
+            ? await facade.declineGroupInvitation(currentSession, notification)
+            : await facade.update(currentSession, notificationId, 'declined'),
         );
       } catch (caught) {
         setError(toUserErrorMessage(caught, copy.notifications.error));
       }
       setAction(null);
     },
-    [replaceNotification],
+    [notifications, replaceNotification],
   );
 
   const archive = useCallback((notificationId: string) => {

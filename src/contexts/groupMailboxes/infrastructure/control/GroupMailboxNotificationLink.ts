@@ -9,8 +9,9 @@ import { GroupMailboxControlSeal } from './GroupMailboxControlSeal';
 /**
  * Delivers a control record to one peer as a `group_conversation_invitation`
  * notification whose key field carries a `GroupMailboxControlSeal` letter.
- * The node admits it only when sender and recipient are both participants
- * of the conversation; the letter itself proves the sender to the peer.
+ * The notification names no conversation: it travels only inside the seal.
+ * The node admits it by its signature and the sender's quotas; the letter
+ * itself proves the sender to the peer.
  */
 export class GroupMailboxNotificationLink implements GroupMailboxDirectLink {
   private static readonly PATH = '/notifications/';
@@ -46,11 +47,9 @@ export class GroupMailboxNotificationLink implements GroupMailboxDirectLink {
     const invitation = await this.invitations.invitation(this.session, {
       encryptedKey: encryptedConversationKey,
       recipientIdentityId: peerIdentityId,
-      subjectId: conversationId,
       type,
     });
     const body = {
-      conversationId,
       encryptedConversationKey,
       inviterIdentityId: invitation.inviterIdentityId,
       mutation: invitation.mutation,

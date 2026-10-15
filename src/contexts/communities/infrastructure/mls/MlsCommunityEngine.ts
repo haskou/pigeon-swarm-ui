@@ -804,7 +804,8 @@ export class MlsCommunityEngine {
    * revision naming operations it has not verified, bound by a member the
    * latest verified roster lets add members, proves the node withholds
    * them (`MlsGroup.waiting`). Rivals for an epoch rank alike, so the lower
-   * commit id decides them.
+   * commit id decides them. A community's GroupContext never changes: no
+   * commit may carry a GroupContextExtensions proposal.
    */
   private policyFor(groupId: string): MlsMembershipPolicy {
     const history = (): CommunityRosterHistory =>
@@ -814,6 +815,7 @@ export class MlsCommunityEngine {
       admits: (identityId, frontier) =>
         history().rosterAt(frontier)?.has(identityId) ?? false,
       allows: (change, { baseline, frontier }) =>
+        change.proposedContext === undefined &&
         history().follows(frontier, baseline) &&
         (history().rosterAt(frontier)?.allowsCommit(change) ?? false),
       frontier: () => history().heads(),

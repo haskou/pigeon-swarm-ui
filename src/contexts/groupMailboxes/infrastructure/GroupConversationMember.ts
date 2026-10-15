@@ -23,8 +23,6 @@ export class GroupConversationMember {
     const identityId = session.identity.id;
     const deviceCredential =
       session.deviceCredentialKeyPair.toPrimitives().publicKey;
-    const rosterFor = (conversationId: string) =>
-      ports.roster(session, conversationId);
     // Local state seals under the latest root, as after a revoke rotated it.
     const sealing = { session };
     const generations = new IndexedDbGroupMailboxGenerationStore(
@@ -48,7 +46,6 @@ export class GroupConversationMember {
         () => sealing.session,
       ),
       generations,
-      rosterFor,
       () => ports.verifiedDevices(sealing.session),
       () => ports.contacts(sealing.session),
       ports.now,
@@ -58,13 +55,12 @@ export class GroupConversationMember {
       engine,
       ports.channel,
       stores.outbox,
-      rosterFor,
       ports.now,
     );
     const control = new GroupMailboxControl(
       { deviceCredential, identityId },
       engine,
-      rosterFor,
+      () => ports.contacts(sealing.session),
       ports.direct(session),
       outbox,
     );

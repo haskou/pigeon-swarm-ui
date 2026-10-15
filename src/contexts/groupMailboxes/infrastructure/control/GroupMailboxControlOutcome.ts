@@ -1,2 +1,9 @@
-/** What a received control record did. */
-export type GroupMailboxControlOutcome = 'applied' | 'ignored' | 'rejected';
+/**
+ * What a received control record did; `deferred` waits for the user to
+ * accept or decline it.
+ */
+export type GroupMailboxControlOutcome =
+  | 'applied'
+  | 'deferred'
+  | 'ignored'
+  | 'rejected';

@@ -16,7 +16,8 @@ export interface GroupRosterActionsController {
   removeParticipant: (identityId: string) => Promise<void>;
 }
 
-// Mirrors the node's roster rules: the creator is never an admin and never
+// Mirrors the rules of the roster in the group's MLS GroupContext
+// (`GroupMailboxRoster`): the creator is never an admin and never
 // leaves; the creator and admins manage members; only the creator removes
 // admins and manages the admin set.
 export function groupRosterPermissions(
@@ -61,7 +62,7 @@ export function useGroupRosterActions({
 
   const run = useCallback(
     async (
-      action: (conversationId: string) => Promise<ConversationResource>,
+      action: (conversationId: string) => Promise<void>,
     ): Promise<void> => {
       if (!conversation || pending) return;
 

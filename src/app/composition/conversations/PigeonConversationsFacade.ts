@@ -6,15 +6,8 @@ import type { Session } from '../../../contexts/identities/infrastructure/sessio
 import type { ConversationUseCases } from './ConversationUseCases';
 
 import { CreateConversationMessage } from '../../../contexts/conversations/application/create-conversation/messages/CreateConversationMessage';
-import { CreateGroupConversationMessage } from '../../../contexts/conversations/application/create-group-conversation/messages/CreateGroupConversationMessage';
-import { DemoteConversationAdminMessage } from '../../../contexts/conversations/application/demote-conversation-admin/messages/DemoteConversationAdminMessage';
-import { InviteConversationParticipantMessage } from '../../../contexts/conversations/application/invite-to-group-conversation/messages/InviteConversationParticipantMessage';
-import { LeaveConversationMessage } from '../../../contexts/conversations/application/leave-conversation/messages/LeaveConversationMessage';
 import { MarkConversationReadUntilMessage } from '../../../contexts/conversations/application/mark-conversation-read-until/messages/MarkConversationReadUntilMessage';
-import { PromoteConversationAdminMessage } from '../../../contexts/conversations/application/promote-conversation-admin/messages/PromoteConversationAdminMessage';
-import { RemoveConversationParticipantMessage } from '../../../contexts/conversations/application/remove-conversation-participant/messages/RemoveConversationParticipantMessage';
 import { SearchConversationsMessage } from '../../../contexts/conversations/application/search-conversations/messages/SearchConversationsMessage';
-import { ConversationGroupNonce } from '../../../contexts/conversations/domain/value-objects/ConversationGroupNonce';
 import { ConversationParticipantId } from '../../../contexts/conversations/domain/value-objects/ConversationParticipantId';
 import { ConversationAccessContexts } from '../../../contexts/conversations/infrastructure/http/ConversationAccessContexts';
 import { ConversationMapper } from '../../../contexts/conversations/infrastructure/http/ConversationMapper';
@@ -27,7 +20,13 @@ export class PigeonConversationsFacade {
     private readonly useCases: ConversationUseCases,
     private readonly groups: Pick<
       GroupConversationMailbox,
-      'create' | 'membersChanged'
+      | 'addMember'
+      | 'conversations'
+      | 'create'
+      | 'demote'
+      | 'leave'
+      | 'promote'
+      | 'removeMember'
     >,
   ) {}
 
@@ -82,94 +81,58 @@ export class PigeonConversationsFacade {
     return this.creationResult(actorIdentityId, conversation);
   }
 
+  /**
+   * Starts a group conversation on this device; the node never learns it.
+   * The invitees join once they answer the key-package requests it sends.
+   */
   public async createGroup(
     session: Session,
     input: { name: string; networkId: string; participantIds: string[] },
-  ): Promise<{
-    conversation: ConversationResource;
-    keychain: LocalKeychain;
-    keychainExternalIdentifier: string;
-  }> {
-    const actorIdentityId = this.actor(session);
-    const message = new CreateGroupConversationMessage(
-      input.name,
-      input.networkId,
-      input.participantIds,
-      actorIdentityId,
-      ConversationGroupNonce.generate().toString(),
-      Date.now(),
-    );
-    const conversation = await this.useCases.groupCreator.create(message);
-
-    // The genesis the id derives from names this identity as creator.
-    await this.groups.create(session, conversation.toPrimitives().id, {
-      creatorIdentityId: message.getActorIdentityId().toString(),
-      networkId: message.getNetworkId().toString(),
-      nonce: message.getNonce().toString(),
-    });
-
-    return this.creationResult(actorIdentityId, conversation);
+  ): Promise<ConversationResource> {
+    return await this.groups.create(session, input);
   }
 
+  /** Demotes an admin of a group conversation; only its creator may. */
   public async demoteAdmin(
     session: Session,
     conversationId: string,
     identityId: string,
-  ): Promise<ConversationResource> {
-    return this.mapper.toResource(
-      await this.useCases.adminDemoter.demote(
-        new DemoteConversationAdminMessage(
-          conversationId,
-          identityId,
-          this.actor(session),
-          Date.now(),
-        ),
-      ),
-    );
+  ): Promise<void> {
+    await this.groups.demote(session, conversationId, identityId);
   }
 
+  /** Adds an identity to a group conversation's roster. */
   public async inviteToGroup(
     session: Session,
     conversationId: string,
     recipientIdentityId: string,
-  ): Promise<ConversationResource> {
-    const conversation = await this.useCases.participantInviter.invite(
-      new InviteConversationParticipantMessage(
-        conversationId,
-        recipientIdentityId,
-        this.actor(session),
-        Date.now(),
-      ),
-    );
-
-    void this.groups.membersChanged(session, conversationId);
-
-    return this.mapper.toResource(conversation);
+  ): Promise<void> {
+    await this.groups.addMember(session, conversationId, recipientIdentityId);
   }
 
-  public async leave(
-    session: Session,
-    conversationId: string,
-  ): Promise<ConversationResource> {
-    return this.mapper.toResource(
-      await this.useCases.leaver.leave(
-        new LeaveConversationMessage(
-          conversationId,
-          this.actor(session),
-          Date.now(),
-        ),
-      ),
-    );
+  /** Takes this identity off a group conversation's roster. */
+  public async leave(session: Session, conversationId: string): Promise<void> {
+    await this.groups.leave(session, conversationId);
   }
 
+  /**
+   * The node's one-to-one conversations, then the group conversations this
+   * device holds.
+   */
   public async list(session: Session): Promise<ConversationResource[]> {
-    const conversations = await this.useCases.searcher.search(
-      new SearchConversationsMessage(this.actor(session)),
-    );
+    const [conversations, groups] = await Promise.all([
+      this.useCases.searcher.search(
+        new SearchConversationsMessage(this.actor(session)),
+      ),
+      this.groups.conversations(session),
+    ]);
 
-    return conversations.map((conversation) =>
-      this.mapper.toResource(conversation),
-    );
+    return [
+      ...conversations.map((conversation) =>
+        this.mapper.toResource(conversation),
+      ),
+      ...groups,
+    ];
   }
 
   /**
@@ -197,39 +160,21 @@ export class PigeonConversationsFacade {
     );
   }
 
+  /** Promotes a member of a group conversation; only its creator may. */
   public async promoteAdmin(
     session: Session,
     conversationId: string,
     identityId: string,
-  ): Promise<ConversationResource> {
-    return this.mapper.toResource(
-      await this.useCases.adminPromoter.promote(
-        new PromoteConversationAdminMessage(
-          conversationId,
-          identityId,
-          this.actor(session),
-          Date.now(),
-        ),
-      ),
-    );
+  ): Promise<void> {
+    await this.groups.promote(session, conversationId, identityId);
   }
 
+  /** Removes a member from a group conversation's roster. */
   public async removeParticipant(
     session: Session,
     conversationId: string,
     identityId: string,
-  ): Promise<ConversationResource> {
-    const conversation = await this.useCases.participantRemover.remove(
-      new RemoveConversationParticipantMessage(
-        conversationId,
-        identityId,
-        this.actor(session),
-        Date.now(),
-      ),
-    );
-
-    void this.groups.membersChanged(session, conversationId);
-
-    return this.mapper.toResource(conversation);
+  ): Promise<void> {
+    await this.groups.removeMember(session, conversationId, identityId);
   }
 }

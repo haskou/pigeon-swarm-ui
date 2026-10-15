@@ -17,23 +17,29 @@ import { GroupMailboxKeyPackageTimeoutError } from './GroupMailboxKeyPackageTime
 
 /**
  * Control traffic of a group conversation (node
- * `docs/design/group-mailboxes.md`, D8). An inviter asks each joiner for a
- * key package in a letter signed by its identity key and sealed to the
- * joiner (`GroupMailboxNotificationLink`); the key package's credential
- * must be signed by that joiner's identity key. The inviter commits the
- * add, which is kept only once the durable outbox has queued it for every
- * existing member's inbox of the generation the commit was made in, and
- * hands each joiner `{welcome, k}` in another letter. A removal is
- * delivered through the outbox to the remaining members only. Only the
- * conversation roster can request key packages; a welcome counts only from
- * a peer the roster lets add members and who holds a leaf in the welcomed
- * group. MLS authenticates commits and the roster decides who may make
- * them. Logs never carry key material, welcomes or commits.
+ * `docs/design/group-mailboxes.md`, D8). The group's roster travels in its
+ * GroupContext (`GroupMailboxRosterExtension`) and changes only by a roster
+ * commit (`changeRoster`), which every member judges by the roster of the
+ * epoch it applies to. A manager asks each member that holds no leaf yet for
+ * a key package, in a letter signed by its identity key and sealed to that
+ * member (`GroupMailboxNotificationLink`), at most once per session. The
+ * answer goes to the manager's identity; the first of its devices in the
+ * group (by device credential) commits the add, kept only once the durable
+ * outbox has queued it for every existing member's inbox of the generation
+ * the commit was made in, and hands the joiner `{welcome, k}` in another
+ * letter. The key package's credential must be signed by the member's
+ * identity key. A removal is delivered through the outbox to the remaining
+ * members only. A welcome is judged by the engine against the roster it
+ * carries. Logs never carry key material, welcomes or commits.
+ *
+ * A key-package request from a contact is answered at once. One from any
+ * other identity is `deferred`: it is answered only once the user accepts
+ * it as a group invitation (`receiveDirect` with `consented`).
  *
  * A device also adds and removes the other devices of its own identity:
  * it sends its identity a key-package request naming one device, which
  * only that device answers, and only while it holds no leaf; the answer's
- * key package must be that device's.
+ * key package must be that device's, and only the asking device takes it.
  *
  * Each welcome names the device whose key package it used and goes to that
  * device's identity; the identity's other devices leave it. A record that is
@@ -44,11 +50,13 @@ import { GroupMailboxKeyPackageTimeoutError } from './GroupMailboxKeyPackageTime
  * knows it, so a joiner learns the creator before any welcome and a
  * welcome from the creator confirms the group at once. A device that
  * awaits the group's confirmation neither asks for nor hands out key
- * packages for it.
+ * packages for it, and commits nothing.
  */
 export class GroupMailboxControl {
   public static readonly KEY_PACKAGE_TIMEOUT_MS = 60_000;
 
+  /** The members asked for a key package this session, per conversation. */
+  private readonly asked = new Set<string>();
   private readonly pending = new Map<string, PendingGroupMailboxKeyPackage>();
 
   /** The owner a key package's credential names, if it decodes. */
@@ -63,9 +71,8 @@ export class GroupMailboxControl {
   public constructor(
     private readonly self: MlsLeafOwner,
     private readonly engine: GroupMailboxControlEngine,
-    private readonly rosterFor: (
-      conversationId: string,
-    ) => Promise<GroupMailboxRoster>,
+    /** See `GroupConversationPorts.contacts`. */
+    private readonly contacts: () => readonly string[],
     private readonly direct: GroupMailboxDirectLink,
     private readonly outbox: Pick<
       GroupMailboxOutbox,
@@ -73,14 +80,35 @@ export class GroupMailboxControl {
     >,
   ) {}
 
-  /** The peer and this device both belong to the conversation roster. */
-  private async bothInRoster(
+  /**
+   * Commits `next` as the group's roster; the leaves of a member it drops
+   * are removed in the same commit, which reaches every member that held a
+   * leaf before it (`GroupMailboxCommit.recipients`).
+   */
+  private async changeRoster(
     conversationId: string,
-    peerIdentityId: string,
-  ): Promise<boolean> {
-    const roster = await this.rosterFor(conversationId);
+    next: GroupMailboxRoster | undefined,
+  ): Promise<GroupMailboxCommit> {
+    if (!next) throw new MlsRejectedError('The roster does not allow it');
+    const commit = await this.engine.changeRoster(
+      conversationId,
+      next,
+      (made) => this.outbox.enqueueCommit(conversationId, made),
+    );
 
-    return roster.has(peerIdentityId) && roster.has(this.self.identityId);
+    await this.outbox.flush();
+
+    return commit;
+  }
+
+  /** The group's current roster; rejects when this device holds none. */
+  private async current(conversationId: string): Promise<GroupMailboxRoster> {
+    const roster = await this.engine.roster(conversationId);
+
+    if (!roster)
+      throw new MlsRejectedError('This identity is not in the group');
+
+    return roster;
   }
 
   /**
@@ -104,16 +132,38 @@ export class GroupMailboxControl {
 
   /**
    * Why a key-package request goes unanswered, if it does: ignored when it
-   * asks another device; rejected from outside the roster, from another
-   * device of this identity that names no device, or by one while this
-   * device already holds a leaf; else as `heldBack` decides.
+   * asks another device; rejected from another device of this identity that
+   * names no device, or by one while this device already holds a leaf, and
+   * from another identity when it names a device; deferred from an identity
+   * that is not a contact, unless the user `consented`; else as `heldBack`
+   * decides.
    */
   private async refusal(
     peerIdentityId: string,
     record: Extract<GroupMailboxControlFields, { type: 'key-package-request' }>,
+    consented: boolean,
+  ): Promise<GroupMailboxControlOutcome | undefined> {
+    const sibling = peerIdentityId === this.self.identityId;
+    const misaddressed = await this.misaddressed(sibling, record);
+
+    if (misaddressed) return misaddressed;
+
+    if (!sibling && !consented && !this.contacts().includes(peerIdentityId)) {
+      return 'deferred';
+    }
+
+    return this.heldBack(record);
+  }
+
+  /**
+   * Ignored when the request asks another device; rejected when a sibling
+   * names no device or already holds a leaf, or another identity names one.
+   */
+  private async misaddressed(
+    sibling: boolean,
+    record: Extract<GroupMailboxControlFields, { type: 'key-package-request' }>,
   ): Promise<GroupMailboxControlOutcome | undefined> {
     const { conversationId, deviceCredential } = record;
-    const sibling = peerIdentityId === this.self.identityId;
 
     if (
       deviceCredential !== undefined &&
@@ -123,28 +173,28 @@ export class GroupMailboxControl {
     }
 
     if (
-      (sibling && deviceCredential === undefined) ||
-      !(await this.bothInRoster(conversationId, peerIdentityId)) ||
+      sibling !== (deviceCredential !== undefined) ||
       (sibling && (await this.engine.devices(conversationId)).length > 0)
     ) {
       return 'rejected';
     }
 
-    return this.heldBack(record);
+    return undefined;
   }
 
   /**
-   * Answers a peer on the roster, or another device of this identity that
-   * asks this very device while it holds no leaf in the group. Keeps the
-   * genesis the request carries. A device awaiting the group's
-   * confirmation answers nobody.
+   * Answers a contact, an identity the user accepted the request of, or
+   * another device of this identity that asks this very device while it
+   * holds no leaf in the group. Keeps the genesis the request carries. A
+   * device awaiting the group's confirmation answers nobody.
    */
   private async receiveKeyPackageRequest(
     peerIdentityId: string,
     record: Extract<GroupMailboxControlFields, { type: 'key-package-request' }>,
+    consented: boolean,
   ): Promise<GroupMailboxControlOutcome> {
     const { conversationId, requestId } = record;
-    const refused = await this.refusal(peerIdentityId, record);
+    const refused = await this.refusal(peerIdentityId, record, consented);
 
     if (refused) return refused;
 
@@ -163,36 +213,65 @@ export class GroupMailboxControl {
   }
 
   /**
-   * Only an answer to a request this device sent that peer counts, and its
-   * key package must be that peer's, and that device's when one was asked.
+   * An answer from another identity: the first device of this identity in
+   * the group commits its add, while this identity may add members, the
+   * roster lists that identity and it holds no leaf yet. The key package
+   * must be that identity's. Other devices of this identity ignore it.
    */
-  private receiveKeyPackageResponse(
+  private async receiveMemberKeyPackage(
     peerIdentityId: string,
+    conversationId: string,
+    keyPackage: Uint8Array,
+  ): Promise<GroupMailboxControlOutcome> {
+    const roster = await this.engine.roster(conversationId);
+
+    if (
+      !roster?.manages(this.self.identityId) ||
+      !roster.has(peerIdentityId) ||
+      GroupMailboxControl.ownerOf(keyPackage)?.identityId !== peerIdentityId
+    ) {
+      return 'rejected';
+    }
+
+    if (
+      (await this.engine.devices(conversationId))[0] !==
+        this.self.deviceCredential ||
+      (await this.engine.awaitsConfirmation(conversationId))
+    ) {
+      return 'ignored';
+    }
+
+    if ((await this.engine.members(conversationId)).includes(peerIdentityId)) {
+      return 'rejected';
+    }
+
+    return this.rejecting(() => this.welcome(conversationId, [keyPackage]));
+  }
+
+  /**
+   * An answer from another device of this identity counts only on the
+   * device that asked it, and its key package must be the asked device's.
+   */
+  private receiveDeviceKeyPackage(
     conversationId: string,
     requestId: string,
     keyPackage: Uint8Array,
   ): GroupMailboxControlOutcome {
     const waiting = this.pending.get(requestId);
 
-    if (
-      waiting?.peerIdentityId !== peerIdentityId ||
-      waiting.conversationId !== conversationId
-    ) {
-      return 'ignored';
-    }
+    if (waiting?.conversationId !== conversationId) return 'ignored';
     this.pending.delete(requestId);
     clearTimeout(waiting.timer);
     const owner = GroupMailboxControl.ownerOf(keyPackage);
 
     if (
-      owner?.identityId !== peerIdentityId ||
-      (waiting.deviceCredential !== undefined &&
-        owner.deviceCredential !== waiting.deviceCredential)
+      owner?.identityId !== this.self.identityId ||
+      owner.deviceCredential !== waiting.deviceCredential
     ) {
       // eslint-disable-next-line no-console
       console.debug('Group mailbox control record rejected.');
       waiting.reject(
-        new MlsRejectedError('Key package does not belong to the peer'),
+        new MlsRejectedError('Key package does not belong to the device'),
       );
 
       return 'rejected';
@@ -202,17 +281,16 @@ export class GroupMailboxControl {
     return 'applied';
   }
 
-  /** Joins from a welcome naming this device, sent by a roster member. */
+  /**
+   * Joins from a welcome naming this device; the engine judges it against
+   * the roster it carries.
+   */
   private async receiveWelcome(
     peerIdentityId: string,
     record: Extract<GroupMailboxControlFields, { type: 'welcome' }>,
   ): Promise<GroupMailboxControlOutcome> {
     if (record.deviceCredential !== this.self.deviceCredential) {
       return 'ignored';
-    }
-
-    if (!(await this.bothInRoster(record.conversationId, peerIdentityId))) {
-      return 'rejected';
     }
 
     return this.rejecting(() =>
@@ -242,26 +320,45 @@ export class GroupMailboxControl {
     }
   }
 
-  /**
-   * Asks a peer, or one other device of this identity, for a key package,
-   * handing on the group's genesis when this device knows it. Rejects
-   * while this device awaits the group's confirmation.
-   */
-  private async requestKeyPackage(
+  /** Asks `peerIdentityId` for a key package, naming `deviceCredential`. */
+  private async request(
     conversationId: string,
     peerIdentityId: string,
+    requestId: string,
     deviceCredential?: string,
-  ): Promise<Uint8Array> {
+  ): Promise<void> {
     if (await this.engine.awaitsConfirmation(conversationId)) {
       throw new GroupMailboxUnconfirmedError();
     }
     const genesis = await this.engine.genesis(conversationId);
+
+    await this.direct.send(
+      conversationId,
+      peerIdentityId,
+      GroupMailboxControlRecord.encode({
+        conversationId,
+        ...(deviceCredential === undefined ? {} : { deviceCredential }),
+        ...(genesis === undefined ? {} : { genesis }),
+        requestId,
+        type: 'key-package-request',
+      }),
+    );
+  }
+
+  /**
+   * Asks one other device of this identity for a key package, handing on
+   * the group's genesis when this device knows it. Rejects while this
+   * device awaits the group's confirmation.
+   */
+  private async requestDeviceKeyPackage(
+    conversationId: string,
+    deviceCredential: string,
+  ): Promise<Uint8Array> {
     const requestId = MailboxChannel.randomEnvelopeId();
     const answer = new Promise<Uint8Array>((resolve, reject) => {
       this.pending.set(requestId, {
         conversationId,
-        ...(deviceCredential === undefined ? {} : { deviceCredential }),
-        peerIdentityId,
+        deviceCredential,
         reject,
         resolve,
         timer: setTimeout(() => {
@@ -272,16 +369,11 @@ export class GroupMailboxControl {
     });
 
     try {
-      await this.direct.send(
+      await this.request(
         conversationId,
-        peerIdentityId,
-        GroupMailboxControlRecord.encode({
-          conversationId,
-          ...(deviceCredential === undefined ? {} : { deviceCredential }),
-          ...(genesis === undefined ? {} : { genesis }),
-          requestId,
-          type: 'key-package-request',
-        }),
+        this.self.identityId,
+        requestId,
+        deviceCredential,
       );
     } catch (error: unknown) {
       const waiting = this.pending.get(requestId);
@@ -337,26 +429,48 @@ export class GroupMailboxControl {
   }
 
   /**
-   * Adds identities from the roster: one key package each, asked in a
-   * signed letter. The commit reaches every existing member; each joiner
-   * gets `{welcome, k}`.
+   * Asks each of these roster members for a key package, once per session;
+   * the answer makes the first device of this identity add it
+   * (`receiveMemberKeyPackage`). Rejects while this device awaits the
+   * group's confirmation, when it may not add members, or when the roster
+   * does not list one of them.
    */
   public async add(
     conversationId: string,
     identityIds: readonly string[],
-  ): Promise<GroupMailboxCommit> {
-    const roster = await this.rosterFor(conversationId);
+  ): Promise<void> {
+    const roster = await this.current(conversationId);
 
-    if (identityIds.some((identityId) => !roster.has(identityId))) {
+    if (
+      !roster.manages(this.self.identityId) ||
+      identityIds.some((identityId) => !roster.has(identityId))
+    ) {
       throw new MlsRejectedError('Only roster members can be added');
     }
-    const keyPackages = await Promise.all(
-      identityIds.map((identityId) =>
-        this.requestKeyPackage(conversationId, identityId),
-      ),
-    );
 
-    return this.welcome(conversationId, keyPackages);
+    for (const identityId of identityIds) {
+      const key = JSON.stringify([conversationId, identityId]);
+
+      if (this.asked.has(key)) continue;
+      await this.request(
+        conversationId,
+        identityId,
+        MailboxChannel.randomEnvelopeId(),
+      );
+      this.asked.add(key);
+    }
+  }
+
+  /** Adds `identityId` to the roster, then asks it for a key package. */
+  public async addMember(
+    conversationId: string,
+    identityId: string,
+  ): Promise<void> {
+    await this.changeRoster(
+      conversationId,
+      (await this.current(conversationId)).withMember(identityId),
+    );
+    await this.add(conversationId, [identityId]);
   }
 
   /**
@@ -370,11 +484,7 @@ export class GroupMailboxControl {
   ): Promise<GroupMailboxCommit> {
     const keyPackages = await Promise.all(
       deviceCredentials.map((deviceCredential) =>
-        this.requestKeyPackage(
-          conversationId,
-          this.self.identityId,
-          deviceCredential,
-        ),
+        this.requestDeviceKeyPackage(conversationId, deviceCredential),
       ),
     );
 
@@ -390,26 +500,67 @@ export class GroupMailboxControl {
     this.pending.clear();
   }
 
+  /** Demotes an admin; only the creator may. */
+  public async demote(
+    conversationId: string,
+    identityId: string,
+  ): Promise<GroupMailboxCommit> {
+    return this.changeRoster(
+      conversationId,
+      (await this.current(conversationId)).demoted(identityId),
+    );
+  }
+
+  /**
+   * Takes this identity off the roster, and off the admins when it is one;
+   * the creator never leaves. A manager removes its leaves later.
+   */
+  public async leave(conversationId: string): Promise<GroupMailboxCommit> {
+    return this.changeRoster(
+      conversationId,
+      (await this.current(conversationId)).withoutMember(this.self.identityId),
+    );
+  }
+
+  /** Promotes a member to admin; only the creator may. */
+  public async promote(
+    conversationId: string,
+    identityId: string,
+  ): Promise<GroupMailboxCommit> {
+    return this.changeRoster(
+      conversationId,
+      (await this.current(conversationId)).promoted(identityId),
+    );
+  }
+
   /**
    * A record `peerIdentityId` sent this identity directly. The link that
-   * read it verified the peer's signature, so the peer is its author.
+   * read it verified the peer's signature, so the peer is its author. A
+   * key-package request the user accepted as a group invitation comes back
+   * `consented`.
    */
   public async receiveDirect(
     peerIdentityId: string,
     plaintext: Uint8Array,
+    consented = false,
   ): Promise<GroupMailboxControlOutcome> {
     const record = GroupMailboxControlRecord.decode(plaintext);
 
     switch (record?.type) {
       case 'key-package-request':
-        return this.receiveKeyPackageRequest(peerIdentityId, record);
+        return this.receiveKeyPackageRequest(peerIdentityId, record, consented);
       case 'key-package-response':
-        return this.receiveKeyPackageResponse(
-          peerIdentityId,
-          record.conversationId,
-          record.requestId,
-          record.keyPackage,
-        );
+        return peerIdentityId === this.self.identityId
+          ? this.receiveDeviceKeyPackage(
+              record.conversationId,
+              record.requestId,
+              record.keyPackage,
+            )
+          : this.receiveMemberKeyPackage(
+              peerIdentityId,
+              record.conversationId,
+              record.keyPackage,
+            );
       case 'welcome':
         return this.receiveWelcome(peerIdentityId, record);
       default:
@@ -433,7 +584,24 @@ export class GroupMailboxControl {
     );
   }
 
-  /** Removes identities; the commit reaches the remaining members only. */
+  /**
+   * Removes a member from the roster and all its leaves in one commit; the
+   * removed member gets it too and learns it left.
+   */
+  public async removeMember(
+    conversationId: string,
+    identityId: string,
+  ): Promise<GroupMailboxCommit> {
+    return this.changeRoster(
+      conversationId,
+      (await this.current(conversationId)).withoutMember(identityId),
+    );
+  }
+
+  /**
+   * Removes the leaves of identities the roster no longer lists; their
+   * identities get the commit too and learn they left.
+   */
   public async remove(
     conversationId: string,
     identityIds: readonly string[],
@@ -452,7 +620,7 @@ export class GroupMailboxControl {
 
   /**
    * Removes the leaves of other devices of this identity, by device
-   * credential; the commit reaches the remaining members.
+   * credential; the commit reaches the members that held a leaf before it.
    */
   public async removeDevices(
     conversationId: string,

@@ -3,15 +3,11 @@ import { assert } from '@haskou/value-objects';
 import type { LocalKeychain } from '../../../identities/infrastructure/keychain/LocalKeychain';
 import type { Conversation } from '../../domain/Conversation';
 import type { ConversationRepository } from '../../domain/repositories/ConversationRepository';
-import type { ConversationGroupNonce } from '../../domain/value-objects/ConversationGroupNonce';
-import type { ConversationId } from '../../domain/value-objects/ConversationId';
 import type { ConversationParticipantId } from '../../domain/value-objects/ConversationParticipantId';
 
-import { ConversationNotFoundError } from '../../domain/errors/ConversationNotFoundError';
 import { ConversationParticipantNotFoundError } from '../../domain/errors/ConversationParticipantNotFoundError';
 import { ConversationAccessContexts } from './ConversationAccessContexts';
 import { ConversationMapper } from './ConversationMapper';
-import { ConversationTarget } from './ConversationTarget';
 import { PigeonConversationsGateway } from './PigeonConversationsGateway';
 
 export class PigeonConversationRepository implements ConversationRepository {
@@ -20,12 +16,6 @@ export class PigeonConversationRepository implements ConversationRepository {
     private readonly contexts: ConversationAccessContexts,
     private readonly mapper: ConversationMapper,
   ) {}
-
-  private targetOf(conversation: Conversation): ConversationTarget {
-    const { id, networkId } = this.mapper.toResource(conversation);
-
-    return { id, networkId };
-  }
 
   private updateContext(
     actorIdentityId: ConversationParticipantId,
@@ -72,108 +62,6 @@ export class PigeonConversationRepository implements ConversationRepository {
         resource.networkId,
       ),
       actorIdentityId,
-    );
-  }
-
-  public async createGroup(
-    conversation: Conversation,
-    nonce: ConversationGroupNonce,
-    actorIdentityId: ConversationParticipantId,
-  ): Promise<Conversation> {
-    const resource = this.mapper.toResource(conversation);
-
-    return this.completeCreation(
-      await this.gateway.createGroupConversation(
-        this.contexts.find(actorIdentityId),
-        {
-          name: resource.name ?? '',
-          networkId: resource.networkId,
-          nonce: nonce.toString(),
-          participantIds: resource.participantIds,
-        },
-      ),
-      actorIdentityId,
-    );
-  }
-
-  public async demoteAdmin(
-    conversation: Conversation,
-    targetIdentityId: ConversationParticipantId,
-    actorIdentityId: ConversationParticipantId,
-  ): Promise<Conversation> {
-    return this.mapper.fromPrimitives(
-      await this.gateway.demoteGroupAdmin(
-        this.contexts.find(actorIdentityId),
-        this.targetOf(conversation),
-        targetIdentityId.toString(),
-      ),
-    );
-  }
-
-  public async find(
-    conversationId: ConversationId,
-    actorIdentityId: ConversationParticipantId,
-  ): Promise<Conversation> {
-    const conversation = (await this.searchByIdentity(actorIdentityId)).find(
-      (candidate) => candidate.belongsTo(conversationId),
-    );
-
-    assert(conversation, new ConversationNotFoundError());
-
-    return conversation;
-  }
-
-  public async invite(
-    conversation: Conversation,
-    recipientIdentityId: ConversationParticipantId,
-    actorIdentityId: ConversationParticipantId,
-  ): Promise<Conversation> {
-    return this.mapper.fromPrimitives(
-      await this.gateway.addGroupMember(
-        this.contexts.find(actorIdentityId),
-        this.targetOf(conversation),
-        recipientIdentityId.toString(),
-      ),
-    );
-  }
-
-  public async leave(
-    conversation: Conversation,
-    actorIdentityId: ConversationParticipantId,
-  ): Promise<Conversation> {
-    return this.mapper.fromPrimitives(
-      await this.gateway.leaveGroupConversation(
-        this.contexts.find(actorIdentityId),
-        this.targetOf(conversation),
-      ),
-    );
-  }
-
-  public async promoteAdmin(
-    conversation: Conversation,
-    targetIdentityId: ConversationParticipantId,
-    actorIdentityId: ConversationParticipantId,
-  ): Promise<Conversation> {
-    return this.mapper.fromPrimitives(
-      await this.gateway.promoteGroupAdmin(
-        this.contexts.find(actorIdentityId),
-        this.targetOf(conversation),
-        targetIdentityId.toString(),
-      ),
-    );
-  }
-
-  public async removeParticipant(
-    conversation: Conversation,
-    targetIdentityId: ConversationParticipantId,
-    actorIdentityId: ConversationParticipantId,
-  ): Promise<Conversation> {
-    return this.mapper.fromPrimitives(
-      await this.gateway.removeGroupMember(
-        this.contexts.find(actorIdentityId),
-        this.targetOf(conversation),
-        targetIdentityId.toString(),
-      ),
     );
   }
 

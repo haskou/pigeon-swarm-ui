@@ -1,0 +1,21 @@
+diff --git a/node_modules/ts-mls/dist/src/createCommit.js b/node_modules/ts-mls/dist/src/createCommit.js
+index 59ab06c..16d9a5a 100644
+--- a/node_modules/ts-mls/dist/src/createCommit.js
++++ b/node_modules/ts-mls/dist/src/createCommit.js
+@@ -38,13 +38,13 @@ export async function createCommit(context, options) {
+     const excludeNodes = res.additionalResult.kind === "memberCommit"
+         ? res.additionalResult.addedLeafNodes.map(([leafIndex]) => leafToNodeIndex(leafIndex))
+         : [];
+-    const [tree, updatePath, pathSecrets, newPrivateKey] = res.needsUpdatePath
+-        ? await createUpdatePath(res.tree, toLeafIndex(state.privatePath.leafIndex), state.groupContext, state.signaturePrivateKey, cipherSuite, excludeNodes)
+-        : [res.tree, undefined, [], undefined];
+     const updatedExtensions = res.additionalResult.kind === "memberCommit" && res.additionalResult.extensions.length > 0
+         ? res.additionalResult.extensions
+         : state.groupContext.extensions;
+     const groupContextWithExtensions = { ...state.groupContext, extensions: updatedExtensions };
++    const [tree, updatePath, pathSecrets, newPrivateKey] = res.needsUpdatePath
++        ? await createUpdatePath(res.tree, toLeafIndex(state.privatePath.leafIndex), groupContextWithExtensions, state.signaturePrivateKey, cipherSuite, excludeNodes)
++        : [res.tree, undefined, [], undefined];
+     const privateKeys = mergePrivateKeyPaths(newPrivateKey !== undefined
+         ? updateLeafKey(state.privatePath, await cipherSuite.hpke.exportPrivateKey(newPrivateKey))
+         : state.privatePath, await toPrivateKeyPath(pathToPathSecrets(pathSecrets), state.privatePath.leafIndex, cipherSuite));

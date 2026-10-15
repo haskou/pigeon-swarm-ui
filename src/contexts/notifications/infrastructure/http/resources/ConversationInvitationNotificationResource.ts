@@ -4,5 +4,5 @@ import type { ConversationInvitationPayload } from './ConversationInvitationPayl
 export type ConversationInvitationNotificationResource =
   BaseNotificationResource & {
     payload: ConversationInvitationPayload;
-    type: 'conversation_invitation' | 'group_conversation_invitation';
+    type: 'conversation_invitation';
   };

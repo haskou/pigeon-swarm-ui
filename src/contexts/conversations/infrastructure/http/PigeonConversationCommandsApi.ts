@@ -12,16 +12,12 @@ import type { ConversationIdFactory } from '../../domain/ConversationIdFactory';
 import type { ConversationIdentityReader } from './ConversationIdentityReader';
 import type { ConversationKeychainPublisher } from './ConversationKeychainPublisher';
 import type { ConversationMapper } from './ConversationMapper';
-import type { ConversationOperationBody } from './ConversationOperationBody';
 import type { ConversationOperationSigner } from './ConversationOperationSigner';
 import type { ConversationResource } from './ConversationResource';
-import type { ConversationTarget } from './ConversationTarget';
-import type { GroupConversationInput } from './GroupConversationInput';
 import type { PigeonConversationCommandsApiDependencies } from './PigeonConversationCommandsApiDependencies';
 
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { NotificationMutationSigner } from '../../../notifications/infrastructure/http/NotificationMutationSigner';
-import { ConversationGroupNonce } from '../../domain/value-objects/ConversationGroupNonce';
 import { ConversationNetworkId } from '../../domain/value-objects/ConversationNetworkId';
 import { ConversationParticipantId } from '../../domain/value-objects/ConversationParticipantId';
 
@@ -137,24 +133,6 @@ export class PigeonConversationCommandsApi {
     };
   }
 
-  /**
-   * The node files a conversation under a keychain its creator published. A
-   * group carries no key of its own, so the current head is enough; only a
-   * session that never published one publishes it unchanged.
-   */
-  private async publishedKeychain(
-    session: Session,
-  ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
-    if (session.keychainExternalIdentifier) {
-      return {
-        keychain: session.keychain,
-        keychainExternalIdentifier: session.keychainExternalIdentifier,
-      };
-    }
-
-    return await this.keychains.publishKeychain(session, (current) => current);
-  }
-
   private async postConversation(
     session: Session,
     published: {
@@ -181,62 +159,6 @@ export class PigeonConversationCommandsApi {
     this.requestCache.invalidateForSession('/conversations/?limit=30', session);
 
     return this.conversations.resource(created);
-  }
-
-  /** Signs an operation on top of the frontier the node holds right now. */
-  private async signOperation(
-    session: Session,
-    target: ConversationTarget,
-    action: string,
-    args: Record<string, unknown>,
-  ): Promise<ConversationOperationBody> {
-    return await this.operations.sign(session, {
-      action,
-      args,
-      conversationId: target.id,
-      createdAt: Date.now(),
-      networkId: target.networkId,
-      parents: await this.frontier(session, target.id),
-    });
-  }
-
-  private async sendRosterChange(
-    session: Session,
-    target: ConversationTarget,
-    change: {
-      action: string;
-      args: Record<string, unknown>;
-      body?: Record<string, unknown>;
-      method: 'DELETE' | 'POST' | 'PUT';
-      path: string;
-    },
-  ): Promise<ConversationResource> {
-    const body = {
-      ...change.body,
-      operation: await this.signOperation(
-        session,
-        target,
-        change.action,
-        change.args,
-      ),
-    };
-    const updated = await this.http.request<unknown>(change.path, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(
-        session,
-        change.method,
-        change.path,
-        body,
-      ),
-      method: change.method,
-    });
-    this.requestCache.invalidateForSession('/conversations/?limit=30', session);
-
-    return this.conversations.resource(updated);
-  }
-
-  private memberPath(conversationId: string, suffix: string): string {
-    return `/conversations/${encodeURIComponent(conversationId)}/${suffix}`;
   }
 
   public async create(
@@ -287,145 +209,5 @@ export class PigeonConversationCommandsApi {
       ),
       keychainExternalIdentifier: published.keychainExternalIdentifier,
     };
-  }
-
-  public async createGroup(
-    session: Session,
-    input: GroupConversationInput,
-  ): Promise<{
-    conversation: ConversationResource;
-    keychain: LocalKeychain;
-    keychainExternalIdentifier: string;
-  }> {
-    const participantIds = [session.identity.id, ...input.participantIds]
-      .filter(Boolean)
-      .filter((id, index, values) => values.indexOf(id) === index)
-      .sort();
-    const name = input.name.trim();
-    const conversationId = this.ids
-      .createGroup(
-        ConversationParticipantId.fromString(session.identity.id),
-        ConversationNetworkId.fromString(input.networkId),
-        ConversationGroupNonce.fromString(input.nonce),
-      )
-      .toString();
-    const published = await this.publishedKeychain(session);
-    const conversation = await this.postConversation(session, published, {
-      keychainExternalIdentifier: published.keychainExternalIdentifier,
-      name,
-      networkId: input.networkId,
-      nonce: input.nonce,
-      operation: await this.operations.sign(session, {
-        action: 'conversation_created',
-        args: { name, nonce: input.nonce, participantIds, type: 'group' },
-        conversationId,
-        createdAt: Date.now(),
-        networkId: input.networkId,
-        parents: [],
-      }),
-      participantIds,
-      type: 'group',
-    });
-
-    return {
-      conversation,
-      keychain: published.keychain,
-      keychainExternalIdentifier: published.keychainExternalIdentifier,
-    };
-  }
-
-  /**
-   * Signs `member_added`. The group's MLS layer welcomes the member once the
-   * roster carries them.
-   */
-  public async addMember(
-    session: Session,
-    target: ConversationTarget,
-    recipientIdentityId: string,
-  ): Promise<ConversationResource> {
-    const recipientIdentity = await this.identities.get(
-      recipientIdentityId.trim(),
-    );
-
-    return await this.sendRosterChange(session, target, {
-      action: 'member_added',
-      args: { identityId: recipientIdentity.id },
-      body: { identityId: recipientIdentity.id },
-      method: 'POST',
-      path: this.memberPath(target.id, 'members'),
-    });
-  }
-
-  public async demoteAdmin(
-    session: Session,
-    target: ConversationTarget,
-    identityId: string,
-  ): Promise<ConversationResource> {
-    return await this.sendRosterChange(session, target, {
-      action: 'admin_demoted',
-      args: { identityId },
-      method: 'DELETE',
-      path: this.memberPath(
-        target.id,
-        `admins/${encodeURIComponent(identityId)}`,
-      ),
-    });
-  }
-
-  public async frontier(
-    session: Session,
-    conversationId: string,
-  ): Promise<string[]> {
-    const path = this.memberPath(conversationId, 'frontier');
-    const result = await this.http.request<{ frontier: string[] }>(path, {
-      headers: await this.signer.headers(session, 'GET', path),
-      method: 'GET',
-    });
-
-    return result.frontier;
-  }
-
-  public async leave(
-    session: Session,
-    target: ConversationTarget,
-  ): Promise<ConversationResource> {
-    return await this.sendRosterChange(session, target, {
-      action: 'member_left',
-      args: {},
-      method: 'DELETE',
-      path: this.memberPath(target.id, 'members/me'),
-    });
-  }
-
-  public async promoteAdmin(
-    session: Session,
-    target: ConversationTarget,
-    identityId: string,
-  ): Promise<ConversationResource> {
-    return await this.sendRosterChange(session, target, {
-      action: 'admin_promoted',
-      args: { identityId },
-      method: 'PUT',
-      path: this.memberPath(
-        target.id,
-        `admins/${encodeURIComponent(identityId)}`,
-      ),
-    });
-  }
-
-  public async removeMember(
-    session: Session,
-    target: ConversationTarget,
-    identityId: string,
-  ): Promise<ConversationResource> {
-    return await this.sendRosterChange(session, target, {
-      action: 'member_removed',
-      args: { identityId },
-      method: 'DELETE',
-      path: this.memberPath(
-        target.id,
-        `members/${encodeURIComponent(identityId)}`,
-      ),
-    });
   }
 }
