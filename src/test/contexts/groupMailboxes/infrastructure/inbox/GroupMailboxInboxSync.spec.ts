@@ -672,6 +672,29 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
     ).toEqual([]);
   });
 
+  it('hands over an identity update from its sender only, never storing it', async () => {
+    const identityUpdated = (author: string, recordId: string) =>
+      DirectMailboxRecords.identityUpdated({
+        authorId: id(author),
+        conversationId: CONVERSATION,
+        createdAt: now,
+        id: recordId,
+      });
+
+    await send(bob, identityUpdated('bob', mid('bob', 'u-bob')));
+    await send(bob, identityUpdated('alice', mid('alice', 'u-forged')));
+    await sync(carol);
+
+    expect(ids(carol.received)).toEqual(['identity_updated:u-bob']);
+    expect(
+      await new GroupMessageHistoryStore(carol.history).load(
+        carol.session,
+        CONVERSATION,
+        50,
+      ),
+    ).toEqual([]);
+  });
+
   it('accepts an edit after a restart from the stored history', async () => {
     await send(alice, sent('alice', mid('alice', 'm1')));
     await sync(carol);

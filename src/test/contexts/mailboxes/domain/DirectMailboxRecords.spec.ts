@@ -61,6 +61,7 @@ describe(DirectMailboxRecords.name, () => {
       ],
       question: 'Which one?',
     }),
+    identityUpdated: DirectMailboxRecords.identityUpdated(base),
     pollClose: generated.pollClose(),
     pollVote: generated.pollVote(),
     reaction: generated.reaction(),
@@ -144,6 +145,7 @@ describe(DirectMailboxRecords.name, () => {
 
   it.each([
     'deleted',
+    'identityUpdated',
     'pin',
     'poll',
     'pollClose',

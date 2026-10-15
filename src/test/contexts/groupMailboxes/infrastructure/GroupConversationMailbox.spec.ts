@@ -884,6 +884,30 @@ describe('GroupConversationMailbox', () => {
     expect(bob.changes.some(({ kind }) => kind === 'typing')).toBe(false);
   });
 
+  it('tells the other members of an identity update, never in history or unread', async () => {
+    await formGroup();
+    const signal = new AbortController().signal;
+    const updated = (member: Member) =>
+      member.changes.filter(({ kind }) => kind === 'identity_updated');
+    const restored: DirectMessageTimelineChange[] = [];
+
+    await alice.mailbox.identityUpdated(alice.session, CONVERSATION);
+    await Promise.all(everyone().map(sync));
+    await bob.mailbox.restore(bob.session, CONVERSATION, signal, (changes) =>
+      restored.push(...changes),
+    );
+
+    expect(updated(bob)).toEqual([
+      { identityId: alice.id, kind: 'identity_updated' },
+    ]);
+    expect(updated(carol)).toEqual(updated(bob));
+    expect(updated(alice)).toEqual([]);
+    expect(restored).toEqual([]);
+    expect(
+      (await bob.mailbox.activity(bob.session, CONVERSATION)).unreadCount,
+    ).toBe(0);
+  });
+
   it('ignores a replayed welcome after a restart', async () => {
     await formGroup();
     bob.mailbox.stop(bob.id);

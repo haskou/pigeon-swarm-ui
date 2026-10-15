@@ -79,6 +79,7 @@ function mountSync(activeConversation: ConversationResource = group) {
     messages = typeof update === 'function' ? update(messages) : update;
   });
   const onHistoryRestored = jest.fn<(conversationId: string) => void>();
+  const onIdentityUpdated = jest.fn<(identityId: string) => void>();
   const setPinnedMessageIds = jest.fn((update: SetStateAction<Set<string>>) => {
     pinned = typeof update === 'function' ? update(pinned) : update;
   });
@@ -96,6 +97,7 @@ function mountSync(activeConversation: ConversationResource = group) {
     activeConversation,
     onErrorChange,
     onHistoryRestored,
+    onIdentityUpdated,
     onMessagesChange,
     onPollChanges,
     onTypingChanges,
@@ -110,6 +112,7 @@ function mountSync(activeConversation: ConversationResource = group) {
     error: () => error,
     messages: () => messages,
     onHistoryRestored,
+    onIdentityUpdated,
     onPollChanges,
     onTypingChanges,
     pinnedIds: () => pinned,
@@ -274,6 +277,30 @@ describe('useGroupMessageMailboxSync', () => {
     expect(mounted.onTypingChanges.mock.calls).toEqual([
       ['group-1', [typing, sent]],
     ]);
+    expect(mounted.messages()).toEqual([message]);
+    mounted.cleanup();
+  });
+
+  it('hands each member that announced an identity update to the identity refresh', async () => {
+    const bobUpdated: DirectMessageTimelineChange = {
+      identityId: 'bob',
+      kind: 'identity_updated',
+    };
+    const carolUpdated: DirectMessageTimelineChange = {
+      identityId: 'carol',
+      kind: 'identity_updated',
+    };
+
+    sync.mockImplementationOnce((_session, _id, _signal, apply) => {
+      apply([bobUpdated, { kind: 'message', message }, carolUpdated]);
+
+      return Promise.resolve({ removed: false });
+    });
+    const mounted = mountSync();
+
+    await settle();
+
+    expect(mounted.onIdentityUpdated.mock.calls).toEqual([['bob'], ['carol']]);
     expect(mounted.messages()).toEqual([message]);
     mounted.cleanup();
   });
