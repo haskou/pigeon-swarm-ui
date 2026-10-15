@@ -185,6 +185,8 @@ export const es = {
     callMetricPeerId: 'Peer ID',
     callMetricStatus: 'Estado',
     callMetricTransport: 'Transporte',
+    callsUnsupported:
+      'Este navegador no puede hacer llamadas porque WebRTC está desactivado o no existe. Vuelve a activar WebRTC o abre Pigeon en un Chrome o Edge actual.',
     camera: 'Activar cámara',
     connectionConnecting: 'Conectando el audio de la llamada…',
     connectionQuality: 'Calidad de conexión',

@@ -201,6 +201,7 @@ describe('refusing private calls this device cannot encrypt', () => {
   const voiceChannel = { id: 'voice-a', name: 'Voice' };
 
   beforeEach(() => {
+    jest.spyOn(CallPeerConnections, 'supported').mockReturnValue(true);
     jest
       .spyOn(CallPeerConnections, 'mediaEncryptionSupported')
       .mockReturnValue(false);
@@ -342,5 +343,75 @@ describe('refusing private calls this device cannot encrypt', () => {
       'call-direct',
     );
     expect(input.stopLocalAudio).toHaveBeenCalledWith(aliceMicrophone.stream);
+  });
+});
+
+describe('refusing every call in a browser without WebRTC', () => {
+  const voiceChannel = { id: 'voice-a', name: 'Voice' };
+
+  beforeEach(() => {
+    jest.spyOn(CallPeerConnections, 'supported').mockReturnValue(false);
+    jest
+      .spyOn(CallPeerConnections, 'mediaEncryptionSupported')
+      .mockReturnValue(false);
+    jest.mocked(applicationContainer.calls.leave).mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('names the missing WebRTC instead of call encryption for a direct call', async () => {
+    const { input, outcome } = callStartHarness({});
+
+    useCallStartActions(input).startConversationCall({
+      conversationId: 'conversation-a',
+      participants: [],
+      title: 'Bob',
+    });
+
+    await expect(outcome).resolves.toEqual({
+      error: copy.calls.callsUnsupported,
+    });
+    expect(input.requestOptionalLocalAudio).not.toHaveBeenCalled();
+    expect(applicationContainer.calls.startConversation).not.toHaveBeenCalled();
+  });
+
+  it('does not join a public community voice channel it could not connect', async () => {
+    const { input, outcome } = callStartHarness({
+      activeCommunity: community('public'),
+    });
+
+    useCallStartActions(input).startCommunityVoiceCall(voiceChannel);
+
+    await expect(outcome).resolves.toEqual({
+      error: copy.calls.callsUnsupported,
+    });
+    expect(input.requestOptionalLocalAudio).not.toHaveBeenCalled();
+    expect(
+      applicationContainer.calls.startCommunityChannel,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('declines an incoming call with the missing WebRTC as the reason', async () => {
+    const { input, outcome } = callStartHarness({
+      incomingCall: {
+        call: directCall('ringing'),
+        participants: [],
+        title: 'Bob',
+      } as IncomingWorkspaceCall,
+    });
+
+    useCallStartActions(input).acceptIncomingCall();
+
+    await expect(outcome).resolves.toEqual({
+      error: copy.calls.callsUnsupported,
+    });
+    expect(applicationContainer.calls.join).not.toHaveBeenCalled();
+    expect(applicationContainer.calls.leave).toHaveBeenCalledWith(
+      alice,
+      'call-direct',
+    );
+    expect(input.requestOptionalLocalAudio).not.toHaveBeenCalled();
   });
 });

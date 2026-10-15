@@ -59,7 +59,10 @@ private community creates an invite link, another identity signs in through
 it, joins the community, sees encryption as active and reads the creator's
 next message; the node only accepts a link whose token commits to its limits),
 `call-page-departure.spec.ts` (a ringing call is
-declined when the callee leaves the page) and `group-conversation.spec.ts`
+declined when the callee leaves the page), `call-browser-support.spec.ts` (a
+Chromium without WebRTC and a Firefox without call media encryption both
+refuse a direct call with the reason, before the microphone or the node is
+asked) and `group-conversation.spec.ts`
 (three users share a group conversation over MLS and per-member mailboxes,
 each message reaches the other two, and after the creator removes one member a
 later message reaches the remaining member and never shows in the removed
@@ -72,10 +75,11 @@ after a reload; and a welcome a laptop sent its phone, read by the phone only
 after the laptop was revoked, is refused and nothing sent later shows on the
 phone) run against a real node. Login,
 direct-message sync, the outbox spec and the security audit run on
-`desktop-chromium`, `desktop-firefox` and `mobile-chromium`; the call, revoke,
-community kick and group conversation specs run on `desktop-chromium`. On
-Firefox the decline sent when the callee leaves the page did not reach the
-node in CI, so the call spec does not run there.
+`desktop-chromium`, `desktop-firefox` and `mobile-chromium`; the browser
+support spec runs there too, each test on the desktop engine it targets; the
+call, revoke, community kick and group conversation specs run on
+`desktop-chromium`. On Firefox the decline sent when the callee leaves the
+page did not reach the node in CI, so the call spec does not run there.
 `history-backup.spec.ts` (a wrong password exports nothing; the right one
 downloads one encrypted file that holds no message or handle in clear;
 another identity and a file with one changed character are refused; once the
@@ -190,13 +194,15 @@ the call bar names the cause, and that the call uses the microphone once it is
 allowed or plugged in, with no duplicated connection or participant. Chromium
 denies through its real permission model and grants at runtime. Firefox denies
 through `permissions.default.microphone`; it cannot grant at runtime, so its
-denied scenario ends after a retry that stays denied. Playwright cannot grant
+denied scenario ends after a retry that stays denied. A denial offers
+"Allow microphone" and no "Retry". Playwright cannot grant
 microphone access on WebKit, so there `getUserMedia` is replaced by an
 oscillator stream and denial is simulated with the `NotAllowedError` WebKit
 raises; WebKit gathers no host candidates without capture permission, so it
 connects through the candidates Chromium learns from it. A missing device is
 simulated on every engine by raising `NotFoundError` and hiding audio inputs
-from `enumerateDevices`. Mobile browsers are not covered.
+from `enumerateDevices`. Mobile browsers are not covered; see
+[calls: browser support](../docs/calls-browser-support.md).
 
 ## Call page departure
 
