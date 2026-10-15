@@ -26,6 +26,7 @@ const anything = {
   admits: () => true,
   allows: () => true,
   frontier: (): string[] => [],
+  priority: () => 0,
   reach: () => 0,
   withheld: () => false,
 };

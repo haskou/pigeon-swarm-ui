@@ -106,14 +106,17 @@ The node cannot order commits across replicas. Clients do it:
 
 - A commit for epoch `n` is applied when received in order. Commits for epoch
   `n` from different authors are competing. In a community, the latest
-  roster decides first (see "Which roster judges a commit");
-  otherwise, and in a group conversation, the one with the **lowest record
-  id** wins. A client that applied a different commit for epoch `n` rolls back
-  to its retained epoch-`n` state (`ts-mls` states are immutable values) and
-  applies the winner. Application messages encrypted in the losing epoch stay
-  readable because that state is retained read-only. A group in epoch `m`
-  lists commits with `afterEpoch = m - 2` and drops any older one the node
-  lists anyway, so a rival only ever displaces the last commit it took.
+  roster decides first (see "Which roster judges a commit"); otherwise the
+  one with the **lowest record id** wins. In a group conversation, the
+  conversation roster ranks them first and the **lowest commit id** only
+  settles equal ranks (see "Same-epoch rivals" in
+  `docs/opaque-mailboxes-client.md`). A client that applied a different
+  commit for epoch `n` rolls back to its retained epoch-`n` state (`ts-mls`
+  states are immutable values) and applies the winner. Application messages
+  encrypted in the losing epoch stay readable because that state is retained
+  read-only. A group in epoch `m` lists commits with `afterEpoch = m - 2` and
+  drops any older one the node lists anyway, so a rival only ever displaces
+  the last commit it took.
 - The loser re-issues its proposals on top of the winning epoch. Removals are
   idempotent: the client first checks whether the leaf is still in the group.
 - A client never applies a commit with a gap. It fetches missing epochs and, if
@@ -566,6 +569,19 @@ public community exception.
   sibling behind the group's epoch, a denial of service, never a read. When
   an identity's only leaf device is revoked, a
   manager must add the identity again.
+- Same-epoch rivals in a group conversation rank by the receiver's latest
+  roster before their commit id: a commit by the creator first, then one that
+  removes another identity, then the rest. A commit id is derived from the
+  commit bytes, which the committer chooses, so it can grind a low id; that
+  only wins among equal ranks, so a member cannot win back the epoch of its
+  own removal, nor an admin one the creator commits. Residuals: two devices
+  of one identity rank alike, so a revoked device that races the removal of
+  its own leaf by a sibling device wins on a lower id wherever its commit is
+  still accepted (see the residual above), until the sibling's next
+  reconcile removes it again. A member that was offline may adopt the losing
+  commit first and switches when the winner arrives; one offline for longer
+  than its inbox keeps the winner may never see it and stays on the losing
+  branch.
 - A community welcome's author is the one the node records. A node that lies
   about it can only name a manager, by the signed operations, who already
   holds a leaf in that group.

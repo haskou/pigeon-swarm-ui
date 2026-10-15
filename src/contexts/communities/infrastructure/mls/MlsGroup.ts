@@ -376,7 +376,8 @@ interface AppliedEpoch {
  * return to the state before a commit when a competing commit for the same
  * epoch wins it. Rivals rank by one key each: whether the roster this device
  * has verified up to still allows the commit, then how much of the roster
- * history it binds, then the lower id. Every
+ * history it binds, then the rank the policy gives its change, then the
+ * lower id. Every
  * commit and welcome binds the roster revision its committer judged it at
  * (`MlsRosterFrontier`); the group remembers the revision of its last
  * commit, which the next one must not step behind. A commit by a manager
@@ -898,10 +899,12 @@ export class MlsGroup {
    * Whether a commit wins its epoch over the one the group applied. Each
    * ranks by its own key: whether the latest roster this device verified,
    * which holds both their revisions, still allows it, then how much of the
-   * roster history it binds, then the lower id. A member removed by one
-   * cannot win the epoch back by binding a revision that leaves its removal
-   * out, and a total order converges on the same winner whatever order any
-   * number of rivals arrive in.
+   * roster history it binds, then the rank the policy gives its change
+   * (`MlsMembershipPolicy.priority`), then the lower id. A member removed
+   * by one cannot win the epoch back by binding a revision that leaves its
+   * removal out, nor, where the policy ranks a removal above the removed
+   * member's commits, by grinding a lower id; a total order converges on
+   * the same winner whatever order any number of rivals arrive in.
    */
   private wins(
     commitId: string,
@@ -915,7 +918,11 @@ export class MlsGroup {
     const reach = this.policy.reach(incoming.frontier);
     const held = this.policy.reach(previous.frontier);
 
-    return reach === held ? commitId < previous.commitId : reach > held;
+    if (reach !== held) return reach > held;
+    const rank = this.policy.priority(incoming.change);
+    const heldRank = this.policy.priority(previous.change);
+
+    return rank === heldRank ? commitId < previous.commitId : rank > heldRank;
   }
 
   /**

@@ -320,6 +320,15 @@ export class GroupMailboxMlsEngine {
     );
   }
 
+  /**
+   * Names bytes (a commit, a key package, a ciphertext) by the lowercase
+   * hex SHA-256 of their base64url text. Every member derives a commit's id
+   * from the commit bytes alone, never from the node's record id, so all
+   * compare the same ids. The committer chooses those bytes and can retry
+   * until the id is low: the id only settles rivals the roster ranks alike
+   * (`GroupMailboxRoster.priorityOf`), so grinding never beats a higher
+   * rank, such as a commit by the creator or one removing the committer.
+   */
   private idOf(bytes: Uint8Array): string {
     return SHA256Hash.from(encodeBase64Url(bytes)).toString();
   }
@@ -431,7 +440,9 @@ export class GroupMailboxMlsEngine {
 
   /**
    * A conversation's groups judge every leaf and commit by its latest
-   * roster, so they bind no roster revision and none can be withheld.
+   * roster, so they bind no roster revision and none can be withheld. Rivals
+   * for an epoch rank by that roster (`GroupMailboxRoster.priorityOf`), then
+   * by the lower id.
    */
   private policyFor(conversationId: string): MlsMembershipPolicy {
     const self = this.signer.owner.identityId;
@@ -447,6 +458,8 @@ export class GroupMailboxMlsEngine {
         (change.committer !== self ||
           Boolean(this.verified?.has(change.committerDevice))),
       frontier: () => [],
+      priority: (change) =>
+        this.rosters.get(conversationId)?.priorityOf(change) ?? 0,
       reach: () => 0,
       withheld: () => false,
     };
