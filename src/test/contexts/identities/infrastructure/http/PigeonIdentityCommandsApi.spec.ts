@@ -7,6 +7,7 @@ import {
   Signature,
   SymmetricKey,
 } from '@haskou/pigeon-swarm-crypto';
+import { Timestamp } from '@haskou/value-objects';
 
 import type { IdentityResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
@@ -14,11 +15,16 @@ import type { DeviceIdentityVault } from '../../../../../contexts/identities/inf
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
+import { Identity } from '../../../../../contexts/identities/domain/Identity';
+import { IdentityProfile } from '../../../../../contexts/identities/domain/profile/IdentityProfile';
 import { DeviceAuthorizationEpoch } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
 import { DeviceId } from '../../../../../contexts/identities/domain/value-objects/DeviceId';
 import { DeviceUnlockSecretHandle } from '../../../../../contexts/identities/domain/value-objects/DeviceUnlockSecretHandle';
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
+import { IdentityMasterKeyProtection } from '../../../../../contexts/identities/domain/value-objects/IdentityMasterKeyProtection';
+import { IdentityNetworkMemberships } from '../../../../../contexts/identities/domain/value-objects/IdentityNetworkMemberships';
+import { IdentityRegistrationCode } from '../../../../../contexts/identities/domain/value-objects/IdentityRegistrationCode';
 import { IdentityAdmissionProof } from '../../../../../contexts/identities/infrastructure/crypto/IdentityAdmissionProof';
 import { IdentitySignaturePayloadFactory } from '../../../../../contexts/identities/infrastructure/http/IdentitySignaturePayloadFactory';
 import { PigeonIdentityCommandsApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityCommandsApi';
@@ -349,5 +355,120 @@ describe(`${PigeonIdentityCommandsApi.name} admission difficulty`, () => {
     ).rejects.toBe(refusal);
     expect(http.request).toHaveBeenCalledTimes(1);
     expect(mine).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe(`${PigeonIdentityCommandsApi.name} registration codes`, () => {
+  const registrationCode = 'Q29kZUNvZGVDb2RlQ29kZUNvZGVDb2RlQ29kZUNvZGU';
+
+  async function created(
+    http: HttpJsonClient,
+    deviceVault: DeviceIdentityVault,
+    code: IdentityRegistrationCode | null,
+  ): Promise<unknown> {
+    const keyPair = await KeyPair.generate();
+    const commands = new PigeonIdentityCommandsApi(
+      http,
+      {
+        headers: jest.fn().mockResolvedValue({ 'X-Signature': 'signed' }),
+      } as unknown as RequestSigner,
+      new PigeonIdentityGateway(http),
+      new IdentitySignaturePayloadFactory(),
+      deviceVault,
+    );
+
+    return await commands.createIdentity(
+      Identity.create(
+        IdentityId.fromString(keyPair.toPrimitives().publicKey),
+        IdentityProfile.fromPrimitives({
+          banner: undefined,
+          biography: undefined,
+          handle: undefined,
+          name: 'Ada',
+          picture: undefined,
+        }),
+        IdentityNetworkMemberships.fromPrimitives(['network-1']),
+        new Timestamp(100),
+      ),
+      {
+        deviceCredentialKeyPair: await KeyPair.generate(),
+        keyPair,
+        masterKey: SymmetricKey.generate(),
+        recoveryAuthorityKeyPair: await KeyPair.generate(),
+      },
+      IdentityMasterKeyProtection.fromPrimitives({
+        password: 'Correct-Horse-Battery-9!',
+        recoveryKey: RecoveryKey.generate().valueOf(),
+      }),
+      code,
+    );
+  }
+
+  function vault(): DeviceIdentityVault {
+    return {
+      delete: jest.fn(),
+      register: jest.fn().mockImplementation(({ material }) =>
+        Promise.resolve({
+          authorizationEpoch: DeviceAuthorizationEpoch.genesis(),
+          authorizationRevision: DeviceAuthorizationRevision.initial(),
+          deviceId: DeviceId.generate(),
+          material,
+          secretHandle: DeviceUnlockSecretHandle.generate(),
+        }),
+      ),
+    } as unknown as DeviceIdentityVault;
+  }
+
+  it('sends the registration code only as the sign-up request header', async () => {
+    const http = {
+      request: jest.fn().mockResolvedValue(identity()),
+    } as unknown as HttpJsonClient;
+
+    await created(
+      http,
+      vault(),
+      IdentityRegistrationCode.fromString(registrationCode),
+    );
+
+    const init = jest.mocked(http.request).mock.calls[0]?.[1];
+
+    expect(init?.headers).toEqual({
+      'X-Registration-Code': registrationCode,
+      'X-Signature': 'signed',
+    });
+    expect(String(init?.body)).not.toContain(registrationCode);
+  });
+
+  it('sends no registration code header without a code', async () => {
+    const http = {
+      request: jest.fn().mockResolvedValue(identity()),
+    } as unknown as HttpJsonClient;
+
+    await created(http, vault(), null);
+
+    expect(jest.mocked(http.request).mock.calls[0]?.[1]?.headers).toEqual({
+      'X-Signature': 'signed',
+    });
+  });
+
+  it('forgets the local device identity when the node refuses the code', async () => {
+    const refusal = new HttpJsonError(
+      403,
+      'Forbidden',
+      JSON.stringify({ code: 403011, httpStatus: 403 }),
+    );
+    const http = {
+      request: jest.fn().mockRejectedValue(refusal),
+    } as unknown as HttpJsonClient;
+    const deviceVault = vault();
+
+    await expect(
+      created(
+        http,
+        deviceVault,
+        IdentityRegistrationCode.fromString(registrationCode),
+      ),
+    ).rejects.toBe(refusal);
+    expect(deviceVault.delete).toHaveBeenCalledTimes(1);
   });
 });

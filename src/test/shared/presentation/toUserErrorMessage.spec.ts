@@ -128,4 +128,19 @@ describe(toUserErrorMessage.name, () => {
       copy.errors.network,
     );
   });
+
+  it.each([403011, 403012])(
+    'explains node access refusal %s',
+    (code) => {
+      const error = new HttpJsonError(
+        403,
+        'Forbidden',
+        JSON.stringify({ code, httpStatus: 403 }),
+      );
+
+      expect(toUserErrorMessage(error, 'fallback')).toBe(
+        copy.errors.backend[code],
+      );
+    },
+  );
 });

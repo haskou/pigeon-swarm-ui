@@ -18,6 +18,7 @@ import { DeviceId } from '../../../../../contexts/identities/domain/value-object
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 import { IdentityMasterKeyProtection } from '../../../../../contexts/identities/domain/value-objects/IdentityMasterKeyProtection';
 import { IdentityNetworkMemberships } from '../../../../../contexts/identities/domain/value-objects/IdentityNetworkMemberships';
+import { IdentityRegistrationCode } from '../../../../../contexts/identities/domain/value-objects/IdentityRegistrationCode';
 import { IdentityCreationMaterials } from '../../../../../contexts/identities/infrastructure/crypto/IdentityCreationMaterials';
 import { IdentityAccessContexts } from '../../../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
 import { IdentityMapper } from '../../../../../contexts/identities/infrastructure/http/IdentityMapper';
@@ -66,6 +67,9 @@ describe(PigeonIdentityRepository.name, () => {
       password: 'Correct-Horse-Battery-9!',
       recoveryKey: RecoveryKey.generate().valueOf(),
     });
+    const registrationCode = IdentityRegistrationCode.fromString(
+      'Q29kZUNvZGVDb2RlQ29kZUNvZGVDb2RlQ29kZUNvZGU',
+    );
     const persistedResource = {
       ...resource(),
       id: identityId.toString(),
@@ -96,13 +100,14 @@ describe(PigeonIdentityRepository.name, () => {
       contexts,
       new IdentityMapper(),
       materials,
-    ).create(identity, protection);
+    ).create(identity, protection, registrationCode);
 
     expect(persisted.belongsTo(identityId)).toBe(true);
     expect(gateway.createIdentityAggregate).toHaveBeenCalledWith(
       identity,
       expect.objectContaining({ keyPair, masterKey }),
       protection,
+      registrationCode,
     );
     expect(contexts.find(identityId).session.identity).toBe(persistedResource);
     expect(contexts.find(identityId).session.deviceSealedRootKey).toBe(
