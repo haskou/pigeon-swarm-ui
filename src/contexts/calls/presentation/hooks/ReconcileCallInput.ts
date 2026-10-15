@@ -6,7 +6,6 @@ export type ReconcileCallInput = Omit<
   | 'currentIdentityId'
   | 'id'
   | 'loadIceConfig'
-  | 'mediaEncryptionEnabled'
   | 'mediaEncryptionKey'
   | 'mediaEncryptionUnavailableReason'
   | 'noiseCancellationEnabled'

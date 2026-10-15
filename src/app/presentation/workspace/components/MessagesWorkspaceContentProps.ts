@@ -38,7 +38,6 @@ export type MessagesWorkspaceContentProps = {
     | 'setParticipantVolume'
     | 'setScreenShareQuality'
     | 'startConversationCall'
-    | 'toggleCallMediaEncryption'
     | 'toggleCallNoiseCancellation'
     | 'toggleCamera'
     | 'toggleDeafen'

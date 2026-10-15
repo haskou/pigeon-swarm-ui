@@ -22,7 +22,6 @@ export type CallSessionControls = {
   toggleCamera: () => Promise<void>;
   toggleDeafen: () => void;
   toggleMute: () => void;
-  toggleMediaEncryption: () => void;
   toggleNoiseCancellation: (enabled: boolean) => Promise<void>;
   retryMicrophone: (deviceId?: string) => Promise<void>;
   retryConnection: () => void;

@@ -311,9 +311,12 @@ media keys come from the exporter of the owning group:
 Labels are distinct per purpose; there is no shared secret between text, media
 and attachments, and a missing group is an error, not a fallback.
 
-A private call (a conversation call, or a call in a community this device does
-not know as public) never falls back to plaintext media
-(`resolveWorkspaceCallMediaEncryption`, `useCallStartActions`):
+A private call (a conversation call, or a call in a community whose signed
+genesis does not make it public) never falls back to plaintext media
+(`resolveWorkspaceCallMediaEncryption`, `useCallStartActions`). Visibility comes
+from folding the community's signed operations (`CommunityOperationFold`), not
+from the node's community list; operations that fail to load or fold count as
+private. There is no switch to turn call E2EE off.
 
 - A browser without encoded insertable streams (`createEncodedStreams`) cannot
   encrypt call media. It does not start, join or answer a private call: the
@@ -326,9 +329,15 @@ not know as public) never falls back to plaintext media
   other side may see the call ring, or this identity in the channel; no media
   is sent.
 - Public community calls never use media E2EE and stay open to every browser.
+- A device in a private call refuses any peer whose offer or answer does not
+  announce encrypted media (`CallMediaEncryption.admits`): it never sets that
+  peer's description, so no media flows either way. Outbound frames are always
+  encrypted, and inbound frames without the encrypted-frame marker, or that fail
+  to decrypt, are dropped rather than played.
 
-`resolveWorkspaceCallMediaEncryption.spec.ts` and `useCallStartActions.spec.ts`
-(`yarn test`) cover both refusals and the public community exception.
+`resolveWorkspaceCallMediaEncryption.spec.ts`, `useCallStartActions.spec.ts`,
+`CallPeerConnections.spec.ts` and `EncodedCallMediaCipher.spec.ts`
+(`yarn test`) cover the refusals and the public community exception.
 
 ## Security properties and limits
 
@@ -443,12 +452,14 @@ not know as public) never falls back to plaintext media
 - Call media keys are derived once, when the call starts. A group epoch change
   during a call (member join or leave) does not rekey it. Devices that derive
   the key in different epochs cannot decrypt each other's media.
-- The refusal covers this device only. A peer whose signalling advertises no
-  media encryption still receives plaintext media, inbound frames without the
-  encrypted-frame marker are still played, and a node that reports a private
-  community as public gets its calls unencrypted, since visibility comes from
-  the node's community list, not the signed genesis (#472). The per-user
-  switch that turns call E2EE off still exists (#473).
+- A peer refused for plaintext media is not remembered. Later ICE candidates or
+  a call reconcile may create a fresh peer connection for it, which is refused
+  again at its next description; expect connection churn but no media.
+- A client from before #472 that offers unencrypted media cannot join a private
+  call with this one.
+- The community id is derived from the network, author and nonce, not the
+  genesis arguments. The author could sign two geneses with the same id and
+  different visibility; the node cannot forge one.
 - A community created before this change has no group. Its owner sees
   "awaiting group access" and must recreate the community; nothing bootstraps
   a group automatically, so two owner devices cannot fork one.

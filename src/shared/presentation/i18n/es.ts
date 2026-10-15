@@ -217,11 +217,8 @@ export const es = {
     live: 'En directo',
     manyParticipants: 'participantes',
     mediaEncryptionActive: 'E2EE activo',
-    mediaEncryptionDisabled: 'E2EE desactivado',
     mediaEncryptionMissingKey:
       'Este dispositivo aún no tiene la clave para cifrar esta llamada de extremo a extremo, así que Pigeon no la ha conectado. Vuelve a intentarlo cuando el dispositivo haya sincronizado la conversación o la comunidad.',
-    mediaEncryptionOff: 'Desactivar E2EE de llamada',
-    mediaEncryptionOn: 'Activar E2EE de llamada',
     mediaEncryptionPublicCommunity:
       'Las llamadas de comunidades públicas no usan E2EE.',
     mediaEncryptionUnsupported:

@@ -211,11 +211,8 @@ export const en = {
     live: 'Live',
     manyParticipants: 'participants',
     mediaEncryptionActive: 'E2EE active',
-    mediaEncryptionDisabled: 'E2EE disabled',
     mediaEncryptionMissingKey:
       'This device has no key to encrypt this call end to end yet, so Pigeon did not connect it. Try again once this device has synced the conversation or community.',
-    mediaEncryptionOff: 'Turn off call E2EE',
-    mediaEncryptionOn: 'Turn on call E2EE',
     mediaEncryptionPublicCommunity: 'Public community calls do not use E2EE.',
     mediaEncryptionUnsupported:
       'This browser cannot encrypt call audio and video end to end, so Pigeon does not start or join private calls here. Encrypted calls currently need a Chromium-based browser, such as Chrome or Edge.',

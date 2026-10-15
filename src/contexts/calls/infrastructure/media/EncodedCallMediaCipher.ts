@@ -129,10 +129,9 @@ export class EncodedCallMediaCipher {
     return concatBytes(frameMarker, nonce, ciphertext);
   }
 
+  /** Rejects for a frame not authenticated with the call key. */
   private async decryptFrameData(data: ArrayBuffer): Promise<ArrayBuffer> {
     const bytes = new Uint8Array(data);
-
-    if (!hasEncryptedFrameMarker(bytes)) return data;
 
     const nonceStart = frameMarker.byteLength;
     const ciphertextStart = nonceStart + nonceLength;
@@ -147,19 +146,17 @@ export class EncodedCallMediaCipher {
     );
   }
 
-  private senderTransform(
-    shouldEncrypt: () => boolean,
-  ): TransformStream<EncodedCallMediaFrame, EncodedCallMediaFrame> {
+  private senderTransform(): TransformStream<
+    EncodedCallMediaFrame,
+    EncodedCallMediaFrame
+  > {
     return new TransformStream<EncodedCallMediaFrame, EncodedCallMediaFrame>({
       transform: async (frame, controller): Promise<void> => {
         const transformedFrame = frame;
 
-        if (shouldEncrypt()) {
-          transformedFrame.data = await this.encryptFrameData(
-            transformedFrame.data,
-          );
-        }
-
+        transformedFrame.data = await this.encryptFrameData(
+          transformedFrame.data,
+        );
         controller.enqueue(transformedFrame);
       },
     });
@@ -171,6 +168,10 @@ export class EncodedCallMediaCipher {
   > {
     return new TransformStream<EncodedCallMediaFrame, EncodedCallMediaFrame>({
       transform: async (frame, controller): Promise<void> => {
+        // A private call never plays plaintext media: frames without the
+        // marker, or that do not authenticate, never reach the decoder.
+        if (!hasEncryptedFrameMarker(new Uint8Array(frame.data))) return;
+
         try {
           const transformedFrame = frame;
 
@@ -179,24 +180,20 @@ export class EncodedCallMediaCipher {
           );
           controller.enqueue(transformedFrame);
         } catch {
-          // Drop frames that cannot be authenticated instead of passing
-          // ciphertext to the media decoder.
+          // Dropped: it was not encrypted with the call key.
         }
       },
     });
   }
 
-  public configureSender(
-    sender: RTCRtpSender,
-    shouldEncrypt: () => boolean,
-  ): void {
+  public configureSender(sender: RTCRtpSender): void {
     if (this.configuredSenders.has(sender)) return;
 
     if (!isEncodedStreamOwner(sender)) return;
 
     const configured = EncodedCallMediaCipher.configureEncodedStreams(
       sender,
-      this.senderTransform(shouldEncrypt),
+      this.senderTransform(),
     );
 
     if (configured) this.configuredSenders.add(sender);

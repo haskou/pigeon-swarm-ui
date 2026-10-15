@@ -25,7 +25,6 @@ export type CallMediaControls = {
   setScreenShareQuality: (quality: ScreenShareQualityPreset) => Promise<void>;
   toggleCamera: () => Promise<void>;
   toggleDeafen: () => void;
-  toggleMediaEncryption: () => void;
   toggleMute: () => void;
   toggleNoiseCancellation: (enabled: boolean) => Promise<void>;
   toggleScreenShare: () => Promise<void>;
@@ -103,26 +102,6 @@ export function useCallMediaControls({
             ? { ...participant, deafened }
             : participant,
         ),
-      };
-    });
-  };
-
-  const toggleMediaEncryption = () => {
-    setActiveCall((current) => {
-      if (!current || !current.mediaEncryption.available) return current;
-
-      const enabled = !current.mediaEncryption.enabled;
-
-      peerManager.setMediaEncryptionEnabled(enabled);
-
-      return {
-        ...current,
-        mediaEncryption: {
-          ...current.mediaEncryption,
-          active: enabled,
-          enabled,
-          reason: enabled ? undefined : 'disabled',
-        },
       };
     });
   };
@@ -405,7 +384,6 @@ export function useCallMediaControls({
     setScreenShareQuality,
     toggleCamera,
     toggleDeafen,
-    toggleMediaEncryption,
     toggleMute,
     toggleNoiseCancellation,
     toggleScreenShare,

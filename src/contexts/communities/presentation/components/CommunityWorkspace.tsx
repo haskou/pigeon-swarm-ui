@@ -72,7 +72,6 @@ export function CommunityWorkspace({
   onCallScreenShareQualityChange,
   onCallToggleCamera,
   onCallToggleDeafen,
-  onCallToggleMediaEncryption,
   onCallToggleMute,
   onCallToggleNoiseCancellation,
   onCallToggleScreenShare,
@@ -555,7 +554,6 @@ export function CommunityWorkspace({
         onCallToggleCamera={onCallToggleCamera}
         onCallToggleDeafen={onCallToggleDeafen}
         onCallToggleMicrophone={onCallToggleMute}
-        onCallToggleMediaEncryption={onCallToggleMediaEncryption}
         onCallToggleNoiseCancellation={onCallToggleNoiseCancellation}
         onCallRetryMicrophone={onCallRetryMicrophone}
         onCallRetryConnection={onCallRetryConnection}

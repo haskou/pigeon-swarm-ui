@@ -57,7 +57,6 @@ export interface CommunityWorkspaceProps {
   onCallToggleCamera?: () => void;
   onCallToggleDeafen?: () => void;
   onCallToggleMute?: () => void;
-  onCallToggleMediaEncryption?: () => void;
   onCallToggleNoiseCancellation?: () => void;
   onCallRetryMicrophone?: (deviceId?: string) => void;
   onCallRetryConnection?: () => void;

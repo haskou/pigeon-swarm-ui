@@ -24,7 +24,6 @@ export type WorkspaceCalls = Pick<
   ) => void;
   setParticipantVolume: (identityId: string, volumePercent: number) => void;
   setScreenShareQuality: (quality: ScreenShareQualityPreset) => Promise<void>;
-  toggleCallMediaEncryption: () => void;
   toggleCallNoiseCancellation: () => void;
   toggleCamera: () => Promise<void>;
   toggleDeafen: () => void;

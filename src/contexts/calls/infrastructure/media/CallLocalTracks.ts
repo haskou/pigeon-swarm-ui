@@ -21,7 +21,6 @@ export class CallLocalTracks {
   ) {}
 
   private addMissingTrack(
-    peerIdentityId: string,
     peer: RTCPeerConnection,
     track: MediaStreamTrack,
     syncedTracks: Set<MediaStreamTrack>,
@@ -35,7 +34,6 @@ export class CallLocalTracks {
         track,
         this.screenShareStreams.localStreamFor(track, this.localStream),
       ),
-      peerIdentityId,
     );
   }
 
@@ -66,8 +64,8 @@ export class CallLocalTracks {
     });
   }
 
-  private configureSender(sender: RTCRtpSender, peerIdentityId: string): void {
-    this.encryption.configureSender(sender, peerIdentityId);
+  private configureSender(sender: RTCRtpSender): void {
+    this.encryption.configureSender(sender);
     this.configureScreenShareQuality(sender);
   }
 
@@ -87,7 +85,6 @@ export class CallLocalTracks {
   }
 
   private syncPeer(
-    peerIdentityId: string,
     peer: RTCPeerConnection,
     activeTracks: MediaStreamTrack[],
   ): void {
@@ -95,31 +92,21 @@ export class CallLocalTracks {
     const syncedTracks = new Set<MediaStreamTrack>();
 
     for (const sender of peer.getSenders()) {
-      this.syncSender(
-        peerIdentityId,
-        peer,
-        sender,
-        activeTracks,
-        activeTrackSet,
-        syncedTracks,
-      );
+      this.syncSender(peer, sender, activeTracks, activeTrackSet, syncedTracks);
     }
 
     for (const track of activeTracks) {
-      this.addMissingTrack(peerIdentityId, peer, track, syncedTracks);
+      this.addMissingTrack(peer, track, syncedTracks);
     }
   }
 
   private syncPeers(peers: Map<string, RTCPeerConnection>): void {
     const activeTracks = this.localStream?.getTracks() ?? [];
 
-    for (const [peerIdentityId, peer] of peers.entries()) {
-      this.syncPeer(peerIdentityId, peer, activeTracks);
-    }
+    for (const peer of peers.values()) this.syncPeer(peer, activeTracks);
   }
 
   private syncSender(
-    peerIdentityId: string,
     peer: RTCPeerConnection,
     sender: RTCRtpSender,
     activeTracks: MediaStreamTrack[],
@@ -147,7 +134,7 @@ export class CallLocalTracks {
     syncedTracks.add(replacement);
     void sender
       .replaceTrack(replacement)
-      .then(() => this.configureSender(sender, peerIdentityId))
+      .then(() => this.configureSender(sender))
       .catch((error: unknown) => {
         logCallError('peer-manager:replace-local-track-failed', error, {
           kind: replacement.kind,
@@ -173,7 +160,6 @@ export class CallLocalTracks {
           track,
           this.screenShareStreams.localStreamFor(track, this.localStream),
         ),
-        peerIdentityId,
       );
     });
   }
@@ -214,10 +200,8 @@ export class CallLocalTracks {
   ): void {
     this.screenShareQuality = quality;
 
-    for (const [peerIdentityId, peer] of peers.entries()) {
-      peer
-        .getSenders()
-        .forEach((sender) => this.configureSender(sender, peerIdentityId));
+    for (const peer of peers.values()) {
+      peer.getSenders().forEach((sender) => this.configureSender(sender));
     }
   }
 

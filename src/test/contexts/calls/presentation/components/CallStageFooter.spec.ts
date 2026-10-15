@@ -15,9 +15,6 @@ const call: CallSession = {
   kind: 'one-to-one',
   mediaEncryption: {
     active: true,
-    available: true,
-    enabled: true,
-    reason: undefined,
   },
   muted: false,
   noiseCancellationEnabled: true,
@@ -40,7 +37,6 @@ describe(CallStageFooter.name, () => {
         onEnd: jest.fn(),
         onToggleCamera: jest.fn(),
         onToggleDeafen: jest.fn(),
-        onToggleMediaEncryption: jest.fn(),
         onToggleMute: jest.fn(),
         onToggleNoiseCancellation: jest.fn(),
         onToggleScreenShare: jest.fn(),

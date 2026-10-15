@@ -79,8 +79,7 @@ describe('following a superseded community voice call', () => {
             kind: 'community-voice',
             participants: [],
           }) as unknown as WorkspaceCallDetails,
-        callMediaEncryptionForResource: () =>
-          Promise.resolve({ mediaEncryptionEnabled: false }),
+        callMediaEncryptionForResource: () => Promise.resolve({}),
         cleanupJoinedCalls: () => Promise.resolve(),
         incomingCall: null,
         leaveCurrentCallForSwitch: () => {
@@ -175,7 +174,6 @@ function callStartHarness(overrides: Partial<CallStartActionsInput>): {
       }) as WorkspaceCallDetails,
     callMediaEncryptionForResource: () =>
       Promise.resolve({
-        mediaEncryptionEnabled: true,
         mediaEncryptionKey: 'call-key',
       }),
     cleanupJoinedCalls: () => Promise.resolve(),
@@ -263,7 +261,6 @@ describe('refusing private calls this device cannot encrypt', () => {
       activeCommunity: community('public'),
       callMediaEncryptionForResource: () =>
         Promise.resolve({
-          mediaEncryptionEnabled: true,
           mediaEncryptionUnavailableReason: 'public-community',
         }),
     });

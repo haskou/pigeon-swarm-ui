@@ -50,7 +50,7 @@ describe(EncodedCallMediaCipher.name, () => {
   it('restores the media another member encrypted with the call key', async () => {
     const key = SymmetricKey.generate().valueOf();
     const encrypted = await piped([media], (sender) =>
-      new EncodedCallMediaCipher(key).configureSender(sender, () => true),
+      new EncodedCallMediaCipher(key).configureSender(sender),
     );
 
     await expect(
@@ -74,7 +74,7 @@ describe(EncodedCallMediaCipher.name, () => {
     const encrypted = await piped([media], (sender) =>
       new EncodedCallMediaCipher(
         SymmetricKey.generate().valueOf(),
-      ).configureSender(sender, () => true),
+      ).configureSender(sender),
     );
 
     await expect(

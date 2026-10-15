@@ -429,7 +429,7 @@ describe(CallPeerConnections.name, () => {
       .mockResolvedValue(undefined);
 
     manager.configure(() => Promise.resolve({ iceServers: [] }));
-    manager.configureMediaEncryption(SymmetricKey.generate().valueOf(), true);
+    manager.configureMediaEncryption(SymmetricKey.generate().valueOf());
     const sending = manager.ensurePeer('remote', true, sendSignal);
 
     await jest.advanceTimersByTimeAsync(500);
@@ -1616,7 +1616,7 @@ describe(CallPeerConnections.name, () => {
     const microphone = mediaTrack('microphone-1', 'audio');
 
     manager.configure(() => Promise.resolve({ iceServers: [] }));
-    manager.configureMediaEncryption(SymmetricKey.generate().valueOf(), true);
+    manager.configureMediaEncryption(SymmetricKey.generate().valueOf());
     manager.setLocalStream(mediaStreamWithTracks([microphone]));
 
     await manager.ensurePeer('peer-identity-id', false, () =>
@@ -1641,7 +1641,7 @@ describe(CallPeerConnections.name, () => {
     ) as unknown as jest.MockedFunction<SignalSender>;
 
     manager.configure(() => Promise.resolve({ iceServers: [] }));
-    manager.configureMediaEncryption(SymmetricKey.generate().valueOf(), true);
+    manager.configureMediaEncryption(SymmetricKey.generate().valueOf());
     manager.setLocalStream(
       mediaStreamWithTracks([mediaTrack('audio', 'audio')]),
     );
@@ -1665,7 +1665,7 @@ describe(CallPeerConnections.name, () => {
     const manager = callPeerConnectionManager();
 
     manager.configure(() => Promise.resolve({ iceServers: [] }));
-    manager.configureMediaEncryption(SymmetricKey.generate().valueOf(), true);
+    manager.configureMediaEncryption(SymmetricKey.generate().valueOf());
     manager.setLocalStream(
       mediaStreamWithTracks([mediaTrack('audio', 'audio')]),
     );
@@ -1712,7 +1712,7 @@ describe(CallPeerConnections.name, () => {
       ) as unknown as jest.MockedFunction<SignalSender>;
 
       manager.configure(() => Promise.resolve({ iceServers: [] }));
-      manager.configureMediaEncryption(SymmetricKey.generate().valueOf(), true);
+      manager.configureMediaEncryption(SymmetricKey.generate().valueOf());
       manager.setLocalStream(
         mediaStreamWithTracks([mediaTrack('audio', 'audio')]),
       );
@@ -1747,7 +1747,7 @@ describe(CallPeerConnections.name, () => {
     ) as unknown as jest.MockedFunction<SignalSender>;
 
     manager.configure(() => Promise.resolve({ iceServers: [] }));
-    manager.configureMediaEncryption(SymmetricKey.generate().valueOf(), true);
+    manager.configureMediaEncryption(SymmetricKey.generate().valueOf());
     await manager.ensurePeer('peer-identity-id', true, sendSignal);
 
     await manager.handleSignal(
@@ -1774,7 +1774,7 @@ describe(CallPeerConnections.name, () => {
     ) as unknown as jest.MockedFunction<SignalSender>;
 
     manager.configure(() => Promise.resolve({ iceServers: [] }));
-    manager.configureMediaEncryption(SymmetricKey.generate().valueOf(), true);
+    manager.configureMediaEncryption(SymmetricKey.generate().valueOf());
     await manager.ensurePeer('peer-identity-id', false, sendSignal);
 
     await manager.handleSignal(
@@ -1806,7 +1806,7 @@ describe(CallPeerConnections.name, () => {
     ) as unknown as jest.MockedFunction<SignalSender>;
 
     manager.configure(() => Promise.resolve({ iceServers: [] }));
-    manager.configureMediaEncryption(SymmetricKey.generate().valueOf(), true);
+    manager.configureMediaEncryption(SymmetricKey.generate().valueOf());
     await manager.ensurePeer('peer-identity-id', false, sendSignal);
 
     await manager.handleSignal(
@@ -1869,7 +1869,7 @@ describe(CallPeerConnections.name, () => {
       }),
     } as unknown as RTCRtpSender;
 
-    expect(() => cipher.configureSender(sender, () => true)).not.toThrow();
+    expect(() => cipher.configureSender(sender)).not.toThrow();
   });
 
   it('serializes concurrent peer creation for the same identity', async () => {

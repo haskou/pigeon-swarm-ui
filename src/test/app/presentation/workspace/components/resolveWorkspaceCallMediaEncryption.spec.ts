@@ -11,25 +11,27 @@ import { copy } from '../../../../../shared/presentation/i18n/copy';
 function operationsOf(
   visibility: string,
 ): jest.Mock<Promise<readonly CommunityOperation[]>, [string]> {
-  return jest.fn().mockResolvedValue([
-    CommunityOperation.fromPrimitives({
-      action: CommunityOperation.GENESIS,
-      args: {
-        autoJoinEnabled: false,
-        description: '',
-        discoverable: true,
-        name: 'Community',
-        nonce: 'nonce-1',
-        visibility,
-      },
-      authorIdentityId: 'identity-1',
-      communityId: 'community-1',
-      createdAt: 1,
-      hash: 'genesis-hash',
-      networkId: 'network-1',
-      parents: [],
-    }),
-  ]);
+  return jest
+    .fn<Promise<readonly CommunityOperation[]>, [string]>()
+    .mockResolvedValue([
+      CommunityOperation.fromPrimitives({
+        action: CommunityOperation.GENESIS,
+        args: {
+          autoJoinEnabled: false,
+          description: '',
+          discoverable: true,
+          name: 'Community',
+          nonce: 'nonce-1',
+          visibility,
+        },
+        authorIdentityId: 'identity-1',
+        communityId: 'community-1',
+        createdAt: 1,
+        hash: 'genesis-hash',
+        networkId: 'network-1',
+        parents: [],
+      }),
+    ]);
 }
 
 function call(scope: CallResource['scope']): CallResource {

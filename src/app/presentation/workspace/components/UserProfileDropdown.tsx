@@ -82,7 +82,6 @@ type UserProfileDropdownProps = {
   onCallToggleCamera?: () => void;
   onCallToggleDeafen?: () => void;
   onCallToggleMute?: () => void;
-  onCallToggleMediaEncryption?: () => void;
   onCallToggleNoiseCancellation?: () => void;
   onCallRetryMicrophone?: (deviceId?: string) => void;
   onCallRetryConnection?: () => void;
@@ -109,7 +108,6 @@ function ProfileCallBar({
   onCallScreenShareQualityChange,
   onCallToggleCamera,
   onCallToggleDeafen,
-  onCallToggleMediaEncryption,
   onCallToggleMute,
   onCallToggleNoiseCancellation,
   onCallToggleScreenShare,
@@ -124,7 +122,6 @@ function ProfileCallBar({
   | 'onCallScreenShareQualityChange'
   | 'onCallToggleCamera'
   | 'onCallToggleDeafen'
-  | 'onCallToggleMediaEncryption'
   | 'onCallToggleMute'
   | 'onCallToggleNoiseCancellation'
   | 'onCallToggleScreenShare'
@@ -139,7 +136,6 @@ function ProfileCallBar({
     onScreenShareQualityChange: onCallScreenShareQualityChange,
     onToggleCamera: onCallToggleCamera,
     onToggleDeafen: onCallToggleDeafen,
-    onToggleMediaEncryption: onCallToggleMediaEncryption,
     onToggleMute: onCallToggleMute,
     onToggleNoiseCancellation: onCallToggleNoiseCancellation,
     onToggleScreenShare: onCallToggleScreenShare,
@@ -666,7 +662,6 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
   onCallScreenShareQualityChange,
   onCallToggleCamera,
   onCallToggleDeafen,
-  onCallToggleMediaEncryption,
   onCallToggleMute,
   onCallToggleNoiseCancellation,
   onCallToggleScreenShare,
@@ -730,7 +725,6 @@ export const UserProfileDropdown = memo(function UserProfileDropdown({
         onCallScreenShareQualityChange={onCallScreenShareQualityChange}
         onCallToggleCamera={onCallToggleCamera}
         onCallToggleDeafen={onCallToggleDeafen}
-        onCallToggleMediaEncryption={onCallToggleMediaEncryption}
         onCallToggleMute={onCallToggleMute}
         onCallToggleNoiseCancellation={onCallToggleNoiseCancellation}
         onCallToggleScreenShare={onCallToggleScreenShare}

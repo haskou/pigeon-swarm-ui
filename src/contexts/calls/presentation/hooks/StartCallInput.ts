@@ -17,7 +17,6 @@ export type StartCallInput = {
   loadIceConfig: () => Promise<CallIceServerConfig>;
   localStream?: MediaStream | null;
   microphoneError?: CallMicrophoneErrorCode;
-  mediaEncryptionEnabled: boolean;
   mediaEncryptionKey?: string;
   mediaEncryptionUnavailableReason?: CallMediaEncryptionUnavailableReason;
   noiseCancellationEnabled: boolean;
