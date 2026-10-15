@@ -75,6 +75,9 @@ a tiny distributed hostage negotiation.
   notifications and peer state.
 - Node first-run flow, public/private network management, peer metrics and
   connection-loss handling.
+- Direct and community voice calls; see
+  [calls: browser support](./docs/calls-browser-support.md) for which
+  browsers can make which calls.
 - English and Spanish UI copy, selectable from the profile menu.
 
 ## Architecture
