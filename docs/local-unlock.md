@@ -364,6 +364,31 @@ applies (see "What each choice protects against").
   client server (`client/server.mjs` in pigeon-swarm) sends
   `frame-ancestors 'none'`. Covered by `contentSecurityPolicy.spec.ts`.
 
+## Transition from the previous local format
+
+Earlier builds stored an automatic local unlock in IndexedDB database
+`pigeon-swarm-device-unlock` (store `sessions`), and in the independent client
+one database per node, `pigeon-swarm-device-unlock:<scope>`. It held the
+identity master key and identity key pair, encrypted with an AES key kept in
+the same database, so any same-origin script could decrypt it.
+
+`deleteLegacyLocalDeviceUnlockStore`
+(`src/contexts/identities/infrastructure/storage/deleteLegacyLocalDeviceUnlockStore.ts`)
+deletes those databases once on app mount (`useAppBootstrap`). It never opens,
+reads, or migrates them: the device vault is the only unlock path.
+
+- The unscoped database is always deleted. Scoped databases are found through
+  `indexedDB.databases()`; browsers without it (or where it rejects) only get
+  the unscoped delete, and a scoped legacy database there stays on disk.
+- A missing database is not created. Without `indexedDB`, the step is skipped.
+- A delete blocked by another open tab completes when that tab closes.
+- The device vault and other databases are untouched.
+
+Deleting the database does not rotate the identity keys it held. A copy taken
+from the browser profile before the upgrade still contains them.
+
+Covered by `deleteLegacyLocalDeviceUnlockStore.spec.ts`.
+
 ## Tests
 
 `DeviceIdentityVault.spec.ts` and `DeviceIdentityProtector.spec.ts` run in the

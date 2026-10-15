@@ -12,6 +12,7 @@ import {
   parseCommunityInviteUrl,
   type PendingCommunityInviteLink,
 } from '../../contexts/communities/presentation/view-models/communityInviteLink';
+import { deleteLegacyLocalDeviceUnlockStore } from '../../contexts/identities/infrastructure/storage/deleteLegacyLocalDeviceUnlockStore';
 import { useNodeNetworks } from '../../contexts/networks/presentation/hooks/useNodeNetworks';
 import { usePeers } from '../../contexts/networks/presentation/hooks/usePeers';
 import { clearProjectedMessageCaches } from '../../shared/infrastructure/storage/clearProjectedMessageCaches';
@@ -88,6 +89,10 @@ export function useAppBootstrap(): {
     void clearProjectedMessageCaches();
     setSession(null);
   }, [session]);
+
+  useEffect(() => {
+    void deleteLegacyLocalDeviceUnlockStore();
+  }, []);
 
   useEffect(() => {
     sessionRef.current = session;
