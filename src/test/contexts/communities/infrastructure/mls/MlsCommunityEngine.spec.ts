@@ -679,11 +679,12 @@ describe('MlsCommunityEngine', () => {
       name: string,
       store: MlsStateStore,
       withheld: string,
+      transport = node.transportFor(id(name)),
     ): MlsCommunityEngine =>
       new MlsCommunityEngine(
         cast[name].signer(),
         store,
-        () => node.transportFor(id(name)),
+        () => transport,
         (groupId) => () =>
           Promise.resolve(
             CommunityRosterHistory.of(
@@ -864,6 +865,50 @@ describe('MlsCommunityEngine', () => {
       );
     });
 
+    it('steps back no further than the epochs it lists when the node serves an older witness', async () => {
+      const { alice, bob, carol } = await carolManages();
+      const beforeDemotion = headsNow();
+      const honest = node.transportFor(id('bob'));
+
+      demoteCarol();
+      // The node lists every commit, however old, and withholds the demotion.
+      const withheld = withholding('bob', bob.store, headsNow()[0], {
+        ...honest,
+        list: (query) => honest.list({ ...query, afterEpoch: undefined }),
+      });
+
+      await alice.engine.reconcile(COMMUNITY);
+      const binding = node.records.pop() as MlsRecordResource;
+      const malloryKey = await generateMlsKeyPackage(cast.mallory.signer());
+      const added = await (
+        await rogueGroupOf('carol', carol.store, beforeDemotion)
+      ).add([malloryKey.publicBytes]);
+
+      await publishCommit('carol', added);
+      await withheld.sync(COMMUNITY);
+      // Mallory rotates her leaf, and bob moves one more epoch on.
+      const mallory = await MlsGroup.join(
+        COMMUNITY,
+        malloryKey,
+        added.welcome as Uint8Array,
+        { ...anything, frontier: () => beforeDemotion },
+      );
+
+      await publishCommit('mallory', await mallory.update());
+      mallory.confirm('rotated');
+      await withheld.sync(COMMUNITY);
+      node.records.push(binding);
+
+      await expect(withheld.sync(COMMUNITY)).resolves.toBe(true);
+      const ciphertext = await mallory.encrypt(
+        new TextEncoder().encode('moved on'),
+      );
+
+      await expect(
+        withheld.decrypt(COMMUNITY, base64(ciphertext)),
+      ).resolves.toBe('moved on');
+    });
+
     /**
      * Alice kicks carol, who never sees it: she races the commit removing
      * her with an update for its epoch that wins on id, bound to the
@@ -961,6 +1006,29 @@ describe('MlsCommunityEngine', () => {
         'mallory',
       );
       demoteCarol();
+
+      await expect(mallory.engine.sync(COMMUNITY)).resolves.toBe(true);
+      await expect(mallory.engine.hasGroup(COMMUNITY)).resolves.toBe(false);
+    });
+
+    it('refuses a welcome a member signed into a look-alike group when the node names a manager its author', async () => {
+      roster.add(id('mallory'));
+      const alice = engineFor('alice');
+      const mallory = engineFor('mallory');
+      const lookAlike = await MlsGroup.create(
+        COMMUNITY,
+        await generateMlsKeyPackage(cast.bob.signer()),
+        { ...anything, frontier: () => headsNow() },
+      );
+
+      await alice.engine.createGroup(COMMUNITY);
+      await alice.engine.publishKeyPackages(COMMUNITY);
+      await mallory.engine.publishKeyPackages(COMMUNITY);
+      await publishWelcome(
+        'alice',
+        await lookAlike.add([keyPackageOf('alice'), keyPackageOf('mallory')]),
+        'mallory',
+      );
 
       await expect(mallory.engine.sync(COMMUNITY)).resolves.toBe(true);
       await expect(mallory.engine.hasGroup(COMMUNITY)).resolves.toBe(false);

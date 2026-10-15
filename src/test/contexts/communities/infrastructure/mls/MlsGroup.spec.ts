@@ -25,12 +25,14 @@ let allows: (
 /** The revision this device has verified up to; it commits bound to it. */
 let latest: string[];
 let reach: (frontier: readonly string[]) => number;
+/** Whether the node withholds the roster operations a commit binds. */
+let withheld: (committer: string, frontier: readonly string[]) => boolean;
 const policy: MlsMembershipPolicy = {
   admits: (identityId) => members.has(identityId),
   allows: (change, order) => allows(change, order),
   frontier: () => latest,
   reach: (frontier) => reach(frontier),
-  withheld: () => false,
+  withheld: (committer, frontier) => withheld(committer, frontier),
 };
 const idOf = (name: string): string => cast[name].id;
 const idsOf = (...names: string[]): string[] => names.map(idOf).sort();
@@ -164,6 +166,7 @@ describe('MlsGroup on the real ts-mls library', () => {
     allows = () => true;
     latest = [];
     reach = () => 0;
+    withheld = () => false;
   });
 
   it('delivers a message to every member of a multi-user group', async () => {
@@ -480,6 +483,37 @@ describe('MlsGroup on the real ts-mls library', () => {
 
       expect(read(await receiver.decrypt(sealed))).toBe('bob won');
     }
+  });
+
+  it('goes on with its sending generations when it takes again an add it stepped back from', async () => {
+    const { alice, bob, carol } = await setup(['alice', 'bob', 'carol']);
+    const add = await alice.group.add([(await device('dave')).publicBytes]);
+    const record = { bytes: add.commit, epoch: add.epoch, id: nextId() };
+
+    alice.group.confirm(record.id);
+    // Carol's rival binds an operation the node has not served bob yet.
+    latest = [op('kick')];
+    const rival = await carol.group.update();
+    latest = [];
+    await bob.group.applyCommit(record);
+    const first = await bob.group.encrypt(text.encode('before the witness'));
+
+    expect(read(await alice.group.decrypt(first))).toBe('before the witness');
+    withheld = (_committer, frontier) => frontier.includes(op('kick'));
+    await bob.group.applyCommit({
+      bytes: rival.commit,
+      epoch: rival.epoch,
+      id: nextId(),
+    });
+    expect(bob.group.epoch).toBe(record.epoch);
+    // The operation arrives and allows the add after all.
+    withheld = () => false;
+    await expect(bob.group.applyCommit(record)).resolves.toMatchObject({
+      kind: 'applied',
+    });
+    const second = await bob.group.encrypt(text.encode('after the operation'));
+
+    expect(read(await alice.group.decrypt(second))).toBe('after the operation');
   });
 
   it('lets a removed member rejoin with a fresh key package and read only what follows', async () => {
