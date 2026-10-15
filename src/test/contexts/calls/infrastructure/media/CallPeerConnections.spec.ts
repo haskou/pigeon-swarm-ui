@@ -314,6 +314,61 @@ function restoreGlobalProperty(
   Reflect.deleteProperty(globalThis, property);
 }
 
+/**
+ * Makes each local sender of the next peer connections emit `frame` once and
+ * collect what it hands to the network in `written`.
+ */
+function installOutboundFrame(frame: Uint8Array, written: ArrayBuffer[]): void {
+  const createPeer = globalThis.RTCPeerConnection as unknown as jest.Mock<
+    FakePeerConnection,
+    [RTCConfiguration]
+  >;
+  const create = createPeer.getMockImplementation();
+
+  createPeer.mockImplementation((configuration) => {
+    const peer = (create as (value: RTCConfiguration) => FakePeerConnection)(
+      configuration,
+    );
+    const addTrack = peer.addTrack as (track: MediaStreamTrack) => RTCRtpSender;
+
+    peer.addTrack = jest.fn((track: MediaStreamTrack) => {
+      const sender = addTrack(track) as unknown as FakeSender;
+
+      sender.createEncodedStreams = jest.fn(() => ({
+        readable: new ReadableStream<
+          RTCEncodedAudioFrame | RTCEncodedVideoFrame
+        >({
+          start(controller): void {
+            controller.enqueue({
+              data: frame.slice().buffer,
+            } as RTCEncodedAudioFrame);
+            controller.close();
+          },
+        }),
+        writable: new WritableStream<
+          RTCEncodedAudioFrame | RTCEncodedVideoFrame
+        >({
+          write(encoded): void {
+            written.push(encoded.data);
+          },
+        }),
+      }));
+
+      return sender as unknown as RTCRtpSender;
+    });
+
+    return peer;
+  });
+}
+
+async function framesWritten(written: ArrayBuffer[]): Promise<void> {
+  for (let turn = 0; turn < 100 && written.length === 0; turn += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+}
+
+const encryptedMedia = { acceptsEncrypted: true, enabled: true, version: 1 };
+
 describe(CallPeerConnections.name, () => {
   afterEach(() => {
     jest.useRealTimers();
@@ -355,7 +410,7 @@ describe(CallPeerConnections.name, () => {
     manager.reset();
   });
 
-  it('refreshes encryption metadata when retrying a rejected offer', async () => {
+  it('announces encrypted media again when retrying a rejected offer', async () => {
     jest.useFakeTimers();
     const peers: FakePeerConnection[] = [];
 
@@ -377,22 +432,15 @@ describe(CallPeerConnections.name, () => {
     manager.configureMediaEncryption(SymmetricKey.generate().valueOf(), true);
     const sending = manager.ensurePeer('remote', true, sendSignal);
 
-    await jest.advanceTimersByTimeAsync(0);
-    expect(sendSignal.mock.calls[0][2].mediaEncryption).toMatchObject({
-      acceptsEncrypted: true,
-    });
-    manager.setMediaEncryptionEnabled(false);
     await jest.advanceTimersByTimeAsync(500);
     await sending;
-    expect(sendSignal.mock.calls[1][2].mediaEncryption).toEqual({
-      acceptsEncrypted: false,
-      enabled: false,
-      version: 1,
-    });
+    expect(
+      sendSignal.mock.calls.map((call) => call[2].mediaEncryption),
+    ).toEqual([encryptedMedia, encryptedMedia]);
     manager.reset();
   });
 
-  it('delivers a pending answer before renegotiating media settings', async () => {
+  it('delivers a pending answer before renegotiating', async () => {
     jest.useFakeTimers();
     const peers: FakePeerConnection[] = [];
 
@@ -422,7 +470,10 @@ describe(CallPeerConnections.name, () => {
 
     await jest.advanceTimersByTimeAsync(0);
     expect(sendSignal.mock.calls.map((call) => call[1])).toEqual(['answer']);
-    manager.setMediaEncryptionEnabled(false);
+    registeredPeerEventListener(
+      peers[0],
+      'negotiationneeded',
+    )(new Event('negotiationneeded'));
     await jest.advanceTimersByTimeAsync(0);
     expect(peers[0].createOffer).not.toHaveBeenCalled();
     await jest.advanceTimersByTimeAsync(500);
@@ -1579,7 +1630,7 @@ describe(CallPeerConnections.name, () => {
     expect(sender.createEncodedStreams).toHaveBeenCalledTimes(1);
   });
 
-  it('does not announce encrypted outbound media to peers without metadata', async () => {
+  it('announces encrypted media in its first offer, before the peer describes itself', async () => {
     const peers: FakePeerConnection[] = [];
 
     installEncodedStreamSupport();
@@ -1600,17 +1651,150 @@ describe(CallPeerConnections.name, () => {
     expect(sendSignal).toHaveBeenCalledWith(
       'peer-identity-id',
       'offer',
-      expect.objectContaining({
-        mediaEncryption: {
-          acceptsEncrypted: true,
-          enabled: false,
-          version: 1,
-        },
-      }),
+      expect.objectContaining({ mediaEncryption: encryptedMedia }),
     );
   });
 
-  it('reports media encryption only when both peer directions are encrypted', async () => {
+  it('encrypts every outbound frame of a private call, before the peer describes itself', async () => {
+    const peers: FakePeerConnection[] = [];
+    const written: ArrayBuffer[] = [];
+
+    installEncodedStreamSupport();
+    installPeerConnectionMock(peers);
+    installOutboundFrame(new Uint8Array([1, 2, 3, 4]), written);
+    const manager = callPeerConnectionManager();
+
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
+    manager.configureMediaEncryption(SymmetricKey.generate().valueOf(), true);
+    manager.setLocalStream(
+      mediaStreamWithTracks([mediaTrack('audio', 'audio')]),
+    );
+
+    await manager.ensurePeer('peer-identity-id', true, () => Promise.resolve());
+    await framesWritten(written);
+
+    expect(written).toHaveLength(1);
+    expect(
+      new TextDecoder().decode(new Uint8Array(written[0]).slice(0, 5)),
+    ).toBe('PSCE1');
+    expect(new Uint8Array(written[0]).byteLength).toBeGreaterThan(4 + 5 + 12);
+  });
+
+  it.each([
+    ['omits media encryption', {}],
+    [
+      'does not accept encrypted media',
+      {
+        mediaEncryption: {
+          acceptsEncrypted: false,
+          enabled: false,
+          version: 1,
+        },
+      },
+    ],
+    [
+      'would send plaintext media',
+      {
+        mediaEncryption: { acceptsEncrypted: true, enabled: false, version: 1 },
+      },
+    ],
+  ])(
+    'refuses a peer of a private call whose offer %s',
+    async (_label, metadata) => {
+      const peers: FakePeerConnection[] = [];
+
+      installEncodedStreamSupport();
+      installSessionDescriptionMock();
+      installPeerConnectionMock(peers);
+      const manager = callPeerConnectionManager();
+      const sendSignal = jest.fn(() =>
+        Promise.resolve(),
+      ) as unknown as jest.MockedFunction<SignalSender>;
+
+      manager.configure(() => Promise.resolve({ iceServers: [] }));
+      manager.configureMediaEncryption(SymmetricKey.generate().valueOf(), true);
+      manager.setLocalStream(
+        mediaStreamWithTracks([mediaTrack('audio', 'audio')]),
+      );
+      await manager.ensurePeer('peer-identity-id', false, sendSignal);
+
+      await manager.handleSignal(
+        'peer-identity-id',
+        'offer',
+        { ...metadata, sdp: 'plaintext-offer', type: 'offer' },
+        sendSignal,
+        'current-identity-id',
+      );
+
+      expect(peers[0].setRemoteDescription).not.toHaveBeenCalled();
+      expect(peers[0].close).toHaveBeenCalled();
+      expect(sendSignal).not.toHaveBeenCalled();
+      expect(manager.isMediaEncryptionActiveWith('peer-identity-id')).toBe(
+        false,
+      );
+    },
+  );
+
+  it('refuses a peer of a private call whose answer does not announce encrypted media', async () => {
+    const peers: FakePeerConnection[] = [];
+
+    installEncodedStreamSupport();
+    installSessionDescriptionMock();
+    installPeerConnectionMock(peers);
+    const manager = callPeerConnectionManager();
+    const sendSignal = jest.fn(() =>
+      Promise.resolve(),
+    ) as unknown as jest.MockedFunction<SignalSender>;
+
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
+    manager.configureMediaEncryption(SymmetricKey.generate().valueOf(), true);
+    await manager.ensurePeer('peer-identity-id', true, sendSignal);
+
+    await manager.handleSignal(
+      'peer-identity-id',
+      'answer',
+      { sdp: 'plaintext-answer', type: 'answer' },
+      sendSignal,
+      'current-identity-id',
+    );
+
+    expect(peers[0].setRemoteDescription).not.toHaveBeenCalled();
+    expect(peers[0].close).toHaveBeenCalled();
+    expect(manager.isMediaEncryptionActiveWith('peer-identity-id')).toBe(false);
+  });
+
+  it('refuses every peer of a private call when this browser cannot encrypt media', async () => {
+    const peers: FakePeerConnection[] = [];
+
+    installSessionDescriptionMock();
+    installPeerConnectionMock(peers);
+    const manager = callPeerConnectionManager();
+    const sendSignal = jest.fn(() =>
+      Promise.resolve(),
+    ) as unknown as jest.MockedFunction<SignalSender>;
+
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
+    manager.configureMediaEncryption(SymmetricKey.generate().valueOf(), true);
+    await manager.ensurePeer('peer-identity-id', false, sendSignal);
+
+    await manager.handleSignal(
+      'peer-identity-id',
+      'offer',
+      {
+        mediaEncryption: encryptedMedia,
+        sdp: 'encrypted-offer',
+        type: 'offer',
+      },
+      sendSignal,
+      'current-identity-id',
+    );
+
+    expect(peers[0].setRemoteDescription).not.toHaveBeenCalled();
+    expect(peers[0].close).toHaveBeenCalled();
+    expect(sendSignal).not.toHaveBeenCalled();
+  });
+
+  it('answers a peer of a private call that announces encrypted media', async () => {
     const peers: FakePeerConnection[] = [];
 
     installEncodedStreamSupport();
@@ -1629,29 +1813,7 @@ describe(CallPeerConnections.name, () => {
       'peer-identity-id',
       'offer',
       {
-        mediaEncryption: {
-          acceptsEncrypted: true,
-          enabled: false,
-          version: 1,
-        },
-        sdp: 'unencrypted-offer',
-        type: 'offer',
-      },
-      sendSignal,
-      'current-identity-id',
-    );
-
-    expect(manager.isMediaEncryptionActiveWith('peer-identity-id')).toBe(false);
-
-    await manager.handleSignal(
-      'peer-identity-id',
-      'offer',
-      {
-        mediaEncryption: {
-          acceptsEncrypted: true,
-          enabled: true,
-          version: 1,
-        },
+        mediaEncryption: encryptedMedia,
         sdp: 'encrypted-offer',
         type: 'offer',
       },
@@ -1659,13 +1821,18 @@ describe(CallPeerConnections.name, () => {
       'current-identity-id',
     );
 
+    expect(peers[0].setRemoteDescription).toHaveBeenCalled();
+    expect(sendSignal).toHaveBeenCalledWith(
+      'peer-identity-id',
+      'answer',
+      expect.objectContaining({ mediaEncryption: encryptedMedia }),
+    );
     expect(manager.isMediaEncryptionActiveWith('peer-identity-id')).toBe(true);
   });
 
-  it('re-announces encrypted sending after a peer accepts it in an answer', async () => {
+  it('answers a peer of a public call that sends no encryption metadata', async () => {
     const peers: FakePeerConnection[] = [];
 
-    installEncodedStreamSupport();
     installSessionDescriptionMock();
     installPeerConnectionMock(peers);
     const manager = callPeerConnectionManager();
@@ -1674,40 +1841,22 @@ describe(CallPeerConnections.name, () => {
     ) as unknown as jest.MockedFunction<SignalSender>;
 
     manager.configure(() => Promise.resolve({ iceServers: [] }));
-    manager.configureMediaEncryption(SymmetricKey.generate().valueOf(), true);
+    await manager.ensurePeer('peer-identity-id', false, sendSignal);
 
-    await manager.ensurePeer('peer-identity-id', true, sendSignal);
     await manager.handleSignal(
       'peer-identity-id',
-      'answer',
-      {
-        mediaEncryption: {
-          acceptsEncrypted: true,
-          enabled: true,
-          version: 1,
-        },
-        sdp: 'encrypted-answer',
-        type: 'answer',
-      },
+      'offer',
+      { sdp: 'public-offer', type: 'offer' },
       sendSignal,
       'current-identity-id',
     );
 
-    expect(sendSignal).toHaveBeenLastCalledWith(
+    expect(peers[0].setRemoteDescription).toHaveBeenCalled();
+    expect(sendSignal).toHaveBeenCalledWith(
       'peer-identity-id',
-      'offer',
-      expect.objectContaining({
-        mediaEncryption: {
-          acceptsEncrypted: true,
-          enabled: true,
-          version: 1,
-        },
-      }),
+      'answer',
+      expect.anything(),
     );
-    expect(
-      sendSignal.mock.calls.filter(([, signalType]) => signalType === 'offer'),
-    ).toHaveLength(2);
-    expect(manager.isMediaEncryptionActiveWith('peer-identity-id')).toBe(true);
   });
 
   it('does not throw when encoded streams are rejected by the browser', () => {
