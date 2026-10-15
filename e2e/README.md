@@ -86,6 +86,13 @@ after a new sign-in) runs on `desktop-chromium`.
 signs in with its recovery key on a new device, sees the notice that its
 conversations must invite it again, and restores a backup exported before the
 recovery) runs on `desktop-chromium`.
+`contact-presence.spec.ts` (two identities on the same node turn on "Share
+status" in their direct conversation; before that the contact shows no
+status, then it shows Online, and once the contact picks Invisible it shows
+Offline when the last update expires, within its 90-second lifetime plus the
+30-second read interval, and never shows Invisible) runs on
+`desktop-chromium`. The harness runs one node, so the spec does not cover
+contacts whose mailboxes live on different nodes.
 `passkey-unlock.spec.ts` (switching this device from a password to a passkey
 and unlocking with it) runs on `desktop-chromium` only: it uses a DevTools
 virtual authenticator with PRF and opens the app through `localhost`, because
