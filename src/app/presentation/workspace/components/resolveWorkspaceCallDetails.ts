@@ -29,7 +29,7 @@ function callParticipantIds(
   call: CallResource,
   currentIdentityId: string,
 ): string[] {
-  if (call.scope.type !== 'community_channel') return call.participantIds;
+  if (call.scope.type === 'conversation') return call.participantIds;
 
   return call.participants
     .filter(
@@ -181,21 +181,10 @@ function conversationCallDetails({
     ? identityProfiles[peerIdentityId]
     : undefined;
   const peerHandle = peerIdentity?.profile.handle?.trim();
-  const kind = conversation?.type === 'group' ? 'group' : 'one-to-one';
-
-  if (kind === 'group') {
-    return {
-      conversationId,
-      kind,
-      participants,
-      subtitle: undefined,
-      title: conversation?.name ?? fallbackLabels.noConversation,
-    };
-  }
 
   return {
     conversationId,
-    kind,
+    kind: 'one-to-one',
     participants,
     subtitle: oneToOneCallSubtitle(peerHandle, peerIdentityId),
     title: oneToOneCallTitle({
@@ -227,6 +216,15 @@ export function resolveWorkspaceCallDetails({
     identityProfiles,
   });
   const scope = call.scope;
+
+  if (scope.type === 'group_capability') {
+    return {
+      kind: 'group',
+      participants,
+      subtitle: undefined,
+      title: fallbackLabels.noConversation,
+    };
+  }
 
   if (scope.type === 'community_channel') {
     return communityVoiceCallDetails({

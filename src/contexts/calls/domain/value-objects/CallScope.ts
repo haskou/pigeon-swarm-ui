@@ -5,14 +5,22 @@ import { CallScopeType } from './CallScopeType';
 
 export class CallScope {
   public static fromPrimitives(primitives: PrimitiveOf<CallScope>): CallScope {
-    return primitives.type === 'community_channel'
-      ? CallScope.communityChannel(
-          CallScopeIdentifier.fromString(primitives.communityId),
-          CallScopeIdentifier.fromString(primitives.channelId),
-        )
-      : CallScope.conversation(
-          CallScopeIdentifier.fromString(primitives.conversationId),
-        );
+    if (primitives.type === 'community_channel') {
+      return CallScope.communityChannel(
+        CallScopeIdentifier.fromString(primitives.communityId),
+        CallScopeIdentifier.fromString(primitives.channelId),
+      );
+    }
+
+    if (primitives.type === 'group_capability') {
+      return CallScope.groupCapability(
+        CallScopeIdentifier.fromString(primitives.capabilityHash),
+      );
+    }
+
+    return CallScope.conversation(
+      CallScopeIdentifier.fromString(primitives.conversationId),
+    );
   }
 
   public static communityChannel(
@@ -28,6 +36,16 @@ export class CallScope {
 
   public static conversation(conversationId: CallScopeIdentifier): CallScope {
     return new CallScope(CallScopeType.CONVERSATION, conversationId);
+  }
+
+  /**
+   * A group call names neither its group nor its members: only the SHA-256
+   * of the capability its members derive from the group's MLS epoch.
+   */
+  public static groupCapability(
+    capabilityHash: CallScopeIdentifier,
+  ): CallScope {
+    return new CallScope(CallScopeType.GROUP_CAPABILITY, capabilityHash);
   }
 
   private constructor(
@@ -50,6 +68,15 @@ export class CallScope {
         channelId: this.secondIdentifier.toString(),
         communityId: this.firstIdentifier.toString(),
         type: 'community_channel',
+      };
+
+      return primitives;
+    }
+
+    if (this.type.isGroupCapability()) {
+      const primitives: { capabilityHash: string; type: 'group_capability' } = {
+        capabilityHash: this.firstIdentifier.toString(),
+        type: 'group_capability',
       };
 
       return primitives;

@@ -95,7 +95,6 @@ export interface ChatColumnProps {
   onCancelReply: () => void;
   onStartCall?: (input: {
     conversationId: string;
-    kind: 'group' | 'one-to-one';
     participants: CallParticipant[];
     title: string;
   }) => void;

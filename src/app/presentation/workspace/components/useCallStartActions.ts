@@ -117,12 +117,9 @@ export function useCallStartActions({
   const startConversationCall = useCallback(
     (input: {
       conversationId: string;
-      kind: 'group' | 'one-to-one';
       participants: CallParticipant[];
       title: string;
     }) => {
-      if (input.kind === 'group') return;
-
       if (callActionInProgressRef.current) {
         logCallWarning(
           'workspace:conversation-call:ignored-action-in-progress',
@@ -135,7 +132,7 @@ export function useCallStartActions({
       }
 
       if (
-        activeCall?.kind === input.kind &&
+        activeCall?.kind === 'one-to-one' &&
         activeCall.conversationId === input.conversationId
       ) {
         logCallWarning('workspace:conversation-call:ignored-already-active', {

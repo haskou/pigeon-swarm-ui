@@ -13,7 +13,6 @@ export type CallStartActions = {
   }) => void;
   startConversationCall: (input: {
     conversationId: string;
-    kind: 'group' | 'one-to-one';
     participants: CallParticipant[];
     title: string;
   }) => void;

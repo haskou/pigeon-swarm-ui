@@ -7,6 +7,7 @@ import type { CallId } from '../../domain/value-objects/CallId';
 import type { CallIdentityId } from '../../domain/value-objects/CallIdentityId';
 import type { CallScope } from '../../domain/value-objects/CallScope';
 
+import { GroupCallCannotBeStartedError } from '../../domain/errors/GroupCallCannotBeStartedError';
 import { CallAccessContexts } from './CallAccessContexts';
 import { CallMapper } from './CallMapper';
 import { PigeonCallsApi } from './PigeonCallsApi';
@@ -25,6 +26,11 @@ export class PigeonCallRepository implements CallRepository {
   ): Promise<Call> {
     const session = this.contexts.find(actorIdentityId);
     const primitives = scope.toPrimitives();
+
+    if (primitives.type === 'group_capability') {
+      throw new GroupCallCannotBeStartedError();
+    }
+
     const resource =
       primitives.type === 'community_channel'
         ? await this.api.startCommunityChannel(

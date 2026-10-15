@@ -371,6 +371,12 @@ private. There is no switch to turn call E2EE off.
   other side may see the call ring, or this identity in the channel; no media
   is sent.
 - Public community calls never use media E2EE and stay open to every browser.
+- A group call (node scope `group_capability`, named by a capability hash and
+  not by its group) has no media key on this client, which does not offer
+  group calls yet (#492). The client never starts one
+  (`GroupCallCannotBeStartedError`), refuses its media
+  (`resolveWorkspaceCallMediaEncryption`) and ends or dismisses one it sees
+  (`workspace:call:ended-unsupported-group-call`).
 - A device in a private call refuses any peer whose offer or answer does not
   announce encrypted media (`CallMediaEncryption.admits`): it never sets that
   peer's description, so no media flows either way. Outbound frames are always
@@ -378,8 +384,9 @@ private. There is no switch to turn call E2EE off.
   to decrypt, are dropped rather than played.
 
 `resolveWorkspaceCallMediaEncryption.spec.ts`, `useCallStartActions.spec.ts`,
-`CallPeerConnections.spec.ts` and `EncodedCallMediaCipher.spec.ts`
-(`yarn test`) cover the refusals and the public community exception.
+`PigeonCallRepository.spec.ts`, `CallPeerConnections.spec.ts` and
+`EncodedCallMediaCipher.spec.ts` (`yarn test`) cover the refusals and the
+public community exception.
 
 ## Security properties and limits
 
