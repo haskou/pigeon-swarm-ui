@@ -493,7 +493,9 @@ private. There is no switch to turn call E2EE off.
   authenticates the sender's leaf, and the UI does not yet display that proof.
 - Call media keys are derived once, when the call starts. A group epoch change
   during a call (member join or leave) does not rekey it. Devices that derive
-  the key in different epochs cannot decrypt each other's media.
+  the key in different epochs cannot decrypt each other's media. Restricting
+  or reopening a channel during a call moves it to another group, so a device
+  that joins afterwards derives a different key and gets no media.
 - A peer refused for plaintext media is not remembered. Later ICE candidates or
   a call reconcile may create a fresh peer connection for it, which is refused
   again at its next description; expect connection churn but no media.
