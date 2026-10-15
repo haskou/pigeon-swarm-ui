@@ -1,7 +1,6 @@
 import { type ChangeEvent, useRef, useState } from 'react';
 
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
-import type { DeviceUnlockMethod } from '../../../../contexts/identities/infrastructure/storage/DeviceUnlockMethod';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
@@ -51,20 +50,13 @@ function BackupStatusLine({ status }: { status: BackupStatus }) {
 
 /**
  * Exports this identity's direct history and contacts as one encrypted file
- * after the device password or passkey confirms the person, and restores such
- * a file. The file never holds private or session keys.
+ * after the device password confirms the person, and restores such a file.
+ * The file never holds private or session keys.
  */
-export function HistoryBackupPanel({
-  session,
-  unlockMethod,
-}: {
-  session: Session;
-  unlockMethod: DeviceUnlockMethod | undefined;
-}) {
+export function HistoryBackupPanel({ session }: { session: Session }) {
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState<BackupStatus>({ kind: 'idle' });
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const usesPassword = unlockMethod !== 'passkey';
   const busy = status.kind === 'busy';
 
   const run = async (
@@ -92,7 +84,7 @@ export function HistoryBackupPanel({
       copy.deviceStorage.backupDone,
       copy.deviceStorage.backupFailed,
       async () => {
-        const secret = usesPassword ? password : undefined;
+        const secret = password;
 
         setPassword('');
         downloadBackup(await historyBackup.export(session, secret));
@@ -124,19 +116,17 @@ export function HistoryBackupPanel({
           {copy.deviceStorage.backupBody}
         </p>
       </div>
-      {usesPassword && (
-        <ProfileInput
-          label={copy.deviceStorage.backupPassword}
-          value={password}
-          onChange={setPassword}
-          placeholder={passwordPlaceholder}
-          type="password"
-        />
-      )}
+      <ProfileInput
+        label={copy.deviceStorage.backupPassword}
+        value={password}
+        onChange={setPassword}
+        placeholder={passwordPlaceholder}
+        type="password"
+      />
       <button
         className="ui-button ui-button-primary w-full"
         data-testid="history-backup-export"
-        disabled={busy || (usesPassword && !password)}
+        disabled={busy || !password}
         onClick={() => void backUp()}
         type="button"
       >

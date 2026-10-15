@@ -21,7 +21,6 @@ import type {
 import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { ContactDirectoryEntry } from '../../../contexts/identities/infrastructure/storage/ContactDirectoryEntry';
 import type { ContactDirectoryStore } from '../../../contexts/identities/infrastructure/storage/ContactDirectoryStore';
-import type { DeviceUnlockMethod } from '../../../contexts/identities/infrastructure/storage/DeviceUnlockMethod';
 import type { ContactPresenceStorage } from './ContactPresenceStorage';
 import type { IdentityUseCases } from './IdentityUseCases';
 
@@ -73,38 +72,12 @@ export class PigeonIdentitiesFacade {
     await this.gateway.changePassword(session, currentPassword, nextPassword);
   }
 
-  /** Switches this device back to a password; the passkey confirms it. */
-  public async disablePasskeyUnlock(
-    session: Session,
-    nextPassword: string,
-  ): Promise<void> {
-    await this.gateway.disablePasskeyUnlock(session, nextPassword);
-  }
-
-  /** Asks for the device password or passkey again; changes nothing. */
+  /** Asks for the device password again; changes nothing. */
   public async confirmLocalUnlock(
     identityId: string,
-    password?: string,
+    password: string,
   ): Promise<void> {
     await this.gateway.confirmLocalUnlock(identityId, password);
-  }
-
-  /** Replaces this device's password unlock with a user-verified passkey. */
-  public async enablePasskeyUnlock(
-    session: Session,
-    currentPassword: string,
-  ): Promise<void> {
-    await this.gateway.enablePasskeyUnlock(session, currentPassword);
-  }
-
-  public async localUnlockMethod(
-    identityId: string,
-  ): Promise<DeviceUnlockMethod | undefined> {
-    return await this.gateway.localUnlockMethod(identityId);
-  }
-
-  public async passkeyUnlockSupported(): Promise<boolean> {
-    return await this.gateway.passkeyUnlockSupported();
   }
 
   public createDevicePairingInvitation(session: Session): DevicePairingCode {
@@ -124,13 +97,13 @@ export class PigeonIdentitiesFacade {
   }
 
   /**
-   * Hands the identity root to a new device once the password, or the
-   * passkey when it unlocks this device, is confirmed again.
+   * Hands the identity root to a new device once the device password is
+   * confirmed again.
    */
   public async authorizeDevicePairing(
     session: Session,
     requestCode: DevicePairingCode,
-    password?: string,
+    password: string,
   ): Promise<{ completionCode: DevicePairingCode; session: Session }> {
     return await this.gateway.authorizeDevicePairing(
       session,
@@ -276,18 +249,6 @@ export class PigeonIdentitiesFacade {
         this.contexts.findFor(identity).session,
         onProgress,
       ),
-    );
-  }
-
-  /** The passkey output stays inside composition; the UI never sees it. */
-  public async loginWithPasskey(
-    identityId: string,
-    onProgress?: LoginIdentityProgressReporter,
-  ): Promise<LoginResult> {
-    return await this.login(
-      identityId,
-      await this.gateway.passkeyUnlockSecret(identityId),
-      onProgress,
     );
   }
 

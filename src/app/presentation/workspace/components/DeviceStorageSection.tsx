@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
-import type { DeviceUnlockMethod } from '../../../../contexts/identities/infrastructure/storage/DeviceUnlockMethod';
 import type { DeviceStorageEstimate } from '../../../../shared/infrastructure/storage/DeviceStorageEstimate';
 
 import { cx } from '../../../../shared/presentation/cx';
@@ -60,13 +59,7 @@ function StoragePlace({ body, title }: { body: string; title: string }) {
  * people. Reads the browser's storage estimate only while open, and offers an
  * encrypted backup of this identity's direct history and contacts.
  */
-export function DeviceStorageSection({
-  session,
-  unlockMethod,
-}: {
-  session: Session;
-  unlockMethod: DeviceUnlockMethod | undefined;
-}) {
+export function DeviceStorageSection({ session }: { session: Session }) {
   const [open, setOpen] = useState(false);
   const [estimate, setEstimate] = useState<
     DeviceStorageEstimate | null | undefined
@@ -134,7 +127,7 @@ export function DeviceStorageSection({
             body={copy.deviceStorage.withOthersBody}
             title={copy.deviceStorage.withOthers}
           />
-          <HistoryBackupPanel session={session} unlockMethod={unlockMethod} />
+          <HistoryBackupPanel session={session} />
         </div>
       )}
     </section>

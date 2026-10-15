@@ -14,9 +14,9 @@ const origin = 'http://127.0.0.1:8080';
 // the security audit view run on every engine and viewport CI covers; the
 // call decline on page departure, the two-device revoke flow, the
 // private-community kick, the group conversation removal, the history backup
-// and restore, recovery-key sign-in over a saved keychain, a contact's shared
-// status and its expiry once the contact goes invisible, and passkey unlock
-// (which needs Chromium's virtual authenticator) run on desktop Chromium.
+// and restore, recovery-key sign-in over a saved keychain, and a contact's
+// shared status and its expiry once the contact goes invisible run on desktop
+// Chromium.
 const runs = [
   {
     specs: [
@@ -34,7 +34,6 @@ const runs = [
       'e2e/community-mls-kick.spec.ts',
       'e2e/community-invite-link.spec.ts',
       'e2e/group-conversation.spec.ts',
-      'e2e/passkey-unlock.spec.ts',
       'e2e/history-backup.spec.ts',
       'e2e/recovery-key-keychain.spec.ts',
       'e2e/contact-presence.spec.ts',

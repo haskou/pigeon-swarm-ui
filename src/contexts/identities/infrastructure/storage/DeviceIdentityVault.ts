@@ -2,13 +2,10 @@ import { EncryptedPayload } from '@haskou/pigeon-swarm-crypto';
 import { assert } from '@haskou/value-objects';
 
 import type { DeviceIdentityKeyMaterial } from '../crypto/DeviceIdentityKeyMaterial';
-import type { DevicePasskeyAuthenticator } from '../crypto/DevicePasskeyAuthenticator';
-import type { DevicePasskeyCredential } from '../crypto/DevicePasskeyCredential';
 import type { ProtectedDeviceIdentity } from '../crypto/ProtectedDeviceIdentity';
 import type { DeviceIdentityVaultRecord } from './DeviceIdentityVaultRecord';
 import type { DeviceIdentityVaultSession } from './DeviceIdentityVaultSession';
 import type { DeviceIdentityVaultStore } from './DeviceIdentityVaultStore';
-import type { DeviceUnlockMethod } from './DeviceUnlockMethod';
 
 import { DeviceAuthorizationEpoch } from '../../domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationRevision } from '../../domain/value-objects/DeviceAuthorizationRevision';
@@ -16,27 +13,30 @@ import { DeviceId } from '../../domain/value-objects/DeviceId';
 import { DeviceRootKeyEnvelope } from '../../domain/value-objects/DeviceRootKeyEnvelope';
 import { DeviceUnlockSecretHandle } from '../../domain/value-objects/DeviceUnlockSecretHandle';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
+import { IdentityPassword } from '../../domain/value-objects/IdentityPassword';
 import { DeviceIdentityProtector } from '../crypto/DeviceIdentityProtector';
-import { WebAuthnPasskeyPrf } from '../crypto/WebAuthnPasskeyPrf';
-import { DevicePasskeyUnlockDisabledError } from './DevicePasskeyUnlockDisabledError';
-import { DevicePasskeyUnlockEnabledError } from './DevicePasskeyUnlockEnabledError';
 import { DeviceUnlockNotConfirmedError } from './DeviceUnlockNotConfirmedError';
 import { IndexedDbDeviceIdentityVaultStore } from './IndexedDbDeviceIdentityVaultStore';
 import { LocalDeviceIdentityNotFoundError } from './LocalDeviceIdentityNotFoundError';
 
 export class DeviceIdentityVault {
-  private readonly passkeys: DevicePasskeyAuthenticator;
   private readonly protector: DeviceIdentityProtector;
   private readonly store: DeviceIdentityVaultStore;
+
+  /**
+   * The password is the only unlock secret, so every envelope written for it
+   * must meet the policy, whichever flow chose it.
+   */
+  private static assertStrong(password: string): void {
+    IdentityPassword.fromString(password).assertStrong();
+  }
 
   public constructor(
     store?: DeviceIdentityVaultStore,
     protector?: DeviceIdentityProtector,
-    passkeys?: DevicePasskeyAuthenticator,
   ) {
     this.store = store ?? new IndexedDbDeviceIdentityVaultStore();
     this.protector = protector ?? new DeviceIdentityProtector();
-    this.passkeys = passkeys ?? new WebAuthnPasskeyPrf();
   }
 
   private protectedIdentity(
@@ -57,7 +57,6 @@ export class DeviceIdentityVault {
     epoch: DeviceAuthorizationEpoch,
     revision: DeviceAuthorizationRevision,
     createdAt: number,
-    passkey?: DevicePasskeyCredential,
   ): DeviceIdentityVaultRecord {
     return {
       authorizationEpoch: epoch.valueOf(),
@@ -68,7 +67,6 @@ export class DeviceIdentityVault {
       envelope: identity.envelope.serialize(),
       factorKey: identity.factorKey,
       identityId: identity.identityId.valueOf(),
-      ...(passkey ? { passkey } : {}),
       secretHandle: identity.secretHandle.valueOf(),
       updatedAt: Date.now(),
       version: 2,
@@ -76,19 +74,19 @@ export class DeviceIdentityVault {
   }
 
   /**
-   * Rewraps the root key from one unlock secret to the next and stores only
-   * the new envelope, so the previous secret no longer unlocks this device.
+   * Rewraps the root key from the current password to the next and stores
+   * only the new envelope, so the current password no longer unlocks this
+   * device.
    */
   private async replaceEnvelope(
     current: DeviceIdentityVaultRecord,
-    currentSecret: string,
-    nextSecret: string,
-    passkey?: DevicePasskeyCredential,
+    currentPassword: string,
+    nextPassword: string,
   ): Promise<void> {
     const rewrapped = await this.protector.rewrap(
       this.protectedIdentity(current),
-      currentSecret,
-      nextSecret,
+      currentPassword,
+      nextPassword,
     );
 
     await this.store.replaceProtection(
@@ -98,7 +96,6 @@ export class DeviceIdentityVault {
         DeviceAuthorizationEpoch.fromString(current.authorizationEpoch),
         DeviceAuthorizationRevision.fromNumber(current.authorizationRevision),
         current.createdAt,
-        passkey,
       ),
     );
   }
@@ -140,99 +137,28 @@ export class DeviceIdentityVault {
     currentPassword: string,
     nextPassword: string,
   ): Promise<void> {
+    DeviceIdentityVault.assertStrong(nextPassword);
     const current = await this.requiredRecord(identityId);
 
-    assert(!current.passkey, new DevicePasskeyUnlockEnabledError());
     await this.replaceEnvelope(current, currentPassword, nextPassword);
   }
 
   /**
-   * Asks the person to prove they can unlock this device again, without
-   * changing anything: the passkey when enrolled, otherwise the password.
+   * Asks the person to type the password for this device again, without
+   * changing anything.
    */
   public async confirmUnlock(
     identityId: IdentityId,
-    password?: string,
+    password: string,
   ): Promise<void> {
     const record = await this.requiredRecord(identityId);
 
     try {
-      const secret = record.passkey
-        ? await this.passkeys.evaluate(record.passkey)
-        : password;
-
-      assert(secret, new DeviceUnlockNotConfirmedError());
-      await this.protector.unlock(this.protectedIdentity(record), secret);
+      assert(password, new DeviceUnlockNotConfirmedError());
+      await this.protector.unlock(this.protectedIdentity(record), password);
     } catch {
       throw new DeviceUnlockNotConfirmedError();
     }
-  }
-
-  /** Turns passkey unlock off; the passkey must still confirm the change. */
-  public async disablePasskey(
-    identityId: IdentityId,
-    nextPassword: string,
-  ): Promise<void> {
-    const current = await this.requiredRecord(identityId);
-
-    assert(current.passkey, new DevicePasskeyUnlockDisabledError());
-    await this.replaceEnvelope(
-      current,
-      await this.passkeys.evaluate(current.passkey),
-      nextPassword,
-    );
-  }
-
-  /**
-   * Replaces the password with a passkey. The password is checked before the
-   * passkey is created so a typo does not leave an unused passkey behind.
-   */
-  public async enablePasskey(
-    identityId: IdentityId,
-    currentPassword: string,
-    displayName: string,
-  ): Promise<void> {
-    const current = await this.requiredRecord(identityId);
-
-    assert(!current.passkey, new DevicePasskeyUnlockEnabledError());
-    await this.protector.unlock(
-      this.protectedIdentity(current),
-      currentPassword,
-    );
-    const enrollment = await this.passkeys.register({
-      displayName,
-      identityId,
-    });
-
-    await this.replaceEnvelope(
-      current,
-      currentPassword,
-      enrollment.secret,
-      enrollment.credential,
-    );
-  }
-
-  public async isPasskeySupported(): Promise<boolean> {
-    return await this.passkeys.isSupported();
-  }
-
-  /** Asks the enrolled passkey for the secret that unlocks this device. */
-  public async passkeyUnlockSecret(identityId: IdentityId): Promise<string> {
-    const record = await this.requiredRecord(identityId);
-
-    assert(record.passkey, new DevicePasskeyUnlockDisabledError());
-
-    return await this.passkeys.evaluate(record.passkey);
-  }
-
-  public async unlockMethod(
-    identityId: IdentityId,
-  ): Promise<DeviceUnlockMethod | undefined> {
-    const record = await this.store.find(identityId);
-
-    if (record?.version !== 2) return undefined;
-
-    return record.passkey ? 'passkey' : 'password';
   }
 
   public async delete(identityId: IdentityId): Promise<void> {
@@ -246,6 +172,7 @@ export class DeviceIdentityVault {
     material: DeviceIdentityKeyMaterial;
     password: string;
   }): Promise<DeviceIdentityVaultSession> {
+    DeviceIdentityVault.assertStrong(input.password);
     const deviceId = DeviceId.generate();
     const secretHandle = DeviceUnlockSecretHandle.generate();
     const protectedIdentity = await this.protector.protect({

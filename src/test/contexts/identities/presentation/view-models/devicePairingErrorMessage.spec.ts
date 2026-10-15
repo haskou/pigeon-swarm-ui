@@ -19,7 +19,7 @@ describe('toDevicePairingErrorMessage', () => {
     ).toBe(copy.profile.devicePairingInvalid);
   });
 
-  it('asks again for the password or passkey when it was not confirmed', () => {
+  it('asks again for the password when it was not confirmed', () => {
     expect(
       toDevicePairingErrorMessage(new DeviceUnlockNotConfirmedError()),
     ).toBe(copy.profile.unlockNotConfirmed);

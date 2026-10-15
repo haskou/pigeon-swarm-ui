@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react';
 
 import { cx } from '../../../../shared/presentation/cx';
+import { copy } from '../../../../shared/presentation/i18n/copy';
 import {
   passwordRequirement,
   type PasswordRequirementChecks,
@@ -46,6 +47,12 @@ export function PasswordRequirementProgress({
         aria-live="polite"
       >
         {progress.message}
+      </p>
+      <p
+        className="mt-2 text-xs leading-snug text-white/50"
+        data-testid="password-guidance"
+      >
+        {copy.auth.passwordGuidance}
       </p>
     </div>
   );

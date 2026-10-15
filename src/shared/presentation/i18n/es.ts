@@ -126,10 +126,9 @@ export const es = {
     nodePeersLoading: 'Buscando...',
     nodePeersOne: '1 par',
     nodeSummaryTitle: 'Nodo local',
-    passkeyUnlockHelp:
-      'Una passkey desbloquea esta identidad en este dispositivo. Si la perdiste, elige Clave de recuperación o Dispositivo nuevo.',
-    passkeyUnlockSubmit: 'Desbloquear con passkey',
     passwordConfirmLabel: 'Repite la contraseña',
+    passwordGuidance:
+      'Esta contraseña es el único cerrojo de este dispositivo. Una frase larga de cuatro o más palabras sin relación, con un número y un símbolo, es fácil de recordar y difícil de adivinar. No la reutilices en otros sitios.',
     passwordLabel: 'Contraseña',
     passwordNewDeviceLabel: 'Contraseña nueva para este dispositivo',
     passwordRequirementItems: {
@@ -1354,8 +1353,6 @@ export const es = {
     devicePairingInvitationQr: 'Invitación para emparejar dispositivo',
     devicePairingMismatch:
       'Esta solicitud está desactualizada o pertenece a otra identidad. Pide al dispositivo nuevo que cree una solicitud nueva.',
-    devicePairingPasskey:
-      'Tu passkey confirma que eres tú antes de autorizar este dispositivo.',
     devicePairingPassword:
       'Confirma tu contraseña para autorizar este dispositivo',
     devicePairingRequestLabel: 'Solicitud del dispositivo nuevo',
@@ -1414,28 +1411,6 @@ export const es = {
     openBanner: 'Abrir banner de perfil',
     openConversation: 'Abrir mensaje directo',
     openPicture: 'Abrir imagen de perfil',
-    passkeyDisable: 'Usar una contraseña',
-    passkeyDisableConfirm: 'Confirmar con passkey',
-    passkeyDisableHelp:
-      'Elige una contraseña nueva para este dispositivo. Tu passkey confirma el cambio y deja de desbloquearlo.',
-    passkeyEnable: 'Configurar passkey',
-    passkeyEnableHelp:
-      'Introduce tu contraseña actual. Deja de funcionar en este dispositivo al configurar la passkey. Tus otros dispositivos mantienen su desbloqueo.',
-    passkeyPrfUnavailable:
-      'Esta passkey no puede desbloquear Pigeon Swarm. Prueba otro proveedor de passkeys o sigue usando tu contraseña.',
-    passkeyRequestFailed:
-      'La solicitud de passkey se canceló o caducó. Inténtalo de nuevo.',
-    passkeyUnlock: 'Desbloquear con una passkey',
-    passkeyUnlockActive:
-      'Una passkey desbloquea este dispositivo. Tu contraseña ya no funciona aquí.',
-    passkeyUnlockDisabled:
-      'Este dispositivo se desbloquea con contraseña, no con passkey.',
-    passkeyUnlockEnabled:
-      'Una passkey desbloquea este dispositivo. Vuelve a usar una contraseña antes de cambiarla.',
-    passkeyUnlockHelp:
-      'Usa tu huella, tu cara o el PIN del dispositivo en lugar de una contraseña en este dispositivo. El autenticador limita los intentos fallidos.',
-    passkeyUnsupported:
-      'Este navegador no puede desbloquear con passkey, así que este dispositivo sigue usando tu contraseña.',
     passwordChangeRequiresRecoveryKey:
       'Requiere tu clave de recuperación actual.',
     passwordRequirements: {
@@ -1463,8 +1438,7 @@ export const es = {
       'Muestra identificadores técnicos, versiones, metadatos de cifrado y controles de diagnóstico en toda la aplicación. Esta preferencia solo se guarda en este navegador.',
     technicalDetailsWarning:
       'Los datos técnicos pueden exponer metadatos sensibles. No los compartas si no sabes exactamente qué contienen.',
-    unlockNotConfirmed:
-      'No se pudo confirmar tu contraseña o tu llave de acceso.',
+    unlockNotConfirmed: 'No se pudo confirmar tu contraseña.',
     updateError: 'No se pudo actualizar el perfil.',
     versions: 'Versiones',
   },

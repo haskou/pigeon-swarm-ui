@@ -47,7 +47,7 @@ function parseContent(plaintext: Uint8Array): BackupContent {
 
 /**
  * One encrypted file with this identity's direct history and remembered
- * contacts. Exporting asks for the device password or passkey again. The file
+ * contacts. Exporting asks for the device password again. The file
  * holds stored messages only, never private, session or ratchet keys, and only
  * this identity can open it. Group history is not included.
  */
@@ -58,8 +58,7 @@ export class PigeonHistoryBackup {
     private readonly contactPins: ContactPinStore,
   ) {}
 
-  /** The password is ignored when a passkey unlocks this device. */
-  public async export(session: Session, password?: string): Promise<string> {
+  public async export(session: Session, password: string): Promise<string> {
     const identityId = session.identity.id;
 
     await this.identities.confirmLocalUnlock(identityId, password);

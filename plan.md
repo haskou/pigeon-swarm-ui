@@ -8,7 +8,7 @@ El resultado esperado es:
 
 - La password deriva una `PasswordKEK` con scrypt fuerte.
 - La recovery key portable aporta un segundo factor criptografico independiente del dominio.
-- La passkey/WebAuthn PRF no forma parte del diseno: su codigo se elimino en #241 y reintroducirla es una decision de producto (ver Pendientes de decision).
+- La passkey/WebAuthn PRF no forma parte del diseno: se elimino en #241, se reintrodujo como desbloqueo local y se retiro de nuevo en #173 a favor de solo password con politica exigida en el vault.
 - La `UserRootKey`/`MasterKey` es la unica raiz que desbloquea la private identity key, keychain y claves internas del usuario.
 - Cambiar password solo reenvuelve la `UserRootKey`/`MasterKey`.
 - Cambiar password no cambia la identity key pair ni claves de chats/comunidades.
@@ -32,7 +32,7 @@ Responsabilidades actuales:
 
 1. Sin passkey PRF en el diseno.
 
-   WebAuthn esta ligado al RP ID/origen. Una passkey creada para `localhost` no sirve como secreto portable para otro dominio o IP local, asi que PRF nunca podria ser el recovery entre nodos P2P. Su codigo se elimino en #241 porque ninguna identidad la creo.
+   WebAuthn esta ligado al RP ID/origen. Una passkey creada para `localhost` no sirve como secreto portable para otro dominio o IP local, asi que PRF nunca podria ser el recovery entre nodos P2P. Como desbloqueo local tampoco se mantiene (#173): no todos los navegadores tienen PRF, y un unico metodo evita degradaciones silenciosas. El vault exige la politica de password en cada envoltura de la raiz.
 
 2. Introducir recovery key portable.
 
@@ -155,7 +155,6 @@ No extraer primitivas para comparar o decidir reglas. Las conversiones a primiti
 1. Usuario introduce identidad/handler.
 2. Frontend descarga identidad.
 3. Si la identidad tiene envelope `password_recovery`, UI pide:
-
    - password
    - recovery key
 
@@ -186,7 +185,6 @@ Precondicion: la `UserRootKey`/`MasterKey` ya esta desbloqueada en la sesion.
 ## Backend: cambios necesarios
 
 1. Persistir nuevos campos opacos en identidad:
-
    - `masterKeyEnvelopes`
    - o, si se decide fase intermedia, mantener `encryptedMasterKey` y `masterKeyDerivation` con metadata de recovery.
 
@@ -195,7 +193,6 @@ Precondicion: la `UserRootKey`/`MasterKey` ya esta desbloqueada en la sesion.
 3. Exigir que `PUT /identities/{id}` preserve los envelopes para no perder acceso a la identidad.
 
 4. No interpretar ni descifrar:
-
    - recovery metadata
    - encrypted master keys
    - encrypted key pairs
@@ -207,7 +204,6 @@ Precondicion: la `UserRootKey`/`MasterKey` ya esta desbloqueada en la sesion.
    Backend debe seguir tratando el keychain como un blob opaco cifrado por frontend. No debe descifrarlo ni validar si puede abrirse con password, recovery key o master key.
 
    Si se publica o actualiza un keychain, backend debe validar:
-
    - La request esta firmada por la identidad propietaria.
    - El keychain pertenece a la identidad autenticada.
    - El payload tiene la forma esperada.
@@ -216,7 +212,6 @@ Precondicion: la `UserRootKey`/`MasterKey` ya esta desbloqueada en la sesion.
    - Una actualizacion no borra accidentalmente metadata necesaria del keychain, si esa metadata existe en el contrato.
 
    Backend no debe validar:
-
    - `UserRootKey`/`MasterKey`.
    - recovery key.
    - `PasswordKEK` o `FinalKEK`.
@@ -237,7 +232,6 @@ Precondicion: la `UserRootKey`/`MasterKey` ya esta desbloqueada en la sesion.
 4. Actualizar cambio de password para reenvolver master key sin password vieja.
 5. Eliminar cualquier camino donde password sola descifre private identity key.
 6. Eliminar cualquier almacenamiento de:
-
    - password
    - `PasswordKEK`
    - `FinalKEK`
@@ -267,7 +261,6 @@ Precondicion: la `UserRootKey`/`MasterKey` ya esta desbloqueada en la sesion.
 ### Ajustes de seguridad
 
 - Mostrar estado:
-
   - Recovery key configurada.
   - Modo portable/debilitado si existe password-only.
 
@@ -351,7 +344,6 @@ Corte limpio: no existen identidades anteriores que migrar. Toda identidad nueva
 
 1. Confirmar si backend acepta `masterKeyEnvelopes[]` o si se hace fase intermedia con `encryptedMasterKey/masterKeyDerivation`.
 2. Elegir formato final de recovery key:
-
    - `psrk1.<base64url>`
    - palabras tipo mnemonic
    - QR
@@ -359,4 +351,3 @@ Corte limpio: no existen identidades anteriores que migrar. Toda identidad nueva
 
 3. Decidir si se permite modo password-only portable/debilitado.
 4. Decidir si identidades existentes se migran o se fuerza corte limpio.
-5. Decidir si se reintroduce passkey PRF como desbloqueo local. Su codigo se elimino en #241 y no forma parte de este plan.

@@ -16,7 +16,6 @@ import type { CommunityResource as Community } from '../../../../contexts/commun
 import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
-import type { DeviceUnlockMethod } from '../../../../contexts/identities/infrastructure/storage/DeviceUnlockMethod';
 import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
 
 import {
@@ -54,7 +53,6 @@ import { DeviceManagementDialog } from './DeviceManagementDialog';
 import { DevicePairingDialog } from './DevicePairingDialog';
 import { DeviceStorageSection } from './DeviceStorageSection';
 import { profileEditorInputClass, ProfileInput } from './ProfileInput';
-import { ProfilePasskeyUnlock } from './ProfilePasskeyUnlock';
 import { SecurityAuditSection } from './SecurityAuditSection';
 
 const ImageCropEditor = lazy(() =>
@@ -626,30 +624,22 @@ function ProfileSecuritySection({
   session: Session;
   technicalDetailsVisible: boolean;
 }) {
-  const [unlockMethod, setUnlockMethod] = useState<DeviceUnlockMethod>();
-
   return (
     <>
       <section className="ui-section">
         <div className="border-b border-white/[0.06] px-4 py-3 text-sm font-black text-white/70">
           {copy.profile.security}
         </div>
-        {unlockMethod !== 'passkey' && (
-          <ProfilePasswordSection
-            currentPassword={currentPassword}
-            newPassword={newPassword}
-            newPasswordConfirmation={newPasswordConfirmation}
-            onCurrentPasswordChange={onCurrentPasswordChange}
-            onNewPasswordChange={onNewPasswordChange}
-            onNewPasswordConfirmationChange={onNewPasswordConfirmationChange}
-            onToggle={onTogglePassword}
-            open={passwordOpen}
-            passwordsMatch={passwordsMatch}
-          />
-        )}
-        <ProfilePasskeyUnlock
-          onMethodChange={setUnlockMethod}
-          session={session}
+        <ProfilePasswordSection
+          currentPassword={currentPassword}
+          newPassword={newPassword}
+          newPasswordConfirmation={newPasswordConfirmation}
+          onCurrentPasswordChange={onCurrentPasswordChange}
+          onNewPasswordChange={onNewPasswordChange}
+          onNewPasswordConfirmationChange={onNewPasswordConfirmationChange}
+          onToggle={onTogglePassword}
+          open={passwordOpen}
+          passwordsMatch={passwordsMatch}
         />
         <div className="border-t border-white/[0.06] px-4 py-4">
           <button
@@ -685,7 +675,7 @@ function ProfileSecuritySection({
           </p>
         </div>
       </section>
-      <DeviceStorageSection session={session} unlockMethod={unlockMethod} />
+      <DeviceStorageSection session={session} />
       <SecurityAuditSection
         communities={communities}
         conversations={conversations}

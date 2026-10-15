@@ -121,10 +121,9 @@ export const en = {
     nodePeersLoading: 'Searching...',
     nodePeersOne: '1 peer',
     nodeSummaryTitle: 'Local node',
-    passkeyUnlockHelp:
-      'A passkey unlocks this identity on this device. If you lost it, choose Recovery key or New device.',
-    passkeyUnlockSubmit: 'Unlock with passkey',
     passwordConfirmLabel: 'Repeat password',
+    passwordGuidance:
+      'This password is the only lock on this device. A long phrase of four or more unrelated words, with a number and a symbol, is easy to remember and hard to guess. Do not reuse it elsewhere.',
     passwordLabel: 'Password',
     passwordNewDeviceLabel: 'New password for this device',
     passwordRequirementItems: {
@@ -1350,8 +1349,6 @@ export const en = {
     devicePairingInvitationQr: 'Device pairing invitation',
     devicePairingMismatch:
       'This request is out of date or belongs to another identity. Ask the new device to create a new request.',
-    devicePairingPasskey:
-      'Your passkey confirms it is you before this device is authorized.',
     devicePairingPassword: 'Confirm your password to authorize this device',
     devicePairingRequestLabel: 'Request from the new device',
     devicePairingRequestPlaceholder:
@@ -1410,28 +1407,6 @@ export const en = {
     openBanner: 'Open profile banner',
     openConversation: 'Open direct message',
     openPicture: 'Open profile picture',
-    passkeyDisable: 'Use a password instead',
-    passkeyDisableConfirm: 'Confirm with passkey',
-    passkeyDisableHelp:
-      'Choose a new password for this device. Your passkey confirms the change, then stops unlocking here.',
-    passkeyEnable: 'Set up passkey',
-    passkeyEnableHelp:
-      'Enter your current password. It stops working on this device once the passkey is set up. Other devices keep their own unlock.',
-    passkeyPrfUnavailable:
-      'This passkey cannot unlock Pigeon Swarm. Try another passkey provider, or keep using your password.',
-    passkeyRequestFailed:
-      'The passkey request was cancelled or timed out. Try again.',
-    passkeyUnlock: 'Unlock with a passkey',
-    passkeyUnlockActive:
-      'A passkey unlocks this device. Your password no longer works here.',
-    passkeyUnlockDisabled:
-      'This device is unlocked with a password, not a passkey.',
-    passkeyUnlockEnabled:
-      'A passkey unlocks this device. Switch back to a password before changing it.',
-    passkeyUnlockHelp:
-      'Use your fingerprint, face or device PIN instead of a password on this device. The authenticator limits wrong attempts.',
-    passkeyUnsupported:
-      'This browser cannot unlock with a passkey, so this device keeps using your password.',
     passwordChangeRequiresRecoveryKey: 'Requires your current recovery key.',
     passwordRequirements: {
       lowercase: 'Lowercase',
@@ -1458,7 +1433,7 @@ export const en = {
       'Shows technical identifiers, versions, encryption metadata and diagnostic controls throughout the app. This preference is stored only in this browser.',
     technicalDetailsWarning:
       'Technical data can expose sensitive metadata. Do not share it unless you understand what it contains.',
-    unlockNotConfirmed: 'Your password or passkey could not be confirmed.',
+    unlockNotConfirmed: 'Your password could not be confirmed.',
     updateError: 'The profile could not be updated.',
     versions: 'Versions',
   },

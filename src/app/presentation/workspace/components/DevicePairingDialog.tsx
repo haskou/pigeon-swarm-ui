@@ -11,8 +11,9 @@ import { DialogHeader } from '../../../../shared/presentation/components/DialogH
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { applicationContainer } from '../../../composition/applicationContainer';
-import { DevicePairingUnlockConfirmation } from './DevicePairingUnlockConfirmation';
-import { useLocalUnlockConfirmation } from './useLocalUnlockConfirmation';
+import { ProfileInput } from './ProfileInput';
+
+const passwordPlaceholder = '••••••••••••';
 
 export function DevicePairingDialog({
   onClose,
@@ -32,7 +33,7 @@ export function DevicePairingDialog({
   const [state, setState] = useState<'idle' | 'loading'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [verificationCode, setVerificationCode] = useState<string | null>(null);
-  const confirmation = useLocalUnlockConfirmation(session.identity.id);
+  const [password, setPassword] = useState('');
 
   const review = async () => {
     setState('loading');
@@ -53,7 +54,7 @@ export function DevicePairingDialog({
     }
   };
   const authorize = async () => {
-    const password = confirmation.consume();
+    setPassword('');
 
     setState('loading');
     setError(null);
@@ -129,8 +130,13 @@ export function DevicePairingDialog({
                       {verificationCode}
                     </p>
                   </div>
-                  <DevicePairingUnlockConfirmation
-                    confirmation={confirmation}
+                  <ProfileInput
+                    label={copy.profile.devicePairingPassword}
+                    onChange={setPassword}
+                    placeholder={passwordPlaceholder}
+                    testId="device-pairing-password-input"
+                    type="password"
+                    value={password}
                   />
                 </>
               )}
@@ -139,7 +145,7 @@ export function DevicePairingDialog({
                 data-testid="device-pairing-submit"
                 disabled={
                   state === 'loading' ||
-                  !(verificationCode ? confirmation.ready : requestCode.trim())
+                  !(verificationCode ? password : requestCode.trim())
                 }
                 onClick={() => void (verificationCode ? authorize() : review())}
                 type="button"
