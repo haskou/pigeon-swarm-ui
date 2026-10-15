@@ -25,9 +25,17 @@ import { GroupMessageId } from './crypto/GroupMessageId';
  * cannot open a member's own messages, so each record is kept in this
  * device's history once it is queued. A queued record is sent even when that
  * copy fails, so a retry never sends it twice under a new id. A poll's
- * record id is the poll id; a poll the poll rules refuse is never queued.
+ * record id is the poll id; a poll the poll rules refuse is never queued. A
+ * typing notice is ephemeral: never queued nor kept, and sent at most once
+ * per `TYPING_INTERVAL_MS` per member and conversation, counting attempts
+ * that were dropped.
  */
 export class GroupConversationSender {
+  private static readonly TYPING_INTERVAL_MS = 10_000;
+
+  /** When each member last sent typing, by identity and conversation. */
+  private readonly typedAt = new Map<string, number>();
+
   private static readonly PLAIN: MessagePayloadSeal = (plainMessage) =>
     plainMessage;
 
@@ -254,5 +262,35 @@ export class GroupConversationSender {
     await this.enqueue(member, record);
 
     return record;
+  }
+
+  /** Tells the other members this one is typing, when not told lately. */
+  public async typing(
+    member: GroupConversationMember,
+    conversationId: string,
+  ): Promise<void> {
+    const { createdAt, id } = this.identity(member);
+    const authorId = member.session.identity.id;
+    const key = [authorId, conversationId].join('\u0000');
+    const last = this.typedAt.get(key);
+
+    if (
+      last !== undefined &&
+      createdAt - last < GroupConversationSender.TYPING_INTERVAL_MS
+    ) {
+      return;
+    }
+    this.typedAt.set(key, createdAt);
+    await member.outbox.sendEphemeral(
+      conversationId,
+      DirectMessageMailboxRecord.encode(
+        DirectMailboxRecords.typing({
+          authorId,
+          conversationId,
+          createdAt,
+          id,
+        }),
+      ),
+    );
   }
 }

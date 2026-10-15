@@ -1,15 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
+import type { DirectMessageTimelineChange } from '../../../../contexts/messages/domain/DirectMessageTimelineChange';
 import type {
   RealtimeTypingInput,
   RealtimeTypingMessage,
 } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
 
+import { ConversationType } from '../../../../contexts/conversations/domain/value-objects/ConversationType';
 import { IdentityMatch } from '../../../../contexts/identities/domain/IdentityMatch';
+import { GroupMailboxEligibility } from '../../../../contexts/mailboxes/domain/GroupMailboxEligibility';
+import { applicationContainer } from '../../../composition/applicationContainer';
 import { sendRealtimeTyping } from '../../realtime/useRealtimeEvents';
 import {
   activeTypingIdentityIds,
+  applyGroupTypingChanges,
   communityTypingKey,
   expireTypingEntries,
   type TypingEntries,
@@ -20,22 +26,38 @@ import {
 type WorkspaceTypingInput = {
   activeCommunityChannelId: null | string;
   activeCommunityId: null | string;
-  activeConversationId: null | string;
+  activeConversation: ConversationResource | undefined;
   session: Session;
 };
 
+/**
+ * Typing indicators of the open conversation and community channel. A
+ * group conversation's typing travels as an ephemeral MLS record through
+ * its mailboxes (`receiveGroupTyping`), never through the node; direct
+ * conversations and community channels use the realtime relay.
+ */
 export function useWorkspaceTyping({
   activeCommunityChannelId,
   activeCommunityId,
-  activeConversationId,
+  activeConversation,
   session,
 }: WorkspaceTypingInput): {
   communityTypingIdentityIds: string[];
   conversationTypingIdentityIds: string[];
   receive: (message: RealtimeTypingMessage) => void;
+  receiveGroupTyping: (
+    conversationId: string,
+    changes: DirectMessageTimelineChange[],
+  ) => void;
   sendCommunityTyping: (channelId: string, active: boolean) => void;
   sendConversationTyping: (active: boolean) => void;
 } {
+  const activeConversationId = activeConversation?.id ?? null;
+  const groupConversation =
+    activeConversation !== undefined &&
+    GroupMailboxEligibility.isEligible(
+      ConversationType.tryFromPrimitives(activeConversation.type),
+    );
   const [conversationEntries, setConversationEntries] = useState<TypingEntries>(
     {},
   );
@@ -75,6 +97,15 @@ export function useWorkspaceTyping({
     [session.identity.id],
   );
 
+  const receiveGroupTyping = useCallback(
+    (conversationId: string, changes: DirectMessageTimelineChange[]) => {
+      setConversationEntries((current) =>
+        applyGroupTypingChanges(current, conversationId, changes, Date.now()),
+      );
+    },
+    [],
+  );
+
   const send = useCallback(
     (input: RealtimeTypingInput) => {
       const key = typingInputKey(input);
@@ -106,13 +137,22 @@ export function useWorkspaceTyping({
     (active: boolean) => {
       if (!activeConversationId) return;
 
+      if (groupConversation) {
+        if (!active) return;
+        void applicationContainer.groupMessages
+          .typing(session, activeConversationId)
+          .catch(() => undefined);
+
+        return;
+      }
+
       send({
         active,
         conversationId: activeConversationId,
         scope: 'conversation',
       });
     },
-    [activeConversationId, send],
+    [activeConversationId, groupConversation, send, session],
   );
 
   const sendCommunityTyping = useCallback(
@@ -141,6 +181,7 @@ export function useWorkspaceTyping({
       activeConversationId,
     ),
     receive,
+    receiveGroupTyping,
     sendCommunityTyping,
     sendConversationTyping,
   };

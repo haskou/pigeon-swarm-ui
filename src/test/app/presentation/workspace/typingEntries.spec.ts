@@ -22,7 +22,12 @@ describe('applyGroupTypingChanges', () => {
 
   it('never shows a notice dated in the future for more than 15 seconds', () => {
     expect(
-      applyGroupTypingChanges({}, 'group-1', [typing('bob', NOW + 60_000)], NOW),
+      applyGroupTypingChanges(
+        {},
+        'group-1',
+        [typing('bob', NOW + 60_000)],
+        NOW,
+      ),
     ).toEqual({ 'group-1': { bob: NOW + 15_000 } });
   });
 

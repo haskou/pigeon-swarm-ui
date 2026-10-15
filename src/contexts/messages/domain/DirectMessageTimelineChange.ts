@@ -41,4 +41,5 @@ export type DirectMessageTimelineChange =
       pollId: string;
     }
   | { kind: 'read'; messageId: string }
-  | { kind: 'removed'; messageId: string };
+  | { kind: 'removed'; messageId: string }
+  | { createdAt: number; identityId: string; kind: 'typing' };

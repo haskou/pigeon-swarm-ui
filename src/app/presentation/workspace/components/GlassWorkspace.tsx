@@ -822,12 +822,26 @@ export function GlassWorkspace({
     conversation: activeConversation,
     session,
   });
+  const {
+    communityTypingIdentityIds,
+    conversationTypingIdentityIds,
+    receive: handleRealtimeTyping,
+    receiveGroupTyping,
+    sendCommunityTyping,
+    sendConversationTyping,
+  } = useWorkspaceTyping({
+    activeCommunityChannelId,
+    activeCommunityId: WorkspaceDerivedState.id(activeCommunity),
+    activeConversation,
+    session,
+  });
   useGroupMessageMailboxSync({
     activeConversation,
     onErrorChange: setSendError,
     onHistoryRestored: handleGroupHistoryRestored,
     onMessagesChange: setMessages,
     onPollChanges: conversationPolls.fold,
+    onTypingChanges: receiveGroupTyping,
     refreshConversations,
     session,
     setPinnedMessageIds,
@@ -940,19 +954,6 @@ export function GlassWorkspace({
     setRealtimeEventLog,
     setSession,
     workspaceMode,
-  });
-
-  const {
-    communityTypingIdentityIds,
-    conversationTypingIdentityIds,
-    receive: handleRealtimeTyping,
-    sendCommunityTyping,
-    sendConversationTyping,
-  } = useWorkspaceTyping({
-    activeCommunityChannelId,
-    activeCommunityId: WorkspaceDerivedState.id(activeCommunity),
-    activeConversationId: WorkspaceDerivedState.id(activeConversation),
-    session,
   });
 
   useRealtimeEvents(session, {

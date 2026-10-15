@@ -249,11 +249,12 @@ function isDirectMessageRecord(value: unknown): value is DirectMessageRecord {
     case 'pin':
       return isPinFields(value);
     default:
-      return isPollRecord(value);
+      return isGroupRecord(value);
   }
 }
 
-function isPollRecord(value: Record<string, unknown>): boolean {
+/** The records only group conversations write: polls and typing. */
+function isGroupRecord(value: Record<string, unknown>): boolean {
   switch (value.type) {
     case 'poll':
       return isPollFields(value);
@@ -261,6 +262,8 @@ function isPollRecord(value: Record<string, unknown>): boolean {
       return isPollVoteFields(value);
     case 'poll_close':
       return typeof value.targetPollId === 'string';
+    case 'typing':
+      return true;
     default:
       return false;
   }

@@ -10,14 +10,15 @@ import type { DirectPollVoteRecord } from './DirectPollVoteRecord';
 import type { DirectReactionRecord } from './DirectReactionRecord';
 import type { DirectReadRecord } from './DirectReadRecord';
 import type { DirectSentRecord } from './DirectSentRecord';
+import type { DirectTypingRecord } from './DirectTypingRecord';
 
 /**
  * Shape rules for direct mailbox records. Sent and edited records take their
- * ids from the message and a poll from the poll; every other record gets a
- * fresh UUID here. Deleted and read records are stamped with the current
- * clock; reaction, pin and poll records keep the caller's clock reading,
- * which also orders them. Keys are
- * listed alphabetically: their order is part of the encoded bytes.
+ * ids from the message, a poll from the poll and a typing notice from its
+ * caller; every other record gets a fresh UUID here. Deleted and read
+ * records are stamped with the current clock; reaction, pin, poll and
+ * typing records keep the caller's clock reading, which also orders them.
+ * Keys are listed alphabetically: their order is part of the encoded bytes.
  */
 export class DirectMailboxRecords {
   private static readonly RECEIPT_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
@@ -34,6 +35,7 @@ export class DirectMailboxRecords {
     reaction: 'reaction',
     read: 'read',
     sent: 'sent',
+    typing: 'typing',
   } as const;
 
   public static sent(fields: Omit<DirectSentRecord, 'type'>): DirectSentRecord {
@@ -160,6 +162,19 @@ export class DirectMailboxRecords {
       id: UUID.generate().toString(),
       targetMessageId: fields.targetMessageId,
       type: 'read',
+    };
+  }
+
+  /** An ephemeral notice that its author is typing; never stored. */
+  public static typing(
+    fields: Omit<DirectTypingRecord, 'type'>,
+  ): DirectTypingRecord {
+    return {
+      authorId: fields.authorId,
+      conversationId: fields.conversationId,
+      createdAt: fields.createdAt,
+      id: fields.id,
+      type: 'typing',
     };
   }
 

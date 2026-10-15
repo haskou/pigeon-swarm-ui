@@ -39,7 +39,8 @@ import { GroupMailboxKeySchedule } from '../crypto/GroupMailboxKeySchedule';
  * stale, until the removal is committed. A commit belongs to its
  * generation and is never re-encrypted. A record still queued after the
  * expiry is dropped and reported. `items` lists each queued record as
- * held, retrying or pending. Logs carry counts only.
+ * held, retrying or pending. An ephemeral record (`sendEphemeral`) is never
+ * queued: it is appended once or dropped. Logs carry counts only.
  */
 export class GroupMailboxOutbox {
   /** The generation index of a message held before it was ever sealed. */
@@ -649,6 +650,74 @@ export class GroupMailboxOutbox {
       this.lastCreatedAt = Math.max(this.lastCreatedAt, row.createdAt);
     }
     await this.pass();
+  }
+
+  /**
+   * Encrypts an ephemeral record, as a typing notice, in the current epoch
+   * and appends it once to every other member's inbox. It is never stored
+   * or retried, and never listed in `items`. A recipient an earlier queued
+   * record still waits for is skipped, so it never reads a record of an
+   * epoch it has not reached. Nothing is sent while a removal is pending or
+   * once this identity is off the roster. Never rejects: an ephemeral
+   * record that cannot go out is dropped.
+   */
+  public async sendEphemeral(
+    conversationId: string,
+    body: Uint8Array,
+  ): Promise<void> {
+    try {
+      if (this.stopped) return;
+
+      if (
+        await this.removalPending(
+          conversationId,
+          await this.roster(conversationId),
+        )
+      ) {
+        return;
+      }
+      const row = await this.sealedMessage(
+        {
+          attempts: 0,
+          conversationId,
+          createdAt: this.clock(),
+          id: MailboxChannel.randomEnvelopeId(),
+          reference: '',
+          retryAt: 0,
+        },
+        body,
+      );
+      const generation = (
+        await this.engine.readableGenerations(conversationId)
+      ).find(({ index }) => index === row.generationIndex);
+
+      if (!generation) return;
+      const blocked = new Set<string>();
+
+      for (const queued of this.rows.values()) {
+        GroupMailboxOutbox.hold(queued, blocked);
+      }
+      const record = new Uint8Array(decodeBase64Url(row.record));
+      const copies = row.copies.filter(
+        (copy) =>
+          copy.identityId !== this.session.identity.id &&
+          !blocked.has(GroupMailboxOutbox.recipient(row, copy)),
+      );
+      const sent = await Promise.all(
+        copies.map((copy) => this.appended(record, generation, copy)),
+      );
+      const dropped = sent.filter((appended) => !appended).length;
+
+      if (dropped > 0) {
+        // eslint-disable-next-line no-console
+        console.debug(
+          `Group outbox dropped ${dropped.toString()} ephemeral copies.`,
+        );
+      }
+    } catch {
+      // eslint-disable-next-line no-console
+      console.debug('Group outbox dropped an ephemeral record.');
+    }
   }
 
   public stop(): void {
