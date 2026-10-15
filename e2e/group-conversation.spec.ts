@@ -32,6 +32,26 @@ async function addGroupParticipant(page: Page, handle: string): Promise<void> {
   }).toPass({ timeout: 45_000 });
 }
 
+/**
+ * An invitee that is not a contact of the inviter answers its key package
+ * request only once it accepts the invitation, which lists as a
+ * notification after its next control read; the panel is reopened until it
+ * shows.
+ */
+async function acceptGroupInvitation(page: Page): Promise<void> {
+  const accept = page.getByTestId('notification-accept-button').first();
+
+  await expect(async () => {
+    await page.keyboard.press('Escape');
+    await openSidebar(page);
+    await page.getByTestId('notifications-open-button').first().click();
+    await expect(accept).toBeVisible({ timeout: 10_000 });
+  }).toPass({ timeout: SLOW });
+  await accept.click();
+  await expect(accept).toBeHidden({ timeout: SLOW });
+  await page.keyboard.press('Escape');
+}
+
 async function createGroup(
   page: Page,
   name: string,
@@ -141,6 +161,8 @@ test('a member removed from a group conversation stops reading it', async ({
   });
 
   await createGroup(alice, groupName, [`bo${suffix}`, `ca${suffix}`]);
+  await acceptGroupInvitation(bob);
+  await acceptGroupInvitation(carol);
   await openGroup(alice, groupName);
   await openGroup(bob, groupName);
   await openGroup(carol, groupName);
@@ -198,6 +220,7 @@ test('both devices of an identity read a group; a revoked one stops reading', as
     });
     await registerIdentity(phone, bob);
     await createGroup(alice, groupName, [bob.handle]);
+    await acceptGroupInvitation(phone);
     await openGroup(alice, groupName);
     await openGroup(phone, groupName);
     await sendUntilEveryoneReads(alice, [phone], 'hello from Alice');
@@ -337,6 +360,7 @@ test('a welcome read after the device that sent it was revoked is refused', asyn
     // package and welcomes it.
     answering = true;
     await createGroup(laptop, groupName, [`al${suffix}`]);
+    await acceptGroupInvitation(alice);
     await openGroup(alice, groupName);
     await openGroup(laptop, groupName);
     await expect

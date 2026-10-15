@@ -5,7 +5,6 @@ import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
 
 import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
-import type { GroupMailboxGenesisFields } from '../../../../contexts/groupMailboxes/domain/GroupMailboxGenesisFields';
 import type { GroupConversationSyncOutcome } from '../../../../contexts/groupMailboxes/infrastructure/GroupConversationSyncOutcome';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { PigeonMailboxClient } from '../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
@@ -18,7 +17,6 @@ import { ConversationIdFactory } from '../../../../contexts/conversations/domain
 import { ConversationGroupNonce } from '../../../../contexts/conversations/domain/value-objects/ConversationGroupNonce';
 import { ConversationNetworkId } from '../../../../contexts/conversations/domain/value-objects/ConversationNetworkId';
 import { ConversationParticipantId } from '../../../../contexts/conversations/domain/value-objects/ConversationParticipantId';
-import { GroupMailboxRoster } from '../../../../contexts/groupMailboxes/domain/GroupMailboxRoster';
 import { GroupMailboxControlSeal } from '../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlSeal';
 import { GroupConversationMailbox } from '../../../../contexts/groupMailboxes/infrastructure/GroupConversationMailbox';
 import { GroupMessageHistoryStore } from '../../../../contexts/groupMailboxes/infrastructure/history/GroupMessageHistoryStore';
@@ -67,9 +65,6 @@ let devices = 0;
 /** The group id alice creates: the hash of `genesis()`. */
 let CONVERSATION: string;
 let now = NOW;
-let roster: Set<string>;
-/** The roster's admins; with none, every member may commit. */
-let admins: string[];
 let letters: Map<string, NotificationResource[]>;
 /** The device credentials the node lists for each identity. */
 let listed: Map<string, string[]>;
@@ -208,7 +203,6 @@ const post = (
   inbox.unshift({
     id,
     payload: {
-      conversationId,
       encryptedConversationKey: sealed,
       inviterIdentityId: from.identity.id,
       nonce: 'nonce',
@@ -243,7 +237,7 @@ const device = (storage: string): GroupConversationMailbox =>
     channel,
     client: wire,
     composer: composer(),
-    contacts: () => [],
+    contacts: () => [...contacts],
     direct: (from) => ({
       send: (conversationId, peer, plaintext) =>
         post(from, conversationId, peer, plaintext),
@@ -274,15 +268,6 @@ const device = (storage: string): GroupConversationMailbox =>
     readerSet: new DirectMessageReaderSet(channel, (owner) =>
       Promise.resolve(listed.get(owner.identity.id) ?? []),
     ),
-    roster: (owner) =>
-      Promise.resolve(
-        roster.has(owner.identity.id)
-          ? GroupMailboxRoster.of({
-              adminIds: admins,
-              participantIds: [...roster],
-            })
-          : GroupMailboxRoster.empty(),
-      ),
     storage,
     verifiedDevices: (owner) =>
       Promise.resolve(verified.get(owner.identity.id) ?? []),
@@ -305,6 +290,7 @@ const person = async (of?: Member): Promise<Member> => {
     keyPair,
   } as unknown as Session;
 
+  contacts.add(id);
   for (const devicesOf of [listed, verified]) {
     devicesOf.set(id, [
       ...(devicesOf.get(id) ?? []),
@@ -342,11 +328,7 @@ const settle = async <T>(work: Promise<T>, everyone: Member[]): Promise<T> => {
 };
 
 const conversation = (): ConversationResource =>
-  ({
-    id: CONVERSATION,
-    participantIds: [...roster],
-    type: 'group',
-  }) as unknown as ConversationResource;
+  ({ id: CONVERSATION, type: 'group' }) as unknown as ConversationResource;
 
 /**
  * Reads the conversation's inboxes. A second device reads on its own local
@@ -378,12 +360,8 @@ const texts = (member: Member): string[] =>
 
 const everyone = (): Member[] => [alice, bob, carol];
 
-/** The preimage of the group id alice creates. */
-const genesis = (): GroupMailboxGenesisFields => ({
-  creatorIdentityId: alice.id,
-  networkId: NETWORK,
-  nonce: NONCE,
-});
+/** Every identity is a contact of every other here. */
+let contacts: Set<string>;
 
 /**
  * Every member reads its inboxes twice: the first pass applies pending
@@ -396,14 +374,26 @@ const catchUp = async (members: Member[] = everyone()): Promise<void> => {
   }
 };
 
-/** The three of them in one group, each joined from its welcome. */
+/**
+ * The three of them in one group, each joined from its welcome. Bob answers
+ * first and opens his inboxes before carol answers: the commit that adds
+ * carol can only reach an inbox bob has opened.
+ */
 const formGroup = async (): Promise<void> => {
-  roster = new Set([alice.id, bob.id, carol.id]);
-  await alice.mailbox.create(alice.session, CONVERSATION, genesis());
-  await settle(
-    alice.mailbox.membersChanged(alice.session, CONVERSATION),
-    everyone(),
-  );
+  CONVERSATION = (
+    await alice.mailbox.create(alice.session, {
+      name: 'Group',
+      networkId: NETWORK,
+      participantIds: [bob.id, carol.id],
+    })
+  ).id;
+  await settle(alice.mailbox.membersChanged(alice.session, CONVERSATION), [
+    alice,
+    bob,
+  ]);
+  await settle(Promise.resolve(), [alice, bob]);
+  await catchUp([alice, bob]);
+  await settle(Promise.resolve(), everyone());
   await settle(Promise.resolve(), everyone());
   await catchUp();
 };
@@ -432,8 +422,7 @@ beforeEach(async () => {
   listed = new Map();
   verified = new Map();
   now = NOW;
-  roster = new Set();
-  admins = [];
+  contacts = new Set();
   laptop = undefined;
   [alice, bob, carol] = await Promise.all([person(), person(), person()]);
   CONVERSATION = new ConversationIdFactory()
@@ -486,7 +475,7 @@ describe('GroupConversationMailbox', () => {
 
   it('a removed member cannot read messages sent after removal', async () => {
     await formGroup();
-    roster = new Set([alice.id, bob.id]);
+    await alice.mailbox.removeMember(alice.session, CONVERSATION, carol.id);
 
     await settle(
       Promise.all(
@@ -502,80 +491,6 @@ describe('GroupConversationMailbox', () => {
 
     expect(texts(alice)).toEqual(['message:after removal']);
     expect(texts(carol)).toEqual([]);
-  });
-
-  it('holds a message until a removal on the roster is committed', async () => {
-    await formGroup();
-    roster = new Set([alice.id, bob.id]);
-
-    await alice.mailbox.send(alice.session, conversation(), 'too early', {});
-    await sync(carol);
-    await sync(bob);
-
-    expect(texts(carol)).toEqual([]);
-    expect(texts(bob)).toEqual([]);
-
-    await settle(
-      Promise.all(
-        everyone().map((member) =>
-          member.mailbox.membersChanged(member.session, CONVERSATION),
-        ),
-      ),
-      everyone(),
-    );
-    await catchUp();
-    // The copy for bob's new inbox waits for its retry once that inbox opens.
-    now += GroupMailboxOutbox.RETRY_MAX_MS;
-    await alice.mailbox.membersChanged(alice.session, CONVERSATION);
-    await sync(carol);
-    await sync(bob);
-
-    expect(texts(carol)).toEqual([]);
-    expect(texts(bob)).toEqual(['message:too early']);
-  });
-
-  it('marks a message held until a removal is committed, then delivered', async () => {
-    await formGroup();
-    const delivered = await alice.mailbox.send(
-      alice.session,
-      conversation(),
-      'on time',
-      {},
-    );
-
-    // It may still wait behind a copy queued while the group formed.
-    expect(delivered.deliveryStatus).not.toBe('held');
-    roster = new Set([alice.id, bob.id]);
-    const held = await alice.mailbox.send(
-      alice.session,
-      conversation(),
-      'too early',
-      {},
-    );
-
-    expect(held.deliveryStatus).toBe('held');
-    expect(
-      alice.mailbox.withOutboxState(alice.session, CONVERSATION, [
-        { ...held, deliveryStatus: undefined },
-      ])[0].deliveryStatus,
-    ).toBe('held');
-
-    await settle(
-      Promise.all(
-        everyone().map((member) =>
-          member.mailbox.membersChanged(member.session, CONVERSATION),
-        ),
-      ),
-      everyone(),
-    );
-    await catchUp();
-    now += GroupMailboxOutbox.RETRY_MAX_MS;
-    await alice.mailbox.membersChanged(alice.session, CONVERSATION);
-
-    expect(
-      alice.mailbox.withOutboxState(alice.session, CONVERSATION, [held])[0]
-        .deliveryStatus,
-    ).toBeUndefined();
   });
 
   it('leaves the state of messages that are not this identity’s group records', async () => {
@@ -655,23 +570,49 @@ describe('GroupConversationMailbox', () => {
     ]);
   });
 
-  it('rejects a send from an identity no longer on the roster', async () => {
+  it('rejects a send, edit, reaction or delete from an identity no longer on the roster', async () => {
     await formGroup();
-    roster = new Set([alice.id, bob.id]);
+    const own = await carol.mailbox.send(
+      carol.session,
+      conversation(),
+      'before',
+      {},
+    );
+    // Read before the removal: a removed leaf's late messages are not.
+    await sync(alice);
+    await alice.mailbox.removeMember(alice.session, CONVERSATION, carol.id);
+    await sync(carol);
+    const removed = 'This identity is not in the group';
 
     await expect(
       carol.mailbox.send(carol.session, conversation(), 'removed', {}),
-    ).rejects.toThrow();
-    await sync(alice);
+    ).rejects.toThrow(removed);
+    await expect(
+      carol.mailbox.edit(carol.session, conversation(), own.id, 'later', {}),
+    ).rejects.toThrow(removed);
+    await expect(
+      carol.mailbox.reaction(carol.session, conversation(), {
+        action: 'add',
+        emoji: '+1',
+        messageId: own.id,
+      }),
+    ).rejects.toThrow(removed);
+    await expect(
+      carol.mailbox.delete(carol.session, conversation(), own.id),
+    ).rejects.toThrow(removed);
+    await catchUp([alice]);
 
-    expect(texts(alice)).toEqual([]);
+    expect(texts(alice)).toEqual(['message:before']);
+    expect(
+      alice.changes.some(({ kind }) => kind === 'removed' || kind === 'edit'),
+    ).toBe(false);
   });
 
   it('a leaver is removed by a remaining member on its next sync', async () => {
     await formGroup();
-    roster = new Set([alice.id, carol.id]);
+    await bob.mailbox.leave(bob.session, CONVERSATION);
 
-    await settle(catchUp([alice, carol]), everyone());
+    await settle(catchUp(), everyone());
     await settle(
       Promise.all([
         alice.mailbox.membersChanged(alice.session, CONVERSATION),
@@ -688,22 +629,22 @@ describe('GroupConversationMailbox', () => {
   });
 
   it('reports the conversation a welcome joined, once', async () => {
-    roster = new Set([alice.id, bob.id]);
-    await alice.mailbox.create(alice.session, CONVERSATION, genesis());
+    CONVERSATION = (
+      await alice.mailbox.create(alice.session, {
+        name: 'Group',
+        networkId: NETWORK,
+        participantIds: [bob.id],
+      })
+    ).id;
     const joined: string[] = [];
-    let done = false;
-    const work = alice.mailbox
-      .membersChanged(alice.session, CONVERSATION)
-      .finally(() => {
-        done = true;
-      });
 
-    for (let round = 0; round < 400 && !done; round += 1) {
+    // The add only asks bob; his answer and the welcome come back later.
+    await alice.mailbox.membersChanged(alice.session, CONVERSATION);
+    for (let round = 0; round < 400 && joined.length === 0; round += 1) {
       await alice.mailbox.receiveControl(alice.session);
       joined.push(...(await bob.mailbox.receiveControl(bob.session)));
       await turn();
     }
-    await work;
     joined.push(...(await bob.mailbox.receiveControl(bob.session)));
 
     expect(joined).toEqual([CONVERSATION]);
@@ -712,7 +653,7 @@ describe('GroupConversationMailbox', () => {
 
   it('a sync tells a removed member it left the roster', async () => {
     await formGroup();
-    roster = new Set([alice.id, bob.id]);
+    await alice.mailbox.removeMember(alice.session, CONVERSATION, carol.id);
 
     await expect(sync(carol)).resolves.toEqual({
       removed: true,
@@ -724,24 +665,78 @@ describe('GroupConversationMailbox', () => {
     });
   });
 
-  it('creates no group from a genesis that does not derive its id', async () => {
+  it('derives the group id from a fresh genesis naming its creator', async () => {
+    const input = { name: ' Group ', networkId: NETWORK, participantIds: [] };
+    const first = await alice.mailbox.create(alice.session, input);
+    const second = await alice.mailbox.create(alice.session, input);
+
+    expect(first.id).toMatch(/^group:[A-Za-z0-9_-]{43}$/);
+    expect(second.id).not.toBe(first.id);
+    expect(first).toEqual({
+      adminIds: [],
+      creatorId: alice.id,
+      id: first.id,
+      name: 'Group',
+      networkId: NETWORK,
+      participantIds: [alice.id],
+      type: 'group',
+    });
+  });
+
+  it('creates no group of more than 256 members', async () => {
     await expect(
-      alice.mailbox.create(alice.session, CONVERSATION, {
-        ...genesis(),
-        nonce: 'BBBBBBBBBBBBBBBBBBBBBB',
+      alice.mailbox.create(alice.session, {
+        name: 'Group',
+        networkId: NETWORK,
+        participantIds: Array.from(
+          { length: 256 },
+          (_, index) => `member-${index}`,
+        ),
       }),
-    ).rejects.toThrow('The genesis does not derive the group id');
+    ).rejects.toThrow('The group cannot be created');
+  });
+
+  it('lists only the groups whose roster names this identity', async () => {
+    await formGroup();
+    await alice.mailbox.removeMember(alice.session, CONVERSATION, carol.id);
+    await settle(catchUp(), everyone());
+
+    expect(
+      (await bob.mailbox.conversations(bob.session)).map(({ id }) => id),
+    ).toEqual([CONVERSATION]);
+    expect(await carol.mailbox.conversations(carol.session)).toEqual([]);
+  });
+
+  it('never calls the node’s group roster routes', async () => {
+    const fetching = jest.spyOn(globalThis, 'fetch');
+
+    try {
+      await formGroup();
+      await alice.mailbox.removeMember(alice.session, CONVERSATION, carol.id);
+      await settle(catchUp(), everyone());
+
+      expect(fetching).not.toHaveBeenCalled();
+    } finally {
+      fetching.mockRestore();
+    }
   });
 
   it('holds what a member welcomed by a non-creator sends until the creator speaks', async () => {
+    // The first committer by identity id adds the leaves: bob, once an admin.
+    if (alice.id < bob.id) [alice, bob] = [bob, alice];
     await formGroup();
     const dave = await person();
     const all = [...everyone(), dave];
 
     try {
-      admins = [bob.id];
-      roster.add(dave.id);
+      await alice.mailbox.promote(alice.session, CONVERSATION, bob.id);
+      await settle(catchUp(), all);
+      // Everyone opens the inboxes the roster commit leads to before dave
+      // answers: the commit adding dave can only reach an opened inbox.
+      await bob.mailbox.addMember(bob.session, CONVERSATION, dave.id);
+      await catchUp();
       await settle(bob.mailbox.membersChanged(bob.session, CONVERSATION), all);
+      await settle(Promise.resolve(), all);
       await settle(Promise.resolve(), all);
       await catchUp(all);
 
@@ -970,17 +965,6 @@ describe('GroupConversationMailbox', () => {
     await sync(bob);
 
     expect(typed(bob)).toEqual([NOW, NOW + 10_000]);
-  });
-
-  it('sends no typing while a removal on the roster is pending', async () => {
-    await formGroup();
-    roster = new Set([alice.id, bob.id]);
-
-    await alice.mailbox.typing(alice.session, CONVERSATION);
-    await Promise.all(everyone().map(sync));
-
-    expect(carol.changes.some(({ kind }) => kind === 'typing')).toBe(false);
-    expect(bob.changes.some(({ kind }) => kind === 'typing')).toBe(false);
   });
 
   it('tells the other members of an identity update, never in history or unread', async () => {

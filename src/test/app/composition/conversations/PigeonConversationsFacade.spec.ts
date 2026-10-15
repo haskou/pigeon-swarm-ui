@@ -1,6 +1,7 @@
 import { mock, mockDeep } from 'jest-mock-extended';
 
 import type { ConversationUseCases } from '../../../../app/composition/conversations/ConversationUseCases';
+import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { GroupConversationMailbox } from '../../../../contexts/groupMailboxes/infrastructure/GroupConversationMailbox';
 
 import { PigeonConversationsFacade } from '../../../../app/composition/conversations/PigeonConversationsFacade';
@@ -13,37 +14,54 @@ import {
 
 type GroupMembership = Pick<
   GroupConversationMailbox,
-  'create' | 'membersChanged'
+  | 'addMember'
+  | 'conversations'
+  | 'create'
+  | 'demote'
+  | 'leave'
+  | 'promote'
+  | 'removeMember'
 >;
 
-describe(PigeonConversationsFacade.name, () => {
-  it('registers the session and maps searched aggregates for presentation', async () => {
-    const useCases = mockDeep<ConversationUseCases>();
-    const conversation = conversationFixture();
+const group: ConversationResource = {
+  adminIds: [],
+  creatorId: 'identity-a',
+  id: 'group:a',
+  name: 'Friends',
+  networkId: 'network-a',
+  participantIds: ['identity-a', 'identity-b'],
+  type: 'group',
+};
 
-    useCases.searcher.search.mockResolvedValue([conversation]);
+describe(PigeonConversationsFacade.name, () => {
+  it('lists the node one-to-one conversations, then the groups this device holds', async () => {
+    const useCases = mockDeep<ConversationUseCases>();
+    const groups = mock<GroupMembership>();
+
+    useCases.searcher.search.mockResolvedValue([conversationFixture()]);
+    groups.conversations.mockResolvedValue([group]);
 
     await expect(
       new PigeonConversationsFacade(
         new ConversationAccessContexts(),
         new ConversationMapper(),
         useCases,
-        mock<GroupMembership>(),
+        groups,
       ).list(sessionFixture()),
     ).resolves.toEqual([
       expect.objectContaining({ id: 'one-to-one:a', type: 'one-to-one' }),
+      group,
     ]);
   });
 
   it('returns the keychain published while creating a conversation', async () => {
-    const contexts = new ConversationAccessContexts();
     const useCases = mockDeep<ConversationUseCases>();
 
     useCases.creator.create.mockResolvedValue(conversationFixture());
 
     await expect(
       new PigeonConversationsFacade(
-        contexts,
+        new ConversationAccessContexts(),
         new ConversationMapper(),
         useCases,
         mock<GroupMembership>(),
@@ -54,67 +72,84 @@ describe(PigeonConversationsFacade.name, () => {
     });
   });
 
-  it('starts the MLS group of a group it creates from the genesis of its id', async () => {
-    const groups = mock<GroupMembership>();
-    const useCases = mockDeep<ConversationUseCases>();
-    const session = sessionFixture();
-
-    useCases.groupCreator.create.mockResolvedValue(
-      conversationFixture({ type: 'group' }),
-    );
-
-    await new PigeonConversationsFacade(
-      new ConversationAccessContexts(),
-      new ConversationMapper(),
-      useCases,
-      groups,
-    ).createGroup(session, {
-      name: 'Friends',
-      networkId: 'network-a',
-      participantIds: ['identity-b'],
-    });
-
-    const [message] = useCases.groupCreator.create.mock.calls[0];
-
-    expect(message.getNonce().toString()).toMatch(/^[\w-]{22}$/);
-    expect(groups.create).toHaveBeenCalledWith(session, 'group:a', {
-      creatorIdentityId: session.identity.id,
-      networkId: 'network-a',
-      nonce: message.getNonce().toString(),
-    });
-  });
-
-  it.each([
+  it.each<
     [
-      'inviting',
-      (facade: PigeonConversationsFacade): Promise<unknown> =>
+      string,
+      (facade: PigeonConversationsFacade) => Promise<unknown>,
+      keyof GroupMembership,
+      unknown[],
+    ]
+  >([
+    [
+      'creates a group',
+      (facade) =>
+        facade.createGroup(sessionFixture(), {
+          name: 'Friends',
+          networkId: 'network-a',
+          participantIds: ['identity-b'],
+        }),
+      'create',
+      [
+        {
+          name: 'Friends',
+          networkId: 'network-a',
+          participantIds: ['identity-b'],
+        },
+      ],
+    ],
+    [
+      'invites',
+      (facade) =>
         facade.inviteToGroup(sessionFixture(), 'group:a', 'identity-c'),
+      'addMember',
+      ['group:a', 'identity-c'],
     ],
     [
-      'removing',
-      (facade: PigeonConversationsFacade): Promise<unknown> =>
+      'removes',
+      (facade) =>
         facade.removeParticipant(sessionFixture(), 'group:a', 'identity-b'),
+      'removeMember',
+      ['group:a', 'identity-b'],
     ],
-  ])('updates the MLS group after %s a member', async (_name, change) => {
-    const groups = mock<GroupMembership>();
-    const useCases = mockDeep<ConversationUseCases>();
-    const group = conversationFixture({ type: 'group' });
+    [
+      'promotes',
+      (facade) =>
+        facade.promoteAdmin(sessionFixture(), 'group:a', 'identity-b'),
+      'promote',
+      ['group:a', 'identity-b'],
+    ],
+    [
+      'demotes',
+      (facade) => facade.demoteAdmin(sessionFixture(), 'group:a', 'identity-b'),
+      'demote',
+      ['group:a', 'identity-b'],
+    ],
+    [
+      'leaves',
+      (facade) => facade.leave(sessionFixture(), 'group:a'),
+      'leave',
+      ['group:a'],
+    ],
+  ])(
+    '%s through the MLS roster, without any node conversation request',
+    async (_name, run, method, args) => {
+      const useCases = mockDeep<ConversationUseCases>();
+      const groups = mock<GroupMembership>();
 
-    useCases.participantInviter.invite.mockResolvedValue(group);
-    useCases.participantRemover.remove.mockResolvedValue(group);
+      groups.create.mockResolvedValue(group);
 
-    await change(
-      new PigeonConversationsFacade(
-        new ConversationAccessContexts(),
-        new ConversationMapper(),
-        useCases,
-        groups,
-      ),
-    );
+      await run(
+        new PigeonConversationsFacade(
+          new ConversationAccessContexts(),
+          new ConversationMapper(),
+          useCases,
+          groups,
+        ),
+      );
 
-    expect(groups.membersChanged).toHaveBeenCalledWith(
-      sessionFixture(),
-      'group:a',
-    );
-  });
+      expect(groups[method]).toHaveBeenCalledWith(sessionFixture(), ...args);
+      expect(useCases.creator.create).not.toHaveBeenCalled();
+      expect(useCases.searcher.search).not.toHaveBeenCalled();
+    },
+  );
 });

@@ -17,7 +17,6 @@ import { ConversationNetworkId } from '../../../../../contexts/conversations/dom
 import { ConversationParticipantId } from '../../../../../contexts/conversations/domain/value-objects/ConversationParticipantId';
 import { GroupMailboxGeneration } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxGeneration';
 import { GroupMailboxGenesis } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxGenesis';
-import { GroupMailboxRoster } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxRoster';
 import { GroupMailboxControl } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControl';
 import { GroupMailboxControlRecord } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlRecord';
 import { GroupMailboxKeySchedule } from '../../../../../contexts/groupMailboxes/infrastructure/crypto/GroupMailboxKeySchedule';
@@ -35,6 +34,7 @@ import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure
 import { DirectMessageInboxKeys } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageInboxKeys';
 import { DirectMessageMailboxRecord } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxRecord';
 import { MlsTestIdentity } from '../../../communities/infrastructure/mls/MlsTestIdentity';
+import { rosterOf } from '../../rosterOf';
 import { sealedGroupStores } from '../sealedGroupStores';
 
 const NETWORK = 'network-1';
@@ -60,16 +60,14 @@ type Member = {
 let now = 1_000;
 let database = 0;
 let cast: Record<string, MlsTestIdentity>;
-let roster = GroupMailboxRoster.empty();
 
 const id = (name: string): string => cast[name].id;
 
-/** The roster of a conversation whose creator is `creator`, if any. */
-const rosterOf = (names: string[], creator?: string): GroupMailboxRoster =>
-  GroupMailboxRoster.of({
-    adminIds: [],
-    creatorId: creator && id(creator),
-    participantIds: names.map(id),
+/** The roster of the conversation `creator` created, listing `names`. */
+const rosterNamed = (names: string[], creator = 'alice') =>
+  rosterOf(names.map(id), {
+    conversationId: CONVERSATION,
+    creatorId: id(creator),
   });
 let inboxes: Map<
   string,
@@ -204,7 +202,6 @@ const member = (name: string): Member => {
     cast[name].signer(),
     stores.state,
     stores.generations,
-    () => Promise.resolve(roster),
     () => Promise.resolve([cast[name].deviceCredential()]),
     () => [],
     () => now,
@@ -220,14 +217,13 @@ const member = (name: string): Member => {
       remove: (_identityId, rowId) => Promise.resolve(void rows.delete(rowId)),
       save: (_session, row) => Promise.resolve(void rows.set(row.id, row)),
     },
-    () => Promise.resolve(roster),
     () => now,
   );
   const direct: Member['direct'] = [];
   const control = new GroupMailboxControl(
     cast[name].owner(),
     engine,
-    () => Promise.resolve(roster),
+    () => Object.keys(cast).map(id),
     {
       send: (_conversationId, peer, plaintext) => {
         members.get(peer)?.direct.push({ from: identityId, plaintext });
@@ -477,7 +473,6 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
 
   beforeEach(async () => {
     now = 1_000;
-    roster = rosterOf(['alice', 'bob', 'carol'], 'alice');
     memoryStorage();
     fakeNode();
     members = new Map();
@@ -485,9 +480,14 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
     bob = member('bob');
     carol = member('carol');
     await alice.engine.learnGenesis(genesis);
-    await alice.engine.createGroup(CONVERSATION);
+    await alice.engine.createGroup(
+      CONVERSATION,
+      rosterNamed(['alice', 'bob', 'carol', 'dave']),
+    );
     await sync(alice);
-    await add(alice, [bob, carol]);
+    await add(alice, [bob]);
+    await Promise.all([sync(alice), sync(bob)]);
+    await add(alice, [carol]);
     await Promise.all([sync(alice), sync(bob), sync(carol)]);
   });
 
@@ -528,7 +528,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
   });
 
   it('keeps a removed member from reading later messages', async () => {
-    await alice.control.remove(CONVERSATION, [carol.id]);
+    await alice.control.removeMember(CONVERSATION, carol.id);
     await sync(bob);
     await sync(alice);
     await send(alice, sent('alice', mid('alice', 'after-removal')));
@@ -565,7 +565,10 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
   it('rejects a message from outside the group and keeps reading', async () => {
     const mallory = member('mallory');
 
-    await mallory.engine.createGroup(CONVERSATION);
+    await mallory.engine.createGroup(
+      CONVERSATION,
+      rosterNamed(['mallory', 'alice', 'bob', 'carol'], 'mallory'),
+    );
     const ciphertext = await mallory.engine.encrypt(
       CONVERSATION,
       DirectMessageMailboxRecord.encode(
@@ -755,9 +758,14 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
     ).mailboxId;
 
     // A patched client of carol forks the group into an epoch only she holds.
-    roster = rosterOf(['alice', 'carol']);
-    await carol.engine.remove(CONVERSATION, [bob.id], () => Promise.resolve());
-    roster = rosterOf(['alice', 'bob', 'carol'], 'alice');
+    const left = (await carol.engine.roster(CONVERSATION))?.withoutMember(
+      carol.id,
+    );
+
+    if (!left) throw new Error('carol may leave');
+    await carol.engine.changeRoster(CONVERSATION, left, () =>
+      Promise.resolve(),
+    );
     await inject(
       bob,
       GroupMailboxControlRecord.encode({
@@ -773,7 +781,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
     );
     const forged = inboxes.get(retired)?.envelopes.length ?? 0;
 
-    await alice.control.remove(CONVERSATION, [carol.id]);
+    await alice.control.removeMember(CONVERSATION, carol.id);
     await sync(bob);
     await send(alice, sent('alice', mid('alice', 'after')));
     await sync(bob);
@@ -858,7 +866,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
   });
 
   it('re-encrypts a stranded message in the next generation, never for a joiner', async () => {
-    await alice.control.remove(CONVERSATION, [carol.id]);
+    await alice.control.removeMember(CONVERSATION, carol.id);
     await Promise.all([sync(alice), sync(bob)]);
     const bobInbox = GroupMailboxKeySchedule.inbox(
       (await bob.engine.generation(CONVERSATION)).secret,
@@ -869,7 +877,6 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
     await send(alice, sent('alice', mid('alice', 'stranded')));
     const stranded = (await alice.engine.generation(CONVERSATION)).index;
 
-    roster = rosterOf(['alice', 'bob', 'carol', 'dave'], 'alice');
     const dave = member('dave');
 
     await add(alice, [dave]);
@@ -914,7 +921,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
     );
     const retired = keys.mailboxId;
 
-    await alice.control.remove(CONVERSATION, [carol.id]);
+    await alice.control.removeMember(CONVERSATION, carol.id);
     await sync(bob);
 
     expect(inboxes.has(retired)).toBe(true);
@@ -950,11 +957,15 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
       (_order, call) => wire.addReader.mock.calls[call][2] === enrolled,
     );
 
+    // Bob also acknowledges another of its inboxes, where no laptop reader
+    // is enrolled; only the cursor of the inbox enrolled in must wait.
+    const acknowledged = wire.acknowledge.mock.invocationCallOrder.filter(
+      (_order, call) => wire.acknowledge.mock.calls[call][0] === keys.mailboxId,
+    );
+
     expect(ids(bob.received)).toEqual(['sent:m1', 'sent:m2']);
     expect(enrolments).toHaveLength(1);
-    expect(enrolments[0]).toBeLessThan(
-      Math.min(...wire.acknowledge.mock.invocationCallOrder),
-    );
+    expect(enrolments[0]).toBeLessThan(Math.min(...acknowledged));
     expect(inboxes.get(keys.mailboxId)?.readers.get(enrolled)).toBe(0);
   });
 
@@ -970,7 +981,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
 
     await send(alice, sent('alice', mid('alice', 'm1')));
     await syncBeside(bob, [laptop])();
-    await alice.control.remove(CONVERSATION, [carol.id]);
+    await alice.control.removeMember(CONVERSATION, carol.id);
     await sync(bob);
     now += GroupMailboxGeneration.DRAIN_WINDOW_MS + 1;
     await sync(bob);

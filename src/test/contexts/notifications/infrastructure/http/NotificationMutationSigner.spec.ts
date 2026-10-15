@@ -29,7 +29,7 @@ describe(NotificationMutationSigner.name, () => {
         signer.invitationId(
           payload.inviterIdentityId as string,
           payload.recipientIdentityId as string,
-          payload.subjectId as string,
+          'subjectId' in payload ? payload.subjectId : undefined,
           payload.nonce as string,
         ),
       ).toBe(payload.id);
@@ -48,15 +48,23 @@ describe(NotificationMutationSigner.name, () => {
     },
   );
 
-  it('signs an invitation whose digest and id match the payload it commits to', async () => {
+  it('signs a group letter that names no subject in its id or payload', async () => {
     const inviter = await session();
     const recipient = await session();
     const signed = await signer.invitation(inviter, {
       encryptedKey: 'key',
       recipientIdentityId: recipient.identity.id,
-      subjectId: 'group:g',
       type: 'group_conversation_invitation',
     });
+
+    expect(signed.notificationId).toBe(
+      signer.invitationId(
+        signed.inviterIdentityId,
+        signed.recipientIdentityId,
+        undefined,
+        signed.nonce,
+      ),
+    );
 
     expect(signed.nonce).toMatch(/^[A-Za-z0-9_-]{16,128}$/);
     expect(signed.mutation).toMatchObject({
@@ -74,7 +82,6 @@ describe(NotificationMutationSigner.name, () => {
         nonce: signed.nonce,
         recipientIdentityId: signed.recipientIdentityId,
         scopeType: 'notification_invitation',
-        subjectId: 'group:g',
         type: 'group_conversation_invitation',
       }),
     );

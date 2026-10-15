@@ -69,7 +69,7 @@ const KINDS: [string, GroupMailboxControlFields][] = [
   ['welcome', WELCOME],
 ];
 const WINDOW = GroupMailboxNotificationPump.ANSWER_WINDOW_MS;
-const WELCOME_WINDOW = GroupMailboxNotificationPump.WELCOME_WINDOW_MS;
+const LETTER_WINDOW = GroupMailboxNotificationPump.LETTER_WINDOW_MS;
 
 const person = async (): Promise<Person> => {
   const keyPair = await KeyPair.generate();
@@ -114,7 +114,6 @@ const notification = (letter: Letter): NotificationResource => {
   return {
     id: letter.id,
     payload: {
-      conversationId,
       encryptedConversationKey: sealed,
       inviterIdentityId: (letter.inviter ?? letter.from).id,
       nonce: 'nonce',
@@ -296,19 +295,23 @@ describe('GroupMailboxNotificationPump', () => {
     it('declines, without handing it over, a letter outside its window', async () => {
       const { control, pump, signed } = setup([
         [
-          notification({ from: alice, id: 'n1', sentAt: NOW - WINDOW - 1 }),
+          notification({
+            from: alice,
+            id: 'n1',
+            sentAt: NOW - LETTER_WINDOW - 1,
+          }),
           notification({
             from: alice,
             id: 'n2',
             record: RESPONSE,
-            sentAt: NOW - WINDOW - 1,
+            sentAt: NOW - LETTER_WINDOW - 1,
           }),
           notification({ from: alice, id: 'n3', sentAt: NOW + WINDOW + 1 }),
           notification({
             from: alice,
             id: 'n4',
             record: WELCOME,
-            sentAt: NOW - WELCOME_WINDOW - 1,
+            sentAt: NOW - LETTER_WINDOW - 1,
           }),
           notification({
             from: alice,
@@ -328,22 +331,25 @@ describe('GroupMailboxNotificationPump', () => {
       );
     });
 
-    it('hands a late welcome within its window over for the engine to judge', async () => {
-      const { control, pump } = setup([
-        [
-          notification({
-            from: alice,
-            id: 'n1',
-            record: WELCOME,
-            sentAt: NOW - WELCOME_WINDOW,
-          }),
-        ],
-      ]);
+    it.each(KINDS)(
+      'hands a late %s within its window over for the control to judge',
+      async (_kind, record) => {
+        const { control, pump } = setup([
+          [
+            notification({
+              from: alice,
+              id: 'n1',
+              record,
+              sentAt: NOW - LETTER_WINDOW,
+            }),
+          ],
+        ]);
 
-      await pump.run();
+        await pump.run();
 
-      expect(control.receiveDirect).toHaveBeenCalledTimes(1);
-    });
+        expect(control.receiveDirect).toHaveBeenCalledTimes(1);
+      },
+    );
 
     it('reads no letter the node holds as accepted or declined', async () => {
       const { control, pump, signed } = setup([
@@ -483,44 +489,29 @@ describe('GroupMailboxNotificationPump', () => {
       expect(signed()).toEqual([['n1', 'accepted']]);
     });
 
-    it('keeps a request or response through its answer window only', async () => {
-      const { database, pump } = setup([
-        [notification({ from: alice, id: 'n1' })],
-      ]);
+    it.each(KINDS)(
+      'keeps a %s through its letter window only',
+      async (_kind, record) => {
+        const { database, pump } = setup([
+          [notification({ from: alice, id: 'n1', record })],
+        ]);
 
-      await pump.run();
-      await setup([[]], { database, now: NOW + WINDOW }).pump.run();
+        await pump.run();
+        await setup([[]], { database, now: NOW + LETTER_WINDOW }).pump.run();
 
-      await expect(
-        entries(database).list(bob.session, 'control-letter'),
-      ).resolves.toHaveLength(1);
-      await setup([[]], { database, now: NOW + WINDOW + 1 }).pump.run();
+        await expect(
+          entries(database).list(bob.session, 'control-letter'),
+        ).resolves.toHaveLength(1);
+        await setup([[]], {
+          database,
+          now: NOW + LETTER_WINDOW + 1,
+        }).pump.run();
 
-      await expect(
-        entries(database).list(bob.session, 'control-letter'),
-      ).resolves.toEqual([]);
-    });
-
-    it('keeps a welcome through its welcome window only', async () => {
-      const { database, pump } = setup([
-        [notification({ from: alice, id: 'n1', record: WELCOME })],
-      ]);
-
-      await pump.run();
-      await setup([[]], { database, now: NOW + WELCOME_WINDOW }).pump.run();
-
-      await expect(
-        entries(database).list(bob.session, 'control-letter'),
-      ).resolves.toHaveLength(1);
-      await setup([[]], {
-        database,
-        now: NOW + WELCOME_WINDOW + 1,
-      }).pump.run();
-
-      await expect(
-        entries(database).list(bob.session, 'control-letter'),
-      ).resolves.toEqual([]);
-    });
+        await expect(
+          entries(database).list(bob.session, 'control-letter'),
+        ).resolves.toEqual([]);
+      },
+    );
   });
 
   describe('across failures and sessions', () => {
@@ -592,29 +583,56 @@ describe('GroupMailboxNotificationPump', () => {
       expect(new Set(records.map(String))).toEqual(new Set(['n1,accepted']));
     });
 
-    it('never hands a letter over twice once a session stopped half-way', async () => {
-      const stopped = setup([[notification({ from: alice, id: 'n1' })]]);
+    it.each([
+      ['request', REQUEST],
+      ['response', RESPONSE],
+    ] as const)(
+      'never hands a %s over twice once a session stopped half-way',
+      async (_kind, record) => {
+        const stopped = setup([
+          [notification({ from: alice, id: 'n1', record })],
+        ]);
+
+        stopped.control.receiveDirect.mockReturnValue(new Promise(() => {}));
+        void stopped.pump.run();
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        const later = (now: number) =>
+          setup([[notification({ from: alice, id: 'n1', record })]], {
+            database: stopped.database,
+            now,
+          });
+        const reloaded = later(NOW + WINDOW + 1);
+
+        await reloaded.pump.run();
+
+        expect(reloaded.control.receiveDirect).not.toHaveBeenCalled();
+        expect(reloaded.signed()).toEqual([]);
+        const late = later(NOW + LETTER_WINDOW + 1);
+
+        await late.pump.run();
+
+        expect(late.control.receiveDirect).not.toHaveBeenCalled();
+        expect(late.signed()).toEqual([['n1', 'declined']]);
+      },
+    );
+
+    it('hands a welcome over again once a session stopped half-way and its claim ended', async () => {
+      const stopped = setup([
+        [notification({ from: alice, id: 'n1', record: WELCOME })],
+      ]);
 
       stopped.control.receiveDirect.mockReturnValue(new Promise(() => {}));
       void stopped.pump.run();
       await new Promise((resolve) => setTimeout(resolve, 50));
-      const reloaded = setup([[notification({ from: alice, id: 'n1' })]], {
-        database: stopped.database,
-      });
+      const reloaded = setup(
+        [[notification({ from: alice, id: 'n1', record: WELCOME })]],
+        { database: stopped.database, now: NOW + WINDOW + 1 },
+      );
 
       await reloaded.pump.run();
 
-      expect(reloaded.control.receiveDirect).not.toHaveBeenCalled();
-      expect(reloaded.signed()).toEqual([]);
-      const late = setup([[notification({ from: alice, id: 'n1' })]], {
-        database: stopped.database,
-        now: NOW + WINDOW + 1,
-      });
-
-      await late.pump.run();
-
-      expect(late.control.receiveDirect).not.toHaveBeenCalled();
-      expect(late.signed()).toEqual([['n1', 'declined']]);
+      expect(reloaded.control.receiveDirect).toHaveBeenCalledTimes(1);
+      expect(reloaded.signed()).toEqual([['n1', 'accepted']]);
     });
   });
 
@@ -684,5 +702,84 @@ describe('GroupMailboxNotificationPump', () => {
     expect(notifications.listPage).toHaveBeenCalledTimes(
       GroupMailboxNotificationPump.MAX_PAGES,
     );
+  });
+
+  describe('a request from an identity that is not a contact', () => {
+    const deferred = () => {
+      const pumped = setup([
+        [
+          notification({ from: alice, id: 'late', sentAt: NOW - 1 }),
+          notification({ from: mallory, id: 'early', sentAt: NOW - 2 }),
+        ],
+      ]);
+
+      pumped.control.receiveDirect.mockResolvedValue('deferred');
+
+      return pumped;
+    };
+
+    it('stays pending and is listed as an invitation, oldest first', async () => {
+      const { pump, signed } = deferred();
+
+      await pump.run();
+
+      expect(signed()).toEqual([]);
+      expect(pump.invitations()).toEqual([
+        {
+          conversationId: CONVERSATION,
+          inviterIdentityId: mallory.id,
+          notificationId: 'early',
+          sentAt: NOW - 2,
+        },
+        {
+          conversationId: CONVERSATION,
+          inviterIdentityId: alice.id,
+          notificationId: 'late',
+          sentAt: NOW - 1,
+        },
+      ]);
+    });
+
+    it('is answered as consented once the user accepts it', async () => {
+      const { control, pump, signed } = deferred();
+
+      await pump.run();
+      control.receiveDirect.mockResolvedValue('applied');
+
+      await expect(pump.accept('late')).resolves.toBe(true);
+      expect(control.receiveDirect).toHaveBeenLastCalledWith(
+        alice.id,
+        expect.any(Uint8Array),
+        true,
+      );
+      expect(signed()).toEqual([['late', 'accepted']]);
+      expect(
+        pump.invitations().map(({ notificationId }) => notificationId),
+      ).toEqual(['early']);
+      await expect(pump.accept('late')).resolves.toBe(false);
+    });
+
+    it('stays listed when the control cannot answer it now', async () => {
+      const { pump } = deferred();
+
+      await pump.run();
+
+      await expect(pump.accept('late')).rejects.toThrow(
+        'The invitation cannot be answered now',
+      );
+      expect(pump.invitations()).toHaveLength(2);
+    });
+
+    it('is declined without an answer once the user declines it', async () => {
+      const { control, pump, signed } = deferred();
+
+      await pump.run();
+
+      await expect(pump.decline('early')).resolves.toBe(true);
+      expect(control.receiveDirect).toHaveBeenCalledTimes(2);
+      expect(signed()).toEqual([['early', 'declined']]);
+      await expect(pump.decline('early')).resolves.toBe(false);
+      await expect(pump.accept('unknown')).resolves.toBe(false);
+    });
   });
 });

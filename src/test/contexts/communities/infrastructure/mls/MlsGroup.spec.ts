@@ -284,6 +284,29 @@ describe('MlsGroup on the real ts-mls library', () => {
     expect(alice.group.identities()).not.toContain(idOf('carol'));
   });
 
+  it('lets another member apply a commit that changes the context and removes a member at once', async () => {
+    const extensionType = 0xf4f0;
+    const keyOf = (name: string) =>
+      generateMlsKeyPackage(cast[name].signer('d1'), [extensionType]);
+    const aliceKey = await keyOf('alice');
+    const alice = await MlsGroup.create('community-1', aliceKey, policy);
+    const {
+      groups: [bob, carol],
+    } = await admit(alice, [await keyOf('bob'), await keyOf('carol')], []);
+    const context = [{ extensionData: text.encode('v2'), extensionType }];
+
+    const change = await alice.changeContext(context, [idOf('carol')]);
+    const record = { bytes: change.commit, epoch: change.epoch, id: nextId() };
+    alice.confirm(record.id);
+    await bob.applyCommit(record);
+    const after = await alice.encrypt(text.encode('after'));
+
+    expect(bob.context()).toEqual(context);
+    expect(bob.identities().sort()).toEqual(idsOf('alice', 'bob'));
+    expect(read(await bob.decrypt(after))).toBe('after');
+    expect((await carol.applyCommit(record)).kind).toBe('removed');
+  });
+
   it('removes every device of an identity at once', async () => {
     const { alice, bob } = await setup(['alice', 'bob']);
     const phone = await device('bob', 'd2');

@@ -2,6 +2,7 @@ import type { MockProxy } from 'jest-mock-extended';
 
 import { mock } from 'jest-mock-extended';
 
+import type { GroupMailboxRoster } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxRoster';
 import type { GroupMailboxCommit } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxCommit';
 import type { GroupMailboxOutboxEngine } from '../../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutboxEngine';
 import type { GroupMailboxOutboxRow } from '../../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutboxRow';
@@ -12,7 +13,6 @@ import type { MailboxChannel } from '../../../../../contexts/mailboxes/infrastru
 
 import { MlsRejectedError } from '../../../../../contexts/communities/infrastructure/mls/MlsRejectedError';
 import { GroupMailboxGeneration } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxGeneration';
-import { GroupMailboxRoster } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxRoster';
 import { GroupMailboxGenerationSecret } from '../../../../../contexts/groupMailboxes/domain/value-objects/GroupMailboxGenerationSecret';
 import { GroupMailboxControlRecord } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlRecord';
 import { GroupMailboxKeySchedule } from '../../../../../contexts/groupMailboxes/infrastructure/crypto/GroupMailboxKeySchedule';
@@ -20,6 +20,7 @@ import { GroupMailboxOutbox } from '../../../../../contexts/groupMailboxes/infra
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
+import { rosterOf } from '../../rosterOf';
 
 const CONVERSATION = 'conversation-1';
 
@@ -36,9 +37,6 @@ const inboxOf = (index: number, identityId: string): string =>
     generation(index).secret,
     IdentityId.fromString(identityId),
   ).mailboxId;
-
-const rosterOf = (...participantIds: string[]): GroupMailboxRoster =>
-  GroupMailboxRoster.of({ adminIds: [], participantIds });
 
 const commitTo = (recipients: string[]): GroupMailboxCommit => ({
   commit: new Uint8Array([9, 9]),
@@ -64,18 +62,11 @@ describe('GroupMailboxOutbox', () => {
   const session = { identity: { id: 'alice' } } as unknown as Session;
 
   const build = (): GroupMailboxOutbox =>
-    new GroupMailboxOutbox(
-      session,
-      engine,
-      channel,
-      store,
-      () => Promise.resolve(roster),
-      () => now,
-    );
+    new GroupMailboxOutbox(session, engine, channel, store, () => now);
 
   beforeEach(() => {
     now = 1_000;
-    roster = rosterOf('alice', 'bob', 'dave');
+    roster = rosterOf(['alice', 'bob', 'dave']);
     current = 0;
     sent = [];
     rows = new Map();
@@ -89,6 +80,7 @@ describe('GroupMailboxOutbox', () => {
       ),
     );
     engine.members.mockResolvedValue(['alice', 'bob']);
+    engine.roster.mockImplementation(() => Promise.resolve(roster));
     engine.awaitsConfirmation.mockResolvedValue(false);
     engine.encrypt.mockImplementation(() =>
       Promise.resolve(new Uint8Array([current, 7])),
@@ -377,7 +369,7 @@ describe('GroupMailboxOutbox', () => {
   });
 
   it('seals nothing while a member off the roster is still in the group', async () => {
-    roster = rosterOf('alice');
+    roster = rosterOf(['alice']);
 
     await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
 
@@ -435,7 +427,7 @@ describe('GroupMailboxOutbox', () => {
   it('holds a queued message once a recipient leaves the roster', async () => {
     channel.send.mockRejectedValue(new TypeError('offline'));
     await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
-    roster = rosterOf('alice');
+    roster = rosterOf(['alice']);
     channel.send.mockReset();
     channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'x' });
     now += GroupMailboxOutbox.RETRY_MAX_MS;
@@ -479,7 +471,7 @@ describe('GroupMailboxOutbox', () => {
   });
 
   it('rejects a message once this identity is off the roster', async () => {
-    roster = rosterOf('bob');
+    roster = rosterOf(['bob']);
 
     await expect(
       outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1])),
@@ -494,12 +486,26 @@ describe('GroupMailboxOutbox', () => {
     outbox.subscribe(({ reference }) => failures.push(reference));
     channel.send.mockRejectedValue(new TypeError('offline'));
     await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
-    roster = rosterOf('bob');
+    roster = rosterOf(['bob']);
     now += GroupMailboxOutbox.RETRY_MAX_MS;
 
     await outbox.resume();
 
     expect(failures).toEqual(['m1']);
+    expect(rows.size).toBe(0);
+  });
+
+  it('drops a queued commit once this device holds no group', async () => {
+    channel.send.mockRejectedValue(new TypeError('offline'));
+    await outbox.enqueueCommit(CONVERSATION, commitTo(['alice', 'bob']));
+    await outbox.flush();
+    channel.send.mockClear();
+    engine.roster.mockResolvedValue(undefined);
+    now += GroupMailboxOutbox.RETRY_MAX_MS;
+
+    await outbox.resume();
+
+    expect(channel.send).not.toHaveBeenCalled();
     expect(rows.size).toBe(0);
   });
 
@@ -565,7 +571,7 @@ describe('GroupMailboxOutbox', () => {
     });
 
     it('seals nothing while a member off the roster is still in the group', async () => {
-      roster = rosterOf('alice');
+      roster = rosterOf(['alice']);
 
       await outbox.sendEphemeral(CONVERSATION, new Uint8Array([1]));
 
@@ -583,7 +589,7 @@ describe('GroupMailboxOutbox', () => {
     });
 
     it('sends nothing once this identity is off the roster', async () => {
-      roster = rosterOf('bob');
+      roster = rosterOf(['bob']);
 
       await expect(
         outbox.sendEphemeral(CONVERSATION, new Uint8Array([1])),
