@@ -22,6 +22,13 @@ const header = {
   kind: 'group-mailbox-control',
   version: 1,
 };
+const welcome = {
+  ...header,
+  deviceCredential: DEVICE,
+  index: 1,
+  type: 'welcome',
+  welcome: 'AA',
+};
 
 describe('GroupMailboxControlRecord', () => {
   it.each<GroupMailboxControlFields>([
@@ -38,6 +45,7 @@ describe('GroupMailboxControlRecord', () => {
     },
     {
       conversationId: 'conversation-1',
+      deviceCredential: DEVICE,
       index: 3,
       type: 'welcome',
       welcome: bytes,
@@ -107,17 +115,16 @@ describe('GroupMailboxControlRecord', () => {
       'a short request id',
       json({ ...header, requestId: 'abc', type: 'key-package-request' }),
     ],
+    ['a negative index', json({ ...welcome, index: -1 })],
+    ['a fractional index', json({ ...welcome, index: 1.5 })],
+    ['a string index', json({ ...welcome, index: '1' })],
     [
-      'a negative index',
-      json({ ...header, index: -1, type: 'welcome', welcome: 'AA' }),
+      'a welcome naming no device',
+      json({ ...welcome, deviceCredential: undefined }),
     ],
     [
-      'a fractional index',
-      json({ ...header, index: 1.5, type: 'welcome', welcome: 'AA' }),
-    ],
-    [
-      'a string index',
-      json({ ...header, index: '1', type: 'welcome', welcome: 'AA' }),
+      'a welcome naming a malformed device',
+      json({ ...welcome, deviceCredential: 'not-a-public-key' }),
     ],
     [
       'an oversized commit',
@@ -141,6 +148,7 @@ describe('GroupMailboxControlRecord', () => {
       new TextDecoder().decode(
         GroupMailboxControlRecord.encode({
           conversationId: 'conversation-1',
+          deviceCredential: DEVICE,
           index: 3,
           type: 'welcome',
           welcome: bytes,
@@ -150,6 +158,7 @@ describe('GroupMailboxControlRecord', () => {
 
     expect(Object.keys(decoded).sort()).toEqual([
       'conversationId',
+      'deviceCredential',
       'index',
       'kind',
       'type',
