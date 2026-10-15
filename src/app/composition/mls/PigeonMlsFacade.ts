@@ -10,7 +10,6 @@ import type { MessageResource } from '../../../contexts/messages/infrastructure/
 
 import { CommunityMlsRoster } from '../../../contexts/communities/domain/CommunityMlsRoster';
 import { CommunityRosterHistory } from '../../../contexts/communities/domain/CommunityRosterHistory';
-import { CommunityChannelNotFoundError } from '../../../contexts/communities/domain/errors/CommunityChannelNotFoundError';
 import { CommunityChannelRestrictionRefusedError } from '../../../contexts/communities/domain/errors/CommunityChannelRestrictionRefusedError';
 import { CommunityOperationFold } from '../../../contexts/communities/domain/operations/CommunityOperationFold';
 import { IndexedDbMlsStateStore } from '../../../contexts/communities/infrastructure/mls/IndexedDbMlsStateStore';
@@ -78,7 +77,10 @@ export class PigeonMlsFacade {
 
   /**
    * The group a channel's messages and calls are sealed for, read from the
-   * signed history right now so a restriction applies to the next write.
+   * signed history right now so a restriction applies to the next write. A
+   * channel the history does not show (a channel from before signed
+   * operations, or one whose creation it rejected) cannot be restricted by
+   * it, so it stays on the community group.
    */
   private async groupFor(
     session: Session,
@@ -87,11 +89,7 @@ export class PigeonMlsFacade {
   ): Promise<string> {
     const authority = await this.authority(session, communityId);
 
-    if (!authority?.hasChannel(channelId)) {
-      throw new CommunityChannelNotFoundError();
-    }
-
-    return authority.isChannelRestricted(channelId)
+    return authority?.isChannelRestricted(channelId)
       ? channelGroupOf(communityId, channelId)
       : communityId;
   }

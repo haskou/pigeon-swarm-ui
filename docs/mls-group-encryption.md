@@ -333,7 +333,9 @@ channelId)`); frontiers stay community operation heads.
 - Writes follow the signed operations read at the time of the write: a
   message or a call media key goes to the channel group from the first write
   after the restriction, and back to the community group once the channel is
-  open to everyone. A message opens only with the community group or the
+  open to everyone. A channel the signed operations do not show (created
+  before them, or by an operation they reject) cannot be restricted by them
+  and stays on the community group. A message opens only with the community group or the
   group of the channel it was listed in, as its MLS framing names it, so the
   node cannot move a message from one channel into another. A channel open
   again stops syncing its group, which still reads what it sealed; restricted

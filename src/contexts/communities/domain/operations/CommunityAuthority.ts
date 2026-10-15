@@ -563,10 +563,6 @@ export class CommunityAuthority {
     return !!channel && this.canSeeRoles(identityId, channel.visibleRoleIds);
   }
 
-  public hasChannel(channelId: string): boolean {
-    return this.channel(channelId) !== undefined;
-  }
-
   /** Whether only some roles may see the channel. */
   public isChannelRestricted(channelId: string): boolean {
     const channel = this.channel(channelId);
