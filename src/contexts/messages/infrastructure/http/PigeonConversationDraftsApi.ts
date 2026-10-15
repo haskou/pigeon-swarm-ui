@@ -2,7 +2,6 @@ import type { HttpJsonClient } from '../../../../shared/infrastructure/http/Http
 import type { RequestCache } from '../../../../shared/infrastructure/http/RequestCache';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { Session } from '../../../identities/infrastructure/session/Session';
-import type { ConversationDraftResource } from './ConversationDraftResource';
 import type { ConversationDraftsResource } from './ConversationDraftsResource';
 import type { ConversationDraftProjection } from './resources/ConversationDraftProjection';
 
@@ -72,19 +71,14 @@ export class PigeonConversationDraftsApi {
       content,
     );
     const body = { encryptedPayload, updatedAt };
-    const draft = await this.http.request<ConversationDraftResource>(path, {
+    await this.http.request(path, {
       body: JSON.stringify(body),
       headers: await this.signer.headers(session, 'PUT', path, body),
       method: 'PUT',
     });
     this.requestCache.invalidateForSession(draftsPath, session);
 
-    return {
-      content,
-      conversationId,
-      encryptedPayload: draft.encryptedPayload,
-      updatedAt: draft.updatedAt,
-    };
+    return { content, conversationId, encryptedPayload, updatedAt };
   }
 
   public async deleteConversationDraft(
