@@ -6,42 +6,53 @@ import type { ConversationDraftResource } from './ConversationDraftResource';
 import type { ConversationDraftsResource } from './ConversationDraftsResource';
 import type { ConversationDraftProjection } from './resources/ConversationDraftProjection';
 
-import { DraftPayloadCipher } from '../crypto/DraftPayloadCipher';
+import { ConversationDraftCipher } from '../crypto/ConversationDraftCipher';
 
 const readCacheTtlMs = 1500;
+const draftsPath = '/conversations/me/drafts';
 
-/** The encrypted conversation drafts the node keeps for this identity. */
+/**
+ * The encrypted conversation drafts the node keeps for this identity, under
+ * opaque keys that never name the conversation.
+ */
 export class PigeonConversationDraftsApi {
   public constructor(
     private readonly http: HttpJsonClient,
     private readonly signer: RequestSigner,
     private readonly requestCache: RequestCache,
-    private readonly draftPayloads = new DraftPayloadCipher(),
+    private readonly cipher = new ConversationDraftCipher(),
   ) {}
 
   public async listConversationDrafts(
     session: Session,
   ): Promise<ConversationDraftProjection[]> {
-    const path = '/conversations/me/drafts';
-
     return await this.requestCache.load(
-      this.requestCache.keyForSession(path, session),
+      this.requestCache.keyForSession(draftsPath, session),
       async () => {
         const result = await this.http.request<ConversationDraftsResource>(
-          path,
+          draftsPath,
           {
-            headers: await this.signer.headers(session, 'GET', path),
+            headers: await this.signer.headers(session, 'GET', draftsPath),
             method: 'GET',
           },
         );
 
         return result.drafts.flatMap((draft) => {
-          const content = this.draftPayloads.decrypt(
+          const opened = this.cipher.decrypt(
             session,
+            draft.draftKey,
             draft.encryptedPayload,
           );
 
-          return content === null ? [] : [{ ...draft, content }];
+          return opened === null
+            ? []
+            : [
+                {
+                  ...opened,
+                  encryptedPayload: draft.encryptedPayload,
+                  updatedAt: draft.updatedAt,
+                },
+              ];
         });
       },
       { ttlMs: readCacheTtlMs },
@@ -54,29 +65,38 @@ export class PigeonConversationDraftsApi {
     content: string,
     updatedAt = Date.now(),
   ): Promise<ConversationDraftProjection> {
-    const path = `/conversations/${encodeURIComponent(conversationId)}/draft`;
-    const encryptedPayload = this.draftPayloads.encrypt(session, content);
+    const path = `${draftsPath}/${this.cipher.draftKey(session, conversationId)}`;
+    const encryptedPayload = this.cipher.encrypt(
+      session,
+      conversationId,
+      content,
+    );
     const body = { encryptedPayload, updatedAt };
     const draft = await this.http.request<ConversationDraftResource>(path, {
       body: JSON.stringify(body),
       headers: await this.signer.headers(session, 'PUT', path, body),
       method: 'PUT',
     });
-    this.requestCache.invalidateForSession('/conversations/me/drafts', session);
+    this.requestCache.invalidateForSession(draftsPath, session);
 
-    return { ...draft, content };
+    return {
+      content,
+      conversationId,
+      encryptedPayload: draft.encryptedPayload,
+      updatedAt: draft.updatedAt,
+    };
   }
 
   public async deleteConversationDraft(
     session: Session,
     conversationId: string,
   ): Promise<void> {
-    const path = `/conversations/${encodeURIComponent(conversationId)}/draft`;
+    const path = `${draftsPath}/${this.cipher.draftKey(session, conversationId)}`;
 
     await this.http.request(path, {
       headers: await this.signer.headers(session, 'DELETE', path),
       method: 'DELETE',
     });
-    this.requestCache.invalidateForSession('/conversations/me/drafts', session);
+    this.requestCache.invalidateForSession(draftsPath, session);
   }
 }
