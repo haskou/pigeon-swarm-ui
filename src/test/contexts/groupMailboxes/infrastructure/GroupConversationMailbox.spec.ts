@@ -68,6 +68,8 @@ let devices = 0;
 let CONVERSATION: string;
 let now = NOW;
 let roster: Set<string>;
+/** The roster's admins; with none, every member may commit. */
+let admins: string[];
 let letters: Map<string, NotificationResource[]>;
 /** The device credentials the node lists for each identity. */
 let listed: Map<string, string[]>;
@@ -262,7 +264,10 @@ const device = (storage: string): GroupConversationMailbox =>
     roster: (owner) =>
       Promise.resolve(
         roster.has(owner.identity.id)
-          ? GroupMailboxRoster.of({ adminIds: [], participantIds: [...roster] })
+          ? GroupMailboxRoster.of({
+              adminIds: admins,
+              participantIds: [...roster],
+            })
           : GroupMailboxRoster.empty(),
       ),
     storage,
@@ -415,6 +420,7 @@ beforeEach(async () => {
   verified = new Map();
   now = NOW;
   roster = new Set();
+  admins = [];
   laptop = undefined;
   [alice, bob, carol] = await Promise.all([person(), person(), person()]);
   CONVERSATION = new ConversationIdFactory()
@@ -720,6 +726,7 @@ describe('GroupConversationMailbox', () => {
     const all = [...everyone(), dave];
 
     try {
+      admins = [bob.id];
       roster.add(dave.id);
       await settle(bob.mailbox.membersChanged(bob.session, CONVERSATION), all);
       await settle(Promise.resolve(), all);
