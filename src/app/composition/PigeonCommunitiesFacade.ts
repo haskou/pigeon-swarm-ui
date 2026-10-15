@@ -109,7 +109,7 @@ export class PigeonCommunitiesFacade {
   ): Promise<void> {
     await this.mls
       .synchronize(session, communityId, { force: true })
-      .catch(() => false);
+      .catch(() => undefined);
   }
 
   private async resolvePublicImageCid(
@@ -437,18 +437,41 @@ export class PigeonCommunitiesFacade {
     return await this.management.deleteChannel(session, communityId, channelId);
   }
 
+  /**
+   * In an encrypted community a restricted channel has its own group, which
+   * the identity signing the restriction starts: it is refused before signing
+   * when that identity could not add the members.
+   */
   public async updateChannelPermissions(
     session: Session,
     communityId: string,
     channelId: string,
     visibleRoleIds: string[],
   ): Promise<CommunityChannel> {
-    return await this.management.updateChannelPermissions(
+    const encrypted =
+      (await this.management.find(session, communityId)).visibility !==
+      'public';
+
+    if (encrypted) {
+      await this.mls.assertCanRestrictChannel(
+        session,
+        communityId,
+        visibleRoleIds,
+      );
+    }
+
+    const channel = await this.management.updateChannelPermissions(
       session,
       communityId,
       channelId,
       visibleRoleIds,
     );
+
+    if (encrypted) {
+      await this.mls.openChannelGroup(session, communityId, channelId);
+    }
+
+    return channel;
   }
 
   public async createChannelMessage(

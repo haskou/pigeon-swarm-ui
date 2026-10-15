@@ -6,16 +6,22 @@ describe('CommunityMlsRoster', () => {
   let cast: Record<string, MlsTestIdentity>;
   let roster: CommunityMlsRoster;
   const id = (name: string): string => cast[name].id;
-  const commit = (
+  const commitTo = (
+    to: CommunityMlsRoster,
     committer: string,
     added: string[] = [],
     removed: string[] = [],
   ): boolean =>
-    roster.allowsCommit({
+    to.allowsCommit({
       added: added.map(id),
       committer: id(committer),
       removed: removed.map(id),
     });
+  const commit = (
+    committer: string,
+    added: string[] = [],
+    removed: string[] = [],
+  ): boolean => commitTo(roster, committer, added, removed);
 
   beforeAll(async () => {
     cast = await MlsTestIdentity.cast([
@@ -116,5 +122,98 @@ describe('CommunityMlsRoster', () => {
     expect(
       empty.allowsCommit({ added: [], committer: id('owner'), removed: [] }),
     ).toBe(false);
+  });
+
+  describe('of a restricted channel', () => {
+    let history: CommunityOperationHistory;
+    let channelId: string;
+    let moderators: string;
+    let viewers: string;
+    const channel = (): CommunityMlsRoster =>
+      CommunityMlsRoster.replay(history.operations(), channelId);
+
+    beforeEach(() => {
+      const { member, moderator, owner } = cast;
+
+      history = new CommunityOperationHistory(owner);
+      moderators = history.createRole(owner, ['manage_members']);
+      viewers = history.createRole(owner, []);
+
+      for (const name of ['moderator', 'member', 'other']) {
+        history.add(owner, cast[name]);
+      }
+
+      history.assign(owner, moderator, [moderators]);
+      history.assign(owner, member, [viewers]);
+      channelId = history.createChannel(owner);
+      history.restrictChannel(owner, channelId, [viewers]);
+    });
+
+    it('holds only the owner and the members a visible role lets in', () => {
+      expect(channel().participants().sort()).toEqual(
+        [id('owner'), id('member')].sort(),
+      );
+      expect(channel().has(id('moderator'))).toBe(false);
+      expect(channel().manages(id('moderator'))).toBe(false);
+      expect(commitTo(channel(), 'owner', ['other'])).toBe(false);
+      expect(commitTo(channel(), 'owner', ['member'])).toBe(true);
+    });
+
+    it('lets a community manager manage it only while it may see the channel', () => {
+      history.assign(cast.owner, cast.moderator, [moderators, viewers]);
+
+      expect(channel().manages(id('moderator'))).toBe(true);
+      expect(channel().manages(id('member'))).toBe(false);
+    });
+
+    it('lets any member remove one who lost the role', () => {
+      history.assign(cast.owner, cast.member, []);
+
+      expect(channel().has(id('member'))).toBe(false);
+      expect(commitTo(channel(), 'owner', [], ['member'])).toBe(true);
+    });
+
+    it('ignores a grant the node forges', () => {
+      history.append(
+        cast.owner,
+        'member_roles_updated',
+        { identityId: id('other'), roleIds: [viewers] },
+        cast.stranger.keyPair,
+      );
+
+      expect(channel().has(id('other'))).toBe(false);
+    });
+
+    it('ignores channel permissions the node forges or a member without manage_channels signs', () => {
+      history.append(
+        cast.owner,
+        'channel_permissions_updated',
+        { channelId, visibleRoleIds: [] },
+        cast.stranger.keyPair,
+      );
+      history.restrictChannel(cast.moderator, channelId, [moderators]);
+
+      expect(channel().has(id('other'))).toBe(false);
+      expect(channel().has(id('moderator'))).toBe(false);
+      expect(channel().has(id('member'))).toBe(true);
+    });
+
+    it('admits no one to a channel the signed history lacks or deleted', () => {
+      expect(
+        CommunityMlsRoster.replay(history.operations(), 'missing').has(
+          id('owner'),
+        ),
+      ).toBe(false);
+
+      history.append(cast.owner, 'channel_deleted', { channelId });
+
+      expect(channel().participants()).toEqual([]);
+    });
+
+    it('leaves the community roster whole', () => {
+      expect(
+        CommunityMlsRoster.replay(history.operations()).has(id('other')),
+      ).toBe(true);
+    });
   });
 });

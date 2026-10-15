@@ -59,6 +59,8 @@ export class IndexedDbMlsStateStore implements MlsStateStore {
         new Uint8Array(decodeBase64Url(parts[field]));
 
       return {
+        // Packages stored before groups had their own pools name none.
+        groupId: parts.groupId as string | undefined,
         id,
         privatePackage: {
           hpkePrivateKey: bytes('hpkePrivateKey'),
@@ -97,6 +99,7 @@ export class IndexedDbMlsStateStore implements MlsStateStore {
   }
 
   public async saveKeyPackage({
+    groupId,
     id,
     privatePackage,
     publicBytes,
@@ -107,6 +110,7 @@ export class IndexedDbMlsStateStore implements MlsStateStore {
       id,
       new TextEncoder().encode(
         JSON.stringify({
+          groupId,
           hpkePrivateKey: encodeBase64Url(privatePackage.hpkePrivateKey),
           initPrivateKey: encodeBase64Url(privatePackage.initPrivateKey),
           publicBytes: encodeBase64Url(publicBytes),

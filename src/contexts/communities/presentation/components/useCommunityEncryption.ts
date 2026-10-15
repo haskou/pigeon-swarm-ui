@@ -1,22 +1,26 @@
 import { useEffect, useState } from 'react';
 
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { CommunityEncryptionState } from '../view-models/CommunityChannelEncryption';
 
-import type { Session } from '../../../identities/infrastructure/session/Session';
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 
 const refreshIntervalMs = 30_000;
 
 /**
- * Keeps this device in the community's MLS group and reports whether it can
- * read it. Public communities are not encrypted.
+ * Keeps this device in the community's MLS groups and reports whether it can
+ * read the group of the shown channel: the community group, or the channel's
+ * own group when only some roles may see it. Without a channel it only keeps
+ * the groups current. Public communities are not encrypted.
  */
 export function useCommunityEncryption({
+  channelId,
   communityId,
   isPublic,
   memberKey,
   session,
 }: {
+  channelId: string | null;
   communityId: string;
   isPublic: boolean;
   memberKey: string;
@@ -29,8 +33,16 @@ export function useCommunityEncryption({
 
     let active = true;
     const refresh = () => {
+      if (channelId === null) {
+        applicationContainer.mls
+          .synchronize(session, communityId)
+          .catch(() => undefined);
+
+        return;
+      }
+
       applicationContainer.mls
-        .synchronize(session, communityId)
+        .ready(session, communityId, channelId)
         .then((ready) => active && setState(ready ? 'ready' : 'pending'))
         .catch(() => active && setState('pending'));
     };
@@ -45,7 +57,7 @@ export function useCommunityEncryption({
       window.clearInterval(timer);
     };
     // `memberKey` re-runs the reconciliation when the roster changes.
-  }, [communityId, isPublic, memberKey, session]);
+  }, [channelId, communityId, isPublic, memberKey, session]);
 
   return isPublic ? 'public' : state;
 }

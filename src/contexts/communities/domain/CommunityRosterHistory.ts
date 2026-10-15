@@ -4,11 +4,12 @@ import { CommunityMlsRoster } from './CommunityMlsRoster';
 
 /**
  * A community's verified operations as a causal history, to judge an MLS
- * commit by the roster its committer saw. A frontier names operations by
- * digest and stands for them and everything they descend from. Operations
- * are signed, so a frontier can only name history that exists; which part
- * of it, its author chooses, which is why a group never accepts a frontier
- * that leaves out one it already followed (`follows`).
+ * commit by the roster its committer saw: the community's roster, or the
+ * roster of the channel it is for. A frontier names operations by digest and
+ * stands for them and everything they descend from. Operations are signed,
+ * so a frontier can only name history that exists; which part of it, its
+ * author chooses, which is why a group never accepts a frontier that leaves
+ * out one it already followed (`follows`).
  */
 export class CommunityRosterHistory {
   private readonly operations: ReadonlyMap<string, CommunityOperation>;
@@ -16,11 +17,15 @@ export class CommunityRosterHistory {
 
   public static of(
     operations: readonly CommunityOperation[],
+    channelId?: string,
   ): CommunityRosterHistory {
-    return new CommunityRosterHistory(operations);
+    return new CommunityRosterHistory(operations, channelId);
   }
 
-  private constructor(operations: readonly CommunityOperation[]) {
+  private constructor(
+    operations: readonly CommunityOperation[],
+    private readonly channelId: string | undefined,
+  ) {
     this.operations = new Map(
       operations.map((operation) => [operation.getHash(), operation]),
     );
@@ -108,7 +113,8 @@ export class CommunityRosterHistory {
 
       this.rosters.set(
         key,
-        operations && CommunityMlsRoster.replay([...operations.values()]),
+        operations &&
+          CommunityMlsRoster.replay([...operations.values()], this.channelId),
       );
     }
 

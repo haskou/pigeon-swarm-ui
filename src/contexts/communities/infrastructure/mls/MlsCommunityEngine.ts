@@ -107,6 +107,14 @@ export class MlsCommunityEngine {
     return `${groupId}#frontier`;
   }
 
+  /**
+   * The group an encrypted message was sent in, as the message names it;
+   * undefined for anything that is not one.
+   */
+  public static groupOf(ciphertext: string): string | undefined {
+    return MlsGroup.groupIdOf(fromBase64(ciphertext));
+  }
+
   public constructor(
     private readonly signer: MlsLeafSigner,
     private readonly store: MlsStateStore,
@@ -121,7 +129,7 @@ export class MlsCommunityEngine {
         throw new MlsRejectedError('Group already exists on this device');
       }
       await this.currentHistory(groupId);
-      const [key] = await this.makeKeyPackages(1, false);
+      const key = await generateMlsKeyPackage(this.signer);
       const group = await MlsGroup.create(
         groupId,
         key,
@@ -138,18 +146,24 @@ export class MlsCommunityEngine {
     );
   }
 
-  /** Publishes key packages until a stock of unused ones is available. */
-  public async publishKeyPackages(communityId: string): Promise<void> {
-    const stored = await this.store.loadKeyPackages();
+  /**
+   * Publishes key packages for the group until it has a stock of unused
+   * ones. Each group has its own stock: one that admits this device never
+   * spends another's.
+   */
+  public async publishKeyPackages(groupId: string): Promise<void> {
+    const stored = (await this.store.loadKeyPackages()).filter(
+      (keyPackage) => keyPackage.groupId === groupId,
+    );
     const missing = KEY_PACKAGE_TARGET - stored.length;
 
     if (missing <= 0) return;
 
-    const bundles = await this.makeKeyPackages(missing, true);
+    const bundles = await this.makeKeyPackages(missing, groupId);
 
     for (const bundle of bundles) {
-      await this.transportFor(communityId).publish({
-        groupId: communityId,
+      await this.transportFor(this.communityOf(groupId)).publish({
+        groupId,
         kind: 'key_package',
         payload: toBase64(bundle.publicBytes),
       });
@@ -205,7 +219,7 @@ export class MlsCommunityEngine {
       );
       const wanted = new Set(identityIds);
       const published = await transport.list({
-        groupId: communityId,
+        groupId,
         kind: 'key_package',
       });
       const chosen = pickNewestPerDevice(published, wanted, present);
@@ -656,22 +670,22 @@ export class MlsCommunityEngine {
     }
   }
 
+  /** Key packages kept on this device for the group they are published in. */
   private async makeKeyPackages(
     count: number,
-    persist: boolean,
+    groupId: string,
   ): Promise<MlsKeyPackageBundle[]> {
     const bundles: MlsKeyPackageBundle[] = [];
 
     for (let index = 0; index < count; index += 1) {
       const bundle = await generateMlsKeyPackage(this.signer);
 
-      if (persist) {
-        await this.store.saveKeyPackage({
-          id: this.idOf(toBase64(bundle.publicBytes)),
-          privatePackage: bundle.privatePackage,
-          publicBytes: bundle.publicBytes,
-        });
-      }
+      await this.store.saveKeyPackage({
+        groupId,
+        id: this.idOf(toBase64(bundle.publicBytes)),
+        privatePackage: bundle.privatePackage,
+        publicBytes: bundle.publicBytes,
+      });
       bundles.push(bundle);
     }
 

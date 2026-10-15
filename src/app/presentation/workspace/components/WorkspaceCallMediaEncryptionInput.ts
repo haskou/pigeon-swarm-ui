@@ -4,7 +4,11 @@ import type { LocalKeychain } from '../../../../contexts/identities/infrastructu
 
 export type WorkspaceCallMediaEncryptionInput = {
   call: CallResource;
-  communityCallKey: (communityId: string, callId: string) => Promise<string>;
+  communityCallKey: (
+    communityId: string,
+    channelId: string,
+    callId: string,
+  ) => Promise<string>;
   communityOperations: (
     communityId: string,
   ) => Promise<readonly CommunityOperation[]>;

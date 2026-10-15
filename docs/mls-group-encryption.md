@@ -8,21 +8,21 @@ A community has one AES-256-GCM key that is generated at creation, stored in
 every member's keychain and handed to newcomers inside the invite. Kicking,
 banning or losing a member does not change it, so a removed member keeps
 reading everything that was and will be encrypted with it. The same key also
-protects call media. A role-restricted channel is only hidden by the node API;
-its content is encrypted with the community key anyway.
+protects call media. A role-restricted channel was only hidden by the node API;
+its content was encrypted with the community key anyway.
 
 ## Decision
 
 Use MLS (RFC 9420) through `ts-mls` with the cipher suite
 `MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519`.
 
-| Scope                               | Group                                         |
-| ----------------------------------- | --------------------------------------------- |
-| Community text, polls, reactions    | one group, `groupId = communityId`            |
-| Role-restricted channel (not yet)   | planned: `groupId = communityId:channelId`    |
-| Call media, attachments             | MLS exporter of the owning group (below)      |
-| Group conversations (non-community) | one group, `groupId = conversationId` (below) |
-| Direct conversations                | out of scope: opaque 1:1 mailboxes            |
+| Scope                               | Group                                            |
+| ----------------------------------- | ------------------------------------------------ |
+| Community text, polls, reactions    | one group, `groupId = communityId`               |
+| Role-restricted channel             | its own group, `groupId = communityId:channelId` |
+| Call media, attachments             | MLS exporter of the owning group (below)         |
+| Group conversations (non-community) | one group, `groupId = conversationId` (below)    |
+| Direct conversations                | out of scope: opaque 1:1 mailboxes               |
 
 Group conversations do not use the node record transport. Their commits,
 welcomes, messages, polls and typing notices travel through per-member group
@@ -292,16 +292,58 @@ messages from earlier epochs. The UI shows that fact when the history is missing
 Sharing earlier history is a separate, explicit feature and is not implied by
 joining.
 
-### Channel groups (not implemented)
+### Channel groups
 
-Restricted channels currently share the community group, exactly as they shared
-the old community key: the node API hides them, the cryptography does not.
-The design below is the intended follow-up.
+A channel that only some roles may see (its signed `visibleRoleIds` do not
+include `everyone`) has its own group, `communityId:channelId`. Its messages
+and call media keys come from that group; the community group secret is never
+used for it, so a member without access has no key material to decrypt it.
+Every channel everyone may see stays on the community group.
 
-Granting a role access to a restricted channel adds that role's members to the
-channel group; removing the grant or the role from a member removes the leaf.
-The community group secret is never used for a restricted channel, so a member
-without access has no key material to decrypt it.
+- The channel group's roster is the community roster narrowed to the members
+  who may see the channel by the signed operations: the owner and the members
+  holding one of its visible roles (`CommunityMlsRoster.replay(operations,
+channelId)`). Its managers are those members who may add members. A
+  channel's restriction, its roles and their assignments count only when a
+  `channel_permissions_updated`, `role_created` or `member_roles_updated`
+  signed by an author allowed to make it says so (`CommunityAuthority`); the
+  node's `visibleRoleIds` change nothing. A deleted or unknown channel has an
+  empty roster. A commit judged by a frontier is checked against the channel
+  roster at that revision (`CommunityRosterHistory.of(operations,
+channelId)`); frontiers stay community operation heads.
+- Granting a role adds its members to the group, as a manager reconciles.
+  Removing the grant, the role from a member, or the member from the
+  community makes the member's leaves removable by any member, and every
+  manager who may see the channel removes them on its next reconcile; the
+  next epoch excludes them.
+- Who starts it: only the device whose identity signs the restricting
+  `channel_permissions_updated`, only in a community that is not public, and
+  only when that identity manages the channel roster, this device holds no
+  state for the group and the node holds no commit for it. It then syncs
+  every group at once, which admits the others. Before signing, the client
+  refuses a restriction whose group its identity could not start: it must be
+  the owner, or may add members and keeps seeing the channel
+  (`CommunityAuthority.canKeyRestrictedChannel`,
+  `CommunityChannelRestrictionRefusedError`). Other managers never start a
+  channel group, so two of them cannot fork one.
+- Each device syncs the community group, then the group of every restricted
+  channel it may see; a channel group that fails to sync is unreadable and
+  does not stop the others. The channel's state ("awaiting group access" or
+  ready) is that of the group of the channel shown.
+- Writes follow the signed operations read at the time of the write: a
+  message or a call media key goes to the channel group from the first write
+  after the restriction, and back to the community group once the channel is
+  open to everyone. A channel the signed operations do not show (created
+  before them, or by an operation they reject) cannot be restricted by them
+  and stays on the community group. A message opens only with the community group or the
+  group of the channel it was listed in, as its MLS framing names it, so the
+  node cannot move a message from one channel into another. A channel open
+  again stops syncing its group, which still reads what it sealed; restricted
+  again, the same group resumes.
+- Key packages are published per group (`groupId` of the `key_package`
+  record). A device keeps a stock of 4 unused ones for each group it may
+  read, so admitting it into one group never spends another's stock.
+  Packages stored before this change carry no group and are never counted.
 
 ### Purpose-separated secrets
 
@@ -451,7 +493,9 @@ private. There is no switch to turn call E2EE off.
   authenticates the sender's leaf, and the UI does not yet display that proof.
 - Call media keys are derived once, when the call starts. A group epoch change
   during a call (member join or leave) does not rekey it. Devices that derive
-  the key in different epochs cannot decrypt each other's media.
+  the key in different epochs cannot decrypt each other's media. Restricting
+  or reopening a channel during a call moves it to another group, so a device
+  that joins afterwards derives a different key and gets no media.
 - A peer refused for plaintext media is not remembered. Later ICE candidates or
   a call reconcile may create a fresh peer connection for it, which is refused
   again at its next description; expect connection churn but no media.
@@ -460,6 +504,20 @@ private. There is no switch to turn call E2EE off.
 - The community id is derived from the network, author and nonce, not the
   genesis arguments. The author could sign two geneses with the same id and
   different visibility; the node cannot forge one.
+- A channel group exists only once the identity that restricted the channel
+  has started it. If that device loses its state before its first commit
+  reaches the node, or a channel is restricted by a client without this
+  change, the group is never started: members see "awaiting group access" for
+  the channel until a manager signs its permissions again. Restricting a
+  channel to roles none of whose members is online leaves them waiting until
+  a manager who sees it syncs. The restriction is signed before the group
+  starts; if starting fails, the user sees the error and the restriction
+  stays.
+- A node that withholds a channel group's commits from the identity signing
+  a restriction can make its device start a second group for the same
+  channel, a fork whose members cannot read each other. It can deny access,
+  never grant it.
+- The security audit view lists the community group's leaves only.
 - A community created before this change has no group. Its owner sees
   "awaiting group access" and must recreate the community; nothing bootstraps
   a group automatically, so two owner devices cannot fork one.

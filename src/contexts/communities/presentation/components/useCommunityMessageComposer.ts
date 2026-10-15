@@ -240,6 +240,7 @@ export function useCommunityMessageComposer({
           encryptedPayload: await applicationContainer.mls.encrypt(
             session,
             community.id,
+            channelId,
             serializeCommunityChannelPayload(payloadInput),
           ),
         };
@@ -523,6 +524,7 @@ export function useCommunityMessageComposer({
               encryptedPayload: await applicationContainer.mls.encrypt(
                 session,
                 community.id,
+                payload.channelId,
                 serializeCommunityChannelPayload(payloadInput),
               ),
             };

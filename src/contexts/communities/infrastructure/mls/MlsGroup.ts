@@ -454,6 +454,19 @@ export class MlsGroup {
     return readCommit(bytes)?.frontier;
   }
 
+  /** The group an encrypted message names, undefined for anything else. */
+  public static groupIdOf(bytes: Uint8Array): string | undefined {
+    try {
+      const decoded = decodeMlsMessage(bytes, 0)?.[0];
+
+      return decoded?.wireformat === 'mls_private_message'
+        ? decoder.decode(decoded.privateMessage.groupId)
+        : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
   /** The roster revision the group's last commit or welcome bound. */
   public get frontier(): readonly string[] {
     return this.bound;
