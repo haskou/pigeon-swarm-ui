@@ -1,3 +1,10 @@
+import {
+  type Credential,
+  type LeafNode,
+  decodeGroupState,
+  encodeGroupState,
+} from 'ts-mls';
+
 import type {
   MlsMembershipChange,
   MlsMembershipPolicy,
@@ -10,6 +17,7 @@ import {
   generateMlsKeyPackage,
   mlsKeyPackageOwner,
 } from '../../../../../contexts/communities/infrastructure/mls/MlsGroup';
+import { MlsIdentityCredential } from '../../../../../contexts/communities/infrastructure/mls/MlsIdentityCredential';
 import { MlsLeafSigner } from '../../../../../contexts/communities/infrastructure/mls/MlsLeafSigner';
 import { MlsTestIdentity } from './MlsTestIdentity';
 
@@ -149,6 +157,40 @@ const copyOf = ({ group, key }: Seat): MlsGroup =>
     group.serialize(),
     group.frontier,
   );
+
+/**
+ * A member's stored group state in which the leaf of `name` shows the
+ * credential `credentialFor` makes from the leaves the state holds, as a
+ * tampered store would hold it.
+ */
+const withCredential = (
+  { group, key }: Seat,
+  name: string,
+  credentialFor: (leaf: LeafNode, leaves: readonly LeafNode[]) => Credential,
+): MlsGroup => {
+  const [state] = decodeGroupState(group.serialize(), 0)!;
+  const leaves = state.ratchetTree.flatMap((node) =>
+    node?.nodeType === 'leaf' ? [node.leaf] : [],
+  );
+  const ratchetTree = state.ratchetTree.map((node) =>
+    node?.nodeType === 'leaf' &&
+    MlsIdentityCredential.ownerOf(node.leaf.credential).identityId ===
+      idOf(name)
+      ? {
+          ...node,
+          leaf: { ...node.leaf, credential: credentialFor(node.leaf, leaves) },
+        }
+      : node,
+  );
+
+  return MlsGroup.restore(
+    group.groupId,
+    key.owner,
+    policy,
+    encodeGroupState({ ...state, ratchetTree }),
+    group.frontier,
+  );
+};
 
 describe('MlsGroup on the real ts-mls library', () => {
   beforeAll(async () => {
@@ -659,6 +701,56 @@ describe('MlsGroup on the real ts-mls library', () => {
     await expect(carol.group.applyCommit(record)).rejects.toThrow('rejected');
     expect(alice.group.identities()).toContain(idOf('carol'));
     expect(carol.group.isRemoved).toBe(false);
+  });
+
+  it('rejects a commit whose committer leaf credential does not verify, whatever identity it names', async () => {
+    const seats = await setup(['alice', 'bob', 'carol', 'dave']);
+    const removal = (await seats.bob.group.removeIdentities([idOf('carol')]))!;
+    seats.bob.group.confirm('c-bob');
+    allows = aliceManages;
+    // Dave's tree names alice on bob's leaf key: a credential alice signed
+    // for her own leaf key, which does not verify for bob's.
+    const dave = withCredential(
+      seats.dave,
+      'bob',
+      (_bob, leaves) =>
+        leaves.find(
+          ({ credential }) =>
+            MlsIdentityCredential.ownerOf(credential).identityId ===
+            idOf('alice'),
+        )!.credential,
+    );
+
+    await expect(
+      dave.applyCommit({
+        bytes: removal.commit,
+        epoch: removal.epoch,
+        id: 'c-bob',
+      }),
+    ).rejects.toThrow('Commit rejected');
+    expect(dave.identities()).toContain(idOf('carol'));
+  });
+
+  it('rejects a commit whose committer hands its own leaf to another identity', async () => {
+    const seats = await setup(['alice', 'bob']);
+    // Bob's patched client also holds mallory's keys and has her identity
+    // and device sign bob's leaf key: a credential that verifies.
+    const bob = withCredential(seats.bob, 'bob', ({ signaturePublicKey }) =>
+      MlsIdentityCredential.issue(cast.mallory.signer(), signaturePublicKey),
+    );
+    const update = await bob.update();
+    bob.confirm('c-swap');
+
+    await expect(
+      seats.alice.group.applyCommit({
+        bytes: update.commit,
+        epoch: update.epoch,
+        id: 'c-swap',
+      }),
+    ).rejects.toThrow('Commit rejected');
+    expect(seats.alice.group.identities().sort()).toEqual(
+      idsOf('alice', 'bob'),
+    );
   });
 
   it('still applies a leaf rotation by a member who may not change membership', async () => {
