@@ -1,3 +1,4 @@
+import { NodeOwnerIdentityCannotBeBlockedError } from '../../../contexts/nodeAccess/domain/errors/NodeOwnerIdentityCannotBeBlockedError';
 import { HttpJsonError } from '../../../shared/infrastructure/http/HttpJsonError';
 import { copy } from '../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../shared/presentation/toUserErrorMessage';
@@ -16,6 +17,12 @@ describe(toUserErrorMessage.name, () => {
     expect(toUserErrorMessage(error, 'fallback')).toBe(
       copy.errors.backend.InvalidMessageSignatureError,
     );
+  });
+
+  it('translates client domain errors by name', () => {
+    expect(
+      toUserErrorMessage(new NodeOwnerIdentityCannotBeBlockedError()),
+    ).toBe(copy.errors.backend.NodeOwnerIdentityCannotBeBlockedError);
   });
 
   it('translates numeric API error codes', () => {
