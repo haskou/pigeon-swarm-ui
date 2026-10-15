@@ -12,6 +12,8 @@ import {
   logCallError,
   logCallWarning,
 } from '../../../../contexts/calls/infrastructure/media/callDebugLogger';
+import { CallPeerConnections } from '../../../../contexts/calls/infrastructure/media/CallPeerConnections';
+import { CallMediaEncryptionUnavailableError } from '../../../../contexts/calls/presentation/errors/CallMediaEncryptionUnavailableError';
 import { participantJoinWasAccepted } from '../../../../contexts/calls/presentation/hooks/callPeerConnectionPlan';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import {
@@ -49,6 +51,23 @@ function fetchLatestCall(
     .catch(() => pendingCall);
 }
 
+/**
+ * A private call is refused before the microphone or the node is asked when
+ * this browser cannot encrypt call media; it never falls back to plaintext.
+ */
+function refusedWithoutMediaEncryption(
+  setSendError: CallStartActionsInput['setSendError'],
+): boolean {
+  if (CallPeerConnections.mediaEncryptionSupported()) return false;
+
+  logCallWarning('workspace:call:refused-without-media-encryption', {
+    reason: 'unsupported',
+  });
+  setSendError(new CallMediaEncryptionUnavailableError('unsupported').message);
+
+  return true;
+}
+
 export function useCallStartActions({
   activeCall,
   activeCommunity,
@@ -77,6 +96,22 @@ export function useCallStartActions({
   const isCallActionInProgress = useCallback(
     () => callActionInProgressRef.current,
     [],
+  );
+  // A call this device cannot encrypt is left on the node at once; no media
+  // is sent. The other side may see it ring until the leave lands.
+  const callMediaEncryptionOrLeave = useCallback(
+    async (call: CallResource) => {
+      try {
+        return await callMediaEncryptionForResource(call);
+      } catch (caught) {
+        await applicationContainer.calls
+          .leave(sessionRef.current, call.id)
+          .catch(() => undefined);
+
+        throw caught;
+      }
+    },
+    [callMediaEncryptionForResource],
   );
 
   const startConversationCall = useCallback(
@@ -111,6 +146,8 @@ export function useCallStartActions({
         return;
       }
 
+      if (refusedWithoutMediaEncryption(setSendError)) return;
+
       let microphone: CallMicrophoneRequest = { stream: null };
 
       callActionInProgressRef.current = true;
@@ -143,7 +180,7 @@ export function useCallStartActions({
             participantStatuses: call.participants.map(participantStatusLog),
           });
           const details = callDetailsForResource(call);
-          const mediaEncryption = await callMediaEncryptionForResource(call);
+          const mediaEncryption = await callMediaEncryptionOrLeave(call);
 
           await startCall({
             ...details,
@@ -177,19 +214,20 @@ export function useCallStartActions({
       activeCall?.kind,
       callNoiseCancellationEnabled,
       callDetailsForResource,
-      callMediaEncryptionForResource,
+      callMediaEncryptionOrLeave,
       callSignalSender,
       cleanupJoinedCalls,
       leaveCurrentCallForSwitch,
       loadCallIceConfig,
       requestOptionalLocalAudio,
+      setSendError,
       startCall,
     ],
   );
   const startLocalCallSession = useCallback(
     async (call: CallResource, microphone: CallMicrophoneRequest) => {
       const details = callDetailsForResource(call);
-      const mediaEncryption = await callMediaEncryptionForResource(call);
+      const mediaEncryption = await callMediaEncryptionOrLeave(call);
 
       logCallDebug('workspace:call:start-local-session', {
         callId: call.id,
@@ -211,7 +249,7 @@ export function useCallStartActions({
     [
       callNoiseCancellationEnabled,
       callDetailsForResource,
-      callMediaEncryptionForResource,
+      callMediaEncryptionOrLeave,
       callSignalSender,
       loadCallIceConfig,
       startCall,
@@ -256,6 +294,12 @@ export function useCallStartActions({
 
         return;
       }
+
+      if (
+        activeCommunity.visibility !== 'public' &&
+        refusedWithoutMediaEncryption(setSendError)
+      )
+        return;
 
       callActionInProgressRef.current = true;
       setSendError(null);
@@ -317,9 +361,22 @@ export function useCallStartActions({
       callNoiseCancellationEnabled,
       cleanupJoinedCalls,
       leaveCurrentCallForSwitch,
+      setSendError,
       startLocalCallSession,
     ],
   );
+
+  const declineIncomingCall = useCallback(() => {
+    if (!incomingCall) return;
+
+    const callId = incomingCall.call.id;
+
+    setIncomingCall(null);
+    stopIncomingCallSound();
+    void applicationContainer.calls
+      .leave(sessionRef.current, callId)
+      .catch(() => undefined);
+  }, [incomingCall]);
 
   const acceptIncomingCall = useCallback(() => {
     if (!incomingCall) return;
@@ -331,6 +388,13 @@ export function useCallStartActions({
           callId: incomingCall.call.id,
         },
       );
+
+      return;
+    }
+
+    // Only direct calls ring, and every direct call is private.
+    if (refusedWithoutMediaEncryption(setSendError)) {
+      declineIncomingCall();
 
       return;
     }
@@ -408,9 +472,11 @@ export function useCallStartActions({
       });
   }, [
     cleanupJoinedCalls,
+    declineIncomingCall,
     incomingCall,
     leaveCurrentCallForSwitch,
     requestOptionalLocalAudio,
+    setSendError,
     startLocalCallSession,
   ]);
 
@@ -474,18 +540,6 @@ export function useCallStartActions({
       startLocalCallSession,
     ],
   );
-
-  const declineIncomingCall = useCallback(() => {
-    if (!incomingCall) return;
-
-    const callId = incomingCall.call.id;
-
-    setIncomingCall(null);
-    stopIncomingCallSound();
-    void applicationContainer.calls
-      .leave(sessionRef.current, callId)
-      .catch(() => undefined);
-  }, [incomingCall]);
 
   return {
     acceptIncomingCall,

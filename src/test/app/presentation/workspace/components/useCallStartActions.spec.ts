@@ -2,12 +2,17 @@ import { mock } from 'jest-mock-extended';
 
 import type { CallStartActionsInput } from '../../../../../app/presentation/workspace/components/CallStartActionsInput';
 import type { WorkspaceCallDetails } from '../../../../../app/presentation/workspace/components/resolveWorkspaceCallDetails';
+import type { IncomingWorkspaceCall } from '../../../../../app/presentation/workspace/components/useCallResourceReconciliation';
 import type { CallResource } from '../../../../../contexts/calls/infrastructure/http/resources/CallResource';
 import type { StartCallInput } from '../../../../../contexts/calls/presentation/hooks/StartCallInput';
+import type { CommunityResource } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';
 import { useCallStartActions } from '../../../../../app/presentation/workspace/components/useCallStartActions';
+import { CallPeerConnections } from '../../../../../contexts/calls/infrastructure/media/CallPeerConnections';
+import { CallMediaEncryptionUnavailableError } from '../../../../../contexts/calls/presentation/errors/CallMediaEncryptionUnavailableError';
+import { copy } from '../../../../../shared/presentation/i18n/copy';
 
 jest.mock('react', () => ({
   useCallback: (callback: unknown) => callback,
@@ -16,7 +21,13 @@ jest.mock('react', () => ({
 }));
 jest.mock('../../../../../app/composition/applicationContainer', () => ({
   applicationContainer: {
-    calls: { join: jest.fn(), startCommunityChannel: jest.fn() },
+    calls: {
+      get: jest.fn(),
+      join: jest.fn(),
+      leave: jest.fn(),
+      startCommunityChannel: jest.fn(),
+      startConversation: jest.fn(),
+    },
   },
 }));
 jest.mock('../../../../../shared/presentation/sounds', () => ({
@@ -102,5 +113,239 @@ describe('following a superseded community voice call', () => {
       id: 'call-b',
       localStream: microphone.stream,
     });
+  });
+});
+
+type CallStartOutcome = { error?: string; started?: StartCallInput };
+
+const alice = { identity: { id: 'alice' } } as Session;
+const aliceMicrophone = { stream: {} as MediaStream };
+
+function directCall(aliceStatus: 'joined' | 'ringing'): CallResource {
+  return {
+    id: 'call-direct',
+    networkId: 'network-a',
+    participantIds: ['alice', 'bob'],
+    participants: [
+      {
+        connected: aliceStatus === 'joined',
+        identityId: 'alice',
+        status: aliceStatus,
+      },
+      { connected: true, identityId: 'bob', status: 'joined' },
+    ],
+    scope: { conversationId: 'conversation-a', type: 'conversation' },
+    status: 'active',
+  } as CallResource;
+}
+
+function community(
+  visibility: CommunityResource['visibility'],
+): CommunityResource {
+  return {
+    createdAt: 1,
+    description: '',
+    id: 'community-a',
+    memberIds: ['alice'],
+    name: 'Community',
+    networkId: 'network-a',
+    ownerIdentityId: 'alice',
+    textChannels: [],
+    visibility,
+  };
+}
+
+/** Settles with the error shown to the user or the local session started. */
+function callStartHarness(overrides: Partial<CallStartActionsInput>): {
+  input: CallStartActionsInput;
+  outcome: Promise<CallStartOutcome>;
+} {
+  let settle: (outcome: CallStartOutcome) => void = () => undefined;
+  const outcome = new Promise<CallStartOutcome>((resolve) => {
+    settle = resolve;
+  });
+  const input = mock<CallStartActionsInput>({
+    activeCall: null,
+    activeCommunity: null,
+    callDetailsForResource: () =>
+      ({
+        kind: 'one-to-one',
+        participants: [],
+        title: 'Bob',
+      }) as WorkspaceCallDetails,
+    callMediaEncryptionForResource: () =>
+      Promise.resolve({
+        mediaEncryptionEnabled: true,
+        mediaEncryptionKey: 'call-key',
+      }),
+    cleanupJoinedCalls: () => Promise.resolve(),
+    incomingCall: null,
+    leaveCurrentCallForSwitch: () => Promise.resolve(),
+    requestOptionalLocalAudio: jest.fn(() => Promise.resolve(aliceMicrophone)),
+    session: alice,
+    setIncomingCall: jest.fn(),
+    setSendError: jest.fn((error) => {
+      if (typeof error === 'string') settle({ error });
+    }),
+    startCall: jest.fn((started: StartCallInput) => {
+      settle({ started });
+
+      return Promise.resolve();
+    }),
+    stopLocalAudio: jest.fn(),
+    ...overrides,
+  });
+
+  return { input, outcome };
+}
+
+describe('refusing private calls this device cannot encrypt', () => {
+  const voiceChannel = { id: 'voice-a', name: 'Voice' };
+
+  beforeEach(() => {
+    jest
+      .spyOn(CallPeerConnections, 'mediaEncryptionSupported')
+      .mockReturnValue(false);
+    jest
+      .mocked(applicationContainer.calls.startConversation)
+      .mockResolvedValue(directCall('joined'));
+    jest
+      .mocked(applicationContainer.calls.startCommunityChannel)
+      .mockResolvedValue(communityCall({}));
+    jest
+      .mocked(applicationContainer.calls.get)
+      .mockResolvedValue(directCall('ringing'));
+    jest
+      .mocked(applicationContainer.calls.join)
+      .mockResolvedValue(directCall('joined'));
+    jest.mocked(applicationContainer.calls.leave).mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('does not start a direct call in a browser that cannot encrypt media', async () => {
+    const { input, outcome } = callStartHarness({});
+
+    useCallStartActions(input).startConversationCall({
+      conversationId: 'conversation-a',
+      kind: 'one-to-one',
+      participants: [],
+      title: 'Bob',
+    });
+
+    await expect(outcome).resolves.toEqual({
+      error: copy.calls.mediaEncryptionUnsupported,
+    });
+    expect(input.requestOptionalLocalAudio).not.toHaveBeenCalled();
+    expect(applicationContainer.calls.startConversation).not.toHaveBeenCalled();
+  });
+
+  it('does not join a private community voice channel in a browser that cannot encrypt media', async () => {
+    const { input, outcome } = callStartHarness({
+      activeCommunity: community('private'),
+    });
+
+    useCallStartActions(input).startCommunityVoiceCall(voiceChannel);
+
+    await expect(outcome).resolves.toEqual({
+      error: copy.calls.mediaEncryptionUnsupported,
+    });
+    expect(input.requestOptionalLocalAudio).not.toHaveBeenCalled();
+    expect(
+      applicationContainer.calls.startCommunityChannel,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('joins a public community voice channel, which never uses media E2EE', async () => {
+    const { input, outcome } = callStartHarness({
+      activeCommunity: community('public'),
+      callMediaEncryptionForResource: () =>
+        Promise.resolve({
+          mediaEncryptionEnabled: true,
+          mediaEncryptionUnavailableReason: 'public-community',
+        }),
+    });
+
+    useCallStartActions(input).startCommunityVoiceCall(voiceChannel);
+
+    await expect(outcome).resolves.toMatchObject({
+      started: {
+        id: 'call-a',
+        mediaEncryptionUnavailableReason: 'public-community',
+      },
+    });
+  });
+
+  it('declines an incoming direct call in a browser that cannot encrypt media', async () => {
+    const { input, outcome } = callStartHarness({
+      incomingCall: {
+        call: directCall('ringing'),
+        participants: [],
+        title: 'Bob',
+      } as IncomingWorkspaceCall,
+    });
+
+    useCallStartActions(input).acceptIncomingCall();
+
+    await expect(outcome).resolves.toEqual({
+      error: copy.calls.mediaEncryptionUnsupported,
+    });
+    expect(applicationContainer.calls.join).not.toHaveBeenCalled();
+    expect(applicationContainer.calls.leave).toHaveBeenCalledWith(
+      alice,
+      'call-direct',
+    );
+    expect(input.setIncomingCall).toHaveBeenCalledWith(null);
+    expect(input.requestOptionalLocalAudio).not.toHaveBeenCalled();
+  });
+
+  it('leaves a private community call it has no key for instead of joining it unencrypted', async () => {
+    jest
+      .spyOn(CallPeerConnections, 'mediaEncryptionSupported')
+      .mockReturnValue(true);
+    const { input, outcome } = callStartHarness({
+      activeCommunity: community('private'),
+      callMediaEncryptionForResource: () =>
+        Promise.reject(new CallMediaEncryptionUnavailableError('missing-key')),
+    });
+
+    useCallStartActions(input).startCommunityVoiceCall(voiceChannel);
+
+    await expect(outcome).resolves.toEqual({
+      error: copy.calls.mediaEncryptionMissingKey,
+    });
+    expect(applicationContainer.calls.leave).toHaveBeenCalledWith(
+      alice,
+      'call-a',
+    );
+    expect(input.stopLocalAudio).toHaveBeenCalledWith(aliceMicrophone.stream);
+  });
+
+  it('leaves a direct call it has no key for instead of connecting it unencrypted', async () => {
+    jest
+      .spyOn(CallPeerConnections, 'mediaEncryptionSupported')
+      .mockReturnValue(true);
+    const { input, outcome } = callStartHarness({
+      callMediaEncryptionForResource: () =>
+        Promise.reject(new CallMediaEncryptionUnavailableError('missing-key')),
+    });
+
+    useCallStartActions(input).startConversationCall({
+      conversationId: 'conversation-a',
+      kind: 'one-to-one',
+      participants: [],
+      title: 'Bob',
+    });
+
+    await expect(outcome).resolves.toEqual({
+      error: copy.calls.mediaEncryptionMissingKey,
+    });
+    expect(applicationContainer.calls.leave).toHaveBeenCalledWith(
+      alice,
+      'call-direct',
+    );
+    expect(input.stopLocalAudio).toHaveBeenCalledWith(aliceMicrophone.stream);
   });
 });
