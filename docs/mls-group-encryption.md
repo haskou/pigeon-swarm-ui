@@ -310,6 +310,23 @@ media keys come from the exporter of the owning group:
 Labels are distinct per purpose; there is no shared secret between text, media
 and attachments, and a missing group is an error, not a fallback.
 
+A private call (a conversation call, or a call in a community this device does
+not know as public) never falls back to plaintext media
+(`resolveWorkspaceCallMediaEncryption`, `useCallStartActions`):
+
+- A browser without encoded insertable streams (`createEncodedStreams`) cannot
+  encrypt call media. It does not start, join or answer a private call: the
+  check runs before the microphone prompt and before the node is asked, and an
+  incoming call is declined. Encrypted calls currently need a Chromium-based
+  browser; Firefox and Safari support is tracked in #474.
+- A device with no key for the call (no conversation key, or no community
+  group) leaves the call it just started or joined on the node and shows the
+  reason, so it neither rings the other side nor appears in the channel.
+- Public community calls never use media E2EE and stay open to every browser.
+
+`resolveWorkspaceCallMediaEncryption.spec.ts` and `useCallStartActions.spec.ts`
+(`yarn test`) cover both refusals and the public community exception.
+
 ## Security properties and limits
 
 - Forward secrecy and post-compromise security are those of MLS with the
@@ -387,6 +404,10 @@ and attachments, and a missing group is an error, not a fallback.
 - Call media keys are derived once, when the call starts. A group epoch change
   during a call (member join or leave) does not rekey it. Devices that derive
   the key in different epochs cannot decrypt each other's media.
+- The refusal covers this device only. A peer whose signalling advertises no
+  media encryption still receives plaintext media, and inbound frames without
+  the encrypted-frame marker are still played (#472). The per-user switch that
+  turns call E2EE off still exists (#473).
 - A community created before this change has no group. Its owner sees
   "awaiting group access" and must recreate the community; nothing bootstraps
   a group automatically, so two owner devices cannot fork one.

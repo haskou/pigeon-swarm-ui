@@ -218,13 +218,14 @@ export const es = {
     manyParticipants: 'participantes',
     mediaEncryptionActive: 'E2EE activo',
     mediaEncryptionDisabled: 'E2EE desactivado',
-    mediaEncryptionMissingKey: 'No hay clave para cifrar esta llamada.',
+    mediaEncryptionMissingKey:
+      'Este dispositivo aún no tiene la clave para cifrar esta llamada de extremo a extremo, así que Pigeon no la ha conectado. Vuelve a intentarlo cuando el dispositivo haya sincronizado la conversación o la comunidad.',
     mediaEncryptionOff: 'Desactivar E2EE de llamada',
     mediaEncryptionOn: 'Activar E2EE de llamada',
     mediaEncryptionPublicCommunity:
       'Las llamadas de comunidades públicas no usan E2EE.',
     mediaEncryptionUnsupported:
-      'Este navegador no soporta cifrado E2EE de media.',
+      'Este navegador no puede cifrar de extremo a extremo el audio y el vídeo de las llamadas, así que Pigeon no inicia ni se une a llamadas privadas aquí. Por ahora, las llamadas cifradas necesitan un navegador basado en Chromium, como Chrome o Edge.',
     microphoneAllow: 'Permitir micrófono',
     microphoneBlockedTitle: 'No se puede usar el micrófono',
     microphoneConstraint:
