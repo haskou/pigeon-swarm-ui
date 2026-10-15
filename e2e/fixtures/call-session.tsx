@@ -177,7 +177,11 @@ window.callSessionTest = {
         ? {
             // Peers whose media this side encrypts and decrypts.
             encryptedWith: call.participants
-              .filter((participant) => participant.mediaEncryptionActive)
+              .filter(
+                (participant) =>
+                  participant.identityId !== identity &&
+                  participant.mediaEncryptionActive,
+              )
               .map((participant) => participant.identityId),
             hasMicrophone: call.hasMicrophone,
             mediaEncryption: call.mediaEncryption,

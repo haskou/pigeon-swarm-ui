@@ -47,9 +47,9 @@ export class CallMediaEncryption {
     return this.cipher?.failed === false;
   }
 
-  /** Whether this browser failed to encrypt a private call. */
+  /** Whether this browser cannot encrypt a private call. */
   public get failed(): boolean {
-    return this.cipher?.failed === true;
+    return this.required && !this.encrypts();
   }
 
   /** Records that `peerIdentityId` described itself as `admits` requires. */

@@ -36,12 +36,15 @@ export class CallLocalTracks {
     // A private call this browser failed to encrypt sends nothing more.
     if (this.encryption.failed) return;
 
-    this.configureSender(
-      peer.addTrack(
-        track,
-        this.screenShareStreams.localStreamFor(track, this.localStream),
-      ),
+    const sender = peer.addTrack(
+      track,
+      this.screenShareStreams.localStreamFor(track, this.localStream),
     );
+
+    // Chromium passes the frames of a sender or receiver that has no
+    // transform once the task creating it ends, even if one comes later.
+    this.encryption.syncPeer(peer);
+    this.configureScreenShareQuality(sender);
   }
 
   private configureScreenShareQuality(sender: RTCRtpSender): void {

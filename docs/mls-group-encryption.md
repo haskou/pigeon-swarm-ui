@@ -432,15 +432,25 @@ private. There is no switch to turn call E2EE off.
   `RTCRtpScriptTransform` runs the same codec on encoded insertable streams
   (`createEncodedStreams`) with a non-extractable key. Both produce the same
   frames, so members on either path hear each other.
-- A browser with neither cannot encrypt call media. It does not start, join or
-  answer a private call: the check runs before the microphone prompt and
-  before the node is asked, and an incoming call is declined. The refusal
-  asks to update the browser or use another one; it names no browser.
+- A worker transform is attached to each sender and receiver in the task
+  that creates it: when a local track is added, when a receive-only peer is
+  created, and when a remote description changes the signaling state.
+  Chromium lets the frames of a sender or receiver that has no transform by
+  the end of that task pass untouched for good, even if a transform is set
+  later. A peer that admits the other side checks every sender and receiver
+  again. The encoded-streams path does not have this gap: a peer created
+  with `encodedInsertableStreams` holds every frame until its streams exist.
+- A browser with neither `RTCRtpScriptTransform` nor encoded streams cannot
+  encrypt call media. It does not start, join or answer a private call: the
+  check runs before the microphone prompt and before the node is asked, and
+  an incoming call is declined. The refusal asks to update the browser or use
+  another one; it names no browser.
 - If a frame transform cannot be attached, or the encryption worker fails,
   the call's media cipher fails for good. That sender's or receiver's media
   is stopped instead of passing unencrypted, and no local track is added to
-  a peer again. The call then announces no encrypted media and admits no
-  peer, and its remote tiles stop showing E2EE as active.
+  a peer again. A private call on a browser with no cipher adds none either.
+  The call then announces no encrypted media and admits no peer, and its
+  remote tiles stop showing E2EE as active.
 - A device with no key for the call (no conversation key, or no community
   group) finds out only once the node has created or joined the call. It
   leaves the call at once and shows the reason. Until the leave lands, the

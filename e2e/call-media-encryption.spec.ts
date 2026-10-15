@@ -167,7 +167,12 @@ test.describe('private call media encryption', () => {
         })
         .toBeGreaterThan(5_000);
 
-    for (const page of [caller, callee])
-      expect((await remotePeer(page)).energy).toBe(0);
+    for (const [page, end] of [
+      [caller, 'caller'],
+      [callee, 'Chromium callee'],
+    ] as const)
+      expect
+        .soft((await remotePeer(page)).energy, `audio the ${end} decoded`)
+        .toBe(0);
   });
 });
