@@ -1,10 +1,13 @@
 import { assert } from '@haskou/value-objects';
 
+import type { CommunityChannelGrant } from './CommunityChannelGrant';
 import type { CommunityOperation } from './CommunityOperation';
 import type { CommunityRoleGrant } from './CommunityRoleGrant';
 
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { CommunityOperationRejectedError } from '../errors/CommunityOperationRejectedError';
+import { CommunityChannelId } from '../value-objects/CommunityChannelId';
+import { CommunityChannelName } from '../value-objects/CommunityChannelName';
 import { CommunityDescription } from '../value-objects/CommunityDescription';
 import { CommunityName } from '../value-objects/CommunityName';
 import { CommunityPermission } from '../value-objects/CommunityPermission';
@@ -36,13 +39,6 @@ const JOIN_METHODS: Record<
   invitation: { reference: true, selfJoin: true },
   invite_link: { reference: true, selfJoin: true },
 };
-/** Actions that change nothing the authority holds; channels are not roles. */
-const OTHER_ACTIONS: Record<string, true> = {
-  channel_created: true,
-  channel_deleted: true,
-  channel_permissions_updated: true,
-  channel_renamed: true,
-};
 
 /**
  * Who holds which right in one community, as its signed operations prove it.
@@ -53,6 +49,7 @@ const OTHER_ACTIONS: Record<string, true> = {
 export class CommunityAuthority {
   private readonly assignments = new Map<string, string[]>();
   private readonly banned: string[] = [];
+  private readonly channels: CommunityChannelGrant[] = [];
   private readonly communityId: string;
   private readonly members: string[];
   private readonly networkId: string;
@@ -117,6 +114,14 @@ export class CommunityAuthority {
     );
   }
 
+  /** A channel name as the node takes it: any string of up to 80 chars. */
+  private static channelName(value: unknown): void {
+    assert(
+      CommunityAuthority.text(value).length <= CommunityChannelName.MAX_LENGTH,
+      new CommunityOperationRejectedError(),
+    );
+  }
+
   /** The community its genesis operation creates; throws when malformed. */
   public static create(genesis: CommunityOperation): CommunityAuthority {
     assert(genesis.isGenesis(), new CommunityOperationRejectedError());
@@ -169,6 +174,22 @@ export class CommunityAuthority {
 
   private role(roleId: string): CommunityRoleGrant | undefined {
     return this.roles.find((role) => role.id === roleId);
+  }
+
+  private channel(channelId: string): CommunityChannelGrant | undefined {
+    return this.channels.find((channel) => channel.id === channelId);
+  }
+
+  /** The existing channel `channelId` names, for a channel manager. */
+  private managedChannel(
+    author: string,
+    channelId: unknown,
+  ): CommunityChannelGrant {
+    const channel = this.channel(CommunityAuthority.text(channelId));
+
+    this.require(this.hasPermission(author, 'manage_channels') && !!channel);
+
+    return channel as CommunityChannelGrant;
   }
 
   private require(condition: boolean): void {
@@ -362,6 +383,65 @@ export class CommunityAuthority {
     this.autoJoinEnabled = autoJoinEnabled ?? this.autoJoinEnabled;
   }
 
+  private createChannel(operation: CommunityOperation): void {
+    const author = operation.getAuthorIdentityId();
+    const args = CommunityAuthority.read(operation.getArguments(), [
+      'channelId',
+      'name',
+      'type',
+    ]);
+    const channelId = CommunityAuthority.text(args.channelId);
+    const type = CommunityAuthority.text(args.type);
+
+    CommunityAuthority.channelName(args.name);
+    this.require(
+      channelId ===
+        CommunityChannelId.derive(
+          this.communityId,
+          author,
+          operation.getCreatedAt(),
+        ).valueOf() &&
+        (type === 'text' || type === 'voice') &&
+        this.hasPermission(author, 'manage_channels'),
+    );
+    this.channels.push({ id: channelId, visibleRoleIds: [EVERYONE] });
+  }
+
+  private renameChannel(
+    author: string,
+    args: Readonly<Record<string, unknown>>,
+  ): void {
+    const read = CommunityAuthority.read(args, ['channelId', 'name']);
+
+    CommunityAuthority.channelName(read.name);
+    this.managedChannel(author, read.channelId);
+  }
+
+  private deleteChannel(
+    author: string,
+    args: Readonly<Record<string, unknown>>,
+  ): void {
+    const channel = this.managedChannel(
+      author,
+      CommunityAuthority.read(args, ['channelId']).channelId,
+    );
+
+    this.channels.splice(this.channels.indexOf(channel), 1);
+  }
+
+  /** Who may see the channel; no role at all means everyone. */
+  private updateChannelPermissions(
+    author: string,
+    args: Readonly<Record<string, unknown>>,
+  ): void {
+    const read = CommunityAuthority.read(args, ['channelId', 'visibleRoleIds']);
+    const visibleRoleIds = CommunityAuthority.texts(read.visibleRoleIds);
+    const channel = this.managedChannel(author, read.channelId);
+
+    channel.visibleRoleIds =
+      visibleRoleIds.length > 0 ? [...visibleRoleIds] : [EVERYONE];
+  }
+
   /** How each action that changes the authority applies `operation`. */
   private handlersFor(
     operation: CommunityOperation,
@@ -371,6 +451,11 @@ export class CommunityAuthority {
     const member = (): string => CommunityAuthority.member(args);
 
     return {
+      channel_created: () => this.createChannel(operation),
+      channel_deleted: () => this.deleteChannel(author, args),
+      channel_permissions_updated: () =>
+        this.updateChannelPermissions(author, args),
+      channel_renamed: () => this.renameChannel(author, args),
       community_updated: () => this.updateProfile(author, args),
       member_banned: () => this.ban(author, member()),
       member_joined: () => this.join(author, args),
@@ -395,14 +480,10 @@ export class CommunityAuthority {
     this.require(
       !operation.isGenesis() &&
         operation.getCommunityId() === this.communityId &&
-        operation.getNetworkId() === this.networkId,
+        operation.getNetworkId() === this.networkId &&
+        Object.prototype.hasOwnProperty.call(handlers, action),
     );
-
-    if (Object.prototype.hasOwnProperty.call(handlers, action)) {
-      handlers[action]();
-    } else {
-      this.require(OTHER_ACTIONS[action] === true);
-    }
+    handlers[action]();
   }
 
   /** Whether no one is left: a deleted community takes no more operations. */
@@ -436,5 +517,40 @@ export class CommunityAuthority {
           this.role(roleId)?.permissions.includes(permission),
         ))
     );
+  }
+
+  /**
+   * Whether the identity may see the channel: the owner always, a member
+   * when `everyone` or one of its roles is visible there, no one in a
+   * channel the signed operations do not hold.
+   */
+  public canAccessChannel(identityId: string, channelId: string): boolean {
+    const channel = this.channel(channelId);
+
+    return (
+      !!channel &&
+      this.isMember(identityId) &&
+      (identityId === this.ownerId ||
+        [EVERYONE, ...(this.assignments.get(identityId) ?? [])].some(
+          (roleId) => channel.visibleRoleIds.includes(roleId),
+        ))
+    );
+  }
+
+  public hasChannel(channelId: string): boolean {
+    return this.channel(channelId) !== undefined;
+  }
+
+  /** Whether only some roles may see the channel. */
+  public isChannelRestricted(channelId: string): boolean {
+    const channel = this.channel(channelId);
+
+    return !!channel && !channel.visibleRoleIds.includes(EVERYONE);
+  }
+
+  public getRestrictedChannelIds(): string[] {
+    return this.channels
+      .filter((channel) => !channel.visibleRoleIds.includes(EVERYONE))
+      .map((channel) => channel.id);
   }
 }
