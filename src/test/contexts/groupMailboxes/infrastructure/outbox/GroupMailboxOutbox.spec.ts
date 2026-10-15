@@ -509,6 +509,24 @@ describe('GroupMailboxOutbox', () => {
       ]);
     });
 
+    it('seals nothing once a queued record has waited longer than the ephemeral hold', async () => {
+      engine.members.mockResolvedValue(['alice', 'bob', 'dave']);
+      channel.send.mockImplementation((keys: MailboxKeys, _plaintext, id) =>
+        keys.mailboxId === inboxOf(0, 'bob')
+          ? Promise.reject(new MailboxUnavailableError())
+          : Promise.resolve({ cursor: 1, envelopeId: id ?? '' }),
+      );
+      await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
+      engine.encrypt.mockClear();
+      channel.send.mockClear();
+      now += GroupMailboxOutbox.EPHEMERAL_HOLD_MS + 1;
+
+      await outbox.sendEphemeral(CONVERSATION, new Uint8Array([2]));
+
+      expect(engine.encrypt).not.toHaveBeenCalled();
+      expect(channel.send).not.toHaveBeenCalled();
+    });
+
     it('seals nothing while a member off the roster is still in the group', async () => {
       roster = rosterOf('alice');
 
