@@ -320,11 +320,11 @@ and attachments, and a missing group is an error, not a fallback.
     message again, also not from its stored state, and the sender keeps no
     key for its own message. A copy of the state taken before the read still
     opens it.
-  - Epoch secrets are kept for the last 8 epochs (`retainKeysForEpochs`) and
-    then deleted. A message of an older epoch that this device has not read
-    stays unreadable, also from the stored state. Within those epochs, ts-mls
-    keeps the keys of up to 10 skipped messages per sender
-    (`retainKeysForGenerations`).
+  - Epoch secrets are kept for the current epoch and the 8 before it
+    (`retainKeysForEpochs`) and then deleted. A message of an older epoch
+    that this device has not read stays unreadable, also from the stored
+    state. Within those epochs, ts-mls keeps the keys of up to 10 skipped
+    messages per sender (`retainKeysForGenerations`).
   - In memory, a group also keeps the state before every commit it applied
     in this app session, so that it can switch to a competing commit. Those
     states hold older epoch secrets, call-media exporters included, until the
@@ -335,14 +335,20 @@ and attachments, and a missing group is an error, not a fallback.
     gone. Group conversation histories keep their records too. Whoever opens
     the device's state reads whatever it still stores.
   - Post-compromise recovery is per device. A device whose state leaked
-    recovers only when it commits its own update. By ts-mls
-    (`needsUpdatePath`), a removal it commits carries an update path too and
-    a commit that only adds carries none; no spec covers those two cases.
-    Commits by other members, their updates included, do not heal it: a copy
-    of its state follows them and keeps reading messages and call-media keys
-    until the device commits an update or a removal, or is removed. Given
-    the update rule above, a device that never commits stays exposed until
-    it is removed (#478).
+    recovers only when it commits its own update: the update path encrypts
+    the new path secrets to the other members' keys only, so a copy of the
+    old state cannot apply that commit and holds no secret of a later epoch.
+    By ts-mls (`needsUpdatePath`), a removal it commits carries an update
+    path too and a commit that only adds carries none; no spec covers those
+    two cases. Commits by other members, their updates included, do not heal
+    it: a copy of its state follows them and keeps reading messages and
+    call-media keys until the device commits an update or a removal, or is
+    removed. Given the update rule above, a device that never commits stays
+    exposed until it is removed (#478).
+  - An update replaces the leaf's encryption key, not its signature key, and
+    the identity-signed credential binds that signature key. Whoever copied a
+    device's state can therefore sign as that leaf until the device is
+    removed, even after it healed.
   - History backups hold one-to-one records and contact pins only, never MLS
     state or group history. Forward secrecy does not cover them (see
     `local-unlock.md`, History backup; `PigeonHistoryBackup.spec.ts`).
