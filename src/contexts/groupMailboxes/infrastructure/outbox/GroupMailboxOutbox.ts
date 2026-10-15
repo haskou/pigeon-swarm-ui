@@ -36,13 +36,16 @@ import { GroupMailboxKeySchedule } from '../crypto/GroupMailboxKeySchedule';
  * the MLS group still holds a member the node's roster removed, no message
  * is encrypted or appended: that member holds the epoch secret and could
  * read any inbox of the generation. Such a message is held, unsealed or
- * stale, until the removal is committed. A commit belongs to its
- * generation and is never re-encrypted. A record still queued after the
- * expiry is dropped and reported. `items` lists each queued record as
- * held, retrying or pending. An ephemeral record (`sendEphemeral`) is never
- * queued: it is appended once or dropped, and none is sealed in a
- * conversation whose queue has held a record past `EPHEMERAL_HOLD_MS`.
- * Logs carry counts only.
+ * stale, until the removal is committed. While this device awaits the
+ * group's confirmation, no record of the conversation is encrypted or
+ * appended at all; its messages are held unsealed and sealed in the epoch
+ * current once it is confirmed. A commit belongs to its generation and is
+ * never re-encrypted. A record still queued after the expiry is dropped
+ * and reported. `items` lists each queued record as held, retrying or
+ * pending. An ephemeral record (`sendEphemeral`) is never queued: it is
+ * appended once or dropped, and none is sealed in a conversation whose
+ * queue has held a record past `EPHEMERAL_HOLD_MS`. Logs carry counts
+ * only.
  */
 export class GroupMailboxOutbox {
   /** The generation index of a message held before it was ever sealed. */
@@ -64,7 +67,7 @@ export class GroupMailboxOutbox {
     (failure: GroupMailboxOutboxFailure) => void
   >();
 
-  /** The ids of rows whose last pass found a removal pending. */
+  /** The ids of rows whose last pass found them held back. */
   private readonly held = new Set<string>();
   private readonly rows = new Map<string, GroupMailboxOutboxRow>();
   /** The roster of each conversation, read once per pass. */
@@ -227,21 +230,27 @@ export class GroupMailboxOutbox {
    * The row to deliver now: a message whose generation was superseded, or
    * one never sealed, is encrypted in the current epoch for those of its
    * pending recipients still in the group, or for every member if never
-   * sealed; a member who joined since never gets it. Null while a removal
-   * is pending. Undefined when it can no longer be encrypted, as after this
-   * identity's removal or when it outgrew the record limit; any other
-   * failure rejects, so the row is retried.
+   * sealed; a member who joined since never gets it. Null while the
+   * conversation holds it back (`holdsBack`); a commit is held back only
+   * while this device awaits the group's confirmation. Undefined when it
+   * can no longer be encrypted, as after this identity's removal or when it
+   * outgrew the record limit; any other failure rejects, so the row is
+   * retried.
    */
   private async currentRow(
     row: GroupMailboxOutboxRow,
   ): Promise<GroupMailboxOutboxRow | null | undefined> {
-    if (row.body === undefined) return row;
     const { conversationId } = row;
 
     try {
+      if (row.body === undefined) {
+        return (await this.engine.awaitsConfirmation(conversationId))
+          ? null
+          : row;
+      }
       const roster = await this.passRoster(conversationId);
 
-      if (await this.removalPending(conversationId, roster)) return null;
+      if (await this.holdsBack(conversationId, roster)) return null;
       const generation = await this.engine.generation(conversationId);
 
       if (generation.index === row.generationIndex) return row;
@@ -481,10 +490,12 @@ export class GroupMailboxOutbox {
   }
 
   /**
-   * Whether the MLS group still holds a member the roster no longer lists.
-   * Rejects once this identity is off the roster itself.
+   * Whether no message may be encrypted in the conversation now: this
+   * device awaits the group's confirmation, or the MLS group still holds a
+   * member the roster no longer lists. Rejects once this identity is off
+   * the roster itself.
    */
-  private async removalPending(
+  private async holdsBack(
     conversationId: string,
     roster: GroupMailboxRoster,
   ): Promise<boolean> {
@@ -492,8 +503,11 @@ export class GroupMailboxOutbox {
       throw new MlsRejectedError('This identity is not in the group');
     }
 
-    return (await this.engine.members(conversationId)).some(
-      (identityId) => !roster.has(identityId),
+    return (
+      (await this.engine.awaitsConfirmation(conversationId)) ||
+      (await this.engine.members(conversationId)).some(
+        (identityId) => !roster.has(identityId),
+      )
     );
   }
 
@@ -604,7 +618,7 @@ export class GroupMailboxOutbox {
     reference: string,
     body: Uint8Array,
   ): Promise<void> {
-    const pending = await this.removalPending(
+    const pending = await this.holdsBack(
       conversationId,
       await this.roster(conversationId),
     );
@@ -676,9 +690,9 @@ export class GroupMailboxOutbox {
    * and appends it once to every other member's inbox. It is never stored
    * or retried, and never listed in `items`. A recipient an earlier queued
    * record still waits for is skipped, so it never reads a record of an
-   * epoch it has not reached. Nothing is sent while a removal is pending or
-   * once this identity is off the roster. Never rejects: an ephemeral
-   * record that cannot go out is dropped.
+   * epoch it has not reached. Nothing is sent while the conversation holds
+   * messages back (`holdsBack`) or once this identity is off the roster.
+   * Never rejects: an ephemeral record that cannot go out is dropped.
    */
   public async sendEphemeral(
     conversationId: string,
@@ -688,10 +702,7 @@ export class GroupMailboxOutbox {
       if (this.stopped || this.heldTooLong(conversationId)) return;
 
       if (
-        await this.removalPending(
-          conversationId,
-          await this.roster(conversationId),
-        )
+        await this.holdsBack(conversationId, await this.roster(conversationId))
       ) {
         return;
       }

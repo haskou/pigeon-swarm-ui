@@ -4,12 +4,14 @@ import type { ChatMessage } from '../../messages/domain/ChatMessage';
 import type { DirectMessageTimelineChange } from '../../messages/domain/DirectMessageTimelineChange';
 import type { EditMessageOptions } from '../../messages/infrastructure/http/resources/EditMessageOptions';
 import type { SendMessageOptions } from '../../messages/infrastructure/http/resources/SendMessageOptions';
+import type { GroupMailboxGenesisFields } from '../domain/GroupMailboxGenesisFields';
 import type { GroupMailboxRoster } from '../domain/GroupMailboxRoster';
 import type { GroupConversationActivity } from './GroupConversationActivity';
 import type { GroupConversationPorts } from './GroupConversationPorts';
 import type { GroupConversationSyncOutcome } from './GroupConversationSyncOutcome';
 import type { GroupTimelineApply } from './GroupTimelineApply';
 
+import { MlsRejectedError } from '../../communities/infrastructure/mls/MlsRejectedError';
 import { IdentityMatch } from '../../identities/domain/IdentityMatch';
 import { DirectMailboxRecords } from '../../mailboxes/domain/DirectMailboxRecords';
 import { MessagePinChange } from '../../messages/domain/MessagePinChange';
@@ -18,6 +20,7 @@ import { MessageId } from '../../messages/domain/value-objects/MessageId';
 import { MessagePinAction } from '../../messages/domain/value-objects/MessagePinAction';
 import { MessageReactionAction } from '../../messages/domain/value-objects/MessageReactionAction';
 import { MessageReactionEmoji } from '../../messages/domain/value-objects/MessageReactionEmoji';
+import { GroupMailboxGenesis } from '../domain/GroupMailboxGenesis';
 import { GroupMessageId } from './crypto/GroupMessageId';
 import { GroupConversationMember } from './GroupConversationMember';
 import { GroupConversationSender } from './GroupConversationSender';
@@ -107,7 +110,8 @@ export class GroupConversationMailbox {
 
   /**
    * Commits the roster and the devices this identity's signed transitions
-   * authorize into the MLS group when this device is the one. Logs counts
+   * authorize into the MLS group when this device is the one. A device
+   * that awaits the group's confirmation commits nothing. Logs counts
    * only.
    */
   private async reconcile(
@@ -119,7 +123,12 @@ export class GroupConversationMailbox {
     // A device not yet welcomed has no group and nothing to commit.
     const leaves = await member.engine.devices(conversationId);
 
-    if (leaves.length === 0) return;
+    if (
+      leaves.length === 0 ||
+      (await member.engine.awaitsConfirmation(conversationId))
+    ) {
+      return;
+    }
     const verified = new Set(await this.ports.verifiedDevices(session));
     const lead = leaves.find((credential) => verified.has(credential));
 
@@ -208,17 +217,34 @@ export class GroupConversationMailbox {
     return await this.stores.history.activity(session, conversationId);
   }
 
-  /** Starts the MLS group with this device alone, then adds the roster. */
-  public async create(session: Session, conversationId: string): Promise<void> {
-    await this.member(session).engine.createGroup(conversationId);
+  /**
+   * Starts the MLS group with this device alone, then adds the roster.
+   * `genesis` must derive the conversation id; joiners learn it from this
+   * identity's key package requests, so a welcome from it confirms.
+   */
+  public async create(
+    session: Session,
+    conversationId: string,
+    genesis: GroupMailboxGenesisFields,
+  ): Promise<void> {
+    const derived = GroupMailboxGenesis.of(conversationId, genesis);
+
+    if (!derived) {
+      throw new MlsRejectedError('The genesis does not derive the group id');
+    }
+    const { engine } = this.member(session);
+
+    await engine.learnGenesis(derived);
+    await engine.createGroup(conversationId);
     void this.membersChanged(session, conversationId);
   }
 
   /**
    * Brings the MLS group in line with the node's roster, then retries the
-   * queue, whose messages wait while a removal is pending; a call while one
-   * is running joins it. Never throws: a failure logs one line and the next
-   * sync tries again.
+   * queue, whose messages wait while a removal is pending or this device
+   * awaits the group's confirmation; an unconfirmed device commits
+   * nothing. A call while one is running joins it. Never throws: a failure
+   * logs one line and the next sync tries again.
    */
   public async membersChanged(
     session: Session,
@@ -242,7 +268,7 @@ export class GroupConversationMailbox {
   /**
    * Queues a message for every member. Rejects before anything is queued.
    * The message carries its outbox state, as `held` while a removal is
-   * pending.
+   * pending or this device awaits the group's confirmation.
    */
   public async send(
     session: Session,
@@ -449,8 +475,9 @@ export class GroupConversationMailbox {
   /**
    * Reads every inbox of the conversation once, then reads the roster and
    * reconciles it in the background. Resolves whether this identity has
-   * left the roster; a roster that cannot be read counts as staying.
-   * Rejects when the inboxes cannot be read.
+   * left the roster, a roster that cannot be read counting as staying, and
+   * whether this device still awaits the group's confirmation. Rejects
+   * when the inboxes cannot be read.
    */
   public async sync(
     session: Session,
@@ -469,7 +496,11 @@ export class GroupConversationMailbox {
 
     void this.membersChanged(session, conversationId, roster);
 
-    return { removed: roster?.has(session.identity.id) === false };
+    return {
+      removed: roster?.has(session.identity.id) === false,
+      unconfirmed:
+        await this.member(session).engine.awaitsConfirmation(conversationId),
+    };
   }
 
   /**

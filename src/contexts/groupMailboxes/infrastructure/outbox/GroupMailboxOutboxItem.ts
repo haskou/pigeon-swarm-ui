@@ -1,6 +1,7 @@
 /**
- * One record still queued: `held` while a removal is pending in its group,
- * `retry` once an attempt left a copy undelivered, `pending` otherwise.
+ * One record still queued: `held` while a removal is pending in its group
+ * or this device awaits the group's confirmation, `retry` once an attempt
+ * left a copy undelivered, `pending` otherwise.
  */
 export type GroupMailboxOutboxItem = {
   reference: string;

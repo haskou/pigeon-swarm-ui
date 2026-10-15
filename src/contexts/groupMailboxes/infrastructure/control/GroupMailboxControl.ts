@@ -11,6 +11,7 @@ import type { PendingGroupMailboxKeyPackage } from './PendingGroupMailboxKeyPack
 import { mlsKeyPackageOwner } from '../../../communities/infrastructure/mls/MlsGroup';
 import { MlsRejectedError } from '../../../communities/infrastructure/mls/MlsRejectedError';
 import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
+import { GroupMailboxUnconfirmedError } from '../mls/GroupMailboxUnconfirmedError';
 import { GroupMailboxControlRecord } from './GroupMailboxControlRecord';
 import { GroupMailboxKeyPackageTimeoutError } from './GroupMailboxKeyPackageTimeoutError';
 
@@ -34,6 +35,12 @@ import { GroupMailboxKeyPackageTimeoutError } from './GroupMailboxKeyPackageTime
  * only that device answers, and only while it holds no leaf; the answer's
  * key package must be that device's. The welcome goes to the identity too,
  * and opens only on the device whose key package it used.
+ *
+ * Each key-package request carries the group's genesis when its sender
+ * knows it, so a joiner learns the creator before any welcome and a
+ * welcome from the creator confirms the group at once. A device that
+ * awaits the group's confirmation neither asks for nor hands out key
+ * packages for it.
  */
 export class GroupMailboxControl {
   public static readonly KEY_PACKAGE_TIMEOUT_MS = 60_000;
@@ -73,8 +80,29 @@ export class GroupMailboxControl {
   }
 
   /**
+   * Keeps the genesis a key-package request carries. While this device
+   * awaits the group's confirmation the request is not answered: rejected
+   * when it names this device, else ignored.
+   */
+  private async heldBack(
+    record: Extract<GroupMailboxControlFields, { type: 'key-package-request' }>,
+  ): Promise<GroupMailboxControlOutcome | undefined> {
+    if (record.genesis) await this.engine.learnGenesis(record.genesis);
+
+    if (!(await this.engine.awaitsConfirmation(record.conversationId))) {
+      return undefined;
+    }
+
+    return record.deviceCredential === this.self.deviceCredential
+      ? 'rejected'
+      : 'ignored';
+  }
+
+  /**
    * Answers a peer on the roster, or another device of this identity that
-   * asks this very device while it holds no leaf in the group.
+   * asks this very device while it holds no leaf in the group. Keeps the
+   * genesis the request carries. A device awaiting the group's
+   * confirmation answers nobody.
    */
   private async receiveKeyPackageRequest(
     peerIdentityId: string,
@@ -96,6 +124,10 @@ export class GroupMailboxControl {
     ) {
       return 'ignored';
     }
+
+    const held = await this.heldBack(record);
+
+    if (held) return held;
 
     await this.direct.send(
       conversationId,
@@ -186,12 +218,20 @@ export class GroupMailboxControl {
     }
   }
 
-  /** Asks a peer, or one other device of this identity, for a key package. */
+  /**
+   * Asks a peer, or one other device of this identity, for a key package,
+   * handing on the group's genesis when this device knows it. Rejects
+   * while this device awaits the group's confirmation.
+   */
   private async requestKeyPackage(
     conversationId: string,
     peerIdentityId: string,
     deviceCredential?: string,
   ): Promise<Uint8Array> {
+    if (await this.engine.awaitsConfirmation(conversationId)) {
+      throw new GroupMailboxUnconfirmedError();
+    }
+    const genesis = await this.engine.genesis(conversationId);
     const requestId = MailboxChannel.randomEnvelopeId();
     const answer = new Promise<Uint8Array>((resolve, reject) => {
       this.pending.set(requestId, {
@@ -214,6 +254,7 @@ export class GroupMailboxControl {
         GroupMailboxControlRecord.encode({
           conversationId,
           ...(deviceCredential === undefined ? {} : { deviceCredential }),
+          ...(genesis === undefined ? {} : { genesis }),
           requestId,
           type: 'key-package-request',
         }),

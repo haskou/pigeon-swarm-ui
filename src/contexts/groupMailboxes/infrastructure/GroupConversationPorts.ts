@@ -16,6 +16,11 @@ export type GroupConversationPorts = {
   >;
   client: Pick<PigeonMailboxClient, 'delete'>;
   composer: Pick<PigeonMessageCommandsApi, 'composeEdit' | 'withSentRecord'>;
+  /**
+   * The identities this identity pinned as contacts on this device. Only
+   * this device's user pins one, so no welcomer can add one.
+   */
+  contacts: (session: Session) => readonly string[];
   /** The 1:1 carrier of control letters for one signed-in identity. */
   direct: (session: Session) => GroupMailboxDirectLink;
   notifications: GroupMailboxNotificationPages;

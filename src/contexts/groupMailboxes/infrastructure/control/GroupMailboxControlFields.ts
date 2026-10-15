@@ -1,3 +1,5 @@
+import type { GroupMailboxGenesis } from '../../domain/GroupMailboxGenesis';
+
 /**
  * A control record of a group conversation. Key-package requests and
  * responses and welcomes travel to one peer in a letter its sender signs
@@ -6,12 +8,16 @@
  * Application messages travel there too, as one MLS ciphertext whose sender
  * MLS authenticates. `gen_k` is never part of a record: a welcome carries
  * only the public index `k`. A key-package request a device sends its own
- * identity names the one other device it asks (`deviceCredential`).
+ * identity names the one other device it asks (`deviceCredential`). A
+ * key-package request carries the group's genesis when its sender knows it,
+ * so the joiner learns the creator; only its derivation of the conversation
+ * id vouches for it.
  */
 export type GroupMailboxControlFields =
   | {
       readonly conversationId: string;
       readonly deviceCredential?: string;
+      readonly genesis?: GroupMailboxGenesis;
       readonly requestId: string;
       readonly type: 'key-package-request';
     }

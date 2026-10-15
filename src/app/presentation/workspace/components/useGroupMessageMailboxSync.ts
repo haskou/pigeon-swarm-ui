@@ -27,7 +27,11 @@ import { applyMailboxSyncChanges } from './applyMailboxSyncChanges';
  * that end them, go to `onTypingChanges`; each member that announced an
  * identity update goes to `onIdentityUpdated`. The first pass that finds
  * this identity off the roster refreshes the conversation list, once per
- * effect run, so the group leaves the sidebar.
+ * effect run, so the group leaves the sidebar. While a pass finds that
+ * this device awaits the group's confirmation, a notice says the group is
+ * not yet verified and its messages wait, unless another error is already
+ * shown; a later pass that finds it confirmed, or the cleanup, clears only
+ * that notice.
  */
 export function useGroupMessageMailboxSync({
   activeConversation,
@@ -54,9 +58,11 @@ export function useGroupMessageMailboxSync({
 
     const syncIntervalMs = 5000;
     const notice = copy.workspace.groupMailboxSyncError;
+    const unconfirmedNotice = copy.workspace.groupUnconfirmed;
     const controller = new AbortController();
     const pinClock = new MessagePinClock();
     let failing = false;
+    let unconfirmedShown = false;
     let removalSeen = false;
     let timer: number | undefined;
     const apply = (changes: DirectMessageTimelineChange[]): void => {
@@ -88,6 +94,15 @@ export function useGroupMessageMailboxSync({
         return current === notice ? null : current;
       });
     };
+    const showUnconfirmed = (unconfirmed: boolean): void => {
+      if (unconfirmed === unconfirmedShown) return;
+      unconfirmedShown = unconfirmed;
+      onErrorChange((current) => {
+        if (unconfirmed) return current ?? unconfirmedNotice;
+
+        return current === unconfirmedNotice ? null : current;
+      });
+    };
     const markRead = (): void => {
       void applicationContainer.groupMessages
         .markRead(session, conversationId)
@@ -104,15 +119,18 @@ export function useGroupMessageMailboxSync({
     };
     const pass = async (): Promise<void> => {
       try {
-        const { removed } = await applicationContainer.groupMessages.sync(
-          session,
-          conversationId,
-          controller.signal,
-          apply,
-        );
+        const { removed, unconfirmed } =
+          await applicationContainer.groupMessages.sync(
+            session,
+            conversationId,
+            controller.signal,
+            apply,
+          );
 
         report(false);
         markRead();
+
+        if (!controller.signal.aborted) showUnconfirmed(unconfirmed);
 
         if (removed && !removalSeen && !controller.signal.aborted) {
           removalSeen = true;
@@ -146,6 +164,7 @@ export function useGroupMessageMailboxSync({
     return () => {
       controller.abort();
       window.clearTimeout(timer);
+      showUnconfirmed(false);
     };
   }, [
     conversationId,
