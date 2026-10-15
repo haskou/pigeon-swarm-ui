@@ -108,6 +108,55 @@ describe(confirmRecoveredCallAbsence.name, () => {
     expect(onEnded).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the call and retries while the restarted node still reads the current identity as ringing', async () => {
+    const getCall = jest
+      .fn()
+      .mockResolvedValueOnce(callWith('active', 'ringing'))
+      .mockResolvedValueOnce(callWith('active', 'joined'));
+    const { onConfirmed, onEnded } = start(getCall);
+
+    await flushPromises();
+    expect(onEnded).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(1000);
+    await flushPromises();
+    expect(getCall).toHaveBeenCalledTimes(2);
+    expect(onConfirmed).toHaveBeenCalledWith(callWith('active', 'joined'));
+    expect(onEnded).not.toHaveBeenCalled();
+  });
+
+  it('keeps the call and retries while the restarted node does not list the current identity yet', async () => {
+    const getCall = jest
+      .fn()
+      .mockResolvedValueOnce(callWith('active', 'joined', 'peer'))
+      .mockResolvedValueOnce(callWith('active', 'joined'));
+    const { onConfirmed, onEnded } = start(getCall);
+
+    await flushPromises();
+    expect(onEnded).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(1000);
+    await flushPromises();
+    expect(onConfirmed).toHaveBeenCalledWith(callWith('active', 'joined'));
+    expect(onEnded).not.toHaveBeenCalled();
+  });
+
+  it('ends a call with dead media once the current identity stays unconfirmed past the bound', async () => {
+    const getCall = jest.fn().mockResolvedValue(callWith('active', 'ringing'));
+    const { onEnded } = start(getCall, () => false);
+
+    await flushPromises();
+    jest.advanceTimersByTime(29_000);
+    await flushPromises();
+    expect(onEnded).not.toHaveBeenCalled();
+
+    for (let step = 0; step < 6; step += 1) {
+      jest.advanceTimersByTime(8000);
+      await flushPromises();
+    }
+    expect(onEnded).toHaveBeenCalledTimes(1);
+  });
+
   it('ends a call with dead media once confirmation stays pending past the bound', async () => {
     const getCall = jest.fn().mockRejectedValue(nodeNotReady);
     const { onEnded } = start(getCall, () => false);
