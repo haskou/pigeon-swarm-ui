@@ -56,19 +56,17 @@ describe('GroupMailboxNotificationLink', () => {
     const opened = GroupMailboxControlSeal.open(
       bob.session,
       String(body.encryptedConversationKey),
-      { conversationId: CONVERSATION, senderIdentityId: alice.id },
+      alice.id,
     );
 
     expect(input).toEqual({
       encryptedKey: body.encryptedConversationKey,
       recipientIdentityId: bob.id,
-      subjectId: CONVERSATION,
       type: 'group_conversation_invitation',
     });
     expect(path).toBe('/notifications/');
     expect(init?.method).toBe('POST');
     expect(body).toEqual({
-      conversationId: CONVERSATION,
       encryptedConversationKey: expect.any(String),
       inviterIdentityId: alice.id,
       mutation,
@@ -76,6 +74,7 @@ describe('GroupMailboxNotificationLink', () => {
       recipientIdentityId: bob.id,
       type: 'group_conversation_invitation',
     });
+    expect(opened?.conversationId).toBe(CONVERSATION);
     expect(opened?.sentAt).toBe(NOW);
     expect([...(opened?.plaintext ?? [])]).toEqual([7, 8]);
   });

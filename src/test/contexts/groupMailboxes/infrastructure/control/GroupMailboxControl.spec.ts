@@ -18,7 +18,6 @@ import { GroupMailboxGenesis } from '../../../../../contexts/groupMailboxes/doma
 import { GroupMailboxRoster } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxRoster';
 import { GroupMailboxControl } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControl';
 import { GroupMailboxControlRecord } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlRecord';
-import { GroupMailboxKeyPackageTimeoutError } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxKeyPackageTimeoutError';
 import { GroupMailboxKeySchedule } from '../../../../../contexts/groupMailboxes/infrastructure/crypto/GroupMailboxKeySchedule';
 import { GroupMailboxMlsEngine } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxMlsEngine';
 import { GroupMailboxUnconfirmedError } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxUnconfirmedError';
@@ -29,6 +28,7 @@ import { MailboxCapability } from '../../../../../contexts/mailboxes/infrastruct
 import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { encodeBase64Url } from '../../../../../shared/infrastructure/encoding/base64url';
 import { MlsTestIdentity } from '../../../communities/infrastructure/mls/MlsTestIdentity';
+import { rosterOf } from '../../rosterOf';
 import { sealedGroupStores } from '../sealedGroupStores';
 
 const NETWORK = 'network-1';
@@ -48,17 +48,17 @@ let cast: Record<string, MlsTestIdentity>;
 /** The group alice created, its id derived from its genesis. */
 let CONVERSATION = '';
 let GENESIS: GroupMailboxGenesis;
-let roster = GroupMailboxRoster.empty();
+/** The identities every device treats as contacts. */
+let contacts: string[] = [];
 let database = 0;
 
 const id = (name: string): string => cast[name].id;
 
-/** The roster of a conversation alice created and alone manages. */
-const rosterOf = (names: string[]): GroupMailboxRoster =>
-  GroupMailboxRoster.of({
-    adminIds: [],
-    creatorId: id('alice'),
-    participantIds: names.map(id),
+/** The roster of the conversation, created by alice, listing `names`. */
+const rosterNamed = (names: string[], creator = 'alice'): GroupMailboxRoster =>
+  rosterOf(names.map(id), {
+    conversationId: CONVERSATION,
+    creatorId: id(creator),
   });
 
 type FakeNode = {
@@ -148,17 +148,12 @@ const outboxOf = (
       remove: (_identityId, rowId) => Promise.resolve(void rows.delete(rowId)),
       save: (_session, row) => Promise.resolve(void rows.set(row.id, row)),
     },
-    () => Promise.resolve(roster),
     () => 1_000,
   );
 };
 
-/** A device of `name` that reads the roster through `rosterView`. */
-const engineOf = (
-  name: string,
-  device = 'd1',
-  rosterView = (): GroupMailboxRoster => roster,
-): GroupMailboxMlsEngine => {
+/** A device of `name`. */
+const engineOf = (name: string, device = 'd1'): GroupMailboxMlsEngine => {
   const databaseName = `group-control-${++database}`;
   const stores = sealedGroupStores(databaseName, id(name));
 
@@ -166,7 +161,6 @@ const engineOf = (
     cast[name].signer(device),
     stores.state,
     stores.generations,
-    () => Promise.resolve(rosterView()),
     () =>
       Promise.resolve(
         ['d1', 'd2', 'd3', 'd4'].map((d) => cast[name].deviceCredential(d)),
@@ -182,7 +176,7 @@ const member = (name: string, device = 'd1'): Member => {
     control: new GroupMailboxControl(
       cast[name].owner(device),
       engine,
-      () => Promise.resolve(roster),
+      () => contacts,
       {
         send: (conversationId, peerIdentityId, plaintext) => {
           if (conversationId !== CONVERSATION) {
@@ -275,21 +269,35 @@ const readGroup = async (
   return outcomes;
 };
 
-/** `inviter` adds `joiners`; each answers its key package request. */
-const add = async (inviter: Member, joiners: Member[]): Promise<void> => {
+/**
+ * `inviter` adds `joiner`, which answers its key package request; the
+ * welcome waits in the joiner's inbox.
+ */
+const add = async (inviter: Member, [joiner]: [Member]): Promise<void> => {
   await openInboxes(inviter);
-  const adding = inviter.control.add(
-    CONVERSATION,
-    joiners.map((joiner) => joiner.id),
-  );
+  const adding = inviter.control.add(CONVERSATION, [joiner.id]);
 
-  await until(() => joiners.every(({ inbox }) => inbox.length > 0));
-  for (const joiner of joiners) {
-    await expect(drain(joiner)).resolves.toEqual(['applied']);
-  }
-  await until(() => inviter.inbox.length === joiners.length);
+  await until(() => joiner.inbox.length > 0);
+  await expect(drain(joiner)).resolves.toEqual(['applied']);
+  await until(() => inviter.inbox.length > 0);
   await drain(inviter);
   await adding;
+};
+
+/**
+ * `inviter` adds `first`, then `second`, one commit each; both join, and
+ * `first` reads the commit that adds `second`.
+ */
+const addTwo = async (
+  inviter: Member,
+  first: Member,
+  second: Member,
+): Promise<void> => {
+  await add(inviter, [first]);
+  await drain(first);
+  await add(inviter, [second]);
+  await readGroup(first);
+  await drain(second);
 };
 
 const sameGeneration = async (a: Member, b: Member): Promise<void> => {
@@ -348,7 +356,7 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
   });
 
   beforeEach(async () => {
-    roster = rosterOf(['alice', 'bob', 'carol']);
+    contacts = ['alice', 'bob', 'carol'].map(id);
     node = fakeNode();
     members = new Map();
     devices = [];
@@ -358,7 +366,10 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
     mallory = member('mallory');
     // As the mailbox does on create: the genesis first, then the group.
     await alice.engine.learnGenesis(GENESIS);
-    await alice.engine.createGroup(CONVERSATION);
+    await alice.engine.createGroup(
+      CONVERSATION,
+      rosterNamed(['alice', 'bob', 'carol']),
+    );
     await openInboxes(alice);
   });
 
@@ -404,17 +415,19 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
     await sameGeneration(alice, carol);
   });
 
-  it('delivers a removal to the remaining members only', async () => {
-    await add(alice, [bob, carol]);
-    await Promise.all([drain(bob), drain(carol)]);
+  it('delivers a removal to the removed member, which ends its group but never learns the next generation', async () => {
+    await addTwo(alice, bob, carol);
     await openInboxes(alice);
     const carolInbox = (await inboxKeys(carol)).mailboxId;
 
-    await alice.control.remove(CONVERSATION, [carol.id]);
+    await alice.control.removeMember(CONVERSATION, carol.id);
 
-    expect(node.envelopes(carolInbox)).toBe(0);
+    expect(node.envelopes(carolInbox)).toBe(1);
     await expect(readGroup(bob)).resolves.toEqual(['applied']);
     await sameGeneration(alice, bob);
+    await readGroup(carol);
+
+    await expect(carol.engine.roster(CONVERSATION)).resolves.toBeUndefined();
     const carolGeneration = await carol.engine.generation(CONVERSATION);
 
     expect(
@@ -425,8 +438,7 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
   });
 
   it('delivers a removal whose envelope id the removed member squatted', async () => {
-    await add(alice, [bob, carol]);
-    await Promise.all([drain(bob), drain(carol)]);
+    await addTwo(alice, bob, carol);
     await openInboxes(alice);
     const bobKeys = await inboxKeys(bob, carol);
     const { epoch } = await carol.engine.generation(CONVERSATION);
@@ -443,22 +455,21 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
       ),
     );
 
-    await alice.control.remove(CONVERSATION, [carol.id]);
+    await alice.control.removeMember(CONVERSATION, carol.id);
 
     await expect(readGroup(bob)).resolves.toEqual(['rejected', 'applied']);
     await sameGeneration(alice, bob);
   });
 
   it('delivers a removal whose first copy the removed member saw before the rest', async () => {
-    await add(alice, [bob, carol]);
-    await Promise.all([drain(bob), drain(carol)]);
+    await addTwo(alice, bob, carol);
     await openInboxes(alice);
     const bobKeys = await inboxKeys(bob, carol);
     let squatted: Promise<void> | undefined;
     const racing = new GroupMailboxControl(
       cast.alice.owner(),
       alice.engine,
-      () => Promise.resolve(roster),
+      () => contacts,
       { send: () => Promise.resolve() },
       outboxOf(alice.id, alice.engine, {
         send: async (keys, plaintext, envelopeId) => {
@@ -486,7 +497,7 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
       }),
     );
 
-    await racing.remove(CONVERSATION, [carol.id]);
+    await racing.removeMember(CONVERSATION, carol.id);
 
     await expect(readGroup(bob)).resolves.toEqual(['rejected', 'applied']);
     await sameGeneration(alice, bob);
@@ -540,15 +551,15 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
     await expect(drain(bob)).resolves.toEqual(['applied']);
   });
 
-  it('rejects a welcome from a roster member the roster does not let add devices', async () => {
-    // Carol may not add anyone; a patched client of hers forges a group anyway.
-    const forger = engineOf('carol', 'd2', () =>
-      GroupMailboxRoster.of({
-        adminIds: [],
-        participantIds: ['alice', 'bob', 'carol'].map(id),
-      }),
+  it('rejects a welcome whose roster names another creator than the genesis', async () => {
+    // Carol forges a group of the conversation that names her its creator.
+    const forger = engineOf('carol', 'd2');
+
+    await bob.engine.learnGenesis(GENESIS);
+    await forger.createGroup(
+      CONVERSATION,
+      rosterNamed(['carol', 'alice', 'bob'], 'carol'),
     );
-    await forger.createGroup(CONVERSATION);
     const forged = await forger.add(
       CONVERSATION,
       [await bob.engine.createKeyPackage()],
@@ -621,7 +632,7 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
     ).resolves.toBe('ignored');
   });
 
-  it('refuses key package requests from outside the roster', async () => {
+  it('defers a key package request from an identity that is not a contact until the user consents', async () => {
     const request = GroupMailboxControlRecord.encode({
       conversationId: CONVERSATION,
       requestId: MailboxChannel.randomEnvelopeId(),
@@ -629,41 +640,30 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
     });
 
     await expect(bob.control.receiveDirect(mallory.id, request)).resolves.toBe(
-      'rejected',
+      'deferred',
     );
     expect(mallory.inbox).toEqual([]);
-    roster = rosterOf(['alice', 'carol', 'mallory']);
-    await expect(bob.control.receiveDirect(mallory.id, request)).resolves.toBe(
-      'rejected',
-    );
-    expect(mallory.inbox).toEqual([]);
+    await expect(
+      bob.control.receiveDirect(mallory.id, request, true),
+    ).resolves.toBe('applied');
+    expect(mallory.inbox).toHaveLength(1);
   });
 
-  it('ignores key packages nobody asked that peer for', async () => {
-    const adding = alice.control.add(CONVERSATION, [bob.id]);
-
-    await until(() => bob.inbox.length > 0);
-    const request = GroupMailboxControlRecord.decode(bob.inbox[0].plaintext);
-
-    if (request?.type !== 'key-package-request') {
-      throw new Error('expected a key package request');
-    }
-    const unsolicited = GroupMailboxControlRecord.encode({
-      conversationId: CONVERSATION,
-      keyPackage: await carol.engine.createKeyPackage(),
-      requestId: request.requestId,
-      type: 'key-package-response',
-    });
-
+  it('rejects a key package from an identity the roster does not list', async () => {
     await expect(
-      alice.control.receiveDirect(carol.id, unsolicited),
-    ).resolves.toBe('ignored');
-    await drain(bob);
-    await drain(alice);
-    await adding;
-    await expect(alice.engine.members(CONVERSATION)).resolves.toEqual(
-      [alice.id, bob.id].sort(),
-    );
+      alice.control.receiveDirect(
+        mallory.id,
+        GroupMailboxControlRecord.encode({
+          conversationId: CONVERSATION,
+          keyPackage: await mallory.engine.createKeyPackage(),
+          requestId: MailboxChannel.randomEnvelopeId(),
+          type: 'key-package-response',
+        }),
+      ),
+    ).resolves.toBe('rejected');
+    await expect(alice.engine.members(CONVERSATION)).resolves.toEqual([
+      alice.id,
+    ]);
   });
 
   it("rejects a key package that is not the answering peer's", async () => {
@@ -687,7 +687,7 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
         }),
       ),
     ).resolves.toBe('rejected');
-    await expect(adding).rejects.toBeInstanceOf(MlsRejectedError);
+    await adding;
     await expect(alice.engine.members(CONVERSATION)).resolves.toEqual([
       alice.id,
     ]);
@@ -723,7 +723,7 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
         }),
       ),
     ).resolves.toBe('rejected');
-    await expect(adding).rejects.toBeInstanceOf(MlsRejectedError);
+    await adding;
     await expect(alice.engine.members(CONVERSATION)).resolves.toEqual([
       alice.id,
     ]);
@@ -736,18 +736,37 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
     expect(mallory.inbox).toEqual([]);
   });
 
-  it('rejects the add of a peer that never answers once closed', async () => {
-    const adding = alice.control.add(CONVERSATION, [bob.id]);
+  it('asks a roster member for a key package once per session', async () => {
+    await alice.control.add(CONVERSATION, [bob.id]);
+    await alice.control.add(CONVERSATION, [bob.id]);
 
-    await until(() => bob.inbox.length > 0);
-    alice.control.close();
+    expect(bob.inbox).toHaveLength(1);
+  });
 
-    await expect(adding).rejects.toBeInstanceOf(
-      GroupMailboxKeyPackageTimeoutError,
+  it('refuses an add by a member the roster does not let add members', async () => {
+    await add(alice, [bob]);
+    await drain(bob);
+
+    await expect(bob.control.add(CONVERSATION, [carol.id])).rejects.toThrow(
+      'Only roster members can be added',
     );
-    await expect(alice.engine.members(CONVERSATION)).resolves.toEqual([
-      alice.id,
-    ]);
+    expect(carol.inbox).toEqual([]);
+  });
+
+  it('puts a new member on the roster, then adds it from its key package', async () => {
+    contacts = [...contacts, mallory.id];
+    const adding = alice.control.addMember(CONVERSATION, mallory.id);
+
+    await until(() => mallory.inbox.length > 0);
+    await expect(drain(mallory)).resolves.toEqual(['applied']);
+    await until(() => alice.inbox.length > 0);
+    await expect(drain(alice)).resolves.toEqual(['applied']);
+    await adding;
+    await expect(drain(mallory)).resolves.toEqual(['applied']);
+    await sameGeneration(alice, mallory);
+    expect((await mallory.engine.roster(CONVERSATION))?.has(mallory.id)).toBe(
+      true,
+    );
   });
 
   it('adds another device of its own identity without a manager, through its own welcome', async () => {

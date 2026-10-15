@@ -4,6 +4,7 @@ import {
   type ClientConfig,
   type ClientState,
   type CiphersuiteImpl,
+  type Extension,
   type IncomingMessageAction,
   type IncomingMessageCallback,
   type KeyPackage,
@@ -32,11 +33,13 @@ import {
   mlsExporter,
   processPrivateMessage,
 } from 'ts-mls';
+import { extensionTypeToNumber } from 'ts-mls/extension.js';
 import { makeKeyPackageRef } from 'ts-mls/keyPackage.js';
 import { decryptSenderData } from 'ts-mls/privateMessage.js';
 import { accumulatePskSecret } from 'ts-mls/pskIndex.js';
 import { decryptGroupInfo, decryptGroupSecrets } from 'ts-mls/welcome.js';
 
+import type { MlsContextExtension } from './MlsContextExtension';
 import type { MlsLeafCredential } from './MlsLeafCredential';
 import type { MlsLeafSigner } from './MlsLeafSigner';
 import type {
@@ -131,15 +134,24 @@ const clientConfig: ClientConfig = {
   paddingConfig: defaultPaddingConfig,
 };
 
-/** A key package whose credential the signer's identity key vouches for. */
+/**
+ * A key package whose credential the signer's identity key vouches for. Its
+ * capabilities list the private-use GroupContext extensions it supports, so
+ * it can join a group carrying them.
+ */
 export const generateMlsKeyPackage = async (
   signer: MlsLeafSigner,
+  extensionTypes: readonly number[] = [],
 ): Promise<MlsKeyPackageBundle> => {
   const cs = await suite();
   const signatureKeys = await cs.signature.keygen();
+  const capabilities = defaultCapabilities();
   const { privatePackage, publicPackage } = await generateKeyPackageWithKey(
     MlsIdentityCredential.issue(signer, signatureKeys.publicKey),
-    defaultCapabilities(),
+    {
+      ...capabilities,
+      extensions: [...capabilities.extensions, ...extensionTypes],
+    },
     defaultLifetime,
     [],
     signatureKeys,
@@ -242,35 +254,66 @@ const assertCommitterKept = (
   }
 };
 
+/** GroupContext extensions by number, as the membership policy reads them. */
+const contextOf = (extensions: readonly Extension[]): MlsContextExtension[] =>
+  extensions.map(({ extensionData, extensionType }) => ({
+    extensionData,
+    extensionType: extensionTypeToNumber(extensionType),
+  }));
+
 /**
  * What a commit's proposals do to membership, by identity, judged against
- * the tree they apply to. Only adds, removals and updates may be in it.
- * Every owner it names, the committer first, comes from a credential that
- * verifies; one that does not rejects the commit, whatever it carries.
+ * the tree and GroupContext they apply to. Only adds, removals, updates and
+ * one GroupContextExtensions proposal may be in it. Every owner it names,
+ * the committer first, comes from a credential that verifies; one that does
+ * not rejects the commit, whatever it carries.
  */
 const membershipChange = (
-  tree: RatchetTree,
+  from: Pick<ClientState, 'groupContext' | 'ratchetTree'>,
   committerLeaf: number,
   proposals: readonly Proposal[],
 ): MlsMembershipChange => {
+  const tree = from.ratchetTree;
   const committer = verifiedOwnerAt(tree, committerLeaf);
   const added: string[] = [];
   const removed: string[] = [];
+  const proposedContexts: MlsContextExtension[][] = [];
 
   for (const proposal of proposals) {
     if (proposal.proposalType === 'add') {
       added.push(ownerOfKeyPackage(proposal.add.keyPackage).identityId);
     } else if (proposal.proposalType === 'remove') {
       removed.push(verifiedOwnerAt(tree, proposal.remove.removed).identityId);
+    } else if (proposal.proposalType === 'group_context_extensions') {
+      proposedContexts.push(
+        contextOf(proposal.groupContextExtensions.extensions),
+      );
     } else if (proposal.proposalType !== 'update') {
       throw new MlsRejectedError('Unsupported proposal');
     }
   }
 
+  if (proposedContexts.length > 1) {
+    throw new MlsRejectedError('Unsupported proposal');
+  }
+  // Every leaf's credential verified when it entered the tree.
+  const holders: string[] = [];
+
+  tree.forEach((node) => {
+    if (node?.nodeType === 'leaf') {
+      holders.push(
+        MlsIdentityCredential.ownerOf(node.leaf.credential).identityId,
+      );
+    }
+  });
+
   return {
     added,
     committer: committer.identityId,
     committerDevice: committer.deviceCredential,
+    context: contextOf(from.groupContext.extensions),
+    holders,
+    proposedContext: proposedContexts[0],
     removed,
   };
 };
@@ -417,16 +460,18 @@ export class MlsGroup {
     public readonly welcomer: MlsLeafOwner | undefined,
   ) {}
 
+  /** Starts a group with this device alone and these context extensions. */
   public static async create(
     groupId: string,
     key: MlsKeyPackageBundle,
     policy: MlsMembershipPolicy,
+    extensions: readonly MlsContextExtension[] = [],
   ): Promise<MlsGroup> {
     const state = await createGroup(
       encoder.encode(groupId),
       key.publicPackage,
       key.privatePackage,
-      [],
+      [...extensions],
       await suite(),
       clientConfig,
     );
@@ -634,6 +679,20 @@ export class MlsGroup {
     return leaves;
   }
 
+  /** The current GroupContext extensions, which every member agrees on. */
+  public context(): MlsContextExtension[] {
+    return contextOf(this.state.groupContext.extensions);
+  }
+
+  /** Whether every leaf lists the extension type in its capabilities. */
+  public supports(extensionType: number): boolean {
+    return this.state.ratchetTree.every(
+      (node) =>
+        node?.nodeType !== 'leaf' ||
+        node.leaf.capabilities.extensions.includes(extensionType),
+    );
+  }
+
   public async add(keyPackages: Uint8Array[]): Promise<MlsCommitOutput> {
     const packages = keyPackages.map(decodeKeyPackage);
     const frontier = this.policy.frontier();
@@ -651,6 +710,23 @@ export class MlsGroup {
         proposalType: 'add' as const,
       })),
     );
+  }
+
+  /**
+   * Replaces the GroupContext extensions and, in the same commit, removes
+   * every leaf of the identities in `removed`.
+   */
+  public async changeContext(
+    extensions: readonly MlsContextExtension[],
+    removed: readonly string[] = [],
+  ): Promise<MlsCommitOutput> {
+    return this.commit([
+      {
+        groupContextExtensions: { extensions: [...extensions] },
+        proposalType: 'group_context_extensions' as const,
+      },
+      ...this.removals(({ identityId }) => removed.includes(identityId)),
+    ]);
   }
 
   /** Removes all leaves of the identities; undefined when none remain. */
@@ -737,22 +813,23 @@ export class MlsGroup {
     return { plaintext: result.message, sender: owner };
   }
 
+  /** Remove proposals for every leaf `doomed` names. */
+  private removals(doomed: (owner: MlsLeafOwner) => boolean): Proposal[] {
+    return this.leaves()
+      .filter(({ owner }) => doomed(owner))
+      .map(({ index }) => ({
+        proposalType: 'remove' as const,
+        remove: { removed: index },
+      }));
+  }
+
   /** Commits the removal of every leaf `doomed` names; undefined if none. */
   private async removeLeaves(
     doomed: (owner: MlsLeafOwner) => boolean,
   ): Promise<MlsCommitOutput | undefined> {
-    const indexes = this.leaves()
-      .filter(({ owner }) => doomed(owner))
-      .map(({ index }) => index);
+    const proposals = this.removals(doomed);
 
-    if (indexes.length === 0) return undefined;
-
-    return this.commit(
-      indexes.map((removed) => ({
-        proposalType: 'remove' as const,
-        remove: { removed },
-      })),
-    );
+    return proposals.length === 0 ? undefined : this.commit(proposals);
   }
 
   /** Sender-data secret and tree of the current or a retained past epoch. */
@@ -967,7 +1044,7 @@ export class MlsGroup {
 
     try {
       const change = membershipChange(
-        from.ratchetTree,
+        from,
         committer,
         incoming.proposals.map(({ proposal }) => proposal),
       );
@@ -1141,7 +1218,7 @@ export class MlsGroup {
     }
     const frontier = this.policy.frontier();
     const change = membershipChange(
-      this.state.ratchetTree,
+      this.state,
       this.state.privatePath.leafIndex,
       proposals,
     );

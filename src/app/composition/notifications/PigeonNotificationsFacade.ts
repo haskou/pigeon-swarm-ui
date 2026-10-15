@@ -1,5 +1,7 @@
+import type { GroupConversationMailbox } from '../../../contexts/groupMailboxes/infrastructure/GroupConversationMailbox';
 import type { LocalKeychain } from '../../../contexts/identities/infrastructure/keychain/LocalKeychain';
 import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
+import type { GroupConversationInvitationNotificationResource } from '../../../contexts/notifications/infrastructure/http/resources/GroupConversationInvitationNotificationResource';
 import type { NotificationResource } from '../../../contexts/notifications/infrastructure/http/resources/NotificationResource';
 import type { NotificationScopeSettingInputResource as NotificationScopeSettingInput } from '../../../contexts/notifications/infrastructure/http/resources/NotificationScopeSettingInputResource';
 import type { NotificationScopeSettingResource as NotificationScopeSetting } from '../../../contexts/notifications/infrastructure/http/resources/NotificationScopeSettingResource';
@@ -25,6 +27,10 @@ export class PigeonNotificationsFacade {
     private readonly notificationMapper: NotificationMapper,
     private readonly settingMapper: NotificationSettingMapper,
     private readonly useCases: NotificationUseCases,
+    private readonly groups: Pick<
+      GroupConversationMailbox,
+      'acceptInvitation' | 'declineInvitation' | 'invitations'
+    >,
   ) {}
 
   private actor(session: Session): string {
@@ -81,6 +87,37 @@ export class PigeonNotificationsFacade {
     };
   }
 
+  /**
+   * Answers a group invitation from an identity that is not a contact: its
+   * key package goes out, and the letter's state record says accepted.
+   * Rejects when the invitation is no longer waiting.
+   */
+  public async acceptGroupInvitation(
+    session: Session,
+    notification: GroupConversationInvitationNotificationResource,
+  ): Promise<GroupConversationInvitationNotificationResource> {
+    if (!(await this.groups.acceptInvitation(session, notification.id))) {
+      throw new Error('The group invitation is no longer waiting.');
+    }
+
+    return { ...notification, state: 'accepted' };
+  }
+
+  /**
+   * Declines a group invitation: no key package goes out, and the letter's
+   * state record says declined. Rejects when it is no longer waiting.
+   */
+  public async declineGroupInvitation(
+    session: Session,
+    notification: GroupConversationInvitationNotificationResource,
+  ): Promise<GroupConversationInvitationNotificationResource> {
+    if (!(await this.groups.declineInvitation(session, notification.id))) {
+      throw new Error('The group invitation is no longer waiting.');
+    }
+
+    return { ...notification, state: 'declined' };
+  }
+
   public async deletePushSubscription(
     session: Session,
     subscription: PushSubscriptionJSON,
@@ -108,16 +145,26 @@ export class PigeonNotificationsFacade {
 
   /**
    * Lists what the identity can act on. Group conversation invitations are
-   * the group's MLS control letters, read by the group mailboxes instead.
+   * the group's MLS control letters, read by the group mailboxes; only the
+   * key-package requests from identities that are not contacts, which wait
+   * for the user to accept or decline, are listed.
    */
   public async list(session: Session): Promise<NotificationResource[]> {
     const notifications = await this.useCases.notificationSearcher.search(
       new SearchNotificationsMessage(this.actor(session)),
     );
+    const waiting = new Set(
+      this.groups
+        .invitations(session)
+        .map(({ notificationId }) => notificationId),
+    );
 
     return notifications
       .map((notification) => this.notificationMapper.toResource(notification))
-      .filter(({ type }) => type !== 'group_conversation_invitation');
+      .filter(
+        ({ id, type }) =>
+          type !== 'group_conversation_invitation' || waiting.has(id),
+      );
   }
 
   public async listNotificationSettings(

@@ -11,6 +11,8 @@ export type GroupMailboxNotificationLetter = {
   lease: number;
   plaintext: Uint8Array;
   sender: string;
+  /** When its sender sealed it (ms since the epoch). */
+  sentAt: number;
   /** Until when this device keeps its key once decided (ms since the epoch). */
   until: number;
   welcome: boolean;

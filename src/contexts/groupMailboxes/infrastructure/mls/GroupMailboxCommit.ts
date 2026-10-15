@@ -18,8 +18,10 @@ export interface GroupMailboxCommit {
    */
   readonly deliveryGeneration: GroupMailboxGeneration;
   /**
-   * Sorted identities holding a leaf both before and after the commit: who
-   * must receive it. Joiners get the welcome; removed members get nothing.
+   * Sorted identities holding a leaf before the commit: who must receive it.
+   * An identity it drops gets it too, to learn it left (RFC 9420 §12.4.2);
+   * such a commit adds no leaf, and it never holds the epoch after it.
+   * Joiners get the welcome.
    */
   readonly recipients: readonly string[];
 }

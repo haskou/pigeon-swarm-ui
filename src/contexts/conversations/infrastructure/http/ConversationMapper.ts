@@ -3,31 +3,26 @@ import type { PrimitiveOf } from '@haskou/value-objects';
 import type { ConversationResource } from './ConversationResource';
 
 import { Conversation } from '../../domain/Conversation';
+import { ConversationId } from '../../domain/value-objects/ConversationId';
 
-const CONVERSATION_TYPES = ['group', 'one-to-one'];
-
-const INVALID_RULES: [string, (value: unknown) => boolean][] = [
-  [
-    'adminIds',
-    (value) =>
-      Array.isArray(value) && value.every((id) => typeof id === 'string'),
-  ],
-  ['creatorId', (value) => value === undefined || typeof value === 'string'],
-  ['id', (value) => typeof value === 'string' && value !== ''],
-  ['networkId', (value) => typeof value === 'string'],
-  [
-    'participantIds',
-    (value) =>
-      Array.isArray(value) && value.every((id) => typeof id === 'string'),
-  ],
-  ['type', (value) => CONVERSATION_TYPES.includes(value as string)],
-];
+const VALID_FIELDS: Record<string, (value: unknown) => boolean> = {
+  id: (value) => typeof value === 'string' && value !== '',
+  name: (value) => value === undefined || typeof value === 'string',
+  networkId: (value) => typeof value === 'string',
+  participantIds: (value) =>
+    Array.isArray(value) && value.every((id) => typeof id === 'string'),
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 export class ConversationMapper {
+  /**
+   * The one-to-one conversations of a node listing. Group conversations
+   * live in their MLS groups on the device; a row with a group id, made
+   * before they moved there, is dropped.
+   */
   public list(value: unknown): ConversationResource[] {
     if (!isRecord(value) || !Array.isArray(value.conversations)) {
       throw new TypeError(
@@ -35,16 +30,21 @@ export class ConversationMapper {
       );
     }
 
-    return value.conversations.map((item) => this.resource(item));
+    return value.conversations
+      .map((item) => this.resource(item))
+      .filter(({ id }) => !ConversationId.fromString(id).isGroup());
   }
 
+  /**
+   * A node row, which is a one-to-one conversation: its `adminIds`,
+   * `creatorId` and `type` are neither read nor required.
+   */
   public resource(value: unknown): ConversationResource {
     if (!isRecord(value)) {
       throw new TypeError('Conversation resource must be an object.');
     }
 
-    const { name } = value;
-    const invalid = INVALID_RULES.find(
+    const invalid = Object.entries(VALID_FIELDS).find(
       ([field, valid]) => !valid(value[field]),
     );
 
@@ -52,11 +52,19 @@ export class ConversationMapper {
       throw new TypeError(`Conversation resource ${invalid[0]} is invalid.`);
     }
 
-    if (name !== undefined && typeof name !== 'string') {
-      throw new TypeError('Conversation resource name must be a string.');
-    }
+    const row = value as Pick<
+      ConversationResource,
+      'id' | 'name' | 'networkId' | 'participantIds'
+    >;
 
-    return value as ConversationResource;
+    return {
+      adminIds: [],
+      id: row.id,
+      name: row.name,
+      networkId: row.networkId,
+      participantIds: row.participantIds,
+      type: 'one-to-one',
+    };
   }
 
   public fromPrimitives(resource: ConversationResource): Conversation {

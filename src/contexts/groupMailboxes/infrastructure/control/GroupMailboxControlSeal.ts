@@ -14,9 +14,9 @@ import { IdentityId } from '../../../identities/domain/value-objects/IdentityId'
  * Seals a control record to one peer (node `docs/design/group-mailboxes.md`,
  * D8): signed by the sender's identity key, bound to sender, recipient,
  * conversation and send time, then encrypted to the recipient's identity
- * key. Opening is strict and never throws: a letter that is not for this
- * identity, not signed by the expected sender or not bound to the expected
- * conversation opens to nothing.
+ * key. The conversation travels only inside the seal. Opening is strict and
+ * never throws: a letter that is not for this identity or not signed by the
+ * expected sender opens to nothing.
  */
 export class GroupMailboxControlSeal {
   private static readonly DOMAIN = 'pigeon:group-mailbox-control-letter:v1\n';
@@ -73,12 +73,12 @@ export class GroupMailboxControlSeal {
     value: Record<string, unknown>,
     expected: Pick<
       GroupMailboxControlLetter,
-      'conversationId' | 'recipientIdentityId' | 'senderIdentityId'
+      'recipientIdentityId' | 'senderIdentityId'
     >,
   ): value is GroupMailboxControlLetter {
     return (
       value.kind === GroupMailboxControlSeal.KIND &&
-      value.conversationId === expected.conversationId &&
+      typeof value.conversationId === 'string' &&
       value.recipientIdentityId === expected.recipientIdentityId &&
       value.senderIdentityId === expected.senderIdentityId &&
       typeof value.payload === 'string' &&
@@ -87,27 +87,32 @@ export class GroupMailboxControlSeal {
     );
   }
 
-  /** The record and send time, if `sealed` is a valid letter to `session`. */
+  /**
+   * The conversation, record and send time, if `sealed` is a valid letter
+   * to `session` from `senderIdentityId`.
+   */
   public static open(
     session: Session,
     sealed: string,
-    expected: { conversationId: string; senderIdentityId: string },
-  ): { plaintext: Uint8Array; sentAt: number } | undefined {
+    senderIdentityId: string,
+  ):
+    | { conversationId: string; plaintext: Uint8Array; sentAt: number }
+    | undefined {
     const value = GroupMailboxControlSeal.letterOf(session, sealed);
-    const senderIdentityId = IdentityId.normalize(expected.senderIdentityId);
+    const sender = IdentityId.normalize(senderIdentityId);
     const bound =
       value &&
       GroupMailboxControlSeal.boundTo(value, {
-        conversationId: expected.conversationId,
         recipientIdentityId: IdentityId.normalize(session.identity.id),
-        senderIdentityId,
+        senderIdentityId: sender,
       });
 
-    if (!bound || !GroupMailboxControlSeal.signedBy(value, senderIdentityId)) {
+    if (!bound || !GroupMailboxControlSeal.signedBy(value, sender)) {
       return undefined;
     }
 
     return {
+      conversationId: value.conversationId,
       plaintext: new Uint8Array(decodeBase64Url(value.payload)),
       sentAt: value.sentAt,
     };

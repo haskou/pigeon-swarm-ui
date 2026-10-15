@@ -826,7 +826,6 @@ export const en = {
         'The community owner cannot leave the community.',
       ConversationMustHaveTwoDifferentParticipantsError:
         'Direct conversations need two different identities.',
-      ConversationNotFoundError: 'That conversation could not be found.',
       ConversationParticipantNotFoundError:
         'Only conversation participants can send messages here.',
       IdentityMustHaveAtLeastOneNetworkError:
@@ -1187,6 +1186,7 @@ export const en = {
     enablePushUnsupported:
       'This browser cannot register push notifications for this app.',
     error: 'Notifications could not be loaded.',
+    groupInvitationTitle: 'Group invitation',
     hideMutedChannels: 'Hide muted channels',
     hideMutedChannelsAgain: 'Hide muted channels again',
     invitationTitle: 'Conversation invitation',

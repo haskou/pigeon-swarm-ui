@@ -2,7 +2,6 @@ import { sha256 } from '@noble/hashes/sha2.js';
 
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { GroupMailboxGeneration } from '../../domain/GroupMailboxGeneration';
-import type { GroupMailboxRoster } from '../../domain/GroupMailboxRoster';
 import type { GroupMailboxCommit } from '../mls/GroupMailboxCommit';
 import type { GroupMailboxOutboxAttempt } from './GroupMailboxOutboxAttempt';
 import type { GroupMailboxOutboxCopy } from './GroupMailboxOutboxCopy';
@@ -33,7 +32,7 @@ import { GroupMailboxKeySchedule } from '../crypto/GroupMailboxKeySchedule';
  * starts. A message whose generation was superseded before every copy
  * landed is re-encrypted in the current epoch for the current members; one
  * that cannot be re-encrypted for a moment is retried with backoff. While
- * the MLS group still holds a member the node's roster removed, no message
+ * the MLS group still holds a member its roster no longer lists, no message
  * is encrypted or appended: that member holds the epoch secret and could
  * read any inbox of the generation. Such a message is held, unsealed or
  * stale, until the removal is committed. While this device awaits the
@@ -70,8 +69,6 @@ export class GroupMailboxOutbox {
   /** The ids of rows whose last pass found them held back. */
   private readonly held = new Set<string>();
   private readonly rows = new Map<string, GroupMailboxOutboxRow>();
-  /** The roster of each conversation, read once per pass. */
-  private readonly rosters = new Map<string, Promise<GroupMailboxRoster>>();
   private lastCreatedAt = 0;
   private queue: Promise<void> = Promise.resolve();
   private stopped = false;
@@ -142,9 +139,6 @@ export class GroupMailboxOutbox {
       GroupMailboxOutboxStore,
       'forget' | 'load' | 'remove' | 'save'
     >,
-    private readonly roster: (
-      conversationId: string,
-    ) => Promise<GroupMailboxRoster>,
     private readonly clock: () => number = Date.now,
   ) {}
 
@@ -158,8 +152,6 @@ export class GroupMailboxOutbox {
   private async attemptAll(): Promise<void> {
     const now = this.clock();
     const attempts: GroupMailboxOutboxAttempt[] = [];
-
-    this.rosters.clear();
 
     for (const row of GroupMailboxOutbox.ordered(this.rows.values())) {
       if (this.stopped) return;
@@ -234,8 +226,8 @@ export class GroupMailboxOutbox {
    * conversation holds it back (`holdsBack`); a commit is held back only
    * while this device awaits the group's confirmation. Undefined when it
    * can no longer be encrypted, as after this identity's removal or when it
-   * outgrew the record limit; any other failure rejects, so the row is
-   * retried.
+   * outgrew the record limit, and for a commit once this device holds no
+   * group; any other failure rejects, so the row is retried.
    */
   private async currentRow(
     row: GroupMailboxOutboxRow,
@@ -243,14 +235,9 @@ export class GroupMailboxOutbox {
     const { conversationId } = row;
 
     try {
-      if (row.body === undefined) {
-        return (await this.engine.awaitsConfirmation(conversationId))
-          ? null
-          : row;
-      }
-      const roster = await this.passRoster(conversationId);
+      if (row.body === undefined) return await this.currentCommit(row);
 
-      if (await this.holdsBack(conversationId, roster)) return null;
+      if (await this.holdsBack(conversationId)) return null;
       const generation = await this.engine.generation(conversationId);
 
       if (generation.index === row.generationIndex) return row;
@@ -266,6 +253,21 @@ export class GroupMailboxOutbox {
       }
       throw error;
     }
+  }
+
+  /**
+   * A queued commit: held back (null) while this device awaits the group's
+   * confirmation, and undefined once it holds no group, as a removed
+   * device sends nothing more, not even a commit it queued.
+   */
+  private async currentCommit(
+    row: GroupMailboxOutboxRow,
+  ): Promise<GroupMailboxOutboxRow | null | undefined> {
+    if (!(await this.engine.roster(row.conversationId))) return undefined;
+
+    return (await this.engine.awaitsConfirmation(row.conversationId))
+      ? null
+      : row;
   }
 
   /**
@@ -477,29 +479,16 @@ export class GroupMailboxOutbox {
     });
   }
 
-  /** The roster for this pass, read once per conversation. */
-  private passRoster(conversationId: string): Promise<GroupMailboxRoster> {
-    const known = this.rosters.get(conversationId);
-
-    if (known) return known;
-    const read = this.roster(conversationId);
-
-    this.rosters.set(conversationId, read);
-
-    return read;
-  }
-
   /**
    * Whether no message may be encrypted in the conversation now: this
    * device awaits the group's confirmation, or the MLS group still holds a
-   * member the roster no longer lists. Rejects once this identity is off
-   * the roster itself.
+   * member the group's roster no longer lists. Rejects once this identity
+   * is off that roster itself, or holds no group for the conversation.
    */
-  private async holdsBack(
-    conversationId: string,
-    roster: GroupMailboxRoster,
-  ): Promise<boolean> {
-    if (!roster.has(this.session.identity.id)) {
+  private async holdsBack(conversationId: string): Promise<boolean> {
+    const roster = await this.engine.roster(conversationId);
+
+    if (!roster?.has(this.session.identity.id)) {
       throw new MlsRejectedError('This identity is not in the group');
     }
 
@@ -610,18 +599,15 @@ export class GroupMailboxOutbox {
    * Encrypts an application message in the current epoch and queues it for
    * every member's inbox, this identity's included; while a removal is
    * pending it is queued unsealed instead. Resolves after the first
-   * delivery attempt; rejects when the roster cannot be read, when this
-   * identity is off it, or when the message cannot be encrypted.
+   * delivery attempt; rejects when this identity is off the group's
+   * roster, or when the message cannot be encrypted.
    */
   public async enqueueMessage(
     conversationId: string,
     reference: string,
     body: Uint8Array,
   ): Promise<void> {
-    const pending = await this.holdsBack(
-      conversationId,
-      await this.roster(conversationId),
-    );
+    const pending = await this.holdsBack(conversationId);
     const unsealed = {
       attempts: 0,
       body: encodeBase64Url(body),
@@ -701,11 +687,7 @@ export class GroupMailboxOutbox {
     try {
       if (this.stopped || this.heldTooLong(conversationId)) return;
 
-      if (
-        await this.holdsBack(conversationId, await this.roster(conversationId))
-      ) {
-        return;
-      }
+      if (await this.holdsBack(conversationId)) return;
       const row = await this.sealedMessage(
         {
           attempts: 0,

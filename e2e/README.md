@@ -64,7 +64,9 @@ Chromium without WebRTC and a Firefox without call media encryption both
 refuse a direct call with the reason, before the microphone or the node is
 asked) and `group-conversation.spec.ts`
 (three users share a group conversation over MLS and per-member mailboxes,
-each message reaches the other two, and after the creator removes one member a
+each invitee, not a contact of the creator, accepts the invitation from its
+notifications before it joins, each message reaches the other two, and after
+the creator removes one member a
 later message reaches the remaining member and never shows in the removed
 member's page during 90 s of polling; and a member pairs a second device,
 which joins the group through its own leaf without a re-invite, so both

@@ -7,4 +7,5 @@ export type GroupMailboxOutboxEngine = Pick<
   | 'generation'
   | 'members'
   | 'readableGenerations'
+  | 'roster'
 >;

@@ -17,6 +17,7 @@ export function notificationPreview(
     case 'community_invitation':
       return communityInvitationPreview(notification, context);
     case 'conversation_invitation':
+    case 'group_conversation_invitation':
       return identityNotificationPreview(
         notification.payload.inviterIdentityId,
         context,

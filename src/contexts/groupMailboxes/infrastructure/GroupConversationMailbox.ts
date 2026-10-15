@@ -4,15 +4,19 @@ import type { ChatMessage } from '../../messages/domain/ChatMessage';
 import type { DirectMessageTimelineChange } from '../../messages/domain/DirectMessageTimelineChange';
 import type { EditMessageOptions } from '../../messages/infrastructure/http/resources/EditMessageOptions';
 import type { SendMessageOptions } from '../../messages/infrastructure/http/resources/SendMessageOptions';
-import type { GroupMailboxGenesisFields } from '../domain/GroupMailboxGenesisFields';
-import type { GroupMailboxRoster } from '../domain/GroupMailboxRoster';
+import type { GroupMailboxInvitation } from './control/GroupMailboxInvitation';
 import type { GroupConversationActivity } from './GroupConversationActivity';
 import type { GroupConversationPorts } from './GroupConversationPorts';
 import type { GroupConversationSyncOutcome } from './GroupConversationSyncOutcome';
 import type { GroupTimelineApply } from './GroupTimelineApply';
 
 import { MlsRejectedError } from '../../communities/infrastructure/mls/MlsRejectedError';
+import { ConversationIdFactory } from '../../conversations/domain/ConversationIdFactory';
+import { ConversationGroupNonce } from '../../conversations/domain/value-objects/ConversationGroupNonce';
+import { ConversationNetworkId } from '../../conversations/domain/value-objects/ConversationNetworkId';
+import { ConversationParticipantId } from '../../conversations/domain/value-objects/ConversationParticipantId';
 import { IdentityMatch } from '../../identities/domain/IdentityMatch';
+import { IdentityId } from '../../identities/domain/value-objects/IdentityId';
 import { DirectMailboxRecords } from '../../mailboxes/domain/DirectMailboxRecords';
 import { MessagePinChange } from '../../messages/domain/MessagePinChange';
 import { MessageReactionChange } from '../../messages/domain/MessageReactionChange';
@@ -21,6 +25,7 @@ import { MessagePinAction } from '../../messages/domain/value-objects/MessagePin
 import { MessageReactionAction } from '../../messages/domain/value-objects/MessageReactionAction';
 import { MessageReactionEmoji } from '../../messages/domain/value-objects/MessageReactionEmoji';
 import { GroupMailboxGenesis } from '../domain/GroupMailboxGenesis';
+import { GroupMailboxRoster } from '../domain/GroupMailboxRoster';
 import { GroupMessageId } from './crypto/GroupMessageId';
 import { GroupConversationMember } from './GroupConversationMember';
 import { GroupConversationSender } from './GroupConversationSender';
@@ -28,12 +33,15 @@ import { GroupConversationStores } from './GroupConversationStores';
 import { GroupConversationTimeline } from './GroupConversationTimeline';
 
 /**
- * Group conversations over MLS and per-member mailboxes. The node keeps the
- * roster; of the members holding a leaf whom the roster lets change
- * membership (its creator and admins, or anyone when it names none), the
- * lowest identity id commits every removal, then every add, so members
- * never race each other's commits. A leaver is removed by that member on
- * its next sync.
+ * Group conversations over MLS and per-member mailboxes. The roster travels
+ * in the MLS group's GroupContext and changes only by roster commits
+ * (`addMember`, `removeMember`, `leave`, `promote`, `demote`); the node
+ * never learns it. This device lists the groups whose roster names this
+ * identity (`conversations`). Of the members holding a leaf whom the roster
+ * lets change membership (its creator and admins), the lowest identity id
+ * removes the leaves of identities the roster no longer lists, as a
+ * leaver's, then asks each listed member holding no leaf for a key package,
+ * so members never race each other's commits.
  * Each leaf is a device. Of an identity's devices, only the one with the
  * lowest device credential among its current devices holding a leaf
  * commits, so its devices never race each other either: it removes the
@@ -117,7 +125,6 @@ export class GroupConversationMailbox {
   private async reconcile(
     member: GroupConversationMember,
     conversationId: string,
-    known?: GroupMailboxRoster,
   ): Promise<void> {
     const { session } = member;
     // A device not yet welcomed has no group and nothing to commit.
@@ -135,7 +142,9 @@ export class GroupConversationMailbox {
     if (lead !== session.deviceCredentialKeyPair.toPrimitives().publicKey) {
       return;
     }
-    const roster = known ?? (await this.ports.roster(session, conversationId));
+    const roster = await member.engine.roster(conversationId);
+
+    if (!roster) return;
     const revoked = leaves.filter((credential) => !verified.has(credential));
 
     if (revoked.length > 0) {
@@ -160,7 +169,8 @@ export class GroupConversationMailbox {
   }
 
   /**
-   * Commits the roster's removals, then its adds, when this identity is the
+   * Removes the leaves of identities off the roster, then asks the listed
+   * members holding no leaf for a key package, when this identity is the
    * first committer holding a leaf.
    */
   private async reconcileMembers(
@@ -180,12 +190,25 @@ export class GroupConversationMailbox {
     }
 
     const leaving = [...current].filter((id) => !roster.has(id));
-    const joining = roster.participants().filter((id) => !current.has(id));
+    const joining = roster.memberIds().filter((id) => !current.has(id));
 
     if (leaving.length > 0)
       await member.control.remove(conversationId, leaving);
 
     if (joining.length > 0) await member.control.add(conversationId, joining);
+  }
+
+  /**
+   * Commits one roster operation of this identity's, then brings the MLS
+   * group in line with the new roster.
+   */
+  private async rosterChange(
+    session: Session,
+    conversationId: string,
+    change: (member: GroupConversationMember) => Promise<unknown>,
+  ): Promise<void> {
+    await change(this.member(session));
+    void this.membersChanged(session, conversationId);
   }
 
   /** Runs `work` after the conversation's earlier inbox reads and replays. */
@@ -217,46 +240,173 @@ export class GroupConversationMailbox {
     return await this.stores.history.activity(session, conversationId);
   }
 
-  /**
-   * Starts the MLS group with this device alone, then adds the roster.
-   * `genesis` must derive the conversation id; joiners learn it from this
-   * identity's key package requests, so a welcome from it confirms.
-   */
-  public async create(
+  /** Accepts a deferred group invitation: its key package goes out. */
+  public async acceptInvitation(
+    session: Session,
+    notificationId: string,
+  ): Promise<boolean> {
+    return this.member(session).pump.accept(notificationId);
+  }
+
+  /** Adds an identity to the roster, then asks it for a key package. */
+  public async addMember(
     session: Session,
     conversationId: string,
-    genesis: GroupMailboxGenesisFields,
+    identityId: string,
   ): Promise<void> {
-    const derived = GroupMailboxGenesis.of(conversationId, genesis);
-
-    if (!derived) {
-      throw new MlsRejectedError('The genesis does not derive the group id');
-    }
-    const { engine } = this.member(session);
-
-    await engine.learnGenesis(derived);
-    await engine.createGroup(conversationId);
-    void this.membersChanged(session, conversationId);
+    await this.rosterChange(session, conversationId, (member) =>
+      member.control.addMember(
+        conversationId,
+        IdentityId.normalize(identityId),
+      ),
+    );
   }
 
   /**
-   * Brings the MLS group in line with the node's roster, then retries the
-   * queue, whose messages wait while a removal is pending or this device
-   * awaits the group's confirmation; an unconfirmed device commits
-   * nothing. A call while one is running joins it. Never throws: a failure
-   * logs one line and the next sync tries again.
+   * The group conversations this device holds, whose roster names this
+   * identity. Never throws: a group that cannot be read is left out.
+   */
+  public async conversations(
+    session: Session,
+  ): Promise<ConversationResource[]> {
+    const member = this.member(session);
+    const conversationIds = await member.generations.conversationIds();
+    const rosters = await Promise.all(
+      conversationIds.map((conversationId) =>
+        member.engine.roster(conversationId).catch(() => undefined),
+      ),
+    );
+    const networks = await Promise.all(
+      conversationIds.map((conversationId) =>
+        member.engine.genesis(conversationId).catch(() => undefined),
+      ),
+    );
+
+    return rosters.flatMap((roster, index) =>
+      roster?.has(session.identity.id)
+        ? [
+            {
+              adminIds: roster.adminIds(),
+              creatorId: roster.creatorId,
+              id: roster.conversationId,
+              name: roster.name,
+              networkId: networks[index]?.toPrimitives().networkId ?? '',
+              participantIds: roster.memberIds(),
+              type: 'group' as const,
+            },
+          ]
+        : [],
+    );
+  }
+
+  /**
+   * Starts a group conversation on this device alone: its id derives from a
+   * fresh genesis naming this identity as creator, and its roster lists
+   * this identity and the invitees, who are then asked for key packages.
+   * Joiners learn the genesis from those requests, so a welcome from this
+   * identity confirms at once.
+   */
+  public async create(
+    session: Session,
+    input: { name: string; networkId: string; participantIds: string[] },
+  ): Promise<ConversationResource> {
+    const creatorIdentityId = IdentityId.normalize(session.identity.id);
+    const nonce = ConversationGroupNonce.generate();
+    const conversationId = new ConversationIdFactory()
+      .createGroup(
+        ConversationParticipantId.fromString(creatorIdentityId),
+        ConversationNetworkId.fromString(input.networkId),
+        nonce,
+      )
+      .toString();
+    const genesis = GroupMailboxGenesis.of(conversationId, {
+      creatorIdentityId,
+      networkId: input.networkId,
+      nonce: nonce.toString(),
+    });
+    const roster = GroupMailboxRoster.of({
+      adminIds: [],
+      conversationId,
+      creatorId: creatorIdentityId,
+      memberIds: [
+        ...new Set([
+          creatorIdentityId,
+          ...input.participantIds.map((id) => IdentityId.normalize(id)),
+        ]),
+      ].sort(),
+      name: input.name.trim(),
+      version: GroupMailboxRoster.VERSION,
+    });
+
+    if (!genesis || !roster) {
+      throw new MlsRejectedError('The group cannot be created');
+    }
+    const { engine } = this.member(session);
+
+    await engine.learnGenesis(genesis);
+    await engine.createGroup(conversationId, roster);
+    void this.membersChanged(session, conversationId);
+
+    return {
+      adminIds: roster.adminIds(),
+      creatorId: creatorIdentityId,
+      id: conversationId,
+      name: roster.name,
+      networkId: input.networkId,
+      participantIds: roster.memberIds(),
+      type: 'group',
+    };
+  }
+
+  /** Declines a deferred group invitation. */
+  public async declineInvitation(
+    session: Session,
+    notificationId: string,
+  ): Promise<boolean> {
+    return this.member(session).pump.decline(notificationId);
+  }
+
+  /** Demotes an admin; only the creator may. */
+  public async demote(
+    session: Session,
+    conversationId: string,
+    identityId: string,
+  ): Promise<void> {
+    await this.rosterChange(session, conversationId, (member) =>
+      member.control.demote(conversationId, IdentityId.normalize(identityId)),
+    );
+  }
+
+  /**
+   * The key-package requests from identities that are not contacts, as the
+   * last control read found them, waiting to be accepted or declined.
+   */
+  public invitations(session: Session): GroupMailboxInvitation[] {
+    return this.member(session).pump.invitations();
+  }
+
+  /** Takes this identity off the roster; the creator never leaves. */
+  public async leave(session: Session, conversationId: string): Promise<void> {
+    await this.member(session).control.leave(conversationId);
+  }
+
+  /**
+   * Brings the MLS group in line with its roster, then retries the queue,
+   * whose messages wait while a removal is pending or this device awaits
+   * the group's confirmation; an unconfirmed device commits nothing. A
+   * call while one is running joins it. Never throws: a failure logs one
+   * line and the next sync tries again.
    */
   public async membersChanged(
     session: Session,
     conversationId: string,
-    roster?: GroupMailboxRoster,
   ): Promise<void> {
     const key = `${session.identity.id}/${conversationId}`;
     const running = this.reconciling.get(key);
 
     if (running) return await running;
     const member = this.member(session);
-    const work = this.reconcile(member, conversationId, roster)
+    const work = this.reconcile(member, conversationId)
       .then(() => member.outbox.flush())
       .catch(() => GroupConversationMailbox.fail('membership update'))
       .finally(() => this.reconciling.delete(key));
@@ -284,6 +434,31 @@ export class GroupConversationMailbox {
     );
 
     return this.withOutboxState(session, conversation.id, [message])[0];
+  }
+
+  /** Promotes a member to admin; only the creator may. */
+  public async promote(
+    session: Session,
+    conversationId: string,
+    identityId: string,
+  ): Promise<void> {
+    await this.rosterChange(session, conversationId, (member) =>
+      member.control.promote(conversationId, IdentityId.normalize(identityId)),
+    );
+  }
+
+  /** Removes a member from the roster, and its leaves in the same commit. */
+  public async removeMember(
+    session: Session,
+    conversationId: string,
+    identityId: string,
+  ): Promise<void> {
+    await this.rosterChange(session, conversationId, (member) =>
+      member.control.removeMember(
+        conversationId,
+        IdentityId.normalize(identityId),
+      ),
+    );
   }
 
   /** Queues an edit of this identity's message. Rejects like send. */
@@ -473,11 +648,11 @@ export class GroupConversationMailbox {
   }
 
   /**
-   * Reads every inbox of the conversation once, then reads the roster and
-   * reconciles it in the background. Resolves whether this identity has
-   * left the roster, a roster that cannot be read counting as staying, and
-   * whether this device still awaits the group's confirmation. Rejects
-   * when the inboxes cannot be read.
+   * Reads every inbox of the conversation once, then reconciles the MLS
+   * group with its roster in the background. Resolves whether this identity
+   * is off the roster, or holds no group for the conversation, and whether
+   * this device still awaits the group's confirmation. Rejects when the
+   * inboxes cannot be read.
    */
   public async sync(
     session: Session,
@@ -490,14 +665,12 @@ export class GroupConversationMailbox {
         apply(this.timeline.changes(session, records)),
       ),
     );
-    const roster = await this.ports
-      .roster(session, conversationId)
-      .catch(() => undefined);
+    const roster = await this.member(session).engine.roster(conversationId);
 
-    void this.membersChanged(session, conversationId, roster);
+    void this.membersChanged(session, conversationId);
 
     return {
-      removed: roster?.has(session.identity.id) === false,
+      removed: !roster?.has(session.identity.id),
       unconfirmed:
         await this.member(session).engine.awaitsConfirmation(conversationId),
     };

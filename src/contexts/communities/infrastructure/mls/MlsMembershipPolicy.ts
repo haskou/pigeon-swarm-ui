@@ -1,3 +1,5 @@
+import type { MlsContextExtension } from './MlsContextExtension';
+
 /** A commit's effect on membership, by identity. */
 export interface MlsMembershipChange {
   /** The identity whose leaf made the commit. */
@@ -6,14 +8,25 @@ export interface MlsMembershipChange {
   readonly committerDevice: string;
   readonly added: readonly string[];
   readonly removed: readonly string[];
+  /** The GroupContext extensions of the epoch the commit applies to. */
+  readonly context: readonly MlsContextExtension[];
+  /** The identity of each leaf in the tree the commit applies to. */
+  readonly holders: readonly string[];
+  /**
+   * The GroupContext extensions its GroupContextExtensions proposal sets;
+   * undefined when it has none.
+   */
+  readonly proposedContext?: readonly MlsContextExtension[];
 }
 
 /**
  * Who may hold a leaf and who may change membership. It must be answered
- * from the roster the node keeps, never from the MLS tree itself, at the
- * roster revision (`MlsRosterFrontier`) a commit or welcome binds: a commit
- * made while its committer was allowed stays allowed in whatever order a
- * member learns of later roster changes.
+ * from a roster, never from the MLS tree itself. A community answers from
+ * the roster the node keeps, at the roster revision (`MlsRosterFrontier`) a
+ * commit or welcome binds: a commit made while its committer was allowed
+ * stays allowed in whatever order a member learns of later roster changes.
+ * A group conversation answers from the roster its GroupContext carries
+ * (`MlsMembershipChange.context`), which every member holds alike.
  */
 export interface MlsMembershipPolicy {
   /** The roster revision this device's commits and welcomes bind. */

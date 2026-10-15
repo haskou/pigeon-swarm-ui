@@ -1,11 +1,13 @@
 import { mock } from 'jest-mock-extended';
 
 import type { NotificationUseCases } from '../../../../app/composition/notifications/NotificationUseCases';
+import type { GroupConversationMailbox } from '../../../../contexts/groupMailboxes/infrastructure/GroupConversationMailbox';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { PushNotificationServerFinder } from '../../../../contexts/notifications/application/find-push-notification-server/PushNotificationServerFinder';
 import type { PushSubscriptionRegistrar } from '../../../../contexts/notifications/application/register-push-subscription/PushSubscriptionRegistrar';
 import type { PushSubscriptionRemover } from '../../../../contexts/notifications/application/remove-push-subscription/PushSubscriptionRemover';
 import type { NotificationsSearcher } from '../../../../contexts/notifications/application/search-notifications/NotificationsSearcher';
+import type { GroupConversationInvitationNotificationResource } from '../../../../contexts/notifications/infrastructure/http/resources/GroupConversationInvitationNotificationResource';
 import type { NotificationResource } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationResource';
 
 import { PigeonNotificationsFacade } from '../../../../app/composition/notifications/PigeonNotificationsFacade';
@@ -14,25 +16,43 @@ import { NotificationAccessContexts } from '../../../../contexts/notifications/i
 import { NotificationMapper } from '../../../../contexts/notifications/infrastructure/http/NotificationMapper';
 import { NotificationSettingMapper } from '../../../../contexts/notifications/infrastructure/http/NotificationSettingMapper';
 
-function invitation(
-  id: string,
-  type: 'conversation_invitation' | 'group_conversation_invitation',
-): NotificationResource {
-  return {
-    id,
-    payload: {
-      conversationId: 'conversation-1',
-      encryptedConversationKey: 'sealed',
-      inviterIdentityId: 'identity-2',
-      nonce: 'nonce-1',
-      recipientIdentityId: 'identity-1',
-    },
+type GroupInvitations = Pick<
+  GroupConversationMailbox,
+  'acceptInvitation' | 'declineInvitation' | 'invitations'
+>;
+
+const session = { identity: { id: 'identity-1' } } as unknown as Session;
+
+const directInvitation = (id: string): NotificationResource => ({
+  id,
+  payload: {
+    conversationId: 'conversation-1',
+    encryptedConversationKey: 'sealed',
+    inviterIdentityId: 'identity-2',
+    nonce: 'nonce-1',
     recipientIdentityId: 'identity-1',
-    state: 'pending',
-    status: 'unread',
-    type,
-  };
-}
+  },
+  recipientIdentityId: 'identity-1',
+  state: 'pending',
+  status: 'unread',
+  type: 'conversation_invitation',
+});
+
+const groupLetter = (
+  id: string,
+): GroupConversationInvitationNotificationResource => ({
+  id,
+  payload: {
+    encryptedConversationKey: 'sealed',
+    inviterIdentityId: 'identity-2',
+    nonce: 'nonce-1',
+    recipientIdentityId: 'identity-1',
+  },
+  recipientIdentityId: 'identity-1',
+  state: 'pending',
+  status: 'unread',
+  type: 'group_conversation_invitation',
+});
 
 describe(PigeonNotificationsFacade.name, () => {
   it('routes browser subscriptions through application use cases', async () => {
@@ -46,10 +66,8 @@ describe(PigeonNotificationsFacade.name, () => {
       new NotificationMapper(),
       new NotificationSettingMapper(),
       useCases,
+      mock<GroupInvitations>(),
     );
-    const session = {
-      identity: { id: 'identity-1' },
-    } as unknown as Session;
     const subscription = {
       endpoint: 'https://push.example/1',
       expirationTime: null,
@@ -87,6 +105,7 @@ describe(PigeonNotificationsFacade.name, () => {
       new NotificationMapper(),
       new NotificationSettingMapper(),
       useCases,
+      mock<GroupInvitations>(),
     );
 
     await expect(facade.getPushVapidPublicKey()).resolves.toEqual({
@@ -95,44 +114,80 @@ describe(PigeonNotificationsFacade.name, () => {
     });
   });
 
-  it('keeps group control letters out of the listed notifications', async () => {
+  it('lists only the group letters waiting for the user to answer', async () => {
     const useCases = mock<NotificationUseCases>();
     const searcher = mock<NotificationsSearcher>();
     const mapper = new NotificationMapper();
+    const groups = mock<GroupInvitations>();
     useCases.notificationSearcher = searcher;
     searcher.search.mockResolvedValue([
-      mapper.fromResource(invitation('direct', 'conversation_invitation')),
-      mapper.fromResource(
-        invitation('control', 'group_conversation_invitation'),
-      ),
+      mapper.fromResource(directInvitation('direct')),
+      mapper.fromResource(groupLetter('control')),
+      mapper.fromResource(groupLetter('waiting')),
+    ]);
+    groups.invitations.mockReturnValue([
+      {
+        conversationId: 'group:a',
+        inviterIdentityId: 'identity-2',
+        notificationId: 'waiting',
+        sentAt: 1,
+      },
     ]);
     const facade = new PigeonNotificationsFacade(
       new NotificationAccessContexts(),
       mapper,
       new NotificationSettingMapper(),
       useCases,
+      groups,
     );
 
-    const listed = await facade.list({
-      identity: { id: 'identity-1' },
-    } as unknown as Session);
+    const listed = await facade.list(session);
 
-    expect(listed.map(({ id }) => id)).toEqual(['direct']);
+    expect(listed.map(({ id }) => id)).toEqual(['direct', 'waiting']);
   });
 
-  it('refuses to accept a group control letter as an invitation', async () => {
+  it('refuses to accept a group control letter as a one-to-one invitation', async () => {
     const facade = new PigeonNotificationsFacade(
       new NotificationAccessContexts(),
       new NotificationMapper(),
       new NotificationSettingMapper(),
       mock<NotificationUseCases>(),
+      mock<GroupInvitations>(),
     );
 
     await expect(
-      facade.acceptConversationInvitation(
-        { identity: { id: 'identity-1' } } as unknown as Session,
-        invitation('control', 'group_conversation_invitation'),
-      ),
+      facade.acceptConversationInvitation(session, groupLetter('control')),
     ).rejects.toThrow('Only one-to-one invitations carry a key to accept.');
   });
+
+  it.each([
+    ['accepts', 'acceptInvitation', 'accepted'],
+    ['declines', 'declineInvitation', 'declined'],
+  ] as const)(
+    '%s a waiting group invitation through the group mailboxes',
+    async (_name, method, state) => {
+      const groups = mock<GroupInvitations>();
+      const facade = new PigeonNotificationsFacade(
+        new NotificationAccessContexts(),
+        new NotificationMapper(),
+        new NotificationSettingMapper(),
+        mock<NotificationUseCases>(),
+        groups,
+      );
+      const letter = groupLetter('waiting');
+      const answer = (): Promise<unknown> =>
+        method === 'acceptInvitation'
+          ? facade.acceptGroupInvitation(session, letter)
+          : facade.declineGroupInvitation(session, letter);
+
+      groups[method].mockResolvedValue(true);
+      await expect(answer()).resolves.toEqual({ ...letter, state });
+      expect(groups[method]).toHaveBeenCalledWith(session, 'waiting');
+
+      groups[method].mockResolvedValue(false);
+      await expect(answer()).rejects.toThrow(
+        'The group invitation is no longer waiting.',
+      );
+    },
+  );
 });

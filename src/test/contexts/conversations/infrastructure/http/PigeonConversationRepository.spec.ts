@@ -3,8 +3,6 @@ import { mock, type MockProxy } from 'jest-mock-extended';
 import type { PigeonConversationsGateway } from '../../../../../contexts/conversations/infrastructure/http/PigeonConversationsGateway';
 
 import { Conversation } from '../../../../../contexts/conversations/domain/Conversation';
-import { ConversationNotFoundError } from '../../../../../contexts/conversations/domain/errors/ConversationNotFoundError';
-import { ConversationId } from '../../../../../contexts/conversations/domain/value-objects/ConversationId';
 import { ConversationParticipantId } from '../../../../../contexts/conversations/domain/value-objects/ConversationParticipantId';
 import { ConversationAccessContexts } from '../../../../../contexts/conversations/infrastructure/http/ConversationAccessContexts';
 import { ConversationMapper } from '../../../../../contexts/conversations/infrastructure/http/ConversationMapper';
@@ -96,16 +94,5 @@ describe(PigeonConversationRepository.name, () => {
     );
 
     expect(conversation?.toPrimitives().latestMessageAt).toBeUndefined();
-  });
-
-  it('fails explicitly when a conversation cannot be found', async () => {
-    gateway.listConversations.mockResolvedValue([]);
-
-    await expect(
-      repository.find(
-        ConversationId.fromString('one-to-one:missing'),
-        ConversationParticipantId.fromString('identity-a'),
-      ),
-    ).rejects.toThrow(ConversationNotFoundError);
   });
 });

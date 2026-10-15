@@ -1,13 +1,14 @@
 import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
 
 import type { Session } from '../../../identities/infrastructure/session/Session';
-import type { ConversationInvitationNotificationResource } from '../../../notifications/infrastructure/http/resources/ConversationInvitationNotificationResource';
+import type { GroupConversationInvitationNotificationResource } from '../../../notifications/infrastructure/http/resources/GroupConversationInvitationNotificationResource';
 import type { NotificationResource } from '../../../notifications/infrastructure/http/resources/NotificationResource';
 import type { GroupMailboxControl } from './GroupMailboxControl';
 import type { GroupMailboxControlFields } from './GroupMailboxControlFields';
 import type { GroupMailboxControlOutcome } from './GroupMailboxControlOutcome';
 import type { GroupMailboxHandledLetter } from './GroupMailboxHandledLetter';
 import type { GroupMailboxHandledLetters } from './GroupMailboxHandledLetters';
+import type { GroupMailboxInvitation } from './GroupMailboxInvitation';
 import type { GroupMailboxLetterState } from './GroupMailboxLetterState';
 import type { GroupMailboxNotificationInbox } from './GroupMailboxNotificationInbox';
 import type { GroupMailboxNotificationLetter } from './GroupMailboxNotificationLetter';
@@ -24,11 +25,11 @@ import { GroupMailboxControlSeal } from './GroupMailboxControlSeal';
  * stops serving it. Notification ids are hashes, so pages are not
  * chronological and a run reads them all.
  *
- * A letter that does not open, verify or decode, names another conversation,
- * carries no request, response or welcome, or is not timely is declined
- * without being handed over. Timely is `ANSWER_WINDOW_MS` either side of its
- * send time for a key package request or response, and from
- * `WELCOME_WINDOW_MS` before now to `ANSWER_WINDOW_MS` after for a welcome.
+ * A letter that does not open, verify or decode, whose record names another
+ * conversation than its seal, carries no request, response or welcome, or is
+ * not timely is declined without being handed over. Timely is from
+ * `LETTER_WINDOW_MS` before now to `ANSWER_WINDOW_MS` after. The node never
+ * learns the conversation: it travels only inside the seal.
  *
  * Every other letter is keyed from inside the seal
  * (`GroupMailboxNotificationLetter.key`) in `GroupMailboxHandledLetters`,
@@ -37,10 +38,13 @@ import { GroupMailboxControlSeal } from './GroupMailboxControlSeal';
  * answers a letter at most once. A letter the control applied is accepted,
  * one it rejected is declined, and the decision is kept with the key until
  * the letter's window ends; one it ignored (for another device or session)
- * gives the key back and stays pending. A letter whose key this device holds
- * under another notification is a replay and is declined; under the same
- * one, a decided state is signed again, as when signing failed. A handling
- * that throws gives the key back and is retried on the next run; a reload or
+ * gives the key back and stays pending. A request the control deferred, from
+ * an identity that is not a contact, gives the key back too and is listed in
+ * `invitations` until the user accepts it (`accept`, answered as consented)
+ * or declines it (`decline`). A letter whose key this device holds under
+ * another notification is a replay and is declined; under the same one, a
+ * decided state is signed again, as when signing failed. A handling that
+ * throws gives the key back and is retried on the next run; a reload or
  * crash in between leaves the claim held until its lease ends, so a request
  * or response is then declined as stale rather than answered twice, and a
  * welcome is retried. A run resolves with the conversations a welcome joined
@@ -48,18 +52,36 @@ import { GroupMailboxControlSeal } from './GroupMailboxControlSeal';
  */
 export class GroupMailboxNotificationPump {
   private static readonly STATES: Record<
-    Exclude<GroupMailboxControlOutcome, 'ignored'>,
+    Exclude<GroupMailboxControlOutcome, 'deferred' | 'ignored'>,
     GroupMailboxLetterState
   > = { applied: 'accepted', rejected: 'declined' };
 
+  /** How far ahead a letter may be dated, and how long a welcome is claimed. */
   public static readonly ANSWER_WINDOW_MS = 5 * 60_000;
+  /** How old a letter may be and still be handed over to the control. */
+  public static readonly LETTER_WINDOW_MS = 30 * 24 * 60 * 60_000;
   /** Pages one run reads at most, so a node cannot keep it reading. */
   public static readonly MAX_PAGES = 200;
   public static readonly PAGE_SIZE = 100;
-  /** How old a welcome may be and still be handed over to the engine. */
-  public static readonly WELCOME_WINDOW_MS = 30 * 24 * 60 * 60_000;
 
   private again = false;
+  /** The deferred requests, by notification id, as the last run left them. */
+  private deferred = new Map<
+    string,
+    {
+      invitation: GroupMailboxInvitation;
+      letter: GroupMailboxNotificationLetter;
+    }
+  >();
+
+  private found = new Map<
+    string,
+    {
+      invitation: GroupMailboxInvitation;
+      letter: GroupMailboxNotificationLetter;
+    }
+  >();
+
   private joined = new Set<string>();
   private running: Promise<ReadonlySet<string>> | undefined;
 
@@ -103,9 +125,45 @@ export class GroupMailboxNotificationPump {
   }
 
   /**
+   * Claims `letter`, hands it to the control, and signs the state decided;
+   * gives the key back when the handling throws, or when the letter is not
+   * for this device or session or waits for the user. Resolves with the
+   * outcome, undefined when another session holds the claim.
+   */
+  private async decided(
+    notificationId: string,
+    letter: GroupMailboxNotificationLetter,
+    consented: boolean,
+  ): Promise<GroupMailboxControlOutcome | undefined> {
+    if (!(await this.letters.claim(letter.key, notificationId, letter.lease))) {
+      return undefined;
+    }
+    let outcome: GroupMailboxControlOutcome;
+
+    try {
+      outcome = await this.control.receiveDirect(
+        letter.sender,
+        letter.plaintext,
+        consented,
+      );
+    } catch (error: unknown) {
+      await this.letters.release(letter.key);
+      throw error;
+    }
+
+    if (outcome === 'ignored' || outcome === 'deferred') {
+      await this.letters.release(letter.key);
+
+      return outcome;
+    }
+    await this.settle(notificationId, letter, outcome);
+
+    return outcome;
+  }
+
+  /**
    * Hands `letter` to the control unless this device holds its key, and
-   * signs the state it decided; gives the key back when the handling throws
-   * or the letter is not for this device or session.
+   * lists it among the invitations when the control defers it.
    */
   private async hand(
     notificationId: string,
@@ -119,38 +177,17 @@ export class GroupMailboxNotificationPump {
       return;
     }
 
-    if (!(await this.letters.claim(letter.key, notificationId, letter.lease))) {
-      return;
+    if ((await this.decided(notificationId, letter, false)) === 'deferred') {
+      this.found.set(notificationId, {
+        invitation: {
+          conversationId: letter.conversationId,
+          inviterIdentityId: letter.sender,
+          notificationId,
+          sentAt: letter.sentAt,
+        },
+        letter,
+      });
     }
-    let outcome: GroupMailboxControlOutcome;
-
-    try {
-      outcome = await this.control.receiveDirect(
-        letter.sender,
-        letter.plaintext,
-      );
-    } catch (error: unknown) {
-      await this.letters.release(letter.key);
-      throw error;
-    }
-
-    if (outcome === 'ignored') {
-      await this.letters.release(letter.key);
-
-      return;
-    }
-    const state = GroupMailboxNotificationPump.STATES[outcome];
-
-    await this.letters.decide(letter.key, {
-      notificationId,
-      state,
-      until: letter.until,
-    });
-
-    if (outcome === 'applied' && letter.welcome) {
-      this.joined.add(letter.conversationId);
-    }
-    await this.notifications.update(this.session, notificationId, state);
   }
 
   /** Decides one pending group control letter; resolves 1 when it failed. */
@@ -183,37 +220,34 @@ export class GroupMailboxNotificationPump {
 
   /** The letter `notification` carries, if it is valid and timely. */
   private letterOf(
-    notification: ConversationInvitationNotificationResource,
+    notification: GroupConversationInvitationNotificationResource,
   ): GroupMailboxNotificationLetter | undefined {
-    const { conversationId, encryptedConversationKey, inviterIdentityId } =
+    const { encryptedConversationKey, inviterIdentityId } =
       notification.payload;
     const opened = GroupMailboxControlSeal.open(
       this.session,
       encryptedConversationKey,
-      { conversationId, senderIdentityId: inviterIdentityId },
+      inviterIdentityId,
     );
 
     if (!opened) return undefined;
+    const { conversationId, sentAt } = opened;
     const record = GroupMailboxControlRecord.decode(opened.plaintext);
 
     if (record?.conversationId !== conversationId) return undefined;
     const refs = GroupMailboxNotificationPump.refsOf(record);
-    const welcome = record.type === 'welcome';
-    const horizon = welcome
-      ? GroupMailboxNotificationPump.WELCOME_WINDOW_MS
-      : GroupMailboxNotificationPump.ANSWER_WINDOW_MS;
     const now = this.now();
-    const { sentAt } = opened;
 
     if (
       !refs ||
-      sentAt < now - horizon ||
+      sentAt < now - GroupMailboxNotificationPump.LETTER_WINDOW_MS ||
       sentAt > now + GroupMailboxNotificationPump.ANSWER_WINDOW_MS
     ) {
       return undefined;
     }
     const sender = IdentityId.normalize(inviterIdentityId);
-    const until = sentAt + horizon;
+    const until = sentAt + GroupMailboxNotificationPump.LETTER_WINDOW_MS;
+    const welcome = record.type === 'welcome';
 
     return {
       conversationId,
@@ -223,6 +257,7 @@ export class GroupMailboxNotificationPump {
         : until,
       plaintext: opened.plaintext,
       sender,
+      sentAt,
       until,
       welcome,
     };
@@ -247,7 +282,7 @@ export class GroupMailboxNotificationPump {
 
   /** Like `letterOf`, for a notification the node may have malformed. */
   private safeLetterOf(
-    notification: ConversationInvitationNotificationResource,
+    notification: GroupConversationInvitationNotificationResource,
   ): GroupMailboxNotificationLetter | undefined {
     try {
       return this.letterOf(notification);
@@ -257,6 +292,7 @@ export class GroupMailboxNotificationPump {
   }
 
   private async scan(): Promise<void> {
+    this.found = new Map();
     const size = GroupMailboxNotificationPump.PAGE_SIZE;
     let before: string | undefined;
     let failed = 0;
@@ -284,10 +320,76 @@ export class GroupMailboxNotificationPump {
       pages < GroupMailboxNotificationPump.MAX_PAGES
     );
 
+    this.deferred = this.found;
+
     if (failed > 0) {
       // eslint-disable-next-line no-console
       console.debug(`Group control letters left for retry: ${failed}.`);
     }
+  }
+
+  /** Keeps the decision for `letter` and signs it. */
+  private async settle(
+    notificationId: string,
+    letter: GroupMailboxNotificationLetter,
+    outcome: Exclude<GroupMailboxControlOutcome, 'deferred' | 'ignored'>,
+  ): Promise<void> {
+    const state = GroupMailboxNotificationPump.STATES[outcome];
+
+    await this.letters.decide(letter.key, {
+      notificationId,
+      state,
+      until: letter.until,
+    });
+
+    if (outcome === 'applied' && letter.welcome) {
+      this.joined.add(letter.conversationId);
+    }
+    await this.notifications.update(this.session, notificationId, state);
+  }
+
+  /**
+   * Answers a deferred request the user accepted; resolves false when it
+   * is no longer listed, or another session is handling it. Rejects when
+   * the control cannot answer it now, the request staying listed.
+   */
+  public async accept(notificationId: string): Promise<boolean> {
+    const letter = this.deferred.get(notificationId)?.letter;
+
+    if (!letter) return false;
+    const outcome = await this.decided(notificationId, letter, true);
+
+    if (outcome === undefined) return false;
+
+    if (outcome === 'ignored' || outcome === 'deferred') {
+      throw new Error('The invitation cannot be answered now');
+    }
+    this.deferred.delete(notificationId);
+
+    return outcome === 'applied';
+  }
+
+  /** Declines a deferred request; false when it is no longer listed. */
+  public async decline(notificationId: string): Promise<boolean> {
+    const letter = this.deferred.get(notificationId)?.letter;
+
+    if (
+      !letter ||
+      !(await this.letters.claim(letter.key, notificationId, letter.lease))
+    ) {
+      return false;
+    }
+    await this.settle(notificationId, letter, 'rejected');
+    this.deferred.delete(notificationId);
+
+    return true;
+  }
+
+  /** The deferred requests the last run found, oldest first. */
+  public invitations(): GroupMailboxInvitation[] {
+    return [...this.deferred.values()]
+      .map(({ invitation }) => invitation)
+      .sort((left, right) => left.sentAt - right.sentAt);
   }
 
   /**

@@ -2,15 +2,11 @@ import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
 
 import type { SignedPublicMutation } from '../../../../shared/infrastructure/crypto/SignedPublicMutation';
 import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { NotificationInvitationInput } from './NotificationInvitationInput';
 
 import { canonicalJson } from '../../../../shared/infrastructure/crypto/canonicalJson';
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
-
-export type NotificationInvitationType =
-  | 'community_invitation'
-  | 'conversation_invitation'
-  | 'group_conversation_invitation';
 
 export interface SignedNotificationInvitation {
   inviterIdentityId: string;
@@ -38,10 +34,14 @@ export class NotificationMutationSigner {
     );
   }
 
+  /**
+   * The invitation's record id; a group control letter's names no subject
+   * (`NotificationInvitationInput`).
+   */
   public invitationId(
     inviterIdentityId: string,
     recipientIdentityId: string,
-    subjectId: string,
+    subjectId: string | undefined,
     nonce: string,
   ): string {
     return `invitation:${SHA256Hash.from(
@@ -49,27 +49,26 @@ export class NotificationMutationSigner {
         inviterIdentityId,
         nonce,
         recipientIdentityId,
-        subjectId,
+        ...(subjectId === undefined ? {} : { subjectId }),
       }),
     ).toString()}`;
   }
 
   public async invitation(
     session: Session,
-    input: {
-      encryptedKey?: string;
-      recipientIdentityId: string;
-      subjectId: string;
-      type: NotificationInvitationType;
-    },
+    input: NotificationInvitationInput,
   ): Promise<SignedNotificationInvitation> {
     const inviterIdentityId = this.mutations.authorOf(session);
     const recipientIdentityId = IdentityId.normalize(input.recipientIdentityId);
     const nonce = this.nonce();
+    const subjectId =
+      input.type === 'group_conversation_invitation'
+        ? undefined
+        : input.subjectId;
     const notificationId = this.invitationId(
       inviterIdentityId,
       recipientIdentityId,
-      input.subjectId,
+      subjectId,
       nonce,
     );
     const mutation = await this.mutations.sign(
@@ -85,7 +84,7 @@ export class NotificationMutationSigner {
           nonce,
           recipientIdentityId,
           scopeType: 'notification_invitation',
-          subjectId: input.subjectId,
+          ...(subjectId === undefined ? {} : { subjectId }),
           type: input.type,
         },
         recordId: notificationId,

@@ -1,220 +1,444 @@
+import type { GroupMailboxRosterChange } from '../../../../contexts/groupMailboxes/domain/GroupMailboxRosterChange';
+import type { GroupMailboxRosterFields } from '../../../../contexts/groupMailboxes/domain/GroupMailboxRosterFields';
+
 import { GroupMailboxRoster } from '../../../../contexts/groupMailboxes/domain/GroupMailboxRoster';
 
-const managed = GroupMailboxRoster.of({
+const CONVERSATION_ID = `group:${'A'.repeat(43)}`;
+
+const fields = (
+  change: Partial<GroupMailboxRosterFields> = {},
+): GroupMailboxRosterFields => ({
   adminIds: ['admin', 'gone-admin'],
+  conversationId: CONVERSATION_ID,
   creatorId: 'creator',
-  participantIds: ['admin', 'creator', 'member', 'other'],
+  memberIds: ['admin', 'creator', 'gone-admin', 'member', 'other'],
+  name: 'Team',
+  version: GroupMailboxRoster.VERSION,
+  ...change,
 });
 
-const unmanaged = GroupMailboxRoster.of({
-  adminIds: [],
-  participantIds: ['member', 'other'],
-});
+const rosterOf = (
+  change: Partial<GroupMailboxRosterFields> = {},
+): GroupMailboxRoster => {
+  const roster = GroupMailboxRoster.of(fields(change));
 
-/** A commit's rank against its same-epoch rivals in the managed roster. */
-const rankOf = (committer: string, removed: string[] = []): number =>
-  managed.priorityOf({ committer, removed });
+  if (!roster) throw new Error('Invalid roster fixture');
+
+  return roster;
+};
+
+const roster = rosterOf();
+
+const commit = (
+  committer: string,
+  change: Partial<Omit<GroupMailboxRosterChange, 'committer'>> = {},
+): GroupMailboxRosterChange => ({
+  added: [],
+  committer,
+  holders: ['admin', 'creator', 'member', 'member', 'other'],
+  removed: [],
+  ...change,
+});
 
 describe('GroupMailboxRoster', () => {
-  it('lets the creator and an admin add a roster member', () => {
-    for (const committer of ['creator', 'admin']) {
+  describe('of', () => {
+    it('accepts a well-formed roster and sorts its lists', () => {
       expect(
-        managed.allowsCommit({ added: ['other'], committer, removed: [] }),
+        rosterOf({
+          memberIds: ['other', 'creator', 'member'],
+          adminIds: [],
+        }).toFields().memberIds,
+      ).toEqual(['creator', 'member', 'other']);
+    });
+
+    it.each<[string, Partial<GroupMailboxRosterFields>]>([
+      ['another version', { version: 2 }],
+      ['a malformed conversation id', { conversationId: 'group:abc' }],
+      [
+        'a direct conversation id',
+        { conversationId: `direct:${'A'.repeat(43)}` },
+      ],
+      ['an empty name', { name: '' }],
+      ['an untrimmed name', { name: ' Team' }],
+      ['a name too long', { name: 'x'.repeat(10_000) }],
+      [
+        'a repeated member',
+        { memberIds: ['creator', 'creator'], adminIds: [] },
+      ],
+      ['an untrimmed identity', { memberIds: ['creator', ' x'], adminIds: [] }],
+      [
+        'an identity too long',
+        { memberIds: ['creator', 'x'.repeat(1025)], adminIds: [] },
+      ],
+      ['a creator off the members', { creatorId: 'stranger' }],
+      ['a creator among the admins', { adminIds: ['creator'] }],
+      ['an admin off the members', { adminIds: ['stranger'] }],
+      [
+        'more members than the node allows',
+        {
+          adminIds: [],
+          memberIds: [
+            'creator',
+            ...Array.from(
+              { length: GroupMailboxRoster.MAX_PARTICIPANTS },
+              (_, index) => `member-${index}`,
+            ),
+          ],
+        },
+      ],
+    ])('rejects %s', (_, change) => {
+      expect(GroupMailboxRoster.of(fields(change))).toBeUndefined();
+    });
+
+    it('holds exactly the node limit of members', () => {
+      expect(
+        GroupMailboxRoster.of(
+          fields({
+            adminIds: [],
+            memberIds: [
+              'creator',
+              ...Array.from(
+                { length: GroupMailboxRoster.MAX_PARTICIPANTS - 1 },
+                (_, index) => `member-${index}`,
+              ),
+            ],
+          }),
+        ),
+      ).toBeDefined();
+    });
+  });
+
+  describe('operations', () => {
+    it('refuses to add a member twice, or to remove, promote or demote one it does not hold', () => {
+      expect(roster.withMember('member')).toBeUndefined();
+      expect(roster.withoutMember('stranger')).toBeUndefined();
+      expect(roster.promoted('admin')).toBeUndefined();
+      expect(roster.promoted('stranger')).toBeUndefined();
+      expect(roster.demoted('member')).toBeUndefined();
+      expect(roster.withoutMember('creator')).toBeUndefined();
+    });
+
+    it('drops a removed admin from the admins', () => {
+      expect(roster.withoutMember('admin')?.adminIds()).toEqual(['gone-admin']);
+    });
+  });
+
+  describe('allowsCommit without a roster change', () => {
+    it('lets any member rotate its own leaf or change its own devices', () => {
+      expect(roster.allowsCommit(commit('member'))).toBe(true);
+      expect(
+        roster.allowsCommit(
+          commit('member', { added: ['member'], removed: ['member'] }),
+        ),
       ).toBe(true);
-    }
+    });
+
+    it('lets a manager add leaves of members, or remove those of strays', () => {
+      expect(
+        roster.allowsCommit(commit('admin', { added: ['other', 'admin'] })),
+      ).toBe(true);
+      expect(roster.allowsCommit(commit('admin', { removed: ['stray'] }))).toBe(
+        true,
+      );
+    });
+
+    it('rejects any added leaf while an identity off the roster holds one, as it would learn of it', () => {
+      const holders = ['admin', 'creator', 'member', 'stray'];
+      const joined = roster.withMember('newcomer') as GroupMailboxRoster;
+
+      expect(
+        roster.allowsCommit(commit('admin', { added: ['other'], holders })),
+      ).toBe(false);
+      expect(
+        roster.allowsCommit(
+          commit('admin', { added: ['admin'], holders, removed: ['stray'] }),
+        ),
+      ).toBe(false);
+      expect(
+        roster.allowsCommit(commit('member', { added: ['member'], holders })),
+      ).toBe(false);
+      expect(
+        roster.allowsCommit(
+          commit('admin', { added: ['newcomer'], holders }),
+          joined,
+        ),
+      ).toBe(false);
+      expect(
+        roster.allowsCommit(commit('admin', { holders, removed: ['stray'] })),
+      ).toBe(true);
+    });
+
+    it('rejects a member who is no manager touching another identity', () => {
+      expect(roster.allowsCommit(commit('member', { added: ['other'] }))).toBe(
+        false,
+      );
+      expect(
+        roster.allowsCommit(commit('member', { removed: ['stray'] })),
+      ).toBe(false);
+    });
+
+    it('rejects removing a member without the roster change', () => {
+      expect(
+        roster.allowsCommit(commit('creator', { removed: ['member'] })),
+      ).toBe(false);
+    });
+
+    it('rejects adding a leaf of an identity off the roster', () => {
+      expect(
+        roster.allowsCommit(commit('creator', { added: ['stranger'] })),
+      ).toBe(false);
+    });
+
+    it('rejects any commit by an identity off the roster', () => {
+      expect(roster.allowsCommit(commit('stranger'))).toBe(false);
+    });
   });
 
-  it('rejects an add by a member who is not an admin', () => {
-    expect(
-      managed.allowsCommit({
-        added: ['other'],
-        committer: 'member',
-        removed: [],
-      }),
-    ).toBe(false);
+  describe('allowsCommit with a roster change', () => {
+    const added = roster.withMember('newcomer') as GroupMailboxRoster;
+
+    it('lets a manager add one member with its leaves', () => {
+      expect(
+        roster.allowsCommit(commit('admin', { added: ['newcomer'] }), added),
+      ).toBe(true);
+      expect(roster.allowsCommit(commit('creator'), added)).toBe(true);
+    });
+
+    it('rejects an add by a member who is no manager', () => {
+      expect(
+        roster.allowsCommit(commit('member', { added: ['newcomer'] }), added),
+      ).toBe(false);
+    });
+
+    it('rejects an add that also adds or removes another leaf', () => {
+      expect(
+        roster.allowsCommit(
+          commit('admin', { added: ['newcomer', 'other'] }),
+          added,
+        ),
+      ).toBe(false);
+      expect(
+        roster.allowsCommit(
+          commit('admin', { added: ['newcomer'], removed: ['stray'] }),
+          added,
+        ),
+      ).toBe(false);
+    });
+
+    it('rejects two members added at once', () => {
+      const two = added.withMember('second') as GroupMailboxRoster;
+
+      expect(roster.allowsCommit(commit('creator'), two)).toBe(false);
+    });
+
+    it('rejects an add that also promotes', () => {
+      const promoted = added.promoted('newcomer') as GroupMailboxRoster;
+
+      expect(roster.allowsCommit(commit('creator'), promoted)).toBe(false);
+    });
+
+    it('lets a manager remove a member with all its leaves', () => {
+      const removed = roster.withoutMember('member') as GroupMailboxRoster;
+
+      expect(
+        roster.allowsCommit(
+          commit('admin', { removed: ['member', 'member'] }),
+          removed,
+        ),
+      ).toBe(true);
+    });
+
+    it('rejects a removal that keeps one of the member leaves', () => {
+      const removed = roster.withoutMember('member') as GroupMailboxRoster;
+
+      expect(
+        roster.allowsCommit(commit('admin', { removed: ['member'] }), removed),
+      ).toBe(false);
+    });
+
+    it('rejects a removal or a leave that also adds a leaf, so the one dropped learns only the roster without itself', () => {
+      const removed = roster.withoutMember('member') as GroupMailboxRoster;
+
+      expect(
+        roster.allowsCommit(
+          commit('admin', { added: ['other'], removed: ['member', 'member'] }),
+          removed,
+        ),
+      ).toBe(false);
+      expect(
+        roster.allowsCommit(commit('member', { added: ['other'] }), removed),
+      ).toBe(false);
+      expect(
+        roster.allowsCommit(commit('member', { added: ['member'] }), removed),
+      ).toBe(false);
+    });
+
+    it('rejects a removal whose leaves do not match the member removed', () => {
+      const removed = roster.withoutMember('member') as GroupMailboxRoster;
+
+      expect(
+        roster.allowsCommit(
+          commit('admin', { removed: ['other', 'member'] }),
+          removed,
+        ),
+      ).toBe(false);
+      expect(
+        roster.allowsCommit(
+          commit('admin', {
+            added: ['other'],
+            removed: ['member', 'member'],
+          }),
+          removed,
+        ),
+      ).toBe(false);
+    });
+
+    it('rejects a removal by a member who is no manager', () => {
+      const removed = roster.withoutMember('other') as GroupMailboxRoster;
+
+      expect(
+        roster.allowsCommit(commit('member', { removed: ['other'] }), removed),
+      ).toBe(false);
+    });
+
+    it('lets only the creator remove an admin, and nobody the creator', () => {
+      const withoutAdmin = roster.withoutMember('admin') as GroupMailboxRoster;
+      const change = { removed: ['admin'] };
+
+      expect(roster.allowsCommit(commit('creator', change), withoutAdmin)).toBe(
+        true,
+      );
+      expect(
+        roster.allowsCommit(commit('gone-admin', change), withoutAdmin),
+      ).toBe(false);
+
+      const withoutCreator = GroupMailboxRoster.of({
+        ...roster.toFields(),
+        memberIds: roster.memberIds().filter((id) => id !== 'creator'),
+      });
+
+      expect(withoutCreator).toBeUndefined();
+    });
+
+    it('never holds an admin left among the admins once removed', () => {
+      expect(
+        GroupMailboxRoster.of({
+          ...roster.toFields(),
+          memberIds: roster.memberIds().filter((id) => id !== 'admin'),
+        }),
+      ).toBeUndefined();
+    });
+
+    it('lets a member leave, removing only its own leaves or strays', () => {
+      const left = roster.withoutMember('member') as GroupMailboxRoster;
+
+      expect(roster.allowsCommit(commit('member'), left)).toBe(true);
+      expect(
+        roster.allowsCommit(
+          commit('member', { removed: ['member', 'stray'] }),
+          left,
+        ),
+      ).toBe(true);
+      expect(
+        roster.allowsCommit(commit('member', { removed: ['other'] }), left),
+      ).toBe(false);
+    });
+
+    it('lets an admin leave, leaving the admins with it', () => {
+      expect(
+        roster.allowsCommit(
+          commit('admin'),
+          roster.withoutMember('admin') as GroupMailboxRoster,
+        ),
+      ).toBe(true);
+    });
+
+    it('never lets the creator leave', () => {
+      const left = GroupMailboxRoster.of({
+        ...roster.toFields(),
+        creatorId: 'admin',
+        adminIds: ['gone-admin'],
+        memberIds: roster.memberIds().filter((id) => id !== 'creator'),
+      }) as GroupMailboxRoster;
+
+      expect(roster.allowsCommit(commit('creator'), left)).toBe(false);
+    });
+
+    it('lets only the creator promote or demote', () => {
+      const promoted = roster.promoted('member') as GroupMailboxRoster;
+      const demoted = roster.demoted('admin') as GroupMailboxRoster;
+
+      expect(roster.allowsCommit(commit('creator'), promoted)).toBe(true);
+      expect(roster.allowsCommit(commit('creator'), demoted)).toBe(true);
+      expect(roster.allowsCommit(commit('admin'), promoted)).toBe(false);
+      expect(roster.allowsCommit(commit('admin'), demoted)).toBe(false);
+    });
+
+    it('rejects a promotion that removes a member leaf, even the committer own', () => {
+      const promoted = roster.promoted('member') as GroupMailboxRoster;
+
+      expect(
+        roster.allowsCommit(
+          commit('creator', { removed: ['stray'] }),
+          promoted,
+        ),
+      ).toBe(true);
+      expect(
+        roster.allowsCommit(
+          commit('creator', { removed: ['other'] }),
+          promoted,
+        ),
+      ).toBe(false);
+      expect(
+        roster.allowsCommit(
+          commit('creator', { removed: ['creator'] }),
+          promoted,
+        ),
+      ).toBe(false);
+      expect(
+        roster.allowsCommit(commit('creator', { added: ['other'] }), promoted),
+      ).toBe(false);
+    });
+
+    it('rejects two admin changes at once', () => {
+      const both = (roster.promoted('member') as GroupMailboxRoster).demoted(
+        'admin',
+      ) as GroupMailboxRoster;
+
+      expect(roster.allowsCommit(commit('creator'), both)).toBe(false);
+    });
+
+    it.each<[string, Partial<GroupMailboxRosterFields>]>([
+      ['a rename', { name: 'Renamed' }],
+      ['a creator change', { creatorId: 'admin', adminIds: ['gone-admin'] }],
+      ['another conversation', { conversationId: `group:${'B'.repeat(42)}A` }],
+    ])('rejects %s', (_, change) => {
+      expect(roster.allowsCommit(commit('creator'), rosterOf(change))).toBe(
+        false,
+      );
+    });
+
+    it('rejects a commit that changes nothing on the roster but claims to', () => {
+      expect(roster.allowsCommit(commit('creator'), rosterOf())).toBe(false);
+    });
   });
 
-  it('rejects an add of an identity off the roster', () => {
-    expect(
-      managed.allowsCommit({
-        added: ['outsider'],
-        committer: 'creator',
-        removed: [],
-      }),
-    ).toBe(false);
-  });
+  describe('committers and priority', () => {
+    it('names the managers among the leaf holders, sorted', () => {
+      expect(
+        roster.committers(['member', 'creator', 'admin', 'stray', 'admin']),
+      ).toEqual(['admin', 'creator']);
+    });
 
-  it('rejects a removal by a member who is not an admin', () => {
-    expect(
-      managed.allowsCommit({
-        added: [],
-        committer: 'member',
-        removed: ['other'],
-      }),
-    ).toBe(false);
-  });
-
-  it('lets an admin remove a member but not another admin', () => {
-    expect(
-      managed.allowsCommit({
-        added: [],
-        committer: 'admin',
-        removed: ['member'],
-      }),
-    ).toBe(true);
-    expect(
-      GroupMailboxRoster.of({
-        adminIds: ['admin', 'second'],
-        creatorId: 'creator',
-        participantIds: ['admin', 'creator', 'second'],
-      }).allowsCommit({ added: [], committer: 'admin', removed: ['second'] }),
-    ).toBe(false);
-  });
-
-  it('never lets anyone remove the creator', () => {
-    expect(
-      managed.allowsCommit({
-        added: [],
-        committer: 'admin',
-        removed: ['creator'],
-      }),
-    ).toBe(false);
-  });
-
-  it('lets the creator remove an admin', () => {
-    expect(
-      managed.allowsCommit({
-        added: [],
-        committer: 'creator',
-        removed: ['admin'],
-      }),
-    ).toBe(true);
-  });
-
-  it('lets any manager remove an identity already off the roster', () => {
-    expect(
-      managed.allowsCommit({
-        added: [],
-        committer: 'admin',
-        removed: ['outsider'],
-      }),
-    ).toBe(true);
-  });
-
-  it('rejects any commit by an identity off the roster', () => {
-    expect(
-      managed.allowsCommit({
-        added: [],
-        committer: 'outsider',
-        removed: [],
-      }),
-    ).toBe(false);
-  });
-
-  it('lets any member rotate their own leaf', () => {
-    expect(
-      managed.allowsCommit({ added: [], committer: 'member', removed: [] }),
-    ).toBe(true);
-  });
-
-  it('lets any member add or remove devices of its own identity', () => {
-    expect(
-      managed.allowsCommit({
-        added: ['member'],
-        committer: 'member',
-        removed: ['member'],
-      }),
-    ).toBe(true);
-    expect(
-      managed.allowsCommit({
-        added: [],
-        committer: 'creator',
-        removed: ['creator'],
-      }),
-    ).toBe(true);
-  });
-
-  it('rejects a commit that changes another identity next to its own devices', () => {
-    expect(
-      managed.allowsCommit({
-        added: ['member', 'other'],
-        committer: 'member',
-        removed: [],
-      }),
-    ).toBe(false);
-    expect(
-      managed.allowsCommit({
-        added: ['member'],
-        committer: 'outsider',
-        removed: [],
-      }),
-    ).toBe(false);
-  });
-
-  it('ignores an admin who left when naming the managers', () => {
-    expect(managed.committers(['gone-admin', 'member'])).toEqual([]);
-  });
-
-  it('lets every member manage a roster without creator or admins, but not remove a member', () => {
-    expect(
-      unmanaged.allowsCommit({
-        added: ['other'],
-        committer: 'member',
-        removed: [],
-      }),
-    ).toBe(true);
-    expect(
-      unmanaged.allowsCommit({
-        added: [],
-        committer: 'member',
-        removed: ['other'],
-      }),
-    ).toBe(false);
-  });
-
-  it('names the leaf holders who may change membership, sorted', () => {
-    expect(
-      managed.committers(['member', 'creator', 'admin', 'creator']),
-    ).toEqual(['admin', 'creator']);
-    expect(unmanaged.committers(['other', 'member', 'outsider'])).toEqual([
-      'member',
-      'other',
-    ]);
-  });
-
-  it('admits nobody when empty', () => {
-    expect(GroupMailboxRoster.empty().has('member')).toBe(false);
-    expect(
-      GroupMailboxRoster.empty().allowsCommit({
-        added: [],
-        committer: 'member',
-        removed: [],
-      }),
-    ).toBe(false);
-  });
-
-  it('ranks a removal above every commit of the member it removes, a removal of its own devices included', () => {
-    const removal = rankOf('admin', ['member']);
-
-    expect(removal).toBeGreaterThan(rankOf('member'));
-    expect(removal).toBeGreaterThan(rankOf('member', ['member']));
-  });
-
-  it('ranks a commit by the creator above one by an admin, a removal included', () => {
-    expect(rankOf('creator')).toBeGreaterThan(rankOf('admin'));
-    expect(rankOf('creator')).toBeGreaterThan(rankOf('admin', ['member']));
-  });
-
-  it('settles a mutual removal by who may remove whom', () => {
-    // Only the creator may remove an admin; nobody may remove the creator.
-    expect(rankOf('creator', ['admin'])).toBeGreaterThan(
-      rankOf('admin', ['creator']),
-    );
-  });
-
-  it('ranks alike, leaving the commit id to decide, commits that remove nobody else by anyone but the creator, and any two by the creator', () => {
-    expect(rankOf('admin')).toBe(rankOf('member'));
-    expect(rankOf('member', ['member'])).toBe(rankOf('other'));
-    expect(rankOf('creator', ['admin'])).toBe(rankOf('creator'));
+    it('ranks the creator first, then removals of others, then the rest', () => {
+      expect(roster.priorityOf({ committer: 'creator', removed: [] })).toBe(2);
+      expect(
+        roster.priorityOf({ committer: 'admin', removed: ['member'] }),
+      ).toBe(1);
+      expect(
+        roster.priorityOf({ committer: 'admin', removed: ['admin'] }),
+      ).toBe(0);
+      expect(roster.priorityOf({ committer: 'member', removed: [] })).toBe(0);
+    });
   });
 });

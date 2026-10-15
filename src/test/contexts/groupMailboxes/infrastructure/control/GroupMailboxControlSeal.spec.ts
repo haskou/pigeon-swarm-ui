@@ -30,16 +30,8 @@ const sealFor = (from: Person, to: Person): string =>
     sentAt: SENT_AT,
   });
 
-const openAs = (
-  to: Person,
-  sealed: string,
-  senderIdentityId: string,
-  conversationId = CONVERSATION,
-) =>
-  GroupMailboxControlSeal.open(to.session, sealed, {
-    conversationId,
-    senderIdentityId,
-  });
+const openAs = (to: Person, sealed: string, senderIdentityId: string) =>
+  GroupMailboxControlSeal.open(to.session, sealed, senderIdentityId);
 
 /** What `holder` reads inside `sealed`, changed and sealed to `to`. */
 const reseal = (
@@ -76,6 +68,7 @@ describe('GroupMailboxControlSeal', () => {
   it('opens a letter sealed to this identity by its sender', () => {
     const opened = openAs(bob, sealFor(alice, bob), alice.id);
 
+    expect(opened?.conversationId).toBe(CONVERSATION);
     expect(opened?.sentAt).toBe(SENT_AT);
     expect([...(opened?.plaintext ?? [])]).toEqual([...PLAINTEXT]);
   });
@@ -124,16 +117,14 @@ describe('GroupMailboxControlSeal', () => {
     expect(openAs(bob, sealFor(alice, bob), mallory.id)).toBeUndefined();
   });
 
-  it('opens nothing bound to another conversation', () => {
+  it('opens nothing whose conversation was altered', () => {
     const letter = sealFor(alice, bob);
 
-    expect(openAs(bob, letter, alice.id, 'group:other')).toBeUndefined();
     expect(
       openAs(
         bob,
         reseal(letter, bob, bob, { conversationId: 'group:other' }),
         alice.id,
-        'group:other',
       ),
     ).toBeUndefined();
   });

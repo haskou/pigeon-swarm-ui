@@ -1,36 +1,36 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 
-import type { NodeNetwork } from '../../../networks/presentation/view-models/NodeNetwork';
-import type { ConversationResource } from '../../infrastructure/http/ConversationResource';
+import type { ContactKeyCheck } from '../../../identities/domain/ContactPins';
 import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
 import type { Session } from '../../../identities/infrastructure/session/Session';
-import type { ContactKeyCheck } from '../../../identities/domain/ContactPins';
+import type { NodeNetwork } from '../../../networks/presentation/view-models/NodeNetwork';
+import type { ConversationResource } from '../../infrastructure/http/ConversationResource';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
-import { Field } from '../../../identities/presentation/auth/Field';
-import { copy } from '../../../../shared/presentation/i18n/copy';
-import { shortId } from '../../../../shared/presentation/formatting';
-import {
-  identityPicture,
-  publicFileObjectUrl,
-} from '../../../identities/presentation/view-models/identityDisplay';
-import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
 import { FallbackImage } from '../../../../shared/presentation/components/FallbackImage';
 import { GlassSelect } from '../../../../shared/presentation/components/glassSelect';
-import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
+import { shortId } from '../../../../shared/presentation/formatting';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
-import { IdentityMemberRow } from '../../../identities/presentation/components/IdentityMemberListPanel';
-import { ContactChangeNotice } from '../../../identities/presentation/components/ContactChangeNotice';
-import { ConversationPeer } from '../view-models/ConversationPeer';
-import { GroupParticipantSelection } from '../view-models/GroupParticipantSelection';
+import { copy } from '../../../../shared/presentation/i18n/copy';
+import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { IdentityMatch } from '../../../identities/domain/IdentityMatch';
+import { Field } from '../../../identities/presentation/auth/Field';
+import { ContactChangeNotice } from '../../../identities/presentation/components/ContactChangeNotice';
+import { IdentityMemberRow } from '../../../identities/presentation/components/IdentityMemberListPanel';
 import { contactKeyBlocked } from '../../../identities/presentation/view-models/contactKeyNotice';
 import {
   checkIdentityContact,
   rememberIdentityContact,
 } from '../../../identities/presentation/view-models/contactPins';
+import {
+  identityPicture,
+  publicFileObjectUrl,
+} from '../../../identities/presentation/view-models/identityDisplay';
+import { ConversationPeer } from '../view-models/ConversationPeer';
+import { GroupParticipantSelection } from '../view-models/GroupParticipantSelection';
 
 type LoadState = 'idle' | 'loading' | 'error';
 type IdentityLookupState =
@@ -276,27 +276,18 @@ export function CreateConversationDialog({
       setError(null);
 
       try {
-        const result = await applicationContainer.conversations.createGroup(
-          session,
-          {
+        const conversation =
+          await applicationContainer.conversations.createGroup(session, {
             name: groupName.trim(),
             networkId: groupNetworkId,
             participantIds: groupParticipants.map(
               ({ identity }) => identity.id,
             ),
-          },
-        );
+          });
         for (const { identity } of groupParticipants) {
           rememberIdentityContact(session.identity.id, identity);
         }
-        onCreated(
-          {
-            ...session,
-            keychain: result.keychain,
-            keychainExternalIdentifier: result.keychainExternalIdentifier,
-          },
-          result.conversation,
-        );
+        onCreated(session, conversation);
       } catch (caught) {
         setState('error');
         setError(
