@@ -95,19 +95,6 @@ export function deriveModerationLogId(
     .slice(0, 24);
 }
 
-/** First 24 hex chars of sha256 over a channel creation tuple. */
-export function deriveCommunityChannelId(
-  communityId: string,
-  creatorIdentityId: string,
-  createdAt: number,
-): string {
-  return SHA256Hash.from(
-    JSON.stringify(['channel', communityId, creatorIdentityId, createdAt]),
-  )
-    .toString()
-    .slice(0, 24);
-}
-
 /** base64url sha256 of the canonical owner tuple a community id commits to. */
 export function deriveCommunityId(
   networkId: string,

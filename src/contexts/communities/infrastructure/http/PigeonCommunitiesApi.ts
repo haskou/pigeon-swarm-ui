@@ -32,11 +32,11 @@ import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/P
 import { ScopeFrontierReader } from '../../../../shared/infrastructure/http/ScopeFrontierReader';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 import { DraftPayloadCipher } from '../../../messages/infrastructure/crypto/DraftPayloadCipher';
+import { CommunityChannelId } from '../../domain/value-objects/CommunityChannelId';
 import { CommunityRoleId } from '../../domain/value-objects/CommunityRoleId';
 import { CommunityModerationLogSigner } from './CommunityModerationLogSigner';
 import { CommunityOperationSigner } from './CommunityOperationSigner';
 import {
-  deriveCommunityChannelId,
   deriveCommunityId,
   deriveMembershipRequestId,
 } from './deriveCommunityRecordId';
@@ -269,11 +269,11 @@ export class PigeonCommunitiesApi {
     operation: CommunityOperationBody;
   }> {
     const createdAt = Date.now();
-    const channelId = deriveCommunityChannelId(
+    const channelId = CommunityChannelId.derive(
       communityId,
       this.mutations.authorOf(session),
       createdAt,
-    );
+    ).valueOf();
 
     return {
       moderationLog: await this.moderationLogs.sign(session, {
