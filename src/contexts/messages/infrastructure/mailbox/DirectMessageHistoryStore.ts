@@ -45,7 +45,8 @@ async function wipeIdentity(
  * survives logout and re-login. Each record is sealed with AES-GCM under a key
  * derived from the device-sealed root. A canary sealed under the same key
  * detects a root change; the identity's rows are then dropped, so rotating the
- * root drops the history. A drop is remembered until `checkDropped` reports it.
+ * root drops the history. A drop is remembered until `acknowledgeDropped`
+ * clears it, so a check whose answer was not shown reports it again.
  */
 export class DirectMessageHistoryStore {
   private readonly dropped = new Set<string>();
@@ -294,7 +295,8 @@ export class DirectMessageHistoryStore {
   /**
    * Whether this device dropped the identity's stored history because it no
    * longer opens under the device-sealed root, as after a device revoke.
-   * Reports each drop once. A deliberate `forget` is not a drop. Never throws.
+   * Reports a drop until `acknowledgeDropped`. A deliberate `forget` is not a
+   * drop. Never throws.
    */
   public async checkDropped(session: Session): Promise<boolean> {
     try {
@@ -304,7 +306,12 @@ export class DirectMessageHistoryStore {
       console.debug('Direct history check failed.');
     }
 
-    return this.dropped.delete(session.identity.id);
+    return this.dropped.has(session.identity.id);
+  }
+
+  /** Clears the identity's reported drop, once its notice is shown. */
+  public acknowledgeDropped(identityId: string): void {
+    this.dropped.delete(identityId);
   }
 
   public async forget(identityId: string): Promise<void> {

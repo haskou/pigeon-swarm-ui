@@ -1,8 +1,14 @@
-import { DeviceRootRowKeys } from '@haskou/pigeon-swarm-crypto';
+import {
+  DeviceRootRowKeys,
+  type SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
 
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessageRecord';
+import type { DeviceSealedRowRoots as Roots } from '../../../messages/infrastructure/mailbox/DeviceSealedRowRoots';
+import type { DeviceSealedSettlement as Settlement } from '../../../messages/infrastructure/mailbox/DeviceSealedSettlement';
 import type { GroupConversationActivity } from '../GroupConversationActivity';
+import type { GroupMessageHistoryResealer } from './GroupMessageHistoryResealer';
 import type { GroupMessageHistoryRow } from './GroupMessageHistoryRow';
 
 import { scopeClientStorageKey } from '../../../../shared/infrastructure/storage/ClientStorageScope';
@@ -21,11 +27,18 @@ import { GroupMessageReadMarker } from './GroupMessageReadMarker';
  *
  * History is read in pages of the latest arrivals: a page opens only rows
  * not opened before, and opened records stay in memory, so reopening a
- * conversation decrypts nothing again. A canary detects a root change; the
- * identity's rows are then dropped, and a drop that removed rows is
- * remembered until `checkDropped` reports it. Without a device-sealed root
- * the store keeps nothing. Calls run one at a time, so memory follows the
+ * conversation decrypts nothing again. Without a device-sealed root the
+ * store keeps nothing. Calls run one at a time, so memory follows the
  * database.
+ *
+ * A canary record settles the device-sealed root once per root and store
+ * (`DeviceSealedCanaryRecords`). Under the root the session replaced, as
+ * after a device revoke, every row and read marker is re-sealed under the
+ * session's root in one transaction, and the replaced root is listed, so a
+ * tab still on it is refused (`REPLACED_ROOT`) instead of wiping the history.
+ * Under any other root the identity's rows are dropped, and a drop that
+ * removed rows is reported until `acknowledgeDropped`. Every write checks in
+ * its own transaction that the canary still opens under the scope's keys.
  *
  * Each conversation keeps a sealed read marker: the last row sequence it
  * accounted, the messages of other members since the last read on this
@@ -196,7 +209,15 @@ export class GroupMessageHistoryStore {
     identityId: string,
     row: GroupMessageHistoryRow,
   ): DirectMessageRecord | undefined {
-    const plaintext = scope.keys.open(
+    return this.recordOf(scope.keys, row);
+  }
+
+  /** The record of one row under `keys`; undefined when it does not open. */
+  private recordOf(
+    keys: DeviceRootRowKeys,
+    row: GroupMessageHistoryRow,
+  ): DirectMessageRecord | undefined {
+    const plaintext = keys.open(
       GroupMessageHistoryStore.RECORD_PURPOSE,
       [row.conversation, row.record],
       row.sealed,
@@ -207,7 +228,74 @@ export class GroupMessageHistoryStore {
       : undefined;
   }
 
-  /** The identity's scope under the session's root; undefined without one. */
+  /** Records what settling the canary record did, in counts only. */
+  private report(identityId: string, settlement: Settlement): void {
+    const { dropped = 0, resealed } = settlement;
+
+    if (dropped > 0) this.dropped.add(identityId);
+
+    if (resealed !== undefined) {
+      // eslint-disable-next-line no-console
+      console.debug('Group history re-sealed.', { dropped, resealed });
+    }
+  }
+
+  /**
+   * Re-seals rows and read markers that open under `roots.replaced` under
+   * `roots.current`, with their tags under it. A row that does not open, or
+   * does not read as a record, is left out.
+   */
+  private resealer(
+    identityId: string,
+    { current, replaced }: Roots,
+  ): GroupMessageHistoryResealer {
+    return {
+      read: (from, to, sealed) => {
+        const plaintext = replaced?.open(
+          GroupMessageHistoryStore.READ_PURPOSE,
+          [from],
+          sealed,
+        );
+
+        return plaintext
+          ? current.seal(GroupMessageHistoryStore.READ_PURPOSE, [to], plaintext)
+          : undefined;
+      },
+      row: (row) => {
+        try {
+          const record = replaced ? this.recordOf(replaced, row) : undefined;
+
+          return record ? this.sealed(current, identityId, record) : undefined;
+        } catch {
+          return undefined;
+        }
+      },
+    };
+  }
+
+  /** The row keys of the session's root and of the root it replaced. */
+  private roots(session: Session, root: SymmetricKey): Roots {
+    const identityId = session.identity.id;
+    const previous = session.previousDeviceSealedRootKey;
+    const derive = (key: SymmetricKey): DeviceRootRowKeys =>
+      DeviceRootRowKeys.derive(
+        key,
+        GroupMessageHistoryStore.KEYS_LABEL,
+        identityId,
+      );
+
+    return {
+      current: derive(root),
+      generation: session.deviceSealedRootGeneration?.valueOf(),
+      replaced: previous ? derive(previous) : undefined,
+    };
+  }
+
+  /**
+   * The identity's scope under the session's root, once its canary record
+   * is settled for it; undefined without a root. Rejects with
+   * `REPLACED_ROOT` for a root the record refuses.
+   */
   private async scope(
     session: Session,
   ): Promise<GroupMessageHistoryScope | undefined> {
@@ -218,20 +306,17 @@ export class GroupMessageHistoryStore {
     const held = this.scopes.get(identityId);
 
     if (held?.opensUnder(root)) return held;
-    const keys = DeviceRootRowKeys.derive(
-      root,
-      GroupMessageHistoryStore.KEYS_LABEL,
-      identityId,
-    );
-    const canary = await this.database.canary(identityId);
+    const roots = this.roots(session, root);
 
-    if (
-      (!canary || !keys.opensCanary(canary)) &&
-      (await this.database.reset(identityId, keys.sealCanary())) > 0
-    ) {
-      this.dropped.add(identityId);
-    }
-    const scope = new GroupMessageHistoryScope(root, keys);
+    this.report(
+      identityId,
+      await this.database.settle(
+        identityId,
+        roots,
+        this.resealer(identityId, roots),
+      ),
+    );
+    const scope = new GroupMessageHistoryScope(root, roots.current);
 
     this.scopes.set(identityId, scope);
 
@@ -239,19 +324,19 @@ export class GroupMessageHistoryStore {
   }
 
   private sealed(
-    scope: GroupMessageHistoryScope,
+    keys: DeviceRootRowKeys,
     identityId: string,
     record: DirectMessageRecord,
   ): GroupMessageHistoryRow {
     const tags = {
-      conversation: scope.keys.tag(['conversation', record.conversationId]),
-      record: scope.keys.tag(['record', record.conversationId, record.id]),
+      conversation: keys.tag(['conversation', record.conversationId]),
+      record: keys.tag(['record', record.conversationId, record.id]),
     };
 
     return {
       ...tags,
       identityId,
-      sealed: scope.keys.seal(
+      sealed: keys.seal(
         GroupMessageHistoryStore.RECORD_PURPOSE,
         [tags.conversation, tags.record],
         new TextEncoder().encode(JSON.stringify(record)),
@@ -307,6 +392,7 @@ export class GroupMessageHistoryStore {
     if (!next.equals(stored)) {
       await this.database.putRead(
         identityId,
+        scope.keys,
         tag,
         scope.keys.seal(
           GroupMessageHistoryStore.READ_PURPOSE,
@@ -363,7 +449,9 @@ export class GroupMessageHistoryStore {
 
       try {
         const sequences = await this.database.insert(
-          records.map((record) => this.sealed(scope, identityId, record)),
+          identityId,
+          scope.keys,
+          records.map((record) => this.sealed(scope.keys, identityId, record)),
         );
 
         records.forEach((record, index) => {
@@ -425,8 +513,8 @@ export class GroupMessageHistoryStore {
   /**
    * Whether this device dropped the identity's stored group history because
    * it no longer opens under the device-sealed root, as after a device
-   * revoke. Reports each drop once. A deliberate `forget` is not a drop.
-   * Never throws; a failure logs one line.
+   * revoke. Reports a drop until `acknowledgeDropped`. A deliberate `forget`
+   * is not a drop. Never throws; a failure logs one line.
    */
   public checkDropped(session: Session): Promise<boolean> {
     return this.exclusive(async () => {
@@ -437,8 +525,13 @@ export class GroupMessageHistoryStore {
         console.debug('Group history check failed.');
       }
 
-      return this.dropped.delete(session.identity.id);
+      return this.dropped.has(session.identity.id);
     });
+  }
+
+  /** Clears the identity's reported drop, once its notice is shown. */
+  public acknowledgeDropped(identityId: string): void {
+    this.dropped.delete(identityId);
   }
 
   /** Wipes one identity's history. Never throws; logs one line. */

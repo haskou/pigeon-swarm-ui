@@ -22,8 +22,14 @@ jest.mock('react', () => ({
 }));
 jest.mock('../../../../../app/composition/applicationContainer', () => ({
   applicationContainer: {
-    directMessages: { checkHistoryDropped: jest.fn() },
-    groupMessages: { checkHistoryDropped: jest.fn() },
+    directMessages: {
+      acknowledgeHistoryDropped: jest.fn(),
+      checkHistoryDropped: jest.fn(),
+    },
+    groupMessages: {
+      acknowledgeHistoryDropped: jest.fn(),
+      checkHistoryDropped: jest.fn(),
+    },
   },
   deviceStorage: { estimate: jest.fn(), protect: jest.fn() },
 }));
@@ -129,7 +135,21 @@ describe(useDeviceStorageNotice.name, () => {
     );
   });
 
-  it('shows nothing once the workspace is gone', async () => {
+  it('acknowledges the drops once it shows the notice', async () => {
+    groupMessages.checkHistoryDropped.mockResolvedValue(true);
+
+    mount();
+    await settle();
+
+    expect(directMessages.acknowledgeHistoryDropped).toHaveBeenCalledWith(
+      'identity-1',
+    );
+    expect(groupMessages.acknowledgeHistoryDropped).toHaveBeenCalledWith(
+      'identity-1',
+    );
+  });
+
+  it('keeps a drop for the next mount once the workspace is gone', async () => {
     directMessages.checkHistoryDropped.mockResolvedValue(true);
 
     const { cleanup, onNoticeChange } = mount();
@@ -138,5 +158,15 @@ describe(useDeviceStorageNotice.name, () => {
     await settle();
 
     expect(onNoticeChange).not.toHaveBeenCalled();
+    expect(directMessages.acknowledgeHistoryDropped).not.toHaveBeenCalled();
+    expect(groupMessages.acknowledgeHistoryDropped).not.toHaveBeenCalled();
+
+    const remounted = mount();
+
+    await settle();
+
+    expect(remounted.onNoticeChange).toHaveBeenCalledWith(
+      copy.workspace.deviceStorageLost,
+    );
   });
 });

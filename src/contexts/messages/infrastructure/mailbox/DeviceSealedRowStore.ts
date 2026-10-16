@@ -12,14 +12,12 @@ import {
   indexedDbRequest,
   indexedDbTransaction,
 } from '../../../../shared/infrastructure/storage/indexedDbRequest';
+import { DeviceSealedCanaryRecords as Records } from './DeviceSealedCanaryRecords';
 
 const DATABASE_VERSION = 1;
 const ENTRIES_STORE = 'entries';
 const CANARIES_STORE = 'canaries';
 const ROW_PURPOSE = 'row';
-const REPLACED_ROOT = 'Device sealed root was replaced.';
-/** How many replaced roots a canary record lists, the latest ones. */
-const MAX_RETIRED = 16;
 
 function entryKey(identityId: string, id: string): string {
   return `${identityId}\u0000${id}`;
@@ -32,76 +30,6 @@ function identityRange(identityId: string): IDBKeyRange {
     false,
     true,
   );
-}
-
-/** Whether the record lists the root behind `keys` as replaced. */
-function isRetired(
-  record: DeviceSealedCanaryRecord | undefined,
-  keys: DeviceRootRowKeys,
-): boolean {
-  return (record?.retired ?? []).some((sealed) => keys.opensCanary(sealed));
-}
-
-/**
- * Whether the record holds a root published at a generation the session's
- * does not exceed: the session's root is older, or not the one now in use.
- */
-function isOutdated(
-  record: DeviceSealedCanaryRecord,
-  generation: number | undefined,
-): boolean {
-  return (
-    record.generation !== undefined &&
-    generation !== undefined &&
-    generation <= record.generation
-  );
-}
-
-/** The later of two generations of one root; undefined when both unknown. */
-function latest(
-  stored: number | undefined,
-  generation: number | undefined,
-): number | undefined {
-  if (stored === undefined) return generation;
-
-  if (generation === undefined) return stored;
-
-  return Math.max(stored, generation);
-}
-
-/**
- * Whether the record is already settled for `roots`: sealed under the current
- * root, the replaced root listed, and the session's generation recorded.
- */
-function isSettled(
-  record: DeviceSealedCanaryRecord | undefined,
-  { current, generation, replaced }: Roots,
-): boolean {
-  return (
-    record !== undefined &&
-    current.opensCanary(record.sealed) &&
-    (!replaced || isRetired(record, replaced)) &&
-    latest(record.generation, generation) === record.generation
-  );
-}
-
-/** `retired` plus `added`, keeping only the latest `MAX_RETIRED`. */
-function bounded(
-  retired: readonly Uint8Array[],
-  added: readonly Uint8Array[],
-): Uint8Array[] {
-  return [...retired, ...added].slice(-MAX_RETIRED);
-}
-
-/** A canary record, carrying the generation only when it is known. */
-function canary(
-  sealed: Uint8Array,
-  retired: readonly Uint8Array[],
-  generation: number | undefined,
-): DeviceSealedCanaryRecord {
-  return generation === undefined
-    ? { retired, sealed }
-    : { generation, retired, sealed };
 }
 
 /** The rows of `sealedRows` that open under `keys`. */
@@ -150,13 +78,10 @@ function resealWithin(
   transaction: IDBTransaction,
   identityId: string,
   held: DeviceSealedCanaryRecord,
-  {
-    current,
-    generation,
-    replaced,
-  }: Roots & { readonly replaced: DeviceRootRowKeys },
+  roots: Roots & { readonly replaced: DeviceRootRowKeys },
   settled: (settlement: Settlement) => void,
 ): void {
+  const { current, replaced } = roots;
   const entries = transaction.objectStore(ENTRIES_STORE);
   const keys = entries.getAllKeys(identityRange(identityId));
   const rows = entries.getAll(identityRange(identityId)) as IDBRequest<
@@ -182,14 +107,7 @@ function resealWithin(
       });
       transaction
         .objectStore(CANARIES_STORE)
-        .put(
-          canary(
-            current.sealCanary(),
-            bounded(held.retired ?? [], [replaced.sealCanary()]),
-            generation,
-          ),
-          identityId,
-        );
+        .put(Records.resealed(held, roots), identityId);
       settled({
         dropped: rows.result.length - resealed,
         refused: false,
@@ -203,38 +121,18 @@ function resealWithin(
 
 /**
  * Drops every row of the identity within `transaction` and renews its
- * canary under `current`, recording the session's generation. The `replaced`
- * root is listed. The dropped canary's root is listed only when both
- * generations are known, so it is known to be older: a root that cannot be
- * ordered may be the one another session uses now, and listing it would lock
- * that session out.
+ * canary under `current` (see `DeviceSealedCanaryRecords.renewed`).
  */
 function renewWithin(
   transaction: IDBTransaction,
   identityId: string,
   held: DeviceSealedCanaryRecord | undefined,
-  { current, generation, replaced }: Roots,
+  roots: Roots,
 ): void {
-  const older =
-    held?.generation !== undefined && generation !== undefined
-      ? [held.sealed]
-      : [];
-  const listed = replaced && !isRetired(held, replaced);
-
   wipeIdentity(transaction, identityId);
   transaction
     .objectStore(CANARIES_STORE)
-    .put(
-      canary(
-        current.sealCanary(),
-        bounded(held?.retired ?? [], [
-          ...older,
-          ...(listed ? [replaced.sealCanary()] : []),
-        ]),
-        generation,
-      ),
-      identityId,
-    );
+    .put(Records.renewed(held, roots), identityId);
 }
 
 /**
@@ -245,50 +143,11 @@ function retireWithin(
   transaction: IDBTransaction,
   identityId: string,
   held: DeviceSealedCanaryRecord,
-  { generation, replaced }: Roots,
+  roots: Roots,
 ): void {
-  const listed = !replaced || isRetired(held, replaced);
-  const stamped = latest(held.generation, generation);
+  const record = Records.retired(held, roots);
 
-  if (listed && stamped === held.generation) return;
-
-  transaction
-    .objectStore(CANARIES_STORE)
-    .put(
-      canary(
-        held.sealed,
-        listed
-          ? (held.retired ?? [])
-          : bounded(held.retired ?? [], [replaced.sealCanary()]),
-        stamped,
-      ),
-      identityId,
-    );
-}
-
-/**
- * What `settle` does with the stored record for `roots`:
- *
- * - `refuse` a root the record lists as retired, and a root published at a
- *   generation the record's does not exceed, keeping its rows;
- * - `retire` under the current root: list the `replaced` root when it is not
- *   yet;
- * - `reseal` under the replaced root: re-seal every row under the current one;
- * - `renew` otherwise: drop the rows and renew the canary.
- */
-function decide(
-  held: DeviceSealedCanaryRecord | undefined,
-  { current, generation, replaced }: Roots,
-): 'refuse' | 'renew' | 'reseal' | 'retire' {
-  if (isRetired(held, current)) return 'refuse';
-
-  if (!held) return 'renew';
-
-  if (current.opensCanary(held.sealed)) return 'retire';
-
-  if (replaced?.opensCanary(held.sealed)) return 'reseal';
-
-  return isOutdated(held, generation) ? 'refuse' : 'renew';
+  if (record) transaction.objectStore(CANARIES_STORE).put(record, identityId);
 }
 
 /**
@@ -309,7 +168,7 @@ function settle(
 
   stored.addEventListener('success', () => {
     const held = stored.result;
-    const decided = decide(held, roots);
+    const decided = Records.decide(held, roots);
 
     if (decided === 'refuse') {
       settled({ refused: true });
@@ -402,7 +261,7 @@ export class DeviceSealedRowStore<Row extends { readonly id: string }> {
     try {
       await indexedDbTransaction(transaction);
     } catch (error) {
-      if (settlement.refused) throw new Error(REPLACED_ROOT);
+      if (settlement.refused) throw new Error(Records.REPLACED_ROOT);
 
       throw error;
     }
@@ -480,9 +339,13 @@ export class DeviceSealedRowStore<Row extends { readonly id: string }> {
       ),
     ]);
 
-    if (isRetired(held, roots.current)) throw new Error(REPLACED_ROOT);
+    if (Records.isRetired(held, roots.current)) {
+      throw new Error(Records.REPLACED_ROOT);
+    }
 
-    if (isSettled(held, roots)) return openRows<Row>(roots.current, sealedRows);
+    if (Records.isSettled(held, roots)) {
+      return openRows<Row>(roots.current, sealedRows);
+    }
 
     let settledRows: { sealed: Uint8Array }[] = [];
 
