@@ -830,6 +830,8 @@ export const es = {
       403012:
         'Este nodo ya no da servicio a tu identidad. Habla con su propietario o usa otro nodo.',
       403020: 'Solo quien envió la notificación puede hacer eso.',
+      408010:
+        'La lista de bloqueos tardó demasiado en subirse. Revisa tu conexión e inténtalo de nuevo.',
       413010: 'La lista de bloqueos es demasiado grande para este nodo.',
       422030: 'El archivo es demasiado grande para el nodo.',
       429040:

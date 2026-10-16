@@ -821,6 +821,8 @@ export const en = {
       403012:
         'This node no longer serves your identity. Ask its owner, or use another node.',
       403020: 'Only the notification inviter can do that.',
+      408010:
+        'The block list took too long to upload. Check your connection and try again.',
       413010: 'The block list is too large for this node to store.',
       422030: 'That file is too large for the node to accept.',
       429040:
