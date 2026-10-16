@@ -1163,6 +1163,22 @@ describe('MlsCommunityEngine', () => {
     );
   });
 
+  it('names the epoch each call media key was exported in', async () => {
+    const { alice, bob } = await admitBob();
+    const first = await secretOf(alice);
+    const carol = engineFor('carol');
+
+    await expect(secretOf(bob)).resolves.toEqual(first);
+    await carol.engine.publishKeyPackages(COMMUNITY);
+    await alice.engine.admit(COMMUNITY, [id('carol')]);
+    await bob.engine.sync(COMMUNITY);
+    const second = await secretOf(bob);
+
+    expect(second.epoch).toBe(first.epoch + 1);
+    expect(second.secret).not.toEqual(first.secret);
+    await expect(secretOf(alice)).resolves.toEqual(second);
+  });
+
   it('abandons its own commit when publishing it fails, so it stays in the epoch the others are in', async () => {
     const { alice, bob, carol } = await admitCarol();
     const before = await secretOf(bob);
