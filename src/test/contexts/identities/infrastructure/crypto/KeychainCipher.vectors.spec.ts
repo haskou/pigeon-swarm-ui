@@ -3,24 +3,24 @@ import {
   KeyPair,
   type SymmetricKey,
 } from '@haskou/pigeon-swarm-crypto';
+import vectors from '@haskou/pigeon-swarm-crypto/vectors/keychain-signature.json';
 import { mock } from 'jest-mock-extended';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { KeychainCipher } from '../../../../../contexts/identities/infrastructure/crypto/KeychainCipher';
-import vectors from '../../../../fixtures/keychain-signature-vectors.json';
 
 const owner = KeyPair.fromPrimitives({
   privateKey: vectors.keys.owner.privateKeyPem,
   publicKey: vectors.keys.owner.publicKeyPem,
 } as never);
 
-describe('keychain signature vectors from pigeon-swarm-node', () => {
+describe('keychain signature vectors from @haskou/pigeon-swarm-crypto', () => {
   afterEach(() => {
     jest.useRealTimers();
   });
 
-  it.each(vectors.accepted)('signs $name byte for byte', async (vector) => {
+  it.each(vectors.accepted)('signs $name byte for byte', (vector) => {
     const root = mock<SymmetricKey>();
     root.encrypt.mockReturnValue(
       new EncryptedPayload(vector.input.encryptedPayload),
@@ -30,10 +30,9 @@ describe('keychain signature vectors from pigeon-swarm-node', () => {
       identity: { id: vectors.keys.owner.publicKeyPem },
       keyPair: owner,
     } as unknown as Session;
-    const sign = jest.spyOn(owner, 'sign');
     jest.useFakeTimers({ now: vector.input.timestamp });
 
-    const { body } = await new KeychainCipher().encryptForPublish(
+    const { body } = new KeychainCipher().encryptForPublish(
       session,
       vector.input.previousKeychainExternalIdentifier === null
         ? undefined
@@ -45,7 +44,6 @@ describe('keychain signature vectors from pigeon-swarm-node', () => {
       { conversations: {}, version: 0 },
     );
 
-    expect(sign).toHaveBeenCalledWith(vector.expected.signingPayload);
     expect(body).toEqual({
       ...vector.input,
       signature: vector.expected.signature,

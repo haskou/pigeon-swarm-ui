@@ -1,4 +1,9 @@
-import { KeyPair, SHA256Hash, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import {
+  DeviceCredentialCommitment,
+  KeyPair,
+  PublicKey,
+  SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
 import { StringValueObject, assert } from '@haskou/value-objects';
 
 import type { LoginIdentityProgressReporter } from '../../application/login-identity/LoginIdentityProgressReporter';
@@ -115,7 +120,7 @@ export class PigeonIdentitySessionApi {
     const genesisMatches =
       identity.deviceCredential === deviceCredential &&
       identity.deviceCredentialCommitment ===
-        SHA256Hash.from(new StringValueObject(deviceCredential)).valueOf() &&
+        DeviceCredentialCommitment.of(new PublicKey(deviceCredential)) &&
       identity.recoveryAuthority === recoveryAuthority;
 
     assert(

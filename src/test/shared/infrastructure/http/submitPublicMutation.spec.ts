@@ -1,4 +1,4 @@
-import type { SignedPublicMutation } from '../../../../shared/infrastructure/crypto/SignedPublicMutation';
+import type { PublicMutation } from '@haskou/pigeon-swarm-crypto';
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
@@ -14,7 +14,7 @@ describe(submitPublicMutation.name, () => {
       }),
     );
   const sign = jest.fn(
-    (position) => ({ ...position }) as unknown as SignedPublicMutation,
+    (position) => ({ ...position }) as unknown as PublicMutation,
   );
 
   beforeEach(() => sign.mockClear());
@@ -40,7 +40,7 @@ describe(submitPublicMutation.name, () => {
       Promise.resolve({
         ...position,
         authorizationRevision: revision,
-      } as unknown as SignedPublicMutation),
+      } as unknown as PublicMutation),
     );
     const send = jest
       .fn()

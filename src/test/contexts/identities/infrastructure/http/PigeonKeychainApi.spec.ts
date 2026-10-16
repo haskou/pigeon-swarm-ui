@@ -1,4 +1,9 @@
-import { EncryptedPayload, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import {
+  EncryptedPayload,
+  KeyPair,
+  SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
+import vectors from '@haskou/pigeon-swarm-crypto/vectors/keychain-signature.json';
 
 import type { KeychainResource } from '../../../../../contexts/identities/infrastructure/http/resources/KeychainResource';
 import type { ConversationKeyEntry } from '../../../../../contexts/identities/infrastructure/keychain/ConversationKeyEntry';
@@ -11,6 +16,12 @@ import type { RequestSigner } from '../../../../../shared/infrastructure/http/Re
 import { KeychainCipher } from '../../../../../contexts/identities/infrastructure/crypto/KeychainCipher';
 import { PigeonKeychainApi } from '../../../../../contexts/identities/infrastructure/http/PigeonKeychainApi';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
+
+const owner = KeyPair.fromPrimitives({
+  privateKey: vectors.keys.owner.privateKeyPem,
+  publicKey: vectors.keys.owner.publicKeyPem,
+} as never);
+const ownerIdentity = { id: vectors.keys.owner.publicKeyPem };
 
 type StoredKeychain = {
   encryptedPayload: string;
@@ -220,12 +231,10 @@ describe(PigeonKeychainApi.name, () => {
         }),
         encrypt: (plaintext: string) => ({ toString: () => plaintext }),
       },
-      identity: { id: 'identity-1' },
+      identity: ownerIdentity,
       keychain,
       keychainExternalIdentifier: 'kc-1',
-      keyPair: {
-        sign: jest.fn().mockReturnValue({ toString: () => 'signature' }),
-      },
+      keyPair: owner,
       password: 'secret',
     } as unknown as Session;
     const api = new PigeonKeychainApi(
@@ -283,10 +292,8 @@ describe(PigeonKeychainApi.name, () => {
         }),
         encrypt: (plaintext: string) => ({ toString: () => plaintext }),
       },
-      identity: { id: 'identity-1' },
-      keyPair: {
-        sign: jest.fn().mockReturnValue({ toString: () => 'signature' }),
-      },
+      identity: ownerIdentity,
+      keyPair: owner,
       password: 'secret',
     };
     const emptyKeychain: LocalKeychain = {
@@ -492,10 +499,8 @@ describe(PigeonKeychainApi.name, () => {
       key.encrypt(JSON.stringify(keychain)).toString();
     const sessionWith = (extra: Record<string, unknown> = {}): Session =>
       ({
-        identity: { id: 'identity-1' },
-        keyPair: {
-          sign: jest.fn().mockReturnValue({ toString: () => 'signature' }),
-        },
+        identity: ownerIdentity,
+        keyPair: owner,
         masterKey,
         ...extra,
       }) as unknown as Session;

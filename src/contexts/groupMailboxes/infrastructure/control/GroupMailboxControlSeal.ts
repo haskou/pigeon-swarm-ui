@@ -1,9 +1,12 @@
-import { EncryptedPayload, Signature } from '@haskou/pigeon-swarm-crypto';
+import {
+  CanonicalJson,
+  EncryptedPayload,
+  Signature,
+} from '@haskou/pigeon-swarm-crypto';
 
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { GroupMailboxControlLetter } from './GroupMailboxControlLetter';
 
-import { canonicalJson } from '../../../../shared/infrastructure/crypto/canonicalJson';
 import {
   decodeBase64Url,
   encodeBase64Url,
@@ -42,7 +45,7 @@ export class GroupMailboxControlSeal {
   private static signed(
     letter: Omit<GroupMailboxControlLetter, 'signature'>,
   ): string {
-    return `${GroupMailboxControlSeal.DOMAIN}${canonicalJson({
+    return `${GroupMailboxControlSeal.DOMAIN}${CanonicalJson.serialize({
       conversationId: letter.conversationId,
       kind: letter.kind,
       payload: letter.payload,

@@ -1,11 +1,10 @@
 import type { Credential } from 'ts-mls';
 
-import { Signature } from '@haskou/pigeon-swarm-crypto';
+import { CanonicalJson, Signature } from '@haskou/pigeon-swarm-crypto';
 
 import type { MlsLeafOwner } from './MlsGroup';
 import type { MlsLeafSigner } from './MlsLeafSigner';
 
-import { canonicalJson } from '../../../../shared/infrastructure/crypto/canonicalJson';
 import { encodeBase64Url } from '../../../../shared/infrastructure/encoding/base64url';
 import { DeviceCredential } from '../../../identities/domain/value-objects/DeviceCredential';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
@@ -29,7 +28,7 @@ export class MlsIdentityCredential {
     { deviceCredential, identityId }: MlsLeafOwner,
     signaturePublicKey: Uint8Array,
   ): string {
-    return `${MlsIdentityCredential.DOMAIN}${canonicalJson({
+    return `${MlsIdentityCredential.DOMAIN}${CanonicalJson.serialize({
       deviceCredential,
       identityId,
       signaturePublicKey: encodeBase64Url(signaturePublicKey),

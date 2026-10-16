@@ -144,11 +144,7 @@ export class PigeonKeychainApi {
     keychain: LocalKeychain,
   ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
     const path = '/keychains/';
-    const encrypted = await this.cipher.encryptForPublish(
-      session,
-      head,
-      keychain,
-    );
+    const encrypted = this.cipher.encryptForPublish(session, head, keychain);
     const published = await this.http.request<{
       keychainExternalIdentifier: string;
       ownerIdentityId: string;

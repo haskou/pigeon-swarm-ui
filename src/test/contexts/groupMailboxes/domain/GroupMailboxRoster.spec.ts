@@ -45,8 +45,8 @@ describe('GroupMailboxRoster', () => {
     it('accepts a well-formed roster and sorts its lists', () => {
       expect(
         rosterOf({
-          memberIds: ['other', 'creator', 'member'],
           adminIds: [],
+          memberIds: ['other', 'creator', 'member'],
         }).toFields().memberIds,
       ).toEqual(['creator', 'member', 'other']);
     });
@@ -61,14 +61,20 @@ describe('GroupMailboxRoster', () => {
       ['an empty name', { name: '' }],
       ['an untrimmed name', { name: ' Team' }],
       ['a name too long', { name: 'x'.repeat(10_000) }],
+      ['a name with a lone high surrogate', { name: 'Team \uD83D' }],
+      ['a name with a lone low surrogate', { name: '\uDE00 Team' }],
+      [
+        'an identity with a lone surrogate',
+        { adminIds: [], memberIds: ['creator', 'x\uD800'] },
+      ],
       [
         'a repeated member',
-        { memberIds: ['creator', 'creator'], adminIds: [] },
+        { adminIds: [], memberIds: ['creator', 'creator'] },
       ],
-      ['an untrimmed identity', { memberIds: ['creator', ' x'], adminIds: [] }],
+      ['an untrimmed identity', { adminIds: [], memberIds: ['creator', ' x'] }],
       [
         'an identity too long',
-        { memberIds: ['creator', 'x'.repeat(1025)], adminIds: [] },
+        { adminIds: [], memberIds: ['creator', 'x'.repeat(1025)] },
       ],
       ['a creator off the members', { creatorId: 'stranger' }],
       ['a creator among the admins', { adminIds: ['creator'] }],
@@ -88,6 +94,10 @@ describe('GroupMailboxRoster', () => {
       ],
     ])('rejects %s', (_, change) => {
       expect(GroupMailboxRoster.of(fields(change))).toBeUndefined();
+    });
+
+    it('accepts a name with paired surrogates', () => {
+      expect(rosterOf({ name: 'Team 😀' }).name).toBe('Team 😀');
     });
 
     it('holds exactly the node limit of members', () => {
@@ -356,8 +366,8 @@ describe('GroupMailboxRoster', () => {
     it('never lets the creator leave', () => {
       const left = GroupMailboxRoster.of({
         ...roster.toFields(),
-        creatorId: 'admin',
         adminIds: ['gone-admin'],
+        creatorId: 'admin',
         memberIds: roster.memberIds().filter((id) => id !== 'creator'),
       }) as GroupMailboxRoster;
 
@@ -410,7 +420,7 @@ describe('GroupMailboxRoster', () => {
 
     it.each<[string, Partial<GroupMailboxRosterFields>]>([
       ['a rename', { name: 'Renamed' }],
-      ['a creator change', { creatorId: 'admin', adminIds: ['gone-admin'] }],
+      ['a creator change', { adminIds: ['gone-admin'], creatorId: 'admin' }],
       ['another conversation', { conversationId: `group:${'B'.repeat(42)}A` }],
     ])('rejects %s', (_, change) => {
       expect(roster.allowsCommit(commit('creator'), rosterOf(change))).toBe(

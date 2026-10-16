@@ -1,10 +1,12 @@
 import {
+  DeviceCredentialCommitment,
+  IdentitySignature,
   KeyPair,
-  SHA256Hash,
+  PrivateKey,
+  PublicKey,
   SymmetricKey,
   UserRootKey,
 } from '@haskou/pigeon-swarm-crypto';
-import { StringValueObject } from '@haskou/value-objects';
 
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
@@ -18,11 +20,9 @@ import type { CreatedIdentityMaterial } from './CreatedIdentityMaterial';
 import type { IdentityAdmissionProgress } from './IdentityAdmissionProgress';
 import type { IdentityAdmissionProgressListener } from './IdentityAdmissionProgressListener';
 import type { IdentityUpdateProfileInput } from './IdentitySignaturePayloadFactory';
-import type { IdentitySignaturePayloadFactory } from './IdentitySignaturePayloadFactory';
 import type { PigeonIdentityGateway } from './PigeonIdentityGateway';
 import type { IdentityResource } from './resources/IdentityResource';
 
-import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
 import { requiredDifficultyBits } from '../../../../shared/infrastructure/http/requiredDifficultyBits';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { IdentityAdmissionDifficultyPolicy } from '../../domain/IdentityAdmissionDifficultyPolicy';
@@ -30,6 +30,7 @@ import { IdentityId } from '../../domain/value-objects/IdentityId';
 import { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
 import { IdentityAdmissionProof } from '../crypto/IdentityAdmissionProof';
 import { RecoveryIdentityMaterial } from '../crypto/RecoveryIdentityMaterial';
+import { IdentitySignaturePayloadFactory } from './IdentitySignaturePayloadFactory';
 
 const emptyKeychain: LocalKeychain = {
   conversations: {},
@@ -93,9 +94,20 @@ export class PigeonIdentityCommandsApi {
   }
 
   private credentialCommitment(keyPair: KeyPair): string {
-    return SHA256Hash.from(
-      new StringValueObject(keyPair.toPrimitives().publicKey),
-    ).valueOf();
+    return DeviceCredentialCommitment.of(
+      new PublicKey(keyPair.toPrimitives().publicKey),
+    );
+  }
+
+  /** The identity key's signature over the record it publishes. */
+  private signIdentity(
+    unsigned: Omit<IdentityResource, 'signature'>,
+    keyPair: KeyPair,
+  ): string {
+    return IdentitySignature.sign(
+      IdentitySignaturePayloadFactory.payloadOf(unsigned),
+      new PrivateKey(keyPair.toPrimitives().privateKey),
+    ).toString();
   }
 
   public async changePassword(
@@ -161,7 +173,7 @@ export class PigeonIdentityCommandsApi {
         });
         const body = {
           ...unsigned,
-          signature: keyPair.sign(JSON.stringify(unsigned)).toString(),
+          signature: this.signIdentity(unsigned, keyPair),
         };
         const signingSession = {
           authorizationEpoch: vaultSession.authorizationEpoch,
@@ -240,7 +252,7 @@ export class PigeonIdentityCommandsApi {
         });
         const body = {
           ...unsigned,
-          signature: material.keyPair.sign(JSON.stringify(unsigned)).toString(),
+          signature: this.signIdentity(unsigned, material.keyPair),
         };
         const signingSession = {
           authorizationEpoch: vaultSession.authorizationEpoch,
@@ -319,9 +331,7 @@ export class PigeonIdentityCommandsApi {
         });
         const body = {
           ...unsigned,
-          signature: (
-            await signSessionPayload(session, JSON.stringify(unsigned))
-          ).toString(),
+          signature: this.signIdentity(unsigned, session.keyPair),
         };
 
         return await this.http.request<IdentityResource>(path, {

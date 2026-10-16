@@ -1,6 +1,6 @@
-import type { SignedPublicMutation } from '../../../../shared/infrastructure/crypto/SignedPublicMutation';
+import type { PublicMutation } from '@haskou/pigeon-swarm-crypto';
 
 export interface CommunityModerationLogBody {
   createdAt: number;
-  mutation: SignedPublicMutation;
+  mutation: PublicMutation;
 }

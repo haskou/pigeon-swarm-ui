@@ -1,3 +1,4 @@
+import { CommunityInviteReference } from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
@@ -15,10 +16,7 @@ import { NotificationMutationSigner } from '../../../notifications/infrastructur
 import { buildCommunityInviteLinkBody } from './buildCommunityInviteLinkBody';
 import { CommunityModerationLogSigner } from './CommunityModerationLogSigner';
 import { CommunityOperationSigner } from './CommunityOperationSigner';
-import {
-  deriveInviteReference,
-  deriveInviteToken,
-} from './deriveCommunityRecordId';
+import { deriveInviteToken } from './deriveCommunityRecordId';
 
 export class PigeonCommunityInvitationApi {
   private readonly notificationPath = '/notifications/';
@@ -106,7 +104,10 @@ export class PigeonCommunityInvitationApi {
               expiresAt: optional.expiresAt || undefined,
               maxUses: input.maxUses || undefined,
             },
-            target: { id: deriveInviteReference(token), type: 'invite' },
+            target: {
+              id: CommunityInviteReference.of(token),
+              type: 'invite',
+            },
           }),
           mutation,
           nonce,
@@ -236,7 +237,7 @@ export class PigeonCommunityInvitationApi {
       args: {
         identityId,
         method: 'invite_link',
-        reference: deriveInviteReference(token),
+        reference: CommunityInviteReference.of(token),
       },
       communityId,
       createdAt: usedAt,

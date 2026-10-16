@@ -1,15 +1,15 @@
 import {
   EncryptedPayload,
+  KeychainSignature,
+  PrivateKey,
   type SymmetricKey,
 } from '@haskou/pigeon-swarm-crypto';
 
 import type { KeychainResource } from '../http/resources/KeychainResource';
 import type { LocalKeychain } from '../keychain/LocalKeychain';
 import type { Session } from '../session/Session';
-import type { KeychainDomainSignaturePayload } from './KeychainDomainSignaturePayload';
 import type { PublishedKeychainPayload } from './PublishedKeychainPayload';
 
-import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
 import { KeychainVersion } from '../../domain/value-objects/KeychainVersion';
 
@@ -66,11 +66,11 @@ export class KeychainCipher {
     }
   }
 
-  public async encryptForPublish(
+  public encryptForPublish(
     session: Session,
     head: KeychainHead | undefined,
     nextKeychain: LocalKeychain,
-  ): Promise<{ body: PublishedKeychainPayload; keychain: LocalKeychain }> {
+  ): { body: PublishedKeychainPayload; keychain: LocalKeychain } {
     const timestamp = Date.now();
     const version = (head?.keychain.version ?? 0) + 1;
     const keychain = { ...nextKeychain, timestamp, version };
@@ -78,16 +78,17 @@ export class KeychainCipher {
       .encrypt(JSON.stringify(keychain))
       .toString();
     const previousKeychainExternalIdentifier = head?.keychainExternalIdentifier;
-    const domainPayload: KeychainDomainSignaturePayload = {
-      encryptedPayload,
-      ownerIdentityId: IdentityId.normalize(session.identity.id),
-      previousKeychainExternalIdentifier,
-      timestamp,
-      version,
-    };
-    const signature = await signSessionPayload(
-      session,
-      JSON.stringify(domainPayload),
+    const signature = KeychainSignature.sign(
+      {
+        encryptedPayload,
+        ownerIdentityId: IdentityId.normalize(session.identity.id),
+        ...(previousKeychainExternalIdentifier === undefined
+          ? {}
+          : { previousKeychainExternalIdentifier }),
+        timestamp,
+        version,
+      },
+      new PrivateKey(session.keyPair.toPrimitives().privateKey),
     );
 
     return {

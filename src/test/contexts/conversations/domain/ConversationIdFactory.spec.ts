@@ -1,10 +1,10 @@
+import vectors from '@haskou/pigeon-swarm-crypto/vectors/conversation-operation.json';
 import { createHash } from 'crypto';
 
 import { ConversationIdFactory } from '../../../../contexts/conversations/domain/ConversationIdFactory';
 import { ConversationGroupNonce } from '../../../../contexts/conversations/domain/value-objects/ConversationGroupNonce';
 import { ConversationNetworkId } from '../../../../contexts/conversations/domain/value-objects/ConversationNetworkId';
 import { ConversationParticipantId } from '../../../../contexts/conversations/domain/value-objects/ConversationParticipantId';
-import vectors from '../../../fixtures/conversation-operation-vectors.json';
 
 const participant = ConversationParticipantId.fromString;
 const network = ConversationNetworkId.fromString;

@@ -1,9 +1,8 @@
-import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import { CanonicalJson, KeyPair } from '@haskou/pigeon-swarm-crypto';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { NotificationMutationSigner } from '../../../../../contexts/notifications/infrastructure/http/NotificationMutationSigner';
-import { canonicalJson } from '../../../../../shared/infrastructure/crypto/canonicalJson';
 import vectors from '../../../../fixtures/notification-vectors.json';
 import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
@@ -39,7 +38,7 @@ describe(NotificationMutationSigner.name, () => {
   it.each(vectors.cases)(
     'canonicalizes and digests the $name payload as published',
     (vector) => {
-      expect(canonicalJson(vector.derived.payload)).toBe(
+      expect(CanonicalJson.serialize(vector.derived.payload)).toBe(
         vector.derived.payloadCanonical,
       );
       expect(mutations.digestOfValue(vector.derived.payload)).toBe(

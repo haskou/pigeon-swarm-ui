@@ -1,3 +1,10 @@
+import {
+  KeyPair,
+  PublicKey,
+  Signature,
+  SignedHttpRequestSignature,
+} from '@haskou/pigeon-swarm-crypto';
+
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
 import { ApiUrlBuilder } from '../../../../shared/infrastructure/http/ApiUrlBuilder';
@@ -17,18 +24,16 @@ function response(status: number, body: unknown): Response {
   } as unknown as Response;
 }
 
-function session(
-  sign = jest.fn().mockResolvedValue({ toString: () => 'sig' }),
-) {
+let identityKeyPair: KeyPair;
+let deviceCredentialKeyPair: KeyPair;
+
+function session(): Session {
   return {
     authorizationEpoch: { valueOf: () => 7 },
     authorizationRevision: { valueOf: () => 3 },
-    deviceCredentialKeyPair: {
-      sign: jest.fn().mockReturnValue({ toString: () => 'device-signature' }),
-      toPrimitives: () => ({ publicKey: 'device-public-key' }),
-    },
+    deviceCredentialKeyPair,
     identity: { id: 'identity-1' },
-    keyPair: { sign },
+    keyPair: identityKeyPair,
     password: 'secret',
   } as unknown as Session;
 }
@@ -49,19 +54,22 @@ function issuer(
 describe(RealtimeTicketIssuer.name, () => {
   const originalFetch = global.fetch;
 
+  beforeAll(async () => {
+    identityKeyPair = await KeyPair.generate();
+    deviceCredentialKeyPair = await KeyPair.generate();
+  });
+
   afterEach(() => {
     global.fetch = originalFetch;
     jest.restoreAllMocks();
   });
 
-  it('posts a signed empty body to the prefixed tickets path', async () => {
-    const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
-    const signer = new RequestSigner(() => 123);
+  it('posts a body signed by the identity key to the prefixed tickets path', async () => {
     global.fetch = jest
       .fn()
       .mockResolvedValue(response(201, { expiresAt: 1, ticket: 'ticket-a' }));
 
-    await issuer('http://localhost:8080/api/', signer).issue(session(sign));
+    await issuer().issue(session());
 
     expect(global.fetch).toHaveBeenCalledWith(
       'http://localhost:8080/api/realtime/v1/tickets',
@@ -69,15 +77,28 @@ describe(RealtimeTicketIssuer.name, () => {
         body: '{}',
         headers: expect.objectContaining({
           'X-Identity-Id': 'identity-1',
-          'X-Signature': 'signature',
           'X-Timestamp': '123',
         }),
         method: 'POST',
       }),
     );
-    expect(sign).toHaveBeenCalledWith(
-      signer.payload('POST', '/api/realtime/v1/tickets', 123, {}),
-    );
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0] as [
+      string,
+      { headers: Record<string, string> },
+    ];
+
+    expect(() =>
+      SignedHttpRequestSignature.verify(
+        {
+          body: {},
+          method: 'POST',
+          path: '/api/realtime/v1/tickets',
+          timestamp: 123,
+        },
+        new Signature(init.headers['X-Signature']),
+        new PublicKey(identityKeyPair.toPrimitives().publicKey),
+      ),
+    ).not.toThrow();
   });
 
   it('returns the issued ticket', async () => {

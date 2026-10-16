@@ -1,5 +1,5 @@
-import { KeyPair } from '@haskou/pigeon-swarm-crypto';
-import { createHash } from 'crypto';
+import { CommunityInviteReference, KeyPair } from '@haskou/pigeon-swarm-crypto';
+import vectors from '@haskou/pigeon-swarm-crypto/vectors/community-operation.json';
 
 import type { CommunityResource as Community } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
@@ -11,7 +11,6 @@ import { CommunityOperationProof } from '../../../../../contexts/communities/inf
 import { deriveInviteToken } from '../../../../../contexts/communities/infrastructure/http/deriveCommunityRecordId';
 import { PigeonCommunityInvitationApi } from '../../../../../contexts/communities/infrastructure/http/PigeonCommunityInvitationApi';
 import { ScopeFrontierReader } from '../../../../../shared/infrastructure/http/ScopeFrontierReader';
-import vectors from '../../../../fixtures/community-operation-vectors.json';
 import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
 beforeEach(() => {
@@ -143,9 +142,7 @@ describe(PigeonCommunityInvitationApi.name, () => {
       request.mock.calls[0]?.[1].body ?? '{}',
     );
     const token = sent.mutation.recordId;
-    const reference = createHash('sha256')
-      .update(`pigeon:community-invite-reference:v1\n${token}`)
-      .digest('base64url');
+    const reference = CommunityInviteReference.of(token);
 
     expect(log.mock.calls[0]?.[1].target).toEqual({
       id: reference,

@@ -1,7 +1,13 @@
-import { KeyPair, Signature } from '@haskou/pigeon-swarm-crypto';
+import {
+  DeviceAuthorizationTransitionSignature,
+  KeyPair,
+  Signature,
+} from '@haskou/pigeon-swarm-crypto';
+import vectors from '@haskou/pigeon-swarm-crypto/vectors/device-authorization-transition.json';
 import { Timestamp } from '@haskou/value-objects';
 
 import type { DeviceAuthorizationCompromisedCredential } from '../../../../contexts/identities/domain/DeviceAuthorizationCompromisedCredential';
+import type { DeviceAuthorizationUnsignedPayload } from '../../../../contexts/identities/domain/DeviceAuthorizationUnsignedPayload';
 
 import { DeviceAuthorizationTransition } from '../../../../contexts/identities/domain/DeviceAuthorizationTransition';
 import { DeviceAuthorizationEpoch } from '../../../../contexts/identities/domain/value-objects/DeviceAuthorizationEpoch';
@@ -10,7 +16,6 @@ import { DeviceAuthorizationRevision } from '../../../../contexts/identities/dom
 import { DeviceCredential } from '../../../../contexts/identities/domain/value-objects/DeviceCredential';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { PairingId } from '../../../../contexts/identities/domain/value-objects/PairingId';
-import vectors from '../../../fixtures/device-authorization-transition-vectors.json';
 
 describe(DeviceAuthorizationTransition.name, () => {
   it('binds enrollment epoch and exact canonical payload to both devices', async () => {
@@ -49,20 +54,18 @@ describe(DeviceAuthorizationTransition.name, () => {
     ]);
     expect(
       target.isValidSignature(
-        JSON.stringify({
-          domain: 'pigeon:device-authorization:proof-of-possession:v2',
-          transition: unsigned,
-        }),
+        DeviceAuthorizationTransitionSignature.proofOfPossessionContent(
+          unsigned,
+        ),
         new Signature(body.proofOfPossession ?? ''),
       ),
     ).toBe(true);
     expect(
       author.isValidSignature(
-        JSON.stringify({
-          domain: 'pigeon:device-authorization:transition:v3',
-          proofOfPossession: body.proofOfPossession,
-          transition: unsigned,
-        }),
+        DeviceAuthorizationTransitionSignature.signingContent(
+          unsigned,
+          new Signature(body.proofOfPossession ?? ''),
+        ),
         new Signature(body.signature),
       ),
     ).toBe(true);
@@ -112,11 +115,9 @@ describe(DeviceAuthorizationTransition.name, () => {
       IdentityId.fromString(author.toPrimitives().publicKey)
         .getPublicKey()
         .isValidSignature(
-          JSON.stringify({
-            domain: 'pigeon:device-authorization:transition:v3',
-            proofOfPossession: undefined,
-            transition: transition.getUnsignedPayload(),
-          }),
+          DeviceAuthorizationTransitionSignature.signingContent(
+            transition.getUnsignedPayload(),
+          ),
           new Signature(body.signature),
         ),
     ).toBe(true);
@@ -124,13 +125,9 @@ describe(DeviceAuthorizationTransition.name, () => {
       IdentityId.fromString(author.toPrimitives().publicKey)
         .getPublicKey()
         .isValidSignature(
-          JSON.stringify({
-            domain: 'pigeon:device-authorization:transition:v3',
-            proofOfPossession: undefined,
-            transition: {
-              ...transition.getUnsignedPayload(),
-              compromisedSince: 1,
-            },
+          DeviceAuthorizationTransitionSignature.signingContent({
+            ...transition.getUnsignedPayload(),
+            compromisedSince: 1,
           }),
           new Signature(body.signature),
         ),
@@ -207,12 +204,13 @@ describe(DeviceAuthorizationTransition.name, () => {
       const credential = await credentialOf();
       const transition = recoveryWith([cap(2, credential)]);
       const body = transition.toPrimitives();
-      const signed = (unsigned: unknown) =>
-        JSON.stringify({
-          domain: 'pigeon:device-authorization:transition:v3',
-          proofOfPossession: body.proofOfPossession,
-          transition: unsigned,
-        });
+      const signed = (unsigned: DeviceAuthorizationUnsignedPayload) =>
+        DeviceAuthorizationTransitionSignature.signingContent(
+          unsigned,
+          body.proofOfPossession === undefined
+            ? undefined
+            : new Signature(body.proofOfPossession),
+        );
 
       expect(
         recoveryAuthority.isValidSignature(

@@ -1,4 +1,5 @@
-import type { SignedPublicMutation } from '../../../../shared/infrastructure/crypto/SignedPublicMutation';
+import type { PublicMutation } from '@haskou/pigeon-swarm-crypto';
+
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { Session } from '../../../identities/infrastructure/session/Session';
@@ -66,7 +67,7 @@ export class PigeonPollsApi {
   private async channelTimelineMutation(
     session: Session,
     input: CreatePollRequest,
-  ): Promise<SignedPublicMutation> {
+  ): Promise<PublicMutation> {
     const authorId = this.mutations.authorOf(session);
     const id = [
       'community',

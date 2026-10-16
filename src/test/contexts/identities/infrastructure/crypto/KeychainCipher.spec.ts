@@ -1,77 +1,94 @@
-import { EncryptedPayload, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import {
+  EncryptedPayload,
+  KeyPair,
+  KeychainSignature,
+  PublicKey,
+  Signature,
+  SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
 import { InvalidFormatError } from '@haskou/value-objects';
 
 import type { KeychainResource } from '../../../../../contexts/identities/infrastructure/http/resources/KeychainResource';
 import type { LocalKeychain } from '../../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
+import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 import { KeychainCipher } from '../../../../../contexts/identities/infrastructure/crypto/KeychainCipher';
 
 describe(KeychainCipher.name, () => {
-  it('signs the canonical initial keychain domain payload', async () => {
-    const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
-    const encrypt = jest.fn().mockReturnValue({ toString: () => 'encrypted' });
-    const session = {
-      deviceSealedRootKey: { encrypt },
-      identity: {
-        id: '-----BEGIN PUBLIC KEY-----\nidentity-1\n-----END PUBLIC KEY-----',
-      },
-      keyPair: { sign },
-      password: 'secret',
-    } as unknown as Session;
+  let owner: KeyPair;
 
-    const result = await new KeychainCipher().encryptForPublish(
-      session,
+  beforeAll(async () => {
+    owner = await KeyPair.generate();
+  });
+
+  function ownerSession(extra: Record<string, unknown> = {}): Session {
+    return {
+      identity: { id: owner.toPrimitives().publicKey },
+      keyPair: owner,
+      password: 'secret',
+      ...extra,
+    } as unknown as Session;
+  }
+
+  it('signs the initial keychain with the owner identity key', () => {
+    const encrypt = jest.fn().mockReturnValue({ toString: () => 'encrypted' });
+
+    const result = new KeychainCipher().encryptForPublish(
+      ownerSession({ deviceSealedRootKey: { encrypt } }),
       undefined,
       { conversations: {}, version: 1 },
     );
-    const [signaturePayload] = sign.mock.calls[0] as [string];
 
-    expect(JSON.parse(signaturePayload)).toEqual({
-      encryptedPayload: 'encrypted',
-      ownerIdentityId: 'identity-1',
-      timestamp: expect.any(Number),
-      version: 1,
-    });
     expect(result.body).toEqual({
       encryptedPayload: 'encrypted',
       previousKeychainExternalIdentifier: null,
-      signature: 'signature',
+      signature: expect.any(String),
       timestamp: expect.any(Number),
       version: 1,
     });
+    expect(() =>
+      KeychainSignature.verify(
+        {
+          encryptedPayload: 'encrypted',
+          ownerIdentityId: IdentityId.normalize(owner.toPrimitives().publicKey),
+          timestamp: result.body.timestamp,
+          version: 1,
+        },
+        new Signature(result.body.signature),
+        new PublicKey(owner.toPrimitives().publicKey),
+      ),
+    ).not.toThrow();
   });
 
-  it('signs the previous keychain external identifier when present', async () => {
-    const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
+  it('signs the previous keychain external identifier when present', () => {
     const encrypt = jest.fn().mockReturnValue({ toString: () => 'encrypted' });
-    const session = {
-      deviceSealedRootKey: { encrypt },
-      identity: { id: 'identity-1' },
-      keyPair: { sign },
-      password: 'secret',
-    } as unknown as Session;
 
-    const result = await new KeychainCipher().encryptForPublish(
-      session,
+    const result = new KeychainCipher().encryptForPublish(
+      ownerSession({ deviceSealedRootKey: { encrypt } }),
       {
         keychain: { conversations: {}, version: 1 },
         keychainExternalIdentifier: 'keychain-previous',
       },
       { conversations: {}, version: 1 },
     );
-    const [signaturePayload] = sign.mock.calls[0] as [string, string];
 
-    expect(JSON.parse(signaturePayload)).toEqual({
-      encryptedPayload: 'encrypted',
-      ownerIdentityId: 'identity-1',
-      previousKeychainExternalIdentifier: 'keychain-previous',
-      timestamp: expect.any(Number),
-      version: 2,
-    });
     expect(result.body.previousKeychainExternalIdentifier).toBe(
       'keychain-previous',
     );
+    expect(() =>
+      KeychainSignature.verify(
+        {
+          encryptedPayload: 'encrypted',
+          ownerIdentityId: IdentityId.normalize(owner.toPrimitives().publicKey),
+          previousKeychainExternalIdentifier: 'keychain-previous',
+          timestamp: result.body.timestamp,
+          version: 2,
+        },
+        new Signature(result.body.signature),
+        new PublicKey(owner.toPrimitives().publicKey),
+      ),
+    ).not.toThrow();
   });
 
   describe('device-sealed root only', () => {
@@ -83,15 +100,7 @@ describe(KeychainCipher.name, () => {
         encryptedPayload: key.encrypt(JSON.stringify(keychain)).toString(),
       }) as KeychainResource;
     const sessionWith = (extra: Record<string, unknown> = {}): Session =>
-      ({
-        identity: { id: 'identity-1' },
-        keyPair: {
-          sign: jest.fn().mockResolvedValue({ toString: () => 'signature' }),
-        },
-        masterKey,
-        password: 'secret',
-        ...extra,
-      }) as unknown as Session;
+      ownerSession({ masterKey, ...extra });
 
     it('opens a head sealed under the root', () => {
       expect(
@@ -148,18 +157,18 @@ describe(KeychainCipher.name, () => {
       ).toThrow(InvalidFormatError);
     });
 
-    it('refuses to publish without a device-sealed root', async () => {
-      await expect(
+    it('refuses to publish without a device-sealed root', () => {
+      expect(() =>
         new KeychainCipher().encryptForPublish(
           sessionWith(),
           undefined,
           keychain,
         ),
-      ).rejects.toThrow();
+      ).toThrow();
     });
 
-    it('seals the publish under the root alone', async () => {
-      const { body } = await new KeychainCipher().encryptForPublish(
+    it('seals the publish under the root alone', () => {
+      const { body } = new KeychainCipher().encryptForPublish(
         sessionWith({ deviceSealedRootKey: rootKey }),
         undefined,
         keychain,

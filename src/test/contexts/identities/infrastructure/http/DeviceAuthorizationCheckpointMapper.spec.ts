@@ -1,7 +1,8 @@
+import vectors from '@haskou/pigeon-swarm-crypto/vectors/device-authorization-transition.json';
+
 import { DeviceAuthorizationIdentityMismatchError } from '../../../../../contexts/identities/domain/errors/DeviceAuthorizationIdentityMismatchError';
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 import { DeviceAuthorizationCheckpointMapper } from '../../../../../contexts/identities/infrastructure/http/DeviceAuthorizationCheckpointMapper';
-import vectors from '../../../../fixtures/device-authorization-transition-vectors.json';
 
 describe(DeviceAuthorizationCheckpointMapper.name, () => {
   it('maps the resource into validated value objects', () => {

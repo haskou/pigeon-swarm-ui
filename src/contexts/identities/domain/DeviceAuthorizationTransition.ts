@@ -1,10 +1,12 @@
 import {
+  DeviceAuthorizationTransitionSignature,
+  DeviceCredentialCommitment,
   KeyPair,
+  PrivateKey,
   PublicKey,
-  SHA256Hash,
   Signature,
 } from '@haskou/pigeon-swarm-crypto';
-import { StringValueObject, Timestamp, assert } from '@haskou/value-objects';
+import { Timestamp, assert } from '@haskou/value-objects';
 
 import type { DeviceAuthorizationCompromisedCredential as CompromisedCredential } from './DeviceAuthorizationCompromisedCredential';
 import type { DeviceAuthorizationCompromisedCredentialPayload } from './DeviceAuthorizationCompromisedCredentialPayload';
@@ -21,8 +23,6 @@ import { DeviceCredential } from './value-objects/DeviceCredential';
 import { IdentityId } from './value-objects/IdentityId';
 import { PairingId } from './value-objects/PairingId';
 
-const PROOF_DOMAIN = 'pigeon:device-authorization:proof-of-possession:v2';
-const SIGNATURE_DOMAIN = 'pigeon:device-authorization:transition:v3';
 const MAX_COMPROMISED_CREDENTIALS = 32;
 const OPERATIONS: readonly DeviceAuthorizationOperation[] = [
   'enroll',
@@ -75,29 +75,27 @@ export class DeviceAuthorizationTransition {
     });
     const target = input.target;
 
-    let proofOfPossession = input.proofOfPossession?.valueOf();
+    let proofOfPossession = input.proofOfPossession;
 
     if (input.targetProofRequired && !proofOfPossession) {
       assert(target, new Error('A target key pair is required.'));
-      proofOfPossession = target
-        .sign(JSON.stringify({ domain: PROOF_DOMAIN, transition: unsigned }))
-        .valueOf();
+      proofOfPossession =
+        DeviceAuthorizationTransitionSignature.provePossession(
+          unsigned,
+          new PrivateKey(target.toPrimitives().privateKey),
+        );
     }
-    const signature = input.author
-      .sign(
-        JSON.stringify({
-          domain: SIGNATURE_DOMAIN,
-          proofOfPossession,
-          transition: unsigned,
-        }),
-      )
-      .valueOf();
+    const signature = DeviceAuthorizationTransitionSignature.sign(
+      unsigned,
+      proofOfPossession,
+      new PrivateKey(input.author.toPrimitives().privateKey),
+    ).valueOf();
 
     return new DeviceAuthorizationTransition(
       input.epoch,
       input.operationId,
       unsigned,
-      proofOfPossession,
+      proofOfPossession?.valueOf(),
       signature,
     );
   }
@@ -166,9 +164,9 @@ export class DeviceAuthorizationTransition {
       previousRevision: input.previousRevision,
       revision: input.previousRevision + 1,
       targetCredential: input.targetCredential,
-      targetCredentialCommitment: SHA256Hash.from(
-        new StringValueObject(input.targetCredential),
-      ).valueOf(),
+      targetCredentialCommitment: DeviceCredentialCommitment.of(
+        new PublicKey(input.targetCredential),
+      ),
     };
   }
 
@@ -292,13 +290,17 @@ export class DeviceAuthorizationTransition {
       targetCredential: input.proof.getCredential().valueOf(),
     });
 
-    return input.proof
-      .getCredential()
-      .getPublicKey()
-      .isValidSignature(
-        JSON.stringify({ domain: PROOF_DOMAIN, transition: unsigned }),
-        input.proof.getSignature(),
-      );
+    return DeviceAuthorizationTransition.verifies(() =>
+      input.proof
+        .getCredential()
+        .getPublicKey()
+        .isValidSignature(
+          DeviceAuthorizationTransitionSignature.proofOfPossessionContent(
+            unsigned,
+          ),
+          input.proof.getSignature(),
+        ),
+    );
   }
 
   public static proveEnrollment(input: {
@@ -330,8 +332,9 @@ export class DeviceAuthorizationTransition {
 
     return new DeviceAuthorizationEnrollmentProof(
       credential,
-      input.target.sign(
-        JSON.stringify({ domain: PROOF_DOMAIN, transition: unsigned }),
+      DeviceAuthorizationTransitionSignature.provePossession(
+        unsigned,
+        new PrivateKey(input.target.toPrimitives().privateKey),
       ),
     );
   }
@@ -571,28 +574,47 @@ export class DeviceAuthorizationTransition {
     return this.unsigned.operation === 'recover';
   }
 
+  /** A signature check that fails closed on malformed input. */
+  private static verifies(check: () => boolean): boolean {
+    try {
+      return check();
+    } catch {
+      return false;
+    }
+  }
+
   /** Whether the key signed this transition together with its target proof. */
   public isSignedBy(publicKey: PublicKey): boolean {
-    return publicKey.isValidSignature(
-      JSON.stringify({
-        domain: SIGNATURE_DOMAIN,
-        proofOfPossession: this.proofOfPossession,
-        transition: this.unsigned,
-      }),
-      new Signature(this.signature),
-    );
+    return DeviceAuthorizationTransition.verifies(() => {
+      DeviceAuthorizationTransitionSignature.verify(
+        this.unsigned,
+        this.proofOfPossession === undefined
+          ? undefined
+          : new Signature(this.proofOfPossession),
+        new Signature(this.signature),
+        publicKey,
+      );
+
+      return true;
+    });
   }
 
   /** Whether the target credential proved it holds its private key. */
   public hasTargetProof(): boolean {
+    const proof = this.proofOfPossession;
+
     return (
-      this.proofOfPossession !== undefined &&
-      this.getTargetCredential()
-        .getPublicKey()
-        .isValidSignature(
-          JSON.stringify({ domain: PROOF_DOMAIN, transition: this.unsigned }),
-          new Signature(this.proofOfPossession),
-        )
+      proof !== undefined &&
+      DeviceAuthorizationTransition.verifies(() =>
+        this.getTargetCredential()
+          .getPublicKey()
+          .isValidSignature(
+            DeviceAuthorizationTransitionSignature.proofOfPossessionContent(
+              this.unsigned,
+            ),
+            new Signature(proof),
+          ),
+      )
     );
   }
 

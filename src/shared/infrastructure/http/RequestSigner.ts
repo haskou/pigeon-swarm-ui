@@ -1,11 +1,18 @@
-import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
-import { Buffer } from 'buffer';
+import type {
+  KeyPair,
+  SignedHttpRequest,
+  SignedHttpRequestBody,
+} from '@haskou/pigeon-swarm-crypto';
+
+import {
+  PrivateKey,
+  SignedHttpRequestSignature,
+} from '@haskou/pigeon-swarm-crypto';
 
 import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { Clock } from './Clock';
 
 import { IdentityId } from '../../../contexts/identities/domain/value-objects/IdentityId';
-import { signSessionPayload } from '../crypto/signSessionPayload';
 import { ApiUrlBuilder } from './ApiUrlBuilder';
 
 export class RequestSigner {
@@ -16,6 +23,13 @@ export class RequestSigner {
     pathPrefix = '',
   ) {
     this.pathPrefix = ApiUrlBuilder.normalizePrefix(pathPrefix);
+  }
+
+  private static sign(request: SignedHttpRequest, keyPair: KeyPair): string {
+    return SignedHttpRequestSignature.sign(
+      request,
+      new PrivateKey(keyPair.toPrimitives().privateKey),
+    ).toString();
   }
 
   private signablePath(path: string): string {
@@ -38,45 +52,47 @@ export class RequestSigner {
     return `${this.pathPrefix}${path}`;
   }
 
-  private bodyHash(body?: unknown): string {
-    if (body instanceof ArrayBuffer) {
-      return SHA256Hash.from(Buffer.from(body)).toString();
-    }
+  /** Raw upload bytes are signed as bytes; anything else as its JSON. */
+  private signableBody(body?: unknown): SignedHttpRequestBody {
+    if (body instanceof ArrayBuffer) return new Uint8Array(body);
 
     if (ArrayBuffer.isView(body)) {
-      return SHA256Hash.from(
-        Buffer.from(body.buffer, body.byteOffset, body.byteLength),
-      ).toString();
+      return new Uint8Array(body.buffer, body.byteOffset, body.byteLength);
     }
 
-    return SHA256Hash.from(this.bodyToString(body)).toString();
+    return body as SignedHttpRequestBody;
   }
 
-  private bodyToString(body?: unknown): string {
-    if (body === undefined || body === null) return JSON.stringify({});
-
-    if (typeof body === 'string') return body;
-
-    return JSON.stringify(body);
+  private request(
+    method: string,
+    path: string,
+    timestamp: number,
+    body?: unknown,
+  ): SignedHttpRequest {
+    return {
+      body: this.signableBody(body),
+      method: method.toUpperCase(),
+      path: this.signablePath(path),
+      timestamp,
+    };
   }
 
-  private async signedRequest(
+  private signedRequest(
     session: Session,
     method: string,
     path: string,
     body: unknown,
-  ): Promise<{ headers: Record<string, string>; payload: string }> {
+  ): { headers: Record<string, string>; request: SignedHttpRequest } {
     const timestamp = this.clock();
-    const payload = this.payload(method, path, timestamp, body);
-    const signature = await signSessionPayload(session, payload);
+    const request = this.request(method, path, timestamp, body);
 
     return {
       headers: {
         'X-Identity-Id': IdentityId.normalize(session.identity.id),
-        'X-Signature': signature.toString(),
+        'X-Signature': RequestSigner.sign(request, session.keyPair),
         'X-Timestamp': `${timestamp}`,
       },
-      payload,
+      request,
     };
   }
 
@@ -89,55 +105,65 @@ export class RequestSigner {
     return this.headersWithDeviceProof(session, method, path, body);
   }
 
-  public async headersWithDeviceProof(
+  public headersWithDeviceProof(
     session: Session,
     method: string,
     path: string,
     body?: unknown,
   ): Promise<Record<string, string>> {
-    const request = await this.signedRequest(session, method, path, body);
+    const { headers, request } = this.signedRequest(
+      session,
+      method,
+      path,
+      body,
+    );
     const credential = IdentityId.normalize(
       session.deviceCredentialKeyPair.toPrimitives().publicKey,
     );
 
-    return {
-      ...request.headers,
+    return Promise.resolve({
+      ...headers,
       'X-Device-Authorization-Epoch': session.authorizationEpoch.valueOf(),
       'X-Device-Authorization-Revision': `${session.authorizationRevision.valueOf()}`,
       'X-Device-Credential': credential,
-      'X-Device-Signature': session.deviceCredentialKeyPair
-        .sign(request.payload)
-        .toString(),
-    };
+      'X-Device-Signature': RequestSigner.sign(
+        request,
+        session.deviceCredentialKeyPair,
+      ),
+    });
   }
 
-  public async headersWithRecoveryProof(
+  public headersWithRecoveryProof(
     session: Session,
     method: string,
     path: string,
     body?: unknown,
   ): Promise<Record<string, string>> {
-    const request = await this.signedRequest(session, method, path, body);
+    const { headers, request } = this.signedRequest(
+      session,
+      method,
+      path,
+      body,
+    );
 
-    return {
-      ...request.headers,
-      'X-Recovery-Signature': session.recoveryAuthorityKeyPair
-        .sign(request.payload)
-        .toString(),
-    };
+    return Promise.resolve({
+      ...headers,
+      'X-Recovery-Signature': RequestSigner.sign(
+        request,
+        session.recoveryAuthorityKeyPair,
+      ),
+    });
   }
 
+  /** The exact content the identity, device and recovery keys sign. */
   public payload(
     method: string,
     path: string,
     timestamp: number,
     body?: unknown,
   ): string {
-    return JSON.stringify({
-      bodyHash: this.bodyHash(body),
-      method: method.toUpperCase(),
-      path: this.signablePath(path),
-      timestamp,
-    });
+    return SignedHttpRequestSignature.signingContent(
+      this.request(method, path, timestamp, body),
+    );
   }
 }

@@ -133,6 +133,25 @@ change. It retries at most twice and never mines above 24 bits
 re-mines, the create and profile save buttons show the requested difficulty
 and the retry number.
 
+### Signed formats
+
+Every signed preimage (identities, keychains, device authorization
+transitions, device sealed secrets, device pairing, community operations,
+public mutations, signed HTTP requests) is built, signed and verified by
+`@haskou/pigeon-swarm-crypto` 6 (`*Signature` classes, `CanonicalJson`,
+`DeviceCredentialCommitment`). The UI keeps no local preimage builder. Specs
+check those bytes against the vectors the library ships
+(`@haskou/pigeon-swarm-crypto/vectors/*.json`), not against local copies.
+
+This is a clean cutover. Identities, keychains, sealed secrets and records
+signed before 6 are rejected; there is no reader for the old formats. Wipe the
+browser storage of the site (IndexedDB and localStorage) and create a new
+identity against a node that also runs crypto 6.
+
+`CanonicalJson` throws on lone UTF-16 surrogates. Group names and member
+identities that contain one are rejected by `GroupMailboxRoster`, so a create
+or rename with such a name fails before anything is sent.
+
 ## Development
 
 Install dependencies:

@@ -1,11 +1,10 @@
-import {
-  deriveInviteReference,
-  deriveInviteToken,
-} from '../../../../../contexts/communities/infrastructure/http/deriveCommunityRecordId';
-import vectors from '../../../../fixtures/community-operation-vectors.json';
+import { CommunityInviteReference } from '@haskou/pigeon-swarm-crypto';
+import vectors from '@haskou/pigeon-swarm-crypto/vectors/community-operation.json';
 
-// The fixture is the node's tests/fixtures/community-operation-vectors.json,
-// checked there by CommunityInviteToken.
+import { deriveInviteToken } from '../../../../../contexts/communities/infrastructure/http/deriveCommunityRecordId';
+
+// The library ships these vectors; the node checks them through
+// CommunityInviteToken.
 describe('invite token vectors', () => {
   const invite = vectors.inviteToken;
 
@@ -34,6 +33,6 @@ describe('invite token vectors', () => {
   });
 
   it('derives the node reference of the token', () => {
-    expect(deriveInviteReference(invite.token)).toBe(invite.reference);
+    expect(CommunityInviteReference.of(invite.token)).toBe(invite.reference);
   });
 });

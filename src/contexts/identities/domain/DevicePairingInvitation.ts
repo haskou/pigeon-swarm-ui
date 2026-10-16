@@ -1,4 +1,9 @@
-import { KeyPair, Signature } from '@haskou/pigeon-swarm-crypto';
+import {
+  DevicePairingInvitationSignature,
+  KeyPair,
+  PrivateKey,
+  Signature,
+} from '@haskou/pigeon-swarm-crypto';
 import { Timestamp, assert } from '@haskou/value-objects';
 
 import type { DevicePairingInvitationPayload } from './DevicePairingInvitationPayload';
@@ -11,7 +16,6 @@ import { DevicePairingCode } from './value-objects/DevicePairingCode';
 import { IdentityId } from './value-objects/IdentityId';
 import { PairingId } from './value-objects/PairingId';
 
-const DOMAIN = 'pigeon:device-pairing:invitation:v1';
 const KIND = 'pigeon-device-pairing-invitation';
 
 export class DevicePairingInvitation {
@@ -68,8 +72,9 @@ export class DevicePairingInvitation {
       input.identityId,
       input.pairingId,
       input.revision,
-      input.author.sign(
-        JSON.stringify({ domain: DOMAIN, invitation: payload }),
+      DevicePairingInvitationSignature.sign(
+        payload,
+        new PrivateKey(input.author.toPrimitives().privateKey),
       ),
     );
   }
@@ -96,14 +101,23 @@ export class DevicePairingInvitation {
     };
   }
 
+  private isSignedByAuthor(): boolean {
+    try {
+      DevicePairingInvitationSignature.verify(
+        this.payload(),
+        this.signature,
+        this.authorCredential.getPublicKey(),
+      );
+
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   public assertValidAt(acceptedAt: Timestamp): void {
     assert(
-      this.authorCredential
-        .getPublicKey()
-        .isValidSignature(
-          JSON.stringify({ domain: DOMAIN, invitation: this.payload() }),
-          this.signature,
-        ),
+      this.isSignedByAuthor(),
       new DevicePairingError('invalid', 'Invalid device pairing invitation.'),
     );
     assert(

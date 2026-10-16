@@ -1,7 +1,8 @@
+import { CanonicalJson } from '@haskou/pigeon-swarm-crypto';
+
 import type { MlsContextExtension } from '../../../communities/infrastructure/mls/MlsContextExtension';
 import type { GroupMailboxRosterFields } from '../../domain/GroupMailboxRosterFields';
 
-import { canonicalJson } from '../../../../shared/infrastructure/crypto/canonicalJson';
 import { GroupMailboxRoster } from '../../domain/GroupMailboxRoster';
 
 const KEYS = [
@@ -69,7 +70,7 @@ export class GroupMailboxRosterExtension {
   }
 
   public static encode(roster: GroupMailboxRoster): Uint8Array {
-    return encoder.encode(canonicalJson(roster.toFields()));
+    return encoder.encode(CanonicalJson.serialize(roster.toFields()));
   }
 
   /** The roster the bytes encode, or undefined when they are not one. */
@@ -94,9 +95,14 @@ export class GroupMailboxRosterExtension {
       version,
     });
 
-    return roster && canonicalJson(roster.toFields()) === parsed!.text
-      ? roster
-      : undefined;
+    try {
+      return roster &&
+        CanonicalJson.serialize(roster.toFields()) === parsed!.text
+        ? roster
+        : undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   /**

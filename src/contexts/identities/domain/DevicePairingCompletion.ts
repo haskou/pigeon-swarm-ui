@@ -1,6 +1,8 @@
 import {
+  DevicePairingCompletionSignature,
   EncryptedPayload,
   KeyPair,
+  PrivateKey,
   Signature,
   SymmetricKey,
   UserRootKey,
@@ -20,7 +22,6 @@ import { DevicePairingCode } from './value-objects/DevicePairingCode';
 import { IdentityId } from './value-objects/IdentityId';
 import { PairingId } from './value-objects/PairingId';
 
-const DOMAIN = 'pigeon:device-pairing:completion:v1';
 const KIND = 'pigeon-device-pairing-completion';
 
 export class DevicePairingCompletion {
@@ -75,8 +76,9 @@ export class DevicePairingCompletion {
       operationId: input.request.getOperationId(),
       pairingId: invitation.getPairingId(),
       revision: input.checkpoint.getRevision(),
-      signature: input.author.sign(
-        JSON.stringify({ completion: payload, domain: DOMAIN }),
+      signature: DevicePairingCompletionSignature.sign(
+        payload,
+        new PrivateKey(input.author.toPrimitives().privateKey),
       ),
     });
   }
@@ -127,6 +129,20 @@ export class DevicePairingCompletion {
     };
   }
 
+  private isSignedByAuthor(): boolean {
+    try {
+      DevicePairingCompletionSignature.verify(
+        this.payload(),
+        this.signature,
+        this.authorCredential.getPublicKey(),
+      );
+
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   /**
    * Verifies the completion against the pending request and returns the
    * decrypted material plaintext.
@@ -144,12 +160,7 @@ export class DevicePairingCompletion {
         this.pairingId.isEqual(invitation.getPairingId()) &&
         this.revision.isEqual(invitation.getRevision().add(1)) &&
         this.epoch.isEqual(invitation.getEpoch()) &&
-        this.authorCredential
-          .getPublicKey()
-          .isValidSignature(
-            JSON.stringify({ completion: this.payload(), domain: DOMAIN }),
-            this.signature,
-          ),
+        this.isSignedByAuthor(),
       new DevicePairingError('invalid', 'Invalid device pairing completion.'),
     );
 

@@ -278,7 +278,7 @@ back to the community's creator and to nobody else:
   author's ed25519 signature, with its identity key, over
   `pigeon:community-operation:v1\n` followed by the id
   (`CommunityOperationProof`). Clients send it with every community change;
-  `src/test/fixtures/community-operation-vectors.json` is a copy of the node's
+  `@haskou/pigeon-swarm-crypto/vectors/community-operation.json` is a copy of the node's
   fixture and pins the same bytes.
 - `GET /communities/{communityId}/operations?after=&limit=` serves the
   operations verbatim, by digest, to members (`PigeonCommunityOperationsApi`).
