@@ -222,6 +222,28 @@ describe(DirectMessageOutboxStore.name, () => {
     ).toEqual([row('a')]);
   });
 
+  it('refuses the replaced root when the rows were first stored under the rotated root', async () => {
+    const name = databaseName();
+    const previousRoot = Buffer.alloc(32, 5);
+    const rotatedRoot = Buffer.alloc(32, 9);
+
+    await new DirectMessageOutboxStore(name).save(
+      session('identity-1', rotatedRoot, previousRoot),
+      row('a'),
+    );
+
+    await expect(
+      new DirectMessageOutboxStore(name).load(
+        session('identity-1', previousRoot),
+      ),
+    ).rejects.toThrow('Device sealed root was replaced.');
+    expect(
+      await new DirectMessageOutboxStore(name).load(
+        session('identity-1', rotatedRoot),
+      ),
+    ).toEqual([row('a')]);
+  });
+
   it('keeps every row under the replaced root when the re-seal fails midway, then completes it', async () => {
     const name = databaseName();
     const previousRoot = Buffer.alloc(32, 5);
