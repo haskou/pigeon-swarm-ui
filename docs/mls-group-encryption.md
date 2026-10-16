@@ -33,9 +33,12 @@ removal, so a joiner exports it from its welcome. See "Generations from MLS" in
 reuses `MlsGroup` and `MlsStateStore` in a separate IndexedDB database. Its
 leaves carry the same identity-signed credential as community leaves (see
 "Identity binding"), each must be on the conversation roster, and only the
-roster's managers may commit an add or a removal. Its state, its plaintext
-cache and its generations are sealed with the device root, like the community
-state (see "Security properties and limits").
+roster's managers may commit an add or a removal. A manager's add of another
+member is committed by the device, and the session, that asked that member
+for its key package; any other device of the manager ignores the answer, so a
+sibling that never reads it cannot hold the add back (#509). The engine's
+state, its plaintext cache and its generations are sealed with the device
+root, like the community state (see "Security properties and limits").
 
 Each leaf is a **device**, not an identity. An identity is in the group while
 at least one of its devices is. Removing an identity removes all its leaves. In
