@@ -1,10 +1,9 @@
-import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import { CommitmentId, KeyPair } from '@haskou/pigeon-swarm-crypto';
 import vectors from '@haskou/pigeon-swarm-crypto/vectors/community-operation.json';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { CommunityOperationSigner } from '../../../../../contexts/communities/infrastructure/http/CommunityOperationSigner';
-import { deriveCommunityId } from '../../../../../contexts/communities/infrastructure/http/deriveCommunityRecordId';
 import { PublicMutationSigner } from '../../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
@@ -44,7 +43,7 @@ describe(CommunityOperationSigner.name, () => {
       };
 
       expect(
-        deriveCommunityId(
+        CommitmentId.community(
           preimage.networkId,
           preimage.ownerIdentityId,
           preimage.nonce,

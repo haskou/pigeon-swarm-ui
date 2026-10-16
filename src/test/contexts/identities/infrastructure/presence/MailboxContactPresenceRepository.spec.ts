@@ -1,4 +1,8 @@
-import { MailboxReadToken, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import {
+  BearerCapability,
+  MailboxReadToken,
+  SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 import { Buffer } from 'buffer';
 import { mock } from 'jest-mock-extended';
@@ -15,7 +19,6 @@ import { IdentityId } from '../../../../../contexts/identities/domain/value-obje
 import { IdentityPresenceStatus } from '../../../../../contexts/identities/domain/value-objects/IdentityPresenceStatus';
 import { MailboxContactPresenceRepository } from '../../../../../contexts/identities/infrastructure/presence/MailboxContactPresenceRepository';
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
-import { MailboxCapability } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { RecipientMailboxRouter } from '../../../../../contexts/messages/infrastructure/mailbox/RecipientMailboxRouter';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
@@ -53,7 +56,7 @@ const fakeNode = () => {
   const inboxFor = (mailboxId: string, token: string): FakeInbox => {
     const inbox = inboxes.get(mailboxId);
 
-    if (!inbox?.readers.has(MailboxCapability.hash(token))) {
+    if (!inbox?.readers.has(BearerCapability.hash(token))) {
       throw new MailboxUnavailableError();
     }
 
@@ -88,7 +91,7 @@ const fakeNode = () => {
     await Promise.resolve();
     const inbox = inboxes.get(mailboxId);
 
-    if (inbox?.postTokenHash !== MailboxCapability.hash(postToken)) {
+    if (inbox?.postTokenHash !== BearerCapability.hash(postToken)) {
       throw new MailboxUnavailableError();
     }
     inbox.lastCursor += 1;
@@ -110,7 +113,7 @@ const fakeNode = () => {
   wire.acknowledge.mockImplementation(async (mailboxId, token, upTo) => {
     await Promise.resolve();
     const inbox = inboxFor(mailboxId, token);
-    const hash = MailboxCapability.hash(token);
+    const hash = BearerCapability.hash(token);
 
     inbox.readers.set(hash, Math.max(inbox.readers.get(hash) ?? 0, upTo));
     settle(inbox);
@@ -266,7 +269,7 @@ describe(MailboxContactPresenceRepository.name, () => {
     const { id, inbox } = bobInbox();
 
     expect([...inbox.readers.keys()]).toEqual([
-      MailboxCapability.hash(MailboxReadToken.derive(SEALED, id)),
+      BearerCapability.hash(MailboxReadToken.derive(SEALED, id)),
     ]);
     await expect(
       bob.receive(BOB, FROM_ALICE, new Timestamp(2)),
@@ -376,7 +379,7 @@ describe(MailboxContactPresenceRepository.name, () => {
     const { id, inbox } = bobInbox();
 
     expect([...inbox.readers.keys()]).toEqual([
-      MailboxCapability.hash(MailboxReadToken.derive(ROTATED, id)),
+      BearerCapability.hash(MailboxReadToken.derive(ROTATED, id)),
     ]);
   });
 
@@ -399,7 +402,7 @@ describe(MailboxContactPresenceRepository.name, () => {
     const { id, inbox } = bobInbox();
 
     expect([...inbox.readers.keys()]).toEqual([
-      MailboxCapability.hash(MailboxReadToken.derive(ROTATED, id)),
+      BearerCapability.hash(MailboxReadToken.derive(ROTATED, id)),
     ]);
   });
 
@@ -424,7 +427,7 @@ describe(MailboxContactPresenceRepository.name, () => {
     const { id, inbox } = bobInbox();
 
     expect([...inbox.readers.keys()]).toEqual([
-      MailboxCapability.hash(MailboxReadToken.derive(ROTATED, id)),
+      BearerCapability.hash(MailboxReadToken.derive(ROTATED, id)),
     ]);
   });
 

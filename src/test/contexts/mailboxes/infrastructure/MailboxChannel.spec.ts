@@ -1,4 +1,5 @@
 import {
+  BearerCapability,
   MailboxEnvelope,
   MailboxKeySchedule,
   SymmetricKey,
@@ -8,7 +9,6 @@ import { mock } from 'jest-mock-extended';
 
 import { MailboxCreationDifficultyError } from '../../../../contexts/mailboxes/domain/errors/MailboxCreationDifficultyError';
 import { MailboxUnavailableError } from '../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
-import { MailboxCapability } from '../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxCreationProof } from '../../../../contexts/mailboxes/infrastructure/crypto/MailboxCreationProof';
 import { PigeonMailboxClient } from '../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
 import { MailboxChannel } from '../../../../contexts/mailboxes/infrastructure/MailboxChannel';
@@ -16,7 +16,7 @@ import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonEr
 
 describe(MailboxChannel.name, () => {
   const bytes = (text: string): Uint8Array => new TextEncoder().encode(text);
-  const readToken = 'read-token-for-bob';
+  const readToken = 'read-capability-token-for-bob';
   const deviceToken = 'device-read-token-for-bob';
   const readers = { device: deviceToken, root: readToken };
   const keys = MailboxKeySchedule.derive(
@@ -52,8 +52,8 @@ describe(MailboxChannel.name, () => {
 
     await channel.createInbox(keys, readToken);
 
-    const postTokenHash = MailboxCapability.hash(keys.postToken);
-    const readTokenHash = MailboxCapability.hash(readToken);
+    const postTokenHash = BearerCapability.hash(keys.postToken);
+    const readTokenHash = BearerCapability.hash(readToken);
 
     expect(client.create).toHaveBeenCalledWith(keys.mailboxId, {
       creationNonce: expect.any(String),
@@ -171,8 +171,8 @@ describe(MailboxChannel.name, () => {
   });
 
   describe('creation difficulty', () => {
-    const postTokenHash = MailboxCapability.hash(keys.postToken);
-    const readTokenHash = MailboxCapability.hash(readToken);
+    const postTokenHash = BearerCapability.hash(keys.postToken);
+    const readTokenHash = BearerCapability.hash(readToken);
 
     it('re-mines at the difficulty the node requires and retries the PUT once', async () => {
       const { channel, client, mine } = setup();
@@ -284,8 +284,8 @@ describe(MailboxChannel.name, () => {
   });
 
   describe('recovering an evicted mailbox', () => {
-    const postTokenHash = MailboxCapability.hash(keys.postToken);
-    const readTokenHash = MailboxCapability.hash(readToken);
+    const postTokenHash = BearerCapability.hash(keys.postToken);
+    const readTokenHash = BearerCapability.hash(readToken);
 
     it('re-creates the mailbox with the same hashes and retries the read once', async () => {
       const { channel, client } = setup();
@@ -313,7 +313,7 @@ describe(MailboxChannel.name, () => {
       expect(client.addReader).toHaveBeenCalledWith(
         keys.mailboxId,
         readToken,
-        MailboxCapability.hash(deviceToken),
+        BearerCapability.hash(deviceToken),
       );
       expect(client.addReader.mock.invocationCallOrder[0]).toBeGreaterThan(
         client.create.mock.invocationCallOrder[0],
@@ -350,7 +350,7 @@ describe(MailboxChannel.name, () => {
       expect(client.addReader).toHaveBeenCalledWith(
         keys.mailboxId,
         readToken,
-        MailboxCapability.hash(deviceToken),
+        BearerCapability.hash(deviceToken),
       );
       expect(client.acknowledge.mock.calls).toEqual([
         [keys.mailboxId, deviceToken, 3],
@@ -392,7 +392,7 @@ describe(MailboxChannel.name, () => {
       expect(client.addReader).toHaveBeenCalledWith(
         keys.mailboxId,
         readToken,
-        MailboxCapability.hash(deviceToken),
+        BearerCapability.hash(deviceToken),
       );
     });
 
