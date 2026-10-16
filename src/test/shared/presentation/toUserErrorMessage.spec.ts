@@ -150,4 +150,22 @@ describe(toUserErrorMessage.name, () => {
       );
     },
   );
+
+  it.each([
+    [401020, 401],
+    [401021, 401],
+    [403010, 403],
+    [413010, 413],
+    [429060, 429],
+  ] as const)('explains block list upload refusal %s', (code, status) => {
+    const error = new HttpJsonError(
+      status,
+      'Refused',
+      JSON.stringify({ code, httpStatus: status }),
+    );
+
+    expect(toUserErrorMessage(error, 'fallback')).toBe(
+      copy.errors.backend[code],
+    );
+  });
 });

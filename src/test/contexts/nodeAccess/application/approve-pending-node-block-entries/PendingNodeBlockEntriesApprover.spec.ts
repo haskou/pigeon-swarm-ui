@@ -6,14 +6,13 @@ import type { NodeBlockSourceResource } from '../../../../../contexts/nodeAccess
 
 import { ApprovePendingNodeBlockEntriesMessage } from '../../../../../contexts/nodeAccess/application/approve-pending-node-block-entries/messages/ApprovePendingNodeBlockEntriesMessage';
 import { PendingNodeBlockEntriesApprover } from '../../../../../contexts/nodeAccess/application/approve-pending-node-block-entries/PendingNodeBlockEntriesApprover';
-import { NodeBlockSourceHasNothingPendingError } from '../../../../../contexts/nodeAccess/domain/errors/NodeBlockSourceHasNothingPendingError';
 import { PigeonNodeAccessApi } from '../../../../../contexts/nodeAccess/infrastructure/http/PigeonNodeAccessApi';
 import { PigeonNodeBlockSourceRepository } from '../../../../../contexts/nodeAccess/infrastructure/http/repositories/PigeonNodeBlockSourceRepository';
+import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 
 const owner = 'T3duZXJLZXk=';
 const sourceOwner = 'U291cmNlT3duZXI=';
 const alice = 'QWxpY2VLZXk=';
-const bob = 'Qm9iS2V5';
 const peer = '12D3KooWAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
 function source(): NodeBlockSourceResource {
@@ -29,21 +28,13 @@ function source(): NodeBlockSourceResource {
   };
 }
 
-function approverWith(pending: {
-  blockedIdentityIds: string[];
-  blockedNodePeerIds: string[];
-  version: number | null;
-}): {
+function approverWith(): {
   api: MockProxy<PigeonNodeAccessApi>;
   approver: PendingNodeBlockEntriesApprover;
 } {
   const api = mock<PigeonNodeAccessApi>();
   const sessions = mock<NodeAccessSessions>();
   sessions.find.mockReturnValue({} as Session);
-  api.getPendingEntries.mockResolvedValue({
-    ...pending,
-    ownerIdentityId: sourceOwner,
-  });
   api.postApproval.mockResolvedValue(source());
 
   return {
@@ -55,39 +46,33 @@ function approverWith(pending: {
 }
 
 describe(PendingNodeBlockEntriesApprover.name, () => {
-  it('approves every pending entry of the version under review', async () => {
-    const { api, approver } = approverWith({
-      blockedIdentityIds: [alice, bob],
-      blockedNodePeerIds: [peer],
-      version: 5,
-    });
+  it('approves every pending entry of the version the owner reviewed', async () => {
+    const { api, approver } = approverWith();
 
     await approver.approve(
       new ApprovePendingNodeBlockEntriesMessage({
         actorIdentityId: owner,
         sourceOwnerIdentityId: sourceOwner,
+        version: 4,
       }),
     );
 
     expect(api.postApproval).toHaveBeenCalledWith(
       sourceOwner,
-      { all: true, version: 5 },
+      { all: true, version: 4 },
       expect.anything(),
     );
   });
 
-  it('approves one pending entry of the version under review', async () => {
-    const { api, approver } = approverWith({
-      blockedIdentityIds: [alice, bob],
-      blockedNodePeerIds: [peer],
-      version: 5,
-    });
+  it('approves one pending entry of the version the owner reviewed', async () => {
+    const { api, approver } = approverWith();
 
     await approver.approve(
       new ApprovePendingNodeBlockEntriesMessage({
         actorIdentityId: owner,
         entry: { nodePeerId: peer },
         sourceOwnerIdentityId: sourceOwner,
+        version: 4,
       }),
     );
 
@@ -97,28 +82,44 @@ describe(PendingNodeBlockEntriesApprover.name, () => {
         all: false,
         blockedIdentityIds: [],
         blockedNodePeerIds: [peer],
-        version: 5,
+        version: 4,
       },
       expect.anything(),
     );
   });
 
-  it('refuses to approve an entry the source does not list as pending', async () => {
-    const { api, approver } = approverWith({
-      blockedIdentityIds: [alice],
-      blockedNodePeerIds: [],
-      version: 5,
-    });
+  it('never swaps the reviewed version for a newer pending one', async () => {
+    const { api, approver } = approverWith();
+
+    await approver.approve(
+      new ApprovePendingNodeBlockEntriesMessage({
+        actorIdentityId: owner,
+        entry: { identityId: alice },
+        sourceOwnerIdentityId: sourceOwner,
+        version: 4,
+      }),
+    );
+
+    expect(api.getPendingEntries).not.toHaveBeenCalled();
+  });
+
+  it('lets a stale version refusal reach the caller', async () => {
+    const { api, approver } = approverWith();
+    const stale = new HttpJsonError(
+      409,
+      'Conflict',
+      JSON.stringify({ code: 'NodeBlockSourceVersionHasChangedError' }),
+    );
+    api.postApproval.mockRejectedValue(stale);
 
     await expect(
       approver.approve(
         new ApprovePendingNodeBlockEntriesMessage({
           actorIdentityId: owner,
-          entry: { identityId: bob },
           sourceOwnerIdentityId: sourceOwner,
+          version: 4,
         }),
       ),
-    ).rejects.toThrow(NodeBlockSourceHasNothingPendingError);
-    expect(api.postApproval).not.toHaveBeenCalled();
+    ).rejects.toBe(stale);
   });
 });
