@@ -5,6 +5,7 @@ import {
 
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { DeviceSealedCanaryRecord } from './DeviceSealedCanaryRecord';
+import type { DeviceSealedSettlement as Settlement } from './DeviceSealedSettlement';
 
 import {
   indexedDbRequest,
@@ -15,6 +16,9 @@ const DATABASE_VERSION = 1;
 const ENTRIES_STORE = 'entries';
 const CANARIES_STORE = 'canaries';
 const ROW_PURPOSE = 'row';
+const REPLACED_ROOT = 'Device sealed root was replaced.';
+/** How many replaced roots a canary record lists, the latest ones. */
+const MAX_RETIRED = 16;
 
 function entryKey(identityId: string, id: string): string {
   return `${identityId}\u0000${id}`;
@@ -37,24 +41,12 @@ function isRetired(
   return (record?.retired ?? []).some((sealed) => keys.opensCanary(sealed));
 }
 
-/**
- * The canary record for `current`: the `held` record's retired roots, plus
- * `replaced` when it is not listed yet.
- */
-function canaryRecord(
-  current: DeviceRootRowKeys,
-  held: DeviceSealedCanaryRecord | undefined,
-  replaced: DeviceRootRowKeys | undefined,
-): DeviceSealedCanaryRecord {
-  const retired = held?.retired ?? [];
-
-  return {
-    retired:
-      replaced && !isRetired(held, replaced)
-        ? [...retired, replaced.sealCanary()]
-        : retired,
-    sealed: current.sealCanary(),
-  };
+/** `retired` plus `added`, keeping only the latest `MAX_RETIRED`. */
+function bounded(
+  retired: readonly Uint8Array[],
+  added: readonly Uint8Array[],
+): Uint8Array[] {
+  return [...retired, ...added].slice(-MAX_RETIRED);
 }
 
 function openDatabase(name: string): Promise<IDBDatabase> {
@@ -75,130 +67,154 @@ function wipeIdentity(transaction: IDBTransaction, identityId: string): void {
 }
 
 /**
- * Drops every row of the identity and stores a canary for `current` that
- * keeps the retired roots of `held` and lists `replaced`, in one transaction.
- */
-async function renew(
-  database: IDBDatabase,
-  identityId: string,
-  current: DeviceRootRowKeys,
-  held: DeviceSealedCanaryRecord | undefined,
-  replaced: DeviceRootRowKeys | undefined,
-): Promise<void> {
-  const transaction = database.transaction(
-    [ENTRIES_STORE, CANARIES_STORE],
-    'readwrite',
-  );
-
-  wipeIdentity(transaction, identityId);
-  transaction
-    .objectStore(CANARIES_STORE)
-    .put(canaryRecord(current, held, replaced), identityId);
-  await indexedDbTransaction(transaction);
-}
-
-/**
- * Re-seals every row of the identity from the keys of the replaced root under
- * the current ones and swaps the canary, listing the replaced root as
- * retired, in one transaction, only while the canary still opens under the
+ * Re-seals every row of the identity from the `replaced` keys under the
+ * `current` ones within `transaction`, then swaps the canary and lists the
  * replaced root. A row that does not open is dropped. Any failure aborts the
- * transaction, so the rows stay whole under the replaced root. When the
- * canary already opens under the current root, as after a re-seal elsewhere,
- * nothing changes. Resolves with the re-sealed and dropped counts.
+ * transaction, so the rows stay whole under the replaced root.
  */
-async function reseal(
-  database: IDBDatabase,
+function resealWithin(
+  transaction: IDBTransaction,
   identityId: string,
-  replaced: DeviceRootRowKeys,
-  current: DeviceRootRowKeys,
-): Promise<{ dropped: number; resealed: number }> {
-  const transaction = database.transaction(
-    [ENTRIES_STORE, CANARIES_STORE],
-    'readwrite',
-  );
+  held: DeviceSealedCanaryRecord,
+  {
+    current,
+    replaced,
+  }: { current: DeviceRootRowKeys; replaced: DeviceRootRowKeys },
+  settled: (settlement: Settlement) => void,
+): void {
   const entries = transaction.objectStore(ENTRIES_STORE);
-  const canaries = transaction.objectStore(CANARIES_STORE);
-  const held = canaries.get(identityId) as IDBRequest<
-    DeviceSealedCanaryRecord | undefined
-  >;
   const keys = entries.getAllKeys(identityRange(identityId));
   const rows = entries.getAll(identityRange(identityId)) as IDBRequest<
     { sealed: Uint8Array }[]
   >;
-  const counts = { dropped: 0, resealed: 0 };
 
-  // Requests of one transaction complete in order: `held` and `keys` are done.
+  // Requests of one transaction complete in order: `keys` is done.
   rows.addEventListener('success', () => {
-    const canary = held.result;
-
-    if (canary && current.opensCanary(canary.sealed)) return;
-
-    if (!canary || !replaced.opensCanary(canary.sealed)) {
-      transaction.abort();
-
-      return;
-    }
-
     try {
+      let resealed = 0;
+
       rows.result.forEach(({ sealed }, index) => {
         const key = keys.result[index];
         const plaintext = replaced.open(ROW_PURPOSE, [], sealed);
 
         if (!plaintext) {
           entries.delete(key);
-          counts.dropped += 1;
 
           return;
         }
         entries.put({ sealed: current.seal(ROW_PURPOSE, [], plaintext) }, key);
-        counts.resealed += 1;
+        resealed += 1;
       });
-      canaries.put(canaryRecord(current, canary, replaced), identityId);
+      transaction.objectStore(CANARIES_STORE).put(
+        {
+          retired: bounded(held.retired ?? [], [replaced.sealCanary()]),
+          sealed: current.sealCanary(),
+        },
+        identityId,
+      );
+      settled({
+        dropped: rows.result.length - resealed,
+        refused: false,
+        resealed,
+      });
     } catch {
       transaction.abort();
     }
   });
-  await indexedDbTransaction(transaction);
-
-  return counts;
 }
 
 /**
- * Lists the replaced root as retired on the canary record, in one
- * transaction, while the canary still opens under the current root and does
- * not list it yet. Writes nothing when the `held` record already lists it.
+ * Drops every row of the identity within `transaction` and renews its
+ * canary under `current`. When the session names a `replaced` root, a
+ * rotation skipped on this device replaced the dropped canary's root as well,
+ * so both are listed.
  */
-async function retire(
-  database: IDBDatabase,
+function renewWithin(
+  transaction: IDBTransaction,
+  identityId: string,
+  held: DeviceSealedCanaryRecord | undefined,
+  {
+    current,
+    replaced,
+  }: { current: DeviceRootRowKeys; replaced?: DeviceRootRowKeys },
+): void {
+  const skipped = held && replaced ? [held.sealed] : [];
+  const listed = replaced && !isRetired(held, replaced);
+
+  wipeIdentity(transaction, identityId);
+  transaction.objectStore(CANARIES_STORE).put(
+    {
+      retired: bounded(held?.retired ?? [], [
+        ...skipped,
+        ...(listed ? [replaced.sealCanary()] : []),
+      ]),
+      sealed: current.sealCanary(),
+    },
+    identityId,
+  );
+}
+
+/** Lists the `replaced` root in `held` within `transaction`, once. */
+function retireWithin(
+  transaction: IDBTransaction,
   identityId: string,
   held: DeviceSealedCanaryRecord,
-  replaced: DeviceRootRowKeys,
-  current: DeviceRootRowKeys,
-): Promise<void> {
-  if (isRetired(held, replaced)) return;
+  replaced: DeviceRootRowKeys | undefined,
+): void {
+  if (!replaced || isRetired(held, replaced)) return;
 
-  const transaction = database.transaction(CANARIES_STORE, 'readwrite');
-  const canaries = transaction.objectStore(CANARIES_STORE);
-  const stored = canaries.get(identityId) as IDBRequest<
-    DeviceSealedCanaryRecord | undefined
-  >;
+  transaction.objectStore(CANARIES_STORE).put(
+    {
+      ...held,
+      retired: bounded(held.retired ?? [], [replaced.sealCanary()]),
+    },
+    identityId,
+  );
+}
+
+/**
+ * Brings the identity's canary record to the `current` root within
+ * `transaction`, read-write on both stores, deciding on the record as stored
+ * now, then calls `settled` so the caller writes in the same transaction:
+ *
+ * - a root the record lists as retired is refused: the transaction aborts;
+ * - under the current root, the `replaced` root is listed when it is not yet;
+ * - under the replaced root, every row is re-sealed under the current one;
+ * - otherwise the rows are dropped and the canary renewed.
+ */
+function settle(
+  transaction: IDBTransaction,
+  identityId: string,
+  roots: { current: DeviceRootRowKeys; replaced?: DeviceRootRowKeys },
+  settled: (settlement: Settlement) => void,
+): void {
+  const { current, replaced } = roots;
+  const stored = transaction
+    .objectStore(CANARIES_STORE)
+    .get(identityId) as IDBRequest<DeviceSealedCanaryRecord | undefined>;
 
   stored.addEventListener('success', () => {
-    const canary = stored.result;
+    const held = stored.result;
 
-    if (!canary || !current.opensCanary(canary.sealed)) return;
-
-    if (isRetired(canary, replaced)) return;
-
-    canaries.put(
-      {
-        ...canary,
-        retired: [...(canary.retired ?? []), replaced.sealCanary()],
-      },
-      identityId,
-    );
+    if (isRetired(held, current)) {
+      settled({ refused: true });
+      transaction.abort();
+    } else if (held && current.opensCanary(held.sealed)) {
+      retireWithin(transaction, identityId, held, replaced);
+      settled({ refused: false });
+    } else if (held && replaced?.opensCanary(held.sealed)) {
+      resealWithin(
+        transaction,
+        identityId,
+        held,
+        { current, replaced },
+        settled,
+      );
+    } else {
+      renewWithin(transaction, identityId, held, roots);
+      settled({ refused: false });
+    }
   });
-  await indexedDbTransaction(transaction);
 }
 
 /**
@@ -211,9 +227,10 @@ async function retire(
  * session's root. When it opens only under the root the session replaced, as
  * after a device revoke, the rows are re-sealed under the current root in one
  * transaction, so nothing pending is lost. When it opens under neither, the
- * identity's rows are dropped. The canary record lists every root the session
- * replaced, and a listed root is refused in any tab or store instance, so a
- * stale session never drops newer rows.
+ * identity's rows are dropped. The canary record lists the latest roots the
+ * session replaced, and a listed root is refused in any tab or store
+ * instance, so a stale session never drops newer rows. Every write decides on
+ * the canary as stored in its own transaction.
  */
 export class DeviceSealedRowStore<Row extends { readonly id: string }> {
   public constructor(
@@ -222,29 +239,66 @@ export class DeviceSealedRowStore<Row extends { readonly id: string }> {
     private readonly logName: string,
   ) {}
 
-  /** Re-seals the rows from the replaced root and logs only the counts. */
-  private async resealFrom(
+  /** The row keys of the session's root and of the root it replaced. */
+  private rowKeys(
+    session: Session,
+    root: SymmetricKey,
+  ): { keys: DeviceRootRowKeys; replaced?: DeviceRootRowKeys } {
+    const identityId = session.identity.id;
+    const previous = session.previousDeviceSealedRootKey;
+
+    return {
+      keys: DeviceRootRowKeys.derive(root, this.label, identityId),
+      replaced: previous
+        ? DeviceRootRowKeys.derive(previous, this.label, identityId)
+        : undefined,
+    };
+  }
+
+  /**
+   * Settles the identity's canary record for `keys` in one read-write
+   * transaction, then runs `write` in it. Rejects for a root the record lists
+   * as replaced. Logs only counts after a re-seal.
+   */
+  private async settleWith(
     database: IDBDatabase,
     identityId: string,
-    replaced: DeviceRootRowKeys,
-    current: DeviceRootRowKeys,
+    keys: DeviceRootRowKeys,
+    replaced: DeviceRootRowKeys | undefined,
+    write: (entries: IDBObjectStore) => void = () => undefined,
   ): Promise<void> {
-    const { dropped, resealed } = await reseal(
-      database,
-      identityId,
-      replaced,
-      current,
+    const transaction = database.transaction(
+      [ENTRIES_STORE, CANARIES_STORE],
+      'readwrite',
     );
+    let settlement: Settlement = { refused: false };
 
-    // eslint-disable-next-line no-console
-    console.info(
-      `${this.logName} re-sealed ${resealed} rows and dropped ${dropped}.`,
-    );
+    settle(transaction, identityId, { current: keys, replaced }, (decided) => {
+      settlement = decided;
+
+      if (!decided.refused) write(transaction.objectStore(ENTRIES_STORE));
+    });
+
+    try {
+      await indexedDbTransaction(transaction);
+    } catch (error) {
+      if (settlement.refused) throw new Error(REPLACED_ROOT);
+
+      throw error;
+    }
+
+    if (settlement.resealed !== undefined) {
+      // eslint-disable-next-line no-console
+      console.info(
+        `${this.logName} re-sealed ${settlement.resealed} rows and dropped ${settlement.dropped ?? 0}.`,
+      );
+    }
   }
 
   /**
    * The identity's row keys under this root, once its rows are known to be
-   * sealed under it. Rejects for a root the canary record lists as replaced.
+   * sealed under it. Reads first, and writes only when the canary record has
+   * to change. Rejects for a root the canary record lists as replaced.
    */
   private async verifiedKeys(
     database: IDBDatabase,
@@ -252,11 +306,7 @@ export class DeviceSealedRowStore<Row extends { readonly id: string }> {
     root: SymmetricKey,
   ): Promise<DeviceRootRowKeys> {
     const identityId = session.identity.id;
-    const keys = DeviceRootRowKeys.derive(root, this.label, identityId);
-    const previous = session.previousDeviceSealedRootKey;
-    const replaced = previous
-      ? DeviceRootRowKeys.derive(previous, this.label, identityId)
-      : undefined;
+    const { keys, replaced } = this.rowKeys(session, root);
     const canary = await indexedDbRequest(
       database
         .transaction(CANARIES_STORE, 'readonly')
@@ -264,24 +314,25 @@ export class DeviceSealedRowStore<Row extends { readonly id: string }> {
         .get(identityId) as IDBRequest<DeviceSealedCanaryRecord | undefined>,
     );
 
-    if (isRetired(canary, keys)) {
-      throw new Error('Device sealed root was replaced.');
-    }
+    if (isRetired(canary, keys)) throw new Error(REPLACED_ROOT);
 
-    if (!canary) {
-      await renew(database, identityId, keys, canary, replaced);
-    } else if (keys.opensCanary(canary.sealed)) {
-      if (replaced) await retire(database, identityId, canary, replaced, keys);
-    } else if (replaced?.opensCanary(canary.sealed)) {
-      await this.resealFrom(database, identityId, replaced, keys);
-    } else {
-      await renew(database, identityId, keys, canary, replaced);
+    const current =
+      canary !== undefined &&
+      keys.opensCanary(canary.sealed) &&
+      (!replaced || isRetired(canary, replaced));
+
+    if (!current) {
+      await this.settleWith(database, identityId, keys, replaced);
     }
 
     return keys;
   }
 
-  /** Persists a row. Rejects on failure. */
+  /**
+   * Persists a row, in the transaction that settles the canary record, so a
+   * row is never written under a root another tab replaced. Rejects on
+   * failure.
+   */
   public async save(session: Session, row: Row): Promise<void> {
     const root = session.deviceSealedRootKey;
 
@@ -291,18 +342,16 @@ export class DeviceSealedRowStore<Row extends { readonly id: string }> {
 
     try {
       const database = await openDatabase(this.databaseName);
-      const keys = await this.verifiedKeys(database, session, root);
+      const { keys, replaced } = this.rowKeys(session, root);
       const sealed = keys.seal(
         ROW_PURPOSE,
         [],
         new TextEncoder().encode(JSON.stringify(row)),
       );
-      const transaction = database.transaction(ENTRIES_STORE, 'readwrite');
 
-      transaction
-        .objectStore(ENTRIES_STORE)
-        .put({ sealed }, entryKey(identityId, row.id));
-      await indexedDbTransaction(transaction);
+      await this.settleWith(database, identityId, keys, replaced, (entries) =>
+        entries.put({ sealed }, entryKey(identityId, row.id)),
+      );
     } catch (error) {
       // eslint-disable-next-line no-console
       console.debug(`${this.logName} save failed.`);
