@@ -8,6 +8,11 @@ import { DirectMailboxRecords } from '../../../mailboxes/domain/DirectMailboxRec
 
 const DIRECT_MESSAGE_KIND = 'direct-message';
 const DIRECT_MESSAGE_VERSION = 2;
+/**
+ * The id is part of the history row's AAD, which the device row cipher caps.
+ * A peer's longer id would fail every seal and stall the conversation.
+ */
+const MAX_RECORD_ID_LENGTH = 256;
 
 type DirectMessageEnvelope = {
   authorTag?: string;
@@ -176,7 +181,8 @@ function hasRecordBase(value: unknown): value is Record<string, unknown> {
     typeof value.authorId === 'string' &&
     typeof value.conversationId === 'string' &&
     typeof value.createdAt === 'number' &&
-    typeof value.id === 'string'
+    typeof value.id === 'string' &&
+    value.id.length <= MAX_RECORD_ID_LENGTH
   );
 }
 
