@@ -93,16 +93,16 @@ export class DeviceRemovalDomainService {
   }
 
   /**
-   * Returns the verified head when it still authorizes the reader. Rejects
-   * with DeviceRemovedError on a verified removal, and with
+   * Returns the replay of a log whose head still authorizes the reader.
+   * Rejects with DeviceRemovedError on a verified removal, and with
    * UnprovenDeviceAuthorizationError when the log proves neither.
    */
-  public static verify(input: {
+  public static verifiedReplay(input: {
     genesis: DeviceAuthorization;
     local: LocalDeviceAuthorizationCheckpoint;
     log: DeviceAuthorizationTransitionLog;
     reader: DeviceCredential;
-  }): DeviceAuthorization {
+  }): DeviceAuthorizationReplay {
     const replay = this.replayOf(input.genesis, input.log);
     const removal = this.removalOf(
       input.log,
@@ -126,6 +126,18 @@ export class DeviceRemovalDomainService {
       new UnprovenDeviceAuthorizationError(),
     );
 
-    return head;
+    return replay;
+  }
+
+  /** The head of the verified replay; see verifiedReplay. */
+  public static verify(input: {
+    genesis: DeviceAuthorization;
+    local: LocalDeviceAuthorizationCheckpoint;
+    log: DeviceAuthorizationTransitionLog;
+    reader: DeviceCredential;
+  }): DeviceAuthorization {
+    const { states } = this.verifiedReplay(input);
+
+    return states[states.length - 1];
   }
 }

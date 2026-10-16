@@ -1294,6 +1294,92 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
       );
     });
 
+    describe('the publisher of a device-sealed secret', () => {
+      const unauthorized = 'Device sealed secret publisher is not authorized.';
+      const credentialOf = (pair: KeyPair): DeviceCredential =>
+        DeviceCredential.fromString(pair.toPrimitives().publicKey);
+      const at = (revision: number): DeviceAuthorizationRevision =>
+        DeviceAuthorizationRevision.fromNumber(revision);
+
+      async function revoking(author: 'genesis' | 'laptop') {
+        const context = await synchronizing();
+        const revocation = DeviceAuthorizationTransition.revocation({
+          author: author === 'genesis' ? context.genesisDevice : context.laptop,
+          epoch: context.session.authorizationEpoch,
+          identityId: context.identityId,
+          operationId: DeviceAuthorizationOperationId.generate(),
+          previousRevision: at(1),
+          targetCredential: credentialOf(context.genesisDevice),
+        });
+
+        context.http.request.mockResolvedValue(
+          context.logOf([
+            context.enrollment.toPrimitives(),
+            revocation.toPrimitives(),
+          ]),
+        );
+
+        return context;
+      }
+
+      it('refuses a publisher the signed transitions never authorized, however validly it signed', async () => {
+        const { api, enrollment, http, logOf, session } = await synchronizing();
+        const minted = await KeyPair.generate();
+
+        http.request.mockResolvedValue(logOf([enrollment.toPrimitives()]));
+
+        await expect(
+          api.verifyPublisher(session, credentialOf(minted), at(1)),
+        ).rejects.toThrow(unauthorized);
+      });
+
+      it('accepts only a device the signed transitions authorize at the entry revision', async () => {
+        const { api, enrollment, genesisDevice, http, laptop, logOf, session } =
+          await synchronizing();
+
+        http.request.mockResolvedValue(logOf([enrollment.toPrimitives()]));
+
+        await expect(
+          api.verifyPublisher(session, credentialOf(genesisDevice), at(0)),
+        ).resolves.toBeUndefined();
+        await expect(
+          api.verifyPublisher(session, credentialOf(laptop), at(1)),
+        ).resolves.toBeUndefined();
+        await expect(
+          api.verifyPublisher(session, credentialOf(laptop), at(0)),
+        ).rejects.toThrow(unauthorized);
+        await expect(
+          api.verifyPublisher(session, credentialOf(laptop), at(5)),
+        ).rejects.toThrow(unauthorized);
+      });
+
+      it('accepts the hand-over of a device that retired itself at the entry revision', async () => {
+        const { api, genesisDevice, session } = await revoking('genesis');
+
+        await expect(
+          api.verifyPublisher(session, credentialOf(genesisDevice), at(2)),
+        ).resolves.toBeUndefined();
+      });
+
+      it('refuses a device another device revoked at the entry revision', async () => {
+        const { api, genesisDevice, session } = await revoking('laptop');
+
+        await expect(
+          api.verifyPublisher(session, credentialOf(genesisDevice), at(2)),
+        ).rejects.toThrow(unauthorized);
+      });
+
+      it('refuses any publisher when the log cannot be proven', async () => {
+        const { api, genesisDevice, http, session } = await synchronizing();
+
+        http.request.mockResolvedValue({ transitions: 'forged' });
+
+        await expect(
+          api.verifyPublisher(session, credentialOf(genesisDevice), at(1)),
+        ).rejects.toThrow(copy.auth.deviceAuthorizationUnproven);
+      });
+    });
+
     describe('never reports a removal the log does not prove', () => {
       const unprovenBy = async (
         served: (context: Awaited<ReturnType<typeof synchronizing>>) => unknown,

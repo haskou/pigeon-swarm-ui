@@ -154,7 +154,14 @@ describe(PigeonDeviceSealedSecretApi.name, () => {
           ).valueOf(),
         },
       }),
-    ).toEqual({ authorizationRevision: 3, generation: 7, payload });
+    ).toEqual({
+      authorizationRevision: 3,
+      generation: 7,
+      payload,
+      publisherCredential: DeviceCredential.fromString(
+        session.deviceCredentialKeyPair.toPrimitives().publicKey,
+      ),
+    });
   });
 
   it('returns null when no entry exists for the caller', async () => {
@@ -200,6 +207,9 @@ describe(PigeonDeviceSealedSecretApi.name, () => {
       authorizationRevision: 2,
       generation: 3,
       payload,
+      publisherCredential: DeviceCredential.fromString(
+        otherDevice.toPrimitives().publicKey,
+      ),
     });
     expect(signer.headersWithDeviceProof).toHaveBeenCalledWith(
       session,

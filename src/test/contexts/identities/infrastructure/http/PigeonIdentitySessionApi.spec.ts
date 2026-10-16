@@ -47,6 +47,8 @@ const passthroughRecovery = {
   rotateLaggingRoot: (session: Session) => Promise.resolve(session),
 } as unknown as DeviceSealedRecovery;
 
+const PUBLISHER = { id: 'publisher' } as unknown as DeviceCredential;
+
 function memoryStorage(): Pick<Storage, 'getItem' | 'removeItem' | 'setItem'> {
   const entries = new Map<string, string>();
 
@@ -438,6 +440,7 @@ describe(PigeonIdentitySessionApi.name, () => {
       authorizationRevision: 1,
       generation: 5,
       payload: encodeBase64Url(laggingRoot.getBuffer()),
+      publisherCredential: PUBLISHER,
     });
     sealedSecrets.publish.mockResolvedValue(undefined);
     const keychains = mock<PigeonKeychainApi>();
@@ -516,6 +519,7 @@ describe(PigeonIdentitySessionApi.name, () => {
       authorizationRevision: 2,
       generation: 6,
       payload: `${encodeBase64Url(handedOverRoot.getBuffer())}.${encodeBase64Url(replacedRoot.getBuffer())}`,
+      publisherCredential: PUBLISHER,
     });
     const keychains = mock<PigeonKeychainApi>();
     keychains.rewrapHeadSealedUnder.mockResolvedValue(undefined);
@@ -650,6 +654,40 @@ describe(PigeonIdentitySessionApi.name, () => {
     await expect(sessionApi.unlock(identityId, 'password')).rejects.toThrow(
       copy.auth.deviceRootUnavailable,
     );
+    expect(recovery.resumeKeychainRewrap).not.toHaveBeenCalled();
+  });
+
+  it('refuses the unlock and moves nothing off the session root when the publisher of its entry is not authorized', async () => {
+    const sealedSecrets = mock<PigeonDeviceSealedSecretApi>();
+    const keychains = mock<PigeonKeychainApi>();
+    const deviceAuthorization = mock<PigeonDeviceAuthorizationApi>();
+    const rotation = new DeviceSealedRootRotation(
+      deviceAuthorization,
+      sealedSecrets,
+      keychains,
+      () => 0,
+    );
+    const recovery = mock<DeviceSealedRecovery>();
+    sealedSecrets.fetchOwn.mockResolvedValue({
+      authorizationRevision: 0,
+      generation: 9_000,
+      payload: `${encodeBase64Url(SymmetricKey.generate().getBuffer())}.${encodeBase64Url(SymmetricKey.generate().getBuffer())}`,
+      publisherCredential: PUBLISHER,
+    });
+    deviceAuthorization.verifyPublisher.mockRejectedValue(
+      new Error('Device sealed secret publisher is not authorized.'),
+    );
+    const { identityId, sessionApi } = await unlockableDevice(
+      rotation,
+      recovery,
+    );
+
+    await expect(sessionApi.unlock(identityId, 'password')).rejects.toThrow(
+      copy.auth.deviceRootUnavailable,
+    );
+    expect(sealedSecrets.publish).not.toHaveBeenCalled();
+    expect(keychains.rewrapHeadSealedUnder).not.toHaveBeenCalled();
+    expect(recovery.rewrapHandedOverKeychain).not.toHaveBeenCalled();
     expect(recovery.resumeKeychainRewrap).not.toHaveBeenCalled();
   });
 
