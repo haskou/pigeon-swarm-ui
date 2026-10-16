@@ -80,7 +80,7 @@ describe('GroupMailboxRoster', () => {
       ['a creator among the admins', { adminIds: ['creator'] }],
       ['an admin off the members', { adminIds: ['stranger'] }],
       [
-        'more members than the node allows',
+        'more members than one welcome fits',
         {
           adminIds: [],
           memberIds: [
@@ -100,7 +100,7 @@ describe('GroupMailboxRoster', () => {
       expect(rosterOf({ name: 'Team 😀' }).name).toBe('Team 😀');
     });
 
-    it('holds exactly the node limit of members', () => {
+    it('holds exactly the member limit', () => {
       expect(
         GroupMailboxRoster.of(
           fields({
@@ -116,6 +116,10 @@ describe('GroupMailboxRoster', () => {
         ),
       ).toBeDefined();
     });
+
+    it('holds at most 48 members, so one welcome to every one of them fits a control record', () => {
+      expect(GroupMailboxRoster.MAX_PARTICIPANTS).toBe(48);
+    });
   });
 
   describe('operations', () => {
@@ -130,6 +134,24 @@ describe('GroupMailboxRoster', () => {
 
     it('drops a removed admin from the admins', () => {
       expect(roster.withoutMember('admin')?.adminIds()).toEqual(['gone-admin']);
+    });
+
+    it('is full at the member limit, and takes no member then', () => {
+      const full = rosterOf({
+        adminIds: [],
+        memberIds: [
+          'creator',
+          ...Array.from(
+            { length: GroupMailboxRoster.MAX_PARTICIPANTS - 1 },
+            (_, index) => `member-${index}`,
+          ),
+        ],
+      });
+
+      expect(full.isFull()).toBe(true);
+      expect(full.withMember('newcomer')).toBeUndefined();
+      expect(full.withoutMember('member-0')?.isFull()).toBe(false);
+      expect(roster.isFull()).toBe(false);
     });
   });
 
