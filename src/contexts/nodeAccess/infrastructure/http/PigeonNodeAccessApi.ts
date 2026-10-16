@@ -1,3 +1,5 @@
+import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
+
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { Session } from '../../../identities/infrastructure/session/Session';
@@ -95,13 +97,28 @@ export class PigeonNodeAccessApi {
     return result.blockList;
   }
 
+  /**
+   * The node authenticates the upload before reading its body: `X-Signature`
+   * covers `X-Body-Hash`, the hex SHA-256 of the exact bytes sent, so each
+   * call hashes and signs the serialized body afresh.
+   */
   public async putBlockList(
     blockList: SignedNodeBlockListResource,
     session: Session,
   ): Promise<SignedNodeBlockListResource> {
-    const result = await this.signed<{
+    const path = '/node/blocks';
+    const body = JSON.stringify(blockList);
+    const bodyHash = SHA256Hash.from(body).toString();
+    const result = await this.http.request<{
       blockList: SignedNodeBlockListResource;
-    }>(session, 'PUT', '/node/blocks', blockList);
+    }>(path, {
+      body,
+      headers: {
+        ...(await this.signer.headers(session, 'PUT', path, bodyHash)),
+        'X-Body-Hash': bodyHash,
+      },
+      method: 'PUT',
+    });
 
     return result.blockList;
   }

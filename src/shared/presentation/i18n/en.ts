@@ -821,6 +821,7 @@ export const en = {
       403012:
         'This node no longer serves your identity. Ask its owner, or use another node.',
       403020: 'Only the notification inviter can do that.',
+      413010: 'The block list is too large for this node to store.',
       422030: 'That file is too large for the node to accept.',
       429040:
         'Too many profile updates in a short time. Wait a minute and try again.',
@@ -921,12 +922,10 @@ export const en = {
         'The block list signature is not valid. Reload and try again.',
       NodeBlockListVersionIsNotNewerError:
         'The block list changed elsewhere. Reload it and try again.',
-      NodeBlockSourceHasNothingPendingError:
-        'That source has no entries waiting for review.',
       NodeBlockSourceNotFoundError:
         'That block list source is no longer followed.',
       NodeBlockSourceVersionHasChangedError:
-        'That source published a newer list. Review the updated entries.',
+        'That source published a newer version, so nothing was applied. Review the updated entries.',
       NodeCannotHaveMoreThanOnePublicNetworkError:
         'A node cannot have more than one public network.',
       NodeOwnerCanOnlyBeChangedByCurrentOwnerError:
@@ -1063,9 +1062,9 @@ export const en = {
     approve: 'Approve',
     approveAll: 'Approve all',
     approved: 'Entries approved. This node now blocks them.',
-    autoApply: 'Apply new entries automatically',
+    autoApply: 'Apply future versions automatically',
     autoApplyHelp:
-      'Only for owners you fully trust. Otherwise new entries wait for your review.',
+      'Only for owners you fully trust. Applies versions fetched from now on; entries already waiting still need your review.',
     autoApplyOff: 'Review first',
     autoApplyOn: 'Automatic',
     block: 'Block',
@@ -1105,7 +1104,8 @@ export const en = {
     fetchOutcomes: {
       accepted: 'Accepted',
       'invalid-document': 'The list is not valid',
-      'invalid-signature': 'The signature does not verify',
+      'invalid-signature':
+        'The signature is missing or invalid, or the owner changed key',
       'not-newer': 'No newer version',
       redirected: 'The address redirects elsewhere',
       'refused-address': 'The address is not allowed',
@@ -1143,6 +1143,7 @@ export const en = {
     originPlaceholder: 'https://node.example.org',
     owner: 'Owner identity',
     pendingEmpty: 'Nothing waits for review.',
+    pendingVersion: 'Reviewing version {version}',
     publicationBody:
       'Other node owners can then follow it. The published list is public and signed by you.',
     publicationOff: 'Your block list is not published.',

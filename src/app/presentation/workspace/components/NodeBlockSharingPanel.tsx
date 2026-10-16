@@ -72,8 +72,10 @@ function PendingEntriesReview({
     void run('pending', load, { failure: copy.nodeAccess.loadError });
   }, [load, run]);
 
+  const version = pending?.version ?? null;
+
   const approve = (entry: NodeBlockTargetViewModel | undefined) => {
-    if (busy) return;
+    if (busy || version === null) return;
 
     void run(
       'approve',
@@ -82,12 +84,14 @@ function PendingEntriesReview({
           onSourceChanged(
             await applicationContainer.nodeAccess.approvePendingEntries(
               owner,
+              version,
               entry,
               session,
             ),
           );
         } finally {
-          // A newer source version changes what waits for review.
+          // A stale version is refused (409) with nothing applied; reloading
+          // shows the newer version that now waits for review.
           await load();
         }
       },
@@ -99,7 +103,7 @@ function PendingEntriesReview({
     <button
       type="button"
       className="ui-button"
-      disabled={busy !== null}
+      disabled={version === null || busy !== null}
       onClick={() => approve(entry)}
     >
       {copy.nodeAccess.approve}
@@ -116,6 +120,14 @@ function PendingEntriesReview({
         <NodeAccessEmpty text={copy.nodeAccess.pendingEmpty} />
       ) : (
         <>
+          {version === null ? null : (
+            <div className="text-xs text-white/55">
+              {copy.nodeAccess.pendingVersion.replace(
+                '{version}',
+                String(version),
+              )}
+            </div>
+          )}
           <div>
             {pending?.blockedIdentityIds.map((identityId) => (
               <NodeAccessIdentityRow
@@ -135,7 +147,7 @@ function PendingEntriesReview({
           <button
             type="button"
             className="ui-button ui-button-primary justify-self-end"
-            disabled={pending === null || busy !== null}
+            disabled={version === null || busy !== null}
             onClick={() => approve(undefined)}
           >
             {copy.nodeAccess.approveAll}
@@ -224,6 +236,9 @@ function BlockSourceRow({
           ]}
           value={source.autoApply ? 'auto' : 'review'}
         />
+        <span className="text-xs leading-5 text-white/45 sm:order-last sm:col-span-2">
+          {copy.nodeAccess.autoApplyHelp}
+        </span>
         {source.pendingCount > 0 && !source.autoApply ? (
           <button
             type="button"

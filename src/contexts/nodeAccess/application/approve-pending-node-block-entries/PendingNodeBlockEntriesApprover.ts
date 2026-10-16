@@ -1,30 +1,33 @@
 import type { NodeBlockSource } from '../../domain/NodeBlockSource';
 import type { NodeBlockSourceRepository } from '../../domain/repositories/NodeBlockSourceRepository';
 
+import { NodeBlockApproval } from '../../domain/value-objects/NodeBlockApproval';
+import { NodeBlockEntries } from '../../domain/value-objects/NodeBlockEntries';
 import { ApprovePendingNodeBlockEntriesMessage } from './messages/ApprovePendingNodeBlockEntriesMessage';
 
 export class PendingNodeBlockEntriesApprover {
   public constructor(private readonly sources: NodeBlockSourceRepository) {}
 
   /**
-   * Approves against the pending version just read, so the node refuses the
-   * approval when the source published a newer version meanwhile.
+   * Approves against the version the node owner reviewed, so the node refuses
+   * the approval and applies nothing when the source published a newer
+   * version meanwhile.
    */
   public async approve(
     message: ApprovePendingNodeBlockEntriesMessage,
   ): Promise<NodeBlockSource> {
-    const actorId = message.getActorId();
-    const sourceOwnerIdentityId = message.getSourceOwnerIdentityId();
-    const pending = await this.sources.findPending(
-      sourceOwnerIdentityId,
-      actorId,
-    );
+    const version = message.getVersion();
     const entry = message.getEntry();
 
     return await this.sources.approve(
-      sourceOwnerIdentityId,
-      entry ? pending.approve(entry) : pending.approveAll(),
-      actorId,
+      message.getSourceOwnerIdentityId(),
+      entry
+        ? NodeBlockApproval.entries(
+            version,
+            NodeBlockEntries.empty().with(entry),
+          )
+        : NodeBlockApproval.all(version),
+      message.getActorId(),
     );
   }
 }

@@ -1,10 +1,4 @@
-import { assert } from '@haskou/value-objects';
-
-import type { NodeBlockTarget } from './value-objects/NodeBlockTarget';
-
-import { NodeBlockSourceHasNothingPendingError } from './errors/NodeBlockSourceHasNothingPendingError';
 import { NodeAccessIdentityId } from './value-objects/NodeAccessIdentityId';
-import { NodeBlockApproval } from './value-objects/NodeBlockApproval';
 import { NodeBlockEntries } from './value-objects/NodeBlockEntries';
 import { NodeBlockListVersion } from './value-objects/NodeBlockListVersion';
 
@@ -37,31 +31,6 @@ export class PendingNodeBlockEntries {
     private readonly version: NodeBlockListVersion | null,
     private readonly entries: NodeBlockEntries,
   ) {}
-
-  private pendingVersion(): NodeBlockListVersion {
-    assert(
-      this.version !== null && !this.entries.isEmpty(),
-      new NodeBlockSourceHasNothingPendingError(),
-    );
-
-    return this.version ?? NodeBlockListVersion.first();
-  }
-
-  public approveAll(): NodeBlockApproval {
-    return NodeBlockApproval.all(this.pendingVersion());
-  }
-
-  public approve(target: NodeBlockTarget): NodeBlockApproval {
-    assert(
-      this.entries.includes(target),
-      new NodeBlockSourceHasNothingPendingError(),
-    );
-
-    return NodeBlockApproval.entries(
-      this.pendingVersion(),
-      NodeBlockEntries.empty().with(target),
-    );
-  }
 
   public getSourceOwnerIdentityId(): NodeAccessIdentityId {
     return this.sourceOwnerIdentityId;

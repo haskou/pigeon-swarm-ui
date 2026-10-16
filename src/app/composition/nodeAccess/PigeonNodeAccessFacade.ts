@@ -91,6 +91,7 @@ export class PigeonNodeAccessFacade {
 
   public async approvePendingEntries(
     sourceOwnerIdentityId: string,
+    version: number,
     entry: NodeBlockTargetViewModel | undefined,
     session: Session,
   ): Promise<NodeBlockSourceViewModel> {
@@ -99,6 +100,7 @@ export class PigeonNodeAccessFacade {
         actorIdentityId: this.actorIdentityId(session),
         entry,
         sourceOwnerIdentityId,
+        version,
       }),
     );
 

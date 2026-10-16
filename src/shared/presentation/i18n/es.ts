@@ -830,6 +830,7 @@ export const es = {
       403012:
         'Este nodo ya no da servicio a tu identidad. Habla con su propietario o usa otro nodo.',
       403020: 'Solo quien envió la notificación puede hacer eso.',
+      413010: 'La lista de bloqueos es demasiado grande para este nodo.',
       422030: 'El archivo es demasiado grande para el nodo.',
       429040:
         'Demasiadas actualizaciones de perfil en poco tiempo. Espera un minuto e inténtalo de nuevo.',
@@ -929,12 +930,10 @@ export const es = {
         'La firma de la lista de bloqueos no es válida. Recarga e inténtalo de nuevo.',
       NodeBlockListVersionIsNotNewerError:
         'La lista de bloqueos cambió en otro lugar. Recárgala e inténtalo de nuevo.',
-      NodeBlockSourceHasNothingPendingError:
-        'Esa fuente no tiene entradas pendientes de revisión.',
       NodeBlockSourceNotFoundError:
         'Ya no sigues esa fuente de lista de bloqueos.',
       NodeBlockSourceVersionHasChangedError:
-        'Esa fuente publicó una lista más nueva. Revisa las entradas actualizadas.',
+        'Esa fuente publicó una versión más nueva y no se aplicó nada. Revisa las entradas actualizadas.',
       NodeCannotHaveMoreThanOnePublicNetworkError:
         'Un nodo no puede tener más de una red pública.',
       NodeOwnerCanOnlyBeChangedByCurrentOwnerError:
@@ -1068,9 +1067,9 @@ export const es = {
     approve: 'Aprobar',
     approveAll: 'Aprobar todo',
     approved: 'Entradas aprobadas. Este nodo ya las bloquea.',
-    autoApply: 'Aplicar entradas nuevas automáticamente',
+    autoApply: 'Aplicar versiones futuras automáticamente',
     autoApplyHelp:
-      'Solo para propietarios de plena confianza. Si no, las entradas nuevas esperan tu revisión.',
+      'Solo para propietarios de plena confianza. Se aplican las versiones obtenidas a partir de ahora; las entradas que ya esperan siguen necesitando tu revisión.',
     autoApplyOff: 'Revisar antes',
     autoApplyOn: 'Automático',
     block: 'Bloquear',
@@ -1110,7 +1109,8 @@ export const es = {
     fetchOutcomes: {
       accepted: 'Aceptada',
       'invalid-document': 'La lista no es válida',
-      'invalid-signature': 'La firma no es válida',
+      'invalid-signature':
+        'Falta la firma o no es válida, o el propietario cambió de clave',
       'not-newer': 'No hay una versión más nueva',
       redirected: 'La dirección redirige a otro sitio',
       'refused-address': 'La dirección no está permitida',
@@ -1147,6 +1147,7 @@ export const es = {
     originPlaceholder: 'https://nodo.example.org',
     owner: 'Identidad del propietario',
     pendingEmpty: 'No hay nada pendiente de revisión.',
+    pendingVersion: 'Revisando la versión {version}',
     publicationBody:
       'Así otros propietarios de nodos pueden seguirla. La lista publicada es pública y está firmada por ti.',
     publicationOff: 'Tu lista de bloqueos no está publicada.',
