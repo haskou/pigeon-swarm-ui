@@ -432,14 +432,31 @@ from folding the community's signed operations (`CommunityOperationFold`), not
 from the node's community list; operations that fail to load or fold count as
 private. There is no switch to turn call E2EE off.
 
-- Each audio and video frame is encrypted with AES-GCM under the call key:
-  the `PSCE1` marker, a random 12-byte nonce, then the ciphertext
-  (`CallMediaFrameCodec`). A browser with `RTCRtpScriptTransform` runs the
-  codec in a dedicated worker: the raw key is transferred to that worker, and
-  the media cipher on the page keeps no copy of it. A Chromium build without
-  `RTCRtpScriptTransform` runs the same codec on encoded insertable streams
-  (`createEncodedStreams`) with a non-extractable key. Both produce the same
-  frames, so members on either path hear each other.
+- Each audio and video frame is sealed in the library's PSCE2 format
+  (`CallMediaFrameSealer`, `CallMediaFrameOpener`, haskou/pigeon-swarm-crypto#54):
+  `PSCE2`, the key epoch, a random sealer id and a frame sequence, then the
+  AES-GCM ciphertext, with the call id, the sender's identity id and the track
+  (`audio`, `video`, `screen-audio`, `screen-video`) bound in. A frame moved
+  to another call, sender or track does not open, and each opener drops a
+  frame it already opened (a 1024-frame replay window). Each device seals with
+  one sealer per call and epoch, shared by all its senders, and opens each
+  member with one opener, shared by all receivers of that member and dropped
+  when the member leaves. Whether a peer's media is encrypted comes from its
+  negotiation, never from the frame bytes: on a private call every inbound
+  frame goes to the opener, and one that does not open is dropped. PSCE1
+  frames and version 1 offers are refused.
+- Community call keys carry the MLS epoch they were exported in. During a
+  private community call the client synchronises the channel group every 15 s
+  (`useCallMediaRekey`) and moves the call to the key of a newer epoch: it
+  seals with a new sealer from then on, and each opener keeps the previous
+  epoch only until the first frame of the new one opens. Conversation calls
+  stay on epoch 0.
+- `CallMediaFrameCodec` runs the sealer and openers. A browser with
+  `RTCRtpScriptTransform` runs it in a dedicated worker: the raw key of each
+  epoch is transferred to that worker, and the media cipher on the page keeps
+  no copy of it. A Chromium build without `RTCRtpScriptTransform` runs the
+  same codec on encoded insertable streams (`createEncodedStreams`). Both
+  produce the same frames, so members on either path hear each other.
 - A worker transform is attached to each sender and receiver in the task
   that creates it: when a local track is added, when a receive-only peer is
   created, and when a remote description changes the signaling state.
@@ -472,10 +489,10 @@ private. There is no switch to turn call E2EE off.
   (`resolveWorkspaceCallMediaEncryption`) and ends or dismisses one it sees
   (`workspace:call:ended-unsupported-group-call`).
 - A device in a private call refuses any peer whose offer or answer does not
-  announce encrypted media (`CallMediaEncryption.admits`): it never sets that
-  peer's description, so no media flows either way. Outbound frames are always
-  encrypted, and inbound frames without the encrypted-frame marker, or that fail
-  to decrypt, are dropped rather than played.
+  announce PSCE2 encrypted media (`CallMediaEncryption.admits`): it never sets
+  that peer's description, so no media flows either way. Outbound frames are
+  always sealed, and inbound frames that do not open for their sender and
+  track are dropped rather than played.
 
 `resolveWorkspaceCallMediaEncryption.spec.ts`, `useCallStartActions.spec.ts`,
 `PigeonCallRepository.spec.ts`, `CallPeerConnections.spec.ts`,
@@ -630,11 +647,18 @@ call key. Safari is not covered by CI.
   holds a leaf in that group.
 - `authorIdentityId` inside a message payload is asserted by the sender. MLS
   authenticates the sender's leaf, and the UI does not yet display that proof.
-- Call media keys are derived once, when the call starts. A group epoch change
-  during a call (member join or leave) does not rekey it. Devices that derive
-  the key in different epochs cannot decrypt each other's media. Restricting
-  or reopening a channel during a call moves it to another group, so a device
+- Call media keys follow the channel group's epoch only through the 15 s poll:
+  for up to one poll after a member joins or leaves, devices may seal under
+  different epochs, and a device that missed an epoch in between cannot open
+  the frames of one two epochs ahead until it catches up. Restricting or
+  reopening a channel during a call moves it to another group, so a device
   that joins afterwards derives a different key and gets no media.
+- Every member of a call holds the same call key, so a member can seal frames
+  as any other sender of the call and can use up the 64 sealers an opener
+  accepts per epoch. Call media has no per-sender authentication.
+- Each device keeps the newest epoch's call key for the call's duration, to key
+  the opener of a member it first hears later; the bytes are overwritten with
+  zeros when a newer epoch replaces them or the call ends.
 - A peer refused for plaintext media is not remembered. Later ICE candidates or
   a call reconcile may create a fresh peer connection for it, which is refused
   again at its next description; expect connection churn but no media.

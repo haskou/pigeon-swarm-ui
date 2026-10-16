@@ -22,6 +22,7 @@ const allowedEvents = new Set([
   'peer-manager:media-encryption:transform-failed',
   'peer-manager:media-encryption:worker-failed',
   'peer-manager:reset',
+  'workspace:call-media-rekey:failed',
 ]);
 const allowedStates: Record<string, readonly string[]> = {
   connectionState: [

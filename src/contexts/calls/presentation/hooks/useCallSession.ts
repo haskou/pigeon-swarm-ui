@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { CallResource } from '../../infrastructure/http/resources/CallResource';
+import type { CallMediaKey } from '../../infrastructure/media/CallMediaKey';
 import type { CallMicrophoneErrorCode } from '../view-models/CallMicrophoneErrorCode';
 import type { CallSession } from '../view-models/CallSession';
 import type { CallSessionControls } from './CallSessionControls';
@@ -209,7 +210,10 @@ export function useCallSession(): CallSessionControls {
         hasStream: Boolean(stream),
       });
       peerManager.configure(input.loadIceConfig);
-      peerManager.configureMediaEncryption(input.mediaEncryptionKey ?? null);
+      peerManager.configureMediaEncryption(
+        { callId: input.id, senderId: input.currentIdentityId },
+        input.mediaEncryptionKey ?? null,
+      );
       peerManager.setLocalStream(stream);
       setActiveCall((current) =>
         current?.id === nextCall.id
@@ -322,6 +326,15 @@ export function useCallSession(): CallSessionControls {
     if (activeCallRef.current) peerManager.retryConnections();
   }, [peerManager]);
 
+  const rekeyMediaEncryption = useCallback(
+    (callId: string, key: CallMediaKey) => {
+      if (activeCallRef.current?.id === callId) {
+        peerManager.rekeyMediaEncryption(key);
+      }
+    },
+    [peerManager],
+  );
+
   return {
     activeCall,
     callMediaConnections,
@@ -329,6 +342,7 @@ export function useCallSession(): CallSessionControls {
     receiveSignal,
     reconcileCall,
     recoverAfterDisruption,
+    rekeyMediaEncryption,
     retryConnection,
     startCall,
     ...mediaControls,

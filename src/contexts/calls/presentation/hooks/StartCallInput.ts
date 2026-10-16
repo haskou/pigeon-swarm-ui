@@ -1,5 +1,6 @@
 import type { CallIceServerResource as CallIceServerConfig } from '../../infrastructure/http/resources/CallIceServerResource';
 import type { CallResource } from '../../infrastructure/http/resources/CallResource';
+import type { CallMediaKey } from '../../infrastructure/media/CallMediaKey';
 import type { CallMediaEncryptionUnavailableReason } from '../view-models/CallMediaEncryptionUnavailableReason';
 import type { CallMicrophoneErrorCode } from '../view-models/CallMicrophoneErrorCode';
 import type { CallParticipant } from '../view-models/CallParticipant';
@@ -17,7 +18,7 @@ export type StartCallInput = {
   loadIceConfig: () => Promise<CallIceServerConfig>;
   localStream?: MediaStream | null;
   microphoneError?: CallMicrophoneErrorCode;
-  mediaEncryptionKey?: string;
+  mediaEncryptionKey?: CallMediaKey;
   mediaEncryptionUnavailableReason?: CallMediaEncryptionUnavailableReason;
   noiseCancellationEnabled: boolean;
   onSignal: SignalSender;

@@ -331,14 +331,22 @@ export class MlsCommunityEngine {
     });
   }
 
-  /** The media key of a call in the group, as `MlsGroup.callMediaKey`. */
+  /**
+   * The media key of a call in the group, as `MlsGroup.callMediaKey`, with
+   * the epoch it was exported in: both are read under the same lock.
+   */
   public async callMediaKey(
     groupId: string,
     callId: string,
-  ): Promise<Uint8Array> {
-    return this.exclusive(groupId, async () =>
-      (await this.requireGroup(groupId)).callMediaKey(callId),
-    );
+  ): Promise<{ epoch: number; secret: Uint8Array }> {
+    return this.exclusive(groupId, async () => {
+      const group = await this.requireGroup(groupId);
+
+      return {
+        epoch: Number(group.epoch),
+        secret: await group.callMediaKey(callId),
+      };
+    });
   }
 
   /**

@@ -21,7 +21,7 @@
     "test:ci": "yarn test && yarn test:e2e:real-node"
   },
   "dependencies": {
-    "@haskou/pigeon-swarm-crypto": "6.6.2",
+    "@haskou/pigeon-swarm-crypto": "7.0.0",
     "@haskou/value-objects": "8.3.3",
     "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.4.0",
