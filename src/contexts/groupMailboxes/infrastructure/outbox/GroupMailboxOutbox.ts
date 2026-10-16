@@ -142,7 +142,8 @@ export class GroupMailboxOutbox {
   }
 
   public constructor(
-    private readonly session: Session,
+    /** The latest session of the identity: its root seals the rows. */
+    private readonly session: () => Session,
     private readonly engine: GroupMailboxOutboxEngine,
     private readonly channel: Pick<MailboxChannel, 'send'>,
     private readonly store: Pick<
@@ -317,7 +318,7 @@ export class GroupMailboxOutbox {
   private async forgetRow(row: GroupMailboxOutboxRow): Promise<void> {
     this.rows.delete(row.id);
     this.held.delete(row.id);
-    await this.store.remove(this.session.identity.id, row.id).catch(() => {
+    await this.store.remove(this.session().identity.id, row.id).catch(() => {
       // eslint-disable-next-line no-console
       console.debug('Group outbox remove failed.');
     });
@@ -335,7 +336,7 @@ export class GroupMailboxOutbox {
   /** Keeps the row in memory; persists it, or runs from memory alone. */
   private async keep(row: GroupMailboxOutboxRow): Promise<void> {
     this.rows.set(row.id, row);
-    await this.store.save(this.session, row).catch(() => undefined);
+    await this.store.save(this.session(), row).catch(() => undefined);
   }
 
   /**
@@ -495,7 +496,7 @@ export class GroupMailboxOutbox {
   private async holdsBack(conversationId: string): Promise<boolean> {
     const roster = await this.engine.roster(conversationId);
 
-    if (!roster?.has(this.session.identity.id)) {
+    if (!roster?.has(this.session().identity.id)) {
       throw new MlsRejectedError('This identity is not in the group');
     }
 
@@ -592,7 +593,7 @@ export class GroupMailboxOutbox {
       retryAt: 0,
     };
 
-    await this.store.save(this.session, row);
+    await this.store.save(this.session(), row);
     this.rows.set(row.id, row);
   }
 
@@ -642,7 +643,7 @@ export class GroupMailboxOutbox {
     this.stop();
     this.rows.clear();
     this.held.clear();
-    await this.store.forget(this.session.identity.id);
+    await this.store.forget(this.session().identity.id);
   }
 
   /** The records still queued for one conversation, oldest first. */
@@ -665,7 +666,7 @@ export class GroupMailboxOutbox {
   public async resume(): Promise<void> {
     this.stopped = false;
 
-    for (const row of await this.store.load(this.session)) {
+    for (const row of await this.store.load(this.session())) {
       if (!this.rows.has(row.id)) this.rows.set(row.id, row);
       this.lastCreatedAt = Math.max(this.lastCreatedAt, row.createdAt);
     }
@@ -713,7 +714,7 @@ export class GroupMailboxOutbox {
       const record = new Uint8Array(decodeBase64Url(row.record));
       const copies = row.copies.filter(
         (copy) =>
-          copy.identityId !== this.session.identity.id &&
+          copy.identityId !== this.session().identity.id &&
           !blocked.has(GroupMailboxOutbox.recipient(row, copy)),
       );
       const sent = await Promise.all(

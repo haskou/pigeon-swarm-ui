@@ -27,6 +27,7 @@ import { ConversationParticipantId } from '../../../../contexts/conversations/do
 import { GroupConversationMailbox } from '../../../../contexts/groupMailboxes/infrastructure/GroupConversationMailbox';
 import { GroupMessageHistoryStore } from '../../../../contexts/groupMailboxes/infrastructure/history/GroupMessageHistoryStore';
 import { GroupMailboxOutbox } from '../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutbox';
+import { GroupMailboxOutboxStore } from '../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutboxStore';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { sessionRootKey } from '../../../../contexts/identities/infrastructure/session/sessionRootKey';
 import { MailboxUnavailableError } from '../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
@@ -247,7 +248,7 @@ const device = (storage: string): GroupConversationMailbox =>
     contacts: () => [...contacts],
     direct: (from) => ({
       send: (conversationId, peer, plaintext) =>
-        post(from, conversationId, peer, plaintext),
+        post(from(), conversationId, peer, plaintext),
     }),
     notifications: {
       listPage: (owner, limit, before) =>
@@ -1282,6 +1283,54 @@ describe('GroupConversationMailbox', () => {
     await sync(bob);
 
     expect(texts(bob)).toEqual(['message:after', 'message:reloaded']);
+    info.mockRestore();
+  });
+
+  it('removes a revoked device while a call with the session the revoke replaced runs', async () => {
+    const info = jest
+      .spyOn(console, 'info')
+      .mockImplementation(() => undefined);
+    const second = await formGroupWithLaptop();
+    const replaced = bob.session;
+
+    for (const devicesOf of [listed, verified]) {
+      devicesOf.set(bob.id, [
+        replaced.deviceCredentialKeyPair.toPrimitives().publicKey,
+      ]);
+    }
+    bob.session = {
+      ...replaced,
+      deviceSealedRootKey: SymmetricKey.fromBuffer(Buffer.alloc(32, 200)),
+      previousDeviceSealedRootKey: replaced.deviceSealedRootKey,
+    } as unknown as Session;
+    const verifiedOf = verified.get.bind(verified);
+
+    await bob.mailbox.cutOffRevokedReaders(bob.session);
+    // A background read that started before the revoke still holds the
+    // replaced session and calls in while the removal runs.
+    jest.spyOn(verified, 'get').mockImplementationOnce((identityId) => {
+      void bob.mailbox.resume(replaced);
+
+      return verifiedOf(identityId);
+    });
+    await bob.mailbox.membersChanged(bob.session, CONVERSATION);
+
+    expect(info).toHaveBeenCalledWith(
+      'Group devices reconciled: removed 1, added 0.',
+    );
+    // The removal commit it queued is sealed under the current root.
+    await expect(
+      new GroupMailboxOutboxStore(`${bob.storage}-outbox`).load(replaced),
+    ).rejects.toThrow('Device sealed root was replaced.');
+
+    await catchUp();
+    await alice.mailbox.send(alice.session, conversation(), 'after', {});
+
+    for (const member of everyone()) await sync(member);
+    await sync(second).catch(() => undefined);
+
+    expect(texts(bob)).toEqual(['message:after']);
+    expect(texts(second)).toEqual([]);
     info.mockRestore();
   });
 

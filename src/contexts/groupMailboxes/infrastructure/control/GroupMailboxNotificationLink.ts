@@ -23,7 +23,8 @@ export class GroupMailboxNotificationLink implements GroupMailboxDirectLink {
   private static readonly TYPE = 'group_conversation_invitation';
 
   public constructor(
-    private readonly session: Session,
+    /** The latest session of the sending identity. */
+    private readonly session: () => Session,
     private readonly http: HttpJsonClient,
     private readonly signer: RequestSigner,
     private readonly invitations: Pick<
@@ -41,7 +42,7 @@ export class GroupMailboxNotificationLink implements GroupMailboxDirectLink {
     const path = GroupMailboxNotificationLink.PATH;
     const type = GroupMailboxNotificationLink.TYPE;
     const encryptedConversationKey = GroupMailboxControlLetter.seal(
-      new PrivateKey(this.session.keyPair.toPrimitives().privateKey),
+      new PrivateKey(this.session().keyPair.toPrimitives().privateKey),
       {
         conversationId,
         payload: plaintext,
@@ -49,7 +50,7 @@ export class GroupMailboxNotificationLink implements GroupMailboxDirectLink {
         sentAt: this.now(),
       },
     );
-    const invitation = await this.invitations.invitation(this.session, {
+    const invitation = await this.invitations.invitation(this.session(), {
       encryptedKey: encryptedConversationKey,
       recipientIdentityId: peerIdentityId,
       type,
@@ -65,7 +66,7 @@ export class GroupMailboxNotificationLink implements GroupMailboxDirectLink {
 
     await this.http.request(path, {
       body: JSON.stringify(body),
-      headers: await this.signer.headers(this.session, 'POST', path, body),
+      headers: await this.signer.headers(this.session(), 'POST', path, body),
       method: 'POST',
     });
   }

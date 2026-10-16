@@ -208,7 +208,7 @@ const member = (name: string): Member => {
   );
   const rows = new Map<string, GroupMailboxOutboxRow>();
   const outbox = new GroupMailboxOutbox(
-    session,
+    () => session,
     engine,
     channel,
     {

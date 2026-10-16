@@ -16,6 +16,9 @@ import { GroupMailboxOutbox } from './outbox/GroupMailboxOutbox';
 
 /** One signed-in identity's MLS engine and the mailbox parts around it. */
 export class GroupConversationMember {
+  /** The roots the sessions it followed replaced. */
+  private readonly retired: Buffer[] = [];
+
   public static open(
     session: Session,
     ports: GroupConversationPorts,
@@ -24,14 +27,16 @@ export class GroupConversationMember {
     const identityId = session.identity.id;
     const deviceCredential =
       session.deviceCredentialKeyPair.toPrimitives().publicKey;
-    // Local state seals under the latest root, as after a revoke rotated it.
-    const sealing = { session };
+    // Every part reads the latest session: after a revoke rotated the root,
+    // local state seals under it and requests carry it.
+    const current = { session };
+    const latest = (): Session => current.session;
     const generations = new IndexedDbGroupMailboxGenerationStore(
       new DeviceSealedEntryStore(
         stores.database('generations', identityId),
         'pigeon-group-generations',
       ),
-      () => sealing.session,
+      latest,
     );
     const engine = new GroupMailboxMlsEngine(
       new MlsLeafSigner(
@@ -44,15 +49,15 @@ export class GroupConversationMember {
           stores.database('mls', identityId),
           'pigeon-group-mls',
         ),
-        () => sealing.session,
+        latest,
       ),
       generations,
-      () => ports.verifiedDevices(sealing.session),
-      () => ports.contacts(sealing.session),
+      () => ports.verifiedDevices(current.session),
+      () => ports.contacts(current.session),
       ports.now,
     );
     const outbox = new GroupMailboxOutbox(
-      session,
+      latest,
       engine,
       ports.channel,
       stores.outbox,
@@ -61,20 +66,19 @@ export class GroupConversationMember {
     const control = new GroupMailboxControl(
       { deviceCredential, identityId },
       engine,
-      () => ports.contacts(sealing.session),
-      ports.direct(session),
+      () => ports.contacts(current.session),
+      ports.direct(latest),
       outbox,
     );
 
     return new GroupConversationMember(
-      session,
-      sealing,
+      current,
       engine,
       control,
       outbox,
       generations,
       new GroupMailboxNotificationPump(
-        session,
+        latest,
         control,
         ports.notifications,
         new GroupMailboxHandledLetters(
@@ -82,12 +86,12 @@ export class GroupConversationMember {
             stores.database('control', identityId),
             'pigeon-group-control',
           ),
-          () => sealing.session,
+          latest,
         ),
         ports.now,
       ),
       new GroupMailboxInboxSync(
-        () => sealing.session,
+        latest,
         engine,
         control,
         ports.channel,
@@ -101,8 +105,7 @@ export class GroupConversationMember {
   }
 
   private constructor(
-    public readonly session: Session,
-    private readonly sealing: { session: Session },
+    private readonly current: { session: Session },
     public readonly engine: GroupMailboxMlsEngine,
     public readonly control: GroupMailboxControl,
     public readonly outbox: GroupMailboxOutbox,
@@ -113,11 +116,31 @@ export class GroupConversationMember {
     >,
     public readonly pump: GroupMailboxNotificationPump,
     public readonly inbox: GroupMailboxInboxSync,
-  ) {}
+  ) {
+    this.follow(current.session);
+  }
 
-  /** Seals the local state under this session's root from now on. */
+  /** The latest session it follows. */
+  public get session(): Session {
+    return this.current.session;
+  }
+
+  /**
+   * Seals the local state under this session's root and sends with it from
+   * now on, unless a session it followed replaced that root: a call that
+   * started before a revoke rotated the root still holds the replaced
+   * session, and must not move the state back under it.
+   */
   public follow(session: Session): void {
-    this.sealing.session = session;
+    const root = session.deviceSealedRootKey?.getBuffer();
+
+    if (root && this.retired.some((stale) => stale.equals(root))) return;
+    const previous = session.previousDeviceSealedRootKey?.getBuffer();
+
+    if (previous && !this.retired.some((stale) => stale.equals(previous))) {
+      this.retired.push(previous);
+    }
+    this.current.session = session;
   }
 
   /** Stops background delivery and pending key package requests. */

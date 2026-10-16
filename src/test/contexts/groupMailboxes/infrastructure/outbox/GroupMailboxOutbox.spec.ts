@@ -61,7 +61,13 @@ describe('GroupMailboxOutbox', () => {
   const session = { identity: { id: 'alice' } } as unknown as Session;
 
   const build = (): GroupMailboxOutbox =>
-    new GroupMailboxOutbox(session, engine, channel, store, () => now);
+    new GroupMailboxOutbox(
+      () => session,
+      engine,
+      channel,
+      store,
+      () => now,
+    );
 
   beforeEach(() => {
     now = 1_000;

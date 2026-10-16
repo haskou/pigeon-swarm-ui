@@ -108,7 +108,8 @@ export class GroupMailboxNotificationPump {
   }
 
   public constructor(
-    private readonly session: Session,
+    /** The latest session of the identity. */
+    private readonly session: () => Session,
     private readonly control: Pick<GroupMailboxControl, 'receiveDirect'>,
     private readonly notifications: GroupMailboxNotificationInbox,
     private readonly letters: Pick<
@@ -209,7 +210,7 @@ export class GroupMailboxNotificationPump {
         await this.hand(notification.id, letter);
       } else {
         await this.notifications.update(
-          this.session,
+          this.session(),
           notification.id,
           'declined',
         );
@@ -231,7 +232,7 @@ export class GroupMailboxNotificationPump {
     const { encryptedConversationKey, inviterIdentityId } =
       notification.payload;
     const opened = GroupMailboxControlLetter.open(
-      new PrivateKey(this.session.keyPair.toPrimitives().privateKey),
+      new PrivateKey(this.session().keyPair.toPrimitives().privateKey),
       encryptedConversationKey,
       IdentityId.normalize(inviterIdentityId),
     );
@@ -280,7 +281,7 @@ export class GroupMailboxNotificationPump {
       held.notificationId === notificationId ? held.state : 'declined';
 
     if (state) {
-      await this.notifications.update(this.session, notificationId, state);
+      await this.notifications.update(this.session(), notificationId, state);
     }
   }
 
@@ -312,7 +313,7 @@ export class GroupMailboxNotificationPump {
     }
 
     do {
-      page = await this.notifications.listPage(this.session, size, before);
+      page = await this.notifications.listPage(this.session(), size, before);
       pages += 1;
       for (const notification of page)
         failed += await this.handle(notification);
@@ -349,7 +350,7 @@ export class GroupMailboxNotificationPump {
     if (outcome === 'applied' && letter.welcome) {
       this.joined.add(letter.conversationId);
     }
-    await this.notifications.update(this.session, notificationId, state);
+    await this.notifications.update(this.session(), notificationId, state);
   }
 
   /**

@@ -20,8 +20,11 @@ export type GroupConversationPorts = {
    * this device's user pins one, so no welcomer can add one.
    */
   contacts: (session: Session) => readonly string[];
-  /** The 1:1 carrier of control letters for one signed-in identity. */
-  direct: (session: Session) => GroupMailboxDirectLink;
+  /**
+   * The 1:1 carrier of control letters for one signed-in identity, sending
+   * with its latest session.
+   */
+  direct: (session: () => Session) => GroupMailboxDirectLink;
   /** This identity's notifications, and the state records resolving them. */
   notifications: GroupMailboxNotificationInbox;
   now: () => number;
