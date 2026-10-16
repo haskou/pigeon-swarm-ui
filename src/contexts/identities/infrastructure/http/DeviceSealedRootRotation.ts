@@ -9,6 +9,7 @@ import type { PigeonDeviceSealedSecretApi } from './PigeonDeviceSealedSecretApi'
 import type { PigeonKeychainApi } from './PigeonKeychainApi';
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
+import { DeviceSealedRootGeneration } from '../../domain/value-objects/DeviceSealedRootGeneration';
 import { DeviceSealedRootPayload } from '../crypto/DeviceSealedRootPayload';
 
 /**
@@ -60,7 +61,8 @@ export class DeviceSealedRootRotation {
 
   /**
    * Seals the roots to the verified recipients when given, otherwise to the
-   * devices the node lists at the head.
+   * devices the node lists at the head, and returns the session holding the
+   * root at the generation it was published at.
    */
   private async publish(
     session: Session,
@@ -71,14 +73,20 @@ export class DeviceSealedRootRotation {
     const recipients = verifiedRecipients
       ? [...verifiedRecipients]
       : await this.deviceAuthorization.findDevices(session);
+    const generation = this.nextGeneration(own?.generation);
 
     await this.sealedSecrets.publish(session, {
-      generation: this.nextGeneration(own?.generation),
+      generation,
       payload: DeviceSealedRootPayload.encode(roots),
       recipients,
     });
 
-    return { ...session, deviceSealedRootKey: roots.root };
+    return {
+      ...session,
+      deviceSealedRootGeneration:
+        DeviceSealedRootGeneration.fromNumber(generation),
+      deviceSealedRootKey: roots.root,
+    };
   }
 
   /**
@@ -129,9 +137,10 @@ export class DeviceSealedRootRotation {
   }
 
   /**
-   * Returns the session holding the root of the current generation, and the
-   * root a hand-over replaced. Publishes a new generation only when this
-   * device has no entry at all and the keychain head is readable.
+   * Returns the session holding the root of the current generation, with
+   * that generation, and the root a hand-over replaced. Publishes a new
+   * generation only when this device has no entry at all and the keychain
+   * head is readable.
    */
   public async current(session: Session): Promise<Session> {
     const own = await this.sealedSecrets.fetchOwn(session);
@@ -162,6 +171,9 @@ export class DeviceSealedRootRotation {
 
     return {
       ...opening.session,
+      deviceSealedRootGeneration: DeviceSealedRootGeneration.fromNumber(
+        opening.entry.generation,
+      ),
       deviceSealedRootKey: roots.root,
       ...(roots.previous
         ? { previousDeviceSealedRootKey: roots.previous }
