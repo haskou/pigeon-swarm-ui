@@ -23,6 +23,8 @@ const RECIPIENTS = [
   { id: 'device-a' },
   { id: 'device-b' },
 ] as unknown as DeviceCredential[];
+const PUBLISHER = { id: 'publisher' } as unknown as DeviceCredential;
+const UNAUTHORIZED = 'Device sealed secret publisher is not authorized.';
 
 const makeSession = (revision: number): SessionWithRoot =>
   ({
@@ -81,6 +83,7 @@ describe('DeviceSealedRootRotation', () => {
         authorizationRevision: 4,
         generation: 9_000,
         payload: 'stale',
+        publisherCredential: PUBLISHER,
       });
 
       await rotation.rotate(makeSession(4));
@@ -237,6 +240,7 @@ describe('DeviceSealedRootRotation', () => {
         authorizationRevision: 5,
         generation: input.generation,
         payload: input.payload,
+        publisherCredential: PUBLISHER,
       });
 
       const current = await rotation.current(makeSession(5));
@@ -257,6 +261,7 @@ describe('DeviceSealedRootRotation', () => {
         authorizationRevision: 4,
         generation: 7,
         payload: encodeBase64Url(root),
+        publisherCredential: PUBLISHER,
       });
 
       const current = await rotation.current(makeSession(4));
@@ -274,6 +279,7 @@ describe('DeviceSealedRootRotation', () => {
         authorizationRevision: 4,
         generation: 7,
         payload: encodeBase64Url(SymmetricKey.generate().getBuffer()),
+        publisherCredential: PUBLISHER,
       });
 
       const current = await rotation.current({
@@ -293,6 +299,7 @@ describe('DeviceSealedRootRotation', () => {
         authorizationRevision: 4,
         generation: 8,
         payload: encodeBase64Url(root.getBuffer()),
+        publisherCredential: PUBLISHER,
       });
 
       const current = await rotation.current(makeSession(3));
@@ -367,6 +374,7 @@ describe('DeviceSealedRootRotation', () => {
         authorizationRevision: 4,
         generation: 8,
         payload: encodeBase64Url(SymmetricKey.generate().getBuffer()),
+        publisherCredential: PUBLISHER,
       });
 
       await expect(rotation.current(makeSession(3))).resolves.toBe(synced);
@@ -382,6 +390,7 @@ describe('DeviceSealedRootRotation', () => {
         authorizationRevision: 4,
         generation: 9,
         payload: `${encodeBase64Url(root.getBuffer())}.${encodeBase64Url(previous.getBuffer())}`,
+        publisherCredential: PUBLISHER,
       });
 
       const current = await rotation.current(makeSession(4));
@@ -403,6 +412,7 @@ describe('DeviceSealedRootRotation', () => {
         authorizationRevision: 4,
         generation: 9,
         payload: `${part}.${part}.${part}`,
+        publisherCredential: PUBLISHER,
       });
 
       await expect(rotation.current(makeSession(4))).rejects.toThrow();
@@ -546,6 +556,7 @@ describe('DeviceSealedRootRotation', () => {
         authorizationRevision: 4,
         generation: 8,
         payload: encodeBase64Url(root.getBuffer()),
+        publisherCredential: PUBLISHER,
       });
 
       const lagging = await rotation.laggingRoot(makeSession(5));
@@ -561,6 +572,7 @@ describe('DeviceSealedRootRotation', () => {
         authorizationRevision: 4,
         generation: 8,
         payload: `${encodeBase64Url(root.getBuffer())}.${encodeBase64Url(SymmetricKey.generate().getBuffer())}`,
+        publisherCredential: PUBLISHER,
       });
 
       const lagging = await rotation.laggingRoot(makeSession(5));
@@ -577,6 +589,7 @@ describe('DeviceSealedRootRotation', () => {
         authorizationRevision: 5,
         generation: 8,
         payload: encodeBase64Url(SymmetricKey.generate().getBuffer()),
+        publisherCredential: PUBLISHER,
       });
 
       await expect(rotation.laggingRoot(makeSession(5))).resolves.toBeNull();
@@ -604,6 +617,7 @@ describe('DeviceSealedRootRotation', () => {
         authorizationRevision: 4,
         generation: 7,
         payload: encodeBase64Url(previous.getBuffer()),
+        publisherCredential: PUBLISHER,
       });
       sealedSecrets.sealHandOver.mockReturnValue(HAND_OVER);
 
@@ -638,6 +652,7 @@ describe('DeviceSealedRootRotation', () => {
         authorizationRevision: 4,
         generation: 7,
         payload: `${encodeBase64Url(previous.getBuffer())}.${encodeBase64Url(SymmetricKey.generate().getBuffer())}`,
+        publisherCredential: PUBLISHER,
       });
       sealedSecrets.sealHandOver.mockReturnValue(HAND_OVER);
 
@@ -661,6 +676,7 @@ describe('DeviceSealedRootRotation', () => {
         authorizationRevision: 4,
         generation: 9_000,
         payload: encodeBase64Url(SymmetricKey.generate().getBuffer()),
+        publisherCredential: PUBLISHER,
       });
       sealedSecrets.sealHandOver.mockReturnValue(HAND_OVER);
 
@@ -695,6 +711,7 @@ describe('DeviceSealedRootRotation', () => {
         authorizationRevision: 5,
         generation: 8,
         payload: encodeBase64Url(SymmetricKey.generate().getBuffer()),
+        publisherCredential: PUBLISHER,
       });
 
       await expect(rotation.generation(makeSession(5))).resolves.toBe(8);
@@ -705,5 +722,76 @@ describe('DeviceSealedRootRotation', () => {
 
       await expect(rotation.generation(makeSession(5))).resolves.toBeNull();
     });
+  });
+
+  describe('the publisher of the own entry', () => {
+    const refusing = (reason: string) => {
+      const context = setup(1_000);
+
+      context.sealedSecrets.fetchOwn.mockResolvedValue({
+        authorizationRevision: 4,
+        generation: 9_000,
+        payload: encodeBase64Url(SymmetricKey.generate().getBuffer()),
+        publisherCredential: PUBLISHER,
+      });
+      context.deviceAuthorization.verifyPublisher.mockRejectedValue(
+        new Error(reason),
+      );
+
+      return context;
+    };
+
+    it('verifies the publisher against the signed transitions at the entry revision before opening', async () => {
+      const { deviceAuthorization, rotation, sealedSecrets } = setup();
+      const session = makeSession(4);
+
+      sealedSecrets.fetchOwn.mockResolvedValue({
+        authorizationRevision: 4,
+        generation: 7,
+        payload: encodeBase64Url(SymmetricKey.generate().getBuffer()),
+        publisherCredential: PUBLISHER,
+      });
+
+      await rotation.current(session);
+
+      expect(deviceAuthorization.verifyPublisher).toHaveBeenCalledTimes(1);
+
+      const [verifiedBy, publisher, revision] =
+        deviceAuthorization.verifyPublisher.mock.calls[0];
+
+      expect(verifiedBy).toBe(session);
+      expect(publisher).toBe(PUBLISHER);
+      expect(revision.valueOf()).toBe(4);
+    });
+
+    it.each([
+      ['an unauthorized publisher', UNAUTHORIZED],
+      ['transitions it cannot prove', 'The transitions were not served.'],
+    ])(
+      'yields no root and publishes nothing for %s',
+      async (_case, reason) => {
+        const { keychains, rotation, sealedSecrets } = refusing(reason);
+
+        await expect(rotation.current(makeSession(4))).rejects.toThrow(
+          reason,
+        );
+        await expect(rotation.laggingRoot(makeSession(5))).rejects.toThrow(
+          reason,
+        );
+        await expect(
+          rotation.handOver(makeSession(4), {
+            authorizationRevision: 5,
+            recipients: RECIPIENTS,
+          }),
+        ).rejects.toThrow(reason);
+        await expect(rotation.generation(makeSession(4))).rejects.toThrow(
+          reason,
+        );
+        await expect(rotation.rotate(makeSession(4))).rejects.toThrow(reason);
+        expect(sealedSecrets.publish).not.toHaveBeenCalled();
+        expect(sealedSecrets.sealHandOver).not.toHaveBeenCalled();
+        expect(keychains.readHead).not.toHaveBeenCalled();
+      },
+    );
   });
 });

@@ -58,14 +58,15 @@ describe(DeviceSealedSecretCipher.name, () => {
       identityId,
       other,
       outsider,
+      publisher,
       publisherCredential,
       recipient,
       resourceFor,
     };
   }
 
-  it('seals one entry per recipient and only that device opens it', async () => {
-    const { entries, identityId, other, recipient, resourceFor } =
+  it('seals one entry per recipient and only that device opens it, naming the publisher it verified', async () => {
+    const { entries, identityId, other, publisher, recipient, resourceFor } =
       await fixture();
     const [forRecipient, forOther] = entries;
 
@@ -76,7 +77,14 @@ describe(DeviceSealedSecretCipher.name, () => {
         recipient,
         resource: resourceFor(forRecipient!),
       }),
-    ).toEqual({ authorizationRevision: 2, generation: 3, payload });
+    ).toEqual({
+      authorizationRevision: 2,
+      generation: 3,
+      payload,
+      publisherCredential: DeviceCredential.fromString(
+        publisher.toPrimitives().publicKey,
+      ),
+    });
     expect(() =>
       DeviceSealedSecretCipher.open({
         identityId,
