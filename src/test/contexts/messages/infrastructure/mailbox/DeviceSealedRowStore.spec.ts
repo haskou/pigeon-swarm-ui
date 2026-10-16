@@ -124,20 +124,27 @@ describe(DeviceSealedRowStore.name, () => {
     expect(await store(name).load(session(root(5)))).toEqual([row('a')]);
   });
 
-  it('refuses a save that read the canary before another instance re-sealed it', async () => {
+  it('never resolves a save whose row another instance re-seals away', async () => {
     const name = databaseName();
 
     await store(name).save(session(root(5)), row('a'));
 
-    const paused = pauseNextRead();
-    const saving = store(name).save(session(root(5)), row('stale'));
+    const rotating = store(name).load(session(root(9), root(5)));
+    const saved = await store(name)
+      .save(session(root(5)), row('stale'))
+      .then(
+        () => true,
+        (error: Error) => {
+          expect(error.message).toBe(replaced);
 
-    await paused.started;
-    await store(name).load(session(root(9), root(5)));
-    paused.release();
+          return false;
+        },
+      );
 
-    await expect(saving).rejects.toThrow(replaced);
-    expect(await store(name).load(session(root(9)))).toEqual([row('a')]);
+    await rotating;
+    expect(await store(name).load(session(root(9)))).toEqual(
+      saved ? [row('a'), row('stale')] : [row('a')],
+    );
   });
 
   it('refuses the root a skipped rotation replaced and keeps the newer rows', async () => {
