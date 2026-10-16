@@ -1,27 +1,22 @@
+import type {
+  MlsCommitOutput,
+  MlsLeafOwner,
+  MlsLeafSigner,
+  MlsMembershipPolicy,
+} from '@haskou/pigeon-swarm-crypto/mls';
+
 import { CommitmentId, SHA256Hash } from '@haskou/pigeon-swarm-crypto';
+import { MlsGroup, MlsKeyPackage } from '@haskou/pigeon-swarm-crypto/mls';
 import { Buffer } from 'buffer';
 
 import type { CommunityMlsRoster } from '../../domain/CommunityMlsRoster';
 import type { MlsRecordResource } from '../http/resources/MlsRecordResource';
-import type {
-  MlsCommitOutput,
-  MlsKeyPackageBundle,
-  MlsLeafOwner,
-} from './MlsGroup';
 import type { MlsGroupCredentials } from './MlsGroupCredentials';
-import type { MlsLeafSigner } from './MlsLeafSigner';
-import type { MlsMembershipPolicy } from './MlsMembershipPolicy';
 import type { MlsRecordTransport } from './MlsRecordTransport';
 import type { MlsRoster } from './MlsRoster';
 import type { MlsStateStore } from './MlsStateStore';
 
 import { CommunityRosterHistory } from '../../domain/CommunityRosterHistory';
-import {
-  generateMlsKeyPackage,
-  MlsGroup,
-  mlsKeyPackageOwner,
-  restoreMlsKeyPackage,
-} from './MlsGroup';
 import { MlsRejectedError } from './MlsRejectedError';
 
 const KEY_PACKAGE_TARGET = 4;
@@ -55,7 +50,7 @@ const authoredOwnerOf = (
   record: MlsRecordResource,
 ): MlsLeafOwner | undefined => {
   try {
-    const owner = mlsKeyPackageOwner(fromBase64(record.payload));
+    const owner = MlsKeyPackage.ownerOf(fromBase64(record.payload));
 
     return owner.identityId === record.authorIdentityId ? owner : undefined;
   } catch {
@@ -129,7 +124,7 @@ export class MlsCommunityEngine {
         throw new MlsRejectedError('Group already exists on this device');
       }
       await this.currentHistory(groupId);
-      const key = await generateMlsKeyPackage(this.signer);
+      const key = await MlsKeyPackage.generate(this.signer);
       const group = await MlsGroup.create(
         groupId,
         key,
@@ -336,16 +331,13 @@ export class MlsCommunityEngine {
     });
   }
 
-  public async exportSecret(
+  /** The media key of a call in the group, as `MlsGroup.callMediaKey`. */
+  public async callMediaKey(
     groupId: string,
-    label: string,
-    context: string,
+    callId: string,
   ): Promise<Uint8Array> {
     return this.exclusive(groupId, async () =>
-      (await this.requireGroup(groupId)).exportSecret(
-        label,
-        encoder.encode(context),
-      ),
+      (await this.requireGroup(groupId)).callMediaKey(callId),
     );
   }
 
@@ -705,7 +697,7 @@ export class MlsCommunityEngine {
    */
   private async open(
     groupId: string,
-    bundle: MlsKeyPackageBundle,
+    bundle: MlsKeyPackage,
     record: MlsRecordResource,
     history: CommunityRosterHistory,
   ): Promise<MlsGroup | undefined> {
@@ -758,11 +750,11 @@ export class MlsCommunityEngine {
   private async makeKeyPackages(
     count: number,
     groupId: string,
-  ): Promise<MlsKeyPackageBundle[]> {
-    const bundles: MlsKeyPackageBundle[] = [];
+  ): Promise<MlsKeyPackage[]> {
+    const bundles: MlsKeyPackage[] = [];
 
     for (let index = 0; index < count; index += 1) {
-      const bundle = await generateMlsKeyPackage(this.signer);
+      const bundle = await MlsKeyPackage.generate(this.signer);
 
       await this.store.saveKeyPackage({
         groupId,
@@ -777,10 +769,10 @@ export class MlsCommunityEngine {
   }
 
   private async storedBundles(): Promise<
-    { bundle: MlsKeyPackageBundle; id: string }[]
+    { bundle: MlsKeyPackage; id: string }[]
   > {
     return (await this.store.loadKeyPackages()).map((stored) => ({
-      bundle: restoreMlsKeyPackage(stored.publicBytes, stored.privatePackage),
+      bundle: MlsKeyPackage.restore(stored.publicBytes, stored.privatePackage),
       id: stored.id,
     }));
   }

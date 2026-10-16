@@ -3,7 +3,8 @@ import type { GroupMailboxGenesis } from '../../domain/GroupMailboxGenesis';
 /**
  * A control record of a group conversation. Key-package requests and
  * responses and welcomes travel to one peer in a letter its sender signs
- * (`GroupMailboxControlSeal`), so the signature authenticates their author.
+ * (the library `GroupMailboxControlLetter`), so the signature authenticates
+ * their author.
  * Commits travel in the group inboxes `I(Y,k)`, and MLS authenticates them.
  * Application messages travel there too, as one MLS ciphertext whose sender
  * MLS authenticates. `gen_k` is never part of a record: a welcome carries

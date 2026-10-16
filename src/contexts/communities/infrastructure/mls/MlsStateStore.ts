@@ -1,5 +1,3 @@
-import type { PrivateKeyPackage } from 'ts-mls';
-
 import type { StoredMlsKeyPackage } from './StoredMlsKeyPackage';
 
 /**
@@ -9,15 +7,13 @@ import type { StoredMlsKeyPackage } from './StoredMlsKeyPackage';
 export interface MlsStateStore {
   deleteKeyPackage(id: string): Promise<void>;
   loadGroup(groupId: string): Promise<Uint8Array | undefined>;
-  loadKeyPackages(): Promise<StoredMlsKeyPackage<PrivateKeyPackage>[]>;
+  loadKeyPackages(): Promise<StoredMlsKeyPackage[]>;
   loadPlaintext(
     groupId: string,
     ciphertextId: string,
   ): Promise<string | undefined>;
   saveGroup(groupId: string, state: Uint8Array): Promise<void>;
-  saveKeyPackage(
-    keyPackage: StoredMlsKeyPackage<PrivateKeyPackage>,
-  ): Promise<void>;
+  saveKeyPackage(keyPackage: StoredMlsKeyPackage): Promise<void>;
   /** Plaintext must outlive the ratchet: a message decrypts only once. */
   savePlaintext(
     groupId: string,

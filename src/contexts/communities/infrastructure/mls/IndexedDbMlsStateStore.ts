@@ -1,5 +1,3 @@
-import type { PrivateKeyPackage } from 'ts-mls';
-
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { DeviceSealedEntryStore } from '../../../messages/infrastructure/mailbox/DeviceSealedEntryStore';
 import type { MlsStateStore } from './MlsStateStore';
@@ -45,9 +43,7 @@ export class IndexedDbMlsStateStore implements MlsStateStore {
     return await this.entries.get(this.session(), 'group', groupId);
   }
 
-  public async loadKeyPackages(): Promise<
-    StoredMlsKeyPackage<PrivateKeyPackage>[]
-  > {
+  public async loadKeyPackages(): Promise<StoredMlsKeyPackage[]> {
     const stored = await this.entries.list(this.session(), 'key-package');
 
     return stored.map(({ id, value }) => {
@@ -103,7 +99,7 @@ export class IndexedDbMlsStateStore implements MlsStateStore {
     id,
     privatePackage,
     publicBytes,
-  }: StoredMlsKeyPackage<PrivateKeyPackage>): Promise<void> {
+  }: StoredMlsKeyPackage): Promise<void> {
     await this.entries.put(
       this.session(),
       'key-package',

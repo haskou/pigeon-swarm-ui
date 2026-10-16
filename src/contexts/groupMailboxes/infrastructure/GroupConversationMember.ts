@@ -1,9 +1,10 @@
+import { MlsLeafSigner } from '@haskou/pigeon-swarm-crypto/mls';
+
 import type { Session } from '../../identities/infrastructure/session/Session';
 import type { GroupConversationPorts } from './GroupConversationPorts';
 import type { GroupConversationStores } from './GroupConversationStores';
 
 import { IndexedDbMlsStateStore } from '../../communities/infrastructure/mls/IndexedDbMlsStateStore';
-import { MlsLeafSigner } from '../../communities/infrastructure/mls/MlsLeafSigner';
 import { DeviceSealedEntryStore } from '../../messages/infrastructure/mailbox/DeviceSealedEntryStore';
 import { GroupMailboxControl } from './control/GroupMailboxControl';
 import { GroupMailboxHandledLetters } from './control/GroupMailboxHandledLetters';

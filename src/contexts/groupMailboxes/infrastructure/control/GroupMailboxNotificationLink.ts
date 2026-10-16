@@ -1,15 +1,20 @@
+import {
+  GroupMailboxControlLetter,
+  PrivateKey,
+} from '@haskou/pigeon-swarm-crypto';
+
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { NotificationMutationSigner } from '../../../notifications/infrastructure/http/NotificationMutationSigner';
 import type { GroupMailboxDirectLink } from './GroupMailboxDirectLink';
 
-import { GroupMailboxControlSeal } from './GroupMailboxControlSeal';
+import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 
 /**
  * Delivers a control record to one peer as a `group_conversation_invitation`
- * notification whose key field carries a `GroupMailboxControlSeal` letter.
- * The notification names no conversation: it travels only inside the seal.
+ * notification whose key field carries a library `GroupMailboxControlLetter`.
+ * The notification names no conversation: it travels only inside the letter.
  * The node admits it by its signature and the sender's quotas; the letter
  * itself proves the sender to the peer.
  */
@@ -35,12 +40,12 @@ export class GroupMailboxNotificationLink implements GroupMailboxDirectLink {
   ): Promise<void> {
     const path = GroupMailboxNotificationLink.PATH;
     const type = GroupMailboxNotificationLink.TYPE;
-    const encryptedConversationKey = GroupMailboxControlSeal.seal(
-      this.session,
+    const encryptedConversationKey = GroupMailboxControlLetter.seal(
+      new PrivateKey(this.session.keyPair.toPrimitives().privateKey),
       {
         conversationId,
-        plaintext,
-        recipientIdentityId: peerIdentityId,
+        payload: plaintext,
+        recipientIdentityId: IdentityId.normalize(peerIdentityId),
         sentAt: this.now(),
       },
     );

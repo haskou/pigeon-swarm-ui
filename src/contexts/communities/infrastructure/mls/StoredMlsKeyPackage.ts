@@ -1,7 +1,9 @@
-export interface StoredMlsKeyPackage<TPrivate> {
+import type { MlsPrivateKeyPackage } from '@haskou/pigeon-swarm-crypto/mls';
+
+export interface StoredMlsKeyPackage {
   /** The group it was published for; absent on packages stored before. */
   groupId?: string;
   id: string;
-  privatePackage: TPrivate;
+  privatePackage: MlsPrivateKeyPackage;
   publicBytes: Uint8Array;
 }

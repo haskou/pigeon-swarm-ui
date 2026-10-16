@@ -1,7 +1,7 @@
+import { CommitmentId } from '@haskou/pigeon-swarm-crypto';
+
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { GroupMessageHistoryStore } from '../history/GroupMessageHistoryStore';
-
-import { GroupMessageId } from '../crypto/GroupMessageId';
 
 /**
  * The authors of one conversation's sent messages and polls during one sync
@@ -39,7 +39,7 @@ export class GroupMessageAuthors {
   /** Whether `id` is a message or poll `sender` sent under an id it owns. */
   public async owns(id: string, sender: string): Promise<boolean> {
     return (
-      GroupMessageId.belongsTo(id, sender) &&
+      CommitmentId.isGroupMessageOf(id, sender) &&
       (await this.authorOf(id)) === sender
     );
   }

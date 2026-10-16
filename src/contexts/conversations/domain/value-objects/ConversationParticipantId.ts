@@ -26,12 +26,4 @@ export class ConversationParticipantId extends StringValueObject {
     super(value);
     assert(!this.isEmpty(), new ConversationParticipantIdRequiredError());
   }
-
-  public orderedWith(
-    participantId: ConversationParticipantId,
-  ): [ConversationParticipantId, ConversationParticipantId] {
-    return this.value <= participantId.value
-      ? [this, participantId]
-      : [participantId, this];
-  }
 }

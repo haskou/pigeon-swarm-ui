@@ -1,4 +1,8 @@
-import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
+import {
+  GroupMailboxControlLetter,
+  PrivateKey,
+  SHA256Hash,
+} from '@haskou/pigeon-swarm-crypto';
 
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { GroupConversationInvitationNotificationResource } from '../../../notifications/infrastructure/http/resources/GroupConversationInvitationNotificationResource';
@@ -16,7 +20,6 @@ import type { GroupMailboxNotificationLetter } from './GroupMailboxNotificationL
 import { encodeBase64Url } from '../../../../shared/infrastructure/encoding/base64url';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { GroupMailboxControlRecord } from './GroupMailboxControlRecord';
-import { GroupMailboxControlSeal } from './GroupMailboxControlSeal';
 
 /**
  * Reads the control letters peers sent this identity as pending
@@ -218,21 +221,22 @@ export class GroupMailboxNotificationPump {
     }
   }
 
-  /** The letter `notification` carries, if it is valid and timely. */
+  /**
+   * The letter `notification` carries, if it is timely. Throws when the
+   * letter does not open or verify; `safeLetterOf` declines it then.
+   */
   private letterOf(
     notification: GroupConversationInvitationNotificationResource,
   ): GroupMailboxNotificationLetter | undefined {
     const { encryptedConversationKey, inviterIdentityId } =
       notification.payload;
-    const opened = GroupMailboxControlSeal.open(
-      this.session,
+    const opened = GroupMailboxControlLetter.open(
+      new PrivateKey(this.session.keyPair.toPrimitives().privateKey),
       encryptedConversationKey,
-      inviterIdentityId,
+      IdentityId.normalize(inviterIdentityId),
     );
-
-    if (!opened) return undefined;
     const { conversationId, sentAt } = opened;
-    const record = GroupMailboxControlRecord.decode(opened.plaintext);
+    const record = GroupMailboxControlRecord.decode(opened.payload);
 
     if (record?.conversationId !== conversationId) return undefined;
     const refs = GroupMailboxNotificationPump.refsOf(record);
@@ -255,7 +259,7 @@ export class GroupMailboxNotificationPump {
       lease: welcome
         ? now + GroupMailboxNotificationPump.ANSWER_WINDOW_MS
         : until,
-      plaintext: opened.plaintext,
+      plaintext: opened.payload,
       sender,
       sentAt,
       until,

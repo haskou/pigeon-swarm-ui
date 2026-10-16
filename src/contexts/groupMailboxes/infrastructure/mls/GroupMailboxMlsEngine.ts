@@ -1,21 +1,22 @@
-import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
-import { decodeMlsMessage } from 'ts-mls';
-import {
-  CodecError,
-  CryptoError,
-  CryptoVerificationError,
-  InternalError,
-  ValidationError,
-} from 'ts-mls/mlsError.js';
-
 import type {
   MlsCommitOutcome,
   MlsCommitOutput,
   MlsLeafOwner,
+  MlsLeafSigner,
+  MlsMembershipPolicy,
   MlsOpenedMessage,
-} from '../../../communities/infrastructure/mls/MlsGroup';
-import type { MlsLeafSigner } from '../../../communities/infrastructure/mls/MlsLeafSigner';
-import type { MlsMembershipPolicy } from '../../../communities/infrastructure/mls/MlsMembershipPolicy';
+} from '@haskou/pigeon-swarm-crypto/mls';
+
+import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
+import {
+  GroupMailboxRosterExtension,
+  InvalidMlsCredentialError,
+  InvalidMlsExtensionError,
+  InvalidMlsGroupError,
+  MlsGroup,
+  MlsKeyPackage,
+} from '@haskou/pigeon-swarm-crypto/mls';
+
 import type { MlsStateStore } from '../../../communities/infrastructure/mls/MlsStateStore';
 import type { GroupMailboxGeneration } from '../../domain/GroupMailboxGeneration';
 import type { GroupMailboxGenesis } from '../../domain/GroupMailboxGenesis';
@@ -28,27 +29,18 @@ import {
   decodeBase64Url,
   encodeBase64Url,
 } from '../../../../shared/infrastructure/encoding/base64url';
-import {
-  generateMlsKeyPackage,
-  MlsGroup,
-  restoreMlsKeyPackage,
-} from '../../../communities/infrastructure/mls/MlsGroup';
 import { MlsRejectedError } from '../../../communities/infrastructure/mls/MlsRejectedError';
 import { GroupMailboxGenerationLog } from '../../domain/GroupMailboxGenerationLog';
 import { GroupMailboxGenerationSecret } from '../../domain/value-objects/GroupMailboxGenerationSecret';
 import { GroupMailboxConfirmations } from './GroupMailboxConfirmations';
-import { GroupMailboxRosterExtension } from './GroupMailboxRosterExtension';
+import { GroupMailboxRosterContext } from './GroupMailboxRosterContext';
 import { GroupMailboxUnconfirmedError } from './GroupMailboxUnconfirmedError';
 
-const GENERATION_LABEL = 'pigeon/group-mailbox/gen/v1';
-
-/** ts-mls failures that a malformed or forged message causes. */
+/** Library failures that a malformed or forged message causes. */
 const MESSAGE_ERRORS = [
-  CodecError,
-  CryptoError,
-  CryptoVerificationError,
-  InternalError,
-  ValidationError,
+  InvalidMlsCredentialError,
+  InvalidMlsExtensionError,
+  InvalidMlsGroupError,
 ];
 
 /**
@@ -58,7 +50,7 @@ const MESSAGE_ERRORS = [
  * and a joiner derives the generation itself. All mutation of a group goes
  * through a per-group queue so the ratchet has a single writer; a failed
  * task drops the cached group so the stored state stays the truth. The
- * roster the group's GroupContext carries (`GroupMailboxRosterExtension`)
+ * roster the group's GroupContext carries (`GroupMailboxRosterContext`)
  * decides who may hold a leaf and who may change membership; only a commit
  * it allows changes it. A commit this device makes is kept only once
  * published. A group joined from someone else's welcome stays unconfirmed
@@ -78,24 +70,20 @@ export class GroupMailboxMlsEngine {
   /** A rejection for what MLS refused; any other failure as it is. */
   private static rejection(error: unknown): unknown {
     return MESSAGE_ERRORS.some((type) => error instanceof type)
-      ? new MlsRejectedError('Message rejected')
+      ? new MlsRejectedError('MLS refused it')
       : error;
+  }
+
+  /** `operation`, with what MLS refused as a `rejection`. */
+  private static async refusing<T>(operation: Promise<T>): Promise<T> {
+    return operation.catch((error: unknown) => {
+      throw GroupMailboxMlsEngine.rejection(error);
+    });
   }
 
   /** Where the group a published commit leads to waits until it is saved. */
   private static pendingKey(conversationId: string): string {
     return `${conversationId}#pending`;
-  }
-
-  /** The epoch a commit was made in; anything but a commit is rejected. */
-  private static epochOf(bytes: Uint8Array): bigint {
-    const decoded = decodeMlsMessage(bytes, 0)?.[0];
-
-    if (decoded?.wireformat !== 'mls_private_message') {
-      throw new MlsRejectedError('Not an MLS commit');
-    }
-
-    return decoded.privateMessage.epoch;
   }
 
   public constructor(
@@ -255,7 +243,7 @@ export class GroupMailboxMlsEngine {
     group: MlsGroup,
   ): Promise<GroupMailboxGenerationSecret> {
     return GroupMailboxGenerationSecret.fromBytes(
-      await group.exportSecret(GENERATION_LABEL, new Uint8Array()),
+      await group.groupMailboxGenerationSecret(),
     );
   }
 
@@ -322,7 +310,7 @@ export class GroupMailboxMlsEngine {
     group: MlsGroup,
     conversationId: string,
   ): GroupMailboxRoster {
-    const roster = GroupMailboxRosterExtension.read(group.context());
+    const roster = GroupMailboxRosterContext.read(group.context());
 
     if (!roster) throw new MlsRejectedError('The welcome carries no roster');
 
@@ -450,7 +438,7 @@ export class GroupMailboxMlsEngine {
     outcome: MlsCommitOutcome;
     pending: boolean;
   }> {
-    const epoch = GroupMailboxMlsEngine.epochOf(bytes);
+    const epoch = MlsGroup.epochOf(bytes);
     const id = this.idOf(bytes);
     const pending = await this.pendingAt(group, epoch);
 
@@ -503,10 +491,10 @@ export class GroupMailboxMlsEngine {
       // commit by it must come from a device they still authorize. A
       // peer's device chains to its identity through its credential only.
       allows: (change) => {
-        const before = GroupMailboxRosterExtension.read(change.context);
+        const before = GroupMailboxRosterContext.read(change.context);
         const next =
           change.proposedContext &&
-          GroupMailboxRosterExtension.read(change.proposedContext);
+          GroupMailboxRosterContext.read(change.proposedContext);
 
         return (
           before !== undefined &&
@@ -518,8 +506,7 @@ export class GroupMailboxMlsEngine {
       },
       frontier: () => [],
       priority: (change) =>
-        GroupMailboxRosterExtension.read(change.context)?.priorityOf(change) ??
-        0,
+        GroupMailboxRosterContext.read(change.context)?.priorityOf(change) ?? 0,
       reach: () => 0,
       withheld: () => false,
     };
@@ -547,7 +534,7 @@ export class GroupMailboxMlsEngine {
         return {
           group: await MlsGroup.join(
             conversationId,
-            restoreMlsKeyPackage(stored.publicBytes, stored.privatePackage),
+            MlsKeyPackage.restore(stored.publicBytes, stored.privatePackage),
             welcome,
             this.policy(),
           ),
@@ -618,7 +605,7 @@ export class GroupMailboxMlsEngine {
 
   /** The roster the group's current GroupContext carries. */
   private static rosterOf(group: MlsGroup): GroupMailboxRoster {
-    const roster = GroupMailboxRosterExtension.read(group.context());
+    const roster = GroupMailboxRosterContext.read(group.context());
 
     if (!roster) throw new MlsRejectedError('The group carries no roster');
 
@@ -642,7 +629,11 @@ export class GroupMailboxMlsEngine {
 
       await this.refreshPolicy();
 
-      return this.commit(group, await group.add(keyPackages), publish);
+      return this.commit(
+        group,
+        await GroupMailboxMlsEngine.refusing(group.add(keyPackages)),
+        publish,
+      );
     });
   }
 
@@ -740,14 +731,11 @@ export class GroupMailboxMlsEngine {
 
       return this.commit(
         group,
-        await group.changeContext(
-          [
-            {
-              extensionData: GroupMailboxRosterExtension.encode(next),
-              extensionType: GroupMailboxRosterExtension.EXTENSION_TYPE,
-            },
-          ],
-          dropped,
+        await GroupMailboxMlsEngine.refusing(
+          group.changeContext(
+            [GroupMailboxRosterContext.extension(next)],
+            dropped,
+          ),
         ),
         publish,
       );
@@ -776,16 +764,11 @@ export class GroupMailboxMlsEngine {
       }
       const group = await MlsGroup.create(
         conversationId,
-        await generateMlsKeyPackage(this.signer, [
+        await MlsKeyPackage.generate(this.signer, [
           GroupMailboxRosterExtension.EXTENSION_TYPE,
         ]),
         this.policy(),
-        [
-          {
-            extensionData: GroupMailboxRosterExtension.encode(roster),
-            extensionType: GroupMailboxRosterExtension.EXTENSION_TYPE,
-          },
-        ],
+        [GroupMailboxRosterContext.extension(roster)],
       );
       const log = (await this.generations.load(conversationId)).start(
         await this.exportGeneration(group),
@@ -806,7 +789,7 @@ export class GroupMailboxMlsEngine {
    * supports the roster extension, so it can join a group carrying one.
    */
   public async createKeyPackage(): Promise<Uint8Array> {
-    const bundle = await generateMlsKeyPackage(this.signer, [
+    const bundle = await MlsKeyPackage.generate(this.signer, [
       GroupMailboxRosterExtension.EXTENSION_TYPE,
     ]);
 
@@ -846,9 +829,9 @@ export class GroupMailboxMlsEngine {
         };
       }
       const group = await this.requireGroup(conversationId);
-      const opened = await group.open(ciphertext).catch((error: unknown) => {
-        throw GroupMailboxMlsEngine.rejection(error);
-      });
+      const opened = await GroupMailboxMlsEngine.refusing(
+        group.open(ciphertext),
+      );
       const { deviceCredential, identityId } = opened.sender;
 
       // Once a removal is applied, its leaf's late messages are not read.
@@ -887,7 +870,9 @@ export class GroupMailboxMlsEngine {
   ): Promise<Uint8Array> {
     return this.exclusive(conversationId, async () => {
       const group = await this.requireConfirmed(conversationId);
-      const ciphertext = await group.encrypt(plaintext);
+      const ciphertext = await GroupMailboxMlsEngine.refusing(
+        group.encrypt(plaintext),
+      );
 
       // The sender cannot decrypt its own message later; keep it first.
       await this.store.savePlaintext(
@@ -1026,7 +1011,7 @@ export class GroupMailboxMlsEngine {
       const group = await this.load(conversationId);
 
       return group && !group.isRemoved
-        ? GroupMailboxRosterExtension.read(group.context())
+        ? GroupMailboxRosterContext.read(group.context())
         : undefined;
     });
   }
@@ -1059,7 +1044,9 @@ export class GroupMailboxMlsEngine {
       const group = await this.requireConfirmed(conversationId);
 
       await this.refreshPolicy();
-      const output = await group.removeIdentities(identityIds);
+      const output = await GroupMailboxMlsEngine.refusing(
+        group.removeIdentities(identityIds),
+      );
 
       return output ? this.commit(group, output, publish) : undefined;
     });
@@ -1079,9 +1066,8 @@ export class GroupMailboxMlsEngine {
       const group = await this.requireConfirmed(conversationId);
 
       await this.refreshPolicy();
-      const output = await group.removeDevices(
-        this.signer.owner.identityId,
-        deviceCredentials,
+      const output = await GroupMailboxMlsEngine.refusing(
+        group.removeDevices(this.signer.owner.identityId, deviceCredentials),
       );
 
       return output ? this.commit(group, output, publish) : undefined;

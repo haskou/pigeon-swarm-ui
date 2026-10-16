@@ -1,3 +1,5 @@
+import { CommitmentId } from '@haskou/pigeon-swarm-crypto';
+
 import type { ConversationResource } from '../../conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../identities/infrastructure/session/Session';
 import type { ChatMessage } from '../../messages/domain/ChatMessage';
@@ -26,7 +28,6 @@ import { MessageReactionAction } from '../../messages/domain/value-objects/Messa
 import { MessageReactionEmoji } from '../../messages/domain/value-objects/MessageReactionEmoji';
 import { GroupMailboxGenesis } from '../domain/GroupMailboxGenesis';
 import { GroupMailboxRoster } from '../domain/GroupMailboxRoster';
-import { GroupMessageId } from './crypto/GroupMessageId';
 import { GroupConversationMember } from './GroupConversationMember';
 import { GroupConversationSender } from './GroupConversationSender';
 import { GroupConversationStores } from './GroupConversationStores';
@@ -768,7 +769,7 @@ export class GroupConversationMailbox {
       if (
         message.deliveryStatus === state ||
         !message.mine ||
-        !GroupMessageId.belongsTo(message.id, self)
+        !CommitmentId.isGroupMessageOf(message.id, self)
       ) {
         return message;
       }
