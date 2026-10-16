@@ -28,6 +28,8 @@ import { GroupConversationMailbox } from '../../../../contexts/groupMailboxes/in
 import { GroupMessageHistoryStore } from '../../../../contexts/groupMailboxes/infrastructure/history/GroupMessageHistoryStore';
 import { GroupMailboxOutbox } from '../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutbox';
 import { GroupMailboxOutboxStore } from '../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutboxStore';
+import { DeviceAuthorizationEpoch } from '../../../../contexts/identities/domain/value-objects/DeviceAuthorizationEpoch';
+import { DeviceAuthorizationRevision } from '../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { sessionRootKey } from '../../../../contexts/identities/infrastructure/session/sessionRootKey';
 import { MailboxUnavailableError } from '../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
@@ -288,6 +290,8 @@ const person = async (of?: Member): Promise<Member> => {
   const id = IdentityId.fromString(keyPair.toPrimitives().publicKey).valueOf();
   const seed = ++devices;
   const session = {
+    authorizationEpoch: DeviceAuthorizationEpoch.genesis(),
+    authorizationRevision: DeviceAuthorizationRevision.fromNumber(1),
     deviceCredentialKeyPair: deviceKeyPair,
     deviceId: `device-${seed}`,
     deviceSealedRootKey: of
@@ -1310,6 +1314,71 @@ describe('GroupConversationMailbox', () => {
     // replaced session and calls in while the removal runs.
     jest.spyOn(verified, 'get').mockImplementationOnce((identityId) => {
       void bob.mailbox.resume(replaced);
+
+      return verifiedOf(identityId);
+    });
+    await bob.mailbox.membersChanged(bob.session, CONVERSATION);
+
+    expect(info).toHaveBeenCalledWith(
+      'Group devices reconciled: removed 1, added 0.',
+    );
+    // The removal commit it queued is sealed under the current root.
+    await expect(
+      new GroupMailboxOutboxStore(`${bob.storage}-outbox`).load(replaced),
+    ).rejects.toThrow('Device sealed root was replaced.');
+
+    await catchUp();
+    await alice.mailbox.send(alice.session, conversation(), 'after', {});
+
+    for (const member of everyone()) await sync(member);
+    await sync(second).catch(() => undefined);
+
+    expect(texts(bob)).toEqual(['message:after']);
+    expect(texts(second)).toEqual([]);
+    info.mockRestore();
+  });
+
+  it('ignores a session from before two revokes while it follows only the last one', async () => {
+    const info = jest
+      .spyOn(console, 'info')
+      .mockImplementation(() => undefined);
+    const second = await formGroupWithLaptop();
+    const stale = bob.session;
+    const replaced = {
+      ...stale,
+      authorizationRevision: DeviceAuthorizationRevision.fromNumber(2),
+      deviceSealedRootKey: SymmetricKey.fromBuffer(Buffer.alloc(32, 200)),
+      previousDeviceSealedRootKey: stale.deviceSealedRootKey,
+    } as unknown as Session;
+
+    bob.session = replaced;
+    await bob.mailbox.cutOffRevokedReaders(bob.session);
+    await catchUp();
+    // A reload under the first replacement moves the local state under it.
+    bob.mailbox.stop(bob.id);
+    bob.mailbox = device(bob.storage);
+    await sync(bob);
+
+    for (const devicesOf of [listed, verified]) {
+      devicesOf.set(bob.id, [
+        stale.deviceCredentialKeyPair.toPrimitives().publicKey,
+      ]);
+    }
+    bob.mailbox.stop(bob.id);
+    bob.mailbox = device(bob.storage);
+    bob.session = {
+      ...replaced,
+      authorizationRevision: DeviceAuthorizationRevision.fromNumber(3),
+      deviceSealedRootKey: SymmetricKey.fromBuffer(Buffer.alloc(32, 201)),
+      previousDeviceSealedRootKey: replaced.deviceSealedRootKey,
+    } as unknown as Session;
+    const verifiedOf = verified.get.bind(verified);
+
+    await bob.mailbox.cutOffRevokedReaders(bob.session);
+    // A background read that started before the first revoke still holds
+    // that session; this member never saw the root the first revoke replaced.
+    jest.spyOn(verified, 'get').mockImplementationOnce((identityId) => {
+      void bob.mailbox.resume(stale);
 
       return verifiedOf(identityId);
     });
