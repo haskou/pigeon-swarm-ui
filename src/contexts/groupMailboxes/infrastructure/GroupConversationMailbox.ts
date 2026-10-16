@@ -594,6 +594,15 @@ export class GroupConversationMailbox {
     await this.sender.identityUpdated(this.member(session), conversationId);
   }
 
+  /**
+   * Whether this device dropped this identity's stored group history because
+   * it no longer opens under the device-sealed root, as after a device revoke.
+   * Reports each drop once. Never throws.
+   */
+  public async checkHistoryDropped(session: Session): Promise<boolean> {
+    return await this.stores.history.checkDropped(session);
+  }
+
   /** Marks the conversation's stored history read on this device. */
   public async markRead(
     session: Session,

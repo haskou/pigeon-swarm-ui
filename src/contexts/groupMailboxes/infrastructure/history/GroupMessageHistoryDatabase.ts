@@ -90,11 +90,14 @@ export class GroupMessageHistoryDatabase {
     return result;
   }
 
-  /** Drops one identity's rows, read markers and canary in `transaction`. */
+  /**
+   * Drops one identity's rows, read markers and canary in `transaction`.
+   * Resolves with the dropped row count.
+   */
   private async wipeWithin(
     transaction: IDBTransaction,
     identityId: string,
-  ): Promise<void> {
+  ): Promise<number> {
     const entries = transaction.objectStore(ENTRIES_STORE);
     const ofIdentity = IDBKeyRange.bound([identityId], [identityId, []]);
     const sequences = await indexedDbRequest(
@@ -104,6 +107,8 @@ export class GroupMessageHistoryDatabase {
     for (const sequence of sequences) entries.delete(sequence);
     transaction.objectStore(READS_STORE).delete(ofIdentity);
     transaction.objectStore(CANARIES_STORE).delete(identityId);
+
+    return sequences.length;
   }
 
   public canary(identityId: string): Promise<Uint8Array | undefined> {
@@ -178,14 +183,20 @@ export class GroupMessageHistoryDatabase {
     );
   }
 
-  /** Drops one identity's rows and stores its new canary. */
-  public reset(identityId: string, canary: Uint8Array): Promise<void> {
+  /**
+   * Drops one identity's rows and stores its new canary. Resolves with the
+   * dropped row count.
+   */
+  public reset(identityId: string, canary: Uint8Array): Promise<number> {
     return this.within(
       [ENTRIES_STORE, CANARIES_STORE, READS_STORE],
       'readwrite',
       async (transaction) => {
-        await this.wipeWithin(transaction, identityId);
+        const dropped = await this.wipeWithin(transaction, identityId);
+
         transaction.objectStore(CANARIES_STORE).put(canary, identityId);
+
+        return dropped;
       },
     );
   }
@@ -244,8 +255,8 @@ export class GroupMessageHistoryDatabase {
     );
   }
 
-  public wipe(identityId: string): Promise<void> {
-    return this.within(
+  public async wipe(identityId: string): Promise<void> {
+    await this.within(
       [ENTRIES_STORE, CANARIES_STORE, READS_STORE],
       'readwrite',
       (transaction) => this.wipeWithin(transaction, identityId),
