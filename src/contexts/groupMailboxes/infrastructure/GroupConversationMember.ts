@@ -1,3 +1,4 @@
+import { SHA256Hash, type SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { MlsLeafSigner } from '@haskou/pigeon-swarm-crypto/mls';
 
 import type { Session } from '../../identities/infrastructure/session/Session';
@@ -16,8 +17,12 @@ import { GroupMailboxOutbox } from './outbox/GroupMailboxOutbox';
 
 /** One signed-in identity's MLS engine and the mailbox parts around it. */
 export class GroupConversationMember {
-  /** The roots the sessions it followed replaced. */
-  private readonly retired: Buffer[] = [];
+  /** SHA-256 digests of the roots the sessions it followed replaced. */
+  private readonly retired = new Set<string>();
+
+  private static digest(root: SymmetricKey | undefined): string | undefined {
+    return root && SHA256Hash.from(root.getBuffer()).toString();
+  }
 
   public static open(
     session: Session,
@@ -127,19 +132,30 @@ export class GroupConversationMember {
 
   /**
    * Seals the local state under this session's root and sends with it from
-   * now on, unless a session it followed replaced that root: a call that
-   * started before a revoke rotated the root still holds the replaced
-   * session, and must not move the state back under it.
+   * now on, unless the session is older than the one it follows or holds a
+   * root a session it followed replaced: a call that started before a revoke
+   * still holds a session from before it, and must not move the state back
+   * under a replaced root. A revoke raises the authorization revision within
+   * its epoch, so a session from before any number of revokes is older even
+   * when this member never saw its root.
    */
   public follow(session: Session): void {
-    const root = session.deviceSealedRootKey?.getBuffer();
+    const { authorizationEpoch, authorizationRevision } = this.current.session;
 
-    if (root && this.retired.some((stale) => stale.equals(root))) return;
-    const previous = session.previousDeviceSealedRootKey?.getBuffer();
-
-    if (previous && !this.retired.some((stale) => stale.equals(previous))) {
-      this.retired.push(previous);
+    if (
+      session.authorizationEpoch.isEqual(authorizationEpoch) &&
+      session.authorizationRevision.isLessThan(authorizationRevision)
+    ) {
+      return;
     }
+    const root = GroupConversationMember.digest(session.deviceSealedRootKey);
+
+    if (root && this.retired.has(root)) return;
+    const previous = GroupConversationMember.digest(
+      session.previousDeviceSealedRootKey,
+    );
+
+    if (previous) this.retired.add(previous);
     this.current.session = session;
   }
 
