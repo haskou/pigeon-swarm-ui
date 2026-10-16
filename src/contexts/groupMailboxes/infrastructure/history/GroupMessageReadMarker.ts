@@ -1,8 +1,9 @@
+import { CommitmentId } from '@haskou/pigeon-swarm-crypto';
+
 import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessageRecord';
 import type { GroupMessageReadMarkerPrimitives } from './GroupMessageReadMarkerPrimitives';
 
 import { DirectMailboxRecords } from '../../../mailboxes/domain/DirectMailboxRecords';
-import { GroupMessageId } from '../crypto/GroupMessageId';
 
 /**
  * How far this device accounted one group conversation's stored history:
@@ -53,7 +54,7 @@ export class GroupMessageReadMarker {
   ): void {
     if (
       record.type !== DirectMailboxRecords.TYPE.deleted ||
-      !GroupMessageId.belongsTo(record.targetMessageId, record.authorId)
+      !CommitmentId.isGroupMessageOf(record.targetMessageId, record.authorId)
     ) {
       return;
     }

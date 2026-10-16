@@ -1,4 +1,8 @@
-import { CanonicalJson, KeyPair } from '@haskou/pigeon-swarm-crypto';
+import {
+  CanonicalJson,
+  CommitmentId,
+  KeyPair,
+} from '@haskou/pigeon-swarm-crypto';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
@@ -20,16 +24,16 @@ describe(NotificationMutationSigner.name, () => {
   }
 
   it.each(vectors.cases.filter(({ name }) => name.endsWith('_invitation')))(
-    'derives the published invitation id for $name',
+    'matches the library invitation id to the published $name',
     (vector) => {
       const { payload } = vector.derived;
 
       expect(
-        signer.invitationId(
+        CommitmentId.invitation(
           payload.inviterIdentityId as string,
           payload.recipientIdentityId as string,
-          'subjectId' in payload ? payload.subjectId : undefined,
           payload.nonce as string,
+          'subjectId' in payload ? payload.subjectId : undefined,
         ),
       ).toBe(payload.id);
     },
@@ -57,10 +61,9 @@ describe(NotificationMutationSigner.name, () => {
     });
 
     expect(signed.notificationId).toBe(
-      signer.invitationId(
+      CommitmentId.invitation(
         signed.inviterIdentityId,
         signed.recipientIdentityId,
-        undefined,
         signed.nonce,
       ),
     );

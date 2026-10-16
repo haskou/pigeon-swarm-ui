@@ -97,6 +97,7 @@ const build = (ownLeafIdentityId = OWN_ID) =>
         epoch: 3n,
         leaves: [
           {
+            index: 0,
             owner: {
               deviceCredential: pem(OWN_DEVICE),
               identityId: ownLeafIdentityId,
@@ -104,10 +105,12 @@ const build = (ownLeafIdentityId = OWN_ID) =>
             signaturePublicKey: SIGNATURE_KEY,
           },
           {
+            index: 1,
             owner: { deviceCredential: pem(OTHER_DEVICE), identityId: OWN_ID },
             signaturePublicKey: SIBLING_SIGNATURE_KEY,
           },
           {
+            index: 2,
             owner: { deviceCredential: pem(PEER_DEVICE), identityId: PEER_ID },
             signaturePublicKey: PEER_SIGNATURE_KEY,
           },

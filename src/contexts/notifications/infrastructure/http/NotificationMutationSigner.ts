@@ -1,6 +1,6 @@
 import type { PublicMutation } from '@haskou/pigeon-swarm-crypto';
 
-import { CanonicalJson, SHA256Hash } from '@haskou/pigeon-swarm-crypto';
+import { CommitmentId } from '@haskou/pigeon-swarm-crypto';
 
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { NotificationInvitationInput } from './NotificationInvitationInput';
@@ -34,26 +34,6 @@ export class NotificationMutationSigner {
     );
   }
 
-  /**
-   * The invitation's record id; a group control letter's names no subject
-   * (`NotificationInvitationInput`).
-   */
-  public invitationId(
-    inviterIdentityId: string,
-    recipientIdentityId: string,
-    subjectId: string | undefined,
-    nonce: string,
-  ): string {
-    return `invitation:${SHA256Hash.from(
-      CanonicalJson.serialize({
-        inviterIdentityId,
-        nonce,
-        recipientIdentityId,
-        ...(subjectId === undefined ? {} : { subjectId }),
-      }),
-    ).toString()}`;
-  }
-
   public async invitation(
     session: Session,
     input: NotificationInvitationInput,
@@ -65,11 +45,11 @@ export class NotificationMutationSigner {
       input.type === 'group_conversation_invitation'
         ? undefined
         : input.subjectId;
-    const notificationId = this.invitationId(
+    const notificationId = CommitmentId.invitation(
       inviterIdentityId,
       recipientIdentityId,
-      subjectId,
       nonce,
+      subjectId,
     );
     const mutation = await this.mutations.sign(
       session,

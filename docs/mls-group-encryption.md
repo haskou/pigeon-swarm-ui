@@ -13,8 +13,10 @@ its content was encrypted with the community key anyway.
 
 ## Decision
 
-Use MLS (RFC 9420) through `ts-mls` with the cipher suite
-`MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519`.
+Use MLS (RFC 9420) through `@haskou/pigeon-swarm-crypto/mls` (`MlsGroup`,
+`MlsKeyPackage`; its `docs/mls-group.md`), which wraps `ts-mls` with the
+cipher suite `MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519`. The client
+imports no `ts-mls` code of its own.
 
 | Scope                               | Group                                            |
 | ----------------------------------- | ------------------------------------------------ |
@@ -114,7 +116,7 @@ The node cannot order commits across replicas. Clients do it:
   conversation roster ranks them first and the **lowest commit id** only
   settles equal ranks (see "Same-epoch rivals" in
   `docs/opaque-mailboxes-client.md`). A client that applied a different
-  commit for epoch `n` rolls back to its retained epoch-`n` state (`ts-mls`
+  commit for epoch `n` rolls back to its retained epoch-`n` state (MLS
   states are immutable values) and applies the winner. Application messages
   encrypted in the losing epoch stay readable because that state is retained
   read-only. A group in epoch `m` lists commits with `afterEpoch = m - 2` and
@@ -195,7 +197,8 @@ a demotion in (#420):
   and everything they descend from (`CommunityRosterHistory.heads`). The
   commit carries it as MLS authenticated data and its welcome as GroupInfo
   extension `0xf420`, both encoded as `pigeon:community-frontier:v1\n`
-  followed by the digests, one per line, at most 256 (`MlsRosterFrontier`).
+  followed by the digests, one per line, at most 256 (library
+  `MlsRosterFrontier`).
 - A receiver replays the roster from the operations the frontier stands for
   (`CommunityRosterHistory.rosterAt`) and checks the commit against it. A
   frontier that names an operation the receiver has not verified judges
@@ -415,8 +418,10 @@ channelId)`); frontiers stay community operation heads.
 ### Purpose-separated secrets
 
 Attachments keep a random per-attachment key, sent inside the message. Call
-media keys come from the exporter of the owning group:
+media keys come from the exporter of the owning group, through the library's
+fixed-label `MlsGroup.callMediaKey(callId)`:
 `exporter(label = "pigeon/call-media/v1", context = callId, length = 32)`.
+The client has no generic exporter, so it cannot export under another label.
 Labels are distinct per purpose; there is no shared secret between text, media
 and attachments, and a missing group is an error, not a fallback.
 
@@ -484,8 +489,8 @@ call key. Safari is not covered by CI.
 ## Security properties and limits
 
 - Forward secrecy and post-compromise recovery are those of MLS, limited as
-  follows (`MlsGroup.spec.ts`, "forward secrecy and post-compromise
-  recovery"; `MlsCommunityEngine.spec.ts`; `yarn test:crypto`):
+  follows (the library's `MlsGroup` specs; `MlsCommunityEngine.spec.ts`,
+  `yarn test:crypto`):
   - A message key is deleted once it is used. The reader cannot open the
     message again, also not from its stored state, and the sender keeps no
     key for its own message. A copy of the state taken before the read still
@@ -493,7 +498,7 @@ call key. Safari is not covered by CI.
   - Epoch secrets are kept for the current epoch and the 8 before it
     (`retainKeysForEpochs`) and then deleted. A message of an older epoch
     that this device has not read stays unreadable, also from the stored
-    state. Within those epochs, ts-mls keeps the keys of up to 10 skipped
+    state. Within those epochs, MLS keeps the keys of up to 10 skipped
     messages per sender (`retainKeysForGenerations`).
   - In memory, a group also keeps the state before every commit it applied
     in this app session, so that it can switch to a competing commit. Those
@@ -508,7 +513,7 @@ call key. Safari is not covered by CI.
     recovers only when it commits its own update: the update path encrypts
     the new path secrets to the other members' keys only, so a copy of the
     old state cannot apply that commit and holds no secret of a later epoch.
-    By ts-mls (`needsUpdatePath`), a removal it commits carries an update
+    By the library (`needsUpdatePath`), a removal it commits carries an update
     path too and a commit that only adds carries none; no spec covers those
     two cases. Commits by other members, their updates included, do not heal
     it: a copy of its state follows them and keeps reading messages and
@@ -530,20 +535,11 @@ call key. Safari is not covered by CI.
   X.509 chain.
 - `ts-mls` has not had a formal external audit (its README says so). This
   design is not audited either. The issue stays open until a specialist review.
-- `ts-mls` 1.6.4 is patched (`patches/ts-mls+1.6.4.patch`, applied by
-  `patch-package` on `postinstall` and again before `build`). Its
-  `createCommit` encrypts the UpdatePath under the old GroupContext, while its
-  `processCommit`, as RFC 9420 §12.4.2 requires, decrypts it under the new
-  one, with the extensions a GroupContextExtensions proposal sets. A commit
-  that changes the context and removes a member at once, as a group
-  conversation's roster removal does, then failed for every receiver. The
-  patch computes the new context first and encrypts under it; nothing else
-  changes. Upstream fixed it in 2.0.0-rc; the patch goes when `ts-mls` moves
-  to 2.0 or later. `build` applies the patch itself because the wrapper image
-  installs dependencies before it copies `patches/`, so the patch is missing at
-  `postinstall` there. `patch-package` skips a patch that is already applied
-  and fails the build if it no longer fits. Installs with `--ignore-scripts`
-  must run `npx patch-package` by hand before tests.
+- The library builds commits itself where `ts-mls` 1.6.4 gets RFC 9420
+  §12.4.2 wrong: a commit that changes the GroupContext and carries an
+  UpdatePath, as a group conversation's roster removal does, encrypts that
+  path to the new context (library `docs/mls-group.md`, "UpdatePath and
+  GroupContextExtensions"). The client applies no patch to `ts-mls`.
 - Concurrent commits depend on the epoch rule and on clients retaining the
   previous epoch state. Lost records are repaired by fetching, not guessed.
 - MLS client state (leaf private keys, epoch secrets, key packages), the

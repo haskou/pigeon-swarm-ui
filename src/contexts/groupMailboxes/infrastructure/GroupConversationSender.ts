@@ -1,3 +1,5 @@
+import { CommitmentId } from '@haskou/pigeon-swarm-crypto';
+
 import type { ConversationResource } from '../../conversations/infrastructure/http/ConversationResource';
 import type { DirectMessageRecord } from '../../mailboxes/domain/DirectMessageRecord';
 import type { DirectPollCloseRecord } from '../../mailboxes/domain/DirectPollCloseRecord';
@@ -16,7 +18,6 @@ import type { GroupMessageHistoryStore } from './history/GroupMessageHistoryStor
 import { DirectMailboxRecords } from '../../mailboxes/domain/DirectMailboxRecords';
 import { DirectMessageMailboxRecord } from '../../messages/infrastructure/mailbox/DirectMessageMailboxRecord';
 import { PollBoard } from '../../polls/domain/PollBoard';
-import { GroupMessageId } from './crypto/GroupMessageId';
 
 /**
  * Writes group records. A payload is the plain message JSON: MLS encrypts
@@ -51,7 +52,7 @@ export class GroupConversationSender {
   private identity(member: GroupConversationMember) {
     return {
       createdAt: this.ports.now(),
-      id: GroupMessageId.create(member.session.identity.id),
+      id: CommitmentId.groupMessage(member.session.identity.id),
     };
   }
 
@@ -76,7 +77,7 @@ export class GroupConversationSender {
   ): Promise<void> {
     await this.enqueue(member, {
       ...record,
-      id: GroupMessageId.create(member.session.identity.id),
+      id: CommitmentId.groupMessage(member.session.identity.id),
     });
   }
 

@@ -1,4 +1,7 @@
-import type { MlsLeafOwner } from '../../../communities/infrastructure/mls/MlsGroup';
+import type { MlsLeafOwner } from '@haskou/pigeon-swarm-crypto/mls';
+
+import { MlsKeyPackage } from '@haskou/pigeon-swarm-crypto/mls';
+
 import type { GroupMailboxRoster } from '../../domain/GroupMailboxRoster';
 import type { GroupMailboxCommit } from '../mls/GroupMailboxCommit';
 import type { GroupMailboxOutbox } from '../outbox/GroupMailboxOutbox';
@@ -8,7 +11,6 @@ import type { GroupMailboxControlOutcome } from './GroupMailboxControlOutcome';
 import type { GroupMailboxDirectLink } from './GroupMailboxDirectLink';
 import type { PendingGroupMailboxKeyPackage } from './PendingGroupMailboxKeyPackage';
 
-import { mlsKeyPackageOwner } from '../../../communities/infrastructure/mls/MlsGroup';
 import { MlsRejectedError } from '../../../communities/infrastructure/mls/MlsRejectedError';
 import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
 import { GroupMailboxUnconfirmedError } from '../mls/GroupMailboxUnconfirmedError';
@@ -64,7 +66,7 @@ export class GroupMailboxControl {
   /** The owner a key package's credential names, if it decodes. */
   private static ownerOf(keyPackage: Uint8Array): MlsLeafOwner | undefined {
     try {
-      return mlsKeyPackageOwner(keyPackage);
+      return MlsKeyPackage.ownerOf(keyPackage);
     } catch {
       return undefined;
     }
@@ -425,7 +427,7 @@ export class GroupMailboxControl {
       await Promise.all(
         keyPackages.map((keyPackage) => {
           const { deviceCredential, identityId } =
-            mlsKeyPackageOwner(keyPackage);
+            MlsKeyPackage.ownerOf(keyPackage);
 
           return this.direct.send(
             conversationId,

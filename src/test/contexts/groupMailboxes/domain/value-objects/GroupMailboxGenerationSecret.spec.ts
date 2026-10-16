@@ -1,23 +1,33 @@
 import { InvalidFormatError } from '@haskou/value-objects';
 
 import { GroupMailboxGenerationSecret } from '../../../../../contexts/groupMailboxes/domain/value-objects/GroupMailboxGenerationSecret';
-import { GroupMailboxSlot } from '../../../../../contexts/groupMailboxes/domain/value-objects/GroupMailboxSlot';
 
-describe(GroupMailboxSlot.name, () => {
-  const slotBytes = new Uint8Array(32).fill(0x22);
+describe(GroupMailboxGenerationSecret.name, () => {
+  const secretBytes = new Uint8Array(32).fill(0x22);
   const encoded = 'IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI';
 
   it('round-trips 32 bytes through unpadded base64url', () => {
-    const slot = GroupMailboxSlot.fromBytes(slotBytes);
+    expect(
+      GroupMailboxGenerationSecret.fromBytes(secretBytes).isEqual(
+        GroupMailboxGenerationSecret.fromString(encoded),
+      ),
+    ).toBe(true);
+  });
 
-    expect(slot.isEqual(GroupMailboxSlot.fromString(encoded))).toBe(true);
-    expect(slot.getBytes()).toEqual(slotBytes);
+  it('hands the same 32 bytes to the library as a symmetric key', () => {
+    expect(
+      new Uint8Array(
+        GroupMailboxGenerationSecret.fromString(encoded)
+          .toSymmetricKey()
+          .getBuffer(),
+      ),
+    ).toEqual(secretBytes);
   });
 
   it.each([31, 33])('rejects %p bytes', (length) => {
-    expect(() => GroupMailboxSlot.fromBytes(new Uint8Array(length))).toThrow(
-      InvalidFormatError,
-    );
+    expect(() =>
+      GroupMailboxGenerationSecret.fromBytes(new Uint8Array(length)),
+    ).toThrow(InvalidFormatError);
   });
 
   it.each([
@@ -29,7 +39,7 @@ describe(GroupMailboxSlot.name, () => {
     ],
     ['too short', encoded.slice(1)],
   ])('rejects %s text', (_case, value) => {
-    expect(() => GroupMailboxSlot.fromString(value)).toThrow(
+    expect(() => GroupMailboxGenerationSecret.fromString(value)).toThrow(
       InvalidFormatError,
     );
   });
@@ -47,13 +57,5 @@ describe(GroupMailboxSlot.name, () => {
 
     expect(rejection).toBeInstanceOf(InvalidFormatError);
     expect(String(rejection)).not.toContain(secret);
-  });
-
-  it('keeps a slot and a generation secret of the same bytes distinct', () => {
-    expect(
-      GroupMailboxSlot.fromBytes(slotBytes).isEqual(
-        GroupMailboxGenerationSecret.fromBytes(slotBytes),
-      ),
-    ).toBe(false);
   });
 });

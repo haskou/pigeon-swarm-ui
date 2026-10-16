@@ -1,8 +1,8 @@
+import type { MlsLeafOwner } from '@haskou/pigeon-swarm-crypto/mls';
+
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import { MlsLeafSigner } from '@haskou/pigeon-swarm-crypto/mls';
 
-import type { MlsLeafOwner } from '../../../../../contexts/communities/infrastructure/mls/MlsGroup';
-
-import { MlsLeafSigner } from '../../../../../contexts/communities/infrastructure/mls/MlsLeafSigner';
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 
 /**

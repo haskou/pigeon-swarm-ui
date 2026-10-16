@@ -1,3 +1,4 @@
+import { MlsLeafSigner } from '@haskou/pigeon-swarm-crypto/mls';
 import { Buffer } from 'buffer';
 
 import type { CommunityAuthority } from '../../../contexts/communities/domain/operations/CommunityAuthority';
@@ -14,7 +15,6 @@ import { CommunityChannelRestrictionRefusedError } from '../../../contexts/commu
 import { CommunityOperationFold } from '../../../contexts/communities/domain/operations/CommunityOperationFold';
 import { IndexedDbMlsStateStore } from '../../../contexts/communities/infrastructure/mls/IndexedDbMlsStateStore';
 import { MlsCommunityEngine } from '../../../contexts/communities/infrastructure/mls/MlsCommunityEngine';
-import { MlsLeafSigner } from '../../../contexts/communities/infrastructure/mls/MlsLeafSigner';
 import { SessionMlsRecordTransport } from '../../../contexts/communities/infrastructure/mls/SessionMlsRecordTransport';
 import { DeviceSealedEntryStore } from '../../../contexts/messages/infrastructure/mailbox/DeviceSealedEntryStore';
 import { scopeClientStorageKey } from '../../../shared/infrastructure/storage/ClientStorageScope';
@@ -394,9 +394,8 @@ export class PigeonMlsFacade {
     channelId: string,
     callId: string,
   ): Promise<string> {
-    const secret = await this.engineFor(session).exportSecret(
+    const secret = await this.engineFor(session).callMediaKey(
       await this.groupFor(session, communityId, channelId),
-      'pigeon/call-media/v1',
       callId,
     );
 

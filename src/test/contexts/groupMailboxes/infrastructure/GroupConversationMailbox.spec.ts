@@ -3,8 +3,10 @@ import type { MockProxy } from 'jest-mock-extended';
 
 import {
   BearerCapability,
+  GroupMailboxControlLetter,
   KeyPair,
   MailboxReadToken,
+  PrivateKey,
   SymmetricKey,
 } from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
@@ -22,7 +24,6 @@ import { ConversationIdFactory } from '../../../../contexts/conversations/domain
 import { ConversationGroupNonce } from '../../../../contexts/conversations/domain/value-objects/ConversationGroupNonce';
 import { ConversationNetworkId } from '../../../../contexts/conversations/domain/value-objects/ConversationNetworkId';
 import { ConversationParticipantId } from '../../../../contexts/conversations/domain/value-objects/ConversationParticipantId';
-import { GroupMailboxControlSeal } from '../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlSeal';
 import { GroupConversationMailbox } from '../../../../contexts/groupMailboxes/infrastructure/GroupConversationMailbox';
 import { GroupMessageHistoryStore } from '../../../../contexts/groupMailboxes/infrastructure/history/GroupMessageHistoryStore';
 import { GroupMailboxOutbox } from '../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutbox';
@@ -196,12 +197,15 @@ const post = (
 ): Promise<void> => {
   const inbox = letters.get(peer) ?? [];
   const id = `n${String(inbox.length + 1).padStart(6, '0')}`;
-  const sealed = GroupMailboxControlSeal.seal(from, {
-    conversationId,
-    plaintext,
-    recipientIdentityId: peer,
-    sentAt: NOW,
-  });
+  const sealed = GroupMailboxControlLetter.seal(
+    new PrivateKey(from.keyPair.toPrimitives().privateKey),
+    {
+      conversationId,
+      payload: plaintext,
+      recipientIdentityId: peer,
+      sentAt: NOW,
+    },
+  );
 
   inbox.unshift({
     id,

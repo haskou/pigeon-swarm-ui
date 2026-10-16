@@ -1,8 +1,12 @@
 import type { MailboxInboxKeys } from '@haskou/pigeon-swarm-crypto';
+import type { MlsOpenedMessage } from '@haskou/pigeon-swarm-crypto/mls';
 
-import { BearerCapability } from '@haskou/pigeon-swarm-crypto';
+import {
+  BearerCapability,
+  CommitmentId,
+  MailboxKeySchedule,
+} from '@haskou/pigeon-swarm-crypto';
 
-import type { MlsOpenedMessage } from '../../../communities/infrastructure/mls/MlsGroup';
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessageRecord';
 import type { PigeonMailboxClient } from '../../../mailboxes/infrastructure/http/PigeonMailboxClient';
@@ -26,8 +30,6 @@ import { MailboxUnavailableError } from '../../../mailboxes/domain/errors/Mailbo
 import { DirectMessageInboxKeys } from '../../../messages/infrastructure/mailbox/DirectMessageInboxKeys';
 import { DirectMessageMailboxRecord } from '../../../messages/infrastructure/mailbox/DirectMessageMailboxRecord';
 import { GroupMailboxControlRecord } from '../control/GroupMailboxControlRecord';
-import { GroupMailboxKeySchedule } from '../crypto/GroupMailboxKeySchedule';
-import { GroupMessageId } from '../crypto/GroupMessageId';
 import { GroupMessageAuthors } from './GroupMessageAuthors';
 
 /**
@@ -37,11 +39,11 @@ import { GroupMessageAuthors } from './GroupMessageAuthors';
  * applied before the messages of the generation it starts. The first read
  * of a generation creates its inbox. A commit goes to the control; a message
  * is decrypted by MLS, whose sender must be the record's author and must
- * own the record's id (`GroupMessageId`). An edit or a deletion counts only
- * from the author of its target message. Accepted records are stored on
- * this device, except typing notices and identity updates, which are only
- * handed on; every
- * accepted record is handed to the caller, then the page is acknowledged; a
+ * own the record's id (`CommitmentId.groupMessage`). An edit or a deletion
+ * counts only from the author of its target message. Accepted records are
+ * stored on this device, except typing notices and identity updates, which
+ * are only handed on; every accepted record is handed to the caller, then
+ * the page is acknowledged; a
  * rejected envelope is acknowledged too, so it cannot stall the inbox, and
  * so is an envelope that failed to open `MAX_FAILURES` times.
  *
@@ -104,7 +106,7 @@ export class GroupMailboxInboxSync {
     sender: string,
     authors: GroupMessageAuthors,
   ): Promise<boolean> {
-    if (!GroupMessageId.belongsTo(record.id, sender)) return false;
+    if (!CommitmentId.isGroupMessageOf(record.id, sender)) return false;
 
     switch (record.type) {
       case DirectMailboxRecords.TYPE.sent:
@@ -344,9 +346,9 @@ export class GroupMailboxInboxSync {
     session: Session,
     generation: GroupMailboxGeneration,
   ): MailboxInboxKeys {
-    return GroupMailboxKeySchedule.inbox(
-      generation.secret,
-      IdentityId.fromString(session.identity.id),
+    return MailboxKeySchedule.groupInbox(
+      generation.secret.toSymmetricKey(),
+      IdentityId.fromString(session.identity.id).valueOf(),
     );
   }
 

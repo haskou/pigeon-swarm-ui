@@ -1,6 +1,10 @@
 import type { PublicMutation } from '@haskou/pigeon-swarm-crypto';
 
-import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import {
+  GroupMailboxControlLetter,
+  KeyPair,
+  PrivateKey,
+} from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
@@ -8,7 +12,6 @@ import type { NotificationMutationSigner } from '../../../../../contexts/notific
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
-import { GroupMailboxControlSeal } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlSeal';
 import { GroupMailboxNotificationLink } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxNotificationLink';
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 
@@ -54,8 +57,8 @@ describe('GroupMailboxNotificationLink', () => {
     const [, input] = invitations.invitation.mock.calls[0];
     const [path, init] = http.request.mock.calls[0];
     const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
-    const opened = GroupMailboxControlSeal.open(
-      bob.session,
+    const opened = GroupMailboxControlLetter.open(
+      new PrivateKey(bob.session.keyPair.toPrimitives().privateKey),
       String(body.encryptedConversationKey),
       alice.id,
     );
@@ -75,8 +78,8 @@ describe('GroupMailboxNotificationLink', () => {
       recipientIdentityId: bob.id,
       type: 'group_conversation_invitation',
     });
-    expect(opened?.conversationId).toBe(CONVERSATION);
-    expect(opened?.sentAt).toBe(NOW);
-    expect([...(opened?.plaintext ?? [])]).toEqual([7, 8]);
+    expect(opened.conversationId).toBe(CONVERSATION);
+    expect(opened.sentAt).toBe(NOW);
+    expect([...opened.payload]).toEqual([7, 8]);
   });
 });

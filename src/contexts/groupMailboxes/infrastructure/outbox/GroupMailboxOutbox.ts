@@ -1,3 +1,6 @@
+import type { MailboxInboxKeys } from '@haskou/pigeon-swarm-crypto';
+
+import { MailboxKeySchedule } from '@haskou/pigeon-swarm-crypto';
 import { sha256 } from '@noble/hashes/sha2.js';
 
 import type { Session } from '../../../identities/infrastructure/session/Session';
@@ -19,7 +22,6 @@ import { MlsRejectedError } from '../../../communities/infrastructure/mls/MlsRej
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
 import { GroupMailboxControlRecord } from '../control/GroupMailboxControlRecord';
-import { GroupMailboxKeySchedule } from '../crypto/GroupMailboxKeySchedule';
 
 /**
  * Durable fan-out of group records (node `docs/design/group-mailboxes.md`,
@@ -77,14 +79,22 @@ export class GroupMailboxOutbox {
     commit: GroupMailboxCommit,
     identityId: string,
   ): string {
-    const next = GroupMailboxKeySchedule.inbox(
-      commit.generation.secret,
-      IdentityId.fromString(identityId),
-    );
+    const next = GroupMailboxOutbox.inbox(commit.generation, identityId);
 
     const hash = encodeBase64Url(sha256(commit.commit));
 
     return `group-commit|${hash}|${next.mailboxId}`;
+  }
+
+  /** The sender keys of `identityId`'s inbox of `generation`. */
+  private static inbox(
+    generation: GroupMailboxGeneration,
+    identityId: string,
+  ): MailboxInboxKeys {
+    return MailboxKeySchedule.groupInbox(
+      generation.secret.toSymmetricKey(),
+      IdentityId.fromString(identityId).valueOf(),
+    );
   }
 
   /** Holds back later rows to the recipients of `row`. */
@@ -204,10 +214,7 @@ export class GroupMailboxOutbox {
   ): Promise<boolean> {
     try {
       await this.channel.send(
-        GroupMailboxKeySchedule.inbox(
-          generation.secret,
-          IdentityId.fromString(copy.identityId),
-        ),
+        GroupMailboxOutbox.inbox(generation, copy.identityId),
         record,
         copy.envelopeId,
       );
@@ -536,10 +543,7 @@ export class GroupMailboxOutbox {
           .map((identityId) => ({
             envelopeId: MailboxChannel.envelopeIdFor(
               `group-message|${row.id}|${
-                GroupMailboxKeySchedule.inbox(
-                  generation.secret,
-                  IdentityId.fromString(identityId),
-                ).mailboxId
+                GroupMailboxOutbox.inbox(generation, identityId).mailboxId
               }`,
             ),
             identityId,
@@ -569,10 +573,7 @@ export class GroupMailboxOutbox {
       copies: commit.recipients.map((identityId) => ({
         envelopeId: MailboxChannel.envelopeIdFor(
           `${GroupMailboxOutbox.commitSeed(commit, identityId)}|${
-            GroupMailboxKeySchedule.inbox(
-              deliveryGeneration.secret,
-              IdentityId.fromString(identityId),
-            ).mailboxId
+            GroupMailboxOutbox.inbox(deliveryGeneration, identityId).mailboxId
           }`,
         ),
         identityId,
