@@ -248,6 +248,24 @@ export class GroupMailboxMlsEngine {
   }
 
   /**
+   * A group with this device alone under `roster`. Async, so a roster the
+   * library refuses to encode rejects like any other MLS refusal.
+   */
+  private async found(
+    conversationId: string,
+    roster: GroupMailboxRoster,
+  ): Promise<MlsGroup> {
+    return MlsGroup.create(
+      conversationId,
+      await MlsKeyPackage.generate(this.signer, [
+        GroupMailboxRosterExtension.EXTENSION_TYPE,
+      ]),
+      this.policy(),
+      [GroupMailboxRosterContext.extension(roster)],
+    );
+  }
+
+  /**
    * Moves the log along with an applied commit; saves it if it changed. The
    * generation is behind whenever the group is past the epoch it was
    * exported in.
@@ -745,7 +763,8 @@ export class GroupMailboxMlsEngine {
   /**
    * Starts the group with this device alone, its GroupContext carrying the
    * roster this identity creates it with, and returns gen_0. A group this
-   * device creates is confirmed from the start.
+   * device creates is confirmed from the start. What MLS refuses, the roster
+   * extension included, rejects with `MlsRejectedError` and creates nothing.
    */
   public async createGroup(
     conversationId: string,
@@ -762,13 +781,8 @@ export class GroupMailboxMlsEngine {
       if (await this.load(conversationId)) {
         throw new MlsRejectedError('Group already exists on this device');
       }
-      const group = await MlsGroup.create(
-        conversationId,
-        await MlsKeyPackage.generate(this.signer, [
-          GroupMailboxRosterExtension.EXTENSION_TYPE,
-        ]),
-        this.policy(),
-        [GroupMailboxRosterContext.extension(roster)],
+      const group = await GroupMailboxMlsEngine.refusing(
+        this.found(conversationId, roster),
       );
       const log = (await this.generations.load(conversationId)).start(
         await this.exportGeneration(group),
