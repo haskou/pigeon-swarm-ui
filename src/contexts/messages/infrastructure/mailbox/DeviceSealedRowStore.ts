@@ -4,8 +4,8 @@ import {
 } from '@haskou/pigeon-swarm-crypto';
 
 import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { DeviceSealedCanaryRecord } from './DeviceSealedCanaryRecord';
 
-import { encodeBase64Url } from '../../../../shared/infrastructure/encoding/base64url';
 import {
   indexedDbRequest,
   indexedDbTransaction,
@@ -29,6 +29,34 @@ function identityRange(identityId: string): IDBKeyRange {
   );
 }
 
+/** Whether the record lists the root behind `keys` as replaced. */
+function isRetired(
+  record: DeviceSealedCanaryRecord | undefined,
+  keys: DeviceRootRowKeys,
+): boolean {
+  return (record?.retired ?? []).some((sealed) => keys.opensCanary(sealed));
+}
+
+/**
+ * The canary record for `current`: the `held` record's retired roots, plus
+ * `replaced` when it is not listed yet.
+ */
+function canaryRecord(
+  current: DeviceRootRowKeys,
+  held: DeviceSealedCanaryRecord | undefined,
+  replaced: DeviceRootRowKeys | undefined,
+): DeviceSealedCanaryRecord {
+  const retired = held?.retired ?? [];
+
+  return {
+    retired:
+      replaced && !isRetired(held, replaced)
+        ? [...retired, replaced.sealCanary()]
+        : retired,
+    sealed: current.sealCanary(),
+  };
+}
+
 function openDatabase(name: string): Promise<IDBDatabase> {
   const opening = indexedDB.open(name, DATABASE_VERSION);
 
@@ -47,18 +75,43 @@ function wipeIdentity(transaction: IDBTransaction, identityId: string): void {
 }
 
 /**
+ * Drops every row of the identity and stores a canary for `current` that
+ * keeps the retired roots of `held` and lists `replaced`, in one transaction.
+ */
+async function renew(
+  database: IDBDatabase,
+  identityId: string,
+  current: DeviceRootRowKeys,
+  held: DeviceSealedCanaryRecord | undefined,
+  replaced: DeviceRootRowKeys | undefined,
+): Promise<void> {
+  const transaction = database.transaction(
+    [ENTRIES_STORE, CANARIES_STORE],
+    'readwrite',
+  );
+
+  wipeIdentity(transaction, identityId);
+  transaction
+    .objectStore(CANARIES_STORE)
+    .put(canaryRecord(current, held, replaced), identityId);
+  await indexedDbTransaction(transaction);
+}
+
+/**
  * Re-seals every row of the identity from the keys of the replaced root under
- * the current ones and swaps the canary, in one transaction, only while the
- * canary still opens under the replaced root. A row that does not open is
- * dropped. When the canary already opens under the current root, as after a
- * re-seal elsewhere, nothing changes. Resolves with the re-sealed count.
+ * the current ones and swaps the canary, listing the replaced root as
+ * retired, in one transaction, only while the canary still opens under the
+ * replaced root. A row that does not open is dropped. Any failure aborts the
+ * transaction, so the rows stay whole under the replaced root. When the
+ * canary already opens under the current root, as after a re-seal elsewhere,
+ * nothing changes. Resolves with the re-sealed and dropped counts.
  */
 async function reseal(
   database: IDBDatabase,
   identityId: string,
   replaced: DeviceRootRowKeys,
   current: DeviceRootRowKeys,
-): Promise<number> {
+): Promise<{ dropped: number; resealed: number }> {
   const transaction = database.transaction(
     [ENTRIES_STORE, CANARIES_STORE],
     'readwrite',
@@ -66,42 +119,86 @@ async function reseal(
   const entries = transaction.objectStore(ENTRIES_STORE);
   const canaries = transaction.objectStore(CANARIES_STORE);
   const held = canaries.get(identityId) as IDBRequest<
-    { sealed: Uint8Array } | undefined
+    DeviceSealedCanaryRecord | undefined
   >;
   const keys = entries.getAllKeys(identityRange(identityId));
   const rows = entries.getAll(identityRange(identityId)) as IDBRequest<
     { sealed: Uint8Array }[]
   >;
-  let resealed = 0;
+  const counts = { dropped: 0, resealed: 0 };
 
   // Requests of one transaction complete in order: `held` and `keys` are done.
   rows.addEventListener('success', () => {
-    const canary = held.result?.sealed;
+    const canary = held.result;
 
-    if (canary && current.opensCanary(canary)) return;
+    if (canary && current.opensCanary(canary.sealed)) return;
 
-    if (!canary || !replaced.opensCanary(canary)) {
+    if (!canary || !replaced.opensCanary(canary.sealed)) {
       transaction.abort();
 
       return;
     }
-    rows.result.forEach(({ sealed }, index) => {
-      const key = keys.result[index];
-      const plaintext = replaced.open(ROW_PURPOSE, [], sealed);
 
-      if (!plaintext) {
-        entries.delete(key);
+    try {
+      rows.result.forEach(({ sealed }, index) => {
+        const key = keys.result[index];
+        const plaintext = replaced.open(ROW_PURPOSE, [], sealed);
 
-        return;
-      }
-      entries.put({ sealed: current.seal(ROW_PURPOSE, [], plaintext) }, key);
-      resealed += 1;
-    });
-    canaries.put({ sealed: current.sealCanary() }, identityId);
+        if (!plaintext) {
+          entries.delete(key);
+          counts.dropped += 1;
+
+          return;
+        }
+        entries.put({ sealed: current.seal(ROW_PURPOSE, [], plaintext) }, key);
+        counts.resealed += 1;
+      });
+      canaries.put(canaryRecord(current, canary, replaced), identityId);
+    } catch {
+      transaction.abort();
+    }
   });
   await indexedDbTransaction(transaction);
 
-  return resealed;
+  return counts;
+}
+
+/**
+ * Lists the replaced root as retired on the canary record, in one
+ * transaction, while the canary still opens under the current root and does
+ * not list it yet. Writes nothing when the `held` record already lists it.
+ */
+async function retire(
+  database: IDBDatabase,
+  identityId: string,
+  held: DeviceSealedCanaryRecord,
+  replaced: DeviceRootRowKeys,
+  current: DeviceRootRowKeys,
+): Promise<void> {
+  if (isRetired(held, replaced)) return;
+
+  const transaction = database.transaction(CANARIES_STORE, 'readwrite');
+  const canaries = transaction.objectStore(CANARIES_STORE);
+  const stored = canaries.get(identityId) as IDBRequest<
+    DeviceSealedCanaryRecord | undefined
+  >;
+
+  stored.addEventListener('success', () => {
+    const canary = stored.result;
+
+    if (!canary || !current.opensCanary(canary.sealed)) return;
+
+    if (isRetired(canary, replaced)) return;
+
+    canaries.put(
+      {
+        ...canary,
+        retired: [...(canary.retired ?? []), replaced.sealCanary()],
+      },
+      identityId,
+    );
+  });
+  await indexedDbTransaction(transaction);
 }
 
 /**
@@ -114,21 +211,40 @@ async function reseal(
  * session's root. When it opens only under the root the session replaced, as
  * after a device revoke, the rows are re-sealed under the current root in one
  * transaction, so nothing pending is lost. When it opens under neither, the
- * identity's rows are dropped. A root this store re-sealed away from is
- * refused, so a stale session never drops newer rows.
+ * identity's rows are dropped. The canary record lists every root the session
+ * replaced, and a listed root is refused in any tab or store instance, so a
+ * stale session never drops newer rows.
  */
 export class DeviceSealedRowStore<Row extends { readonly id: string }> {
-  private readonly replacedRoots = new Map<string, Set<string>>();
-
   public constructor(
     private readonly databaseName: string,
     private readonly label: string,
     private readonly logName: string,
   ) {}
 
+  /** Re-seals the rows from the replaced root and logs only the counts. */
+  private async resealFrom(
+    database: IDBDatabase,
+    identityId: string,
+    replaced: DeviceRootRowKeys,
+    current: DeviceRootRowKeys,
+  ): Promise<void> {
+    const { dropped, resealed } = await reseal(
+      database,
+      identityId,
+      replaced,
+      current,
+    );
+
+    // eslint-disable-next-line no-console
+    console.info(
+      `${this.logName} re-sealed ${resealed} rows and dropped ${dropped}.`,
+    );
+  }
+
   /**
    * The identity's row keys under this root, once its rows are known to be
-   * sealed under it. Rejects for a root this store re-sealed away from.
+   * sealed under it. Rejects for a root the canary record lists as replaced.
    */
   private async verifiedKeys(
     database: IDBDatabase,
@@ -136,52 +252,31 @@ export class DeviceSealedRowStore<Row extends { readonly id: string }> {
     root: SymmetricKey,
   ): Promise<DeviceRootRowKeys> {
     const identityId = session.identity.id;
-    const replacedRoots = this.replacedRoots.get(identityId) ?? new Set();
-
-    if (replacedRoots.has(encodeBase64Url(root.getBuffer()))) {
-      throw new Error('Device sealed root was replaced.');
-    }
     const keys = DeviceRootRowKeys.derive(root, this.label, identityId);
+    const previous = session.previousDeviceSealedRootKey;
+    const replaced = previous
+      ? DeviceRootRowKeys.derive(previous, this.label, identityId)
+      : undefined;
     const canary = await indexedDbRequest(
       database
         .transaction(CANARIES_STORE, 'readonly')
         .objectStore(CANARIES_STORE)
-        .get(identityId) as IDBRequest<{ sealed: Uint8Array } | undefined>,
+        .get(identityId) as IDBRequest<DeviceSealedCanaryRecord | undefined>,
     );
 
-    if (canary && keys.opensCanary(canary.sealed)) return keys;
-    const previous = session.previousDeviceSealedRootKey;
-
-    if (canary && previous) {
-      const replaced = DeviceRootRowKeys.derive(
-        previous,
-        this.label,
-        identityId,
-      );
-
-      if (replaced.opensCanary(canary.sealed)) {
-        const count = await reseal(database, identityId, replaced, keys);
-
-        this.replacedRoots.set(
-          identityId,
-          replacedRoots.add(encodeBase64Url(previous.getBuffer())),
-        );
-        // eslint-disable-next-line no-console
-        console.info(`${this.logName} re-sealed ${count} rows.`);
-
-        return keys;
-      }
+    if (isRetired(canary, keys)) {
+      throw new Error('Device sealed root was replaced.');
     }
-    const transaction = database.transaction(
-      [ENTRIES_STORE, CANARIES_STORE],
-      'readwrite',
-    );
 
-    wipeIdentity(transaction, identityId);
-    transaction
-      .objectStore(CANARIES_STORE)
-      .put({ sealed: keys.sealCanary() }, identityId);
-    await indexedDbTransaction(transaction);
+    if (!canary) {
+      await renew(database, identityId, keys, canary, replaced);
+    } else if (keys.opensCanary(canary.sealed)) {
+      if (replaced) await retire(database, identityId, canary, replaced, keys);
+    } else if (replaced?.opensCanary(canary.sealed)) {
+      await this.resealFrom(database, identityId, replaced, keys);
+    } else {
+      await renew(database, identityId, keys, canary, replaced);
+    }
 
     return keys;
   }
