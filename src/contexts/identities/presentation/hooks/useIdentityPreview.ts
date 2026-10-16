@@ -1,41 +1,31 @@
 import { useEffect, useState } from 'react';
 
 import type { IdentityResource } from '../../infrastructure/http/resources/IdentityResource';
+import type {
+  IdentityPreview,
+  LoadedIdentityPreview,
+} from './identityPreviewFor';
 
 import { applicationContainer } from '../../../../app/composition/applicationContainer';
 import {
   identityPicture,
   publicFileObjectUrl,
 } from '../view-models/identityDisplay';
-
-export type IdentityPreview = {
-  identity: IdentityResource | null;
-  loaded: boolean;
-  pictureUrl: string | null;
-};
+import { identityPreviewFor } from './identityPreviewFor';
 
 export function useIdentityPreview(
   identityId: string | undefined,
   fallbackIdentity?: IdentityResource,
 ): IdentityPreview {
-  const [preview, setPreview] = useState<IdentityPreview>({
-    identity: null,
-    loaded: !identityId,
-    pictureUrl: null,
-  });
+  const [loadedPreview, setLoadedPreview] =
+    useState<LoadedIdentityPreview | null>(null);
 
   useEffect(() => {
-    if (!identityId) {
-      setPreview({ identity: null, loaded: true, pictureUrl: null });
-
-      return;
-    }
+    if (!identityId) return undefined;
 
     let cancelled = false;
 
     const loadPreview = async () => {
-      setPreview({ identity: null, loaded: false, pictureUrl: null });
-
       try {
         const identity =
           fallbackIdentity?.id === identityId
@@ -43,13 +33,10 @@ export function useIdentityPreview(
             : await applicationContainer.identities.get(identityId);
         const pictureUrl = await loadIdentityPictureUrl(identity);
 
-        if (!cancelled) {
-          setPreview({ identity, loaded: true, pictureUrl });
-        }
+        if (!cancelled) setLoadedPreview({ identity, identityId, pictureUrl });
       } catch {
-        if (!cancelled) {
-          setPreview({ identity: null, loaded: true, pictureUrl: null });
-        }
+        if (!cancelled)
+          setLoadedPreview({ identity: null, identityId, pictureUrl: null });
       }
     };
 
@@ -60,7 +47,7 @@ export function useIdentityPreview(
     };
   }, [fallbackIdentity, identityId]);
 
-  return preview;
+  return identityPreviewFor(identityId, loadedPreview);
 }
 
 async function loadIdentityPictureUrl(

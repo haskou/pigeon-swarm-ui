@@ -1,8 +1,9 @@
 import type { ReactElement } from 'react';
 
+import type { IdentityPreview } from '../hooks/identityPreviewFor';
+
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { IdentityMemberRow } from '../components/IdentityMemberListPanel';
-import { useIdentityPreview } from '../hooks/useIdentityPreview';
 import { Field } from './Field';
 
 export function LoginIdentityPreview({
@@ -10,7 +11,7 @@ export function LoginIdentityPreview({
   preview,
 }: {
   onClear: () => void;
-  preview: ReturnType<typeof useIdentityPreview>;
+  preview: IdentityPreview;
 }): ReactElement | null {
   if (!preview.identity) return null;
 

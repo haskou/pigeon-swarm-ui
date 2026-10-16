@@ -30,6 +30,7 @@ import { AuthFormFields } from './AuthFormFields';
 import {
   type AuthMode,
   canSubmitAuthForm,
+  identityLookupPending,
   normalizeIdentityLogin,
   registrationNetworks,
 } from './authFormRules';
@@ -123,6 +124,12 @@ export function AuthScreen({
   const loginIdentityPreview = useIdentityPreview(
     mode === 'login' ? identityPreviewLookup || undefined : undefined,
   );
+  const identityLookupBusy = identityLookupPending({
+    identityId,
+    mode,
+    previewLoaded: loginIdentityPreview.loaded,
+    requestedLookup: identityPreviewLookup,
+  });
   useEffect(() => {
     if (availableNetworks.length > 0 && !selectedNetwork) {
       setSelectedNetwork(availableNetworks[0].id);
@@ -397,7 +404,9 @@ export function AuthScreen({
 
         <form
           onSubmit={handleSubmit}
+          aria-busy={identityLookupBusy}
           className="glass-panel-strong min-h-0 rounded-2xl p-5 sm:p-7"
+          data-testid="auth-form"
         >
           <div className="mb-5 flex items-center gap-3 lg:hidden">
             <img
