@@ -12,6 +12,7 @@ import {
   revokeOtherDevice,
   selectConversationByTitle,
   sendMessage,
+  waitForSettledLoginScreen,
   type TestIdentity,
 } from './support/pigeonApp';
 
@@ -111,6 +112,7 @@ test('locks a revoked device out of the direct messages sent after the revoke', 
     ).toBeVisible();
     await expect.poll(() => storedHistoryRows(laptop)).toBe(0);
     await laptop.goto('/');
+    await waitForSettledLoginScreen(laptop);
     await expect(laptop.getByTestId('auth-identity-preview')).toHaveCount(0);
 
     // A node can refuse the read or forge a removal of a device that is still

@@ -1,4 +1,7 @@
-import { canSubmitAuthForm } from '../../../../../contexts/identities/presentation/auth/authFormRules';
+import {
+  canSubmitAuthForm,
+  identityLookupPending,
+} from '../../../../../contexts/identities/presentation/auth/authFormRules';
 
 const PASSWORD = 'Disposable-mailbox-test-password1!abc123';
 
@@ -73,5 +76,56 @@ describe('canSubmitAuthForm', () => {
     };
 
     expect(canSubmitAuthForm(input)).toBe(true);
+  });
+});
+
+describe('identityLookupPending', () => {
+  const settled = {
+    identityId: '@ada',
+    mode: 'login' as const,
+    previewLoaded: true,
+    requestedLookup: 'ada',
+  };
+
+  it('is pending while the typed or remembered identifier waits for its lookup', () => {
+    expect(identityLookupPending({ ...settled, requestedLookup: '' })).toBe(
+      true,
+    );
+  });
+
+  it('is pending while the lookup of the identifier is in flight', () => {
+    expect(identityLookupPending({ ...settled, previewLoaded: false })).toBe(
+      true,
+    );
+  });
+
+  it('is pending while the identifier changed after the last lookup', () => {
+    expect(identityLookupPending({ ...settled, identityId: '@grace' })).toBe(
+      true,
+    );
+  });
+
+  it('is settled once the lookup of the current identifier resolved', () => {
+    expect(identityLookupPending(settled)).toBe(false);
+    expect(identityLookupPending({ ...settled, identityId: ' @Ada ' })).toBe(
+      false,
+    );
+  });
+
+  it('is settled without an identifier or outside login', () => {
+    expect(
+      identityLookupPending({
+        ...settled,
+        identityId: ' ',
+        requestedLookup: '',
+      }),
+    ).toBe(false);
+    expect(
+      identityLookupPending({
+        ...settled,
+        mode: 'create',
+        requestedLookup: '',
+      }),
+    ).toBe(false);
   });
 });

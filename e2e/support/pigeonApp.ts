@@ -19,18 +19,16 @@ export async function loginIdentity(
   recoveryKey?: string,
 ): Promise<void> {
   await page.goto('/');
+  await waitForSettledLoginScreen(page);
+
   // A browser that last signed in as this identity shows it in place of the
   // identity input.
-  const identityInput = page.getByTestId('auth-identity-input');
   const rememberedIdentity = page.getByTestId('auth-identity-preview');
 
-  await expect(identityInput.or(rememberedIdentity).first()).toBeVisible({
-    timeout: 30_000,
-  });
   if (await rememberedIdentity.isVisible()) {
     await expect(rememberedIdentity).toContainText(identity.replace(/^@/, ''));
   } else {
-    await identityInput.fill(identity, { timeout: 10_000 });
+    await page.getByTestId('auth-identity-input').fill(identity);
   }
   await page.getByTestId('auth-password-input').fill(password);
 
@@ -46,6 +44,19 @@ export async function loginIdentity(
   await page.getByTestId('auth-submit-button').click();
   await waitForWorkspace(page);
   await dismissPushPrompt(page);
+}
+
+/**
+ * Waits until the login screen has looked up the identifier it shows. A
+ * remembered identifier first fills the identity input; its lookup then
+ * replaces the input with the preview. The form is `aria-busy` until then.
+ */
+export async function waitForSettledLoginScreen(page: Page): Promise<void> {
+  await expect(page.getByTestId('auth-form')).toHaveAttribute(
+    'aria-busy',
+    'false',
+    { timeout: 30_000 },
+  );
 }
 
 export async function newIsolatedPage(
