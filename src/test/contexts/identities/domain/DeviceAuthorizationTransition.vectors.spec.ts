@@ -1,4 +1,9 @@
-import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import {
+  DeviceAuthorizationTransitionSignature,
+  KeyPair,
+  Signature,
+} from '@haskou/pigeon-swarm-crypto';
+import vectors from '@haskou/pigeon-swarm-crypto/vectors/device-authorization-transition.json';
 import { Timestamp } from '@haskou/value-objects';
 
 import { DeviceAuthorizationTransition } from '../../../../contexts/identities/domain/DeviceAuthorizationTransition';
@@ -8,7 +13,6 @@ import { DeviceAuthorizationRevision } from '../../../../contexts/identities/dom
 import { DeviceCredential } from '../../../../contexts/identities/domain/value-objects/DeviceCredential';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { PairingId } from '../../../../contexts/identities/domain/value-objects/PairingId';
-import vectors from '../../../fixtures/device-authorization-transition-vectors.json';
 
 type Vector = {
   expected: {
@@ -93,7 +97,7 @@ const build = ({ input }: Vector): DeviceAuthorizationTransition => {
   });
 };
 
-describe('device authorization transition vectors from pigeon-swarm-node', () => {
+describe('device authorization transition vectors from @haskou/pigeon-swarm-crypto', () => {
   it.each(cases)('signs $name byte for byte', (vector) => {
     expect(JSON.parse(JSON.stringify(build(vector).toPrimitives()))).toEqual(
       vector.expected.transition,
@@ -104,20 +108,23 @@ describe('device authorization transition vectors from pigeon-swarm-node', () =>
     const transition = build(vector);
     const body = transition.toPrimitives();
 
+    const proofOfPossession =
+      body.proofOfPossession === undefined
+        ? undefined
+        : new Signature(body.proofOfPossession);
+
     expect(
-      JSON.stringify({
-        domain: 'pigeon:device-authorization:transition:v3',
-        proofOfPossession: body.proofOfPossession,
-        transition: transition.getUnsignedPayload(),
-      }),
+      DeviceAuthorizationTransitionSignature.signingContent(
+        transition.getUnsignedPayload(),
+        proofOfPossession,
+      ),
     ).toBe(vector.expected.signingPayload);
     expect(
-      body.proofOfPossession === undefined
+      proofOfPossession === undefined
         ? null
-        : JSON.stringify({
-            domain: 'pigeon:device-authorization:proof-of-possession:v2',
-            transition: transition.getUnsignedPayload(),
-          }),
+        : DeviceAuthorizationTransitionSignature.proofOfPossessionContent(
+            transition.getUnsignedPayload(),
+          ),
     ).toBe(vector.expected.proofOfPossessionPayload);
   });
 

@@ -1,4 +1,12 @@
-import { KeyPair, SHA256Hash, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import {
+  DeviceCredentialCommitment,
+  IdentitySignature,
+  KeyPair,
+  PrivateKey,
+  PublicKey,
+  SHA256Hash,
+  SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
 import { StringValueObject, Timestamp } from '@haskou/value-objects';
 import { mock } from 'jest-mock-extended';
 
@@ -1006,9 +1014,9 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
         () => undefined,
       ).createInitial({
         deviceCredential: input.deviceCredential,
-        deviceCredentialCommitment: SHA256Hash.from(
-          new StringValueObject(input.deviceCredential),
-        ).valueOf(),
+        deviceCredentialCommitment: DeviceCredentialCommitment.of(
+          new PublicKey(input.deviceCredential),
+        ),
         id: identityKeyPair.toPrimitives().publicKey,
         networks: [],
         profile: { name: 'Ada' },
@@ -1018,7 +1026,10 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
 
       return {
         ...unsigned,
-        signature: identityKeyPair.sign(JSON.stringify(unsigned)).toString(),
+        signature: IdentitySignature.sign(
+          unsigned,
+          new PrivateKey(identityKeyPair.toPrimitives().privateKey),
+        ).toString(),
       };
     }
 

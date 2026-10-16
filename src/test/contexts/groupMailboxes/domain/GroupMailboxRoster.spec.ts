@@ -61,6 +61,12 @@ describe('GroupMailboxRoster', () => {
       ['an empty name', { name: '' }],
       ['an untrimmed name', { name: ' Team' }],
       ['a name too long', { name: 'x'.repeat(10_000) }],
+      ['a name with a lone high surrogate', { name: 'Team \uD83D' }],
+      ['a name with a lone low surrogate', { name: '\uDE00 Team' }],
+      [
+        'an identity with a lone surrogate',
+        { memberIds: ['creator', 'x\uD800'], adminIds: [] },
+      ],
       [
         'a repeated member',
         { memberIds: ['creator', 'creator'], adminIds: [] },
@@ -88,6 +94,10 @@ describe('GroupMailboxRoster', () => {
       ],
     ])('rejects %s', (_, change) => {
       expect(GroupMailboxRoster.of(fields(change))).toBeUndefined();
+    });
+
+    it('accepts a name with paired surrogates', () => {
+      expect(rosterOf({ name: 'Team 😀' }).name).toBe('Team 😀');
     });
 
     it('holds exactly the node limit of members', () => {

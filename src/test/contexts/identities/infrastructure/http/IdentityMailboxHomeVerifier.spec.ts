@@ -1,4 +1,10 @@
-import { KeyPair, SHA256Hash } from '@haskou/pigeon-swarm-crypto';
+import {
+  IdentitySignature,
+  KeyPair,
+  PrivateKey,
+  SHA256Hash,
+} from '@haskou/pigeon-swarm-crypto';
+import vectors from '@haskou/pigeon-swarm-crypto/vectors/identity-signature.json';
 import { StringValueObject } from '@haskou/value-objects';
 
 import type { IdentityResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
@@ -17,7 +23,10 @@ function publish(
 ): IdentityResource {
   return {
     ...unsigned,
-    signature: keyPair.sign(JSON.stringify(unsigned)).toString(),
+    signature: IdentitySignature.sign(
+      unsigned,
+      new PrivateKey(keyPair.toPrimitives().privateKey),
+    ).toString(),
   };
 }
 
@@ -169,5 +178,33 @@ describe(IdentityMailboxHomeVerifier.name, () => {
         }),
       ).toBe(false);
     });
+  });
+
+  describe('identity signature vectors from @haskou/pigeon-swarm-crypto', () => {
+    it.each(vectors.identities.accepted)('trusts $name', ({ primitives }) => {
+      expect(
+        IdentityMailboxHomeVerifier.isTrusted(primitives.id, primitives),
+      ).toBe(true);
+    });
+
+    it('returns the mailbox home of the signed full identity', () => {
+      const [, full] = vectors.identities.accepted;
+
+      expect(
+        IdentityMailboxHomeVerifier.verifiedBase(
+          full!.primitives.id,
+          full!.primitives,
+        ),
+      ).toBe(full!.primitives.mailboxHome);
+    });
+
+    it.each(vectors.identities.rejected)(
+      'distrusts $name',
+      ({ primitives }) => {
+        expect(
+          IdentityMailboxHomeVerifier.isTrusted(primitives.id, primitives),
+        ).toBe(false);
+      },
+    );
   });
 });

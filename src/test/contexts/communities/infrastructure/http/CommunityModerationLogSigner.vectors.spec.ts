@@ -1,4 +1,5 @@
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import vectors from '@haskou/pigeon-swarm-crypto/vectors/community-moderation-log.json';
 
 import type { CommunityModerationLogInput } from '../../../../../contexts/communities/infrastructure/http/CommunityModerationLogInput';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
@@ -6,12 +7,10 @@ import type { Session } from '../../../../../contexts/identities/infrastructure/
 import { CommunityModerationLogSigner } from '../../../../../contexts/communities/infrastructure/http/CommunityModerationLogSigner';
 import { deriveModerationLogId } from '../../../../../contexts/communities/infrastructure/http/deriveCommunityRecordId';
 import { PublicMutationSigner } from '../../../../../shared/infrastructure/crypto/PublicMutationSigner';
-import vectors from '../../../../fixtures/community-moderation-log-vectors.json';
 import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
-// The fixture is mirrored byte for byte from the node, where an independent
-// node:crypto script generated it: ed25519 is deterministic, so even the
-// signatures match.
+// The vectors ship with @haskou/pigeon-swarm-crypto: ed25519 is deterministic,
+// so even the signatures match.
 type Vector = (typeof vectors.cases)[number];
 
 function sessionOf(signer: keyof typeof vectors.keys): Session {

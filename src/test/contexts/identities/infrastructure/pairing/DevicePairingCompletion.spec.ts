@@ -1,6 +1,10 @@
+import type { DevicePairingCompletionPayload } from '@haskou/pigeon-swarm-crypto';
+
 import {
+  DevicePairingCompletionSignature,
   EncryptedPayload,
   KeyPair,
+  PrivateKey,
   SymmetricKey,
   UserRootKey,
 } from '@haskou/pigeon-swarm-crypto';
@@ -110,7 +114,7 @@ describe(DevicePairingCompletion.name, () => {
 
     delete material.historyTransferSecret;
 
-    const payload = {
+    const payload: DevicePairingCompletionPayload = {
       authorCredential: resource.authorCredential,
       encryptedMaterial: source.draft
         .getRequest()
@@ -122,21 +126,17 @@ describe(DevicePairingCompletion.name, () => {
       identityId: resource.identityId,
       operationId: resource.operationId,
       pairingId: resource.pairingId,
-      revision: resource.revision,
+      revision: Number(resource.revision),
       version: 1,
     };
     const completion = DevicePairingCodeReader.completion(
       DevicePairingCode.encode({
         kind: resource.kind,
         ...payload,
-        signature: source.author
-          .sign(
-            JSON.stringify({
-              completion: payload,
-              domain: 'pigeon:device-pairing:completion:v1',
-            }),
-          )
-          .valueOf(),
+        signature: DevicePairingCompletionSignature.sign(
+          payload,
+          new PrivateKey(source.author.toPrimitives().privateKey),
+        ).valueOf(),
       }),
     );
 

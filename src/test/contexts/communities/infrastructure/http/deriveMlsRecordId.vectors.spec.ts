@@ -1,7 +1,8 @@
+import { CanonicalJson } from '@haskou/pigeon-swarm-crypto';
+
 import type { MlsRecordInput } from '../../../../../contexts/communities/infrastructure/http/MlsRecordInput';
 
 import { deriveMlsRecordId } from '../../../../../contexts/communities/infrastructure/http/deriveMlsRecordId';
-import { canonicalJson } from '../../../../../shared/infrastructure/crypto/canonicalJson';
 import vectors from '../../../../fixtures/mls-record-id-vectors.json';
 
 // The fixture is the node's tests/fixtures/mls-record-id-vectors.json, checked
@@ -10,7 +11,7 @@ describe('deriveMlsRecordId vectors', () => {
   it.each(vectors.cases)(
     'pins the canonical bytes of $name',
     ({ derived, input }) => {
-      expect(canonicalJson(input)).toBe(derived.canonical);
+      expect(CanonicalJson.serialize(input)).toBe(derived.canonical);
     },
   );
 

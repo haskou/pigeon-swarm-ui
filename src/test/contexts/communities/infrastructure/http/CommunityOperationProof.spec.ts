@@ -1,10 +1,10 @@
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import vectors from '@haskou/pigeon-swarm-crypto/vectors/community-operation.json';
 
 import type { CommunityOperationContent } from '../../../../../contexts/communities/infrastructure/http/CommunityOperationContent';
 import type { CommunityOperationDocument } from '../../../../../contexts/communities/infrastructure/http/CommunityOperationDocument';
 
 import { CommunityOperationProof } from '../../../../../contexts/communities/infrastructure/http/CommunityOperationProof';
-import vectors from '../../../../fixtures/community-operation-vectors.json';
 import { MlsTestIdentity } from '../mls/MlsTestIdentity';
 import { CommunityOperationHistory } from './CommunityOperationHistory';
 

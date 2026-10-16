@@ -1,299 +1,255 @@
-import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
+import type { SignedHttpRequest } from '@haskou/pigeon-swarm-crypto';
+
+import {
+  KeyPair,
+  PublicKey,
+  Signature,
+  SignedHttpRequestSignature,
+} from '@haskou/pigeon-swarm-crypto';
 
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
+import { DeviceAuthorizationEpoch } from '../../../../contexts/identities/domain/value-objects/DeviceAuthorizationEpoch';
+import { DeviceAuthorizationRevision } from '../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
+import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 
-type SignedRequestPayload = {
-  bodyHash: string;
-  method: string;
-  path: string;
-  timestamp: number;
+type SigningSession = Session & {
+  deviceCredentialKeyPair: KeyPair;
+  keyPair: KeyPair;
+  recoveryAuthorityKeyPair: KeyPair;
 };
 
-function signedPayload(sign: jest.Mock): SignedRequestPayload {
-  const [payload] = sign.mock.calls[0] as [string];
+async function signingSession(): Promise<SigningSession> {
+  const keyPair = await KeyPair.generate();
 
-  return JSON.parse(payload) as SignedRequestPayload;
-}
-
-function emptyBodyHash(): string {
-  return SHA256Hash.from(JSON.stringify({})).toString();
-}
-
-function sessionWithSigner(
-  sign: jest.Mock,
-  identityId = 'identity-1',
-): Session {
   return {
-    authorizationEpoch: { valueOf: () => 'genesis' },
-    authorizationRevision: { valueOf: () => 0 },
-    deviceCredentialKeyPair: {
-      sign: jest.fn().mockReturnValue({ toString: () => 'device-signature' }),
-      toPrimitives: () => ({
-        privateKey: 'private',
-        publicKey:
-          '-----BEGIN PUBLIC KEY-----\ncredential\n-----END PUBLIC KEY-----\n',
-      }),
-    },
-    identity: { id: identityId },
-    keyPair: { sign },
-    password: 'secret',
-  } as unknown as Session;
+    authorizationEpoch: DeviceAuthorizationEpoch.genesis(),
+    authorizationRevision: DeviceAuthorizationRevision.initial(),
+    deviceCredentialKeyPair: await KeyPair.generate(),
+    identity: { id: keyPair.toPrimitives().publicKey },
+    keyPair,
+    recoveryAuthorityKeyPair: await KeyPair.generate(),
+  } as unknown as SigningSession;
+}
+
+function publicKeyOf(keyPair: KeyPair): PublicKey {
+  return new PublicKey(keyPair.toPrimitives().publicKey);
+}
+
+function expectSigned(
+  request: SignedHttpRequest,
+  signature: string | undefined,
+  keyPair: KeyPair,
+): void {
+  expect(() =>
+    SignedHttpRequestSignature.verify(
+      request,
+      new Signature(signature ?? ''),
+      publicKeyOf(keyPair),
+    ),
+  ).not.toThrow();
 }
 
 describe(RequestSigner.name, () => {
-  it('builds the canonical payload used for signatures', () => {
+  it('signs the library content of the upper-cased method and request path', () => {
     const signer = new RequestSigner(() => 123);
+    const body = { conversationId: 'conversation-1' };
 
-    const payload = JSON.parse(
-      signer.payload('post', '/conversations/', 123, {
-        hello: 'world',
+    expect(signer.payload('post', '/conversations/', 123, body)).toBe(
+      SignedHttpRequestSignature.signingContent({
+        body,
+        method: 'POST',
+        path: '/conversations/',
+        timestamp: 123,
       }),
-    ) as SignedRequestPayload;
-
-    expect(payload).toEqual({
-      bodyHash: expect.any(String),
-      method: 'POST',
-      path: '/conversations/',
-      timestamp: 123,
-    });
+    );
   });
 
   it('signs only the request path and leaves query params out', () => {
     const signer = new RequestSigner(() => 123);
 
-    const payload = JSON.parse(
-      signer.payload('GET', '/notifications/?limit=30', 123),
-    ) as SignedRequestPayload;
-
-    expect(payload).toEqual({
-      bodyHash: expect.any(String),
-      method: 'GET',
-      path: '/notifications/',
-      timestamp: 123,
-    });
+    expect(signer.payload('GET', '/notifications/?limit=30', 123)).toBe(
+      SignedHttpRequestSignature.signingContent({
+        method: 'GET',
+        path: '/notifications/',
+        timestamp: 123,
+      }),
+    );
   });
 
-  it('signs keychain reads with encoded path params and an empty body hash', () => {
+  it('keeps encoded path params', () => {
     const signer = new RequestSigner(() => 123);
-    const identityId = 'identity/with+symbols=';
-    const path = `/keychains/${encodeURIComponent(identityId)}`;
+    const path = '/keychains/identity%2Fwith%2Fslashes';
 
-    const payload = JSON.parse(
-      signer.payload('GET', path, 123),
-    ) as SignedRequestPayload;
-
-    expect(payload).toEqual({
-      bodyHash: emptyBodyHash(),
-      method: 'GET',
-      path: '/keychains/identity%2Fwith%2Bsymbols%3D',
-      timestamp: 123,
-    });
+    expect(signer.payload('GET', path, 123)).toBe(
+      SignedHttpRequestSignature.signingContent({
+        method: 'GET',
+        path,
+        timestamp: 123,
+      }),
+    );
   });
 
   it('prefixes relative signed paths when the API is mounted under a route prefix', () => {
     const signer = new RequestSigner(() => 123, '/api');
-    const identityId = 'identity/with+symbols=';
-    const path = `/keychains/${encodeURIComponent(identityId)}`;
 
-    const payload = JSON.parse(
-      signer.payload('GET', path, 123),
-    ) as SignedRequestPayload;
-
-    expect(payload).toEqual({
-      bodyHash: emptyBodyHash(),
-      method: 'GET',
-      path: '/api/keychains/identity%2Fwith%2Bsymbols%3D',
-      timestamp: 123,
-    });
+    expect(signer.payload('GET', '/keychains/id', 123)).toBe(
+      SignedHttpRequestSignature.signingContent({
+        method: 'GET',
+        path: '/api/keychains/id',
+        timestamp: 123,
+      }),
+    );
   });
 
   it('does not duplicate an API route prefix that is already in the signed path', () => {
     const signer = new RequestSigner(() => 123, '/api');
 
-    const payload = JSON.parse(
-      signer.payload('GET', '/api/keychains/id', 123),
-    ) as SignedRequestPayload;
-
-    expect(payload.path).toBe('/api/keychains/id');
-  });
-
-  it('signs headers with the session keypair', async () => {
-    const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
-    const signer = new RequestSigner(() => 123);
-    const session = sessionWithSigner(sign);
-
-    await expect(signer.headers(session, 'GET', '/messages')).resolves.toEqual({
-      'X-Device-Authorization-Epoch': 'genesis',
-      'X-Device-Authorization-Revision': '0',
-      'X-Device-Credential': 'credential',
-      'X-Device-Signature': 'device-signature',
-      'X-Identity-Id': 'identity-1',
-      'X-Signature': 'signature',
-      'X-Timestamp': '123',
-    });
-    expect(sign).toHaveBeenCalledTimes(1);
-    expect(signedPayload(sign)).toEqual({
-      bodyHash: expect.any(String),
-      method: 'GET',
-      path: '/messages',
-      timestamp: 123,
-    });
-  });
-
-  it('binds an authorized device proof to the same canonical request', async () => {
-    const identitySign = jest
-      .fn()
-      .mockReturnValue({ toString: () => 'identity-signature' });
-    const deviceSign = jest
-      .fn()
-      .mockReturnValue({ toString: () => 'device-signature' });
-    const signer = new RequestSigner(() => 123);
-    const session = sessionWithSigner(identitySign) as Session;
-    session.deviceCredentialKeyPair = {
-      sign: deviceSign,
-      toPrimitives: () => ({
-        privateKey: 'private',
-        publicKey:
-          '-----BEGIN PUBLIC KEY-----\ncredential\n-----END PUBLIC KEY-----\n',
-      }),
-    } as unknown as Session['deviceCredentialKeyPair'];
-
-    await expect(
-      signer.headersWithDeviceProof(session, 'GET', '/identity-devices/id'),
-    ).resolves.toEqual({
-      'X-Device-Authorization-Epoch': 'genesis',
-      'X-Device-Authorization-Revision': '0',
-      'X-Device-Credential': 'credential',
-      'X-Device-Signature': 'device-signature',
-      'X-Identity-Id': 'identity-1',
-      'X-Signature': 'identity-signature',
-      'X-Timestamp': '123',
-    });
-    expect(identitySign).toHaveBeenCalledWith(expect.any(String));
-    expect(deviceSign).toHaveBeenCalledWith(
-      (identitySign.mock.calls[0] as [string])[0],
+    expect(signer.payload('GET', '/api/keychains/id', 123)).toBe(
+      signer.payload('GET', '/keychains/id', 123),
     );
   });
 
-  it('binds recovery authority proof to the same canonical request', async () => {
-    const identitySign = jest
-      .fn()
-      .mockReturnValue({ toString: () => 'identity-signature' });
-    const recoverySign = jest
-      .fn()
-      .mockReturnValue({ toString: () => 'recovery-signature' });
-    const signer = new RequestSigner(() => 123);
-    const session = sessionWithSigner(identitySign);
-    session.recoveryAuthorityKeyPair = {
-      sign: recoverySign,
-    } as unknown as Session['recoveryAuthorityKeyPair'];
-
-    await expect(
-      signer.headersWithRecoveryProof(session, 'GET', '/identity-devices/id'),
-    ).resolves.toEqual({
-      'X-Identity-Id': 'identity-1',
-      'X-Recovery-Signature': 'recovery-signature',
-      'X-Signature': 'identity-signature',
-      'X-Timestamp': '123',
-    });
-    expect(identitySign).toHaveBeenCalledWith(expect.any(String));
-    expect(recoverySign).toHaveBeenCalledWith(
-      (identitySign.mock.calls[0] as [string])[0],
-    );
-  });
-
-  it('signs only the URL pathname when passed an absolute URL', () => {
-    const signer = new RequestSigner(() => 123);
-
-    const payload = JSON.parse(
-      signer.payload('GET', 'https://example.com/keychains/id?limit=1', 123),
-    ) as SignedRequestPayload;
-
-    expect(payload).toEqual({
-      bodyHash: emptyBodyHash(),
+  it('signs only the URL pathname when passed an absolute URL, even under a prefix', () => {
+    const expected = SignedHttpRequestSignature.signingContent({
       method: 'GET',
       path: '/keychains/id',
       timestamp: 123,
     });
+
+    expect(
+      new RequestSigner(() => 123).payload(
+        'GET',
+        'https://example.com/keychains/id?limit=1',
+        123,
+      ),
+    ).toBe(expected);
+    expect(
+      new RequestSigner(() => 123, '/api').payload(
+        'GET',
+        'https://example.com/keychains/id?limit=1',
+        123,
+      ),
+    ).toBe(expected);
   });
 
-  it('keeps absolute URL pathnames unchanged when a route prefix is configured', () => {
-    const signer = new RequestSigner(() => 123, '/api');
-
-    const payload = JSON.parse(
-      signer.payload('GET', 'https://example.com/keychains/id?limit=1', 123),
-    ) as SignedRequestPayload;
-
-    expect(payload.path).toBe('/keychains/id');
-  });
-
-  it('normalizes PEM identity ids in HTTP signature headers', async () => {
-    const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
-    const signer = new RequestSigner(() => 123);
-    const session = sessionWithSigner(
-      sign,
-      '-----BEGIN PUBLIC KEY-----\nidentity-1\n-----END PUBLIC KEY-----',
+  it('signs headers with the session identity key', async () => {
+    const session = await signingSession();
+    const headers = await new RequestSigner(() => 123).headers(
+      session,
+      'GET',
+      '/messages',
     );
 
-    await expect(signer.headers(session, 'GET', '/messages')).resolves.toEqual(
-      expect.objectContaining({
-        'X-Identity-Id': 'identity-1',
-      }),
-    );
-  });
-
-  it('signs long request payloads without string value object limits', async () => {
-    const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
-    const signer = new RequestSigner(() => 123);
-    const session = sessionWithSigner(sign);
-    const body = { encryptedPayload: 'x'.repeat(6000) };
-
-    await signer.headers(session, 'POST', '/keychains/', body);
-
-    expect(signedPayload(sign)).toEqual({
-      bodyHash: expect.any(String),
-      method: 'POST',
-      path: '/keychains/',
-      timestamp: 123,
+    expect(headers).toMatchObject({
+      'X-Identity-Id': IdentityId.normalize(session.identity.id),
+      'X-Timestamp': '123',
     });
+    expect(headers).not.toHaveProperty('X-Nonce');
+    expectSigned(
+      { method: 'GET', path: '/messages', timestamp: 123 },
+      headers['X-Signature'],
+      session.keyPair,
+    );
   });
 
-  it('hashes raw upload bytes instead of JSON stringifying them', async () => {
-    const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
+  it('binds an authorized device proof to the same signed request', async () => {
+    const session = await signingSession();
+    const request = {
+      method: 'GET',
+      path: '/identity-devices/id',
+      timestamp: 123,
+    };
+    const headers = await new RequestSigner(() => 123).headersWithDeviceProof(
+      session,
+      'GET',
+      '/identity-devices/id',
+    );
+
+    expect(headers).toMatchObject({
+      'X-Device-Authorization-Epoch': 'genesis',
+      'X-Device-Authorization-Revision': '0',
+      'X-Device-Credential': IdentityId.normalize(
+        session.deviceCredentialKeyPair.toPrimitives().publicKey,
+      ),
+    });
+    expectSigned(request, headers['X-Signature'], session.keyPair);
+    expectSigned(
+      request,
+      headers['X-Device-Signature'],
+      session.deviceCredentialKeyPair,
+    );
+  });
+
+  it('binds recovery authority proof to the same signed request', async () => {
+    const session = await signingSession();
+    const request = {
+      method: 'GET',
+      path: '/identity-devices/id',
+      timestamp: 123,
+    };
+    const headers = await new RequestSigner(() => 123).headersWithRecoveryProof(
+      session,
+      'GET',
+      '/identity-devices/id',
+    );
+
+    expectSigned(request, headers['X-Signature'], session.keyPair);
+    expectSigned(
+      request,
+      headers['X-Recovery-Signature'],
+      session.recoveryAuthorityKeyPair,
+    );
+  });
+
+  it('signs long request bodies', async () => {
+    const session = await signingSession();
+    const body = { encryptedPayload: 'x'.repeat(6000) };
+    const headers = await new RequestSigner(() => 123).headers(
+      session,
+      'POST',
+      '/keychains/',
+      body,
+    );
+
+    expectSigned(
+      { body, method: 'POST', path: '/keychains/', timestamp: 123 },
+      headers['X-Signature'],
+      session.keyPair,
+    );
+  });
+
+  it('hashes raw upload bytes instead of JSON stringifying them', () => {
     const signer = new RequestSigner(() => 123);
-    const session = sessionWithSigner(sign);
-    const bytes = new Uint8Array([1, 2, 3]);
-
-    await signer.headers(session, 'POST', '/ipfs/public', bytes.buffer);
-    const arrayBufferPayload = signedPayload(sign);
-
-    sign.mockClear();
-    await signer.headers(session, 'POST', '/ipfs/public', bytes);
-    const typedArrayPayload = signedPayload(sign);
-
-    sign.mockClear();
-    await signer.headers(session, 'POST', '/ipfs/public', Array.from(bytes));
-    const jsonPayload = signedPayload(sign);
-
-    expect(arrayBufferPayload).toEqual({
-      bodyHash: typedArrayPayload.bodyHash,
+    const bytes = new Uint8Array([0, 1, 2, 3, 4]);
+    const view = bytes.subarray(1, 4);
+    const raw = SignedHttpRequestSignature.signingContent({
+      body: Uint8Array.from([1, 2, 3]),
       method: 'POST',
       path: '/ipfs/public',
       timestamp: 123,
     });
-    expect(arrayBufferPayload.bodyHash).not.toBe(jsonPayload.bodyHash);
-  });
 
-  it('does not send nonce headers', async () => {
-    const sign = jest.fn().mockResolvedValue({ toString: () => 'signature' });
-    const session = sessionWithSigner(sign);
-
-    await expect(
-      new RequestSigner(() => 123).headers(session, 'GET', '/messages'),
-    ).resolves.toEqual(
-      expect.not.objectContaining({ 'X-Nonce': expect.any(String) }),
+    expect(
+      signer.payload(
+        'POST',
+        '/ipfs/public',
+        123,
+        Uint8Array.from([1, 2, 3]).buffer,
+      ),
+    ).toBe(raw);
+    expect(signer.payload('POST', '/ipfs/public', 123, view)).toBe(raw);
+    expect(
+      signer.payload(
+        'POST',
+        '/ipfs/public',
+        123,
+        new DataView(bytes.buffer, 1, 3),
+      ),
+    ).toBe(raw);
+    expect(signer.payload('POST', '/ipfs/public', 123, [1, 2, 3])).not.toBe(
+      raw,
     );
   });
 });

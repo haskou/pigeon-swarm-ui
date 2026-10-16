@@ -22,6 +22,7 @@ const REAL_CRYPTO_SPECS = [
   'DeviceAuthorizationTransition.vectors',
   'DeviceIdentityProtector',
   'DeviceIdentityVault',
+  'DevicePairing.vectors',
   'DevicePairingCompletion',
   'DevicePairingInvitation',
   'DevicePairingRequest',
@@ -61,7 +62,9 @@ const REAL_CRYPTO_SPECS = [
   'MailboxReadToken',
   'MlsCommunityEngine',
   'MlsGroup',
+  'NotificationMutationSigner',
   'PigeonApiGateway',
+  'PigeonCommunityInvitationApi',
   'PigeonCommunityOperationsApi',
   'PigeonConversationDraftsApi',
   'PigeonConversationsApi.readUntilVectors',
@@ -69,9 +72,14 @@ const REAL_CRYPTO_SPECS = [
   'PigeonDeviceSealedSecretApi',
   'PigeonIdentityCommandsApi',
   'PigeonMlsFacade',
+  'PigeonStickersApi',
+  'PublicMutationSigner',
   'RecipientMailboxRouter',
   'RecoveryAuthorityKeyPair',
+  'RequestSigner',
   'RequestSigner.vectors',
+  'deriveInviteToken.vectors',
+  'deriveMlsRecordId.vectors',
 ];
 
 const realCryptoSpec = `/(${REAL_CRYPTO_SPECS.join('|').replaceAll('.', '\\.')})\\.spec\\.ts$`;

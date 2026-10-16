@@ -1,9 +1,9 @@
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import vectors from '@haskou/pigeon-swarm-crypto/vectors/content-replication.json';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { PigeonContentReplicationClient } from '../../../../../contexts/attachments/infrastructure/http/PigeonContentReplicationClient';
-import vectors from '../../../../fixtures/content-replication-vectors.json';
 import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
 describe(PigeonContentReplicationClient.name, () => {

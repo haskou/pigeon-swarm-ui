@@ -1,4 +1,11 @@
-import { KeyPair, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import {
+  DeviceCredentialCommitment,
+  IdentitySignature,
+  KeyPair,
+  PublicKey,
+  Signature,
+  SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
 
 import type { IdentityResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
@@ -10,6 +17,7 @@ import { DeviceAuthorizationEpoch } from '../../../../../contexts/identities/dom
 import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
 import { DeviceId } from '../../../../../contexts/identities/domain/value-objects/DeviceId';
 import { DeviceUnlockSecretHandle } from '../../../../../contexts/identities/domain/value-objects/DeviceUnlockSecretHandle';
+import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 import { RecoveryKey } from '../../../../../contexts/identities/domain/value-objects/RecoveryKey';
 import { IdentityAdmissionProof } from '../../../../../contexts/identities/infrastructure/crypto/IdentityAdmissionProof';
 import { IdentitySignaturePayloadFactory } from '../../../../../contexts/identities/infrastructure/http/IdentitySignaturePayloadFactory';
@@ -32,6 +40,20 @@ function identity(overrides: Partial<IdentityResource> = {}): IdentityResource {
     version: 1,
     ...overrides,
   };
+}
+
+function expectIdentitySigned(http: HttpJsonClient, keyPair: KeyPair): void {
+  const { signature, ...unsigned } = JSON.parse(
+    String(jest.mocked(http.request).mock.calls[0]?.[1]?.body),
+  ) as IdentityResource;
+
+  expect(() =>
+    IdentitySignature.verify(
+      unsigned,
+      new Signature(signature),
+      new PublicKey(keyPair.toPrimitives().publicKey),
+    ),
+  ).not.toThrow();
 }
 
 describe(PigeonIdentityCommandsApi.name, () => {
@@ -63,11 +85,15 @@ describe(PigeonIdentityCommandsApi.name, () => {
       vault,
     );
 
-    await expect(
-      commands.create('Ada', 'password', ['network-1'], '@ada', {
-        recoveryKey: RecoveryKey.generate().valueOf(),
-      }),
-    ).resolves.toMatchObject({
+    const created = await commands.create(
+      'Ada',
+      'password',
+      ['network-1'],
+      '@ada',
+      { recoveryKey: RecoveryKey.generate().valueOf() },
+    );
+
+    expect(created).toMatchObject({
       authorizationEpoch: expect.any(Object),
       authorizationRevision: expect.any(Object),
       deviceCredentialKeyPair: expect.any(KeyPair),
@@ -77,6 +103,7 @@ describe(PigeonIdentityCommandsApi.name, () => {
       masterKey: expect.any(SymmetricKey),
       recoveryAuthorityKeyPair: expect.any(KeyPair),
     });
+    expectIdentitySigned(http, created.keyPair);
 
     expect(http.request).toHaveBeenCalledWith(
       '/identities/',
@@ -94,10 +121,21 @@ describe(PigeonIdentityCommandsApi.name, () => {
   });
 
   it('refreshes, signs, and caches profile updates at the identity boundary', async () => {
+    const keyPair = await KeyPair.generate();
+    const deviceCredential = (await KeyPair.generate()).toPrimitives()
+      .publicKey;
+    const id = IdentityId.normalize(keyPair.toPrimitives().publicKey);
     const currentIdentity = identity({
+      deviceCredential,
+      deviceCredentialCommitment: DeviceCredentialCommitment.of(
+        new PublicKey(deviceCredential),
+      ),
+      id,
       identityExternalIdentifier: 'identity-cid',
+      recoveryAuthority: (await KeyPair.generate()).toPrimitives().publicKey,
     });
     const updatedIdentity = identity({
+      id,
       identityExternalIdentifier: 'updated-identity-cid',
       profile: { name: 'Ada Next' },
       version: 2,
@@ -113,7 +151,6 @@ describe(PigeonIdentityCommandsApi.name, () => {
       remember: jest.fn(),
     } as unknown as PigeonIdentityGateway;
     const vault = {} as DeviceIdentityVault;
-    const keyPair = await KeyPair.generate();
     const session = {
       identity: currentIdentity,
       keychain: { conversations: {}, version: 0 },
@@ -133,9 +170,10 @@ describe(PigeonIdentityCommandsApi.name, () => {
     ).resolves.toBe(updatedIdentity);
 
     expect(http.request).toHaveBeenCalledWith(
-      '/identities/public-key',
+      `/identities/${encodeURIComponent(id)}`,
       expect.objectContaining({ method: 'PUT' }),
     );
+    expectIdentitySigned(http, keyPair);
     expect(identities.remember).toHaveBeenCalledWith(updatedIdentity);
   });
 });

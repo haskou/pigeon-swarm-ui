@@ -1,5 +1,4 @@
-import { KeyPair, SHA256Hash } from '@haskou/pigeon-swarm-crypto';
-import { Buffer } from 'buffer';
+import { KeyPair, PublicMutationSignature } from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
@@ -8,7 +7,6 @@ import type { RequestSigner } from '../../../../../shared/infrastructure/http/Re
 
 import { PigeonPublicFilesClient } from '../../../../../contexts/attachments/infrastructure/http/PigeonPublicFilesClient';
 import { PigeonStickersApi } from '../../../../../contexts/stickers/infrastructure/http/PigeonStickersApi';
-import { canonicalJson } from '../../../../../shared/infrastructure/crypto/canonicalJson';
 import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
 describe(PigeonStickersApi.name, () => {
@@ -74,11 +72,7 @@ describe(PigeonStickersApi.name, () => {
 
   describe('signed mutations', () => {
     const digestOf = (record: Record<string, unknown>): string =>
-      Buffer.from(SHA256Hash.from(canonicalJson(record)).toString(), 'hex')
-        .toString('base64')
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '');
+      PublicMutationSignature.payloadDigest(record);
     const input = {
       assetCid: 'cid-new',
       contentType: 'image/webp',
