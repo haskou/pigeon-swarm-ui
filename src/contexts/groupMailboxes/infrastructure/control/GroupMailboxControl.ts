@@ -218,9 +218,12 @@ export class GroupMailboxControl {
    * An answer from another identity counts only on the device and session
    * that asked it, for that conversation, and once; any other device or
    * session of this identity ignores it, so a sibling that never reads it,
-   * or whose roster read lags, cannot hold the add back. The asker commits
-   * the add while this identity may add members, the roster lists that
-   * identity and it holds no leaf yet, from that identity's key package.
+   * or whose roster read lags, cannot hold the add back. The request is
+   * taken before anything else awaits, so concurrent copies of the answer
+   * count once, and given back when the add throws, so the letter's retry
+   * counts. The asker commits the add while this identity may add members,
+   * the roster lists that identity and it holds no leaf yet, from that
+   * identity's key package.
    */
   private async receiveMemberKeyPackage(
     peerIdentityId: string,
@@ -230,28 +233,36 @@ export class GroupMailboxControl {
     >,
   ): Promise<GroupMailboxControlOutcome> {
     const { conversationId, keyPackage, requestId } = record;
+    const key = JSON.stringify([conversationId, peerIdentityId]);
 
     if (
-      this.awaited.get(requestId) !==
-        JSON.stringify([conversationId, peerIdentityId]) ||
-      (await this.engine.awaitsConfirmation(conversationId))
+      (await this.engine.awaitsConfirmation(conversationId)) ||
+      this.awaited.get(requestId) !== key
     ) {
       return 'ignored';
     }
-    const roster = await this.engine.roster(conversationId);
-    const outcome =
-      !roster?.manages(this.self.identityId) ||
-      !roster.has(peerIdentityId) ||
-      GroupMailboxControl.ownerOf(keyPackage)?.identityId !== peerIdentityId ||
-      (await this.engine.members(conversationId)).includes(peerIdentityId)
-        ? 'rejected'
-        : await this.rejecting(() =>
-            this.welcome(conversationId, [keyPackage]),
-          );
-
     this.awaited.delete(requestId);
 
-    return outcome;
+    try {
+      const roster = await this.engine.roster(conversationId);
+
+      if (
+        !roster?.manages(this.self.identityId) ||
+        !roster.has(peerIdentityId) ||
+        GroupMailboxControl.ownerOf(keyPackage)?.identityId !==
+          peerIdentityId ||
+        (await this.engine.members(conversationId)).includes(peerIdentityId)
+      ) {
+        return 'rejected';
+      }
+
+      return await this.rejecting(() =>
+        this.welcome(conversationId, [keyPackage]),
+      );
+    } catch (error: unknown) {
+      this.awaited.set(requestId, key);
+      throw error;
+    }
   }
 
   /**
