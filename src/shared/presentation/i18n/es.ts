@@ -854,6 +854,8 @@ export const es = {
         'Las conversaciones directas necesitan dos identidades distintas.',
       ConversationParticipantNotFoundError:
         'Solo los participantes de la conversación pueden enviar mensajes aquí.',
+      GroupMailboxTooLargeError:
+        'Un grupo admite como máximo 48 miembros, y una sola bienvenida debe llegar a todos sus dispositivos. Elimina un miembro o un dispositivo antes de añadir otro.',
       IdentityMustHaveAtLeastOneNetworkError:
         'La identidad debe pertenecer al menos a una red.',
       IdentityNotFoundError: 'No se encontró esa identidad.',
@@ -1729,6 +1731,8 @@ export const es = {
     dismissNotice: 'Descartar',
     groupMailboxSyncError:
       'No se pudieron sincronizar los mensajes del grupo. Reintentando.',
+    groupOutgrown:
+      'Un miembro añadido a este grupo no recibió la bienvenida: el grupo tiene demasiados dispositivos para una sola bienvenida. Sigue invitado sin acceso. Elimina un miembro o un dispositivo y vuelve a añadirlo.',
     groupUnconfirmed:
       'Este grupo aún no está verificado: ningún miembro que este dispositivo ya conoce lo ha confirmado desde que te añadieron. Tus mensajes esperan aquí y se envían cuando lo haga un miembro conocido. Puedes esperar o salir del grupo; el tiempo por sí solo nunca lo verifica. Los grupos a los que te uniste antes de esta comprobación siguen sin verificar.',
     newMessages: 'Nuevos mensajes',

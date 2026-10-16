@@ -28,6 +28,7 @@ import { MessageReactionAction } from '../../messages/domain/value-objects/Messa
 import { MessageReactionEmoji } from '../../messages/domain/value-objects/MessageReactionEmoji';
 import { GroupMailboxGenesis } from '../domain/GroupMailboxGenesis';
 import { GroupMailboxRoster } from '../domain/GroupMailboxRoster';
+import { GroupMailboxTooLargeError } from './control/GroupMailboxTooLargeError';
 import { GroupConversationMember } from './GroupConversationMember';
 import { GroupConversationSender } from './GroupConversationSender';
 import { GroupConversationStores } from './GroupConversationStores';
@@ -306,7 +307,9 @@ export class GroupConversationMailbox {
    * fresh genesis naming this identity as creator, and its roster lists
    * this identity and the invitees, who are then asked for key packages.
    * Joiners learn the genesis from those requests, so a welcome from this
-   * identity confirms at once.
+   * identity confirms at once. Rejects with `GroupMailboxTooLargeError`,
+   * before anything is stored or sent, when the roster would hold more than
+   * `GroupMailboxRoster.MAX_PARTICIPANTS` members.
    */
   public async create(
     session: Session,
@@ -326,16 +329,21 @@ export class GroupConversationMailbox {
       networkId: input.networkId,
       nonce: nonce.toString(),
     });
+    const memberIds = [
+      ...new Set([
+        creatorIdentityId,
+        ...input.participantIds.map((id) => IdentityId.normalize(id)),
+      ]),
+    ].sort();
+
+    if (memberIds.length > GroupMailboxRoster.MAX_PARTICIPANTS) {
+      throw new GroupMailboxTooLargeError();
+    }
     const roster = GroupMailboxRoster.of({
       adminIds: [],
       conversationId,
       creatorId: creatorIdentityId,
-      memberIds: [
-        ...new Set([
-          creatorIdentityId,
-          ...input.participantIds.map((id) => IdentityId.normalize(id)),
-        ]),
-      ].sort(),
+      memberIds,
       name: input.name.trim(),
       version: GroupMailboxRoster.VERSION,
     });
@@ -666,9 +674,9 @@ export class GroupConversationMailbox {
   /**
    * Reads every inbox of the conversation once, then reconciles the MLS
    * group with its roster in the background. Resolves whether this identity
-   * is off the roster, or holds no group for the conversation, and whether
-   * this device still awaits the group's confirmation. Rejects when the
-   * inboxes cannot be read.
+   * is off the roster, or holds no group for the conversation, whether
+   * this device still awaits the group's confirmation, and whether its last
+   * add outgrew a welcome. Rejects when the inboxes cannot be read.
    */
   public async sync(
     session: Session,
@@ -686,6 +694,7 @@ export class GroupConversationMailbox {
     void this.membersChanged(session, conversationId);
 
     return {
+      outgrown: this.member(session).control.outgrown(conversationId),
       removed: !roster?.has(session.identity.id),
       unconfirmed:
         await this.member(session).engine.awaitsConfirmation(conversationId),

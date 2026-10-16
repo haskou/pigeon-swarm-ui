@@ -6,6 +6,7 @@ import type { ConversationResource } from '../../../../contexts/conversations/in
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
 import { copy } from '../../../../shared/presentation/i18n/copy';
+import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { normalizeIdentityLookup } from './normalizeIdentityLookup';
 
@@ -70,9 +71,7 @@ export function useGroupInvitationDialog({
         setInput('');
         setOpen(false);
       } catch (caught) {
-        setError(
-          caught instanceof Error ? caught.message : copy.chat.inviteError,
-        );
+        setError(toUserErrorMessage(caught, copy.chat.inviteError));
       } finally {
         setLoading(false);
       }

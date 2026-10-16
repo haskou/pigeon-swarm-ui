@@ -844,6 +844,8 @@ export const en = {
         'Direct conversations need two different identities.',
       ConversationParticipantNotFoundError:
         'Only conversation participants can send messages here.',
+      GroupMailboxTooLargeError:
+        'A group holds at most 48 members, and one welcome must reach every device in it. Remove a member or device before adding another.',
       IdentityMustHaveAtLeastOneNetworkError:
         'The identity must belong to at least one network.',
       IdentityNotFoundError: 'That identity could not be found.',
@@ -1721,6 +1723,8 @@ export const en = {
     directMailboxSyncError: 'Direct messages could not be synced. Retrying.',
     dismissNotice: 'Dismiss',
     groupMailboxSyncError: 'Group messages could not be synced. Retrying.',
+    groupOutgrown:
+      'A member added to this group was not welcomed: the group has too many devices for one welcome. They stay invited without access. Remove a member or device, then add them again.',
     groupUnconfirmed:
       'This group is not yet verified: no member this device already knows has confirmed it since you were added. Your messages wait here and are sent once a known member does. You can wait or leave the group; time alone never verifies it. Groups joined before this check stay unverified.',
     newMessages: 'New messages',

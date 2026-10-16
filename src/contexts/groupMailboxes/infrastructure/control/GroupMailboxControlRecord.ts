@@ -15,11 +15,15 @@ import { GroupMailboxGenesis } from '../../domain/GroupMailboxGenesis';
 export class GroupMailboxControlRecord {
   private static readonly ENCODED = /^[A-Za-z0-9_-]+$/;
   private static readonly KIND = 'group-mailbox-control';
-  /** Keeps a sealed record inside the largest mailbox bucket (64 KiB). */
-  private static readonly MAX_BINARY_BYTES = 40_000;
   private static readonly MAX_CONVERSATION_ID_LENGTH = 256;
   private static readonly REQUEST_ID = /^[A-Za-z0-9_-]{22}$/;
   private static readonly VERSION = 1;
+  /**
+   * The most bytes one binary field carries: keeps a sealed record inside
+   * the largest mailbox bucket (64 KiB). An encoded record whose welcome is
+   * larger never decodes, so no such welcome is committed or sent.
+   */
+  public static readonly MAX_BINARY_BYTES = 40_000;
 
   private static binary(value: unknown): Uint8Array | undefined {
     if (
