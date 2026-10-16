@@ -67,3 +67,21 @@ function canSubmitCreateIdentity(input: {
     }).length > 0
   );
 }
+
+/**
+ * Whether the login screen still waits for the lookup of the identifier it
+ * shows. Until it resolves, the identity input may still be replaced by the
+ * preview of that identity.
+ */
+export function identityLookupPending(input: {
+  identityId: string;
+  mode: AuthMode;
+  previewLoaded: boolean;
+  requestedLookup: string;
+}): boolean {
+  const lookup = normalizeIdentityLogin(input.identityId);
+
+  if (input.mode !== 'login' || !lookup) return false;
+
+  return input.requestedLookup !== lookup || !input.previewLoaded;
+}
