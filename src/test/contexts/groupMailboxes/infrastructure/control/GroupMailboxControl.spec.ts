@@ -139,7 +139,7 @@ const outboxOf = (
   const rows = new Map<string, GroupMailboxOutboxRow>();
 
   return new GroupMailboxOutbox(
-    { identity: { id: identityId } } as unknown as Session,
+    () => ({ identity: { id: identityId } }) as unknown as Session,
     engine,
     channel,
     {

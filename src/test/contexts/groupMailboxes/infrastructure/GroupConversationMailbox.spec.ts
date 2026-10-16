@@ -248,7 +248,7 @@ const device = (storage: string): GroupConversationMailbox =>
     contacts: () => [...contacts],
     direct: (from) => ({
       send: (conversationId, peer, plaintext) =>
-        post(from, conversationId, peer, plaintext),
+        post(from(), conversationId, peer, plaintext),
     }),
     notifications: {
       listPage: (owner, limit, before) =>

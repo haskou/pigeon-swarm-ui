@@ -178,7 +178,7 @@ const setup = (
     database,
     notifications,
     pump: new GroupMailboxNotificationPump(
-      bob.session,
+      () => bob.session,
       control,
       notifications,
       new GroupMailboxHandledLetters(entries(database), () => bob.session),

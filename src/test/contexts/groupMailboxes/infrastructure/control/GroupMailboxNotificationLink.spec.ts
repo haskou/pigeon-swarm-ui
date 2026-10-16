@@ -47,7 +47,7 @@ describe('GroupMailboxNotificationLink', () => {
     });
 
     await new GroupMailboxNotificationLink(
-      alice.session,
+      () => alice.session,
       http,
       signer,
       invitations,
