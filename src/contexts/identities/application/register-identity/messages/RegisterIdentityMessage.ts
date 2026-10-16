@@ -3,6 +3,7 @@ import { Timestamp } from '@haskou/value-objects';
 import { IdentityProfile } from '../../../domain/profile/IdentityProfile';
 import { IdentityMasterKeyProtection } from '../../../domain/value-objects/IdentityMasterKeyProtection';
 import { IdentityNetworkMemberships } from '../../../domain/value-objects/IdentityNetworkMemberships';
+import { IdentityRegistrationCode } from '../../../domain/value-objects/IdentityRegistrationCode';
 
 export class RegisterIdentityMessage {
   public constructor(
@@ -13,6 +14,7 @@ export class RegisterIdentityMessage {
       occurredAt: number;
       password: string;
       recoveryKey?: string;
+      registrationCode?: string;
     },
   ) {}
 
@@ -39,5 +41,11 @@ export class RegisterIdentityMessage {
       password: this.input.password,
       recoveryKey: this.input.recoveryKey,
     });
+  }
+
+  public getRegistrationCode(): IdentityRegistrationCode | null {
+    return this.input.registrationCode === undefined
+      ? null
+      : IdentityRegistrationCode.fromString(this.input.registrationCode);
   }
 }

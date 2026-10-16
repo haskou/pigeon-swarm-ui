@@ -5,9 +5,9 @@ import type { Session } from '../../../../contexts/identities/infrastructure/ses
 import { DevicePairingCode } from '../../../../contexts/identities/domain/value-objects/DevicePairingCode';
 import { DevicePairingCodeField } from '../../../../contexts/identities/presentation/device-pairing/DevicePairingCodeField';
 import { DevicePairingCodeOutput } from '../../../../contexts/identities/presentation/device-pairing/DevicePairingCodeOutput';
-import { DevicePairingQrCode } from '../../../../contexts/identities/presentation/device-pairing/DevicePairingQrCode';
 import { toDevicePairingErrorMessage } from '../../../../contexts/identities/presentation/view-models/toDevicePairingErrorMessage';
 import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
+import { QrCode } from '../../../../shared/presentation/components/QrCode';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { applicationContainer } from '../../../composition/applicationContainer';
@@ -98,8 +98,8 @@ export function DevicePairingDialog({
               <p className="text-sm leading-relaxed text-white/60">
                 {copy.profile.devicePairingInvitationHelp}
               </p>
-              <DevicePairingQrCode
-                code={invitation}
+              <QrCode
+                value={invitation.valueOf()}
                 label={copy.profile.devicePairingInvitationQr}
               />
               <DevicePairingCodeOutput
@@ -160,8 +160,8 @@ export function DevicePairingDialog({
               <p className="text-sm leading-relaxed text-white/60">
                 {copy.profile.devicePairingCompletionHelp}
               </p>
-              <DevicePairingQrCode
-                code={completionCode}
+              <QrCode
+                value={completionCode.valueOf()}
                 label={copy.profile.devicePairingCompletionQr}
               />
               <DevicePairingCodeOutput

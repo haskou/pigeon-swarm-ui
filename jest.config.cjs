@@ -73,6 +73,7 @@ const REAL_CRYPTO_SPECS = [
   'MailboxCreationProof.vectors',
   'MlsCommunityEngine',
   'MlsGroup',
+  'NodeBlockListSigner',
   'NotificationMutationSigner',
   'PigeonApiGateway',
   'PigeonCommunitiesApi',

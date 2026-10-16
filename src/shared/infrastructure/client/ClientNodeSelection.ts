@@ -36,7 +36,7 @@ export class ClientNodeSelection {
     }
   }
 
-  public async save(endpoint: string): Promise<void> {
+  public async save(endpoint: string): Promise<SelectedClientNode> {
     const url = ClientNodeEndpoint.normalize(endpoint);
     const digest = await crypto.subtle.digest(
       'SHA-256',
@@ -49,5 +49,7 @@ export class ClientNodeSelection {
       ClientNodeSelection.storageKey,
       JSON.stringify({ scope, url }),
     );
+
+    return { scope, url };
   }
 }

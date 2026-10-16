@@ -30,6 +30,10 @@ import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorM
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { NodeNetworksPanel } from './NodeNetworksPanel';
 import {
+  NodeOwnerSectionPanel,
+  nodeOwnerSectionTabs,
+} from './NodeOwnerSections';
+import {
   NetworkSynchronizationPanel,
   ReplicationStatusPanel,
 } from './NodeSynchronizationPanels';
@@ -530,6 +534,7 @@ export function NodeSettingsDialog({
       'peers',
       copy.nodeSettings.peersTab.replace('{count}', String(peers.length)),
     ],
+    ...nodeOwnerSectionTabs(isOwner),
   ];
 
   useEffect(() => {
@@ -757,6 +762,12 @@ export function NodeSettingsDialog({
                   peers={peers}
                 />
               )}
+
+              <NodeOwnerSectionPanel
+                isOwner={isOwner}
+                section={activeSection}
+                session={session}
+              />
             </div>
           </div>
         </div>

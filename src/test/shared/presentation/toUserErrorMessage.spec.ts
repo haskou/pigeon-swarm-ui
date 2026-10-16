@@ -1,3 +1,4 @@
+import { NodeOwnerIdentityCannotBeBlockedError } from '../../../contexts/nodeAccess/domain/errors/NodeOwnerIdentityCannotBeBlockedError';
 import { HttpJsonError } from '../../../shared/infrastructure/http/HttpJsonError';
 import { copy } from '../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../shared/presentation/toUserErrorMessage';
@@ -16,6 +17,12 @@ describe(toUserErrorMessage.name, () => {
     expect(toUserErrorMessage(error, 'fallback')).toBe(
       copy.errors.backend.InvalidMessageSignatureError,
     );
+  });
+
+  it('translates client domain errors by name', () => {
+    expect(
+      toUserErrorMessage(new NodeOwnerIdentityCannotBeBlockedError()),
+    ).toBe(copy.errors.backend.NodeOwnerIdentityCannotBeBlockedError);
   });
 
   it('translates numeric API error codes', () => {
@@ -126,6 +133,40 @@ describe(toUserErrorMessage.name, () => {
   it('uses a network message for fetch failures', () => {
     expect(toUserErrorMessage(new TypeError('Failed to fetch'))).toBe(
       copy.errors.network,
+    );
+  });
+
+  it.each([403011, 403012] as const)(
+    'explains node access refusal %s',
+    (code) => {
+      const error = new HttpJsonError(
+        403,
+        'Forbidden',
+        JSON.stringify({ code, httpStatus: 403 }),
+      );
+
+      expect(toUserErrorMessage(error, 'fallback')).toBe(
+        copy.errors.backend[code],
+      );
+    },
+  );
+
+  it.each([
+    [401020, 401],
+    [401021, 401],
+    [403010, 403],
+    [408010, 408],
+    [413010, 413],
+    [429060, 429],
+  ] as const)('explains block list upload refusal %s', (code, status) => {
+    const error = new HttpJsonError(
+      status,
+      'Refused',
+      JSON.stringify({ code, httpStatus: status }),
+    );
+
+    expect(toUserErrorMessage(error, 'fallback')).toBe(
+      copy.errors.backend[code],
     );
   });
 });

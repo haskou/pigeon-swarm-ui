@@ -1,0 +1,26 @@
+import { NodeAccessActorId } from '../../../domain/value-objects/NodeAccessActorId';
+import { NodeAccessIdentityId } from '../../../domain/value-objects/NodeAccessIdentityId';
+import { NodeBlockTarget } from '../../../domain/value-objects/NodeBlockTarget';
+
+export class BlockNodeEntryMessage {
+  public constructor(
+    private readonly input: {
+      actorIdentityId: string;
+      identityId?: string;
+      nodePeerId?: string;
+    },
+  ) {}
+
+  public getActorId(): NodeAccessActorId {
+    return NodeAccessActorId.fromString(this.input.actorIdentityId);
+  }
+
+  /** Only the node owner signs block lists, so the actor is the owner. */
+  public getOwnerIdentityId(): NodeAccessIdentityId {
+    return NodeAccessIdentityId.fromString(this.input.actorIdentityId);
+  }
+
+  public getTarget(): NodeBlockTarget {
+    return NodeBlockTarget.fromPrimitives(this.input);
+  }
+}

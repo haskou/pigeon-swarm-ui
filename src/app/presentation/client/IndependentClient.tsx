@@ -1,11 +1,23 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 
+import {
+  forgetRegistrationLink,
+  pendingRegistrationLink,
+} from '../../../contexts/nodeAccess/presentation/view-models/registrationLink';
 import { ClientCompatibilityProbe } from '../../../shared/infrastructure/client/ClientCompatibilityProbe';
 import { ClientConnectionError } from '../../../shared/infrastructure/client/ClientConnectionError';
 import { ClientNodeEndpoint } from '../../../shared/infrastructure/client/ClientNodeEndpoint';
-import { clientNodeForDocument } from '../../../shared/infrastructure/client/clientNodeForDocument';
+import {
+  clientNodeForDocument,
+  selectClientNodeForDocument,
+} from '../../../shared/infrastructure/client/clientNodeForDocument';
 import { ClientNodeSelection } from '../../../shared/infrastructure/client/ClientNodeSelection';
 import { retireClientNodeNotifications } from '../../../shared/infrastructure/client/retireClientNodeNotifications';
+import { fillPlaceholders } from '../../../shared/presentation/fillPlaceholders';
+import {
+  type RegistrationSwitch,
+  registrationSwitchFor,
+} from './registrationSwitch';
 
 const App = lazy(() => import('../../app'));
 const copy = navigator.language.toLowerCase().startsWith('es')
@@ -21,6 +33,16 @@ const copy = navigator.language.toLowerCase().startsWith('es')
       label: 'Dirección del nodo',
       notifications:
         'No se pudieron desconectar las notificaciones del nodo anterior. Vuelve a intentarlo antes de cambiar de nodo.',
+      registrationAdoptBody:
+        'Este enlace de registro es para {node}. Continúa solo si confías en ese nodo: guardará tu identidad y tus datos.',
+      registrationAdoptConfirm: 'Usar este nodo y registrarme',
+      registrationAdoptKeep: 'Elegir otro nodo',
+      registrationAdoptTitle: '¿Registrarte en este nodo?',
+      registrationSwitchBody:
+        'Este enlace de registro es para {node}. Este navegador está conectado a {current}. Tus identidades en el nodo actual se quedan allí; puedes volver con «Cambiar de nodo».',
+      registrationSwitchConfirm: 'Cambiar de nodo y registrarme',
+      registrationSwitchKeep: 'Seguir en el nodo actual',
+      registrationSwitchTitle: '¿Registrarte en otro nodo?',
       storage:
         'No se pudo guardar el nodo. Permite el almacenamiento local para continuar.',
       title: 'Conectar a un nodo',
@@ -39,6 +61,16 @@ const copy = navigator.language.toLowerCase().startsWith('es')
       label: 'Node address',
       notifications:
         'Could not disconnect notifications from the previous node. Retry before switching nodes.',
+      registrationAdoptBody:
+        'This registration link is for {node}. Continue only if you trust that node: it will store your identity and your data.',
+      registrationAdoptConfirm: 'Use this node and sign up',
+      registrationAdoptKeep: 'Choose another node',
+      registrationAdoptTitle: 'Sign up on this node?',
+      registrationSwitchBody:
+        'This registration link is for {node}. This browser is connected to {current}. Your identities on the current node stay there; you can come back with “Change node”.',
+      registrationSwitchConfirm: 'Switch node and sign up',
+      registrationSwitchKeep: 'Stay on the current node',
+      registrationSwitchTitle: 'Sign up on another node?',
       storage: 'Could not save the node. Allow local storage to continue.',
       title: 'Connect to a node',
       unreachable:
@@ -58,8 +90,78 @@ function resumeClientAfterSelection(): void {
   }
 }
 
+function registrationPromptText({ current, node }: RegistrationSwitch): {
+  body: string;
+  confirm: string;
+  keep: string;
+  title: string;
+} {
+  if (current === null)
+    return {
+      body: fillPlaceholders(copy.registrationAdoptBody, { node }),
+      confirm: copy.registrationAdoptConfirm,
+      keep: copy.registrationAdoptKeep,
+      title: copy.registrationAdoptTitle,
+    };
+
+  return {
+    body: fillPlaceholders(copy.registrationSwitchBody, { current, node }),
+    confirm: copy.registrationSwitchConfirm,
+    keep: copy.registrationSwitchKeep,
+    title: copy.registrationSwitchTitle,
+  };
+}
+
+function RegistrationSwitchPrompt({
+  checking,
+  error,
+  onConfirm,
+  onKeep,
+  registrationSwitch,
+}: {
+  checking: boolean;
+  error: string;
+  onConfirm: () => void;
+  onKeep: () => void;
+  registrationSwitch: RegistrationSwitch;
+}) {
+  const text = registrationPromptText(registrationSwitch);
+
+  return (
+    <main className="flex min-h-dvh items-center justify-center bg-slate-950 px-5 text-slate-100">
+      <section className="w-full max-w-lg space-y-5 rounded-2xl border border-slate-700 bg-slate-900 p-7 shadow-xl">
+        <img src="/logo.png" alt="Pigeon Swarm" className="h-14 w-14" />
+        <h1 className="text-2xl font-semibold">{text.title}</h1>
+        <p className="text-sm break-all text-slate-300">{text.body}</p>
+        {error && (
+          <p role="alert" className="text-sm text-red-300">
+            {error}
+          </p>
+        )}
+        <button
+          type="button"
+          disabled={checking}
+          onClick={onConfirm}
+          className="w-full rounded-lg bg-indigo-600 px-4 py-3 font-medium text-white disabled:opacity-50"
+        >
+          {checking ? copy.checking : text.confirm}
+        </button>
+        <button
+          type="button"
+          disabled={checking}
+          onClick={onKeep}
+          className="w-full rounded-lg border border-slate-600 px-4 py-3 font-medium text-white disabled:opacity-50"
+        >
+          {text.keep}
+        </button>
+      </section>
+    </main>
+  );
+}
+
 export function IndependentClient() {
-  const selected = clientNodeForDocument();
+  const [selected, setSelected] = useState(clientNodeForDocument);
+  const [registration, setRegistration] = useState(pendingRegistrationLink);
   const choosing =
     window.location.pathname === '/connect' ||
     new URLSearchParams(window.location.search).get('choose-node') === '1';
@@ -70,13 +172,26 @@ export function IndependentClient() {
   )
     ? nodeChoiceUrl.href
     : '/connect';
+  const registrationSwitch = registrationSwitchFor(
+    registration,
+    choosing,
+    selected,
+  );
   const [endpoint, setEndpoint] = useState(selected?.url ?? '');
   const [ready, setReady] = useState(false);
-  const [checking, setChecking] = useState(Boolean(selected && !choosing));
+  const [checking, setChecking] = useState(
+    () => !choosing && !registrationSwitch && Boolean(selected),
+  );
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!selected || choosing) return;
+    if (
+      !selected ||
+      ready ||
+      choosing ||
+      registrationSwitchFor(registration, choosing, selected)
+    )
+      return;
     const controller = new AbortController();
 
     void new ClientCompatibilityProbe()
@@ -97,7 +212,50 @@ export function IndependentClient() {
       });
 
     return () => controller.abort();
-  }, [selected, choosing]);
+  }, [selected, choosing, registration, ready]);
+
+  async function adoptRegistrationNode(node: string): Promise<void> {
+    setError('');
+    setChecking(true);
+    try {
+      await new ClientCompatibilityProbe().verify(node);
+    } catch (failure) {
+      setEndpoint(node);
+      setError(
+        failure instanceof ClientConnectionError
+          ? copy[failure.code]
+          : copy.unreachable,
+      );
+      setChecking(false);
+
+      return;
+    }
+
+    if (selected) {
+      try {
+        await retireClientNodeNotifications();
+      } catch {
+        setError(copy.notifications);
+        setChecking(false);
+
+        return;
+      }
+    }
+    try {
+      setSelected(await selectClientNodeForDocument(node));
+      setEndpoint(node);
+      setReady(true);
+    } catch {
+      setError(copy.storage);
+    }
+    setChecking(false);
+  }
+
+  function keepCurrentNode(): void {
+    forgetRegistrationLink();
+    setRegistration(null);
+    setChecking(Boolean(selected));
+  }
 
   async function connect(event: React.FormEvent): Promise<void> {
     event.preventDefault();
@@ -157,6 +315,17 @@ export function IndependentClient() {
           <App />
         </Suspense>
       </>
+    );
+
+  if (registrationSwitch)
+    return (
+      <RegistrationSwitchPrompt
+        checking={checking}
+        error={error}
+        onConfirm={() => void adoptRegistrationNode(registrationSwitch.node)}
+        onKeep={keepCurrentNode}
+        registrationSwitch={registrationSwitch}
+      />
     );
 
   return (

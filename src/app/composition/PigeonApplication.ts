@@ -95,6 +95,32 @@ import { PigeonNetworkPeerRepository } from '../../contexts/networks/infrastruct
 import { PigeonNetworkRepository } from '../../contexts/networks/infrastructure/http/repositories/PigeonNetworkRepository';
 import { PigeonNodeRelayConfigurationRepository } from '../../contexts/networks/infrastructure/http/repositories/PigeonNodeRelayConfigurationRepository';
 import { NodeRelayConfigurationViewModelMapper } from '../../contexts/networks/presentation/view-models/NodeRelayConfigurationViewModelMapper';
+import { PendingNodeBlockEntriesApprover } from '../../contexts/nodeAccess/application/approve-pending-node-block-entries/PendingNodeBlockEntriesApprover';
+import { NodeEntryBlocker } from '../../contexts/nodeAccess/application/block-node-entry/NodeEntryBlocker';
+import { NodeBlockPublicationChanger } from '../../contexts/nodeAccess/application/change-node-block-publication/NodeBlockPublicationChanger';
+import { NodeRegistrationModeChanger } from '../../contexts/nodeAccess/application/change-node-registration-mode/NodeRegistrationModeChanger';
+import { NodeBlockEntryExcepter } from '../../contexts/nodeAccess/application/except-node-block-entry/NodeBlockEntryExcepter';
+import { NodeBlockExceptionsFinder } from '../../contexts/nodeAccess/application/find-node-block-exceptions/NodeBlockExceptionsFinder';
+import { NodeBlockListFinder } from '../../contexts/nodeAccess/application/find-node-block-list/NodeBlockListFinder';
+import { NodeBlockPublicationFinder } from '../../contexts/nodeAccess/application/find-node-block-publication/NodeBlockPublicationFinder';
+import { NodeRegistrationFinder } from '../../contexts/nodeAccess/application/find-node-registration/NodeRegistrationFinder';
+import { PendingNodeBlockEntriesFinder } from '../../contexts/nodeAccess/application/find-pending-node-block-entries/PendingNodeBlockEntriesFinder';
+import { NodeBlockSourceFollower } from '../../contexts/nodeAccess/application/follow-node-block-source/NodeBlockSourceFollower';
+import { NodeRegistrationCodeIssuer } from '../../contexts/nodeAccess/application/issue-node-registration-code/NodeRegistrationCodeIssuer';
+import { NodeBlockExceptionRemover } from '../../contexts/nodeAccess/application/remove-node-block-exception/NodeBlockExceptionRemover';
+import { NodeRegistrationCodeRevoker } from '../../contexts/nodeAccess/application/revoke-node-registration-code/NodeRegistrationCodeRevoker';
+import { NodeBlockSourcesSearcher } from '../../contexts/nodeAccess/application/search-node-block-sources/NodeBlockSourcesSearcher';
+import { NodeRegistrationCodesSearcher } from '../../contexts/nodeAccess/application/search-node-registration-codes/NodeRegistrationCodesSearcher';
+import { NodeEntryUnblocker } from '../../contexts/nodeAccess/application/unblock-node-entry/NodeEntryUnblocker';
+import { NodeBlockSourceUnfollower } from '../../contexts/nodeAccess/application/unfollow-node-block-source/NodeBlockSourceUnfollower';
+import { NodeAccessSessions } from '../../contexts/nodeAccess/infrastructure/http/repositories/NodeAccessSessions';
+import { PigeonNodeBlockExceptionsRepository } from '../../contexts/nodeAccess/infrastructure/http/repositories/PigeonNodeBlockExceptionsRepository';
+import { PigeonNodeBlockListRepository } from '../../contexts/nodeAccess/infrastructure/http/repositories/PigeonNodeBlockListRepository';
+import { PigeonNodeBlockPublicationRepository } from '../../contexts/nodeAccess/infrastructure/http/repositories/PigeonNodeBlockPublicationRepository';
+import { PigeonNodeBlockSourceRepository } from '../../contexts/nodeAccess/infrastructure/http/repositories/PigeonNodeBlockSourceRepository';
+import { PigeonNodeRegistrationCodeRepository } from '../../contexts/nodeAccess/infrastructure/http/repositories/PigeonNodeRegistrationCodeRepository';
+import { PigeonNodeRegistrationRepository } from '../../contexts/nodeAccess/infrastructure/http/repositories/PigeonNodeRegistrationRepository';
+import { NodeBlockListSigner } from '../../contexts/nodeAccess/infrastructure/signing/NodeBlockListSigner';
 import { ConversationInvitationAcceptor } from '../../contexts/notifications/application/accept-conversation-invitation/ConversationInvitationAcceptor';
 import { NotificationSettingConfigurer } from '../../contexts/notifications/application/configure-notification-setting/NotificationSettingConfigurer';
 import { NotificationDecider } from '../../contexts/notifications/application/decide-notification/NotificationDecider';
@@ -159,6 +185,7 @@ import { PigeonMessageWriter } from './messages/PigeonMessageWriter';
 import { PigeonMlsFacade } from './mls/PigeonMlsFacade';
 import { PigeonNetworksFacade } from './networks/PigeonNetworksFacade';
 import { PigeonNodeFacade } from './networks/PigeonNodeFacade';
+import { PigeonNodeAccessFacade } from './nodeAccess/PigeonNodeAccessFacade';
 import { PigeonNotificationsFacade } from './notifications/PigeonNotificationsFacade';
 import { PigeonApiGateway } from './PigeonApiGateway';
 import { PigeonAttachmentsFacade } from './PigeonAttachmentsFacade';
@@ -188,6 +215,8 @@ export class PigeonApplication {
   public readonly groupMessages: GroupConversationMailbox;
 
   public readonly networks: PigeonNetworksFacade;
+
+  public readonly nodeAccess: PigeonNodeAccessFacade;
 
   public readonly notifications: PigeonNotificationsFacade;
 
@@ -473,6 +502,88 @@ export class PigeonApplication {
       ),
       nodeFacade,
     );
+    const nodeAccessSessions = new NodeAccessSessions(identityContexts);
+    const nodeAccessRepositories = {
+      blockLists: new PigeonNodeBlockListRepository(
+        gateway.nodeAccess,
+        nodeAccessSessions,
+        new NodeBlockListSigner(),
+      ),
+      codes: new PigeonNodeRegistrationCodeRepository(
+        gateway.nodeAccess,
+        nodeAccessSessions,
+      ),
+      exceptions: new PigeonNodeBlockExceptionsRepository(
+        gateway.nodeAccess,
+        nodeAccessSessions,
+      ),
+      publications: new PigeonNodeBlockPublicationRepository(
+        gateway.nodeAccess,
+        nodeAccessSessions,
+      ),
+      registrations: new PigeonNodeRegistrationRepository(
+        gateway.nodeAccess,
+        nodeAccessSessions,
+      ),
+      sources: new PigeonNodeBlockSourceRepository(
+        gateway.nodeAccess,
+        nodeAccessSessions,
+      ),
+    };
+    this.nodeAccess = new PigeonNodeAccessFacade(identityContexts, {
+      nodeBlockEntryExcepter: new NodeBlockEntryExcepter(
+        nodeAccessRepositories.exceptions,
+      ),
+      nodeBlockExceptionRemover: new NodeBlockExceptionRemover(
+        nodeAccessRepositories.exceptions,
+      ),
+      nodeBlockExceptionsFinder: new NodeBlockExceptionsFinder(
+        nodeAccessRepositories.exceptions,
+      ),
+      nodeBlockListFinder: new NodeBlockListFinder(
+        nodeAccessRepositories.blockLists,
+      ),
+      nodeBlockPublicationChanger: new NodeBlockPublicationChanger(
+        nodeAccessRepositories.publications,
+      ),
+      nodeBlockPublicationFinder: new NodeBlockPublicationFinder(
+        nodeAccessRepositories.publications,
+      ),
+      nodeBlockSourceFollower: new NodeBlockSourceFollower(
+        nodeAccessRepositories.sources,
+      ),
+      nodeBlockSourcesSearcher: new NodeBlockSourcesSearcher(
+        nodeAccessRepositories.sources,
+      ),
+      nodeBlockSourceUnfollower: new NodeBlockSourceUnfollower(
+        nodeAccessRepositories.sources,
+      ),
+      nodeEntryBlocker: new NodeEntryBlocker(nodeAccessRepositories.blockLists),
+      nodeEntryUnblocker: new NodeEntryUnblocker(
+        nodeAccessRepositories.blockLists,
+      ),
+      nodeRegistrationCodeIssuer: new NodeRegistrationCodeIssuer(
+        nodeAccessRepositories.codes,
+      ),
+      nodeRegistrationCodeRevoker: new NodeRegistrationCodeRevoker(
+        nodeAccessRepositories.codes,
+      ),
+      nodeRegistrationCodesSearcher: new NodeRegistrationCodesSearcher(
+        nodeAccessRepositories.codes,
+      ),
+      nodeRegistrationFinder: new NodeRegistrationFinder(
+        nodeAccessRepositories.registrations,
+      ),
+      nodeRegistrationModeChanger: new NodeRegistrationModeChanger(
+        nodeAccessRepositories.registrations,
+      ),
+      pendingNodeBlockEntriesApprover: new PendingNodeBlockEntriesApprover(
+        nodeAccessRepositories.sources,
+      ),
+      pendingNodeBlockEntriesFinder: new PendingNodeBlockEntriesFinder(
+        nodeAccessRepositories.sources,
+      ),
+    });
     const notificationContexts = new NotificationAccessContexts();
     const notificationMapper = new NotificationMapper();
     const notificationSettingMapper = new NotificationSettingMapper();

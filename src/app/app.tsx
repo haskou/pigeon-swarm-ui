@@ -1,6 +1,12 @@
 import { lazy, Suspense, type ReactElement, type ReactNode } from 'react';
 
+import {
+  forgetRegistrationLink,
+  isRegistrationLinkFor,
+  pendingRegistrationLink,
+} from '../contexts/nodeAccess/presentation/view-models/registrationLink';
 import { copy } from '../shared/presentation/i18n/copy';
+import { API_SERVER_URL } from './API_SERVER_URL';
 import { AppFrame } from './presentation/AppFrame';
 import { useAppBootstrap } from './presentation/useAppBootstrap';
 import { loadGlassWorkspaceModule } from './presentation/workspace/loadGlassWorkspaceModule';
@@ -109,6 +115,11 @@ function App(): ReactElement {
     setSession,
   } = bootstrap;
 
+  const registrationLink = pendingRegistrationLink();
+  const registrationLinkUsable =
+    registrationLink !== null &&
+    isRegistrationLinkFor(registrationLink, API_SERVER_URL);
+
   const screen = screenFrom({
     hasNetworkError: !!nodeNetworks.error,
     isLoadingNetworks: nodeNetworks.loading,
@@ -153,8 +164,20 @@ function App(): ReactElement {
             ipfsPeerCount={peers.ipfsPeerCount}
             networkSynchronizationStatus={peers.networkSynchronizationStatus}
             nodeOwnerId={nodeNetworks.node?.owner ?? null}
-            onAuthenticated={handleAuthenticated}
+            onAuthenticated={(nextSession, nextConversations) => {
+              forgetRegistrationLink();
+              handleAuthenticated(nextSession, nextConversations);
+            }}
             peersLoading={peers.loading}
+            registrationCode={
+              registrationLinkUsable ? registrationLink.code : null
+            }
+            registrationLinkForOtherNode={
+              registrationLink && !registrationLinkUsable
+                ? registrationLink.node
+                : null
+            }
+            registrationMode={nodeNetworks.node?.registration?.mode ?? null}
             removal={deviceRemoval}
           />
         ) : (

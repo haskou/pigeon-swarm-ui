@@ -167,6 +167,13 @@ export const es = {
     recoveryKeyTitle: 'Clave de recuperación',
     recoveryKeyUnlockFailed:
       'La contraseña o la clave de recuperación no son correctas.',
+    registrationClosed: 'Este nodo no acepta cuentas nuevas por ahora.',
+    registrationLinkNotice:
+      'Te estás registrando con un enlace de registro del propietario de este nodo.',
+    registrationLinkOtherNode:
+      'Este enlace de registro es para otro nodo ({node}). Ábrelo en un cliente conectado a ese nodo.',
+    registrationNeedsLink:
+      'Este nodo solo acepta cuentas nuevas mediante un enlace de registro de su propietario.',
     title: 'Pigeon Swarm',
     unknownError: 'Error desconocido. Poético, pero poco útil.',
   },
@@ -811,15 +818,26 @@ export const es = {
   },
   errors: {
     backend: {
+      400070:
+        'El nodo rechazó ese código de registro. Permite entre 1 y 100 usos y elige una caducidad futura dentro del límite del nodo.',
       401020:
         'La solicitud firmada fue rechazada. Recarga e inténtalo de nuevo.',
       401021:
         'Faltan las cabeceras de autenticación. Recarga e inténtalo de nuevo.',
       403010: 'Solo el propietario del nodo puede hacer eso.',
+      403011:
+        'Este nodo necesita un enlace de registro válido para crear una cuenta. Pide un enlace nuevo al propietario del nodo.',
+      403012:
+        'Este nodo ya no da servicio a tu identidad. Habla con su propietario o usa otro nodo.',
       403020: 'Solo quien envió la notificación puede hacer eso.',
+      408010:
+        'La lista de bloqueos tardó demasiado en subirse. Revisa tu conexión e inténtalo de nuevo.',
+      413010: 'La lista de bloqueos es demasiado grande para este nodo.',
       422030: 'El archivo es demasiado grande para el nodo.',
       429040:
         'Demasiadas actualizaciones de perfil en poco tiempo. Espera un minuto e inténtalo de nuevo.',
+      429060:
+        'Se está guardando otro cambio de la lista de bloqueos. Espera un momento y vuelve a intentarlo.',
       503020:
         'El nodo está sincronizando, espera unos minutos e inténtalo de nuevo.',
       AuthenticatedIdentityIsNotInviterError:
@@ -843,6 +861,8 @@ export const es = {
         'Solo el propietario de la identidad puede publicar cambios de perfil.',
       InvalidIdentityCandidateError:
         'Los datos de la identidad no son válidos. Revisa el perfil e inténtalo de nuevo.',
+      InvalidIdentityRegistrationCodeError:
+        'Ese enlace de registro no es válido. Pide uno nuevo al propietario del nodo.',
       InvalidIdentitySignatureError: 'La firma de la identidad no es válida.',
       InvalidIdentityVersionError: 'La versión de la identidad no es válida.',
       InvalidKeychainCandidateError:
@@ -850,7 +870,25 @@ export const es = {
       InvalidKeychainVersionError: 'La versión del llavero no es válida.',
       InvalidMessageSignatureError:
         'La firma del mensaje no es válida. Recarga el chat e inténtalo de nuevo.',
+      InvalidNodeAccessIdentityIdError:
+        'Ese id de identidad no es válido. Pega el id o un @usuario.',
+      InvalidNodeBlockApprovalError:
+        'Aprueba todas las entradas o elige al menos una entrada para aprobar.',
+      InvalidNodeBlockListError: 'La lista de bloqueos no es válida.',
+      InvalidNodeBlockListVersionError:
+        'La versión de la lista de bloqueos no es válida.',
+      InvalidNodeBlockSourceApprovalError:
+        'Aprueba todas las entradas o elige al menos una entrada para aprobar.',
+      InvalidNodeBlockSourceOriginError:
+        'La dirección de la fuente debe ser un origen HTTPS, como https://nodo.example.org.',
       InvalidNodeIdError: 'El identificador del nodo no es válido.',
+      InvalidNodePeerIdError: 'Ese id de par de nodo no es válido.',
+      InvalidNodeRegistrationCodeExpiryError:
+        'Un enlace de registro debe caducar en el futuro.',
+      InvalidNodeRegistrationCodeIdError:
+        'No se encontró ese enlace de registro.',
+      InvalidNodeRegistrationCodeUsesError:
+        'Un enlace de registro admite entre 1 y 100 usos.',
       InvalidPasswordError:
         'Usa de 12 a 256 caracteres con mayúscula, minúscula, número y símbolo.',
       InvalidProfileHandleError:
@@ -882,10 +920,28 @@ export const es = {
         'No se encontró el mensaje al que intentas hacer referencia.',
       MissingSignedRequestHeaderError:
         'Faltan las cabeceras de autenticación. Recarga e inténtalo de nuevo.',
+      NodeBlockEntriesAreNotListedBySourceError:
+        'Esa fuente ya no incluye esas entradas. Recarga la cola de revisión.',
+      NodeBlockEntryAlreadyBlockedError: 'Esa entrada ya está bloqueada.',
+      NodeBlockEntryNotBlockedError: 'Esa entrada no está bloqueada.',
+      NodeBlockListMustBeSignedByCurrentOwnerError:
+        'Solo el propietario actual del nodo puede firmar la lista de bloqueos.',
+      NodeBlockListNotIssuedError:
+        'La lista de bloqueos no tiene una versión nueva que firmar. Recarga e inténtalo de nuevo.',
+      NodeBlockListSignatureIsNotValidError:
+        'La firma de la lista de bloqueos no es válida. Recarga e inténtalo de nuevo.',
+      NodeBlockListVersionIsNotNewerError:
+        'La lista de bloqueos cambió en otro lugar. Recárgala e inténtalo de nuevo.',
+      NodeBlockSourceNotFoundError:
+        'Ya no sigues esa fuente de lista de bloqueos.',
+      NodeBlockSourceVersionHasChangedError:
+        'Esa fuente publicó una versión más nueva y no se aplicó nada. Revisa las entradas actualizadas.',
       NodeCannotHaveMoreThanOnePublicNetworkError:
         'Un nodo no puede tener más de una red pública.',
       NodeOwnerCanOnlyBeChangedByCurrentOwnerError:
         'Solo el propietario actual puede transferir este nodo.',
+      NodeOwnerIdentityCannotBeBlockedError:
+        'No puedes bloquear tu propia identidad.',
       NotificationNotFoundError: 'No se encontró esa notificación.',
       NotificationRecipientMismatchError:
         'Esta notificación pertenece a otra identidad.',
@@ -1008,6 +1064,124 @@ export const es = {
     publicSubmit: 'Usar red pública',
     title: 'Configura tu nodo',
     unknownError: 'Error desconocido. Poético, pero poco útil.',
+  },
+  nodeAccess: {
+    approve: 'Aprobar',
+    approveAll: 'Aprobar todo',
+    approved: 'Entradas aprobadas. Este nodo ya las bloquea.',
+    autoApply: 'Aplicar versiones futuras automáticamente',
+    autoApplyHelp:
+      'Solo para propietarios de plena confianza. Se aplican las versiones obtenidas a partir de ahora; las entradas que ya esperan siguen necesitando tu revisión.',
+    autoApplyOff: 'Revisar antes',
+    autoApplyOn: 'Automático',
+    block: 'Bloquear',
+    blockedIdentities: 'Identidades bloqueadas',
+    blockedIdentitiesEmpty: 'No hay identidades bloqueadas.',
+    blockedNodes: 'Nodos bloqueados',
+    blockedNodesEmpty: 'No hay nodos bloqueados.',
+    blockIdentity: 'Bloquear una identidad',
+    blockListVersion: 'Versión {version}',
+    blockNode: 'Bloquear un nodo',
+    blocksBody:
+      'Las identidades bloqueadas no pueden usar este nodo, y deja de intercambiar datos con los nodos bloqueados. Cada cambio se firma con tu identidad.',
+    blocksTab: 'Bloqueos',
+    blocksTitle: 'Identidades y nodos bloqueados',
+    blocksUpdated: 'Lista de bloqueos guardada.',
+    codeExpired: 'Caducado',
+    codeExpires: 'Caduca el {date}',
+    codesEmpty: 'Todavía no hay enlaces de registro.',
+    codesTitle: 'Enlaces de registro',
+    codeUses: 'Quedan {left} de {max} usos',
+    connectedNodes: 'Nodos conectados',
+    connectedNodesEmpty: 'No hay otros nodos conectados.',
+    copyLink: 'Copiar enlace',
+    createLink: 'Crear enlace',
+    createLinkTitle: 'Crear un enlace de registro',
+    exceptionKind: 'Tipo de excepción',
+    exceptionsBody:
+      'Las listas de bloqueos que sigues nunca bloquean estas identidades ni nodos. Tu propia lista no cambia.',
+    exceptionsEmpty: 'No hay excepciones.',
+    exceptionsTitle: 'Excepciones',
+    exceptionsUpdated: 'Excepciones guardadas.',
+    expiresIn: 'Caduca en',
+    expiryDay: '1 día',
+    expiryHour: '1 hora',
+    expiryMonth: '30 días',
+    expiryWeek: '7 días',
+    fetchOutcomes: {
+      accepted: 'Aceptada',
+      'invalid-document': 'La lista no es válida',
+      'invalid-signature':
+        'Falta la firma o no es válida, o el propietario cambió de clave',
+      'not-newer': 'No hay una versión más nueva',
+      redirected: 'La dirección redirige a otro sitio',
+      'refused-address': 'La dirección no está permitida',
+      'too-large': 'La lista es demasiado grande',
+      unreachable: 'Inaccesible',
+      'wrong-signer': 'Firmada por otra identidad',
+    },
+    follow: 'Seguir',
+    followed: 'Lista de bloqueos seguida.',
+    followTitle: 'Seguir la lista de bloqueos de otro propietario',
+    identity: 'Identidad',
+    issuedBody:
+      'Este enlace solo se muestra una vez. Quien lo tenga puede crear una cuenta hasta que se agoten sus usos o caduque.',
+    issuedTitle: 'Comparte ahora este enlace de registro',
+    lastChecked: 'Última comprobación {date}: {outcome}',
+    linkCopied: 'Enlace copiado.',
+    linkDone: 'Hecho',
+    linkQrLabel: 'Código QR del enlace de registro',
+    loadError: 'No se pudieron cargar los ajustes de acceso al nodo.',
+    modeClosed: 'Cerrado',
+    modeClosedHelp: 'Nadie puede crear una cuenta nueva en este nodo.',
+    modeCodes: 'Solo con enlace',
+    modeCodesHelp:
+      'Las cuentas nuevas necesitan un enlace de registro que creas abajo.',
+    modeOpen: 'Abierto',
+    modeOpenHelp: 'Cualquiera que llegue a este nodo puede crear una cuenta.',
+    modeSaved: 'Ajuste de registro guardado.',
+    neverChecked: 'Aún no se ha comprobado.',
+    node: 'Nodo',
+    nodePeerHelp: 'Pega el id de par libp2p del nodo, por ejemplo 12D3KooW….',
+    nodePeerLabel: 'Id de par del nodo',
+    nodePeerPlaceholder: '12D3KooW…',
+    origin: 'Dirección del nodo',
+    originPlaceholder: 'https://nodo.example.org',
+    owner: 'Identidad del propietario',
+    pendingEmpty: 'No hay nada pendiente de revisión.',
+    pendingVersion: 'Revisando la versión {version}',
+    publicationBody:
+      'Así otros propietarios de nodos pueden seguirla. La lista publicada es pública y está firmada por ti.',
+    publicationOff: 'Tu lista de bloqueos no está publicada.',
+    publicationOn: 'Tu lista de bloqueos está publicada.',
+    publicationTitle: 'Publicar tu lista de bloqueos',
+    publish: 'Publicar',
+    registrationBody:
+      'Elige quién puede crear una identidad nueva en este nodo. Las identidades existentes no cambian.',
+    registrationTab: 'Registro',
+    registrationTitle: 'Quién puede crear cuentas',
+    remove: 'Quitar',
+    review: 'Revisar {count}',
+    revoke: 'Revocar',
+    revokeConfirm:
+      '¿Revocar este enlace de registro? Deja de funcionar al instante.',
+    revoked: 'Enlace de registro revocado.',
+    saveError: 'No se pudieron actualizar los ajustes de acceso al nodo.',
+    sharingTab: 'Compartir',
+    sourceCounts: '{applied} aplicadas, {pending} pendientes de revisión',
+    sourcesEmpty: 'No sigues ninguna lista de bloqueos.',
+    sourcesTitle: 'Listas de bloqueos seguidas',
+    sourceUpdated: 'Fuente de la lista de bloqueos guardada.',
+    sourceVersion: 'Versión {version}',
+    stopPublishing: 'Dejar de publicar',
+    unblock: 'Desbloquear',
+    unfollow: 'Dejar de seguir',
+    unfollowConfirm:
+      '¿Dejar de seguir esta lista de bloqueos? Sus entradas dejan de aplicarse al instante.',
+    unfollowed: 'Ya no sigues esa lista de bloqueos.',
+    unknownIdentity: 'Identidad desconocida',
+    uses: 'Usos',
+    usesHelp: 'De 1 a 100 cuentas.',
   },
   nodeSettings: {
     addNetwork: 'Añadir red privada',

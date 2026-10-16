@@ -21,7 +21,9 @@ export function toUserErrorMessage(
     return copy.errors.network;
   }
 
-  return caught instanceof Error ? caught.message : fallback;
+  if (!(caught instanceof Error)) return fallback;
+
+  return backendErrorMessage(caught.name) ?? caught.message;
 }
 
 function httpErrorMessage(error: HttpJsonError, fallback: string): string {

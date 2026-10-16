@@ -13,6 +13,7 @@ import { loadApplicationContainer } from '../../../../app/composition/loadApplic
 import { eraseRemovedDevice } from '../../../../app/presentation/eraseRemovedDevice';
 import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
 import { cx } from '../../../../shared/presentation/cx';
+import { fillPlaceholders } from '../../../../shared/presentation/fillPlaceholders';
 import { useInstallPrompt } from '../../../../shared/presentation/hooks/useInstallPrompt';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
@@ -58,6 +59,11 @@ interface AuthScreenProps {
     conversations: ConversationResource[],
   ) => void;
   peersLoading: boolean;
+  /** The code of a registration link for this node, kept in memory only. */
+  registrationCode: string | null;
+  /** The node a registration link names when it is not this node. */
+  registrationLinkForOtherNode: string | null;
+  registrationMode: 'closed' | 'codes' | 'open' | null;
   /** A removal of this device verified while it was signed in. */
   removal: DeviceRemoval | null;
 }
@@ -69,9 +75,14 @@ export function AuthScreen({
   nodeOwnerId,
   onAuthenticated,
   peersLoading,
+  registrationCode,
+  registrationLinkForOtherNode,
+  registrationMode,
   removal,
 }: AuthScreenProps): ReactElement {
-  const [mode, setMode] = useState<AuthMode>('login');
+  const [mode, setMode] = useState<AuthMode>(
+    registrationCode ? 'create' : 'login',
+  );
   const [identityId, setIdentityId] = useState(loadLastLoginIdentity);
   const [identityPreviewLookup, setIdentityPreviewLookup] = useState('');
   const [name, setName] = useState('');
@@ -170,6 +181,24 @@ export function AuthScreen({
   };
   const localDevicePasswordValid =
     isValidPassword(password) && password === passwordConfirmation;
+  const registrationRefused =
+    mode === 'create' &&
+    (registrationMode === 'closed' ||
+      (registrationMode === 'codes' && !registrationCode));
+  const registrationNotice =
+    mode !== 'create'
+      ? null
+      : registrationLinkForOtherNode
+        ? fillPlaceholders(copy.auth.registrationLinkOtherNode, {
+            node: registrationLinkForOtherNode,
+          })
+        : registrationMode === 'closed'
+          ? copy.auth.registrationClosed
+          : registrationCode
+            ? copy.auth.registrationLinkNotice
+            : registrationMode === 'codes'
+              ? copy.auth.registrationNeedsLink
+              : null;
   const canSubmit = useDevicePairing
     ? Boolean(
         pairingDraft &&
@@ -178,7 +207,7 @@ export function AuthScreen({
       )
     : useRecoveryKey
       ? ordinaryCanSubmit && localDevicePasswordValid
-      : ordinaryCanSubmit;
+      : ordinaryCanSubmit && !registrationRefused;
   const canShowInstallButton = installState !== 'installed';
   const installButtonDisabled =
     installState === 'checking' || installState === 'prompting';
@@ -247,6 +276,7 @@ export function AuthScreen({
               handle.trim() ? normalizeHandleInput(handle) : undefined,
               {
                 recoveryKey,
+                registrationCode: registrationCode ?? undefined,
               },
             );
 
@@ -544,6 +574,14 @@ export function AuthScreen({
               onPairAgain={handlePairAgain}
             />
           ) : null}
+          {registrationNotice && (
+            <div
+              className="ui-inline-notice mt-3 break-words"
+              data-testid="auth-registration-notice"
+            >
+              {registrationNotice}
+            </div>
+          )}
           {error && (
             <div className="ui-inline-notice mt-3 border-rose-300/50 bg-rose-500/10 text-rose-100">
               {error}

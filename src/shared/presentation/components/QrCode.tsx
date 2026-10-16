@@ -1,32 +1,30 @@
 import QRCode from 'qrcode';
 import { type ReactElement, useEffect, useState } from 'react';
 
-import type { DevicePairingCode } from '../../domain/value-objects/DevicePairingCode';
-
-export function DevicePairingQrCode({
-  code,
+export function QrCode({
   label,
+  value,
 }: {
-  code: DevicePairingCode;
   label: string;
+  value: string;
 }): ReactElement {
   const [source, setSource] = useState('');
 
   useEffect(() => {
     let active = true;
 
-    void QRCode.toDataURL(code.valueOf(), {
+    void QRCode.toDataURL(value, {
       errorCorrectionLevel: 'M',
       margin: 2,
       width: 320,
-    }).then((value) => {
-      if (active) setSource(value);
+    }).then((dataUrl) => {
+      if (active) setSource(dataUrl);
     });
 
     return () => {
       active = false;
     };
-  }, [code]);
+  }, [value]);
 
   return source ? (
     <img

@@ -1,6 +1,7 @@
 import type { Identity } from '../../domain/Identity';
 import type { IdentityRepository } from '../../domain/repositories/IdentityRepository';
 import type { IdentityMasterKeyProtection } from '../../domain/value-objects/IdentityMasterKeyProtection';
+import type { IdentityRegistrationCode } from '../../domain/value-objects/IdentityRegistrationCode';
 import type { IdentityCreationMaterials } from '../crypto/IdentityCreationMaterials';
 import type { PigeonIdentitiesGateway } from './PigeonIdentitiesGateway';
 
@@ -19,6 +20,7 @@ export class PigeonIdentityRepository implements IdentityRepository {
   public async create(
     identity: Identity,
     protection: IdentityMasterKeyProtection,
+    registrationCode: IdentityRegistrationCode | null,
   ): Promise<Identity> {
     const primitives = identity.toPrimitives();
     const identityId = IdentityId.fromString(primitives.id);
@@ -27,6 +29,7 @@ export class PigeonIdentityRepository implements IdentityRepository {
       identity,
       material,
       protection,
+      registrationCode,
     );
     // The keychain seals only under the device root, so open it before the
     // session is registered: a fresh identity has no keychain write yet.

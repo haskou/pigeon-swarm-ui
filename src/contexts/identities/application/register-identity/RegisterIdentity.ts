@@ -12,6 +12,7 @@ export class RegisterIdentity {
 
   public async register(message: RegisterIdentityMessage): Promise<Identity> {
     const protection = message.getProtection();
+    const registrationCode = message.getRegistrationCode();
 
     protection.assertRegistrationReady();
     const identity = Identity.create(
@@ -21,6 +22,10 @@ export class RegisterIdentity {
       message.getOccurredAt(),
     );
 
-    return await this.identityRepository.create(identity, protection);
+    return await this.identityRepository.create(
+      identity,
+      protection,
+      registrationCode,
+    );
   }
 }

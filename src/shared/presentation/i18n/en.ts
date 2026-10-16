@@ -161,6 +161,13 @@ export const en = {
     recoveryKeySaved: 'I saved my recovery key',
     recoveryKeyTitle: 'Recovery key',
     recoveryKeyUnlockFailed: 'The password or recovery key is incorrect.',
+    registrationClosed: 'This node does not accept new accounts right now.',
+    registrationLinkNotice:
+      'You are signing up with a registration link from this node’s owner.',
+    registrationLinkOtherNode:
+      'This registration link is for another node ({node}). Open it in a client connected to that node.',
+    registrationNeedsLink:
+      'This node only accepts new accounts through a registration link from its owner.',
     title: 'Pigeon Swarm',
     unknownError: 'Unknown error. Poetic, but not useful.',
   },
@@ -803,14 +810,25 @@ export const en = {
   },
   errors: {
     backend: {
+      400070:
+        'The node refused that registration code. Allow 1 to 100 uses and pick an expiry in the future within the node’s limit.',
       401020: 'The signed request was rejected. Please reload and try again.',
       401021:
         'The request was missing authentication headers. Please reload and try again.',
       403010: 'Only the node owner can do that.',
+      403011:
+        'This node needs a valid registration link to create an account. Ask the node owner for a new link.',
+      403012:
+        'This node no longer serves your identity. Ask its owner, or use another node.',
       403020: 'Only the notification inviter can do that.',
+      408010:
+        'The block list took too long to upload. Check your connection and try again.',
+      413010: 'The block list is too large for this node to store.',
       422030: 'That file is too large for the node to accept.',
       429040:
         'Too many profile updates in a short time. Wait a minute and try again.',
+      429060:
+        'Another block list change is being saved. Wait a moment and try again.',
       503020: 'The node is synchronizing. Wait a few minutes and try again.',
       AuthenticatedIdentityIsNotInviterError:
         'Only the notification inviter can do that.',
@@ -833,6 +851,8 @@ export const en = {
         'Only the identity owner can publish profile updates.',
       InvalidIdentityCandidateError:
         'The identity data is not valid. Please review the profile and try again.',
+      InvalidIdentityRegistrationCodeError:
+        'That registration link is not valid. Ask the node owner for a new one.',
       InvalidIdentitySignatureError: 'The identity signature is not valid.',
       InvalidIdentityVersionError: 'The identity version is not valid.',
       InvalidKeychainCandidateError:
@@ -840,7 +860,24 @@ export const en = {
       InvalidKeychainVersionError: 'The keychain version is not valid.',
       InvalidMessageSignatureError:
         'The message signature is not valid. Please reload the chat and try again.',
+      InvalidNodeAccessIdentityIdError:
+        'That identity id is not valid. Paste the id or an @handle.',
+      InvalidNodeBlockApprovalError:
+        'Approve all entries, or pick at least one entry to approve.',
+      InvalidNodeBlockListError: 'The block list is not valid.',
+      InvalidNodeBlockListVersionError: 'The block list version is not valid.',
+      InvalidNodeBlockSourceApprovalError:
+        'Approve all entries, or pick at least one entry to approve.',
+      InvalidNodeBlockSourceOriginError:
+        'The source address must be an HTTPS origin, such as https://node.example.org.',
       InvalidNodeIdError: 'The node identifier is not valid.',
+      InvalidNodePeerIdError: 'That node peer id is not valid.',
+      InvalidNodeRegistrationCodeExpiryError:
+        'A registration link must expire in the future.',
+      InvalidNodeRegistrationCodeIdError:
+        'That registration link could not be found.',
+      InvalidNodeRegistrationCodeUsesError:
+        'A registration link allows between 1 and 100 uses.',
       InvalidPasswordError:
         'Use 12 to 256 characters with uppercase, lowercase, number and symbol.',
       InvalidProfileHandleError:
@@ -875,10 +912,28 @@ export const en = {
         'The message you are trying to reference could not be found.',
       MissingSignedRequestHeaderError:
         'The request was missing authentication headers. Please reload and try again.',
+      NodeBlockEntriesAreNotListedBySourceError:
+        'Those entries are no longer listed by that source. Reload the review queue.',
+      NodeBlockEntryAlreadyBlockedError: 'That entry is already blocked.',
+      NodeBlockEntryNotBlockedError: 'That entry is not blocked.',
+      NodeBlockListMustBeSignedByCurrentOwnerError:
+        'Only the current node owner can sign the block list.',
+      NodeBlockListNotIssuedError:
+        'The block list has no new version to sign. Reload and try again.',
+      NodeBlockListSignatureIsNotValidError:
+        'The block list signature is not valid. Reload and try again.',
+      NodeBlockListVersionIsNotNewerError:
+        'The block list changed elsewhere. Reload it and try again.',
+      NodeBlockSourceNotFoundError:
+        'That block list source is no longer followed.',
+      NodeBlockSourceVersionHasChangedError:
+        'That source published a newer version, so nothing was applied. Review the updated entries.',
       NodeCannotHaveMoreThanOnePublicNetworkError:
         'A node cannot have more than one public network.',
       NodeOwnerCanOnlyBeChangedByCurrentOwnerError:
         'Only the current owner can transfer this node.',
+      NodeOwnerIdentityCannotBeBlockedError:
+        'You cannot block your own identity.',
       NotificationNotFoundError: 'That notification could not be found.',
       NotificationRecipientMismatchError:
         'This notification belongs to another identity.',
@@ -1004,6 +1059,124 @@ export const en = {
     publicSubmit: 'Use public network',
     title: 'Set up your node',
     unknownError: 'Unknown error. Poetic, but not useful.',
+  },
+  nodeAccess: {
+    approve: 'Approve',
+    approveAll: 'Approve all',
+    approved: 'Entries approved. This node now blocks them.',
+    autoApply: 'Apply future versions automatically',
+    autoApplyHelp:
+      'Only for owners you fully trust. Applies versions fetched from now on; entries already waiting still need your review.',
+    autoApplyOff: 'Review first',
+    autoApplyOn: 'Automatic',
+    block: 'Block',
+    blockedIdentities: 'Blocked identities',
+    blockedIdentitiesEmpty: 'No blocked identities.',
+    blockedNodes: 'Blocked nodes',
+    blockedNodesEmpty: 'No blocked nodes.',
+    blockIdentity: 'Block an identity',
+    blockListVersion: 'Version {version}',
+    blockNode: 'Block a node',
+    blocksBody:
+      'Blocked identities cannot use this node, and it stops exchanging data with blocked nodes. Each change is signed with your identity.',
+    blocksTab: 'Blocks',
+    blocksTitle: 'Blocked identities and nodes',
+    blocksUpdated: 'Block list saved.',
+    codeExpired: 'Expired',
+    codeExpires: 'Expires {date}',
+    codesEmpty: 'No registration links yet.',
+    codesTitle: 'Registration links',
+    codeUses: '{left} of {max} uses left',
+    connectedNodes: 'Connected nodes',
+    connectedNodesEmpty: 'No other connected nodes.',
+    copyLink: 'Copy link',
+    createLink: 'Create link',
+    createLinkTitle: 'Create a registration link',
+    exceptionKind: 'Exception type',
+    exceptionsBody:
+      'Followed block lists never block these identities or nodes. Your own block list is not affected.',
+    exceptionsEmpty: 'No exceptions.',
+    exceptionsTitle: 'Exceptions',
+    exceptionsUpdated: 'Exceptions saved.',
+    expiresIn: 'Expires in',
+    expiryDay: '1 day',
+    expiryHour: '1 hour',
+    expiryMonth: '30 days',
+    expiryWeek: '7 days',
+    fetchOutcomes: {
+      accepted: 'Accepted',
+      'invalid-document': 'The list is not valid',
+      'invalid-signature':
+        'The signature is missing or invalid, or the owner changed key',
+      'not-newer': 'No newer version',
+      redirected: 'The address redirects elsewhere',
+      'refused-address': 'The address is not allowed',
+      'too-large': 'The list is too large',
+      unreachable: 'Unreachable',
+      'wrong-signer': 'Signed by another identity',
+    },
+    follow: 'Follow',
+    followed: 'Block list followed.',
+    followTitle: 'Follow another owner’s block list',
+    identity: 'Identity',
+    issuedBody:
+      'This link is shown only once. Anyone who has it can create an account until its uses run out or it expires.',
+    issuedTitle: 'Share this registration link now',
+    lastChecked: 'Last checked {date}: {outcome}',
+    linkCopied: 'Link copied.',
+    linkDone: 'Done',
+    linkQrLabel: 'Registration link QR code',
+    loadError: 'Node access settings could not be loaded.',
+    modeClosed: 'Closed',
+    modeClosedHelp: 'Nobody can create a new account on this node.',
+    modeCodes: 'Link only',
+    modeCodesHelp:
+      'New accounts need a registration link that you create below.',
+    modeOpen: 'Open',
+    modeOpenHelp: 'Anyone who reaches this node can create an account.',
+    modeSaved: 'Registration setting saved.',
+    neverChecked: 'Not checked yet.',
+    node: 'Node',
+    nodePeerHelp:
+      'Paste the libp2p peer id of the node, for example 12D3KooW….',
+    nodePeerLabel: 'Node peer id',
+    nodePeerPlaceholder: '12D3KooW…',
+    origin: 'Node address',
+    originPlaceholder: 'https://node.example.org',
+    owner: 'Owner identity',
+    pendingEmpty: 'Nothing waits for review.',
+    pendingVersion: 'Reviewing version {version}',
+    publicationBody:
+      'Other node owners can then follow it. The published list is public and signed by you.',
+    publicationOff: 'Your block list is not published.',
+    publicationOn: 'Your block list is published.',
+    publicationTitle: 'Publish your block list',
+    publish: 'Publish',
+    registrationBody:
+      'Choose who can create a new identity on this node. Existing identities are not affected.',
+    registrationTab: 'Registration',
+    registrationTitle: 'Who can create accounts',
+    remove: 'Remove',
+    review: 'Review {count}',
+    revoke: 'Revoke',
+    revokeConfirm: 'Revoke this registration link? It stops working at once.',
+    revoked: 'Registration link revoked.',
+    saveError: 'Node access settings could not be updated.',
+    sharingTab: 'Sharing',
+    sourceCounts: '{applied} applied, {pending} waiting for review',
+    sourcesEmpty: 'You do not follow any block list.',
+    sourcesTitle: 'Followed block lists',
+    sourceUpdated: 'Block list source saved.',
+    sourceVersion: 'Version {version}',
+    stopPublishing: 'Stop publishing',
+    unblock: 'Unblock',
+    unfollow: 'Unfollow',
+    unfollowConfirm:
+      'Stop following this block list? Its entries stop applying at once.',
+    unfollowed: 'Block list no longer followed.',
+    unknownIdentity: 'Unknown identity',
+    uses: 'Uses',
+    usesHelp: 'From 1 to 100 accounts.',
   },
   nodeSettings: {
     addNetwork: 'Add private network',
