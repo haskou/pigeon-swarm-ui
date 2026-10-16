@@ -10,16 +10,28 @@ import type { Session } from '../../../../../contexts/identities/infrastructure/
 import type { RawHistoryRow } from './RawHistoryRow';
 
 import { GroupMessageHistoryStore } from '../../../../../contexts/groupMailboxes/infrastructure/history/GroupMessageHistoryStore';
+import { DeviceSealedRootGeneration } from '../../../../../contexts/identities/domain/value-objects/DeviceSealedRootGeneration';
 import { DirectMailboxRecords } from '../../../../../contexts/mailboxes/domain/DirectMailboxRecords';
 
 const marker = 'group-history-marker-9a2b';
+const replacedRoot = 'Device sealed root was replaced.';
+const root = (fill: number): Buffer => Buffer.alloc(32, fill);
 const session = (
   identityId: string,
-  root: Buffer = Buffer.alloc(32, 5),
+  current: Buffer = root(5),
+  previous?: Buffer,
+  generation?: number,
 ): Session =>
   ({
-    deviceSealedRootKey: SymmetricKey.fromBuffer(root),
+    deviceSealedRootGeneration:
+      generation === undefined
+        ? undefined
+        : DeviceSealedRootGeneration.fromNumber(generation),
+    deviceSealedRootKey: SymmetricKey.fromBuffer(current),
     identity: { id: identityId },
+    previousDeviceSealedRootKey: previous
+      ? SymmetricKey.fromBuffer(previous)
+      : undefined,
   }) as unknown as Session;
 const sent = (conversationId: string, id: string, createdAt: number) =>
   DirectMailboxRecords.sent({
@@ -305,7 +317,7 @@ describe(GroupMessageHistoryStore.name, () => {
     ).toEqual([]);
   });
 
-  it('reports once that a root change dropped the stored history', async () => {
+  it('reports a root change that dropped the stored history until it is acknowledged', async () => {
     const name = `history-${randomUUID()}`;
     const rotated = session('alice', Buffer.alloc(32, 6));
 
@@ -316,6 +328,8 @@ describe(GroupMessageHistoryStore.name, () => {
 
     expect(await store.checkDropped(session('alice'))).toBe(false);
     expect(await store.checkDropped(rotated)).toBe(true);
+    expect(await store.checkDropped(rotated)).toBe(true);
+    store.acknowledgeDropped('alice');
     expect(await store.checkDropped(rotated)).toBe(false);
     expect(await store.load(rotated, 'c1', 5)).toEqual([]);
   });
@@ -370,6 +384,126 @@ describe(GroupMessageHistoryStore.name, () => {
     jest.spyOn(console, 'debug').mockImplementation(() => undefined);
 
     expect(await store.checkDropped(session('alice'))).toBe(false);
+  });
+
+  it('re-seals the history and its counts under the root that replaced it, reporting no drop', async () => {
+    const name = `history-${randomUUID()}`;
+    const before = new GroupMessageHistoryStore(name);
+
+    await before.append(session('bob'), [
+      from('alice', 'c1', 1, 'a'),
+      from('alice', 'c2', 2, 'b'),
+    ]);
+    await before.markRead(session('bob'), 'c1');
+    await before.append(session('bob'), [from('alice', 'c1', 3, 'c')]);
+    const revoked = session('bob', root(6), root(5));
+    const store = new GroupMessageHistoryStore(name);
+
+    expect(await store.checkDropped(revoked)).toBe(false);
+    await store.append(revoked, [from('alice', 'c1', 1, 'a')]);
+    expect(ids(await store.load(revoked, 'c1', 5))).toEqual(['a', 'c']);
+    expect(ids(await store.load(revoked, 'c2', 5))).toEqual(['b']);
+    expect(await store.activity(revoked, 'c1')).toEqual({
+      latestMessageAt: 3,
+      unreadCount: 1,
+    });
+    expect(await store.activity(revoked, 'c2')).toEqual({
+      latestMessageAt: 2,
+      unreadCount: 1,
+    });
+    expect(await rawRows(name, 'entries')).toHaveLength(3);
+  });
+
+  it('refuses a tab on the replaced root instead of wiping the re-sealed history', async () => {
+    const name = `history-${randomUUID()}`;
+
+    jest.spyOn(console, 'debug').mockImplementation(() => undefined);
+    await new GroupMessageHistoryStore(name).append(session('bob'), [
+      from('alice', 'c1', 1, 'a'),
+    ]);
+    await new GroupMessageHistoryStore(name).load(
+      session('bob', root(6), root(5)),
+      'c1',
+      5,
+    );
+    const stale = new GroupMessageHistoryStore(name);
+
+    await expect(stale.load(session('bob'), 'c1', 5)).rejects.toThrow(
+      replacedRoot,
+    );
+    expect(await stale.checkDropped(session('bob'))).toBe(false);
+    expect(
+      ids(
+        await new GroupMessageHistoryStore(name).load(
+          session('bob', root(6)),
+          'c1',
+          5,
+        ),
+      ),
+    ).toEqual(['a']);
+  });
+
+  it('stores nothing from a tab that held the replaced root while another re-sealed', async () => {
+    const name = `history-${randomUUID()}`;
+    const stale = new GroupMessageHistoryStore(name);
+
+    jest.spyOn(console, 'debug').mockImplementation(() => undefined);
+    await stale.append(session('bob'), [from('alice', 'c1', 1, 'a')]);
+    await new GroupMessageHistoryStore(name).load(
+      session('bob', root(6), root(5)),
+      'c1',
+      5,
+    );
+
+    await expect(
+      stale.append(session('bob'), [from('alice', 'c1', 2, 'b')]),
+    ).rejects.toThrow(replacedRoot);
+    await expect(stale.markRead(session('bob'), 'c1')).rejects.toThrow(
+      replacedRoot,
+    );
+    expect(await rawRows(name, 'entries')).toHaveLength(1);
+    expect(
+      ids(
+        await new GroupMessageHistoryStore(name).load(
+          session('bob', root(6)),
+          'c1',
+          5,
+        ),
+      ),
+    ).toEqual(['a']);
+  });
+
+  it('drops and reports the history of a root a skipped rotation replaced', async () => {
+    const name = `history-${randomUUID()}`;
+    const skipped = session('bob', root(7), root(6));
+
+    await new GroupMessageHistoryStore(name).append(session('bob'), [
+      from('alice', 'c1', 1, 'a'),
+    ]);
+    const store = new GroupMessageHistoryStore(name);
+
+    expect(await store.checkDropped(skipped)).toBe(true);
+    expect(await store.load(skipped, 'c1', 5)).toEqual([]);
+  });
+
+  it('refuses a root published at a generation the stored one does not exceed, keeping the newer history', async () => {
+    const name = `history-${randomUUID()}`;
+    const newer = session('bob', root(6), undefined, 2);
+
+    await new GroupMessageHistoryStore(name).append(newer, [
+      from('alice', 'c1', 1, 'a'),
+    ]);
+
+    await expect(
+      new GroupMessageHistoryStore(name).load(
+        session('bob', root(5), undefined, 1),
+        'c1',
+        5,
+      ),
+    ).rejects.toThrow(replacedRoot);
+    expect(
+      ids(await new GroupMessageHistoryStore(name).load(newer, 'c1', 5)),
+    ).toEqual(['a']);
   });
 
   it('stores no plaintext at rest, not even the conversation or record id', async () => {
@@ -709,48 +843,70 @@ describe(GroupMessageHistoryStore.name, () => {
       expect(await storedText(name)).not.toContain(marker);
     });
 
-    it('keeps the history of a database from before the counts', async () => {
-      const source = `history-${randomUUID()}`;
-      const target = `history-${randomUUID()}`;
+    it.each([2, 3])(
+      'keeps the history of a version %i database, its raw canary included',
+      async (version) => {
+        const source = `history-${randomUUID()}`;
+        const target = `history-${randomUUID()}`;
 
-      await new GroupMessageHistoryStore(source).append(session('bob'), [
-        from('alice', 'c1', 1, 'a'),
-      ]);
-      const entries = await rawRows(source, 'entries');
-      const canaries = await rawRows(source, 'canaries');
-      const legacy = await new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open(target, 2);
+        await new GroupMessageHistoryStore(source).append(session('bob'), [
+          from('alice', 'c1', 1, 'a'),
+        ]);
+        const entries = await rawRows(source, 'entries');
+        const legacy = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open(target, version);
 
-        request.onupgradeneeded = () => {
-          const entryStore = request.result.createObjectStore('entries', {
-            autoIncrement: true,
-          });
+          request.onupgradeneeded = () => {
+            const entryStore = request.result.createObjectStore('entries', {
+              autoIncrement: true,
+            });
 
-          entryStore.createIndex(
-            'byRecord',
-            ['identityId', 'conversation', 'record'],
-            { unique: true },
-          );
-          entryStore.createIndex('byConversation', [
-            'identityId',
-            'conversation',
-          ]);
-          request.result.createObjectStore('canaries');
-        };
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
+            entryStore.createIndex(
+              'byRecord',
+              ['identityId', 'conversation', 'record'],
+              { unique: true },
+            );
+            entryStore.createIndex('byConversation', [
+              'identityId',
+              'conversation',
+            ]);
+            request.result.createObjectStore('canaries');
 
-      legacy.close();
-      await replaceRows(target, 'entries', entries);
-      await replaceRows(target, 'canaries', canaries);
-      const store = new GroupMessageHistoryStore(target);
+            if (version > 2) request.result.createObjectStore('reads');
+          };
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
 
-      expect(ids(await store.load(session('bob'), 'c1', 5))).toEqual(['a']);
-      expect(await store.activity(session('bob'), 'c1')).toEqual({
-        latestMessageAt: 1,
-        unreadCount: 0,
-      });
-    });
+        legacy.close();
+        await replaceRows(target, 'entries', entries);
+        await replaceRows(target, 'canaries', [
+          {
+            key: 'bob',
+            value: DeviceRootRowKeys.derive(
+              SymmetricKey.fromBuffer(root(5)),
+              'pigeon-group-history',
+              'bob',
+            ).sealCanary(),
+          },
+        ]);
+        const store = new GroupMessageHistoryStore(target);
+
+        expect(ids(await store.load(session('bob'), 'c1', 5))).toEqual(['a']);
+        expect(await store.activity(session('bob'), 'c1')).toEqual({
+          latestMessageAt: 1,
+          unreadCount: 0,
+        });
+        expect(
+          ids(
+            await new GroupMessageHistoryStore(target).load(
+              session('bob', root(6), root(5)),
+              'c1',
+              5,
+            ),
+          ),
+        ).toEqual(['a']);
+      },
+    );
   });
 });

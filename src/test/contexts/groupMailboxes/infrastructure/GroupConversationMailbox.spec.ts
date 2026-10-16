@@ -1417,7 +1417,7 @@ describe('GroupConversationMailbox', () => {
     ).rejects.toThrow();
   });
 
-  it('reports once the history a root it cannot trace back dropped', async () => {
+  it('reports the history a root it cannot trace back dropped until acknowledged', async () => {
     await formGroup();
     await alice.mailbox.send(alice.session, conversation(), 'lost', {});
     await sync(bob);
@@ -1431,6 +1431,8 @@ describe('GroupConversationMailbox', () => {
     } as unknown as Session;
 
     expect(await bob.mailbox.checkHistoryDropped(bob.session)).toBe(true);
+    expect(await bob.mailbox.checkHistoryDropped(bob.session)).toBe(true);
+    bob.mailbox.acknowledgeHistoryDropped(bob.id);
     expect(await bob.mailbox.checkHistoryDropped(bob.session)).toBe(false);
   });
 

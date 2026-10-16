@@ -150,7 +150,7 @@ describe(DirectMessageHistoryStore.name, () => {
     ).toEqual([`${marker}:b`]);
   });
 
-  it('reports history dropped by a device root change once', async () => {
+  it('reports history dropped by a device root change until it is acknowledged', async () => {
     const store = new DirectMessageHistoryStore(databaseName());
     const previousRoot = Buffer.alloc(32, 5);
     const rotatedRoot = Buffer.alloc(32, 9);
@@ -165,6 +165,10 @@ describe(DirectMessageHistoryStore.name, () => {
     expect(await store.checkDropped(session('identity-1', rotatedRoot))).toBe(
       true,
     );
+    expect(await store.checkDropped(session('identity-1', rotatedRoot))).toBe(
+      true,
+    );
+    store.acknowledgeDropped('identity-1');
     expect(await store.checkDropped(session('identity-1', rotatedRoot))).toBe(
       false,
     );
