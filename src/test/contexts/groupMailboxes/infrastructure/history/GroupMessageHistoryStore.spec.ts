@@ -1,10 +1,13 @@
-import { DeviceRootRowKeys, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import {
+  CommitmentId,
+  DeviceRootRowKeys,
+  SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
 import 'fake-indexeddb/auto';
 import { randomUUID } from 'node:crypto';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
-import { GroupMessageId } from '../../../../../contexts/groupMailboxes/infrastructure/crypto/GroupMessageId';
 import { GroupMessageHistoryStore } from '../../../../../contexts/groupMailboxes/infrastructure/history/GroupMessageHistoryStore';
 import { DirectMailboxRecords } from '../../../../../contexts/mailboxes/domain/DirectMailboxRecords';
 
@@ -119,7 +122,7 @@ const from = (
   authorId: string,
   conversationId: string,
   createdAt: number,
-  id: string = GroupMessageId.create(authorId),
+  id: string = CommitmentId.groupMessage(authorId),
 ) =>
   DirectMailboxRecords.sent({
     authorId,
@@ -480,7 +483,7 @@ describe(GroupMessageHistoryStore.name, () => {
           conversationId: 'c1',
           createdAt: 2,
           encryptedPayload: 'edit',
-          id: GroupMessageId.create('alice'),
+          id: CommitmentId.groupMessage('alice'),
           targetMessageId: message.id,
         }),
         DirectMailboxRecords.reaction({

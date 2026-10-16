@@ -1,7 +1,9 @@
 import 'fake-indexeddb/auto';
 import {
   EncryptedPayload,
+  GroupMailboxControlLetter,
   KeyPair,
+  PrivateKey,
   SymmetricKey,
 } from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
@@ -15,7 +17,6 @@ import type { NotificationResource } from '../../../../../contexts/notifications
 
 import { GroupMailboxControl as Control } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControl';
 import { GroupMailboxControlRecord } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlRecord';
-import { GroupMailboxControlSeal } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlSeal';
 import { GroupMailboxHandledLetters } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxHandledLetters';
 import { GroupMailboxNotificationPump } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxNotificationPump';
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
@@ -97,12 +98,15 @@ let mallory: Person;
 /** A notification addressed to Bob carrying one sealed control record. */
 const notification = (letter: Letter): NotificationResource => {
   const conversationId = letter.conversationId ?? CONVERSATION;
-  let sealed = GroupMailboxControlSeal.seal(letter.from.session, {
-    conversationId,
-    plaintext: GroupMailboxControlRecord.encode(letter.record ?? REQUEST),
-    recipientIdentityId: bob.id,
-    sentAt: letter.sentAt ?? NOW,
-  });
+  let sealed = GroupMailboxControlLetter.seal(
+    new PrivateKey(letter.from.keyPair.toPrimitives().privateKey),
+    {
+      conversationId,
+      payload: GroupMailboxControlRecord.encode(letter.record ?? REQUEST),
+      recipientIdentityId: bob.id,
+      sentAt: letter.sentAt ?? NOW,
+    },
+  );
 
   if (letter.reseal) {
     const envelope = JSON.parse(

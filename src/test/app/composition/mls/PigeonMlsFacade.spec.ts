@@ -39,7 +39,7 @@ describe('PigeonMlsFacade', () => {
       identity: { id: owner.id },
     } as unknown as Session;
     jest
-      .spyOn(MlsCommunityEngine.prototype, 'exportSecret')
+      .spyOn(MlsCommunityEngine.prototype, 'callMediaKey')
       .mockResolvedValue(new Uint8Array(32));
     jest
       .spyOn(MlsCommunityEngine.prototype, 'encrypt')
@@ -53,7 +53,7 @@ describe('PigeonMlsFacade', () => {
     await facade.encrypt(session, history.communityId, channelId, 'text');
 
     return [
-      jest.mocked(MlsCommunityEngine.prototype.exportSecret).mock.calls[0][0],
+      jest.mocked(MlsCommunityEngine.prototype.callMediaKey).mock.calls[0][0],
       jest.mocked(MlsCommunityEngine.prototype.encrypt).mock.calls[0][0],
     ];
   };

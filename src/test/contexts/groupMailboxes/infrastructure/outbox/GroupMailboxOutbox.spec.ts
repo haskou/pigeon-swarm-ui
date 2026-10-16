@@ -1,6 +1,7 @@
 import type { MailboxInboxKeys } from '@haskou/pigeon-swarm-crypto';
 import type { MockProxy } from 'jest-mock-extended';
 
+import { MailboxKeySchedule } from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
 
 import type { GroupMailboxRoster } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxRoster';
@@ -15,9 +16,7 @@ import { MlsRejectedError } from '../../../../../contexts/communities/infrastruc
 import { GroupMailboxGeneration } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxGeneration';
 import { GroupMailboxGenerationSecret } from '../../../../../contexts/groupMailboxes/domain/value-objects/GroupMailboxGenerationSecret';
 import { GroupMailboxControlRecord } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlRecord';
-import { GroupMailboxKeySchedule } from '../../../../../contexts/groupMailboxes/infrastructure/crypto/GroupMailboxKeySchedule';
 import { GroupMailboxOutbox } from '../../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutbox';
-import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 import { rosterOf } from '../../rosterOf';
@@ -33,9 +32,9 @@ const generation = (index: number): GroupMailboxGeneration =>
   );
 
 const inboxOf = (index: number, identityId: string): string =>
-  GroupMailboxKeySchedule.inbox(
-    generation(index).secret,
-    IdentityId.fromString(identityId),
+  MailboxKeySchedule.groupInbox(
+    generation(index).secret.toSymmetricKey(),
+    identityId,
   ).mailboxId;
 
 const commitTo = (recipients: string[]): GroupMailboxCommit => ({

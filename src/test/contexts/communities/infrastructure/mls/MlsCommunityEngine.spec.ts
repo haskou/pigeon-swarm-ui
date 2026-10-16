@@ -1,6 +1,9 @@
-import type { PrivateKeyPackage } from 'ts-mls';
-
 import { CommitmentId, KeyPair } from '@haskou/pigeon-swarm-crypto';
+import {
+  MlsGroup,
+  MlsKeyPackage,
+  MlsLeafSigner,
+} from '@haskou/pigeon-swarm-crypto/mls';
 
 import type { MlsRecordInput } from '../../../../../contexts/communities/infrastructure/http/MlsRecordInput';
 import type { MlsRecordResource } from '../../../../../contexts/communities/infrastructure/http/resources/MlsRecordResource';
@@ -11,11 +14,6 @@ import type { StoredMlsKeyPackage } from '../../../../../contexts/communities/in
 import { CommunityRosterHistory } from '../../../../../contexts/communities/domain/CommunityRosterHistory';
 import { CommunityOperationProof } from '../../../../../contexts/communities/infrastructure/http/CommunityOperationProof';
 import { MlsCommunityEngine } from '../../../../../contexts/communities/infrastructure/mls/MlsCommunityEngine';
-import {
-  generateMlsKeyPackage,
-  MlsGroup,
-} from '../../../../../contexts/communities/infrastructure/mls/MlsGroup';
-import { MlsLeafSigner } from '../../../../../contexts/communities/infrastructure/mls/MlsLeafSigner';
 import { CommunityOperationHistory } from '../http/CommunityOperationHistory';
 import { MlsTestIdentity } from './MlsTestIdentity';
 
@@ -90,7 +88,7 @@ const createNode = () => {
 
 const createStore = (): MlsStateStore & { plaintexts: Map<string, string> } => {
   const groups = new Map<string, Uint8Array>();
-  const keyPackages = new Map<string, StoredMlsKeyPackage<PrivateKeyPackage>>();
+  const keyPackages = new Map<string, StoredMlsKeyPackage>();
   const plaintexts = new Map<string, string>();
 
   return {
@@ -315,7 +313,7 @@ describe('MlsCommunityEngine', () => {
     return { alice, bob, carol };
   };
   const secretOf = (member: ReturnType<typeof engineFor>) =>
-    member.engine.exportSecret(COMMUNITY, 'test', 'epoch');
+    member.engine.callMediaKey(COMMUNITY, 'epoch');
   const failCommits = (error: Error): void => {
     node.hooks.beforePublish = (input) => {
       if (input.kind === 'commit') throw error;
@@ -879,7 +877,7 @@ describe('MlsCommunityEngine', () => {
 
       await alice.engine.reconcile(COMMUNITY);
       const binding = node.records.pop() as MlsRecordResource;
-      const malloryKey = await generateMlsKeyPackage(cast.mallory.signer());
+      const malloryKey = await MlsKeyPackage.generate(cast.mallory.signer());
       const added = await (
         await rogueGroupOf('carol', carol.store, beforeDemotion)
       ).add([malloryKey.publicBytes]);
@@ -994,7 +992,7 @@ describe('MlsCommunityEngine', () => {
       const beforeDemotion = headsNow();
       const lookAlike = await MlsGroup.create(
         COMMUNITY,
-        await generateMlsKeyPackage(cast.carol.signer()),
+        await MlsKeyPackage.generate(cast.carol.signer()),
         { ...anything, frontier: () => beforeDemotion },
       );
 
@@ -1017,7 +1015,7 @@ describe('MlsCommunityEngine', () => {
       const mallory = engineFor('mallory');
       const lookAlike = await MlsGroup.create(
         COMMUNITY,
-        await generateMlsKeyPackage(cast.bob.signer()),
+        await MlsKeyPackage.generate(cast.bob.signer()),
         { ...anything, frontier: () => headsNow() },
       );
 
@@ -1067,7 +1065,7 @@ describe('MlsCommunityEngine', () => {
   it('refuses a welcome into a look-alike group made by a member who may not add', async () => {
     const alice = engineFor('alice');
     const carol = engineFor('carol');
-    const bobKey = await generateMlsKeyPackage(cast.bob.signer());
+    const bobKey = await MlsKeyPackage.generate(cast.bob.signer());
     const lookAlike = await MlsGroup.create(COMMUNITY, bobKey, anything);
 
     await alice.engine.createGroup(COMMUNITY);
@@ -1138,7 +1136,7 @@ describe('MlsCommunityEngine', () => {
     const alice = engineFor('alice');
     const bob = engineFor('bob');
     // Published under bob's name, but its credential is signed by mallory.
-    const forged = await generateMlsKeyPackage(
+    const forged = await MlsKeyPackage.generate(
       new MlsLeafSigner(
         cast.bob.owner('d9'),
         cast.mallory.keyPair,
@@ -1293,9 +1291,7 @@ describe('MlsCommunityEngine', () => {
       'for viewers',
     );
     await expect(carol.engine.decrypt(group, ciphertext)).rejects.toThrow();
-    await expect(
-      carol.engine.exportSecret(group, 'pigeon/call-media/v1', 'call-1'),
-    ).rejects.toThrow();
+    await expect(carol.engine.callMediaKey(group, 'call-1')).rejects.toThrow();
     expect(MlsCommunityEngine.groupOf(ciphertext)).toBe(group);
   });
 
@@ -1317,9 +1313,7 @@ describe('MlsCommunityEngine', () => {
       'carol must not read',
     );
     await expect(carol.engine.decrypt(group, ciphertext)).rejects.toThrow();
-    await expect(
-      carol.engine.exportSecret(group, 'pigeon/call-media/v1', 'call-1'),
-    ).rejects.toThrow();
+    await expect(carol.engine.callMediaKey(group, 'call-1')).rejects.toThrow();
   });
 
   it('keeps a stock of key packages for each group it publishes them to', async () => {

@@ -1,18 +1,22 @@
 import 'fake-indexeddb/auto';
+import type {
+  MlsContextExtension,
+  MlsMembershipPolicy,
+} from '@haskou/pigeon-swarm-crypto/mls';
+
 import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
+import {
+  GroupMailboxRosterExtension,
+  MlsGroup,
+  MlsKeyPackage,
+  MlsLeafSigner,
+} from '@haskou/pigeon-swarm-crypto/mls';
 import { mock, type MockProxy } from 'jest-mock-extended';
 
-import type { MlsContextExtension } from '../../../../../contexts/communities/infrastructure/mls/MlsContextExtension';
-import type { MlsMembershipPolicy } from '../../../../../contexts/communities/infrastructure/mls/MlsMembershipPolicy';
 import type { MlsStateStore } from '../../../../../contexts/communities/infrastructure/mls/MlsStateStore';
 import type { GroupMailboxGenerationRepository } from '../../../../../contexts/groupMailboxes/domain/repositories/GroupMailboxGenerationRepository';
 import type { GroupMailboxCommit } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxCommit';
 
-import {
-  generateMlsKeyPackage,
-  MlsGroup,
-} from '../../../../../contexts/communities/infrastructure/mls/MlsGroup';
-import { MlsLeafSigner } from '../../../../../contexts/communities/infrastructure/mls/MlsLeafSigner';
 import { MlsRejectedError } from '../../../../../contexts/communities/infrastructure/mls/MlsRejectedError';
 import { ConversationIdFactory } from '../../../../../contexts/conversations/domain/ConversationIdFactory';
 import { ConversationGroupNonce } from '../../../../../contexts/conversations/domain/value-objects/ConversationGroupNonce';
@@ -22,7 +26,7 @@ import { GroupMailboxGeneration } from '../../../../../contexts/groupMailboxes/d
 import { GroupMailboxGenesis } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxGenesis';
 import { GroupMailboxRoster } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxRoster';
 import { GroupMailboxMlsEngine } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxMlsEngine';
-import { GroupMailboxRosterExtension } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxRosterExtension';
+import { GroupMailboxRosterContext } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxRosterContext';
 import { GroupMailboxUnconfirmedError } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxUnconfirmedError';
 import { encodeBase64Url } from '../../../../../shared/infrastructure/encoding/base64url';
 import { MlsTestIdentity } from '../../../communities/infrastructure/mls/MlsTestIdentity';
@@ -231,7 +235,7 @@ const ordersOf = <T>(items: T[]): T[][] =>
         ]),
       );
 
-describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
+describe('GroupMailboxMlsEngine on the real MLS library', () => {
   beforeAll(async () => {
     cast = await MlsTestIdentity.cast([...NAMES, 'eve', 'mallory']);
     CONVERSATION = new ConversationIdFactory()
@@ -705,7 +709,7 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
       };
       const group = await MlsGroup.create(
         CONVERSATION,
-        await generateMlsKeyPackage(cast[by].signer(), supports),
+        await MlsKeyPackage.generate(cast[by].signer(), supports),
         anything,
         context,
       );
@@ -713,7 +717,7 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
         joiners.map(async (name) =>
           name === 'bob'
             ? await bob.createKeyPackage()
-            : (await generateMlsKeyPackage(cast[name].signer(), supports))
+            : (await MlsKeyPackage.generate(cast[name].signer(), supports))
                 .publicBytes,
         ),
       );
@@ -721,10 +725,7 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
       return (await group.add(keyPackages)).welcome!;
     };
     const carrying = (fields: GroupMailboxRoster): MlsContextExtension[] => [
-      {
-        extensionData: GroupMailboxRosterExtension.encode(fields),
-        extensionType: GroupMailboxRosterExtension.EXTENSION_TYPE,
-      },
+      GroupMailboxRosterContext.extension(fields),
     ];
     let bob: GroupMailboxMlsEngine;
 
@@ -871,7 +872,7 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
         ],
         publish,
       ),
-    ).rejects.toThrow('This member may not make this change');
+    ).rejects.toBeInstanceOf(MlsRejectedError);
     expect(publish).not.toHaveBeenCalled();
   });
 
@@ -1078,8 +1079,8 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
     const publish = jest.fn(sent);
     current = ['d1'];
 
-    await expect(drop(laptop, 'carol', publish)).rejects.toThrow(
-      'This member may not make this change',
+    await expect(drop(laptop, 'carol', publish)).rejects.toBeInstanceOf(
+      MlsRejectedError,
     );
     expect(publish).not.toHaveBeenCalled();
   });
@@ -1164,7 +1165,7 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
     const alice = engine('alice');
     await alice.createGroup(CONVERSATION, roster);
     // Bob's key signs a credential that claims a device of carol.
-    const forged = await generateMlsKeyPackage(
+    const forged = await MlsKeyPackage.generate(
       new MlsLeafSigner(
         cast.carol.owner('d9'),
         cast.bob.keyPair,
@@ -1174,7 +1175,7 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
 
     await expect(
       alice.add(CONVERSATION, [forged.publicBytes], sent),
-    ).rejects.toThrow('Key package credential is forged');
+    ).rejects.toBeInstanceOf(MlsRejectedError);
     expect(await alice.members(CONVERSATION)).toEqual([id('alice')]);
   });
 
@@ -1184,9 +1185,9 @@ describe('GroupMailboxMlsEngine on the real ts-mls library', () => {
 
     await expect(
       bob.add(CONVERSATION, [await engine('dave').createKeyPackage()], publish),
-    ).rejects.toThrow('This member may not make this change');
-    await expect(drop(bob, 'carol', publish)).rejects.toThrow(
-      'This member may not make this change',
+    ).rejects.toBeInstanceOf(MlsRejectedError);
+    await expect(drop(bob, 'carol', publish)).rejects.toBeInstanceOf(
+      MlsRejectedError,
     );
     expect(publish).not.toHaveBeenCalled();
   });

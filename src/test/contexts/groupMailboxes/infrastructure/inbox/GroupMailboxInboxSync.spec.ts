@@ -1,7 +1,12 @@
 import 'fake-indexeddb/auto';
 import type { MockProxy } from 'jest-mock-extended';
 
-import { BearerCapability, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import {
+  BearerCapability,
+  CommitmentId,
+  MailboxKeySchedule,
+  SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
 
 import type { GroupMailboxGenerationRepository } from '../../../../../contexts/groupMailboxes/domain/repositories/GroupMailboxGenerationRepository';
@@ -20,14 +25,11 @@ import { GroupMailboxGeneration } from '../../../../../contexts/groupMailboxes/d
 import { GroupMailboxGenesis } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxGenesis';
 import { GroupMailboxControl } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControl';
 import { GroupMailboxControlRecord } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlRecord';
-import { GroupMailboxKeySchedule } from '../../../../../contexts/groupMailboxes/infrastructure/crypto/GroupMailboxKeySchedule';
-import { GroupMessageId } from '../../../../../contexts/groupMailboxes/infrastructure/crypto/GroupMessageId';
 import { GroupMessageHistoryStore } from '../../../../../contexts/groupMailboxes/infrastructure/history/GroupMessageHistoryStore';
 import { GroupMailboxInboxStore } from '../../../../../contexts/groupMailboxes/infrastructure/inbox/GroupMailboxInboxStore';
 import { GroupMailboxInboxSync } from '../../../../../contexts/groupMailboxes/infrastructure/inbox/GroupMailboxInboxSync';
 import { GroupMailboxMlsEngine } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxMlsEngine';
 import { GroupMailboxOutbox } from '../../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutbox';
-import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 import { DirectMailboxRecords } from '../../../../../contexts/mailboxes/domain/DirectMailboxRecords';
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
 import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
@@ -337,7 +339,7 @@ const mid = (author: string, label: string): string => {
   const known = made.get(key);
 
   if (known) return known;
-  const messageId = GroupMessageId.create(id(author));
+  const messageId = CommitmentId.groupMessage(id(author));
 
   made.set(key, messageId);
   labels.set(messageId, label);
@@ -426,9 +428,9 @@ const ids = (records: DirectMessageRecord[]): string[] =>
 /** Appends `plaintext` to the inbox of `to` of its current generation. */
 const inject = async (to: Member, plaintext: Uint8Array): Promise<void> => {
   await channel.send(
-    GroupMailboxKeySchedule.inbox(
-      (await to.engine.generation(CONVERSATION)).secret,
-      IdentityId.fromString(to.id),
+    MailboxKeySchedule.groupInbox(
+      (await to.engine.generation(CONVERSATION)).secret.toSymmetricKey(),
+      to.id,
     ),
     plaintext,
   );
@@ -440,7 +442,7 @@ const retry = async (...senders: Member[]): Promise<void> => {
   for (const sender of senders) await sender.outbox.resume();
 };
 
-describe('GroupMailboxInboxSync on the real ts-mls library', () => {
+describe('GroupMailboxInboxSync on the real MLS library', () => {
   let alice: Member;
   let bob: Member;
   let carol: Member;
@@ -545,10 +547,8 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
     expect(carolGeneration.secret.isEqual(current.secret)).toBe(false);
     expect(
       inboxes.has(
-        GroupMailboxKeySchedule.inbox(
-          current.secret,
-          IdentityId.fromString(carol.id),
-        ).mailboxId,
+        MailboxKeySchedule.groupInbox(current.secret.toSymmetricKey(), carol.id)
+          .mailboxId,
       ),
     ).toBe(false);
   });
@@ -750,9 +750,9 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
   });
 
   it('drops a forged future-epoch envelope without stalling the removal behind it', async () => {
-    const retired = GroupMailboxKeySchedule.inbox(
-      (await bob.engine.generation(CONVERSATION)).secret,
-      IdentityId.fromString(bob.id),
+    const retired = MailboxKeySchedule.groupInbox(
+      (await bob.engine.generation(CONVERSATION)).secret.toSymmetricKey(),
+      bob.id,
     ).mailboxId;
 
     // A patched client of carol forks the group into an epoch only she holds.
@@ -844,9 +844,9 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
   });
 
   it('keeps a copy whose inbox is missing and appends it on retry', async () => {
-    const bobInbox = GroupMailboxKeySchedule.inbox(
-      (await bob.engine.generation(CONVERSATION)).secret,
-      IdentityId.fromString(bob.id),
+    const bobInbox = MailboxKeySchedule.groupInbox(
+      (await bob.engine.generation(CONVERSATION)).secret.toSymmetricKey(),
+      bob.id,
     ).mailboxId;
 
     inboxes.delete(bobInbox);
@@ -866,9 +866,9 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
   it('re-encrypts a stranded message in the next generation, never for a joiner', async () => {
     await alice.control.removeMember(CONVERSATION, carol.id);
     await Promise.all([sync(alice), sync(bob)]);
-    const bobInbox = GroupMailboxKeySchedule.inbox(
-      (await bob.engine.generation(CONVERSATION)).secret,
-      IdentityId.fromString(bob.id),
+    const bobInbox = MailboxKeySchedule.groupInbox(
+      (await bob.engine.generation(CONVERSATION)).secret.toSymmetricKey(),
+      bob.id,
     ).mailboxId;
 
     inboxes.delete(bobInbox);
@@ -898,9 +898,9 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
 
     alice.outbox.subscribe(({ reference }) => failures.push(reference));
     inboxes.delete(
-      GroupMailboxKeySchedule.inbox(
-        (await bob.engine.generation(CONVERSATION)).secret,
-        IdentityId.fromString(bob.id),
+      MailboxKeySchedule.groupInbox(
+        (await bob.engine.generation(CONVERSATION)).secret.toSymmetricKey(),
+        bob.id,
       ).mailboxId,
     );
     await send(alice, sent('alice', mid('alice', 'm1')));
@@ -913,9 +913,9 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
   });
 
   it('deletes its retired inbox once the drain window closes', async () => {
-    const keys = GroupMailboxKeySchedule.inbox(
-      (await bob.engine.generation(CONVERSATION)).secret,
-      IdentityId.fromString(bob.id),
+    const keys = MailboxKeySchedule.groupInbox(
+      (await bob.engine.generation(CONVERSATION)).secret.toSymmetricKey(),
+      bob.id,
     );
     const retired = keys.mailboxId;
 
@@ -934,9 +934,9 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
   });
 
   it('enrols the readers of its other devices once, before acknowledging', async () => {
-    const keys = GroupMailboxKeySchedule.inbox(
-      (await bob.engine.generation(CONVERSATION)).secret,
-      IdentityId.fromString(bob.id),
+    const keys = MailboxKeySchedule.groupInbox(
+      (await bob.engine.generation(CONVERSATION)).secret.toSymmetricKey(),
+      bob.id,
     );
     const laptop = cast.bob.deviceCredential('d2');
     const enrolled = BearerCapability.hash(
@@ -972,9 +972,9 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
       .spyOn(console, 'debug')
       .mockImplementation(() => undefined);
     const laptop = cast.bob.deviceCredential('d2');
-    const retired = GroupMailboxKeySchedule.inbox(
-      (await bob.engine.generation(CONVERSATION)).secret,
-      IdentityId.fromString(bob.id),
+    const retired = MailboxKeySchedule.groupInbox(
+      (await bob.engine.generation(CONVERSATION)).secret.toSymmetricKey(),
+      bob.id,
     ).mailboxId;
 
     await send(alice, sent('alice', mid('alice', 'm1')));

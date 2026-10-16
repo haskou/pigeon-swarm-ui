@@ -1,5 +1,9 @@
-import { BearerCapability } from '@haskou/pigeon-swarm-crypto';
+import {
+  BearerCapability,
+  MailboxKeySchedule,
+} from '@haskou/pigeon-swarm-crypto';
 import 'fake-indexeddb/auto';
+import { MlsKeyPackage, MlsLeafSigner } from '@haskou/pigeon-swarm-crypto/mls';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { mock } from 'jest-mock-extended';
 
@@ -8,8 +12,6 @@ import type { GroupMailboxOutboxRow } from '../../../../../contexts/groupMailbox
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { PigeonMailboxClient } from '../../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
 
-import { generateMlsKeyPackage } from '../../../../../contexts/communities/infrastructure/mls/MlsGroup';
-import { MlsLeafSigner } from '../../../../../contexts/communities/infrastructure/mls/MlsLeafSigner';
 import { MlsRejectedError } from '../../../../../contexts/communities/infrastructure/mls/MlsRejectedError';
 import { ConversationIdFactory } from '../../../../../contexts/conversations/domain/ConversationIdFactory';
 import { ConversationGroupNonce } from '../../../../../contexts/conversations/domain/value-objects/ConversationGroupNonce';
@@ -19,11 +21,9 @@ import { GroupMailboxGenesis } from '../../../../../contexts/groupMailboxes/doma
 import { GroupMailboxRoster } from '../../../../../contexts/groupMailboxes/domain/GroupMailboxRoster';
 import { GroupMailboxControl } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControl';
 import { GroupMailboxControlRecord } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControlRecord';
-import { GroupMailboxKeySchedule } from '../../../../../contexts/groupMailboxes/infrastructure/crypto/GroupMailboxKeySchedule';
 import { GroupMailboxMlsEngine } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxMlsEngine';
 import { GroupMailboxUnconfirmedError } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxUnconfirmedError';
 import { GroupMailboxOutbox } from '../../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutbox';
-import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
 import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { encodeBase64Url } from '../../../../../shared/infrastructure/encoding/base64url';
@@ -228,9 +228,9 @@ const drain = async (to: Member): Promise<GroupMailboxControlOutcome[]> => {
 };
 
 const inboxKeys = async (owner: Member, of: Member = owner) =>
-  GroupMailboxKeySchedule.inbox(
-    (await of.engine.generation(CONVERSATION)).secret,
-    IdentityId.fromString(owner.id),
+  MailboxKeySchedule.groupInbox(
+    (await of.engine.generation(CONVERSATION)).secret.toSymmetricKey(),
+    owner.id,
   );
 
 /**
@@ -333,7 +333,7 @@ const addLaptop = async (owner: Member): Promise<Member> => {
   return laptop;
 };
 
-describe('GroupMailboxControl on the real ts-mls library', () => {
+describe('GroupMailboxControl on the real MLS library', () => {
   let alice: Member;
   let bob: Member;
   let carol: Member;
@@ -802,7 +802,7 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
       throw new Error('expected a key package request');
     }
     // Mallory holds the leaf key and claims it is a device of bob.
-    const forged = await generateMlsKeyPackage(
+    const forged = await MlsKeyPackage.generate(
       new MlsLeafSigner(
         cast.bob.owner('d9'),
         cast.mallory.keyPair,
