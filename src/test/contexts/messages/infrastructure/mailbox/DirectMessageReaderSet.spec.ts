@@ -1,19 +1,21 @@
-import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import type { MailboxInboxKeys } from '@haskou/pigeon-swarm-crypto';
+
+import { MailboxReadToken, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import { Buffer } from 'buffer';
 import { mock } from 'jest-mock-extended';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
-import type { MailboxKeys } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxKeySchedule';
 import type { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 
 import { MailboxCapability } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
-import { MailboxReadToken } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxReadToken';
 import { DirectMessageReaderSet } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageReaderSet';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 
-const MAILBOX = 'mailbox-1';
-const IDENTITY_ROOT = Buffer.alloc(32, 1);
-const SEALED = Buffer.alloc(32, 2);
-const keys = { mailboxId: MAILBOX } as unknown as MailboxKeys;
+/** A mailbox id is the canonical base64url of 32 bytes. */
+const MAILBOX = 'CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk';
+const IDENTITY_ROOT = SymmetricKey.fromBuffer(Buffer.alloc(32, 1));
+const SEALED = SymmetricKey.fromBuffer(Buffer.alloc(32, 2));
+const keys = { mailboxId: MAILBOX } as unknown as MailboxInboxKeys;
 
 const hash = (token: string): string => MailboxCapability.hash(token);
 const sealedRoot = MailboxReadToken.derive(SEALED, MAILBOX);
@@ -25,9 +27,9 @@ const identityRootDevice = (credential: string): string =>
 
 const session = (): Session =>
   ({
-    deviceSealedRootKey: SymmetricKey.fromBuffer(SEALED),
+    deviceSealedRootKey: SEALED,
     identity: { id: 'identity-1' },
-    masterKey: SymmetricKey.fromBuffer(IDENTITY_ROOT),
+    masterKey: IDENTITY_ROOT,
   }) as unknown as Session;
 
 const readers = (credential = 'device-a') => ({
@@ -36,12 +38,12 @@ const readers = (credential = 'device-a') => ({
 });
 
 /** The sealed root a revoke rotated in, replacing SEALED. */
-const ROTATED = Buffer.alloc(32, 3);
+const ROTATED = SymmetricKey.fromBuffer(Buffer.alloc(32, 3));
 const rotatedSession = (): Session =>
   ({
     ...session(),
-    deviceSealedRootKey: SymmetricKey.fromBuffer(ROTATED),
-    previousDeviceSealedRootKey: SymmetricKey.fromBuffer(SEALED),
+    deviceSealedRootKey: ROTATED,
+    previousDeviceSealedRootKey: SEALED,
   }) as unknown as Session;
 const rotatedReaders = (credential = 'device-a') => ({
   device: MailboxReadToken.deriveDevice(ROTATED, MAILBOX, credential),

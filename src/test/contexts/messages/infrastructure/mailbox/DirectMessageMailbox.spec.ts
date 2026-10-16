@@ -1,5 +1,14 @@
 import 'fake-indexeddb/auto';
-import { EncryptedPayload, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import type { MailboxInboxKeys } from '@haskou/pigeon-swarm-crypto';
+
+import {
+  EncryptedPayload,
+  MailboxEnvelope,
+  MailboxKeySchedule,
+  MailboxReadToken,
+  MailboxRecordAuthorship,
+  SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 import { mock } from 'jest-mock-extended';
 
@@ -12,7 +21,6 @@ import type { DirectPinRecord } from '../../../../../contexts/mailboxes/domain/D
 import type { DirectReactionRecord } from '../../../../../contexts/mailboxes/domain/DirectReactionRecord';
 import type { DirectReadRecord } from '../../../../../contexts/mailboxes/domain/DirectReadRecord';
 import type { DirectSentRecord } from '../../../../../contexts/mailboxes/domain/DirectSentRecord';
-import type { MailboxKeys } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxKeySchedule';
 import type { PigeonMailboxClient } from '../../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
 import type { MailboxReadTokens } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import type { ChatMessage } from '../../../../../contexts/messages/domain/ChatMessage';
@@ -24,11 +32,7 @@ import type { DirectMessageMailboxState } from '../../../../../contexts/messages
 
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
 import { MailboxCapability } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
-import { MailboxEnvelopeCipher } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxEnvelopeCipher';
-import { MailboxKeySchedule } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxKeySchedule';
-import { MailboxReadToken } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxReadToken';
 import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
-import { DirectMessageAuthorship } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageAuthorship';
 import { DirectMessageHistoryStorageError } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageHistoryStorageError';
 import { DirectMessageHistoryStore } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageHistoryStore';
 import { DirectMessageMailbox } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
@@ -79,15 +83,15 @@ describe(DirectMessageMailbox.name, () => {
     `device-credential-${identityId}`;
 
   /** The device-sealed root that tags and reader tokens derive from. */
-  const rootFor = (identityId: string): Buffer =>
-    Buffer.alloc(32, identityId === 'alice' ? 3 : 9);
+  const rootFor = (identityId: string): SymmetricKey =>
+    SymmetricKey.fromBuffer(Buffer.alloc(32, identityId === 'alice' ? 3 : 9));
 
   const session = (identityId: string): Session =>
     ({
       deviceCredentialKeyPair: {
         toPrimitives: () => ({ publicKey: credentialFor(identityId) }),
       },
-      deviceSealedRootKey: SymmetricKey.fromBuffer(rootFor(identityId)),
+      deviceSealedRootKey: rootFor(identityId),
       identity: { id: identityId },
       keychain: {
         conversations: {
@@ -113,11 +117,15 @@ describe(DirectMessageMailbox.name, () => {
   const ownEncode = (record: DirectMessageRecord): Uint8Array =>
     DirectMessageMailboxRecord.encode(
       record,
-      DirectMessageAuthorship.tag(rootFor('alice'), record),
+      MailboxRecordAuthorship.tag(rootFor('alice'), record),
     );
 
-  const keysFor = (identityId: string): MailboxKeys =>
-    MailboxKeySchedule.derive(sharedSecret, identityId, 0);
+  const keysFor = (identityId: string): MailboxInboxKeys =>
+    MailboxKeySchedule.derive(
+      SymmetricKey.fromBuffer(sharedSecret),
+      identityId,
+      0,
+    );
 
   const deviceSession = (identityId: string, credential: string): Session =>
     ({
@@ -383,9 +391,7 @@ describe(DirectMessageMailbox.name, () => {
       channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'envelope-1' });
       composed.sent = {
         ...sent,
-        encryptedPayload: 'x'.repeat(
-          MailboxEnvelopeCipher.MAX_PLAINTEXT_BYTES - 500,
-        ),
+        encryptedPayload: 'x'.repeat(MailboxEnvelope.MAX_PLAINTEXT_BYTES - 500),
       };
 
       await expect(
@@ -422,7 +428,7 @@ describe(DirectMessageMailbox.name, () => {
       const { channel, composed, mailbox } = setup();
       composed.sent = {
         ...sent,
-        encryptedPayload: 'x'.repeat(MailboxEnvelopeCipher.MAX_PLAINTEXT_BYTES),
+        encryptedPayload: 'x'.repeat(MailboxEnvelope.MAX_PLAINTEXT_BYTES),
       };
 
       await expect(
@@ -729,7 +735,7 @@ describe(DirectMessageMailbox.name, () => {
           type: 'MessageSent',
         });
         expect(encryptedPayload.length).toBeGreaterThan(
-          MailboxEnvelopeCipher.MAX_PLAINTEXT_BYTES,
+          MailboxEnvelope.MAX_PLAINTEXT_BYTES,
         );
 
         composed.sent = { ...sent, encryptedPayload };
@@ -823,7 +829,7 @@ describe(DirectMessageMailbox.name, () => {
         mailbox.pin(session('alice'), conversation, {
           action: 'pin',
           createdAt: 700,
-          messageId: 'm'.repeat(MailboxEnvelopeCipher.MAX_PLAINTEXT_BYTES),
+          messageId: 'm'.repeat(MailboxEnvelope.MAX_PLAINTEXT_BYTES),
         }),
       ).rejects.toThrow();
       expect(channel.send).not.toHaveBeenCalled();
@@ -1058,14 +1064,14 @@ describe(DirectMessageMailbox.name, () => {
       const [, ownPlaintext] = channel.send.mock.calls[1];
       const { authorTag, record } = envelopeOf(ownPlaintext);
       expect(authorTag).toBe(
-        DirectMessageAuthorship.tag(
+        MailboxRecordAuthorship.tag(
           rootFor('alice'),
           record as DirectMessageRecord,
         ),
       );
       expect(authorTag).not.toBe(
-        DirectMessageAuthorship.tag(
-          session('alice').masterKey.getBuffer(),
+        MailboxRecordAuthorship.tag(
+          SymmetricKey.fromBuffer(session('alice').masterKey.getBuffer()),
           record as DirectMessageRecord,
         ),
       );
@@ -1237,8 +1243,8 @@ describe(DirectMessageMailbox.name, () => {
 
       it('drops an own copy tagged under the identity root', async () => {
         const { channel } = setup();
-        const revokedTag = DirectMessageAuthorship.tag(
-          session('alice').masterKey.getBuffer(),
+        const revokedTag = MailboxRecordAuthorship.tag(
+          SymmetricKey.fromBuffer(session('alice').masterKey.getBuffer()),
           storedRecord,
         );
         channel.read.mockResolvedValue(
@@ -1259,7 +1265,7 @@ describe(DirectMessageMailbox.name, () => {
 
       it('applies an own copy tagged under the sealed root', async () => {
         const { channel } = setup();
-        const tag = DirectMessageAuthorship.tag(rootFor('alice'), storedRecord);
+        const tag = MailboxRecordAuthorship.tag(rootFor('alice'), storedRecord);
         channel.read.mockResolvedValue(
           pageOf([DirectMessageMailboxRecord.encode(storedRecord, tag)]),
         );
@@ -2680,7 +2686,11 @@ describe(DirectMessageMailbox.name, () => {
       const { channel, mailbox } = setup();
       const secondSecret = Buffer.alloc(32, 8);
       const alice = session('alice');
-      const secondKeys = MailboxKeySchedule.derive(secondSecret, 'alice', 0);
+      const secondKeys = MailboxKeySchedule.derive(
+        SymmetricKey.fromBuffer(secondSecret),
+        'alice',
+        0,
+      );
       const secondTokens = readerTokensFor('alice', secondKeys.mailboxId);
       const withSecond = {
         ...alice,
@@ -2753,8 +2763,11 @@ describe(DirectMessageMailbox.name, () => {
       }) as unknown as Session;
 
     const mailboxIdOf = (index: number): string =>
-      MailboxKeySchedule.derive(Buffer.alloc(32, 11 + index), 'alice', 0)
-        .mailboxId;
+      MailboxKeySchedule.derive(
+        SymmetricKey.fromBuffer(Buffer.alloc(32, 11 + index)),
+        'alice',
+        0,
+      ).mailboxId;
 
     it('opens every one-to-one inbox this identity holds a key for, without reading', async () => {
       const { channel, mailbox, store } = setup();
@@ -3522,12 +3535,12 @@ describe(DirectMessageMailbox.name, () => {
       const laptop = 'device-credential-bob-laptop';
       const beforeRevoke = [credentialFor('bob'), laptop];
       const afterRevoke = [credentialFor('bob')];
-      const rotatedRoot = Buffer.alloc(32, 6);
+      const rotatedRoot = SymmetricKey.fromBuffer(Buffer.alloc(32, 6));
       // The session the revoke returns: the new root, and the root it replaced.
       const rotatedPhone = {
         ...session('bob'),
-        deviceSealedRootKey: SymmetricKey.fromBuffer(rotatedRoot),
-        previousDeviceSealedRootKey: SymmetricKey.fromBuffer(rootFor('bob')),
+        deviceSealedRootKey: rotatedRoot,
+        previousDeviceSealedRootKey: rootFor('bob'),
       } as unknown as Session;
       const { appends, readerHashes, wire } = nodeMailboxClient();
       const composed = composedRecords();
@@ -3611,11 +3624,11 @@ describe(DirectMessageMailbox.name, () => {
       const keys = keysFor('bob');
       const { projection } = setup();
       const laptop = 'device-credential-bob-laptop';
-      const rotatedRoot = Buffer.alloc(32, 6);
+      const rotatedRoot = SymmetricKey.fromBuffer(Buffer.alloc(32, 6));
       const rotatedPhone = {
         ...session('bob'),
-        deviceSealedRootKey: SymmetricKey.fromBuffer(rotatedRoot),
-        previousDeviceSealedRootKey: SymmetricKey.fromBuffer(rootFor('bob')),
+        deviceSealedRootKey: rotatedRoot,
+        previousDeviceSealedRootKey: rootFor('bob'),
       } as unknown as Session;
       const { readerHashes, wire } = nodeMailboxClient();
       const phoneStore = memoryStore();
@@ -3696,13 +3709,13 @@ describe(DirectMessageMailbox.name, () => {
 
     describe('cutOffRevokedReaders', () => {
       const laptop = 'device-credential-bob-laptop';
-      const rotatedRoot = Buffer.alloc(32, 6);
+      const rotatedRoot = SymmetricKey.fromBuffer(Buffer.alloc(32, 6));
       // The session the revoke returns: the new root, and the root it replaced.
       const rotatedPhone = (): Session =>
         ({
           ...session('bob'),
-          deviceSealedRootKey: SymmetricKey.fromBuffer(rotatedRoot),
-          previousDeviceSealedRootKey: SymmetricKey.fromBuffer(rootFor('bob')),
+          deviceSealedRootKey: rotatedRoot,
+          previousDeviceSealedRootKey: rootFor('bob'),
         }) as unknown as Session;
 
       it('locks the revoked device out of records written once it resolves, before any read', async () => {
@@ -3983,7 +3996,7 @@ describe(DirectMessageMailbox.name, () => {
     const ownSealedEncode = (record: DirectMessageRecord): Uint8Array =>
       DirectMessageMailboxRecord.encode(
         record,
-        DirectMessageAuthorship.tag(rootFor('alice'), record),
+        MailboxRecordAuthorship.tag(rootFor('alice'), record),
       );
 
     beforeEach(async () => {

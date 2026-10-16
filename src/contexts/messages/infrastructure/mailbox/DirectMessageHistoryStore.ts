@@ -1,3 +1,5 @@
+import { DeviceRootRowKeys } from '@haskou/pigeon-swarm-crypto';
+
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { DirectMessageHistoryEntry } from './DirectMessageHistoryEntry';
 import type { DirectMessageHistoryItem } from './DirectMessageHistoryItem';
@@ -9,7 +11,6 @@ import {
   indexedDbTransaction,
 } from '../../../../shared/infrastructure/storage/indexedDbRequest';
 import { sessionRootKey } from '../../../identities/infrastructure/session/sessionRootKey';
-import { DeviceRootRowCipher } from './DeviceRootRowCipher';
 import { DirectMessageHistoryStorageError } from './DirectMessageHistoryStorageError';
 
 const DATABASE_VERSION = 1;
@@ -17,17 +18,8 @@ const ENTRIES_STORE = 'entries';
 const CANARIES_STORE = 'canaries';
 const BY_RECORD_INDEX = 'byRecord';
 const BY_SCOPE_INDEX = 'byScope';
-const CIPHER_LABEL = 'pigeon-direct-history';
-
-function recordAad(
-  identityId: string,
-  conversationId: string,
-  recordId: string,
-): Uint8Array<ArrayBuffer> {
-  return new TextEncoder().encode(
-    JSON.stringify(['record', identityId, conversationId, recordId]),
-  );
-}
+const KEYS_LABEL = 'pigeon-direct-history';
+const RECORD_PURPOSE = 'record';
 
 /** Drops one identity's rows and canary. Resolves with the dropped count. */
 async function wipeIdentity(
@@ -156,20 +148,18 @@ export class DirectMessageHistoryStore {
     }
   }
 
-  private async verifiedCipher(session: Session): Promise<DeviceRootRowCipher> {
-    const root = sessionRootKey(session).getBuffer();
-
+  private async verifiedKeys(session: Session): Promise<DeviceRootRowKeys> {
     const identityId = session.identity.id;
-    const cipher = await DeviceRootRowCipher.derive(
-      root,
-      CIPHER_LABEL,
+    const keys = DeviceRootRowKeys.derive(
+      sessionRootKey(session),
+      KEYS_LABEL,
       identityId,
     );
     const canary = await this.readCanary(identityId);
 
-    if (canary && (await cipher.opensCanary(canary))) return cipher;
+    if (canary && keys.opensCanary(canary)) return keys;
 
-    const sealedCanary = await cipher.sealCanary();
+    const sealedCanary = keys.sealCanary();
     const db = await this.open();
 
     try {
@@ -187,19 +177,19 @@ export class DirectMessageHistoryStore {
       db.close();
     }
 
-    return cipher;
+    return keys;
   }
 
   private async readCanary(
     identityId: string,
-  ): Promise<Uint8Array<ArrayBuffer> | undefined> {
+  ): Promise<Uint8Array | undefined> {
     const db = await this.open();
 
     try {
       const transaction = db.transaction(CANARIES_STORE, 'readonly');
       const canary = await indexedDbRequest(
         transaction.objectStore(CANARIES_STORE).get(identityId) as IDBRequest<
-          Uint8Array<ArrayBuffer> | undefined
+          Uint8Array | undefined
         >,
       );
 
@@ -232,26 +222,21 @@ export class DirectMessageHistoryStore {
     return indexedDbRequest(openRequest);
   }
 
-  private async openItems(
-    cipher: DeviceRootRowCipher,
+  private openItems(
+    keys: DeviceRootRowKeys,
     rows: DirectMessageHistoryRow[],
-  ): Promise<DirectMessageHistoryItem[]> {
-    const opened = await Promise.all(
-      rows.map(async (row) => {
-        const plaintext = await cipher.open(
-          recordAad(row.identityId, row.conversationId, row.recordId),
-          row.sealed,
-        );
+  ): DirectMessageHistoryItem[] {
+    return rows.flatMap((row) => {
+      const plaintext = keys.open(
+        RECORD_PURPOSE,
+        [row.conversationId, row.recordId],
+        row.sealed,
+      );
 
-        return plaintext === undefined
-          ? undefined
-          : { conversationId: row.conversationId, plaintext };
-      }),
-    );
-
-    return opened.filter(
-      (item): item is DirectMessageHistoryItem => item !== undefined,
-    );
+      return plaintext === undefined
+        ? []
+        : [{ conversationId: row.conversationId, plaintext }];
+    });
   }
 
   /**
@@ -261,13 +246,13 @@ export class DirectMessageHistoryStore {
    */
   public async all(session: Session): Promise<DirectMessageHistoryItem[]> {
     try {
-      const cipher = await this.verifiedCipher(session);
+      const keys = await this.verifiedKeys(session);
       const rows = await this.recentRows(
         session.identity.id,
         Number.POSITIVE_INFINITY,
       );
 
-      return await this.openItems(cipher, rows.reverse());
+      return this.openItems(keys, rows.reverse());
     } catch {
       throw new DirectMessageHistoryStorageError();
     }
@@ -284,22 +269,21 @@ export class DirectMessageHistoryStore {
     entries: DirectMessageHistoryEntry[],
   ): Promise<void> {
     try {
-      const cipher = await this.verifiedCipher(session);
+      const keys = await this.verifiedKeys(session);
 
       if (entries.length === 0) return;
 
       const identityId = session.identity.id;
-      const rows = await Promise.all(
-        entries.map(async (entry) => ({
-          conversationId,
-          identityId,
-          recordId: entry.recordId,
-          sealed: await cipher.seal(
-            recordAad(identityId, conversationId, entry.recordId),
-            entry.plaintext,
-          ),
-        })),
-      );
+      const rows = entries.map((entry) => ({
+        conversationId,
+        identityId,
+        recordId: entry.recordId,
+        sealed: keys.seal(
+          RECORD_PURPOSE,
+          [conversationId, entry.recordId],
+          entry.plaintext,
+        ),
+      }));
 
       await this.insert(rows);
     } catch {
@@ -314,7 +298,7 @@ export class DirectMessageHistoryStore {
    */
   public async checkDropped(session: Session): Promise<boolean> {
     try {
-      await this.verifiedCipher(session);
+      await this.verifiedKeys(session);
     } catch {
       // eslint-disable-next-line no-console
       console.debug('Direct history check failed.');
@@ -351,21 +335,19 @@ export class DirectMessageHistoryStore {
     conversationId: string,
   ): Promise<Uint8Array[]> {
     try {
-      const cipher = await this.verifiedCipher(session);
+      const keys = await this.verifiedKeys(session);
 
       const rows = await this.rowsFor(session.identity.id, conversationId);
-      const opened = await Promise.all(
-        rows.map((row) =>
-          cipher.open(
-            recordAad(row.identityId, row.conversationId, row.recordId),
-            row.sealed,
-          ),
-        ),
-      );
 
-      return opened.filter(
-        (plaintext): plaintext is Uint8Array => plaintext !== undefined,
-      );
+      return rows.flatMap((row) => {
+        const plaintext = keys.open(
+          RECORD_PURPOSE,
+          [row.conversationId, row.recordId],
+          row.sealed,
+        );
+
+        return plaintext === undefined ? [] : [plaintext];
+      });
     } catch {
       // eslint-disable-next-line no-console
       console.debug('Direct history load failed.');
@@ -383,10 +365,10 @@ export class DirectMessageHistoryStore {
     limit: number,
   ): Promise<DirectMessageHistoryItem[]> {
     try {
-      const cipher = await this.verifiedCipher(session);
+      const keys = await this.verifiedKeys(session);
 
-      return await this.openItems(
-        cipher,
+      return this.openItems(
+        keys,
         await this.recentRows(session.identity.id, limit),
       );
     } catch {

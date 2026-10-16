@@ -1,3 +1,5 @@
+import { MailboxRecordAuthorship } from '@haskou/pigeon-swarm-crypto';
+
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { DirectMessageHistoryEntry } from './DirectMessageHistoryEntry';
 import type { DirectMessageHistoryItem } from './DirectMessageHistoryItem';
@@ -6,7 +8,6 @@ import type { DirectMessageHistoryStore } from './DirectMessageHistoryStore';
 import { IdentityMatch } from '../../../identities/domain/IdentityMatch';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { sessionRootKey } from '../../../identities/infrastructure/session/sessionRootKey';
-import { DirectMessageAuthorship } from './DirectMessageAuthorship';
 import { DirectMessageMailboxRecord } from './DirectMessageMailboxRecord';
 
 /**
@@ -28,7 +29,7 @@ export class DirectMessageHistoryBackup {
     session: Session,
     items: DirectMessageHistoryItem[],
   ): Promise<void> {
-    const rootKey = sessionRootKey(session).getBuffer();
+    const rootKey = sessionRootKey(session);
     const byConversation = new Map<string, DirectMessageHistoryEntry[]>();
 
     for (const { conversationId, plaintext } of items) {
@@ -46,7 +47,7 @@ export class DirectMessageHistoryBackup {
         plaintext: own
           ? DirectMessageMailboxRecord.encode(
               record,
-              DirectMessageAuthorship.tag(rootKey, record),
+              MailboxRecordAuthorship.tag(rootKey, record),
             )
           : plaintext,
         recordId: record.id,

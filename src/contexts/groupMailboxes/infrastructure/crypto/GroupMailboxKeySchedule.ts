@@ -1,11 +1,13 @@
+import type { MailboxInboxKeys } from '@haskou/pigeon-swarm-crypto';
+
+import { MailboxReadToken, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { concatBytes } from '@noble/hashes/utils.js';
+import { Buffer } from 'buffer';
 
 import type { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
-import type { MailboxKeys } from '../../../mailboxes/infrastructure/crypto/MailboxKeySchedule';
 
-import { MailboxReadToken } from '../../../mailboxes/infrastructure/crypto/MailboxReadToken';
 import { GroupMailboxEnvelopeKey } from '../../domain/value-objects/GroupMailboxEnvelopeKey';
 import { GroupMailboxGenerationSecret } from '../../domain/value-objects/GroupMailboxGenerationSecret';
 import { GroupMailboxId } from '../../domain/value-objects/GroupMailboxId';
@@ -90,7 +92,7 @@ export class GroupMailboxKeySchedule {
   public static inbox(
     generation: GroupMailboxGenerationSecret,
     identityId: IdentityId,
-  ): MailboxKeys {
+  ): MailboxInboxKeys {
     const slot = GroupMailboxKeySchedule.slot(generation, identityId);
 
     return {
@@ -138,7 +140,10 @@ export class GroupMailboxKeySchedule {
     mailboxId: GroupMailboxId,
   ): GroupMailboxReadToken {
     return GroupMailboxReadToken.fromString(
-      MailboxReadToken.derive(ownerRootKey.getBytes(), mailboxId.valueOf()),
+      MailboxReadToken.derive(
+        SymmetricKey.fromBuffer(Buffer.from(ownerRootKey.getBytes())),
+        mailboxId.valueOf(),
+      ),
     );
   }
 }

@@ -1,4 +1,4 @@
-import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import { RecoveryKey, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
 import type { LoginIdentityProgressReporter } from '../../application/login-identity/LoginIdentityProgressReporter';
 import type { DevicePairingRequestDraft } from '../../domain/DevicePairingRequestDraft';
@@ -37,7 +37,6 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { DevicePairingError } from '../../domain/DevicePairingError';
 import { DevicePairingCode } from '../../domain/value-objects/DevicePairingCode';
 import { IdentityPassword } from '../../domain/value-objects/IdentityPassword';
-import { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
 
 export class PigeonIdentitiesGateway {
   public constructor(
@@ -123,10 +122,7 @@ export class PigeonIdentitiesGateway {
     // partial or absent, and the new device imports whatever was sent.
     const historyTransferSecret = SymmetricKey.generate();
 
-    await this.pairingHistory.publish(
-      opened,
-      historyTransferSecret.getBuffer(),
-    );
+    await this.pairingHistory.publish(opened, historyTransferSecret);
 
     const result = await this.deviceAuthorization.authorizePairing(
       opened,
@@ -279,7 +275,7 @@ export class PigeonIdentitiesGateway {
 
     await this.pairingHistory.receive(
       result.session,
-      paired.historyTransferSecret.getBuffer(),
+      paired.historyTransferSecret,
     );
 
     return result;

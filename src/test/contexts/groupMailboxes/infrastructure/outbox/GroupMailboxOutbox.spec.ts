@@ -1,3 +1,4 @@
+import type { MailboxInboxKeys } from '@haskou/pigeon-swarm-crypto';
 import type { MockProxy } from 'jest-mock-extended';
 
 import { mock } from 'jest-mock-extended';
@@ -8,7 +9,6 @@ import type { GroupMailboxOutboxEngine } from '../../../../../contexts/groupMail
 import type { GroupMailboxOutboxRow } from '../../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutboxRow';
 import type { GroupMailboxOutboxStore } from '../../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutboxStore';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
-import type { MailboxKeys } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxKeySchedule';
 import type { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 
 import { MlsRejectedError } from '../../../../../contexts/communities/infrastructure/mls/MlsRejectedError';
@@ -86,11 +86,13 @@ describe('GroupMailboxOutbox', () => {
       Promise.resolve(new Uint8Array([current, 7])),
     );
     channel = mock<Pick<MailboxChannel, 'send'>>();
-    channel.send.mockImplementation((keys: MailboxKeys, _plaintext, id) => {
-      sent.push(keys.mailboxId);
+    channel.send.mockImplementation(
+      (keys: MailboxInboxKeys, _plaintext, id) => {
+        sent.push(keys.mailboxId);
 
-      return Promise.resolve({ cursor: 1, envelopeId: id ?? '' });
-    });
+        return Promise.resolve({ cursor: 1, envelopeId: id ?? '' });
+      },
+    );
     store =
       mock<
         Pick<GroupMailboxOutboxStore, 'forget' | 'load' | 'remove' | 'save'>
@@ -141,10 +143,11 @@ describe('GroupMailboxOutbox', () => {
   ])(
     'keeps a copy refused by %s and retries it with backoff',
     async (_n, error) => {
-      channel.send.mockImplementation((keys: MailboxKeys, _plaintext, id) =>
-        keys.mailboxId === inboxOf(0, 'bob')
-          ? Promise.reject(error)
-          : Promise.resolve({ cursor: 1, envelopeId: id ?? '' }),
+      channel.send.mockImplementation(
+        (keys: MailboxInboxKeys, _plaintext, id) =>
+          keys.mailboxId === inboxOf(0, 'bob')
+            ? Promise.reject(error)
+            : Promise.resolve({ cursor: 1, envelopeId: id ?? '' }),
       );
 
       await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
@@ -179,7 +182,7 @@ describe('GroupMailboxOutbox', () => {
   });
 
   it('keeps later records to an inbox behind a stuck one', async () => {
-    channel.send.mockImplementation((keys: MailboxKeys, _plaintext, id) =>
+    channel.send.mockImplementation((keys: MailboxInboxKeys, _plaintext, id) =>
       keys.mailboxId === inboxOf(0, 'bob')
         ? Promise.reject(new MailboxUnavailableError())
         : Promise.resolve({ cursor: 1, envelopeId: id ?? '' }),
@@ -198,7 +201,7 @@ describe('GroupMailboxOutbox', () => {
   });
 
   it('keeps a later message behind a held commit to the same recipient in the next generation', async () => {
-    channel.send.mockImplementation((keys: MailboxKeys, _plaintext, id) =>
+    channel.send.mockImplementation((keys: MailboxInboxKeys, _plaintext, id) =>
       keys.mailboxId === inboxOf(0, 'bob')
         ? Promise.reject(new MailboxUnavailableError())
         : Promise.resolve({ cursor: 1, envelopeId: id ?? '' }),
@@ -231,7 +234,7 @@ describe('GroupMailboxOutbox', () => {
   });
 
   it('re-encrypts a stranded message for its pending recipients still in the group', async () => {
-    channel.send.mockImplementation((keys: MailboxKeys, _plaintext, id) =>
+    channel.send.mockImplementation((keys: MailboxInboxKeys, _plaintext, id) =>
       keys.mailboxId === inboxOf(0, 'bob')
         ? Promise.reject(new MailboxUnavailableError())
         : Promise.resolve({ cursor: 1, envelopeId: id ?? '' }),
@@ -537,10 +540,11 @@ describe('GroupMailboxOutbox', () => {
 
     it('skips a recipient a queued record still waits for', async () => {
       engine.members.mockResolvedValue(['alice', 'bob', 'dave']);
-      channel.send.mockImplementation((keys: MailboxKeys, _plaintext, id) =>
-        keys.mailboxId === inboxOf(0, 'bob')
-          ? Promise.reject(new MailboxUnavailableError())
-          : Promise.resolve({ cursor: 1, envelopeId: id ?? '' }),
+      channel.send.mockImplementation(
+        (keys: MailboxInboxKeys, _plaintext, id) =>
+          keys.mailboxId === inboxOf(0, 'bob')
+            ? Promise.reject(new MailboxUnavailableError())
+            : Promise.resolve({ cursor: 1, envelopeId: id ?? '' }),
       );
       await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
       channel.send.mockClear();
@@ -554,10 +558,11 @@ describe('GroupMailboxOutbox', () => {
 
     it('seals nothing once a queued record has waited longer than the ephemeral hold', async () => {
       engine.members.mockResolvedValue(['alice', 'bob', 'dave']);
-      channel.send.mockImplementation((keys: MailboxKeys, _plaintext, id) =>
-        keys.mailboxId === inboxOf(0, 'bob')
-          ? Promise.reject(new MailboxUnavailableError())
-          : Promise.resolve({ cursor: 1, envelopeId: id ?? '' }),
+      channel.send.mockImplementation(
+        (keys: MailboxInboxKeys, _plaintext, id) =>
+          keys.mailboxId === inboxOf(0, 'bob')
+            ? Promise.reject(new MailboxUnavailableError())
+            : Promise.resolve({ cursor: 1, envelopeId: id ?? '' }),
       );
       await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
       engine.encrypt.mockClear();

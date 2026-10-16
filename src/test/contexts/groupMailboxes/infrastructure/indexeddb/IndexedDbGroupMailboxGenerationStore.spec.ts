@@ -1,4 +1,5 @@
 import 'fake-indexeddb/auto';
+import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { randomUUID } from 'node:crypto';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
@@ -17,7 +18,7 @@ const CONVERSATION_ID = 'conversation-id-marker-62f1';
 const TREE = 'tree-digest-marker-90bd';
 const SECRET = new TextEncoder().encode('generation-secret-marker-0123456');
 
-const root = (fill: number) => ({ getBuffer: () => Buffer.alloc(32, fill) });
+const root = (fill: number) => SymmetricKey.fromBuffer(Buffer.alloc(32, fill));
 
 const session = (current: number | undefined, previous?: number): Session =>
   ({

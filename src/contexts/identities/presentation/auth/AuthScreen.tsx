@@ -1,3 +1,4 @@
+import { RecoveryKey } from '@haskou/pigeon-swarm-crypto';
 import { FormEvent, type ReactElement, useEffect, useState } from 'react';
 
 import type { DeviceRemoval } from '../../../../app/presentation/DeviceRemoval';
@@ -17,7 +18,6 @@ import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
 import { DeviceRemovedError } from '../../domain/DeviceRemovedError';
 import { DevicePairingCode } from '../../domain/value-objects/DevicePairingCode';
-import { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
 import {
   clearLastLoginIdentity,
   loadLastLoginIdentity,
@@ -161,7 +161,7 @@ export function AuthScreen({
     }) &&
     (mode !== 'login' ||
       !useRecoveryKey ||
-      RecoveryKey.isValid(loginRecoveryKey)) &&
+      RecoveryKey.isValid(loginRecoveryKey.trim())) &&
     (mode === 'login' || recoveryKeyConfirmed);
   const passwordChecks = passwordValidationChecks(password);
   const passwordRequirementChecks = {

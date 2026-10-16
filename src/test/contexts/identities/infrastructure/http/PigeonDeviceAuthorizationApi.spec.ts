@@ -4,6 +4,8 @@ import {
   KeyPair,
   PrivateKey,
   PublicKey,
+  RecoveryKey,
+  RecoveryKit,
   SymmetricKey,
 } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
@@ -30,8 +32,6 @@ import { DevicePairingCode } from '../../../../../contexts/identities/domain/val
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 import { IdentityPassword } from '../../../../../contexts/identities/domain/value-objects/IdentityPassword';
 import { PairingId } from '../../../../../contexts/identities/domain/value-objects/PairingId';
-import { RecoveryKey } from '../../../../../contexts/identities/domain/value-objects/RecoveryKey';
-import { RecoveryIdentityMaterial } from '../../../../../contexts/identities/infrastructure/crypto/RecoveryIdentityMaterial';
 import { IdentitySignaturePayloadFactory } from '../../../../../contexts/identities/infrastructure/http/IdentitySignaturePayloadFactory';
 import { PigeonDeviceAuthorizationApi } from '../../../../../contexts/identities/infrastructure/http/PigeonDeviceAuthorizationApi';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
@@ -251,7 +251,7 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
 
   it('replaces lost devices and stores recovered material at the new epoch', async () => {
     const recoveryKey = RecoveryKey.generate();
-    const material = await RecoveryIdentityMaterial.derive(recoveryKey);
+    const material = RecoveryKit.derive(recoveryKey);
     const identityId = IdentityId.fromString(
       material.identityKeyPair.toPrimitives().publicKey,
     );
@@ -340,7 +340,7 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
 
   it('refuses a weak password before the recovery reaches the node', async () => {
     const recoveryKey = RecoveryKey.generate();
-    const material = await RecoveryIdentityMaterial.derive(recoveryKey);
+    const material = RecoveryKit.derive(recoveryKey);
     const identityId = IdentityId.fromString(
       material.identityKeyPair.toPrimitives().publicKey,
     );
@@ -376,7 +376,7 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
   describe('recovery compromise caps', () => {
     async function recoverAfter(checkpoint: Record<string, unknown>) {
       const recoveryKey = RecoveryKey.generate();
-      const material = await RecoveryIdentityMaterial.derive(recoveryKey);
+      const material = RecoveryKit.derive(recoveryKey);
       const identityId = IdentityId.fromString(
         material.identityKeyPair.toPrimitives().publicKey,
       );

@@ -68,7 +68,7 @@ export function ContactVerificationDialog({
             aria-label={copy.contacts.safetyNumber}
             className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4"
           >
-            {(safetyNumber ?? []).map((group, index) => (
+            {safetyNumber.map((group, index) => (
               <span
                 key={index}
                 className="rounded-xl border border-white/10 bg-white/[0.04] py-2 text-center font-mono text-sm tracking-wider text-white/85"

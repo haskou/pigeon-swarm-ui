@@ -1,3 +1,5 @@
+import { HistoryBackupFile } from '@haskou/pigeon-swarm-crypto';
+
 import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { ContactPinStore } from '../../../contexts/identities/infrastructure/storage/ContactPinStore';
 import type { DirectMessageHistoryItem } from '../../../contexts/messages/infrastructure/mailbox/DirectMessageHistoryItem';
@@ -9,7 +11,6 @@ import {
   decodeBase64Url,
   encodeBase64Url,
 } from '../../../shared/infrastructure/encoding/base64url';
-import { HistoryBackupFile } from './HistoryBackupFile';
 import { HistoryBackupUnreadableError } from './HistoryBackupUnreadableError';
 
 type BackupContent = {
@@ -58,6 +59,19 @@ export class PigeonHistoryBackup {
     private readonly contactPins: ContactPinStore,
   ) {}
 
+  /** Any file but this identity's current-format backup is unreadable. */
+  private opened(session: Session, file: string): Uint8Array {
+    try {
+      return HistoryBackupFile.open(
+        session.masterKey,
+        session.identity.id,
+        file,
+      );
+    } catch {
+      throw new HistoryBackupUnreadableError();
+    }
+  }
+
   public async export(session: Session, password: string): Promise<string> {
     const identityId = session.identity.id;
 
@@ -72,8 +86,8 @@ export class PigeonHistoryBackup {
       })),
     };
 
-    return await HistoryBackupFile.seal(
-      session.masterKey.getBuffer(),
+    return HistoryBackupFile.seal(
+      session.masterKey,
       identityId,
       new TextEncoder().encode(JSON.stringify(content)),
     );
@@ -82,13 +96,7 @@ export class PigeonHistoryBackup {
   /** Restores nothing unless the whole file is this identity's backup. */
   public async restore(session: Session, file: string): Promise<void> {
     const identityId = session.identity.id;
-    const content = parseContent(
-      await HistoryBackupFile.open(
-        session.masterKey.getBuffer(),
-        identityId,
-        file,
-      ),
-    );
+    const content = parseContent(this.opened(session, file));
     const history: DirectMessageHistoryItem[] = content.history.map(
       (entry) => ({
         conversationId: entry.conversationId,

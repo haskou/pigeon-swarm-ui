@@ -1,3 +1,4 @@
+import { RecoveryKey } from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
 
 import type { IdentityIdFactory } from '../../../../../contexts/identities/domain/IdentityIdFactory';
@@ -6,7 +7,6 @@ import type { IdentityRepository } from '../../../../../contexts/identities/doma
 import { RegisterIdentityMessage } from '../../../../../contexts/identities/application/register-identity/messages/RegisterIdentityMessage';
 import { RegisterIdentity } from '../../../../../contexts/identities/application/register-identity/RegisterIdentity';
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
-import { RecoveryKey } from '../../../../../contexts/identities/domain/value-objects/RecoveryKey';
 
 describe(RegisterIdentity.name, () => {
   it('creates the aggregate before asking the repository to persist it', async () => {

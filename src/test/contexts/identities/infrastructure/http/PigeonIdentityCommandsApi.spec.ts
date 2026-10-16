@@ -3,6 +3,7 @@ import {
   IdentitySignature,
   KeyPair,
   PublicKey,
+  RecoveryKey,
   Signature,
   SymmetricKey,
 } from '@haskou/pigeon-swarm-crypto';
@@ -18,7 +19,6 @@ import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/
 import { DeviceId } from '../../../../../contexts/identities/domain/value-objects/DeviceId';
 import { DeviceUnlockSecretHandle } from '../../../../../contexts/identities/domain/value-objects/DeviceUnlockSecretHandle';
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
-import { RecoveryKey } from '../../../../../contexts/identities/domain/value-objects/RecoveryKey';
 import { IdentityAdmissionProof } from '../../../../../contexts/identities/infrastructure/crypto/IdentityAdmissionProof';
 import { IdentitySignaturePayloadFactory } from '../../../../../contexts/identities/infrastructure/http/IdentitySignaturePayloadFactory';
 import { PigeonIdentityCommandsApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityCommandsApi';

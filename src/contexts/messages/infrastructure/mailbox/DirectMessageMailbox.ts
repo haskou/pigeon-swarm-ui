@@ -1,3 +1,5 @@
+import type { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+
 import type { RealtimeMailboxSubscriptionInput } from '../../../../shared/infrastructure/realtime/RealtimeMailboxSubscriptionInput';
 import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../../identities/infrastructure/session/Session';
@@ -368,7 +370,7 @@ export class DirectMessageMailbox {
    * mailbox derived from `secret`. A failure is logged without content and
    * leaves the transfer partial or absent. Never throws.
    */
-  public publishHistory(session: Session, secret: Uint8Array): Promise<void> {
+  public publishHistory(session: Session, secret: SymmetricKey): Promise<void> {
     return this.transfer.publish(session, secret);
   }
 
@@ -376,7 +378,7 @@ export class DirectMessageMailbox {
    * Pairing. Imports the history published to the transfer mailbox derived
    * from `secret`. Never throws.
    */
-  public receiveHistory(session: Session, secret: Uint8Array): Promise<void> {
+  public receiveHistory(session: Session, secret: SymmetricKey): Promise<void> {
     return this.transfer.receive(session, secret);
   }
 

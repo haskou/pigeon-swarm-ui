@@ -1,6 +1,9 @@
-import { Buffer } from 'buffer';
+import type {
+  DeviceRootRowKeys,
+  SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
+import type { Buffer } from 'buffer';
 
-import type { DeviceRootRowKeys } from '../../../messages/infrastructure/mailbox/DeviceRootRowKeys';
 import type { GroupMessageHistoryConversation } from './GroupMessageHistoryConversation';
 
 /**
@@ -16,13 +19,13 @@ export class GroupMessageHistoryScope {
   >();
 
   public constructor(
-    root: Uint8Array,
+    root: SymmetricKey,
     public readonly keys: DeviceRootRowKeys,
   ) {
-    this.root = Buffer.from(root);
+    this.root = root.getBuffer();
   }
 
-  public opensUnder(root: Uint8Array): boolean {
-    return this.root.equals(Buffer.from(root));
+  public opensUnder(root: SymmetricKey): boolean {
+    return this.root.equals(root.getBuffer());
   }
 }

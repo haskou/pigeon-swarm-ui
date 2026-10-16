@@ -1,3 +1,5 @@
+import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
 import { IndexedDbMlsStateStore } from '../../../../contexts/communities/infrastructure/mls/IndexedDbMlsStateStore';
@@ -18,7 +20,7 @@ export function sealedGroupStores(
 } {
   const session = (): Session =>
     ({
-      deviceSealedRootKey: { getBuffer: () => Buffer.alloc(32, 7) },
+      deviceSealedRootKey: SymmetricKey.fromBuffer(Buffer.alloc(32, 7)),
       identity: { id: identityId },
     }) as unknown as Session;
 

@@ -1,3 +1,5 @@
+import { DeviceRootRowKeys } from '@haskou/pigeon-swarm-crypto';
+
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessageRecord';
 import type { GroupConversationActivity } from '../GroupConversationActivity';
@@ -5,7 +7,6 @@ import type { GroupMessageHistoryRow } from './GroupMessageHistoryRow';
 
 import { scopeClientStorageKey } from '../../../../shared/infrastructure/storage/ClientStorageScope';
 import { DirectMailboxRecords } from '../../../mailboxes/domain/DirectMailboxRecords';
-import { DeviceRootRowKeys } from '../../../messages/infrastructure/mailbox/DeviceRootRowKeys';
 import { GroupMessageHistoryConversation } from './GroupMessageHistoryConversation';
 import { GroupMessageHistoryDatabase } from './GroupMessageHistoryDatabase';
 import { GroupMessageHistoryScope } from './GroupMessageHistoryScope';
@@ -39,23 +40,9 @@ export class GroupMessageHistoryStore {
   private queue: Promise<unknown> = Promise.resolve();
   private readonly scopes = new Map<string, GroupMessageHistoryScope>();
 
-  private static aad(
-    identityId: string,
-    row: Pick<GroupMessageHistoryRow, 'conversation' | 'record'>,
-  ): Uint8Array<ArrayBuffer> {
-    return new TextEncoder().encode(
-      JSON.stringify(['record', identityId, row.conversation, row.record]),
-    );
-  }
-
-  private static readAad(
-    identityId: string,
-    conversation: string,
-  ): Uint8Array<ArrayBuffer> {
-    return new TextEncoder().encode(
-      JSON.stringify(['read', identityId, conversation]),
-    );
-  }
+  private static readonly KEYS_LABEL = 'pigeon-group-history';
+  private static readonly READ_PURPOSE = 'read';
+  private static readonly RECORD_PURPOSE = 'record';
 
   public constructor(
     databaseName: string = scopeClientStorageKey('pigeon-group-history'),
@@ -63,15 +50,15 @@ export class GroupMessageHistoryStore {
     this.database = new GroupMessageHistoryDatabase(databaseName);
   }
 
-  private async conversation(
+  private conversation(
     scope: GroupMessageHistoryScope,
     conversationId: string,
-  ): Promise<GroupMessageHistoryConversation> {
+  ): GroupMessageHistoryConversation {
     const held = scope.conversations.get(conversationId);
 
     if (held) return held;
     const conversation = new GroupMessageHistoryConversation(
-      await scope.keys.tag(['conversation', conversationId]),
+      scope.keys.tag(['conversation', conversationId]),
     );
 
     scope.conversations.set(conversationId, conversation);
@@ -107,9 +94,7 @@ export class GroupMessageHistoryStore {
       .slice(-GroupMessageHistoryStore.LATEST_LOOKBACK)
       .reverse()) {
       const [row] = await this.database.rows([sequence]);
-      const record = row
-        ? await this.openRow(scope, identityId, row)
-        : undefined;
+      const record = row ? this.openRow(scope, identityId, row) : undefined;
 
       if (record?.type === DirectMailboxRecords.TYPE.sent) {
         return GroupMessageReadMarker.fresh(
@@ -129,13 +114,13 @@ export class GroupMessageHistoryStore {
     conversationId: string,
     id: string,
   ): Promise<DirectMessageRecord | undefined> {
-    const conversation = await this.conversation(scope, conversationId);
+    const conversation = this.conversation(scope, conversationId);
     const row = await this.database.row(
       identityId,
       conversation.tag,
-      await scope.keys.tag(['record', conversationId, id]),
+      scope.keys.tag(['record', conversationId, id]),
     );
-    const [record] = await this.opened(scope, identityId, row ? [row] : []);
+    const [record] = this.opened(scope, identityId, row ? [row] : []);
 
     if (record) conversation.remember(record);
 
@@ -156,7 +141,7 @@ export class GroupMessageHistoryStore {
     const rows = await this.database.rows(wanted);
 
     conversation.addOlder(
-      await this.opened(
+      this.opened(
         scope,
         identityId,
         rows.filter((row) => row !== undefined),
@@ -174,8 +159,9 @@ export class GroupMessageHistoryStore {
   ): Promise<GroupMessageReadMarker | undefined> {
     const sealed = await this.database.read(identityId, conversation);
     const plaintext = sealed
-      ? await scope.keys.cipher.open(
-          GroupMessageHistoryStore.readAad(identityId, conversation),
+      ? scope.keys.open(
+          GroupMessageHistoryStore.READ_PURPOSE,
+          [conversation],
           sealed,
         )
       : undefined;
@@ -192,24 +178,25 @@ export class GroupMessageHistoryStore {
   }
 
   /** The records of the rows that open under this scope, in row order. */
-  private async opened(
+  private opened(
     scope: GroupMessageHistoryScope,
     identityId: string,
     rows: readonly GroupMessageHistoryRow[],
-  ): Promise<DirectMessageRecord[]> {
-    return (
-      await Promise.all(rows.map((row) => this.openRow(scope, identityId, row)))
-    ).filter((record) => record !== undefined);
+  ): DirectMessageRecord[] {
+    return rows
+      .map((row) => this.openRow(scope, identityId, row))
+      .filter((record) => record !== undefined);
   }
 
   /** The record of one row; undefined when it does not open. */
-  private async openRow(
+  private openRow(
     scope: GroupMessageHistoryScope,
     identityId: string,
     row: GroupMessageHistoryRow,
-  ): Promise<DirectMessageRecord | undefined> {
-    const plaintext = await scope.keys.cipher.open(
-      GroupMessageHistoryStore.aad(identityId, row),
+  ): DirectMessageRecord | undefined {
+    const plaintext = scope.keys.open(
+      GroupMessageHistoryStore.RECORD_PURPOSE,
+      [row.conversation, row.record],
       row.sealed,
     );
 
@@ -222,22 +209,22 @@ export class GroupMessageHistoryStore {
   private async scope(
     session: Session,
   ): Promise<GroupMessageHistoryScope | undefined> {
-    const root = session.deviceSealedRootKey?.getBuffer();
+    const root = session.deviceSealedRootKey;
 
     if (!root) return undefined;
     const identityId = session.identity.id;
     const held = this.scopes.get(identityId);
 
     if (held?.opensUnder(root)) return held;
-    const keys = await DeviceRootRowKeys.derive(
+    const keys = DeviceRootRowKeys.derive(
       root,
-      'pigeon-group-history',
+      GroupMessageHistoryStore.KEYS_LABEL,
       identityId,
     );
     const canary = await this.database.canary(identityId);
 
-    if (!canary || !(await keys.cipher.opensCanary(canary))) {
-      await this.database.reset(identityId, await keys.cipher.sealCanary());
+    if (!canary || !keys.opensCanary(canary)) {
+      await this.database.reset(identityId, keys.sealCanary());
     }
     const scope = new GroupMessageHistoryScope(root, keys);
 
@@ -246,28 +233,22 @@ export class GroupMessageHistoryStore {
     return scope;
   }
 
-  private async sealed(
+  private sealed(
     scope: GroupMessageHistoryScope,
     identityId: string,
     record: DirectMessageRecord,
-  ): Promise<GroupMessageHistoryRow> {
+  ): GroupMessageHistoryRow {
     const tags = {
-      conversation: await scope.keys.tag([
-        'conversation',
-        record.conversationId,
-      ]),
-      record: await scope.keys.tag([
-        'record',
-        record.conversationId,
-        record.id,
-      ]),
+      conversation: scope.keys.tag(['conversation', record.conversationId]),
+      record: scope.keys.tag(['record', record.conversationId, record.id]),
     };
 
     return {
       ...tags,
       identityId,
-      sealed: await scope.keys.cipher.seal(
-        GroupMessageHistoryStore.aad(identityId, tags),
+      sealed: scope.keys.seal(
+        GroupMessageHistoryStore.RECORD_PURPOSE,
+        [tags.conversation, tags.record],
         new TextEncoder().encode(JSON.stringify(record)),
       ),
     };
@@ -291,7 +272,7 @@ export class GroupMessageHistoryStore {
   ): Promise<GroupMessageReadMarker> {
     const tag =
       scope.conversations.get(conversationId)?.tag ??
-      (await scope.keys.tag(['conversation', conversationId]));
+      scope.keys.tag(['conversation', conversationId]);
     const stored = await this.marker(scope, identityId, tag);
     const sequences = await this.database.sequences(identityId, tag);
     // Sequences come in arrival order, so the last one is the highest.
@@ -305,15 +286,11 @@ export class GroupMessageHistoryStore {
     const unknownRows = await this.database.rows(unknown);
     const openedRecords = new Map<number, DirectMessageRecord>();
 
-    await Promise.all(
-      unknownRows.map(async (row, index) => {
-        const record = row
-          ? await this.openRow(scope, identityId, row)
-          : undefined;
+    unknownRows.forEach((row, index) => {
+      const record = row ? this.openRow(scope, identityId, row) : undefined;
 
-        if (record) openedRecords.set(unknown[index], record);
-      }),
-    );
+      if (record) openedRecords.set(unknown[index], record);
+    });
     const records = after
       .map((sequence) => known.get(sequence) ?? openedRecords.get(sequence))
       .filter((record) => record !== undefined);
@@ -326,8 +303,9 @@ export class GroupMessageHistoryStore {
       await this.database.putRead(
         identityId,
         tag,
-        await scope.keys.cipher.seal(
-          GroupMessageHistoryStore.readAad(identityId, tag),
+        scope.keys.seal(
+          GroupMessageHistoryStore.READ_PURPOSE,
+          [tag],
           new TextEncoder().encode(JSON.stringify(next.toPrimitives())),
         ),
       );
@@ -380,9 +358,7 @@ export class GroupMessageHistoryStore {
 
       try {
         const sequences = await this.database.insert(
-          await Promise.all(
-            records.map((record) => this.sealed(scope, identityId, record)),
-          ),
+          records.map((record) => this.sealed(scope, identityId, record)),
         );
 
         records.forEach((record, index) => {
@@ -468,7 +444,7 @@ export class GroupMessageHistoryStore {
       const scope = await this.scope(session);
 
       if (!scope) return [];
-      const conversation = await this.conversation(scope, conversationId);
+      const conversation = this.conversation(scope, conversationId);
       const missing = conversation.missing(limit);
 
       if (missing > 0) {

@@ -1,3 +1,4 @@
+import { DeviceRootRowKeys, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import 'fake-indexeddb/auto';
 import { randomUUID } from 'node:crypto';
 
@@ -13,7 +14,7 @@ const session = (
   root: Buffer = Buffer.alloc(32, 5),
 ): Session =>
   ({
-    deviceSealedRootKey: { getBuffer: () => root },
+    deviceSealedRootKey: SymmetricKey.fromBuffer(root),
     identity: { id: identityId },
   }) as unknown as Session;
 const sent = (conversationId: string, id: string, createdAt: number) =>
@@ -217,7 +218,7 @@ describe(GroupMessageHistoryStore.name, () => {
       ]);
     }
     const store = new GroupMessageHistoryStore(name);
-    const decrypt = jest.spyOn(crypto.subtle, 'decrypt');
+    const decrypt = jest.spyOn(DeviceRootRowKeys.prototype, 'open');
 
     expect(ids(await store.load(session('alice'), 'c1', 3))).toEqual([
       'm7',
@@ -245,7 +246,7 @@ describe(GroupMessageHistoryStore.name, () => {
     await store.append(session('alice'), [sent('c1', 'a', 1)]);
     await store.load(session('alice'), 'c1', 5);
     await store.append(session('alice'), [sent('c1', 'b', 2)]);
-    const decrypt = jest.spyOn(crypto.subtle, 'decrypt');
+    const decrypt = jest.spyOn(DeviceRootRowKeys.prototype, 'open');
 
     expect(ids(await store.load(session('alice'), 'c1', 5))).toEqual([
       'a',
@@ -275,7 +276,7 @@ describe(GroupMessageHistoryStore.name, () => {
       await writer.append(session('alice'), [sent('c1', `m${index}`, index)]);
     }
     const store = new GroupMessageHistoryStore(name);
-    const decrypt = jest.spyOn(crypto.subtle, 'decrypt');
+    const decrypt = jest.spyOn(DeviceRootRowKeys.prototype, 'open');
 
     expect(await store.author(session('alice'), 'c1', 'm4')).toBe('alice');
     expect(decrypt.mock.calls.length).toBeLessThanOrEqual(2);
@@ -574,7 +575,7 @@ describe(GroupMessageHistoryStore.name, () => {
       );
       await writer.markRead(session('bob'), 'c1');
       const store = new GroupMessageHistoryStore(name);
-      const decrypt = jest.spyOn(crypto.subtle, 'decrypt');
+      const decrypt = jest.spyOn(DeviceRootRowKeys.prototype, 'open');
 
       await store.append(session('bob'), [from('alice', 'c1', 10)]);
 
@@ -587,7 +588,7 @@ describe(GroupMessageHistoryStore.name, () => {
 
       await store.append(session('bob'), [from('alice', 'c1', 1)]);
       await store.markRead(session('bob'), 'c1');
-      const encrypt = jest.spyOn(crypto.subtle, 'encrypt');
+      const encrypt = jest.spyOn(DeviceRootRowKeys.prototype, 'seal');
 
       await store.markRead(session('bob'), 'c1');
 

@@ -1,7 +1,7 @@
+import { RecoveryKey } from '@haskou/pigeon-swarm-crypto';
 import { assert } from '@haskou/value-objects';
 
 import { IdentityPassword } from './IdentityPassword';
-import { RecoveryKey } from './RecoveryKey';
 
 export class IdentityMasterKeyProtection {
   public static fromPrimitives(primitives: {
@@ -35,7 +35,7 @@ export class IdentityMasterKeyProtection {
   public toPrimitives() {
     return {
       password: this.password.toString(),
-      recoveryKey: this.recoveryKey?.toString(),
+      recoveryKey: this.recoveryKey?.valueOf(),
     };
   }
 }

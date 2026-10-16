@@ -1,3 +1,4 @@
+import { KeyFingerprint, PublicKey } from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 
 import type { ConversationKeyEntry } from '../../../../contexts/identities/infrastructure/keychain/ConversationKeyEntry';
@@ -10,11 +11,20 @@ import {
   identityName,
   identityPrimaryDisplayName,
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
-import { KeyFingerprint } from '../../../../contexts/identities/presentation/view-models/KeyFingerprint';
 import { shortId } from '../../../../shared/presentation/formatting';
 
 /** Builds the security and audit view from ids and public material only. */
 export class SecurityAuditReport {
+  private static credentialFingerprint(credential: string): string {
+    return KeyFingerprint.ofPublicKey(PublicKey.fromPEM(credential));
+  }
+
+  private static identityFingerprint(identityId: string): string {
+    return KeyFingerprint.ofPublicKey(
+      IdentityId.fromString(identityId).getPublicKey(),
+    );
+  }
+
   private static account(input: SecurityAuditInput): SecurityAudit['account'] {
     const { session } = input;
     const root = session.deviceSealedRootKey;
@@ -22,12 +32,14 @@ export class SecurityAuditReport {
     return {
       authorizationEpoch: String(session.authorizationEpoch.valueOf()),
       authorizationRevision: Number(session.authorizationRevision.valueOf()),
-      deviceCredentialFingerprint: KeyFingerprint.ofPublicKey(
+      deviceCredentialFingerprint: SecurityAuditReport.credentialFingerprint(
         session.deviceCredentialKeyPair.toPrimitives().publicKey,
       ),
       deviceId: String(session.deviceId.valueOf()),
       identityId: session.identity.id,
-      identityKeyFingerprint: KeyFingerprint.ofPublicKey(session.identity.id),
+      identityKeyFingerprint: SecurityAuditReport.identityFingerprint(
+        session.identity.id,
+      ),
       sealedRoot: {
         fingerprint: root ? KeyFingerprint.ofSecret(root.getBuffer()) : null,
         generation: input.sealedRootGeneration,
@@ -44,7 +56,8 @@ export class SecurityAuditReport {
 
     return input.devices
       .map((credential) => ({
-        credentialFingerprint: KeyFingerprint.ofPublicKey(credential),
+        credentialFingerprint:
+          SecurityAuditReport.credentialFingerprint(credential),
         current: IdentityId.normalize(credential) === own,
       }))
       .sort((first, second) => Number(second.current) - Number(first.current));
@@ -115,7 +128,7 @@ export class SecurityAuditReport {
     return [...ids]
       .map((identityId) => ({
         identityId,
-        keyFingerprint: KeyFingerprint.ofPublicKey(identityId),
+        keyFingerprint: SecurityAuditReport.identityFingerprint(identityId),
         name: SecurityAuditReport.displayName(input, identityId),
         verified: Boolean(input.pins[identityId]?.verifiedAt),
       }))
@@ -133,7 +146,7 @@ export class SecurityAuditReport {
       communityId,
       epoch: group.epoch.toString(),
       leaves: group.leaves.map(({ owner, signaturePublicKey }) => ({
-        deviceCredentialFingerprint: KeyFingerprint.ofPublicKey(
+        deviceCredentialFingerprint: SecurityAuditReport.credentialFingerprint(
           owner.deviceCredential,
         ),
         identityId: owner.identityId,

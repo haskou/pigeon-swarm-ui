@@ -1,7 +1,8 @@
+import type { MailboxInboxKeys } from '@haskou/pigeon-swarm-crypto';
+
 import type { MlsOpenedMessage } from '../../../communities/infrastructure/mls/MlsGroup';
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessageRecord';
-import type { MailboxKeys } from '../../../mailboxes/infrastructure/crypto/MailboxKeySchedule';
 import type { PigeonMailboxClient } from '../../../mailboxes/infrastructure/http/PigeonMailboxClient';
 import type {
   MailboxChannel,
@@ -173,7 +174,7 @@ export class GroupMailboxInboxSync {
 
   /** Acknowledges a page; an inbox re-created meanwhile restarts at 0. */
   private async acknowledge(
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     readers: MailboxReadTokens,
     upTo: number,
   ): Promise<void> {
@@ -220,7 +221,7 @@ export class GroupMailboxInboxSync {
    * next sync.
    */
   private async deleteSettled(
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     readers: MailboxReadTokens,
   ): Promise<boolean> {
     try {
@@ -250,7 +251,7 @@ export class GroupMailboxInboxSync {
    */
   private async bridgeReaders(
     session: Session,
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     readers: MailboxReadTokens,
   ): Promise<void> {
     try {
@@ -320,7 +321,7 @@ export class GroupMailboxInboxSync {
    */
   private async enrolSiblings(
     session: Session,
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     rootToken: string,
     siblings: readonly string[],
   ): Promise<void> {
@@ -341,7 +342,7 @@ export class GroupMailboxInboxSync {
   private keysFor(
     session: Session,
     generation: GroupMailboxGeneration,
-  ): MailboxKeys {
+  ): MailboxInboxKeys {
     return GroupMailboxKeySchedule.inbox(
       generation.secret,
       IdentityId.fromString(session.identity.id),
@@ -421,7 +422,7 @@ export class GroupMailboxInboxSync {
    * numbers its envelopes from 1 again, so it is read again from zero.
    */
   private async readPage(
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     readers: MailboxReadTokens,
   ): Promise<OpenedMailboxPage> {
     const cursor = this.inboxes.cursor(keys.mailboxId);
@@ -481,7 +482,7 @@ export class GroupMailboxInboxSync {
 
   /** Whether every reader acknowledged as far as this device's reader. */
   private async settled(
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     readers: MailboxReadTokens,
   ): Promise<boolean> {
     const listed = await this.channel.listReaders(keys, readers.root);

@@ -103,7 +103,7 @@ test('backs up after the password is confirmed again and restores on the same id
 
     await restoreFile(bobBackup, file);
     await expect(bobBackup.getByRole('alert')).toHaveText(
-      'This file is not a backup of this identity, or it was changed.',
+      'This file is not a backup of this identity made by this version of the app, or it was changed.',
     );
 
     // This device of the same identity loses its stored history, and the
@@ -127,7 +127,7 @@ test('backs up after the password is confirmed again and restores on the same id
 
     await restoreFile(restoredBackup, tampered(text));
     await expect(restoredBackup.getByRole('alert')).toHaveText(
-      'This file is not a backup of this identity, or it was changed.',
+      'This file is not a backup of this identity made by this version of the app, or it was changed.',
     );
 
     await restoreFile(restoredBackup, file);

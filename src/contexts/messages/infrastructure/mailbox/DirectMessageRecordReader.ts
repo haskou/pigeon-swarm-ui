@@ -22,7 +22,7 @@ export class DirectMessageRecordReader {
       (record, authorTag) =>
         DirectMessageAuthorship.isAuthentic(
           session.identity.id,
-          sessionRootKey(session).getBuffer(),
+          sessionRootKey(session),
           record,
           authorTag,
         ),

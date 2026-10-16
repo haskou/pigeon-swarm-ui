@@ -1,15 +1,12 @@
 import {
+  DeviceUnlockFactor,
   KeyPair,
   ProtectedUserRootKey,
   SymmetricKey,
   UserRootKey,
   UserRootKeySecondFactor,
 } from '@haskou/pigeon-swarm-crypto';
-import {
-  InvalidFormatError,
-  StringValueObject,
-  assert,
-} from '@haskou/value-objects';
+import { InvalidFormatError, assert } from '@haskou/value-objects';
 
 import type { DeviceId } from '../../domain/value-objects/DeviceId';
 import type { DeviceUnlockSecretHandle } from '../../domain/value-objects/DeviceUnlockSecretHandle';
@@ -25,18 +22,16 @@ const FACTOR_KEY_BITS = 256;
 const MATERIAL_VERSION = 1;
 
 export class DeviceIdentityProtector {
+  /** The unlock factor context, also the AAD of the material it protects. */
   private context(protectedIdentity: {
     deviceId: DeviceId;
     identityId: IdentityId;
     secretHandle: DeviceUnlockSecretHandle;
-  }): StringValueObject {
-    return new StringValueObject(
-      [
-        'pigeon-swarm:device-unlock-factor:v1',
-        protectedIdentity.identityId.valueOf(),
-        protectedIdentity.deviceId.valueOf(),
-        protectedIdentity.secretHandle.valueOf(),
-      ].join('\n'),
+  }): string {
+    return DeviceUnlockFactor.context(
+      protectedIdentity.identityId.valueOf(),
+      protectedIdentity.deviceId.valueOf(),
+      protectedIdentity.secretHandle.valueOf(),
     );
   }
 
@@ -48,13 +43,12 @@ export class DeviceIdentityProtector {
       secretHandle: DeviceUnlockSecretHandle;
     },
   ): Promise<UserRootKeySecondFactor> {
-    const signature = await crypto.subtle.sign(
-      'HMAC',
+    return await DeviceUnlockFactor.derive(
       factorKey,
-      new TextEncoder().encode(this.context(protectedIdentity).valueOf()),
+      protectedIdentity.identityId.valueOf(),
+      protectedIdentity.deviceId.valueOf(),
+      protectedIdentity.secretHandle.valueOf(),
     );
-
-    return UserRootKeySecondFactor.fromBuffer(new Uint8Array(signature));
   }
 
   private serialize(

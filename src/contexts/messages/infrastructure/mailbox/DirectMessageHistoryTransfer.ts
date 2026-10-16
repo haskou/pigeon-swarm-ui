@@ -1,3 +1,10 @@
+import {
+  MailboxEnvelope,
+  MailboxKeySchedule,
+  MailboxReadToken,
+  type SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
+
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type {
   MailboxChannel,
@@ -6,9 +13,6 @@ import type {
 import type { DirectMessageHistoryItem } from './DirectMessageHistoryItem';
 import type { DirectMessageHistoryStore } from './DirectMessageHistoryStore';
 
-import { MailboxEnvelopeCipher } from '../../../mailboxes/infrastructure/crypto/MailboxEnvelopeCipher';
-import { MailboxKeySchedule } from '../../../mailboxes/infrastructure/crypto/MailboxKeySchedule';
-import { MailboxReadToken } from '../../../mailboxes/infrastructure/crypto/MailboxReadToken';
 import { DirectMessageRecordReader } from './DirectMessageRecordReader';
 
 const EPOCH = 0;
@@ -70,9 +74,9 @@ function withinBudget(
   for (const item of items) {
     const framed = frame(item);
 
-    if (framed.byteLength > MailboxEnvelopeCipher.MAX_PLAINTEXT_BYTES) continue;
+    if (framed.byteLength > MailboxEnvelope.MAX_PLAINTEXT_BYTES) continue;
 
-    const bytes = MailboxEnvelopeCipher.bucketFor(framed.byteLength);
+    const bytes = MailboxEnvelope.bucketFor(framed.byteLength);
 
     if (sealedBytes + bytes > MAX_SEALED_BYTES) continue;
 
@@ -126,7 +130,7 @@ export class DirectMessageHistoryTransfer {
    * derived from `secret`. A failure stops the publish and leaves the transfer
    * partial or absent; the importer then gets what was sent. Never throws.
    */
-  public async publish(session: Session, secret: Uint8Array): Promise<void> {
+  public async publish(session: Session, secret: SymmetricKey): Promise<void> {
     try {
       const keys = MailboxKeySchedule.derive(
         secret,
@@ -155,7 +159,7 @@ export class DirectMessageHistoryTransfer {
    * this identity's root authored, and acks each page. Re-running is safe:
    * records already held collapse by record id. Never throws.
    */
-  public async receive(session: Session, secret: Uint8Array): Promise<void> {
+  public async receive(session: Session, secret: SymmetricKey): Promise<void> {
     try {
       const keys = MailboxKeySchedule.derive(
         secret,

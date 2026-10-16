@@ -1,6 +1,7 @@
-import 'fake-indexeddb/auto';
 import type * as BufferModule from 'buffer';
 
+import 'fake-indexeddb/auto';
+import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { randomUUID } from 'node:crypto';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
@@ -15,9 +16,7 @@ const KIND = 'kind-marker-3a90';
 const ID = 'id-marker-8c1e';
 const VALUE = new TextEncoder().encode('value-marker-e24b');
 
-const root = (fill: number) => ({
-  getBuffer: () => new Uint8Array(32).fill(fill),
-});
+const root = (fill: number) => SymmetricKey.fromBuffer(Buffer.alloc(32, fill));
 
 const session = (current: number, previous?: number): Session =>
   ({

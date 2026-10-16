@@ -1,4 +1,5 @@
 import 'fake-indexeddb/auto';
+import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { randomUUID } from 'node:crypto';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
@@ -15,7 +16,7 @@ function session(
   root: Buffer | null = Buffer.alloc(32, 5),
 ): Session {
   return {
-    deviceSealedRootKey: root ? { getBuffer: () => root } : undefined,
+    deviceSealedRootKey: root ? SymmetricKey.fromBuffer(root) : undefined,
     identity: { id: identityId },
   } as unknown as Session;
 }

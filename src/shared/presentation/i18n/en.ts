@@ -714,9 +714,7 @@ export const en = {
     backupPassword: 'Confirm your password to back up',
     backupTitle: 'Backup',
     backupUnreadable:
-      'This file is not a backup of this identity, or it was changed.',
-    backupVersion:
-      'This backup format is not supported. Create a new backup with this version of the app.',
+      'This file is not a backup of this identity made by this version of the app, or it was changed.',
     help: 'What is kept here, on the server, and with other people.',
     low: 'Space is running low. New messages may not be saved here until you free some space.',
     notProtected:

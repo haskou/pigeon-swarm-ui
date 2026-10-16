@@ -1,3 +1,4 @@
+import { KeyFingerprint } from '@haskou/pigeon-swarm-crypto';
 import { describe, expect, it } from '@jest/globals';
 import { Buffer } from 'buffer';
 
@@ -6,7 +7,6 @@ import type { IdentityResource } from '../../../../../contexts/identities/infras
 import type { ConversationKeyEntry } from '../../../../../contexts/identities/infrastructure/keychain/ConversationKeyEntry';
 
 import { ChatConversationPresentation } from '../../../../../app/presentation/workspace/components/ChatConversationPresentation';
-import { KeyFingerprint } from '../../../../../contexts/identities/presentation/view-models/KeyFingerprint';
 
 describe(ChatConversationPresentation.name, () => {
   it('projects a group conversation and its call participants', () => {

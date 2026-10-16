@@ -1,4 +1,8 @@
 import 'fake-indexeddb/auto';
+import {
+  MailboxRecordAuthorship,
+  SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 import { mock } from 'jest-mock-extended';
 import { randomUUID } from 'node:crypto';
@@ -7,7 +11,6 @@ import type { Session } from '../../../../../contexts/identities/infrastructure/
 import type { DirectSentRecord } from '../../../../../contexts/mailboxes/domain/DirectSentRecord';
 import type { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 
-import { DirectMessageAuthorship } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageAuthorship';
 import { DirectMessageHistoryStore } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageHistoryStore';
 import { DirectMessageHistoryTransfer } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageHistoryTransfer';
 import { DirectMessageMailboxRecord } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxRecord';
@@ -19,13 +22,13 @@ type StoredEnvelope = {
 };
 
 describe(DirectMessageHistoryTransfer.name, () => {
-  const secret = Buffer.alloc(32, 11);
+  const secret = SymmetricKey.fromBuffer(Buffer.alloc(32, 11));
   const conversationId = 'conversation-1';
-  const sealedRoot = Buffer.alloc(32, 5);
+  const sealedRoot = SymmetricKey.fromBuffer(Buffer.alloc(32, 5));
 
-  const session = (root: Buffer = sealedRoot): Session =>
+  const session = (root: SymmetricKey = sealedRoot): Session =>
     ({
-      deviceSealedRootKey: { getBuffer: () => root },
+      deviceSealedRootKey: root,
       identity: { id: 'alice' },
     }) as unknown as Session;
 
@@ -39,10 +42,13 @@ describe(DirectMessageHistoryTransfer.name, () => {
     type: 'sent',
   });
 
-  const plaintextOf = (record: DirectSentRecord, root: Buffer = sealedRoot) =>
+  const plaintextOf = (
+    record: DirectSentRecord,
+    root: SymmetricKey = sealedRoot,
+  ) =>
     DirectMessageMailboxRecord.encode(
       record,
-      DirectMessageAuthorship.tag(root, record),
+      MailboxRecordAuthorship.tag(root, record),
     );
 
   const texts = (values: Uint8Array[]): string[] =>
@@ -193,7 +199,7 @@ describe(DirectMessageHistoryTransfer.name, () => {
     const { channel } = fakeNode();
     const exporter = new DirectMessageHistoryStore(databaseName());
     const importer = new DirectMessageHistoryStore(databaseName());
-    const other = Buffer.alloc(32, 9);
+    const other = SymmetricKey.fromBuffer(Buffer.alloc(32, 9));
 
     await exporter.append(session(), conversationId, [
       { plaintext: plaintextOf(sent('m1', 100)), recordId: 'm1' },

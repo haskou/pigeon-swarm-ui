@@ -1,3 +1,8 @@
+import {
+  ConversationDraft,
+  type ConversationDraftContent,
+} from '@haskou/pigeon-swarm-crypto';
+
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestCache } from '../../../../shared/infrastructure/http/RequestCache';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
@@ -5,22 +10,42 @@ import type { Session } from '../../../identities/infrastructure/session/Session
 import type { ConversationDraftsResource } from './ConversationDraftsResource';
 import type { ConversationDraftProjection } from './resources/ConversationDraftProjection';
 
-import { ConversationDraftCipher } from '../crypto/ConversationDraftCipher';
+import { sessionRootKey } from '../../../identities/infrastructure/session/sessionRootKey';
 
 const readCacheTtlMs = 1500;
 const draftsPath = '/conversations/me/drafts';
 
 /**
  * The encrypted conversation drafts the node keeps for this identity, under
- * opaque keys that never name the conversation.
+ * opaque `ConversationDraft` keys that never name the conversation.
  */
 export class PigeonConversationDraftsApi {
   public constructor(
     private readonly http: HttpJsonClient,
     private readonly signer: RequestSigner,
     private readonly requestCache: RequestCache,
-    private readonly cipher = new ConversationDraftCipher(),
   ) {}
+
+  /** Undefined for a draft that does not open under the key it is stored as. */
+  private opened(
+    session: Session,
+    draftKey: string,
+    encryptedPayload: string,
+  ): ConversationDraftContent | undefined {
+    try {
+      return ConversationDraft.open(
+        sessionRootKey(session),
+        draftKey,
+        encryptedPayload,
+      );
+    } catch {
+      return undefined;
+    }
+  }
+
+  private draftPath(session: Session, conversationId: string): string {
+    return `${draftsPath}/${ConversationDraft.draftKey(sessionRootKey(session), conversationId)}`;
+  }
 
   public async listConversationDrafts(
     session: Session,
@@ -37,17 +62,18 @@ export class PigeonConversationDraftsApi {
         );
 
         return result.drafts.flatMap((draft) => {
-          const opened = this.cipher.decrypt(
+          const opened = this.opened(
             session,
             draft.draftKey,
             draft.encryptedPayload,
           );
 
-          return opened === null
+          return opened === undefined
             ? []
             : [
                 {
-                  ...opened,
+                  content: opened.content,
+                  conversationId: opened.conversationId,
                   encryptedPayload: draft.encryptedPayload,
                   updatedAt: draft.updatedAt,
                 },
@@ -64,9 +90,9 @@ export class PigeonConversationDraftsApi {
     content: string,
     updatedAt = Date.now(),
   ): Promise<ConversationDraftProjection> {
-    const path = `${draftsPath}/${this.cipher.draftKey(session, conversationId)}`;
-    const encryptedPayload = this.cipher.encrypt(
-      session,
+    const path = this.draftPath(session, conversationId);
+    const encryptedPayload = ConversationDraft.seal(
+      sessionRootKey(session),
       conversationId,
       content,
     );
@@ -85,7 +111,7 @@ export class PigeonConversationDraftsApi {
     session: Session,
     conversationId: string,
   ): Promise<void> {
-    const path = `${draftsPath}/${this.cipher.draftKey(session, conversationId)}`;
+    const path = this.draftPath(session, conversationId);
 
     await this.http.request(path, {
       headers: await this.signer.headers(session, 'DELETE', path),

@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto';
 import type * as BufferModule from 'buffer';
 
+import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { randomUUID } from 'node:crypto';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
@@ -18,7 +19,7 @@ jest.mock('buffer', () => jest.requireActual<typeof BufferModule>('buffer/'));
 const session = (identityId: string, fill = 1): Session =>
   ({
     deviceId: 'device-1',
-    deviceSealedRootKey: { getBuffer: () => new Uint8Array(32).fill(fill) },
+    deviceSealedRootKey: SymmetricKey.fromBuffer(Buffer.alloc(32, fill)),
     identity: { id: identityId },
   }) as unknown as Session;
 
