@@ -704,6 +704,66 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
     await expect(answer(bob, request.requestId)).resolves.toBe('ignored');
   });
 
+  it('takes concurrent copies of one answer once, and none after it closes', async () => {
+    await alice.control.add(CONVERSATION, [bob.id, carol.id]);
+    const [toBob, toCarol] = await Promise.all(
+      [bob, carol].map(async (member) => {
+        const request = GroupMailboxControlRecord.decode(
+          member.inbox[0].plaintext,
+        );
+
+        if (request?.type !== 'key-package-request') {
+          throw new Error('expected a key package request');
+        }
+
+        return GroupMailboxControlRecord.encode({
+          conversationId: CONVERSATION,
+          keyPackage: await member.engine.createKeyPackage(),
+          requestId: request.requestId,
+          type: 'key-package-response',
+        });
+      }),
+    );
+    const outcomes = await Promise.all([
+      alice.control.receiveDirect(bob.id, toBob),
+      alice.control.receiveDirect(bob.id, toBob),
+    ]);
+
+    expect(outcomes.sort()).toEqual(['applied', 'ignored']);
+    alice.control.close();
+    await expect(alice.control.receiveDirect(carol.id, toCarol)).resolves.toBe(
+      'ignored',
+    );
+    await expect(alice.engine.members(CONVERSATION)).resolves.toEqual(
+      [alice.id, bob.id].sort(),
+    );
+  });
+
+  it('takes the answer again when its add threw', async () => {
+    await alice.control.add(CONVERSATION, [bob.id]);
+    const request = GroupMailboxControlRecord.decode(bob.inbox[0].plaintext);
+
+    if (request?.type !== 'key-package-request') {
+      throw new Error('expected a key package request');
+    }
+    const answer = GroupMailboxControlRecord.encode({
+      conversationId: CONVERSATION,
+      keyPackage: await bob.engine.createKeyPackage(),
+      requestId: request.requestId,
+      type: 'key-package-response',
+    });
+
+    jest
+      .spyOn(alice.engine, 'roster')
+      .mockRejectedValueOnce(new Error('offline'));
+    await expect(alice.control.receiveDirect(bob.id, answer)).rejects.toThrow(
+      'offline',
+    );
+    await expect(alice.control.receiveDirect(bob.id, answer)).resolves.toBe(
+      'applied',
+    );
+  });
+
   it("rejects a key package that is not the answering peer's", async () => {
     const adding = alice.control.add(CONVERSATION, [bob.id]);
 
