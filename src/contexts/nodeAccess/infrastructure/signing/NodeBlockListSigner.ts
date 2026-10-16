@@ -1,9 +1,9 @@
+import { CanonicalJson } from '@haskou/pigeon-swarm-crypto';
+
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { NodeBlockListPrimitives } from '../../domain/NodeBlockList';
 import type { SignedNodeBlockListResource } from '../http/resources/NodeAccessResources';
 
-import { canonicalJson } from '../../../../shared/infrastructure/crypto/canonicalJson';
-import { signSessionPayload } from '../../../../shared/infrastructure/crypto/signSessionPayload';
 import { NodeBlockListNotIssuedError } from './errors/NodeBlockListNotIssuedError';
 
 const documentType = 'pigeon-node-block-list';
@@ -18,10 +18,10 @@ export class NodeBlockListSigner {
   public static signedContent(
     document: Omit<SignedNodeBlockListResource, 'identitySignature'>,
   ): string {
-    return `${signingDomain}${canonicalJson(document)}`;
+    return `${signingDomain}${CanonicalJson.serialize(document)}`;
   }
 
-  public async sign(
+  public sign(
     list: NodeBlockListPrimitives,
     session: Session,
   ): Promise<SignedNodeBlockListResource> {
@@ -37,11 +37,13 @@ export class NodeBlockListSigner {
       type: documentType,
       version: list.version,
     } as const;
-    const signature = await signSessionPayload(
-      session,
+    const signature = session.keyPair.sign(
       NodeBlockListSigner.signedContent(document),
     );
 
-    return { ...document, identitySignature: signature.valueOf() };
+    return Promise.resolve({
+      ...document,
+      identitySignature: signature.valueOf(),
+    });
   }
 }
