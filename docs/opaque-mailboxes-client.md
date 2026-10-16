@@ -17,7 +17,7 @@ HKDF-SHA256 (`@noble/hashes/hkdf.js`, no salt, 32-byte outputs) over a shared 32
 - `info` = label ‖ recipient UTF-8 ‖ u32be(epoch).
 - Labels: `pigeon/mailbox/id/v1` (mailbox id), `pigeon/mailbox/post/v1` (post token), `pigeon/mailbox/envelope/v1` (envelope key).
 - Read token: derived from the identity root key. See Read token below.
-- Node-side capability hashes: SHA-256 hex of the token string (`MailboxCapability.hash`).
+- Node-side capability hashes: SHA-256 hex of the token string (`BearerCapability.hash` from `@haskou/pigeon-swarm-crypto`; tokens must match `^[A-Za-z0-9_-]{20,128}$`).
 
 Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vector asserts the derived mailbox id, post token, and envelope key.
 
@@ -30,7 +30,7 @@ Pinned vector: secret `0x01 × 32`, recipient `identity-bob`, epoch 0. The vecto
 - The peer holds the conversation secret, which yields the mailbox id, post token, and envelope key, but not the root key. It cannot derive the token, so it cannot read, acknowledge, or delete the inbox.
 - The root key also decrypts the identity keychain, which holds the conversation keys. Compromising it already exposes the messages, so the read token adds only the ability to read, acknowledge, or delete the inbox.
 - Who can use it: holders of the identity root key, i.e. this identity's own devices. The 1:1 peer holds only the conversation secret, so it cannot read, acknowledge, or delete the inbox.
-- What the node sees: create sends only `MailboxCapability.hash(token)`. Each read and acknowledge sends the raw token as `Authorization: Bearer`, and the node checks it against that hash. The node therefore learns the raw token on every read and ack. It can already read and delete the inbox's ciphertext envelopes, and the token adds no new capability beyond that.
+- What the node sees: create sends only `BearerCapability.hash(token)`. Each read and acknowledge sends the raw token as `Authorization: Bearer`, and the node checks it against that hash. The node therefore learns the raw token on every read and ack. It can already read and delete the inbox's ciphertext envelopes, and the token adds no new capability beyond that.
 - Groups: do not reuse this derivation with a shared conversation or group secret as the input. Every holder of that secret could then read, acknowledge, and delete each member's inbox. Group inboxes need a per-member token. The group key schedule below derives it from the inbox owner's root key.
 
 ### Reader set

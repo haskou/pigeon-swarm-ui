@@ -1,6 +1,9 @@
 import type { MailboxInboxKeys } from '@haskou/pigeon-swarm-crypto';
 
-import { MailboxReadToken } from '@haskou/pigeon-swarm-crypto';
+import {
+  BearerCapability,
+  MailboxReadToken,
+} from '@haskou/pigeon-swarm-crypto';
 
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { MailboxReadTokens } from '../../../mailboxes/infrastructure/MailboxChannel';
@@ -8,7 +11,6 @@ import type { MailboxReadTokens } from '../../../mailboxes/infrastructure/Mailbo
 import { sessionRootKey } from '../../../identities/infrastructure/session/sessionRootKey';
 import { MailboxUnavailableError } from '../../../mailboxes/domain/errors/MailboxUnavailableError';
 import { MailboxReaderPruningDomainService } from '../../../mailboxes/domain/services/MailboxReaderPruningDomainService';
-import { MailboxCapability } from '../../../mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageReaderCutOffError } from './DirectMessageReaderCutOffError';
 
@@ -48,7 +50,7 @@ export class DirectMessageReaderSet {
         const rootKey = sessionRootKey(session);
 
         return credentials.map((credential) =>
-          MailboxCapability.hash(
+          BearerCapability.hash(
             MailboxReadToken.deriveDevice(rootKey, keys.mailboxId, credential),
           ),
         );
@@ -61,8 +63,8 @@ export class DirectMessageReaderSet {
       removeReader: (readTokenHash) =>
         this.channel.removeReader(keys, readers.root, readTokenHash),
       retainedReaders: () => [
-        MailboxCapability.hash(readers.root),
-        MailboxCapability.hash(readers.device),
+        BearerCapability.hash(readers.root),
+        BearerCapability.hash(readers.device),
       ],
     });
   }
@@ -100,7 +102,7 @@ export class DirectMessageReaderSet {
     keys: MailboxInboxKeys,
     readers: MailboxReadTokens,
   ): Promise<void> {
-    const key = `${keys.mailboxId}:${MailboxCapability.hash(readers.root)}`;
+    const key = `${keys.mailboxId}:${BearerCapability.hash(readers.root)}`;
     const known = this.reconciled.get(key);
 
     if (known) return known;
@@ -151,7 +153,7 @@ export class DirectMessageReaderSet {
     keys: MailboxInboxKeys,
     readers: MailboxReadTokens,
   ): Promise<void> {
-    const key = `${keys.mailboxId}:${MailboxCapability.hash(readers.root)}`;
+    const key = `${keys.mailboxId}:${BearerCapability.hash(readers.root)}`;
     const known = this.enrolled.get(key);
 
     if (known) return known;

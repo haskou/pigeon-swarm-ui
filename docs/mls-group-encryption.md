@@ -93,8 +93,8 @@ GET  /communities/{communityId}/mls/records?groupId=&kind=&afterEpoch=
 - `id` is derived from the record content, so a retry is idempotent:
   `base64url(sha256(canonicalize({epoch?, groupId, kind, payload,
 recipientIdentityId?})))`, with an empty recipient omitted
-  (`deriveMlsRecordId`). `src/test/fixtures/mls-record-id-vectors.json` is a
-  copy of the node's fixture and pins the same bytes.
+  (`CommitmentId.mlsRecord` from `@haskou/pigeon-swarm-crypto`, pinned by
+  the library's shipped `vectors/commitment-ids.json`).
 - `key_package`: author must be a community member. One use only; a client
   publishes a fresh one whenever it has fewer than 4 unused.
 - `commit`: author must be a member; for a channel group, able to see the
@@ -273,13 +273,13 @@ identity key, the same key that signs the leaf credentials, so its trust goes
 back to the community's creator and to nobody else:
 
 - An operation's id is `community:<communityId>:op:<digest>`, where `digest`
-  is `base64url(sha256(canonicalJson(content)))` and `content` is the
+  is `base64url(sha256(CanonicalJson.serialize(content)))` and `content` is the
   operation without `id` and `identitySignature`. `identitySignature` is the
   author's ed25519 signature, with its identity key, over
   `pigeon:community-operation:v1\n` followed by the id
   (`CommunityOperationProof`). Clients send it with every community change;
-  `@haskou/pigeon-swarm-crypto/vectors/community-operation.json` is a copy of the node's
-  fixture and pins the same bytes.
+  `@haskou/pigeon-swarm-crypto/vectors/community-operation.json` pins the
+  same bytes the node checks.
 - `GET /communities/{communityId}/operations?after=&limit=` serves the
   operations verbatim, by digest, to members (`PigeonCommunityOperationsApi`).
   The client keeps only those whose content, address, community and identity
@@ -340,13 +340,13 @@ granted. An `invite_link` join names the link by its reference, never by the
 token: every member reads the operations, and the token alone lets anyone
 join. The reference is
 `base64url(sha256("pigeon:community-invite-reference:v1\n" + token))`
-(`deriveInviteReference`). The `invite_link_created` moderation log entry
+(`CommunityInviteReference.of`). The `invite_link_created` moderation log entry
 names the link by the same reference, since roles that may read the log
 need not be allowed to invite.
 
 The token itself is
 `base64url(sha256(JSON([communityId, creatorIdentityId, nonce, maxUses,
-expiresAt ?? null])))` (`deriveInviteToken`), with `maxUses` 1 and
+expiresAt ?? null])))` (`CommitmentId.communityInviteToken`), with `maxUses` 1 and
 `expiresAt` null when the creator sets none. It commits to the limits, so the
 node refuses a link whose stored limits differ from those the creator chose.
 Only the accepting node counts uses against `maxUses`; replicas do not cap

@@ -1,4 +1,7 @@
-import { CommunityInviteReference } from '@haskou/pigeon-swarm-crypto';
+import {
+  CommitmentId,
+  CommunityInviteReference,
+} from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
@@ -16,7 +19,6 @@ import { NotificationMutationSigner } from '../../../notifications/infrastructur
 import { buildCommunityInviteLinkBody } from './buildCommunityInviteLinkBody';
 import { CommunityModerationLogSigner } from './CommunityModerationLogSigner';
 import { CommunityOperationSigner } from './CommunityOperationSigner';
-import { deriveInviteToken } from './deriveCommunityRecordId';
 
 export class PigeonCommunityInvitationApi {
   private readonly notificationPath = '/notifications/';
@@ -56,7 +58,7 @@ export class PigeonCommunityInvitationApi {
     const createdAt = Date.now();
     const optional = buildCommunityInviteLinkBody(input);
     const maxUses = input.maxUses ?? 1;
-    const token = deriveInviteToken(
+    const token = CommitmentId.communityInviteToken(
       communityId,
       creatorIdentityId,
       nonce,

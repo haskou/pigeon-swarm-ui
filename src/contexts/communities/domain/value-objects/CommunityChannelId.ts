@@ -1,4 +1,4 @@
-import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
+import { CommitmentId } from '@haskou/pigeon-swarm-crypto';
 import { StringValueObject, assert } from '@haskou/value-objects';
 
 import { CommunityChannelNotFoundError } from '../errors/CommunityChannelNotFoundError';
@@ -10,8 +10,7 @@ export class CommunityChannelId extends StringValueObject {
 
   /**
    * The id of the channel a member creates at `createdAt`, as the node
-   * derives it: the first 24 hex chars of sha256(JSON(['channel', community,
-   * creator, createdAt])).
+   * derives it.
    */
   public static derive(
     communityId: string,
@@ -19,11 +18,7 @@ export class CommunityChannelId extends StringValueObject {
     createdAt: number,
   ): CommunityChannelId {
     return new CommunityChannelId(
-      SHA256Hash.from(
-        JSON.stringify(['channel', communityId, creatorIdentityId, createdAt]),
-      )
-        .toString()
-        .slice(0, 24),
+      CommitmentId.communityChannel(communityId, creatorIdentityId, createdAt),
     );
   }
 

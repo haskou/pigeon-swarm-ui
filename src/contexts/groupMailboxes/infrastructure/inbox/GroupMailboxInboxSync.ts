@@ -1,5 +1,7 @@
 import type { MailboxInboxKeys } from '@haskou/pigeon-swarm-crypto';
 
+import { BearerCapability } from '@haskou/pigeon-swarm-crypto';
+
 import type { MlsOpenedMessage } from '../../../communities/infrastructure/mls/MlsGroup';
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessageRecord';
@@ -21,7 +23,6 @@ import { MlsRejectedError } from '../../../communities/infrastructure/mls/MlsRej
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { DirectMailboxRecords } from '../../../mailboxes/domain/DirectMailboxRecords';
 import { MailboxUnavailableError } from '../../../mailboxes/domain/errors/MailboxUnavailableError';
-import { MailboxCapability } from '../../../mailboxes/infrastructure/crypto/MailboxCapability';
 import { DirectMessageInboxKeys } from '../../../messages/infrastructure/mailbox/DirectMessageInboxKeys';
 import { DirectMessageMailboxRecord } from '../../../messages/infrastructure/mailbox/DirectMessageMailboxRecord';
 import { GroupMailboxControlRecord } from '../control/GroupMailboxControlRecord';
@@ -331,7 +332,7 @@ export class GroupMailboxInboxSync {
         keys,
         credential,
       );
-      const key = `${keys.mailboxId}:${MailboxCapability.hash(device)}`;
+      const key = `${keys.mailboxId}:${BearerCapability.hash(device)}`;
 
       if (this.enrolled.has(key)) continue;
       await this.channel.addReader(keys, rootToken, device);
@@ -486,7 +487,7 @@ export class GroupMailboxInboxSync {
     readers: MailboxReadTokens,
   ): Promise<boolean> {
     const listed = await this.channel.listReaders(keys, readers.root);
-    const own = MailboxCapability.hash(readers.device);
+    const own = BearerCapability.hash(readers.device);
     const mine = listed.readers.find((reader) => reader.readTokenHash === own);
 
     return (

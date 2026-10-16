@@ -1,3 +1,5 @@
+import { CommitmentId } from '@haskou/pigeon-swarm-crypto';
+
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { Session } from '../../../identities/infrastructure/session/Session';
@@ -9,7 +11,6 @@ import type { MlsRecordsResource } from './resources/MlsRecordsResource';
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import { ScopeFrontierReader } from '../../../../shared/infrastructure/http/ScopeFrontierReader';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
-import { deriveMlsRecordId } from './deriveMlsRecordId';
 
 const recordsPath = (communityId: string): string =>
   `/communities/${encodeURIComponent(communityId)}/mls/records`;
@@ -50,7 +51,7 @@ export class PigeonMlsRecordsApi {
     input: MlsRecordInput,
   ): Promise<MlsRecordResource> {
     const path = recordsPath(communityId);
-    const recordId = deriveMlsRecordId(input);
+    const recordId = CommitmentId.mlsRecord(input);
     const createdAt = Date.now();
     const document = {
       authorIdentityId: this.mutations.authorOf(session),

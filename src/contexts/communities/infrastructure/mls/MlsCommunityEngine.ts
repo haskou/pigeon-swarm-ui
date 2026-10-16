@@ -1,4 +1,4 @@
-import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
+import { CommitmentId, SHA256Hash } from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 
 import type { CommunityMlsRoster } from '../../domain/CommunityMlsRoster';
@@ -16,7 +16,6 @@ import type { MlsRoster } from './MlsRoster';
 import type { MlsStateStore } from './MlsStateStore';
 
 import { CommunityRosterHistory } from '../../domain/CommunityRosterHistory';
-import { deriveMlsRecordId } from '../http/deriveMlsRecordId';
 import {
   generateMlsKeyPackage,
   MlsGroup,
@@ -416,7 +415,7 @@ export class MlsCommunityEngine {
     };
     const { frontier, state } = group.pendingState();
     const pending: PendingCommit = {
-      commitId: deriveMlsRecordId(input),
+      commitId: CommitmentId.mlsRecord(input),
       epoch: input.epoch,
       frontier: [...frontier],
       state: toBase64(state),
