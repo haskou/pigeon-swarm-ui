@@ -654,6 +654,51 @@ describe('GroupConversationMailbox', () => {
     expect(await alice.mailbox.receiveControl(alice.session)).toEqual([]);
   });
 
+  // The e2e laptop/phone case: the device added sorts first among the
+  // identity's leaves and never reads its control letters again, so only the
+  // creator, which asked the member, may take the answer.
+  it('welcomes a member who answers after the creator added its own other device', async () => {
+    const sibling = await person(alice);
+    const credential = (member: Member): string =>
+      member.session.deviceCredentialKeyPair.toPrimitives().publicKey;
+    // Leaves sort by credential as `GroupMailboxMlsEngine.devices` does.
+    const [added, creator] =
+      credential(alice) < credential(sibling)
+        ? [alice, sibling]
+        : [sibling, alice];
+
+    contacts.delete(alice.id);
+    CONVERSATION = (
+      await creator.mailbox.create(creator.session, {
+        name: 'Group',
+        networkId: NETWORK,
+        participantIds: [bob.id],
+      })
+    ).id;
+    await settle(
+      creator.mailbox.membersChanged(creator.session, CONVERSATION),
+      [creator, added],
+    );
+    await bob.mailbox.receiveControl(bob.session);
+    const [invitation] = bob.mailbox.invitations(bob.session);
+
+    expect(
+      await bob.mailbox.acceptInvitation(
+        bob.session,
+        invitation.notificationId,
+      ),
+    ).toBe(true);
+    const joined: string[] = [];
+
+    for (let round = 0; round < 50 && joined.length === 0; round += 1) {
+      await creator.mailbox.receiveControl(creator.session);
+      joined.push(...(await bob.mailbox.receiveControl(bob.session)));
+      await turn();
+    }
+
+    expect(joined).toEqual([CONVERSATION]);
+  });
+
   it('a sync tells a removed member it left the roster', async () => {
     await formGroup();
     await alice.mailbox.removeMember(alice.session, CONVERSATION, carol.id);
