@@ -191,6 +191,120 @@ describe(DirectMessageOutboxStore.name, () => {
     ]);
   });
 
+  it('refuses the replaced root in another store instance, as in a stale tab, and keeps the rows', async () => {
+    const name = databaseName();
+    const previousRoot = Buffer.alloc(32, 5);
+    const rotatedRoot = Buffer.alloc(32, 9);
+
+    await new DirectMessageOutboxStore(name).save(
+      session('identity-1', previousRoot),
+      row('a'),
+    );
+    await new DirectMessageOutboxStore(name).load(
+      session('identity-1', rotatedRoot, previousRoot),
+    );
+
+    await expect(
+      new DirectMessageOutboxStore(name).load(
+        session('identity-1', previousRoot),
+      ),
+    ).rejects.toThrow('Device sealed root was replaced.');
+    await expect(
+      new DirectMessageOutboxStore(name).save(
+        session('identity-1', previousRoot),
+        row('b'),
+      ),
+    ).rejects.toThrow('Device sealed root was replaced.');
+    expect(
+      await new DirectMessageOutboxStore(name).load(
+        session('identity-1', rotatedRoot),
+      ),
+    ).toEqual([row('a')]);
+  });
+
+  it('keeps every row under the replaced root when the re-seal fails midway, then completes it', async () => {
+    const name = databaseName();
+    const previousRoot = Buffer.alloc(32, 5);
+    const rotatedRoot = Buffer.alloc(32, 9);
+    const writer = new DirectMessageOutboxStore(name);
+
+    for (const id of ['a', 'b', 'c']) {
+      await writer.save(session('identity-1', previousRoot), row(id));
+    }
+    const original = IDBObjectStore.prototype.put;
+    let puts = 0;
+
+    // The second write of the re-seal fails, after one row was re-sealed.
+    jest.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+      this: IDBObjectStore,
+      value,
+      key,
+    ) {
+      puts += 1;
+
+      if (puts === 2) throw new Error('Quota exceeded.');
+
+      return original.call(this, value, key);
+    });
+
+    await expect(
+      new DirectMessageOutboxStore(name).load(
+        session('identity-1', rotatedRoot, previousRoot),
+      ),
+    ).rejects.toThrow();
+    jest.restoreAllMocks();
+
+    expect(puts).toBe(2);
+    expect(
+      await new DirectMessageOutboxStore(name).load(
+        session('identity-1', previousRoot),
+      ),
+    ).toEqual([row('a'), row('b'), row('c')]);
+    expect(
+      await new DirectMessageOutboxStore(name).load(
+        session('identity-1', rotatedRoot, previousRoot),
+      ),
+    ).toEqual([row('a'), row('b'), row('c')]);
+    await expect(
+      new DirectMessageOutboxStore(name).load(
+        session('identity-1', previousRoot),
+      ),
+    ).rejects.toThrow('Device sealed root was replaced.');
+  });
+
+  it('logs only counts when a re-seal drops a row that does not open', async () => {
+    const name = databaseName();
+    const previousRoot = Buffer.alloc(32, 5);
+    const rotatedRoot = Buffer.alloc(32, 9);
+    const info = jest.spyOn(console, 'info').mockImplementation(() => {});
+
+    await new DirectMessageOutboxStore(name).save(
+      session('identity-1', previousRoot),
+      row('a'),
+    );
+    const db = await openRaw(name);
+
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction('entries', 'readwrite');
+
+      transaction
+        .objectStore('entries')
+        .put({ sealed: new Uint8Array(64) }, 'identity-1\u0000broken');
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+    db.close();
+
+    expect(
+      await new DirectMessageOutboxStore(name).load(
+        session('identity-1', rotatedRoot, previousRoot),
+      ),
+    ).toEqual([row('a')]);
+    expect(info.mock.calls).toEqual([
+      ['Direct outbox re-sealed 1 rows and dropped 1.'],
+    ]);
+  });
+
   it('drops rows sealed under a root the session neither holds nor replaced', async () => {
     const name = databaseName();
     const previousRoot = Buffer.alloc(32, 5);
