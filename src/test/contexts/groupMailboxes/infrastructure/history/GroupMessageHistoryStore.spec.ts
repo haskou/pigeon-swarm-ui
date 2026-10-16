@@ -303,6 +303,73 @@ describe(GroupMessageHistoryStore.name, () => {
     ).toEqual([]);
   });
 
+  it('reports once that a root change dropped the stored history', async () => {
+    const name = `history-${randomUUID()}`;
+    const rotated = session('alice', Buffer.alloc(32, 6));
+
+    await new GroupMessageHistoryStore(name).append(session('alice'), [
+      sent('c1', 'a', 1),
+    ]);
+    const store = new GroupMessageHistoryStore(name);
+
+    expect(await store.checkDropped(session('alice'))).toBe(false);
+    expect(await store.checkDropped(rotated)).toBe(true);
+    expect(await store.checkDropped(rotated)).toBe(false);
+    expect(await store.load(rotated, 'c1', 5)).toEqual([]);
+  });
+
+  it('reports no drop when a root change finds nothing stored', async () => {
+    const name = `history-${randomUUID()}`;
+
+    await new GroupMessageHistoryStore(name).load(session('alice'), 'c1', 5);
+    const store = new GroupMessageHistoryStore(name);
+
+    expect(
+      await store.checkDropped(session('alice', Buffer.alloc(32, 6))),
+    ).toBe(false);
+    expect(
+      await new GroupMessageHistoryStore(
+        `history-${randomUUID()}`,
+      ).checkDropped(session('alice')),
+    ).toBe(false);
+  });
+
+  it('reports neither a forget nor another identity’s drop', async () => {
+    const name = `history-${randomUUID()}`;
+    const rotated = (identityId: string) =>
+      session(identityId, Buffer.alloc(32, 6));
+
+    await new GroupMessageHistoryStore(name).append(session('alice'), [
+      sent('c1', 'a', 1),
+    ]);
+    await new GroupMessageHistoryStore(name).append(session('bob'), [
+      sent('c1', 'b', 1),
+    ]);
+    const store = new GroupMessageHistoryStore(name);
+
+    await store.load(rotated('alice'), 'c1', 5);
+    await store.forget('alice');
+
+    expect(await store.checkDropped(rotated('alice'))).toBe(false);
+    expect(await store.checkDropped(session('bob'))).toBe(false);
+  });
+
+  it('reports no drop without a device-sealed root or a readable database', async () => {
+    const store = new GroupMessageHistoryStore(`history-${randomUUID()}`);
+
+    expect(
+      await store.checkDropped({
+        identity: { id: 'alice' },
+      } as unknown as Session),
+    ).toBe(false);
+    jest.spyOn(indexedDB, 'open').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    jest.spyOn(console, 'debug').mockImplementation(() => undefined);
+
+    expect(await store.checkDropped(session('alice'))).toBe(false);
+  });
+
   it('stores no plaintext at rest, not even the conversation or record id', async () => {
     const name = `history-${randomUUID()}`;
 

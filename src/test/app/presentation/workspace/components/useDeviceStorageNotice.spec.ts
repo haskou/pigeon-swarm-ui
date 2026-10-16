@@ -23,11 +23,13 @@ jest.mock('react', () => ({
 jest.mock('../../../../../app/composition/applicationContainer', () => ({
   applicationContainer: {
     directMessages: { checkHistoryDropped: jest.fn() },
+    groupMessages: { checkHistoryDropped: jest.fn() },
   },
   deviceStorage: { estimate: jest.fn(), protect: jest.fn() },
 }));
 
 const directMessages = jest.mocked(applicationContainer.directMessages);
+const groupMessages = jest.mocked(applicationContainer.groupMessages);
 const storage = jest.mocked(deviceStorage);
 const session = { identity: { id: 'identity-1' } } as unknown as Session;
 
@@ -59,6 +61,7 @@ describe(useDeviceStorageNotice.name, () => {
       new DeviceStorageEstimate(10 * MIB, 1024 * MIB, true),
     );
     directMessages.checkHistoryDropped.mockResolvedValue(false);
+    groupMessages.checkHistoryDropped.mockResolvedValue(false);
   });
 
   it('asks for persistent storage after unlock and stays quiet with room to spare', async () => {
@@ -68,6 +71,7 @@ describe(useDeviceStorageNotice.name, () => {
 
     expect(storage.protect).toHaveBeenCalledTimes(1);
     expect(directMessages.checkHistoryDropped).toHaveBeenCalledWith(session);
+    expect(groupMessages.checkHistoryDropped).toHaveBeenCalledWith(session);
     expect(onNoticeChange).not.toHaveBeenCalled();
   });
 
@@ -82,6 +86,32 @@ describe(useDeviceStorageNotice.name, () => {
     expect(onNoticeChange).toHaveBeenCalledWith(
       copy.workspace.deviceStorageLost,
     );
+  });
+
+  it('says so once when this device dropped its stored group history', async () => {
+    groupMessages.checkHistoryDropped.mockResolvedValue(true);
+
+    const { onNoticeChange } = mount();
+
+    await settle();
+
+    expect(onNoticeChange).toHaveBeenCalledTimes(1);
+    expect(onNoticeChange).toHaveBeenCalledWith(
+      copy.workspace.deviceStorageLost,
+    );
+    expect(storage.estimate).not.toHaveBeenCalled();
+  });
+
+  it('takes both drops into one notice, so neither shows on a later unlock', async () => {
+    directMessages.checkHistoryDropped.mockResolvedValue(true);
+    groupMessages.checkHistoryDropped.mockResolvedValue(true);
+
+    const { onNoticeChange } = mount();
+
+    await settle();
+
+    expect(groupMessages.checkHistoryDropped).toHaveBeenCalledWith(session);
+    expect(onNoticeChange).toHaveBeenCalledTimes(1);
   });
 
   it('warns once when space on this device runs low', async () => {

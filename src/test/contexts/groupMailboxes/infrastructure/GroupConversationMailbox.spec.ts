@@ -1348,6 +1348,23 @@ describe('GroupConversationMailbox', () => {
     ).rejects.toThrow();
   });
 
+  it('reports once the history a root it cannot trace back dropped', async () => {
+    await formGroup();
+    await alice.mailbox.send(alice.session, conversation(), 'lost', {});
+    await sync(bob);
+
+    expect(await bob.mailbox.checkHistoryDropped(bob.session)).toBe(false);
+    bob.mailbox.stop(bob.id);
+    bob.mailbox = device(bob.storage);
+    bob.session = {
+      ...bob.session,
+      deviceSealedRootKey: SymmetricKey.fromBuffer(Buffer.alloc(32, 201)),
+    } as unknown as Session;
+
+    expect(await bob.mailbox.checkHistoryDropped(bob.session)).toBe(true);
+    expect(await bob.mailbox.checkHistoryDropped(bob.session)).toBe(false);
+  });
+
   it('forgets history and MLS state', async () => {
     await formGroup();
     await alice.mailbox.send(alice.session, conversation(), 'gone', {});
