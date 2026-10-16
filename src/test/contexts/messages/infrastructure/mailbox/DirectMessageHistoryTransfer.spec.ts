@@ -155,6 +155,43 @@ describe(DirectMessageHistoryTransfer.name, () => {
     );
   }, 60_000);
 
+  it('exports the newest records within 4 MiB sealed and skips an over-size one', async () => {
+    const { channel } = fakeNode();
+    const exporter = new DirectMessageHistoryStore(databaseName());
+    const importer = new DirectMessageHistoryStore(databaseName());
+    const large = (id: string, createdAt: number, size: number) => ({
+      ...sent(id, createdAt),
+      encryptedPayload: 'x'.repeat(size),
+    });
+    // 65 records in the largest (64 KiB) bucket: only 64 fit in 4 MiB.
+    const fitting = Array.from({ length: 65 }, (_, index) =>
+      large(`m${index}`, index, 40_000),
+    );
+    const oversize = large('newest', 100, 70_000);
+    const records = [...fitting, oversize];
+
+    await exporter.append(
+      session(),
+      conversationId,
+      records.map((record) => ({
+        plaintext: plaintextOf(record),
+        recordId: record.id,
+      })),
+    );
+    await new DirectMessageHistoryTransfer(channel, exporter).publish(
+      session(),
+      secret,
+    );
+    await new DirectMessageHistoryTransfer(channel, importer).receive(
+      session(),
+      secret,
+    );
+
+    expect(texts(await importer.load(session(), conversationId))).toEqual(
+      texts(fitting.slice(1).map((record) => plaintextOf(record))),
+    );
+  }, 60_000);
+
   it('does not throw when the publish fails', async () => {
     const { channel } = fakeNode();
 
