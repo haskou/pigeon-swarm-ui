@@ -14,10 +14,14 @@ const storeNames = ['entries', 'canaries'];
 function session(
   identityId: string,
   root: Buffer | null = Buffer.alloc(32, 5),
+  previousRoot?: Buffer,
 ): Session {
   return {
     deviceSealedRootKey: root ? SymmetricKey.fromBuffer(root) : undefined,
     identity: { id: identityId },
+    previousDeviceSealedRootKey: previousRoot
+      ? SymmetricKey.fromBuffer(previousRoot)
+      : undefined,
   } as unknown as Session;
 }
 
@@ -143,7 +147,51 @@ describe(DirectMessageOutboxStore.name, () => {
     expect(await store.load(session('identity-1'))).toEqual([row('b')]);
   });
 
-  it('drops rows sealed under a previous device root', async () => {
+  it('keeps the rows across a root rotation, re-sealed under the new root', async () => {
+    const name = databaseName();
+    const previousRoot = Buffer.alloc(32, 5);
+    const rotatedRoot = Buffer.alloc(32, 9);
+
+    await new DirectMessageOutboxStore(name).save(
+      session('identity-1', previousRoot),
+      row('a'),
+    );
+
+    expect(
+      await new DirectMessageOutboxStore(name).load(
+        session('identity-1', rotatedRoot, previousRoot),
+      ),
+    ).toEqual([row('a')]);
+    expect(
+      await new DirectMessageOutboxStore(name).load(
+        session('identity-1', rotatedRoot),
+      ),
+    ).toEqual([row('a')]);
+    expect(
+      (await storedChunks(name)).some((chunk) => chunk.includes(marker)),
+    ).toBe(false);
+  });
+
+  it('refuses the root it re-sealed away from and keeps the rows', async () => {
+    const store = new DirectMessageOutboxStore(databaseName());
+    const previousRoot = Buffer.alloc(32, 5);
+    const rotatedRoot = Buffer.alloc(32, 9);
+
+    await store.save(session('identity-1', previousRoot), row('a'));
+    await store.load(session('identity-1', rotatedRoot, previousRoot));
+
+    await expect(
+      store.save(session('identity-1', previousRoot), row('b')),
+    ).rejects.toThrow();
+    await expect(
+      store.load(session('identity-1', previousRoot)),
+    ).rejects.toThrow();
+    expect(await store.load(session('identity-1', rotatedRoot))).toEqual([
+      row('a'),
+    ]);
+  });
+
+  it('drops rows sealed under a root the session neither holds nor replaced', async () => {
     const name = databaseName();
     const previousRoot = Buffer.alloc(32, 5);
     const rotatedRoot = Buffer.alloc(32, 9);
