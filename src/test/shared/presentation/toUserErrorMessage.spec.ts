@@ -155,6 +155,7 @@ describe(toUserErrorMessage.name, () => {
     [401020, 401],
     [401021, 401],
     [403010, 403],
+    [408010, 408],
     [413010, 413],
     [429060, 429],
   ] as const)('explains block list upload refusal %s', (code, status) => {
