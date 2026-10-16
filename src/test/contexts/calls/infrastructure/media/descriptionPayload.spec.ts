@@ -6,13 +6,13 @@ describe(descriptionPayload.name, () => {
       descriptionPayload({ sdp: 'v=0', type: 'offer' }, [], [], [], [], {
         acceptsEncrypted: true,
         enabled: true,
-        version: 1,
+        version: 2,
       }),
     ).toMatchObject({
       mediaEncryption: {
         acceptsEncrypted: true,
         enabled: true,
-        version: 1,
+        version: 2,
       },
       sdp: 'v=0',
       type: 'offer',

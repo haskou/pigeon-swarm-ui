@@ -1,6 +1,7 @@
 import { MlsLeafSigner } from '@haskou/pigeon-swarm-crypto/mls';
 import { Buffer } from 'buffer';
 
+import type { CallMediaKey } from '../../../contexts/calls/infrastructure/media/CallMediaKey';
 import type { CommunityAuthority } from '../../../contexts/communities/domain/operations/CommunityAuthority';
 import type { CommunityOperation } from '../../../contexts/communities/domain/operations/CommunityOperation';
 import type { PigeonCommunityOperationsApi } from '../../../contexts/communities/infrastructure/http/PigeonCommunityOperationsApi';
@@ -387,19 +388,19 @@ export class PigeonMlsFacade {
     return await this.operations.list(session, communityId);
   }
 
-  /** The media key of a call, from the group of the channel it runs in. */
+  /** The media key of a call and its epoch, from the channel's group. */
   public async callMediaKey(
     session: Session,
     communityId: string,
     channelId: string,
     callId: string,
-  ): Promise<string> {
-    const secret = await this.engineFor(session).callMediaKey(
+  ): Promise<CallMediaKey> {
+    const { epoch, secret } = await this.engineFor(session).callMediaKey(
       await this.groupFor(session, communityId, channelId),
       callId,
     );
 
-    return Buffer.from(secret).toString('base64');
+    return { epoch, key: Buffer.from(secret).toString('base64') };
   }
 
   /** Drops the engines and keys held in memory, for logout. State is kept. */

@@ -1,4 +1,5 @@
 import type { CallResource } from '../../infrastructure/http/resources/CallResource';
+import type { CallMediaKey } from '../../infrastructure/media/CallMediaKey';
 import type { PeerMediaStats } from '../../infrastructure/media/CallPeerConnections';
 import type { CallMediaEncryptionState } from '../view-models/CallMediaEncryptionState';
 import type { CallMediaEncryptionUnavailableReason } from '../view-models/CallMediaEncryptionUnavailableReason';
@@ -70,7 +71,7 @@ export function callMediaEncryptionState({
   key,
   reason,
 }: {
-  key?: string;
+  key?: CallMediaKey;
   reason?: CallMediaEncryptionUnavailableReason;
 }): CallMediaEncryptionState {
   if (!key) return { active: false, reason: reason ?? 'missing-key' };

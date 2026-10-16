@@ -174,7 +174,7 @@ function callStartHarness(overrides: Partial<CallStartActionsInput>): {
       }) as WorkspaceCallDetails,
     callMediaEncryptionForResource: () =>
       Promise.resolve({
-        mediaEncryptionKey: 'call-key',
+        mediaEncryptionKey: { epoch: 0, key: 'call-key' },
       }),
     cleanupJoinedCalls: () => Promise.resolve(),
     incomingCall: null,

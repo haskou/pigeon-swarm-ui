@@ -21,6 +21,7 @@ export class CallLocalTracks {
   ) {}
 
   private addMissingTrack(
+    peerIdentityId: string,
     peer: RTCPeerConnection,
     track: MediaStreamTrack,
     syncedTracks: Set<MediaStreamTrack>,
@@ -29,10 +30,14 @@ export class CallLocalTracks {
       return;
     }
 
-    this.addTrack(peer, track);
+    this.addTrack(peerIdentityId, peer, track);
   }
 
-  private addTrack(peer: RTCPeerConnection, track: MediaStreamTrack): void {
+  private addTrack(
+    peerIdentityId: string,
+    peer: RTCPeerConnection,
+    track: MediaStreamTrack,
+  ): void {
     // A private call this browser failed to encrypt sends nothing more.
     if (this.encryption.failed) return;
 
@@ -43,7 +48,7 @@ export class CallLocalTracks {
 
     // Chromium passes the frames of a sender or receiver that has no
     // transform once the task creating it ends, even if one comes later.
-    this.encryption.syncPeer(peer);
+    this.encryption.syncPeer(peerIdentityId, peer);
     this.configureScreenShareQuality(sender);
   }
 
@@ -95,6 +100,7 @@ export class CallLocalTracks {
   }
 
   private syncPeer(
+    peerIdentityId: string,
     peer: RTCPeerConnection,
     activeTracks: MediaStreamTrack[],
   ): void {
@@ -106,14 +112,16 @@ export class CallLocalTracks {
     }
 
     for (const track of activeTracks) {
-      this.addMissingTrack(peer, track, syncedTracks);
+      this.addMissingTrack(peerIdentityId, peer, track, syncedTracks);
     }
   }
 
   private syncPeers(peers: Map<string, RTCPeerConnection>): void {
     const activeTracks = this.localStream?.getTracks() ?? [];
 
-    for (const peer of peers.values()) this.syncPeer(peer, activeTracks);
+    for (const [peerIdentityId, peer] of peers) {
+      this.syncPeer(peerIdentityId, peer, activeTracks);
+    }
   }
 
   private syncSender(
@@ -165,7 +173,7 @@ export class CallLocalTracks {
         readyState: track.readyState,
       });
 
-      this.addTrack(peer, track);
+      this.addTrack(peerIdentityId, peer, track);
     });
   }
 

@@ -1,3 +1,4 @@
+import { Buffer } from 'buffer';
 import { mock } from 'jest-mock-extended';
 
 import type { PigeonCommunityOperationsApi } from '../../../../contexts/communities/infrastructure/http/PigeonCommunityOperationsApi';
@@ -40,7 +41,7 @@ describe('PigeonMlsFacade', () => {
     } as unknown as Session;
     jest
       .spyOn(MlsCommunityEngine.prototype, 'callMediaKey')
-      .mockResolvedValue(new Uint8Array(32));
+      .mockResolvedValue({ epoch: 3, secret: new Uint8Array(32).fill(7) });
     jest
       .spyOn(MlsCommunityEngine.prototype, 'encrypt')
       .mockResolvedValue('sealed');
@@ -86,5 +87,14 @@ describe('PigeonMlsFacade', () => {
       history.communityId,
       history.communityId,
     ]);
+  });
+
+  it('returns the call media key in base64 with the epoch it was exported in', async () => {
+    await expect(
+      facade.callMediaKey(session, history.communityId, open, 'call'),
+    ).resolves.toEqual({
+      epoch: 3,
+      key: Buffer.from(new Uint8Array(32).fill(7)).toString('base64'),
+    });
   });
 });

@@ -1,3 +1,6 @@
+import type { CallMediaFramePeer } from '@haskou/pigeon-swarm-crypto';
+
+import type { CallMediaKey } from './CallMediaKey';
 import type { CallSignalType } from './CallSignalType';
 import type { PeerMediaStats } from './collectPeerMediaStats';
 import type { RtcConfigurationProvider } from './RtcConfigurationProvider';
@@ -109,7 +112,7 @@ export class CallPeerConnections {
     }
     // Chromium passes the frames of a sender or receiver that has no
     // transform once the task creating it ends, even if one comes later.
-    this.mediaEncryption.syncPeer(peer);
+    this.mediaEncryption.syncPeer(peerIdentityId, peer);
     peer.addEventListener('connectionstatechange', () => {
       logCallDebug('peer-manager:connection-state-change', {
         connectionState: peer.connectionState,
@@ -134,7 +137,7 @@ export class CallPeerConnections {
     });
     peer.addEventListener('signalingstatechange', () => {
       // A remote description has just created any transceiver it needs.
-      this.mediaEncryption.syncPeer(peer);
+      this.mediaEncryption.syncPeer(peerIdentityId, peer);
       logCallDebug('peer-manager:signaling-state-change', {
         peerIdentityId,
         signalingState: peer.signalingState,
@@ -176,7 +179,11 @@ export class CallPeerConnections {
     peer.addEventListener('track', (event) => {
       const [stream] = event.streams;
 
-      this.mediaEncryption.configureReceiver(event.receiver);
+      this.mediaEncryption.configureReceiver(
+        peerIdentityId,
+        event.receiver,
+        this.screenShareStreams.remoteMediaTrack(peerIdentityId, event),
+      );
       logCallDebug('peer-manager:track-received', {
         hasStream: Boolean(stream),
         peerIdentityId,
@@ -341,9 +348,15 @@ export class CallPeerConnections {
     logCallDebug('peer-manager:configure');
   }
 
-  /** A private call has `base64Key`; a public one has none. */
-  public configureMediaEncryption(base64Key: null | string): void {
-    this.mediaEncryption.configure(base64Key);
+  /**
+   * A private call has the `key` this identity seals `call`'s media with; a
+   * public one has none.
+   */
+  public configureMediaEncryption(
+    call: CallMediaFramePeer,
+    key: CallMediaKey | null,
+  ): void {
+    this.mediaEncryption.configure(call, key);
     this.mediaEncryption.syncPeers(this.peers);
   }
 
@@ -454,6 +467,11 @@ export class CallPeerConnections {
 
   public remoteScreenMediaStreams(): Record<string, MediaStream> {
     return this.screenShareStreams.streams();
+  }
+
+  /** Moves a private call's media to the `key` of a newer epoch. */
+  public rekeyMediaEncryption(key: CallMediaKey): void {
+    this.mediaEncryption.rekey(key);
   }
 
   public reset(): void {

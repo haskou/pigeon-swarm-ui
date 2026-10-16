@@ -1,3 +1,4 @@
+import type { CallMediaTrack } from './CallMediaTrack';
 import type { DescriptionSignalPayload } from './DescriptionSignalPayload';
 
 import { logCallDebug } from './callDebugLogger';
@@ -190,6 +191,32 @@ export class CallScreenShareStreams {
   ): void {
     this.rememberRemoteVideoMetadata(peerIdentityId, payload);
     this.rememberRemoteAudioMetadata(peerIdentityId, payload);
+  }
+
+  /** The track the frames of a remote `event.track` are sealed for. */
+  public remoteMediaTrack(
+    peerIdentityId: string,
+    event: RTCTrackEvent,
+  ): CallMediaTrack {
+    if (event.track.kind === 'audio') {
+      return isRemoteScreenShareAudioTrack(
+        event.track,
+        event.streams,
+        this.remoteAudioTrackIds.get(peerIdentityId) ?? new Set(),
+        this.remoteAudioStreamIds.get(peerIdentityId) ?? new Set(),
+      )
+        ? 'screen-audio'
+        : 'audio';
+    }
+
+    return isRemoteScreenShareTrack(
+      event.track,
+      event.streams,
+      this.remoteTrackIds.get(peerIdentityId) ?? new Set(),
+      this.remoteStreamIds.get(peerIdentityId) ?? new Set(),
+    )
+      ? 'screen-video'
+      : 'video';
   }
 
   public reset(): void {

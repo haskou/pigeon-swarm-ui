@@ -1,4 +1,5 @@
 import type { CallResource } from '../../../../../contexts/calls/infrastructure/http/resources/CallResource';
+import type { CallMediaKey } from '../../../../../contexts/calls/infrastructure/media/CallMediaKey';
 import type { LocalKeychain } from '../../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
 
 import { resolveWorkspaceCallMediaEncryption } from '../../../../../app/presentation/workspace/components/resolveWorkspaceCallMediaEncryption';
@@ -6,6 +7,8 @@ import { CallPeerConnections } from '../../../../../contexts/calls/infrastructur
 import { CallMediaEncryptionUnavailableError } from '../../../../../contexts/calls/presentation/errors/CallMediaEncryptionUnavailableError';
 import { CommunityOperation } from '../../../../../contexts/communities/domain/operations/CommunityOperation';
 import { copy } from '../../../../../shared/presentation/i18n/copy';
+
+const derivedKey: CallMediaKey = { epoch: 4, key: 'derived-key' };
 
 /** The signed operations of a community its genesis made `visibility`. */
 function operationsOf(
@@ -123,8 +126,8 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
     });
   });
 
-  it("derives private community keys from the group of the call's channel, scoped to the call", async () => {
-    const communityCallKey = jest.fn().mockResolvedValue('derived-key');
+  it("derives private community keys and their epoch from the group of the call's channel, scoped to the call", async () => {
+    const communityCallKey = jest.fn().mockResolvedValue(derivedKey);
 
     await expect(
       resolveWorkspaceCallMediaEncryption({
@@ -134,7 +137,7 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
         currentIdentityId: 'identity-1',
         keychain: emptyKeychain(),
       }),
-    ).resolves.toEqual({ mediaEncryptionKey: 'derived-key' });
+    ).resolves.toEqual({ mediaEncryptionKey: derivedKey });
     expect(communityCallKey).toHaveBeenCalledWith(
       'community-1',
       'voice-1',
@@ -173,7 +176,7 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
     );
   });
 
-  it('encrypts a direct call with the conversation key', async () => {
+  it('encrypts a direct call with the conversation key in epoch 0', async () => {
     await expect(
       resolveWorkspaceCallMediaEncryption({
         call: conversationCall(),
@@ -182,7 +185,9 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
         currentIdentityId: 'identity-1',
         keychain: keychainWithConversationKey(),
       }),
-    ).resolves.toEqual({ mediaEncryptionKey: 'conversation-key' });
+    ).resolves.toEqual({
+      mediaEncryptionKey: { epoch: 0, key: 'conversation-key' },
+    });
   });
 
   it('refuses a direct call without a conversation key', async () => {
@@ -213,7 +218,7 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
   });
 
   it('treats a community as private when its signed operations cannot be read', async () => {
-    const communityCallKey = jest.fn().mockResolvedValue('derived-key');
+    const communityCallKey = jest.fn().mockResolvedValue(derivedKey);
 
     await expect(
       resolveWorkspaceCallMediaEncryption({
@@ -223,7 +228,7 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
         currentIdentityId: 'identity-1',
         keychain: emptyKeychain(),
       }),
-    ).resolves.toEqual({ mediaEncryptionKey: 'derived-key' });
+    ).resolves.toEqual({ mediaEncryptionKey: derivedKey });
   });
 
   it.each([
@@ -235,7 +240,7 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
       jest
         .spyOn(CallPeerConnections, 'mediaEncryptionSupported')
         .mockReturnValue(false);
-      const communityCallKey = jest.fn().mockResolvedValue('derived-key');
+      const communityCallKey = jest.fn().mockResolvedValue(derivedKey);
 
       await expect(
         resolveWorkspaceCallMediaEncryption({

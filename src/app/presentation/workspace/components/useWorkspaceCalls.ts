@@ -15,6 +15,7 @@ import type { CommunityResource as Community } from '../../../../contexts/commun
 import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
+import type { CallMediaRekeyTarget } from './CallMediaRekeyTarget';
 import type { WorkspaceCalls } from './WorkspaceCalls';
 
 import { logCallDebug } from '../../../../contexts/calls/infrastructure/media/callDebugLogger';
@@ -28,6 +29,7 @@ import { loadWorkspaceCallIceConfig } from './loadWorkspaceCallIceConfig';
 import { resolveWorkspaceCallDetails } from './resolveWorkspaceCallDetails';
 import { resolveWorkspaceCallMediaEncryption } from './resolveWorkspaceCallMediaEncryption';
 import { useCallDeparture } from './useCallDeparture';
+import { useCallMediaRekey } from './useCallMediaRekey';
 import { useCallResourceReconciliation } from './useCallResourceReconciliation';
 import { useCallStartActions } from './useCallStartActions';
 import { useWorkspaceCallHeartbeat } from './useWorkspaceCallHeartbeat';
@@ -121,6 +123,7 @@ export function useWorkspaceCalls({
     receiveSignal,
     reconcileCall,
     recoverAfterDisruption,
+    rekeyMediaEncryption,
     retryConnection,
     retryMicrophone,
     setParticipantScreenShareVolume,
@@ -405,6 +408,29 @@ export function useWorkspaceCalls({
         })
         .catch(endDeniedCall);
     },
+  });
+
+  const currentCallMediaKey = useCallback(
+    async ({ callId, channelId, communityId }: CallMediaRekeyTarget) => {
+      await applicationContainer.mls.synchronize(
+        sessionRef.current,
+        communityId,
+      );
+
+      return await applicationContainer.mls.callMediaKey(
+        sessionRef.current,
+        communityId,
+        channelId,
+        callId,
+      );
+    },
+    [sessionRef],
+  );
+
+  useCallMediaRekey({
+    activeCall,
+    currentMediaKey: currentCallMediaKey,
+    rekeyMediaEncryption,
   });
 
   useEffect(() => {

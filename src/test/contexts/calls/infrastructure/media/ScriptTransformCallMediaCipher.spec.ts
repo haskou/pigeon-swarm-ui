@@ -1,12 +1,20 @@
 import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { mock, type MockProxy } from 'jest-mock-extended';
 
+import type { CallMediaKey } from '../../../../../contexts/calls/infrastructure/media/CallMediaKey';
+
 import {
   readCallDiagnostics,
   startCallDiagnostics,
   stopCallDiagnostics,
 } from '../../../../../contexts/calls/infrastructure/media/callDebugLogger';
 import { ScriptTransformCallMediaCipher } from '../../../../../contexts/calls/infrastructure/media/ScriptTransformCallMediaCipher';
+
+const alice = { callId: 'call-1', senderId: 'identity-alice' };
+
+function callKey(epoch = 0): CallMediaKey {
+  return { epoch, key: SymmetricKey.generate().valueOf() };
+}
 
 const browserGlobals = [
   'RTCRtpReceiver',
@@ -120,7 +128,7 @@ describe(ScriptTransformCallMediaCipher.name, () => {
   it('runs its transforms in a module worker', () => {
     const { workerConstructor } = installScriptTransformSupport();
 
-    new ScriptTransformCallMediaCipher(SymmetricKey.generate().valueOf());
+    new ScriptTransformCallMediaCipher(alice, callKey());
 
     expect(workerConstructor).toHaveBeenCalledTimes(1);
     expect(workerConstructor).toHaveBeenCalledWith(
@@ -129,18 +137,24 @@ describe(ScriptTransformCallMediaCipher.name, () => {
     );
   });
 
-  it('hands the call key to its worker by message, transferring it away', () => {
+  it('names the call to its worker, then hands it the call key of the epoch, transferring it away', () => {
     const { worker } = installScriptTransformSupport();
     const key = SymmetricKey.generate().valueOf();
 
-    new ScriptTransformCallMediaCipher(key);
+    new ScriptTransformCallMediaCipher(alice, { epoch: 4, key });
 
-    expect(worker.postMessage).toHaveBeenCalledTimes(1);
-    const [message, transfer] = worker.postMessage.mock.calls[0] as [
-      { key: ArrayBuffer },
+    expect(worker.postMessage).toHaveBeenCalledTimes(2);
+    expect(worker.postMessage).toHaveBeenNthCalledWith(1, {
+      ...alice,
+      type: 'call',
+    });
+    const [message, transfer] = worker.postMessage.mock.calls[1] as [
+      { epoch: number; key: ArrayBuffer; type: string },
       Transferable[],
     ];
 
+    expect(message.type).toBe('key');
+    expect(message.epoch).toBe(4);
     expect(new Uint8Array(message.key)).toEqual(
       Uint8Array.from(Buffer.from(key, 'base64')),
     );
@@ -148,104 +162,156 @@ describe(ScriptTransformCallMediaCipher.name, () => {
     expect(transfer[0]).toBe(message.key);
   });
 
+  it('hands the key of each new epoch to its worker, transferring it away', () => {
+    const { worker } = installScriptTransformSupport();
+    const cipher = new ScriptTransformCallMediaCipher(alice, callKey());
+    const nextKey = callKey(1);
+
+    cipher.rekey(nextKey);
+
+    const [message, transfer] = worker.postMessage.mock.calls[2] as [
+      { epoch: number; key: ArrayBuffer; type: string },
+      Transferable[],
+    ];
+
+    expect(message).toEqual({
+      epoch: 1,
+      key: expect.any(ArrayBuffer),
+      type: 'key',
+    });
+    expect(new Uint8Array(message.key)).toEqual(
+      Uint8Array.from(Buffer.from(nextKey.key, 'base64')),
+    );
+    expect(transfer).toEqual([message.key]);
+  });
+
+  it('tells its worker to forget a member who left', () => {
+    const { worker } = installScriptTransformSupport();
+
+    new ScriptTransformCallMediaCipher(alice, callKey()).forget('identity-bob');
+
+    expect(worker.postMessage).toHaveBeenLastCalledWith({
+      senderId: 'identity-bob',
+      type: 'forget',
+    });
+  });
+
   it('encrypts each sender in its worker, without handing the key to the transform', () => {
     const { ScriptTransform, worker } = installScriptTransformSupport();
-    const cipher = new ScriptTransformCallMediaCipher(
-      SymmetricKey.generate().valueOf(),
-    );
+    const cipher = new ScriptTransformCallMediaCipher(alice, callKey());
     const sender = fakeSender();
 
-    expect(cipher.configureSender(sender)).toBe(true);
-    expect(ScriptTransform).toHaveBeenCalledWith(worker, { side: 'send' });
+    expect(cipher.configureSender(sender, 'screen-video')).toBe(true);
+    expect(ScriptTransform).toHaveBeenCalledWith(worker, {
+      senderId: alice.senderId,
+      side: 'send',
+      track: 'screen-video',
+    });
     expect(sender.transform).toBe(ScriptTransform.mock.results[0].value);
   });
 
   it('decrypts each receiver in its worker, without handing the key to the transform', () => {
     const { ScriptTransform, worker } = installScriptTransformSupport();
-    const cipher = new ScriptTransformCallMediaCipher(
-      SymmetricKey.generate().valueOf(),
-    );
+    const cipher = new ScriptTransformCallMediaCipher(alice, callKey());
     const receiver = fakeReceiver();
 
-    expect(cipher.configureReceiver(receiver)).toBe(true);
-    expect(ScriptTransform).toHaveBeenCalledWith(worker, { side: 'receive' });
+    expect(cipher.configureReceiver(receiver, 'identity-bob', 'audio')).toBe(
+      true,
+    );
+    expect(ScriptTransform).toHaveBeenCalledWith(worker, {
+      senderId: 'identity-bob',
+      side: 'receive',
+      track: 'audio',
+    });
     expect(receiver.transform).toBe(ScriptTransform.mock.results[0].value);
   });
 
-  it('transforms each sender and receiver once', () => {
+  it('gives a sender moved to another track a transform for that track', () => {
+    const { ScriptTransform, worker } = installScriptTransformSupport();
+    const cipher = new ScriptTransformCallMediaCipher(alice, callKey());
+    const sender = fakeSender();
+
+    cipher.configureSender(sender, 'video');
+    cipher.configureSender(sender, 'screen-video');
+
+    expect(ScriptTransform).toHaveBeenLastCalledWith(worker, {
+      senderId: alice.senderId,
+      side: 'send',
+      track: 'screen-video',
+    });
+    expect(sender.transform).toBe(ScriptTransform.mock.results[1].value);
+  });
+
+  it('transforms each sender and receiver once per track', () => {
     const { ScriptTransform } = installScriptTransformSupport();
-    const cipher = new ScriptTransformCallMediaCipher(
-      SymmetricKey.generate().valueOf(),
-    );
+    const cipher = new ScriptTransformCallMediaCipher(alice, callKey());
     const sender = fakeSender();
     const receiver = fakeReceiver();
 
-    cipher.configureSender(sender);
-    cipher.configureSender(sender);
-    cipher.configureReceiver(receiver);
-    cipher.configureReceiver(receiver);
+    cipher.configureSender(sender, 'audio');
+    cipher.configureSender(sender, 'audio');
+    cipher.configureReceiver(receiver, 'identity-bob', 'video');
+    cipher.configureReceiver(receiver, 'identity-bob', 'video');
 
     expect(ScriptTransform).toHaveBeenCalledTimes(2);
   });
 
   it('fails when the browser will not encrypt a sender', () => {
     installScriptTransformSupport();
-    const cipher = new ScriptTransformCallMediaCipher(
-      SymmetricKey.generate().valueOf(),
-    );
+    const cipher = new ScriptTransformCallMediaCipher(alice, callKey());
 
-    expect(cipher.configureSender(refusingTransform(fakeSender()))).toBe(false);
+    expect(
+      cipher.configureSender(refusingTransform(fakeSender()), 'audio'),
+    ).toBe(false);
     expect(cipher.failed).toBe(true);
   });
 
   it('fails when the browser will not decrypt a receiver', () => {
     installScriptTransformSupport();
-    const cipher = new ScriptTransformCallMediaCipher(
-      SymmetricKey.generate().valueOf(),
-    );
+    const cipher = new ScriptTransformCallMediaCipher(alice, callKey());
 
-    expect(cipher.configureReceiver(refusingTransform(fakeReceiver()))).toBe(
-      false,
-    );
+    expect(
+      cipher.configureReceiver(
+        refusingTransform(fakeReceiver()),
+        'identity-bob',
+        'audio',
+      ),
+    ).toBe(false);
     expect(cipher.failed).toBe(true);
   });
 
   it('encrypts nothing once it has failed, not even what it already did', () => {
     const { ScriptTransform } = installScriptTransformSupport();
-    const cipher = new ScriptTransformCallMediaCipher(
-      SymmetricKey.generate().valueOf(),
-    );
+    const cipher = new ScriptTransformCallMediaCipher(alice, callKey());
     const sender = fakeSender();
 
-    cipher.configureSender(sender);
-    cipher.configureSender(refusingTransform(fakeSender()));
+    cipher.configureSender(sender, 'audio');
+    cipher.configureSender(refusingTransform(fakeSender()), 'audio');
 
-    expect(cipher.configureSender(sender)).toBe(false);
-    expect(cipher.configureSender(fakeSender())).toBe(false);
-    expect(cipher.configureReceiver(fakeReceiver())).toBe(false);
+    expect(cipher.configureSender(sender, 'audio')).toBe(false);
+    expect(cipher.configureSender(fakeSender(), 'audio')).toBe(false);
+    expect(
+      cipher.configureReceiver(fakeReceiver(), 'identity-bob', 'audio'),
+    ).toBe(false);
     expect(ScriptTransform).toHaveBeenCalledTimes(2);
   });
 
   it('fails when its worker fails', () => {
     const { ScriptTransform, worker } = installScriptTransformSupport();
-    const cipher = new ScriptTransformCallMediaCipher(
-      SymmetricKey.generate().valueOf(),
-    );
+    const cipher = new ScriptTransformCallMediaCipher(alice, callKey());
 
     expect(cipher.failed).toBe(false);
     workerErrorListener(worker)(new Event('error'));
 
     expect(cipher.failed).toBe(true);
-    expect(cipher.configureSender(fakeSender())).toBe(false);
+    expect(cipher.configureSender(fakeSender(), 'audio')).toBe(false);
     expect(ScriptTransform).not.toHaveBeenCalled();
   });
 
   it('terminates its worker when disposed', () => {
     const { worker } = installScriptTransformSupport();
 
-    new ScriptTransformCallMediaCipher(
-      SymmetricKey.generate().valueOf(),
-    ).dispose();
+    new ScriptTransformCallMediaCipher(alice, callKey()).dispose();
 
     expect(worker.terminate).toHaveBeenCalledTimes(1);
   });
@@ -254,9 +320,9 @@ describe(ScriptTransformCallMediaCipher.name, () => {
     installScriptTransformSupport();
 
     expect(
-      new ScriptTransformCallMediaCipher(
-        SymmetricKey.generate().valueOf(),
-      ).peerConfiguration({ iceServers: [] }),
+      new ScriptTransformCallMediaCipher(alice, callKey()).peerConfiguration({
+        iceServers: [],
+      }),
     ).toEqual({ iceServers: [] });
   });
 
@@ -265,7 +331,7 @@ describe(ScriptTransformCallMediaCipher.name, () => {
     const key = SymmetricKey.generate().valueOf();
 
     startCallDiagnostics();
-    new ScriptTransformCallMediaCipher(key);
+    new ScriptTransformCallMediaCipher(alice, { epoch: 4, key });
     workerErrorListener(worker)(
       Object.assign(new Event('error'), { message: 'Script failed to load.' }),
     );

@@ -1,3 +1,4 @@
+import type { CallMediaKey } from '../../../../contexts/calls/infrastructure/media/CallMediaKey';
 import type { CallMediaEncryptionUnavailableReason } from '../../../../contexts/calls/presentation/view-models/CallMediaEncryptionUnavailableReason';
 import type { WorkspaceCallMediaEncryptionInput } from './WorkspaceCallMediaEncryptionInput';
 
@@ -7,7 +8,7 @@ import { CommunityOperationFold } from '../../../../contexts/communities/domain/
 import { ConversationKeychain } from '../../../../contexts/identities/infrastructure/keychain/ConversationKeychain';
 
 export type WorkspaceCallMediaEncryption = {
-  mediaEncryptionKey?: string;
+  mediaEncryptionKey?: CallMediaKey;
   mediaEncryptionUnavailableReason?: CallMediaEncryptionUnavailableReason;
 };
 
@@ -83,5 +84,6 @@ export async function resolveWorkspaceCallMediaEncryption({
 
   if (!key) throw new CallMediaEncryptionUnavailableError('missing-key');
 
-  return { mediaEncryptionKey: key };
+  // The conversation key never changes during a call: its epoch is 0.
+  return { mediaEncryptionKey: { epoch: 0, key } };
 }

@@ -1,4 +1,8 @@
+import type { CallMediaFramePeer } from '@haskou/pigeon-swarm-crypto';
+
 import type { CallMediaCipher } from './CallMediaCipher';
+import type { CallMediaKey } from './CallMediaKey';
+import type { CallMediaTrack } from './CallMediaTrack';
 import type { EncodedCallMediaFrame } from './EncodedCallMediaFrame';
 import type { EncodedCallMediaFrameStreams } from './EncodedCallMediaFrameStreams';
 import type { EncodedCallMediaStreamOwner } from './EncodedCallMediaStreamOwner';
@@ -24,9 +28,15 @@ function isEncodedStreamOwner(
 export class EncodedStreamsCallMediaCipher implements CallMediaCipher {
   private readonly codec: CallMediaFrameCodec;
 
-  private readonly configuredReceivers = new WeakSet<RTCRtpReceiver>();
+  private readonly configuredReceivers = new WeakMap<
+    RTCRtpReceiver,
+    CallMediaTrack
+  >();
 
-  private readonly configuredSenders = new WeakSet<RTCRtpSender>();
+  private readonly configuredSenders = new WeakMap<
+    RTCRtpSender,
+    CallMediaTrack
+  >();
 
   private hasFailed = false;
 
@@ -67,31 +77,49 @@ export class EncodedStreamsCallMediaCipher implements CallMediaCipher {
     );
   }
 
-  public constructor(base64Key: string) {
-    this.codec = new CallMediaFrameCodec(
-      CallMediaFrameCodec.cipherOfKey(base64Key),
-    );
+  /** `call` names the call and this identity, which seals with `key`. */
+  public constructor(call: CallMediaFramePeer, key: CallMediaKey) {
+    this.codec = new CallMediaFrameCodec({
+      callId: call.callId,
+      senderId: call.senderId,
+    });
+    this.rekey(key);
   }
 
+  /**
+   * Pipes `owner` through `transform` once; a later call only moves it to
+   * `track`, which every frame reads as it passes.
+   */
   private pipe<Owner extends object>(
     owner: Owner,
-    configured: WeakSet<Owner>,
-    transform: () => TransformStream<
-      EncodedCallMediaFrame,
-      EncodedCallMediaFrame
-    >,
+    configured: WeakMap<Owner, CallMediaTrack>,
+    track: CallMediaTrack,
+    transform: (
+      track: () => CallMediaTrack,
+    ) => TransformStream<EncodedCallMediaFrame, EncodedCallMediaFrame>,
   ): boolean {
     if (this.hasFailed) return false;
 
-    if (configured.has(owner)) return true;
+    if (configured.has(owner)) {
+      configured.set(owner, track);
 
-    if (!EncodedStreamsCallMediaCipher.pipeEncodedStreams(owner, transform())) {
+      return true;
+    }
+
+    const frameTrack = (): CallMediaTrack => configured.get(owner) ?? track;
+
+    if (
+      !EncodedStreamsCallMediaCipher.pipeEncodedStreams(
+        owner,
+        transform(frameTrack),
+      )
+    ) {
       this.hasFailed = true;
 
       return false;
     }
 
-    configured.add(owner);
+    configured.set(owner, track);
 
     return true;
   }
@@ -100,20 +128,29 @@ export class EncodedStreamsCallMediaCipher implements CallMediaCipher {
     return this.hasFailed;
   }
 
-  public configureReceiver(receiver: RTCRtpReceiver): boolean {
-    return this.pipe(receiver, this.configuredReceivers, () =>
-      this.codec.receiverTransform(),
+  public configureReceiver(
+    receiver: RTCRtpReceiver,
+    senderId: string,
+    track: CallMediaTrack,
+  ): boolean {
+    return this.pipe(receiver, this.configuredReceivers, track, (frameTrack) =>
+      this.codec.receiverTransform(senderId, frameTrack),
     );
   }
 
-  public configureSender(sender: RTCRtpSender): boolean {
-    return this.pipe(sender, this.configuredSenders, () =>
-      this.codec.senderTransform(),
+  public configureSender(sender: RTCRtpSender, track: CallMediaTrack): boolean {
+    return this.pipe(sender, this.configuredSenders, track, (frameTrack) =>
+      this.codec.senderTransform(frameTrack),
     );
   }
 
   public dispose(): void {
-    // Nothing to release: the encoded streams end with their peers.
+    // The encoded streams end with their peers; the keys end here.
+    this.codec.dispose();
+  }
+
+  public forget(senderId: string): void {
+    this.codec.forget(senderId);
   }
 
   /** Encoded streams exist only on peers created asking for them. */
@@ -124,5 +161,9 @@ export class EncodedStreamsCallMediaCipher implements CallMediaCipher {
       ...rtcConfiguration,
       encodedInsertableStreams: true,
     } as RTCConfiguration;
+  }
+
+  public rekey(key: CallMediaKey): void {
+    this.codec.addKey(CallMediaFrameCodec.rawKey(key.key), key.epoch);
   }
 }

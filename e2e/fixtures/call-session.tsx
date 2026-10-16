@@ -14,8 +14,10 @@ import type { CallSession } from '../../src/contexts/calls/presentation/view-mod
 const params = new URLSearchParams(location.search);
 const identity = params.get('identity') ?? 'alice';
 const remote = identity === 'alice' ? 'bob' : 'alice';
-// A private call has a media key; without one the call is public.
-const mediaEncryptionKey = params.get('mediaKey') ?? undefined;
+// A private call has a media key, the conversation key in epoch 0; without
+// one the call is public.
+const mediaKey = params.get('mediaKey');
+const mediaEncryptionKey = mediaKey ? { epoch: 0, key: mediaKey } : undefined;
 const callId = 'private-call-id';
 const nativePeers: RTCPeerConnection[] = [];
 const NativePeerConnection = window.RTCPeerConnection;
