@@ -3,6 +3,7 @@ import type { KeyPair, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import type { DeviceAuthorizationEpoch } from '../../domain/value-objects/DeviceAuthorizationEpoch';
 import type { DeviceAuthorizationRevision } from '../../domain/value-objects/DeviceAuthorizationRevision';
 import type { DeviceId } from '../../domain/value-objects/DeviceId';
+import type { DeviceSealedRootGeneration } from '../../domain/value-objects/DeviceSealedRootGeneration';
 import type { IdentityResource } from '../http/resources/IdentityResource';
 import type { LocalKeychain } from '../keychain/LocalKeychain';
 
@@ -11,6 +12,11 @@ export type Session = {
   authorizationRevision: DeviceAuthorizationRevision;
   deviceCredentialKeyPair: KeyPair;
   deviceId: DeviceId;
+  /**
+   * The generation of the publication `deviceSealedRootKey` was read from or
+   * published at. Local stores order roots by it.
+   */
+  deviceSealedRootGeneration?: DeviceSealedRootGeneration;
   deviceSealedRootKey?: SymmetricKey;
   identity: IdentityResource;
   keyPair: KeyPair;

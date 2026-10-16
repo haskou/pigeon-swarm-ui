@@ -71,6 +71,7 @@ describe('DeviceSealedRootRotation', () => {
           ?.getBuffer()
           .equals(decodeBase64Url(input.payload)),
       ).toBe(true);
+      expect(rotated.deviceSealedRootGeneration?.valueOf()).toBe(1_001);
     });
 
     it('issues a generation strictly greater than the stored one even when the clock is behind', async () => {
@@ -262,6 +263,7 @@ describe('DeviceSealedRootRotation', () => {
 
       expect(sealedSecrets.publish).not.toHaveBeenCalled();
       expect(current.deviceSealedRootKey?.getBuffer().equals(root)).toBe(true);
+      expect(current.deviceSealedRootGeneration?.valueOf()).toBe(7);
     });
 
     it('keeps the previous root of the session when the entry carries none', async () => {
@@ -299,6 +301,7 @@ describe('DeviceSealedRootRotation', () => {
       expect(current.deviceSealedRootKey?.getBuffer()).toEqual(
         root.getBuffer(),
       );
+      expect(current.deviceSealedRootGeneration?.valueOf()).toBe(8);
     });
 
     it('publishes when this device has no entry yet', async () => {
@@ -431,6 +434,7 @@ describe('DeviceSealedRootRotation', () => {
       expect(keychains.readHead).not.toHaveBeenCalled();
       expect(sealedSecrets.publish).toHaveBeenCalledTimes(1);
       expect(opened.deviceSealedRootKey).toBeDefined();
+      expect(opened.deviceSealedRootGeneration?.valueOf()).toBe(1_001);
       expect(keychains.replaceHeadAfterRecovery).toHaveBeenCalledWith(
         expect.objectContaining({
           deviceSealedRootKey: opened.deviceSealedRootKey,
