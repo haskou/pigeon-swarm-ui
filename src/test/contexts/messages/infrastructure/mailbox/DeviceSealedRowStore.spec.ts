@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { DeviceSealedCanaryRecord } from '../../../../../contexts/messages/infrastructure/mailbox/DeviceSealedCanaryRecord';
 
+import { DeviceSealedRootGeneration } from '../../../../../contexts/identities/domain/value-objects/DeviceSealedRootGeneration';
 import { DeviceSealedRowStore } from '../../../../../contexts/messages/infrastructure/mailbox/DeviceSealedRowStore';
 
 type Row = { readonly id: string; readonly text: string };
@@ -16,8 +17,16 @@ function root(fill: number): Buffer {
   return Buffer.alloc(32, fill);
 }
 
-function session(current: Buffer, previous?: Buffer): Session {
+function session(
+  current: Buffer,
+  previous?: Buffer,
+  generation?: number,
+): Session {
   return {
+    deviceSealedRootGeneration:
+      generation === undefined
+        ? undefined
+        : DeviceSealedRootGeneration.fromNumber(generation),
     deviceSealedRootKey: SymmetricKey.fromBuffer(current),
     identity: { id: identityId },
     previousDeviceSealedRootKey: previous
@@ -150,16 +159,77 @@ describe(DeviceSealedRowStore.name, () => {
   it('refuses the root a skipped rotation replaced and keeps the newer rows', async () => {
     const name = databaseName();
 
-    await store(name).save(session(root(1)), row('a'));
-    expect(await store(name).load(session(root(3), root(2)))).toEqual([]);
-    await store(name).save(session(root(3), root(2)), row('b'));
+    await store(name).save(session(root(1), undefined, 1), row('a'));
+    expect(await store(name).load(session(root(3), root(2), 3))).toEqual([]);
+    await store(name).save(session(root(3), root(2), 3), row('b'));
 
     await expect(store(name).load(session(root(1)))).rejects.toThrow(replaced);
     await expect(store(name).load(session(root(2)))).rejects.toThrow(replaced);
     expect(await store(name).load(session(root(3)))).toEqual([row('b')]);
   });
 
-  it('keeps the latest 16 replaced roots and still refuses the last one', async () => {
+  it('refuses a stale session meeting a newer root that does not name its own, and keeps the newer rows', async () => {
+    const name = databaseName();
+    const stale = session(root(2), root(1), 2);
+    const relogged = session(root(3), undefined, 3);
+
+    await store(name).save(stale, row('a'));
+    expect(await store(name).load(relogged)).toEqual([]);
+    await store(name).save(relogged, row('b'));
+
+    await expect(store(name).save(stale, row('stale'))).rejects.toThrow(
+      replaced,
+    );
+    await expect(store(name).load(stale)).rejects.toThrow(replaced);
+    expect(await store(name).load(relogged)).toEqual([row('b')]);
+    await store(name).save(relogged, row('c'));
+    expect(await store(name).load(relogged)).toEqual([row('b'), row('c')]);
+  });
+
+  it('drops without listing a root it cannot order, so no session is locked out', async () => {
+    const name = databaseName();
+
+    await store(name).save(session(root(2), root(1)), row('a'));
+    await store(name).save(session(root(3)), row('b'));
+
+    expect(await store(name).load(session(root(2), root(1)))).toEqual([]);
+    expect(await store(name).load(session(root(3)))).toEqual([]);
+    await expect(store(name).load(session(root(1)))).rejects.toThrow(replaced);
+  });
+
+  it('stamps the generation of a session on a canary stored without one', async () => {
+    const name = databaseName();
+
+    await store(name).save(session(root(3)), row('b'));
+    expect(await store(name).load(session(root(3), undefined, 3))).toEqual([
+      row('b'),
+    ]);
+
+    expect((await canaryRecord(name))?.generation).toBe(3);
+    await expect(
+      store(name).load(session(root(2), root(1), 2)),
+    ).rejects.toThrow(replaced);
+    expect(await store(name).load(session(root(3)))).toEqual([row('b')]);
+  });
+
+  it('loads the rows as they were when it read the canary, even when another instance re-seals them meanwhile', async () => {
+    const name = databaseName();
+
+    await store(name).save(session(root(5)), row('a'));
+
+    const paused = pauseNextRead();
+    const loading = store(name).load(session(root(5)));
+
+    await paused.started;
+    expect(await store(name).load(session(root(9), root(5)))).toEqual([
+      row('a'),
+    ]);
+    paused.release();
+
+    expect(await loading).toEqual([row('a')]);
+  });
+
+  it('keeps the latest 16 replaced roots, still refuses the last one and forgets older ones', async () => {
     const name = databaseName();
 
     await store(name).save(session(root(1)), row('a'));
@@ -171,6 +241,7 @@ describe(DeviceSealedRowStore.name, () => {
     await expect(store(name).load(session(root(20)))).rejects.toThrow(replaced);
     await expect(store(name).load(session(root(5)))).rejects.toThrow(replaced);
     expect(await store(name).load(session(root(21)))).toEqual([row('a')]);
+    expect(await store(name).load(session(root(4)))).toEqual([]);
   });
 
   it('writes nothing when the replaced root is already listed', async () => {
