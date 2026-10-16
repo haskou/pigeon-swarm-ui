@@ -16,6 +16,7 @@ import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel
 import { GroupMailboxUnconfirmedError } from '../mls/GroupMailboxUnconfirmedError';
 import { GroupMailboxControlRecord } from './GroupMailboxControlRecord';
 import { GroupMailboxKeyPackageTimeoutError } from './GroupMailboxKeyPackageTimeoutError';
+import { GroupMailboxTooLargeError } from './GroupMailboxTooLargeError';
 
 /**
  * Control traffic of a group conversation (node
@@ -53,6 +54,12 @@ import { GroupMailboxKeyPackageTimeoutError } from './GroupMailboxKeyPackageTime
  * welcome from the creator confirms the group at once. A device that
  * awaits the group's confirmation neither asks for nor hands out key
  * packages for it, and commits nothing.
+ *
+ * An add whose welcome would not fit one control record
+ * (`GroupMailboxControlRecord.MAX_BINARY_BYTES`) is refused before its
+ * commit is queued (`GroupMailboxTooLargeError`): nothing is committed or
+ * sent, the answer that asked for it is decided, and the group stays
+ * `outgrown` until an add's welcome fits again.
  */
 export class GroupMailboxControl {
   public static readonly KEY_PACKAGE_TIMEOUT_MS = 60_000;
@@ -62,6 +69,8 @@ export class GroupMailboxControl {
   /** The member (`asked` key) each unanswered request of this session asked. */
   private readonly awaited = new Map<string, string>();
   private readonly pending = new Map<string, PendingGroupMailboxKeyPackage>();
+  /** The conversations whose last refused add had a welcome too large. */
+  private readonly outgrownGroups = new Set<string>();
 
   /** The owner a key package's credential names, if it decodes. */
   private static ownerOf(keyPackage: Uint8Array): MlsLeafOwner | undefined {
@@ -410,15 +419,31 @@ export class GroupMailboxControl {
    * Commits the key packages, then hands `{welcome, k}` to the device of
    * each, in a letter to its identity that names it. The commit reaches
    * every existing member first. Every key package was checked to be its
-   * requested owner's when it arrived.
+   * requested owner's when it arrived. A welcome too large for a control
+   * record refuses the add before its commit is queued.
    */
   private async welcome(
     conversationId: string,
     keyPackages: Uint8Array[],
   ): Promise<GroupMailboxCommit> {
-    const commit = await this.engine.add(conversationId, keyPackages, (made) =>
-      this.outbox.enqueueCommit(conversationId, made),
+    const commit = await this.engine.add(
+      conversationId,
+      keyPackages,
+      async (made) => {
+        if (
+          (made.welcome?.length ?? 0) >
+          GroupMailboxControlRecord.MAX_BINARY_BYTES
+        ) {
+          this.outgrownGroups.add(conversationId);
+          // eslint-disable-next-line no-console
+          console.warn('Group mailbox welcome does not fit a control record.');
+          throw new GroupMailboxTooLargeError();
+        }
+        await this.outbox.enqueueCommit(conversationId, made);
+      },
     );
+
+    this.outgrownGroups.delete(conversationId);
 
     await this.outbox.flush();
     const { welcome } = commit;
@@ -480,15 +505,18 @@ export class GroupMailboxControl {
     }
   }
 
-  /** Adds `identityId` to the roster, then asks it for a key package. */
+  /**
+   * Adds `identityId` to the roster, then asks it for a key package.
+   * Rejects with `GroupMailboxTooLargeError` when the roster is full.
+   */
   public async addMember(
     conversationId: string,
     identityId: string,
   ): Promise<void> {
-    await this.changeRoster(
-      conversationId,
-      (await this.current(conversationId)).withMember(identityId),
-    );
+    const roster = await this.current(conversationId);
+
+    if (roster.isFull()) throw new GroupMailboxTooLargeError();
+    await this.changeRoster(conversationId, roster.withMember(identityId));
     await this.add(conversationId, [identityId]);
   }
 
@@ -521,6 +549,7 @@ export class GroupMailboxControl {
     }
     this.pending.clear();
     this.awaited.clear();
+    this.outgrownGroups.clear();
   }
 
   /** Demotes an admin; only the creator may. */
@@ -543,6 +572,14 @@ export class GroupMailboxControl {
       conversationId,
       (await this.current(conversationId)).withoutMember(this.self.identityId),
     );
+  }
+
+  /**
+   * Whether this session's last refused add to the group had a welcome too
+   * large for a control record, and no add's welcome has fit since.
+   */
+  public outgrown(conversationId: string): boolean {
+    return this.outgrownGroups.has(conversationId);
   }
 
   /** Promotes a member to admin; only the creator may. */

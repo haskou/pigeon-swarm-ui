@@ -57,12 +57,8 @@ export function useGroupMessageMailboxSync({
     if (!conversationId) return;
 
     const syncIntervalMs = 5000;
-    const notice = copy.workspace.groupMailboxSyncError;
-    const unconfirmedNotice = copy.workspace.groupUnconfirmed;
     const controller = new AbortController();
     const pinClock = new MessagePinClock();
-    let failing = false;
-    let unconfirmedShown = false;
     let removalSeen = false;
     let timer: number | undefined;
     const apply = (changes: DirectMessageTimelineChange[]): void => {
@@ -85,24 +81,23 @@ export function useGroupMessageMailboxSync({
         setPinnedMessageIds,
       });
     };
-    const report = (failed: boolean): void => {
-      if (failed === failing) return;
-      failing = failed;
-      onErrorChange((current) => {
-        if (failed) return current ?? notice;
+    /** Shows `notice` while `show` holds, unless another error is shown. */
+    const noticeShower = (notice: string): ((show: boolean) => void) => {
+      let shown = false;
 
-        return current === notice ? null : current;
-      });
-    };
-    const showUnconfirmed = (unconfirmed: boolean): void => {
-      if (unconfirmed === unconfirmedShown) return;
-      unconfirmedShown = unconfirmed;
-      onErrorChange((current) => {
-        if (unconfirmed) return current ?? unconfirmedNotice;
+      return (show) => {
+        if (show === shown) return;
+        shown = show;
+        onErrorChange((current) => {
+          if (show) return current ?? notice;
 
-        return current === unconfirmedNotice ? null : current;
-      });
+          return current === notice ? null : current;
+        });
+      };
     };
+    const report = noticeShower(copy.workspace.groupMailboxSyncError);
+    const showUnconfirmed = noticeShower(copy.workspace.groupUnconfirmed);
+    const showOutgrown = noticeShower(copy.workspace.groupOutgrown);
     const markRead = (): void => {
       void applicationContainer.groupMessages
         .markRead(session, conversationId)
@@ -119,7 +114,7 @@ export function useGroupMessageMailboxSync({
     };
     const pass = async (): Promise<void> => {
       try {
-        const { removed, unconfirmed } =
+        const { outgrown, removed, unconfirmed } =
           await applicationContainer.groupMessages.sync(
             session,
             conversationId,
@@ -130,7 +125,10 @@ export function useGroupMessageMailboxSync({
         report(false);
         markRead();
 
-        if (!controller.signal.aborted) showUnconfirmed(unconfirmed);
+        if (!controller.signal.aborted) {
+          showUnconfirmed(unconfirmed);
+          showOutgrown(outgrown);
+        }
 
         if (removed && !removalSeen && !controller.signal.aborted) {
           removalSeen = true;
@@ -165,6 +163,7 @@ export function useGroupMessageMailboxSync({
       controller.abort();
       window.clearTimeout(timer);
       showUnconfirmed(false);
+      showOutgrown(false);
     };
   }, [
     conversationId,

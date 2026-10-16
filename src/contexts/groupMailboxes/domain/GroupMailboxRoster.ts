@@ -28,8 +28,15 @@ const missingFrom = (
  * operation per commit (`allowsCommit`).
  */
 export class GroupMailboxRoster {
-  /** The most members a group holds, as the node's own limit. */
-  public static readonly MAX_PARTICIPANTS = 256;
+  /**
+   * The most members a group holds: an add hands the group's tree to its
+   * joiners in one welcome, about 570 bytes per leaf, which must fit one
+   * control record of at most 40 000 bytes
+   * (`GroupMailboxControlRecord.MAX_BINARY_BYTES`). 48 members with one
+   * device each fit, even when one add welcomes all the others; more devices
+   * may still outgrow it, which the add then refuses.
+   */
+  public static readonly MAX_PARTICIPANTS = 48;
   public static readonly VERSION = 1;
 
   private readonly admins: ReadonlySet<string>;
@@ -343,6 +350,11 @@ export class GroupMailboxRoster {
 
   public isAdmin(identityId: string): boolean {
     return this.admins.has(identityId);
+  }
+
+  /** Whether the roster holds `MAX_PARTICIPANTS` and takes nobody more. */
+  public isFull(): boolean {
+    return this.members.size >= GroupMailboxRoster.MAX_PARTICIPANTS;
   }
 
   /** Whether the identity may add and remove members. */

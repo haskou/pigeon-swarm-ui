@@ -867,6 +867,109 @@ describe('GroupMailboxControl on the real MLS library', () => {
     );
   });
 
+  it('puts nobody on a full roster, and commits nothing', async () => {
+    const full = rosterOf(
+      [
+        alice.id,
+        ...Array.from(
+          { length: GroupMailboxRoster.MAX_PARTICIPANTS - 1 },
+          (_, index) => `member-${index}`,
+        ),
+      ],
+      { conversationId: CONVERSATION },
+    );
+    const before = await alice.engine.generation(CONVERSATION);
+
+    jest.spyOn(alice.engine, 'roster').mockResolvedValue(full);
+
+    await expect(
+      alice.control.addMember(CONVERSATION, mallory.id),
+    ).rejects.toMatchObject({ name: 'GroupMailboxTooLargeError' });
+    expect((await alice.engine.generation(CONVERSATION)).index).toBe(
+      before.index,
+    );
+    expect(mallory.inbox).toEqual([]);
+  });
+
+  it('commits no add whose welcome does not fit a control record, and says the group outgrew it', async () => {
+    const commitAdd = alice.engine.add.bind(alice.engine);
+    const before = await alice.engine.generation(CONVERSATION);
+
+    jest
+      .spyOn(alice.engine, 'add')
+      .mockImplementationOnce((conversationId, keyPackages, publish) =>
+        commitAdd(conversationId, keyPackages, (made) =>
+          publish({
+            ...made,
+            welcome: new Uint8Array(
+              GroupMailboxControlRecord.MAX_BINARY_BYTES + 1,
+            ),
+          }),
+        ),
+      );
+    const adding = alice.control.add(CONVERSATION, [bob.id]);
+
+    await until(() => bob.inbox.length > 0);
+    await expect(drain(bob)).resolves.toEqual(['applied']);
+    await until(() => alice.inbox.length > 0);
+    const [answer] = alice.inbox;
+
+    await expect(drain(alice)).resolves.toEqual(['rejected']);
+    await adding;
+
+    expect(alice.control.outgrown(CONVERSATION)).toBe(true);
+    await expect(alice.engine.members(CONVERSATION)).resolves.toEqual([
+      alice.id,
+    ]);
+    expect((await alice.engine.generation(CONVERSATION)).index).toBe(
+      before.index,
+    );
+    expect(bob.inbox).toEqual([]);
+    // Decided: the same answer again is not taken, so it is not retried.
+    await expect(
+      alice.control.receiveDirect(answer.from, answer.plaintext),
+    ).resolves.toBe('ignored');
+  });
+
+  it('commits an add whose welcome is exactly the control record limit, which clears the outgrown state', async () => {
+    const commitAdd = alice.engine.add.bind(alice.engine);
+    const welcomeOf = (bytes: number) =>
+      jest
+        .spyOn(alice.engine, 'add')
+        .mockImplementationOnce((conversationId, keyPackages, publish) =>
+          commitAdd(conversationId, keyPackages, (made) =>
+            publish({ ...made, welcome: new Uint8Array(bytes) }),
+          ),
+        );
+
+    welcomeOf(GroupMailboxControlRecord.MAX_BINARY_BYTES + 1);
+    const refused = alice.control.add(CONVERSATION, [carol.id]);
+
+    await until(() => carol.inbox.length > 0);
+    await drain(carol);
+    await until(() => alice.inbox.length > 0);
+    await expect(drain(alice)).resolves.toEqual(['rejected']);
+    await refused;
+    expect(alice.control.outgrown(CONVERSATION)).toBe(true);
+
+    welcomeOf(GroupMailboxControlRecord.MAX_BINARY_BYTES);
+    const adding = alice.control.add(CONVERSATION, [bob.id]);
+
+    await until(() => bob.inbox.length > 0);
+    await expect(drain(bob)).resolves.toEqual(['applied']);
+    await until(() => alice.inbox.length > 0);
+    await expect(drain(alice)).resolves.toEqual(['applied']);
+    await adding;
+    const [{ plaintext }] = bob.inbox;
+
+    expect(GroupMailboxControlRecord.decode(plaintext)).toMatchObject({
+      type: 'welcome',
+    });
+    await expect(drain(bob)).resolves.toEqual(['applied']);
+    await sameGeneration(alice, bob);
+    expect(alice.control.outgrown(CONVERSATION)).toBe(false);
+  });
+
   it('adds another device of its own identity without a manager, through its own welcome', async () => {
     await add(alice, [bob]);
     await drain(bob);

@@ -39,8 +39,12 @@ jest.mock('../../../../../app/composition/applicationContainer', () => ({
 }));
 
 const POLL_MS = 5000;
-/** A pass that finds this identity on the roster and the group confirmed. */
-const STAYS = { removed: false, unconfirmed: false };
+/**
+ * A pass that finds this identity on the roster, the group confirmed and
+ * every welcome handed out.
+ */
+const STAYS = { outgrown: false, removed: false, unconfirmed: false };
+const UNCONFIRMED = { ...STAYS, unconfirmed: true };
 const sync = jest.mocked(applicationContainer.groupMessages.sync);
 const restore = jest.mocked(applicationContainer.groupMessages.restore);
 const markRead = jest.mocked(applicationContainer.groupMessages.markRead);
@@ -331,8 +335,8 @@ describe('useGroupMessageMailboxSync', () => {
 
   it('says the group is not yet verified while this device awaits its confirmation', async () => {
     sync
-      .mockResolvedValueOnce({ removed: false, unconfirmed: true })
-      .mockResolvedValueOnce({ removed: false, unconfirmed: true })
+      .mockResolvedValueOnce(UNCONFIRMED)
+      .mockResolvedValueOnce(UNCONFIRMED)
       .mockResolvedValueOnce(STAYS);
     const mounted = mountSync();
 
@@ -350,8 +354,34 @@ describe('useGroupMessageMailboxSync', () => {
     mounted.cleanup();
   });
 
+  it('says the group outgrew a welcome while one did not fit, and clears it once one does', async () => {
+    sync
+      .mockResolvedValueOnce({ ...STAYS, outgrown: true })
+      .mockResolvedValueOnce(STAYS);
+    const mounted = mountSync();
+
+    await settle();
+    expect(mounted.error()).toBe(copy.workspace.groupOutgrown);
+
+    jest.advanceTimersByTime(POLL_MS);
+    await settle();
+
+    expect(mounted.error()).toBeNull();
+    mounted.cleanup();
+  });
+
+  it('clears the outgrown notice on cleanup', async () => {
+    sync.mockResolvedValue({ ...STAYS, outgrown: true });
+    const mounted = mountSync();
+
+    await settle();
+    mounted.cleanup();
+
+    expect(mounted.error()).toBeNull();
+  });
+
   it('clears the not-yet-verified notice on cleanup', async () => {
-    sync.mockResolvedValue({ removed: false, unconfirmed: true });
+    sync.mockResolvedValue(UNCONFIRMED);
     const mounted = mountSync();
 
     await settle();
@@ -361,7 +391,7 @@ describe('useGroupMessageMailboxSync', () => {
   });
 
   it('never replaces another error with the not-yet-verified notice', async () => {
-    sync.mockResolvedValue({ removed: false, unconfirmed: true });
+    sync.mockResolvedValue(UNCONFIRMED);
     const mounted = mountSync();
 
     mounted.setError('Something else');
@@ -374,7 +404,7 @@ describe('useGroupMessageMailboxSync', () => {
   });
 
   it('refreshes the conversation list once after this member was removed', async () => {
-    sync.mockResolvedValue({ removed: true, unconfirmed: false });
+    sync.mockResolvedValue({ ...STAYS, removed: true });
     const mounted = mountSync();
 
     await settle();

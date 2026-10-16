@@ -24,6 +24,8 @@ import { ConversationIdFactory } from '../../../../contexts/conversations/domain
 import { ConversationGroupNonce } from '../../../../contexts/conversations/domain/value-objects/ConversationGroupNonce';
 import { ConversationNetworkId } from '../../../../contexts/conversations/domain/value-objects/ConversationNetworkId';
 import { ConversationParticipantId } from '../../../../contexts/conversations/domain/value-objects/ConversationParticipantId';
+import { GroupMailboxRoster } from '../../../../contexts/groupMailboxes/domain/GroupMailboxRoster';
+import { GroupMailboxControl } from '../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControl';
 import { GroupConversationMailbox } from '../../../../contexts/groupMailboxes/infrastructure/GroupConversationMailbox';
 import { GroupMessageHistoryStore } from '../../../../contexts/groupMailboxes/infrastructure/history/GroupMessageHistoryStore';
 import { GroupMailboxOutbox } from '../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutbox';
@@ -713,13 +715,30 @@ describe('GroupConversationMailbox', () => {
     await alice.mailbox.removeMember(alice.session, CONVERSATION, carol.id);
 
     await expect(sync(carol)).resolves.toEqual({
+      outgrown: false,
       removed: true,
       unconfirmed: false,
     });
     await expect(sync(bob)).resolves.toEqual({
+      outgrown: false,
       removed: false,
       unconfirmed: false,
     });
+  });
+
+  it('a sync tells the member whose welcome did not fit that the group outgrew it', async () => {
+    await formGroup();
+    const outgrown = jest
+      .spyOn(GroupMailboxControl.prototype, 'outgrown')
+      .mockReturnValue(true);
+
+    await expect(sync(alice)).resolves.toEqual({
+      outgrown: true,
+      removed: false,
+      unconfirmed: false,
+    });
+    expect(outgrown).toHaveBeenCalledWith(CONVERSATION);
+    outgrown.mockRestore();
   });
 
   it('derives the group id from a fresh genesis naming its creator', async () => {
@@ -740,17 +759,17 @@ describe('GroupConversationMailbox', () => {
     });
   });
 
-  it('creates no group of more than 256 members', async () => {
+  it('creates no group of more than 48 members, before anything is sent', async () => {
     await expect(
       alice.mailbox.create(alice.session, {
         name: 'Group',
         networkId: NETWORK,
         participantIds: Array.from(
-          { length: 256 },
+          { length: GroupMailboxRoster.MAX_PARTICIPANTS },
           (_, index) => `member-${index}`,
         ),
       }),
-    ).rejects.toThrow('The group cannot be created');
+    ).rejects.toMatchObject({ name: 'GroupMailboxTooLargeError' });
   });
 
   it('lists only the groups whose roster names this identity', async () => {
@@ -798,6 +817,7 @@ describe('GroupConversationMailbox', () => {
       await catchUp(all);
 
       await expect(sync(dave)).resolves.toEqual({
+        outgrown: false,
         removed: false,
         unconfirmed: true,
       });
@@ -809,6 +829,7 @@ describe('GroupConversationMailbox', () => {
       await alice.mailbox.send(alice.session, conversation(), 'welcome', {});
 
       await expect(sync(dave)).resolves.toEqual({
+        outgrown: false,
         removed: false,
         unconfirmed: false,
       });
