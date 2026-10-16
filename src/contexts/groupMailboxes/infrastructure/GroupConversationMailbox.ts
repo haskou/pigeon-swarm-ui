@@ -41,10 +41,11 @@ import { GroupConversationTimeline } from './GroupConversationTimeline';
  * lets change membership (its creator and admins), the lowest identity id
  * removes the leaves of identities the roster no longer lists, as a
  * leaver's, then asks each listed member holding no leaf for a key package,
- * so members never race each other's commits.
+ * so members never race each other's commits; the device that asked commits
+ * that member's add.
  * Each leaf is a device. Of an identity's devices, only the one with the
  * lowest device credential among its current devices holding a leaf
- * commits, so its devices never race each other either: it removes the
+ * reconciles, so its devices never race each other either: it removes the
  * leaves of devices the identity's signed transitions no longer authorize,
  * as after a revoke, and adds the authorized devices that hold no leaf. A
  * device only the node lists is never asked for a key package.

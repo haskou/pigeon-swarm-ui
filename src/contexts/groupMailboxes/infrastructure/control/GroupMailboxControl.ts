@@ -23,11 +23,11 @@ import { GroupMailboxKeyPackageTimeoutError } from './GroupMailboxKeyPackageTime
  * epoch it applies to. A manager asks each member that holds no leaf yet for
  * a key package, in a letter signed by its identity key and sealed to that
  * member (`GroupMailboxNotificationLink`), at most once per session. The
- * answer goes to the manager's identity; the first of its devices in the
- * group (by device credential) commits the add, kept only once the durable
- * outbox has queued it for every existing member's inbox of the generation
- * the commit was made in, and hands the joiner `{welcome, k}` in another
- * letter. The key package's credential must be signed by the member's
+ * answer goes to the manager's identity; only the device and session that
+ * sent the request take it, once, and commit the add, kept only once the
+ * durable outbox has queued it for every existing member's inbox of the
+ * generation the commit was made in, and hand the joiner `{welcome, k}` in
+ * another letter. The key package's credential must be signed by the member's
  * identity key. A removal is delivered through the outbox to the remaining
  * members only. A welcome is judged by the engine against the roster it
  * carries. Logs never carry key material, welcomes or commits.
@@ -57,6 +57,8 @@ export class GroupMailboxControl {
 
   /** The members asked for a key package this session, per conversation. */
   private readonly asked = new Set<string>();
+  /** The member (`asked` key) each unanswered request of this session asked. */
+  private readonly awaited = new Map<string, string>();
   private readonly pending = new Map<string, PendingGroupMailboxKeyPackage>();
 
   /** The owner a key package's credential names, if it decodes. */
@@ -213,39 +215,43 @@ export class GroupMailboxControl {
   }
 
   /**
-   * An answer from another identity: the first device of this identity in
-   * the group commits its add, while this identity may add members, the
-   * roster lists that identity and it holds no leaf yet. The key package
-   * must be that identity's. Other devices of this identity ignore it.
+   * An answer from another identity counts only on the device and session
+   * that asked it, for that conversation, and once; any other device or
+   * session of this identity ignores it, so a sibling that never reads it,
+   * or whose roster read lags, cannot hold the add back. The asker commits
+   * the add while this identity may add members, the roster lists that
+   * identity and it holds no leaf yet, from that identity's key package.
    */
   private async receiveMemberKeyPackage(
     peerIdentityId: string,
-    conversationId: string,
-    keyPackage: Uint8Array,
+    record: Extract<
+      GroupMailboxControlFields,
+      { type: 'key-package-response' }
+    >,
   ): Promise<GroupMailboxControlOutcome> {
-    const roster = await this.engine.roster(conversationId);
+    const { conversationId, keyPackage, requestId } = record;
 
     if (
-      !roster?.manages(this.self.identityId) ||
-      !roster.has(peerIdentityId) ||
-      GroupMailboxControl.ownerOf(keyPackage)?.identityId !== peerIdentityId
-    ) {
-      return 'rejected';
-    }
-
-    if (
-      (await this.engine.devices(conversationId))[0] !==
-        this.self.deviceCredential ||
+      this.awaited.get(requestId) !==
+        JSON.stringify([conversationId, peerIdentityId]) ||
       (await this.engine.awaitsConfirmation(conversationId))
     ) {
       return 'ignored';
     }
+    const roster = await this.engine.roster(conversationId);
+    const outcome =
+      !roster?.manages(this.self.identityId) ||
+      !roster.has(peerIdentityId) ||
+      GroupMailboxControl.ownerOf(keyPackage)?.identityId !== peerIdentityId ||
+      (await this.engine.members(conversationId)).includes(peerIdentityId)
+        ? 'rejected'
+        : await this.rejecting(() =>
+            this.welcome(conversationId, [keyPackage]),
+          );
 
-    if ((await this.engine.members(conversationId)).includes(peerIdentityId)) {
-      return 'rejected';
-    }
+    this.awaited.delete(requestId);
 
-    return this.rejecting(() => this.welcome(conversationId, [keyPackage]));
+    return outcome;
   }
 
   /**
@@ -430,10 +436,11 @@ export class GroupMailboxControl {
 
   /**
    * Asks each of these roster members for a key package, once per session;
-   * the answer makes the first device of this identity add it
-   * (`receiveMemberKeyPackage`). Rejects while this device awaits the
-   * group's confirmation, when it may not add members, or when the roster
-   * does not list one of them.
+   * only this device, in this session, takes the answer and adds the member
+   * (`receiveMemberKeyPackage`). A request is awaited before it is sent, so
+   * an answer that overtakes the send still counts. Rejects while this
+   * device awaits the group's confirmation, when it may not add members, or
+   * when the roster does not list one of them.
    */
   public async add(
     conversationId: string,
@@ -452,11 +459,10 @@ export class GroupMailboxControl {
       const key = JSON.stringify([conversationId, identityId]);
 
       if (this.asked.has(key)) continue;
-      await this.request(
-        conversationId,
-        identityId,
-        MailboxChannel.randomEnvelopeId(),
-      );
+      const requestId = MailboxChannel.randomEnvelopeId();
+
+      this.awaited.set(requestId, key);
+      await this.request(conversationId, identityId, requestId);
       this.asked.add(key);
     }
   }
@@ -491,13 +497,17 @@ export class GroupMailboxControl {
     return this.welcome(conversationId, keyPackages);
   }
 
-  /** Drops unanswered key package requests; their adds reject. */
+  /**
+   * Drops unanswered key package requests: device adds reject, and an answer
+   * from a member asked is no longer taken.
+   */
   public close(): void {
     for (const waiting of this.pending.values()) {
       clearTimeout(waiting.timer);
       waiting.reject(new GroupMailboxKeyPackageTimeoutError());
     }
     this.pending.clear();
+    this.awaited.clear();
   }
 
   /** Demotes an admin; only the creator may. */
@@ -556,11 +566,7 @@ export class GroupMailboxControl {
               record.requestId,
               record.keyPackage,
             )
-          : this.receiveMemberKeyPackage(
-              peerIdentityId,
-              record.conversationId,
-              record.keyPackage,
-            );
+          : this.receiveMemberKeyPackage(peerIdentityId, record);
       case 'welcome':
         return this.receiveWelcome(peerIdentityId, record);
       default:
