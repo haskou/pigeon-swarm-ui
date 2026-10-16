@@ -89,11 +89,15 @@ function PendingEntriesReview({
               session,
             ),
           );
-        } finally {
+        } catch (caught) {
           // A stale version is refused (409) with nothing applied; reloading
-          // shows the newer version that now waits for review.
-          await load();
+          // shows the newer version that now waits for review. The refusal,
+          // not a failed reload, is what the node owner must see.
+          await load().catch(() => undefined);
+          throw caught;
         }
+
+        await load();
       },
       { success: copy.nodeAccess.approved },
     );
