@@ -7,6 +7,7 @@ import type {
 import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
 import {
   GroupMailboxRosterExtension,
+  InvalidMlsExtensionError,
   MlsGroup,
   MlsKeyPackage,
   MlsLeafSigner,
@@ -1586,6 +1587,27 @@ describe('GroupMailboxMlsEngine on the real MLS library', () => {
     await expect(alice.createGroup(CONVERSATION, roster)).rejects.toThrow(
       'Group already exists on this device',
     );
+  });
+
+  it('rejects a roster the library refuses to encode at creation, and creates no group', async () => {
+    const alice = engine('alice');
+    const encode = jest
+      .spyOn(GroupMailboxRosterExtension, 'encode')
+      .mockImplementationOnce(() => {
+        throw new InvalidMlsExtensionError();
+      });
+
+    try {
+      await expect(
+        alice.createGroup(CONVERSATION, roster),
+      ).rejects.toBeInstanceOf(MlsRejectedError);
+    } finally {
+      encode.mockRestore();
+    }
+
+    await expect(
+      alice.createGroup(CONVERSATION, roster),
+    ).resolves.toBeInstanceOf(GroupMailboxGeneration);
   });
 
   it('still reads a message a remaining member sent in the epoch before a removal', async () => {
