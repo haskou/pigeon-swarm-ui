@@ -311,24 +311,24 @@ const sameGeneration = async (a: Member, b: Member): Promise<void> => {
 };
 
 /**
- * Bob, already a member, adds his laptop: the laptop alone answers the key
- * package request his identity receives, and joins from the welcome.
+ * `owner`, already a member, adds its laptop: the laptop alone answers the
+ * key package request its identity receives, and joins from the welcome.
  */
-const addLaptop = async (bob: Member): Promise<Member> => {
-  const laptop = member('bob', 'd2');
-  const adding = bob.control.addDevices(CONVERSATION, [
-    cast.bob.deviceCredential('d2'),
+const addLaptop = async (owner: Member): Promise<Member> => {
+  const laptop = member(owner.name, 'd2');
+  const adding = owner.control.addDevices(CONVERSATION, [
+    cast[owner.name].deviceCredential('d2'),
   ]);
 
   await until(() => laptop.inbox.length > 0);
-  // Bob's identity gets its own request; only the device it names answers.
-  await expect(drain(bob)).resolves.toEqual(['ignored']);
+  // The identity gets its own request; only the device it names answers.
+  await expect(drain(owner)).resolves.toEqual(['ignored']);
   await expect(drain(laptop)).resolves.toEqual(['applied', 'ignored']);
-  await expect(drain(bob)).resolves.toEqual(['applied']);
+  await expect(drain(owner)).resolves.toEqual(['applied']);
   await adding;
   await expect(drain(laptop)).resolves.toEqual(['applied']);
-  // The welcome names the laptop; bob's identity gets it too and leaves it.
-  await expect(drain(bob)).resolves.toEqual(['ignored']);
+  // The welcome names the laptop; the identity's first device leaves it.
+  await expect(drain(owner)).resolves.toEqual(['ignored']);
 
   return laptop;
 };
@@ -649,21 +649,59 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
     expect(mallory.inbox).toHaveLength(1);
   });
 
-  it('rejects a key package from an identity the roster does not list', async () => {
-    await expect(
-      alice.control.receiveDirect(
-        mallory.id,
-        GroupMailboxControlRecord.encode({
-          conversationId: CONVERSATION,
-          keyPackage: await mallory.engine.createKeyPackage(),
-          requestId: MailboxChannel.randomEnvelopeId(),
-          type: 'key-package-response',
-        }),
-      ),
-    ).resolves.toBe('rejected');
+  it('rejects the answer of a member the roster dropped after it was asked', async () => {
+    await alice.control.add(CONVERSATION, [bob.id]);
+    await alice.control.removeMember(CONVERSATION, bob.id);
+
+    await expect(drain(bob)).resolves.toEqual(['applied']);
+    await expect(drain(alice)).resolves.toEqual(['rejected']);
     await expect(alice.engine.members(CONVERSATION)).resolves.toEqual([
       alice.id,
     ]);
+    expect(bob.inbox).toEqual([]);
+  });
+
+  it('takes only the answer to the request it sent that peer for that conversation, once', async () => {
+    const answer = async (
+      from: Member,
+      requestId: string,
+      conversationId = CONVERSATION,
+    ): Promise<GroupMailboxControlOutcome> =>
+      alice.control.receiveDirect(
+        from.id,
+        GroupMailboxControlRecord.encode({
+          conversationId,
+          keyPackage: await from.engine.createKeyPackage(),
+          requestId,
+          type: 'key-package-response',
+        }),
+      );
+
+    await alice.control.add(CONVERSATION, [bob.id]);
+    const request = GroupMailboxControlRecord.decode(bob.inbox[0].plaintext);
+
+    if (request?.type !== 'key-package-request') {
+      throw new Error('expected a key package request');
+    }
+    const unsolicited = MailboxChannel.randomEnvelopeId();
+
+    await expect(answer(bob, unsolicited)).resolves.toBe('ignored');
+    await expect(answer(mallory, unsolicited)).resolves.toBe('ignored');
+    await expect(answer(carol, request.requestId)).resolves.toBe('ignored');
+    await expect(
+      answer(bob, request.requestId, 'conversation-2'),
+    ).resolves.toBe('ignored');
+    await expect(alice.engine.members(CONVERSATION)).resolves.toEqual([
+      alice.id,
+    ]);
+    expect(bob.inbox).toHaveLength(1);
+    expect(carol.inbox).toEqual([]);
+    expect(mallory.inbox).toEqual([]);
+
+    await expect(drain(bob)).resolves.toEqual(['applied']);
+    await expect(drain(alice)).resolves.toEqual(['applied']);
+    await expect(drain(bob)).resolves.toEqual(['applied']);
+    await expect(answer(bob, request.requestId)).resolves.toBe('ignored');
   });
 
   it("rejects a key package that is not the answering peer's", async () => {
@@ -809,6 +847,36 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
         (await alice.engine.generation(CONVERSATION)).secret,
       ),
     ).toBe(false);
+  });
+
+  it('lets the device that asked add a member, not the sibling whose leaf sorts first', async () => {
+    await add(alice, [bob]);
+    await drain(bob);
+    await openInboxes(alice);
+    const laptop = await addLaptop(alice);
+
+    await expect(readGroup(bob)).resolves.toEqual(['applied']);
+    const [first] = [
+      cast.alice.deviceCredential('d1'),
+      cast.alice.deviceCredential('d2'),
+    ].sort();
+    // #509: the sibling's leaf sorts first, and it never asked carol.
+    const [asker, sibling] =
+      first === cast.alice.deviceCredential('d1')
+        ? [laptop, alice]
+        : [alice, laptop];
+
+    await openInboxes(asker);
+    await asker.control.add(CONVERSATION, [carol.id]);
+    await expect(drain(carol)).resolves.toEqual(['applied']);
+
+    await expect(drain(sibling)).resolves.toEqual(['ignored']);
+    await expect(drain(asker)).resolves.toEqual(['applied']);
+    await expect(drain(carol)).resolves.toEqual(['applied']);
+    await expect(readGroup(sibling)).resolves.toEqual(['applied']);
+    await expect(readGroup(bob)).resolves.toEqual(['applied']);
+    await sameGeneration(sibling, carol);
+    await sameGeneration(bob, carol);
   });
 
   it('ignores a request naming another device, and refuses one of its own identity naming none or once it holds a leaf', async () => {
