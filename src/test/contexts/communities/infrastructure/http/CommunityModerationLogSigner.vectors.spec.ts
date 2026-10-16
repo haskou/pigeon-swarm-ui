@@ -1,11 +1,10 @@
-import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import { CommitmentId, KeyPair } from '@haskou/pigeon-swarm-crypto';
 import vectors from '@haskou/pigeon-swarm-crypto/vectors/community-moderation-log.json';
 
 import type { CommunityModerationLogInput } from '../../../../../contexts/communities/infrastructure/http/CommunityModerationLogInput';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { CommunityModerationLogSigner } from '../../../../../contexts/communities/infrastructure/http/CommunityModerationLogSigner';
-import { deriveModerationLogId } from '../../../../../contexts/communities/infrastructure/http/deriveCommunityRecordId';
 import { PublicMutationSigner } from '../../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
@@ -34,7 +33,7 @@ describe(CommunityModerationLogSigner.name, () => {
     'derives the $name log id like the node',
     ({ derived, input }: Vector) => {
       expect(
-        deriveModerationLogId(
+        CommitmentId.communityModerationLog(
           input.communityId,
           vectors.keys.moderator.identityId,
           input.action,

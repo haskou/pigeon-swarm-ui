@@ -1,6 +1,7 @@
 import type { MailboxInboxKeys } from '@haskou/pigeon-swarm-crypto';
 
 import {
+  BearerCapability,
   InvalidMailboxEnvelopeError,
   MailboxEnvelope,
 } from '@haskou/pigeon-swarm-crypto';
@@ -15,7 +16,6 @@ import type {
 import { encodeBase64Url } from '../../../shared/infrastructure/encoding/base64url';
 import { MailboxUnavailableError } from '../domain/errors/MailboxUnavailableError';
 import { MailboxCreationDomainService } from '../domain/services/MailboxCreationDomainService';
-import { MailboxCapability } from './crypto/MailboxCapability';
 import { MailboxCreationProof } from './crypto/MailboxCreationProof';
 
 export type MailboxCreationMiner = (
@@ -147,7 +147,7 @@ export class MailboxChannel {
    * creating it.
    */
   public createInbox(keys: MailboxInboxKeys, readToken: string): Promise<void> {
-    const readTokenHash = MailboxCapability.hash(readToken);
+    const readTokenHash = BearerCapability.hash(readToken);
     const flightKey = `${keys.mailboxId}|${readTokenHash}`;
     const inFlight = this.pendingCreations.get(flightKey);
 
@@ -167,7 +167,7 @@ export class MailboxChannel {
     keys: MailboxInboxKeys,
     readTokenHash: string,
   ): Promise<void> {
-    const postTokenHash = MailboxCapability.hash(keys.postToken);
+    const postTokenHash = BearerCapability.hash(keys.postToken);
 
     await MailboxCreationDomainService.create(
       {
@@ -289,7 +289,7 @@ export class MailboxChannel {
     await this.client.addReader(
       keys.mailboxId,
       rootToken,
-      MailboxCapability.hash(readerToken),
+      BearerCapability.hash(readerToken),
     );
   }
 

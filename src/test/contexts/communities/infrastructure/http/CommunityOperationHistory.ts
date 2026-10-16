@@ -1,4 +1,4 @@
-import type { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import { CommitmentId, type KeyPair } from '@haskou/pigeon-swarm-crypto';
 
 import type { CommunityOperation } from '../../../../../contexts/communities/domain/operations/CommunityOperation';
 import type { CommunityOperationDocument } from '../../../../../contexts/communities/infrastructure/http/CommunityOperationDocument';
@@ -7,7 +7,6 @@ import type { CommunityOperationAuthor } from './CommunityOperationAuthor';
 import { CommunityChannelId } from '../../../../../contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityRoleId } from '../../../../../contexts/communities/domain/value-objects/CommunityRoleId';
 import { CommunityOperationProof } from '../../../../../contexts/communities/infrastructure/http/CommunityOperationProof';
-import { deriveCommunityId } from '../../../../../contexts/communities/infrastructure/http/deriveCommunityRecordId';
 
 const NETWORK = 'network-1';
 const NONCE = 'nonce-1';
@@ -28,7 +27,7 @@ export class CommunityOperationHistory {
   }
 
   public constructor(owner: CommunityOperationAuthor) {
-    this.communityId = deriveCommunityId(NETWORK, owner.id, NONCE);
+    this.communityId = CommitmentId.community(NETWORK, owner.id, NONCE);
     this.append(owner, 'community_created', {
       autoJoinEnabled: false,
       description: 'A community',

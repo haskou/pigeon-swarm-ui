@@ -1,6 +1,9 @@
 import type { MailboxInboxKeys } from '@haskou/pigeon-swarm-crypto';
 
-import { MailboxReadToken } from '@haskou/pigeon-swarm-crypto';
+import {
+  BearerCapability,
+  MailboxReadToken,
+} from '@haskou/pigeon-swarm-crypto';
 import { Duration, Timestamp } from '@haskou/value-objects';
 import { randomBytes } from '@noble/hashes/utils.js';
 
@@ -19,7 +22,6 @@ import type { Session } from '../session/Session';
 import { encodeBase64Url } from '../../../../shared/infrastructure/encoding/base64url';
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 import { MailboxUnavailableError } from '../../../mailboxes/domain/errors/MailboxUnavailableError';
-import { MailboxCapability } from '../../../mailboxes/infrastructure/crypto/MailboxCapability';
 import { ContactPresenceBoard } from '../../domain/ContactPresenceBoard';
 import { ContactPresenceBroadcast } from '../../domain/ContactPresenceBroadcast';
 import { IdentityMatch } from '../../domain/IdentityMatch';
@@ -111,7 +113,7 @@ export class MailboxContactPresenceRepository implements ContactPresenceReposito
         .catch(() => undefined);
     }
 
-    const kept = MailboxCapability.hash(reader);
+    const kept = BearerCapability.hash(reader);
     const { readers } = await this.channel.listReaders(keys, reader);
 
     for (const { readTokenHash } of readers) {
@@ -127,7 +129,7 @@ export class MailboxContactPresenceRepository implements ContactPresenceReposito
     keys: MailboxInboxKeys,
     reader: string,
   ): Promise<void> {
-    const key = `${keys.mailboxId}|${MailboxCapability.hash(reader)}`;
+    const key = `${keys.mailboxId}|${BearerCapability.hash(reader)}`;
     const known = this.opened.get(key);
 
     if (known) return known.open;

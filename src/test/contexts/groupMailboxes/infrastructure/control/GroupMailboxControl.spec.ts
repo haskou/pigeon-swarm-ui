@@ -1,3 +1,4 @@
+import { BearerCapability } from '@haskou/pigeon-swarm-crypto';
 import 'fake-indexeddb/auto';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { mock } from 'jest-mock-extended';
@@ -24,7 +25,6 @@ import { GroupMailboxUnconfirmedError } from '../../../../../contexts/groupMailb
 import { GroupMailboxOutbox } from '../../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutbox';
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
-import { MailboxCapability } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { encodeBase64Url } from '../../../../../shared/infrastructure/encoding/base64url';
 import { MlsTestIdentity } from '../../../communities/infrastructure/mls/MlsTestIdentity';
@@ -106,7 +106,7 @@ const fakeNode = (): FakeNode => {
   wire.read.mockImplementation((mailboxId, readToken, after, limit) => {
     const inbox = inboxes.get(mailboxId);
 
-    if (inbox?.readTokenHash !== MailboxCapability.hash(readToken)) {
+    if (inbox?.readTokenHash !== BearerCapability.hash(readToken)) {
       return Promise.reject(new MailboxUnavailableError());
     }
 
@@ -244,7 +244,7 @@ const openInboxes = async (inviter: Member): Promise<void> => {
     if (!owner) throw new Error('unknown member');
     await node.channel.createInbox(
       await inboxKeys(owner, inviter),
-      `read-${owner.name}`,
+      `read-capability-token-${owner.name}`,
     );
   }
 };
@@ -253,7 +253,7 @@ const openInboxes = async (inviter: Member): Promise<void> => {
 const readGroup = async (
   owner: Member,
 ): Promise<GroupMailboxControlOutcome[]> => {
-  const token = `read-${owner.name}`;
+  const token = `read-capability-token-${owner.name}`;
   const page = await node.channel.read(
     await inboxKeys(owner),
     { device: token, root: token },
@@ -588,7 +588,7 @@ describe('GroupMailboxControl on the real ts-mls library', () => {
     const { mailboxId } = await inboxKeys(bob);
 
     await add(alice, [carol]);
-    const token = 'read-bob';
+    const token = 'read-capability-token-bob';
     const [envelope] = (
       await node.channel.read(
         await inboxKeys(bob),

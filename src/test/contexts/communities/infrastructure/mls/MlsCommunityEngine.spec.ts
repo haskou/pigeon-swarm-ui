@@ -1,6 +1,6 @@
 import type { PrivateKeyPackage } from 'ts-mls';
 
-import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import { CommitmentId, KeyPair } from '@haskou/pigeon-swarm-crypto';
 
 import type { MlsRecordInput } from '../../../../../contexts/communities/infrastructure/http/MlsRecordInput';
 import type { MlsRecordResource } from '../../../../../contexts/communities/infrastructure/http/resources/MlsRecordResource';
@@ -10,7 +10,6 @@ import type { StoredMlsKeyPackage } from '../../../../../contexts/communities/in
 
 import { CommunityRosterHistory } from '../../../../../contexts/communities/domain/CommunityRosterHistory';
 import { CommunityOperationProof } from '../../../../../contexts/communities/infrastructure/http/CommunityOperationProof';
-import { deriveMlsRecordId } from '../../../../../contexts/communities/infrastructure/http/deriveMlsRecordId';
 import { MlsCommunityEngine } from '../../../../../contexts/communities/infrastructure/mls/MlsCommunityEngine';
 import {
   generateMlsKeyPackage,
@@ -68,7 +67,7 @@ const createNode = () => {
         } catch (error) {
           return Promise.reject(error);
         }
-        const recordId = deriveMlsRecordId(input);
+        const recordId = CommitmentId.mlsRecord(input);
         const existing = records.find((r) => r.recordId === recordId);
 
         if (existing) return Promise.resolve(existing);
@@ -943,7 +942,7 @@ describe('MlsCommunityEngine', () => {
       for (
         let attempt = 0;
         attempt < 64 &&
-        deriveMlsRecordId({
+        CommitmentId.mlsRecord({
           epoch: Number(raced.epoch),
           groupId: COMMUNITY,
           kind: 'commit',

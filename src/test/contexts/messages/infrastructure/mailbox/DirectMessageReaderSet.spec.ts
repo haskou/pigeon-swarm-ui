@@ -1,13 +1,16 @@
 import type { MailboxInboxKeys } from '@haskou/pigeon-swarm-crypto';
 
-import { MailboxReadToken, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import {
+  BearerCapability,
+  MailboxReadToken,
+  SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 import { mock } from 'jest-mock-extended';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 
-import { MailboxCapability } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
 import { DirectMessageReaderSet } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageReaderSet';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 
@@ -17,7 +20,7 @@ const IDENTITY_ROOT = SymmetricKey.fromBuffer(Buffer.alloc(32, 1));
 const SEALED = SymmetricKey.fromBuffer(Buffer.alloc(32, 2));
 const keys = { mailboxId: MAILBOX } as unknown as MailboxInboxKeys;
 
-const hash = (token: string): string => MailboxCapability.hash(token);
+const hash = (token: string): string => BearerCapability.hash(token);
 const sealedRoot = MailboxReadToken.derive(SEALED, MAILBOX);
 const sealedDevice = (credential: string): string =>
   MailboxReadToken.deriveDevice(SEALED, MAILBOX, credential);
@@ -126,7 +129,7 @@ describe(DirectMessageReaderSet.name, () => {
     registered.add(hash(identityRootReader));
     registered.add(hash(identityRootDevice('device-a')));
     registered.add(hash(identityRootDevice('device-b')));
-    registered.add(hash('stale-token'));
+    registered.add(hash('stale-reader-capability-token'));
 
     await set.enrolSealedRoot(session(), keys, readers('device-a'));
     await set.reconcile(session(), keys, readers('device-a'));

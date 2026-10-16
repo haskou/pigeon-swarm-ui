@@ -1,10 +1,13 @@
-import { KeyPair, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import {
+  CommitmentId,
+  KeyPair,
+  SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
-import { deriveModerationLogId } from '../../../../../contexts/communities/infrastructure/http/deriveCommunityRecordId';
 import { PigeonCommunitiesApi } from '../../../../../contexts/communities/infrastructure/http/PigeonCommunitiesApi';
 import { DraftPayloadCipher } from '../../../../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
 import { RequestCache } from '../../../../../shared/infrastructure/http/RequestCache';
@@ -935,7 +938,7 @@ describe(PigeonCommunitiesApi.name, () => {
       expect(moderationLog.mutation).toMatchObject({
         kind: 'put',
         predecessor: null,
-        recordId: deriveModerationLogId(
+        recordId: CommitmentId.communityModerationLog(
           'community-1',
           'identity-1',
           'member_kicked',

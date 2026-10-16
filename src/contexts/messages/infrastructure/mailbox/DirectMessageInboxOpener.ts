@@ -1,5 +1,7 @@
 import type { MailboxInboxKeys } from '@haskou/pigeon-swarm-crypto';
 
+import { BearerCapability } from '@haskou/pigeon-swarm-crypto';
+
 import type { RealtimeMailboxSubscriptionInput } from '../../../../shared/infrastructure/realtime/RealtimeMailboxSubscriptionInput';
 import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../../identities/infrastructure/session/Session';
@@ -13,7 +15,6 @@ import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonEr
 import { ConversationType } from '../../../conversations/domain/value-objects/ConversationType';
 import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
 import { DirectMailboxEligibility } from '../../../mailboxes/domain/DirectMailboxEligibility';
-import { MailboxCapability } from '../../../mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageInboxKeys } from './DirectMessageInboxKeys';
 import { DirectMessageMailboxLimits } from './DirectMessageMailboxLimits';
@@ -311,7 +312,7 @@ export class DirectMessageInboxOpener {
         await this.channel.removeReader(
           keys,
           readers.root,
-          MailboxCapability.hash(readers.device),
+          BearerCapability.hash(readers.device),
         );
       } catch {
         // Count-only: no ids, content, or error details.

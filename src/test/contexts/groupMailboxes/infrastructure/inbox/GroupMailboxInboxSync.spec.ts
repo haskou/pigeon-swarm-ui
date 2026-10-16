@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import type { MockProxy } from 'jest-mock-extended';
 
-import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import { BearerCapability, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
 
 import type { GroupMailboxGenerationRepository } from '../../../../../contexts/groupMailboxes/domain/repositories/GroupMailboxGenerationRepository';
@@ -30,7 +30,6 @@ import { GroupMailboxOutbox } from '../../../../../contexts/groupMailboxes/infra
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 import { DirectMailboxRecords } from '../../../../../contexts/mailboxes/domain/DirectMailboxRecords';
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
-import { MailboxCapability } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageInboxKeys } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageInboxKeys';
 import { DirectMessageMailboxRecord } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxRecord';
@@ -94,7 +93,7 @@ const fakeNode = (): void => {
   const readable = (mailboxId: string, token: string) => {
     const inbox = inboxes.get(mailboxId);
 
-    if (!inbox?.readers.has(MailboxCapability.hash(token))) {
+    if (!inbox?.readers.has(BearerCapability.hash(token))) {
       throw new MailboxUnavailableError();
     }
 
@@ -157,14 +156,14 @@ const fakeNode = (): void => {
   wire.acknowledge.mockImplementation((mailboxId, token, upTo) =>
     Promise.resolve().then(() => {
       const { readers } = readable(mailboxId, token);
-      const hash = MailboxCapability.hash(token);
+      const hash = BearerCapability.hash(token);
 
       readers.set(hash, Math.max(readers.get(hash) ?? 0, upTo));
     }),
   );
   wire.delete.mockImplementation((mailboxId, token) =>
     Promise.resolve().then(() => {
-      if (inboxes.get(mailboxId)?.root !== MailboxCapability.hash(token)) {
+      if (inboxes.get(mailboxId)?.root !== BearerCapability.hash(token)) {
         throw new MailboxUnavailableError();
       }
       inboxes.delete(mailboxId);
@@ -940,7 +939,7 @@ describe('GroupMailboxInboxSync on the real ts-mls library', () => {
       IdentityId.fromString(bob.id),
     );
     const laptop = cast.bob.deviceCredential('d2');
-    const enrolled = MailboxCapability.hash(
+    const enrolled = BearerCapability.hash(
       DirectMessageInboxKeys.readersFor(bob.session, keys, laptop).device,
     );
 

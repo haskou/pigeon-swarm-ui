@@ -1,5 +1,6 @@
 import {
   CanonicalJson,
+  CommitmentId,
   CommunityOperationSignature,
   type KeyPair,
   PrivateKey,
@@ -14,7 +15,6 @@ import type { CommunityOperationDocument } from './CommunityOperationDocument';
 import { encodeBase64Url } from '../../../../shared/infrastructure/encoding/base64url';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { CommunityOperation } from '../../domain/operations/CommunityOperation';
-import { deriveCommunityId } from './deriveCommunityRecordId';
 
 const SCOPE_TYPE = 'community_operation';
 const DIGEST = /^[A-Za-z0-9_-]{43}$/;
@@ -127,15 +127,19 @@ export class CommunityOperationProof {
   ): boolean {
     const { nonce } = document.args;
 
-    return (
-      typeof nonce === 'string' &&
-      document.communityId ===
-        deriveCommunityId(
-          document.networkId,
-          IdentityId.normalize(document.authorIdentityId),
-          nonce,
-        )
-    );
+    try {
+      return (
+        typeof nonce === 'string' &&
+        document.communityId ===
+          CommitmentId.community(
+            document.networkId,
+            IdentityId.normalize(document.authorIdentityId),
+            nonce,
+          )
+      );
+    } catch {
+      return false;
+    }
   }
 
   /**

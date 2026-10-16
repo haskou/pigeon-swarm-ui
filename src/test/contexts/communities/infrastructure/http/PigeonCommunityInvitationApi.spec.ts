@@ -1,4 +1,8 @@
-import { CommunityInviteReference, KeyPair } from '@haskou/pigeon-swarm-crypto';
+import {
+  CommitmentId,
+  CommunityInviteReference,
+  KeyPair,
+} from '@haskou/pigeon-swarm-crypto';
 import vectors from '@haskou/pigeon-swarm-crypto/vectors/community-operation.json';
 
 import type { CommunityResource as Community } from '../../../../../contexts/communities/infrastructure/http/resources/CommunityResource';
@@ -8,7 +12,6 @@ import type { RequestSigner } from '../../../../../shared/infrastructure/http/Re
 
 import { CommunityModerationLogSigner } from '../../../../../contexts/communities/infrastructure/http/CommunityModerationLogSigner';
 import { CommunityOperationProof } from '../../../../../contexts/communities/infrastructure/http/CommunityOperationProof';
-import { deriveInviteToken } from '../../../../../contexts/communities/infrastructure/http/deriveCommunityRecordId';
 import { PigeonCommunityInvitationApi } from '../../../../../contexts/communities/infrastructure/http/PigeonCommunityInvitationApi';
 import { ScopeFrontierReader } from '../../../../../shared/infrastructure/http/ScopeFrontierReader';
 import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
@@ -107,7 +110,7 @@ describe(PigeonCommunityInvitationApi.name, () => {
 
     expect(body.nonce).toHaveLength(32);
     expect(body.mutation).toMatchObject({
-      recordId: deriveInviteToken(
+      recordId: CommitmentId.communityInviteToken(
         'community-1',
         publicMutationSignerAt().authorOf(session),
         body.nonce,

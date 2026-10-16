@@ -1,6 +1,6 @@
 import type { PublicMutation } from '@haskou/pigeon-swarm-crypto';
 
-import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
+import { CommitmentId } from '@haskou/pigeon-swarm-crypto';
 
 import type { PublicMutationPosition } from '../../../../shared/infrastructure/crypto/PublicMutationPosition';
 import type { Session } from '../../../identities/infrastructure/session/Session';
@@ -59,34 +59,12 @@ export class CallEventSigner {
     );
   }
 
-  /** The id commits to the creator: UUID bytes from sha256(creator:nonce). */
-  public callId(creatorIdentityId: string, nonce: string): string {
-    const digest = SHA256Hash.from(`${creatorIdentityId}:${nonce}`).toString();
-    const bytes = Array.from({ length: 16 }, (_, index) =>
-      Number.parseInt(digest.slice(index * 2, index * 2 + 2), 16),
-    );
-
-    bytes[6] = (bytes[6] % 16) + 128;
-    bytes[8] = (bytes[8] % 64) + 128;
-    const hex = bytes
-      .map((byte) => byte.toString(16).padStart(2, '0'))
-      .join('');
-
-    return [
-      hex.slice(0, 8),
-      hex.slice(8, 12),
-      hex.slice(12, 16),
-      hex.slice(16, 20),
-      hex.slice(20, 32),
-    ].join('-');
-  }
-
   public async start(
     session: Session,
     input: CallStartInput,
   ): Promise<SignedCallStart> {
     const creatorIdentityId = this.mutations.authorOf(session);
-    const callId = this.callId(creatorIdentityId, input.nonce);
+    const callId = CommitmentId.call(creatorIdentityId, input.nonce);
     const conversation = input.scope.type === 'conversation';
     const id = `call:${callId}`;
     const payload = {

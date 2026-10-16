@@ -1,5 +1,6 @@
 import 'fake-indexeddb/auto';
 import {
+  BearerCapability,
   MailboxKeySchedule,
   MailboxReadToken,
   SymmetricKey,
@@ -17,7 +18,6 @@ import type { MessageResource } from '../../../../../contexts/messages/infrastru
 import type { PigeonMessageCommandsApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
 
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
-import { MailboxCapability } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageAvailabilityAnnouncement } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageAvailabilityAnnouncement';
 import { DirectMessageHistoryStorageError } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageHistoryStorageError';
@@ -115,7 +115,7 @@ describe('DirectMessageMailbox availability servers', () => {
       reachable();
       const inbox = inboxes.get(mailboxId);
 
-      if (!inbox?.readers.has(MailboxCapability.hash(readToken))) {
+      if (!inbox?.readers.has(BearerCapability.hash(readToken))) {
         throw new MailboxUnavailableError();
       }
 
@@ -550,7 +550,7 @@ describe('DirectMessageMailbox availability servers', () => {
           credentialFor('bob'),
         ),
       ]
-        .map((token) => MailboxCapability.hash(token))
+        .map((token) => BearerCapability.hash(token))
         .sort();
 
     /** Bob's inbox open on both nodes, each read by his revoked laptop too. */
@@ -564,7 +564,7 @@ describe('DirectMessageMailbox availability servers', () => {
         await node.wire.addReader(
           mailboxId,
           MailboxReadToken.derive(bobRoot, mailboxId),
-          MailboxCapability.hash(
+          BearerCapability.hash(
             MailboxReadToken.deriveDevice(
               bobRoot,
               mailboxId,
@@ -607,7 +607,7 @@ describe('DirectMessageMailbox availability servers', () => {
   describe('enrolDeviceReader', () => {
     const laptop = 'device-credential-bob-laptop';
     const laptopReader = (): string =>
-      MailboxCapability.hash(
+      BearerCapability.hash(
         MailboxReadToken.deriveDevice(
           SymmetricKey.fromBuffer(Buffer.alloc(32, 9)),
           mailboxIdOf('bob'),

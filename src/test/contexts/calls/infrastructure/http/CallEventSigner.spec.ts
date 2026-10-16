@@ -1,4 +1,4 @@
-import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import { CommitmentId, KeyPair } from '@haskou/pigeon-swarm-crypto';
 import vectors from '@haskou/pigeon-swarm-crypto/vectors/call-event.json';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
@@ -48,7 +48,7 @@ describe(CallEventSigner.name, () => {
     const payload = derived.payload as Payload;
 
     expect(
-      signer.callId(
+      CommitmentId.call(
         payload.creatorIdentityId as string,
         payload.nonce as string,
       ),

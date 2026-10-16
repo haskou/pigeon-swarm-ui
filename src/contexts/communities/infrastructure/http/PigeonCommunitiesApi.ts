@@ -1,3 +1,4 @@
+import { CommitmentId } from '@haskou/pigeon-swarm-crypto';
 import { UUID } from '@haskou/value-objects';
 import { Buffer } from 'buffer';
 
@@ -36,10 +37,6 @@ import { CommunityChannelId } from '../../domain/value-objects/CommunityChannelI
 import { CommunityRoleId } from '../../domain/value-objects/CommunityRoleId';
 import { CommunityModerationLogSigner } from './CommunityModerationLogSigner';
 import { CommunityOperationSigner } from './CommunityOperationSigner';
-import {
-  deriveCommunityId,
-  deriveMembershipRequestId,
-} from './deriveCommunityRecordId';
 
 const startupReadCacheTtlMs = 1500;
 
@@ -585,7 +582,7 @@ export class PigeonCommunitiesApi {
     const path = '/communities/';
     const ownerIdentityId = this.mutations.authorOf(session);
     const nonce = this.randomNonce();
-    const communityId = deriveCommunityId(
+    const communityId = CommitmentId.community(
       input.networkId,
       ownerIdentityId,
       nonce,
@@ -697,7 +694,7 @@ export class PigeonCommunitiesApi {
       communityId,
       createdAt,
       creatorIdentityId,
-      id: deriveMembershipRequestId(
+      id: CommitmentId.communityRequest(
         communityId,
         'invitation',
         creatorIdentityId,
@@ -847,7 +844,7 @@ export class PigeonCommunitiesApi {
       communityId,
       createdAt,
       creatorIdentityId: identityId,
-      id: deriveMembershipRequestId(
+      id: CommitmentId.communityRequest(
         communityId,
         'request',
         identityId,

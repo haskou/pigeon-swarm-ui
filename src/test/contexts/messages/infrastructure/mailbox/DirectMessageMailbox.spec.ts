@@ -2,6 +2,7 @@ import 'fake-indexeddb/auto';
 import type { MailboxInboxKeys } from '@haskou/pigeon-swarm-crypto';
 
 import {
+  BearerCapability,
   EncryptedPayload,
   MailboxEnvelope,
   MailboxKeySchedule,
@@ -31,7 +32,6 @@ import type { PigeonMessageCommandsApi } from '../../../../../contexts/messages/
 import type { DirectMessageMailboxState } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxStore';
 
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
-import { MailboxCapability } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageHistoryStorageError } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageHistoryStorageError';
 import { DirectMessageHistoryStore } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageHistoryStore';
@@ -2678,7 +2678,7 @@ describe(DirectMessageMailbox.name, () => {
       expect(channel.removeReader).toHaveBeenCalledWith(
         keys,
         tokens.root,
-        MailboxCapability.hash(tokens.device),
+        BearerCapability.hash(tokens.device),
       );
     });
 
@@ -2719,7 +2719,7 @@ describe(DirectMessageMailbox.name, () => {
       expect(channel.removeReader).toHaveBeenLastCalledWith(
         secondKeys,
         secondTokens.root,
-        MailboxCapability.hash(secondTokens.device),
+        BearerCapability.hash(secondTokens.device),
       );
     });
   });
@@ -2977,7 +2977,7 @@ describe(DirectMessageMailbox.name, () => {
       const maxReaders = options.maxReaders ?? 8;
       const refused = new Set(
         (options.refusedReaders ?? []).map((token) =>
-          MailboxCapability.hash(token),
+          BearerCapability.hash(token),
         ),
       );
       let present = true;
@@ -2989,10 +2989,10 @@ describe(DirectMessageMailbox.name, () => {
         [];
       const readers = new Map<string, number>();
       for (const token of options.readerTokens ?? []) {
-        readers.set(MailboxCapability.hash(token), 0);
+        readers.set(BearerCapability.hash(token), 0);
       }
       const requireReader = (readToken: string) => {
-        if (!present || !readers.has(MailboxCapability.hash(readToken))) {
+        if (!present || !readers.has(BearerCapability.hash(readToken))) {
           throw new MailboxUnavailableError();
         }
       };
@@ -3096,7 +3096,7 @@ describe(DirectMessageMailbox.name, () => {
       });
       wire.acknowledge.mockImplementation((_mailboxId, readToken, upTo) => {
         requireReader(readToken);
-        const readTokenHash = MailboxCapability.hash(readToken);
+        const readTokenHash = BearerCapability.hash(readToken);
         readers.set(
           readTokenHash,
           Math.max(readers.get(readTokenHash) ?? 0, upTo),
@@ -3152,7 +3152,7 @@ describe(DirectMessageMailbox.name, () => {
     };
 
     const hashed = (...tokens: string[]): string[] =>
-      tokens.map((token) => MailboxCapability.hash(token)).sort();
+      tokens.map((token) => BearerCapability.hash(token)).sort();
 
     const deviceTokensFor = (
       mailboxId: string,
@@ -3482,7 +3482,7 @@ describe(DirectMessageMailbox.name, () => {
       await wire.addReader(
         keys.mailboxId,
         tokens.root,
-        MailboxCapability.hash('removed-device'),
+        BearerCapability.hash('removed-device-read-token'),
       );
       // A new app session starts with an empty reconcile memo.
       await syncPass(
@@ -3643,7 +3643,7 @@ describe(DirectMessageMailbox.name, () => {
       await wire.addReader(
         keys.mailboxId,
         MailboxReadToken.derive(rootFor('bob'), keys.mailboxId),
-        MailboxCapability.hash(
+        BearerCapability.hash(
           MailboxReadToken.deriveDevice(rootFor('bob'), keys.mailboxId, laptop),
         ),
       );
@@ -3800,7 +3800,7 @@ describe(DirectMessageMailbox.name, () => {
           ),
         ).rejects.toThrow(DirectMessageReaderCutOffError);
         expect(readerHashes()).toContain(
-          MailboxCapability.hash(
+          BearerCapability.hash(
             MailboxReadToken.derive(rootFor('bob'), keys.mailboxId),
           ),
         );

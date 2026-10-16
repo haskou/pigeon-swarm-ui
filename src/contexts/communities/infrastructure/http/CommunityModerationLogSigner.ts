@@ -1,10 +1,11 @@
+import { CommitmentId } from '@haskou/pigeon-swarm-crypto';
+
 import type { ScopeFrontierReader } from '../../../../shared/infrastructure/http/ScopeFrontierReader';
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { CommunityModerationLogBody } from './CommunityModerationLogBody';
 import type { CommunityModerationLogInput } from './CommunityModerationLogInput';
 
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
-import { deriveModerationLogId } from './deriveCommunityRecordId';
 
 /** Signs the `moderationLogs` put that accompanies a moderation action. */
 export class CommunityModerationLogSigner {
@@ -18,7 +19,7 @@ export class CommunityModerationLogSigner {
     input: CommunityModerationLogInput,
   ): Promise<CommunityModerationLogBody> {
     const actorIdentityId = this.mutations.authorOf(session);
-    const id = deriveModerationLogId(
+    const id = CommitmentId.communityModerationLog(
       input.communityId,
       actorIdentityId,
       input.action,

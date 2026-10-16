@@ -2,6 +2,7 @@ import 'fake-indexeddb/auto';
 import type { MockProxy } from 'jest-mock-extended';
 
 import {
+  BearerCapability,
   KeyPair,
   MailboxReadToken,
   SymmetricKey,
@@ -28,7 +29,6 @@ import { GroupMailboxOutbox } from '../../../../contexts/groupMailboxes/infrastr
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { sessionRootKey } from '../../../../contexts/identities/infrastructure/session/sessionRootKey';
 import { MailboxUnavailableError } from '../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
-import { MailboxCapability } from '../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxChannel } from '../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { MessageProjector } from '../../../../contexts/messages/infrastructure/crypto/MessageProjector';
 import { PigeonMessageCommandsApi } from '../../../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
@@ -97,7 +97,7 @@ const fakeMailboxes = (): void => {
   const readable = (mailboxId: string, token: string) => {
     const inbox = inboxes.get(mailboxId);
 
-    if (!inbox?.readers.has(MailboxCapability.hash(token))) {
+    if (!inbox?.readers.has(BearerCapability.hash(token))) {
       throw new MailboxUnavailableError();
     }
 
@@ -165,7 +165,7 @@ const fakeMailboxes = (): void => {
   );
   wire.delete.mockImplementation((mailboxId, token) =>
     Promise.resolve().then(() => {
-      if (inboxes.get(mailboxId)?.root !== MailboxCapability.hash(token)) {
+      if (inboxes.get(mailboxId)?.root !== BearerCapability.hash(token)) {
         throw new MailboxUnavailableError();
       }
       inboxes.delete(mailboxId);
