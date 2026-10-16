@@ -178,7 +178,10 @@ export class PigeonCommunitiesApi {
   ): Promise<T> {
     let response: T | undefined;
     let acceptance: Record<string, unknown> = {};
-    const frontier = await this.frontiers.ofPayload(session, record);
+    const frontier = await this.frontiers.community(
+      session,
+      String(record.communityId),
+    );
 
     await submitPublicMutation(
       PublicMutationSigner.FIRST_POSITION,
@@ -303,7 +306,10 @@ export class PigeonCommunitiesApi {
     payload: Record<string, unknown>,
     fields: Record<string, unknown> = {},
   ): Promise<void> {
-    const frontier = await this.frontiers.ofPayload(session, payload);
+    const frontier = await this.frontiers.community(
+      session,
+      String(payload.communityId),
+    );
 
     await submitPublicMutation(
       PublicMutationSigner.FIRST_POSITION,
@@ -450,7 +456,10 @@ export class PigeonCommunitiesApi {
     fields: Record<string, unknown>,
   ): Promise<MessageResource> {
     let response: MessageResource | undefined;
-    const frontier = await this.frontiers.ofPayload(session, intent.payload);
+    const frontier = await this.frontiers.community(
+      session,
+      String(intent.payload.communityId),
+    );
 
     await submitPublicMutation(
       PublicMutationSigner.FIRST_POSITION,
