@@ -347,6 +347,32 @@ describe(DirectMessageMailboxRecord.name, () => {
         DirectMessageMailboxRecord.decode(plaintext, conversationId),
       ).toBeNull();
     });
+
+    it('keeps an id of 256 characters so its history row can be sealed', () => {
+      const record = { ...sentRecord, id: 'm'.repeat(256) };
+
+      expect(
+        DirectMessageMailboxRecord.decode(
+          DirectMessageMailboxRecord.encode(record),
+          conversationId,
+        ),
+      ).toEqual(record);
+    });
+
+    it.each([257, 17_000])(
+      'returns null for an id of %i characters, so it cannot stall history',
+      (length) => {
+        expect(
+          DirectMessageMailboxRecord.decode(
+            DirectMessageMailboxRecord.encode({
+              ...sentRecord,
+              id: 'm'.repeat(length),
+            }),
+            conversationId,
+          ),
+        ).toBeNull();
+      },
+    );
   });
 
   describe('toResource', () => {
