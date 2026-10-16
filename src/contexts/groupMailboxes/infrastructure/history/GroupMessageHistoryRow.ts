@@ -9,5 +9,5 @@ export type GroupMessageHistoryRow = {
   readonly conversation: string;
   readonly identityId: string;
   readonly record: string;
-  readonly sealed: Uint8Array<ArrayBuffer>;
+  readonly sealed: Uint8Array;
 };

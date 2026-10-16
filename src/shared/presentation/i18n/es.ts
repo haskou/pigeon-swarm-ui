@@ -721,9 +721,7 @@ export const es = {
     backupPassword: 'Confirma tu contraseña para hacer la copia',
     backupTitle: 'Copia de seguridad',
     backupUnreadable:
-      'Este archivo no es una copia de esta identidad o ha sido modificado.',
-    backupVersion:
-      'Este formato de copia no es compatible. Haz una copia nueva con esta versión de la aplicación.',
+      'Este archivo no es una copia de esta identidad hecha con esta versión de la aplicación o ha sido modificado.',
     help: 'Qué se guarda aquí, en el servidor y en manos de otras personas.',
     low: 'Queda poco espacio. Puede que los mensajes nuevos no se guarden aquí hasta que liberes espacio.',
     notProtected:

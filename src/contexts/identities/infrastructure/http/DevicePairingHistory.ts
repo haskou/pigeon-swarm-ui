@@ -1,3 +1,5 @@
+import type { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+
 import type { Session } from '../session/Session';
 
 /**
@@ -6,7 +8,7 @@ import type { Session } from '../session/Session';
  */
 export interface DevicePairingHistory {
   /** Publishes this identity's history; a failure leaves it partial or gone. */
-  publish(session: Session, secret: Uint8Array): Promise<void>;
+  publish(session: Session, secret: SymmetricKey): Promise<void>;
   /** Imports the history published under `secret` into a rooted session. */
-  receive(session: Session, secret: Uint8Array): Promise<void>;
+  receive(session: Session, secret: SymmetricKey): Promise<void>;
 }

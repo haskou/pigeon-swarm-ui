@@ -1,7 +1,9 @@
+import type { MailboxInboxKeys } from '@haskou/pigeon-swarm-crypto';
+
+import { MailboxReadToken } from '@haskou/pigeon-swarm-crypto';
 import { Duration, Timestamp } from '@haskou/value-objects';
 import { randomBytes } from '@noble/hashes/utils.js';
 
-import type { MailboxKeys } from '../../../mailboxes/infrastructure/crypto/MailboxKeySchedule';
 import type {
   MailboxChannel,
   OpenedMailboxEnvelope,
@@ -18,7 +20,6 @@ import { encodeBase64Url } from '../../../../shared/infrastructure/encoding/base
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 import { MailboxUnavailableError } from '../../../mailboxes/domain/errors/MailboxUnavailableError';
 import { MailboxCapability } from '../../../mailboxes/infrastructure/crypto/MailboxCapability';
-import { MailboxReadToken } from '../../../mailboxes/infrastructure/crypto/MailboxReadToken';
 import { ContactPresenceBoard } from '../../domain/ContactPresenceBoard';
 import { ContactPresenceBroadcast } from '../../domain/ContactPresenceBroadcast';
 import { IdentityMatch } from '../../domain/IdentityMatch';
@@ -51,7 +52,7 @@ export class MailboxContactPresenceRepository implements ContactPresenceReposito
   /** Inboxes opened this app session, by mailbox and reader. */
   private readonly opened = new Map<
     string,
-    { identityId: string; keys: MailboxKeys; open: Promise<void> }
+    { identityId: string; keys: MailboxInboxKeys; open: Promise<void> }
   >();
 
   private readonly resumeAt = new Map<string, Timestamp>();
@@ -95,7 +96,7 @@ export class MailboxContactPresenceRepository implements ContactPresenceReposito
    */
   private async keepOnly(
     session: Session,
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     reader: string,
   ): Promise<void> {
     const previous = session.previousDeviceSealedRootKey;
@@ -104,7 +105,7 @@ export class MailboxContactPresenceRepository implements ContactPresenceReposito
       await this.channel
         .addReader(
           keys,
-          MailboxReadToken.derive(previous.getBuffer(), keys.mailboxId),
+          MailboxReadToken.derive(previous, keys.mailboxId),
           reader,
         )
         .catch(() => undefined);
@@ -123,7 +124,7 @@ export class MailboxContactPresenceRepository implements ContactPresenceReposito
   /** Creates or bridges into the inbox once per app session and reader. */
   private open(
     session: Session,
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     reader: string,
   ): Promise<void> {
     const key = `${keys.mailboxId}|${MailboxCapability.hash(reader)}`;
@@ -151,7 +152,7 @@ export class MailboxContactPresenceRepository implements ContactPresenceReposito
   }
 
   private async read(
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     reader: string,
     sharing: PresenceSharing,
     receivedAt: Timestamp,

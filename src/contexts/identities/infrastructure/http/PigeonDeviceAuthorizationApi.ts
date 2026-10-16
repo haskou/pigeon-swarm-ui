@@ -1,5 +1,8 @@
+import type { RecoveryKey } from '@haskou/pigeon-swarm-crypto';
+
 import {
   KeyPair,
+  RecoveryKit,
   SymmetricKey,
   UserRootKey,
 } from '@haskou/pigeon-swarm-crypto';
@@ -13,7 +16,6 @@ import type { DeviceAuthorizationTransitionLogPrimitives } from '../../domain/De
 import type { DeviceAuthorizationTransitionPrimitives } from '../../domain/DeviceAuthorizationTransitionPrimitives';
 import type { DevicePairingRequestDraft } from '../../domain/DevicePairingRequestDraft';
 import type { IdentityPassword } from '../../domain/value-objects/IdentityPassword';
-import type { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
 import type { Session } from '../session/Session';
 import type { DeviceIdentityVault } from '../storage/DeviceIdentityVault';
 import type { CompletedDevicePairing } from './CompletedDevicePairing';
@@ -48,7 +50,6 @@ import { DevicePairingCode } from '../../domain/value-objects/DevicePairingCode'
 import { IdentityId } from '../../domain/value-objects/IdentityId';
 import { PairingId } from '../../domain/value-objects/PairingId';
 import { RecoveryAuthority } from '../../domain/value-objects/RecoveryAuthority';
-import { RecoveryIdentityMaterial } from '../crypto/RecoveryIdentityMaterial';
 import { DevicePairingCodeReader } from '../pairing/DevicePairingCodeReader';
 import { DeviceAuthorizationCheckpointMapper } from './DeviceAuthorizationCheckpointMapper';
 import { IdentityMailboxHomeVerifier } from './IdentityMailboxHomeVerifier';
@@ -594,7 +595,7 @@ export class PigeonDeviceAuthorizationApi {
   ): Promise<Session> {
     password.assertStrong();
 
-    const material = await RecoveryIdentityMaterial.derive(recoveryKey);
+    const material = RecoveryKit.derive(recoveryKey);
     const identityId = IdentityId.fromString(
       material.identityKeyPair.toPrimitives().publicKey,
     );

@@ -1,7 +1,12 @@
+import type { MailboxInboxKeys } from '@haskou/pigeon-swarm-crypto';
+
+import {
+  InvalidMailboxEnvelopeError,
+  MailboxEnvelope,
+} from '@haskou/pigeon-swarm-crypto';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { randomBytes } from '@noble/hashes/utils.js';
 
-import type { MailboxKeys } from './crypto/MailboxKeySchedule';
 import type {
   MailboxReaderSet,
   PigeonMailboxClient,
@@ -12,8 +17,6 @@ import { MailboxUnavailableError } from '../domain/errors/MailboxUnavailableErro
 import { MailboxCreationDomainService } from '../domain/services/MailboxCreationDomainService';
 import { MailboxCapability } from './crypto/MailboxCapability';
 import { MailboxCreationProof } from './crypto/MailboxCreationProof';
-import { MailboxEnvelopeCipher } from './crypto/MailboxEnvelopeCipher';
-import { MailboxEnvelopeError } from './crypto/MailboxEnvelopeError';
 
 export type MailboxCreationMiner = (
   mailboxId: string,
@@ -118,7 +121,7 @@ export class MailboxChannel {
    * the mailbox is new, so cursors from the old one no longer apply.
    */
   private async recovering<T>(
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     readers: MailboxReadTokens,
     operation: () => Promise<T>,
   ): Promise<{ recreated: boolean; value: T }> {
@@ -143,7 +146,7 @@ export class MailboxChannel {
    * second pass can see the inbox as missing while the first is still
    * creating it.
    */
-  public createInbox(keys: MailboxKeys, readToken: string): Promise<void> {
+  public createInbox(keys: MailboxInboxKeys, readToken: string): Promise<void> {
     const readTokenHash = MailboxCapability.hash(readToken);
     const flightKey = `${keys.mailboxId}|${readTokenHash}`;
     const inFlight = this.pendingCreations.get(flightKey);
@@ -161,7 +164,7 @@ export class MailboxChannel {
   }
 
   private async createInboxOnce(
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     readTokenHash: string,
   ): Promise<void> {
     const postTokenHash = MailboxCapability.hash(keys.postToken);
@@ -182,16 +185,11 @@ export class MailboxChannel {
 
   /** Sender. Seals one plaintext under `envelopeId`, a fresh id by default. */
   public async send(
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     plaintext: Uint8Array,
     envelopeId: string = MailboxChannel.randomEnvelopeId(),
   ): Promise<MailboxAppend> {
-    const body = await MailboxEnvelopeCipher.seal(
-      keys.envelopeKey,
-      keys.mailboxId,
-      envelopeId,
-      plaintext,
-    );
+    const body = MailboxEnvelope.seal(keys, envelopeId, plaintext);
     const { cursor } = await this.client.append(
       keys.mailboxId,
       keys.postToken,
@@ -209,7 +207,7 @@ export class MailboxChannel {
    * without being reported.
    */
   public async read(
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     readers: MailboxReadTokens,
     after: number,
     limit: number,
@@ -219,27 +217,22 @@ export class MailboxChannel {
       readers,
       () => this.client.read(keys.mailboxId, readers.device, after, limit),
     );
-    const opened = await Promise.all(
-      page.envelopes.map(({ body, cursor, envelopeId }) =>
-        MailboxEnvelopeCipher.open(
-          keys.envelopeKey,
-          keys.mailboxId,
-          envelopeId,
-          body,
-        ).then(
-          (plaintext): OpenedMailboxEnvelope => ({
-            cursor,
-            envelopeId,
-            plaintext,
-          }),
-          (error: unknown) => {
-            if (error instanceof MailboxEnvelopeError) return null;
-            throw error;
-          },
-        ),
-      ),
+    const envelopes = page.envelopes.flatMap(
+      ({ body, cursor, envelopeId }): OpenedMailboxEnvelope[] => {
+        try {
+          return [
+            {
+              cursor,
+              envelopeId,
+              plaintext: MailboxEnvelope.open(keys, envelopeId, body),
+            },
+          ];
+        } catch (error) {
+          if (error instanceof InvalidMailboxEnvelopeError) return [];
+          throw error;
+        }
+      },
     );
-    const envelopes = opened.filter((envelope) => envelope !== null);
 
     return {
       envelopes,
@@ -259,7 +252,7 @@ export class MailboxChannel {
    * whether that re-creation happened.
    */
   public async acknowledge(
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     readers: MailboxReadTokens,
     upTo: number,
   ): Promise<{ recreated: boolean }> {
@@ -273,7 +266,7 @@ export class MailboxChannel {
 
   /** Deletes the inbox and its envelopes; any read token of it may. */
   public async deleteInbox(
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     readToken: string,
   ): Promise<void> {
     await this.client.delete(keys.mailboxId, readToken);
@@ -281,7 +274,7 @@ export class MailboxChannel {
 
   /** Lists the inbox's readers. The root token authorises the call. */
   public listReaders(
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     rootToken: string,
   ): Promise<MailboxReaderSet> {
     return this.client.readers(keys.mailboxId, rootToken);
@@ -289,7 +282,7 @@ export class MailboxChannel {
 
   /** Enrols a reader by its token hash, authorised by the root token. */
   public async addReader(
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     rootToken: string,
     readerToken: string,
   ): Promise<void> {
@@ -302,7 +295,7 @@ export class MailboxChannel {
 
   /** Removes a reader by hash. The node refuses to drop the last reader. */
   public async removeReader(
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     rootToken: string,
     readerTokenHash: string,
   ): Promise<void> {

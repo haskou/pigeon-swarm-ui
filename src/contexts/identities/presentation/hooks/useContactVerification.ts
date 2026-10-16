@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { SafetyNumber } from '@haskou/pigeon-swarm-crypto';
+import { useMemo, useState } from 'react';
 
 import { contactPinStore } from '../../../../app/composition/applicationContainer';
-import { SafetyNumber } from '../../infrastructure/crypto/SafetyNumber';
 
 export type ContactVerification = {
   markVerified: () => boolean;
@@ -37,6 +37,7 @@ export function useContactVerification({
     }
 
     setRevision((revision) => revision + 1);
+
     return true;
   };
 
@@ -50,6 +51,7 @@ export function useContactVerification({
     }
 
     setRevision((revision) => revision + 1);
+
     return true;
   };
 
@@ -59,21 +61,9 @@ export function useContactVerification({
 export function useSafetyNumber(
   localIdentityId: string,
   peerIdentityId: string,
-): string[] | null {
-  const [groups, setGroups] = useState<string[] | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    setGroups(null);
-
-    void SafetyNumber.between(localIdentityId, peerIdentityId).then((value) => {
-      if (active) setGroups(value);
-    });
-
-    return () => {
-      active = false;
-    };
-  }, [localIdentityId, peerIdentityId]);
-
-  return groups;
+): readonly string[] {
+  return useMemo(
+    () => SafetyNumber.between(localIdentityId, peerIdentityId),
+    [localIdentityId, peerIdentityId],
+  );
 }

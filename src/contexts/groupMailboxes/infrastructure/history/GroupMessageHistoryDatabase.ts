@@ -106,13 +106,11 @@ export class GroupMessageHistoryDatabase {
     transaction.objectStore(CANARIES_STORE).delete(identityId);
   }
 
-  public canary(
-    identityId: string,
-  ): Promise<Uint8Array<ArrayBuffer> | undefined> {
+  public canary(identityId: string): Promise<Uint8Array | undefined> {
     return this.within([CANARIES_STORE], 'readonly', (transaction) =>
       indexedDbRequest(
         transaction.objectStore(CANARIES_STORE).get(identityId) as IDBRequest<
-          Uint8Array<ArrayBuffer> | undefined
+          Uint8Array | undefined
         >,
       ),
     );
@@ -153,7 +151,7 @@ export class GroupMessageHistoryDatabase {
   public putRead(
     identityId: string,
     conversation: string,
-    sealed: Uint8Array<ArrayBuffer>,
+    sealed: Uint8Array,
   ): Promise<void> {
     return this.within([READS_STORE], 'readwrite', async (transaction) => {
       await indexedDbRequest(
@@ -168,23 +166,20 @@ export class GroupMessageHistoryDatabase {
   public read(
     identityId: string,
     conversation: string,
-  ): Promise<Uint8Array<ArrayBuffer> | undefined> {
+  ): Promise<Uint8Array | undefined> {
     return this.within([READS_STORE], 'readonly', (transaction) =>
       indexedDbRequest(
         transaction
           .objectStore(READS_STORE)
           .get([identityId, conversation]) as IDBRequest<
-          Uint8Array<ArrayBuffer> | undefined
+          Uint8Array | undefined
         >,
       ),
     );
   }
 
   /** Drops one identity's rows and stores its new canary. */
-  public reset(
-    identityId: string,
-    canary: Uint8Array<ArrayBuffer>,
-  ): Promise<void> {
+  public reset(identityId: string, canary: Uint8Array): Promise<void> {
     return this.within(
       [ENTRIES_STORE, CANARIES_STORE, READS_STORE],
       'readwrite',

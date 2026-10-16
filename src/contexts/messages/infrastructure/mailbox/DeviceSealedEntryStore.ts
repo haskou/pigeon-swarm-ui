@@ -1,3 +1,7 @@
+import {
+  DeviceRootRowKeys,
+  type SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 
 import type { Session } from '../../../identities/infrastructure/session/Session';
@@ -7,12 +11,12 @@ import {
   indexedDbTransaction,
 } from '../../../../shared/infrastructure/storage/indexedDbRequest';
 import { sessionRootKey } from '../../../identities/infrastructure/session/sessionRootKey';
-import { DeviceRootRowKeys } from './DeviceRootRowKeys';
 
 const DATABASE_VERSION = 2;
 const ENTRIES = 'entries';
 const CANARIES = 'canaries';
 const ID_LENGTH_BYTES = 4;
+const ENTRY_PURPOSE = 'entry';
 
 /**
  * Entries of each identity, by kind and id, sealed with AES-256-GCM under a
@@ -37,16 +41,6 @@ export class DeviceSealedEntryStore {
     string,
     { keys: Promise<DeviceRootRowKeys>; root: Buffer }
   >();
-
-  private static aad(
-    identityId: string,
-    kind: string,
-    tag: string,
-  ): Uint8Array<ArrayBuffer> {
-    return new TextEncoder().encode(
-      JSON.stringify(['entry', identityId, kind, tag]),
-    );
-  }
 
   /** The id, its UTF-8 length first, then the value. */
   private static frame(id: string, value: Uint8Array): Uint8Array {
@@ -126,24 +120,22 @@ export class DeviceSealedEntryStore {
     return this.connection;
   }
 
-  private async canary(
-    identityId: string,
-  ): Promise<Uint8Array<ArrayBuffer> | undefined> {
+  private async canary(identityId: string): Promise<Uint8Array | undefined> {
     const transaction = (await this.open()).transaction(CANARIES, 'readonly');
 
-    return await indexedDbRequest<Uint8Array<ArrayBuffer> | undefined>(
+    return await indexedDbRequest<Uint8Array | undefined>(
       transaction.objectStore(CANARIES).get(identityId),
     );
   }
 
   private async rows(
     range: IDBKeyRange,
-  ): Promise<{ key: string[]; sealed: Uint8Array<ArrayBuffer> }[]> {
+  ): Promise<{ key: string[]; sealed: Uint8Array }[]> {
     const transaction = (await this.open()).transaction(ENTRIES, 'readonly');
     const entries = transaction.objectStore(ENTRIES);
     const [keys, values] = await Promise.all([
       indexedDbRequest(entries.getAllKeys(range)),
-      indexedDbRequest<Uint8Array<ArrayBuffer>[]>(entries.getAll(range)),
+      indexedDbRequest<Uint8Array[]>(entries.getAll(range)),
     ]);
 
     return keys.map((key, index) => ({
@@ -153,10 +145,7 @@ export class DeviceSealedEntryStore {
   }
 
   /** Drops the identity's rows and starts over under `canary`. */
-  private async reset(
-    identityId: string,
-    canary: Uint8Array<ArrayBuffer>,
-  ): Promise<void> {
+  private async reset(identityId: string, canary: Uint8Array): Promise<void> {
     const transaction = (await this.open()).transaction(
       [ENTRIES, CANARIES],
       'readwrite',
@@ -179,34 +168,28 @@ export class DeviceSealedEntryStore {
     identityId: string,
     replaced: DeviceRootRowKeys,
     current: DeviceRootRowKeys,
-    canary: Uint8Array<ArrayBuffer>,
+    canary: Uint8Array,
   ): Promise<void> {
-    const resealed: { key: string[]; sealed: Uint8Array<ArrayBuffer> }[] = [];
+    const resealed: { key: string[]; sealed: Uint8Array }[] = [];
 
     for (const { key, sealed } of await this.rows(
       DeviceSealedEntryStore.identityRange(identityId),
     )) {
       const [, kind, tag] = key;
-      const framed = await replaced.cipher.open(
-        DeviceSealedEntryStore.aad(identityId, kind, tag),
-        sealed,
-      );
+      const framed = replaced.open(ENTRY_PURPOSE, [kind, tag], sealed);
 
       if (!framed) continue;
-      const next = await current.tag([
+      const next = current.tag([
         kind,
         DeviceSealedEntryStore.unframe(framed).id,
       ]);
 
       resealed.push({
         key: [identityId, kind, next],
-        sealed: await current.cipher.seal(
-          DeviceSealedEntryStore.aad(identityId, kind, next),
-          framed,
-        ),
+        sealed: current.seal(ENTRY_PURPOSE, [kind, next], framed),
       });
     }
-    const nextCanary = await current.cipher.sealCanary();
+    const nextCanary = current.sealCanary();
     const transaction = (await this.open()).transaction(
       [ENTRIES, CANARIES],
       'readwrite',
@@ -243,21 +226,24 @@ export class DeviceSealedEntryStore {
 
   /** The keys of the session's root, once the rows are known to be under it. */
   private keys(session: Session): Promise<DeviceRootRowKeys> {
-    const root = Buffer.from(sessionRootKey(session).getBuffer());
+    const root = sessionRootKey(session);
+    const rootBytes = root.getBuffer();
     const identityId = session.identity.id;
     const held = this.scopes.get(identityId);
 
-    if (held?.root.equals(root)) return held.keys;
+    if (held?.root.equals(rootBytes)) return held.keys;
 
-    if (this.replaced.get(identityId)?.some((stale) => stale.equals(root))) {
+    if (
+      this.replaced.get(identityId)?.some((stale) => stale.equals(rootBytes))
+    ) {
       return Promise.reject(new Error('Device sealed root was replaced.'));
     }
     const keys = this.verified(
       identityId,
       root,
-      session.previousDeviceSealedRootKey?.getBuffer(),
+      session.previousDeviceSealedRootKey,
     );
-    const scope = { keys, root };
+    const scope = { keys, root: rootBytes };
 
     this.scopes.set(identityId, scope);
     keys.catch(() => {
@@ -269,36 +255,32 @@ export class DeviceSealedEntryStore {
 
   private async verified(
     identityId: string,
-    root: Uint8Array,
-    replacedRoot: Uint8Array | undefined,
+    root: SymmetricKey,
+    replacedRoot: SymmetricKey | undefined,
   ): Promise<DeviceRootRowKeys> {
-    const current = await DeviceRootRowKeys.derive(
-      root,
-      this.label,
-      identityId,
-    );
+    const current = DeviceRootRowKeys.derive(root, this.label, identityId);
     const canary = await this.canary(identityId);
 
-    if (canary && (await current.cipher.opensCanary(canary))) return current;
+    if (canary && current.opensCanary(canary)) return current;
 
     if (canary && replacedRoot) {
-      const replaced = await DeviceRootRowKeys.derive(
+      const replaced = DeviceRootRowKeys.derive(
         replacedRoot,
         this.label,
         identityId,
       );
 
-      if (await replaced.cipher.opensCanary(canary)) {
+      if (replaced.opensCanary(canary)) {
         await this.reseal(identityId, replaced, current, canary);
         this.replaced.set(identityId, [
           ...(this.replaced.get(identityId) ?? []),
-          Buffer.from(replacedRoot),
+          Buffer.from(replacedRoot.getBuffer()),
         ]);
 
         return current;
       }
     }
-    await this.reset(identityId, await current.cipher.sealCanary());
+    await this.reset(identityId, current.sealCanary());
 
     return current;
   }
@@ -317,9 +299,10 @@ export class DeviceSealedEntryStore {
   ): Promise<boolean> {
     const identityId = session.identity.id;
     const keys = await this.keys(session);
-    const tag = await keys.tag([kind, id]);
-    const sealed = await keys.cipher.seal(
-      DeviceSealedEntryStore.aad(identityId, kind, tag),
+    const tag = keys.tag([kind, id]);
+    const sealed = keys.seal(
+      ENTRY_PURPOSE,
+      [kind, tag],
       DeviceSealedEntryStore.frame(id, value),
     );
     const transaction = (await this.open()).transaction(ENTRIES, 'readwrite');
@@ -356,7 +339,7 @@ export class DeviceSealedEntryStore {
     id: string,
   ): Promise<void> {
     const keys = await this.keys(session);
-    const tag = await keys.tag([kind, id]);
+    const tag = keys.tag([kind, id]);
     const transaction = (await this.open()).transaction(ENTRIES, 'readwrite');
 
     transaction.objectStore(ENTRIES).delete([session.identity.id, kind, tag]);
@@ -387,17 +370,14 @@ export class DeviceSealedEntryStore {
   ): Promise<Uint8Array | undefined> {
     const identityId = session.identity.id;
     const keys = await this.keys(session);
-    const tag = await keys.tag([kind, id]);
+    const tag = keys.tag([kind, id]);
     const transaction = (await this.open()).transaction(ENTRIES, 'readonly');
-    const sealed = await indexedDbRequest<Uint8Array<ArrayBuffer> | undefined>(
+    const sealed = await indexedDbRequest<Uint8Array | undefined>(
       transaction.objectStore(ENTRIES).get([identityId, kind, tag]),
     );
 
     if (!sealed) return undefined;
-    const framed = await keys.cipher.open(
-      DeviceSealedEntryStore.aad(identityId, kind, tag),
-      sealed,
-    );
+    const framed = keys.open(ENTRY_PURPOSE, [kind, tag], sealed);
 
     if (!framed) return undefined;
     const entry = DeviceSealedEntryStore.unframe(framed);
@@ -417,10 +397,7 @@ export class DeviceSealedEntryStore {
     for (const { key, sealed } of await this.rows(
       IDBKeyRange.bound([identityId, kind], [identityId, kind, []]),
     )) {
-      const framed = await keys.cipher.open(
-        DeviceSealedEntryStore.aad(identityId, kind, key[2]),
-        sealed,
-      );
+      const framed = keys.open(ENTRY_PURPOSE, [kind, key[2]], sealed);
 
       if (framed) opened.push(DeviceSealedEntryStore.unframe(framed));
     }
@@ -436,9 +413,10 @@ export class DeviceSealedEntryStore {
   ): Promise<void> {
     const identityId = session.identity.id;
     const keys = await this.keys(session);
-    const tag = await keys.tag([kind, id]);
-    const sealed = await keys.cipher.seal(
-      DeviceSealedEntryStore.aad(identityId, kind, tag),
+    const tag = keys.tag([kind, id]);
+    const sealed = keys.seal(
+      ENTRY_PURPOSE,
+      [kind, tag],
       DeviceSealedEntryStore.frame(id, value),
     );
     const transaction = (await this.open()).transaction(ENTRIES, 'readwrite');

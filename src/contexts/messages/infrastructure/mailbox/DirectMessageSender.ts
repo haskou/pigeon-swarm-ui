@@ -1,3 +1,8 @@
+import {
+  MailboxEnvelope,
+  MailboxRecordAuthorship,
+} from '@haskou/pigeon-swarm-crypto';
+
 import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessageRecord';
@@ -23,16 +28,14 @@ import { DirectMailboxOwnership } from '../../../mailboxes/domain/DirectMailboxO
 import { DirectMailboxRecordError } from '../../../mailboxes/domain/DirectMailboxRecordError';
 import { DirectMailboxRecords } from '../../../mailboxes/domain/DirectMailboxRecords';
 import { MailboxUnavailableError } from '../../../mailboxes/domain/errors/MailboxUnavailableError';
-import { MailboxEnvelopeCipher } from '../../../mailboxes/infrastructure/crypto/MailboxEnvelopeCipher';
 import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
-import { DirectMessageAuthorship } from './DirectMessageAuthorship';
 import { DirectMessageInboxKeys } from './DirectMessageInboxKeys';
 import { DirectMessageMailboxRecord } from './DirectMessageMailboxRecord';
 import { DirectMessageOutbox } from './DirectMessageOutbox';
 
 /** Refuses a record the envelope cannot carry, before anything is written. */
 function assertWithinEnvelope(plaintext: Uint8Array): void {
-  if (plaintext.byteLength > MailboxEnvelopeCipher.MAX_PLAINTEXT_BYTES) {
+  if (plaintext.byteLength > MailboxEnvelope.MAX_PLAINTEXT_BYTES) {
     throw new Error('Direct mailbox record exceeds the envelope bound.');
   }
 }
@@ -236,10 +239,7 @@ export class DirectMessageSender {
     return DirectMessageMailboxRecord.encode(
       record,
       IdentityMatch.isSame(recipientIdentityId, session.identity.id)
-        ? DirectMessageAuthorship.tag(
-            sessionRootKey(session).getBuffer(),
-            record,
-          )
+        ? MailboxRecordAuthorship.tag(sessionRootKey(session), record)
         : undefined,
     );
   }

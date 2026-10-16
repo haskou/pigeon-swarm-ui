@@ -1,7 +1,8 @@
+import type { MailboxInboxKeys } from '@haskou/pigeon-swarm-crypto';
+
 import type { RealtimeMailboxSubscriptionInput } from '../../../../shared/infrastructure/realtime/RealtimeMailboxSubscriptionInput';
 import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../../identities/infrastructure/session/Session';
-import type { MailboxKeys } from '../../../mailboxes/infrastructure/crypto/MailboxKeySchedule';
 import type { MailboxReadTokens } from '../../../mailboxes/infrastructure/MailboxChannel';
 import type { DirectMessageInboxOutcome } from './DirectMessageInboxOutcome';
 import type { DirectMessageMailboxStore } from './DirectMessageMailboxStore';
@@ -77,7 +78,7 @@ export class DirectMessageInboxOpener {
    */
   private async reopenInbox(
     session: Session,
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     readers: MailboxReadTokens,
     state: DirectMessageRecipientInbox['state'],
   ): Promise<DirectMessageRecipientInbox> {
@@ -97,7 +98,7 @@ export class DirectMessageInboxOpener {
    */
   private async ensureInbox(
     session: Session,
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     readers: MailboxReadTokens,
   ): Promise<DirectMessageInboxOutcome> {
     const retryAt = this.retryOpenAt.get(keys.mailboxId);
@@ -132,7 +133,7 @@ export class DirectMessageInboxOpener {
    */
   private async provisionInbox(
     session: Session,
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     readers: MailboxReadTokens,
   ): Promise<void> {
     try {
@@ -151,7 +152,7 @@ export class DirectMessageInboxOpener {
   /** Bridges the device-sealed root into the inbox. */
   private async enrolSealed(
     session: Session,
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     readers: MailboxReadTokens,
   ): Promise<boolean> {
     try {

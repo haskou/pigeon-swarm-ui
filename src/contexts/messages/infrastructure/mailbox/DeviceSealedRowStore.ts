@@ -1,14 +1,19 @@
+import {
+  DeviceRootRowKeys,
+  type SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
+
 import type { Session } from '../../../identities/infrastructure/session/Session';
 
 import {
   indexedDbRequest,
   indexedDbTransaction,
 } from '../../../../shared/infrastructure/storage/indexedDbRequest';
-import { DeviceRootRowCipher } from './DeviceRootRowCipher';
 
 const DATABASE_VERSION = 1;
 const ENTRIES_STORE = 'entries';
 const CANARIES_STORE = 'canaries';
+const ROW_PURPOSE = 'row';
 
 function entryKey(identityId: string, id: string): string {
   return `${identityId}\u0000${id}`;
@@ -21,10 +26,6 @@ function identityRange(identityId: string): IDBKeyRange {
     false,
     true,
   );
-}
-
-function rowAad(identityId: string): Uint8Array<ArrayBuffer> {
-  return new TextEncoder().encode(JSON.stringify(['row', identityId]));
 }
 
 function openDatabase(name: string): Promise<IDBDatabase> {
@@ -45,29 +46,26 @@ function wipeIdentity(transaction: IDBTransaction, identityId: string): void {
 }
 
 /**
- * The identity's cipher under this root. A canary sealed under the same key
+ * The identity's row keys under this root. A canary sealed under the same key
  * detects a root change; on a mismatch or a missing canary the identity's rows
  * are dropped and the canary is re-sealed under the current root.
  */
-async function verifiedCipher(
+async function verifiedKeys(
   database: IDBDatabase,
   label: string,
   identityId: string,
-  root: Uint8Array,
-): Promise<DeviceRootRowCipher> {
-  const cipher = await DeviceRootRowCipher.derive(root, label, identityId);
+  root: SymmetricKey,
+): Promise<DeviceRootRowKeys> {
+  const keys = DeviceRootRowKeys.derive(root, label, identityId);
   const canary = await indexedDbRequest(
     database
       .transaction(CANARIES_STORE, 'readonly')
       .objectStore(CANARIES_STORE)
-      .get(identityId) as IDBRequest<
-      { sealed: Uint8Array<ArrayBuffer> } | undefined
-    >,
+      .get(identityId) as IDBRequest<{ sealed: Uint8Array } | undefined>,
   );
 
-  if (canary && (await cipher.opensCanary(canary.sealed))) return cipher;
+  if (canary && keys.opensCanary(canary.sealed)) return keys;
 
-  const sealedCanary = await cipher.sealCanary();
   const transaction = database.transaction(
     [ENTRIES_STORE, CANARIES_STORE],
     'readwrite',
@@ -76,10 +74,10 @@ async function verifiedCipher(
   wipeIdentity(transaction, identityId);
   transaction
     .objectStore(CANARIES_STORE)
-    .put({ sealed: sealedCanary }, identityId);
+    .put({ sealed: keys.sealCanary() }, identityId);
   await indexedDbTransaction(transaction);
 
-  return cipher;
+  return keys;
 }
 
 /**
@@ -97,7 +95,7 @@ export class DeviceSealedRowStore<Row extends { readonly id: string }> {
 
   /** Persists a row. Rejects on failure. */
   public async save(session: Session, row: Row): Promise<void> {
-    const root = session.deviceSealedRootKey?.getBuffer();
+    const root = session.deviceSealedRootKey;
 
     if (!root) return;
 
@@ -105,14 +103,10 @@ export class DeviceSealedRowStore<Row extends { readonly id: string }> {
 
     try {
       const database = await openDatabase(this.databaseName);
-      const cipher = await verifiedCipher(
-        database,
-        this.label,
-        identityId,
-        root,
-      );
-      const sealed = await cipher.seal(
-        rowAad(identityId),
+      const keys = await verifiedKeys(database, this.label, identityId, root);
+      const sealed = keys.seal(
+        ROW_PURPOSE,
+        [],
         new TextEncoder().encode(JSON.stringify(row)),
       );
       const transaction = database.transaction(ENTRIES_STORE, 'readwrite');
@@ -131,25 +125,25 @@ export class DeviceSealedRowStore<Row extends { readonly id: string }> {
 
   /** Loads this identity's rows under the current root. Empty without one. */
   public async load(session: Session): Promise<Row[]> {
-    const root = session.deviceSealedRootKey?.getBuffer();
+    const root = session.deviceSealedRootKey;
 
     if (!root) return [];
 
     const identityId = session.identity.id;
     const database = await openDatabase(this.databaseName);
-    const cipher = await verifiedCipher(database, this.label, identityId, root);
+    const keys = await verifiedKeys(database, this.label, identityId, root);
     const sealedRows = await indexedDbRequest(
       database
         .transaction(ENTRIES_STORE, 'readonly')
         .objectStore(ENTRIES_STORE)
         .getAll(identityRange(identityId)) as IDBRequest<
-        { sealed: Uint8Array<ArrayBuffer> }[]
+        { sealed: Uint8Array }[]
       >,
     );
     const rows: Row[] = [];
 
     for (const { sealed } of sealedRows) {
-      const plaintext = await cipher.open(rowAad(identityId), sealed);
+      const plaintext = keys.open(ROW_PURPOSE, [], sealed);
 
       if (plaintext) {
         rows.push(JSON.parse(new TextDecoder().decode(plaintext)) as Row);

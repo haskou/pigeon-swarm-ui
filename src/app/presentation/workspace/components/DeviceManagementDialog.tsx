@@ -1,3 +1,4 @@
+import { KeyFingerprint } from '@haskou/pigeon-swarm-crypto';
 import { type ReactElement, useCallback, useEffect, useState } from 'react';
 
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
@@ -5,7 +6,6 @@ import type { Session } from '../../../../contexts/identities/infrastructure/ses
 import { DeviceAuthorizationRevision } from '../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
 import { DeviceCredential } from '../../../../contexts/identities/domain/value-objects/DeviceCredential';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
-import { KeyFingerprint } from '../../../../contexts/identities/presentation/view-models/KeyFingerprint';
 import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
@@ -132,7 +132,7 @@ export function DeviceManagementDialog({
                   key={device.valueOf()}
                 >
                   <span className="min-w-0 break-all font-mono text-sm">
-                    {KeyFingerprint.ofPublicKey(device.valueOf())}
+                    {KeyFingerprint.ofPublicKey(device.getPublicKey())}
                   </span>
                   {isOwn ? (
                     <span className="text-xs text-white/60">
@@ -154,7 +154,7 @@ export function DeviceManagementDialog({
           </ul>
           {selected && (
             <DeviceRevocationPanel
-              fingerprint={KeyFingerprint.ofPublicKey(selected.valueOf())}
+              fingerprint={KeyFingerprint.ofPublicKey(selected.getPublicKey())}
               latestRevision={current.authorizationRevision.valueOf()}
               onCancel={() => setSelected(null)}
               onRevoke={revoke}

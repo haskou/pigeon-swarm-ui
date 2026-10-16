@@ -69,7 +69,7 @@ export class EncodedStreamsCallMediaCipher implements CallMediaCipher {
 
   public constructor(base64Key: string) {
     this.codec = new CallMediaFrameCodec(
-      CallMediaFrameCodec.importKey(CallMediaFrameCodec.rawKey(base64Key)),
+      CallMediaFrameCodec.cipherOfKey(base64Key),
     );
   }
 

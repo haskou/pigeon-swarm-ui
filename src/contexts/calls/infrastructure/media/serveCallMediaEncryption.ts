@@ -13,8 +13,9 @@ function isCallMediaKeyMessage(data: unknown): data is CallMediaKeyMessage {
 
 /**
  * Encrypts the frames of every sender and decrypts those of every receiver of
- * one call, inside its dedicated worker. The first call key message wins and
- * is kept only as a non-extractable CryptoKey. Frames wait for it, so none
+ * one call, inside its dedicated worker. The first call key message wins; its
+ * bytes are overwritten with zeros once imported as a non-extractable
+ * CryptoKey. Frames wait for it, so none
  * leaves unencrypted; a transform not created to send decrypts, dropping
  * anything the call key does not authenticate.
  */
@@ -25,7 +26,7 @@ export function serveCallMediaEncryption(
   const codec = new CallMediaFrameCodec(
     new Promise<ArrayBuffer>((resolve) => {
       keyArrived = resolve;
-    }).then(CallMediaFrameCodec.importKey),
+    }).then(CallMediaFrameCodec.cipherOfRawKey),
   );
 
   // eslint-disable-next-line no-param-reassign -- a worker serves its scope

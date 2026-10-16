@@ -1,13 +1,16 @@
-import { Buffer } from 'buffer';
+import type { MailboxInboxKeys } from '@haskou/pigeon-swarm-crypto';
+
+import {
+  MailboxKeySchedule,
+  MailboxReadToken,
+  SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
 
 import type { Session } from '../../../identities/infrastructure/session/Session';
-import type { MailboxKeys } from '../../../mailboxes/infrastructure/crypto/MailboxKeySchedule';
 import type { MailboxReadTokens } from '../../../mailboxes/infrastructure/MailboxChannel';
 
 import { ConversationKeychain } from '../../../identities/infrastructure/keychain/ConversationKeychain';
 import { sessionRootKey } from '../../../identities/infrastructure/session/sessionRootKey';
-import { MailboxKeySchedule } from '../../../mailboxes/infrastructure/crypto/MailboxKeySchedule';
-import { MailboxReadToken } from '../../../mailboxes/infrastructure/crypto/MailboxReadToken';
 import { ConversationKeyRequiredError } from '../../domain/errors/ConversationKeyRequiredError';
 
 /** Keys and reader tokens for the inboxes of one direct conversation. */
@@ -18,7 +21,7 @@ export class DirectMessageInboxKeys {
     session: Session,
     conversationId: string,
     recipientIdentityId: string,
-  ): MailboxKeys {
+  ): MailboxInboxKeys {
     const entry = ConversationKeychain.entry(
       session.keychain,
       session.identity.id,
@@ -28,7 +31,7 @@ export class DirectMessageInboxKeys {
     if (!entry) throw new ConversationKeyRequiredError();
 
     return MailboxKeySchedule.derive(
-      Buffer.from(entry.key, 'base64'),
+      SymmetricKey.fromBase64(entry.key),
       recipientIdentityId,
       DirectMessageInboxKeys.EPOCH,
     );
@@ -41,11 +44,11 @@ export class DirectMessageInboxKeys {
    */
   public static readersFor(
     session: Session,
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     credential: string = session.deviceCredentialKeyPair.toPrimitives()
       .publicKey,
   ): MailboxReadTokens {
-    const rootKey = sessionRootKey(session).getBuffer();
+    const rootKey = sessionRootKey(session);
 
     return {
       device: MailboxReadToken.deriveDevice(

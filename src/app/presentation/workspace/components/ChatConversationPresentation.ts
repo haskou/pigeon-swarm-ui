@@ -1,3 +1,4 @@
+import { KeyFingerprint } from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 
 import type { CallParticipant } from '../../../../contexts/calls/presentation/view-models/CallParticipant';
@@ -14,7 +15,6 @@ import {
   type IdentityNames,
   type IdentityPictures,
 } from '../../../../contexts/identities/presentation/view-models/identityDisplay';
-import { KeyFingerprint } from '../../../../contexts/identities/presentation/view-models/KeyFingerprint';
 import { shortId } from '../../../../shared/presentation/formatting';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 

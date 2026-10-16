@@ -4,6 +4,8 @@ import {
   KeyPair,
   PrivateKey,
   PublicKey,
+  RecoveryKey,
+  RecoveryKit,
   SymmetricKey,
   UserRootKey,
 } from '@haskou/pigeon-swarm-crypto';
@@ -27,9 +29,7 @@ import { requiredDifficultyBits } from '../../../../shared/infrastructure/http/r
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { IdentityAdmissionDifficultyPolicy } from '../../domain/IdentityAdmissionDifficultyPolicy';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
-import { RecoveryKey } from '../../domain/value-objects/RecoveryKey';
 import { IdentityAdmissionProof } from '../crypto/IdentityAdmissionProof';
-import { RecoveryIdentityMaterial } from '../crypto/RecoveryIdentityMaterial';
 import { IdentitySignaturePayloadFactory } from './IdentitySignaturePayloadFactory';
 
 const emptyKeychain: LocalKeychain = {
@@ -137,7 +137,7 @@ export class PigeonIdentityCommandsApi {
     options: { recoveryKey?: string } = {},
   ): Promise<CreatedIdentityMaterial> {
     const recoveryKey = RecoveryKey.fromString(options.recoveryKey ?? '');
-    const recovered = await RecoveryIdentityMaterial.derive(recoveryKey);
+    const recovered = RecoveryKit.derive(recoveryKey);
     const keyPair = recovered.identityKeyPair;
     const deviceCredentialKeyPair = await KeyPair.generate();
     const recoveryAuthorityKeyPair = recovered.recoveryAuthorityKeyPair;

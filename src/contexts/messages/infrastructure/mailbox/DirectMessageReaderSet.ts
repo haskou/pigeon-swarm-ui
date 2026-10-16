@@ -1,12 +1,14 @@
+import type { MailboxInboxKeys } from '@haskou/pigeon-swarm-crypto';
+
+import { MailboxReadToken } from '@haskou/pigeon-swarm-crypto';
+
 import type { Session } from '../../../identities/infrastructure/session/Session';
-import type { MailboxKeys } from '../../../mailboxes/infrastructure/crypto/MailboxKeySchedule';
 import type { MailboxReadTokens } from '../../../mailboxes/infrastructure/MailboxChannel';
 
 import { sessionRootKey } from '../../../identities/infrastructure/session/sessionRootKey';
 import { MailboxUnavailableError } from '../../../mailboxes/domain/errors/MailboxUnavailableError';
 import { MailboxReaderPruningDomainService } from '../../../mailboxes/domain/services/MailboxReaderPruningDomainService';
 import { MailboxCapability } from '../../../mailboxes/infrastructure/crypto/MailboxCapability';
-import { MailboxReadToken } from '../../../mailboxes/infrastructure/crypto/MailboxReadToken';
 import { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageReaderCutOffError } from './DirectMessageReaderCutOffError';
 
@@ -37,13 +39,13 @@ export class DirectMessageReaderSet {
    */
   private prune(
     session: Session,
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     readers: MailboxReadTokens,
   ): Promise<void> {
     return MailboxReaderPruningDomainService.prune({
       deviceReaders: async () => {
         const credentials = await this.listCredentials(session);
-        const rootKey = sessionRootKey(session).getBuffer();
+        const rootKey = sessionRootKey(session);
 
         return credentials.map((credential) =>
           MailboxCapability.hash(
@@ -72,7 +74,7 @@ export class DirectMessageReaderSet {
    */
   private async bridge(
     session: Session,
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     readers: MailboxReadTokens,
   ): Promise<void> {
     const previous = session.previousDeviceSealedRootKey;
@@ -81,7 +83,7 @@ export class DirectMessageReaderSet {
       try {
         await this.channel.addReader(
           keys,
-          MailboxReadToken.derive(previous.getBuffer(), keys.mailboxId),
+          MailboxReadToken.derive(previous, keys.mailboxId),
           readers.root,
         );
       } catch {
@@ -95,7 +97,7 @@ export class DirectMessageReaderSet {
   /** Prunes once per mailbox and root; a failed pass is dropped, rethrown. */
   private prunePass(
     session: Session,
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     readers: MailboxReadTokens,
   ): Promise<void> {
     const key = `${keys.mailboxId}:${MailboxCapability.hash(readers.root)}`;
@@ -120,7 +122,7 @@ export class DirectMessageReaderSet {
    */
   private async requireClosedToPreviousRoot(
     session: Session,
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
   ): Promise<void> {
     const previous = session.previousDeviceSealedRootKey;
 
@@ -129,7 +131,7 @@ export class DirectMessageReaderSet {
     try {
       await this.channel.listReaders(
         keys,
-        MailboxReadToken.derive(previous.getBuffer(), keys.mailboxId),
+        MailboxReadToken.derive(previous, keys.mailboxId),
       );
     } catch (error: unknown) {
       if (error instanceof MailboxUnavailableError) return;
@@ -146,7 +148,7 @@ export class DirectMessageReaderSet {
    */
   public enrolSealedRoot(
     session: Session,
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     readers: MailboxReadTokens,
   ): Promise<void> {
     const key = `${keys.mailboxId}:${MailboxCapability.hash(readers.root)}`;
@@ -175,7 +177,7 @@ export class DirectMessageReaderSet {
    */
   public reconcile(
     session: Session,
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     readers: MailboxReadTokens,
   ): Promise<void> {
     return this.prunePass(session, keys, readers).catch(() => {
@@ -196,7 +198,7 @@ export class DirectMessageReaderSet {
    */
   public async cutOff(
     session: Session,
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     readers: MailboxReadTokens,
   ): Promise<void> {
     try {

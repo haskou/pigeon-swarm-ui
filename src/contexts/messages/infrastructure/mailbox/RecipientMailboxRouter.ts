@@ -1,4 +1,5 @@
-import type { MailboxKeys } from '../../../mailboxes/infrastructure/crypto/MailboxKeySchedule';
+import type { MailboxInboxKeys } from '@haskou/pigeon-swarm-crypto';
+
 import type { MailboxAppend } from '../../../mailboxes/infrastructure/MailboxChannel';
 import type { RecipientMailboxAttempt } from '../../domain/RecipientMailboxAttempt';
 
@@ -29,7 +30,7 @@ export class RecipientMailboxRouter {
   /** Logs a count-only line per home fault. */
   private async attemptHome(
     recipientIdentityId: string,
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     plaintext: Uint8Array,
     envelopeId: string,
   ): Promise<RecipientMailboxAttempt<MailboxAppend>> {
@@ -60,7 +61,7 @@ export class RecipientMailboxRouter {
   }
 
   private async attemptLocal(
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     plaintext: Uint8Array,
     envelopeId: string,
   ): Promise<RecipientMailboxAttempt<MailboxAppend>> {
@@ -77,7 +78,7 @@ export class RecipientMailboxRouter {
   /** Home, then local node, as RecipientMailboxRoutingPolicy decides. */
   private async sendPrimary(
     recipientIdentityId: string,
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     plaintext: Uint8Array,
     envelopeId: string,
   ): Promise<MailboxAppend> {
@@ -106,7 +107,7 @@ export class RecipientMailboxRouter {
   public async send(
     recipientIdentityId: string,
     servers: readonly string[],
-    keys: MailboxKeys,
+    keys: MailboxInboxKeys,
     plaintext: Uint8Array,
     envelopeId: string = MailboxChannel.randomEnvelopeId(),
   ): Promise<MailboxAppend> {
