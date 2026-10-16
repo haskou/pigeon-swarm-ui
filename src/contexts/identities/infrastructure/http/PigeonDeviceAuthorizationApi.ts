@@ -15,6 +15,7 @@ import type { DeviceAuthorizationTransition } from '../../domain/DeviceAuthoriza
 import type { DeviceAuthorizationTransitionLogPrimitives } from '../../domain/DeviceAuthorizationTransitionLogPrimitives';
 import type { DeviceAuthorizationTransitionPrimitives } from '../../domain/DeviceAuthorizationTransitionPrimitives';
 import type { DevicePairingRequestDraft } from '../../domain/DevicePairingRequestDraft';
+import type { DeviceAuthorizationReplay } from '../../domain/services/DeviceAuthorizationReplay';
 import type { IdentityPassword } from '../../domain/value-objects/IdentityPassword';
 import type { Session } from '../session/Session';
 import type { DeviceIdentityVault } from '../storage/DeviceIdentityVault';
@@ -41,6 +42,7 @@ import { DevicePairingRequest } from '../../domain/DevicePairingRequest';
 import { DeviceRemovedError } from '../../domain/DeviceRemovedError';
 import { UnprovenDeviceAuthorizationError } from '../../domain/errors/UnprovenDeviceAuthorizationError';
 import { DeviceRemovalDomainService } from '../../domain/services/DeviceRemovalDomainService';
+import { DeviceSealedSecretPublisherDomainService } from '../../domain/services/DeviceSealedSecretPublisherDomainService';
 import { DeviceAuthorizationEpoch } from '../../domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationOperationId } from '../../domain/value-objects/DeviceAuthorizationOperationId';
 import { DeviceAuthorizationRevision } from '../../domain/value-objects/DeviceAuthorizationRevision';
@@ -207,8 +209,10 @@ export class PigeonDeviceAuthorizationApi {
     );
   }
 
-  /** The head the signed transitions prove for this device; see synchronize. */
-  private async verifiedHead(session: Session): Promise<DeviceAuthorization> {
+  /** The replay the signed transitions prove for this device. */
+  private async verifiedReplay(
+    session: Session,
+  ): Promise<DeviceAuthorizationReplay> {
     const identityId = IdentityId.fromString(session.identity.id);
     const path = `${this.checkpointPath(identityId)}/transitions`;
     const resource =
@@ -240,7 +244,7 @@ export class PigeonDeviceAuthorizationApi {
         new UnprovenDeviceAuthorizationError(),
       );
 
-      return DeviceRemovalDomainService.verify({
+      return DeviceRemovalDomainService.verifiedReplay({
         genesis: DeviceAuthorization.genesis(
           identityId,
           DeviceCredential.fromString(session.identity.deviceCredential),
@@ -260,6 +264,13 @@ export class PigeonDeviceAuthorizationApi {
 
       throw new Error(copy.auth.deviceAuthorizationUnproven);
     }
+  }
+
+  /** The head the signed transitions prove for this device; see synchronize. */
+  private async verifiedHead(session: Session): Promise<DeviceAuthorization> {
+    const { states } = await this.verifiedReplay(session);
+
+    return states[states.length - 1];
   }
 
   public invite(session: Session): DevicePairingInvitation {
@@ -579,6 +590,25 @@ export class PigeonDeviceAuthorizationApi {
     session: Session,
   ): Promise<readonly DeviceCredential[]> {
     return (await this.verifiedHead(session)).getCredentials();
+  }
+
+  /**
+   * Verifies that the signed transitions, replayed like `synchronize`,
+   * authorize the publisher of a device-sealed secret at the revision the
+   * secret names: as a device of that revision, or as the device that retired
+   * itself into it with a hand-over. Rejects as `synchronize` does, and with
+   * the unauthorized-publisher error otherwise. Stores nothing.
+   */
+  public async verifyPublisher(
+    session: Session,
+    publisher: DeviceCredential,
+    revision: DeviceAuthorizationRevision,
+  ): Promise<void> {
+    DeviceSealedSecretPublisherDomainService.verify({
+      publisher,
+      replay: await this.verifiedReplay(session),
+      revision,
+    });
   }
 
   public async apply(

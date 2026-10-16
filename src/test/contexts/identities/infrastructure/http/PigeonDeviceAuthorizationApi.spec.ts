@@ -1304,8 +1304,7 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
       async function revoking(author: 'genesis' | 'laptop') {
         const context = await synchronizing();
         const revocation = DeviceAuthorizationTransition.revocation({
-          author:
-            author === 'genesis' ? context.genesisDevice : context.laptop,
+          author: author === 'genesis' ? context.genesisDevice : context.laptop,
           epoch: context.session.authorizationEpoch,
           identityId: context.identityId,
           operationId: DeviceAuthorizationOperationId.generate(),
@@ -1324,8 +1323,7 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
       }
 
       it('refuses a publisher the signed transitions never authorized, however validly it signed', async () => {
-        const { api, enrollment, http, logOf, session } =
-          await synchronizing();
+        const { api, enrollment, http, logOf, session } = await synchronizing();
         const minted = await KeyPair.generate();
 
         http.request.mockResolvedValue(logOf([enrollment.toPrimitives()]));

@@ -2,6 +2,7 @@ import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
 import type { DeviceCredential } from '../../domain/value-objects/DeviceCredential';
 import type { DeviceSealedRoots } from '../crypto/DeviceSealedRoots';
+import type { OpenedDeviceSealedSecret } from '../crypto/OpenedDeviceSealedSecret';
 import type { Session } from '../session/Session';
 import type { DeviceSealedRootHandOver } from './DeviceSealedRootHandOver';
 import type { PigeonDeviceAuthorizationApi } from './PigeonDeviceAuthorizationApi';
@@ -9,6 +10,7 @@ import type { PigeonDeviceSealedSecretApi } from './PigeonDeviceSealedSecretApi'
 import type { PigeonKeychainApi } from './PigeonKeychainApi';
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
+import { DeviceAuthorizationRevision } from '../../domain/value-objects/DeviceAuthorizationRevision';
 import { DeviceSealedRootGeneration } from '../../domain/value-objects/DeviceSealedRootGeneration';
 import { DeviceSealedRootPayload } from '../crypto/DeviceSealedRootPayload';
 
@@ -25,7 +27,10 @@ import { DeviceSealedRootPayload } from '../crypto/DeviceSealedRootPayload';
  * stranded. The one exception is a device a recovery kit just authorized as
  * the only device: no one holds that root any more, so it replaces the head.
  * A device that forgets itself hands a fresh root, with the root it replaces,
- * to the devices that remain, inside its own retirement.
+ * to the devices that remain, inside its own retirement. No entry is opened,
+ * nor its generation trusted, until the signed transitions authorize its
+ * publisher at the entry revision; an entry they do not, or cannot, authorize
+ * fails the call and leaves every local row as it was.
  */
 export class DeviceSealedRootRotation {
   public constructor(
@@ -37,6 +42,33 @@ export class DeviceSealedRootRotation {
 
   private nextGeneration(stored: number | undefined): number {
     return Math.max(stored ?? 0, this.clock()) + 1;
+  }
+
+  /**
+   * Returns the entry once the signed transitions authorize its publisher at
+   * the entry revision, so a signature by a key the node minted opens
+   * nothing. Rejects otherwise, including when the transitions are not served.
+   */
+  private async verified(
+    session: Session,
+    entry: OpenedDeviceSealedSecret,
+  ): Promise<OpenedDeviceSealedSecret> {
+    await this.deviceAuthorization.verifyPublisher(
+      session,
+      entry.publisherCredential,
+      DeviceAuthorizationRevision.fromNumber(entry.authorizationRevision),
+    );
+
+    return entry;
+  }
+
+  /** This device's own entry with a verified publisher; null without one. */
+  private async ownEntry(
+    session: Session,
+  ): Promise<OpenedDeviceSealedSecret | null> {
+    const own = await this.sealedSecrets.fetchOwn(session);
+
+    return own ? await this.verified(session, own) : null;
   }
 
   private async publishWithRetry(
@@ -69,7 +101,7 @@ export class DeviceSealedRootRotation {
     roots: DeviceSealedRoots,
     verifiedRecipients?: readonly DeviceCredential[],
   ): Promise<Session> {
-    const own = await this.sealedSecrets.fetchOwn(session);
+    const own = await this.ownEntry(session);
     const recipients = verifiedRecipients
       ? [...verifiedRecipients]
       : await this.deviceAuthorization.findDevices(session);
@@ -133,7 +165,9 @@ export class DeviceSealedRootRotation {
       return null;
     }
 
-    return DeviceSealedRootPayload.decode(own.payload).root;
+    return DeviceSealedRootPayload.decode(
+      (await this.verified(session, own)).payload,
+    ).root;
   }
 
   /**
@@ -167,7 +201,9 @@ export class DeviceSealedRootRotation {
       opening = { entry: fresh, session: synced };
     }
 
-    const roots = DeviceSealedRootPayload.decode(opening.entry.payload);
+    const roots = DeviceSealedRootPayload.decode(
+      (await this.verified(opening.session, opening.entry)).payload,
+    );
 
     return {
       ...opening.session,
@@ -230,7 +266,7 @@ export class DeviceSealedRootRotation {
       recipients: readonly DeviceCredential[];
     },
   ): Promise<DeviceSealedRootHandOver | null> {
-    const own = await this.sealedSecrets.fetchOwn(session);
+    const own = await this.ownEntry(session);
 
     if (!own) {
       return null;
@@ -253,6 +289,6 @@ export class DeviceSealedRootRotation {
 
   /** Generation of this device's sealed root entry; null without one. */
   public async generation(session: Session): Promise<number | null> {
-    return (await this.sealedSecrets.fetchOwn(session))?.generation ?? null;
+    return (await this.ownEntry(session))?.generation ?? null;
   }
 }

@@ -11,24 +11,11 @@ import type {
   DeviceSealedSecretEntryResource,
   DeviceSealedSecretResource,
 } from '../http/resources/DeviceSealedSecretResource';
+import type { DeviceSealedSecretSealInput } from './DeviceSealedSecretSealInput';
+import type { OpenedDeviceSealedSecret } from './OpenedDeviceSealedSecret';
 
 import { DeviceCredential } from '../../domain/value-objects/DeviceCredential';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
-
-export type OpenedDeviceSealedSecret = {
-  authorizationRevision: number;
-  generation: number;
-  payload: string;
-};
-
-export type DeviceSealedSecretSealInput = {
-  authorizationRevision: number;
-  generation: number;
-  identityId: string;
-  payload: string;
-  publisher: KeyPair;
-  recipients: readonly DeviceCredential[];
-};
 
 /**
  * Seals one generation of device secrets: the payload is encrypted to each
@@ -138,6 +125,9 @@ export class DeviceSealedSecretCipher {
       payload: input.recipient
         .decrypt(new EncryptedPayload(resource.sealedSecret))
         .toString('utf8'),
+      publisherCredential: DeviceCredential.fromPublicKey(
+        IdentityId.fromString(resource.publisherCredential).getPublicKey(),
+      ),
     };
   }
 }

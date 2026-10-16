@@ -767,31 +767,24 @@ describe('DeviceSealedRootRotation', () => {
     it.each([
       ['an unauthorized publisher', UNAUTHORIZED],
       ['transitions it cannot prove', 'The transitions were not served.'],
-    ])(
-      'yields no root and publishes nothing for %s',
-      async (_case, reason) => {
-        const { keychains, rotation, sealedSecrets } = refusing(reason);
+    ])('yields no root and publishes nothing for %s', async (_case, reason) => {
+      const { keychains, rotation, sealedSecrets } = refusing(reason);
 
-        await expect(rotation.current(makeSession(4))).rejects.toThrow(
-          reason,
-        );
-        await expect(rotation.laggingRoot(makeSession(5))).rejects.toThrow(
-          reason,
-        );
-        await expect(
-          rotation.handOver(makeSession(4), {
-            authorizationRevision: 5,
-            recipients: RECIPIENTS,
-          }),
-        ).rejects.toThrow(reason);
-        await expect(rotation.generation(makeSession(4))).rejects.toThrow(
-          reason,
-        );
-        await expect(rotation.rotate(makeSession(4))).rejects.toThrow(reason);
-        expect(sealedSecrets.publish).not.toHaveBeenCalled();
-        expect(sealedSecrets.sealHandOver).not.toHaveBeenCalled();
-        expect(keychains.readHead).not.toHaveBeenCalled();
-      },
-    );
+      await expect(rotation.current(makeSession(4))).rejects.toThrow(reason);
+      await expect(rotation.laggingRoot(makeSession(5))).rejects.toThrow(
+        reason,
+      );
+      await expect(
+        rotation.handOver(makeSession(4), {
+          authorizationRevision: 5,
+          recipients: RECIPIENTS,
+        }),
+      ).rejects.toThrow(reason);
+      await expect(rotation.generation(makeSession(4))).rejects.toThrow(reason);
+      await expect(rotation.rotate(makeSession(4))).rejects.toThrow(reason);
+      expect(sealedSecrets.publish).not.toHaveBeenCalled();
+      expect(sealedSecrets.sealHandOver).not.toHaveBeenCalled();
+      expect(keychains.readHead).not.toHaveBeenCalled();
+    });
   });
 });

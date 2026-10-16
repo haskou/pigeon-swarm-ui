@@ -2,8 +2,9 @@ import { assert } from '@haskou/value-objects';
 
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
-import type { DeviceCredential } from '../../domain/value-objects/DeviceCredential';
+import type { OpenedDeviceSealedSecret } from '../crypto/OpenedDeviceSealedSecret';
 import type { Session } from '../session/Session';
+import type { DeviceSealedSecretPublication } from './DeviceSealedSecretPublication';
 import type {
   DeviceSealedSecretHandOverResource,
   DeviceSealedSecretPublicationResource,
@@ -13,16 +14,7 @@ import type {
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
-import {
-  DeviceSealedSecretCipher,
-  type OpenedDeviceSealedSecret,
-} from '../crypto/DeviceSealedSecretCipher';
-
-export type DeviceSealedSecretPublication = {
-  generation: number;
-  payload: string;
-  recipients: readonly DeviceCredential[];
-};
+import { DeviceSealedSecretCipher } from '../crypto/DeviceSealedSecretCipher';
 
 /**
  * Publishes and reads the per-device sealed secrets of one identity. Both
