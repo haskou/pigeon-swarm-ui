@@ -1,10 +1,10 @@
-import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import { ConversationDraft, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
-import { ConversationDraftCipher } from '../../../../../contexts/messages/infrastructure/crypto/ConversationDraftCipher';
+import { sessionRootKey } from '../../../../../contexts/identities/infrastructure/session/sessionRootKey';
 import { PigeonConversationDraftsApi } from '../../../../../contexts/messages/infrastructure/http/PigeonConversationDraftsApi';
 import { RequestCache } from '../../../../../shared/infrastructure/http/RequestCache';
 
@@ -21,29 +21,33 @@ function signer(headers: jest.Mock): RequestSigner {
 
 describe(PigeonConversationDraftsApi.name, () => {
   const conversationId = 'group:conversation-1';
-  const cipher = new ConversationDraftCipher();
+  const rootOf = sessionRootKey;
   const rooted = (): Session =>
     ({
       deviceSealedRootKey: SymmetricKey.generate(),
       identity: { id: 'identity-1' },
     }) as unknown as Session;
+  const draftKey = (session: Session, conversation: string): string =>
+    ConversationDraft.draftKey(rootOf(session), conversation);
+  const seal = (session: Session, conversation: string, content: string) =>
+    ConversationDraft.seal(rootOf(session), conversation, content);
 
   it('lists only the drafts whose opaque key matches the conversation sealed inside', async () => {
     const session = rooted();
-    const draftKey = cipher.draftKey(session, conversationId);
+    const key = draftKey(session, conversationId);
     const openable = {
-      draftKey,
-      encryptedPayload: cipher.encrypt(session, conversationId, 'draft text'),
+      draftKey: key,
+      encryptedPayload: seal(session, conversationId, 'draft text'),
       updatedAt: 3,
     };
     const movedToAnotherKey = {
-      draftKey: cipher.draftKey(session, 'group:conversation-2'),
-      encryptedPayload: cipher.encrypt(session, conversationId, 'moved draft'),
+      draftKey: draftKey(session, 'group:conversation-2'),
+      encryptedPayload: seal(session, conversationId, 'moved draft'),
       updatedAt: 2,
     };
     const replacedRoot = {
-      draftKey,
-      encryptedPayload: cipher.encrypt(rooted(), conversationId, 'old root'),
+      draftKey: key,
+      encryptedPayload: seal(rooted(), conversationId, 'old root'),
       updatedAt: 1,
     };
     const request = jest.fn().mockResolvedValue({
@@ -71,10 +75,10 @@ describe(PigeonConversationDraftsApi.name, () => {
 
   it('saves a draft under its opaque key and keeps what it sent, not what the node echoes', async () => {
     const session = rooted();
-    const draftKey = cipher.draftKey(session, conversationId);
-    const path = `/conversations/me/drafts/${draftKey}`;
+    const key = draftKey(session, conversationId);
+    const path = `/conversations/me/drafts/${key}`;
     const request = jest.fn().mockResolvedValue({
-      draftKey,
+      draftKey: key,
       encryptedPayload: 'node-substituted-payload',
       updatedAt: 99,
     });
@@ -103,7 +107,9 @@ describe(PigeonConversationDraftsApi.name, () => {
       encryptedPayload: sent.encryptedPayload,
       updatedAt: 7,
     });
-    expect(cipher.decrypt(session, draftKey, sent.encryptedPayload)).toEqual({
+    expect(
+      ConversationDraft.open(rootOf(session), key, sent.encryptedPayload),
+    ).toEqual({
       content: 'draft text',
       conversationId,
     });
@@ -117,7 +123,7 @@ describe(PigeonConversationDraftsApi.name, () => {
 
   it('deletes a draft under its opaque key', async () => {
     const session = rooted();
-    const path = `/conversations/me/drafts/${cipher.draftKey(session, conversationId)}`;
+    const path = `/conversations/me/drafts/${draftKey(session, conversationId)}`;
     const request = jest.fn().mockResolvedValue({});
     const headers = jest.fn().mockResolvedValue({});
     const api = new PigeonConversationDraftsApi(

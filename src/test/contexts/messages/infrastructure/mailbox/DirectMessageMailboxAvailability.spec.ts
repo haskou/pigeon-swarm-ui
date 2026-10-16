@@ -1,5 +1,9 @@
 import 'fake-indexeddb/auto';
-import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import {
+  MailboxKeySchedule,
+  MailboxReadToken,
+  SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 import { type MockProxy, mock } from 'jest-mock-extended';
 
@@ -14,8 +18,6 @@ import type { PigeonMessageCommandsApi } from '../../../../../contexts/messages/
 
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
 import { MailboxCapability } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
-import { MailboxKeySchedule } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxKeySchedule';
-import { MailboxReadToken } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxReadToken';
 import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageAvailabilityAnnouncement } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageAvailabilityAnnouncement';
 import { DirectMessageHistoryStorageError } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageHistoryStorageError';
@@ -33,6 +35,7 @@ import { RecipientMailboxRouter } from '../../../../../contexts/messages/infrast
  */
 describe('DirectMessageMailbox availability servers', () => {
   const sharedSecret = Buffer.alloc(32, 7);
+  const sharedKey = SymmetricKey.fromBuffer(sharedSecret);
   const conversationId = 'conversation-1';
   const conversation = {
     id: conversationId,
@@ -80,7 +83,7 @@ describe('DirectMessageMailbox availability servers', () => {
     }) as unknown as Session;
 
   const mailboxIdOf = (identityId: string): string =>
-    MailboxKeySchedule.derive(sharedSecret, identityId, 0).mailboxId;
+    MailboxKeySchedule.derive(sharedKey, identityId, 0).mailboxId;
 
   interface FakeNode {
     acked(mailboxId: string): number;
@@ -342,7 +345,7 @@ describe('DirectMessageMailbox availability servers', () => {
     },
   ): Promise<void> => {
     await new MailboxChannel(node.wire, jest.fn()).send(
-      MailboxKeySchedule.derive(sharedSecret, 'alice', 0),
+      MailboxKeySchedule.derive(sharedKey, 'alice', 0),
       DirectMessageAvailabilityAnnouncement.encode({
         ...announcement,
         conversationId,
@@ -529,14 +532,14 @@ describe('DirectMessageMailbox availability servers', () => {
   });
 
   describe('cutOffRevokedReaders', () => {
-    const bobRoot = Buffer.alloc(32, 9);
-    const rotatedRoot = Buffer.alloc(32, 6);
+    const bobRoot = SymmetricKey.fromBuffer(Buffer.alloc(32, 9));
+    const rotatedRoot = SymmetricKey.fromBuffer(Buffer.alloc(32, 6));
     // The session Bob's revoke returns: the new root, and the root it replaced.
     const rotatedBob = (): Session =>
       ({
         ...session('bob'),
-        deviceSealedRootKey: SymmetricKey.fromBuffer(rotatedRoot),
-        previousDeviceSealedRootKey: SymmetricKey.fromBuffer(bobRoot),
+        deviceSealedRootKey: rotatedRoot,
+        previousDeviceSealedRootKey: bobRoot,
       }) as unknown as Session;
     const rotatedReaders = (): string[] =>
       [
@@ -606,7 +609,7 @@ describe('DirectMessageMailbox availability servers', () => {
     const laptopReader = (): string =>
       MailboxCapability.hash(
         MailboxReadToken.deriveDevice(
-          Buffer.alloc(32, 9),
+          SymmetricKey.fromBuffer(Buffer.alloc(32, 9)),
           mailboxIdOf('bob'),
           laptop,
         ),

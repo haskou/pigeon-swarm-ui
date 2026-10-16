@@ -1,4 +1,4 @@
-import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import { RecoveryKey, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { type MockProxy, mock } from 'jest-mock-extended';
 
 import type { DevicePairingRequestDraft } from '../../../../../contexts/identities/domain/DevicePairingRequestDraft';
@@ -23,7 +23,6 @@ import type { LocalKeychain } from '../../../../../contexts/identities/infrastru
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { DevicePairingError } from '../../../../../contexts/identities/domain/DevicePairingError';
-import { RecoveryKey } from '../../../../../contexts/identities/domain/value-objects/RecoveryKey';
 import { PigeonIdentitiesGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
 import { DeviceUnlockNotConfirmedError } from '../../../../../contexts/identities/infrastructure/storage/DeviceUnlockNotConfirmedError';
 import { copy } from '../../../../../shared/presentation/i18n/copy';
@@ -471,16 +470,14 @@ describe(PigeonIdentitiesGateway.name, () => {
 
       expect(pairingHistory.publish).toHaveBeenCalledWith(
         session,
-        expect.any(Uint8Array),
+        expect.any(SymmetricKey),
       );
       expect(pairingHistory.publish.mock.invocationCallOrder[0]).toBeLessThan(
         authorization.authorizePairing.mock.invocationCallOrder[0],
       );
       const [, , secret] = authorization.authorizePairing.mock.calls[0];
       expect(secret).toBeInstanceOf(SymmetricKey);
-      expect(secret?.getBuffer()).toEqual(
-        pairingHistory.publish.mock.calls[0][1],
-      );
+      expect(secret).toBe(pairingHistory.publish.mock.calls[0][1]);
     });
   });
 
@@ -525,10 +522,7 @@ describe(PigeonIdentitiesGateway.name, () => {
         login.hydrate.mock.invocationCallOrder[0],
       );
       expect(login.hydrate).toHaveBeenCalledWith(rooted, undefined);
-      expect(pairingHistory.receive).toHaveBeenCalledWith(
-        hydrated,
-        secret.getBuffer(),
-      );
+      expect(pairingHistory.receive).toHaveBeenCalledWith(hydrated, secret);
       expect(result.session).toBe(hydrated);
     });
 

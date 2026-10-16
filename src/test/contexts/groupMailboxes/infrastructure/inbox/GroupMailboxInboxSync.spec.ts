@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto';
 import type { MockProxy } from 'jest-mock-extended';
 
+import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
 
 import type { GroupMailboxGenerationRepository } from '../../../../../contexts/groupMailboxes/domain/repositories/GroupMailboxGenerationRepository';
@@ -192,9 +193,7 @@ const member = (name: string): Member => {
   const session = {
     deviceCredentialKeyPair: cast[name].deviceKeyPair(),
     deviceId: 'd1',
-    deviceSealedRootKey: {
-      getBuffer: () => Buffer.alloc(32, seed),
-    },
+    deviceSealedRootKey: SymmetricKey.fromBuffer(Buffer.alloc(32, seed)),
     identity: { id: identityId },
   } as unknown as Session;
   const stores = sealedGroupStores(databaseName, identityId);

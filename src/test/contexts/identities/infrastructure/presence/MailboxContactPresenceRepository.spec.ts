@@ -1,4 +1,4 @@
-import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import { MailboxReadToken, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 import { Buffer } from 'buffer';
 import { mock } from 'jest-mock-extended';
@@ -16,7 +16,6 @@ import { IdentityPresenceStatus } from '../../../../../contexts/identities/domai
 import { MailboxContactPresenceRepository } from '../../../../../contexts/identities/infrastructure/presence/MailboxContactPresenceRepository';
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
 import { MailboxCapability } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
-import { MailboxReadToken } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxReadToken';
 import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { RecipientMailboxRouter } from '../../../../../contexts/messages/infrastructure/mailbox/RecipientMailboxRouter';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
@@ -24,8 +23,8 @@ import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJso
 const ALICE = IdentityId.fromString('identity-alice');
 const BOB = IdentityId.fromString('identity-bob');
 const CONVERSATION = 'conversation-ab';
-const SEALED = Buffer.alloc(32, 1);
-const ROTATED = Buffer.alloc(32, 2);
+const SEALED = SymmetricKey.fromBuffer(Buffer.alloc(32, 1));
+const ROTATED = SymmetricKey.fromBuffer(Buffer.alloc(32, 2));
 /** Alice shares with Bob; Bob reads what Alice sent. */
 const TO_BOB = PresenceSharing.fromPrimitives({
   contactIdentityId: BOB.toString(),
@@ -160,10 +159,10 @@ const fakeNode = () => {
 const sessionOf = (
   identityId: IdentityId,
   peerIdentityId: IdentityId,
-  roots: { previous?: Buffer; sealed: Buffer } = { sealed: SEALED },
+  roots: { previous?: SymmetricKey; sealed: SymmetricKey } = { sealed: SEALED },
 ): Session =>
   ({
-    deviceSealedRootKey: SymmetricKey.fromBuffer(roots.sealed),
+    deviceSealedRootKey: roots.sealed,
     identity: { id: identityId.toString() },
     keychain: {
       conversations: {
@@ -179,9 +178,7 @@ const sessionOf = (
       },
       version: 1,
     },
-    previousDeviceSealedRootKey: roots.previous
-      ? SymmetricKey.fromBuffer(roots.previous)
-      : undefined,
+    previousDeviceSealedRootKey: roots.previous,
   }) as unknown as Session;
 
 const aliceUpdate = (status: IdentityPresenceStatus, sentAt: number) =>

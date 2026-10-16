@@ -1,7 +1,11 @@
 import 'fake-indexeddb/auto';
 import type { MockProxy } from 'jest-mock-extended';
 
-import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import {
+  KeyPair,
+  MailboxReadToken,
+  SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
 
 import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
@@ -25,7 +29,6 @@ import { IdentityId } from '../../../../contexts/identities/domain/value-objects
 import { sessionRootKey } from '../../../../contexts/identities/infrastructure/session/sessionRootKey';
 import { MailboxUnavailableError } from '../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
 import { MailboxCapability } from '../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
-import { MailboxReadToken } from '../../../../contexts/mailboxes/infrastructure/crypto/MailboxReadToken';
 import { MailboxChannel } from '../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { MessageProjector } from '../../../../contexts/messages/infrastructure/crypto/MessageProjector';
 import { PigeonMessageCommandsApi } from '../../../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
@@ -284,7 +287,7 @@ const person = async (of?: Member): Promise<Member> => {
     deviceId: `device-${seed}`,
     deviceSealedRootKey: of
       ? of.session.deviceSealedRootKey
-      : { getBuffer: () => Buffer.alloc(32, seed) },
+      : SymmetricKey.fromBuffer(Buffer.alloc(32, seed)),
     identity: { id },
     keychain: { conversations: [] },
     keyPair,
@@ -1061,7 +1064,7 @@ describe('GroupConversationMailbox', () => {
     await formGroup();
     const rotated = {
       ...bob.session,
-      deviceSealedRootKey: { getBuffer: () => Buffer.alloc(32, 200) },
+      deviceSealedRootKey: SymmetricKey.fromBuffer(Buffer.alloc(32, 200)),
       previousDeviceSealedRootKey: bob.session.deviceSealedRootKey,
     } as unknown as Session;
 
@@ -1089,7 +1092,7 @@ describe('GroupConversationMailbox', () => {
 
   it('cuts the replaced root off its own group inboxes after a revoke', async () => {
     await formGroup();
-    const replacedRoot = sessionRootKey(bob.session).getBuffer();
+    const replacedRoot = sessionRootKey(bob.session);
 
     wire.read.mockClear();
     await sync(bob);
@@ -1100,7 +1103,7 @@ describe('GroupConversationMailbox', () => {
 
     bob.session = {
       ...bob.session,
-      deviceSealedRootKey: { getBuffer: () => Buffer.alloc(32, 200) },
+      deviceSealedRootKey: SymmetricKey.fromBuffer(Buffer.alloc(32, 200)),
       previousDeviceSealedRootKey: bob.session.deviceSealedRootKey,
     } as unknown as Session;
     await bob.mailbox.cutOffRevokedReaders(bob.session);
@@ -1200,7 +1203,7 @@ describe('GroupConversationMailbox', () => {
     }
     bob.session = {
       ...bob.session,
-      deviceSealedRootKey: { getBuffer: () => Buffer.alloc(32, 200) },
+      deviceSealedRootKey: SymmetricKey.fromBuffer(Buffer.alloc(32, 200)),
       previousDeviceSealedRootKey: bob.session.deviceSealedRootKey,
     } as unknown as Session;
     await bob.mailbox.cutOffRevokedReaders(bob.session);
@@ -1239,7 +1242,7 @@ describe('GroupConversationMailbox', () => {
     bob.mailbox = device(bob.storage);
     bob.session = {
       ...bob.session,
-      deviceSealedRootKey: { getBuffer: () => Buffer.alloc(32, 201) },
+      deviceSealedRootKey: SymmetricKey.fromBuffer(Buffer.alloc(32, 201)),
     } as unknown as Session;
 
     await expect(

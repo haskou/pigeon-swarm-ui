@@ -1,4 +1,5 @@
-import { RecoveryKey } from '../../../../../contexts/identities/domain/value-objects/RecoveryKey';
+import { RecoveryKey } from '@haskou/pigeon-swarm-crypto';
+
 import { IdentityCreationMaterials } from '../../../../../contexts/identities/infrastructure/crypto/IdentityCreationMaterials';
 import { PigeonIdentityIdFactory } from '../../../../../contexts/identities/infrastructure/crypto/PigeonIdentityIdFactory';
 

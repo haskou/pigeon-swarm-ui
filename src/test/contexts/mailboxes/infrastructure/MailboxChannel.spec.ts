@@ -1,3 +1,8 @@
+import {
+  MailboxEnvelope,
+  MailboxKeySchedule,
+  SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 import { mock } from 'jest-mock-extended';
 
@@ -5,8 +10,6 @@ import { MailboxCreationDifficultyError } from '../../../../contexts/mailboxes/d
 import { MailboxUnavailableError } from '../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
 import { MailboxCapability } from '../../../../contexts/mailboxes/infrastructure/crypto/MailboxCapability';
 import { MailboxCreationProof } from '../../../../contexts/mailboxes/infrastructure/crypto/MailboxCreationProof';
-import { MailboxEnvelopeCipher } from '../../../../contexts/mailboxes/infrastructure/crypto/MailboxEnvelopeCipher';
-import { MailboxKeySchedule } from '../../../../contexts/mailboxes/infrastructure/crypto/MailboxKeySchedule';
 import { PigeonMailboxClient } from '../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
 import { MailboxChannel } from '../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
@@ -17,7 +20,7 @@ describe(MailboxChannel.name, () => {
   const deviceToken = 'device-read-token-for-bob';
   const readers = { device: deviceToken, root: readToken };
   const keys = MailboxKeySchedule.derive(
-    new Uint8Array(32).fill(3),
+    SymmetricKey.fromBuffer(Buffer.alloc(32, 3)),
     'identity-bob',
     0,
   );
@@ -89,12 +92,7 @@ describe(MailboxChannel.name, () => {
     expect(Buffer.from(envelope.body, 'base64url').length).toBe(1024);
     expect(
       Buffer.from(
-        await MailboxEnvelopeCipher.open(
-          keys.envelopeKey,
-          keys.mailboxId,
-          envelope.envelopeId,
-          envelope.body,
-        ),
+        MailboxEnvelope.open(keys, envelope.envelopeId, envelope.body),
       ).toString('utf8'),
     ).toBe('hi bob');
   });
@@ -109,9 +107,8 @@ describe(MailboxChannel.name, () => {
     const first = await channel.send(keys, bytes('one'));
     const second = await channel.send(keys, bytes('two'));
     const forgedEnvelopeId = 'AAAAAAAAAAAAAAAAAAAAAA';
-    const forged = await MailboxEnvelopeCipher.seal(
-      new Uint8Array(32).fill(9),
-      keys.mailboxId,
+    const forged = MailboxEnvelope.seal(
+      { envelopeKey: new Uint8Array(32).fill(9), mailboxId: keys.mailboxId },
       forgedEnvelopeId,
       bytes('forged'),
     );

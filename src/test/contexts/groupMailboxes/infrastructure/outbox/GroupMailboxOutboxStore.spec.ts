@@ -1,4 +1,5 @@
 import 'fake-indexeddb/auto';
+import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { randomUUID } from 'node:crypto';
 
 import type { GroupMailboxOutboxRow } from '../../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutboxRow';
@@ -8,7 +9,7 @@ import { GroupMailboxOutboxStore } from '../../../../../contexts/groupMailboxes/
 
 const marker = 'group-outbox-marker-31e0';
 const session = {
-  deviceSealedRootKey: { getBuffer: () => Buffer.alloc(32, 5) },
+  deviceSealedRootKey: SymmetricKey.fromBuffer(Buffer.alloc(32, 5)),
   identity: { id: 'alice' },
 } as unknown as Session;
 const row: GroupMailboxOutboxRow = {

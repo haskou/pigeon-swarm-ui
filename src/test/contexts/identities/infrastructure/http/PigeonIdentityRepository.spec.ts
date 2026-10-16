@@ -1,4 +1,8 @@
-import { KeyPair, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import {
+  KeyPair,
+  RecoveryKey,
+  SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 import { mock } from 'jest-mock-extended';
 
@@ -14,7 +18,6 @@ import { DeviceId } from '../../../../../contexts/identities/domain/value-object
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 import { IdentityMasterKeyProtection } from '../../../../../contexts/identities/domain/value-objects/IdentityMasterKeyProtection';
 import { IdentityNetworkMemberships } from '../../../../../contexts/identities/domain/value-objects/IdentityNetworkMemberships';
-import { RecoveryKey } from '../../../../../contexts/identities/domain/value-objects/RecoveryKey';
 import { IdentityCreationMaterials } from '../../../../../contexts/identities/infrastructure/crypto/IdentityCreationMaterials';
 import { IdentityAccessContexts } from '../../../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
 import { IdentityMapper } from '../../../../../contexts/identities/infrastructure/http/IdentityMapper';

@@ -1,5 +1,9 @@
 import 'fake-indexeddb/auto';
-import { EncryptedPayload, KeyPair } from '@haskou/pigeon-swarm-crypto';
+import {
+  EncryptedPayload,
+  KeyPair,
+  SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
 import { randomUUID } from 'node:crypto';
 
@@ -79,7 +83,7 @@ const person = async (): Promise<Person> => {
     id,
     keyPair,
     session: {
-      deviceSealedRootKey: { getBuffer: () => Buffer.alloc(32, 7) },
+      deviceSealedRootKey: SymmetricKey.fromBuffer(Buffer.alloc(32, 7)),
       identity: { id },
       keyPair,
     } as unknown as Session,

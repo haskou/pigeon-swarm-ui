@@ -1,4 +1,4 @@
-import type { MailboxKeys } from '../../../../../contexts/mailboxes/infrastructure/crypto/MailboxKeySchedule';
+import type { MailboxInboxKeys } from '@haskou/pigeon-swarm-crypto';
 
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
 import { RecipientMailboxRouter } from '../../../../../contexts/messages/infrastructure/mailbox/RecipientMailboxRouter';
@@ -7,7 +7,7 @@ describe(RecipientMailboxRouter.name, () => {
   const keys = {
     mailboxId: 'mailbox-1',
     postToken: 'post-token',
-  } as MailboxKeys;
+  } as MailboxInboxKeys;
   const plaintext = new Uint8Array([1, 2, 3]);
   const appended = { cursor: 1, envelopeId: 'envelope-1' };
   const anyEnvelopeId = expect.any(String) as unknown as string;

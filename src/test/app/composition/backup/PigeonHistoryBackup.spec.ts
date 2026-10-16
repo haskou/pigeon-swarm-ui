@@ -1,3 +1,4 @@
+import { HistoryBackupFile, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 import { mock } from 'jest-mock-extended';
 
@@ -6,9 +7,7 @@ import type { Session } from '../../../../contexts/identities/infrastructure/ses
 import type { ContactPinStore } from '../../../../contexts/identities/infrastructure/storage/ContactPinStore';
 import type { DirectMessageMailbox } from '../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
 
-import { HistoryBackupFile } from '../../../../app/composition/backup/HistoryBackupFile';
 import { HistoryBackupUnreadableError } from '../../../../app/composition/backup/HistoryBackupUnreadableError';
-import { HistoryBackupVersionError } from '../../../../app/composition/backup/HistoryBackupVersionError';
 import { PigeonHistoryBackup } from '../../../../app/composition/backup/PigeonHistoryBackup';
 import { DeviceUnlockNotConfirmedError } from '../../../../contexts/identities/infrastructure/storage/DeviceUnlockNotConfirmedError';
 import { encodeBase64Url } from '../../../../shared/infrastructure/encoding/base64url';
@@ -19,11 +18,13 @@ describe(PigeonHistoryBackup.name, () => {
     conversationId: 'conversation-1',
     plaintext: new TextEncoder().encode('{"record":"m1"}'),
   };
+  const rootOf = (seed: number): SymmetricKey =>
+    SymmetricKey.fromBuffer(Buffer.alloc(32, seed));
 
   const session = (id = 'alice', root = 7): Session =>
     ({
       identity: { id },
-      masterKey: { getBuffer: () => Buffer.alloc(32, root) },
+      masterKey: rootOf(root),
     }) as unknown as Session;
 
   const fixture = () => {
@@ -85,7 +86,7 @@ describe(PigeonHistoryBackup.name, () => {
     // Neither this device, its password nor its stored history is needed.
     const content = JSON.parse(
       new TextDecoder().decode(
-        await HistoryBackupFile.open(Buffer.alloc(32, 7), 'alice', file),
+        HistoryBackupFile.open(rootOf(7), 'alice', file),
       ),
     ) as Record<string, unknown>;
 
@@ -123,15 +124,15 @@ describe(PigeonHistoryBackup.name, () => {
     ).rejects.toBeInstanceOf(HistoryBackupUnreadableError);
     await expect(
       backup.restore(session(), JSON.stringify({ ...file, version: 0 })),
-    ).rejects.toBeInstanceOf(HistoryBackupVersionError);
+    ).rejects.toBeInstanceOf(HistoryBackupUnreadableError);
     expect(directMessages.importHistory).not.toHaveBeenCalled();
     expect(contactPins.restore).not.toHaveBeenCalled();
   });
 
   it('rejects an authentic file whose content is not a backup', async () => {
     const { backup, directMessages } = fixture();
-    const file = await HistoryBackupFile.seal(
-      Buffer.alloc(32, 7),
+    const file = HistoryBackupFile.seal(
+      rootOf(7),
       'alice',
       new TextEncoder().encode('{"history":"nope"}'),
     );

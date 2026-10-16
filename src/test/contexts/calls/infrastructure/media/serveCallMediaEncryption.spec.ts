@@ -71,10 +71,13 @@ class CallMediaEncryptionWorker {
     serveCallMediaEncryption(this.scope);
   }
 
-  public receiveKey(base64Key: string): void {
-    this.scope.onmessage?.({
-      data: { key: rawKey(base64Key) },
-    } as MessageEvent<unknown>);
+  /** Sends the call key by message, returning the bytes it sent. */
+  public receiveKey(base64Key: string): ArrayBuffer {
+    const key = rawKey(base64Key);
+
+    this.scope.onmessage?.({ data: { key } } as MessageEvent<unknown>);
+
+    return key;
   }
 
   /** The frames this worker lets through `frames`, once all are handled. */
@@ -200,6 +203,15 @@ describe(serveCallMediaEncryption.name, () => {
     await expect(
       keyedWorker(key).transform('receive', [frame]),
     ).resolves.toEqual([]);
+  });
+
+  it('overwrites the call key bytes it was sent with zeros once it holds the key', async () => {
+    const worker = new CallMediaEncryptionWorker();
+    const sent = worker.receiveKey(SymmetricKey.generate().valueOf());
+
+    await worker.transform('send', [media]);
+
+    expect(new Uint8Array(sent).every((byte) => byte === 0)).toBe(true);
   });
 
   it('holds outbound frames until the call key arrives, then encrypts them', async () => {

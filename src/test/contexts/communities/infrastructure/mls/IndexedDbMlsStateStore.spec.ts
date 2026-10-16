@@ -1,4 +1,5 @@
 import 'fake-indexeddb/auto';
+import { DeviceRootRowKeys, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import { randomUUID } from 'node:crypto';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
@@ -21,7 +22,7 @@ const HPKE_PRIVATE_KEY = new TextEncoder().encode('hpke-private-marker-a1e0');
 
 type RawRow = { key: IDBValidKey; value: Uint8Array };
 
-const root = (fill: number) => ({ getBuffer: () => Buffer.alloc(32, fill) });
+const root = (fill: number) => SymmetricKey.fromBuffer(Buffer.alloc(32, fill));
 
 const session = (
   identityId: string,
@@ -292,16 +293,18 @@ describe('IndexedDbMlsStateStore', () => {
     );
     const before = await rawRows(name);
     const canary = await rawRows(name, 'canaries');
-    const encrypt = crypto.subtle.encrypt.bind(crypto.subtle);
+    const seal = DeviceRootRowKeys.prototype.seal;
     let calls = 0;
 
-    jest.spyOn(crypto.subtle, 'encrypt').mockImplementation(async (...args) => {
-      calls += 1;
+    jest
+      .spyOn(DeviceRootRowKeys.prototype, 'seal')
+      .mockImplementation(function (this: DeviceRootRowKeys, ...args) {
+        calls += 1;
 
-      if (calls === 2) throw new Error('interrupted');
+        if (calls === 2) throw new Error('interrupted');
 
-      return await encrypt(...args);
-    });
+        return seal.apply(this, args);
+      });
     const store = stateStore(name, session('alice', 2, 1));
 
     await expect(store.loadGroup(GROUP_ID)).rejects.toThrow('interrupted');
@@ -318,16 +321,18 @@ describe('IndexedDbMlsStateStore', () => {
 
   it('drops the entries an interrupted re-seal left when neither root opens them', async () => {
     await fill(stateStore(name, session('alice', 1)));
-    const encrypt = crypto.subtle.encrypt.bind(crypto.subtle);
+    const seal = DeviceRootRowKeys.prototype.seal;
     let calls = 0;
 
-    jest.spyOn(crypto.subtle, 'encrypt').mockImplementation(async (...args) => {
-      calls += 1;
+    jest
+      .spyOn(DeviceRootRowKeys.prototype, 'seal')
+      .mockImplementation(function (this: DeviceRootRowKeys, ...args) {
+        calls += 1;
 
-      if (calls === 2) throw new Error('interrupted');
+        if (calls === 2) throw new Error('interrupted');
 
-      return await encrypt(...args);
-    });
+        return seal.apply(this, args);
+      });
 
     await expect(
       stateStore(name, session('alice', 2, 1)).loadGroup(GROUP_ID),

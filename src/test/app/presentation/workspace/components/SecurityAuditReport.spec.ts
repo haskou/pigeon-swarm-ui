@@ -1,3 +1,4 @@
+import { KeyFingerprint, PublicKey } from '@haskou/pigeon-swarm-crypto';
 import { describe, expect, it } from '@jest/globals';
 import { Buffer } from 'buffer';
 
@@ -7,16 +8,22 @@ import type { Session } from '../../../../../contexts/identities/infrastructure/
 import type { DirectMessageOutboxItem } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageOutboxItem';
 
 import { SecurityAuditReport } from '../../../../../app/presentation/workspace/components/SecurityAuditReport';
-import { KeyFingerprint } from '../../../../../contexts/identities/presentation/view-models/KeyFingerprint';
 
+const ED25519_SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
 const pem = (body: string): string =>
   `-----BEGIN PUBLIC KEY-----\n${body}\n-----END PUBLIC KEY-----\n`;
-const OWN_ID = Buffer.from('own-identity-key').toString('base64');
-const PEER_ID = Buffer.from('peer-identity-key').toString('base64');
-const IMPOSTOR_ID = Buffer.from('impostor-identity-key').toString('base64');
-const OWN_DEVICE = Buffer.from('own-device-key').toString('base64');
-const OTHER_DEVICE = Buffer.from('other-device-key').toString('base64');
-const PEER_DEVICE = Buffer.from('peer-device-key').toString('base64');
+const spki = (fill: number): string =>
+  Buffer.concat([ED25519_SPKI_PREFIX, Buffer.alloc(32, fill)]).toString(
+    'base64',
+  );
+const fingerprintOf = (body: string): string =>
+  KeyFingerprint.ofPublicKey(PublicKey.fromPEM(pem(body)));
+const OWN_ID = spki(11);
+const PEER_ID = spki(12);
+const IMPOSTOR_ID = spki(13);
+const OWN_DEVICE = spki(14);
+const OTHER_DEVICE = spki(15);
+const PEER_DEVICE = spki(16);
 const CONVERSATION_KEY = Buffer.alloc(32, 3).toString('base64');
 const COMMUNITY_KEY = Buffer.alloc(32, 4).toString('base64');
 const ROOT_KEY = Buffer.alloc(32, 5);
@@ -125,10 +132,10 @@ describe(SecurityAuditReport.name, () => {
     expect(build().account).toEqual({
       authorizationEpoch: 'epoch-1',
       authorizationRevision: 7,
-      deviceCredentialFingerprint: KeyFingerprint.ofPublicKey(OWN_DEVICE),
+      deviceCredentialFingerprint: fingerprintOf(OWN_DEVICE),
       deviceId: '11111111-1111-4111-8111-111111111111',
       identityId: OWN_ID,
-      identityKeyFingerprint: KeyFingerprint.ofPublicKey(OWN_ID),
+      identityKeyFingerprint: fingerprintOf(OWN_ID),
       sealedRoot: {
         fingerprint: KeyFingerprint.ofSecret(ROOT_KEY),
         generation: 9,
@@ -139,11 +146,11 @@ describe(SecurityAuditReport.name, () => {
   it('lists authorized devices with this device first', () => {
     expect(build().devices).toEqual([
       {
-        credentialFingerprint: KeyFingerprint.ofPublicKey(OWN_DEVICE),
+        credentialFingerprint: fingerprintOf(OWN_DEVICE),
         current: true,
       },
       {
-        credentialFingerprint: KeyFingerprint.ofPublicKey(OTHER_DEVICE),
+        credentialFingerprint: fingerprintOf(OTHER_DEVICE),
         current: false,
       },
     ]);
@@ -182,13 +189,13 @@ describe(SecurityAuditReport.name, () => {
     expect(build().contacts).toEqual([
       {
         identityId: PEER_ID,
-        keyFingerprint: KeyFingerprint.ofPublicKey(PEER_ID),
+        keyFingerprint: fingerprintOf(PEER_ID),
         name: 'Ada',
         verified: true,
       },
       {
         identityId: IMPOSTOR_ID,
-        keyFingerprint: KeyFingerprint.ofPublicKey(IMPOSTOR_ID),
+        keyFingerprint: fingerprintOf(IMPOSTOR_ID),
         name: '@ada',
         verified: false,
       },
@@ -202,18 +209,14 @@ describe(SecurityAuditReport.name, () => {
         epoch: '3',
         leaves: [
           {
-            deviceCredentialFingerprint: KeyFingerprint.ofPublicKey(
-              pem(OWN_DEVICE),
-            ),
+            deviceCredentialFingerprint: fingerprintOf(OWN_DEVICE),
             identityId: OWN_ID,
             own: true,
             signatureKeyFingerprint:
               KeyFingerprint.ofPublicBytes(SIGNATURE_KEY),
           },
           {
-            deviceCredentialFingerprint: KeyFingerprint.ofPublicKey(
-              pem(OTHER_DEVICE),
-            ),
+            deviceCredentialFingerprint: fingerprintOf(OTHER_DEVICE),
             identityId: OWN_ID,
             own: false,
             signatureKeyFingerprint: KeyFingerprint.ofPublicBytes(
@@ -221,9 +224,7 @@ describe(SecurityAuditReport.name, () => {
             ),
           },
           {
-            deviceCredentialFingerprint: KeyFingerprint.ofPublicKey(
-              pem(PEER_DEVICE),
-            ),
+            deviceCredentialFingerprint: fingerprintOf(PEER_DEVICE),
             identityId: PEER_ID,
             own: false,
             signatureKeyFingerprint:

@@ -1,11 +1,14 @@
 import 'fake-indexeddb/auto';
+import {
+  MailboxRecordAuthorship,
+  SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 import { randomUUID } from 'node:crypto';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { DirectSentRecord } from '../../../../../contexts/mailboxes/domain/DirectSentRecord';
 
-import { DirectMessageAuthorship } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageAuthorship';
 import { DirectMessageHistoryBackup } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageHistoryBackup';
 import { DirectMessageHistoryStore } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageHistoryStore';
 import { DirectMessageMailboxRecord } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxRecord';
@@ -13,12 +16,12 @@ import { DirectMessageRecordReader } from '../../../../../contexts/messages/infr
 
 describe(DirectMessageHistoryBackup.name, () => {
   const conversationId = 'conversation-1';
-  const previousRoot = Buffer.alloc(32, 5);
-  const rotatedRoot = Buffer.alloc(32, 6);
+  const previousRoot = SymmetricKey.fromBuffer(Buffer.alloc(32, 5));
+  const rotatedRoot = SymmetricKey.fromBuffer(Buffer.alloc(32, 6));
 
-  const session = (root: Buffer = previousRoot): Session =>
+  const session = (root: SymmetricKey = previousRoot): Session =>
     ({
-      deviceSealedRootKey: { getBuffer: () => root },
+      deviceSealedRootKey: root,
       identity: { id: 'alice' },
     }) as unknown as Session;
 
@@ -36,10 +39,10 @@ describe(DirectMessageHistoryBackup.name, () => {
     type: 'sent',
   });
 
-  const own = (record: DirectSentRecord, root: Buffer = previousRoot) =>
+  const own = (record: DirectSentRecord, root: SymmetricKey = previousRoot) =>
     DirectMessageMailboxRecord.encode(
       record,
-      DirectMessageAuthorship.tag(root, record),
+      MailboxRecordAuthorship.tag(root, record),
     );
 
   const store = () =>
