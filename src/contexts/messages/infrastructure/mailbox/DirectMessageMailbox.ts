@@ -343,10 +343,15 @@ export class DirectMessageMailbox {
   /**
    * Whether this device dropped this identity's stored direct history because
    * it no longer opens under the device-sealed root, as after a device revoke.
-   * Reports each drop once. Never throws.
+   * Reports a drop until `acknowledgeHistoryDropped`. Never throws.
    */
   public checkHistoryDropped(session: Session): Promise<boolean> {
     return this.history.checkDropped(session);
+  }
+
+  /** Clears the identity's reported history drop, once its notice is shown. */
+  public acknowledgeHistoryDropped(identityId: string): void {
+    this.history.acknowledgeDropped(identityId);
   }
 
   /**

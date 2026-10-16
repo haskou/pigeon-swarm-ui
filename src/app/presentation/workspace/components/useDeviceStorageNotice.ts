@@ -17,7 +17,9 @@ type DeviceStorageNoticeInput = {
  * Once per unlock: asks the browser quietly to keep the site's data, then
  * shows one notice when this device dropped its stored direct or group
  * history, or runs low on space. Both drops are taken at once, so one notice
- * covers them. Says nothing otherwise.
+ * covers them, and acknowledged only once the notice is shown: a workspace
+ * gone before the checks answer leaves them for the next unlock. Says nothing
+ * otherwise.
  */
 export function useDeviceStorageNotice({
   onNoticeChange,
@@ -37,7 +39,15 @@ export function useDeviceStorageNotice({
       ]);
 
       if (dropped.includes(true)) {
-        if (live) onNoticeChange(copy.workspace.deviceStorageLost);
+        if (!live) return;
+
+        onNoticeChange(copy.workspace.deviceStorageLost);
+        applicationContainer.directMessages.acknowledgeHistoryDropped(
+          identityId,
+        );
+        applicationContainer.groupMessages.acknowledgeHistoryDropped(
+          identityId,
+        );
 
         return;
       }
