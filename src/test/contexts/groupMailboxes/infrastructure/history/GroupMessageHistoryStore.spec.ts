@@ -7,6 +7,7 @@ import 'fake-indexeddb/auto';
 import { randomUUID } from 'node:crypto';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
+import type { RawHistoryRow } from './RawHistoryRow';
 
 import { GroupMessageHistoryStore } from '../../../../../contexts/groupMailboxes/infrastructure/history/GroupMessageHistoryStore';
 import { DirectMailboxRecords } from '../../../../../contexts/mailboxes/domain/DirectMailboxRecords';
@@ -142,12 +143,13 @@ const openRaw = (name: string, version?: number): Promise<IDBDatabase> =>
     request.onerror = () => reject(request.error);
   });
 
-type RawRow = { key: IDBValidKey; value: unknown };
-
-const rawRows = async (name: string, storeName: string): Promise<RawRow[]> => {
+const rawRows = async (
+  name: string,
+  storeName: string,
+): Promise<RawHistoryRow[]> => {
   const db = await openRaw(name);
   const store = db.transaction(storeName, 'readonly').objectStore(storeName);
-  const rows = await new Promise<RawRow[]>((resolve, reject) => {
+  const rows = await new Promise<RawHistoryRow[]>((resolve, reject) => {
     const values = store.getAll();
     const keys = store.getAllKeys();
 
@@ -170,7 +172,7 @@ const rawRows = async (name: string, storeName: string): Promise<RawRow[]> => {
 const replaceRows = async (
   name: string,
   storeName: string,
-  rows: RawRow[],
+  rows: RawHistoryRow[],
 ): Promise<void> => {
   const db = await openRaw(name);
   const transaction = db.transaction(storeName, 'readwrite');

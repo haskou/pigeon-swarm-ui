@@ -22,8 +22,10 @@ import { GroupMessageReadMarker } from './GroupMessageReadMarker';
  * History is read in pages of the latest arrivals: a page opens only rows
  * not opened before, and opened records stay in memory, so reopening a
  * conversation decrypts nothing again. A canary detects a root change; the
- * identity's rows are then dropped. Without a device-sealed root the store
- * keeps nothing. Calls run one at a time, so memory follows the database.
+ * identity's rows are then dropped, and a drop that removed rows is
+ * remembered until `checkDropped` reports it. Without a device-sealed root
+ * the store keeps nothing. Calls run one at a time, so memory follows the
+ * database.
  *
  * Each conversation keeps a sealed read marker: the last row sequence it
  * accounted, the messages of other members since the last read on this
@@ -33,16 +35,16 @@ import { GroupMessageReadMarker } from './GroupMessageReadMarker';
  * stored before any marker counts as read.
  */
 export class GroupMessageHistoryStore {
+  private static readonly KEYS_LABEL = 'pigeon-group-history';
   /** How many stored rows a first marker opens to find the newest message. */
   private static readonly LATEST_LOOKBACK = 50;
-
-  private readonly database: GroupMessageHistoryDatabase;
-  private queue: Promise<unknown> = Promise.resolve();
-  private readonly scopes = new Map<string, GroupMessageHistoryScope>();
-
-  private static readonly KEYS_LABEL = 'pigeon-group-history';
   private static readonly READ_PURPOSE = 'read';
   private static readonly RECORD_PURPOSE = 'record';
+
+  private readonly database: GroupMessageHistoryDatabase;
+  private readonly dropped = new Set<string>();
+  private queue: Promise<unknown> = Promise.resolve();
+  private readonly scopes = new Map<string, GroupMessageHistoryScope>();
 
   public constructor(
     databaseName: string = scopeClientStorageKey('pigeon-group-history'),
@@ -223,8 +225,11 @@ export class GroupMessageHistoryStore {
     );
     const canary = await this.database.canary(identityId);
 
-    if (!canary || !keys.opensCanary(canary)) {
-      await this.database.reset(identityId, keys.sealCanary());
+    if (
+      (!canary || !keys.opensCanary(canary)) &&
+      (await this.database.reset(identityId, keys.sealCanary())) > 0
+    ) {
+      this.dropped.add(identityId);
     }
     const scope = new GroupMessageHistoryScope(root, keys);
 
@@ -417,10 +422,30 @@ export class GroupMessageHistoryStore {
     });
   }
 
+  /**
+   * Whether this device dropped the identity's stored group history because
+   * it no longer opens under the device-sealed root, as after a device
+   * revoke. Reports each drop once. A deliberate `forget` is not a drop.
+   * Never throws; a failure logs one line.
+   */
+  public checkDropped(session: Session): Promise<boolean> {
+    return this.exclusive(async () => {
+      try {
+        await this.scope(session);
+      } catch {
+        // eslint-disable-next-line no-console
+        console.debug('Group history check failed.');
+      }
+
+      return this.dropped.delete(session.identity.id);
+    });
+  }
+
   /** Wipes one identity's history. Never throws; logs one line. */
   public forget(identityId: string): Promise<void> {
     return this.exclusive(async () => {
       this.scopes.delete(identityId);
+      this.dropped.delete(identityId);
 
       try {
         await this.database.wipe(identityId);

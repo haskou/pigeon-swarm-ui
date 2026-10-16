@@ -15,8 +15,9 @@ type DeviceStorageNoticeInput = {
 
 /**
  * Once per unlock: asks the browser quietly to keep the site's data, then
- * shows one notice when this device dropped its stored direct history or runs
- * low on space. Says nothing otherwise.
+ * shows one notice when this device dropped its stored direct or group
+ * history, or runs low on space. Both drops are taken at once, so one notice
+ * covers them. Says nothing otherwise.
  */
 export function useDeviceStorageNotice({
   onNoticeChange,
@@ -30,9 +31,12 @@ export function useDeviceStorageNotice({
     const check = async (): Promise<void> => {
       await deviceStorage.protect();
 
-      if (
-        await applicationContainer.directMessages.checkHistoryDropped(session)
-      ) {
+      const dropped = await Promise.all([
+        applicationContainer.directMessages.checkHistoryDropped(session),
+        applicationContainer.groupMessages.checkHistoryDropped(session),
+      ]);
+
+      if (dropped.includes(true)) {
         if (live) onNoticeChange(copy.workspace.deviceStorageLost);
 
         return;
