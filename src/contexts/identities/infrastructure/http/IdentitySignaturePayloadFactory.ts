@@ -1,3 +1,5 @@
+import type { IdentitySignaturePayload } from '@haskou/pigeon-swarm-crypto';
+
 import type { IdentityUpdateProfileInput } from './resources/IdentityUpdateProfileInput';
 
 export type { IdentityUpdateProfileInput } from './resources/IdentityUpdateProfileInput';
@@ -44,6 +46,38 @@ export class IdentitySignaturePayloadFactory {
   public constructor(
     private readonly publishedMailboxHome?: () => string | undefined,
   ) {}
+
+  /**
+   * The fields of an identity record its identity key signs. Absent optional
+   * fields are omitted: a node may serve them as null.
+   */
+  public static payloadOf(
+    identity: Omit<IdentityResource, 'signature'>,
+  ): IdentitySignaturePayload {
+    const { banner, biography, handle, name, picture } = identity.profile;
+
+    return {
+      admissionNonce: identity.admissionNonce,
+      authorizationRevision: identity.authorizationRevision,
+      deviceCredential: identity.deviceCredential,
+      deviceCredentialCommitment: identity.deviceCredentialCommitment,
+      id: identity.id,
+      mailboxHome: identity.mailboxHome ?? undefined,
+      networks: identity.networks,
+      previousIdentityExternalIdentifier:
+        identity.previousIdentityExternalIdentifier ?? undefined,
+      profile: {
+        banner: banner ?? undefined,
+        biography: biography ?? undefined,
+        handle: handle ?? undefined,
+        name,
+        picture: picture ?? undefined,
+      },
+      recoveryAuthority: identity.recoveryAuthority,
+      timestamp: identity.timestamp,
+      version: identity.version,
+    };
+  }
 
   /**
    * Reuses the proof unless the networks changed or the node asked for a

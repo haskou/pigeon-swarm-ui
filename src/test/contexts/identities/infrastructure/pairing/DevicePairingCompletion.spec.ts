@@ -183,32 +183,60 @@ describe(DevicePairingCompletion.name, () => {
     ).toBe('invalid');
   });
 
+  it('refuses to sign a completion with a device other than the invitation author', async () => {
+    const source = await fixture();
+    const author = await KeyPair.generate();
+    const recoveryAuthorityKeyPair = await KeyPair.generate();
+
+    expect(() =>
+      DevicePairingCompletion.create({
+        author,
+        checkpoint: DeviceAuthorizationCheckpointMapper.fromResource(
+          {
+            epoch: 'genesis',
+            identityId: source.identityId.valueOf(),
+            revision: 4,
+          },
+          source.identityId,
+        ),
+        historyTransferSecret: SymmetricKey.generate(),
+        identityKeyPair: source.identityKeyPair,
+        recoveryAuthorityKeyPair,
+        request: source.draft.getRequest(),
+        rootKey: source.rootKey,
+      }),
+    ).toThrow();
+  });
+
   it('rejects a completion signed by a device other than the invitation author', async () => {
     const source = await fixture();
-    const forged = DevicePairingCompletion.create({
-      author: await KeyPair.generate(),
-      checkpoint: DeviceAuthorizationCheckpointMapper.fromResource(
-        {
-          epoch: 'genesis',
-          identityId: source.identityId.valueOf(),
-          revision: 4,
-        },
-        source.identityId,
-      ),
-      historyTransferSecret: SymmetricKey.generate(),
-      identityKeyPair: source.identityKeyPair,
-      recoveryAuthorityKeyPair: await KeyPair.generate(),
-      request: source.draft.getRequest(),
-      rootKey: source.rootKey,
-    });
+    const resource = source.completion.toCode().decode() as Record<
+      string,
+      string
+    >;
+    const payload: DevicePairingCompletionPayload = {
+      authorCredential: resource.authorCredential,
+      encryptedMaterial: resource.encryptedMaterial,
+      epoch: resource.epoch,
+      identityId: resource.identityId,
+      operationId: resource.operationId,
+      pairingId: resource.pairingId,
+      revision: Number(resource.revision),
+      version: 1,
+    };
+    const forger = await KeyPair.generate();
+    const forged = DevicePairingCodeReader.completion(
+      DevicePairingCode.encode({
+        kind: resource.kind,
+        ...payload,
+        signature: forger
+          .sign(DevicePairingCompletionSignature.signingContent(payload))
+          .valueOf(),
+      }),
+    );
 
-    expect(
-      thrownPairingFailure(() =>
-        openMaterial(
-          DevicePairingCodeReader.completion(forged.toCode()),
-          source.draft,
-        ),
-      ),
-    ).toBe('invalid');
+    expect(thrownPairingFailure(() => openMaterial(forged, source.draft))).toBe(
+      'invalid',
+    );
   });
 });

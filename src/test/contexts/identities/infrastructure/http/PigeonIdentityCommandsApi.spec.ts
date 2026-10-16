@@ -49,7 +49,7 @@ function expectIdentitySigned(http: HttpJsonClient, keyPair: KeyPair): void {
 
   expect(() =>
     IdentitySignature.verify(
-      unsigned,
+      IdentitySignaturePayloadFactory.payloadOf(unsigned),
       new Signature(signature),
       new PublicKey(keyPair.toPrimitives().publicKey),
     ),
@@ -263,7 +263,18 @@ describe(`${PigeonIdentityCommandsApi.name} admission difficulty`, () => {
   });
 
   it('re-mines a profile update even when its networks are unchanged', async () => {
-    const current = identity({ identityExternalIdentifier: 'identity-cid' });
+    const keyPair = await KeyPair.generate();
+    const deviceCredential = (await KeyPair.generate()).toPrimitives()
+      .publicKey;
+    const current = identity({
+      deviceCredential,
+      deviceCredentialCommitment: DeviceCredentialCommitment.of(
+        new PublicKey(deviceCredential),
+      ),
+      id: IdentityId.normalize(keyPair.toPrimitives().publicKey),
+      identityExternalIdentifier: 'identity-cid',
+      recoveryAuthority: (await KeyPair.generate()).toPrimitives().publicKey,
+    });
     const http = {
       request: jest
         .fn()
@@ -278,7 +289,7 @@ describe(`${PigeonIdentityCommandsApi.name} admission difficulty`, () => {
     const session = {
       identity: current,
       keychain: { conversations: {}, version: 0 },
-      keyPair: await KeyPair.generate(),
+      keyPair,
       masterKey: SymmetricKey.generate(),
     } as Session;
 

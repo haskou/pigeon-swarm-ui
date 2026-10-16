@@ -1,16 +1,16 @@
-import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
+import type { PublicMutation } from '@haskou/pigeon-swarm-crypto';
 
-import type { SignedPublicMutation } from '../../../../shared/infrastructure/crypto/SignedPublicMutation';
+import { CanonicalJson, SHA256Hash } from '@haskou/pigeon-swarm-crypto';
+
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { NotificationInvitationInput } from './NotificationInvitationInput';
 
-import { canonicalJson } from '../../../../shared/infrastructure/crypto/canonicalJson';
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 
 export interface SignedNotificationInvitation {
   inviterIdentityId: string;
-  mutation: SignedPublicMutation;
+  mutation: PublicMutation;
   nonce: string;
   notificationId: string;
   recipientIdentityId: string;
@@ -45,7 +45,7 @@ export class NotificationMutationSigner {
     nonce: string,
   ): string {
     return `invitation:${SHA256Hash.from(
-      canonicalJson({
+      CanonicalJson.serialize({
         inviterIdentityId,
         nonce,
         recipientIdentityId,
@@ -106,7 +106,7 @@ export class NotificationMutationSigner {
     session: Session,
     notificationId: string,
     state: 'accepted' | 'declined',
-  ): Promise<SignedPublicMutation> {
+  ): Promise<PublicMutation> {
     const payload = {
       id: `notification-state:${notificationId}:${state}`,
       notificationId,

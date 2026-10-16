@@ -1,9 +1,7 @@
-import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
+import { CanonicalJson, SHA256Hash } from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 
 import type { MlsRecordInput } from './MlsRecordInput';
-
-import { canonicalJson } from '../../../../shared/infrastructure/crypto/canonicalJson';
 
 /**
  * base64url(sha256(canonicalize({epoch, groupId, kind, payload,
@@ -13,7 +11,7 @@ import { canonicalJson } from '../../../../shared/infrastructure/crypto/canonica
 export function deriveMlsRecordId(input: MlsRecordInput): string {
   return Buffer.from(
     SHA256Hash.from(
-      canonicalJson({
+      CanonicalJson.serialize({
         ...(input.epoch !== undefined && { epoch: input.epoch }),
         groupId: input.groupId,
         kind: input.kind,

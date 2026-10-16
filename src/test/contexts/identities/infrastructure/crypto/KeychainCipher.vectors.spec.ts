@@ -20,7 +20,7 @@ describe('keychain signature vectors from @haskou/pigeon-swarm-crypto', () => {
     jest.useRealTimers();
   });
 
-  it.each(vectors.accepted)('signs $name byte for byte', async (vector) => {
+  it.each(vectors.accepted)('signs $name byte for byte', (vector) => {
     const root = mock<SymmetricKey>();
     root.encrypt.mockReturnValue(
       new EncryptedPayload(vector.input.encryptedPayload),
@@ -32,7 +32,7 @@ describe('keychain signature vectors from @haskou/pigeon-swarm-crypto', () => {
     } as unknown as Session;
     jest.useFakeTimers({ now: vector.input.timestamp });
 
-    const { body } = await new KeychainCipher().encryptForPublish(
+    const { body } = new KeychainCipher().encryptForPublish(
       session,
       vector.input.previousKeychainExternalIdentifier === null
         ? undefined

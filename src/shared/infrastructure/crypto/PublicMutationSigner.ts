@@ -1,22 +1,22 @@
-import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
-import { Buffer } from 'buffer';
+import type { PublicMutation } from '@haskou/pigeon-swarm-crypto';
+
+import {
+  PrivateKey,
+  PublicMutationSignature,
+} from '@haskou/pigeon-swarm-crypto';
 
 import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { AuthorizationRevisionSource } from './AuthorizationRevisionSource';
 import type { PublicMutationIntent } from './PublicMutationIntent';
 import type { PublicMutationPosition } from './PublicMutationPosition';
-import type { SignedPublicMutation } from './SignedPublicMutation';
 
 import { IdentityId } from '../../../contexts/identities/domain/value-objects/IdentityId';
-import { canonicalJson } from './canonicalJson';
 
 /**
  * Signs the intent of one public record mutation with the device credential.
  * The node holds no user private keys, so it only verifies and replicates it.
  */
 export class PublicMutationSigner {
-  private static readonly DOMAIN = 'pigeon:public-mutation:v2\n';
-
   public static readonly FIRST_POSITION: PublicMutationPosition = {
     predecessor: null,
     sequence: 0,
@@ -24,36 +24,18 @@ export class PublicMutationSigner {
 
   public constructor(private readonly revisions: AuthorizationRevisionSource) {}
 
-  private base64Url(bytes: Uint8Array): string {
-    return Buffer.from(bytes)
-      .toString('base64')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
-  }
-
-  private digest(content: string): string {
-    return this.base64Url(
-      Buffer.from(SHA256Hash.from(content).toString(), 'hex'),
-    );
-  }
-
   private operationId(): string {
-    const bytes = new Uint8Array(16);
-
-    crypto.getRandomValues(bytes);
-
-    return this.base64Url(bytes);
+    return PublicMutationSignature.newOperationId();
   }
 
   /** base64url sha256 of the canonical JSON of a value. */
   public digestOfValue(value: unknown): string {
-    return this.digest(canonicalJson(value));
+    return PublicMutationSignature.payloadDigest(value);
   }
 
   /** Digest a successor commits to as its predecessor. */
-  public digestOf(mutation: SignedPublicMutation): string {
-    return this.digest(canonicalJson({ ...mutation }));
+  public digestOf(mutation: PublicMutation): string {
+    return PublicMutationSignature.digest(mutation);
   }
 
   /** Identity that the node records as the author of the mutation. */
@@ -65,29 +47,27 @@ export class PublicMutationSigner {
     session: Session,
     intent: PublicMutationIntent,
     position: PublicMutationPosition,
-  ): Promise<SignedPublicMutation> {
-    const body = {
-      author: {
-        authorizationRevision: await this.revisions.current(session),
-        deviceCredential: IdentityId.normalize(
-          session.deviceCredentialKeyPair.toPrimitives().publicKey,
-        ),
-        identityId: this.authorOf(session),
-      },
-      ...(intent.frontier ? { frontier: intent.frontier } : {}),
-      kind: intent.kind,
-      operationId: this.operationId(),
-      payloadDigest: this.digest(canonicalJson(intent.payload)),
-      predecessor: position.predecessor,
-      recordId: intent.recordId,
-      sequence: position.sequence,
-      store: intent.store,
-      version: 2 as const,
-    };
-    const signature = session.deviceCredentialKeyPair
-      .sign(`${PublicMutationSigner.DOMAIN}${canonicalJson(body)}`)
-      .toString();
+  ): Promise<PublicMutation> {
+    const device = session.deviceCredentialKeyPair.toPrimitives();
 
-    return { ...body, signature };
+    return PublicMutationSignature.sign(
+      {
+        author: {
+          authorizationRevision: await this.revisions.current(session),
+          deviceCredential: IdentityId.normalize(device.publicKey),
+          identityId: this.authorOf(session),
+        },
+        ...(intent.frontier?.length ? { frontier: intent.frontier } : {}),
+        kind: intent.kind,
+        operationId: this.operationId(),
+        payloadDigest: PublicMutationSignature.payloadDigest(intent.payload),
+        predecessor: position.predecessor,
+        recordId: intent.recordId,
+        sequence: position.sequence,
+        store: intent.store,
+        version: 2,
+      },
+      new PrivateKey(device.privateKey),
+    );
   }
 }

@@ -1,11 +1,11 @@
 import {
+  DeviceCredentialCommitment,
   IdentitySignature,
   KeyPair,
   PrivateKey,
-  SHA256Hash,
+  PublicKey,
 } from '@haskou/pigeon-swarm-crypto';
 import vectors from '@haskou/pigeon-swarm-crypto/vectors/identity-signature.json';
-import { StringValueObject } from '@haskou/value-objects';
 
 import type { IdentityResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 
@@ -24,16 +24,18 @@ function publish(
   return {
     ...unsigned,
     signature: IdentitySignature.sign(
-      unsigned,
+      IdentitySignaturePayloadFactory.payloadOf(unsigned),
       new PrivateKey(keyPair.toPrimitives().privateKey),
     ).toString(),
   };
 }
 
-async function fixture(
-  mailboxHome?: string,
-  commitment?: (deviceCredential: string) => string,
-) {
+/** Vector identities may omit `admissionNonce`; the resource requires it. */
+function resourceOf(primitives: object): IdentityResource {
+  return primitives as IdentityResource;
+}
+
+async function fixture(mailboxHome?: string) {
   const keyPair = await KeyPair.generate();
   const id = IdentityId.fromString(keyPair.toPrimitives().publicKey).valueOf();
   const deviceCredential = (await KeyPair.generate()).toPrimitives().publicKey;
@@ -41,9 +43,9 @@ async function fixture(
     () => mailboxHome,
   ).createInitial({
     deviceCredential,
-    deviceCredentialCommitment:
-      commitment?.(deviceCredential) ??
-      SHA256Hash.from(new StringValueObject(deviceCredential)).valueOf(),
+    deviceCredentialCommitment: DeviceCredentialCommitment.of(
+      new PublicKey(deviceCredential),
+    ),
     id,
     networks: [],
     profile: { name: 'Ada' },
@@ -95,10 +97,13 @@ describe(IdentityMailboxHomeVerifier.name, () => {
   });
 
   it('rejects a device credential whose commitment does not match', async () => {
-    const { id, identity } = await fixture(HOME, () => 'forged-commitment');
+    const { id, identity } = await fixture(HOME);
 
     expect(
-      IdentityMailboxHomeVerifier.verifiedBase(id, identity),
+      IdentityMailboxHomeVerifier.verifiedBase(id, {
+        ...identity,
+        deviceCredentialCommitment: 'a'.repeat(64),
+      }),
     ).toBeUndefined();
   });
 
@@ -172,9 +177,9 @@ describe(IdentityMailboxHomeVerifier.name, () => {
         IdentityMailboxHomeVerifier.isTrusted(id, {
           ...identity,
           deviceCredential: swapped,
-          deviceCredentialCommitment: SHA256Hash.from(
-            new StringValueObject(swapped),
-          ).valueOf(),
+          deviceCredentialCommitment: DeviceCredentialCommitment.of(
+            new PublicKey(swapped),
+          ),
         }),
       ).toBe(false);
     });
@@ -183,7 +188,10 @@ describe(IdentityMailboxHomeVerifier.name, () => {
   describe('identity signature vectors from @haskou/pigeon-swarm-crypto', () => {
     it.each(vectors.identities.accepted)('trusts $name', ({ primitives }) => {
       expect(
-        IdentityMailboxHomeVerifier.isTrusted(primitives.id, primitives),
+        IdentityMailboxHomeVerifier.isTrusted(
+          primitives.id,
+          resourceOf(primitives),
+        ),
       ).toBe(true);
     });
 
@@ -193,7 +201,7 @@ describe(IdentityMailboxHomeVerifier.name, () => {
       expect(
         IdentityMailboxHomeVerifier.verifiedBase(
           full!.primitives.id,
-          full!.primitives,
+          resourceOf(full!.primitives),
         ),
       ).toBe(full!.primitives.mailboxHome);
     });
@@ -202,7 +210,10 @@ describe(IdentityMailboxHomeVerifier.name, () => {
       'distrusts $name',
       ({ primitives }) => {
         expect(
-          IdentityMailboxHomeVerifier.isTrusted(primitives.id, primitives),
+          IdentityMailboxHomeVerifier.isTrusted(
+            primitives.id,
+            resourceOf(primitives),
+          ),
         ).toBe(false);
       },
     );

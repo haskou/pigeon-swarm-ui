@@ -1,6 +1,8 @@
 import {
+  DeviceSealedSecretSignature,
   EncryptedPayload,
   KeyPair,
+  PrivateKey,
   Signature,
 } from '@haskou/pigeon-swarm-crypto';
 import { assert } from '@haskou/value-objects';
@@ -10,7 +12,6 @@ import type {
   DeviceSealedSecretResource,
 } from '../http/resources/DeviceSealedSecretResource';
 
-import { DeviceSealedSecretPreimage } from '../../domain/DeviceSealedSecretPreimage';
 import { DeviceCredential } from '../../domain/value-objects/DeviceCredential';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
 
@@ -47,6 +48,29 @@ export class DeviceSealedSecretCipher {
     return IdentityId.fromString(credential.valueOf()).valueOf();
   }
 
+  private static isSignedByPublisher(
+    resource: DeviceSealedSecretResource,
+  ): boolean {
+    try {
+      DeviceSealedSecretSignature.verify(
+        {
+          authorizationRevision: resource.authorizationRevision,
+          generation: resource.generation,
+          identityId: resource.identityId,
+          publisherCredential: resource.publisherCredential,
+          recipientCredential: resource.recipientCredential,
+          sealedSecret: resource.sealedSecret,
+        },
+        new Signature(resource.signature),
+        IdentityId.fromString(resource.publisherCredential).getPublicKey(),
+      );
+
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   public static seal(
     input: DeviceSealedSecretSealInput,
   ): DeviceSealedSecretEntryResource[] {
@@ -67,19 +91,22 @@ export class DeviceSealedSecretCipher {
         .getPublicKey()
         .encrypt(input.payload)
         .valueOf();
-      const preimage = DeviceSealedSecretPreimage.of({
-        authorizationRevision: input.authorizationRevision,
-        generation: input.generation,
-        identityId: input.identityId,
-        publisherCredential,
-        recipientCredential,
-        sealedSecret,
-      });
+      const signature = DeviceSealedSecretSignature.sign(
+        {
+          authorizationRevision: input.authorizationRevision,
+          generation: input.generation,
+          identityId: input.identityId,
+          publisherCredential,
+          recipientCredential,
+          sealedSecret,
+        },
+        new PrivateKey(input.publisher.toPrimitives().privateKey),
+      );
 
       return {
         recipientCredential,
         sealedSecret,
-        signature: input.publisher.sign(preimage).toString(),
+        signature: signature.toString(),
       };
     });
   }
@@ -100,19 +127,8 @@ export class DeviceSealedSecretCipher {
       new Error('Device sealed secret is not addressed to this device.'),
     );
 
-    const preimage = DeviceSealedSecretPreimage.of({
-      authorizationRevision: resource.authorizationRevision,
-      generation: resource.generation,
-      identityId: resource.identityId,
-      publisherCredential: resource.publisherCredential,
-      recipientCredential: resource.recipientCredential,
-      sealedSecret: resource.sealedSecret,
-    });
-
     assert(
-      IdentityId.fromString(resource.publisherCredential)
-        .getPublicKey()
-        .isValidSignature(preimage, new Signature(resource.signature)),
+      DeviceSealedSecretCipher.isSignedByPublisher(resource),
       new Error('Invalid device sealed secret signature.'),
     );
 

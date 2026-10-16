@@ -1,9 +1,10 @@
+import type { PublicMutation } from '@haskou/pigeon-swarm-crypto';
+
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { NotificationMutationSigner } from '../../../../../contexts/notifications/infrastructure/http/NotificationMutationSigner';
-import type { SignedPublicMutation } from '../../../../../shared/infrastructure/crypto/SignedPublicMutation';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
@@ -30,7 +31,7 @@ describe('GroupMailboxNotificationLink', () => {
     const http = mock<HttpJsonClient>();
     const signer = mock<RequestSigner>();
     const invitations = mock<Pick<NotificationMutationSigner, 'invitation'>>();
-    const mutation = { signature: 'mutation' } as SignedPublicMutation;
+    const mutation = { signature: 'mutation' } as PublicMutation;
 
     signer.headers.mockResolvedValue({ authorization: 'signed' });
     http.request.mockResolvedValue({});

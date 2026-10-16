@@ -6,6 +6,9 @@ import { ConversationName } from '../../conversations/domain/value-objects/Conve
 /** `group:` and base64url of 32 bytes, unpadded and canonical. */
 const CONVERSATION_ID = /^group:[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/;
 const MAX_IDENTITY_LENGTH = 1024;
+/** A UTF-16 surrogate without its pair, which canonical JSON refuses. */
+const LONE_SURROGATE =
+  /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 
 const sorted = (values: Iterable<string>): string[] =>
   [...values].sort((left, right) => (left < right ? -1 : 1));
@@ -37,7 +40,8 @@ export class GroupMailboxRoster {
       typeof value === 'string' &&
       value !== '' &&
       value.length <= MAX_IDENTITY_LENGTH &&
-      value.trim() === value
+      value.trim() === value &&
+      !LONE_SURROGATE.test(value)
     );
   }
 
@@ -61,7 +65,8 @@ export class GroupMailboxRoster {
       typeof name === 'string' &&
       name !== '' &&
       name.trim() === name &&
-      name.length <= ConversationName.MAX_LENGTH
+      name.length <= ConversationName.MAX_LENGTH &&
+      !LONE_SURROGATE.test(name)
     );
   }
 

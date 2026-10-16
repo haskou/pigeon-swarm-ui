@@ -1,4 +1,5 @@
-import type { SignedPublicMutation } from '../../../../shared/infrastructure/crypto/SignedPublicMutation';
+import type { PublicMutation } from '@haskou/pigeon-swarm-crypto';
+
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { Session } from '../../../identities/infrastructure/session/Session';
@@ -69,7 +70,7 @@ export class PigeonCallsApi {
     callId: string,
     state: CallParticipantState,
     at: number,
-    send: (mutation: SignedPublicMutation) => Promise<void>,
+    send: (mutation: PublicMutation) => Promise<void>,
   ): Promise<void> {
     await submitPublicMutation(
       PublicMutationSigner.FIRST_POSITION,

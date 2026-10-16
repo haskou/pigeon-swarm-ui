@@ -1,4 +1,10 @@
-import { KeyPair, Signature } from '@haskou/pigeon-swarm-crypto';
+import {
+  DevicePairingRequestSignature,
+  DevicePairingVerificationCode,
+  KeyPair,
+  PrivateKey,
+  Signature,
+} from '@haskou/pigeon-swarm-crypto';
 import { Timestamp, assert } from '@haskou/value-objects';
 
 import type { DevicePairingRequestPayload } from './DevicePairingRequestPayload';
@@ -12,9 +18,7 @@ import { DeviceAuthorizationOperationId } from './value-objects/DeviceAuthorizat
 import { DevicePairingCode } from './value-objects/DevicePairingCode';
 import { PairingTransportPublicKey } from './value-objects/PairingTransportPublicKey';
 
-const DOMAIN = 'pigeon:device-pairing:request:v1';
 const KIND = 'pigeon-device-pairing-request';
-const VERIFICATION_DOMAIN = 'pigeon:device-pairing:verification:v1';
 const MAX_FUTURE_SKEW_MS = 30_000;
 
 export class DevicePairingRequest {
@@ -73,7 +77,12 @@ export class DevicePairingRequest {
     );
 
     return new DevicePairingRequestDraft(
-      request.withSignature(target.sign(request.signingPayload())),
+      request.withSignature(
+        DevicePairingRequestSignature.sign(
+          request.payload(),
+          new PrivateKey(target.toPrimitives().privateKey),
+        ),
+      ),
       target,
       transport,
     );
@@ -100,8 +109,18 @@ export class DevicePairingRequest {
     };
   }
 
-  private signingPayload(): string {
-    return JSON.stringify({ domain: DOMAIN, request: this.payload() });
+  private isSignedByTarget(signature: Signature): boolean {
+    try {
+      DevicePairingRequestSignature.verify(
+        this.payload(),
+        signature,
+        this.proof.getCredential().getPublicKey(),
+      );
+
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private withSignature(signature: Signature): DevicePairingRequest {
@@ -140,10 +159,7 @@ export class DevicePairingRequest {
           previousRevision: this.invitation.getRevision(),
           proof: this.proof,
         }) &&
-        this.proof
-          .getCredential()
-          .getPublicKey()
-          .isValidSignature(this.signingPayload(), this.signature),
+        this.isSignedByTarget(this.signature),
       new DevicePairingError(
         'invalid',
         'Invalid or expired device pairing request.',
@@ -151,25 +167,15 @@ export class DevicePairingRequest {
     );
   }
 
-  public async getVerificationCode(): Promise<string> {
-    const digest = new Uint8Array(
-      await crypto.subtle.digest(
-        'SHA-256',
-        new TextEncoder().encode(
-          JSON.stringify({
-            domain: VERIFICATION_DOMAIN,
-            operationId: this.operationId.valueOf(),
-            pairingId: this.invitation.getPairingId().valueOf(),
-            targetCredential: this.proof.getCredential().valueOf(),
-            transportPublicKey: this.transportPublicKey.valueOf(),
-          }),
-        ),
-      ),
+  public getVerificationCode(): Promise<string> {
+    return Promise.resolve(
+      DevicePairingVerificationCode.of({
+        operationId: this.operationId.valueOf(),
+        pairingId: this.invitation.getPairingId().valueOf(),
+        targetCredential: this.proof.getCredential().valueOf(),
+        transportPublicKey: this.transportPublicKey.valueOf(),
+      }),
     );
-    const value = new DataView(digest.buffer).getBigUint64(0) % 10n ** 10n;
-    const digits = value.toString().padStart(10, '0');
-
-    return `${digits.slice(0, 5)} ${digits.slice(5)}`;
   }
 
   public getInvitation(): DevicePairingInvitation {

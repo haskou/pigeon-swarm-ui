@@ -1,7 +1,8 @@
+import type { PublicMutation } from '@haskou/pigeon-swarm-crypto';
+
 import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
 
 import type { PublicMutationPosition } from '../../../../shared/infrastructure/crypto/PublicMutationPosition';
-import type { SignedPublicMutation } from '../../../../shared/infrastructure/crypto/SignedPublicMutation';
 import type { Session } from '../../../identities/infrastructure/session/Session';
 
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
@@ -23,7 +24,7 @@ export interface CallStartInput {
 
 export interface SignedCallStart {
   callId: string;
-  mutation: SignedPublicMutation;
+  mutation: PublicMutation;
 }
 
 /**
@@ -39,7 +40,7 @@ export class CallEventSigner {
     recordId: string,
     payload: Record<string, unknown>,
     position: PublicMutationPosition,
-  ): Promise<SignedPublicMutation> {
+  ): Promise<PublicMutation> {
     return await this.mutations.sign(
       session,
       { kind: 'put', payload, recordId, store: 'calls' },
@@ -120,7 +121,7 @@ export class CallEventSigner {
     state: CallParticipantState,
     at: number,
     position: PublicMutationPosition,
-  ): Promise<SignedPublicMutation> {
+  ): Promise<PublicMutation> {
     const identityId = this.mutations.authorOf(session);
     const id = `call-participant:${callId}:${identityId}`;
 
@@ -143,7 +144,7 @@ export class CallEventSigner {
     session: Session,
     callId: string,
     at: number,
-  ): Promise<SignedPublicMutation> {
+  ): Promise<PublicMutation> {
     const id = `call-end:${callId}`;
 
     return await this.sign(

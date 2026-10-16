@@ -1,5 +1,8 @@
 import {
+  CanonicalJson,
+  CommunityOperationSignature,
   type KeyPair,
+  PrivateKey,
   SHA256Hash,
   Signature,
 } from '@haskou/pigeon-swarm-crypto';
@@ -8,14 +11,12 @@ import { Buffer } from 'buffer';
 import type { CommunityOperationContent } from './CommunityOperationContent';
 import type { CommunityOperationDocument } from './CommunityOperationDocument';
 
-import { canonicalJson } from '../../../../shared/infrastructure/crypto/canonicalJson';
 import { encodeBase64Url } from '../../../../shared/infrastructure/encoding/base64url';
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
 import { CommunityOperation } from '../../domain/operations/CommunityOperation';
 import { deriveCommunityId } from './deriveCommunityRecordId';
 
 const SCOPE_TYPE = 'community_operation';
-const SIGNING_CONTEXT = 'pigeon:community-operation:v1\n';
 const DIGEST = /^[A-Za-z0-9_-]{43}$/;
 const MAX_PARENTS = 64;
 const FIELDS = [
@@ -50,8 +51,22 @@ export class CommunityOperationProof {
   /** base64url sha256 of the canonical content. */
   private static digestOf(content: CommunityOperationContent): string {
     return encodeBase64Url(
-      Buffer.from(SHA256Hash.from(canonicalJson(content)).toString(), 'hex'),
+      Buffer.from(
+        SHA256Hash.from(CanonicalJson.serialize(content)).toString(),
+        'hex',
+      ),
     );
+  }
+
+  /** The digest of `content`, or `undefined` when it is not canonical JSON. */
+  private static safeDigestOf(
+    content: CommunityOperationContent,
+  ): string | undefined {
+    try {
+      return CommunityOperationProof.digestOf(content);
+    } catch {
+      return undefined;
+    }
   }
 
   private static isRecord(value: unknown): value is Record<string, unknown> {
@@ -94,12 +109,13 @@ export class CommunityOperationProof {
     document: CommunityOperationDocument,
   ): boolean {
     try {
-      return IdentityId.fromString(document.authorIdentityId)
-        .getPublicKey()
-        .isValidSignature(
-          `${SIGNING_CONTEXT}${document.id}`,
-          new Signature(document.identitySignature),
-        );
+      CommunityOperationSignature.verify(
+        document.id,
+        new Signature(document.identitySignature),
+        IdentityId.fromString(document.authorIdentityId).getPublicKey(),
+      );
+
+      return true;
     } catch {
       return false;
     }
@@ -119,6 +135,26 @@ export class CommunityOperationProof {
           IdentityId.normalize(document.authorIdentityId),
           nonce,
         )
+    );
+  }
+
+  /**
+   * Whether `document`, content addressed by `hash`, is an operation of
+   * `communityId` signed by its author, and a genesis exactly when parentless.
+   */
+  private static proves(
+    document: CommunityOperationDocument,
+    communityId: string,
+    hash: string,
+  ): boolean {
+    const genesis = document.action === CommunityOperation.GENESIS;
+
+    return (
+      document.communityId === communityId &&
+      genesis === (document.parents.length === 0) &&
+      document.id === `community:${communityId}:op:${hash}` &&
+      CommunityOperationProof.isSignedByAuthor(document) &&
+      (!genesis || CommunityOperationProof.createsItsCommunity(document))
     );
   }
 
@@ -148,7 +184,10 @@ export class CommunityOperationProof {
     return {
       ...content,
       id,
-      identitySignature: keyPair.sign(`${SIGNING_CONTEXT}${id}`).toString(),
+      identitySignature: CommunityOperationSignature.sign(
+        id,
+        new PrivateKey(keyPair.toPrimitives().privateKey),
+      ).toString(),
     };
   }
 
@@ -165,26 +204,23 @@ export class CommunityOperationProof {
     if (!CommunityOperationProof.isDocument(document)) return undefined;
 
     const content = CommunityOperationProof.contentOf(document);
-    const hash = CommunityOperationProof.digestOf(content);
-    const genesis = content.action === CommunityOperation.GENESIS;
-    const proven =
-      content.communityId === communityId &&
-      genesis === (content.parents.length === 0) &&
-      document.id === `community:${communityId}:op:${hash}` &&
-      CommunityOperationProof.isSignedByAuthor(document) &&
-      (!genesis || CommunityOperationProof.createsItsCommunity(document));
+    const hash = CommunityOperationProof.safeDigestOf(content);
 
-    return proven
-      ? CommunityOperation.fromPrimitives({
-          action: content.action,
-          args: content.args,
-          authorIdentityId: IdentityId.normalize(content.authorIdentityId),
-          communityId: content.communityId,
-          createdAt: content.createdAt,
-          hash,
-          networkId: content.networkId,
-          parents: content.parents,
-        })
-      : undefined;
+    if (hash === undefined) return undefined;
+
+    if (!CommunityOperationProof.proves(document, communityId, hash)) {
+      return undefined;
+    }
+
+    return CommunityOperation.fromPrimitives({
+      action: content.action,
+      args: content.args,
+      authorIdentityId: IdentityId.normalize(content.authorIdentityId),
+      communityId: content.communityId,
+      createdAt: content.createdAt,
+      hash,
+      networkId: content.networkId,
+      parents: content.parents,
+    });
   }
 }

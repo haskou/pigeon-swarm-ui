@@ -1,5 +1,6 @@
+import type { PublicMutation } from '@haskou/pigeon-swarm-crypto';
+
 import type { PublicMutationPosition } from '../crypto/PublicMutationPosition';
-import type { SignedPublicMutation } from '../crypto/SignedPublicMutation';
 
 import { HttpJsonError } from './HttpJsonError';
 
@@ -41,8 +42,8 @@ export async function submitPublicMutation(
   initial: PublicMutationPosition,
   sign: (
     position: PublicMutationPosition,
-  ) => Promise<SignedPublicMutation> | SignedPublicMutation,
-  send: (mutation: SignedPublicMutation) => Promise<void>,
+  ) => Promise<PublicMutation> | PublicMutation,
+  send: (mutation: PublicMutation) => Promise<void>,
 ): Promise<void> {
   let position = initial;
 

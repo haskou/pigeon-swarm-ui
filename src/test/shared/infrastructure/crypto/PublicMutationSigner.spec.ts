@@ -81,7 +81,7 @@ describe(PublicMutationSigner.name, () => {
     const plain = await signer.sign(session, intent, first);
 
     expect(scoped.frontier).toEqual(frontier);
-    expect(plain).not.toHaveProperty('frontier');
+    expect(JSON.parse(JSON.stringify(plain))).not.toHaveProperty('frontier');
     expect(() =>
       PublicMutationSignature.verify(scoped, publicKeyOf(device)),
     ).not.toThrow();

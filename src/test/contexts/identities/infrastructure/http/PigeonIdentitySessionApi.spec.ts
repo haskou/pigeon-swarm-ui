@@ -1,5 +1,9 @@
-import { KeyPair, SHA256Hash, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
-import { StringValueObject } from '@haskou/value-objects';
+import {
+  DeviceCredentialCommitment,
+  KeyPair,
+  PublicKey,
+  SymmetricKey,
+} from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
 
 import type { DeviceCredential } from '../../../../../contexts/identities/domain/value-objects/DeviceCredential';
@@ -91,9 +95,9 @@ async function unlockableDevice(
   const recoveryAuthorityKeyPair = await KeyPair.generate();
   currentIdentity.deviceCredential =
     deviceCredentialKeyPair.toPrimitives().publicKey;
-  currentIdentity.deviceCredentialCommitment = SHA256Hash.from(
-    new StringValueObject(currentIdentity.deviceCredential),
-  ).valueOf();
+  currentIdentity.deviceCredentialCommitment = DeviceCredentialCommitment.of(
+    new PublicKey(currentIdentity.deviceCredential),
+  );
   currentIdentity.recoveryAuthority =
     recoveryAuthorityKeyPair.toPrimitives().publicKey;
   const identities = mock<PigeonIdentityGateway>();
@@ -140,9 +144,9 @@ describe(PigeonIdentitySessionApi.name, () => {
     const recoveryAuthorityKeyPair = await KeyPair.generate();
     currentIdentity.deviceCredential =
       deviceCredentialKeyPair.toPrimitives().publicKey;
-    currentIdentity.deviceCredentialCommitment = SHA256Hash.from(
-      new StringValueObject(currentIdentity.deviceCredential),
-    ).valueOf();
+    currentIdentity.deviceCredentialCommitment = DeviceCredentialCommitment.of(
+      new PublicKey(currentIdentity.deviceCredential),
+    );
     currentIdentity.recoveryAuthority =
       recoveryAuthorityKeyPair.toPrimitives().publicKey;
     const vault = {
@@ -589,9 +593,9 @@ describe(PigeonIdentitySessionApi.name, () => {
     const deviceCredentialKeyPair = await KeyPair.generate();
     currentIdentity.deviceCredential =
       deviceCredentialKeyPair.toPrimitives().publicKey;
-    currentIdentity.deviceCredentialCommitment = SHA256Hash.from(
-      new StringValueObject(currentIdentity.deviceCredential),
-    ).valueOf();
+    currentIdentity.deviceCredentialCommitment = DeviceCredentialCommitment.of(
+      new PublicKey(currentIdentity.deviceCredential),
+    );
     const recoveryAuthorityKeyPair = await KeyPair.generate();
     currentIdentity.recoveryAuthority =
       recoveryAuthorityKeyPair.toPrimitives().publicKey;
