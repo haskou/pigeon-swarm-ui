@@ -13,6 +13,7 @@ import { mock } from 'jest-mock-extended';
 
 import type { ConversationResource } from '../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { GroupConversationSyncOutcome } from '../../../../contexts/groupMailboxes/infrastructure/GroupConversationSyncOutcome';
+import type { GroupMailboxCommit } from '../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxCommit';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { PigeonMailboxClient } from '../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
 import type { DirectMessageTimelineChange } from '../../../../contexts/messages/domain/DirectMessageTimelineChange';
@@ -20,12 +21,14 @@ import type { MessageAttachmentPublisher } from '../../../../contexts/messages/i
 import type { PigeonLinkPreviewsApi } from '../../../../contexts/messages/infrastructure/http/PigeonLinkPreviewsApi';
 import type { NotificationResource } from '../../../../contexts/notifications/infrastructure/http/resources/NotificationResource';
 
+import { MlsUpdateCadence } from '../../../../contexts/communities/domain/MlsUpdateCadence';
 import { ConversationIdFactory } from '../../../../contexts/conversations/domain/ConversationIdFactory';
 import { ConversationGroupNonce } from '../../../../contexts/conversations/domain/value-objects/ConversationGroupNonce';
 import { ConversationNetworkId } from '../../../../contexts/conversations/domain/value-objects/ConversationNetworkId';
 import { ConversationParticipantId } from '../../../../contexts/conversations/domain/value-objects/ConversationParticipantId';
 import { GroupMailboxRoster } from '../../../../contexts/groupMailboxes/domain/GroupMailboxRoster';
 import { GroupMailboxControl } from '../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxControl';
+import { GroupMailboxUpdateFailedError } from '../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxUpdateFailedError';
 import { GroupConversationMailbox } from '../../../../contexts/groupMailboxes/infrastructure/GroupConversationMailbox';
 import { GroupMessageHistoryStore } from '../../../../contexts/groupMailboxes/infrastructure/history/GroupMessageHistoryStore';
 import { GroupMailboxOutbox } from '../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutbox';
@@ -388,6 +391,15 @@ const catchUp = async (members: Member[] = everyone()): Promise<void> => {
   }
 };
 
+/** Waits for the membership update a sync left running for each member. */
+const idle = async (): Promise<void> => {
+  await Promise.all(
+    everyone().map((member) =>
+      member.mailbox.membersChanged(member.session, CONVERSATION),
+    ),
+  );
+};
+
 /**
  * The three of them in one group, each joined from its welcome. Bob answers
  * first and opens his inboxes before carol answers: the commit that adds
@@ -449,6 +461,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+  jest.restoreAllMocks();
   for (const member of [...everyone(), ...(laptop ? [laptop] : [])]) {
     member.mailbox.stop(member.id);
   }
@@ -1311,6 +1324,50 @@ describe('GroupConversationMailbox', () => {
     info.mockRestore();
   });
 
+  it('removes a revoked device before its own leaf update, which a failing update holds back no more', async () => {
+    const info = jest
+      .spyOn(console, 'info')
+      .mockImplementation(() => undefined);
+    const second = await formGroupWithLaptop();
+    const removal = jest.spyOn(GroupMailboxControl.prototype, 'removeDevices');
+    const update = jest
+      .spyOn(GroupMailboxControl.prototype, 'updateWhenDue')
+      .mockRejectedValue(new Error('update refused'));
+
+    for (const devicesOf of [listed, verified]) {
+      devicesOf.set(bob.id, [
+        bob.session.deviceCredentialKeyPair.toPrimitives().publicKey,
+      ]);
+    }
+    bob.session = {
+      ...bob.session,
+      deviceSealedRootKey: SymmetricKey.fromBuffer(Buffer.alloc(32, 200)),
+      previousDeviceSealedRootKey: bob.session.deviceSealedRootKey,
+    } as unknown as Session;
+    await bob.mailbox.cutOffRevokedReaders(bob.session);
+    await settle(
+      bob.mailbox.membersChanged(bob.session, CONVERSATION),
+      everyone(),
+    );
+
+    expect(removal).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalled();
+    expect(removal.mock.invocationCallOrder[0]).toBeLessThan(
+      update.mock.invocationCallOrder[0],
+    );
+
+    update.mockRestore();
+    removal.mockRestore();
+    await catchUp();
+    await alice.mailbox.send(alice.session, conversation(), 'after', {});
+    for (const member of everyone()) await sync(member);
+    await sync(second).catch(() => undefined);
+
+    expect(texts(bob)).toEqual(['message:after']);
+    expect(texts(second)).toEqual([]);
+    info.mockRestore();
+  });
+
   it('removes a revoked device while a call with the session the revoke replaced runs', async () => {
     const info = jest
       .spyOn(console, 'info')
@@ -1537,5 +1594,59 @@ describe('GroupConversationMailbox', () => {
     await updating;
 
     expect(await databaseNames()).not.toContain(name);
+  });
+
+  it('reads the inboxes before a due leaf update, so it is made in the epoch the others are in', async () => {
+    await formGroup();
+    await carol.mailbox.send(carol.session, conversation(), 'from carol', {});
+    await idle();
+    const updates = jest.spyOn(GroupMailboxControl.prototype, 'updateWhenDue');
+
+    now += MlsUpdateCadence.INTERVAL_MS + MlsUpdateCadence.JITTER_MS + 1;
+    await bob.mailbox.send(bob.session, conversation(), 'from bob', {});
+    await alice.mailbox.send(alice.session, conversation(), 'from alice', {});
+    const made = (
+      await Promise.all(
+        updates.mock.results.map(
+          ({ value }) => value as Promise<GroupMailboxCommit | undefined>,
+        ),
+      )
+    ).filter((commit) => commit !== undefined);
+
+    updates.mockRestore();
+
+    expect(made.map(({ epoch }) => epoch - made[0].epoch)).toEqual([0n, 1n]);
+
+    now += GroupMailboxOutbox.RETRY_MAX_MS;
+    await catchUp();
+    await catchUp();
+
+    expect(texts(alice)).toEqual(
+      expect.arrayContaining(['message:from carol', 'message:from bob']),
+    );
+    expect(texts(bob)).toEqual(
+      expect.arrayContaining(['message:from carol', 'message:from alice']),
+    );
+    expect(texts(carol)).toEqual(
+      expect.arrayContaining(['message:from bob', 'message:from alice']),
+    );
+  });
+
+  it('fails a send whose leaf update fails as one to retry, queuing nothing', async () => {
+    await formGroup();
+    await idle();
+    const update = jest
+      .spyOn(GroupMailboxControl.prototype, 'updateWhenDue')
+      .mockRejectedValueOnce(new Error('update refused'));
+
+    await expect(
+      alice.mailbox.send(alice.session, conversation(), 'first try', {}),
+    ).rejects.toBeInstanceOf(GroupMailboxUpdateFailedError);
+    update.mockRestore();
+    await alice.mailbox.send(alice.session, conversation(), 'retried', {});
+    await Promise.all(everyone().map(sync));
+
+    expect(texts(bob)).toEqual(['message:retried']);
+    expect(texts(carol)).toEqual(['message:retried']);
   });
 });

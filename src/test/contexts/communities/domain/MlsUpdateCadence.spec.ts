@@ -12,6 +12,19 @@ describe('MlsUpdateCadence', () => {
     expect(cadence.isDueAt(deadline + 1)).toBe(true);
   });
 
+  it('is due when it was stamped after now, so a forged or skewed stamp suppresses no update', () => {
+    const cadence = MlsUpdateCadence.startedAt(START, 3n, 0);
+
+    expect(cadence.isDueAt(START)).toBe(false);
+    expect(cadence.isDueAt(START - 1)).toBe(true);
+    expect(
+      MlsUpdateCadence.fromPrimitives({
+        ...cadence.toPrimitives(),
+        lastPathCommitAt: START + 10 * INTERVAL_MS,
+      }).isDueAt(START),
+    ).toBe(true);
+  });
+
   it('is due once it counted the most messages it lets a device send', () => {
     let cadence = MlsUpdateCadence.startedAt(START, 3n, 0);
 

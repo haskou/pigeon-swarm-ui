@@ -10,6 +10,7 @@ import type { StickerMessageReference } from '../../../../../contexts/stickers/i
 
 import { applicationContainer } from '../../../../../app/composition/applicationContainer';
 import { useConversationMessageDelivery } from '../../../../../app/presentation/workspace/components/useConversationMessageDelivery';
+import { GroupMailboxUpdateFailedError } from '../../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxUpdateFailedError';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 import { copy } from '../../../../../shared/presentation/i18n/copy';
 import { captureUnhandledRejections } from '../../../../captureUnhandledRejections';
@@ -476,5 +477,32 @@ describe('useConversationMessageDelivery group send', () => {
     expect(delivery.state.messages).toEqual([
       expect.objectContaining({ deliveryStatus: 'failed' }),
     ]);
+  });
+
+  it('shows a group send whose leaf update failed as failed, and sends it on retry', async () => {
+    groupSend
+      .mockRejectedValueOnce(new GroupMailboxUpdateFailedError())
+      .mockResolvedValueOnce(sentMessage);
+    const delivery = mountDelivery(groupConversation);
+
+    await delivery.sendMessage('hello', [], {});
+    await drain();
+
+    expect(delivery.state.error).toBe(
+      copy.errors.backend.GroupMailboxUpdateFailedError,
+    );
+    const failed = onlyMessage(delivery);
+
+    expect(failed).toEqual(
+      expect.objectContaining({ content: 'hello', deliveryStatus: 'failed' }),
+    );
+
+    delivery.retryMessage(failed);
+    await drain();
+
+    expect(groupSend).toHaveBeenCalledTimes(2);
+    expect(groupSend.mock.calls[1]?.[2]).toBe('hello');
+    expect(delivery.state.messages).toEqual([sentMessage]);
+    expect(delivery.state.error).toBeNull();
   });
 });
