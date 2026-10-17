@@ -47,6 +47,17 @@ describe(GroupMailboxGenerationLog.name, () => {
     expect(log.readable(Number.MAX_SAFE_INTEGER)).toHaveLength(1);
   });
 
+  it('lists as rewindable only the generations of the last 8 epochs, newest first', () => {
+    const log = GroupMailboxGenerationLog.empty()
+      .start(secret(1), 0n, 'tree-0')
+      .advance(secret(2), 2n, 'tree-2', 5)
+      .advance(secret(3), 9n, 'tree-9', 6);
+
+    expect(GroupMailboxGenerationLog.RIVAL_EPOCHS).toBe(8n);
+    expect(GroupMailboxGenerationLog.empty().rewindable()).toEqual([]);
+    expect(log.rewindable().map(({ index }) => index)).toEqual([2, 1]);
+  });
+
   it('round-trips through primitives without changing a generation', () => {
     const log = GroupMailboxGenerationLog.empty()
       .start(secret(1), 0n, 'tree-0')

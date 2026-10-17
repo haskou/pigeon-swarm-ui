@@ -1,4 +1,4 @@
-import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import { SHA256Hash, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import {
   InvalidFormatError,
   StringValueObject,
@@ -40,6 +40,17 @@ export class GroupMailboxGenerationSecret extends StringValueObject {
         encodeBase64Url(decodeBase64Url(value)) === value,
       new InvalidFormatError('[redacted group mailbox generation secret]'),
     );
+  }
+
+  /**
+   * A one-way digest that tells this secret apart from any other, as from
+   * the secret of a rival commit for the same epoch; it reveals nothing of
+   * the secret, so a record may keep it past the generation's drain.
+   */
+  public fingerprint(): string {
+    return SHA256Hash.from(
+      `pigeon/group-mailbox/gen-fingerprint/v1|${this.valueOf()}`,
+    ).toString();
   }
 
   /** The key the library's group inbox schedule derives from. */

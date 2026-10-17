@@ -1101,6 +1101,17 @@ export class GroupMailboxMlsEngine {
   }
 
   /**
+   * The current generation first, then every other one a rival commit that
+   * wins an epoch back could still make this device forget; none without a
+   * group.
+   */
+  public async rewindableGenerations(
+    conversationId: string,
+  ): Promise<GroupMailboxGeneration[]> {
+    return (await this.reconciledLog(conversationId)).rewindable();
+  }
+
+  /**
    * Removes every device of the given identities, which the roster must no
    * longer list, and advances the generation; undefined when none of them
    * holds a leaf. The commit is kept only once `publish` has queued it.
