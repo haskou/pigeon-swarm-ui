@@ -1,6 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import {
+  claimInviteLink,
+  createInviteLink,
+} from './support/communityInvitations';
+import {
   newIsolatedPage,
   openSidebar,
   registerIdentity,
@@ -10,35 +14,23 @@ import {
 const ENCRYPTED = /encryption is active/;
 const SLOW = 240_000;
 
+/**
+ * Bob claims an invite link of Alice's; her client, as a manager, admits him
+ * and adds him to the MLS group.
+ */
 async function inviteAndJoin(
   alice: Page,
   bob: Page,
-  handle: string,
+  password: string,
   communityName: string,
 ): Promise<void> {
-  await alice.getByRole('button', { name: 'Add member' }).click();
-  await alice.getByPlaceholder('@user or public ID').fill(`@${handle}`);
-  await alice.getByRole('button', { name: 'Add member' }).last().click();
+  const url = await createInviteLink(alice);
 
-  await openSidebar(bob);
+  await claimInviteLink(bob, url, password);
   await bob
-    .locator('[data-testid=notifications-open-button]:visible')
+    .getByRole('button', { name: communityName })
     .first()
-    .click();
-  await bob
-    .getByTestId('notification-accept-button')
-    .first()
-    .waitFor({ timeout: SLOW });
-  // The first card is the membership invitation; the second one is the
-  // conversation-style notification.
-  await bob.getByRole('button', { exact: true, name: 'Accept' }).first().click();
-  await bob.waitForResponse(
-    (response) =>
-      response.request().method() === 'PATCH' && response.status() === 200,
-    { timeout: SLOW },
-  );
-  await bob.getByRole('button', { name: 'Close dialog' }).click();
-  await bob.getByRole('button', { name: communityName }).click();
+    .click({ timeout: SLOW });
 }
 
 async function kickMember(alice: Page, name: string): Promise<void> {
@@ -66,7 +58,9 @@ test('a member removed from a private community stops reading it', async ({
   const suffix = Date.now().toString(36);
   const password = `P455uruD3su!${suffix}`;
   const communityName = `Private ${suffix}`;
-  const alice = await newIsolatedPage(browser);
+  const alice = await newIsolatedPage(browser, {
+    permissions: ['clipboard-read', 'clipboard-write'],
+  });
   const bob = await newIsolatedPage(browser);
 
   await registerIdentity(alice, {
@@ -81,14 +75,22 @@ test('a member removed from a private community stops reading it', async ({
   });
 
   await openSidebar(alice);
-  await alice.getByRole('button', { name: /Add community/i }).first().click();
-  await alice.getByRole('button', { name: /^Create$/i }).first().click();
+  await alice
+    .getByRole('button', { name: /Add community/i })
+    .first()
+    .click();
+  await alice
+    .getByRole('button', { name: /^Create$/i })
+    .first()
+    .click();
   await alice.getByLabel('Community name').fill(communityName);
   await alice.getByRole('button', { name: /Private community/ }).click();
   await alice.getByRole('button', { name: 'Create community' }).click();
-  await alice.getByRole('button', { name: ENCRYPTED }).waitFor({ timeout: SLOW });
+  await alice
+    .getByRole('button', { name: ENCRYPTED })
+    .waitFor({ timeout: SLOW });
 
-  await inviteAndJoin(alice, bob, `bo${suffix}`, communityName);
+  await inviteAndJoin(alice, bob, password, communityName);
   await bob.getByRole('button', { name: ENCRYPTED }).waitFor({ timeout: SLOW });
 
   await sendMessage(alice, 'before the kick, from Alice');
