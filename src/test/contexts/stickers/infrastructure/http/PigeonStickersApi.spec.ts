@@ -250,6 +250,10 @@ describe(PigeonStickersApi.name, () => {
       });
 
       await api.markStickerUsed(session, 'pack-1', 'sticker-1', 20);
+      expect(last().method).toBe('PUT');
+      expect(last().path).toBe(
+        '/stickers/packs/pack-1/stickers/sticker-1/usage',
+      );
       expect(last().body).toMatchObject({ usedAt: 20 });
       expect(last().body.mutation.recordId).toBe(
         'recent:identity-1:pack-1:sticker-1',

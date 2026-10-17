@@ -123,11 +123,11 @@ describe(PigeonMessageAttachmentUploader.name, () => {
     expect(signerHeaders).toHaveBeenCalledWith(
       session,
       'POST',
-      '/ipfs/public',
+      '/ipfs/contents',
       expect.any(ArrayBuffer),
     );
     expect(request).toHaveBeenCalledWith(
-      '/ipfs/public',
+      '/ipfs/contents',
       expect.objectContaining({
         headers: expect.objectContaining({
           'Content-Type': 'text/plain',
@@ -184,7 +184,7 @@ describe(PigeonMessageAttachmentUploader.name, () => {
     expect(publicImageUploadPreparer.prepare).toHaveBeenCalledWith(sourceFile);
     expect(cipher.encrypt).not.toHaveBeenCalled();
     expect(request).toHaveBeenCalledWith(
-      '/ipfs/public',
+      '/ipfs/contents',
       expect.objectContaining({
         body: expect.any(ArrayBuffer),
         headers: expect.objectContaining({

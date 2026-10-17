@@ -21,7 +21,7 @@ export class PigeonPollsApi {
 
   private async submit(
     session: Session,
-    method: 'DELETE' | 'POST',
+    method: 'DELETE' | 'PATCH' | 'POST',
     path: string,
     scope: PollScopeFields,
     intent: {
@@ -214,11 +214,11 @@ export class PigeonPollsApi {
 
     return await this.submit(
       session,
-      'POST',
-      `/polls/${encodeURIComponent(pollId)}/close`,
+      'PATCH',
+      `/polls/${encodeURIComponent(pollId)}`,
       scope,
       { kind: 'put', payload },
-      { createdAt },
+      { createdAt, status: 'closed' },
     );
   }
 }
