@@ -8,7 +8,6 @@ import {
 } from '../../../../shared/presentation/formatting';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { CommunityAccessPolicy } from '../../../communities/presentation/view-models/CommunityAccessPolicy';
-import { IdentityMatch } from '../../../identities/domain/IdentityMatch';
 import {
   identityDisplayName,
   type IdentityNames,
@@ -25,41 +24,17 @@ interface MembershipRequestCardProps {
   working: boolean;
 }
 
-function membershipRequestActorIdentityId(
-  request: CommunityMembershipRequest,
-): string {
-  return request.type === 'request'
-    ? request.identityId
-    : request.creatorIdentityId;
-}
-
-function membershipRequestTitle(request: CommunityMembershipRequest): string {
-  return request.type === 'request'
-    ? copy.notifications.communityJoinRequestTitle
-    : copy.notifications.communityMembershipInvitationTitle;
-}
-
-function membershipRequestActorLabel(
-  request: CommunityMembershipRequest,
-): string {
-  return request.type === 'request'
-    ? copy.notifications.requestedBy
-    : copy.notifications.invitedBy;
-}
-
 function canRespondToMembershipRequest({
   community,
   currentIdentityId,
-  request,
 }: {
   community?: Community;
   currentIdentityId: string;
-  request: CommunityMembershipRequest;
 }): boolean {
-  return request.type === 'invitation'
-    ? IdentityMatch.isSame(request.identityId, currentIdentityId)
-    : community !== undefined &&
-        CommunityAccessPolicy.isOwner(community, currentIdentityId);
+  return (
+    community !== undefined &&
+    CommunityAccessPolicy.isOwner(community, currentIdentityId)
+  );
 }
 
 function isIdentityLoading(input: {
@@ -86,7 +61,7 @@ export function MembershipRequestCard({
   working,
 }: MembershipRequestCardProps) {
   const community = communities.find((item) => item.id === request.communityId);
-  const actorIdentityId = membershipRequestActorIdentityId(request);
+  const actorIdentityId = request.identityId;
   const actorLoading = isIdentityLoading({
     identityId: actorIdentityId,
     identityNames,
@@ -95,7 +70,6 @@ export function MembershipRequestCard({
   const canRespond = canRespondToMembershipRequest({
     community,
     currentIdentityId,
-    request,
   });
 
   return (
@@ -103,10 +77,10 @@ export function MembershipRequestCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="font-black text-white">
-            {membershipRequestTitle(request)}
+            {copy.notifications.communityJoinRequestTitle}
           </h3>
           <p className="mt-1 text-sm text-white/55">
-            {membershipRequestActorLabel(request)}{' '}
+            {copy.notifications.requestedBy}{' '}
             {actorLoading ? (
               <span className="inline-block h-3.5 w-24 animate-pulse rounded-full bg-white/18 align-middle" />
             ) : (

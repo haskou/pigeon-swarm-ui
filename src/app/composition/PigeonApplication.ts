@@ -173,6 +173,7 @@ import { PigeonCallParticipation } from './calls/PigeonCallParticipation';
 import { PigeonCallReader } from './calls/PigeonCallReader';
 import { PigeonCallSignaling } from './calls/PigeonCallSignaling';
 import { PigeonCallStarter } from './calls/PigeonCallStarter';
+import { CommunityInvitationAdmitter } from './communities/CommunityInvitationAdmitter';
 import { PigeonCommunityManagement } from './communities/PigeonCommunityManagement';
 import { PigeonConversationsFacade } from './conversations/PigeonConversationsFacade';
 import { PigeonIdentitiesFacade } from './identities/PigeonIdentitiesFacade';
@@ -279,6 +280,10 @@ export class PigeonApplication {
     this.mls = new PigeonMlsFacade(
       gateway.mlsRecords,
       gateway.communityOperations,
+      new CommunityInvitationAdmitter(
+        gateway.communityOperations,
+        gateway.communityGateway,
+      ),
     );
     const communityContexts = new CommunityAccessContexts();
     const communityMapper = new CommunityMapper();

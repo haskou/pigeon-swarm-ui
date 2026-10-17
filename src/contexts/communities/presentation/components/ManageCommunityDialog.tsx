@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 
 import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
 import type { CommunityChannelResource as CommunityChannel } from '../../infrastructure/http/resources/CommunityChannelResource';
+import type { CommunityInvitationResource as CommunityInvitation } from '../../infrastructure/http/resources/CommunityInvitationResource';
 import type { CommunityMembershipRequestResource as CommunityMembershipRequest } from '../../infrastructure/http/resources/CommunityMembershipRequestResource';
 import type { CommunityModerationLogResource as CommunityModerationLog } from '../../infrastructure/http/resources/CommunityModerationLogResource';
 import type { CommunityPermissionResource as CommunityPermission } from '../../infrastructure/http/resources/CommunityPermissionResource';
@@ -24,6 +25,7 @@ import { CommunityChannels } from '../view-models/CommunityChannels';
 import { CommunityBannedMembersPanel } from './CommunityBannedMembersPanel';
 import { DialogHeader } from './communityDialogPrimitives';
 import { loadIdentityPicture, loadPublicImage } from './communityImages';
+import { AddCommunityMemberDialog } from './AddCommunityMemberDialog';
 import { CommunityInvitationsPanel } from './CommunityInvitationsPanel';
 import { CommunityMembersRolesPanel } from './CommunityMembersRolesPanel';
 import { CommunityModerationLogsPanel } from './CommunityModerationLogsPanel';
@@ -147,7 +149,8 @@ export function ManageCommunityDialog({
   const [nextModerationLogId, setNextModerationLogId] = useState<
     string | undefined
   >(undefined);
-  const [inviteIdentityInput, setInviteIdentityInput] = useState('');
+  const [invitations, setInvitations] = useState<CommunityInvitation[]>([]);
+  const [creatingInvitation, setCreatingInvitation] = useState(false);
   const [channelDrafts, setChannelDrafts] = useState<Record<string, string>>(
     () =>
       Object.fromEntries(
@@ -311,6 +314,7 @@ export function ManageCommunityDialog({
     if (activeSection !== 'invitations') return;
 
     void refreshMembershipRequests();
+    void refreshInvitations();
   }, [activeSection, community.id, session.identity.id]);
 
   useEffect(() => {
@@ -636,27 +640,33 @@ export function ManageCommunityDialog({
     }
   };
 
-  const inviteMember = async () => {
-    const identityId = IdentityId.normalize(inviteIdentityInput);
+  const refreshInvitations = async () => {
+    try {
+      setInvitations(
+        await applicationContainer.communities.listInvitations(
+          session,
+          community.id,
+        ),
+      );
+    } catch (caught) {
+      setError(toUserErrorMessage(caught, copy.communities.membershipError));
+    }
+  };
 
-    if (!identityId || state === 'loading') return;
+  const revokeInvitation = async (invitationId: string) => {
+    if (state === 'loading') return;
 
     setState('loading');
     setError(null);
     try {
-      const request = await applicationContainer.communities.addMember(
+      await applicationContainer.communities.revokeInvitation(
         session,
         community.id,
-        identityId,
+        invitationId,
       );
-
-      setInviteIdentityInput('');
-      setMembershipRequests((current) => [
-        request,
-        ...current.filter((item) => item.id !== request.id),
-      ]);
+      await refreshInvitations();
     } catch (caught) {
-      setError(toUserErrorMessage(caught, copy.communities.memberError));
+      setError(toUserErrorMessage(caught, copy.communities.inviteLinkRevokeError));
     } finally {
       setState('idle');
     }
@@ -1150,20 +1160,32 @@ export function ManageCommunityDialog({
                 <CommunityInvitationsPanel
                   canApproveRequests={canApproveRequests}
                   canCreateInvitations={canCreateInvitations}
+                  canManageMembers={canManageMembers}
                   canRejectRequests={canRejectRequests}
                   community={community}
-                  identityInput={inviteIdentityInput}
+                  currentIdentityId={session.identity.id}
                   identityLookup={memberIdentities}
+                  invitations={invitations}
                   onAccept={(requestId) =>
                     void updateMembershipRequest(requestId, 'accepted')
                   }
+                  onCreateInvitation={() => setCreatingInvitation(true)}
                   onDecline={(requestId) =>
                     void updateMembershipRequest(requestId, 'declined')
                   }
-                  onIdentityInputChange={setInviteIdentityInput}
-                  onInvite={() => void inviteMember()}
+                  onRevoke={(invitationId) => void revokeInvitation(invitationId)}
                   requests={membershipRequests}
                   state={state}
+                />
+              )}
+              {creatingInvitation && (
+                <AddCommunityMemberDialog
+                  communityId={community.id}
+                  onClose={() => {
+                    setCreatingInvitation(false);
+                    void refreshInvitations();
+                  }}
+                  session={session}
                 />
               )}
               {activeSection === 'moderation-logs' && (

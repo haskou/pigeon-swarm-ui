@@ -41,7 +41,7 @@ if (isIndependentClient()) {
     if (event.key !== null && event.key !== ClientNodeSelection.storageKey)
       return;
 
-    if (window.location.pathname.startsWith('/invite/community/')) {
+    if (window.location.pathname === '/invite/community') {
       const destination = new URL(window.location.href);
       destination.searchParams.set('choose-node', '1');
       window.history.replaceState(null, '', destination.href);

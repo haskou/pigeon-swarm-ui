@@ -73,10 +73,8 @@ describe('i18n language selection', () => {
 
     const { copy } = await import('../../../../shared/presentation/i18n/copy');
 
-    expect(copy.communities.addMemberFindIdentity).toBe('Buscar identidad');
-    expect(copy.communities.addMemberCreateInviteLink).toBe(
-      'Crear enlace de invitación',
-    );
+    expect(copy.communities.linkInvite).toBe('Crear enlace de invitación');
+    expect(copy.communities.linkMaxUses).toBe('Usos máximos');
   });
 
   it('uses Spanish profile password helper copy by default', async () => {

@@ -65,16 +65,6 @@ const communityInvitation: NotificationResource = {
 };
 
 describe(canActOnMembershipRequest.name, () => {
-  it('lets the invited identity act on an invitation addressed in PEM form', () => {
-    expect(
-      canActOnMembershipRequest(
-        request({ identityId: PEM_OWN_ID, type: 'invitation' }),
-        [],
-        OWN_ID,
-      ),
-    ).toBe(true);
-  });
-
   it('lets the owner stored in PEM form act on a join request', () => {
     expect(
       canActOnMembershipRequest(request({}), [community(PEM_OWN_ID)], OWN_ID),
@@ -87,7 +77,7 @@ describe(canActOnMembershipRequest.name, () => {
     ).toBe(false);
     expect(
       canActOnMembershipRequest(
-        request({ identityId: 'x'.repeat(5000), type: 'invitation' }),
+        request({ identityId: 'x'.repeat(5000) }),
         [],
         'x'.repeat(5000),
       ),

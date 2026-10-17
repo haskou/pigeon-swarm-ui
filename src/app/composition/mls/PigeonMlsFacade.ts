@@ -9,6 +9,7 @@ import type { PigeonMlsRecordsApi } from '../../../contexts/communities/infrastr
 import type { MlsGroupCredentials } from '../../../contexts/communities/infrastructure/mls/MlsGroupCredentials';
 import type { Session } from '../../../contexts/identities/infrastructure/session/Session';
 import type { MessageResource } from '../../../contexts/messages/infrastructure/http/MessageResource';
+import type { CommunityInvitationAdmitter } from '../communities/CommunityInvitationAdmitter';
 
 import { CommunityMlsRoster } from '../../../contexts/communities/domain/CommunityMlsRoster';
 import { CommunityRosterHistory } from '../../../contexts/communities/domain/CommunityRosterHistory';
@@ -51,6 +52,10 @@ export class PigeonMlsFacade {
   public constructor(
     private readonly records: PigeonMlsRecordsApi,
     private readonly operations: PigeonCommunityOperationsApi,
+    private readonly admissions: Pick<
+      CommunityInvitationAdmitter,
+      'admitPending'
+    >,
   ) {}
 
   /** Who may change the group, as the community's signed history. */
@@ -181,6 +186,10 @@ export class PigeonMlsFacade {
     communityId: string,
   ): Promise<ReadonlyMap<string, boolean>> {
     const engine = this.engineFor(session);
+
+    // Admit claimants first, so the same pass adds them to the group.
+    await this.admissions.admitPending(session, communityId).catch(() => {});
+
     const authority = await this.authority(session, communityId);
     const readable = new Map([
       [communityId, await this.reconcile(engine, communityId)],

@@ -7,6 +7,7 @@ import { CallPeerConnections } from '../../../../../contexts/calls/infrastructur
 import { CallMediaEncryptionUnavailableError } from '../../../../../contexts/calls/presentation/errors/CallMediaEncryptionUnavailableError';
 import { CommunityOperation } from '../../../../../contexts/communities/domain/operations/CommunityOperation';
 import { copy } from '../../../../../shared/presentation/i18n/copy';
+import { owner } from '../../../../contexts/communities/domain/operations/CommunityOperationFixtures';
 
 const derivedKey: CallMediaKey = { epoch: 4, key: 'derived-key' };
 
@@ -27,7 +28,7 @@ function operationsOf(
           nonce: 'nonce-1',
           visibility,
         },
-        authorIdentityId: 'identity-1',
+        authorIdentityId: owner,
         communityId: 'community-1',
         createdAt: 1,
         hash: 'genesis-hash',
@@ -98,8 +99,8 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
     await expect(
       resolveWorkspaceCallMediaEncryption({
         call: communityCall(),
-        communityOperations: operationsOf('public'),
         communityCallKey: jest.fn(),
+        communityOperations: operationsOf('public'),
         currentIdentityId: 'identity-1',
         keychain: emptyKeychain(),
       }),
@@ -116,8 +117,8 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
     await expect(
       resolveWorkspaceCallMediaEncryption({
         call: communityCall(),
-        communityOperations: operationsOf('public'),
         communityCallKey: jest.fn(),
+        communityOperations: operationsOf('public'),
         currentIdentityId: 'identity-1',
         keychain: emptyKeychain(),
       }),
@@ -132,8 +133,8 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
     await expect(
       resolveWorkspaceCallMediaEncryption({
         call: communityCall(),
-        communityOperations: operationsOf('private'),
         communityCallKey,
+        communityOperations: operationsOf('private'),
         currentIdentityId: 'identity-1',
         keychain: emptyKeychain(),
       }),
@@ -149,8 +150,8 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
     await expect(
       resolveWorkspaceCallMediaEncryption({
         call: communityCall(),
-        communityOperations: operationsOf('private'),
         communityCallKey: jest.fn().mockRejectedValue(new Error('no group')),
+        communityOperations: operationsOf('private'),
         currentIdentityId: 'identity-1',
         keychain: emptyKeychain(),
       }),
@@ -163,8 +164,8 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
     await expect(
       resolveWorkspaceCallMediaEncryption({
         call: communityCall(),
-        communityOperations: jest.fn().mockResolvedValue([]),
         communityCallKey,
+        communityOperations: jest.fn().mockResolvedValue([]),
         currentIdentityId: 'identity-1',
         keychain: emptyKeychain(),
       }),
@@ -180,8 +181,8 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
     await expect(
       resolveWorkspaceCallMediaEncryption({
         call: conversationCall(),
-        communityOperations: jest.fn().mockResolvedValue([]),
         communityCallKey: jest.fn(),
+        communityOperations: jest.fn().mockResolvedValue([]),
         currentIdentityId: 'identity-1',
         keychain: keychainWithConversationKey(),
       }),
@@ -194,8 +195,8 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
     await expect(
       resolveWorkspaceCallMediaEncryption({
         call: conversationCall(),
-        communityOperations: jest.fn().mockResolvedValue([]),
         communityCallKey: jest.fn(),
+        communityOperations: jest.fn().mockResolvedValue([]),
         currentIdentityId: 'identity-1',
         keychain: emptyKeychain(),
       }),
@@ -209,8 +210,8 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
           capabilityHash: 'a'.repeat(64),
           type: 'group_capability',
         }),
-        communityOperations: jest.fn().mockResolvedValue([]),
         communityCallKey: jest.fn(),
+        communityOperations: jest.fn().mockResolvedValue([]),
         currentIdentityId: 'identity-1',
         keychain: keychainWithConversationKey(),
       }),
@@ -223,8 +224,8 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
     await expect(
       resolveWorkspaceCallMediaEncryption({
         call: communityCall(),
-        communityOperations: jest.fn().mockRejectedValue(new Error('offline')),
         communityCallKey,
+        communityOperations: jest.fn().mockRejectedValue(new Error('offline')),
         currentIdentityId: 'identity-1',
         keychain: emptyKeychain(),
       }),
@@ -245,8 +246,8 @@ describe('resolveWorkspaceCallMediaEncryption', () => {
       await expect(
         resolveWorkspaceCallMediaEncryption({
           call: refusedCall,
-          communityOperations: operationsOf('private'),
           communityCallKey,
+          communityOperations: operationsOf('private'),
           currentIdentityId: 'identity-1',
           keychain: keychainWithConversationKey(),
         }),

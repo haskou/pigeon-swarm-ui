@@ -9,13 +9,15 @@ import { Field } from '../../../identities/presentation/auth/Field';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { createCommunityInviteUrl } from '../view-models/communityInviteLink';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
-import { SegmentedControl } from '../../../../shared/presentation/components/segmentedControl';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
 import { IdentityMemberRow } from '../../../identities/presentation/components/IdentityMemberListPanel';
 import { loadIdentityPicture } from './communityImages';
 
-type AddMemberMode = 'identity' | 'link';
+const DAY_MS = 24 * 60 * 60 * 1000;
+const EXPIRY_DAYS = [1, 7, 14, 30];
+const DEFAULT_EXPIRY_DAYS = 7;
+const MAX_USES = 100;
 
 type AddCommunityMemberDialogProps = {
   communityId: string;
@@ -30,116 +32,74 @@ export function AddCommunityMemberDialog({
 }: AddCommunityMemberDialogProps) {
   useCloseOnEscape(onClose);
 
+  const [expiryDays, setExpiryDays] = useState(DEFAULT_EXPIRY_DAYS);
+  const [maxUses, setMaxUses] = useState(1);
   const [identityInput, setIdentityInput] = useState('');
-  const [mode, setMode] = useState<AddMemberMode>('identity');
-  const [error, setError] = useState<string | null>(null);
-  const [lookupState, setLookupState] = useState<'idle' | 'loading' | 'ready'>(
-    'idle',
-  );
-  const [memberIdentity, setMemberIdentity] = useState<IdentityResource | null>(
+  const [invitee, setInvitee] = useState<IdentityResource | null>(null);
+  const [inviteePictureUrl, setInviteePictureUrl] = useState<string | null>(
     null,
   );
-  const [memberPictureUrl, setMemberPictureUrl] = useState<string | null>(null);
-  const [state, setState] = useState<'idle' | 'loading'>('idle');
-  const [linkState, setLinkState] = useState<'copied' | 'idle' | 'loading'>(
-    'idle',
-  );
+  const [error, setError] = useState<string | null>(null);
   const [inviteLink, setInviteLink] = useState('');
-  const modeOptions = [
-    { label: copy.communities.addMemberFindIdentity, value: 'identity' },
-    { label: copy.communities.addMemberCreateInviteLink, value: 'link' },
-  ] satisfies Array<{ label: string; value: AddMemberMode }>;
+  const [state, setState] = useState<'copied' | 'idle' | 'loading'>('idle');
+  const singleUse = maxUses === 1;
 
   useEffect(() => {
-    const identityId = normalizeIdentityLookup(identityInput);
+    const identityId = identityInput.trim();
 
-    setError(null);
-    setMemberIdentity(null);
-    setMemberPictureUrl(null);
+    setInvitee(null);
+    setInviteePictureUrl(null);
 
-    if (!identityId) {
-      setLookupState('idle');
-
-      return undefined;
-    }
+    if (!identityId || !singleUse) return undefined;
 
     let cancelled = false;
-
-    setLookupState('loading');
     const timeout = window.setTimeout(() => {
-      void applicationContainer
-        .identities.get(identityId)
+      void applicationContainer.identities
+        .get(identityId)
         .then((identity) => {
           if (cancelled) return;
 
-          setMemberIdentity(identity);
-          setLookupState('ready');
-
+          setInvitee(identity);
           void loadIdentityPicture(identity).then((picture) => {
-            if (!cancelled) setMemberPictureUrl(picture);
+            if (!cancelled) setInviteePictureUrl(picture);
           });
         })
-        .catch(() => {
-          if (cancelled) return;
-          setLookupState('idle');
-        });
+        .catch(() => undefined);
     }, 300);
 
     return () => {
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [identityInput]);
+  }, [identityInput, singleUse]);
 
-  const addMember = async () => {
-    const identityId = memberIdentity?.id;
-
-    if (!identityId || state === 'loading') return;
+  const createLink = async () => {
+    if (state === 'loading') return;
 
     setState('loading');
     setError(null);
     try {
-      await applicationContainer.communities.createInvitation(
+      const { secret } = await applicationContainer.communities.createInvitation(
         session,
         communityId,
-        identityId,
+        {
+          expiresAt: Date.now() + expiryDays * DAY_MS,
+          ...(singleUse && invitee ? { invitee: invitee.id } : {}),
+          maxUses,
+        },
       );
-
-      onClose();
-    } catch (caught) {
-      setError(toUserErrorMessage(caught, copy.communities.memberError));
-    }
-
-    setState('idle');
-  };
-
-  const createInviteLink = async () => {
-    if (linkState === 'loading') return;
-
-    setLinkState('loading');
-    setError(null);
-    try {
-      const invite = await applicationContainer.communities.createInviteLink(
-        session,
-        communityId,
-      );
-      const token = invite.inviteToken ?? invite.token;
-
-      if (!token) throw new Error(copy.communities.linkError);
-
-      const link = createCommunityInviteUrl({ token });
+      const link = createCommunityInviteUrl({ communityId, secret });
 
       setInviteLink(link);
-
       if (navigator.clipboard) {
         await navigator.clipboard.writeText(link);
-        setLinkState('copied');
+        setState('copied');
       } else {
-        setLinkState('idle');
+        setState('idle');
       }
     } catch (caught) {
       setError(toUserErrorMessage(caught, copy.communities.linkError));
-      setLinkState('idle');
+      setState('idle');
     }
   };
 
@@ -157,97 +117,88 @@ export function AddCommunityMemberDialog({
           title={copy.communities.addMember}
           onClose={onClose}
         />
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5">
-          <SegmentedControl
-            className="mt-5"
-            onChange={setMode}
-            options={modeOptions}
-            value={mode}
-          />
-          {mode === 'identity' ? (
-            <div className="mt-4 grid min-h-[18rem] content-start gap-5 sm:grid-cols-[minmax(0,1fr)_17rem]">
-              <div>
-                <Field label={copy.identityLookup.label}>
-                  <input
-                    autoFocus
-                    value={identityInput}
-                    onChange={(event) => setIdentityInput(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key !== 'Enter') return;
-                      event.preventDefault();
-                      void addMember();
-                    }}
-                    className="ui-field-control px-3 py-2 text-sm placeholder:text-white/30"
-                    placeholder={copy.identityLookup.placeholder}
-                  />
-                </Field>
-                <p className="mt-2 text-xs leading-5 text-white/45">
-                  {copy.identityLookup.help}
-                </p>
-                {lookupState === 'loading' && (
-                  <div className="mt-4 flex items-center gap-2 border-y border-white/10 py-3 text-sm font-bold text-white/55">
-                    <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-300" />
-                    {copy.dialog.loadingIdentity}
-                  </div>
-                )}
-              </div>
-              <div className="border-y border-white/10 py-3 sm:border-y-0 sm:border-l sm:py-0 sm:pl-5">
-                <div className="ui-section-heading pt-0">
-                  {copy.communities.memberPreview}
-                </div>
-                {memberIdentity && lookupState === 'ready' ? (
-                  <IdentityMemberRow
-                    interactive={false}
-                    item={{
-                      identity: memberIdentity,
-                      identityId: memberIdentity.id,
-                      pictureUrl: memberPictureUrl,
-                    }}
-                  />
-                ) : (
-                  <p className="py-4 text-sm leading-6 text-white/40">
-                    {copy.communities.memberPreviewEmpty}
-                  </p>
-                )}
-                <button
-                  type="button"
-                  onClick={() => void addMember()}
-                  disabled={!memberIdentity || state === 'loading'}
-                  className="ui-button ui-button-primary mt-4 w-full"
-                >
-                  {copy.communities.addMember}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="mt-4 grid min-h-[18rem] content-start gap-4 border-y border-white/10 py-5">
-              <div className="max-w-xl text-sm leading-6 text-white/55">
-                {copy.communities.linkHelp}
-              </div>
-              {inviteLink && (
-                <input
-                  readOnly
-                  value={inviteLink}
-                  className="ui-field-control px-3 py-2 text-xs text-white/70"
-                  onFocus={(event) => event.target.select()}
+        <div className="grid min-h-0 flex-1 content-start gap-4 overflow-y-auto px-5 pb-5">
+          <div className="max-w-xl text-sm leading-6 text-white/55">
+            {copy.communities.linkHelp}
+          </div>
+          <Field label={copy.communities.linkExpiry}>
+            <select
+              value={expiryDays}
+              onChange={(event) => setExpiryDays(Number(event.target.value))}
+              className="ui-field-control px-3 py-2 text-sm"
+            >
+              {EXPIRY_DAYS.map((days) => (
+                <option key={days} value={days}>
+                  {copy.communities.linkExpiryDays.replace(
+                    '{count}',
+                    String(days),
+                  )}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label={copy.communities.linkMaxUses}>
+            <input
+              type="number"
+              min={1}
+              max={MAX_USES}
+              value={maxUses}
+              onChange={(event) =>
+                setMaxUses(
+                  Math.min(
+                    MAX_USES,
+                    Math.max(1, Math.trunc(Number(event.target.value)) || 1),
+                  ),
+                )
+              }
+              className="ui-field-control px-3 py-2 text-sm"
+            />
+          </Field>
+          {singleUse && (
+            <Field label={copy.communities.linkInvitee}>
+              <input
+                value={identityInput}
+                onChange={(event) => setIdentityInput(event.target.value)}
+                className="ui-field-control px-3 py-2 text-sm placeholder:text-white/30"
+                placeholder={copy.identityLookup.placeholder}
+              />
+              <p className="mt-2 text-xs leading-5 text-white/45">
+                {copy.communities.linkInviteeHelp}
+              </p>
+              {invitee && (
+                <IdentityMemberRow
+                  interactive={false}
+                  item={{
+                    identity: invitee,
+                    identityId: invitee.id,
+                    pictureUrl: inviteePictureUrl,
+                  }}
                 />
               )}
-              <button
-                type="button"
-                onClick={() => void createInviteLink()}
-                disabled={linkState === 'loading'}
-                className="ui-button ui-button-primary justify-self-start"
-              >
-                {linkState === 'loading'
-                  ? copy.profile.saving
-                  : linkState === 'copied'
-                    ? copy.communities.linkCopied
-                    : copy.communities.linkInvite}
-              </button>
-            </div>
+            </Field>
           )}
+          {inviteLink && (
+            <input
+              readOnly
+              value={inviteLink}
+              className="ui-field-control px-3 py-2 text-xs text-white/70"
+              onFocus={(event) => event.target.select()}
+            />
+          )}
+          <button
+            type="button"
+            onClick={() => void createLink()}
+            disabled={state === 'loading'}
+            className="ui-button ui-button-primary justify-self-start"
+          >
+            {state === 'loading'
+              ? copy.profile.saving
+              : state === 'copied'
+                ? copy.communities.linkCopied
+                : copy.communities.linkInvite}
+          </button>
           {error && (
-            <div className="ui-inline-notice mt-4 border-rose-300/25 bg-rose-500/10 text-xs text-rose-100">
+            <div className="ui-inline-notice border-rose-300/25 bg-rose-500/10 text-xs text-rose-100">
               {error}
             </div>
           )}
@@ -256,10 +207,4 @@ export function AddCommunityMemberDialog({
     </div>,
     document.body,
   );
-}
-
-function normalizeIdentityLookup(value: string): string {
-  const trimmed = value.trim();
-
-  return trimmed.startsWith('@') ? trimmed.slice(1).toLowerCase() : trimmed;
 }
