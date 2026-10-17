@@ -58,6 +58,7 @@ import { PigeonPresenceGateway } from '../../contexts/identities/infrastructure/
 import { ContactPinStore } from '../../contexts/identities/infrastructure/storage/ContactPinStore';
 import { DeviceIdentityVault } from '../../contexts/identities/infrastructure/storage/DeviceIdentityVault';
 import { DeviceSealedRecoveryStore } from '../../contexts/identities/infrastructure/storage/DeviceSealedRecoveryStore';
+import { DeviceSealedRootTrustStore } from '../../contexts/identities/infrastructure/storage/DeviceSealedRootTrustStore';
 import { LazyMailboxCreationMiner } from '../../contexts/mailboxes/infrastructure/crypto/LazyMailboxCreationMiner';
 import { PigeonMailboxClient } from '../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
 import { MailboxChannel } from '../../contexts/mailboxes/infrastructure/MailboxChannel';
@@ -190,6 +191,7 @@ export class PigeonApiGateway {
       deviceAuthorization,
       deviceSealedSecrets,
       keychainApi,
+      new DeviceSealedRootTrustStore(storage),
     );
     const deviceSealedRecovery = new DeviceSealedRecovery(
       deviceSealedRoot,

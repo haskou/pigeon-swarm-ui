@@ -35,6 +35,8 @@ const REAL_CRYPTO_SPECS = [
   'DevicePairingRequest',
   'DeviceRemovalDomainService',
   'DeviceSealedEntryStore',
+  'DeviceSealedRootRotation',
+  'DeviceSealedRootTrustStore',
   'DeviceSealedRowStore',
   'DeviceSealedSecretCipher',
   'DirectMessageAuthorship',

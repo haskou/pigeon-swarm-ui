@@ -7,9 +7,9 @@ import type { PigeonKeychainApi } from '../../../../../contexts/identities/infra
 import type { LocalKeychain } from '../../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
+import { RevokedDeviceSealedSecretPublisherError } from '../../../../../contexts/identities/domain/errors/RevokedDeviceSealedSecretPublisherError';
 import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
 import { DeviceCredential } from '../../../../../contexts/identities/domain/value-objects/DeviceCredential';
-import { RevokedDeviceSealedSecretPublisherError } from '../../../../../contexts/identities/domain/errors/RevokedDeviceSealedSecretPublisherError';
 import { DeviceSealedRootRotation } from '../../../../../contexts/identities/infrastructure/http/DeviceSealedRootRotation';
 import { DeviceSealedRootTrustStore } from '../../../../../contexts/identities/infrastructure/storage/DeviceSealedRootTrustStore';
 import {
@@ -36,7 +36,10 @@ const makeSession = (revision: number): SessionWithRoot =>
     masterKey: MASTER_KEY,
   }) as unknown as SessionWithRoot;
 
-const memoryStorage = (): Pick<Storage, 'getItem' | 'removeItem' | 'setItem'> => {
+const memoryStorage = (): Pick<
+  Storage,
+  'getItem' | 'removeItem' | 'setItem'
+> => {
   const entries = new Map<string, string>();
 
   return {

@@ -520,9 +520,8 @@ describe(PigeonIdentitySessionApi.name, () => {
         deviceAuthorization.synchronize.mockImplementation((session) =>
           Promise.resolve({
             ...session,
-            authorizationRevision: DeviceAuthorizationRevision.fromNumber(
-              revision,
-            ),
+            authorizationRevision:
+              DeviceAuthorizationRevision.fromNumber(revision),
           }),
         );
       deviceAuthorization.findDevices.mockResolvedValue([

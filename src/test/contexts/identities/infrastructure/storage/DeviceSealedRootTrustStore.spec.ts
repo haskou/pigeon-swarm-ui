@@ -86,8 +86,8 @@ describe(DeviceSealedRootTrustStore.name, () => {
       setItem: () => undefined,
     });
 
-    expect(
-      store.trusts('identity-1', localKey, SymmetricKey.generate()),
-    ).toBe(false);
+    expect(store.trusts('identity-1', localKey, SymmetricKey.generate())).toBe(
+      false,
+    );
   });
 });
