@@ -1517,6 +1517,12 @@ export const en = {
       'This code has expired. Create a new code on your signed-in device and try again.',
     devicePairingHelp:
       'Uses short-lived authenticated QR codes. The new device creates an independent credential and local password envelope.',
+    devicePairingHistoryAll: 'All history',
+    devicePairingHistoryHelp:
+      "This sets how much of this device's history the app copies to the new device. Even with Nothing, the new device still shows messages the server still holds, about the last 14 days. It is not a cryptographic limit: an authorized device holds your identity key. The people you talk with keep their own copies.",
+    devicePairingHistoryLabel: 'Message history to copy to the new device',
+    devicePairingHistoryLast30Days: 'Last 30 days',
+    devicePairingHistoryNone: 'Nothing',
     devicePairingInvalid:
       'This code is not valid. Check that you copied the whole code, or create a new one.',
     devicePairingInvitationCodeLabel:

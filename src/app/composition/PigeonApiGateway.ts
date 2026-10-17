@@ -512,8 +512,12 @@ export class PigeonApiGateway {
       deviceSealedRoot,
       deviceSealedRecovery,
       {
-        publish: async (session, secret) =>
-          await this.directMessageMailbox.publishHistory(session, secret),
+        publish: async (session, secret, floor) =>
+          await this.directMessageMailbox.publishHistory(
+            session,
+            secret,
+            floor,
+          ),
         receive: async (session, secret) =>
           await this.directMessageMailbox.receiveHistory(session, secret),
       },

@@ -1,10 +1,12 @@
 import { RecoveryKey, SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import { Timestamp } from '@haskou/value-objects';
 
 import type { LoginIdentityProgressReporter } from '../../application/login-identity/LoginIdentityProgressReporter';
 import type { DevicePairingRequestDraft } from '../../domain/DevicePairingRequestDraft';
 import type { Identity } from '../../domain/Identity';
 import type { DeviceAuthorizationRevision } from '../../domain/value-objects/DeviceAuthorizationRevision';
 import type { DeviceCredential } from '../../domain/value-objects/DeviceCredential';
+import type { DevicePairingHistoryPolicy } from '../../domain/value-objects/DevicePairingHistoryPolicy';
 import type { IdentityMasterKeyProtection } from '../../domain/value-objects/IdentityMasterKeyProtection';
 import type { IdentityRegistrationCode } from '../../domain/value-objects/IdentityRegistrationCode';
 import type { IdentityCreationMaterial } from '../crypto/IdentityCreationMaterial';
@@ -92,10 +94,16 @@ export class PigeonIdentitiesGateway {
     return await this.deviceAuthorization.verifyPairingRequest(requestCode);
   }
 
+  /**
+   * `historyPolicy` bounds the stored history this device exports to the new
+   * one. Inbox records the node still holds reach the new device whatever the
+   * policy.
+   */
   public async authorizeDevicePairing(
     session: Session,
     requestCode: DevicePairingCode,
     password: string,
+    historyPolicy: DevicePairingHistoryPolicy,
   ): Promise<{ completionCode: DevicePairingCode; session: Session }> {
     // The new device receives the identity root and the history secret, so
     // the person types the password for this device again. A refusal sends
@@ -119,11 +127,17 @@ export class PigeonIdentitiesGateway {
       );
     }
 
-    // Every completion carries the secret. A failed publish leaves the transfer
-    // partial or absent, and the new device imports whatever was sent.
+    // Every completion carries the secret. The floor bounds only this
+    // device's export: a failed publish leaves the transfer partial or absent,
+    // and the new device imports whatever was sent.
     const historyTransferSecret = SymmetricKey.generate();
+    const historyFloor = historyPolicy.floorAt(Timestamp.now());
 
-    await this.pairingHistory.publish(opened, historyTransferSecret);
+    await this.pairingHistory.publish(
+      opened,
+      historyTransferSecret,
+      historyFloor,
+    );
 
     const result = await this.deviceAuthorization.authorizePairing(
       opened,

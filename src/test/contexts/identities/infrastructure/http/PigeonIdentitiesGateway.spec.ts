@@ -24,6 +24,8 @@ import type { Session } from '../../../../../contexts/identities/infrastructure/
 
 import { DevicePairingError } from '../../../../../contexts/identities/domain/DevicePairingError';
 import { SupersededDeviceSealedRootHandOverError } from '../../../../../contexts/identities/domain/errors/SupersededDeviceSealedRootHandOverError';
+import { DeviceHistoryFloor } from '../../../../../contexts/identities/domain/value-objects/DeviceHistoryFloor';
+import { DevicePairingHistoryPolicy } from '../../../../../contexts/identities/domain/value-objects/DevicePairingHistoryPolicy';
 import { PigeonIdentitiesGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
 import { DeviceUnlockNotConfirmedError } from '../../../../../contexts/identities/infrastructure/storage/DeviceUnlockNotConfirmedError';
 import { copy } from '../../../../../shared/presentation/i18n/copy';
@@ -297,7 +299,12 @@ describe(PigeonIdentitiesGateway.name, () => {
         session,
       } as unknown as DevicePairingAuthorization);
 
-      await gateway.authorizeDevicePairing(session, requestCode, 'password');
+      await gateway.authorizeDevicePairing(
+        session,
+        requestCode,
+        'password',
+        DevicePairingHistoryPolicy.DEFAULT,
+      );
 
       expect(commands.confirmLocalUnlock).toHaveBeenCalledWith(
         'identity-1',
@@ -317,7 +324,12 @@ describe(PigeonIdentitiesGateway.name, () => {
       );
 
       await expect(
-        gateway.authorizeDevicePairing(session, requestCode, 'wrong password'),
+        gateway.authorizeDevicePairing(
+          session,
+          requestCode,
+          'wrong password',
+          DevicePairingHistoryPolicy.DEFAULT,
+        ),
       ).rejects.toBeInstanceOf(DeviceUnlockNotConfirmedError);
       expect(sealedRoot.current).not.toHaveBeenCalled();
       expect(pairingHistory.publish).not.toHaveBeenCalled();
@@ -330,7 +342,12 @@ describe(PigeonIdentitiesGateway.name, () => {
       sealedRoot.current.mockRejectedValue(new Error('corrupt head'));
 
       await expect(
-        gateway.authorizeDevicePairing(session, requestCode, 'password'),
+        gateway.authorizeDevicePairing(
+          session,
+          requestCode,
+          'password',
+          DevicePairingHistoryPolicy.DEFAULT,
+        ),
       ).rejects.toThrow('corrupt head');
       expect(sealedRoot.openAfterRecovery).not.toHaveBeenCalled();
       expect(authorization.authorizePairing).not.toHaveBeenCalled();
@@ -356,6 +373,7 @@ describe(PigeonIdentitiesGateway.name, () => {
         session,
         requestCode,
         'password',
+        DevicePairingHistoryPolicy.DEFAULT,
       );
 
       expect(
@@ -387,6 +405,7 @@ describe(PigeonIdentitiesGateway.name, () => {
         session,
         requestCode,
         'password',
+        DevicePairingHistoryPolicy.DEFAULT,
       );
 
       expect(pairingReaders.enrol).toHaveBeenCalledWith(next, credential);
@@ -418,6 +437,7 @@ describe(PigeonIdentitiesGateway.name, () => {
         session,
         requestCode,
         'password',
+        DevicePairingHistoryPolicy.DEFAULT,
       );
 
       expect(sealedRoot.current).toHaveBeenCalledWith(session);
@@ -436,7 +456,12 @@ describe(PigeonIdentitiesGateway.name, () => {
       sealedRoot.current.mockResolvedValue(session);
 
       await expect(
-        gateway.authorizeDevicePairing(session, requestCode, 'password'),
+        gateway.authorizeDevicePairing(
+          session,
+          requestCode,
+          'password',
+          DevicePairingHistoryPolicy.DEFAULT,
+        ),
       ).rejects.toMatchObject({ failure: 'mismatch' });
       expect(authorization.authorizePairing).not.toHaveBeenCalled();
       expect(recovery.resealAfterPairing).not.toHaveBeenCalled();
@@ -449,7 +474,12 @@ describe(PigeonIdentitiesGateway.name, () => {
       sealedRoot.current.mockRejectedValue(failure);
 
       await expect(
-        gateway.authorizeDevicePairing(session, requestCode, 'password'),
+        gateway.authorizeDevicePairing(
+          session,
+          requestCode,
+          'password',
+          DevicePairingHistoryPolicy.DEFAULT,
+        ),
       ).rejects.toBe(failure);
       expect(authorization.authorizePairing).not.toHaveBeenCalled();
       expect(recovery.resealAfterPairing).not.toHaveBeenCalled();
@@ -467,11 +497,17 @@ describe(PigeonIdentitiesGateway.name, () => {
         session,
       } as unknown as DevicePairingAuthorization);
 
-      await gateway.authorizeDevicePairing(session, requestCode, 'password');
+      await gateway.authorizeDevicePairing(
+        session,
+        requestCode,
+        'password',
+        DevicePairingHistoryPolicy.ALL,
+      );
 
       expect(pairingHistory.publish).toHaveBeenCalledWith(
         session,
         expect.any(SymmetricKey),
+        DeviceHistoryFloor.OPEN,
       );
       expect(pairingHistory.publish.mock.invocationCallOrder[0]).toBeLessThan(
         authorization.authorizePairing.mock.invocationCallOrder[0],
@@ -480,6 +516,37 @@ describe(PigeonIdentitiesGateway.name, () => {
       expect(secret).toBeInstanceOf(SymmetricKey);
       expect(secret).toBe(pairingHistory.publish.mock.calls[0][1]);
     });
+
+    it.each([
+      [DevicePairingHistoryPolicy.LAST_30_DAYS, 30 * 24 * 60 * 60 * 1_000],
+      [DevicePairingHistoryPolicy.NONE, 0],
+    ])(
+      'bounds the export by the floor the %s policy sets now',
+      async (policy, back) => {
+        const { authorization, gateway, pairingHistory } = gatewayDouble();
+        const session = {
+          deviceSealedRootKey: SymmetricKey.generate(),
+          identity: { id: 'identity-1' },
+        } as unknown as Session;
+        pairingHistory.publish.mockResolvedValue();
+        authorization.authorizePairing.mockResolvedValue({
+          completion: { toCode: () => 'completion-code' },
+          session,
+        } as unknown as DevicePairingAuthorization);
+        const before = Date.now();
+
+        await gateway.authorizeDevicePairing(
+          session,
+          requestCode,
+          'password',
+          policy,
+        );
+
+        const floor = pairingHistory.publish.mock.calls[0][2];
+        expect(floor.toPrimitives()).toBeGreaterThanOrEqual(before - back);
+        expect(floor.toPrimitives()).toBeLessThanOrEqual(Date.now() - back);
+      },
+    );
   });
 
   describe('completeDevicePairing', () => {

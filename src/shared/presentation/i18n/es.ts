@@ -1522,6 +1522,13 @@ export const es = {
       'Este código ha caducado. Crea uno nuevo en tu dispositivo con sesión iniciada e inténtalo de nuevo.',
     devicePairingHelp:
       'Usa códigos QR autenticados y de corta duración. El dispositivo nuevo crea una credencial independiente y su propia envoltura de contraseña.',
+    devicePairingHistoryAll: 'Todo el historial',
+    devicePairingHistoryHelp:
+      'Esto decide cuánto historial de este dispositivo copia la app al dispositivo nuevo. Incluso con Nada, el dispositivo nuevo muestra los mensajes que el servidor aún guarda, aproximadamente los últimos 14 días. No es un límite criptográfico: un dispositivo autorizado tiene la clave de tu identidad. Las personas con las que hablas conservan sus propias copias.',
+    devicePairingHistoryLabel:
+      'Historial de mensajes que copiar al dispositivo nuevo',
+    devicePairingHistoryLast30Days: 'Últimos 30 días',
+    devicePairingHistoryNone: 'Nada',
     devicePairingInvalid:
       'Este código no es válido. Comprueba que copiaste el código completo o crea uno nuevo.',
     devicePairingInvitationCodeLabel:
