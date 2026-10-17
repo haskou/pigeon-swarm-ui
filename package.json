@@ -20,9 +20,6 @@
     "test:unit": "jest --selectProjects unit",
     "test:ci": "yarn test && yarn test:e2e:real-node"
   },
-  "engines": {
-    "node": ">=24.22.0"
-  },
   "dependencies": {
     "@haskou/pigeon-swarm-crypto": "7.0.0",
     "@haskou/value-objects": "8.3.3",

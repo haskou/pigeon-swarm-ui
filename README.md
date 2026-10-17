@@ -183,7 +183,7 @@ CI runs lint, typecheck, tests, the Chromium end-to-end specs and the builds on 
 
 `yarn test` is a single `jest` run with two projects. `unit` replaces `@haskou/pigeon-swarm-crypto` with the deterministic fake in `src/test/valueObjectsMock.ts`. `crypto` runs the specs listed in `REAL_CRYPTO_SPECS` in `jest.config.cjs` (signatures, KEMs, KDFs and wire vectors) against the real library. `yarn test:unit` and `yarn test:crypto` run one project each. Mocks are cleared before every test (`clearMocks`).
 
-Development and CI require Node 24.22.0 or later (`engines` in `package.json`). Earlier Node 24 releases ship a V8 whose Sparkplug baseline compiler can make a garbage collection crash a jest worker with SIGSEGV in an unrelated suite ([nodejs/node#62393](https://github.com/nodejs/node/issues/62393)); 24.22.0 carries the fix. `src/test/jestRuntime.spec.ts` fails on an older runtime.
+Jest needs Node 24.22.0 or later; CI installs the latest Node 24. Earlier Node 24 releases ship a V8 whose Sparkplug baseline compiler can make a garbage collection crash a jest worker with SIGSEGV in an unrelated suite ([nodejs/node#62393](https://github.com/nodejs/node/issues/62393)); 24.22.0 carries the fix. `src/test/jestRuntime.spec.ts` fails on an older runtime.
 
 This repository does not currently require a `.env` file. The default node URL
 is `http://localhost:8080/`, set in `src/app/API_SERVER_URL.ts`. Set
