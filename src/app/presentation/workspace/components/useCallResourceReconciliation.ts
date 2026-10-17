@@ -285,6 +285,35 @@ function isJoinedOnAnotherDevice({
   );
 }
 
+/**
+ * Signals for a call whose session has not started yet are queued, so its peers
+ * connect; its roster must survive too, or the older join response seeding the
+ * session later retains only the peers it knew about and closes the others.
+ */
+function rememberRosterAwaitingSession({
+  call,
+  currentActiveCall,
+  currentParticipant,
+  rosters,
+}: {
+  call: CallResource;
+  currentActiveCall: CallResourceReconciliationInput['activeCall'];
+  currentParticipant: CallResource['participants'][number] | undefined;
+  rosters: Map<string, CallResource>;
+}): void {
+  if (
+    currentActiveCall?.id !== call.id &&
+    call.status === 'active' &&
+    currentParticipant?.status === 'joined'
+  ) {
+    rosters.set(call.id, call);
+
+    return;
+  }
+
+  rosters.delete(call.id);
+}
+
 function reconcileCallLifecycle({
   call,
   currentActiveCall,
@@ -418,6 +447,7 @@ export function useCallResourceReconciliation({
     Record<string, Record<string, CallParticipantStatus>>
   >({});
   const notifiedIncomingCallIdsRef = useRef(new Set<string>());
+  const rostersAwaitingSessionRef = useRef(new Map<string, CallResource>());
 
   useEffect(() => {
     activeCallRef.current = activeCall;
@@ -472,6 +502,12 @@ export function useCallResourceReconciliation({
         projectCommunityVoicePresence(call, setCommunities);
       }
 
+      rememberRosterAwaitingSession({
+        call,
+        currentActiveCall,
+        currentParticipant,
+        rosters: rostersAwaitingSessionRef.current,
+      });
       reconcileCallLifecycle({
         call,
         currentActiveCall,
@@ -500,7 +536,12 @@ export function useCallResourceReconciliation({
   useEffect(() => {
     if (!activeCall?.call) return;
 
-    reconcileCall(activeCall.call, callDetailsForResource(activeCall.call));
+    const call =
+      rostersAwaitingSessionRef.current.get(activeCall.call.id) ??
+      activeCall.call;
+
+    rostersAwaitingSessionRef.current.delete(call.id);
+    reconcileCall(call, callDetailsForResource(call));
   }, [activeCall?.call, callDetailsForResource, reconcileCall]);
 
   return { incomingCall, reconcileCallResource, setIncomingCall };
