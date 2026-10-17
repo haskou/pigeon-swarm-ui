@@ -441,8 +441,8 @@ export class PigeonStickersApi {
   ): Promise<void> {
     await this.submit(
       session,
-      'POST',
-      `${this.stickerPath(packId, stickerId)}/used`,
+      'PUT',
+      `${this.stickerPath(packId, stickerId)}/usage`,
       {
         kind: 'put',
         payload: {

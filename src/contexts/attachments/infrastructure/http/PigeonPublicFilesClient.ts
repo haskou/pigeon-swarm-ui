@@ -53,7 +53,7 @@ export class PigeonPublicFilesClient {
     filename: string,
     contentType = 'application/octet-stream',
   ): Promise<PublicFileUpload> {
-    const path = '/ipfs/public';
+    const path = '/ipfs/contents';
 
     const upload = await this.http.request<PublicFileUpload>(path, {
       body: bytes,
