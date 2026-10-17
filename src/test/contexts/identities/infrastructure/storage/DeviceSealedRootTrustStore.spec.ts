@@ -146,15 +146,20 @@ describe(DeviceSealedRootTrustStore.name, () => {
     expect(store.supersedes('identity-1', vaultRootKey, other, 5)).toBe(false);
   });
 
-  it('never lowers the revision it keeps, so a rolled-back entry cannot un-supersede a hand-over', () => {
+  it('keeps the whole record it holds at a higher revision, so a rolled-back entry neither lowers the revision nor replaces the root trusted there', () => {
     const store = new DeviceSealedRootTrustStore(memoryStorage().storage);
+    const trusted = SymmetricKey.generate();
     const rolledBack = SymmetricKey.generate();
     const other = SymmetricKey.generate();
 
-    store.remember('identity-1', vaultRootKey, SymmetricKey.generate(), 5);
+    store.remember('identity-1', vaultRootKey, trusted, 5);
     store.remember('identity-1', vaultRootKey, rolledBack, 4);
 
-    expect(store.trusts('identity-1', vaultRootKey, rolledBack)).toBe(true);
+    expect(store.trusts('identity-1', vaultRootKey, trusted)).toBe(true);
+    expect(store.trusts('identity-1', vaultRootKey, rolledBack)).toBe(false);
+    expect(store.supersedes('identity-1', vaultRootKey, trusted, 5)).toBe(
+      false,
+    );
     expect(store.supersedes('identity-1', vaultRootKey, other, 5)).toBe(true);
     expect(store.supersedes('identity-1', vaultRootKey, other, 6)).toBe(false);
   });
@@ -185,6 +190,25 @@ describe(DeviceSealedRootTrustStore.name, () => {
     expect([...entries.keys()]).toEqual([
       'pigeon-swarm:device-sealed-root-trust:v3:identity-1',
     ]);
+  });
+
+  it('remembers and forgets the record even when the browser refuses to remove an earlier one', () => {
+    const { entries, storage } = memoryStorage();
+    const store = new DeviceSealedRootTrustStore({
+      ...storage,
+      removeItem: (key) => {
+        if (!key.includes(':v3:')) throw new Error('blocked');
+        storage.removeItem(key);
+      },
+    });
+    const root = SymmetricKey.generate();
+
+    expect(() =>
+      store.remember('identity-1', vaultRootKey, root, 4),
+    ).not.toThrow();
+    expect(store.trusts('identity-1', vaultRootKey, root)).toBe(true);
+    expect(() => store.forget('identity-1')).not.toThrow();
+    expect(entries.size).toBe(0);
   });
 
   it('reports a root taken at or below the revision of another trusted root as superseded', () => {
