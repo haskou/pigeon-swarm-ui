@@ -299,28 +299,58 @@ export function useConversationMessageDelivery({
     ],
   );
 
-  const retryMessage = useCallback(
-    (message: ChatMessage) => {
-      if (activeConversation?.type === 'one-to-one') {
-        void retryDirectMessage(message);
-
-        return;
-      }
+  // A group send that never reached the outbox goes again. One the outbox
+  // kept as failed is queued there again, and shows its new state.
+  const retryGroupMessage = useCallback(
+    async (message: ChatMessage): Promise<void> => {
+      if (!activeConversation) return;
 
       const payload = failedSendsRef.current.get(message.id);
 
-      if (!payload) return;
+      if (payload) {
+        failedSendsRef.current.delete(message.id);
+        onMessagesChange((current) => withoutMessageById(current, message.id));
+        sendPendingMessage(payload);
 
-      failedSendsRef.current.delete(message.id);
-      onMessagesChange((current) => withoutMessageById(current, message.id));
-      sendPendingMessage(payload);
+        return;
+      }
+      onErrorChange(null);
+
+      try {
+        const retried = await applicationContainer.groupMessages.retry(
+          session,
+          activeConversation.id,
+          message.id,
+        );
+
+        if (!retried) return;
+        onMessagesChange((current) =>
+          applicationContainer.groupMessages.withOutboxState(
+            session,
+            activeConversation.id,
+            current,
+          ),
+        );
+      } catch (caught) {
+        onErrorChange(toUserErrorMessage(caught, copy.workspace.sendError));
+      }
     },
     [
       activeConversation,
+      onErrorChange,
       onMessagesChange,
-      retryDirectMessage,
       sendPendingMessage,
+      session,
     ],
+  );
+
+  const retryMessage = useCallback(
+    (message: ChatMessage) => {
+      void (activeConversation?.type === 'one-to-one'
+        ? retryDirectMessage(message)
+        : retryGroupMessage(message));
+    },
+    [activeConversation, retryDirectMessage, retryGroupMessage],
   );
 
   return { retryMessage, sendMessage, sendSticker };

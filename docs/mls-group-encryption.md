@@ -207,8 +207,8 @@ grant `manage_members`.
   however long ago, it re-encrypts the message in the epoch that won and
   sends it again to those members; a member that already read it keeps one
   copy, by its record id. One it can no longer encrypt, as after this
-  device's removal, is dropped like any record the outbox drops
-  (`opaque-mailboxes-client.md`, Outbox). A message an older build queued
+  device's removal, is kept as failed with a retry, like any message the
+  outbox gives up on (`opaque-mailboxes-client.md`, Failed message). A message an older build queued
   lacks that state: on load it is re-encrypted in the current epoch for the
   members its copies had not reached, and a commit takes the generation of
   its index, or is dropped once that one drained. In a community a manager's device also

@@ -15,6 +15,7 @@ import type { GroupTimelineApply } from './GroupTimelineApply';
 
 import { MlsRejectedError } from '../../communities/infrastructure/mls/MlsRejectedError';
 import { ConversationIdFactory } from '../../conversations/domain/ConversationIdFactory';
+import { ConversationParticipantNotFoundError } from '../../conversations/domain/errors/ConversationParticipantNotFoundError';
 import { ConversationGroupNonce } from '../../conversations/domain/value-objects/ConversationGroupNonce';
 import { ConversationNetworkId } from '../../conversations/domain/value-objects/ConversationNetworkId';
 import { ConversationParticipantId } from '../../conversations/domain/value-objects/ConversationParticipantId';
@@ -514,6 +515,26 @@ export class GroupConversationMailbox {
     );
 
     return this.withOutboxState(session, conversation.id, [message])[0];
+  }
+
+  /**
+   * Queues again a message of this identity the outbox kept as failed, for
+   * its pending recipients still in the group. False when no such message
+   * is kept; rejects, keeping it failed, once this identity left the group.
+   */
+  public async retry(
+    session: Session,
+    conversationId: string,
+    messageId: string,
+  ): Promise<boolean> {
+    try {
+      return await this.member(session).outbox.retry(conversationId, messageId);
+    } catch (error: unknown) {
+      if (error instanceof MlsRejectedError) {
+        throw new ConversationParticipantNotFoundError();
+      }
+      throw error;
+    }
   }
 
   /** Promotes a member to admin; only the creator may. */

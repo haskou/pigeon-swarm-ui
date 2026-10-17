@@ -11,7 +11,9 @@ import type { GroupMailboxOutboxLanding } from './GroupMailboxOutboxLanding';
  * seeds the envelope ids of a message, so no recipient can derive the id
  * of another one's copy. `body` is the application plaintext of a message,
  * kept so that a copy stranded by a generation change is re-encrypted; a
- * commit has none and lands nothing. Binary fields are base64url.
+ * commit has none and lands nothing. `failed` marks a message given up on:
+ * it keeps its body and pending recipients and is never sent again until
+ * an explicit retry. Binary fields are base64url.
  */
 export type GroupMailboxOutboxRow = {
   readonly attempts: number;
@@ -19,6 +21,7 @@ export type GroupMailboxOutboxRow = {
   readonly conversationId: string;
   readonly copies: readonly GroupMailboxOutboxCopy[];
   readonly createdAt: number;
+  readonly failed?: true;
   readonly generation: string;
   readonly generationIndex: number;
   readonly id: string;
