@@ -41,7 +41,11 @@ jest.mock('../../../../../app/composition/applicationContainer', () => ({
       retry: jest.fn(),
       send: jest.fn(),
     },
-    groupMessages: { send: jest.fn() },
+    groupMessages: {
+      retry: jest.fn(),
+      send: jest.fn(),
+      withOutboxState: jest.fn(),
+    },
     stickers: { markUsed: jest.fn() },
   },
 }));
@@ -52,6 +56,10 @@ const outboxItems = jest.mocked(
   applicationContainer.directMessages.outboxItems,
 );
 const groupSend = jest.mocked(applicationContainer.groupMessages.send);
+const groupRetry = jest.mocked(applicationContainer.groupMessages.retry);
+const groupOutboxState = jest.mocked(
+  applicationContainer.groupMessages.withOutboxState,
+);
 const markUsed = jest.mocked(applicationContainer.stickers.markUsed);
 
 const session = { identity: { id: 'identity-1' } } as unknown as Session;
@@ -504,5 +512,46 @@ describe('useConversationMessageDelivery group send', () => {
     expect(groupSend.mock.calls[1]?.[2]).toBe('hello');
     expect(delivery.state.messages).toEqual([sentMessage]);
     expect(delivery.state.error).toBeNull();
+  });
+
+  it('retries a group message the outbox kept as failed and shows its new state', async () => {
+    const failed = { ...sentMessage, deliveryStatus: 'failed' as const };
+    const queued = { ...sentMessage, deliveryStatus: 'pending' as const };
+
+    groupRetry.mockResolvedValue(true);
+    groupOutboxState.mockReturnValue([queued]);
+    const delivery = mountDelivery(groupConversation);
+
+    delivery.state.messages = [failed];
+    delivery.retryMessage(failed);
+    await drain();
+
+    expect(groupRetry).toHaveBeenCalledWith(
+      session,
+      groupConversation.id,
+      failed.id,
+    );
+    expect(groupOutboxState).toHaveBeenCalledWith(
+      session,
+      groupConversation.id,
+      [failed],
+    );
+    expect(groupSend).not.toHaveBeenCalled();
+    expect(delivery.state.messages).toEqual([queued]);
+    expect(delivery.state.error).toBeNull();
+  });
+
+  it('keeps a group message failed and shows why when its retry is refused', async () => {
+    const failed = { ...sentMessage, deliveryStatus: 'failed' as const };
+
+    groupRetry.mockRejectedValue(new Error('retry refused'));
+    const delivery = mountDelivery(groupConversation);
+
+    delivery.state.messages = [failed];
+    delivery.retryMessage(failed);
+    await drain();
+
+    expect(delivery.state.messages).toEqual([failed]);
+    expect(delivery.state.error).toBe('retry refused');
   });
 });

@@ -9,7 +9,6 @@ import type { GroupMailboxCommit } from '../mls/GroupMailboxCommit';
 import type { GroupMailboxOutboxAttempt } from './GroupMailboxOutboxAttempt';
 import type { GroupMailboxOutboxCopy } from './GroupMailboxOutboxCopy';
 import type { GroupMailboxOutboxEngine } from './GroupMailboxOutboxEngine';
-import type { GroupMailboxOutboxFailure } from './GroupMailboxOutboxFailure';
 import type { GroupMailboxOutboxItem } from './GroupMailboxOutboxItem';
 import type { GroupMailboxOutboxLanding } from './GroupMailboxOutboxLanding';
 import type { GroupMailboxOutboxRow } from './GroupMailboxOutboxRow';
@@ -49,9 +48,12 @@ import { GroupMailboxControlRecord } from '../control/GroupMailboxControlRecord'
  * group's confirmation, no record of the conversation is encrypted or
  * appended at all; its messages are held unsealed and sealed in the epoch
  * current once it is confirmed. A commit belongs to its generation and is
- * never re-encrypted. A record still queued after the expiry is dropped
- * and reported. `items` lists each queued record as held, retrying or
- * pending. An ephemeral record (`sendEphemeral`) is never queued: it is
+ * never re-encrypted. A message that can no longer be delivered, as after
+ * this identity's removal or when still queued after the expiry, is kept
+ * as failed with its body until `retry` queues it again; a commit that can
+ * no longer be delivered is dropped. `items` lists each queued record as
+ * held, retrying or pending, and each failed message as failed. An
+ * ephemeral record (`sendEphemeral`) is never queued: it is
  * appended once or dropped, and none is sealed in a conversation whose
  * queue has held a record past `EPHEMERAL_HOLD_MS`. Logs carry counts
  * only.
@@ -71,10 +73,6 @@ export class GroupMailboxOutbox {
   public static readonly EXPIRY_MS = 14 * 24 * 60 * 60 * 1000;
   public static readonly RETRY_BASE_MS = 5_000;
   public static readonly RETRY_MAX_MS = 5 * 60 * 1000;
-
-  private readonly listeners = new Set<
-    (failure: GroupMailboxOutboxFailure) => void
-  >();
 
   /** The ids of rows whose last pass found them held back. */
   private readonly held = new Set<string>();
@@ -105,8 +103,10 @@ export class GroupMailboxOutbox {
     );
   }
 
-  /** Holds back later rows to the recipients of `row`. */
+  /** Holds back later rows to the recipients of `row`; a failed one, none. */
   private static hold(row: GroupMailboxOutboxRow, blocked: Set<string>): void {
+    if (row.failed) return;
+
     for (const copy of row.copies) {
       blocked.add(GroupMailboxOutbox.recipient(row, copy));
     }
@@ -224,6 +224,8 @@ export class GroupMailboxOutbox {
 
     for (const row of GroupMailboxOutbox.ordered(this.rows.values())) {
       if (this.stopped) return;
+
+      if (row.failed) continue;
       const attempt = await this.prepared(row, now, generations);
 
       if (attempt) attempts.push(attempt);
@@ -360,17 +362,22 @@ export class GroupMailboxOutbox {
     return generation ? { current, generation, row } : undefined;
   }
 
+  /**
+   * Gives up on a row: a message is kept as failed, with its body and
+   * pending recipients, until an explicit `retry`; a commit is dropped.
+   */
   private async fail(row: GroupMailboxOutboxRow): Promise<void> {
-    await this.forgetRow(row);
-    // eslint-disable-next-line no-console
-    console.debug('Group outbox dropped 1 record.');
+    if (row.body === undefined) {
+      await this.forgetRow(row);
+      // eslint-disable-next-line no-console
+      console.debug('Group outbox dropped 1 commit.');
 
-    for (const listener of this.listeners) {
-      listener({
-        conversationId: row.conversationId,
-        reference: row.reference,
-      });
+      return;
     }
+    this.held.delete(row.id);
+    // eslint-disable-next-line no-console
+    console.debug('Group outbox failed 1 message.');
+    await this.keep({ ...row, failed: true, retryAt: 0 });
   }
 
   private async forgetRow(row: GroupMailboxOutboxRow): Promise<void> {
@@ -389,6 +396,7 @@ export class GroupMailboxOutbox {
     return [...this.rows.values()].some(
       (row) =>
         row.conversationId === conversationId &&
+        !row.failed &&
         GroupMailboxOutbox.isQueued(row) &&
         row.createdAt < cutoff,
     );
@@ -830,7 +838,10 @@ export class GroupMailboxOutbox {
     await this.store.forget(this.session().identity.id);
   }
 
-  /** The records still queued for one conversation, oldest first. */
+  /**
+   * The records still queued for one conversation, oldest first, and the
+   * messages kept as failed.
+   */
   public items(conversationId: string): GroupMailboxOutboxItem[] {
     return GroupMailboxOutbox.ordered(this.rows.values())
       .filter(
@@ -840,9 +851,10 @@ export class GroupMailboxOutbox {
       )
       .map((row) => ({
         reference: row.reference,
-        state:
-          this.held.has(row.id) ||
-          row.generationIndex === GroupMailboxOutbox.UNSEALED
+        state: row.failed
+          ? 'failed'
+          : this.held.has(row.id) ||
+              row.generationIndex === GroupMailboxOutbox.UNSEALED
             ? 'held'
             : row.attempts > 0
               ? 'retry'
@@ -867,6 +879,39 @@ export class GroupMailboxOutbox {
       this.lastCreatedAt = Math.max(this.lastCreatedAt, row.createdAt);
     }
     await this.pass();
+  }
+
+  /**
+   * Queues a message kept as failed again, as a fresh record: it is sealed
+   * anew in the current epoch for its pending recipients still in the
+   * group, or for every member if it was never sealed, and resolves after
+   * the next delivery attempt. False when no such message is kept; rejects,
+   * keeping it failed, while this identity is off the group's roster.
+   */
+  public async retry(
+    conversationId: string,
+    reference: string,
+  ): Promise<boolean> {
+    const row = [...this.rows.values()].find(
+      (kept) =>
+        kept.failed &&
+        kept.conversationId === conversationId &&
+        kept.reference === reference,
+    );
+
+    if (!row) return false;
+    await this.holdsBack(conversationId);
+    await this.keep({
+      ...row,
+      attempts: 0,
+      createdAt: this.stamp(),
+      failed: undefined,
+      generation: '',
+      retryAt: 0,
+    });
+    await this.pass();
+
+    return true;
   }
 
   /**
@@ -934,15 +979,5 @@ export class GroupMailboxOutbox {
   public stop(): void {
     this.stopped = true;
     this.cancelTimer();
-  }
-
-  public subscribe(
-    listener: (failure: GroupMailboxOutboxFailure) => void,
-  ): () => void {
-    this.listeners.add(listener);
-
-    return () => {
-      this.listeners.delete(listener);
-    };
   }
 }

@@ -933,10 +933,7 @@ describe('GroupMailboxInboxSync on the real MLS library', () => {
     expect(alice.outbox.items(CONVERSATION)).toEqual([]);
   });
 
-  it('drops a record still queued after the expiry and reports it', async () => {
-    const failures: string[] = [];
-
-    alice.outbox.subscribe(({ reference }) => failures.push(reference));
+  it('keeps a record still queued after the expiry as failed', async () => {
     inboxes.delete(
       MailboxKeySchedule.groupInbox(
         (await bob.engine.generation(CONVERSATION)).secret.toSymmetricKey(),
@@ -948,8 +945,9 @@ describe('GroupMailboxInboxSync on the real MLS library', () => {
     now += GroupMailboxOutbox.EXPIRY_MS + 1_000;
     await alice.outbox.resume();
 
-    expect(failures).toEqual([mid('alice', 'm1')]);
-    expect(alice.outbox.items(CONVERSATION)).toEqual([]);
+    expect(alice.outbox.items(CONVERSATION)).toEqual([
+      { reference: mid('alice', 'm1'), state: 'failed' },
+    ]);
   });
 
   it('deletes its retired inbox once the drain window closes', async () => {

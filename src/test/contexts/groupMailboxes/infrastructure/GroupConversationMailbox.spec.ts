@@ -23,6 +23,7 @@ import type { NotificationResource } from '../../../../contexts/notifications/in
 
 import { MlsUpdateCadence } from '../../../../contexts/communities/domain/MlsUpdateCadence';
 import { ConversationIdFactory } from '../../../../contexts/conversations/domain/ConversationIdFactory';
+import { ConversationParticipantNotFoundError } from '../../../../contexts/conversations/domain/errors/ConversationParticipantNotFoundError';
 import { ConversationGroupNonce } from '../../../../contexts/conversations/domain/value-objects/ConversationGroupNonce';
 import { ConversationNetworkId } from '../../../../contexts/conversations/domain/value-objects/ConversationNetworkId';
 import { ConversationParticipantId } from '../../../../contexts/conversations/domain/value-objects/ConversationParticipantId';
@@ -1146,6 +1147,73 @@ describe('GroupConversationMailbox', () => {
     await sync(bob);
 
     expect(texts(bob)).toEqual(['message:queued']);
+  });
+
+  it('shows a message still queued at the expiry as failed, and sends it on retry', async () => {
+    await formGroup();
+    const offline = jest
+      .spyOn(channel, 'send')
+      .mockRejectedValue(new Error('offline'));
+    const message = await alice.mailbox.send(
+      alice.session,
+      conversation(),
+      'late',
+      {},
+    );
+
+    offline.mockRestore();
+    now += GroupMailboxOutbox.EXPIRY_MS + GroupMailboxOutbox.RETRY_MAX_MS;
+    await alice.mailbox.resume(alice.session);
+
+    expect(
+      alice.mailbox.withOutboxState(alice.session, CONVERSATION, [message])[0]
+        .deliveryStatus,
+    ).toBe('failed');
+    await expect(
+      alice.mailbox.retry(alice.session, CONVERSATION, message.id),
+    ).resolves.toBe(true);
+    await sync(bob);
+
+    expect(texts(bob)).toEqual(['message:late']);
+    expect(
+      alice.mailbox.withOutboxState(alice.session, CONVERSATION, [message])[0]
+        .deliveryStatus,
+    ).toBeUndefined();
+  });
+
+  it('refuses to retry a failed message once this identity left the group', async () => {
+    await formGroup();
+    const offline = jest
+      .spyOn(channel, 'send')
+      .mockRejectedValue(new Error('offline'));
+    const message = await carol.mailbox.send(
+      carol.session,
+      conversation(),
+      'late',
+      {},
+    );
+
+    offline.mockRestore();
+    now += GroupMailboxOutbox.EXPIRY_MS + GroupMailboxOutbox.RETRY_MAX_MS;
+    await carol.mailbox.resume(carol.session);
+    await alice.mailbox.removeMember(alice.session, CONVERSATION, carol.id);
+    await settle(
+      Promise.all(
+        everyone().map((member) =>
+          member.mailbox.membersChanged(member.session, CONVERSATION),
+        ),
+      ),
+      everyone(),
+    );
+    await catchUp();
+
+    await expect(
+      carol.mailbox.retry(carol.session, CONVERSATION, message.id),
+    ).rejects.toThrow(ConversationParticipantNotFoundError);
+    expect(
+      carol.mailbox.withOutboxState(carol.session, CONVERSATION, [message])[0]
+        .deliveryStatus,
+    ).toBe('failed');
   });
 
   it('keeps the groups when another device of the identity is revoked', async () => {

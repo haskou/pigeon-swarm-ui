@@ -405,10 +405,7 @@ describe('GroupMailboxOutbox', () => {
     });
   });
 
-  it('reports a stranded message it can no longer encrypt', async () => {
-    const failures: string[] = [];
-
-    outbox.subscribe(({ reference }) => failures.push(reference));
+  it('keeps a stranded message it can no longer encrypt as failed, sending nothing more', async () => {
     channel.send.mockRejectedValue(new MailboxUnavailableError());
     await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
     current = 1;
@@ -418,15 +415,76 @@ describe('GroupMailboxOutbox', () => {
     now += GroupMailboxOutbox.RETRY_MAX_MS;
 
     await outbox.resume();
+    channel.send.mockClear();
+    engine.encrypt.mockClear();
+    now += GroupMailboxOutbox.RETRY_MAX_MS;
+    await outbox.resume();
 
-    expect(failures).toEqual(['m1']);
-    expect(rows.size).toBe(0);
+    expect(outbox.items(CONVERSATION)).toEqual([
+      { reference: 'm1', state: 'failed' },
+    ]);
+    expect([...rows.values()]).toEqual([
+      expect.objectContaining({ failed: true, reference: 'm1' }),
+    ]);
+    expect(engine.encrypt).not.toHaveBeenCalled();
+    expect(channel.send).not.toHaveBeenCalled();
+  });
+
+  it('re-encrypts a failed message on retry for its pending recipients only', async () => {
+    channel.send.mockRejectedValue(new MailboxUnavailableError());
+    await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
+    current = 1;
+    engine.encrypt.mockRejectedValueOnce(
+      new MlsRejectedError('This device is not in the group'),
+    );
+    now += GroupMailboxOutbox.RETRY_MAX_MS;
+    await outbox.resume();
+    engine.members.mockResolvedValue(['alice', 'bob', 'dave']);
+    channel.send.mockReset();
+    channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'x' });
+
+    await expect(outbox.retry(CONVERSATION, 'm1')).resolves.toBe(true);
+
+    expect(engine.encrypt).toHaveBeenLastCalledWith(
+      CONVERSATION,
+      new Uint8Array([1]),
+    );
+    expect(
+      channel.send.mock.calls.map(([keys]) => keys.mailboxId).sort(),
+    ).toEqual([inboxOf(1, 'alice'), inboxOf(1, 'bob')].sort());
+    expect(outbox.items(CONVERSATION)).toEqual([]);
+  });
+
+  it('retries only a failed message of the conversation', async () => {
+    channel.send.mockRejectedValue(new TypeError('offline'));
+    await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
+    channel.send.mockClear();
+
+    await expect(outbox.retry(CONVERSATION, 'm1')).resolves.toBe(false);
+    await expect(outbox.retry(CONVERSATION, 'm2')).resolves.toBe(false);
+    expect(channel.send).not.toHaveBeenCalled();
+  });
+
+  it('keeps a message still queued at the expiry as failed, and holds no ephemeral record for it', async () => {
+    channel.send.mockRejectedValue(new TypeError('offline'));
+    await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
+    now += GroupMailboxOutbox.EXPIRY_MS;
+    await outbox.resume();
+
+    expect(outbox.items(CONVERSATION)).toEqual([
+      { reference: 'm1', state: 'failed' },
+    ]);
+
+    channel.send.mockReset();
+    channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'x' });
+    await outbox.sendEphemeral(CONVERSATION, new Uint8Array([2]));
+
+    expect(channel.send.mock.calls.map(([keys]) => keys.mailboxId)).toEqual([
+      inboxOf(0, 'bob'),
+    ]);
   });
 
   it('keeps a stranded message whose re-encryption fails for a moment', async () => {
-    const failures: string[] = [];
-
-    outbox.subscribe(({ reference }) => failures.push(reference));
     channel.send.mockRejectedValue(new MailboxUnavailableError());
     await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
     current = 1;
@@ -437,7 +495,6 @@ describe('GroupMailboxOutbox', () => {
 
     await outbox.resume();
 
-    expect(failures).toEqual([]);
     expect(outbox.items(CONVERSATION)).toEqual([
       { reference: 'm1', state: 'retry' },
     ]);
@@ -446,7 +503,6 @@ describe('GroupMailboxOutbox', () => {
     now += GroupMailboxOutbox.RETRY_MAX_MS;
     await outbox.resume();
 
-    expect(failures).toEqual([]);
     expect(outbox.items(CONVERSATION)).toEqual([]);
   });
 
@@ -477,9 +533,6 @@ describe('GroupMailboxOutbox', () => {
   });
 
   it('never re-encrypts a commit and drops it once its generation drained', async () => {
-    const failures: string[] = [];
-
-    outbox.subscribe(({ reference }) => failures.push(reference));
     channel.send.mockRejectedValue(new MailboxUnavailableError());
     await outbox.enqueueCommit(CONVERSATION, commitTo(['bob']));
     await outbox.flush();
@@ -497,7 +550,6 @@ describe('GroupMailboxOutbox', () => {
     now += GroupMailboxOutbox.RETRY_MAX_MS;
     await outbox.resume();
 
-    expect(failures).toHaveLength(1);
     expect(rows.size).toBe(0);
   });
 
@@ -623,10 +675,7 @@ describe('GroupMailboxOutbox', () => {
     expect(rows.size).toBe(0);
   });
 
-  it('drops a queued message once this identity is off the roster', async () => {
-    const failures: string[] = [];
-
-    outbox.subscribe(({ reference }) => failures.push(reference));
+  it('keeps a queued message as failed once this identity is off the roster, and retries it only once back', async () => {
     channel.send.mockRejectedValue(new TypeError('offline'));
     await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
     roster = rosterOf(['bob']);
@@ -634,8 +683,23 @@ describe('GroupMailboxOutbox', () => {
 
     await outbox.resume();
 
-    expect(failures).toEqual(['m1']);
-    expect(rows.size).toBe(0);
+    expect(outbox.items(CONVERSATION)).toEqual([
+      { reference: 'm1', state: 'failed' },
+    ]);
+    await expect(outbox.retry(CONVERSATION, 'm1')).rejects.toThrow(
+      MlsRejectedError,
+    );
+    expect(outbox.items(CONVERSATION)).toEqual([
+      { reference: 'm1', state: 'failed' },
+    ]);
+
+    roster = rosterOf(['alice', 'bob']);
+    channel.send.mockReset();
+    channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'x' });
+
+    await expect(outbox.retry(CONVERSATION, 'm1')).resolves.toBe(true);
+    expect(channel.send).toHaveBeenCalledTimes(2);
+    expect(outbox.items(CONVERSATION)).toEqual([]);
   });
 
   it('drops a queued commit once this device holds no group', async () => {
@@ -664,9 +728,6 @@ describe('GroupMailboxOutbox', () => {
     });
 
     it('drops a copy it cannot append and never retries it', async () => {
-      const failures: string[] = [];
-
-      outbox.subscribe(({ reference }) => failures.push(reference));
       channel.send.mockRejectedValue(new TypeError('offline'));
 
       await outbox.sendEphemeral(CONVERSATION, new Uint8Array([1]));
@@ -675,7 +736,6 @@ describe('GroupMailboxOutbox', () => {
 
       expect(channel.send).toHaveBeenCalledTimes(1);
       expect(store.save).not.toHaveBeenCalled();
-      expect(failures).toEqual([]);
     });
 
     it('skips a recipient a queued record still waits for', async () => {
