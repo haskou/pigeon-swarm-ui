@@ -87,7 +87,7 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
         session.deviceCredentialKeyPair.toPrimitives().publicKey,
       deviceCredentialCommitment: 'commitment',
       id: identityId.valueOf(),
-      networks: [],
+      networks: ['network-1'],
       profile: { name: 'Ada' },
       recoveryAuthority:
         session.recoveryAuthorityKeyPair.toPrimitives().publicKey,
@@ -1017,7 +1017,7 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
           new PublicKey(input.deviceCredential),
         ),
         id: identityKeyPair.toPrimitives().publicKey,
-        networks: [],
+        networks: ['network-1'],
         profile: { name: 'Ada' },
         recoveryAuthority: input.recoveryAuthority,
         timestamp: 1,

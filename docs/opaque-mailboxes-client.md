@@ -155,11 +155,11 @@ Each group conversation is one MLS group (`GroupMailboxMlsEngine`, `infrastructu
 ## Creation proof
 
 - Preimage: `[pigeon-mailbox-creation:v1, mailboxId, postTokenHash, readTokenHash, nonce].join(':')`.
-- SHA-256 must start with at least `difficultyBits` zero bits. The default is 16 (`MailboxCreationProof.DEFAULT_DIFFICULTY_BITS`). A `PUT` 400 that names `requiredDifficultyBits` raises the requirement; see Creation difficulty and recovery.
+- SHA-256 must start with at least `difficultyBits` zero bits. The default is 16 (`MailboxCreationDifficultyPolicy.DEFAULT_DIFFICULTY_BITS`). A `PUT` 400 that names `requiredDifficultyBits` raises the requirement; see Creation difficulty and recovery.
 - `nonce` is the first passing decimal integer from 0, at most 64 characters.
 - Mining runs in a dedicated worker: `mailboxCreationWorker.ts`, driven by `MailboxCreationWorkerClient`, constructed by `createMailboxWorkerClient()`.
 - Pinned nonce for the vector: `47805`.
-- Shared vectors: `src/test/fixtures/mailbox-creation-proof-vectors.json` is byte-identical to the node's `tests/fixtures/mailbox-creation-proof-vectors.json` (preimage, digest, leading zero bits, mined nonce, rejected cases), checked by `MailboxCreationProof.vectors.spec.ts`.
+- Mining and verification come from `ProofOfWork.mailboxCreation` in `@haskou/pigeon-swarm-crypto`. Shared vectors: `@haskou/pigeon-swarm-crypto/vectors/proof-of-work.json` (preimage, digest, leading zero bits, mined nonce, rejected cases), checked by `src/test/shared/infrastructure/crypto/ProofOfWork.vectors.spec.ts`.
 
 ## Envelopes
 

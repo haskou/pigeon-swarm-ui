@@ -1,16 +1,18 @@
 import type { IdentitySignaturePayload } from '@haskou/pigeon-swarm-crypto';
 
+import { ProofOfWork } from '@haskou/pigeon-swarm-crypto';
+
 import type { IdentityUpdateProfileInput } from './resources/IdentityUpdateProfileInput';
 
 export type { IdentityUpdateProfileInput } from './resources/IdentityUpdateProfileInput';
 import type { IdentityResource } from './resources/IdentityResource';
 
 import { MailboxHomeBase } from '../../../../shared/infrastructure/client/MailboxHomeBase';
+import { IdentityAdmissionDifficultyPolicy } from '../../domain/IdentityAdmissionDifficultyPolicy';
 import { ProfileBiography } from '../../domain/profile/ProfileBiography';
 import { ProfileHandle } from '../../domain/profile/ProfileHandle';
 import { ProfileName } from '../../domain/profile/ProfileName';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
-import { IdentityAdmissionProof } from '../crypto/IdentityAdmissionProof';
 
 function uniqueNetworks(networks: string[]): string[] {
   return [...new Set(networks.filter(Boolean))];
@@ -95,7 +97,10 @@ export class IdentitySignaturePayloadFactory {
 
     return unchanged && difficultyBits === undefined
       ? current.admissionNonce
-      : await IdentityAdmissionProof.mine(id, networks, difficultyBits);
+      : await ProofOfWork.identityAdmission(id, networks).mint(
+          difficultyBits ??
+            IdentityAdmissionDifficultyPolicy.DEFAULT_DIFFICULTY_BITS,
+        );
   }
 
   /** `admissionDifficultyBits` defaults to the protocol minimum. */
@@ -113,10 +118,9 @@ export class IdentitySignaturePayloadFactory {
     const networks = uniqueNetworks(input.networks);
 
     return {
-      admissionNonce: await IdentityAdmissionProof.mine(
-        id,
-        networks,
-        input.admissionDifficultyBits,
+      admissionNonce: await ProofOfWork.identityAdmission(id, networks).mint(
+        input.admissionDifficultyBits ??
+          IdentityAdmissionDifficultyPolicy.DEFAULT_DIFFICULTY_BITS,
       ),
       authorizationRevision: 0,
       deviceCredential: input.deviceCredential,

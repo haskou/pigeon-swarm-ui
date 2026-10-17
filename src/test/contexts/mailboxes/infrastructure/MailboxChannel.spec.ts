@@ -2,6 +2,7 @@ import {
   BearerCapability,
   MailboxEnvelope,
   MailboxKeySchedule,
+  ProofOfWork,
   SymmetricKey,
 } from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
@@ -9,7 +10,6 @@ import { mock } from 'jest-mock-extended';
 
 import { MailboxCreationDifficultyError } from '../../../../contexts/mailboxes/domain/errors/MailboxCreationDifficultyError';
 import { MailboxUnavailableError } from '../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
-import { MailboxCreationProof } from '../../../../contexts/mailboxes/infrastructure/crypto/MailboxCreationProof';
 import { PigeonMailboxClient } from '../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
 import { MailboxChannel } from '../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
@@ -35,12 +35,11 @@ describe(MailboxChannel.name, () => {
         difficultyBits: number,
       ) =>
         Promise.resolve(
-          MailboxCreationProof.mine(
+          ProofOfWork.mailboxCreation(
             mailboxId,
             postTokenHash,
             readTokenHash,
-            difficultyBits,
-          ),
+          ).mintSync(difficultyBits),
         ),
     );
 
@@ -64,12 +63,11 @@ describe(MailboxChannel.name, () => {
     const creationNonce = client.create.mock.calls[0][1].creationNonce;
 
     expect(
-      MailboxCreationProof.isValid(
+      ProofOfWork.mailboxCreation(
         keys.mailboxId,
         postTokenHash,
         readTokenHash,
-        creationNonce,
-      ),
+      ).verify(creationNonce, 16),
     ).toBe(true);
   });
 
@@ -202,13 +200,11 @@ describe(MailboxChannel.name, () => {
       const retriedNonce = client.create.mock.calls[1][1].creationNonce;
 
       expect(
-        MailboxCreationProof.isValid(
+        ProofOfWork.mailboxCreation(
           keys.mailboxId,
           postTokenHash,
           readTokenHash,
-          retriedNonce,
-          17,
-        ),
+        ).verify(retriedNonce, 17),
       ).toBe(true);
     });
 
