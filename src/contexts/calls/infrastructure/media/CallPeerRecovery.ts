@@ -222,6 +222,17 @@ export class CallPeerRecovery {
     );
   }
 
+  /**
+   * Stops the work aimed at a connection that is being replaced. The restart
+   * budget stays with the peer: a glare is no sign of a healthier network,
+   * and a budget that reset with every replacement would never run out.
+   */
+  public detach(peerIdentityId: string): void {
+    this.cancel(peerIdentityId);
+    this.inFlight.get(peerIdentityId)?.abort();
+    this.inFlight.delete(peerIdentityId);
+  }
+
   public forget(peerIdentityId: string): void {
     this.release(peerIdentityId);
     this.lastRestartAt.delete(peerIdentityId);
@@ -270,8 +281,8 @@ export class CallPeerRecovery {
    *
    * A disruption usually reaches both peers at once. The impolite peer restarts
    * immediately and the polite peer waits for that offer: had both offered,
-   * the polite peer would roll back its own ICE-restart offer, and Chromium
-   * then keeps that peer's audio sender silent for the rest of the call.
+   * the polite peer would have to replace its whole connection to answer, for
+   * Chromium and WebKit never run the frame transforms of one that rolled back.
    */
   public disrupt(
     peerIdentityId: string,

@@ -266,7 +266,7 @@ function describedBy(
   type: RTCSdpType,
   fingerprint: string,
   revision = 1,
-): RTCSessionDescriptionInit {
+): { sdp: string; type: RTCSdpType } {
   return {
     sdp: `v=0\r\na=ice-ufrag:${fingerprint}-${revision}\r\na=fingerprint:${fingerprint}\r\n`,
     type,
@@ -800,88 +800,6 @@ describe(CallPeerConnections.name, () => {
       manager.reset();
     },
   );
-
-  it.each([false, true])(
-    'rebinds live audio after accepting a colliding offer (collision=%s)',
-    async (collision) => {
-      const peers: FakePeerConnection[] = [];
-      installPeerConnectionMock(peers);
-      const manager = callPeerConnectionManager();
-      installSessionDescriptionMock();
-      const audio = mediaTrack('microphone', 'audio');
-      const video = mediaTrack('camera', 'video');
-      audio.enabled = false;
-      manager.setLocalStream(mediaStreamWithTracks([audio, video]));
-      manager.configure(() => Promise.resolve({ iceServers: [] }));
-      const sendSignal = jest.fn().mockResolvedValue(undefined);
-      await manager.ensurePeer('alice', false, sendSignal);
-      const peer = peers[0];
-
-      if (collision)
-        await peer.setLocalDescription({ sdp: 'local-offer', type: 'offer' });
-
-      await manager.handleSignal(
-        'alice',
-        'offer',
-        { sdp: 'remote-offer', type: 'offer' },
-        sendSignal,
-        'bob',
-      );
-
-      expect(peer.getSenders()[0].replaceTrack).toHaveBeenCalledTimes(
-        collision ? 1 : 0,
-      );
-
-      if (collision)
-        expect(peer.getSenders()[0].replaceTrack).toHaveBeenCalledWith(audio);
-      expect(peer.getSenders()[1].replaceTrack).not.toHaveBeenCalled();
-      expect(audio.enabled).toBe(false);
-      expect(audio.stop).not.toHaveBeenCalled();
-      expect(sendSignal).toHaveBeenCalledWith(
-        'alice',
-        'answer',
-        expect.objectContaining({ type: 'answer' }),
-      );
-      manager.reset();
-    },
-  );
-
-  it('does not restore an old microphone while its replacement is pending during glare', async () => {
-    const peers: FakePeerConnection[] = [];
-    installPeerConnectionMock(peers);
-    installSessionDescriptionMock();
-    const manager = callPeerConnectionManager();
-    const original = mediaTrack('old-microphone', 'audio');
-    const replacement = mediaTrack('new-microphone', 'audio');
-    manager.setLocalStream(mediaStreamWithTracks([original]));
-    manager.configure(() => Promise.resolve({ iceServers: [] }));
-    const sendSignal = jest.fn().mockResolvedValue(undefined);
-    await manager.ensurePeer('alice', false, sendSignal);
-    const peer = peers[0];
-    const sender = peer.getSenders()[0];
-    let finishReplacement!: () => void;
-    jest.mocked(sender.replaceTrack).mockImplementation(
-      () =>
-        new Promise<void>((resolve) => {
-          finishReplacement = resolve;
-        }),
-    );
-    manager.setLocalStream(mediaStreamWithTracks([replacement]));
-    await peer.setLocalDescription({ sdp: 'local-offer', type: 'offer' });
-
-    await manager.handleSignal(
-      'alice',
-      'offer',
-      { sdp: 'remote-offer', type: 'offer' },
-      sendSignal,
-      'bob',
-    );
-
-    expect(sender.replaceTrack).toHaveBeenCalledTimes(1);
-    expect(sender.replaceTrack).toHaveBeenCalledWith(replacement);
-    finishReplacement();
-    manager.reset();
-  });
 
   it('replaces recaptured microphone tracks without removing the sender', async () => {
     const peers: FakePeerConnection[] = [];

@@ -413,6 +413,46 @@ describe('CallPeerRecovery', () => {
     recovery.reset();
     expect(jest.getTimerCount()).toBe(0);
   });
+
+  it('keeps the restart budget when a connection is replaced', async () => {
+    jest.useFakeTimers();
+    const restart = jest.fn(() => Promise.resolve());
+    const recovery = new CallPeerRecovery(restart);
+    recovery.reconcile('peer', peerConnection('failed', 'failed'), () => true);
+    await jest.advanceTimersByTimeAsync(0);
+    expect(restart).toHaveBeenCalledTimes(1);
+
+    recovery.detach('peer');
+    recovery.reconcile('peer', peerConnection('failed', 'failed'), () => true);
+    await jest.advanceTimersByTimeAsync(60_000);
+
+    expect(restart).toHaveBeenCalledTimes(3);
+    expect(recovery.stateFor('peer')).toBe('exhausted');
+  });
+
+  it('abandons a refresh in flight for a replaced connection', async () => {
+    jest.useFakeTimers();
+    const oldPeer = peerConnection('failed', 'failed');
+    const completions: (() => void)[] = [];
+    const recovery = new CallPeerRecovery(
+      (_peerIdentityId, peer, canRestart) =>
+        new Promise<void>((resolve) => {
+          completions.push(() => {
+            if (canRestart()) peer.restartIce();
+            resolve();
+          });
+        }),
+    );
+    recovery.reconcile('peer', oldPeer, () => true);
+    await jest.advanceTimersByTimeAsync(0);
+    recovery.detach('peer');
+    completions[0]();
+    await jest.advanceTimersByTimeAsync(0);
+
+    expect(oldPeer.restartIce).not.toHaveBeenCalled();
+    expect(jest.getTimerCount()).toBe(0);
+    recovery.reset();
+  });
   it('restarts a negotiated unhealthy peer at once after a disruption, even when recovery was exhausted', async () => {
     jest.useFakeTimers();
     const restart = jest.fn(() => Promise.resolve());

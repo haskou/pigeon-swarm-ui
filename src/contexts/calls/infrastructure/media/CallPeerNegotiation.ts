@@ -5,13 +5,17 @@ import type { CallScreenShareStreams } from './CallScreenShareStreams';
 import type { CallSignalRetry } from './CallSignalRetry';
 import type { PeerLookup } from './PeerLookup';
 import type { PeerNegotiationState } from './PeerNegotiationState';
+import type { PeerReplacement } from './PeerReplacement';
 
 import { logCallDebug, logCallWarning } from './callDebugLogger';
+import { descriptionFingerprint } from './descriptionFingerprint';
 import {
   descriptionPayload,
   type DescriptionSignalPayload,
   type SignalSender,
 } from './descriptionPayload';
+
+const retiredFingerprintLimit = 8;
 
 export class CallPeerNegotiation {
   private readonly descriptionDeliveries = new WeakMap<
@@ -19,10 +23,7 @@ export class CallPeerNegotiation {
     symbol
   >();
 
-  private readonly descriptionHandlings = new WeakMap<
-    RTCPeerConnection,
-    Promise<void>
-  >();
+  private readonly descriptionHandlings = new Map<string, Promise<void>>();
 
   private readonly pendingAnswers = new WeakMap<
     RTCPeerConnection,
@@ -33,6 +34,7 @@ export class CallPeerNegotiation {
 
   public constructor(
     private readonly peerFor: PeerLookup,
+    private readonly replacePeer: PeerReplacement,
     private readonly signalRetry: CallSignalRetry,
     private readonly screenShareStreams: CallScreenShareStreams,
     private readonly localTracks: CallLocalTracks,
@@ -40,93 +42,21 @@ export class CallPeerNegotiation {
     private readonly iceCandidates: CallIceCandidates,
   ) {}
 
-  private acceptRemoteDescription(
-    senderIdentityId: string,
-    peer: RTCPeerConnection,
-    state: PeerNegotiationState,
-    description: RTCSessionDescription,
-  ): boolean {
-    const negotiationState = state;
-
-    if (
-      description.type === 'answer' &&
-      !['have-local-offer', 'have-remote-pranswer'].includes(
-        peer.signalingState,
-      )
-    ) {
-      return false;
-    }
-
-    if (description.type !== 'offer') {
-      negotiationState.ignoreOffer = false;
-
-      return true;
-    }
-
-    const offerCollision = this.isOfferCollision(
-      description,
-      negotiationState,
-      peer,
-    );
-
-    negotiationState.ignoreOffer = !negotiationState.polite && offerCollision;
-
-    if (negotiationState.ignoreOffer) {
-      logCallWarning('peer-manager:handle-signal:ignored-glare-offer', {
-        senderIdentityId,
-        signalingState: peer.signalingState,
-      });
-
-      return false;
-    }
-
-    negotiationState.ignoreOffer = false;
-
-    if (offerCollision) {
-      logCallDebug('peer-manager:handle-signal:rollback-glare-offer', {
-        senderIdentityId,
-        signalingState: peer.signalingState,
-      });
-    }
-
-    return true;
-  }
-
-  private isOfferCollision(
-    description: RTCSessionDescriptionInit,
-    state: PeerNegotiationState,
-    peer: RTCPeerConnection,
-  ): boolean {
-    return (
-      description.type === 'offer' &&
-      (state.makingOffer || peer.signalingState !== 'stable')
-    );
-  }
-
   private async applyDescriptionSignal(
     senderIdentityId: string,
-    peer: RTCPeerConnection,
     payload: DescriptionSignalPayload,
-    state: PeerNegotiationState,
     sendSignal: SignalSender,
   ): Promise<void> {
     const description = new RTCSessionDescription(payload);
-    const offerCollision = this.isOfferCollision(description, state, peer);
+    const peer = await this.receivingConnection(
+      senderIdentityId,
+      description,
+      sendSignal,
+    );
 
-    if (
-      !this.acceptRemoteDescription(senderIdentityId, peer, state, description)
-    ) {
-      await this.redeliverAfterIgnoredOffer(
-        senderIdentityId,
-        peer,
-        state,
-        sendSignal,
-      );
+    if (!peer) return;
 
-      return;
-    }
-
-    this.encryption.admit(senderIdentityId, this.peerFor(senderIdentityId));
+    this.encryption.admit(senderIdentityId, peer);
     this.screenShareStreams.rememberRemoteMetadata(senderIdentityId, payload);
     await peer.setRemoteDescription(description);
     logCallDebug('peer-manager:handle-signal:remote-description-set', {
@@ -142,10 +72,6 @@ export class CallPeerNegotiation {
     const answer = await peer.createAnswer();
 
     await peer.setLocalDescription(answer);
-
-    if (offerCollision) {
-      await this.localTracks.rebindAudioSenders(senderIdentityId, peer);
-    }
     logCallDebug('peer-manager:handle-signal:send-answer', {
       senderIdentityId,
     });
@@ -165,6 +91,197 @@ export class CallPeerNegotiation {
     if (!state.ignoreOffer) return;
 
     await this.resendUnansweredOffer(senderIdentityId, peer, sendSignal);
+  }
+
+  /**
+   * Closes the connection to a peer and opens a fresh one for what comes
+   * next. `retiring` are the fingerprints of the remote connections that
+   * will not be heard from again.
+   */
+  private async replaceConnection(
+    senderIdentityId: string,
+    retiring: Array<string | undefined>,
+    sendSignal: SignalSender,
+  ): Promise<RTCPeerConnection> {
+    const state = this.state(senderIdentityId);
+
+    this.states.set(senderIdentityId, {
+      ignoreOffer: false,
+      makingOffer: false,
+      polite: state.polite,
+      retiredFingerprints: [
+        ...state.retiredFingerprints,
+        ...retiring.filter((fingerprint) => fingerprint !== undefined),
+      ].slice(-retiredFingerprintLimit),
+    });
+    logCallWarning('peer-manager:handle-signal:replaced-connection', {
+      retiredCount: retiring.length,
+      senderIdentityId,
+    });
+
+    return await this.replacePeer(senderIdentityId, sendSignal);
+  }
+
+  /** The connection an answer is applied on, or none when it is left alone. */
+  private async connectionForAnswer(
+    senderIdentityId: string,
+    peer: RTCPeerConnection,
+    description: RTCSessionDescription,
+    sendSignal: SignalSender,
+  ): Promise<RTCPeerConnection | undefined> {
+    const state = this.state(senderIdentityId);
+
+    if (
+      !['have-local-offer', 'have-remote-pranswer'].includes(
+        peer.signalingState,
+      )
+    ) {
+      await this.redeliverAfterIgnoredOffer(
+        senderIdentityId,
+        peer,
+        state,
+        sendSignal,
+      );
+
+      return undefined;
+    }
+
+    state.ignoreOffer = false;
+
+    if (!this.isNewConnection(peer, description)) return peer;
+
+    // This answer is for a connection that no longer exists: offer again.
+    const replacement = await this.replaceConnection(
+      senderIdentityId,
+      [
+        descriptionFingerprint(peer.remoteDescription),
+        descriptionFingerprint(description),
+      ],
+      sendSignal,
+    );
+
+    await this.offerIfNeeded(senderIdentityId, replacement, true, sendSignal);
+
+    return undefined;
+  }
+
+  /**
+   * The connection an offer is applied on, or none when it is left alone.
+   * An offer that collides with ours is ignored by the impolite peer and
+   * answered by the polite one on a fresh connection, for a connection that
+   * rolled back its own offer would never run its frame transforms again in
+   * Chromium and WebKit.
+   */
+  private async connectionForOffer(
+    senderIdentityId: string,
+    peer: RTCPeerConnection,
+    description: RTCSessionDescription,
+    sendSignal: SignalSender,
+  ): Promise<RTCPeerConnection | undefined> {
+    const state = this.state(senderIdentityId);
+
+    const collision = state.makingOffer || peer.signalingState !== 'stable';
+
+    state.ignoreOffer = !state.polite && collision;
+
+    if (state.ignoreOffer) {
+      logCallWarning('peer-manager:handle-signal:ignored-glare-offer', {
+        senderIdentityId,
+        signalingState: peer.signalingState,
+      });
+      await this.redeliverAfterIgnoredOffer(
+        senderIdentityId,
+        peer,
+        state,
+        sendSignal,
+      );
+
+      return undefined;
+    }
+
+    const fromNewConnection = this.isNewConnection(peer, description);
+
+    if (!fromNewConnection && !collision) return peer;
+
+    return await this.replaceConnection(
+      senderIdentityId,
+      fromNewConnection ? [descriptionFingerprint(peer.remoteDescription)] : [],
+      sendSignal,
+    );
+  }
+
+  /**
+   * Whether `description` is of a remote connection this connection
+   * negotiated with before, but is not the one it negotiated with: a
+   * connection cannot take another DTLS certificate of the remote peer.
+   */
+  private isNewConnection(
+    peer: RTCPeerConnection,
+    description: RTCSessionDescription,
+  ): boolean {
+    const established = descriptionFingerprint(peer.remoteDescription);
+    const fingerprint = descriptionFingerprint(description);
+
+    return (
+      established !== undefined &&
+      fingerprint !== undefined &&
+      fingerprint !== established
+    );
+  }
+
+  private isRetired(
+    state: PeerNegotiationState,
+    peer: RTCPeerConnection,
+    description: RTCSessionDescription,
+  ): boolean {
+    const fingerprint = descriptionFingerprint(description);
+
+    return (
+      fingerprint !== undefined &&
+      fingerprint !== descriptionFingerprint(peer.remoteDescription) &&
+      state.retiredFingerprints.includes(fingerprint)
+    );
+  }
+
+  /**
+   * The connection `description` is to be applied on, or none when it is to
+   * be left alone: a description of a retired remote connection is dropped,
+   * one of another remote connection than the one this connection negotiated
+   * with, or an offer that collides, is met by a fresh connection.
+   */
+  private async receivingConnection(
+    senderIdentityId: string,
+    description: RTCSessionDescription,
+    sendSignal: SignalSender,
+  ): Promise<RTCPeerConnection | undefined> {
+    const peer = this.peerFor(senderIdentityId);
+
+    if (!peer) return undefined;
+
+    const state = this.state(senderIdentityId);
+
+    if (this.isRetired(state, peer, description)) {
+      logCallWarning('peer-manager:handle-signal:dropped-retired-description', {
+        senderIdentityId,
+        signalType: description.type,
+      });
+
+      return undefined;
+    }
+
+    return description.type === 'answer'
+      ? await this.connectionForAnswer(
+          senderIdentityId,
+          peer,
+          description,
+          sendSignal,
+        )
+      : await this.connectionForOffer(
+          senderIdentityId,
+          peer,
+          description,
+          sendSignal,
+        );
   }
 
   private async sendDescription(
@@ -222,36 +339,30 @@ export class CallPeerNegotiation {
   }
 
   /**
-   * Descriptions are applied one at a time per peer: a re-sent offer may
-   * arrive while its first copy is still being answered.
+   * Descriptions are applied one at a time per remote peer, whichever of its
+   * connections they are for: a re-sent offer may arrive while its first copy
+   * is still being answered, or while the connection it was for is replaced.
    */
   public async handleDescriptionSignal(
     senderIdentityId: string,
-    peer: RTCPeerConnection,
     payload: DescriptionSignalPayload,
-    state: PeerNegotiationState,
     sendSignal: SignalSender,
   ): Promise<void> {
-    const previous = this.descriptionHandlings.get(peer) ?? Promise.resolve();
+    const previous =
+      this.descriptionHandlings.get(senderIdentityId) ?? Promise.resolve();
     const handling = previous
       .catch(() => undefined)
       .then(() =>
-        this.applyDescriptionSignal(
-          senderIdentityId,
-          peer,
-          payload,
-          state,
-          sendSignal,
-        ),
+        this.applyDescriptionSignal(senderIdentityId, payload, sendSignal),
       );
 
-    this.descriptionHandlings.set(peer, handling);
+    this.descriptionHandlings.set(senderIdentityId, handling);
 
     try {
       await handling;
     } finally {
-      if (this.descriptionHandlings.get(peer) === handling)
-        this.descriptionHandlings.delete(peer);
+      if (this.descriptionHandlings.get(senderIdentityId) === handling)
+        this.descriptionHandlings.delete(senderIdentityId);
     }
   }
 
@@ -289,6 +400,7 @@ export class CallPeerNegotiation {
   }
 
   public reset(): void {
+    this.descriptionHandlings.clear();
     this.states.clear();
   }
 
@@ -345,6 +457,7 @@ export class CallPeerNegotiation {
       ignoreOffer: false,
       makingOffer: false,
       polite: true,
+      retiredFingerprints: [],
     };
 
     this.states.set(peerIdentityId, state);

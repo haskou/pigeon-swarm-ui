@@ -16,6 +16,9 @@ const remote = identity === 'alice' ? 'bob' : 'alice';
 const root = createRoot(document.getElementById('root')!);
 const nativePeers: RTCPeerConnection[] = [];
 const gatheredCandidates: RTCIceCandidateInit[] = [];
+// A glare replaces a peer's connection, so only open ones represent the call.
+const livePeers = () =>
+  nativePeers.filter((peer) => peer.signalingState !== 'closed');
 const NativePeerConnection = window.RTCPeerConnection;
 window.RTCPeerConnection = class extends NativePeerConnection {
   constructor(configuration?: RTCConfiguration) {
@@ -124,9 +127,9 @@ window.callRecoveryTest = {
   },
   receive: async (type: CallSignalType, payload: Record<string, unknown>) =>
     manager.handleSignal(remote, type, payload, send, identity),
-  restart: () => nativePeers.forEach((peer) => peer.restartIce()),
+  restart: () => livePeers().forEach((peer) => peer.restartIce()),
   candidates: async () => {
-    const peer = nativePeers[0];
+    const peer = livePeers()[0];
     const fragment = peer.localDescription?.sdp.match(
       /^a=ice-ufrag:([^\r\n]+)/m,
     )?.[1];
@@ -151,11 +154,12 @@ window.callRecoveryTest = {
   },
   inspect: async () => ({
     stats: await manager.collectStats(),
-    native: nativePeers.map((peer) => ({
+    native: livePeers().map((peer) => ({
       signalingState: peer.signalingState,
       hasDescriptions: Boolean(peer.localDescription && peer.remoteDescription),
     })),
     configurationRequests,
+    createdPeers: nativePeers.length,
     stageOpens,
     audioElements: document.querySelectorAll('audio').length,
   }),
@@ -182,6 +186,7 @@ declare global {
           hasDescriptions: boolean;
         }>;
         configurationRequests: number;
+        createdPeers: number;
         stageOpens: number;
         audioElements: number;
       }>;

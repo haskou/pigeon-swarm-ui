@@ -1,6 +1,5 @@
 import type { CallMediaEncryption } from './CallMediaEncryption';
 import type { CallScreenShareStreams } from './CallScreenShareStreams';
-import type { PeerLookup } from './PeerLookup';
 import type { ScreenShareQualityPreset } from './ScreenShareQualityPreset';
 
 import { logCallDebug, logCallError, logCallWarning } from './callDebugLogger';
@@ -15,7 +14,6 @@ export class CallLocalTracks {
   private screenShareQuality: ScreenShareQualityPreset = 'auto';
 
   public constructor(
-    private readonly peerFor: PeerLookup,
     private readonly screenShareStreams: CallScreenShareStreams,
     private readonly encryption: CallMediaEncryption,
   ) {}
@@ -175,32 +173,6 @@ export class CallLocalTracks {
 
       this.addTrack(peerIdentityId, peer, track);
     });
-  }
-
-  public async rebindAudioSenders(
-    peerIdentityId: string,
-    peer: RTCPeerConnection,
-  ): Promise<void> {
-    if (
-      this.peerFor(peerIdentityId) !== peer ||
-      peer.connectionState === 'closed'
-    )
-      return;
-
-    await Promise.all(
-      peer.getSenders().map((sender) => {
-        const track = sender.track;
-
-        if (
-          track?.kind !== 'audio' ||
-          track.readyState !== 'live' ||
-          !this.localStream?.getTracks().includes(track)
-        )
-          return;
-
-        return sender.replaceTrack(track);
-      }),
-    );
   }
 
   public reset(): void {
