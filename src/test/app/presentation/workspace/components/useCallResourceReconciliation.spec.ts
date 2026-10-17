@@ -4,10 +4,23 @@ import type { CallSession } from '../../../../../contexts/calls/presentation/vie
 
 import { useCallResourceReconciliation } from '../../../../../app/presentation/workspace/components/useCallResourceReconciliation';
 
+const mockHooks = {
+  effects: [] as (() => void)[],
+  refIndex: 0,
+  refs: [] as { current: unknown }[],
+};
+
 jest.mock('react', () => ({
   useCallback: (callback: unknown) => callback,
-  useEffect: () => undefined,
-  useRef: (current: unknown) => ({ current }),
+  useEffect: (effect: () => void) => {
+    mockHooks.effects.push(effect);
+  },
+  useRef: (current: unknown) => {
+    const index = mockHooks.refIndex++;
+    mockHooks.refs[index] ??= { current };
+
+    return mockHooks.refs[index];
+  },
   useState: (current: unknown) => [current, jest.fn()],
 }));
 jest.mock('../../../../../shared/presentation/sounds', () => ({
@@ -80,5 +93,76 @@ describe('call resource reconciliation of a superseded community call', () => {
 
     expect(endCall).toHaveBeenCalledTimes(1);
     expect(followSupersededCall).not.toHaveBeenCalled();
+  });
+});
+
+describe('call resource reconciliation while a call session is starting', () => {
+  const alice = { connected: true, identityId: 'alice', status: 'joined' };
+  const bob = { connected: true, identityId: 'bob', status: 'joined' };
+  const joinResponse = communityCall({});
+  const rosterWithBob = communityCall({
+    participantIds: ['alice', 'bob'],
+    participants: [alice, bob],
+  } as Partial<CallResource>);
+
+  function render(
+    activeCall: CallSession | null,
+    reconcileCall: jest.Mock,
+  ): (call: CallResource) => void {
+    mockHooks.refIndex = 0;
+    mockHooks.effects = [];
+    const { reconcileCallResource } = useCallResourceReconciliation({
+      activeCall,
+      callDetailsForResource: () =>
+        ({ kind: 'community-voice' }) as WorkspaceCallDetails,
+      currentIdentityId: 'alice',
+      endCall: jest.fn(),
+      followSupersededCall: jest.fn(),
+      reconcileCall,
+      setCommunities: jest.fn(),
+    });
+    mockHooks.effects.forEach((effect) => effect());
+
+    return reconcileCallResource;
+  }
+
+  function startedSession(call: CallResource): CallSession {
+    return { call, id: call.id, kind: 'community-voice' } as CallSession;
+  }
+
+  beforeEach(() => {
+    mockHooks.refs = [];
+  });
+
+  it('reconciles the new session with a roster received before it became active', () => {
+    const reconcileCall = jest.fn();
+
+    render(null, reconcileCall)(rosterWithBob);
+    expect(reconcileCall).not.toHaveBeenCalled();
+    render(startedSession(joinResponse), reconcileCall);
+
+    expect(reconcileCall).toHaveBeenLastCalledWith(
+      rosterWithBob,
+      expect.anything(),
+    );
+  });
+
+  it('keeps the join response when the remembered roster no longer has the current identity joined', () => {
+    const reconcileCall = jest.fn();
+    const reconcileCallResource = render(null, reconcileCall);
+
+    reconcileCallResource(rosterWithBob);
+    reconcileCallResource(
+      communityCall({
+        participantIds: ['alice', 'bob'],
+        participants: [{ ...alice, connected: false, status: 'left' }, bob],
+      } as Partial<CallResource>),
+    );
+    render(startedSession(joinResponse), reconcileCall);
+
+    expect(reconcileCall).toHaveBeenLastCalledWith(
+      joinResponse,
+      expect.anything(),
+    );
   });
 });
