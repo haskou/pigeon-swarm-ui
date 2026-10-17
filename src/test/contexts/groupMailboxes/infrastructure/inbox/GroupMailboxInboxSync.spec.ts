@@ -7,11 +7,13 @@ import {
   MailboxKeySchedule,
   SymmetricKey,
 } from '@haskou/pigeon-swarm-crypto';
+import { Timestamp } from '@haskou/value-objects';
 import { mock } from 'jest-mock-extended';
 
 import type { GroupMailboxGenerationRepository } from '../../../../../contexts/groupMailboxes/domain/repositories/GroupMailboxGenerationRepository';
 import type { GroupMailboxOutboxRow } from '../../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutboxRow';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
+import type { DeviceHistoryFloorStore } from '../../../../../contexts/identities/infrastructure/storage/DeviceHistoryFloorStore';
 import type { DirectMessageRecord } from '../../../../../contexts/mailboxes/domain/DirectMessageRecord';
 import type { PigeonMailboxClient } from '../../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
 import type { DirectMessageReaderSet } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageReaderSet';
@@ -31,6 +33,7 @@ import { GroupMailboxInboxStore } from '../../../../../contexts/groupMailboxes/i
 import { GroupMailboxInboxSync } from '../../../../../contexts/groupMailboxes/infrastructure/inbox/GroupMailboxInboxSync';
 import { GroupMailboxMlsEngine } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxMlsEngine';
 import { GroupMailboxOutbox } from '../../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutbox';
+import { DeviceHistoryFloor } from '../../../../../contexts/identities/domain/value-objects/DeviceHistoryFloor';
 import { DirectMailboxRecords } from '../../../../../contexts/mailboxes/domain/DirectMailboxRecords';
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
 import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
@@ -52,6 +55,8 @@ type Member = {
   direct: { from: string; plaintext: Uint8Array }[];
   engine: GroupMailboxMlsEngine;
   history: string;
+  /** The history floor this device was paired with; open unless set. */
+  historyFloors: MockProxy<Pick<DeviceHistoryFloorStore, 'load'>>;
   id: string;
   name: string;
   outbox: GroupMailboxOutbox;
@@ -235,11 +240,15 @@ const member = (name: string): Member => {
     },
     outbox,
   );
+  const historyFloors = mock<Pick<DeviceHistoryFloorStore, 'load'>>();
+
+  historyFloors.load.mockReturnValue(DeviceHistoryFloor.OPEN);
   const created: Member = {
     control,
     direct,
     engine,
     history: `${databaseName}-history`,
+    historyFloors,
     id: identityId,
     name,
     outbox,
@@ -255,6 +264,7 @@ const member = (name: string): Member => {
       new GroupMessageHistoryStore(`${databaseName}-history`),
       mock<GroupMailboxGenerationRepository>(),
       mock<DirectMessageReaderSet>(),
+      historyFloors,
     ),
   };
 
@@ -309,6 +319,7 @@ const syncBeside = (to: Member, siblings: string[]): (() => Promise<void>) => {
     new GroupMessageHistoryStore(to.history),
     mock<GroupMailboxGenerationRepository>(),
     mock<DirectMessageReaderSet>(),
+    to.historyFloors,
   );
 
   return () =>
@@ -593,6 +604,56 @@ describe('GroupMailboxInboxSync on the real MLS library', () => {
     }
   });
 
+  it('applies a commit dated before its history floor and drops only the message, so the device stays in the group', async () => {
+    const before = await bob.engine.generation(CONVERSATION);
+    const keys = MailboxKeySchedule.groupInbox(
+      before.secret.toSymmetricKey(),
+      bob.id,
+    );
+
+    await send(carol, sent('carol', mid('carol', 'before-floor')));
+    now += MlsUpdateCadence.INTERVAL_MS + MlsUpdateCadence.JITTER_MS + 1;
+    const update = await alice.control.updateWhenDue(CONVERSATION);
+    // Bob is then paired with 'Nothing': both envelopes predate its floor.
+    const floor = now + 60 * 60 * 1_000;
+
+    bob.historyFloors.load.mockReturnValue(
+      DeviceHistoryFloor.at(new Timestamp(floor)),
+    );
+    wire.acknowledge.mockClear();
+    await sync(bob);
+
+    expect(update!.generation.index).toBe(before.index + 1);
+    expect(
+      (await bob.engine.generation(CONVERSATION)).secret.isEqual(
+        update!.generation.secret,
+      ),
+    ).toBe(true);
+    expect(bob.received).toEqual([]);
+    expect(
+      await new GroupMessageHistoryStore(bob.history).load(
+        bob.session,
+        CONVERSATION,
+        10,
+      ),
+    ).toEqual([]);
+    const delivered = inboxes.get(keys.mailboxId)!.envelopes;
+
+    expect(wire.acknowledge).toHaveBeenCalledWith(
+      keys.mailboxId,
+      expect.anything(),
+      delivered[delivered.length - 1].cursor,
+    );
+
+    now = floor + 1;
+    for (const reader of [alice, carol]) await sync(reader);
+    await retry(alice, carol);
+    await send(carol, sent('carol', mid('carol', 'after-floor')));
+    await sync(bob);
+
+    expect(ids(bob.received)).toEqual(['sent:after-floor']);
+  });
+
   it('rejects a message whose author is not its MLS sender', async () => {
     await send(bob, sent('alice', mid('alice', 'forged')));
     await sync(carol);
@@ -774,6 +835,7 @@ describe('GroupMailboxInboxSync on the real MLS library', () => {
       new GroupMessageHistoryStore(carol.history),
       mock<GroupMailboxGenerationRepository>(),
       mock<DirectMessageReaderSet>(),
+      carol.historyFloors,
     );
 
     await send(
@@ -866,6 +928,7 @@ describe('GroupMailboxInboxSync on the real MLS library', () => {
       new GroupMessageHistoryStore(bob.history),
       mock<GroupMailboxGenerationRepository>(),
       mock<DirectMessageReaderSet>(),
+      bob.historyFloors,
     );
     const pass = () =>
       failing.sync(CONVERSATION, new AbortController().signal, (records) => {

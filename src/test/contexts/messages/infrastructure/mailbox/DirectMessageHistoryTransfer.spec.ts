@@ -3,6 +3,7 @@ import {
   MailboxRecordAuthorship,
   SymmetricKey,
 } from '@haskou/pigeon-swarm-crypto';
+import { Timestamp } from '@haskou/value-objects';
 import { Buffer } from 'buffer';
 import { mock } from 'jest-mock-extended';
 import { randomUUID } from 'node:crypto';
@@ -11,6 +12,8 @@ import type { Session } from '../../../../../contexts/identities/infrastructure/
 import type { DirectSentRecord } from '../../../../../contexts/mailboxes/domain/DirectSentRecord';
 import type { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 
+import { DeviceHistoryFloor } from '../../../../../contexts/identities/domain/value-objects/DeviceHistoryFloor';
+import { DevicePairingHistoryPolicy } from '../../../../../contexts/identities/domain/value-objects/DevicePairingHistoryPolicy';
 import { DirectMessageHistoryStore } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageHistoryStore';
 import { DirectMessageHistoryTransfer } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageHistoryTransfer';
 import { DirectMessageMailboxRecord } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxRecord';
@@ -25,6 +28,12 @@ describe(DirectMessageHistoryTransfer.name, () => {
   const secret = SymmetricKey.fromBuffer(Buffer.alloc(32, 11));
   const conversationId = 'conversation-1';
   const sealedRoot = SymmetricKey.fromBuffer(Buffer.alloc(32, 5));
+  const now = Date.now();
+  const recent = (offset: number): number => now - 60_000 + offset;
+  const daysAgo = (days: number): number =>
+    new Timestamp(now).addDays(-days).toMilliseconds();
+  const defaultFloor = (): DeviceHistoryFloor =>
+    DevicePairingHistoryPolicy.DEFAULT.floorAt(new Timestamp(now));
 
   const session = (root: SymmetricKey = sealedRoot): Session =>
     ({
@@ -98,40 +107,14 @@ describe(DirectMessageHistoryTransfer.name, () => {
     return { channel };
   };
 
-  it('replays the exporter history on the new device', async () => {
+  /** Publishes the exporter history under a floor and imports it anew. */
+  const transferred = async (
+    records: DirectSentRecord[],
+    floor: DeviceHistoryFloor,
+  ) => {
     const { channel } = fakeNode();
     const exporter = new DirectMessageHistoryStore(databaseName());
     const importer = new DirectMessageHistoryStore(databaseName());
-    const first = plaintextOf(sent('m1', 100));
-    const second = plaintextOf(sent('m2', 200));
-
-    await exporter.append(session(), conversationId, [
-      { plaintext: first, recordId: 'm1' },
-      { plaintext: second, recordId: 'm2' },
-    ]);
-
-    await new DirectMessageHistoryTransfer(channel, exporter).publish(
-      session(),
-      secret,
-    );
-    await new DirectMessageHistoryTransfer(channel, importer).receive(
-      session(),
-      secret,
-    );
-
-    expect(texts(await importer.load(session(), conversationId))).toEqual(
-      texts([first, second]),
-    );
-  });
-
-  it('exports at most MAX_RECORDS and keeps the newest', async () => {
-    const { channel } = fakeNode();
-    const exporter = new DirectMessageHistoryStore(databaseName());
-    const importer = new DirectMessageHistoryStore(databaseName());
-    const records = Array.from(
-      { length: DirectMessageHistoryTransfer.MAX_RECORDS + 1 },
-      (_, index) => sent(`m${index}`, index),
-    );
 
     await exporter.append(
       session(),
@@ -144,50 +127,90 @@ describe(DirectMessageHistoryTransfer.name, () => {
     await new DirectMessageHistoryTransfer(channel, exporter).publish(
       session(),
       secret,
+      floor,
     );
     await new DirectMessageHistoryTransfer(channel, importer).receive(
       session(),
       secret,
     );
 
-    expect(texts(await importer.load(session(), conversationId))).toEqual(
+    return {
+      channel,
+      imported: texts(await importer.load(session(), conversationId)),
+    };
+  };
+
+  it('replays the exporter history on the new device', async () => {
+    const first = sent('m1', recent(1));
+    const second = sent('m2', recent(2));
+
+    const { imported } = await transferred([first, second], defaultFloor());
+
+    expect(imported).toEqual(texts([first, second].map((r) => plaintextOf(r))));
+  });
+
+  it('exports only the last 30 days under the default policy', async () => {
+    const old = sent('old', daysAgo(31));
+    const fresh = sent('fresh', daysAgo(29));
+
+    const { imported } = await transferred([old, fresh], defaultFloor());
+
+    expect(imported).toEqual(texts([plaintextOf(fresh)]));
+  });
+
+  it('exports every record under All history', async () => {
+    const old = sent('old', daysAgo(400));
+    const fresh = sent('fresh', recent(1));
+
+    const { imported } = await transferred(
+      [old, fresh],
+      DevicePairingHistoryPolicy.ALL.floorAt(new Timestamp(now)),
+    );
+
+    expect(imported).toEqual(texts([old, fresh].map((r) => plaintextOf(r))));
+  });
+
+  it('exports no record under Nothing yet still opens the transfer inbox', async () => {
+    const { channel, imported } = await transferred(
+      [sent('m1', recent(1))],
+      DevicePairingHistoryPolicy.NONE.floorAt(new Timestamp(now)),
+    );
+
+    expect(imported).toEqual([]);
+    expect(channel.createInbox).toHaveBeenCalledTimes(1);
+    expect(channel.send).not.toHaveBeenCalled();
+  });
+
+  it('exports at most MAX_RECORDS and keeps the newest under the default policy', async () => {
+    const records = Array.from(
+      { length: DirectMessageHistoryTransfer.MAX_RECORDS + 1 },
+      (_, index) => sent(`m${index}`, recent(index)),
+    );
+
+    const { imported } = await transferred(records, defaultFloor());
+
+    expect(imported).toEqual(
       texts(records.slice(1).map((record) => plaintextOf(record))),
     );
   }, 60_000);
 
-  it('exports the newest records within 4 MiB sealed and skips an over-size one', async () => {
-    const { channel } = fakeNode();
-    const exporter = new DirectMessageHistoryStore(databaseName());
-    const importer = new DirectMessageHistoryStore(databaseName());
+  it('exports the newest records within 4 MiB sealed and skips an over-size one under the default policy', async () => {
     const large = (id: string, createdAt: number, size: number) => ({
       ...sent(id, createdAt),
       encryptedPayload: 'x'.repeat(size),
     });
     // 65 records in the largest (64 KiB) bucket: only 64 fit in 4 MiB.
     const fitting = Array.from({ length: 65 }, (_, index) =>
-      large(`m${index}`, index, 40_000),
+      large(`m${index}`, recent(index), 40_000),
     );
-    const oversize = large('newest', 100, 70_000);
-    const records = [...fitting, oversize];
+    const oversize = large('newest', recent(100), 70_000);
 
-    await exporter.append(
-      session(),
-      conversationId,
-      records.map((record) => ({
-        plaintext: plaintextOf(record),
-        recordId: record.id,
-      })),
-    );
-    await new DirectMessageHistoryTransfer(channel, exporter).publish(
-      session(),
-      secret,
-    );
-    await new DirectMessageHistoryTransfer(channel, importer).receive(
-      session(),
-      secret,
+    const { imported } = await transferred(
+      [...fitting, oversize],
+      defaultFloor(),
     );
 
-    expect(texts(await importer.load(session(), conversationId))).toEqual(
+    expect(imported).toEqual(
       texts(fitting.slice(1).map((record) => plaintextOf(record))),
     );
   }, 60_000);
@@ -201,7 +224,7 @@ describe(DirectMessageHistoryTransfer.name, () => {
       new DirectMessageHistoryTransfer(
         channel,
         new DirectMessageHistoryStore(databaseName()),
-      ).publish(session(), secret),
+      ).publish(session(), secret, defaultFloor()),
     ).resolves.toBeUndefined();
   });
 
@@ -210,11 +233,12 @@ describe(DirectMessageHistoryTransfer.name, () => {
     const exporter = new DirectMessageHistoryStore(databaseName());
 
     await exporter.append(session(), conversationId, [
-      { plaintext: plaintextOf(sent('m1', 100)), recordId: 'm1' },
+      { plaintext: plaintextOf(sent('m1', recent(1))), recordId: 'm1' },
     ]);
     await new DirectMessageHistoryTransfer(channel, exporter).publish(
       session(),
       secret,
+      defaultFloor(),
     );
     jest.spyOn(indexedDB, 'open').mockImplementation(() => {
       throw new DOMException('quota', 'QuotaExceededError');
@@ -239,11 +263,12 @@ describe(DirectMessageHistoryTransfer.name, () => {
     const other = SymmetricKey.fromBuffer(Buffer.alloc(32, 9));
 
     await exporter.append(session(), conversationId, [
-      { plaintext: plaintextOf(sent('m1', 100)), recordId: 'm1' },
+      { plaintext: plaintextOf(sent('m1', recent(1))), recordId: 'm1' },
     ]);
     await new DirectMessageHistoryTransfer(channel, exporter).publish(
       session(),
       secret,
+      defaultFloor(),
     );
     await new DirectMessageHistoryTransfer(channel, importer).receive(
       session(other),

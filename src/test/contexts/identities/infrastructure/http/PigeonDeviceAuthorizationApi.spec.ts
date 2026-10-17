@@ -27,6 +27,7 @@ import { DeviceAuthorizationEpoch } from '../../../../../contexts/identities/dom
 import { DeviceAuthorizationOperationId } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationOperationId';
 import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
 import { DeviceCredential } from '../../../../../contexts/identities/domain/value-objects/DeviceCredential';
+import { DeviceHistoryFloor } from '../../../../../contexts/identities/domain/value-objects/DeviceHistoryFloor';
 import { DeviceId } from '../../../../../contexts/identities/domain/value-objects/DeviceId';
 import { DevicePairingCode } from '../../../../../contexts/identities/domain/value-objects/DevicePairingCode';
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
@@ -488,6 +489,7 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
       session,
       draft.getRequest().toCode(),
       SymmetricKey.generate(),
+      DeviceHistoryFloor.OPEN,
     );
     const { session: paired } = await targetApi.completePairing(
       identity,
@@ -510,7 +512,7 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
     ).rejects.toMatchObject({ failure: 'used' });
   });
 
-  it('hands the history transfer secret from authorization to completion', async () => {
+  it('hands the history transfer secret and floor from authorization to completion', async () => {
     const { apiAt, authorVault, identity, session, targetVault } =
       await pairing();
     const password = IdentityPassword.fromString('Strong password 123!');
@@ -520,10 +522,12 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
       authorApi.invite(session).toCode(),
     );
     const secret = SymmetricKey.generate();
+    const floor = DeviceHistoryFloor.at(new Timestamp(900));
     const authorized = await authorApi.authorizePairing(
       session,
       draft.getRequest().toCode(),
       secret,
+      floor,
     );
     const paired = await targetApi.completePairing(
       identity,
@@ -533,6 +537,36 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
     );
 
     expect(paired.historyTransferSecret?.valueOf()).toBe(secret.valueOf());
+    expect(paired.historyFloor.toPrimitives()).toBe(900);
+  });
+
+  it('refuses a completion whose history floor lies beyond the clock skew', async () => {
+    const { apiAt, authorVault, identity, session, targetVault } =
+      await pairing();
+    const authorApi = apiAt(1_000, authorVault);
+    const targetApi = apiAt(1_100, targetVault);
+    const draft = await targetApi.requestPairing(
+      authorApi.invite(session).toCode(),
+    );
+    const authorized = await authorApi.authorizePairing(
+      session,
+      draft.getRequest().toCode(),
+      SymmetricKey.generate(),
+      DeviceHistoryFloor.at(
+        // One minute past the five minutes of clock skew a device tolerates.
+        new Timestamp(1_100).addMinutes(6),
+      ),
+    );
+
+    await expect(
+      targetApi.completePairing(
+        identity,
+        IdentityPassword.fromString('Strong password 123!'),
+        draft,
+        authorized.completion.toCode(),
+      ),
+    ).rejects.toMatchObject({ failure: 'invalid' });
+    expect(targetVault.register).not.toHaveBeenCalled();
   });
 
   it('names the paired device by the credential it reads its inboxes with', async () => {
@@ -548,6 +582,7 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
       session,
       draft.getRequest().toCode(),
       SymmetricKey.generate(),
+      DeviceHistoryFloor.OPEN,
     );
     const { session: paired } = await targetApi.completePairing(
       identity,
@@ -574,6 +609,7 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
       session,
       draft.getRequest().toCode(),
       SymmetricKey.generate(),
+      DeviceHistoryFloor.OPEN,
     );
     const completion = authorized.completion.toCode();
 
@@ -606,6 +642,7 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
       session,
       requestCode,
       SymmetricKey.generate(),
+      DeviceHistoryFloor.OPEN,
     );
 
     await expect(
@@ -613,6 +650,7 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
         authorized.session,
         requestCode,
         SymmetricKey.generate(),
+        DeviceHistoryFloor.OPEN,
       ),
     ).rejects.toMatchObject({ failure: 'mismatch' });
     expect(http.request).toHaveBeenCalledTimes(1);
@@ -634,6 +672,7 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
         otherDevice,
         draft.getRequest().toCode(),
         SymmetricKey.generate(),
+        DeviceHistoryFloor.OPEN,
       ),
     ).rejects.toMatchObject({ failure: 'mismatch' });
     expect(http.request).not.toHaveBeenCalled();
@@ -655,6 +694,7 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
         session,
         draft.getRequest().toCode(),
         SymmetricKey.generate(),
+        DeviceHistoryFloor.OPEN,
       ),
     ).rejects.toMatchObject({ failure: 'expired' });
     expect(http.request).not.toHaveBeenCalled();

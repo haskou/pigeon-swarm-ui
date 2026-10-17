@@ -10,6 +10,7 @@ import {
   lastConversationStorageKey,
   workspaceStorageKey,
 } from '../../../app/presentation/workspace/components/workspacePersistence';
+import { DeviceHistoryFloorStore } from '../../../contexts/identities/infrastructure/storage/DeviceHistoryFloorStore';
 import {
   clearLastLoginIdentity,
   loadLastLoginIdentity,
@@ -57,7 +58,7 @@ describe('eraseRemovedDevice', () => {
     Reflect.deleteProperty(globalThis, 'localStorage');
   });
 
-  it('erases decrypted projections, drafts and workspace state, then the vault record with the identity keys', async () => {
+  it('erases decrypted projections, drafts, workspace state and the history floor, then the vault record with the identity keys', async () => {
     const removed = services();
 
     await expect(eraseRemovedDevice('identity-1', removed)).resolves.toBe(true);
@@ -68,6 +69,7 @@ describe('eraseRemovedDevice', () => {
       lastConversationStorageKey('identity-1'),
       workspaceStorageKey('identity-1'),
       communityUnreadStorageKey('identity-1'),
+      DeviceHistoryFloorStore.storageKey('identity-1'),
     ]) {
       expect(storage.removeItem).toHaveBeenCalledWith(key);
     }

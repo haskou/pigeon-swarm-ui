@@ -18,6 +18,7 @@ import { DevicePairingInvitation } from '../../../../../contexts/identities/doma
 import { DevicePairingRequest } from '../../../../../contexts/identities/domain/DevicePairingRequest';
 import { DeviceAuthorizationEpoch } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
+import { DeviceHistoryFloor } from '../../../../../contexts/identities/domain/value-objects/DeviceHistoryFloor';
 import { DevicePairingCode } from '../../../../../contexts/identities/domain/value-objects/DevicePairingCode';
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 import { PairingId } from '../../../../../contexts/identities/domain/value-objects/PairingId';
@@ -25,18 +26,24 @@ import { DeviceAuthorizationCheckpointMapper } from '../../../../../contexts/ide
 import { DevicePairingCodeReader } from '../../../../../contexts/identities/infrastructure/pairing/DevicePairingCodeReader';
 import { thrownPairingFailure } from '../../domain/thrownPairingFailure';
 
+const ACCEPTED_AT = new Timestamp(1_000);
+
 function openMaterial(
   completion: DevicePairingCompletion,
   draft: DevicePairingRequestDraft,
 ): DevicePairingMaterial {
   return DevicePairingCodeReader.material(
     completion.decryptMaterial(draft.getRequest(), draft.getTransportKeyPair()),
+    ACCEPTED_AT,
   );
 }
 
 describe(DevicePairingCompletion.name, () => {
   async function fixture(
     historyTransferSecret: SymmetricKey = SymmetricKey.generate(),
+    historyFloor: DeviceHistoryFloor = DeviceHistoryFloor.at(
+      new Timestamp(400),
+    ),
   ) {
     const author = await KeyPair.generate();
     const identityKeyPair = await KeyPair.generate();
@@ -63,6 +70,7 @@ describe(DevicePairingCompletion.name, () => {
         { epoch: 'genesis', identityId: identityId.valueOf(), revision: 4 },
         identityId,
       ),
+      historyFloor,
       historyTransferSecret,
       identityKeyPair,
       recoveryAuthorityKeyPair,
@@ -99,20 +107,30 @@ describe(DevicePairingCompletion.name, () => {
     );
   });
 
-  it('refuses a validly signed completion whose material carries no history transfer secret', async () => {
-    const source = await fixture();
+  /**
+   * The source completion, its material edited and signed again. A field
+   * edited to undefined is left out of the material.
+   */
+  function resigned(
+    source: {
+      author: KeyPair;
+      completion: DevicePairingCompletion;
+      draft: DevicePairingRequestDraft;
+    },
+    edit: (material: Record<string, unknown>) => Record<string, unknown>,
+  ): DevicePairingCompletion {
     const resource = source.completion.toCode().decode() as Record<
       string,
       string
     >;
-    const material = JSON.parse(
-      source.draft
-        .getTransportKeyPair()
-        .decrypt(new EncryptedPayload(resource.encryptedMaterial))
-        .toString(),
-    ) as Record<string, unknown>;
-
-    delete material.historyTransferSecret;
+    const material = edit(
+      JSON.parse(
+        source.draft
+          .getTransportKeyPair()
+          .decrypt(new EncryptedPayload(resource.encryptedMaterial))
+          .toString(),
+      ) as Record<string, unknown>,
+    );
 
     const payload: DevicePairingCompletionPayload = {
       authorCredential: resource.authorCredential,
@@ -129,7 +147,8 @@ describe(DevicePairingCompletion.name, () => {
       revision: Number(resource.revision),
       version: 1,
     };
-    const completion = DevicePairingCodeReader.completion(
+
+    return DevicePairingCodeReader.completion(
       DevicePairingCode.encode({
         kind: resource.kind,
         ...payload,
@@ -139,11 +158,63 @@ describe(DevicePairingCompletion.name, () => {
         ).valueOf(),
       }),
     );
+  }
+
+  it('refuses a validly signed completion whose material carries no history transfer secret', async () => {
+    const source = await fixture();
+    const completion = resigned(source, (material) => ({
+      ...material,
+      historyTransferSecret: undefined,
+    }));
 
     expect(
       thrownPairingFailure(() => openMaterial(completion, source.draft)),
     ).toBe('invalid');
   });
+
+  it('carries the history floor the authorizer chose inside the encrypted material', async () => {
+    const floor = DeviceHistoryFloor.at(new Timestamp(700));
+    const source = await fixture(SymmetricKey.generate(), floor);
+    const material = openMaterial(
+      DevicePairingCodeReader.completion(source.completion.toCode()),
+      source.draft,
+    );
+
+    expect(material.getHistoryFloor().toPrimitives()).toBe(700);
+  });
+
+  it('accepts a history floor ahead of this device clock within the clock skew', async () => {
+    const source = await fixture();
+    const completion = resigned(source, (material) => ({
+      ...material,
+      historyFloor: ACCEPTED_AT.addMinutes(5).toMilliseconds(),
+    }));
+
+    expect(
+      openMaterial(completion, source.draft).getHistoryFloor().toPrimitives(),
+    ).toBe(ACCEPTED_AT.addMinutes(5).toMilliseconds());
+  });
+
+  it.each([
+    ['is missing', undefined],
+    ['is not a number', '400'],
+    ['is negative', -1],
+    ['is fractional', 400.5],
+    ['lies past the clock skew', ACCEPTED_AT.addMinutes(6).toMilliseconds()],
+  ])(
+    'refuses a validly signed completion whose history floor %s',
+    async (_case, historyFloor) => {
+      const source = await fixture();
+      const completion = resigned(source, (material) => ({
+        ...material,
+        historyFloor,
+      }));
+
+      expect(
+        thrownPairingFailure(() => openMaterial(completion, source.draft)),
+      ).toBe('invalid');
+    },
+  );
 
   it('rejects tampered completion checkpoints before decryption', async () => {
     const source = await fixture();
@@ -199,6 +270,7 @@ describe(DevicePairingCompletion.name, () => {
           },
           source.identityId,
         ),
+        historyFloor: DeviceHistoryFloor.OPEN,
         historyTransferSecret: SymmetricKey.generate(),
         identityKeyPair: source.identityKeyPair,
         recoveryAuthorityKeyPair,

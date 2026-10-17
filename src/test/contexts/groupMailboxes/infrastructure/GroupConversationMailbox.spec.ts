@@ -37,6 +37,7 @@ import { GroupMailboxOutbox } from '../../../../contexts/groupMailboxes/infrastr
 import { GroupMailboxOutboxStore } from '../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutboxStore';
 import { DeviceAuthorizationEpoch } from '../../../../contexts/identities/domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationRevision } from '../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
+import { DeviceHistoryFloor } from '../../../../contexts/identities/domain/value-objects/DeviceHistoryFloor';
 import { IdentityId } from '../../../../contexts/identities/domain/value-objects/IdentityId';
 import { sessionRootKey } from '../../../../contexts/identities/infrastructure/session/sessionRootKey';
 import { MailboxUnavailableError } from '../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
@@ -259,6 +260,7 @@ const device = (storage: string): GroupConversationMailbox =>
       send: (conversationId, peer, plaintext) =>
         post(from(), conversationId, peer, plaintext),
     }),
+    historyFloors: { load: () => DeviceHistoryFloor.OPEN },
     notifications: {
       listPage: (owner, limit, before) =>
         Promise.resolve(
