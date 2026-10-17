@@ -2,7 +2,9 @@ import type { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 
 import type { RealtimeMailboxSubscriptionInput } from '../../../../shared/infrastructure/realtime/RealtimeMailboxSubscriptionInput';
 import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
+import type { DeviceHistoryFloor } from '../../../identities/domain/value-objects/DeviceHistoryFloor';
 import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { DeviceHistoryFloorStore } from '../../../identities/infrastructure/storage/DeviceHistoryFloorStore';
 import type { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
 import type { ChatMessage } from '../../domain/ChatMessage';
 import type { DirectMessageTimelineChange } from '../../domain/DirectMessageTimelineChange';
@@ -66,6 +68,7 @@ export class DirectMessageMailbox {
     readerSet: DirectMessageReaderSet,
     composer: Pick<PigeonMessageCommandsApi, 'composeEdit' | 'withSentRecord'>,
     servers: readonly DirectMessageAvailabilityServer[],
+    historyFloors: Pick<DeviceHistoryFloorStore, 'load'>,
   ) {
     const ownCopies = new DirectMessageOwnCopies();
 
@@ -103,8 +106,9 @@ export class DirectMessageMailbox {
       ownCopies,
       this.history,
       this.availability,
+      historyFloors,
     );
-    this.reads = new DirectMessageReadSync(channel, store);
+    this.reads = new DirectMessageReadSync(channel, store, historyFloors);
   }
 
   /**
@@ -371,12 +375,16 @@ export class DirectMessageMailbox {
   }
 
   /**
-   * Pairing. Publishes this identity's newest direct history to the transfer
-   * mailbox derived from `secret`. A failure is logged without content and
-   * leaves the transfer partial or absent. Never throws.
+   * Pairing. Publishes this identity's newest direct history the floor admits
+   * to the transfer mailbox derived from `secret`. A failure is logged without
+   * content and leaves the transfer partial or absent. Never throws.
    */
-  public publishHistory(session: Session, secret: SymmetricKey): Promise<void> {
-    return this.transfer.publish(session, secret);
+  public publishHistory(
+    session: Session,
+    secret: SymmetricKey,
+    floor: DeviceHistoryFloor,
+  ): Promise<void> {
+    return this.transfer.publish(session, secret, floor);
   }
 
   /**

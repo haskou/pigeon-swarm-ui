@@ -106,6 +106,7 @@ export class GroupConversationMember {
         stores.history,
         generations,
         ports.readerSet,
+        ports.historyFloors,
       ),
     );
   }

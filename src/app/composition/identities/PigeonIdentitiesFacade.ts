@@ -3,6 +3,7 @@ import type { LoginIdentityProgressReporter } from '../../../contexts/identities
 import type { DevicePairingRequestDraft } from '../../../contexts/identities/domain/DevicePairingRequestDraft';
 import type { DeviceAuthorizationRevision } from '../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
 import type { DeviceCredential } from '../../../contexts/identities/domain/value-objects/DeviceCredential';
+import type { DevicePairingHistoryPolicy } from '../../../contexts/identities/domain/value-objects/DevicePairingHistoryPolicy';
 import type { IdentityAccessContexts } from '../../../contexts/identities/infrastructure/http/IdentityAccessContexts';
 import type { IdentityAdmissionProgressListener } from '../../../contexts/identities/infrastructure/http/IdentityAdmissionProgressListener';
 import type { IdentityMapper } from '../../../contexts/identities/infrastructure/http/IdentityMapper';
@@ -98,17 +99,19 @@ export class PigeonIdentitiesFacade {
 
   /**
    * Hands the identity root to a new device once the device password is
-   * confirmed again.
+   * confirmed again; `historyPolicy` sets how much history it keeps.
    */
   public async authorizeDevicePairing(
     session: Session,
     requestCode: DevicePairingCode,
     password: string,
+    historyPolicy: DevicePairingHistoryPolicy,
   ): Promise<{ completionCode: DevicePairingCode; session: Session }> {
     return await this.gateway.authorizeDevicePairing(
       session,
       requestCode,
       password,
+      historyPolicy,
     );
   }
 

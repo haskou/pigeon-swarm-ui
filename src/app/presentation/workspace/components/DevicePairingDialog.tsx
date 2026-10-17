@@ -3,6 +3,7 @@ import { type ReactElement, useState } from 'react';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 
 import { DevicePairingCode } from '../../../../contexts/identities/domain/value-objects/DevicePairingCode';
+import { DevicePairingHistoryPolicy } from '../../../../contexts/identities/domain/value-objects/DevicePairingHistoryPolicy';
 import { DevicePairingCodeField } from '../../../../contexts/identities/presentation/device-pairing/DevicePairingCodeField';
 import { DevicePairingCodeOutput } from '../../../../contexts/identities/presentation/device-pairing/DevicePairingCodeOutput';
 import { toDevicePairingErrorMessage } from '../../../../contexts/identities/presentation/view-models/toDevicePairingErrorMessage';
@@ -11,9 +12,24 @@ import { QrCode } from '../../../../shared/presentation/components/QrCode';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { applicationContainer } from '../../../composition/applicationContainer';
-import { ProfileInput } from './ProfileInput';
+import { profileEditorInputClass, ProfileInput } from './ProfileInput';
 
 const passwordPlaceholder = '••••••••••••';
+
+const historyOptions = [
+  {
+    label: copy.profile.devicePairingHistoryLast30Days,
+    policy: DevicePairingHistoryPolicy.LAST_30_DAYS,
+  },
+  {
+    label: copy.profile.devicePairingHistoryAll,
+    policy: DevicePairingHistoryPolicy.ALL,
+  },
+  {
+    label: copy.profile.devicePairingHistoryNone,
+    policy: DevicePairingHistoryPolicy.NONE,
+  },
+];
 
 export function DevicePairingDialog({
   onClose,
@@ -34,6 +50,9 @@ export function DevicePairingDialog({
   const [error, setError] = useState<string | null>(null);
   const [verificationCode, setVerificationCode] = useState<string | null>(null);
   const [password, setPassword] = useState('');
+  const [historyPolicy, setHistoryPolicy] = useState(
+    DevicePairingHistoryPolicy.DEFAULT,
+  );
 
   const review = async () => {
     setState('loading');
@@ -65,6 +84,7 @@ export function DevicePairingDialog({
           session,
           DevicePairingCode.fromString(requestCode),
           password,
+          historyPolicy,
         );
 
       setCompletionCode(result.completionCode);
@@ -138,6 +158,33 @@ export function DevicePairingDialog({
                     type="password"
                     value={password}
                   />
+                  <label className="grid gap-2 text-sm font-black text-white/70">
+                    {copy.profile.devicePairingHistoryLabel}
+                    <select
+                      className={`${profileEditorInputClass} text-sm font-normal`}
+                      data-testid="device-pairing-history-select"
+                      onChange={(event) =>
+                        setHistoryPolicy(
+                          DevicePairingHistoryPolicy.fromPrimitives(
+                            event.target.value,
+                          ),
+                        )
+                      }
+                      value={historyPolicy.valueOf()}
+                    >
+                      {historyOptions.map((option) => (
+                        <option
+                          key={option.policy.valueOf()}
+                          value={option.policy.valueOf()}
+                        >
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-xs font-normal leading-relaxed text-white/55">
+                      {copy.profile.devicePairingHistoryHelp}
+                    </span>
+                  </label>
                 </>
               )}
               <button

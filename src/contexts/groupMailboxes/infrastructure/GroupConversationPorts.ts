@@ -1,4 +1,5 @@
 import type { Session } from '../../identities/infrastructure/session/Session';
+import type { DeviceHistoryFloorStore } from '../../identities/infrastructure/storage/DeviceHistoryFloorStore';
 import type { PigeonMailboxClient } from '../../mailboxes/infrastructure/http/PigeonMailboxClient';
 import type { MailboxChannel } from '../../mailboxes/infrastructure/MailboxChannel';
 import type { MessageProjector } from '../../messages/infrastructure/crypto/MessageProjector';
@@ -25,6 +26,8 @@ export type GroupConversationPorts = {
    * with its latest session.
    */
   direct: (session: () => Session) => GroupMailboxDirectLink;
+  /** This device's history floor, below which messages are not kept. */
+  historyFloors: Pick<DeviceHistoryFloorStore, 'load'>;
   /** This identity's notifications, and the state records resolving them. */
   notifications: GroupMailboxNotificationInbox;
   now: () => number;

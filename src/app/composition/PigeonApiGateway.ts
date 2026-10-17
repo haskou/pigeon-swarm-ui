@@ -56,6 +56,7 @@ import { PigeonKeychainApi } from '../../contexts/identities/infrastructure/http
 import { PigeonPresenceApi } from '../../contexts/identities/infrastructure/http/PigeonPresenceApi';
 import { PigeonPresenceGateway } from '../../contexts/identities/infrastructure/http/PigeonPresenceGateway';
 import { ContactPinStore } from '../../contexts/identities/infrastructure/storage/ContactPinStore';
+import { DeviceHistoryFloorStore } from '../../contexts/identities/infrastructure/storage/DeviceHistoryFloorStore';
 import { DeviceIdentityVault } from '../../contexts/identities/infrastructure/storage/DeviceIdentityVault';
 import { DeviceSealedRecoveryStore } from '../../contexts/identities/infrastructure/storage/DeviceSealedRecoveryStore';
 import { DeviceSealedRootTrustStore } from '../../contexts/identities/infrastructure/storage/DeviceSealedRootTrustStore';
@@ -422,6 +423,8 @@ export class PigeonApiGateway {
     );
     this.mailboxChannel = mailboxChannel;
     this.recipientMailboxes = recipientMailboxes;
+    // One store: the pairing gateway writes the floor the inbox syncs read.
+    const historyFloors = new DeviceHistoryFloorStore();
     this.directMessageMailbox = new DirectMessageMailbox(
       mailboxChannel,
       recipientMailboxes,
@@ -443,6 +446,7 @@ export class PigeonApiGateway {
           store: new DirectMessageMailboxStore(base),
         };
       }),
+      historyFloors,
     );
     this.node = new PigeonNodeApi(http, signer);
     this.nodeAccess = new PigeonNodeAccessApi(http, signer);
@@ -471,6 +475,7 @@ export class PigeonApiGateway {
           new NotificationMutationSigner(mutations),
           Date.now,
         ),
+      historyFloors,
       notifications: notificationsApi,
       now: Date.now,
       projector: messageProjector,
@@ -512,8 +517,12 @@ export class PigeonApiGateway {
       deviceSealedRoot,
       deviceSealedRecovery,
       {
-        publish: async (session, secret) =>
-          await this.directMessageMailbox.publishHistory(session, secret),
+        publish: async (session, secret, floor) =>
+          await this.directMessageMailbox.publishHistory(
+            session,
+            secret,
+            floor,
+          ),
         receive: async (session, secret) =>
           await this.directMessageMailbox.receiveHistory(session, secret),
       },
@@ -524,6 +533,7 @@ export class PigeonApiGateway {
             credential.valueOf(),
           ),
       },
+      historyFloors,
     );
   }
 

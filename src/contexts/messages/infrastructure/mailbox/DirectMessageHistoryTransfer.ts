@@ -4,7 +4,9 @@ import {
   MailboxReadToken,
   type SymmetricKey,
 } from '@haskou/pigeon-swarm-crypto';
+import { Timestamp } from '@haskou/value-objects';
 
+import type { DeviceHistoryFloor } from '../../../identities/domain/value-objects/DeviceHistoryFloor';
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type {
   MailboxChannel,
@@ -89,10 +91,11 @@ function withinBudget(
 
 /**
  * Pairing history export. The authorizing device posts its newest direct
- * history into a one-shot mailbox derived from a secret that travels only in
- * the encrypted pairing completion. The node sees mailbox ids and token
- * hashes, never record plaintext or the secret. Each record is one envelope,
- * sent oldest first so the importer keeps chronological order.
+ * history created at or after the history floor chosen for the new device
+ * into a one-shot mailbox derived from a secret that travels only in the
+ * encrypted pairing completion. The node sees mailbox ids and token hashes,
+ * never record plaintext or the secret. Each record is one envelope, sent
+ * oldest first so the importer keeps chronological order.
  */
 export class DirectMessageHistoryTransfer {
   /** Most records exported; the newest are kept. */
@@ -126,11 +129,17 @@ export class DirectMessageHistoryTransfer {
   }
 
   /**
-   * Exporter. Publishes this identity's newest history to the transfer mailbox
-   * derived from `secret`. A failure stops the publish and leaves the transfer
-   * partial or absent; the importer then gets what was sent. Never throws.
+   * Exporter. Publishes this identity's newest history the floor admits to
+   * the transfer mailbox derived from `secret`. The mailbox opens even when
+   * no record is admitted. A failure stops the publish and leaves the
+   * transfer partial or absent; the importer then gets what was sent. Never
+   * throws.
    */
-  public async publish(session: Session, secret: SymmetricKey): Promise<void> {
+  public async publish(
+    session: Session,
+    secret: SymmetricKey,
+    floor: DeviceHistoryFloor,
+  ): Promise<void> {
     try {
       const keys = MailboxKeySchedule.derive(
         secret,
@@ -142,7 +151,19 @@ export class DirectMessageHistoryTransfer {
         session,
         DirectMessageHistoryTransfer.MAX_RECORDS,
       );
-      const frames = withinBudget(items);
+      const frames = withinBudget(
+        items.filter((item) => {
+          const record = DirectMessageRecordReader.decode(
+            session,
+            item.conversationId,
+            item.plaintext,
+          );
+
+          return (
+            record !== null && floor.admits(new Timestamp(record.createdAt))
+          );
+        }),
+      );
 
       await this.channel.createInbox(keys, readToken);
 

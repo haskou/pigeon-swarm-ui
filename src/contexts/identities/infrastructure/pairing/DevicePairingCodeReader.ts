@@ -22,6 +22,7 @@ import { DeviceAuthorizationEpoch } from '../../domain/value-objects/DeviceAutho
 import { DeviceAuthorizationOperationId } from '../../domain/value-objects/DeviceAuthorizationOperationId';
 import { DeviceAuthorizationRevision } from '../../domain/value-objects/DeviceAuthorizationRevision';
 import { DeviceCredential } from '../../domain/value-objects/DeviceCredential';
+import { DeviceHistoryFloor } from '../../domain/value-objects/DeviceHistoryFloor';
 import { DevicePairingCode } from '../../domain/value-objects/DevicePairingCode';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
 import { PairingId } from '../../domain/value-objects/PairingId';
@@ -77,6 +78,7 @@ export class DevicePairingCodeReader {
 
   private static materialResource(
     plaintext: string,
+    acceptedAt: Timestamp,
   ): DevicePairingCompletionMaterialResource {
     const invalidMessage = 'Invalid encrypted device pairing material.';
     const resource = DevicePairingResource.fromUnknown(
@@ -87,8 +89,14 @@ export class DevicePairingCodeReader {
       resource.getNumber('version') === 1,
       new DevicePairingError('invalid', invalidMessage),
     );
+    const historyFloor = resource.getNumber('historyFloor');
+    assert(
+      DeviceHistoryFloor.isReceivable(historyFloor, acceptedAt),
+      new DevicePairingError('invalid', invalidMessage),
+    );
 
     return {
+      historyFloor,
       historyTransferSecret: resource.getString('historyTransferSecret'),
       identityKeyPair: resource.getKeyPair('identityKeyPair'),
       recoveryAuthorityKeyPair: resource.getKeyPair('recoveryAuthorityKeyPair'),
@@ -158,14 +166,19 @@ export class DevicePairingCodeReader {
     );
   }
 
-  public static material(plaintext: string): DevicePairingMaterial {
-    const resource = this.materialResource(plaintext);
+  /** Refuses a history floor `acceptedAt` cannot have reached yet. */
+  public static material(
+    plaintext: string,
+    acceptedAt: Timestamp,
+  ): DevicePairingMaterial {
+    const resource = this.materialResource(plaintext, acceptedAt);
 
     return new DevicePairingMaterial(
       KeyPair.fromPrimitives(resource.identityKeyPair),
       KeyPair.fromPrimitives(resource.recoveryAuthorityKeyPair),
       UserRootKey.fromBase64(resource.rootKey),
       SymmetricKey.fromBase64(resource.historyTransferSecret),
+      DeviceHistoryFloor.fromPrimitives(resource.historyFloor),
     );
   }
 
