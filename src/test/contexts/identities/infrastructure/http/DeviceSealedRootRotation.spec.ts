@@ -855,7 +855,7 @@ describe('DeviceSealedRootRotation', () => {
       const root = SymmetricKey.generate();
       const { deviceAuthorization, rotation } = revokedLater(root);
 
-      deviceAuthorization.verifyPublisher.mockResolvedValueOnce(undefined);
+      deviceAuthorization.verifyPublisher.mockResolvedValueOnce('authorized');
       await rotation.current(makeSession(4));
 
       const lagging = await rotation.laggingRoot(makeSession(5));
@@ -911,11 +911,11 @@ describe('DeviceSealedRootRotation', () => {
 
       deviceAuthorization.verifyPublisher.mockResolvedValueOnce('authorized');
       await rotation.current(makeSession(4));
-      await rotation.rotate(makeSession(5));
       await rotation.handOver(makeSession(5), {
         authorizationRevision: 6,
         recipients: RECIPIENTS,
       });
+      await rotation.rotate(makeSession(5));
 
       expect(sealedSecrets.publish.mock.calls[0][1].generation).toBe(
         1_000 + DAY + 1,
@@ -958,7 +958,7 @@ describe('DeviceSealedRootRotation', () => {
         identity: { id: '00000000-0000-4000-8000-000000000002' },
       } as unknown as SessionWithRoot;
 
-      deviceAuthorization.verifyPublisher.mockResolvedValueOnce(undefined);
+      deviceAuthorization.verifyPublisher.mockResolvedValueOnce('authorized');
       await rotation.current(makeSession(4));
 
       await expect(rotation.laggingRoot(other)).rejects.toThrow(REVOKED);
@@ -985,7 +985,7 @@ describe('DeviceSealedRootRotation', () => {
     };
 
     it('opens the hand-over above the revision of the root this device trusts, and again while it trusts that hand-over', async () => {
-      const { deviceAuthorization, rotation, sealedSecrets, root } =
+      const { deviceAuthorization, root, rotation, sealedSecrets } =
         handedOver();
 
       sealedSecrets.fetchOwn.mockResolvedValueOnce(

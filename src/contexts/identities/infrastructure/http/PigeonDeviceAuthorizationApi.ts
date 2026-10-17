@@ -16,6 +16,7 @@ import type { DeviceAuthorizationTransitionLogPrimitives } from '../../domain/De
 import type { DeviceAuthorizationTransitionPrimitives } from '../../domain/DeviceAuthorizationTransitionPrimitives';
 import type { DevicePairingRequestDraft } from '../../domain/DevicePairingRequestDraft';
 import type { DeviceAuthorizationReplay } from '../../domain/services/DeviceAuthorizationReplay';
+import type { DeviceSealedSecretPublisherStanding } from '../../domain/services/DeviceSealedSecretPublisherStanding';
 import type { IdentityPassword } from '../../domain/value-objects/IdentityPassword';
 import type { Session } from '../session/Session';
 import type { DeviceIdentityVault } from '../storage/DeviceIdentityVault';
@@ -596,17 +597,18 @@ export class PigeonDeviceAuthorizationApi {
    * Verifies that the signed transitions, replayed like `synchronize`,
    * authorize the publisher of a device-sealed secret at the revision the
    * secret names: as a device of that revision that no later transition
-   * revoked, or as the device that retired itself into it with a hand-over.
-   * Rejects as `synchronize` does, with the revoked-publisher error when a
-   * later transition revoked that device, and with the unauthorized-publisher
-   * error otherwise. Stores nothing.
+   * revoked, or as the device that retired itself into it with a hand-over,
+   * and returns which. Rejects as `synchronize` does, with the
+   * revoked-publisher error when a later transition revoked that device, and
+   * with the unauthorized-publisher error otherwise. Stores nothing. Each
+   * call fetches and replays the whole log once.
    */
   public async verifyPublisher(
     session: Session,
     publisher: DeviceCredential,
     revision: DeviceAuthorizationRevision,
-  ): Promise<void> {
-    DeviceSealedSecretPublisherDomainService.verify({
+  ): Promise<DeviceSealedSecretPublisherStanding> {
+    return DeviceSealedSecretPublisherDomainService.verify({
       publisher,
       replay: await this.verifiedReplay(session),
       revision,
