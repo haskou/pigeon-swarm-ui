@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { setTimeout as sleep } from 'node:timers/promises';
 import {
   type Browser,
   type BrowserContext,
@@ -44,6 +45,7 @@ async function startCall(
   contexts: BrowserContext[],
   baseURL: string | undefined,
   keys: [string, string],
+  negotiationDelayMs = 0,
 ): Promise<Page[]> {
   const pages = await Promise.all(contexts.map((context) => context.newPage()));
 
@@ -51,11 +53,16 @@ async function startCall(
     await page.exposeBinding(
       'sendTestSignal',
       async (_source, type: CallSignalType, payload: Record<string, unknown>) =>
-        void pages[1 - index]
-          .evaluate(
-            ({ type, payload }) =>
-              window.callSessionTest.receive(type, payload),
-            { type, payload },
+        // A held offer or answer reaches the other end only after that end
+        // has made an offer of its own, so crossed offers are not left to
+        // timing.
+        void sleep(type === 'ice_candidate' ? 0 : negotiationDelayMs)
+          .then(() =>
+            pages[1 - index].evaluate(
+              ({ type, payload }) =>
+                window.callSessionTest.receive(type, payload),
+              { type, payload },
+            ),
           )
           .catch((error) => signalingErrors.push(String(error))),
     );
@@ -87,6 +94,20 @@ async function remotePeer(page: Page) {
   expect(peers).toHaveLength(1);
 
   return peers[0];
+}
+
+// True when one connection decoded audio across a stretch of time, so it stays
+// false while the connection is replaced.
+async function decodesAudio(page: Page): Promise<boolean> {
+  const [first] = (await inspect(page)).peers;
+
+  await sleep(3_000);
+
+  const [second] = (await inspect(page)).peers;
+
+  if (!first || !second) return false;
+
+  return first.iceUfrag === second.iceUfrag && second.energy > first.energy;
 }
 
 test.describe('private call media encryption', () => {
@@ -174,5 +195,45 @@ test.describe('private call media encryption', () => {
       expect
         .soft((await remotePeer(page)).energy, `audio the ${end} decoded`)
         .toBe(0);
+  });
+
+  test('keeps decoding audio after both ends restart ICE at once', async ({
+    baseURL,
+  }) => {
+    const heldMs = 1_500;
+    const key = callKey();
+    const pages = await startCall(contexts, baseURL, [key, key], heldMs);
+
+    for (const page of pages)
+      await expect
+        .poll(async () => (await remotePeer(page)).energy, { timeout: 30_000 })
+        .toBeGreaterThan(0);
+
+    // The offers cross; the end that yields must neither lose its encryption
+    // nor leave the other end decrypting nothing.
+    await Promise.all(
+      pages.map((page) =>
+        page.evaluate(() => window.callSessionTest.restartIce()),
+      ),
+    );
+    // Audio keeps flowing until the crossed offers are applied, so measure
+    // only once the held offers, answers and any re-offer have been delivered.
+    await sleep(heldMs * 6);
+
+    for (const page of pages)
+      await expect
+        .poll(() => decodesAudio(page), { timeout: 30_000 })
+        .toBe(true);
+
+    for (const page of pages) {
+      const { call } = await inspect(page);
+      const peer = await remotePeer(page);
+
+      expect(call?.mediaEncryption).toEqual({ active: true });
+      expect(peer.audioTransforms).toEqual({
+        receiver: 'RTCRtpScriptTransform',
+        sender: 'RTCRtpScriptTransform',
+      });
+    }
   });
 });

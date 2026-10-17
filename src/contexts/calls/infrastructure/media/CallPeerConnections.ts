@@ -62,13 +62,14 @@ export class CallPeerConnections {
 
     this.screenShareStreams = new CallScreenShareStreams(remoteAudio);
     this.localTracks = new CallLocalTracks(
-      peerFor,
       this.screenShareStreams,
       this.mediaEncryption,
     );
     this.iceCandidates = new CallIceCandidates(peerFor, signalRetry);
     this.negotiation = new CallPeerNegotiation(
       peerFor,
+      (peerIdentityId, sendSignal) =>
+        this.replacePeer(peerIdentityId, sendSignal),
       signalRetry,
       this.screenShareStreams,
       this.localTracks,
@@ -330,17 +331,42 @@ export class CallPeerConnections {
     );
   }
 
-  private removePeer(peerIdentityId: string): void {
-    this.recovery.forget(peerIdentityId);
+  /**
+   * Drops the connection and what hangs on it. What outlives it is what a
+   * connection that replaces it needs: the remote peer's admission to a
+   * private call and the ICE candidates it sent for the new connection.
+   */
+  private closePeer(peerIdentityId: string): void {
     this.peers.get(peerIdentityId)?.close();
     this.peers.delete(peerIdentityId);
+    this.remoteStreams.delete(peerIdentityId);
+    this.screenShareStreams.forget(peerIdentityId);
+    this.remoteAudio.removePeer(peerIdentityId);
+  }
+
+  private removePeer(peerIdentityId: string): void {
+    this.recovery.forget(peerIdentityId);
+    this.discardPeer(peerIdentityId);
+  }
+
+  private discardPeer(peerIdentityId: string): void {
+    this.closePeer(peerIdentityId);
     this.iceCandidates.forget(peerIdentityId);
     this.mediaEncryption.forget(peerIdentityId);
     this.negotiation.forget(peerIdentityId);
     this.peerSignalSenders.delete(peerIdentityId);
-    this.remoteStreams.delete(peerIdentityId);
-    this.screenShareStreams.forget(peerIdentityId);
-    this.remoteAudio.removePeer(peerIdentityId);
+  }
+
+  private async replacePeer(
+    peerIdentityId: string,
+    sendSignal: SignalSender,
+  ): Promise<RTCPeerConnection | undefined> {
+    if (!this.recovery.allowReplacement(peerIdentityId)) return undefined;
+
+    this.recovery.detach(peerIdentityId);
+    this.closePeer(peerIdentityId);
+
+    return await this.getOrCreatePeer(peerIdentityId, sendSignal);
   }
 
   public configure(rtcConfigurationProvider: RtcConfigurationProvider): void {
@@ -424,21 +450,31 @@ export class CallPeerConnections {
         senderIdentityId,
         signalType,
       });
-      this.removePeer(senderIdentityId);
+      this.recovery.abandon(senderIdentityId);
+      this.discardPeer(senderIdentityId);
 
+      return;
+    }
+
+    // A peer that signals again after a refusal gets a new connection with
+    // every signal, so the connections created for it count like replacements.
+    if (
+      !this.peers.has(senderIdentityId) &&
+      !this.pendingPeerCreations.has(senderIdentityId) &&
+      !this.recovery.allowReplacement(senderIdentityId)
+    ) {
       return;
     }
 
     this.peerSignalSenders.set(senderIdentityId, sendSignal);
     const peer = await this.getOrCreatePeer(senderIdentityId, sendSignal);
-    const state = this.negotiation.state(senderIdentityId);
 
     if (signalType === 'ice_candidate') {
       await this.iceCandidates.handleSignal(
         senderIdentityId,
         peer,
         payload as RTCIceCandidateInit,
-        state,
+        this.negotiation.state(senderIdentityId),
       );
 
       return;
@@ -446,9 +482,7 @@ export class CallPeerConnections {
 
     await this.negotiation.handleDescriptionSignal(
       senderIdentityId,
-      peer,
       payload as unknown as DescriptionSignalPayload,
-      state,
       sendSignal,
     );
   }
@@ -501,6 +535,7 @@ export class CallPeerConnections {
         this.removePeer(peerIdentityId);
       }
     }
+    this.recovery.retain(peerIdentityIds);
   }
 
   public retryConnections(): void {

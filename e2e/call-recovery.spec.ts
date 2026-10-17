@@ -190,7 +190,11 @@ for (const scenario of [
         const exhausted = await pages[0].evaluate(() =>
           window.callRecoveryTest.inspect(),
         );
-        expect(exhausted.configurationRequests).toBe(4);
+        // Every connection asks for its configuration once, and a glare
+        // replaces a connection, so only the surplus is a recovery attempt.
+        expect(exhausted.configurationRequests - exhausted.createdPeers).toBe(
+          3,
+        );
         expect(exhausted.stats.bob.recoveryState).toBe('exhausted');
         await pages[0]
           .getByRole('button', { name: 'Start diagnostics', exact: true })

@@ -12,6 +12,14 @@ const credentialRefreshTimeoutMs = 15_000;
 const disruptionCooldownMs = 5_000;
 const politeDisruptionDelayMs = 3_000;
 
+/**
+ * Three recovery attempts may each replace both ends' connection once, with
+ * room to spare. Beyond it a peer is changing its DTLS certificate, or
+ * signalling again after every refusal, for the sake of it: every rebuilt
+ * connection costs a configuration fetch and a relay allocation.
+ */
+const maximumPeerReplacements = 10;
+
 export class CallPeerRecovery {
   private readonly exhausted = new Set<string>();
 
@@ -25,6 +33,8 @@ export class CallPeerRecovery {
   >();
 
   private readonly retryNotBefore = new Map<string, number>();
+
+  private readonly replacements = new Map<string, number>();
 
   private readonly lastRestartAt = new Map<string, number>();
 
@@ -200,12 +210,8 @@ export class CallPeerRecovery {
   }
 
   private release(peerIdentityId: string): void {
-    this.cancel(peerIdentityId);
-    this.inFlight.get(peerIdentityId)?.abort();
-    this.inFlight.delete(peerIdentityId);
-    this.attempts.delete(peerIdentityId);
-    this.exhausted.delete(peerIdentityId);
-    this.retryNotBefore.delete(peerIdentityId);
+    this.abandon(peerIdentityId);
+    this.replacements.delete(peerIdentityId);
   }
 
   private isDisruptable(
@@ -222,9 +228,64 @@ export class CallPeerRecovery {
     );
   }
 
+  /**
+   * Stops the work aimed at a connection that is being replaced. The restart
+   * budget stays with the peer: a glare is no sign of a healthier network,
+   * and a budget that reset with every replacement would never run out.
+   */
+  public detach(peerIdentityId: string): void {
+    this.cancel(peerIdentityId);
+    this.inFlight.get(peerIdentityId)?.abort();
+    this.inFlight.delete(peerIdentityId);
+  }
+
+  /**
+   * Drops the recovery of a peer whose connection is removed. Its rebuilt
+   * connections stay counted: a peer that is refused and signals again would
+   * otherwise get a fresh connection, and a fresh budget, with every signal.
+   */
+  public abandon(peerIdentityId: string): void {
+    this.detach(peerIdentityId);
+    this.attempts.delete(peerIdentityId);
+    this.exhausted.delete(peerIdentityId);
+    this.retryNotBefore.delete(peerIdentityId);
+  }
+
+  /**
+   * Whether a connection may be rebuilt for a peer once more, by replacing
+   * the one it has or by creating it again after it was removed. The
+   * rebuilds of a peer are counted until one of its connections turns
+   * healthy, the user retries or the peer leaves the call; past the limit the
+   * peer is given up as exhausted and keeps the connection it has.
+   */
+  public allowReplacement(peerIdentityId: string): boolean {
+    const replacements = (this.replacements.get(peerIdentityId) ?? 0) + 1;
+
+    if (replacements > maximumPeerReplacements) {
+      this.detach(peerIdentityId);
+      this.exhausted.add(peerIdentityId);
+      logCallWarning('peer-manager:ice-recovery:replacement-limit');
+
+      return false;
+    }
+
+    this.replacements.set(peerIdentityId, replacements);
+
+    return true;
+  }
+
   public forget(peerIdentityId: string): void {
     this.release(peerIdentityId);
     this.lastRestartAt.delete(peerIdentityId);
+  }
+
+  /** Forgets the peers that are no longer in the call. */
+  public retain(peerIdentityIds: Set<string>): void {
+    for (const peerIdentityId of this.replacements.keys()) {
+      if (!peerIdentityIds.has(peerIdentityId)) {
+        this.forget(peerIdentityId);
+      }
+    }
   }
 
   public reconcile(
@@ -270,8 +331,8 @@ export class CallPeerRecovery {
    *
    * A disruption usually reaches both peers at once. The impolite peer restarts
    * immediately and the polite peer waits for that offer: had both offered,
-   * the polite peer would roll back its own ICE-restart offer, and Chromium
-   * then keeps that peer's audio sender silent for the rest of the call.
+   * the polite peer would have to replace its whole connection to answer, for
+   * Chromium and WebKit never run the frame transforms of one that rolled back.
    */
   public disrupt(
     peerIdentityId: string,
@@ -337,6 +398,7 @@ export class CallPeerRecovery {
     this.pending.clear();
     this.attempts.clear();
     this.exhausted.clear();
+    this.replacements.clear();
     this.retryNotBefore.clear();
     this.lastRestartAt.clear();
   }

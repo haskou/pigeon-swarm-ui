@@ -168,6 +168,12 @@ window.callSessionTest = {
   },
   // What the workspace runs when its realtime socket reconnects.
   recoverRealtime: () => activeSession().recoverAfterDisruption(),
+  // What the browser does when ICE gives up on a path: every connection offers
+  // a restart on its own.
+  restartIce: () => {
+    for (const peer of nativePeers)
+      if (peer.connectionState !== 'closed') peer.restartIce();
+  },
   inspect: async () => {
     const call = activeSession().activeCall;
     const open = nativePeers.filter(
@@ -229,6 +235,7 @@ declare global {
       ) => Promise<void>;
       setBackendAvailable: (available: boolean) => void;
       recoverRealtime: () => void;
+      restartIce: () => void;
       inspect: () => Promise<{
         call: {
           encryptedWith: string[];
