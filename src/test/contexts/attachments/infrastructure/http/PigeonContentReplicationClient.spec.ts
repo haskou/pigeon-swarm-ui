@@ -52,7 +52,7 @@ describe(PigeonContentReplicationClient.name, () => {
     ];
     const body = JSON.parse(init.body);
 
-    expect(path).toBe(`/ipfs/replication/${cid}`);
+    expect(path).toBe(`/ipfs/replications/${cid}`);
     expect(init.method).toBe('PUT');
     expect(body).toMatchObject({
       context: 'ipfs_private_upload',

@@ -121,7 +121,7 @@ export class PigeonDeviceAuthorizationApi {
       ...transition.toPrimitives(),
       ...(sealedSecrets ? { sealedSecrets } : {}),
     };
-    const path = '/identity-devices/transitions';
+    const path = `${this.checkpointPath(transition.getIdentityId())}/transitions`;
     const resource = await this.http.request<
       DeviceAuthorizationCheckpointResource & {
         sealedSecrets?: DeviceSealedSecretHandedOverResource;

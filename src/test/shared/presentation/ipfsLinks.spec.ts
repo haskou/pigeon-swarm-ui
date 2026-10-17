@@ -25,7 +25,7 @@ describe(ipfsUrl.name, () => {
     expect(
       ipfsUrl('bafkreic2zqlwprwv2iofsnh32fc77zqj5eh7vlpjxlsxcfjxv45jcbjfdq'),
     ).toBe(
-      'https://pigeon.futoineko.com/api/ipfs/bafkreic2zqlwprwv2iofsnh32fc77zqj5eh7vlpjxlsxcfjxv45jcbjfdq',
+      'https://pigeon.futoineko.com/api/ipfs/contents/bafkreic2zqlwprwv2iofsnh32fc77zqj5eh7vlpjxlsxcfjxv45jcbjfdq',
     );
   });
 });

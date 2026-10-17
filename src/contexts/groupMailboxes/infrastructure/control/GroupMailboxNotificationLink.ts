@@ -19,7 +19,7 @@ import { IdentityId } from '../../../identities/domain/value-objects/IdentityId'
  * itself proves the sender to the peer.
  */
 export class GroupMailboxNotificationLink implements GroupMailboxDirectLink {
-  private static readonly PATH = '/notifications/';
+  private static readonly PATH = '/notifications';
   private static readonly TYPE = 'group_conversation_invitation';
 
   public constructor(

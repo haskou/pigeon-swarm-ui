@@ -27,7 +27,7 @@ import { RealtimeTypingPublisher } from './RealtimeTypingPublisher';
 export type { RealtimeHeartbeatActivityMode } from './RealtimeHeartbeat';
 
 const debugRealtimeStorageKey = 'pigeon:debugRealtime';
-const realtimePath = '/realtime/v1';
+const realtimePath = '/realtime';
 const realtimeProtocol = 'pigeon-realtime.v1';
 
 export class RealtimeGateway {

@@ -156,7 +156,7 @@ export class PigeonIdentityCommandsApi {
       },
       password,
     });
-    const path = '/identities/';
+    const path = '/identities';
     let identity: IdentityResource;
 
     try {
@@ -237,7 +237,7 @@ export class PigeonIdentityCommandsApi {
       },
       password: options.password,
     });
-    const path = '/identities/';
+    const path = '/identities';
     let persistedIdentity: IdentityResource;
 
     try {

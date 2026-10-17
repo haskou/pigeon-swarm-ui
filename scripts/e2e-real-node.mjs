@@ -113,11 +113,11 @@ const startNode = async () => {
   ]);
 
   await waitFor(
-    () => expectOk(`${origin}/api/node/`),
+    () => expectOk(`${origin}/api/node`),
     120_000,
     'node API did not become ready',
   );
-  await expectOk(`${origin}/api/node/networks/`, {
+  await expectOk(`${origin}/api/node/networks`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(network),

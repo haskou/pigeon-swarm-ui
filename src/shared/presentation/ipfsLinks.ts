@@ -11,7 +11,7 @@ export type IpfsLink = {
 export function ipfsUrl(cid: string): string {
   return absoluteApiUrl(
     new ApiUrlBuilder(API_SERVER_URL).build(
-      `/ipfs/${encodeURIComponent(cid)}`,
+      `/ipfs/contents/${encodeURIComponent(cid)}`,
     ),
   );
 }

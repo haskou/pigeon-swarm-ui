@@ -130,7 +130,7 @@ export class PigeonPollsApi {
     return await this.submit(
       session,
       'POST',
-      '/polls/',
+      '/polls',
       scope,
       { kind: 'put', payload },
       fields,

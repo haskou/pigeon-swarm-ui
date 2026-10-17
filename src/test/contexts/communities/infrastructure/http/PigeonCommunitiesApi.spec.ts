@@ -291,10 +291,10 @@ describe(PigeonCommunitiesApi.name, () => {
     expect(signer.headers).toHaveBeenCalledWith(
       session,
       'GET',
-      '/communities/community-1/channels/channel-1/messages/search',
+      '/communities/community-1/channels/channel-1/messages',
     );
     expect(http.request).toHaveBeenCalledWith(
-      '/communities/community-1/channels/channel-1/messages/search?limit=20&query=hello+there',
+      '/communities/community-1/channels/channel-1/messages?limit=20&query=hello+there',
       {
         headers: { 'X-Identity-Id': 'identity-1' },
         method: 'GET',
@@ -333,10 +333,10 @@ describe(PigeonCommunitiesApi.name, () => {
     expect(signer.headers).toHaveBeenCalledWith(
       session,
       'GET',
-      '/communities/community-1/messages/search',
+      '/communities/community-1/messages',
     );
     expect(http.request).toHaveBeenCalledWith(
-      '/communities/community-1/messages/search?limit=20&query=hello+there',
+      '/communities/community-1/messages?limit=20&query=hello+there',
       {
         headers: { 'X-Identity-Id': 'identity-1' },
         method: 'GET',
@@ -579,7 +579,7 @@ describe(PigeonCommunitiesApi.name, () => {
         if (path === '/communities/community-1')
           return { networkId: 'network-1' };
 
-        if (path === '/communities/membership-requests') {
+        if (path === '/community-membership-requests') {
           return { requests: [request] };
         }
 
@@ -605,7 +605,7 @@ describe(PigeonCommunitiesApi.name, () => {
       .filter(([path]: [string]) => !path.endsWith('/frontier'))
       .filter(
         ([path]: [string]) =>
-          path !== '/communities/membership-requests' &&
+          path !== '/community-membership-requests' &&
           path !== '/communities/community-1',
       )
       .map(

@@ -493,7 +493,7 @@ export class PigeonCommunitiesApi {
   }
 
   public async list(session: Session): Promise<Community[]> {
-    const path = '/communities/';
+    const path = '/communities';
     const result = await this.cachedRequest(
       `GET ${path} ${session.identity.id}`,
       async () =>
@@ -579,7 +579,7 @@ export class PigeonCommunitiesApi {
       visibility?: CommunityVisibility;
     },
   ): Promise<Community> {
-    const path = '/communities/';
+    const path = '/communities';
     const ownerIdentityId = this.mutations.authorOf(session);
     const nonce = this.randomNonce();
     const communityId = CommitmentId.community(
@@ -835,9 +835,7 @@ export class PigeonCommunitiesApi {
     communityId: string,
     networkId: string,
   ): Promise<CommunityMembershipRequest> {
-    const path = `/communities/${encodeURIComponent(
-      communityId,
-    )}/join-requests`;
+    const path = '/community-membership-requests';
     const identityId = this.mutations.authorOf(session);
     const createdAt = Date.now();
     const base = {
@@ -868,6 +866,7 @@ export class PigeonCommunitiesApi {
         updatedAt: createdAt,
       }),
       {
+        communityId,
         createdAt,
         operation: await this.signOperation(
           session,
@@ -892,7 +891,7 @@ export class PigeonCommunitiesApi {
   public async listMembershipRequests(
     session: Session,
   ): Promise<CommunityMembershipRequest[]> {
-    const path = '/communities/membership-requests';
+    const path = '/community-membership-requests';
     const result = await this.cachedRequest(
       `GET ${path} ${session.identity.id}`,
       async () =>
@@ -916,7 +915,7 @@ export class PigeonCommunitiesApi {
       'accepted' | 'declined'
     >,
   ): Promise<CommunityMembershipRequest> {
-    const path = `/communities/membership-requests/${encodeURIComponent(
+    const path = `/community-membership-requests/${encodeURIComponent(
       requestId,
     )}`;
     const current = (await this.listMembershipRequests(session)).find(
@@ -1546,7 +1545,7 @@ export class PigeonCommunitiesApi {
   }
 
   public async listDrafts(session: Session): Promise<CommunityChannelDraft[]> {
-    const path = '/communities/me/drafts';
+    const path = '/community-drafts';
 
     return await this.cachedRequest(
       `GET ${path} ${session.identity.id}`,
@@ -1618,7 +1617,7 @@ export class PigeonCommunitiesApi {
   ): Promise<CommunityChannelMessageSearchResult> {
     const path = `/communities/${encodeURIComponent(
       communityId,
-    )}/channels/${encodeURIComponent(channelId)}/messages/search`;
+    )}/channels/${encodeURIComponent(channelId)}/messages`;
     const query = new URLSearchParams({
       limit: String(input.limit ?? 20),
       query: input.query,
@@ -1642,9 +1641,7 @@ export class PigeonCommunitiesApi {
     communityId: string,
     input: { limit?: number; query: string },
   ): Promise<CommunityChannelMessageSearchResult> {
-    const path = `/communities/${encodeURIComponent(
-      communityId,
-    )}/messages/search`;
+    const path = `/communities/${encodeURIComponent(communityId)}/messages`;
     const query = new URLSearchParams({
       limit: String(input.limit ?? 20),
       query: input.query,

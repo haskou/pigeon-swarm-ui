@@ -82,7 +82,7 @@ export class PigeonStickersFacade {
   }
 
   public assetUrl(assetCid: string): string {
-    return this.apiUrl(`/ipfs/${encodeURIComponent(assetCid)}`);
+    return this.apiUrl(`/ipfs/contents/${encodeURIComponent(assetCid)}`);
   }
 
   public async createPack(

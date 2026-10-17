@@ -12,7 +12,7 @@ export class PigeonConversationsApi {
   ) {}
 
   public async list(session: Session): Promise<ConversationResource[]> {
-    const path = '/conversations/?limit=30';
+    const path = '/conversations?limit=30';
     const raw = await this.http.request<unknown>(path, {
       headers: await this.signer.headers(session, 'GET', path),
       method: 'GET',

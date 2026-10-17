@@ -26,9 +26,12 @@ describe(PigeonStickersApi.name, () => {
     await expect(api.loadAsset('cid/value', controller.signal)).resolves.toBe(
       blob,
     );
-    expect(http.requestBlob).toHaveBeenCalledWith('/ipfs/cid%2Fvalue', {
-      signal: controller.signal,
-    });
+    expect(http.requestBlob).toHaveBeenCalledWith(
+      '/ipfs/contents/cid%2Fvalue',
+      {
+        signal: controller.signal,
+      },
+    );
   });
 
   it('converts sticker images before uploading the public asset', async () => {

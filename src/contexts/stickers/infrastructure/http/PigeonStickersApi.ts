@@ -174,7 +174,7 @@ export class PigeonStickersApi {
 
   public async loadAsset(assetCid: string, signal: AbortSignal): Promise<Blob> {
     return await this.http.requestBlob(
-      `/ipfs/${encodeURIComponent(assetCid)}`,
+      `/ipfs/contents/${encodeURIComponent(assetCid)}`,
       {
         signal,
       },
@@ -226,7 +226,7 @@ export class PigeonStickersApi {
   }
 
   public async getMyStickers(session: Session): Promise<MyStickersResource> {
-    const path = '/stickers/me';
+    const path = '/stickers/library';
 
     return await this.http.request<MyStickersResource>(path, {
       headers: await this.signer.headers(session, 'GET', path),

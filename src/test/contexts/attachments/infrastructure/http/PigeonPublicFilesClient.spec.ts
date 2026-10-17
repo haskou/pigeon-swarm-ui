@@ -38,7 +38,7 @@ describe(PigeonPublicFilesClient.name, () => {
       size: 5,
     });
     expect(http.requestBlob).toHaveBeenCalledWith(
-      '/ipfs/external%2Fid',
+      '/ipfs/contents/external%2Fid',
       expect.any(Object),
     );
     expect(progress).toHaveBeenCalledWith(50);

@@ -29,7 +29,7 @@ export class NodeBootstrapApi {
   }
 
   public async getInfo(): Promise<NodeInfo & { owner: string | null }> {
-    const info = await this.http.request<NodeInfo>('/node/');
+    const info = await this.http.request<NodeInfo>('/node');
 
     return { ...info, owner: info.owner ?? null };
   }
@@ -38,7 +38,7 @@ export class NodeBootstrapApi {
     const result = await this.cachedRequest(
       'GET /node/networks/ anonymous',
       () =>
-        this.http.request<{ networks: NetworkResource[] }>('/node/networks/', {
+        this.http.request<{ networks: NetworkResource[] }>('/node/networks', {
           method: 'GET',
         }),
     );
@@ -52,7 +52,7 @@ export class NodeBootstrapApi {
 
   public async getPeerSnapshot(): Promise<NodePeersSnapshot> {
     const result =
-      await this.http.request<Partial<NodePeersSnapshot>>('/peers/');
+      await this.http.request<Partial<NodePeersSnapshot>>('/peers');
 
     return {
       ipfsPeers: result.ipfsPeers ?? [],

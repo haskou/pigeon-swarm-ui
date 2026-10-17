@@ -30,7 +30,7 @@ export class PigeonPublicFilesClient {
     onDownloadProgress?: (percent: number) => void,
   ): Promise<PublicFileContent> {
     const blob = await this.http.requestBlob(
-      `/ipfs/${encodeURIComponent(cid)}`,
+      `/ipfs/contents/${encodeURIComponent(cid)}`,
       {
         ...(onDownloadProgress
           ? {

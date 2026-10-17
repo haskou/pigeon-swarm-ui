@@ -158,7 +158,7 @@ export class PigeonCommunitiesGateway {
     );
 
     this.requestCache.invalidateForSession(
-      '/communities/membership-requests',
+      '/community-membership-requests',
       session,
     );
 
@@ -185,7 +185,7 @@ export class PigeonCommunitiesGateway {
       status,
     );
     this.requestCache.invalidateForSession(
-      '/communities/membership-requests',
+      '/community-membership-requests',
       session,
     );
 
@@ -451,7 +451,7 @@ export class PigeonCommunitiesGateway {
       content,
       updatedAt,
     );
-    this.requestCache.invalidateForSession('/communities/me/drafts', session);
+    this.requestCache.invalidateForSession('/community-drafts', session);
 
     return draft;
   }
@@ -462,7 +462,7 @@ export class PigeonCommunitiesGateway {
     channelId: string,
   ): Promise<void> {
     await this.communities.deleteChannelDraft(session, communityId, channelId);
-    this.requestCache.invalidateForSession('/communities/me/drafts', session);
+    this.requestCache.invalidateForSession('/community-drafts', session);
   }
 
   public async searchCommunityChannelMessages(

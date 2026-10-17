@@ -42,7 +42,7 @@ export class PigeonNodeAccessApi {
   }
 
   public async getInfo(): Promise<NodeAccessInfoResource> {
-    return await this.http.request<NodeAccessInfoResource>('/node/');
+    return await this.http.request<NodeAccessInfoResource>('/node');
   }
 
   public async updateRegistrationMode(
@@ -192,7 +192,7 @@ export class PigeonNodeAccessApi {
     return await this.signed<PendingNodeBlockEntriesResource>(
       session,
       'GET',
-      `${PigeonNodeAccessApi.sourcePath(ownerIdentityId)}/pending`,
+      `${PigeonNodeAccessApi.sourcePath(ownerIdentityId)}/pending-entries`,
     );
   }
 

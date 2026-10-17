@@ -56,11 +56,11 @@ describe(RequestSigner.name, () => {
     const signer = new RequestSigner(() => 123);
     const body = { conversationId: 'conversation-1' };
 
-    expect(signer.payload('post', '/conversations/', 123, body)).toBe(
+    expect(signer.payload('post', '/conversations', 123, body)).toBe(
       SignedHttpRequestSignature.signingContent({
         body,
         method: 'POST',
-        path: '/conversations/',
+        path: '/conversations',
         timestamp: 123,
       }),
     );
@@ -69,10 +69,10 @@ describe(RequestSigner.name, () => {
   it('signs only the request path and leaves query params out', () => {
     const signer = new RequestSigner(() => 123);
 
-    expect(signer.payload('GET', '/notifications/?limit=30', 123)).toBe(
+    expect(signer.payload('GET', '/notifications?limit=30', 123)).toBe(
       SignedHttpRequestSignature.signingContent({
         method: 'GET',
-        path: '/notifications/',
+        path: '/notifications',
         timestamp: 123,
       }),
     );
@@ -209,12 +209,12 @@ describe(RequestSigner.name, () => {
     const headers = await new RequestSigner(() => 123).headers(
       session,
       'POST',
-      '/keychains/',
+      '/keychains',
       body,
     );
 
     expectSigned(
-      { body, method: 'POST', path: '/keychains/', timestamp: 123 },
+      { body, method: 'POST', path: '/keychains', timestamp: 123 },
       headers['X-Signature'],
       session.keyPair,
     );

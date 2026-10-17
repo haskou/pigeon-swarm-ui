@@ -68,7 +68,7 @@ describe(PigeonConversationDraftsApi.name, () => {
       },
     ]);
     expect(request).toHaveBeenCalledWith(
-      '/conversations/me/drafts',
+      '/conversation-drafts',
       expect.objectContaining({ method: 'GET' }),
     );
   });
@@ -76,7 +76,7 @@ describe(PigeonConversationDraftsApi.name, () => {
   it('saves a draft under its opaque key and keeps what it sent, not what the node echoes', async () => {
     const session = rooted();
     const key = draftKey(session, conversationId);
-    const path = `/conversations/me/drafts/${key}`;
+    const path = `/conversation-drafts/${key}`;
     const request = jest.fn().mockResolvedValue({
       draftKey: key,
       encryptedPayload: 'node-substituted-payload',
@@ -123,7 +123,7 @@ describe(PigeonConversationDraftsApi.name, () => {
 
   it('deletes a draft under its opaque key', async () => {
     const session = rooted();
-    const path = `/conversations/me/drafts/${draftKey(session, conversationId)}`;
+    const path = `/conversation-drafts/${draftKey(session, conversationId)}`;
     const request = jest.fn().mockResolvedValue({});
     const headers = jest.fn().mockResolvedValue({});
     const api = new PigeonConversationDraftsApi(

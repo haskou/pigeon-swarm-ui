@@ -81,7 +81,7 @@ export class PigeonCallsApi {
   }
 
   public async list(session: Session): Promise<CallResource[]> {
-    const path = '/calls/';
+    const path = '/calls';
     const result = await this.http.request<{ calls: CallResource[] }>(path, {
       headers: await this.signer.headers(session, 'GET', path),
       method: 'GET',
@@ -126,7 +126,7 @@ export class PigeonCallsApi {
       startedAt,
     });
 
-    return await this.post(session, '/calls/', {
+    return await this.post(session, '/calls', {
       conversationId,
       mutation: start.mutation,
       nonce,
@@ -159,7 +159,7 @@ export class PigeonCallsApi {
       sessionEpoch,
       startedAt,
     });
-    const call = await this.post(session, '/calls/', {
+    const call = await this.post(session, '/calls', {
       channelId,
       communityId,
       mutation: start.mutation,

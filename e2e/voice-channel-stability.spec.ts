@@ -173,7 +173,7 @@ function trackPresenceResourceResponses(
   page.on('response', (response) => {
     const url = new URL(response.url()).pathname.replace(/^\/api(?=\/)/, '');
 
-    if (url !== '/calls/' && !/^\/communities\/[^/]+\/channels$/.test(url)) {
+    if (url !== '/calls' && !/^\/communities\/[^/]+\/channels$/.test(url)) {
       return;
     }
 
@@ -397,7 +397,7 @@ function trackCallResponses(page: Page): CallResponse[] {
 
   page.on('response', (response) => {
     if (
-      !response.url().includes('/calls/') &&
+      !response.url().includes('/calls') &&
       !/\/communities\/[^/]+\/channels$/.test(response.url())
     )
       return;
