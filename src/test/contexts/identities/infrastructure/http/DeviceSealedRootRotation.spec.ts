@@ -7,9 +7,11 @@ import type { PigeonKeychainApi } from '../../../../../contexts/identities/infra
 import type { LocalKeychain } from '../../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
+import { RevokedDeviceSealedSecretPublisherError } from '../../../../../contexts/identities/domain/errors/RevokedDeviceSealedSecretPublisherError';
 import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
 import { DeviceCredential } from '../../../../../contexts/identities/domain/value-objects/DeviceCredential';
 import { DeviceSealedRootRotation } from '../../../../../contexts/identities/infrastructure/http/DeviceSealedRootRotation';
+import { DeviceSealedRootTrustStore } from '../../../../../contexts/identities/infrastructure/storage/DeviceSealedRootTrustStore';
 import {
   decodeBase64Url,
   encodeBase64Url,
@@ -25,22 +27,42 @@ const RECIPIENTS = [
 ] as unknown as DeviceCredential[];
 const PUBLISHER = { id: 'publisher' } as unknown as DeviceCredential;
 const UNAUTHORIZED = 'Device sealed secret publisher is not authorized.';
+const MASTER_KEY = SymmetricKey.generate();
 
 const makeSession = (revision: number): SessionWithRoot =>
   ({
     authorizationRevision: DeviceAuthorizationRevision.fromNumber(revision),
     identity: { id: IDENTITY_ID },
-    masterKey: SymmetricKey.generate(),
+    masterKey: MASTER_KEY,
   }) as unknown as SessionWithRoot;
+
+const memoryStorage = (): Pick<
+  Storage,
+  'getItem' | 'removeItem' | 'setItem'
+> => {
+  const entries = new Map<string, string>();
+
+  return {
+    getItem: (key) => entries.get(key) ?? null,
+    removeItem: (key) => {
+      entries.delete(key);
+    },
+    setItem: (key, value) => {
+      entries.set(key, value);
+    },
+  };
+};
 
 const setup = (clock = 1_000) => {
   const deviceAuthorization = mock<PigeonDeviceAuthorizationApi>();
   const sealedSecrets = mock<PigeonDeviceSealedSecretApi>();
   const keychains = mock<PigeonKeychainApi>();
+  const trust = new DeviceSealedRootTrustStore(memoryStorage());
   const rotation = new DeviceSealedRootRotation(
     deviceAuthorization,
     sealedSecrets,
     keychains,
+    trust,
     () => clock,
   );
 
@@ -785,6 +807,112 @@ describe('DeviceSealedRootRotation', () => {
       expect(sealedSecrets.publish).not.toHaveBeenCalled();
       expect(sealedSecrets.sealHandOver).not.toHaveBeenCalled();
       expect(keychains.readHead).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('an own entry whose publisher was revoked after the entry revision', () => {
+    const REVOKED =
+      'Device sealed secret publisher was revoked after the entry revision.';
+    const revokedLater = (root: SymmetricKey) => {
+      const context = setup(1_000);
+
+      context.sealedSecrets.fetchOwn.mockResolvedValue({
+        authorizationRevision: 4,
+        generation: 9_000,
+        payload: encodeBase64Url(root.getBuffer()),
+        publisherCredential: PUBLISHER,
+      });
+      context.deviceAuthorization.verifyPublisher.mockRejectedValue(
+        new RevokedDeviceSealedSecretPublisherError(),
+      );
+
+      return context;
+    };
+
+    it('yields no root this device never trusted and hands nothing over', async () => {
+      const { keychains, rotation, sealedSecrets } = revokedLater(
+        SymmetricKey.generate(),
+      );
+
+      await expect(rotation.laggingRoot(makeSession(5))).rejects.toThrow(
+        REVOKED,
+      );
+      await expect(
+        rotation.handOver(makeSession(5), {
+          authorizationRevision: 6,
+          recipients: RECIPIENTS,
+        }),
+      ).rejects.toThrow(REVOKED);
+      await expect(rotation.generation(makeSession(5))).rejects.toThrow(
+        REVOKED,
+      );
+      expect(sealedSecrets.sealHandOver).not.toHaveBeenCalled();
+      expect(keychains.readHead).not.toHaveBeenCalled();
+    });
+
+    it('yields the root this device trusted when it opened that entry while its publisher was authorized', async () => {
+      const root = SymmetricKey.generate();
+      const { deviceAuthorization, rotation } = revokedLater(root);
+
+      deviceAuthorization.verifyPublisher.mockResolvedValueOnce(undefined);
+      await rotation.current(makeSession(4));
+
+      const lagging = await rotation.laggingRoot(makeSession(5));
+
+      expect(lagging?.getBuffer().equals(root.getBuffer())).toBe(true);
+    });
+
+    it('trusts the root this device last published, and no root it replaced', async () => {
+      const { deviceAuthorization, rotation, sealedSecrets } = setup(1_000);
+      const before = await rotation.rotate(makeSession(4));
+      const after = await rotation.rotate(makeSession(4));
+      const entryOf = (session: SessionWithRoot) => ({
+        authorizationRevision: 4,
+        generation: 9_000,
+        payload: encodeBase64Url(
+          (session.deviceSealedRootKey as SymmetricKey).getBuffer(),
+        ),
+        publisherCredential: PUBLISHER,
+      });
+
+      deviceAuthorization.verifyPublisher.mockRejectedValue(
+        new RevokedDeviceSealedSecretPublisherError(),
+      );
+      sealedSecrets.fetchOwn.mockResolvedValue(entryOf(after));
+
+      const lagging = await rotation.laggingRoot(makeSession(5));
+
+      expect(
+        lagging
+          ?.getBuffer()
+          .equals((after.deviceSealedRootKey as SymmetricKey).getBuffer()),
+      ).toBe(true);
+      sealedSecrets.fetchOwn.mockResolvedValue(entryOf(before));
+      await expect(rotation.laggingRoot(makeSession(5))).rejects.toThrow(
+        REVOKED,
+      );
+    });
+
+    it('still issues a generation above that entry when this device revokes its publisher', async () => {
+      const { rotation, sealedSecrets } = revokedLater(SymmetricKey.generate());
+
+      await rotation.rotate(makeSession(5));
+
+      expect(sealedSecrets.publish.mock.calls[0][1].generation).toBe(9_001);
+    });
+
+    it('keeps the trusted root apart per identity', async () => {
+      const root = SymmetricKey.generate();
+      const { deviceAuthorization, rotation } = revokedLater(root);
+      const other = {
+        ...makeSession(5),
+        identity: { id: '00000000-0000-4000-8000-000000000002' },
+      } as unknown as SessionWithRoot;
+
+      deviceAuthorization.verifyPublisher.mockResolvedValueOnce(undefined);
+      await rotation.current(makeSession(4));
+
+      await expect(rotation.laggingRoot(other)).rejects.toThrow(REVOKED);
     });
   });
 });

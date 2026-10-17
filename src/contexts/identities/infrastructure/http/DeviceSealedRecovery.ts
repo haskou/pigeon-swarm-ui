@@ -44,12 +44,13 @@ export class DeviceSealedRecovery {
   }
 
   /**
-   * Drops every step this device recorded for the identity, as when the node
-   * no longer authorizes this device and it can never resume them. Throws
-   * when the browser refuses the removal.
+   * Drops every step this device recorded for the identity, and the root it
+   * trusted, as when the node no longer authorizes this device and it can
+   * never resume them. Throws when the browser refuses the removal.
    */
   public discard(identityId: string): void {
     this.store.write(identityId, {});
+    this.deviceSealedRoot.forgetTrustedRoot(identityId);
   }
 
   /**
@@ -223,12 +224,15 @@ export class DeviceSealedRecovery {
   /**
    * Mints a fresh root when this device's own entry is behind the head and
    * no device handed a fresh one over, as after another device forgot itself
-   * while its hand-over lost a race: that device can no longer publish, so
-   * the next remaining device to unlock does. The keychain head is read under
-   * the lagging root and moved to the fresh one, recorded first like a revoke,
-   * and the lagging root stays on the session for the mailboxes to bridge.
-   * Returns the session unchanged when nothing lags or nothing was minted.
-   * Never throws.
+   * while its hand-over lost a race, or after a revoke whose rotation never
+   * landed: the publisher of that entry can no longer publish, so the next
+   * remaining device to unlock does. The lagging root of an entry whose
+   * publisher was revoked since opens only when this device trusted it, so a
+   * root it never trusted reads no keychain head and mints nothing. The
+   * keychain head is read under the lagging root and moved to the fresh one,
+   * recorded first like a revoke, and the lagging root stays on the session
+   * for the mailboxes to bridge. Returns the session unchanged when nothing
+   * lags or nothing was minted. Never throws.
    */
   public async rotateLaggingRoot(synchronized: Session): Promise<Session> {
     let rotated: Session;

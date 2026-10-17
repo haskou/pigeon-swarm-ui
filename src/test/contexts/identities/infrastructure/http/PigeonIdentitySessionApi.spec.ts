@@ -16,6 +16,7 @@ import type { DeviceIdentityVaultSession } from '../../../../../contexts/identit
 import type { DeviceIdentityVaultStore } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVaultStore';
 
 import { DeviceRemovedError } from '../../../../../contexts/identities/domain/DeviceRemovedError';
+import { RevokedDeviceSealedSecretPublisherError } from '../../../../../contexts/identities/domain/errors/RevokedDeviceSealedSecretPublisherError';
 import { DeviceAuthorizationEpoch } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
 import { DeviceId } from '../../../../../contexts/identities/domain/value-objects/DeviceId';
@@ -26,6 +27,7 @@ import { PigeonIdentityGateway } from '../../../../../contexts/identities/infras
 import { PigeonIdentitySessionApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentitySessionApi';
 import { DeviceIdentityVault } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVault';
 import { DeviceSealedRecoveryStore } from '../../../../../contexts/identities/infrastructure/storage/DeviceSealedRecoveryStore';
+import { DeviceSealedRootTrustStore } from '../../../../../contexts/identities/infrastructure/storage/DeviceSealedRootTrustStore';
 import {
   decodeBase64Url,
   encodeBase64Url,
@@ -451,6 +453,7 @@ describe(PigeonIdentitySessionApi.name, () => {
       deviceAuthorization,
       sealedSecrets,
       keychains,
+      new DeviceSealedRootTrustStore(memoryStorage()),
       () => 0,
     );
 
@@ -481,6 +484,139 @@ describe(PigeonIdentitySessionApi.name, () => {
     );
     expect(keychains.rewrapHead).toHaveBeenCalledWith(rooted, head);
     expect(store.read(currentIdentity.id)).toEqual({});
+  });
+
+  describe('an entry whose publisher another device revoked later', () => {
+    const REVOKED = new RevokedDeviceSealedSecretPublisherError();
+
+    async function lagging() {
+      const keyPair = await KeyPair.generate();
+      const currentIdentity = identity(keyPair.toPrimitives().publicKey);
+      const root = SymmetricKey.generate();
+      const localRoot = SymmetricKey.generate();
+      const head = {
+        keychain: { conversations: {}, version: 3 },
+        keychainExternalIdentifier: 'kc-3',
+      };
+      const identities = {
+        get: jest.fn().mockResolvedValue(currentIdentity),
+      } as unknown as PigeonIdentityGateway;
+      const vault = {
+        unlock: jest.fn().mockResolvedValue({
+          authorizationEpoch: DeviceAuthorizationEpoch.genesis(),
+          authorizationRevision: DeviceAuthorizationRevision.fromNumber(1),
+          deviceId: DeviceId.generate(),
+          material: {
+            deviceCredentialKeyPair: await KeyPair.generate(),
+            identityKeyPair: keyPair,
+            recoveryAuthorityKeyPair: await KeyPair.generate(),
+            rootKey: localRoot,
+          },
+          secretHandle: DeviceUnlockSecretHandle.generate(),
+        }),
+      } as unknown as DeviceIdentityVault;
+      const deviceAuthorization = mock<PigeonDeviceAuthorizationApi>();
+      const atRevision = (revision: number) =>
+        deviceAuthorization.synchronize.mockImplementation((session) =>
+          Promise.resolve({
+            ...session,
+            authorizationRevision:
+              DeviceAuthorizationRevision.fromNumber(revision),
+          }),
+        );
+      deviceAuthorization.findDevices.mockResolvedValue([
+        fakeCredential('remaining-device'),
+      ] as unknown as DeviceCredential[]);
+      const sealedSecrets = mock<PigeonDeviceSealedSecretApi>();
+      // The publisher sealed this root at revision 1; a later revision revoked
+      // it and no device published a fresh root after.
+      sealedSecrets.fetchOwn.mockResolvedValue({
+        authorizationRevision: 1,
+        generation: 5,
+        payload: encodeBase64Url(root.getBuffer()),
+        publisherCredential: PUBLISHER,
+      });
+      sealedSecrets.publish.mockResolvedValue(undefined);
+      const keychains = mock<PigeonKeychainApi>();
+      keychains.readHead.mockResolvedValue(head);
+      keychains.rewrapHead.mockResolvedValue(undefined);
+      const deviceSealedRoot = new DeviceSealedRootRotation(
+        deviceAuthorization,
+        sealedSecrets,
+        keychains,
+        new DeviceSealedRootTrustStore(memoryStorage()),
+        () => 0,
+      );
+      const sessionApi = new PigeonIdentitySessionApi(
+        identities,
+        vault,
+        deviceAuthorization,
+        deviceSealedRoot,
+        new DeviceSealedRecovery(
+          deviceSealedRoot,
+          keychains,
+          new DeviceSealedRecoveryStore(memoryStorage()),
+        ),
+      );
+
+      return {
+        atRevision,
+        deviceAuthorization,
+        head,
+        keychains,
+        revoke: () => {
+          atRevision(2);
+          deviceAuthorization.verifyPublisher.mockRejectedValue(REVOKED);
+        },
+        root,
+        sealedSecrets,
+        unlock: () => sessionApi.unlock(currentIdentity.id, 'password'),
+      };
+    }
+
+    it('refuses the unlock and mints nothing when this device never trusted that root', async () => {
+      const device = await lagging();
+
+      device.revoke();
+
+      await expect(device.unlock()).rejects.toThrow(
+        copy.auth.deviceRootUnavailable,
+      );
+      expect(device.keychains.readHead).not.toHaveBeenCalled();
+      expect(device.sealedSecrets.publish).not.toHaveBeenCalled();
+      expect(device.keychains.rewrapHead).not.toHaveBeenCalled();
+    });
+
+    it('rotates from the root this device trusted before, so its rows reseal and the keychain moves', async () => {
+      const device = await lagging();
+
+      device.atRevision(1);
+      await device.unlock();
+      device.revoke();
+
+      const rooted = await device.unlock();
+
+      expect(device.keychains.readHead).toHaveBeenCalledWith(
+        expect.objectContaining({ deviceSealedRootKey: device.root }),
+      );
+      expect(device.sealedSecrets.publish).toHaveBeenCalledTimes(1);
+
+      const [, publication] = device.sealedSecrets.publish.mock.calls[0];
+      const [fresh, replaced] = publication.payload.split('.');
+
+      expect(publication.generation).toBe(6);
+      expect(replaced).toBe(encodeBase64Url(device.root.getBuffer()));
+      expect(rooted.deviceSealedRootKey?.getBuffer()).toEqual(
+        decodeBase64Url(fresh),
+      );
+      expect(rooted.previousDeviceSealedRootKey?.getBuffer()).toEqual(
+        device.root.getBuffer(),
+      );
+      expect(device.keychains.rewrapHead).toHaveBeenCalledWith(
+        rooted,
+        device.head,
+      );
+    });
   });
 
   it('opens the root another device handed over when it forgot itself and moves the keychain head from the root it replaced', async () => {
@@ -527,6 +663,7 @@ describe(PigeonIdentitySessionApi.name, () => {
       deviceAuthorization,
       sealedSecrets,
       keychains,
+      new DeviceSealedRootTrustStore(memoryStorage()),
       () => 0,
     );
 
@@ -665,6 +802,7 @@ describe(PigeonIdentitySessionApi.name, () => {
       deviceAuthorization,
       sealedSecrets,
       keychains,
+      new DeviceSealedRootTrustStore(memoryStorage()),
       () => 0,
     );
     const recovery = mock<DeviceSealedRecovery>();

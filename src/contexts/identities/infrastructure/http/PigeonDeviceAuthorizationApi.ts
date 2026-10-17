@@ -595,9 +595,11 @@ export class PigeonDeviceAuthorizationApi {
   /**
    * Verifies that the signed transitions, replayed like `synchronize`,
    * authorize the publisher of a device-sealed secret at the revision the
-   * secret names: as a device of that revision, or as the device that retired
-   * itself into it with a hand-over. Rejects as `synchronize` does, and with
-   * the unauthorized-publisher error otherwise. Stores nothing.
+   * secret names: as a device of that revision that no later transition
+   * revoked, or as the device that retired itself into it with a hand-over.
+   * Rejects as `synchronize` does, with the revoked-publisher error when a
+   * later transition revoked that device, and with the unauthorized-publisher
+   * error otherwise. Stores nothing.
    */
   public async verifyPublisher(
     session: Session,

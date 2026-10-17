@@ -5,12 +5,15 @@ import type { DeviceAuthorizationRevision } from '../value-objects/DeviceAuthori
 import type { DeviceCredential } from '../value-objects/DeviceCredential';
 import type { DeviceAuthorizationReplay } from './DeviceAuthorizationReplay';
 
+import { RevokedDeviceSealedSecretPublisherError } from '../errors/RevokedDeviceSealedSecretPublisherError';
 import { UnauthorizedDeviceSealedSecretPublisherError } from '../errors/UnauthorizedDeviceSealedSecretPublisherError';
 
 /**
  * Decides from a verified replay whether a device could publish a
  * device-sealed secret at the revision the secret names. A publish needs a
- * device the state at that revision authorizes. A hand-over rides in the
+ * device the state at that revision authorizes and every later state still
+ * authorizes: a key revoked afterwards may be in other hands, and could sign
+ * a secret naming any revision it once held. A hand-over rides in the
  * publisher's own retirement, so it needs a device the state before that
  * revision authorized and a self-revocation of that device that the replay
  * accepted into it. A revision the replay never reached authorizes no one.
@@ -44,17 +47,24 @@ export class DeviceSealedSecretPublisherDomainService {
     const index = replay.states.findIndex((state) =>
       state.getRevision().isEqual(revision),
     );
-    const authorized =
-      index >= 0 &&
-      (replay.states[index].isAuthorized(publisher) ||
-        (index > 0 &&
-          this.retiredInto(
-            replay,
-            replay.states[index - 1],
-            publisher,
-            revision,
-          )));
+    const published =
+      index >= 0 && replay.states[index].isAuthorized(publisher);
 
-    assert(authorized, new UnauthorizedDeviceSealedSecretPublisherError());
+    if (published) {
+      assert(
+        replay.states
+          .slice(index + 1)
+          .every((state) => state.isAuthorized(publisher)),
+        new RevokedDeviceSealedSecretPublisherError(),
+      );
+
+      return;
+    }
+
+    assert(
+      index > 0 &&
+        this.retiredInto(replay, replay.states[index - 1], publisher, revision),
+      new UnauthorizedDeviceSealedSecretPublisherError(),
+    );
   }
 }
