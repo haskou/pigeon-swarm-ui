@@ -328,6 +328,50 @@ describe('MlsCommunityEngine', () => {
       if (input.kind === 'commit') throw error;
     };
   };
+  /** The node stores the next commit, but its answer never arrives. */
+  const loseCommitAnswer = (): void => {
+    node.hooks.afterPublish = (record) => {
+      if (record.kind !== 'commit') return;
+      delete node.hooks.afterPublish;
+      throw new Error('answer lost');
+    };
+  };
+  const commitsAt = (epoch: number): MlsRecordResource[] =>
+    node.records.filter(
+      (record) => record.kind === 'commit' && record.epoch === epoch,
+    );
+  /** The bytes kept under the member's pending commit; 0 when there is none. */
+  const pendingIn = async (store: MlsStateStore): Promise<number> =>
+    (await store.loadGroup(`${COMMUNITY}#pending`))?.length ?? 0;
+  /** Makes the member stop when it is about to forget its pending commit. */
+  const stopBeforeForgettingPending = (store: MlsStateStore): void => {
+    const saveGroup = store.saveGroup.bind(store);
+
+    jest
+      .spyOn(store, 'saveGroup')
+      .mockImplementation((key, state) =>
+        key === `${COMMUNITY}#pending` && state.length === 0
+          ? Promise.reject(new Error('crash'))
+          : saveGroup(key, state),
+      );
+  };
+  /** Collects every welcome published to the identity from now on. */
+  const welcomesTo = (name: string): string[] => {
+    const sent: string[] = [];
+
+    node.hooks.beforePublish = (input) => {
+      if (input.kind === 'welcome' && input.recipientIdentityId === id(name)) {
+        sent.push(input.payload);
+      }
+    };
+
+    return sent;
+  };
+  const failWelcomes = (): void => {
+    node.hooks.beforePublish = (input) => {
+      if (input.kind === 'welcome') throw new Error('crash');
+    };
+  };
   /**
    * Alice creates a channel and restricts it to a role the viewers hold;
    * returns the MLS group id of the channel.
@@ -1301,6 +1345,148 @@ describe('MlsCommunityEngine', () => {
     );
     await expect(bob.engine.decrypt(COMMUNITY, sealed)).resolves.toBe(
       'welcome carol',
+    );
+  });
+
+  it('drops its pending commit when the node serves other bytes under its record id, and makes the change again', async () => {
+    const { alice, bob, carol } = await admitCarol();
+    const before = await secretOf(bob);
+
+    roster.delete(id('carol'));
+    loseCommitAnswer();
+    await expect(alice.engine.remove(COMMUNITY, [id('carol')])).rejects.toThrow(
+      'answer lost',
+    );
+    const [stored] = commitsAt(before.epoch);
+
+    stored.payload = base64(new Uint8Array([1, 2, 3]));
+    const restarted = engineFor('alice', alice.store);
+
+    await expect(restarted.engine.sync(COMMUNITY)).resolves.toBe(true);
+    await expect(secretOf(restarted)).resolves.toEqual(before);
+    await expect(pendingIn(alice.store)).resolves.toBe(0);
+    await expect(restarted.engine.reconcile(COMMUNITY)).resolves.toBe(true);
+    await bob.engine.sync(COMMUNITY);
+
+    await expect(secretOf(restarted)).resolves.not.toEqual(before);
+    await expect(secretOf(bob)).resolves.toEqual(await secretOf(restarted));
+    await expect(carol.engine.sync(COMMUNITY)).resolves.toBe(false);
+  });
+
+  it('catches up before it admits, so admitting again keeps the commit the node already holds', async () => {
+    const { alice, bob } = await admitBob();
+    const carol = engineFor('carol');
+    const { epoch } = await secretOf(alice);
+
+    await carol.engine.publishKeyPackages(COMMUNITY);
+    loseCommitAnswer();
+    await expect(alice.engine.admit(COMMUNITY, [id('carol')])).rejects.toThrow(
+      'answer lost',
+    );
+    await alice.engine.admit(COMMUNITY, [id('carol')]);
+
+    expect(commitsAt(epoch)).toHaveLength(1);
+    await bob.engine.sync(COMMUNITY);
+    await expect(carol.engine.sync(COMMUNITY)).resolves.toBe(true);
+    const sealed = await alice.engine.encrypt(COMMUNITY, 'admitted once');
+
+    for (const member of [bob, carol]) {
+      await expect(member.engine.decrypt(COMMUNITY, sealed)).resolves.toBe(
+        'admitted once',
+      );
+    }
+  });
+
+  it('catches up before it removes, so removing again keeps the commit the node already holds', async () => {
+    const { alice, bob, carol } = await admitCarol();
+    const { epoch } = await secretOf(alice);
+
+    roster.delete(id('carol'));
+    loseCommitAnswer();
+    await expect(alice.engine.remove(COMMUNITY, [id('carol')])).rejects.toThrow(
+      'answer lost',
+    );
+    await alice.engine.remove(COMMUNITY, [id('carol')]);
+
+    expect(commitsAt(epoch)).toHaveLength(1);
+    await bob.engine.sync(COMMUNITY);
+    await expect(secretOf(bob)).resolves.toEqual(await secretOf(alice));
+    await expect(carol.engine.sync(COMMUNITY)).resolves.toBe(false);
+  });
+
+  it('forgets its pending commit and the welcome in it once removed, and sends none of it when admitted again', async () => {
+    moderators.add(id('carol'));
+    roster.add(id('mallory'));
+    const { alice, carol } = await admitCarol();
+    const mallory = engineFor('mallory');
+
+    await mallory.engine.publishKeyPackages(COMMUNITY);
+    failWelcomes();
+    await expect(carol.engine.admit(COMMUNITY, [id('mallory')])).rejects.toThrow(
+      'crash',
+    );
+    delete node.hooks.beforePublish;
+    roster.delete(id('carol'));
+    await alice.engine.sync(COMMUNITY);
+    await alice.engine.remove(COMMUNITY, [id('carol')]);
+    stopBeforeForgettingPending(carol.store);
+    await expect(carol.engine.sync(COMMUNITY)).rejects.toThrow('crash');
+    jest.mocked(carol.store.saveGroup).mockRestore();
+    const restarted = engineFor('carol', carol.store);
+
+    await expect(restarted.engine.sync(COMMUNITY)).resolves.toBe(false);
+    await expect(pendingIn(carol.store)).resolves.toBe(0);
+
+    const resent = welcomesTo('mallory');
+
+    roster.add(id('carol'));
+    await restarted.engine.publishKeyPackages(COMMUNITY);
+    await alice.engine.admit(COMMUNITY, [id('carol')]);
+
+    await expect(restarted.engine.sync(COMMUNITY)).resolves.toBe(true);
+    expect(resent).toEqual([]);
+    await expect(pendingIn(carol.store)).resolves.toBe(0);
+  });
+
+  it('remembers across a restart which commit its group took, so it sends no welcome of a commit that lost the epoch', async () => {
+    moderators.add(id('carol'));
+    roster.add(id('mallory'));
+    const { alice, carol } = await admitCarol();
+    const mallory = engineFor('mallory');
+
+    await mallory.engine.publishKeyPackages(COMMUNITY);
+    failWelcomes();
+    await expect(carol.engine.admit(COMMUNITY, [id('mallory')])).rejects.toThrow(
+      'crash',
+    );
+    delete node.hooks.beforePublish;
+    // Alice removes bob in that epoch before the node lists carol's add to
+    // her; her commit binds the kick, more roster history, so it wins.
+    const [add] = node.records.splice(
+      node.records.findIndex(
+        (record) =>
+          record.kind === 'commit' && record.authorIdentityId === id('carol'),
+      ),
+      1,
+    );
+
+    roster.delete(id('bob'));
+    await alice.engine.remove(COMMUNITY, [id('bob')]);
+    node.records.push(add);
+    stopBeforeForgettingPending(carol.store);
+    await expect(carol.engine.sync(COMMUNITY)).rejects.toThrow('crash');
+    jest.mocked(carol.store.saveGroup).mockRestore();
+    const resent = welcomesTo('mallory');
+    const restarted = engineFor('carol', carol.store);
+
+    await expect(restarted.engine.sync(COMMUNITY)).resolves.toBe(true);
+    expect(resent).toEqual([]);
+    await expect(pendingIn(carol.store)).resolves.toBe(0);
+    await expect(secretOf(restarted)).resolves.toEqual(await secretOf(alice));
+    const sealed = await alice.engine.encrypt(COMMUNITY, 'one branch');
+
+    await expect(restarted.engine.decrypt(COMMUNITY, sealed)).resolves.toBe(
+      'one branch',
     );
   });
 
