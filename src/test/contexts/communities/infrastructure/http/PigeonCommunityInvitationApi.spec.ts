@@ -1,9 +1,11 @@
 import {
+  CommitmentId,
   CommunityInvitationKey,
   CommunityInvitationPossession,
   KeyPair,
   PrivateKey,
 } from '@haskou/pigeon-swarm-crypto';
+import operationVectors from '@haskou/pigeon-swarm-crypto/vectors/community-operation.json';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
@@ -13,6 +15,7 @@ import { CommunityModerationLogSigner } from '../../../../../contexts/communitie
 import { CommunityOperationSigner } from '../../../../../contexts/communities/infrastructure/http/CommunityOperationSigner';
 import { PigeonCommunityInvitationApi } from '../../../../../contexts/communities/infrastructure/http/PigeonCommunityInvitationApi';
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
+import { PublicMutationSigner } from '../../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import { ScopeFrontierReader } from '../../../../../shared/infrastructure/http/ScopeFrontierReader';
 import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
@@ -64,6 +67,10 @@ beforeEach(() => {
     .mockResolvedValue([FRONTIER]);
 });
 
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
 describe(PigeonCommunityInvitationApi.name, () => {
   it('creates an invitation that names the key, not the secret', async () => {
     const log = jest.spyOn(CommunityModerationLogSigner.prototype, 'sign');
@@ -93,10 +100,66 @@ describe(PigeonCommunityInvitationApi.name, () => {
     });
     expect(operation.mutation.store).toBe('communityOperations');
     expect(log.mock.calls[0]?.[1].target).toEqual({
-      id: operation.mutation.recordId,
+      id: operation.mutation.recordId.split(':op:')[1],
       type: 'invitation',
     });
     expect(JSON.stringify(body)).not.toContain(secret);
+  });
+
+  it('names the invitation by its operation digest, like the node', async () => {
+    const { derived, input } = operationVectors.cases.find(
+      ({ name }) => name === 'invitation_created',
+    ) as (typeof operationVectors.cases)[number];
+    const owner = operationVectors.keys.owner;
+    const keyPair = KeyPair.fromPrimitives({
+      privateKey: owner.privateKeyPem,
+      publicKey: owner.publicKeyPem,
+    } as never);
+    const session = {
+      deviceCredentialKeyPair: keyPair,
+      identity: { id: owner.identityId },
+      keyPair,
+    } as unknown as Session;
+    const request = jest.fn().mockResolvedValue({});
+    const api = new PigeonCommunityInvitationApi(
+      { request } as unknown as HttpJsonClient,
+      { headers: jest.fn().mockResolvedValue({}) } as unknown as RequestSigner,
+      {
+        head: jest.fn().mockResolvedValue({
+          frontier: input.parents,
+          networkId: input.networkId,
+        }),
+      },
+      publicMutationSignerAt(),
+    );
+
+    jest.spyOn(Date, 'now').mockReturnValue(input.createdAt);
+    jest
+      .spyOn(PublicMutationSigner.prototype as never, 'operationId')
+      .mockReturnValue(input.operationId as never);
+
+    await api.create(session, input.communityId, {
+      expiresAt: input.args.expiresAt as number,
+      invitationKey: input.args.invitationKey as string,
+      maxUses: input.args.maxUses as number,
+    });
+
+    const { body } = sent(request);
+    const moderationLog = body.moderationLog as {
+      mutation: { recordId: string };
+    };
+
+    expect(body.operation).toEqual(derived.requestOperation);
+    expect(moderationLog.mutation.recordId).toBe(
+      CommitmentId.communityModerationLog(
+        input.communityId,
+        owner.identityId,
+        'invitation_created',
+        'invitation',
+        derived.digest,
+        input.createdAt,
+      ),
+    );
   });
 
   it('previews with the invitation key as bearer token', async () => {

@@ -111,8 +111,12 @@ export class PigeonCommunityInvitationApi {
         communityId,
         createdAt,
         details: { expiresAt: input.expiresAt, maxUses: input.maxUses },
-        // The invitation is named by the hash of the operation that creates it.
-        target: { id: operation.mutation.recordId, type: 'invitation' },
+        // The invitation is named by the digest of the operation that creates
+        // it: the hash its record id `community:<id>:op:<hash>` ends with.
+        target: {
+          id: operation.mutation.recordId.split(':op:')[1] as string,
+          type: 'invitation',
+        },
       }),
       operation,
     };
