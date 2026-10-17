@@ -40,7 +40,9 @@ import { GroupMailboxControlRecord } from '../control/GroupMailboxControlRecord'
  * generation (`GroupMailboxGenerationLog.RIVAL_EPOCHS`): once one wins,
  * this device forgets that generation and nobody reads its inboxes, so the
  * landed copies are re-encrypted and sent again in the epoch that won. A
- * recipient that read the first copy keeps one message. While
+ * recipient that read the first copy keeps one message. A message whose
+ * deletion is queued is forgotten, body and all, delivered or not, so the
+ * device never keeps nor sends again what its author deleted. While
  * the MLS group still holds a member its roster no longer lists, no message
  * is encrypted or appended: that member holds the epoch secret and could
  * read any inbox of the generation. Such a message is held, unsealed or
@@ -50,13 +52,13 @@ import { GroupMailboxControlRecord } from '../control/GroupMailboxControlRecord'
  * current once it is confirmed. A commit belongs to its generation and is
  * never re-encrypted. A message that can no longer be delivered, as after
  * this identity's removal or when still queued after the expiry, is kept
- * as failed with its body until `retry` queues it again; a commit that can
- * no longer be delivered is dropped. `items` lists each queued record as
- * held, retrying or pending, and each failed message as failed. An
- * ephemeral record (`sendEphemeral`) is never queued: it is
- * appended once or dropped, and none is sealed in a conversation whose
- * queue has held a record past `EPHEMERAL_HOLD_MS`. Logs carry counts
- * only.
+ * as failed with its body until `retry` queues it again or its deletion is
+ * queued; a commit that can no longer be delivered is dropped. `items`
+ * lists each queued record as held, retrying or pending, and each failed
+ * message as failed. An ephemeral record (`sendEphemeral`) is never
+ * queued: it is appended once or dropped, and none is sealed in a
+ * conversation whose queue has held a record past `EPHEMERAL_HOLD_MS`.
+ * Logs carry counts only.
  */
 export class GroupMailboxOutbox {
   /** The generation index of a message held before it was ever sealed. */
@@ -540,11 +542,35 @@ export class GroupMailboxOutbox {
 
   /** Runs one pass after any pass already queued. */
   private pass(): Promise<void> {
-    const next = this.queue.then(() => this.attemptAll());
+    return this.serial(() => this.attemptAll());
+  }
+
+  /** Runs `step` after every step and pass already queued. */
+  private serial(step: () => Promise<void>): Promise<void> {
+    const next = this.queue.then(step);
 
     this.queue = next.catch(() => undefined);
 
     return next;
+  }
+
+  /**
+   * Forgets the message of the conversation queued under `reference`, as
+   * once its deletion is queued; never a commit.
+   */
+  private async withdraw(
+    conversationId: string,
+    reference: string,
+  ): Promise<void> {
+    for (const row of [...this.rows.values()]) {
+      if (
+        row.conversationId === conversationId &&
+        row.reference === reference &&
+        row.body !== undefined
+      ) {
+        await this.forgetRow(row);
+      }
+    }
   }
 
   /**
@@ -790,14 +816,17 @@ export class GroupMailboxOutbox {
   /**
    * Encrypts an application message in the current epoch and queues it for
    * every member's inbox, this identity's included; while a removal is
-   * pending it is queued unsealed instead. Resolves after the first
-   * delivery attempt; rejects when this identity is off the group's
+   * pending it is queued unsealed instead. A deletion names the message it
+   * deletes in `deletes`: once the deletion is queued, that message is
+   * forgotten (`withdraw`) before the next attempt. Resolves after the
+   * first delivery attempt; rejects when this identity is off the group's
    * roster, or when the message cannot be encrypted.
    */
   public async enqueueMessage(
     conversationId: string,
     reference: string,
     body: Uint8Array,
+    deletes?: string,
   ): Promise<void> {
     const pending = await this.holdsBack(conversationId);
     const unsealed = {
@@ -822,6 +851,10 @@ export class GroupMailboxOutbox {
           }
         : await this.sealedMessage(unsealed, body),
     );
+
+    if (deletes !== undefined) {
+      await this.serial(() => this.withdraw(conversationId, deletes));
+    }
     await this.pass();
   }
 

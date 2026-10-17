@@ -275,6 +275,72 @@ describe('GroupMailboxOutbox', () => {
     expect(sent).toEqual([inboxOf(20, 'alice'), inboxOf(20, 'bob')]);
   });
 
+  it('forgets a delivered message once its deletion is queued, and never sends it again when a rival wins its epoch', async () => {
+    await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
+    await outbox.enqueueMessage(CONVERSATION, 'm2', new Uint8Array([2]));
+
+    await outbox.enqueueMessage(CONVERSATION, 'd1', new Uint8Array([3]), 'm1');
+
+    expect([...rows.values()].map(({ reference }) => reference)).toEqual([
+      'm2',
+      'd1',
+    ]);
+    expect(store.remove).toHaveBeenCalledTimes(1);
+
+    current = 20;
+    engine.branchGenerations.mockResolvedValue([generation(20)]);
+    engine.encrypt.mockClear();
+    await outbox.flush();
+
+    expect(engine.encrypt.mock.calls.map(([, body]) => [...body])).toEqual([
+      [2],
+      [3],
+    ]);
+  });
+
+  it('forgets a message still queued once its deletion is queued, and appends only the deletion', async () => {
+    channel.send.mockRejectedValue(new TypeError('offline'));
+    await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
+    channel.send.mockReset();
+    channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'x' });
+
+    await outbox.enqueueMessage(CONVERSATION, 'd1', new Uint8Array([3]), 'm1');
+
+    expect(outbox.items(CONVERSATION)).toEqual([]);
+    expect([...rows.values()].map(({ reference }) => reference)).toEqual([
+      'd1',
+    ]);
+    expect(channel.send).toHaveBeenCalledTimes(2);
+  });
+
+  it('forgets no message of another conversation, nor a commit, under the reference a deletion names', async () => {
+    await outbox.enqueueMessage('other', 'm1', new Uint8Array([1]));
+    await outbox.enqueueCommit(CONVERSATION, commitTo(['bob']));
+    const { reference: commit } = [...rows.values()][1];
+
+    channel.send.mockRejectedValue(new TypeError('offline'));
+
+    await outbox.enqueueMessage(
+      CONVERSATION,
+      'd1',
+      new Uint8Array([3]),
+      commit,
+    );
+    await outbox.enqueueMessage(CONVERSATION, 'd2', new Uint8Array([3]), 'm1');
+
+    expect(
+      [...rows.values()].map(({ conversationId, reference }) => [
+        conversationId,
+        reference,
+      ]),
+    ).toEqual([
+      ['other', 'm1'],
+      [CONVERSATION, commit],
+      [CONVERSATION, 'd1'],
+      [CONVERSATION, 'd2'],
+    ]);
+  });
+
   it.each([
     ['a missing inbox', new MailboxUnavailableError()],
     ['a conflict', new HttpJsonError(409, 'conflict', '')],
@@ -463,6 +529,23 @@ describe('GroupMailboxOutbox', () => {
     await expect(outbox.retry(CONVERSATION, 'm1')).resolves.toBe(false);
     await expect(outbox.retry(CONVERSATION, 'm2')).resolves.toBe(false);
     expect(channel.send).not.toHaveBeenCalled();
+  });
+
+  it('forgets a message kept as failed once its deletion is queued, so no retry sends it', async () => {
+    channel.send.mockRejectedValue(new TypeError('offline'));
+    await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
+    now += GroupMailboxOutbox.EXPIRY_MS;
+    await outbox.resume();
+    channel.send.mockReset();
+    channel.send.mockResolvedValue({ cursor: 1, envelopeId: 'x' });
+
+    await outbox.enqueueMessage(CONVERSATION, 'd1', new Uint8Array([3]), 'm1');
+
+    expect(outbox.items(CONVERSATION)).toEqual([]);
+    expect([...rows.values()].map(({ reference }) => reference)).toEqual([
+      'd1',
+    ]);
+    await expect(outbox.retry(CONVERSATION, 'm1')).resolves.toBe(false);
   });
 
   it('keeps a message still queued at the expiry as failed, and holds no ephemeral record for it', async () => {

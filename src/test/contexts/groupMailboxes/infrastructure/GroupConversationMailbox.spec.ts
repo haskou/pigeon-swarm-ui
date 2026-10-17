@@ -906,6 +906,25 @@ describe('GroupConversationMailbox', () => {
     });
   });
 
+  it('keeps no body of a delivered message on the device once its author deletes it', async () => {
+    await formGroup();
+    const original = await carol.mailbox.send(
+      carol.session,
+      conversation(),
+      'gone soon',
+      {},
+    );
+    const outbox = new GroupMailboxOutboxStore(`${carol.storage}-outbox`);
+    const references = async () =>
+      (await outbox.load(carol.session)).map(({ reference }) => reference);
+
+    expect(await references()).toContain(original.id);
+
+    await carol.mailbox.delete(carol.session, conversation(), original.id);
+
+    expect(await references()).not.toContain(original.id);
+  });
+
   it('carries a poll, its votes and its creator’s close to every member', async () => {
     await formGroup();
     const created = await alice.mailbox.createPoll(
