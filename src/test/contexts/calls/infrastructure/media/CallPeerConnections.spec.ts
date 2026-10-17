@@ -15,6 +15,7 @@ import {
 import { CallPeerConnections } from '../../../../../contexts/calls/infrastructure/media/CallPeerConnections';
 import { RemoteCallAudio } from '../../../../../contexts/calls/infrastructure/media/RemoteCallAudio';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
+import { QueuedCallSide } from './QueuedCallSide';
 
 const originalMediaStream = Object.getOwnPropertyDescriptor(
   globalThis,
@@ -235,11 +236,51 @@ function lastCipherWorker(): MockProxy<Worker> {
   return results[results.length - 1].value as MockProxy<Worker>;
 }
 
+let fakeConnectionCount = 0;
+
+/**
+ * Chromium and WebKit never run the frame transforms of a connection again,
+ * on the senders and receivers it already has, once it rolled a local offer
+ * back (#560): assigning them anew changes nothing. Firefox keeps them. The
+ * fake takes the first two's side so a rolled back connection is as silent as
+ * theirs.
+ */
+function detachFrameTransforms(peer: FakePeerConnection): void {
+  for (const endpoint of [...peer.senders, ...peer.receivers]) {
+    Object.defineProperty(endpoint, 'transform', {
+      configurable: true,
+      get: () => null,
+      set: () => undefined,
+    });
+  }
+}
+
+function fingerprintOf(
+  description: RTCSessionDescriptionInit | null,
+): string | undefined {
+  return description?.sdp?.match(/^a=fingerprint:([^\r\n]+)$/m)?.[1];
+}
+
+/** A description of the connection whose DTLS certificate is `fingerprint`. */
+function describedBy(
+  type: RTCSdpType,
+  fingerprint: string,
+  revision = 1,
+): RTCSessionDescriptionInit {
+  return {
+    sdp: `v=0\r\na=ice-ufrag:${fingerprint}-${revision}\r\na=fingerprint:${fingerprint}\r\n`,
+    type,
+  };
+}
+
 function createFakePeerConnection(): FakePeerConnection {
   const senders: RTCRtpSender[] = [];
   const receivers: RTCRtpReceiver[] = [];
   let offerCount = 0;
   let answerCount = 0;
+
+  fakeConnectionCount += 1;
+  const fingerprint = `sha-256 FA:CE:${fakeConnectionCount.toString(16).padStart(2, '0').toUpperCase()}`;
   const peer: FakePeerConnection = {
     addEventListener: jest.fn(),
     addIceCandidate: jest.fn(() => Promise.resolve()),
@@ -267,18 +308,12 @@ function createFakePeerConnection(): FakePeerConnection {
     createAnswer: jest.fn(() => {
       answerCount += 1;
 
-      return Promise.resolve({
-        sdp: `answer-sdp-${answerCount}`,
-        type: 'answer',
-      } as RTCSessionDescriptionInit);
+      return Promise.resolve(describedBy('answer', fingerprint, answerCount));
     }),
     createOffer: jest.fn(() => {
       offerCount += 1;
 
-      return Promise.resolve({
-        sdp: `offer-sdp-${offerCount}`,
-        type: 'offer',
-      } as RTCSessionDescriptionInit);
+      return Promise.resolve(describedBy('offer', fingerprint, offerCount));
     }),
     getConfiguration: jest.fn(() => ({ iceTransportPolicy: 'relay' })),
     getReceivers: jest.fn(() => receivers),
@@ -301,6 +336,7 @@ function createFakePeerConnection(): FakePeerConnection {
       if (description.type === 'rollback') {
         peer.localDescription = null;
         peer.signalingState = 'stable';
+        detachFrameTransforms(peer);
 
         return Promise.resolve();
       }
@@ -312,6 +348,16 @@ function createFakePeerConnection(): FakePeerConnection {
       return Promise.resolve();
     }),
     setRemoteDescription: jest.fn((description: RTCSessionDescriptionInit) => {
+      if (
+        description.type === 'offer' &&
+        peer.signalingState === 'have-local-offer'
+      ) {
+        // A remote offer takes the place of a pending local one: an
+        // implicit rollback.
+        peer.localDescription = null;
+        detachFrameTransforms(peer);
+      }
+
       peer.remoteDescription = description;
       peer.signalingState =
         description.type === 'offer' ? 'have-remote-offer' : 'stable';
@@ -469,6 +515,58 @@ const ownCall = { callId: 'call-id', senderId: 'current-identity-id' };
 
 function callKey(epoch = 0): CallMediaKey {
   return { epoch, key: SymmetricKey.generate().valueOf() };
+}
+
+/** An identity of a private call whose signals queue until delivered. */
+function encryptedCallSide(identityId: string): QueuedCallSide {
+  const manager = callPeerConnectionManager();
+
+  manager.configure(() =>
+    Promise.resolve({
+      iceServers: [{ urls: `turn:${identityId}.example.test` }],
+    }),
+  );
+  manager.configureMediaEncryption(
+    { callId: 'call-id', senderId: identityId },
+    callKey(),
+  );
+  manager.setLocalStream(
+    mediaStreamWithTracks([mediaTrack(`${identityId}-microphone`, 'audio')]),
+  );
+
+  return new QueuedCallSide(identityId, manager);
+}
+
+/** The connections `side` created, oldest first. */
+function connectionsOf(
+  side: QueuedCallSide,
+  peers: FakePeerConnection[],
+  configurations: RTCConfiguration[],
+): FakePeerConnection[] {
+  return peers.filter(
+    (_peer, index) =>
+      configurations[index].iceServers?.[0]?.urls ===
+      `turn:${side.identityId}.example.test`,
+  );
+}
+
+/**
+ * Delivers both outboxes, `first`'s before `second`'s, until neither side has
+ * anything left to say.
+ */
+async function converse(
+  first: QueuedCallSide,
+  second: QueuedCallSide,
+): Promise<void> {
+  for (let turn = 0; turn < 10; turn += 1) {
+    // Let the negotiations the last signals started run to their end.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    if (first.outbox.length === 0 && second.outbox.length === 0) return;
+
+    await first.deliverTo(second);
+    await second.deliverTo(first);
+  }
 }
 
 describe(CallPeerConnections.name, () => {
@@ -1243,6 +1341,352 @@ describe(CallPeerConnections.name, () => {
       'answer',
     ]);
     manager.reset();
+  });
+
+  describe('crossed offers of two connections (#560)', () => {
+    const first = 'sha-256 A1:A1';
+    const second = 'sha-256 A2:A2';
+    const third = 'sha-256 A3:A3';
+    let peers: FakePeerConnection[];
+    let manager: CallPeerConnections;
+    let sendSignal: jest.Mock<Promise<void>, Parameters<SignalSender>>;
+
+    /** The connection that answered, wherever it was created. */
+    function answeringConnection(): FakePeerConnection {
+      const answering = peers.find(
+        ({ localDescription }) => localDescription?.type === 'answer',
+      );
+
+      if (!answering) throw new Error('No connection answered.');
+
+      return answering;
+    }
+
+    /** Makes `peer` ask the other side to restart ICE, as its own offer. */
+    async function offerRestart(peer: FakePeerConnection): Promise<void> {
+      await peer.setLocalDescription(await peer.createOffer());
+    }
+
+    beforeEach(() => {
+      peers = [];
+      installEncodedStreamSupport();
+      installScriptTransformSupport();
+      installSessionDescriptionMock();
+      installPeerConnectionMock(peers);
+      manager = callPeerConnectionManager();
+      sendSignal = jest
+        .fn<Promise<void>, Parameters<SignalSender>>()
+        .mockResolvedValue(undefined);
+      manager.configure(() => Promise.resolve({ iceServers: [] }));
+    });
+
+    afterEach(() => {
+      manager.reset();
+    });
+
+    it('answers an offer that crosses its own on a new connection, not on a rolled back one', async () => {
+      manager.configureMediaEncryption(
+        { callId: 'call-id', senderId: 'bob' },
+        callKey(),
+      );
+      manager.setLocalStream(
+        mediaStreamWithTracks([mediaTrack('microphone', 'audio')]),
+      );
+      await manager.ensurePeer('alice', false, sendSignal);
+      const [crossed] = peers;
+      await offerRestart(crossed);
+
+      await manager.handleSignal(
+        'alice',
+        'offer',
+        { ...describedBy('offer', first), mediaEncryption: encryptedMedia },
+        sendSignal,
+        'bob',
+      );
+
+      const answering = answeringConnection();
+
+      expect(untransformed(answering)).toEqual([]);
+      expect(peers).toHaveLength(2);
+      expect(answering).not.toBe(crossed);
+      expect(crossed.close).toHaveBeenCalledTimes(1);
+      expect(crossed.setLocalDescription).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'rollback' }),
+      );
+      expect(crossed.setRemoteDescription).not.toHaveBeenCalled();
+      expect(answering.remoteDescription).toEqual(
+        expect.objectContaining({
+          sdp: describedBy('offer', first).sdp,
+          type: 'offer',
+        }),
+      );
+      expect(sendSignal).toHaveBeenCalledWith(
+        'alice',
+        'answer',
+        expect.objectContaining({ type: 'answer' }),
+      );
+    });
+
+    it('keeps its connection for the next offer of the connection it knows', async () => {
+      await manager.ensurePeer('alice', false, sendSignal);
+      await manager.handleSignal(
+        'alice',
+        'offer',
+        describedBy('offer', first),
+        sendSignal,
+        'bob',
+      );
+
+      await manager.handleSignal(
+        'alice',
+        'offer',
+        describedBy('offer', first, 2),
+        sendSignal,
+        'bob',
+      );
+
+      expect(peers).toHaveLength(1);
+      expect(peers[0].close).not.toHaveBeenCalled();
+      expect(peers[0].remoteDescription).toEqual(
+        describedBy('offer', first, 2),
+      );
+      expect(sendSignal).toHaveBeenCalledTimes(2);
+    });
+
+    it('ignores an offer that crosses its own and keeps its connection when it is the impolite side', async () => {
+      await manager.ensurePeer('bob', true, sendSignal);
+      const [crossed] = peers;
+      await manager.handleSignal(
+        'bob',
+        'answer',
+        describedBy('answer', first),
+        sendSignal,
+        'alice',
+      );
+      await offerRestart(crossed);
+
+      await manager.handleSignal(
+        'bob',
+        'offer',
+        describedBy('offer', first, 2),
+        sendSignal,
+        'alice',
+      );
+
+      expect(peers).toHaveLength(1);
+      expect(crossed.close).not.toHaveBeenCalled();
+      expect(crossed.setRemoteDescription).toHaveBeenCalledTimes(1);
+      expect(crossed.signalingState).toBe('have-local-offer');
+    });
+
+    it.each([
+      { current: 'alice', remote: 'bob' },
+      { current: 'bob', remote: 'alice' },
+    ])(
+      'answers the offer of a new remote connection on a new connection ($current)',
+      async ({ current, remote }) => {
+        await manager.ensurePeer(remote, false, sendSignal);
+        const [known] = peers;
+        await manager.handleSignal(
+          remote,
+          'offer',
+          describedBy('offer', first),
+          sendSignal,
+          current,
+        );
+
+        await manager.handleSignal(
+          remote,
+          'offer',
+          describedBy('offer', second),
+          sendSignal,
+          current,
+        );
+
+        expect(peers).toHaveLength(2);
+        expect(known.close).toHaveBeenCalledTimes(1);
+        expect(known.setRemoteDescription).toHaveBeenCalledTimes(1);
+        expect(peers[1].remoteDescription).toEqual(
+          describedBy('offer', second),
+        );
+        expect(peers[1].localDescription?.type).toBe('answer');
+        expect(sendSignal).toHaveBeenCalledTimes(2);
+      },
+    );
+
+    it('offers again on a new connection when the answer to its restart comes from a new remote connection', async () => {
+      await manager.ensurePeer('bob', true, sendSignal);
+      const [crossed] = peers;
+      await manager.handleSignal(
+        'bob',
+        'answer',
+        describedBy('answer', first),
+        sendSignal,
+        'alice',
+      );
+      await offerRestart(crossed);
+      sendSignal.mockClear();
+
+      await manager.handleSignal(
+        'bob',
+        'answer',
+        describedBy('answer', second),
+        sendSignal,
+        'alice',
+      );
+
+      expect(crossed.close).toHaveBeenCalledTimes(1);
+      expect(crossed.setRemoteDescription).toHaveBeenCalledTimes(1);
+      expect(peers).toHaveLength(2);
+      expect(peers[1].setRemoteDescription).not.toHaveBeenCalled();
+      expect(peers[1].localDescription?.type).toBe('offer');
+      expect(sendSignal).toHaveBeenCalledTimes(1);
+      expect(sendSignal).toHaveBeenCalledWith(
+        'bob',
+        'offer',
+        expect.objectContaining({ type: 'offer' }),
+      );
+    });
+
+    it('drops the descriptions of a remote connection it replaced', async () => {
+      await manager.ensurePeer('bob', true, sendSignal);
+      const [crossed] = peers;
+      await manager.handleSignal(
+        'bob',
+        'answer',
+        describedBy('answer', first),
+        sendSignal,
+        'alice',
+      );
+      await offerRestart(crossed);
+      await manager.handleSignal(
+        'bob',
+        'answer',
+        describedBy('answer', second),
+        sendSignal,
+        'alice',
+      );
+      sendSignal.mockClear();
+
+      // The same answer once more, and an offer of the connection before it.
+      await manager.handleSignal(
+        'bob',
+        'answer',
+        describedBy('answer', second, 2),
+        sendSignal,
+        'alice',
+      );
+      await manager.handleSignal(
+        'bob',
+        'offer',
+        describedBy('offer', first, 3),
+        sendSignal,
+        'alice',
+      );
+
+      expect(peers).toHaveLength(2);
+      expect(peers[1].setRemoteDescription).not.toHaveBeenCalled();
+      expect(sendSignal).not.toHaveBeenCalled();
+
+      await manager.handleSignal(
+        'bob',
+        'answer',
+        describedBy('answer', third),
+        sendSignal,
+        'alice',
+      );
+
+      expect(peers).toHaveLength(2);
+      expect(peers[1].remoteDescription).toEqual(describedBy('answer', third));
+      expect(peers[1].signalingState).toBe('stable');
+    });
+
+    it('keeps the candidates it queued for the offer that made it replace its connection', async () => {
+      Object.defineProperty(globalThis, 'RTCIceCandidate', {
+        configurable: true,
+        value: jest.fn((candidate: RTCIceCandidateInit) => candidate),
+      });
+      const offer = describedBy('offer', first);
+      const candidate = {
+        candidate: 'candidate:1',
+        sdpMid: '0',
+        usernameFragment: `${first}-1`,
+      };
+      await manager.ensurePeer('alice', false, sendSignal);
+      await offerRestart(peers[0]);
+      await manager.handleSignal(
+        'alice',
+        'ice_candidate',
+        candidate,
+        sendSignal,
+        'bob',
+      );
+
+      await manager.handleSignal('alice', 'offer', offer, sendSignal, 'bob');
+
+      expect(peers).toHaveLength(2);
+      expect(peers[0].addIceCandidate).not.toHaveBeenCalled();
+      expect(peers[1].addIceCandidate).toHaveBeenCalledWith(candidate);
+    });
+
+    it.each(['alice', 'bob'])(
+      'ends with one working connection each when both sides restart ICE and their offers cross (%s delivered first)',
+      async (deliveredFirst) => {
+        const connections: FakePeerConnection[] = [];
+        const configurations: RTCConfiguration[] = [];
+        installPeerConnectionMock(connections, configurations);
+        const alice = encryptedCallSide('alice');
+        const bob = encryptedCallSide('bob');
+        await alice.manager.ensurePeer('bob', true, alice.sendSignal);
+        await bob.manager.ensurePeer('alice', false, bob.sendSignal);
+        await converse(alice, bob);
+
+        for (const side of [alice, bob]) {
+          const [established] = connectionsOf(
+            side,
+            connections,
+            configurations,
+          );
+
+          registeredPeerEventListener(
+            established,
+            'negotiationneeded',
+          )(new Event('negotiationneeded'));
+        }
+        await (deliveredFirst === 'alice'
+          ? converse(alice, bob)
+          : converse(bob, alice));
+
+        const [aliceConnections, bobConnections] = [alice, bob].map((side) =>
+          connectionsOf(side, connections, configurations),
+        );
+        const aliceNow = aliceConnections[aliceConnections.length - 1];
+        const bobNow = bobConnections[bobConnections.length - 1];
+
+        expect(untransformed(aliceNow)).toEqual([]);
+        expect(untransformed(bobNow)).toEqual([]);
+        expect([aliceNow.signalingState, bobNow.signalingState]).toEqual([
+          'stable',
+          'stable',
+        ]);
+        expect(fingerprintOf(aliceNow.remoteDescription)).toBe(
+          fingerprintOf(bobNow.localDescription),
+        );
+        expect(fingerprintOf(bobNow.remoteDescription)).toBe(
+          fingerprintOf(aliceNow.localDescription),
+        );
+        expect(aliceNow.close).not.toHaveBeenCalled();
+        expect(bobNow.close).not.toHaveBeenCalled();
+        for (const replaced of [
+          ...aliceConnections.slice(0, -1),
+          ...bobConnections.slice(0, -1),
+        ]) {
+          expect(replaced.close).toHaveBeenCalledTimes(1);
+        }
+        alice.manager.reset();
+        bob.manager.reset();
+      },
+    );
   });
 
   it.each(['reset', 'healthy', 'timeout'])(
