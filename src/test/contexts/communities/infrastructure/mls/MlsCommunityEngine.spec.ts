@@ -1696,6 +1696,43 @@ describe('MlsCommunityEngine', () => {
     );
   });
 
+  it('keeps taking later commits while the node refuses the welcome of a commit that won its epoch, and sends it once accepted', async () => {
+    moderators.add(id('bob'));
+    roster.add(id('mallory'));
+    const { alice, bob } = await admitBob();
+    const carol = engineFor('carol');
+    const mallory = engineFor('mallory');
+
+    await carol.engine.publishKeyPackages(COMMUNITY);
+    await mallory.engine.publishKeyPackages(COMMUNITY);
+    await bob.engine.admit(COMMUNITY, [id('mallory')]);
+    await alice.engine.sync(COMMUNITY);
+    failWelcomes();
+    await expect(alice.engine.admit(COMMUNITY, [id('carol')])).rejects.toThrow(
+      'crash',
+    );
+    roster.delete(id('mallory'));
+    await bob.engine.remove(COMMUNITY, [id('mallory')]);
+
+    await expect(alice.engine.sync(COMMUNITY)).rejects.toThrow('crash');
+    await expect(alice.engine.sync(COMMUNITY)).rejects.toThrow('crash');
+    const sealed = await alice.engine.encrypt(COMMUNITY, 'after mallory');
+    const restarted = engineFor('alice', alice.store);
+
+    await expect(bob.engine.decrypt(COMMUNITY, sealed)).resolves.toBe(
+      'after mallory',
+    );
+    await expect(mallory.engine.decrypt(COMMUNITY, sealed)).rejects.toThrow();
+    delete node.hooks.beforePublish;
+    const resent = welcomesTo('carol');
+
+    await expect(restarted.engine.sync(COMMUNITY)).resolves.toBe(true);
+    expect(resent).toHaveLength(1);
+    await expect(pendingIn(alice.store)).resolves.toBe(0);
+    await expect(carol.engine.sync(COMMUNITY)).resolves.toBe(true);
+    await expect(secretOf(carol)).resolves.toEqual(await secretOf(restarted));
+  });
+
   it('refuses a commit while one it made after the other call caught up is unsettled, and delivers that one first', async () => {
     roster.add(id('mallory'));
     const { alice, bob } = await admitBob();

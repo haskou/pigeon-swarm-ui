@@ -216,7 +216,9 @@ export class MlsCommunityEngine {
       taken: await this.takenCommits.of(groupId, group.epoch),
     });
 
-    if (!synced.isRemoved) await this.welcomeOnce(synced, pending, won);
+    const winner = MlsCommunityEngine.winner(synced, pending, won);
+
+    await this.markWon(groupId, winner);
     await this.remember(synced, taken);
 
     if (synced.isRemoved) {
@@ -225,11 +227,25 @@ export class MlsCommunityEngine {
       return false;
     }
 
+    if (winner) {
+      await this.sendWelcome(this.transportFor(communityId), groupId, winner);
+    }
+
     if (stored && (!pending || synced.epoch !== BigInt(pending.epoch))) {
       await this.forgetPending(groupId);
     }
 
     return true;
+  }
+
+  /** Keeps that the pending won, unless it already says so. */
+  private async markWon(
+    groupId: string,
+    winner: MlsPendingCommit | undefined,
+  ): Promise<void> {
+    if (winner && !winner.won) {
+      await this.savePending(groupId, { ...winner, won: true });
+    }
   }
 
   /**
@@ -633,26 +649,28 @@ export class MlsCommunityEngine {
   }
 
   /**
-   * Once the group left the epoch of this device's pending commit, sends
-   * the welcome again when that commit won the epoch (`won`), before the
-   * group is saved: a stop in between syncs again and sends it again,
-   * welcome record ids being idempotent. A commit that lost its epoch is
-   * not in the group, so a joiner it named is not a member and a manager's
-   * `reconcile` admits it again. While the group is still in that epoch the
-   * commit may yet reach the other members, so it stays.
+   * This device's pending commit once it won its epoch (`won`) and the
+   * group left that epoch, so its welcome is due. `catchUp` marks it won
+   * before it saves the group and sends the welcome after: a welcome the
+   * node refuses leaves the group saved, so later commits are still taken,
+   * and the next sync sends it again, welcome record ids being idempotent,
+   * also once the record of the commits the group took forgot the epoch. A
+   * commit that lost its epoch is not in the group, so a joiner it named is
+   * not a member and a manager's `reconcile` admits it again. While the
+   * group is still in that epoch the commit may yet reach the other
+   * members, so it stays.
    */
-  private async welcomeOnce(
+  private static winner(
     group: MlsGroup,
     pending: MlsPendingCommit | undefined,
     won: boolean,
-  ): Promise<void> {
-    if (!pending || !won || group.epoch <= BigInt(pending.epoch)) return;
-
-    await this.sendWelcome(
-      this.transportFor(this.communityOf(group.groupId)),
-      group.groupId,
-      pending,
-    );
+  ): MlsPendingCommit | undefined {
+    return !group.isRemoved &&
+      pending &&
+      won &&
+      group.epoch > BigInt(pending.epoch)
+      ? pending
+      : undefined;
   }
 
   /**
@@ -705,7 +723,7 @@ export class MlsCommunityEngine {
         : undefined;
     let current = group;
     let { taken } = outbox;
-    let won = MlsCommunityEngine.won(pending, taken, false);
+    let won = MlsCommunityEngine.won(pending, taken, pending?.won === true);
 
     for (const record of ordered) {
       if (current.isRemoved) break;
@@ -724,7 +742,8 @@ export class MlsCommunityEngine {
    * taking a commit in `epoch` (none before the first): the record naming
    * another commit there, or forgetting it after a commit of that epoch or
    * an earlier one undid it, says it lost; the record forgetting it as the
-   * group moves past it keeps what was known (`was`).
+   * group moves past it, or having forgotten it before this sync, keeps
+   * what was known (`was`, at first the pending's own `won`).
    */
   private static won(
     pending: MlsPendingCommit | undefined,
@@ -737,7 +756,7 @@ export class MlsCommunityEngine {
 
     if (kept !== undefined) return kept === pending.commitId;
 
-    return epoch !== undefined && epoch > pending.epoch && was;
+    return (epoch === undefined || epoch > pending.epoch) && was;
   }
 
   /** Whether the record claims the pending commit's id with other bytes. */
