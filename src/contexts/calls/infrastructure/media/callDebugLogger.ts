@@ -12,6 +12,7 @@ const allowedEvents = new Set([
   'peer-manager:ice-recovery:scheduled',
   'peer-manager:ice-recovery:configuration-unavailable',
   'peer-manager:ice-recovery:exhausted',
+  'peer-manager:ice-recovery:replacement-limit',
   'peer-manager:ice-recovery:manual-retry',
   'peer-manager:ice-recovery:resent-offer',
   'peer-manager:ice-recovery:requested-offer',

@@ -95,14 +95,19 @@ export class CallPeerNegotiation {
 
   /**
    * Closes the connection to a peer and opens a fresh one for what comes
-   * next. `retiring` are the fingerprints of the remote connections that
-   * will not be heard from again.
+   * next, unless the peer has used up its replacements. `retiring` are the
+   * fingerprints of the remote connections that will not be heard from
+   * again.
    */
   private async replaceConnection(
     senderIdentityId: string,
     retiring: Array<string | undefined>,
     sendSignal: SignalSender,
-  ): Promise<RTCPeerConnection> {
+  ): Promise<RTCPeerConnection | undefined> {
+    const replacement = await this.replacePeer(senderIdentityId, sendSignal);
+
+    if (!replacement) return undefined;
+
     const state = this.state(senderIdentityId);
 
     this.states.set(senderIdentityId, {
@@ -119,7 +124,7 @@ export class CallPeerNegotiation {
       senderIdentityId,
     });
 
-    return await this.replacePeer(senderIdentityId, sendSignal);
+    return replacement;
   }
 
   /** The connection an answer is applied on, or none when it is left alone. */
@@ -160,7 +165,8 @@ export class CallPeerNegotiation {
       sendSignal,
     );
 
-    await this.offerIfNeeded(senderIdentityId, replacement, true, sendSignal);
+    if (replacement)
+      await this.offerIfNeeded(senderIdentityId, replacement, true, sendSignal);
 
     return undefined;
   }

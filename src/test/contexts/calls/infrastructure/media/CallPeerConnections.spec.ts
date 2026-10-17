@@ -1432,6 +1432,35 @@ describe(CallPeerConnections.name, () => {
       },
     );
 
+    it('stops replacing the connection of a peer that keeps changing its certificate', async () => {
+      await manager.ensurePeer('alice', false, sendSignal);
+
+      for (let revision = 0; revision < 25; revision += 1)
+        await manager.handleSignal(
+          'alice',
+          'offer',
+          describedBy(
+            'offer',
+            `sha-256 B0:${revision.toString(16).padStart(2, '0').toUpperCase()}`,
+          ),
+          sendSignal,
+          'bob',
+        );
+      peers.forEach((peer) =>
+        Object.assign(peer, { getStats: () => Promise.resolve(new Map()) }),
+      );
+
+      // The first connection, then the ten replacements it is allowed.
+      expect(peers).toHaveLength(11);
+      expect(peers[10].close).not.toHaveBeenCalled();
+      expect(peers[10].remoteDescription).toEqual(
+        describedBy('offer', 'sha-256 B0:0A'),
+      );
+      expect((await manager.collectStats()).alice.recoveryState).toBe(
+        'exhausted',
+      );
+    });
+
     it('offers again on a new connection when the answer to its restart comes from a new remote connection', async () => {
       await manager.ensurePeer('bob', true, sendSignal);
       const [crossed] = peers;

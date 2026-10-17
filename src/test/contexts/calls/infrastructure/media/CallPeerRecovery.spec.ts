@@ -453,6 +453,40 @@ describe('CallPeerRecovery', () => {
     expect(jest.getTimerCount()).toBe(0);
     recovery.reset();
   });
+
+  it('allows a peer only so many replacements until a connection turns healthy', () => {
+    const recovery = new CallPeerRecovery(jest.fn(() => Promise.resolve()));
+    const allowed = Array.from({ length: 12 }, () =>
+      recovery.allowReplacement('peer'),
+    );
+
+    expect(allowed.filter(Boolean)).toHaveLength(10);
+    expect(recovery.stateFor('peer')).toBe('exhausted');
+
+    recovery.reconcile(
+      'peer',
+      peerConnection('connected', 'connected'),
+      () => true,
+    );
+
+    expect(recovery.stateFor('peer')).toBe('idle');
+    expect(recovery.allowReplacement('peer')).toBe(true);
+  });
+
+  it('counts the replacements of each peer on its own and forgets them with the peer', () => {
+    const recovery = new CallPeerRecovery(jest.fn(() => Promise.resolve()));
+
+    Array.from({ length: 11 }, () => recovery.allowReplacement('noisy'));
+
+    expect(recovery.allowReplacement('quiet')).toBe(true);
+    expect(recovery.stateFor('quiet')).toBe('idle');
+
+    recovery.forget('noisy');
+
+    expect(recovery.stateFor('noisy')).toBe('idle');
+    expect(recovery.allowReplacement('noisy')).toBe(true);
+  });
+
   it('restarts a negotiated unhealthy peer at once after a disruption, even when recovery was exhausted', async () => {
     jest.useFakeTimers();
     const restart = jest.fn(() => Promise.resolve());

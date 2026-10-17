@@ -12,6 +12,14 @@ const credentialRefreshTimeoutMs = 15_000;
 const disruptionCooldownMs = 5_000;
 const politeDisruptionDelayMs = 3_000;
 
+/**
+ * Three recovery attempts may each replace both ends' connection once, with
+ * room to spare. Beyond it a peer is changing its DTLS certificate for the
+ * sake of it: every replacement costs a connection, a configuration fetch and
+ * a relay allocation.
+ */
+const maximumPeerReplacements = 10;
+
 export class CallPeerRecovery {
   private readonly exhausted = new Set<string>();
 
@@ -25,6 +33,8 @@ export class CallPeerRecovery {
   >();
 
   private readonly retryNotBefore = new Map<string, number>();
+
+  private readonly replacements = new Map<string, number>();
 
   private readonly lastRestartAt = new Map<string, number>();
 
@@ -206,6 +216,7 @@ export class CallPeerRecovery {
     this.attempts.delete(peerIdentityId);
     this.exhausted.delete(peerIdentityId);
     this.retryNotBefore.delete(peerIdentityId);
+    this.replacements.delete(peerIdentityId);
   }
 
   private isDisruptable(
@@ -231,6 +242,28 @@ export class CallPeerRecovery {
     this.cancel(peerIdentityId);
     this.inFlight.get(peerIdentityId)?.abort();
     this.inFlight.delete(peerIdentityId);
+  }
+
+  /**
+   * Whether the connection to a peer may be replaced once more. The
+   * replacements of a peer are counted until one of its connections turns
+   * healthy or the user retries; past the limit the peer is given up as
+   * exhausted and keeps the connection it has.
+   */
+  public allowReplacement(peerIdentityId: string): boolean {
+    const replacements = (this.replacements.get(peerIdentityId) ?? 0) + 1;
+
+    if (replacements > maximumPeerReplacements) {
+      this.detach(peerIdentityId);
+      this.exhausted.add(peerIdentityId);
+      logCallWarning('peer-manager:ice-recovery:replacement-limit');
+
+      return false;
+    }
+
+    this.replacements.set(peerIdentityId, replacements);
+
+    return true;
   }
 
   public forget(peerIdentityId: string): void {
@@ -348,6 +381,7 @@ export class CallPeerRecovery {
     this.pending.clear();
     this.attempts.clear();
     this.exhausted.clear();
+    this.replacements.clear();
     this.retryNotBefore.clear();
     this.lastRestartAt.clear();
   }

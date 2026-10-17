@@ -356,7 +356,9 @@ export class CallPeerConnections {
   private async replacePeer(
     peerIdentityId: string,
     sendSignal: SignalSender,
-  ): Promise<RTCPeerConnection> {
+  ): Promise<RTCPeerConnection | undefined> {
+    if (!this.recovery.allowReplacement(peerIdentityId)) return undefined;
+
     this.recovery.detach(peerIdentityId);
     this.closePeer(peerIdentityId);
 
