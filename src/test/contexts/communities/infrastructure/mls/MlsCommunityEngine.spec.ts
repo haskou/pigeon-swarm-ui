@@ -12,6 +12,7 @@ import type { MlsStateStore } from '../../../../../contexts/communities/infrastr
 import type { StoredMlsKeyPackage } from '../../../../../contexts/communities/infrastructure/mls/StoredMlsKeyPackage';
 
 import { CommunityRosterHistory } from '../../../../../contexts/communities/domain/CommunityRosterHistory';
+import { MlsUpdateCadence } from '../../../../../contexts/communities/domain/MlsUpdateCadence';
 import { CommunityOperationProof } from '../../../../../contexts/communities/infrastructure/http/CommunityOperationProof';
 import { MlsCommunityEngine } from '../../../../../contexts/communities/infrastructure/mls/MlsCommunityEngine';
 import { CommunityOperationHistory } from '../http/CommunityOperationHistory';
@@ -129,6 +130,10 @@ describe('MlsCommunityEngine', () => {
   let tamper: (history: CommunityOperationHistory, managers: string) => void;
   /** A key that is no member's identity key, as a node's would be. */
   let nodeKey: KeyPair;
+  /** The time on every device's clock. */
+  let now: number;
+  /** What every device draws its update jitter from. */
+  let jitter: number;
   /** The history so far, and the roster, moderators and tamper it holds. */
   let signed:
     | {
@@ -217,6 +222,8 @@ describe('MlsCommunityEngine', () => {
             groupId.split(':')[1],
           ),
         ),
+      () => now,
+      () => jitter,
     ),
     store,
   });
@@ -279,6 +286,8 @@ describe('MlsCommunityEngine', () => {
     moderators = new Set();
     tamper = () => undefined;
     signed = undefined;
+    now = 1_700_000_000_000;
+    jitter = 0;
   });
 
   const admitBob = async (): Promise<{
@@ -692,6 +701,8 @@ describe('MlsCommunityEngine', () => {
               groupId.split(':')[1],
             ),
           ),
+        () => now,
+        () => jitter,
       );
 
     it('accepts an add made before the demotion by a member who saw the demotion first', async () => {
@@ -1356,5 +1367,171 @@ describe('MlsCommunityEngine', () => {
     expect(MlsCommunityEngine.groupOf(base64(new Uint8Array([1, 2])))).toBe(
       undefined,
     );
+  });
+
+  describe('commits an update of its own leaf on a cadence', () => {
+    const DAY = MlsUpdateCadence.INTERVAL_MS;
+    const commitsBy = (name: string): MlsRecordResource[] =>
+      node.records.filter(
+        (record) =>
+          record.kind === 'commit' && record.authorIdentityId === id(name),
+      );
+    /**
+     * Bob's state as it was, read with alice's next message once bob's
+     * own update has gone out: a leaked copy must lose the group.
+     */
+    const expectLockedOut = async (
+      leaked: MlsGroup,
+      alice: ReturnType<typeof engineFor>,
+      update: MlsRecordResource,
+    ): Promise<void> => {
+      await alice.engine.sync(COMMUNITY);
+      const after = await alice.engine.encrypt(COMMUNITY, 'after');
+
+      await leaked
+        .applyCommit({
+          bytes: Buffer.from(update.payload, 'base64'),
+          epoch: BigInt(update.epoch as number),
+          id: update.recordId,
+        })
+        .catch(() => undefined);
+
+      await expect(
+        leaked.decrypt(Buffer.from(after, 'base64')),
+      ).rejects.toThrow();
+      expect(await leaked.callMediaKey('epoch')).not.toEqual(
+        (await secretOf(alice)).secret,
+      );
+    };
+
+    it('commits one update before the first message sent a day after the last', async () => {
+      const { alice, bob } = await admitBob();
+      const leaked = await rogueGroupOf('bob', bob.store);
+      const before = await alice.engine.encrypt(COMMUNITY, 'before');
+
+      expect(
+        new TextDecoder().decode(
+          await leaked.decrypt(Buffer.from(before, 'base64')),
+        ),
+      ).toBe('before');
+      jitter = 0.5;
+      now += DAY;
+      await bob.engine.encrypt(COMMUNITY, 'within a day');
+
+      expect(commitsBy('bob')).toHaveLength(0);
+
+      now += MlsUpdateCadence.JITTER_MS + 1;
+      const { epoch } = await secretOf(bob);
+      const message = await bob.engine.encrypt(COMMUNITY, 'a day later');
+      const [update] = commitsBy('bob');
+
+      expect(commitsBy('bob')).toHaveLength(1);
+      expect(update.epoch).toBe(epoch);
+      expect(MlsGroup.epochOf(Buffer.from(message, 'base64'))).toBe(
+        BigInt(epoch + 1),
+      );
+      await alice.engine.sync(COMMUNITY);
+      await expect(alice.engine.decrypt(COMMUNITY, message)).resolves.toBe(
+        'a day later',
+      );
+      await bob.engine.encrypt(COMMUNITY, 'right after');
+      expect(commitsBy('bob')).toHaveLength(1);
+      await expectLockedOut(leaked, alice, update);
+    });
+
+    it('commits one update before the message after the thousandth since the last', async () => {
+      const { alice, bob } = await admitBob();
+      const leaked = await rogueGroupOf('bob', bob.store);
+
+      for (let sent = 0; sent < MlsUpdateCadence.MAX_SENT; sent += 1) {
+        await bob.engine.encrypt(COMMUNITY, 'chatter');
+      }
+
+      expect(commitsBy('bob')).toHaveLength(0);
+
+      const message = await bob.engine.encrypt(COMMUNITY, 'one more');
+      const [update] = commitsBy('bob');
+
+      expect(commitsBy('bob')).toHaveLength(1);
+      await alice.engine.sync(COMMUNITY);
+      await expect(alice.engine.decrypt(COMMUNITY, message)).resolves.toBe(
+        'one more',
+      );
+      await expectLockedOut(leaked, alice, update);
+    }, 120_000);
+
+    it('updates on the first reconcile of a device that comes back after a day', async () => {
+      const { alice, bob } = await admitBob();
+      const leaked = await rogueGroupOf('bob', bob.store);
+
+      now += DAY + MlsUpdateCadence.JITTER_MS;
+      await bob.engine.reconcile(COMMUNITY);
+      const [update] = commitsBy('bob');
+
+      expect(commitsBy('bob')).toHaveLength(1);
+      await expectLockedOut(leaked, alice, update);
+    });
+
+    it('restarts the cadence on a removal it commits, but not on an add', async () => {
+      const { alice } = await admitBob();
+      const carol = engineFor('carol');
+
+      now += DAY + MlsUpdateCadence.JITTER_MS;
+      await carol.engine.publishKeyPackages(COMMUNITY);
+      await alice.engine.admit(COMMUNITY, [id('carol')]);
+      await alice.engine.encrypt(COMMUNITY, 'after the add');
+
+      expect(commitsBy('alice')).toHaveLength(3);
+
+      now += DAY + MlsUpdateCadence.JITTER_MS;
+      await alice.engine.remove(COMMUNITY, [id('carol')]);
+      await alice.engine.encrypt(COMMUNITY, 'after the removal');
+
+      expect(commitsBy('alice')).toHaveLength(4);
+    });
+
+    it('resolves concurrent updates of two devices to one epoch on both, and the loser updates again', async () => {
+      const { alice, bob } = await admitBob();
+
+      now += DAY + MlsUpdateCadence.JITTER_MS;
+      await alice.engine.encrypt(COMMUNITY, 'from alice');
+      // Bob updates before the node lists alice's update to him.
+      const [hidden] = node.records.splice(
+        node.records.indexOf(commitsBy('alice')[1]),
+        1,
+      );
+
+      await bob.engine.encrypt(COMMUNITY, 'from bob');
+      node.records.push(hidden);
+
+      expect(
+        [...commitsBy('alice'), ...commitsBy('bob')].map(
+          (record) => record.epoch,
+        ),
+      ).toEqual([0, 1, 1]);
+      await alice.engine.sync(COMMUNITY);
+      await bob.engine.sync(COMMUNITY);
+
+      expect(await secretOf(alice)).toEqual(await secretOf(bob));
+
+      const committed = node.records.filter(
+        (record) => record.kind === 'commit',
+      ).length;
+      const fromAlice = await alice.engine.encrypt(COMMUNITY, 'again alice');
+      const fromBob = await bob.engine.encrypt(COMMUNITY, 'again bob');
+
+      expect(
+        node.records.filter((record) => record.kind === 'commit'),
+      ).toHaveLength(committed + 1);
+      await alice.engine.sync(COMMUNITY);
+      await bob.engine.sync(COMMUNITY);
+      expect(await secretOf(alice)).toEqual(await secretOf(bob));
+      await expect(alice.engine.decrypt(COMMUNITY, fromBob)).resolves.toBe(
+        'again bob',
+      );
+      await expect(bob.engine.decrypt(COMMUNITY, fromAlice)).resolves.toBe(
+        'again alice',
+      );
+    });
   });
 });
