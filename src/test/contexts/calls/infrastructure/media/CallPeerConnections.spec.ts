@@ -1604,6 +1604,74 @@ describe(CallPeerConnections.name, () => {
     },
   );
 
+  it.each([{ during: false }, { during: true }])(
+    'adds remote restart candidates that arrive before their offer is applied (applying=$during)',
+    async ({ during }) => {
+      const peers: FakePeerConnection[] = [];
+      installSessionDescriptionMock();
+      installPeerConnectionMock(peers);
+      Object.defineProperty(globalThis, 'RTCIceCandidate', {
+        configurable: true,
+        value: jest.fn((candidate: RTCIceCandidateInit) => candidate),
+      });
+      const manager = callPeerConnectionManager();
+      manager.configure(() => Promise.resolve({ iceServers: [] }));
+      const sendSignal = jest.fn().mockResolvedValue(undefined);
+      const receiveOffer = (fragment: string) =>
+        manager.handleSignal(
+          'bob',
+          'offer',
+          { sdp: `v=0\r\na=ice-ufrag:${fragment}\r\n`, type: 'offer' },
+          sendSignal,
+          'alice',
+        );
+      await receiveOffer('old');
+      const peer = peers[0];
+      let applyingRestart: Promise<void> | undefined;
+      let finishRestart: (() => void) | undefined;
+
+      if (during) {
+        const original = jest
+          .mocked(peer.setRemoteDescription)
+          .getMockImplementation()!;
+        let started!: () => void;
+        const applying = new Promise<void>((resolve) => {
+          started = resolve;
+        });
+        jest
+          .mocked(peer.setRemoteDescription)
+          .mockImplementationOnce((description) => {
+            started();
+
+            return new Promise<void>((resolve) => {
+              finishRestart = () => {
+                void original(description).then(resolve);
+              };
+            });
+          });
+        applyingRestart = receiveOffer('new');
+        await applying;
+      }
+      await manager.handleSignal(
+        'bob',
+        'ice_candidate',
+        { candidate: 'candidate:new', sdpMid: '0', usernameFragment: 'new' },
+        sendSignal,
+        'alice',
+      );
+      expect(peer.addIceCandidate).not.toHaveBeenCalled();
+
+      finishRestart?.();
+      await (applyingRestart ?? receiveOffer('new'));
+
+      expect(peer.addIceCandidate).toHaveBeenCalledTimes(1);
+      expect(peer.addIceCandidate).toHaveBeenCalledWith(
+        expect.objectContaining({ usernameFragment: 'new' }),
+      );
+      manager.reset();
+    },
+  );
+
   it.each([
     { arrival: 'before', fragment: 'old' },
     { arrival: 'after', fragment: 'old' },

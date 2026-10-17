@@ -15,10 +15,17 @@ export class CallIceCandidates {
     private readonly signalRetry: CallSignalRetry,
   ) {}
 
+  /**
+   * Adds a candidate of the remote description's ICE generation and keeps one
+   * of another generation pending. Signals arrive independently, so a remote
+   * restart's candidates can precede the description that starts their
+   * generation; candidates of an earlier generation never match again.
+   */
   private async apply(
+    peerIdentityId: string,
     peer: RTCPeerConnection,
     candidate: RTCIceCandidateInit,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const iceCandidate = new RTCIceCandidate(candidate);
     const remoteFragments = [
       ...(peer.remoteDescription?.sdp ?? '').matchAll(
@@ -30,8 +37,11 @@ export class CallIceCandidates {
       iceCandidate.usernameFragment &&
       remoteFragments.length > 0 &&
       !remoteFragments.includes(iceCandidate.usernameFragment)
-    )
-      return;
+    ) {
+      this.queue(peerIdentityId, candidate);
+
+      return false;
+    }
 
     try {
       await peer.addIceCandidate(iceCandidate);
@@ -41,6 +51,8 @@ export class CallIceCandidates {
       }
       logCallWarning('peer-manager:drop-incompatible-ice-candidate', {});
     }
+
+    return true;
   }
 
   private queue(peerIdentityId: string, candidate: RTCIceCandidateInit): void {
@@ -71,7 +83,7 @@ export class CallIceCandidates {
     });
 
     for (const candidate of candidates) {
-      await this.apply(peer, candidate);
+      await this.apply(peerIdentityId, peer, candidate);
     }
   }
 
@@ -99,7 +111,7 @@ export class CallIceCandidates {
     }
 
     try {
-      await this.apply(peer, candidate);
+      if (!(await this.apply(senderIdentityId, peer, candidate))) return;
     } catch (error) {
       if (state.ignoreOffer) return;
 
