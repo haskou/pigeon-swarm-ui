@@ -154,7 +154,7 @@ test('keeps two community voice participants connected', async ({}, testInfo) =>
 });
 
 async function forceRelayTransport(page: Page): Promise<void> {
-  await page.route('**/calls/ice-servers', async (route) => {
+  await page.route('**/call-ice-servers', async (route) => {
     const response = await route.fetch();
     const configuration = (await response.json()) as Record<string, unknown>;
 
@@ -464,8 +464,8 @@ function assertHeartbeatResponses(
   responses: CallResponse[],
   durationMs: number,
 ): void {
-  const heartbeats = responses.filter(({ url }) =>
-    url.endsWith('/participants/me/heartbeat'),
+  const heartbeats = responses.filter(
+    ({ method, url }) => method === 'PATCH' && url.endsWith('/participants/me'),
   );
   const expectedMinimum = Math.max(2, Math.floor(durationMs / 4_000));
 

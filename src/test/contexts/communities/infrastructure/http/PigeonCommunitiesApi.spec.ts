@@ -925,7 +925,7 @@ describe(PigeonCommunitiesApi.name, () => {
       const [path, init] = calls[calls.length - 1];
       const { moderationLog, operation } = lastBody();
 
-      expect(path).toBe('/communities/community-1/members/member-1/kick');
+      expect(path).toBe('/communities/community-1/members/member-1');
       expect(init.method).toBe('DELETE');
       expect(moderationLog.mutation).toMatchObject({
         kind: 'put',
@@ -942,6 +942,40 @@ describe(PigeonCommunitiesApi.name, () => {
         store: 'moderationLogs',
       });
       expect(operation.createdAt).toBe(moderationLog.createdAt);
+    });
+
+    it.each(['text', 'voice'] as const)(
+      'creates a %s channel by posting its type to the channels collection',
+      async (type) => {
+        const { api, http, lastBody, session } = await setup({});
+
+        if (type === 'text') {
+          await api.createTextChannel(session, 'community-1', 'room');
+        } else {
+          await api.createVoiceChannel(session, 'community-1', 'room');
+        }
+
+        const calls = (http.request as jest.Mock).mock.calls as [
+          string,
+          { method: string },
+        ][];
+        const [path, init] = calls[calls.length - 1];
+
+        expect(path).toBe('/communities/community-1/channels');
+        expect(init.method).toBe('POST');
+        expect(lastBody()).toMatchObject({ name: 'room', type });
+      },
+    );
+
+    it('discovers communities from the discoverable-communities collection', async () => {
+      const { api, http, session } = await setup({ communities: [] });
+
+      await api.discover(session, { networkId: 'network-1', query: 'api' });
+
+      expect((http.request as jest.Mock).mock.calls.pop()).toEqual([
+        '/discoverable-communities?query=api&networkId=network-1',
+        expect.objectContaining({ method: 'GET' }),
+      ]);
     });
 
     it('derives the log id and the created entity id from the same createdAt', async () => {

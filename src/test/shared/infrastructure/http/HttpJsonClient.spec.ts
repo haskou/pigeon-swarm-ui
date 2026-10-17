@@ -111,14 +111,14 @@ describe(HttpJsonClient.name, () => {
     const client = new HttpJsonClient(new ApiUrlBuilder('http://localhost'));
     const body = new Uint8Array([1, 2, 3]).buffer;
 
-    await client.request('/ipfs/public', {
+    await client.request('/ipfs/contents', {
       body,
       headers: { 'Content-Type': 'image/png', 'X-Filename': 'avatar.png' },
       method: 'POST',
     });
 
     expect(global.fetch).toHaveBeenCalledWith(
-      'http://localhost/ipfs/public',
+      'http://localhost/ipfs/contents',
       expect.objectContaining({
         body,
         headers: expect.objectContaining({
