@@ -4,6 +4,7 @@ import type { DeviceAuthorization } from '../DeviceAuthorization';
 import type { DeviceAuthorizationRevision } from '../value-objects/DeviceAuthorizationRevision';
 import type { DeviceCredential } from '../value-objects/DeviceCredential';
 import type { DeviceAuthorizationReplay } from './DeviceAuthorizationReplay';
+import type { DeviceSealedSecretPublisherStanding } from './DeviceSealedSecretPublisherStanding';
 
 import { RevokedDeviceSealedSecretPublisherError } from '../errors/RevokedDeviceSealedSecretPublisherError';
 import { UnauthorizedDeviceSealedSecretPublisherError } from '../errors/UnauthorizedDeviceSealedSecretPublisherError';
@@ -17,6 +18,9 @@ import { UnauthorizedDeviceSealedSecretPublisherError } from '../errors/Unauthor
  * publisher's own retirement, so it needs a device the state before that
  * revision authorized and a self-revocation of that device that the replay
  * accepted into it. A revision the replay never reached authorizes no one.
+ * Returns which of the two authorizes the publisher: the replay cannot tell a
+ * genuine hand-over from another one the retired key signs for the same
+ * revision, so the caller orders hand-overs against the roots it trusts.
  */
 export class DeviceSealedSecretPublisherDomainService {
   private static retiredInto(
@@ -42,7 +46,7 @@ export class DeviceSealedSecretPublisherDomainService {
     publisher: DeviceCredential;
     replay: DeviceAuthorizationReplay;
     revision: DeviceAuthorizationRevision;
-  }): void {
+  }): DeviceSealedSecretPublisherStanding {
     const { publisher, replay, revision } = input;
     const index = replay.states.findIndex((state) =>
       state.getRevision().isEqual(revision),
@@ -58,7 +62,7 @@ export class DeviceSealedSecretPublisherDomainService {
         new RevokedDeviceSealedSecretPublisherError(),
       );
 
-      return;
+      return 'authorized';
     }
 
     assert(
@@ -66,5 +70,7 @@ export class DeviceSealedSecretPublisherDomainService {
         this.retiredInto(replay, replay.states[index - 1], publisher, revision),
       new UnauthorizedDeviceSealedSecretPublisherError(),
     );
+
+    return 'retired';
   }
 }

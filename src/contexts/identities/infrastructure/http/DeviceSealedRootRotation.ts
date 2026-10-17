@@ -1,5 +1,7 @@
 import { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
+import { assert } from '@haskou/value-objects';
 
+import type { DeviceSealedSecretPublisherStanding } from '../../domain/services/DeviceSealedSecretPublisherStanding';
 import type { DeviceCredential } from '../../domain/value-objects/DeviceCredential';
 import type { DeviceSealedRoots } from '../crypto/DeviceSealedRoots';
 import type { OpenedDeviceSealedSecret } from '../crypto/OpenedDeviceSealedSecret';
@@ -12,9 +14,13 @@ import type { PigeonKeychainApi } from './PigeonKeychainApi';
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 import { RevokedDeviceSealedSecretPublisherError } from '../../domain/errors/RevokedDeviceSealedSecretPublisherError';
+import { SupersededDeviceSealedRootHandOverError } from '../../domain/errors/SupersededDeviceSealedRootHandOverError';
 import { DeviceAuthorizationRevision } from '../../domain/value-objects/DeviceAuthorizationRevision';
 import { DeviceSealedRootGeneration } from '../../domain/value-objects/DeviceSealedRootGeneration';
 import { DeviceSealedRootPayload } from '../crypto/DeviceSealedRootPayload';
+
+/** How far past the clock a revoked publisher's generation still counts. */
+const revokedGenerationHorizonMs = 86_400_000;
 
 /**
  * Publishes and opens the device-sealed root of one identity. A generation
@@ -32,12 +38,15 @@ import { DeviceSealedRootPayload } from '../crypto/DeviceSealedRootPayload';
  * to the devices that remain, inside its own retirement. The secret API
  * decrypts an entry before any check, but no entry is used or trusted until
  * the signed transitions authorize its publisher at the entry revision and no
- * later transition revoked it. An entry whose publisher a later transition
- * revoked is used only while its root is the one this device last opened from
- * a trusted entry or published itself, so a device left behind by a failed
- * rotation still moves off that root; its generation alone still orders the
- * next publish. Any other entry they do not, or cannot, authorize fails the
- * call and leaves every local row as it was.
+ * later transition revoked it. A hand-over is the first entry at its
+ * revision, so one at or below the revision of another root this device
+ * trusts is refused: the retired key could sign another. An entry whose
+ * publisher a later transition revoked is used only while its root is the one
+ * this device last opened from a trusted entry or published itself, and only
+ * to move off that root: `current` never adopts it, so a device left behind
+ * by a failed rotation rotates from it. Its generation, bounded to a day past
+ * the clock, still orders the next publish. Any other entry they do not, or
+ * cannot, authorize fails the call and leaves every local row as it was.
  */
 export class DeviceSealedRootRotation {
   private static revoked(error: unknown): boolean {
@@ -56,53 +65,114 @@ export class DeviceSealedRootRotation {
     return Math.max(stored ?? 0, this.clock()) + 1;
   }
 
-  /** Never throws: trust only helps a device move off a revoked publisher. */
-  private remember(session: Session, root: SymmetricKey): void {
+  /**
+   * A revoked key may sign any generation, and the node keeps the highest;
+   * honoured as is, one near `MAX_SAFE_INTEGER` leaves no generation above.
+   */
+  private bounded(entry: OpenedDeviceSealedSecret): OpenedDeviceSealedSecret {
+    return {
+      ...entry,
+      generation: Math.min(
+        entry.generation,
+        this.clock() + revokedGenerationHorizonMs,
+      ),
+    };
+  }
+
+  /**
+   * Never throws: trust only helps a device move off a revoked publisher and
+   * order hand-overs. Without it, the device waits for a trusting device to
+   * rotate or is paired again.
+   */
+  private remember(
+    session: Session,
+    root: SymmetricKey,
+    revision: number,
+  ): void {
     try {
-      this.trust.remember(session.identity.id, session.masterKey, root);
+      this.trust.remember(
+        session.identity.id,
+        session.masterKey,
+        root,
+        revision,
+      );
     } catch {
       // eslint-disable-next-line no-console
       console.debug('Could not remember the trusted device-sealed root');
     }
   }
 
+  private trustsRevoked(
+    session: Session,
+    entry: OpenedDeviceSealedSecret,
+    error: unknown,
+  ): boolean {
+    return (
+      DeviceSealedRootRotation.revoked(error) &&
+      this.trust.trusts(
+        session.identity.id,
+        session.masterKey,
+        DeviceSealedRootPayload.decode(entry.payload).root,
+      )
+    );
+  }
+
+  private supersededHandOver(
+    session: Session,
+    entry: OpenedDeviceSealedSecret,
+    standing: DeviceSealedSecretPublisherStanding,
+  ): boolean {
+    return (
+      standing === 'retired' &&
+      this.trust.supersedes(
+        session.identity.id,
+        session.masterKey,
+        DeviceSealedRootPayload.decode(entry.payload).root,
+        entry.authorizationRevision,
+      )
+    );
+  }
+
   /**
    * Returns the entry once the signed transitions authorize its publisher at
    * the entry revision and no later transition revoked it, so a signature by
-   * a key the node minted, or by a key revoked since, opens nothing. A revoked
-   * publisher's entry still returns while its root is the one this device
-   * trusted. Rejects otherwise, including when the transitions are not served.
+   * a key the node minted, or by a key revoked since, opens nothing. A
+   * hand-over at or below the revision of another trusted root is refused. A
+   * revoked publisher's entry still returns, marked revoked and with its
+   * generation bounded, while its root is the one this device trusted.
+   * Rejects otherwise, including when the transitions are not served.
    */
   private async verified(
     session: Session,
     entry: OpenedDeviceSealedSecret,
-  ): Promise<OpenedDeviceSealedSecret> {
+  ): Promise<{ entry: OpenedDeviceSealedSecret; revoked: boolean }> {
+    let standing: DeviceSealedSecretPublisherStanding;
+
     try {
-      await this.deviceAuthorization.verifyPublisher(
+      standing = await this.deviceAuthorization.verifyPublisher(
         session,
         entry.publisherCredential,
         DeviceAuthorizationRevision.fromNumber(entry.authorizationRevision),
       );
     } catch (error: unknown) {
-      const root = DeviceSealedRootRotation.revoked(error)
-        ? DeviceSealedRootPayload.decode(entry.payload).root
-        : null;
+      if (!this.trustsRevoked(session, entry, error)) throw error;
 
-      if (
-        !root ||
-        !this.trust.trusts(session.identity.id, session.masterKey, root)
-      ) {
-        throw error;
-      }
+      return { entry: this.bounded(entry), revoked: true };
     }
 
-    return entry;
+    assert(
+      !this.supersededHandOver(session, entry, standing),
+      new SupersededDeviceSealedRootHandOverError(),
+    );
+
+    return { entry, revoked: false };
   }
 
   /**
    * Generation of this device's own entry, to publish above it. An entry
-   * whose publisher a later transition revoked still counts here, as the node
-   * refuses a generation that is not above it; nothing else of it is used.
+   * whose publisher a later transition revoked still counts here, bounded,
+   * as the node refuses a generation that is not above it; nothing else of
+   * it is used.
    */
   private async storedGeneration(
     session: Session,
@@ -112,21 +182,24 @@ export class DeviceSealedRootRotation {
     if (!own) return undefined;
 
     try {
-      await this.verified(session, own);
+      return (await this.verified(session, own)).entry.generation;
     } catch (error: unknown) {
       if (!DeviceSealedRootRotation.revoked(error)) throw error;
-    }
 
-    return own.generation;
+      return this.bounded(own).generation;
+    }
   }
 
-  /** This device's own entry with a verified publisher; null without one. */
+  /**
+   * This device's own entry with a verified publisher, its generation bounded
+   * when that publisher was revoked since; null without one.
+   */
   private async ownEntry(
     session: Session,
   ): Promise<OpenedDeviceSealedSecret | null> {
     const own = await this.sealedSecrets.fetchOwn(session);
 
-    return own ? await this.verified(session, own) : null;
+    return own ? (await this.verified(session, own)).entry : null;
   }
 
   private async publishWithRetry(
@@ -170,13 +243,50 @@ export class DeviceSealedRootRotation {
       payload: DeviceSealedRootPayload.encode(roots),
       recipients,
     });
-    this.remember(session, roots.root);
+    this.remember(session, roots.root, session.authorizationRevision.valueOf());
 
     return {
       ...session,
       deviceSealedRootGeneration:
         DeviceSealedRootGeneration.fromNumber(generation),
       deviceSealedRootKey: roots.root,
+    };
+  }
+
+  /**
+   * The session holding the root of the verified entry it was opened on. An
+   * entry of a revoked publisher is never adopted: the session returns
+   * synchronized and without a root, so the caller rotates off that root.
+   */
+  private async opened(opening: {
+    entry: OpenedDeviceSealedSecret;
+    session: Session;
+    synchronized: boolean;
+  }): Promise<Session> {
+    const { entry, revoked } = await this.verified(
+      opening.session,
+      opening.entry,
+    );
+
+    if (revoked) {
+      return opening.synchronized
+        ? opening.session
+        : await this.deviceAuthorization.synchronize(opening.session);
+    }
+
+    const roots = DeviceSealedRootPayload.decode(entry.payload);
+
+    this.remember(opening.session, roots.root, entry.authorizationRevision);
+
+    return {
+      ...opening.session,
+      deviceSealedRootGeneration: DeviceSealedRootGeneration.fromNumber(
+        entry.generation,
+      ),
+      deviceSealedRootKey: roots.root,
+      ...(roots.previous
+        ? { previousDeviceSealedRootKey: roots.previous }
+        : {}),
     };
   }
 
@@ -225,7 +335,7 @@ export class DeviceSealedRootRotation {
     }
 
     return DeviceSealedRootPayload.decode(
-      (await this.verified(session, own)).payload,
+      (await this.verified(session, own)).entry.payload,
     ).root;
   }
 
@@ -233,7 +343,8 @@ export class DeviceSealedRootRotation {
    * Returns the session holding the root of the current generation, with
    * that generation, and the root a hand-over replaced. Publishes a new
    * generation only when this device has no entry at all and the keychain
-   * head is readable.
+   * head is readable. Returns the synchronized session without a root when
+   * the entry lags the head or its publisher was revoked since.
    */
   public async current(session: Session): Promise<Session> {
     const own = await this.sealedSecrets.fetchOwn(session);
@@ -244,38 +355,25 @@ export class DeviceSealedRootRotation {
       return await this.rotate(session);
     }
 
-    let opening = { entry: own, session };
-
-    if (!session.authorizationRevision.hasValue(own.authorizationRevision)) {
-      const synced = await this.deviceAuthorization.synchronize(session);
-      const fresh = await this.sealedSecrets.fetchOwn(synced);
-
-      if (
-        !fresh ||
-        !synced.authorizationRevision.hasValue(fresh.authorizationRevision)
-      ) {
-        return synced;
-      }
-
-      opening = { entry: fresh, session: synced };
+    if (session.authorizationRevision.hasValue(own.authorizationRevision)) {
+      return await this.opened({ entry: own, session, synchronized: false });
     }
 
-    const roots = DeviceSealedRootPayload.decode(
-      (await this.verified(opening.session, opening.entry)).payload,
-    );
+    const synced = await this.deviceAuthorization.synchronize(session);
+    const fresh = await this.sealedSecrets.fetchOwn(synced);
 
-    this.remember(opening.session, roots.root);
+    if (
+      !fresh ||
+      !synced.authorizationRevision.hasValue(fresh.authorizationRevision)
+    ) {
+      return synced;
+    }
 
-    return {
-      ...opening.session,
-      deviceSealedRootGeneration: DeviceSealedRootGeneration.fromNumber(
-        opening.entry.generation,
-      ),
-      deviceSealedRootKey: roots.root,
-      ...(roots.previous
-        ? { previousDeviceSealedRootKey: roots.previous }
-        : {}),
-    };
+    return await this.opened({
+      entry: fresh,
+      session: synced,
+      synchronized: true,
+    });
   }
 
   /**
