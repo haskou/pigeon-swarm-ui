@@ -7,7 +7,7 @@ const values = [
   'channel_renamed',
   'community_updated',
   'invitation_created',
-  'invite_link_created',
+  'invitation_revoked',
   'member_banned',
   'member_kicked',
   'member_roles_updated',
