@@ -147,10 +147,15 @@ conversations do (#380, #418):
   commit: the pending is dropped, never adopted, and the device syncs as
   usual. While the group stays in the pending's epoch the pending is kept.
   Once the group moved on, the welcome is sent again (welcome record ids are
-  idempotent) only if the record of what the group took names this device's
-  commit for that epoch, and the pending is dropped. A pending whose epoch
-  that record does not know may have lost it, so its welcome is not sent; a
-  joiner it leaves out is admitted again by a manager's `reconcile`.
+  idempotent) only if this device's commit won its epoch, and the pending is
+  dropped. It won once the group took it, in that sync or as the record of
+  what the group took says, until a rival replaced it or a commit of an
+  earlier epoch undid it; the record forgetting that epoch as the group
+  moves on, two epochs later, does not make it lose, so a sync that applies
+  many commits after it still sends the welcome. The welcome goes out before
+  the group is saved, so a stop in between sends it again on the next sync.
+  A commit that lost its epoch is not in the group, so neither is the joiner
+  it named, and a manager's `reconcile` admits that joiner again.
 - A commit that never reached the node is not re-sent. The device stays in the
   previous epoch and `reconcile` makes the change again from the roster.
   `admit` and `remove` sync first, whoever calls them, so a commit that did
