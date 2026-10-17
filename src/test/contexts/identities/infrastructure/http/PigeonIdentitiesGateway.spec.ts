@@ -23,6 +23,7 @@ import type { LocalKeychain } from '../../../../../contexts/identities/infrastru
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { DevicePairingError } from '../../../../../contexts/identities/domain/DevicePairingError';
+import { SupersededDeviceSealedRootHandOverError } from '../../../../../contexts/identities/domain/errors/SupersededDeviceSealedRootHandOverError';
 import { PigeonIdentitiesGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
 import { DeviceUnlockNotConfirmedError } from '../../../../../contexts/identities/infrastructure/storage/DeviceUnlockNotConfirmedError';
 import { copy } from '../../../../../shared/presentation/i18n/copy';
@@ -741,6 +742,24 @@ describe(PigeonIdentitiesGateway.name, () => {
       authorization.prepareOwnRetirement.mockResolvedValue(revocation);
       sealedRoot.handOver.mockRejectedValue(new Error('offline'));
       authorization.retireOwnDevice.mockResolvedValue(false);
+
+      await expect(gateway.retireOwnDevice(session)).resolves.toBe('revoked');
+
+      expect(authorization.retireOwnDevice).toHaveBeenCalledWith(
+        session,
+        revocation,
+        undefined,
+      );
+      expect(keychain.rewrapHeadSealedUnder).not.toHaveBeenCalled();
+    });
+
+    it('retires without a hand-over when its own entry is a superseded hand-over, leaving the rotation to the remaining devices', async () => {
+      const { authorization, gateway, keychain, sealedRoot } = gatewayDouble();
+      authorization.prepareOwnRetirement.mockResolvedValue(revocation);
+      sealedRoot.handOver.mockRejectedValue(
+        new SupersededDeviceSealedRootHandOverError(),
+      );
+      authorization.retireOwnDevice.mockResolvedValue(true);
 
       await expect(gateway.retireOwnDevice(session)).resolves.toBe('revoked');
 
