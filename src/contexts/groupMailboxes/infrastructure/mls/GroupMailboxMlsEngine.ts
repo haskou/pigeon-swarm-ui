@@ -30,6 +30,7 @@ import {
   encodeBase64Url,
 } from '../../../../shared/infrastructure/encoding/base64url';
 import { MlsRejectedError } from '../../../communities/infrastructure/mls/MlsRejectedError';
+import { MlsUpdateCadences } from '../../../communities/infrastructure/mls/MlsUpdateCadences';
 import { GroupMailboxGenerationLog } from '../../domain/GroupMailboxGenerationLog';
 import { GroupMailboxGenerationSecret } from '../../domain/value-objects/GroupMailboxGenerationSecret';
 import { GroupMailboxConfirmations } from './GroupMailboxConfirmations';
@@ -55,9 +56,12 @@ const MESSAGE_ERRORS = [
  * it allows changes it. A commit this device makes is kept only once
  * published. A group joined from someone else's welcome stays unconfirmed
  * until a confirming member speaks in it, and this device sends nothing to
- * it meanwhile: no message, commit or welcome.
+ * it meanwhile: no message, commit or welcome. Each device commits an
+ * update of its own leaf on a cadence (`updateWhenDue`), so a copy of its
+ * state that leaked stops reading the group once the update is in.
  */
 export class GroupMailboxMlsEngine {
+  private readonly cadences: MlsUpdateCadences;
   private readonly confirmations: GroupMailboxConfirmations;
   private readonly groups = new Map<string, MlsGroup>();
   private readonly queues = new Map<string, Promise<unknown>>();
@@ -95,7 +99,10 @@ export class GroupMailboxMlsEngine {
     /** See `GroupConversationPorts.contacts`. */
     private readonly contacts: () => readonly string[],
     private readonly clock: () => number,
+    /** Draws from [0, 1); jitters the update cadence. */
+    random: () => number,
   ) {
+    this.cadences = new MlsUpdateCadences(store, clock, random);
     this.confirmations = new GroupMailboxConfirmations(store);
   }
 
@@ -153,6 +160,22 @@ export class GroupMailboxMlsEngine {
     return made;
   }
 
+  /**
+   * Commits as `commit` does a commit whose update path gave this device
+   * fresh leaf keys, then restarts its update cadence from the new epoch.
+   */
+  private async commitRenewing(
+    group: MlsGroup,
+    output: MlsCommitOutput,
+    publish: (commit: GroupMailboxCommit) => Promise<void>,
+  ): Promise<GroupMailboxCommit> {
+    const made = await this.commit(group, output, publish);
+
+    await this.cadences.restart(group.groupId, group.epoch);
+
+    return made;
+  }
+
   private async exclusive<T>(
     conversationId: string,
     task: () => Promise<T>,
@@ -173,7 +196,8 @@ export class GroupMailboxMlsEngine {
 
   /**
    * Advances the log when the group is past the epoch it was exported in:
-   * every commit moves the generation, a GroupContext-only one included.
+   * every commit moves the generation, a GroupContext-only one and a
+   * self-update included.
    */
   private async caughtUp(
     group: MlsGroup,
@@ -690,6 +714,10 @@ export class GroupMailboxMlsEngine {
       );
       await this.remember(group);
 
+      if (outcome.kind === 'replaced') {
+        await this.cadences.replaced(conversationId, epoch);
+      }
+
       // The epoch moved on: a pending group of this device is void now.
       if (pending) {
         await this.store
@@ -747,7 +775,7 @@ export class GroupMailboxMlsEngine {
 
       await this.refreshPolicy();
 
-      return this.commit(
+      return this.commitRenewing(
         group,
         await GroupMailboxMlsEngine.refusing(
           group.changeContext(
@@ -793,6 +821,7 @@ export class GroupMailboxMlsEngine {
       await this.generations.save(conversationId, log);
       await this.confirmations.record(conversationId, { confirmed: true });
       await this.remember(group);
+      await this.cadences.restart(conversationId, group.epoch);
 
       return log.current();
     });
@@ -878,6 +907,10 @@ export class GroupMailboxMlsEngine {
     });
   }
 
+  /**
+   * Encrypts in the current epoch and counts the message toward this
+   * device's update cadence (`updateWhenDue`).
+   */
   public async encrypt(
     conversationId: string,
     plaintext: Uint8Array,
@@ -898,6 +931,7 @@ export class GroupMailboxMlsEngine {
         } satisfies { plaintext: string; sender: MlsLeafOwner }),
       );
       await this.remember(group);
+      await this.cadences.recordSend(conversationId);
 
       return ciphertext;
     });
@@ -984,6 +1018,7 @@ export class GroupMailboxMlsEngine {
       );
       await this.remember(group);
       await this.store.deleteKeyPackage(opened.keyPackageId);
+      await this.cadences.restart(conversationId, group.epoch);
     });
   }
 
@@ -1062,7 +1097,7 @@ export class GroupMailboxMlsEngine {
         group.removeIdentities(identityIds),
       );
 
-      return output ? this.commit(group, output, publish) : undefined;
+      return output ? this.commitRenewing(group, output, publish) : undefined;
     });
   }
 
@@ -1084,7 +1119,40 @@ export class GroupMailboxMlsEngine {
         group.removeDevices(this.signer.owner.identityId, deviceCredentials),
       );
 
-      return output ? this.commit(group, output, publish) : undefined;
+      return output ? this.commitRenewing(group, output, publish) : undefined;
+    });
+  }
+
+  /**
+   * Commits an update of this device's own leaf when its cadence is due:
+   * a day, plus up to an hour of jitter, after its leaf keys were last
+   * renewed, or once it sent `MlsUpdateCadence.MAX_SENT` messages since.
+   * The update advances the generation like every commit, and is kept
+   * only once `publish` has queued it; a failure leaves it due. Undefined
+   * when it is not due, or this device holds no confirmed group.
+   */
+  public async updateWhenDue(
+    conversationId: string,
+    publish: (commit: GroupMailboxCommit) => Promise<void>,
+  ): Promise<GroupMailboxCommit | undefined> {
+    return this.exclusive(conversationId, async () => {
+      const group = await this.load(conversationId);
+
+      if (
+        !group ||
+        group.isRemoved ||
+        !(await this.confirmations.of(conversationId)).confirmed ||
+        !(await this.cadences.isDue(conversationId))
+      ) {
+        return undefined;
+      }
+      await this.refreshPolicy();
+
+      return this.commitRenewing(
+        group,
+        await GroupMailboxMlsEngine.refusing(group.update()),
+        publish,
+      );
     });
   }
 }

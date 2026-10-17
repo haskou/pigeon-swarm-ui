@@ -693,4 +693,22 @@ export class GroupMailboxControl {
 
     return commit;
   }
+
+  /**
+   * Commits an update of this device's own leaf when its cadence is due
+   * (`GroupMailboxMlsEngine.updateWhenDue`); the commit reaches every
+   * member holding a leaf.
+   */
+  public async updateWhenDue(
+    conversationId: string,
+  ): Promise<GroupMailboxCommit | undefined> {
+    const commit = await this.engine.updateWhenDue(conversationId, (made) =>
+      this.outbox.enqueueCommit(conversationId, made),
+    );
+
+    if (!commit) return undefined;
+    await this.outbox.flush();
+
+    return commit;
+  }
 }

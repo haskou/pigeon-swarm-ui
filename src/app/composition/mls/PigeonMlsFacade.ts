@@ -142,6 +142,8 @@ export class PigeonMlsFacade {
           communityId,
         ),
       (groupId) => async () => await this.history(holder.session, groupId),
+      () => Date.now(),
+      () => crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32,
     );
     this.engines.set(key, holder);
 

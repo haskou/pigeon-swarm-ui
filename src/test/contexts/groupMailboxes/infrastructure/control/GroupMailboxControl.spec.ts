@@ -167,6 +167,7 @@ const engineOf = (name: string, device = 'd1'): GroupMailboxMlsEngine => {
       ),
     () => [],
     () => 1_000,
+    () => 0,
   );
 };
 

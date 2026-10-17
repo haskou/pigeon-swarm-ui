@@ -165,12 +165,23 @@ grant `manage_members`.
 - Remove: any member removes a leaf whose identity left, was kicked or banned.
   Only a manager removes an identity still on the roster, and nobody removes
   the owner. Races are resolved by the epoch rule above.
-- Update: anyone on the roster rotates their own leaf. There is no periodic
-  update yet (#478): only a manager's device commits one, when the roster
-  revision the group bound grants other rights than the latest, or when the
-  group took an add by a member the latest roster no longer lets add members
-  and no member it lets add members has committed since (`bindRoster`).
-  Group conversations never update.
+- Update: anyone on the roster rotates their own leaf. Every device commits
+  an update of its own leaf on a cadence (`MlsUpdateCadence`): a day plus a
+  random jitter of up to an hour after its leaf keys were last renewed, or
+  once it sent 1000 messages since. Creating or joining the group, and every
+  update or removal this device commits, renews them; an add, which carries
+  no update path, does not. The cadence is checked before each message this
+  device encrypts (community) or queues (group conversation), and on each
+  reconcile, so a device that comes back after a day updates on its first
+  pass. It is sealed next to the group state; a group without a readable
+  cadence is due. Two devices updating in the same epoch race like any
+  commits: the losing device's update is undone, its cadence is due again
+  and it updates once more. In a community a manager's device also commits
+  an update when the roster revision the group bound grants other rights
+  than the latest, or when the group took an add by a member the latest
+  roster no longer lets add members and no member it lets add members has
+  committed since (`bindRoster`). In a group conversation an update
+  advances the generation like every commit (`opaque-mailboxes-client.md`).
 
 Every commit is checked against these rules both when it is made and when it
 is received, by the roster at the revision the commit binds (see "Which
@@ -535,8 +546,15 @@ call key. Safari is not covered by CI.
     two cases. Commits by other members, their updates included, do not heal
     it: a copy of its state follows them and keeps reading messages and
     call-media keys until the device commits an update or a removal, or is
-    removed. Given the update rule above, a device that never commits stays
-    exposed until it is removed (#478).
+    removed. Every device commits an update on the cadence of "Who commits",
+    so a device that keeps running heals within a day and an hour, or
+    within 1000 messages it sends; one that stays offline stays exposed
+    until it comes back or is removed. The specs: "commits an update of its
+    own leaf on a cadence" in `MlsCommunityEngine.spec.ts` and
+    `GroupMailboxMlsEngine.spec.ts`, which also show a copy of the old state
+    cannot read what follows; `MlsUpdateCadence.spec.ts`; and
+    `GroupMailboxInboxSync.spec.ts`, where no message of the epoch an update
+    starts or ends is lost.
   - An update replaces the leaf's encryption key, not its signature key, and
     the identity-signed credential binds that signature key. Whoever copied a
     device's state can therefore sign as that leaf until the device is

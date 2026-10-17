@@ -16,4 +16,5 @@ export type GroupMailboxControlEngine = Pick<
   | 'remove'
   | 'removeDevices'
   | 'roster'
+  | 'updateWhenDue'
 >;

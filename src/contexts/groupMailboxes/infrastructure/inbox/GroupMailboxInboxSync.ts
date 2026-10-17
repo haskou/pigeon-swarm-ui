@@ -48,13 +48,10 @@ import { GroupMessageAuthors } from './GroupMessageAuthors';
  * so is an envelope that failed to open `MAX_FAILURES` times.
  *
  * A message from an epoch this device has not reached is rejected, not kept
- * for later: every epoch change here is a membership change, which also
- * starts a new generation, so a member's genuine message of the next epoch
- * lands in the next generation's inbox, read after the commit. A commit that
- * changes the epoch but not the members (a self-update) would break this;
- * adding one needs a bounded local buffer of such envelopes, acknowledged,
- * and retried after the next applied commit. Inboxes whose drain window
- * closed are deleted. Logs carry counts only.
+ * for later: every epoch change here, a self-update included, starts a new
+ * generation, so a member's genuine message of the next epoch lands in the
+ * next generation's inbox, read after the commit. Inboxes whose drain
+ * window closed are deleted. Logs carry counts only.
  *
  * Readers derive from the session's device-sealed root, read on each pass,
  * so a revoke's rotation applies at once. Before an inbox is read, the
