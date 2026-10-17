@@ -94,9 +94,14 @@ async function removeMember(
     .getByRole('button', { exact: true, name: groupName })
     .last()
     .click();
-  const row = page
+  // The members aside lists the same member at xl widths; the row to remove
+  // is the dialog's, which mounts after the click. Both lists drop it.
+  const listed = page
     .getByTestId('identity-member-row')
     .filter({ hasText: memberName });
+  const row = listed.and(
+    page.locator(':not([data-testid="identity-members-aside"] *)'),
+  );
 
   await expect(row).toBeVisible();
   page.once('dialog', (dialog) => void dialog.accept());
@@ -104,7 +109,7 @@ async function removeMember(
     .locator('xpath=..')
     .getByRole('button', { exact: true, name: 'Remove' })
     .click();
-  await expect(row).toHaveCount(0, { timeout: 45_000 });
+  await expect(listed).toHaveCount(0, { timeout: 45_000 });
   await page.getByRole('button', { name: 'Close dialog' }).last().click();
 }
 
