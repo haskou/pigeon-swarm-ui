@@ -14,21 +14,23 @@ describe(DevicePairingHistoryPolicy.name, () => {
   it('keeps the last 30 days under its default', () => {
     const floor = DevicePairingHistoryPolicy.DEFAULT.floorAt(now);
 
-    expect(floor.admits(now.addDays(-30))).toBe(true);
-    expect(floor.admits(now.addDays(-30).addMilliseconds(-1))).toBe(false);
+    expect(floor.admits(now.addDays(-30).toMilliseconds())).toBe(true);
+    expect(
+      floor.admits(now.addDays(-30).addMilliseconds(-1).toMilliseconds()),
+    ).toBe(false);
   });
 
   it('keeps every record under All history', () => {
     const floor = DevicePairingHistoryPolicy.ALL.floorAt(now);
 
-    expect(floor.admits(new Timestamp(0))).toBe(true);
+    expect(floor.admits(0)).toBe(true);
   });
 
   it('keeps no record created before the pairing under Nothing', () => {
     const floor = DevicePairingHistoryPolicy.NONE.floorAt(now);
 
-    expect(floor.admits(now.addMilliseconds(-1))).toBe(false);
-    expect(floor.admits(now)).toBe(true);
+    expect(floor.admits(now.addMilliseconds(-1).toMilliseconds())).toBe(false);
+    expect(floor.admits(now.toMilliseconds())).toBe(true);
   });
 
   it('reads each choice back from its primitive', () => {

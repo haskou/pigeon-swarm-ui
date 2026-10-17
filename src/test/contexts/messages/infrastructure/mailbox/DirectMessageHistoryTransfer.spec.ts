@@ -181,6 +181,22 @@ describe(DirectMessageHistoryTransfer.name, () => {
     expect(channel.send).not.toHaveBeenCalled();
   });
 
+  it('skips stored records whose createdAt is outside the Date range and still exports the rest', async () => {
+    const fresh = sent('fresh', recent(1));
+
+    const { imported } = await transferred(
+      [
+        sent('far-future', 1e300),
+        fresh,
+        sent('far-past', -1e300),
+        sent('past-date-range', 9e15),
+      ],
+      DevicePairingHistoryPolicy.ALL.floorAt(new Timestamp(now)),
+    );
+
+    expect(imported).toEqual(texts([plaintextOf(fresh)]));
+  });
+
   it('exports at most MAX_RECORDS and keeps the newest under the default policy', async () => {
     const records = Array.from(
       { length: DirectMessageHistoryTransfer.MAX_RECORDS + 1 },

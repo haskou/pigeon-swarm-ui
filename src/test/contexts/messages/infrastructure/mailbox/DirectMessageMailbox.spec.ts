@@ -10,13 +10,11 @@ import {
   MailboxRecordAuthorship,
   SymmetricKey,
 } from '@haskou/pigeon-swarm-crypto';
-import { Timestamp } from '@haskou/value-objects';
 import { Buffer } from 'buffer';
 import { mock } from 'jest-mock-extended';
 
 import type { ConversationResource } from '../../../../../contexts/conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
-import type { DeviceHistoryFloorStore } from '../../../../../contexts/identities/infrastructure/storage/DeviceHistoryFloorStore';
 import type { DirectDeletedRecord } from '../../../../../contexts/mailboxes/domain/DirectDeletedRecord';
 import type { DirectEditedRecord } from '../../../../../contexts/mailboxes/domain/DirectEditedRecord';
 import type { DirectMessageRecord } from '../../../../../contexts/mailboxes/domain/DirectMessageRecord';
@@ -33,7 +31,6 @@ import type { MessageResource } from '../../../../../contexts/messages/infrastru
 import type { PigeonMessageCommandsApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
 import type { DirectMessageMailboxState } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageMailboxStore';
 
-import { DeviceHistoryFloor } from '../../../../../contexts/identities/domain/value-objects/DeviceHistoryFloor';
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
 import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageHistoryStorageError } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageHistoryStorageError';
@@ -211,16 +208,12 @@ describe(DirectMessageMailbox.name, () => {
     const projection = projectionDouble();
     const store = new DirectMessageMailboxStore();
     const { composed, composer } = composerDouble();
-    const historyFloors = mock<Pick<DeviceHistoryFloorStore, 'load'>>();
-
-    historyFloors.load.mockReturnValue(DeviceHistoryFloor.OPEN);
 
     return {
       channel,
       clearStorage: () => storage.clear(),
       composed,
       composer,
-      historyFloors,
       mailbox: new DirectMessageMailbox(
         channel,
         new RecipientMailboxRouter(
@@ -233,7 +226,6 @@ describe(DirectMessageMailbox.name, () => {
         readerSet,
         composer,
         [],
-        historyFloors,
       ),
       projection,
       store,
@@ -1028,7 +1020,6 @@ describe(DirectMessageMailbox.name, () => {
         ),
         composerDouble().composer,
         [],
-        { load: () => DeviceHistoryFloor.OPEN },
       );
 
     const appliedOf = (apply: jest.Mock): DirectMessageTimelineChange[] =>
@@ -1538,52 +1529,6 @@ describe(DirectMessageMailbox.name, () => {
       expect(channel.acknowledge).toHaveBeenCalledWith(keys, readers, 2);
       expect(order).toEqual(['apply', 'ack']);
       expect(store.load(keys.mailboxId)).toEqual({ cursor: 2 });
-    });
-
-    it('drops a record dated before the history floor before storing or showing it, and still acknowledges it', async () => {
-      await new DirectMessageHistoryStore().forget('alice');
-      const { channel, historyFloors, mailbox, store } = setup();
-      const keys = keysFor('alice');
-      historyFloors.load.mockReturnValue(
-        DeviceHistoryFloor.at(new Timestamp(1_000_000)),
-      );
-      channel.read.mockResolvedValue(
-        pageOf([
-          ownEncode(storedRecord),
-          ownEncode({ ...storedRecord, createdAt: 2_000_000, id: 'message-2' }),
-        ]),
-      );
-      channel.acknowledge.mockResolvedValue({ recreated: false });
-      const shown = jest.fn<void, [DirectMessageTimelineChange[]]>();
-
-      await mailbox.sync(
-        session('alice'),
-        conversationId,
-        new AbortController().signal,
-        shown,
-      );
-
-      expect(historyFloors.load).toHaveBeenCalledWith('alice');
-      expect(messageIds(shown.mock.calls.flatMap(([batch]) => batch))).toEqual([
-        'message-2',
-      ]);
-      expect(channel.acknowledge).toHaveBeenCalledWith(
-        keys,
-        readerTokensFor('alice', keys.mailboxId),
-        2,
-      );
-      expect(store.load(keys.mailboxId)).toEqual({ cursor: 2 });
-
-      const restored = jest.fn<void, [DirectMessageTimelineChange[]]>();
-      await setup().mailbox.restore(
-        session('alice'),
-        conversationId,
-        new AbortController().signal,
-        restored,
-      );
-      expect(
-        messageIds(restored.mock.calls.flatMap(([batch]) => batch)),
-      ).toEqual(['message-2']);
     });
 
     it('shows a page it cannot store but keeps it on the node until a later pass stores it', async () => {
@@ -2445,30 +2390,6 @@ describe(DirectMessageMailbox.name, () => {
       expect(readCursorOf(store)).toBe(2);
     });
 
-    it('lets no peer message dated before the history floor mark the conversation unread', async () => {
-      const { channel, historyFloors, mailbox, store } = setup();
-      openedInbox(store);
-      historyFloors.load.mockReturnValue(
-        DeviceHistoryFloor.at(new Timestamp(now - DAY_MS)),
-      );
-      channel.read.mockResolvedValue(
-        pageOf([ownEncode(readOf({})), sentBy('bob', 'message-2')]),
-      );
-      const apply = jest.fn();
-
-      await mailbox.syncReads(
-        session('alice'),
-        conversationId,
-        new AbortController().signal,
-        apply,
-      );
-
-      expect(apply).toHaveBeenCalledWith([
-        { kind: 'read', messageId: 'message-1' },
-      ]);
-      expect(readCursorOf(store)).toBe(2);
-    });
-
     it('does not let a sent message of this identity block a read', async () => {
       const { channel, mailbox, store } = setup();
       openedInbox(store);
@@ -3227,7 +3148,6 @@ describe(DirectMessageMailbox.name, () => {
         readerSet,
         composerDouble(composed).composer,
         [],
-        { load: () => DeviceHistoryFloor.OPEN },
       );
     };
 

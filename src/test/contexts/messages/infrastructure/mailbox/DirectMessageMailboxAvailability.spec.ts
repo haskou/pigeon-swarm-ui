@@ -17,7 +17,6 @@ import type { MessageProjectionPort } from '../../../../../contexts/messages/inf
 import type { MessageResource } from '../../../../../contexts/messages/infrastructure/http/MessageResource';
 import type { PigeonMessageCommandsApi } from '../../../../../contexts/messages/infrastructure/http/PigeonMessageCommandsApi';
 
-import { DeviceHistoryFloor } from '../../../../../contexts/identities/domain/value-objects/DeviceHistoryFloor';
 import { MailboxUnavailableError } from '../../../../../contexts/mailboxes/domain/errors/MailboxUnavailableError';
 import { MailboxChannel } from '../../../../../contexts/mailboxes/infrastructure/MailboxChannel';
 import { DirectMessageAvailabilityAnnouncement } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageAvailabilityAnnouncement';
@@ -295,7 +294,6 @@ describe('DirectMessageMailbox availability servers', () => {
         readerSet: new DirectMessageReaderSet(channelFor(base), devices),
         store: new DirectMessageMailboxStore(base),
       })),
-      { load: () => DeviceHistoryFloor.OPEN },
     );
   };
 
