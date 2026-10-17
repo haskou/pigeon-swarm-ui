@@ -63,20 +63,10 @@ export class CommunityOperationFold {
     return { applied: false, authority };
   }
 
-  /** Who answers for `operation` in the quota: the joiner of an admission. */
-  private static responsibleOf(operation: CommunityOperation): string {
-    const { identityId } = operation.getArguments();
-
-    return CommunityInvitation.isAdmission(operation) &&
-      typeof identityId === 'string'
-      ? IdentityId.normalize(identityId)
-      : IdentityId.normalize(operation.getAuthorIdentityId());
-  }
-
   /**
-   * Tells, for each operation of `ordered` taken in that order, whether the
-   * identity responsible for it still has quota left. The founder, who
-   * authors the genesis, has none.
+   * Tells, for each operation of `ordered` taken in that order, whether its
+   * author still has quota left. The founder, who authors the genesis, has
+   * none. An admission counts toward its admitter, like every operation.
    */
   private static quotaOf(
     ordered: readonly CommunityOperation[],
@@ -87,16 +77,12 @@ export class CommunityOperationFold {
       ?.getAuthorIdentityId();
 
     return (operation) => {
-      const responsible = CommunityOperationFold.responsibleOf(operation);
-      const count = signed.get(responsible) ?? 0;
+      const author = operation.getAuthorIdentityId();
+      const count = signed.get(author) ?? 0;
 
-      signed.set(responsible, count + 1);
+      signed.set(author, count + 1);
 
-      return (
-        (founder !== undefined &&
-          IdentityId.normalize(founder) === responsible) ||
-        count < MAX_OPERATIONS_PER_AUTHOR
-      );
+      return author === founder || count < MAX_OPERATIONS_PER_AUTHOR;
     };
   }
 

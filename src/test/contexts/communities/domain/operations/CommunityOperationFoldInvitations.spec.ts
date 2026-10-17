@@ -150,6 +150,18 @@ describe('CommunityOperationFold invitations', () => {
     expect(invitationIn(operations, invited)?.uses).toBe(1);
   });
 
+  it('charges sibling admissions of one joiner to their admitter, never to the joiner', () => {
+    const invited = invitation([base], owner, {}, 10);
+    const siblings = Array.from({ length: 1_000 }, (_, index) =>
+      admission([invited.operation], invited, alice, mallory, 11 + index),
+    );
+    const left = leave(siblings, alice);
+    const state = stateOf([...history, invited.operation, ...siblings, left]);
+
+    expect(state.members).not.toContain(alice);
+    expect(state.skipped).not.toContain(left.getHash());
+  });
+
   it('keeps an admission concurrent with the revocation of its invitation', () => {
     const invited = invitation([base], owner, {}, 10);
     const admitted = admission([invited.operation], invited, alice, owner, 11);
