@@ -4,7 +4,6 @@ import type { RealtimeMailboxSubscriptionInput } from '../../../../shared/infras
 import type { ConversationResource } from '../../../conversations/infrastructure/http/ConversationResource';
 import type { DeviceHistoryFloor } from '../../../identities/domain/value-objects/DeviceHistoryFloor';
 import type { Session } from '../../../identities/infrastructure/session/Session';
-import type { DeviceHistoryFloorStore } from '../../../identities/infrastructure/storage/DeviceHistoryFloorStore';
 import type { MailboxChannel } from '../../../mailboxes/infrastructure/MailboxChannel';
 import type { ChatMessage } from '../../domain/ChatMessage';
 import type { DirectMessageTimelineChange } from '../../domain/DirectMessageTimelineChange';
@@ -68,7 +67,6 @@ export class DirectMessageMailbox {
     readerSet: DirectMessageReaderSet,
     composer: Pick<PigeonMessageCommandsApi, 'composeEdit' | 'withSentRecord'>,
     servers: readonly DirectMessageAvailabilityServer[],
-    historyFloors: Pick<DeviceHistoryFloorStore, 'load'>,
   ) {
     const ownCopies = new DirectMessageOwnCopies();
 
@@ -106,9 +104,8 @@ export class DirectMessageMailbox {
       ownCopies,
       this.history,
       this.availability,
-      historyFloors,
     );
-    this.reads = new DirectMessageReadSync(channel, store, historyFloors);
+    this.reads = new DirectMessageReadSync(channel, store);
   }
 
   /**

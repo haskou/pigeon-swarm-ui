@@ -1,7 +1,4 @@
-import { Timestamp } from '@haskou/value-objects';
-
 import type { Session } from '../../../identities/infrastructure/session/Session';
-import type { DeviceHistoryFloorStore } from '../../../identities/infrastructure/storage/DeviceHistoryFloorStore';
 import type {
   MailboxChannel,
   OpenedMailboxPage,
@@ -23,7 +20,6 @@ export class DirectMessageReadSync {
   public constructor(
     private readonly channel: MailboxChannel,
     private readonly store: DirectMessageMailboxStore,
-    private readonly historyFloors: Pick<DeviceHistoryFloorStore, 'load'>,
   ) {}
 
   /** Reads only an inbox prewarm already opened. */
@@ -59,8 +55,7 @@ export class DirectMessageReadSync {
   /**
    * The read a page leaves pending. A fresh read of this identity sets it, and
    * a sent message from another identity after it clears it, since that
-   * message is unread. Other records, and any record dated before this
-   * device's history floor, leave it as it is.
+   * message is unread. Other records leave it as it is.
    */
   private pendingRead(
     session: Session,
@@ -68,19 +63,14 @@ export class DirectMessageReadSync {
     page: OpenedMailboxPage,
     pending: string | null,
   ): string | null {
-    const floor = this.historyFloors.load(session.identity.id);
     let next = pending;
 
     for (const envelope of page.envelopes) {
-      const decoded = DirectMessageRecordReader.decode(
+      const record = DirectMessageRecordReader.decode(
         session,
         conversationId,
         envelope.plaintext,
       );
-      const record =
-        decoded && floor.admitsDelivered(new Timestamp(decoded.createdAt))
-          ? decoded
-          : null;
 
       if (
         record?.type === DirectMailboxRecords.TYPE.read &&

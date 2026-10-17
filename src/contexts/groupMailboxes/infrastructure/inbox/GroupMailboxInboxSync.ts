@@ -6,10 +6,8 @@ import {
   CommitmentId,
   MailboxKeySchedule,
 } from '@haskou/pigeon-swarm-crypto';
-import { Timestamp } from '@haskou/value-objects';
 
 import type { Session } from '../../../identities/infrastructure/session/Session';
-import type { DeviceHistoryFloorStore } from '../../../identities/infrastructure/storage/DeviceHistoryFloorStore';
 import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessageRecord';
 import type { PigeonMailboxClient } from '../../../mailboxes/infrastructure/http/PigeonMailboxClient';
 import type {
@@ -48,11 +46,6 @@ import { GroupMessageAuthors } from './GroupMessageAuthors';
  * the page is acknowledged; a
  * rejected envelope is acknowledged too, so it cannot stall the inbox, and
  * so is an envelope that failed to open `MAX_FAILURES` times.
- *
- * MLS opens every message, so the group state keeps up whatever its age. A
- * message dated before this device's history floor is then dropped, before
- * any store or display step, and acknowledged with its page; commits are
- * applied whatever their age.
  *
  * A message from an epoch this device has not reached is rejected, not kept
  * for later: every epoch change here, a self-update included, starts a new
@@ -151,7 +144,6 @@ export class GroupMailboxInboxSync {
       DirectMessageReaderSet,
       'cutOff' | 'enrolSealedRoot' | 'reconcile'
     >,
-    private readonly historyFloors: Pick<DeviceHistoryFloorStore, 'load'>,
   ) {}
 
   /**
@@ -388,8 +380,8 @@ export class GroupMailboxInboxSync {
 
   /**
    * Hands the page's commits to the control and keeps the accepted
-   * messages of inbox `mailboxId` the history floor admits. `applied` tells
-   * whether a commit moved the group on.
+   * messages of inbox `mailboxId`. `applied` tells whether a commit moved
+   * the group on.
    */
   private async openedPage(
     conversationId: string,
@@ -397,8 +389,7 @@ export class GroupMailboxInboxSync {
     page: OpenedMailboxPage,
     authors: GroupMessageAuthors,
   ): Promise<{ accepted: DirectMessageRecord[]; applied: boolean }> {
-    const floor = this.historyFloors.load(this.session().identity.id);
-    const accepted: DirectMessageRecord[] = [];
+    const accepted: (DirectMessageRecord | null)[] = [];
     let applied = false;
 
     for (const { envelopeId, plaintext } of page.envelopes) {
@@ -411,23 +402,19 @@ export class GroupMailboxInboxSync {
           (await this.control.receiveGroup(conversationId, plaintext)) ===
             'applied' || applied;
       } else if (record.type === 'message') {
-        const message = await this.accepted(
-          conversationId,
-          record.ciphertext,
-          authors,
-          { envelopeId, mailboxId },
+        accepted.push(
+          await this.accepted(conversationId, record.ciphertext, authors, {
+            envelopeId,
+            mailboxId,
+          }),
         );
-
-        if (
-          message &&
-          floor.admitsDelivered(new Timestamp(message.createdAt))
-        ) {
-          accepted.push(message);
-        }
       }
     }
 
-    return { accepted, applied };
+    return {
+      accepted: accepted.filter((record) => record !== null),
+      applied,
+    };
   }
 
   /**

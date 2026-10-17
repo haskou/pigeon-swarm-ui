@@ -17,7 +17,6 @@ import type { DeviceAuthorizationTransitionPrimitives } from '../../domain/Devic
 import type { DevicePairingRequestDraft } from '../../domain/DevicePairingRequestDraft';
 import type { DeviceAuthorizationReplay } from '../../domain/services/DeviceAuthorizationReplay';
 import type { DeviceSealedSecretPublisherStanding } from '../../domain/services/DeviceSealedSecretPublisherStanding';
-import type { DeviceHistoryFloor } from '../../domain/value-objects/DeviceHistoryFloor';
 import type { IdentityPassword } from '../../domain/value-objects/IdentityPassword';
 import type { Session } from '../session/Session';
 import type { DeviceIdentityVault } from '../storage/DeviceIdentityVault';
@@ -313,7 +312,6 @@ export class PigeonDeviceAuthorizationApi {
     session: Session,
     requestCode: DevicePairingCode,
     historyTransferSecret: SymmetricKey,
-    historyFloor: DeviceHistoryFloor,
   ): Promise<DevicePairingAuthorization> {
     const acceptedAt = new Timestamp(this.clock());
     const request = DevicePairingCodeReader.request(requestCode, acceptedAt);
@@ -350,7 +348,6 @@ export class PigeonDeviceAuthorizationApi {
     const completion = DevicePairingCompletion.create({
       author: session.deviceCredentialKeyPair,
       checkpoint,
-      historyFloor,
       historyTransferSecret,
       identityKeyPair: session.keyPair,
       recoveryAuthorityKeyPair: session.recoveryAuthorityKeyPair,
@@ -384,7 +381,6 @@ export class PigeonDeviceAuthorizationApi {
           draft.getRequest(),
           draft.getTransportKeyPair(),
         ),
-        new Timestamp(this.clock()),
       );
       const identityId = IdentityId.fromString(
         material.getIdentityKeyPair().toPrimitives().publicKey,
@@ -438,7 +434,6 @@ export class PigeonDeviceAuthorizationApi {
       draft.consume();
 
       return {
-        historyFloor: material.getHistoryFloor(),
         historyTransferSecret: material.getHistoryTransferSecret(),
         session: {
           ...pendingSession,

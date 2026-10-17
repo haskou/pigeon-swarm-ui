@@ -1,7 +1,4 @@
-import { Timestamp } from '@haskou/value-objects';
-
 import type { Session } from '../../../identities/infrastructure/session/Session';
-import type { DeviceHistoryFloorStore } from '../../../identities/infrastructure/storage/DeviceHistoryFloorStore';
 import type { DirectEditedRecord } from '../../../mailboxes/domain/DirectEditedRecord';
 import type { DirectMessageRecord } from '../../../mailboxes/domain/DirectMessageRecord';
 import type { DirectReadRecord } from '../../../mailboxes/domain/DirectReadRecord';
@@ -50,7 +47,6 @@ export class DirectMessageTimelineSync {
     private readonly ownCopies: DirectMessageOwnCopies,
     private readonly history: DirectMessageHistoryStore,
     private readonly availability: Pick<DirectMessageAvailability, 'receive'>,
-    private readonly historyFloors: Pick<DeviceHistoryFloorStore, 'load'>,
   ) {}
 
   /**
@@ -204,17 +200,13 @@ export class DirectMessageTimelineSync {
 
   /**
    * The records of a page. An envelope that is no record may be an
-   * availability announcement from the peer. A record dated before this
-   * device's history floor is dropped here, before any store or display step,
-   * and is acknowledged with its page.
+   * availability announcement from the peer.
    */
   private decode(
     session: Session,
     conversationId: string,
     page: OpenedMailboxPage,
   ): { plaintext: Uint8Array; record: DirectMessageRecord }[] {
-    const floor = this.historyFloors.load(session.identity.id);
-
     return page.envelopes.flatMap((envelope) => {
       const record = DirectMessageRecordReader.decode(
         session,
@@ -224,13 +216,9 @@ export class DirectMessageTimelineSync {
 
       if (!record) {
         this.availability.receive(session, conversationId, envelope.plaintext);
-
-        return [];
       }
 
-      return floor.admitsDelivered(new Timestamp(record.createdAt))
-        ? [{ plaintext: envelope.plaintext, record }]
-        : [];
+      return record ? [{ plaintext: envelope.plaintext, record }] : [];
     });
   }
 

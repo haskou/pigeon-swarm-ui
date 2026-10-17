@@ -8,7 +8,7 @@ enum DevicePairingHistoryPolicyPrimitive {
   NONE = 'none',
 }
 
-/** How much message history the authorizing device lets a new device keep. */
+/** How much stored history the authorizing device copies to a new device. */
 export class DevicePairingHistoryPolicy extends Enum<string> {
   private static readonly WINDOW_DAYS = 30;
 
@@ -35,7 +35,7 @@ export class DevicePairingHistoryPolicy extends Enum<string> {
     super(value);
   }
 
-  /** The floor of the new device's history, from the authorizer's clock. */
+  /** The floor of the history export, from the authorizer's clock. */
   public floorAt(now: Timestamp): DeviceHistoryFloor {
     if (this.isEqual(DevicePairingHistoryPolicy.ALL)) {
       return DeviceHistoryFloor.OPEN;

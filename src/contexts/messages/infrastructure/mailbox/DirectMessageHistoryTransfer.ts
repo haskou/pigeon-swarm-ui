@@ -4,7 +4,6 @@ import {
   MailboxReadToken,
   type SymmetricKey,
 } from '@haskou/pigeon-swarm-crypto';
-import { Timestamp } from '@haskou/value-objects';
 
 import type { DeviceHistoryFloor } from '../../../identities/domain/value-objects/DeviceHistoryFloor';
 import type { Session } from '../../../identities/infrastructure/session/Session';
@@ -159,9 +158,7 @@ export class DirectMessageHistoryTransfer {
             item.plaintext,
           );
 
-          return (
-            record !== null && floor.admits(new Timestamp(record.createdAt))
-          );
+          return record !== null && floor.admits(record.createdAt);
         }),
       );
 

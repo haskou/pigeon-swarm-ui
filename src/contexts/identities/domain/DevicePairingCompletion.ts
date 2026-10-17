@@ -11,7 +11,6 @@ import { assert } from '@haskou/value-objects';
 
 import type { DeviceAuthorizationCheckpoint } from './DeviceAuthorizationCheckpoint';
 import type { DevicePairingCompletionPayload } from './DevicePairingCompletionPayload';
-import type { DeviceHistoryFloor } from './value-objects/DeviceHistoryFloor';
 
 import { DevicePairingError } from './DevicePairingError';
 import { DevicePairingRequest } from './DevicePairingRequest';
@@ -38,7 +37,6 @@ export class DevicePairingCompletion {
   public static create(input: {
     author: KeyPair;
     checkpoint: DeviceAuthorizationCheckpoint;
-    historyFloor: DeviceHistoryFloor;
     historyTransferSecret: SymmetricKey;
     identityKeyPair: KeyPair;
     recoveryAuthorityKeyPair: KeyPair;
@@ -50,7 +48,6 @@ export class DevicePairingCompletion {
       .getPublicKey()
       .encrypt(
         JSON.stringify({
-          historyFloor: input.historyFloor.toPrimitives(),
           historyTransferSecret: input.historyTransferSecret.valueOf(),
           identityKeyPair: input.identityKeyPair.toPrimitives(),
           recoveryAuthorityKeyPair:

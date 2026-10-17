@@ -1524,8 +1524,9 @@ export const es = {
       'Usa códigos QR autenticados y de corta duración. El dispositivo nuevo crea una credencial independiente y su propia envoltura de contraseña.',
     devicePairingHistoryAll: 'Todo el historial',
     devicePairingHistoryHelp:
-      'Esto decide qué copia esta app al dispositivo nuevo y qué muestra allí. No es un límite criptográfico: un dispositivo autorizado tiene la clave de tu identidad. Las personas con las que hablas conservan sus propias copias.',
-    devicePairingHistoryLabel: 'Historial de mensajes en el dispositivo nuevo',
+      'Esto decide cuánto historial de este dispositivo copia la app al dispositivo nuevo. Incluso con Nada, el dispositivo nuevo muestra los mensajes que el servidor aún guarda, aproximadamente los últimos 14 días. No es un límite criptográfico: un dispositivo autorizado tiene la clave de tu identidad. Las personas con las que hablas conservan sus propias copias.',
+    devicePairingHistoryLabel:
+      'Historial de mensajes que copiar al dispositivo nuevo',
     devicePairingHistoryLast30Days: 'Últimos 30 días',
     devicePairingHistoryNone: 'Nada',
     devicePairingInvalid:

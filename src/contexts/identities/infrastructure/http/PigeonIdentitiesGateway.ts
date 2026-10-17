@@ -15,7 +15,6 @@ import type {
   LocalKeychainUpdate,
 } from '../keychain/LocalKeychain';
 import type { Session } from '../session/Session';
-import type { DeviceHistoryFloorStore } from '../storage/DeviceHistoryFloorStore';
 import type { CreatedIdentityMaterial } from './CreatedIdentityMaterial';
 import type { DevicePairingHistory } from './DevicePairingHistory';
 import type { DevicePairingReaders } from './DevicePairingReaders';
@@ -54,7 +53,6 @@ export class PigeonIdentitiesGateway {
     private readonly recovery: DeviceSealedRecovery,
     private readonly pairingHistory: DevicePairingHistory,
     private readonly pairingReaders: DevicePairingReaders,
-    private readonly historyFloors: DeviceHistoryFloorStore,
   ) {}
 
   public async recover(
@@ -97,8 +95,9 @@ export class PigeonIdentitiesGateway {
   }
 
   /**
-   * `historyPolicy` sets how much history the new device keeps: it bounds the
-   * export, and the new device drops older records its inboxes deliver.
+   * `historyPolicy` bounds the stored history this device exports to the new
+   * one. Inbox records the node still holds reach the new device whatever the
+   * policy.
    */
   public async authorizeDevicePairing(
     session: Session,
@@ -128,9 +127,9 @@ export class PigeonIdentitiesGateway {
       );
     }
 
-    // Every completion carries the secret and the history floor. A failed
-    // publish leaves the transfer partial or absent, and the new device
-    // imports whatever was sent.
+    // Every completion carries the secret. The floor bounds only this
+    // device's export: a failed publish leaves the transfer partial or absent,
+    // and the new device imports whatever was sent.
     const historyTransferSecret = SymmetricKey.generate();
     const historyFloor = historyPolicy.floorAt(Timestamp.now());
 
@@ -144,7 +143,6 @@ export class PigeonIdentitiesGateway {
       opened,
       requestCode,
       historyTransferSecret,
-      historyFloor,
     );
     // The new device's reader is enrolled in every direct inbox before it gets
     // the completion code, so a message this device acknowledges before the
@@ -277,9 +275,6 @@ export class PigeonIdentitiesGateway {
       draft,
       completionCode,
     );
-    // Kept before any inbox sync runs, so records older than the floor the
-    // authorizer chose are never stored or shown here.
-    this.historyFloors.save(paired.session.identity.id, paired.historyFloor);
     // Keychain heads open only under the device sealed root, which the
     // authorizer resealed to this device before handing out the completion.
     const rooted = await this.deviceSealedRoot.current(paired.session);
