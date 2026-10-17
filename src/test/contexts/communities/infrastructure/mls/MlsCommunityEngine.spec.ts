@@ -15,6 +15,7 @@ import { CommunityRosterHistory } from '../../../../../contexts/communities/doma
 import { MlsUpdateCadence } from '../../../../../contexts/communities/domain/MlsUpdateCadence';
 import { CommunityOperationProof } from '../../../../../contexts/communities/infrastructure/http/CommunityOperationProof';
 import { MlsCommunityEngine } from '../../../../../contexts/communities/infrastructure/mls/MlsCommunityEngine';
+import { MlsRejectedError } from '../../../../../contexts/communities/infrastructure/mls/MlsRejectedError';
 import { CommunityOperationHistory } from '../http/CommunityOperationHistory';
 import { MlsTestIdentity } from './MlsTestIdentity';
 
@@ -353,6 +354,22 @@ describe('MlsCommunityEngine', () => {
         key === `${COMMUNITY}#pending` && state.length === 0
           ? Promise.reject(new Error('crash'))
           : saveGroup(key, state),
+      );
+  };
+  /** Makes the member stop when about to save `key`, once `when` holds. */
+  const stopBeforeSaving = (
+    store: MlsStateStore,
+    key: string,
+    when: () => boolean = () => true,
+  ): void => {
+    const saveGroup = store.saveGroup.bind(store);
+
+    jest
+      .spyOn(store, 'saveGroup')
+      .mockImplementation((saved, state) =>
+        saved === key && when()
+          ? Promise.reject(new Error('crash'))
+          : saveGroup(saved, state),
       );
   };
   /** Collects every welcome published to the identity from now on. */
@@ -1515,6 +1532,192 @@ describe('MlsCommunityEngine', () => {
     await expect(restarted.engine.decrypt(COMMUNITY, sealed)).resolves.toBe(
       'one branch',
     );
+  });
+
+  it('forgets the commit it was publishing before its removal when a welcome lets it in again at once, and sends none of it', async () => {
+    moderators.add(id('carol'));
+    roster.add(id('mallory'));
+    const { alice, carol } = await admitCarol();
+    const mallory = engineFor('mallory');
+
+    await mallory.engine.publishKeyPackages(COMMUNITY);
+    failWelcomes();
+    await expect(
+      carol.engine.admit(COMMUNITY, [id('mallory')]),
+    ).rejects.toThrow('crash');
+    delete node.hooks.beforePublish;
+    roster.delete(id('carol'));
+    await alice.engine.sync(COMMUNITY);
+    await alice.engine.remove(COMMUNITY, [id('carol')]);
+    stopBeforeForgettingPending(carol.store);
+    await expect(carol.engine.sync(COMMUNITY)).rejects.toThrow('crash');
+    jest.mocked(carol.store.saveGroup).mockRestore();
+    const restarted = engineFor('carol', carol.store);
+
+    roster.add(id('carol'));
+    await restarted.engine.publishKeyPackages(COMMUNITY);
+    await alice.engine.admit(COMMUNITY, [id('carol')]);
+    const resent = welcomesTo('mallory');
+
+    await expect(restarted.engine.sync(COMMUNITY)).resolves.toBe(true);
+    expect(resent).toEqual([]);
+    await expect(pendingIn(carol.store)).resolves.toBe(0);
+  });
+
+  it('keeps which commit its group took before the group, so stopping between them sends no welcome of a commit that lost the epoch', async () => {
+    moderators.add(id('carol'));
+    roster.add(id('mallory'));
+    const { alice, carol } = await admitCarol();
+    const mallory = engineFor('mallory');
+
+    await mallory.engine.publishKeyPackages(COMMUNITY);
+    failWelcomes();
+    await expect(
+      carol.engine.admit(COMMUNITY, [id('mallory')]),
+    ).rejects.toThrow('crash');
+    delete node.hooks.beforePublish;
+    // Alice's removal of bob binds more roster history, so it wins.
+    const [add] = node.records.splice(
+      node.records.findIndex(
+        (record) =>
+          record.kind === 'commit' && record.authorIdentityId === id('carol'),
+      ),
+      1,
+    );
+
+    roster.delete(id('bob'));
+    await alice.engine.remove(COMMUNITY, [id('bob')]);
+    node.records.push(add);
+    stopBeforeSaving(carol.store, COMMUNITY);
+    await expect(carol.engine.sync(COMMUNITY)).rejects.toThrow('crash');
+    jest.mocked(carol.store.saveGroup).mockRestore();
+    const resent = welcomesTo('mallory');
+    const restarted = engineFor('carol', carol.store);
+
+    await expect(restarted.engine.sync(COMMUNITY)).resolves.toBe(true);
+    expect(resent).toEqual([]);
+    await expect(pendingIn(carol.store)).resolves.toBe(0);
+  });
+
+  it('sends no welcome of a pending commit from an epoch its record of the commits its group took does not know', async () => {
+    moderators.add(id('carol'));
+    roster.add(id('mallory'));
+    const { alice, carol } = await admitCarol();
+    const mallory = engineFor('mallory');
+
+    await mallory.engine.publishKeyPackages(COMMUNITY);
+    failWelcomes();
+    await expect(
+      carol.engine.admit(COMMUNITY, [id('mallory')]),
+    ).rejects.toThrow('crash');
+    delete node.hooks.beforePublish;
+    const [add] = node.records.splice(
+      node.records.findIndex(
+        (record) =>
+          record.kind === 'commit' && record.authorIdentityId === id('carol'),
+      ),
+      1,
+    );
+
+    roster.delete(id('bob'));
+    await alice.engine.remove(COMMUNITY, [id('bob')]);
+    node.records.push(add);
+    stopBeforeForgettingPending(carol.store);
+    await expect(carol.engine.sync(COMMUNITY)).rejects.toThrow('crash');
+    jest.mocked(carol.store.saveGroup).mockRestore();
+    await carol.store.saveGroup(`${COMMUNITY}#taken`, new Uint8Array());
+    const resent = welcomesTo('mallory');
+    const restarted = engineFor('carol', carol.store);
+
+    await expect(restarted.engine.sync(COMMUNITY)).resolves.toBe(true);
+    expect(resent).toEqual([]);
+    await expect(pendingIn(carol.store)).resolves.toBe(0);
+    await expect(secretOf(restarted)).resolves.toEqual(await secretOf(alice));
+  });
+
+  it('sends the welcome of its admission again after stopping between keeping which commit its group took and the group', async () => {
+    const { alice, bob } = await admitBob();
+    const carol = engineFor('carol');
+    let published = false;
+
+    await carol.engine.publishKeyPackages(COMMUNITY);
+    node.hooks.afterPublish = (record) => {
+      published ||= record.kind === 'commit';
+    };
+    stopBeforeSaving(alice.store, COMMUNITY, () => published);
+    await expect(alice.engine.admit(COMMUNITY, [id('carol')])).rejects.toThrow(
+      'crash',
+    );
+    jest.mocked(alice.store.saveGroup).mockRestore();
+    const restarted = engineFor('alice', alice.store);
+
+    await expect(restarted.engine.sync(COMMUNITY)).resolves.toBe(true);
+    await bob.engine.sync(COMMUNITY);
+    await expect(carol.engine.sync(COMMUNITY)).resolves.toBe(true);
+    const sealed = await restarted.engine.encrypt(COMMUNITY, 'welcome carol');
+
+    for (const member of [bob, carol]) {
+      await expect(member.engine.decrypt(COMMUNITY, sealed)).resolves.toBe(
+        'welcome carol',
+      );
+    }
+  });
+
+  it('refuses a commit while one it made after the other call caught up is unsettled, and delivers that one first', async () => {
+    roster.add(id('mallory'));
+    const { alice, bob } = await admitBob();
+    const carol = engineFor('carol');
+    const mallory = engineFor('mallory');
+
+    await carol.engine.publishKeyPackages(COMMUNITY);
+    await mallory.engine.publishKeyPackages(COMMUNITY);
+    failWelcomes();
+    const [first, second] = await Promise.allSettled([
+      alice.engine.admit(COMMUNITY, [id('carol')]),
+      alice.engine.admit(COMMUNITY, [id('mallory')]),
+    ]);
+
+    delete node.hooks.beforePublish;
+
+    expect(first).toEqual(
+      expect.objectContaining({ reason: new Error('crash') }),
+    );
+    expect(second).toEqual(
+      expect.objectContaining({ reason: expect.any(MlsRejectedError) }),
+    );
+    await alice.engine.admit(COMMUNITY, [id('mallory')]);
+    const sealed = await alice.engine.encrypt(COMMUNITY, 'welcome both');
+
+    for (const member of [bob, carol, mallory]) {
+      await expect(member.engine.sync(COMMUNITY)).resolves.toBe(true);
+      await expect(member.engine.decrypt(COMMUNITY, sealed)).resolves.toBe(
+        'welcome both',
+      );
+    }
+  });
+
+  it('refuses a commit while the node holds one whose answer it lost after the other call caught up', async () => {
+    const { alice, bob, carol } = await admitCarol();
+    const { epoch } = await secretOf(alice);
+
+    roster.delete(id('carol'));
+    roster.delete(id('bob'));
+    loseCommitAnswer();
+    const results = await Promise.allSettled([
+      alice.engine.remove(COMMUNITY, [id('carol')]),
+      alice.engine.remove(COMMUNITY, [id('bob')]),
+    ]);
+
+    expect(results).toEqual([
+      expect.objectContaining({ reason: new Error('answer lost') }),
+      expect.objectContaining({ reason: expect.any(MlsRejectedError) }),
+    ]);
+    expect(commitsAt(epoch)).toHaveLength(1);
+    await alice.engine.remove(COMMUNITY, [id('bob')]);
+
+    for (const member of [bob, carol]) {
+      await expect(member.engine.sync(COMMUNITY)).resolves.toBe(false);
+    }
   });
 
   it('keeps a restricted channel group to the members who may see the channel', async () => {

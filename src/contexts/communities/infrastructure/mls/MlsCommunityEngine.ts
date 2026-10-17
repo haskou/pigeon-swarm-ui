@@ -502,6 +502,7 @@ export class MlsCommunityEngine {
     const taken = await this.takenCommits.of(group.groupId, group.epoch);
 
     try {
+      await this.refuseOverPending(transport, group);
       await this.savePending(group.groupId, pending);
       const record = await transport.publish(input);
 
@@ -516,6 +517,33 @@ export class MlsCommunityEngine {
     await this.remember(group, taken.took(pending.epoch, pending.commitId));
     await this.sendWelcome(transport, group.groupId, pending);
     await this.forgetPending(group.groupId);
+  }
+
+  /**
+   * Refuses a commit while this device has another one the group took or
+   * may still take, which another call made after this one caught up: one
+   * from an earlier epoch, whose welcome only `sync` sends, or one the node
+   * holds, which only `sync` adopts. One in the group's epoch that the node
+   * does not hold never reached it, and the new commit replaces it.
+   */
+  private async refuseOverPending(
+    transport: MlsRecordTransport,
+    group: MlsGroup,
+  ): Promise<void> {
+    const stored = await this.loadPending(group.groupId);
+
+    if (!stored) return;
+
+    if (BigInt(stored.epoch) === group.epoch) {
+      const listed = await transport.list({
+        ...(stored.epoch > 0 && { afterEpoch: stored.epoch - 1 }),
+        groupId: group.groupId,
+        kind: 'commit',
+      });
+
+      if (!listed.some(({ recordId }) => recordId === stored.commitId)) return;
+    }
+    throw new MlsRejectedError('Another commit of this device is pending');
   }
 
   private async sendWelcome(
@@ -603,9 +631,12 @@ export class MlsCommunityEngine {
 
   /**
    * Once the group left the epoch of this device's pending commit: sends
-   * the welcome again when that commit is the one the group took, then
-   * forgets it. While the group is still in that epoch the commit may yet
-   * reach the other members, so it stays.
+   * the welcome again when that commit is the one the group is known to
+   * have taken, then forgets it. A commit whose epoch the group's record no
+   * longer, or never, knew may have lost it, so its welcome is not sent: a
+   * joiner it strands is admitted again by a manager's `reconcile`. While
+   * the group is still in that epoch the commit may yet reach the other
+   * members, so it stays.
    */
   private async settle(
     group: MlsGroup,
@@ -617,11 +648,9 @@ export class MlsCommunityEngine {
 
     if (group.epoch === epoch) return;
 
-    // No commit known for the epoch: the group was past it before its
-    // record was kept, which only this device's own confirmed commit does.
     if (
       group.epoch > epoch &&
-      (taken.commitIn(pending.epoch) ?? pending.commitId) === pending.commitId
+      taken.commitIn(pending.epoch) === pending.commitId
     ) {
       await this.sendWelcome(
         this.transportFor(this.communityOf(group.groupId)),
@@ -860,6 +889,9 @@ export class MlsCommunityEngine {
 
         if (!group || (previous && group.epoch <= previous.epoch)) continue;
         await this.store.deleteKeyPackage(id);
+        // A commit this device was publishing in its last membership, and
+        // what that group took, belong to a group it left.
+        await this.forgetOutbox(groupId);
         await this.remember(group, MlsTakenCommits.none(group.epoch));
         await this.cadences.restart(groupId, group.epoch);
 
@@ -1035,26 +1067,27 @@ export class MlsCommunityEngine {
   }
 
   /**
-   * Saves the group, and, when given, the commits it took, after it: a
-   * record kept for another epoch than the stored group's knows no commit.
+   * Saves the group, and, when given, the commits it took, before it: a
+   * stop between the two leaves the group in the epoch it was in, where the
+   * record, kept for a later one, knows no commit, rather than a group past
+   * an epoch whose commit it does not know.
    */
   private async remember(
     group: MlsGroup,
     taken?: MlsTakenCommits,
   ): Promise<void> {
-    this.groups.set(group.groupId, group);
-    await this.store.saveGroup(group.groupId, group.serialize());
-    await this.store.saveGroup(
-      MlsCommunityEngine.frontierKey(group.groupId),
-      encoder.encode(JSON.stringify(group.frontier)),
-    );
-
     if (taken) {
       await this.takenCommits.save(
         group.groupId,
         taken.epoch === group.epoch ? taken : MlsTakenCommits.none(group.epoch),
       );
     }
+    this.groups.set(group.groupId, group);
+    await this.store.saveGroup(group.groupId, group.serialize());
+    await this.store.saveGroup(
+      MlsCommunityEngine.frontierKey(group.groupId),
+      encoder.encode(JSON.stringify(group.frontier)),
+    );
   }
 
   private communityOf(groupId: string): string {
