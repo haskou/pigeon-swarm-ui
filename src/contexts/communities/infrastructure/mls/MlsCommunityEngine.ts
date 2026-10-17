@@ -1,4 +1,5 @@
 import type {
+  MlsCommitOutcome,
   MlsCommitOutput,
   MlsLeafOwner,
   MlsLeafSigner,
@@ -18,6 +19,7 @@ import type { MlsStateStore } from './MlsStateStore';
 
 import { CommunityRosterHistory } from '../../domain/CommunityRosterHistory';
 import { MlsRejectedError } from './MlsRejectedError';
+import { MlsUpdateCadences } from './MlsUpdateCadences';
 
 const KEY_PACKAGE_TARGET = 4;
 const encoder = new TextEncoder();
@@ -86,11 +88,15 @@ const pickNewestPerDevice = (
 /**
  * One device's MLS state for every group it belongs to. All mutation of a
  * group goes through a per-group queue so the ratchet has a single writer.
+ * Each device commits an update of its own leaf on a cadence
+ * (`MlsUpdateCadence`), checked before each message it encrypts and on
+ * each `reconcile`, so a leaked copy of its state stops reading the group.
  */
 export class MlsCommunityEngine {
   private readonly groups = new Map<string, MlsGroup>();
   private readonly queues = new Map<string, Promise<unknown>>();
   private readonly histories = new Map<string, CommunityRosterHistory>();
+  private readonly cadences: MlsUpdateCadences;
 
   /** Where the commit this device is publishing waits until it settles. */
   private static pendingKey(groupId: string): string {
@@ -115,7 +121,12 @@ export class MlsCommunityEngine {
     private readonly store: MlsStateStore,
     private readonly transportFor: (communityId: string) => MlsRecordTransport,
     private readonly rosterFor: (groupId: string) => MlsRoster,
-  ) {}
+    clock: () => number,
+    /** Draws from [0, 1), from a cryptographic source. */
+    random: () => number,
+  ) {
+    this.cadences = new MlsUpdateCadences(store, clock, random);
+  }
 
   /** Starts a group with this device as its only leaf. */
   public async createGroup(groupId: string): Promise<void> {
@@ -132,6 +143,7 @@ export class MlsCommunityEngine {
       );
 
       await this.remember(group);
+      await this.cadences.restart(groupId, group.epoch);
     });
   }
 
@@ -239,6 +251,7 @@ export class MlsCommunityEngine {
 
       if (!output) return;
       await this.commit(group, output, []);
+      await this.cadences.restart(groupId, group.epoch);
     });
   }
 
@@ -271,6 +284,7 @@ export class MlsCommunityEngine {
         await this.admit(groupId, roster.participants());
         await this.bindRoster(groupId);
       }
+      await this.updateWhenDue(groupId);
     }
 
     return this.sync(groupId);
@@ -294,8 +308,15 @@ export class MlsCommunityEngine {
     });
   }
 
-  /** Returns base64 ciphertext and keeps the plaintext on this device. */
+  /**
+   * Returns base64 ciphertext and keeps the plaintext on this device. When
+   * this device's update is due, it is committed first, so the message is
+   * sent with the fresh leaf keys; a failure to publish it fails the send
+   * and leaves the update due.
+   */
   public async encrypt(groupId: string, plaintext: string): Promise<string> {
+    await this.updateWhenDue(groupId);
+
     return this.exclusive(groupId, async () => {
       const group = await this.requireGroup(groupId);
       const ciphertext = toBase64(
@@ -305,6 +326,7 @@ export class MlsCommunityEngine {
       // The sender cannot decrypt its own message later; keep it first.
       await this.store.savePlaintext(groupId, this.idOf(ciphertext), plaintext);
       await this.remember(group);
+      await this.cadences.recordSend(groupId);
 
       return ciphertext;
     });
@@ -372,6 +394,30 @@ export class MlsCommunityEngine {
         return;
       }
       await this.commit(group, await group.update(), []);
+      await this.cadences.restart(groupId, group.epoch);
+    });
+  }
+
+  /**
+   * Commits an update of this device's own leaf when its cadence is due,
+   * after catching up, so the update is made in the epoch the others are
+   * in. A group waiting for withheld roster operations commits nothing.
+   * Only a confirmed update restarts the cadence: one whose publishing
+   * fails leaves it due. One whose answer was lost and that `sync` adopts
+   * later leaves it due as well, and the device updates once more.
+   */
+  private async updateWhenDue(groupId: string): Promise<void> {
+    if (!(await this.cadences.isDue(groupId))) return;
+
+    if (!(await this.sync(groupId))) return;
+    await this.exclusive(groupId, async () => {
+      const group = await this.load(groupId);
+
+      if (!group || group.waiting || !(await this.cadences.isDue(groupId))) {
+        return;
+      }
+      await this.commit(group, await group.update(), []);
+      await this.cadences.restart(groupId, group.epoch);
     });
   }
 
@@ -640,18 +686,28 @@ export class MlsCommunityEngine {
       };
     }
 
+    let kind: MlsCommitOutcome['kind'];
+
     try {
-      const { kind } = await group.applyCommit({
+      ({ kind } = await group.applyCommit({
         bytes: fromBase64(record.payload),
         epoch: BigInt(record.epoch as number),
         id: record.recordId,
-      });
-
-      return { group, took: kind === 'applied' || kind === 'replaced' };
+      }));
     } catch {
       // Not allowed by the roster, or not a commit of this group.
       return { group, took: false };
     }
+
+    // A rival that won an epoch may have undone this device's update.
+    if (kind === 'replaced') {
+      await this.cadences.replaced(
+        group.groupId,
+        BigInt(record.epoch as number),
+      );
+    }
+
+    return { group, took: kind === 'applied' || kind === 'replaced' };
   }
 
   /**
@@ -686,6 +742,7 @@ export class MlsCommunityEngine {
         if (!group || (previous && group.epoch <= previous.epoch)) continue;
         await this.store.deleteKeyPackage(id);
         await this.remember(group);
+        await this.cadences.restart(groupId, group.epoch);
 
         return group;
       }

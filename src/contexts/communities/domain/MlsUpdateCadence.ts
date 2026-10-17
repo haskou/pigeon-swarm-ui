@@ -15,13 +15,6 @@ export class MlsUpdateCadence {
   public static readonly JITTER_MS = 60 * 60 * 1000;
   public static readonly MAX_SENT = 1000;
 
-  private constructor(
-    public readonly lastPathCommitAt: number,
-    public readonly keyEpoch: bigint,
-    public readonly jitterMs: number,
-    public readonly sentSinceUpdate: number,
-  ) {}
-
   public static fromPrimitives(
     primitives: MlsUpdateCadencePrimitives,
   ): MlsUpdateCadence {
@@ -69,6 +62,13 @@ export class MlsUpdateCadence {
       0,
     );
   }
+
+  private constructor(
+    public readonly lastPathCommitAt: number,
+    public readonly keyEpoch: bigint,
+    public readonly jitterMs: number,
+    public readonly sentSinceUpdate: number,
+  ) {}
 
   /** The cadence after one more application message. */
   public afterSend(): MlsUpdateCadence {
