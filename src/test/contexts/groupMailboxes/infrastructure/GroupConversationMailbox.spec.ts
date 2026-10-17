@@ -1351,9 +1351,14 @@ describe('GroupConversationMailbox', () => {
     );
 
     expect(removal).toHaveBeenCalledTimes(1);
-    expect(update).toHaveBeenCalled();
+    const lead = removal.mock.contexts[0];
+    const leadUpdates = update.mock.invocationCallOrder.filter(
+      (_, call) => update.mock.contexts[call] === lead,
+    );
+
+    expect(leadUpdates).not.toHaveLength(0);
     expect(removal.mock.invocationCallOrder[0]).toBeLessThan(
-      update.mock.invocationCallOrder[0],
+      Math.min(...leadUpdates),
     );
 
     update.mockRestore();
@@ -1596,10 +1601,10 @@ describe('GroupConversationMailbox', () => {
     expect(await databaseNames()).not.toContain(name);
   });
 
-  it('reads the inboxes before a due leaf update, so it is made in the epoch the others are in', async () => {
+  it('reads the inboxes before a due leaf update, so it is made in the epoch the others are in, and shows what it read on the next sync', async () => {
     await formGroup();
-    await carol.mailbox.send(carol.session, conversation(), 'from carol', {});
     await idle();
+    await bob.mailbox.send(bob.session, conversation(), 'before', {});
     const updates = jest.spyOn(GroupMailboxControl.prototype, 'updateWhenDue');
 
     now += MlsUpdateCadence.INTERVAL_MS + MlsUpdateCadence.JITTER_MS + 1;
@@ -1617,19 +1622,23 @@ describe('GroupConversationMailbox', () => {
 
     expect(made.map(({ epoch }) => epoch - made[0].epoch)).toEqual([0n, 1n]);
 
-    now += GroupMailboxOutbox.RETRY_MAX_MS;
-    await catchUp();
-    await catchUp();
+    // Carol, due as well, stays offline, so no update of hers races these.
+    // A copy sent before its recipient opened that generation's inbox is
+    // retried once the recipient reached it.
+    for (let pass = 0; pass < 3; pass += 1) {
+      now += GroupMailboxOutbox.RETRY_MAX_MS;
+      await Promise.all(
+        [alice, bob].map((member) =>
+          member.mailbox.membersChanged(member.session, CONVERSATION),
+        ),
+      );
+      await catchUp([alice, bob]);
+    }
 
     expect(texts(alice)).toEqual(
-      expect.arrayContaining(['message:from carol', 'message:from bob']),
+      expect.arrayContaining(['message:before', 'message:from bob']),
     );
-    expect(texts(bob)).toEqual(
-      expect.arrayContaining(['message:from carol', 'message:from alice']),
-    );
-    expect(texts(carol)).toEqual(
-      expect.arrayContaining(['message:from bob', 'message:from alice']),
-    );
+    expect(texts(bob)).toContain('message:from alice');
   });
 
   it('fails a send whose leaf update fails as one to retry, queuing nothing', async () => {

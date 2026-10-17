@@ -856,6 +856,8 @@ export const es = {
         'Solo los participantes de la conversación pueden enviar mensajes aquí.',
       GroupMailboxTooLargeError:
         'Un grupo admite como máximo 48 miembros, y una sola bienvenida debe llegar a todos sus dispositivos. Elimina un miembro o un dispositivo antes de añadir otro.',
+      GroupMailboxUpdateFailedError:
+        'Este dispositivo no pudo renovar sus claves del grupo, así que el mensaje no se envió. Vuelve a enviarlo con Reintentar.',
       IdentityMustHaveAtLeastOneNetworkError:
         'La identidad debe pertenecer al menos a una red.',
       IdentityNotFoundError: 'No se encontró esa identidad.',

@@ -170,10 +170,19 @@ grant `manage_members`.
   random jitter of up to an hour after its leaf keys were last renewed, or
   once it sent 1000 messages since. Creating or joining the group, and every
   update or removal this device commits, renews them; an add, which carries
-  no update path, does not. The cadence is checked before each message this
-  device encrypts (community) or queues (group conversation), and on each
-  reconcile, so a device that comes back after a day updates on its first
-  pass. It is sealed next to the group state; a group without a readable
+  no update path, does not. A cadence stamped after the current time, from a
+  skewed clock or a written store, is due. The cadence is checked before each
+  message this device encrypts (community) or queues (group conversation),
+  and on each reconcile, so a device that comes back after a day updates on
+  its first pass. Before a due update the device catches up: a community
+  syncs its commits, and a group conversation reads its inboxes, keeping the
+  records it read for the next sync, so the update is made in the epoch the
+  other members are in. A failed read still lets it update, as it does
+  offline. In a group conversation's reconcile the update comes after the
+  lead device's removals of revoked devices, so a failing update never holds
+  one back. When the update a group message needs fails, the message is not
+  queued: it shows as failed with a retry, and the update stays due. The
+  cadence is sealed next to the group state; a group without a readable
   cadence is due. Two devices updating in the same epoch race like any
   commits: the losing device's update is undone, its cadence is due again
   and it updates once more. In a community a manager's device also commits

@@ -195,6 +195,27 @@ export class GroupMailboxMlsEngine {
   }
 
   /**
+   * The confirmed group this device was not removed from, when its update
+   * cadence is due. Run it inside `exclusive`.
+   */
+  private async dueGroup(
+    conversationId: string,
+  ): Promise<MlsGroup | undefined> {
+    const group = await this.load(conversationId);
+
+    if (
+      !group ||
+      group.isRemoved ||
+      !(await this.confirmations.of(conversationId)).confirmed ||
+      !(await this.cadences.isDue(conversationId))
+    ) {
+      return undefined;
+    }
+
+    return group;
+  }
+
+  /**
    * Advances the log when the group is past the epoch it was exported in:
    * every commit moves the generation, a GroupContext-only one and a
    * self-update included.
@@ -1124,28 +1145,33 @@ export class GroupMailboxMlsEngine {
   }
 
   /**
+   * Whether `updateWhenDue` would now commit: this device holds a confirmed
+   * group it was not removed from, and its update cadence is due.
+   */
+  public async isUpdateDue(conversationId: string): Promise<boolean> {
+    return this.exclusive(
+      conversationId,
+      async () => (await this.dueGroup(conversationId)) !== undefined,
+    );
+  }
+
+  /**
    * Commits an update of this device's own leaf when its cadence is due:
    * a day, plus up to an hour of jitter, after its leaf keys were last
-   * renewed, or once it sent `MlsUpdateCadence.MAX_SENT` messages since.
-   * The update advances the generation like every commit, and is kept
-   * only once `publish` has queued it; a failure leaves it due. Undefined
-   * when it is not due, or this device holds no confirmed group.
+   * renewed, once it sent `MlsUpdateCadence.MAX_SENT` messages since, or
+   * once the stamp of that renewal lies in the future. The update advances
+   * the generation like every commit, and is kept only once `publish` has
+   * queued it; a failure leaves it due. Undefined when it is not due, or
+   * this device holds no confirmed group.
    */
   public async updateWhenDue(
     conversationId: string,
     publish: (commit: GroupMailboxCommit) => Promise<void>,
   ): Promise<GroupMailboxCommit | undefined> {
     return this.exclusive(conversationId, async () => {
-      const group = await this.load(conversationId);
+      const group = await this.dueGroup(conversationId);
 
-      if (
-        !group ||
-        group.isRemoved ||
-        !(await this.confirmations.of(conversationId)).confirmed ||
-        !(await this.cadences.isDue(conversationId))
-      ) {
-        return undefined;
-      }
+      if (!group) return undefined;
       await this.refreshPolicy();
 
       return this.commitRenewing(

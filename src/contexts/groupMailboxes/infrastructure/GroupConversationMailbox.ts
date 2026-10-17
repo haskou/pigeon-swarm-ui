@@ -2,6 +2,7 @@ import { CommitmentId } from '@haskou/pigeon-swarm-crypto';
 
 import type { ConversationResource } from '../../conversations/infrastructure/http/ConversationResource';
 import type { Session } from '../../identities/infrastructure/session/Session';
+import type { DirectMessageRecord } from '../../mailboxes/domain/DirectMessageRecord';
 import type { ChatMessage } from '../../messages/domain/ChatMessage';
 import type { DirectMessageTimelineChange } from '../../messages/domain/DirectMessageTimelineChange';
 import type { EditMessageOptions } from '../../messages/infrastructure/http/resources/EditMessageOptions';
@@ -29,6 +30,7 @@ import { MessageReactionEmoji } from '../../messages/domain/value-objects/Messag
 import { GroupMailboxGenesis } from '../domain/GroupMailboxGenesis';
 import { GroupMailboxRoster } from '../domain/GroupMailboxRoster';
 import { GroupMailboxTooLargeError } from './control/GroupMailboxTooLargeError';
+import { GroupMailboxUpdateFailedError } from './control/GroupMailboxUpdateFailedError';
 import { GroupConversationMember } from './GroupConversationMember';
 import { GroupConversationSender } from './GroupConversationSender';
 import { GroupConversationStores } from './GroupConversationStores';
@@ -53,10 +55,17 @@ import { GroupConversationTimeline } from './GroupConversationTimeline';
  * device only the node lists is never asked for a key package.
  * Reading a conversation's inboxes and replaying its history run one at a
  * time, so a replay never misses what a background read stored meanwhile.
+ * Before a write, a device whose leaf update is due reads the inboxes
+ * first, so the update is made in the epoch the other members are in.
  */
 export class GroupConversationMailbox {
   public static readonly HISTORY_PAGE = 50;
 
+  /**
+   * The records a read before a leaf update took off each conversation's
+   * inboxes, by identity and conversation, for its next `sync` to apply.
+   */
+  private readonly caughtUp = new Map<string, DirectMessageRecord[]>();
   private readonly members = new Map<string, GroupConversationMember>();
   private readonly reconciling = new Map<string, Promise<void>>();
   private readonly sender: GroupConversationSender;
@@ -70,9 +79,18 @@ export class GroupConversationMailbox {
     console.debug(`Group ${what} failed.`);
   }
 
+  /** The key of an identity's conversation in its per-conversation maps. */
+  private static key(session: Session, conversationId: string): string {
+    return `${session.identity.id}/${conversationId}`;
+  }
+
   public constructor(private readonly ports: GroupConversationPorts) {
     this.stores = new GroupConversationStores(ports.storage);
-    this.sender = new GroupConversationSender(ports, this.stores.history);
+    this.sender = new GroupConversationSender(
+      ports,
+      this.stores.history,
+      (member, conversationId) => this.renewLeaf(member, conversationId),
+    );
     this.timeline = new GroupConversationTimeline(ports.projector);
   }
 
@@ -120,16 +138,17 @@ export class GroupConversationMailbox {
   }
 
   /**
-   * Commits this device's leaf update when its cadence is due, then the
-   * roster and the devices this identity's signed transitions authorize
-   * into the MLS group when this device is the one. A device that awaits
-   * the group's confirmation commits nothing. Logs counts only.
+   * Commits the roster and the devices this identity's signed transitions
+   * authorize into the MLS group when this device is the one, then this
+   * device's leaf update when its cadence is due: a revoked device is cut
+   * off even when the update fails, and a removal's update path already
+   * renews this leaf. A device that awaits the group's confirmation commits
+   * nothing. Logs counts only.
    */
   private async reconcile(
     member: GroupConversationMember,
     conversationId: string,
   ): Promise<void> {
-    const { session } = member;
     // A device not yet welcomed has no group and nothing to commit.
     const leaves = await member.engine.devices(conversationId);
 
@@ -139,8 +158,21 @@ export class GroupConversationMailbox {
     ) {
       return;
     }
+    await this.reconcileAsLead(member, conversationId, leaves);
     // Every device renews its own leaf, lead or not.
     await member.control.updateWhenDue(conversationId);
+  }
+
+  /**
+   * Removes the revoked devices, reconciles the roster and adds the missing
+   * devices when this device is the first verified one holding a leaf.
+   */
+  private async reconcileAsLead(
+    member: GroupConversationMember,
+    conversationId: string,
+    leaves: string[],
+  ): Promise<void> {
+    const { session } = member;
     const verified = new Set(await this.ports.verifiedDevices(session));
     const lead = leaves.find((credential) => verified.has(credential));
 
@@ -204,6 +236,42 @@ export class GroupConversationMailbox {
   }
 
   /**
+   * Commits this device's leaf update before a write when its cadence is
+   * due. It reads the conversation's inboxes first, so it applies the
+   * commits the other members made and the update is made in the epoch they
+   * are in; the records that read keeps for the next `sync`. A failed read
+   * lets the update go ahead, as it does offline. Rejects with
+   * `GroupMailboxUpdateFailedError` when the update cannot be committed or
+   * queued; it stays due.
+   */
+  private async renewLeaf(
+    member: GroupConversationMember,
+    conversationId: string,
+  ): Promise<void> {
+    const { session } = member;
+    const key = GroupConversationMailbox.key(session, conversationId);
+
+    try {
+      if (await member.engine.isUpdateDue(conversationId)) {
+        await this.serially(session, conversationId, () =>
+          member.inbox.sync(
+            conversationId,
+            new AbortController().signal,
+            (records) =>
+              this.caughtUp.set(key, [
+                ...(this.caughtUp.get(key) ?? []),
+                ...records,
+              ]),
+          ),
+        ).catch(() => GroupConversationMailbox.fail('read before an update'));
+      }
+      await member.control.updateWhenDue(conversationId);
+    } catch {
+      throw new GroupMailboxUpdateFailedError();
+    }
+  }
+
+  /**
    * Commits one roster operation of this identity's, then brings the MLS
    * group in line with the new roster.
    */
@@ -222,7 +290,7 @@ export class GroupConversationMailbox {
     conversationId: string,
     work: () => Promise<T>,
   ): Promise<T> {
-    const key = `${session.identity.id}/${conversationId}`;
+    const key = GroupConversationMailbox.key(session, conversationId);
     const result = (this.serial.get(key) ?? Promise.resolve()).then(work);
     const tail = result.catch(() => undefined);
 
@@ -651,7 +719,10 @@ export class GroupConversationMailbox {
     return await this.stores.history.activity(session, conversationId);
   }
 
-  /** Replays the stored history. Never throws. */
+  /**
+   * Replays the stored history, which holds what a read before a leaf
+   * update took. Never throws.
+   */
   public async restore(
     session: Session,
     conversationId: string,
@@ -659,13 +730,17 @@ export class GroupConversationMailbox {
     apply: GroupTimelineApply,
   ): Promise<void> {
     try {
-      const records = await this.serially(session, conversationId, () =>
-        this.stores.history.load(
+      const records = await this.serially(session, conversationId, () => {
+        this.caughtUp.delete(
+          GroupConversationMailbox.key(session, conversationId),
+        );
+
+        return this.stores.history.load(
           session,
           conversationId,
           GroupConversationMailbox.HISTORY_PAGE,
-        ),
-      );
+        );
+      });
 
       if (!signal.aborted) apply(this.timeline.changes(session, records));
     } catch {
@@ -674,7 +749,8 @@ export class GroupConversationMailbox {
   }
 
   /**
-   * Reads every inbox of the conversation once, then reconciles the MLS
+   * Applies what a read before a leaf update took off the inboxes, reads
+   * every inbox of the conversation once, then reconciles the MLS
    * group with its roster in the background. Resolves whether this identity
    * is off the roster, or holds no group for the conversation, whether
    * this device still awaits the group's confirmation, and whether its last
@@ -686,11 +762,22 @@ export class GroupConversationMailbox {
     signal: AbortSignal,
     apply: GroupTimelineApply,
   ): Promise<GroupConversationSyncOutcome> {
-    await this.serially(session, conversationId, () =>
-      this.member(session).inbox.sync(conversationId, signal, (records) =>
-        apply(this.timeline.changes(session, records)),
-      ),
-    );
+    const key = GroupConversationMailbox.key(session, conversationId);
+
+    await this.serially(session, conversationId, () => {
+      const caughtUp = this.caughtUp.get(key);
+
+      if (caughtUp && !signal.aborted) {
+        this.caughtUp.delete(key);
+        apply(this.timeline.changes(session, caughtUp));
+      }
+
+      return this.member(session).inbox.sync(
+        conversationId,
+        signal,
+        (records) => apply(this.timeline.changes(session, records)),
+      );
+    });
     const roster = await this.member(session).engine.roster(conversationId);
 
     void this.membersChanged(session, conversationId);
@@ -748,10 +835,16 @@ export class GroupConversationMailbox {
     }
   }
 
-  /** Stops this identity's background work, for logout. State is kept. */
+  /**
+   * Stops this identity's background work, for logout, and drops the
+   * records it holds for a next `sync`. State is kept.
+   */
   public stop(identityId: string): void {
     this.members.get(identityId)?.close();
     this.members.delete(identityId);
+    for (const key of this.caughtUp.keys()) {
+      if (key.startsWith(`${identityId}/`)) this.caughtUp.delete(key);
+    }
   }
 
   /**
