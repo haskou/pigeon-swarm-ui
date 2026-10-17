@@ -60,6 +60,7 @@ export class GroupConversationMember {
       () => ports.verifiedDevices(current.session),
       () => ports.contacts(current.session),
       ports.now,
+      () => crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32,
     );
     const outbox = new GroupMailboxOutbox(
       latest,

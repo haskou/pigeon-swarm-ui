@@ -120,10 +120,10 @@ export class GroupConversationMailbox {
   }
 
   /**
-   * Commits the roster and the devices this identity's signed transitions
-   * authorize into the MLS group when this device is the one. A device
-   * that awaits the group's confirmation commits nothing. Logs counts
-   * only.
+   * Commits this device's leaf update when its cadence is due, then the
+   * roster and the devices this identity's signed transitions authorize
+   * into the MLS group when this device is the one. A device that awaits
+   * the group's confirmation commits nothing. Logs counts only.
    */
   private async reconcile(
     member: GroupConversationMember,
@@ -139,6 +139,8 @@ export class GroupConversationMailbox {
     ) {
       return;
     }
+    // Every device renews its own leaf, lead or not.
+    await member.control.updateWhenDue(conversationId);
     const verified = new Set(await this.ports.verifiedDevices(session));
     const lead = leaves.find((credential) => verified.has(credential));
 

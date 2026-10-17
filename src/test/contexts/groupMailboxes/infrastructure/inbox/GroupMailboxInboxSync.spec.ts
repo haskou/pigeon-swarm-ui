@@ -567,6 +567,9 @@ describe('GroupMailboxInboxSync on the real MLS library', () => {
 
     expect(update!.generation.index).toBe(before.index + 1);
     for (const reader of [alice, bob, carol]) await sync(reader);
+    // A copy for an inbox of the new generation its reader has not opened
+    // yet stays queued until a retry, as after any commit.
+    await retry(alice, bob, carol);
     await send(alice, sent('alice', mid('alice', 'caught-up')));
     await send(carol, sent('carol', mid('carol', 'carol-caught-up')));
     for (const reader of [alice, bob, carol]) await sync(reader);
@@ -586,6 +589,7 @@ describe('GroupMailboxInboxSync on the real MLS library', () => {
           update!.generation.secret,
         ),
       ).toBe(true);
+      expect(reader.outbox.items(CONVERSATION)).toEqual([]);
     }
   });
 
