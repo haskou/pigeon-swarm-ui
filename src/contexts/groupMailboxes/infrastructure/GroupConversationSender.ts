@@ -24,7 +24,8 @@ import { PollBoard } from '../../polls/domain/PollBoard';
  * every record for the members of the current epoch, so no conversation key
  * exists. Every record id is bound to its author, as the inbox demands. MLS
  * cannot open a member's own messages, so each record is kept in this
- * device's history once it is queued. A queued record is sent even when that
+ * device's history once it is queued. A deletion makes the outbox forget
+ * the message it deletes. A queued record is sent even when that
  * copy fails, so a retry never sends it twice under a new id. A poll's
  * record id is the poll id; a poll the poll rules refuse is never queued. A
  * typing notice is ephemeral: never queued nor kept, and sent at most once
@@ -71,6 +72,7 @@ export class GroupConversationSender {
       record.conversationId,
       record.id,
       DirectMessageMailboxRecord.encode(record),
+      record.type === 'deleted' ? record.targetMessageId : undefined,
     );
     await this.history.append(member.session, [record]).catch(() => {
       // eslint-disable-next-line no-console
