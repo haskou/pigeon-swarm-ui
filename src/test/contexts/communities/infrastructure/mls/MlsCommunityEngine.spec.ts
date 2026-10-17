@@ -1373,6 +1373,33 @@ describe('MlsCommunityEngine', () => {
     await expect(carol.engine.sync(COMMUNITY)).resolves.toBe(false);
   });
 
+  it('forgets a stored pending commit whose bytes are not those of its record id, without adopting it', async () => {
+    const { alice } = await admitCarol();
+    const before = await secretOf(alice);
+
+    roster.delete(id('carol'));
+    loseCommitAnswer();
+    await expect(alice.engine.remove(COMMUNITY, [id('carol')])).rejects.toThrow(
+      'answer lost',
+    );
+    const key = `${COMMUNITY}#pending`;
+    const pending = JSON.parse(
+      new TextDecoder().decode(await alice.store.loadGroup(key)),
+    ) as { payload: string };
+
+    await alice.store.saveGroup(
+      key,
+      new TextEncoder().encode(
+        JSON.stringify({ ...pending, payload: base64(new Uint8Array([1])) }),
+      ),
+    );
+    const restarted = engineFor('alice', alice.store);
+
+    await expect(restarted.engine.sync(COMMUNITY)).resolves.toBe(true);
+    await expect(pendingIn(alice.store)).resolves.toBe(0);
+    await expect(secretOf(restarted)).resolves.toEqual(before);
+  });
+
   it('catches up before it admits, so admitting again keeps the commit the node already holds', async () => {
     const { alice, bob } = await admitBob();
     const carol = engineFor('carol');
@@ -1422,9 +1449,9 @@ describe('MlsCommunityEngine', () => {
 
     await mallory.engine.publishKeyPackages(COMMUNITY);
     failWelcomes();
-    await expect(carol.engine.admit(COMMUNITY, [id('mallory')])).rejects.toThrow(
-      'crash',
-    );
+    await expect(
+      carol.engine.admit(COMMUNITY, [id('mallory')]),
+    ).rejects.toThrow('crash');
     delete node.hooks.beforePublish;
     roster.delete(id('carol'));
     await alice.engine.sync(COMMUNITY);
@@ -1456,9 +1483,9 @@ describe('MlsCommunityEngine', () => {
 
     await mallory.engine.publishKeyPackages(COMMUNITY);
     failWelcomes();
-    await expect(carol.engine.admit(COMMUNITY, [id('mallory')])).rejects.toThrow(
-      'crash',
-    );
+    await expect(
+      carol.engine.admit(COMMUNITY, [id('mallory')]),
+    ).rejects.toThrow('crash');
     delete node.hooks.beforePublish;
     // Alice removes bob in that epoch before the node lists carol's add to
     // her; her commit binds the kick, more roster history, so it wins.

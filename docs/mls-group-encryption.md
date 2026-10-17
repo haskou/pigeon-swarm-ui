@@ -132,8 +132,8 @@ A client keeps its own commit pending until the node holds it, as group
 conversations do (#380, #418):
 
 - Before publishing, it saves the group the commit leads to under
-  `<groupId>#pending`, with the record id, the epoch and the welcome with its
-  recipients. The stored group stays in its epoch.
+  `<groupId>#pending`, with the commit itself, its record id, the epoch and
+  the welcome with its recipients. The stored group stays in its epoch.
 - If publishing fails, the commit is abandoned: the group, its stored state
   and every secret derived from it stay in the epoch the other members are in.
   The pending stays, because the answer may have been lost after the node
@@ -141,15 +141,29 @@ conversations do (#380, #418):
 - Once the node returns the record, the group advances and is saved, the
   welcomes are published, and only then is the pending cleared.
 - On sync, a device that stopped after publishing adopts its pending group
-  when the node lists that exact record id at that epoch, instead of trying to
-  open its own commit. While the group stays in the pending's epoch the pending
-  is kept. Once the group moved on, the welcome is sent again (welcome record
-  ids are idempotent) if the group took this device's commit, and the pending
-  is dropped.
+  only when the node lists that record id at that epoch carrying the exact
+  commit bytes it saved, instead of trying to open its own commit. A record
+  under that id with other bytes or at another epoch is not this device's
+  commit: the pending is dropped, never adopted, and the device syncs as
+  usual. While the group stays in the pending's epoch the pending is kept.
+  Once the group moved on, the welcome is sent again (welcome record ids are
+  idempotent) if the group took this device's commit, and the pending is
+  dropped.
 - A commit that never reached the node is not re-sent. The device stays in the
-  previous epoch and `reconcile` makes the change again from the roster. It
-  syncs first, so a commit that did land is adopted before a new commit
-  replaces the pending.
+  previous epoch and `reconcile` makes the change again from the roster.
+  `admit` and `remove` sync first, whoever calls them, so a commit that did
+  land is adopted before a new commit is built, in the epoch the others are
+  in, and replaces the pending.
+- Once sync finds the device removed, it deletes `<groupId>#pending`, with
+  the welcome in it, so a device admitted again never sends a welcome from
+  its earlier membership. A device that forgets an identity deletes every
+  group of it, pending commits included.
+- Which commit the group took in each epoch sync still lists is kept under
+  `<groupId>#taken` (`MlsTakenCommits`), saved after the group state and
+  only trusted for the epoch that state is in. Across a restart, sync skips
+  a commit the group already took rather than applying it again, and judges
+  whether its own pending commit won the epoch by that record rather than
+  by which commits it could still apply.
 
 ### Who commits
 
@@ -346,8 +360,9 @@ The node can still delay distrust:
   does;
 - by withholding those commits too, or serving one only once the member has
   moved more than one epoch past it, beyond what sync takes;
-- across a restart, which forgets the commits a group took and the epochs it
-  left: it then steps back from nothing, a manager no longer commits for a
+- across a restart, which keeps only which commit a group took, not the
+  states before them, and forgets the epochs it left: it then steps back
+  from nothing, a manager no longer commits for a
   joiner left waiting, who waits for the next manager commit instead, and a
   commit taken again after a step back starts this device's sending
   generations in that epoch over, so members refuse its messages there up to

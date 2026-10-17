@@ -13,12 +13,15 @@ import { Buffer } from 'buffer';
 import type { CommunityMlsRoster } from '../../domain/CommunityMlsRoster';
 import type { MlsRecordResource } from '../http/resources/MlsRecordResource';
 import type { MlsGroupCredentials } from './MlsGroupCredentials';
+import type { MlsPendingCommit } from './MlsPendingCommit';
 import type { MlsRecordTransport } from './MlsRecordTransport';
 import type { MlsRoster } from './MlsRoster';
 import type { MlsStateStore } from './MlsStateStore';
 
 import { CommunityRosterHistory } from '../../domain/CommunityRosterHistory';
+import { MlsTakenCommits } from '../../domain/MlsTakenCommits';
 import { MlsRejectedError } from './MlsRejectedError';
+import { MlsTakenCommitsStore } from './MlsTakenCommitsStore';
 import { MlsUpdateCadences } from './MlsUpdateCadences';
 
 const KEY_PACKAGE_TARGET = 4;
@@ -29,23 +32,6 @@ const toBase64 = (bytes: Uint8Array): string =>
   Buffer.from(bytes).toString('base64');
 const fromBase64 = (value: string): Uint8Array =>
   new Uint8Array(Buffer.from(value, 'base64'));
-
-/**
- * A commit this device made, kept aside from before it is published until
- * the group has left the epoch it was made in.
- */
-interface PendingCommit {
-  /** The record id the commit is published under. */
-  commitId: string;
-  /** The epoch the commit was made in. */
-  epoch: number;
-  /** Base64 group state the commit leads to. */
-  state: string;
-  /** The roster revision the commit binds. */
-  frontier: string[];
-  /** The welcome for the devices the commit adds, and who gets it. */
-  welcome?: { payload: string; recipientIdentityIds: string[] };
-}
 
 /** The device a record's key package belongs to, if its author signed it. */
 const authoredOwnerOf = (
@@ -97,6 +83,7 @@ export class MlsCommunityEngine {
   private readonly queues = new Map<string, Promise<unknown>>();
   private readonly histories = new Map<string, CommunityRosterHistory>();
   private readonly cadences: MlsUpdateCadences;
+  private readonly takenCommits: MlsTakenCommitsStore;
 
   /** Where the commit this device is publishing waits until it settles. */
   private static pendingKey(groupId: string): string {
@@ -126,6 +113,7 @@ export class MlsCommunityEngine {
     random: () => number,
   ) {
     this.cadences = new MlsUpdateCadences(store, clock, random);
+    this.takenCommits = new MlsTakenCommitsStore(store);
   }
 
   /** Starts a group with this device as its only leaf. */
@@ -180,7 +168,9 @@ export class MlsCommunityEngine {
   /**
    * Brings the group up to date: joins from a welcome when this device has no
    * state, or was removed and has been admitted again, then applies commits
-   * in order. Returns false once this device has been removed.
+   * in order. Returns false once this device has been removed, which also
+   * forgets its pending commit, with any welcome in it, and the commits its
+   * group took.
    */
   public async sync(groupId: string): Promise<boolean> {
     return this.exclusive(groupId, async () => {
@@ -196,25 +186,57 @@ export class MlsCommunityEngine {
               previous,
             })) ?? previous);
 
-      if (!group) return true;
-
-      if (group.isRemoved) return false;
-      const pending = await this.loadPending(groupId);
-      const { group: synced, taken } = await this.applyCommits(
-        group,
-        communityId,
-        pending,
-      );
-
-      await this.remember(synced);
-      await this.settle(synced, pending, taken);
-
-      return !synced.isRemoved;
+      return group ? this.catchUp(group, communityId) : true;
     });
   }
 
-  /** Adds every device of the identities that published a key package. */
+  /**
+   * `sync` for a group this device holds: applies the commits and settles
+   * its pending commit, or forgets its outbox once removed.
+   */
+  private async catchUp(
+    group: MlsGroup,
+    communityId: string,
+  ): Promise<boolean> {
+    const { groupId } = group;
+
+    if (group.isRemoved) {
+      await this.forgetOutbox(groupId);
+
+      return false;
+    }
+    const stored = await this.loadPending(groupId);
+    const {
+      group: synced,
+      pending,
+      taken,
+    } = await this.applyCommits(group, communityId, {
+      pending: stored,
+      taken: await this.takenCommits.of(groupId, group.epoch),
+    });
+
+    await this.remember(synced, taken);
+
+    if (synced.isRemoved) {
+      await this.forgetOutbox(groupId);
+
+      return false;
+    }
+
+    if (stored && !pending) await this.forgetPending(groupId);
+    await this.settle(synced, pending, taken);
+
+    return true;
+  }
+
+  /**
+   * Adds every device of the identities that published a key package, after
+   * catching up, so the commit is made in the epoch the others are in and
+   * one this device already published is adopted rather than made again.
+   * No-op once this device is no longer in the group.
+   */
   public async admit(groupId: string, identityIds: string[]): Promise<void> {
+    if (!(await this.sync(groupId))) return;
     await this.exclusive(groupId, async () => {
       const group = await this.requireGroup(groupId);
       const communityId = this.communityOf(groupId);
@@ -243,8 +265,12 @@ export class MlsCommunityEngine {
     });
   }
 
-  /** Removes every leaf of the identities. No-op when none are present. */
+  /**
+   * Removes every leaf of the identities, after catching up as `admit`
+   * does. No-op when none are present.
+   */
   public async remove(groupId: string, identityIds: string[]): Promise<void> {
+    if (!(await this.sync(groupId))) return;
     await this.exclusive(groupId, async () => {
       const group = await this.requireGroup(groupId);
       const output = await group.removeIdentities(identityIds);
@@ -438,14 +464,16 @@ export class MlsCommunityEngine {
 
   /**
    * Publishes a commit this device made, then keeps it. The group the
-   * commit leads to is set aside as pending while the stored group stays
-   * in its epoch; only once the node holds the commit is the group
-   * advanced and saved. A commit whose publishing fails is abandoned: the
-   * group, its stored state and every secret derived from it stay in the
-   * epoch the other members are in. The pending is kept, since a commit
-   * whose answer was lost may still have reached the node: `sync` adopts
-   * it if it shows up there and forgets it once the epoch moved on. The
-   * welcome is sent after the commit and stays pending until it is.
+   * commit leads to is set aside as pending, with the commit itself, while
+   * the stored group stays in its epoch; only once the node holds the
+   * commit is the group advanced and saved. A commit whose publishing
+   * fails is abandoned: the group, its stored state and every secret
+   * derived from it stay in the epoch the other members are in. The
+   * pending is kept, since a commit whose answer was lost may still have
+   * reached the node: `sync` adopts it if the node serves that very commit,
+   * and forgets it once the epoch moved on or the node serves other bytes
+   * under its record id. The welcome is sent after the commit and stays
+   * pending until it is.
    */
   private async commit(
     group: MlsGroup,
@@ -460,16 +488,18 @@ export class MlsCommunityEngine {
       payload: toBase64(output.commit),
     };
     const { frontier, state } = group.pendingState();
-    const pending: PendingCommit = {
+    const pending: MlsPendingCommit = {
       commitId: CommitmentId.mlsRecord(input),
       epoch: input.epoch,
       frontier: [...frontier],
+      payload: input.payload,
       state: toBase64(state),
       ...(output.welcome &&
         recipientIdentityIds.length > 0 && {
           welcome: { payload: toBase64(output.welcome), recipientIdentityIds },
         }),
     };
+    const taken = await this.takenCommits.of(group.groupId, group.epoch);
 
     try {
       await this.savePending(group.groupId, pending);
@@ -483,18 +513,15 @@ export class MlsCommunityEngine {
       throw error;
     }
     group.confirm(pending.commitId);
-    await this.remember(group);
+    await this.remember(group, taken.took(pending.epoch, pending.commitId));
     await this.sendWelcome(transport, group.groupId, pending);
-    await this.store.saveGroup(
-      MlsCommunityEngine.pendingKey(group.groupId),
-      new Uint8Array(),
-    );
+    await this.forgetPending(group.groupId);
   }
 
   private async sendWelcome(
     transport: MlsRecordTransport,
     groupId: string,
-    { epoch, welcome }: PendingCommit,
+    { epoch, welcome }: MlsPendingCommit,
   ): Promise<void> {
     if (!welcome) return;
 
@@ -511,7 +538,7 @@ export class MlsCommunityEngine {
 
   private async savePending(
     groupId: string,
-    pending: PendingCommit,
+    pending: MlsPendingCommit,
   ): Promise<void> {
     await this.store.saveGroup(
       MlsCommunityEngine.pendingKey(groupId),
@@ -519,16 +546,59 @@ export class MlsCommunityEngine {
     );
   }
 
+  /**
+   * The commit this device is publishing in the group, if any. A pending
+   * that is unreadable, or whose record id is not that of the commit it
+   * carries, is forgotten.
+   */
   private async loadPending(
     groupId: string,
-  ): Promise<PendingCommit | undefined> {
+  ): Promise<MlsPendingCommit | undefined> {
     const bytes = await this.store.loadGroup(
       MlsCommunityEngine.pendingKey(groupId),
     );
 
-    return bytes?.length
-      ? (JSON.parse(decoder.decode(bytes)) as PendingCommit)
-      : undefined;
+    if (!bytes?.length) return undefined;
+    const pending = MlsCommunityEngine.readPending(groupId, bytes);
+
+    if (!pending) await this.forgetPending(groupId);
+
+    return pending;
+  }
+
+  private static readPending(
+    groupId: string,
+    bytes: Uint8Array,
+  ): MlsPendingCommit | undefined {
+    try {
+      const pending = JSON.parse(decoder.decode(bytes)) as MlsPendingCommit;
+      const { commitId, epoch, payload } = pending;
+
+      return typeof payload === 'string' &&
+        Number.isSafeInteger(epoch) &&
+        commitId ===
+          CommitmentId.mlsRecord({ epoch, groupId, kind: 'commit', payload })
+        ? pending
+        : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async forgetPending(groupId: string): Promise<void> {
+    await this.store.saveGroup(
+      MlsCommunityEngine.pendingKey(groupId),
+      new Uint8Array(),
+    );
+  }
+
+  /**
+   * Forgets, once this device left the group, the commit it was publishing
+   * there, with the welcome in it, and the commits its group took.
+   */
+  private async forgetOutbox(groupId: string): Promise<void> {
+    if (await this.loadPending(groupId)) await this.forgetPending(groupId);
+    await this.takenCommits.forget(groupId);
   }
 
   /**
@@ -539,20 +609,19 @@ export class MlsCommunityEngine {
    */
   private async settle(
     group: MlsGroup,
-    pending: PendingCommit | undefined,
-    taken: string | undefined,
+    pending: MlsPendingCommit | undefined,
+    taken: MlsTakenCommits,
   ): Promise<void> {
     if (!pending) return;
     const epoch = BigInt(pending.epoch);
 
-    if (!group.isRemoved && group.epoch === epoch) return;
+    if (group.epoch === epoch) return;
 
-    // Nothing taken in this sync: the group was already past the epoch,
-    // which only this device's own confirmed commit leaves behind.
+    // No commit known for the epoch: the group was past it before its
+    // record was kept, which only this device's own confirmed commit does.
     if (
-      !group.isRemoved &&
       group.epoch > epoch &&
-      (taken ?? pending.commitId) === pending.commitId
+      (taken.commitIn(pending.epoch) ?? pending.commitId) === pending.commitId
     ) {
       await this.sendWelcome(
         this.transportFor(this.communityOf(group.groupId)),
@@ -560,10 +629,7 @@ export class MlsCommunityEngine {
         pending,
       );
     }
-    await this.store.saveGroup(
-      MlsCommunityEngine.pendingKey(group.groupId),
-      new Uint8Array(),
-    );
+    await this.forgetPending(group.groupId);
   }
 
   /**
@@ -574,17 +640,24 @@ export class MlsCommunityEngine {
    * the roster does not allow, or that does not open, is skipped: the group
    * stays at its epoch for the next commit, and
    * one member cannot stall everyone else. This device's own pending commit
-   * is adopted rather than applied. Commits from before the epoch preceding
+   * is adopted rather than applied, and a commit the group took, even
+   * before a restart, is not applied again (`taken`). A pending commit
+   * whose record id the node serves with other bytes is never adopted.
+   * Commits from before the epoch preceding
    * the group's are dropped even when the node lists them, so a rival or a
    * step back (`MlsGroup.waiting`) undoes at most the last commit taken.
-   * Returns the group and the id of the commit it took in the pending's
-   * epoch.
+   * Returns the group, the pending commit still worth keeping and the
+   * commits the group took.
    */
   private async applyCommits(
     group: MlsGroup,
     communityId: string,
-    pending: PendingCommit | undefined,
-  ): Promise<{ group: MlsGroup; taken?: string }> {
+    outbox: { pending?: MlsPendingCommit; taken: MlsTakenCommits },
+  ): Promise<{
+    group: MlsGroup;
+    pending?: MlsPendingCommit;
+    taken: MlsTakenCommits;
+  }> {
     const after = Number(group.epoch) - 2;
     const records = await this.transportFor(communityId).list({
       ...(after >= 0 && { afterEpoch: after }),
@@ -597,21 +670,34 @@ export class MlsCommunityEngine {
         (record) => record.epoch !== undefined && record.epoch > after,
       ),
     );
+    const pending =
+      outbox.pending &&
+      !records.some((record) => this.forges(record, outbox.pending))
+        ? outbox.pending
+        : undefined;
     let current = group;
-    let taken: string | undefined;
+    let { taken } = outbox;
 
     for (const record of ordered) {
       if (current.isRemoved) break;
-      const step = await this.take(current, record, pending);
-
-      current = step.group;
-
-      if (step.took && record.epoch === pending?.epoch) {
-        taken = record.recordId;
-      }
+      ({ group: current, taken } = await this.take(current, record, {
+        pending,
+        taken,
+      }));
     }
 
-    return { group: current, taken };
+    return { group: current, pending, taken };
+  }
+
+  /** Whether the record claims the pending commit's id with other bytes. */
+  private forges(
+    record: MlsRecordResource,
+    pending: MlsPendingCommit | undefined,
+  ): boolean {
+    return (
+      record.recordId === pending?.commitId &&
+      (record.payload !== pending.payload || record.epoch !== pending.epoch)
+    );
   }
 
   /**
@@ -659,21 +745,22 @@ export class MlsCommunityEngine {
   }
 
   /**
-   * Adopts the group this device's own pending commit leads to, unless the
-   * group waits for withheld roster operations, or applies the commit.
-   * `took` tells whether the group took it.
+   * Adopts the group this device's own pending commit leads to, when the
+   * record carries that very commit, unless the group waits for withheld
+   * roster operations; skips a commit the group already took; applies any
+   * other. Returns the group and the commits it took.
    */
   private async take(
     group: MlsGroup,
     record: MlsRecordResource,
-    pending: PendingCommit | undefined,
-  ): Promise<{ group: MlsGroup; took: boolean }> {
-    if (
-      !group.waiting &&
-      record.recordId === pending?.commitId &&
-      record.epoch === pending.epoch &&
-      group.epoch === BigInt(pending.epoch)
-    ) {
+    outbox: { pending?: MlsPendingCommit; taken: MlsTakenCommits },
+  ): Promise<{ group: MlsGroup; taken: MlsTakenCommits }> {
+    const { pending, taken } = outbox;
+    const epoch = record.epoch as number;
+
+    if (taken.commitIn(epoch) === record.recordId) return { group, taken };
+
+    if (this.adopts(group, record, pending)) {
       return {
         group: MlsGroup.restore(
           group.groupId,
@@ -682,32 +769,64 @@ export class MlsCommunityEngine {
           fromBase64(pending.state),
           pending.frontier,
         ),
-        took: true,
+        taken: taken.took(epoch, record.recordId),
       };
     }
+    const kind = await this.apply(group, record);
 
+    return {
+      group,
+      taken:
+        kind === 'applied' || kind === 'replaced'
+          ? taken.took(epoch, record.recordId)
+          : taken,
+    };
+  }
+
+  /**
+   * Whether the record carries this device's pending commit, byte for
+   * byte, in the epoch the group is in, and the group is not waiting for
+   * withheld roster operations.
+   */
+  private adopts(
+    group: MlsGroup,
+    record: MlsRecordResource,
+    pending: MlsPendingCommit | undefined,
+  ): pending is MlsPendingCommit {
+    return (
+      !group.waiting &&
+      record.recordId === pending?.commitId &&
+      record.payload === pending.payload &&
+      record.epoch === pending.epoch &&
+      group.epoch === BigInt(pending.epoch)
+    );
+  }
+
+  /**
+   * Applies a commit to the group. Returns its outcome, or undefined when
+   * the roster does not allow it or it is not a commit of this group.
+   */
+  private async apply(
+    group: MlsGroup,
+    record: MlsRecordResource,
+  ): Promise<MlsCommitOutcome['kind'] | undefined> {
+    const epoch = BigInt(record.epoch as number);
     let kind: MlsCommitOutcome['kind'];
 
     try {
       ({ kind } = await group.applyCommit({
         bytes: fromBase64(record.payload),
-        epoch: BigInt(record.epoch as number),
+        epoch,
         id: record.recordId,
       }));
     } catch {
-      // Not allowed by the roster, or not a commit of this group.
-      return { group, took: false };
+      return undefined;
     }
 
     // A rival that won an epoch may have undone this device's update.
-    if (kind === 'replaced') {
-      await this.cadences.replaced(
-        group.groupId,
-        BigInt(record.epoch as number),
-      );
-    }
+    if (kind === 'replaced') await this.cadences.replaced(group.groupId, epoch);
 
-    return { group, took: kind === 'applied' || kind === 'replaced' };
+    return kind;
   }
 
   /**
@@ -741,7 +860,7 @@ export class MlsCommunityEngine {
 
         if (!group || (previous && group.epoch <= previous.epoch)) continue;
         await this.store.deleteKeyPackage(id);
-        await this.remember(group);
+        await this.remember(group, MlsTakenCommits.none(group.epoch));
         await this.cadences.restart(groupId, group.epoch);
 
         return group;
@@ -802,7 +921,7 @@ export class MlsCommunityEngine {
     const { group: synced } = await this.applyCommits(
       group,
       this.communityOf(group.groupId),
-      undefined,
+      { taken: MlsTakenCommits.none(group.epoch) },
     );
     const latest = history.latest();
 
@@ -915,13 +1034,27 @@ export class MlsCommunityEngine {
     return group;
   }
 
-  private async remember(group: MlsGroup): Promise<void> {
+  /**
+   * Saves the group, and, when given, the commits it took, after it: a
+   * record kept for another epoch than the stored group's knows no commit.
+   */
+  private async remember(
+    group: MlsGroup,
+    taken?: MlsTakenCommits,
+  ): Promise<void> {
     this.groups.set(group.groupId, group);
     await this.store.saveGroup(group.groupId, group.serialize());
     await this.store.saveGroup(
       MlsCommunityEngine.frontierKey(group.groupId),
       encoder.encode(JSON.stringify(group.frontier)),
     );
+
+    if (taken) {
+      await this.takenCommits.save(
+        group.groupId,
+        taken.epoch === group.epoch ? taken : MlsTakenCommits.none(group.epoch),
+      );
+    }
   }
 
   private communityOf(groupId: string): string {
