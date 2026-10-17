@@ -29,8 +29,8 @@ describe(NodeBootstrapApi.name, () => {
     });
 
     expect(request).toHaveBeenCalledTimes(2);
-    expect(request).toHaveBeenNthCalledWith(1, '/node/');
-    expect(request).toHaveBeenNthCalledWith(2, '/node/');
+    expect(request).toHaveBeenNthCalledWith(1, '/node');
+    expect(request).toHaveBeenNthCalledWith(2, '/node');
   });
 
   it('loads peers fresh because peer visibility changes over time', async () => {
@@ -68,8 +68,8 @@ describe(NodeBootstrapApi.name, () => {
     await expect(api.getPeers()).resolves.toEqual([peer]);
 
     expect(request).toHaveBeenCalledTimes(2);
-    expect(request).toHaveBeenNthCalledWith(1, '/peers/');
-    expect(request).toHaveBeenNthCalledWith(2, '/peers/');
+    expect(request).toHaveBeenNthCalledWith(1, '/peers');
+    expect(request).toHaveBeenNthCalledWith(2, '/peers');
   });
 
   it('exposes live IPFS peers and network synchronization from the peers snapshot', async () => {

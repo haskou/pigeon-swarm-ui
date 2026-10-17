@@ -48,8 +48,8 @@ describe(PigeonNodeApi.name, () => {
     });
 
     expect(request).toHaveBeenCalledTimes(2);
-    expect(request).toHaveBeenNthCalledWith(1, '/node/');
-    expect(request).toHaveBeenNthCalledWith(2, '/node/');
+    expect(request).toHaveBeenNthCalledWith(1, '/node');
+    expect(request).toHaveBeenNthCalledWith(2, '/node');
   });
 
   it('loads peers fresh because peer visibility changes over time', async () => {
@@ -88,8 +88,8 @@ describe(PigeonNodeApi.name, () => {
     await expect(api.getPeers()).resolves.toEqual([peer]);
 
     expect(request).toHaveBeenCalledTimes(2);
-    expect(request).toHaveBeenNthCalledWith(1, '/peers/');
-    expect(request).toHaveBeenNthCalledWith(2, '/peers/');
+    expect(request).toHaveBeenNthCalledWith(1, '/peers');
+    expect(request).toHaveBeenNthCalledWith(2, '/peers');
   });
 
   it('loads relay configuration with an owner-signed request', async () => {
@@ -111,10 +111,10 @@ describe(PigeonNodeApi.name, () => {
     expect(signer.headers).toHaveBeenCalledWith(
       session,
       'GET',
-      '/node/relay-configuration/',
+      '/node/relay-configuration',
       {},
     );
-    expect(request).toHaveBeenCalledWith('/node/relay-configuration/', {
+    expect(request).toHaveBeenCalledWith('/node/relay-configuration', {
       headers: { 'X-Signature': 'signature' },
       method: 'GET',
     });
@@ -178,10 +178,10 @@ describe(PigeonNodeApi.name, () => {
     expect(signer.headers).toHaveBeenCalledWith(
       session,
       'PUT',
-      '/node/relay-configuration/',
+      '/node/relay-configuration',
       expectedBody,
     );
-    expect(request).toHaveBeenCalledWith('/node/relay-configuration/', {
+    expect(request).toHaveBeenCalledWith('/node/relay-configuration', {
       body: JSON.stringify(expectedBody),
       headers: { 'X-Signature': 'signature' },
       method: 'PUT',
@@ -225,10 +225,10 @@ describe(PigeonNodeApi.name, () => {
     expect(signer.headers).toHaveBeenCalledWith(
       session,
       'PUT',
-      '/node/relay-configuration/',
+      '/node/relay-configuration',
       expectedBody,
     );
-    expect(request).toHaveBeenCalledWith('/node/relay-configuration/', {
+    expect(request).toHaveBeenCalledWith('/node/relay-configuration', {
       body: JSON.stringify(expectedBody),
       headers: { 'X-Signature': 'signature' },
       method: 'PUT',

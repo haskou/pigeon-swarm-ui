@@ -112,7 +112,7 @@ describe(PigeonIdentityCommandsApi.name, () => {
     expectIdentitySigned(http, created.keyPair);
 
     expect(http.request).toHaveBeenCalledWith(
-      '/identities/',
+      '/identities',
       expect.objectContaining({
         body: expect.not.stringContaining('encryptedMasterKey'),
         method: 'POST',
@@ -121,7 +121,7 @@ describe(PigeonIdentityCommandsApi.name, () => {
     expect(signer.headers).toHaveBeenCalledWith(
       expect.objectContaining({ keyPair: expect.any(KeyPair) }),
       'POST',
-      '/identities/',
+      '/identities',
       expect.any(Object),
     );
   });

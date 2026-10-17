@@ -72,7 +72,7 @@ describe(RealtimeTicketIssuer.name, () => {
     await issuer().issue(session());
 
     expect(global.fetch).toHaveBeenCalledWith(
-      'http://localhost:8080/api/realtime/v1/tickets',
+      'http://localhost:8080/api/realtime/tickets',
       expect.objectContaining({
         body: '{}',
         headers: expect.objectContaining({
@@ -92,7 +92,7 @@ describe(RealtimeTicketIssuer.name, () => {
         {
           body: {},
           method: 'POST',
-          path: '/api/realtime/v1/tickets',
+          path: '/api/realtime/tickets',
           timestamp: 123,
         },
         new Signature(init.headers['X-Signature']),

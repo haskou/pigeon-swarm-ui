@@ -50,7 +50,7 @@ export class PigeonConversationCommandsApi {
     peerIdentity: IdentityResource,
     keyEntry: ConversationKeyEntry,
   ): Promise<void> {
-    const path = '/notifications/';
+    const path = '/notifications';
     const recipientKeyEntry = {
       ...keyEntry,
       peerIdentityId: session.identity.id,
@@ -156,7 +156,7 @@ export class PigeonConversationCommandsApi {
       ),
       method: 'POST',
     });
-    this.requestCache.invalidateForSession('/conversations/?limit=30', session);
+    this.requestCache.invalidateForSession('/conversations?limit=30', session);
 
     return this.conversations.resource(created);
   }

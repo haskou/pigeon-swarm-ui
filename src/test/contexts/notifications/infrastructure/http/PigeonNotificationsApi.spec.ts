@@ -46,7 +46,7 @@ describe(PigeonNotificationsApi.name, () => {
     expect(await newRead).toEqual([invitation]);
     resolveOld({ results: [] });
     expect(await oldRead).toEqual([]);
-    expect(http.request).toHaveBeenLastCalledWith('/notifications/?limit=30', {
+    expect(http.request).toHaveBeenLastCalledWith('/notifications?limit=30', {
       headers: { signature: 'signed' },
       method: 'GET',
     });
@@ -63,8 +63,7 @@ describe(PigeonNotificationsApi.name, () => {
       publicMutationSignerAt(),
     );
     const invitation = { id: 'invitation' } as NotificationResource;
-    const path =
-      '/notifications/?limit=100&beforeNotificationId=invitation%3Aa';
+    const path = '/notifications?limit=100&beforeNotificationId=invitation%3Aa';
 
     http.request.mockResolvedValue({ results: [invitation] });
     signer.headers.mockResolvedValue({ signature: 'signed' });

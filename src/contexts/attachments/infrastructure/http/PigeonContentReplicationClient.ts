@@ -31,7 +31,7 @@ export class PigeonContentReplicationClient {
     payload: Record<string, unknown>,
     fields: Record<string, unknown>,
   ): Promise<void> {
-    const path = `/ipfs/replication/${encodeURIComponent(cid)}`;
+    const path = `/ipfs/replications/${encodeURIComponent(cid)}`;
 
     await submitPublicMutation(
       PublicMutationSigner.FIRST_POSITION,

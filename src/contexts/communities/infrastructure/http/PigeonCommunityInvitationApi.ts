@@ -21,7 +21,7 @@ import { CommunityModerationLogSigner } from './CommunityModerationLogSigner';
 import { CommunityOperationSigner } from './CommunityOperationSigner';
 
 export class PigeonCommunityInvitationApi {
-  private readonly notificationPath = '/notifications/';
+  private readonly notificationPath = '/notifications';
 
   private readonly moderationLogs: CommunityModerationLogSigner;
 

@@ -485,7 +485,7 @@ export class PigeonApiGateway {
       notificationsApi,
       (session) =>
         this.requestCache.invalidateForSession(
-          '/notification-settings/',
+          '/notification-settings',
           session,
         ),
     );

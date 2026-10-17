@@ -338,7 +338,7 @@ test('a welcome read after the device that sent it was revoked is refused', asyn
   // its key package response is a POST, and after it every read comes back
   // empty while holding, so the laptop's welcome waits on the node.
   await phone.route(
-    (url) => url.pathname.endsWith('/notifications/'),
+    (url) => url.pathname.endsWith('/notifications'),
     async (route) => {
       const method = route.request().method();
 

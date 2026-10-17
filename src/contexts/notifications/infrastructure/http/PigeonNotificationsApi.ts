@@ -89,7 +89,7 @@ export class PigeonNotificationsApi {
       beforeNotificationId === undefined
         ? ''
         : `&beforeNotificationId=${encodeURIComponent(beforeNotificationId)}`;
-    const path = `/notifications/?limit=${limit}${before}`;
+    const path = `/notifications?limit=${limit}${before}`;
     const result = await this.http.request<{ results: NotificationResource[] }>(
       path,
       {
@@ -104,7 +104,7 @@ export class PigeonNotificationsApi {
   public async listSettings(
     session: Session,
   ): Promise<NotificationScopeSetting[]> {
-    const path = '/notification-settings/';
+    const path = '/notification-settings';
     const result = await this.cachedRequest(
       `GET ${path} ${session.identity.id}`,
       async () =>

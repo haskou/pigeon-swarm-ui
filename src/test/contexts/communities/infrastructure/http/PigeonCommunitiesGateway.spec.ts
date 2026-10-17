@@ -96,7 +96,7 @@ describe(PigeonCommunitiesGateway.name, () => {
     );
 
     expect(requestCache.invalidateForSession).toHaveBeenCalledWith(
-      '/communities/membership-requests',
+      '/community-membership-requests',
       session(),
     );
   });

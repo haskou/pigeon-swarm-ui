@@ -13,7 +13,7 @@ import type { ConversationDraftProjection } from './resources/ConversationDraftP
 import { sessionRootKey } from '../../../identities/infrastructure/session/sessionRootKey';
 
 const readCacheTtlMs = 1500;
-const draftsPath = '/conversations/me/drafts';
+const draftsPath = '/conversation-drafts';
 
 /**
  * The encrypted conversation drafts the node keeps for this identity, under

@@ -73,7 +73,7 @@ describe(PigeonStickersFacade.name, () => {
       savedPacks: [],
     });
     expect(facade.assetUrl('asset/a')).toBe(
-      'https://example.test/api/ipfs/asset%2Fa',
+      'https://example.test/api/ipfs/contents/asset%2Fa',
     );
   });
 

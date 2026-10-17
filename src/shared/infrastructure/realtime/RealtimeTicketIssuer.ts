@@ -4,7 +4,7 @@ import { HttpJsonClient } from '../http/HttpJsonClient';
 import { RequestSigner } from '../http/RequestSigner';
 import { RealtimeConnectionUrl } from './RealtimeConnectionUrl';
 
-const ticketsPath = '/realtime/v1/tickets';
+const ticketsPath = '/realtime/tickets';
 const base64UrlPattern = /^[A-Za-z0-9_-]+$/;
 
 export class RealtimeTicketIssuer {

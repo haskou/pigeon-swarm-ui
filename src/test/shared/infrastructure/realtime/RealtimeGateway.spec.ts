@@ -118,7 +118,7 @@ describe(RealtimeGateway.name, () => {
 
     expect(url.protocol).toBe('ws:');
     expect(url.origin).toBe('ws://localhost:8080');
-    expect(url.pathname).toBe('/api/realtime/v1');
+    expect(url.pathname).toBe('/api/realtime');
     expect(url.search).toBe('');
     expect(socket?.protocols).toEqual([
       'pigeon-realtime.v1',
@@ -144,7 +144,7 @@ describe(RealtimeGateway.name, () => {
 
     const url = new URL(WebSocketMock.instances[0]?.url ?? '');
 
-    expect(url.pathname).toBe('/api/realtime/v1');
+    expect(url.pathname).toBe('/api/realtime');
     expect(['ws:', 'wss:']).toContain(url.protocol);
   });
 
@@ -165,7 +165,7 @@ describe(RealtimeGateway.name, () => {
       '[pigeon realtime] websocket',
       'error',
       expect.objectContaining({
-        url: 'wss://example.com/api/realtime/v1',
+        url: 'wss://example.com/api/realtime',
       }),
     );
     expect(JSON.stringify(consoleError.mock.calls)).not.toContain('ticket-1');
@@ -183,7 +183,7 @@ describe(RealtimeGateway.name, () => {
 
     expect(global.fetch).toHaveBeenCalledTimes(2);
     expect(global.fetch).toHaveBeenLastCalledWith(
-      'http://localhost:8080/api/realtime/v1/tickets',
+      'http://localhost:8080/api/realtime/tickets',
       expect.objectContaining({ method: 'POST' }),
     );
     expect(WebSocketMock.instances.map((socket) => socket.protocols)).toEqual([
@@ -191,8 +191,8 @@ describe(RealtimeGateway.name, () => {
       ['pigeon-realtime.v1', 'ticket.ticket-2'],
     ]);
     expect(WebSocketMock.instances.map((socket) => socket.url)).toEqual([
-      'ws://localhost:8080/api/realtime/v1',
-      'ws://localhost:8080/api/realtime/v1',
+      'ws://localhost:8080/api/realtime',
+      'ws://localhost:8080/api/realtime',
     ]);
   });
 

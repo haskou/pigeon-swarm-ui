@@ -79,7 +79,7 @@ export class PigeonNodeApi {
   }
 
   public async getInfo(): Promise<NodeInfo & { owner: string | null }> {
-    const info = await this.http.request<NodeInfo>('/node/');
+    const info = await this.http.request<NodeInfo>('/node');
 
     return { ...info, owner: info.owner ?? null };
   }
@@ -96,7 +96,7 @@ export class PigeonNodeApi {
   }
 
   public async getNetworks(session?: Session): Promise<NetworkResource[]> {
-    const path = '/node/networks/';
+    const path = '/node/networks';
     const result = await this.cachedRequest(
       `GET ${path} ${session?.identity.id ?? 'anonymous'}`,
       async () =>
@@ -119,7 +119,7 @@ export class PigeonNodeApi {
 
   public async getPeerSnapshot(): Promise<NodePeersSnapshot> {
     const result =
-      await this.http.request<Partial<NodePeersSnapshot>>('/peers/');
+      await this.http.request<Partial<NodePeersSnapshot>>('/peers');
 
     return {
       ipfsPeers: result.ipfsPeers ?? [],
@@ -132,7 +132,7 @@ export class PigeonNodeApi {
     network: NetworkResource,
     session?: Session,
   ): Promise<void> {
-    const path = '/node/networks/';
+    const path = '/node/networks';
     const body = network;
 
     await this.http.request(path, {
@@ -146,7 +146,7 @@ export class PigeonNodeApi {
   }
 
   public async createPublicNetwork(session?: Session): Promise<void> {
-    const path = '/node/networks/public/';
+    const path = '/node/networks/public';
 
     await this.http.request(path, {
       headers: session
@@ -161,7 +161,7 @@ export class PigeonNodeApi {
     networkId: string,
     session?: Session,
   ): Promise<NetworkResource[]> {
-    const path = `/node/networks/${encodeURIComponent(networkId)}/`;
+    const path = `/node/networks/${encodeURIComponent(networkId)}`;
     const body = {};
     const result = await this.http.request<{ networks: NetworkResource[] }>(
       path,
@@ -181,7 +181,7 @@ export class PigeonNodeApi {
   public async getIpfsReplicationStatus(
     session: Session,
   ): Promise<IpfsReplicationStatusResource> {
-    const path = '/ipfs/replication/status';
+    const path = '/ipfs/replication-status';
     const body = {};
 
     return await this.http.request<IpfsReplicationStatusResource>(path, {
@@ -193,7 +193,7 @@ export class PigeonNodeApi {
   public async getRelayConfiguration(
     session?: Session,
   ): Promise<NodeRelayConfigurationResource> {
-    const path = '/node/relay-configuration/';
+    const path = '/node/relay-configuration';
     const body = {};
 
     return await this.http.request<NodeRelayConfigurationResource>(path, {
@@ -208,7 +208,7 @@ export class PigeonNodeApi {
     configuration: NodeRelayConfigurationResource,
     session?: Session,
   ): Promise<NodeRelayConfigurationResource> {
-    const path = '/node/relay-configuration/';
+    const path = '/node/relay-configuration';
     const body = this.relayConfigurationPayload(configuration);
 
     return await this.http.request<NodeRelayConfigurationResource>(path, {

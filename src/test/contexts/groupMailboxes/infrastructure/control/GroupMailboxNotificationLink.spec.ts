@@ -68,7 +68,7 @@ describe('GroupMailboxNotificationLink', () => {
       recipientIdentityId: bob.id,
       type: 'group_conversation_invitation',
     });
-    expect(path).toBe('/notifications/');
+    expect(path).toBe('/notifications');
     expect(init?.method).toBe('POST');
     expect(body).toEqual({
       encryptedConversationKey: expect.any(String),
