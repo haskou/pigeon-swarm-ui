@@ -7,8 +7,9 @@ import type { MlsUpdateCadencePrimitives } from './MlsUpdateCadencePrimitives';
  * (an update or a removal; an add carries none) replaces its leaf keys.
  * The commit is due once `INTERVAL_MS` plus this cadence's jitter passed
  * since the device last took fresh leaf keys, or once `MAX_SENT`
- * application messages were sent since. The jitter, below `JITTER_MS`,
- * keeps devices from all committing together.
+ * application messages were sent since, or once the stamp lies after the
+ * current time. The jitter, below `JITTER_MS`, keeps devices from all
+ * committing together.
  */
 export class MlsUpdateCadence {
   public static readonly INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -80,8 +81,15 @@ export class MlsUpdateCadence {
     );
   }
 
+  /**
+   * Whether a leaf update is due: the interval and its jitter passed, it sent
+   * the most messages a device may send, or it was stamped after `now`. A
+   * stamp in the future, from a skewed clock or a written store, suppresses
+   * no update.
+   */
   public isDueAt(now: number): boolean {
     return (
+      now < this.lastPathCommitAt ||
       now - this.lastPathCommitAt >
         MlsUpdateCadence.INTERVAL_MS + this.jitterMs ||
       this.sentSinceUpdate >= MlsUpdateCadence.MAX_SENT

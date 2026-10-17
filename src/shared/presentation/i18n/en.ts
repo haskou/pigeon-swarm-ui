@@ -846,6 +846,8 @@ export const en = {
         'Only conversation participants can send messages here.',
       GroupMailboxTooLargeError:
         'A group holds at most 48 members, and one welcome must reach every device in it. Remove a member or device before adding another.',
+      GroupMailboxUpdateFailedError:
+        'This device could not renew its keys for the group, so the message was not sent. Send it again with Retry.',
       IdentityMustHaveAtLeastOneNetworkError:
         'The identity must belong to at least one network.',
       IdentityNotFoundError: 'That identity could not be found.',

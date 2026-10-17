@@ -30,9 +30,9 @@ import { PollBoard } from '../../polls/domain/PollBoard';
  * typing notice is ephemeral: never queued nor kept, and sent at most once
  * per `TYPING_INTERVAL_MS` per member and conversation, counting attempts
  * that were dropped. An identity update is ephemeral too, sent on every
- * update. Before a record is queued, this device commits its leaf update
- * when its cadence is due, so the record goes out under fresh leaf keys;
- * a failure to queue that update fails the write.
+ * update. Before a record is queued, `renewLeaf` commits this device's leaf
+ * update when its cadence is due, so the record goes out under fresh leaf
+ * keys; when it rejects, the write fails and queues nothing.
  */
 export class GroupConversationSender {
   private static readonly TYPING_INTERVAL_MS = 10_000;
@@ -49,6 +49,10 @@ export class GroupConversationSender {
       'composer' | 'now' | 'projector'
     >,
     private readonly history: Pick<GroupMessageHistoryStore, 'append'>,
+    private readonly renewLeaf: (
+      member: GroupConversationMember,
+      conversationId: string,
+    ) => Promise<void>,
   ) {}
 
   private identity(member: GroupConversationMember) {
@@ -62,7 +66,7 @@ export class GroupConversationSender {
     member: GroupConversationMember,
     record: DirectMessageRecord,
   ): Promise<void> {
-    await member.control.updateWhenDue(record.conversationId);
+    await this.renewLeaf(member, record.conversationId);
     await member.outbox.enqueueMessage(
       record.conversationId,
       record.id,
