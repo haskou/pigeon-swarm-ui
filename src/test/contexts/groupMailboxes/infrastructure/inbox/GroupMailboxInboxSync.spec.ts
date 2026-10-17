@@ -16,6 +16,7 @@ import type { DirectMessageRecord } from '../../../../../contexts/mailboxes/doma
 import type { PigeonMailboxClient } from '../../../../../contexts/mailboxes/infrastructure/http/PigeonMailboxClient';
 import type { DirectMessageReaderSet } from '../../../../../contexts/messages/infrastructure/mailbox/DirectMessageReaderSet';
 
+import { MlsUpdateCadence } from '../../../../../contexts/communities/domain/MlsUpdateCadence';
 import { IndexedDbMlsStateStore } from '../../../../../contexts/communities/infrastructure/mls/IndexedDbMlsStateStore';
 import { ConversationIdFactory } from '../../../../../contexts/conversations/domain/ConversationIdFactory';
 import { ConversationGroupNonce } from '../../../../../contexts/conversations/domain/value-objects/ConversationGroupNonce';
@@ -205,6 +206,7 @@ const member = (name: string): Member => {
     () => Promise.resolve([cast[name].deviceCredential()]),
     () => [],
     () => now,
+    () => 0,
   );
   const rows = new Map<string, GroupMailboxOutboxRow>();
   const outbox = new GroupMailboxOutbox(
@@ -551,6 +553,40 @@ describe('GroupMailboxInboxSync on the real MLS library', () => {
           .mailboxId,
       ),
     ).toBe(false);
+  });
+
+  it('loses no message of the epoch a self-update starts, nor of the one it ends', async () => {
+    const before = await bob.engine.generation(CONVERSATION);
+
+    now += MlsUpdateCadence.INTERVAL_MS + MlsUpdateCadence.JITTER_MS + 1;
+    await send(carol, sent('carol', mid('carol', 'before-update')));
+    const update = await bob.control.updateWhenDue(CONVERSATION);
+
+    await send(alice, sent('alice', mid('alice', 'in-flight')));
+    await send(bob, sent('bob', mid('bob', 'after-update')));
+
+    expect(update!.generation.index).toBe(before.index + 1);
+    for (const reader of [alice, bob, carol]) await sync(reader);
+    await send(alice, sent('alice', mid('alice', 'caught-up')));
+    await send(carol, sent('carol', mid('carol', 'carol-caught-up')));
+    for (const reader of [alice, bob, carol]) await sync(reader);
+
+    for (const reader of [alice, bob, carol]) {
+      expect(ids(reader.received).sort()).toEqual(
+        [
+          'sent:after-update',
+          'sent:before-update',
+          'sent:carol-caught-up',
+          'sent:caught-up',
+          'sent:in-flight',
+        ].sort(),
+      );
+      expect(
+        (await reader.engine.generation(CONVERSATION)).secret.isEqual(
+          update!.generation.secret,
+        ),
+      ).toBe(true);
+    }
   });
 
   it('rejects a message whose author is not its MLS sender', async () => {

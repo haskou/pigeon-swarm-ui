@@ -18,6 +18,7 @@ import type { MlsStateStore } from '../../../../../contexts/communities/infrastr
 import type { GroupMailboxGenerationRepository } from '../../../../../contexts/groupMailboxes/domain/repositories/GroupMailboxGenerationRepository';
 import type { GroupMailboxCommit } from '../../../../../contexts/groupMailboxes/infrastructure/mls/GroupMailboxCommit';
 
+import { MlsUpdateCadence } from '../../../../../contexts/communities/domain/MlsUpdateCadence';
 import { MlsRejectedError } from '../../../../../contexts/communities/infrastructure/mls/MlsRejectedError';
 import { ConversationIdFactory } from '../../../../../contexts/conversations/domain/ConversationIdFactory';
 import { ConversationGroupNonce } from '../../../../../contexts/conversations/domain/value-objects/ConversationGroupNonce';
@@ -101,6 +102,7 @@ const engine = (
       ),
     () => options.contacts?.() ?? [],
     () => clock,
+    () => 0,
   );
 };
 
@@ -1651,6 +1653,152 @@ describe('GroupMailboxMlsEngine on the real MLS library', () => {
     expect(await restored.members(CONVERSATION)).toEqual(
       [id('alice'), id('bob')].sort(),
     );
+  });
+
+  describe('commits an update of its own leaf on a cadence', () => {
+    const DUE = MlsUpdateCadence.INTERVAL_MS + MlsUpdateCadence.JITTER_MS + 1;
+    const anything: MlsMembershipPolicy = {
+      admits: () => true,
+      allows: () => true,
+      frontier: () => [],
+      priority: () => 0,
+      reach: () => 0,
+      withheld: () => false,
+    };
+
+    /** Alice and bob, bob on a store the test reads as a thief would. */
+    const withBob = async () => {
+      const stores = sealedGroupStores(`group-mls-${++database}`, id('bob'));
+      const alice = engine('alice');
+      const bob = engine('bob', {
+        generations: stores.generations,
+        store: stores.state,
+      });
+
+      await alice.createGroup(CONVERSATION, roster);
+      await join(alice, [bob]);
+
+      return { alice, bob, store: stores.state };
+    };
+
+    /** Bob's group as it is stored now, copied by whoever leaked it. */
+    const leakedFrom = async (store: MlsStateStore): Promise<MlsGroup> =>
+      MlsGroup.restore(
+        CONVERSATION,
+        cast.bob.owner(),
+        anything,
+        (await store.loadGroup(CONVERSATION))!,
+        [],
+      );
+
+    /** The leaked copy follows bob's update and reads alice's next message. */
+    const expectLockedOut = async (
+      leaked: MlsGroup,
+      alice: GroupMailboxMlsEngine,
+      update: GroupMailboxCommit,
+    ): Promise<void> => {
+      await leaked
+        .applyCommit({
+          bytes: update.commit,
+          epoch: MlsGroup.epochOf(update.commit),
+          id: commitIdOf(update.commit),
+        })
+        .catch(() => undefined);
+      const after = await alice.encrypt(CONVERSATION, text.encode('after'));
+
+      await expect(leaked.decrypt(after)).rejects.toThrow();
+    };
+
+    it('commits one update once a day has passed, which the others apply and a leaked copy cannot follow', async () => {
+      const { alice, bob, store } = await withBob();
+      const leaked = await leakedFrom(store);
+      const before = await bob.generation(CONVERSATION);
+
+      expect(await bob.updateWhenDue(CONVERSATION, sent)).toBeUndefined();
+      clock += DUE;
+      const update = await bob.updateWhenDue(CONVERSATION, sent);
+
+      expect(update!.deliveryGeneration.index).toBe(before.index);
+      expect(update!.generation.index).toBe(before.index + 1);
+      expect(update!.recipients).toEqual([id('alice'), id('bob')].sort());
+      expect(await bob.updateWhenDue(CONVERSATION, sent)).toBeUndefined();
+      expect((await alice.applyCommit(CONVERSATION, update!.commit)).kind).toBe(
+        'applied',
+      );
+      expect(
+        (await alice.generation(CONVERSATION)).secret.isEqual(
+          update!.generation.secret,
+        ),
+      ).toBe(true);
+      await expectLockedOut(leaked, alice, update!);
+    });
+
+    it('commits one update once it sent a thousand messages since the last', async () => {
+      const { alice, bob, store } = await withBob();
+      const leaked = await leakedFrom(store);
+
+      for (let count = 1; count < MlsUpdateCadence.MAX_SENT; count += 1) {
+        await bob.encrypt(CONVERSATION, text.encode('chatter'));
+      }
+
+      expect(await bob.updateWhenDue(CONVERSATION, sent)).toBeUndefined();
+      await bob.encrypt(CONVERSATION, text.encode('the thousandth'));
+      const update = await bob.updateWhenDue(CONVERSATION, sent);
+
+      expect(update).toBeDefined();
+      await alice.applyCommit(CONVERSATION, update!.commit);
+      await expectLockedOut(leaked, alice, update!);
+    }, 120_000);
+
+    it('keeps the creator update of two rivals on both and updates again when its own lost', async () => {
+      const { alice, bob } = await withBob();
+
+      clock += DUE;
+      const fromAlice = await alice.updateWhenDue(CONVERSATION, sent);
+      const fromBob = await bob.updateWhenDue(CONVERSATION, sent);
+
+      expect(
+        (await bob.applyCommit(CONVERSATION, fromAlice!.commit)).kind,
+      ).toBe('replaced');
+      expect(
+        (await alice.applyCommit(CONVERSATION, fromBob!.commit)).kind,
+      ).toBe('ignored');
+      expect(
+        (await bob.generation(CONVERSATION)).secret.isEqual(
+          (await alice.generation(CONVERSATION)).secret,
+        ),
+      ).toBe(true);
+      expect(await alice.updateWhenDue(CONVERSATION, sent)).toBeUndefined();
+      const again = await bob.updateWhenDue(CONVERSATION, sent);
+
+      expect((await alice.applyCommit(CONVERSATION, again!.commit)).kind).toBe(
+        'applied',
+      );
+    });
+
+    it('restarts the cadence on a removal it commits, but not on an add', async () => {
+      const { alice } = await setup(['alice', 'bob']);
+      const carol = engine('carol');
+
+      clock += DUE;
+      await join(alice, [carol]);
+
+      expect(await alice.updateWhenDue(CONVERSATION, sent)).toBeDefined();
+      clock += DUE;
+      await drop(alice, 'carol');
+
+      expect(await alice.updateWhenDue(CONVERSATION, sent)).toBeUndefined();
+    });
+
+    it('commits no update once removed', async () => {
+      const { alice, bob } = await setup(['alice', 'bob']);
+      const removal = await drop(alice, 'bob');
+
+      await bob.applyCommit(CONVERSATION, removal.commit);
+      clock += DUE;
+
+      expect(await bob.updateWhenDue(CONVERSATION, sent)).toBeUndefined();
+    });
   });
 
   describe('confirming a welcomed group', () => {
