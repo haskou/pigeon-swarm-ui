@@ -1049,7 +1049,7 @@ describe('DeviceSealedRootRotation', () => {
     });
 
     it('bounds the generation of a hand-over to a day past the clock, so a forged one near MAX_SAFE_INTEGER neither stamps the session nor stalls publishes', async () => {
-      const { rotation, root, sealedSecrets } = handedOver();
+      const { root, rotation, sealedSecrets } = handedOver();
 
       sealedSecrets.fetchOwn.mockResolvedValue({
         ...entryOf(root),

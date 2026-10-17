@@ -139,9 +139,7 @@ describe(DeviceSealedRootTrustStore.name, () => {
     entries.set(key, kept.replace(/^4\./, '99.'));
 
     expect(store.trusts('identity-1', vaultRootKey, root)).toBe(false);
-    expect(store.supersedes('identity-1', vaultRootKey, other, 50)).toBe(
-      false,
-    );
+    expect(store.supersedes('identity-1', vaultRootKey, other, 50)).toBe(false);
 
     store.remember('identity-1', vaultRootKey, root, 4);
 

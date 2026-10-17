@@ -40,13 +40,15 @@ const revokedGenerationHorizonMs = 86_400_000;
  * the signed transitions authorize its publisher at the entry revision and no
  * later transition revoked it. A hand-over is the first entry at its
  * revision, so one at or below the revision of another root this device
- * trusts is refused: the retired key could sign another. An entry whose
- * publisher a later transition revoked is used only while its root is the one
- * this device last opened from a trusted entry or published itself, and only
- * to move off that root: `current` never adopts it, so a device left behind
- * by a failed rotation rotates from it. Its generation, bounded to a day past
- * the clock, still orders the next publish. Any other entry they do not, or
- * cannot, authorize fails the call and leaves every local row as it was.
+ * trusts is refused: the retired key could sign another. Its generation is
+ * bounded to a day past the clock, as the retired key could sign any. An
+ * entry whose publisher a later transition revoked is used only while its
+ * root is the one this device last opened from a trusted entry or published
+ * itself, and only to move off that root: `current` never adopts it, so a
+ * device left behind by a failed rotation rotates from it. Its generation,
+ * bounded to a day past the clock, still orders the next publish. Any other
+ * entry they do not, or cannot, authorize fails the call and leaves every
+ * local row as it was.
  */
 export class DeviceSealedRootRotation {
   private static revoked(error: unknown): boolean {
@@ -66,8 +68,9 @@ export class DeviceSealedRootRotation {
   }
 
   /**
-   * A revoked key may sign any generation, and the node keeps the highest;
-   * honoured as is, one near `MAX_SAFE_INTEGER` leaves no generation above.
+   * A revoked or retired key may sign any generation, and the node keeps the
+   * highest; honoured as is, one near `MAX_SAFE_INTEGER` leaves no generation
+   * above.
    */
   private bounded(entry: OpenedDeviceSealedSecret): OpenedDeviceSealedSecret {
     return {
@@ -137,9 +140,10 @@ export class DeviceSealedRootRotation {
    * Returns the entry once the signed transitions authorize its publisher at
    * the entry revision and no later transition revoked it, so a signature by
    * a key the node minted, or by a key revoked since, opens nothing. A
-   * hand-over at or below the revision of another trusted root is refused. A
-   * revoked publisher's entry still returns, marked revoked and with its
-   * generation bounded, while its root is the one this device trusted.
+   * hand-over at or below the revision of another trusted root is refused,
+   * and a hand-over above it returns with its generation bounded. A revoked
+   * publisher's entry still returns, marked revoked and with its generation
+   * bounded, while its root is the one this device trusted.
    * Rejects otherwise, including when the transitions are not served.
    */
   private async verified(
@@ -165,7 +169,10 @@ export class DeviceSealedRootRotation {
       new SupersededDeviceSealedRootHandOverError(),
     );
 
-    return { entry, revoked: false };
+    return {
+      entry: standing === 'retired' ? this.bounded(entry) : entry,
+      revoked: false,
+    };
   }
 
   /**
