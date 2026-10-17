@@ -13,10 +13,11 @@ const SLOW = 240_000;
 async function createInviteLink(alice: Page): Promise<string> {
   await alice.getByRole('button', { name: 'Add member' }).click();
   await alice.getByRole('button', { name: 'Create invite link' }).click();
-  await alice.getByRole('button', { name: 'Invite by link' }).click();
   const link = alice.locator('input[readonly]');
 
-  await expect(link).toHaveValue(/\/invite\/community\//, { timeout: SLOW });
+  await expect(link).toHaveValue(/\/invite\/community#c=.+&k=.+/, {
+    timeout: SLOW,
+  });
   const url = await link.inputValue();
 
   await alice.getByRole('button', { name: 'Close dialog' }).last().click();
@@ -28,24 +29,23 @@ async function signInThrough(
   page: Page,
   url: string,
   password: string,
-  communityName: string,
 ): Promise<void> {
   await page.goto(url);
   // A reload may keep the unlocked session; otherwise the login screen shows
-  // the remembered identity. Accepting the link switches to the community it
-  // opened, so the messages workspace only shows for a moment and is no sign
-  // of a finished sign-in.
+  // the remembered identity. The invitation is kept in session storage
+  // meanwhile, so it survives the sign-in.
   const remembered = page.getByTestId('auth-identity-preview');
-  const community = page.getByRole('button', { name: communityName }).first();
+  const join = page.getByRole('button', { name: 'Request to join' });
 
-  await expect(remembered.or(community).first()).toBeVisible({
-    timeout: SLOW,
-  });
+  await expect(remembered.or(join).first()).toBeVisible({ timeout: SLOW });
   if (await remembered.isVisible()) {
     await page.getByTestId('auth-password-input').fill(password);
     await page.getByTestId('auth-submit-button').click();
   }
-  await community.click({ timeout: SLOW });
+  await join.click({ timeout: SLOW });
+  await expect(page.getByText(/Waiting for a community manager/)).toBeVisible({
+    timeout: SLOW,
+  });
 }
 
 test('a member joins a private community through an invite link', async ({
@@ -72,18 +72,30 @@ test('a member joins a private community through an invite link', async ({
   });
 
   await openSidebar(alice);
-  await alice.getByRole('button', { name: /Add community/i }).first().click();
-  await alice.getByRole('button', { name: /^Create$/i }).first().click();
+  await alice
+    .getByRole('button', { name: /Add community/i })
+    .first()
+    .click();
+  await alice
+    .getByRole('button', { name: /^Create$/i })
+    .first()
+    .click();
   await alice.getByLabel('Community name').fill(communityName);
   await alice.getByRole('button', { name: /Private community/ }).click();
   await alice.getByRole('button', { name: 'Create community' }).click();
-  await alice.getByRole('button', { name: ENCRYPTED }).waitFor({ timeout: SLOW });
+  await alice
+    .getByRole('button', { name: ENCRYPTED })
+    .waitFor({ timeout: SLOW });
 
-  // The node refuses a link whose token does not commit to its limits, so a
-  // created link that opens the community proves both ends agree on it.
+  // Bob signs a claim from the link; Alice's client, as a manager, admits it
+  // and adds him to the MLS group.
   const url = await createInviteLink(alice);
 
-  await signInThrough(bob, url, password, communityName);
+  await signInThrough(bob, url, password);
+  await bob
+    .getByRole('button', { name: communityName })
+    .first()
+    .click({ timeout: SLOW });
   await bob.getByRole('button', { name: ENCRYPTED }).waitFor({ timeout: SLOW });
 
   await sendMessage(alice, 'after the link join, from Alice');
