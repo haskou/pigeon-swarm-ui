@@ -1641,6 +1641,51 @@ describe('GroupConversationMailbox', () => {
     expect(texts(bob)).toContain('message:from alice');
   });
 
+  // Which of the racing updates wins depends on the commit ids, so a few
+  // rounds cover a winner of each kind.
+  it.each(Array.from({ length: 8 }, (_, round) => round + 1))(
+    'delivers every message sent while three due members update their leaves at once, whichever update wins (round %i)',
+    async () => {
+      const names = new Map<Member, string>([
+        [alice, 'alice'],
+        [bob, 'bob'],
+        [carol, 'carol'],
+      ]);
+
+      await formGroup();
+      await carol.mailbox.send(carol.session, conversation(), 'from carol', {});
+      await idle();
+
+      now += MlsUpdateCadence.INTERVAL_MS + MlsUpdateCadence.JITTER_MS + 1;
+      await bob.mailbox.send(bob.session, conversation(), 'from bob', {});
+      await alice.mailbox.send(alice.session, conversation(), 'from alice', {});
+
+      // Carol updates on her next read. A message sealed in an update that
+      // loses its epoch is still delivered, once, in the winning one.
+      for (let pass = 0; pass < 6; pass += 1) {
+        now += GroupMailboxOutbox.RETRY_MAX_MS;
+        await idle();
+        await catchUp();
+      }
+      const received = everyone().flatMap((member) =>
+        texts(member)
+          .filter((text) => text.startsWith('message:from '))
+          .map((text) => text.slice('message:from '.length))
+          .filter((sender) => sender !== names.get(member))
+          .map((sender) => `${sender}->${names.get(member) ?? ''}`),
+      );
+
+      expect(received.sort()).toEqual([
+        'alice->bob',
+        'alice->carol',
+        'bob->alice',
+        'bob->carol',
+        'carol->alice',
+        'carol->bob',
+      ]);
+    },
+  );
+
   it('fails a send whose leaf update fails as one to retry, queuing nothing', async () => {
     await formGroup();
     await idle();
