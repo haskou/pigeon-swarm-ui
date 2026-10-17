@@ -408,24 +408,29 @@ The node can still delay distrust:
 - for a joiner's welcome, which has no earlier epoch to step back to; and
 - while replication lags, which only delays.
 
-Joins by `invitation` or `invite_link` are trusted on the joiner's signature
-alone, since the client cannot see the invitation they cite. Neither they
-nor withheld operations let a node give anyone a right no signed operation
-granted. An `invite_link` join names the link by its reference, never by the
-token: every member reads the operations, and the token alone lets anyone
-join. The reference is
-`base64url(sha256("pigeon:community-invite-reference:v1\n" + token))`
-(`CommunityInviteReference.of`). The `invite_link_created` moderation log entry
-names the link by the same reference, since roles that may read the log
-need not be allowed to invite.
+A newcomer enters through a signed invitation (see the node's
+`docs/design/signed-community-invitations.md`). An issuer signs an
+`invitation_created` operation that carries the public half of a one-use-per-
+claimant link key, the expiry (at most 30 days) and the use limit (at most
+100); the link `https://<origin>/invite/community#c=<communityId>&k=<secret>`
+carries the secret in its fragment, which the client strips from the address
+bar at once and never sends to a node. The joiner previews the invitation with
+the public key, then signs a claim: a consent signed by its identity key and a
+possession proof signed by the link key, both over the community, the
+identity, the invitation and the network.
 
-The token itself is
-`base64url(sha256(JSON([communityId, creatorIdentityId, nonce, maxUses,
-expiresAt ?? null])))` (`CommitmentId.communityInviteToken`), with `maxUses` 1 and
-`expiresAt` null when the creator sets none. It commits to the limits, so the
-node refuses a link whose stored limits differ from those the creator chose.
-Only the accepting node counts uses against `maxUses`; replicas do not cap
-joins per reference, and the join operation does not carry the limits.
+The newcomer is not added by the claim. A member who holds `manage_members`
+admits it: that member's client checks each pending claim against its own fold
+of the signed operations (a live invitation, an open window, valid proofs, a
+canonical identity id) and, only then, signs `member_joined` with
+`method: 'invitation'` that carries both proofs. The same loop commits the MLS
+add, so the joiner gets its welcome from a manager that already holds the
+group, and until then the UI says the joiner is waiting for a community
+manager. Every replica checks the proofs again when it folds the operation, and
+an admission counts as a use toward the invitation's limit in the fold, so a
+node cannot give anyone a right no signed operation granted. An issuer revokes
+its own invitation with `invitation_revoked`; a member who manages members
+revokes any.
 
 ### History policy
 

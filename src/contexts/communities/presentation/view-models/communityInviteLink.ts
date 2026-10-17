@@ -1,42 +1,74 @@
 export type PendingCommunityInviteLink = {
-  token: string;
+  communityId: string;
+  secret: string;
 };
 
-const communityInvitePathPattern = /^\/invite\/community\/([^/]+)\/?$/;
+const INVITE_PATH = '/invite/community';
+const STORAGE_KEY = 'pigeon.pendingCommunityInvite';
 
-export function createCommunityInviteUrl(input: { token: string }): string {
+export function createCommunityInviteUrl(input: PendingCommunityInviteLink): string {
   const url = new URL(window.location.href);
+  const fragment = new URLSearchParams({
+    c: input.communityId,
+    k: input.secret,
+  });
 
-  url.pathname = `/invite/community/${encodeURIComponent(input.token)}`;
+  url.pathname = INVITE_PATH;
   url.search = '';
-  url.hash = '';
+  url.hash = fragment.toString();
 
   return url.toString();
 }
 
+/**
+ * Reads the invitation from the link fragment, removes the fragment from the
+ * address bar at once and keeps the invitation for this browser session only.
+ */
 export function parseCommunityInviteUrl(): PendingCommunityInviteLink | null {
-  const token = communityInvitePathToken(new URL(window.location.href));
+  const url = new URL(window.location.href);
 
-  return token ? { token } : null;
+  if (url.pathname.replace(/\/$/, '') === INVITE_PATH) {
+    const fragment = new URLSearchParams(url.hash.slice(1));
+    const communityId = fragment.get('c')?.trim();
+    const secret = fragment.get('k')?.trim();
+
+    stripInviteUrl(url);
+
+    if (communityId && secret) {
+      window.sessionStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ communityId, secret }),
+      );
+    }
+  }
+
+  return readStoredInvite();
 }
 
 export function clearCommunityInviteUrl(): void {
-  const url = new URL(window.location.href);
+  window.sessionStorage.removeItem(STORAGE_KEY);
+}
 
-  if (communityInvitePathToken(url)) url.pathname = '/';
+function stripInviteUrl(url: URL): void {
+  url.pathname = '/';
+  url.search = '';
   url.hash = '';
   window.history.replaceState({}, document.title, url.toString());
 }
 
-function communityInvitePathToken(url: URL): string | undefined {
-  const match = communityInvitePathPattern.exec(url.pathname);
-  let value = '';
+function readStoredInvite(): PendingCommunityInviteLink | null {
+  const stored = window.sessionStorage.getItem(STORAGE_KEY);
+
+  if (!stored) return null;
 
   try {
-    value = match?.[1] ? decodeURIComponent(match[1]).trim() : '';
-  } catch {
-    return undefined;
-  }
+    const value = JSON.parse(stored) as Partial<PendingCommunityInviteLink>;
 
-  return value || undefined;
+    return typeof value.communityId === 'string' &&
+      typeof value.secret === 'string'
+      ? { communityId: value.communityId, secret: value.secret }
+      : null;
+  } catch {
+    return null;
+  }
 }

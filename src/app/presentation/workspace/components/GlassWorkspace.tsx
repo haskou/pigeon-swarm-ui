@@ -49,6 +49,7 @@ import { ConversationListRevision } from './ConversationListRevision';
 import { type EditingMessage } from './conversationThreadState';
 import { mergeSessionSnapshot } from './mergeSessionSnapshot';
 import { MessagesWorkspaceContent } from './MessagesWorkspaceContent';
+import { PendingCommunityInviteHost } from './PendingCommunityInviteHost';
 import { PushNotificationPrompt } from './PushNotificationPrompt';
 import { Rail, type RailProps } from './Rail';
 import { StorageNotice } from './StorageNotice';
@@ -68,7 +69,6 @@ import { useDirectMessageOutboxSync } from './useDirectMessageOutboxSync';
 import { useGroupControlReceiver } from './useGroupControlReceiver';
 import { useGroupMessageBackgroundSync } from './useGroupMessageBackgroundSync';
 import { useGroupMessageMailboxSync } from './useGroupMessageMailboxSync';
-import { usePendingCommunityInvite } from './usePendingCommunityInvite';
 import { useSidebarGesture } from './useSidebarGesture';
 import { useWorkspaceCalls } from './useWorkspaceCalls';
 import { useWorkspaceCommunityActions } from './useWorkspaceCommunityActions';
@@ -461,15 +461,6 @@ export function GlassWorkspace({
     setSession(null);
   };
 
-  usePendingCommunityInvite({
-    onPendingCommunityInviteHandled,
-    pendingCommunityInvite,
-    session,
-    setActiveCommunityId,
-    setCommunities,
-    setSendError,
-    setWorkspaceMode,
-  });
   const nodeUnclaimed = WorkspaceDerivedState.nodeIsUnclaimed(node);
   const activeConversationKey = WorkspaceDerivedState.conversationKey(
     session,
@@ -1063,6 +1054,20 @@ export function GlassWorkspace({
       onPointerMove={handleWorkspacePointerMove}
       onPointerUp={clearSidebarGesture}
     >
+      <PendingCommunityInviteHost
+        invite={pendingCommunityInvite}
+        onClose={() => onPendingCommunityInviteHandled?.()}
+        onJoined={(joined) => {
+          setCommunities((current) => [
+            joined,
+            ...current.filter((item) => item.id !== joined.id),
+          ]);
+          setActiveCommunityId(joined.id);
+          setWorkspaceMode('community');
+          onPendingCommunityInviteHandled?.();
+        }}
+        session={session}
+      />
       <div className="app-workspace grid w-full grid-cols-1 gap-0 px-0 pb-0 lg:grid-cols-[82px_330px_minmax(0,1fr)] xl:grid-cols-[82px_330px_minmax(0,1fr)_320px]">
         <Rail {...railProps} className="hidden lg:flex" />
 

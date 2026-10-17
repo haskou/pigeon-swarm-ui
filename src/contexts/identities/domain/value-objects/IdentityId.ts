@@ -17,6 +17,20 @@ export class IdentityId extends StringValueObject {
     }
   }
 
+  /**
+   * Whether `value` decodes to a canonical public key: the only form an
+   * invitation or an admission may name.
+   */
+  public static isCanonical(value: string): boolean {
+    try {
+      IdentityId.fromString(value).getPublicKey().toRaw();
+
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   public static normalize(value: string): string {
     const trimmed = value.trim();
 

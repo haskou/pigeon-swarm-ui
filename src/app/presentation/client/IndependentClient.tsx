@@ -167,11 +167,10 @@ export function IndependentClient() {
     new URLSearchParams(window.location.search).get('choose-node') === '1';
   const nodeChoiceUrl = new URL(window.location.href);
   nodeChoiceUrl.searchParams.set('choose-node', '1');
-  const changeNodeHref = window.location.pathname.startsWith(
-    '/invite/community/',
-  )
-    ? nodeChoiceUrl.href
-    : '/connect';
+  const changeNodeHref =
+    window.location.pathname === '/invite/community'
+      ? nodeChoiceUrl.href
+      : '/connect';
   const registrationSwitch = registrationSwitchFor(
     registration,
     choosing,

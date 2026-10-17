@@ -23,7 +23,10 @@ function restoreGlobalProperty(
   Reflect.deleteProperty(globalThis, property);
 }
 
-function installLocation(href: string): { replacedUrls: string[] } {
+function installLocation(
+  href: string,
+  stored: Map<string, string> = new Map(),
+): { replacedUrls: string[]; stored: Map<string, string> } {
   const replacedUrls: string[] = [];
   const location = new URL(href);
 
@@ -40,57 +43,71 @@ function installLocation(href: string): { replacedUrls: string[] } {
         },
       },
       location,
+      sessionStorage: {
+        getItem: (key: string) => stored.get(key) ?? null,
+        removeItem: (key: string) => stored.delete(key),
+        setItem: (key: string, value: string) => stored.set(key, value),
+      },
     },
   });
 
-  return { replacedUrls };
+  return { replacedUrls, stored };
 }
 
-describe('community invite links', () => {
+describe('community invitation links', () => {
   afterEach(() => {
     restoreGlobalProperty('document', originalDocument);
     restoreGlobalProperty('window', originalWindow);
   });
 
-  it('creates short invite links without any key material', () => {
+  it('creates one link carrying the community and secret in the fragment', () => {
     installLocation('https://pigeon.example/messages?old=1#stale');
 
-    expect(createCommunityInviteUrl({ token: 'invite/token' })).toBe(
-      'https://pigeon.example/invite/community/invite%2Ftoken',
-    );
+    expect(
+      createCommunityInviteUrl({ communityId: 'community-1', secret: 'sec_1' }),
+    ).toBe('https://pigeon.example/invite/community#c=community-1&k=sec_1');
   });
 
-  it('parses the short invite link format', () => {
-    installLocation(
-      'https://pigeon.example/invite/community/invite-token#k=secret_123',
-    );
-
-    expect(parseCommunityInviteUrl()).toEqual({ token: 'invite-token' });
-  });
-
-  it('ignores short invite links with malformed path encoding', () => {
-    installLocation(
-      'https://pigeon.example/invite/community/%E0%A4%A#k=secret',
-    );
-
-    expect(parseCommunityInviteUrl()).toBeNull();
-  });
-
-  it('ignores invite links with embedded key entries', () => {
-    installLocation(
-      'https://pigeon.example/?communityInvite=embedded-key-token#communityKey=eyJjb252ZXJzYXRpb25JZCI6ImNvbW11bml0eS0xIiwiY3JlYXRlZEF0IjoxNzcsInBlZXJJZGVudGl0eUlkIjoiIiwicHJpdmF0ZUtleSI6InByaXZhdGUiLCJwdWJsaWNLZXkiOiJwdWJsaWMifQ',
-    );
-
-    expect(parseCommunityInviteUrl()).toBeNull();
-  });
-
-  it('clears short invite links back to the app root', () => {
+  it('parses the fragment and strips it from the address bar immediately', () => {
     const { replacedUrls } = installLocation(
-      'https://pigeon.example/invite/community/invite-token#k=secret_123',
+      'https://pigeon.example/invite/community#c=community-1&k=sec_1',
     );
 
+    expect(parseCommunityInviteUrl()).toEqual({
+      communityId: 'community-1',
+      secret: 'sec_1',
+    });
+    expect(replacedUrls).toEqual(['https://pigeon.example/']);
+  });
+
+  it('keeps the parsed invitation for the session after the fragment is gone', () => {
+    const first = installLocation(
+      'https://pigeon.example/invite/community#c=community-1&k=sec_1',
+    );
+
+    parseCommunityInviteUrl();
+    installLocation('https://pigeon.example/', first.stored);
+
+    expect(parseCommunityInviteUrl()).toEqual({
+      communityId: 'community-1',
+      secret: 'sec_1',
+    });
+  });
+
+  it('ignores links missing the community or the secret', () => {
+    installLocation('https://pigeon.example/invite/community#c=community-1');
+
+    expect(parseCommunityInviteUrl()).toBeNull();
+  });
+
+  it('forgets the stored invitation when cleared', () => {
+    const { stored } = installLocation(
+      'https://pigeon.example/invite/community#c=community-1&k=sec_1',
+    );
+
+    parseCommunityInviteUrl();
     clearCommunityInviteUrl();
 
-    expect(replacedUrls).toEqual(['https://pigeon.example/']);
+    expect(stored.size).toBe(0);
   });
 });

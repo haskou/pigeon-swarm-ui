@@ -75,10 +75,6 @@ export function canActOnMembershipRequest(
 ): boolean {
   if (request.status !== 'pending') return false;
 
-  if (request.type === 'invitation') {
-    return IdentityMatch.isSame(request.identityId, currentIdentityId);
-  }
-
   return communities.some(
     (community) =>
       community.id === request.communityId &&

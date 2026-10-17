@@ -119,29 +119,6 @@ describe('community commitment id vectors', () => {
     },
   );
 
-  it.each(vectors.communityInviteToken.valid)(
-    'derives the invite token of $name',
-    ({ args, id }) => {
-      const [communityId, creator, nonce, maxUses, expiresAt] = args as [
-        string,
-        string,
-        string,
-        number,
-        number | undefined,
-      ];
-
-      expect(
-        CommitmentId.communityInviteToken(
-          communityId,
-          creator,
-          nonce,
-          maxUses,
-          expiresAt,
-        ),
-      ).toBe(id);
-    },
-  );
-
   it.each(vectors.mlsRecord.valid)(
     'derives the MLS record id of $name',
     ({ args, id }) => {

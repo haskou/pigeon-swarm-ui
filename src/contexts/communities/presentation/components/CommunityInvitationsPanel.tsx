@@ -1,3 +1,4 @@
+import type { CommunityInvitationResource as CommunityInvitation } from '../../infrastructure/http/resources/CommunityInvitationResource';
 import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
 import type { CommunityMembershipRequestResource as CommunityMembershipRequest } from '../../infrastructure/http/resources/CommunityMembershipRequestResource';
 import type { IdentityResource } from '../../../identities/infrastructure/http/resources/IdentityResource';
@@ -14,60 +15,77 @@ import { cx } from '../../../../shared/presentation/cx';
 export function CommunityInvitationsPanel({
   canApproveRequests,
   canCreateInvitations,
+  canManageMembers,
   canRejectRequests,
   community,
-  identityInput,
+  currentIdentityId,
   identityLookup,
+  invitations,
   onAccept,
+  onCreateInvitation,
   onDecline,
-  onIdentityInputChange,
-  onInvite,
+  onRevoke,
   requests,
   state,
 }: {
   canApproveRequests: boolean;
   canCreateInvitations: boolean;
+  canManageMembers: boolean;
   canRejectRequests: boolean;
   community: Community;
-  identityInput: string;
+  currentIdentityId: string;
   identityLookup: Record<string, IdentityResource>;
+  invitations: CommunityInvitation[];
   onAccept: (requestId: string) => void;
+  onCreateInvitation: () => void;
   onDecline: (requestId: string) => void;
-  onIdentityInputChange: (value: string) => void;
-  onInvite: () => void;
+  onRevoke: (invitationId: string) => void;
   requests: CommunityMembershipRequest[];
   state: 'idle' | 'loading';
 }) {
   return (
     <div className="grid gap-5">
-      {canCreateInvitations && (
-        <section className="ui-list-block border-y border-white/10 py-3">
-          <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-white/35">
-            {copy.communities.inviteMember}
+      {(canCreateInvitations || invitations.length > 0) && (
+        <section className="ui-list-block">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
+              {copy.communities.inviteLinks}
+            </div>
+            {canCreateInvitations && (
+              <button
+                type="button"
+                onClick={onCreateInvitation}
+                className="ui-button ui-button-primary"
+              >
+                {copy.communities.linkInvite}
+              </button>
+            )}
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <input
-              value={identityInput}
-              onChange={(event) => onIdentityInputChange(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key !== 'Enter') return;
-                event.preventDefault();
-                onInvite();
-              }}
-              className="ui-field-control min-w-0 flex-1 px-4 py-3 text-sm"
-              placeholder={copy.identityLookup.placeholder}
-            />
-            <button
-              type="button"
-              onClick={onInvite}
-              disabled={!identityInput.trim() || state === 'loading'}
-              className="ui-button ui-button-primary disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              {copy.communities.sendInvitation}
-            </button>
-          </div>
+          {invitations.length === 0 ? (
+            <div className="border-y border-white/10 py-5 text-sm text-white/45">
+              {copy.communities.noInviteLinks}
+            </div>
+          ) : (
+            <div className="divide-y divide-white/10 border-y border-white/15">
+              {invitations.map((invitation) => (
+                <InvitationRow
+                  canRevoke={
+                    invitation.live &&
+                    (canManageMembers ||
+                      invitation.issuerIdentityId === currentIdentityId)
+                  }
+                  identityLookup={identityLookup}
+                  invitation={invitation}
+                  key={invitation.id}
+                  onRevoke={() => onRevoke(invitation.id)}
+                  state={state}
+                />
+              ))}
+            </div>
+          )}
         </section>
       )}
+
 
       <section className="ui-list-block">
         <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-white/35">
@@ -99,6 +117,52 @@ export function CommunityInvitationsPanel({
   );
 }
 
+function InvitationRow({
+  canRevoke,
+  identityLookup,
+  invitation,
+  onRevoke,
+  state,
+}: {
+  canRevoke: boolean;
+  identityLookup: Record<string, IdentityResource>;
+  invitation: CommunityInvitation;
+  onRevoke: () => void;
+  state: 'idle' | 'loading';
+}) {
+  const status = invitation.revoked
+    ? copy.communities.inviteLinkRevoked
+    : invitation.live
+      ? copy.communities.inviteLinkLive
+      : copy.communities.inviteLinkClosed;
+
+  return (
+    <article className="flex flex-wrap items-center justify-between gap-3 px-3 py-4">
+      <div className="min-w-0 text-xs text-white/55">
+        <div className="font-semibold text-white/75">
+          {identityLabel(invitation.issuerIdentityId, identityLookup)}
+          {invitation.invitee &&
+            ` → ${identityLabel(invitation.invitee, identityLookup)}`}
+        </div>
+        <div className="mt-1">
+          {status} · {invitation.uses}/{invitation.maxUses} ·{' '}
+          {formatTime(invitation.expiresAt)}
+        </div>
+      </div>
+      {canRevoke && (
+        <button
+          type="button"
+          onClick={onRevoke}
+          disabled={state === 'loading'}
+          className="ui-button disabled:opacity-50"
+        >
+          {copy.communities.inviteLinkRevoke}
+        </button>
+      )}
+    </article>
+  );
+}
+
 function MembershipRequestRow({
   canApproveRequests,
   canRejectRequests,
@@ -118,14 +182,10 @@ function MembershipRequestRow({
   request: CommunityMembershipRequest;
   state: 'idle' | 'loading';
 }) {
-  const actorIdentityId =
-    request.type === 'request' ? request.identityId : request.creatorIdentityId;
-  const targetIdentityId =
-    request.type === 'request' ? request.creatorIdentityId : request.identityId;
+  const actorIdentityId = request.identityId;
+  const targetIdentityId = request.creatorIdentityId;
   const canAct =
-    request.status === 'pending' &&
-    request.type === 'request' &&
-    (canApproveRequests || canRejectRequests);
+    request.status === 'pending' && (canApproveRequests || canRejectRequests);
 
   return (
     <article
@@ -139,14 +199,10 @@ function MembershipRequestRow({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="font-black text-white">
-            {request.type === 'request'
-              ? copy.notifications.communityJoinRequestTitle
-              : copy.notifications.communityMembershipInvitationTitle}
+            {copy.notifications.communityJoinRequestTitle}
           </h3>
           <p className="mt-1 text-xs text-white/45">
-            {request.type === 'request'
-              ? copy.notifications.requestedBy
-              : copy.notifications.invitedBy}
+            {copy.notifications.requestedBy}
           </p>
         </div>
         <span className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-xs font-black text-white/60">

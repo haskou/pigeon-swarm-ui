@@ -560,7 +560,7 @@ describe(PigeonCommunitiesApi.name, () => {
     });
   });
 
-  it('signs membership invitations and resolutions as request records', async () => {
+  it('signs membership request resolutions as request records', async () => {
     const device = await KeyPair.generate();
     const request = {
       communityId: 'community-1',
@@ -569,7 +569,7 @@ describe(PigeonCommunitiesApi.name, () => {
       id: 'a'.repeat(24),
       identityId: 'identity-1',
       status: 'pending',
-      type: 'invitation',
+      type: 'request',
       updatedAt: 10,
     };
     const http = {
@@ -599,9 +599,8 @@ describe(PigeonCommunitiesApi.name, () => {
     );
 
     await api.updateMembershipRequest(session, request.id, 'accepted');
-    await api.inviteMember(session, 'community-1', 'identity-3');
 
-    const [patch, invite] = (http.request as jest.Mock).mock.calls
+    const [patch] = (http.request as jest.Mock).mock.calls
       .filter(([path]: [string]) => !path.endsWith('/frontier'))
       .filter(
         ([path]: [string]) =>
@@ -617,13 +616,6 @@ describe(PigeonCommunitiesApi.name, () => {
       mutation: { recordId: request.id, store: 'requests' },
       status: 'accepted',
       updatedAt: expect.any(Number),
-    });
-    expect(invite).toMatchObject({
-      identityId: 'identity-3',
-      mutation: {
-        recordId: expect.stringMatching(/^[0-9a-f]{24}$/),
-        sequence: 0,
-      },
     });
   });
 

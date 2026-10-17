@@ -4,13 +4,15 @@ import type { CommunityChannelMessagePinsResource } from '../../../messages/infr
 import type { MessageResource } from '../../../messages/infrastructure/http/MessageResource';
 import type { CommunityChannelMessageEditInput } from './CommunityChannelMessageEditInput';
 import type { CommunityChannelMessageInput } from './CommunityChannelMessageInput';
-import type { CommunityInviteLinkInput } from './CommunityInviteLinkInput';
+import type { CommunityInvitationInput } from './CommunityInvitationInput';
 import type { PigeonCommunitiesApi } from './PigeonCommunitiesApi';
 import type { PigeonCommunityInvitationApi } from './PigeonCommunityInvitationApi';
 import type { CommunityChannelDraft } from './resources/CommunityChannelDraft';
 import type { CommunityChannelResource as CommunityChannel } from './resources/CommunityChannelResource';
 import type { CommunityDiscoveryResource } from './resources/CommunityDiscoveryResource';
-import type { CommunityInviteLinkResource } from './resources/CommunityInviteLinkResource';
+import type { CommunityInvitationClaimResource } from './resources/CommunityInvitationClaimResource';
+import type { CommunityInvitationPreviewResource } from './resources/CommunityInvitationPreviewResource';
+import type { CommunityInvitationResource } from './resources/CommunityInvitationResource';
 import type { CommunityMembershipRequestResource as CommunityMembershipRequest } from './resources/CommunityMembershipRequestResource';
 import type { CommunityModerationLogPageResource as CommunityModerationLogPage } from './resources/CommunityModerationLogPageResource';
 import type { CommunityPermissionResource as CommunityPermission } from './resources/CommunityPermissionResource';
@@ -108,18 +110,6 @@ export class PigeonCommunitiesGateway {
     },
   ): Promise<Community> {
     return await this.communities.update(session, communityId, input);
-  }
-
-  public async addCommunityMember(
-    session: Session,
-    communityId: string,
-    identityId: string,
-  ): Promise<CommunityMembershipRequest> {
-    return await this.communities.inviteMember(
-      session,
-      communityId,
-      identityId,
-    );
   }
 
   public async banCommunityMember(
@@ -566,33 +556,52 @@ export class PigeonCommunitiesGateway {
   public async createCommunityInvitation(
     session: Session,
     communityId: string,
-    recipientIdentityId: string,
-  ): Promise<void> {
-    return await this.invitations.create(
-      session,
-      communityId,
-      recipientIdentityId,
-    );
+    input: CommunityInvitationInput,
+  ): Promise<CommunityInvitationResource> {
+    return await this.invitations.create(session, communityId, input);
   }
 
-  public async createCommunityInviteLink(
+  public async listCommunityInvitations(
     session: Session,
     communityId: string,
-    input: CommunityInviteLinkInput = {},
-  ): Promise<CommunityInviteLinkResource> {
-    return await this.invitations.createInviteLink(session, communityId, input);
+  ): Promise<CommunityInvitationResource[]> {
+    return await this.invitations.list(session, communityId);
   }
 
-  public async getCommunityInviteLink(
-    inviteToken: string,
-  ): Promise<CommunityInviteLinkResource> {
-    return await this.invitations.getInviteLink(inviteToken);
-  }
-
-  public async acceptCommunityInviteLink(
+  public async revokeCommunityInvitation(
     session: Session,
-    inviteToken: string,
-  ): Promise<Community> {
-    return await this.invitations.acceptInviteLink(session, inviteToken);
+    communityId: string,
+    invitationId: string,
+  ): Promise<void> {
+    await this.invitations.revoke(session, communityId, invitationId);
+  }
+
+  public async previewCommunityInvitation(
+    communityId: string,
+    invitationKey: string,
+  ): Promise<CommunityInvitationPreviewResource> {
+    return await this.invitations.preview(communityId, invitationKey);
+  }
+
+  public async claimCommunityInvitation(
+    session: Session,
+    preview: CommunityInvitationPreviewResource,
+    secret: string,
+  ): Promise<void> {
+    await this.invitations.claim(session, preview, secret);
+  }
+
+  public async listCommunityInvitationClaims(
+    session: Session,
+    communityId: string,
+  ): Promise<CommunityInvitationClaimResource[]> {
+    return await this.invitations.listClaims(session, communityId);
+  }
+
+  public async admitCommunityInvitationClaim(
+    session: Session,
+    claim: CommunityInvitationClaimResource,
+  ): Promise<void> {
+    await this.invitations.admit(session, claim);
   }
 }

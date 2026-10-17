@@ -1,9 +1,12 @@
+import { CommunityInvitationKey } from '@haskou/pigeon-swarm-crypto';
+
 import type { CommunityChannelMessageEditInput } from '../../contexts/communities/infrastructure/http/CommunityChannelMessageEditInput';
 import type { CommunityChannelMessageInput } from '../../contexts/communities/infrastructure/http/CommunityChannelMessageInput';
 import type { CommunityChannelDraft } from '../../contexts/communities/infrastructure/http/resources/CommunityChannelDraft';
 import type { CommunityChannelResource as CommunityChannel } from '../../contexts/communities/infrastructure/http/resources/CommunityChannelResource';
 import type { CommunityDiscoveryResource } from '../../contexts/communities/infrastructure/http/resources/CommunityDiscoveryResource';
-import type { CommunityInviteLinkResource } from '../../contexts/communities/infrastructure/http/resources/CommunityInviteLinkResource';
+import type { CommunityInvitationPreviewResource } from '../../contexts/communities/infrastructure/http/resources/CommunityInvitationPreviewResource';
+import type { CommunityInvitationResource } from '../../contexts/communities/infrastructure/http/resources/CommunityInvitationResource';
 import type { CommunityMembershipRequestResource as CommunityMembershipRequest } from '../../contexts/communities/infrastructure/http/resources/CommunityMembershipRequestResource';
 import type { CommunityModerationLogPageResource as CommunityModerationLogPage } from '../../contexts/communities/infrastructure/http/resources/CommunityModerationLogPageResource';
 import type { CommunityPermissionResource as CommunityPermission } from '../../contexts/communities/infrastructure/http/resources/CommunityPermissionResource';
@@ -43,13 +46,7 @@ export class PigeonCommunitiesFacade {
 
   private readonly communityUpdater: PigeonCommunitiesGateway;
 
-  private readonly communityInvitationCreator: PigeonCommunitiesGateway;
-
-  private readonly communityInviteLinkAcceptor: PigeonCommunitiesGateway;
-
-  private readonly communityInviteLinkCreator: PigeonCommunitiesGateway;
-
-  private readonly communityInviteLinkGetter: PigeonCommunitiesGateway;
+  private readonly communityInvitations: PigeonCommunitiesGateway;
 
   private readonly keychain: PigeonIdentitiesGateway;
 
@@ -84,10 +81,7 @@ export class PigeonCommunitiesFacade {
     this.communityDiscoverer = communities;
     this.communityGetter = communities;
     this.communityUpdater = communities;
-    this.communityInvitationCreator = communities;
-    this.communityInviteLinkAcceptor = communities;
-    this.communityInviteLinkCreator = communities;
-    this.communityInviteLinkGetter = communities;
+    this.communityInvitations = communities;
     this.keychain = identities;
     this.leaveCommunityUseCase = new LeaveCommunity(communities, identities);
     this.media = communities;
@@ -182,18 +176,6 @@ export class PigeonCommunitiesFacade {
     });
   }
 
-  public async addMember(
-    session: Session,
-    communityId: string,
-    identityId: string,
-  ): Promise<CommunityMembershipRequest> {
-    return await this.members.addCommunityMember(
-      session,
-      communityId,
-      identityId,
-    );
-  }
-
   public async banMember(
     session: Session,
     communityId: string,
@@ -276,45 +258,73 @@ export class PigeonCommunitiesFacade {
     return await this.leaveCommunityUseCase.leave(session, communityId);
   }
 
+  /**
+   * Signs an invitation under a fresh secret. The secret is returned to the
+   * issuer for the link and goes nowhere else: the node gets only the key.
+   */
   public async createInvitation(
     session: Session,
     communityId: string,
-    recipientIdentityId: string,
-  ): Promise<void> {
-    return await this.communityInvitationCreator.createCommunityInvitation(
-      session,
-      communityId,
-      recipientIdentityId,
-    );
+    input: { expiresAt: number; invitee?: string; maxUses: number },
+  ): Promise<{ invitation: CommunityInvitationResource; secret: string }> {
+    const { key, secret } = CommunityInvitationKey.generate();
+    const invitation =
+      await this.communityInvitations.createCommunityInvitation(
+        session,
+        communityId,
+        {
+          expiresAt: input.expiresAt,
+          invitationKey: key.publicKey(),
+          ...(input.invitee === undefined ? {} : { invitee: input.invitee }),
+          maxUses: input.maxUses,
+        },
+      );
+
+    return { invitation, secret };
   }
 
-  public async createInviteLink(
+  public async listInvitations(
     session: Session,
     communityId: string,
-    input: { expiresAt?: number; maxUses?: number } = {},
-  ): Promise<CommunityInviteLinkResource> {
-    return await this.communityInviteLinkCreator.createCommunityInviteLink(
+  ): Promise<CommunityInvitationResource[]> {
+    return await this.communityInvitations.listCommunityInvitations(
       session,
       communityId,
-      input,
     );
   }
 
-  public async getInviteLink(
-    inviteToken: string,
-  ): Promise<CommunityInviteLinkResource> {
-    return await this.communityInviteLinkGetter.getCommunityInviteLink(
-      inviteToken,
-    );
-  }
-
-  public async acceptInviteLink(
+  public async revokeInvitation(
     session: Session,
-    inviteToken: string,
-  ): Promise<Community> {
-    return await this.communityInviteLinkAcceptor.acceptCommunityInviteLink(
+    communityId: string,
+    invitationId: string,
+  ): Promise<void> {
+    await this.communityInvitations.revokeCommunityInvitation(
       session,
-      inviteToken,
+      communityId,
+      invitationId,
+    );
+  }
+
+  /** What the link holder may see of the community, read with its key. */
+  public async previewInvitation(
+    communityId: string,
+    secret: string,
+  ): Promise<CommunityInvitationPreviewResource> {
+    return await this.communityInvitations.previewCommunityInvitation(
+      communityId,
+      CommunityInvitationKey.fromSecret(secret).publicKey(),
+    );
+  }
+
+  public async claimInvitation(
+    session: Session,
+    preview: CommunityInvitationPreviewResource,
+    secret: string,
+  ): Promise<void> {
+    await this.communityInvitations.claimCommunityInvitation(
+      session,
+      preview,
+      secret,
     );
   }
 

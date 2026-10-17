@@ -1,10 +1,10 @@
 import { assert } from '@haskou/value-objects';
 
 import type { CommunityChannelGrant } from './CommunityChannelGrant';
-import type { CommunityOperation } from './CommunityOperation';
 import type { CommunityRoleGrant } from './CommunityRoleGrant';
 
 import { IdentityId } from '../../../identities/domain/value-objects/IdentityId';
+import { CommunityInvitation } from '../entities/invitations/CommunityInvitation';
 import { CommunityOperationRejectedError } from '../errors/CommunityOperationRejectedError';
 import { CommunityChannelId } from '../value-objects/CommunityChannelId';
 import { CommunityChannelName } from '../value-objects/CommunityChannelName';
@@ -14,6 +14,7 @@ import { CommunityPermission } from '../value-objects/CommunityPermission';
 import { CommunityRoleId } from '../value-objects/CommunityRoleId';
 import { CommunityRoleName } from '../value-objects/CommunityRoleName';
 import { CommunityVisibility } from '../value-objects/CommunityVisibility';
+import { CommunityOperation } from './CommunityOperation';
 
 const EVERYONE = 'everyone';
 /** What the built-in `everyone` role allows until a manager changes it. */
@@ -26,18 +27,37 @@ const BASIC_MEMBER_PERMISSIONS = [
   'view_channels',
 ];
 /**
- * How an identity may join, and the permission the author needs: a self join
- * is signed by the joiner, `automatic` needs auto join to be enabled.
+ * How an identity may join: the arguments its operation carries, the
+ * permission the author needs and whether the joiner signs it. A self join is
+ * signed by the joiner, `automatic` needs auto join to be enabled, and an
+ * invitation admission is signed by a member who manages members.
  */
 const JOIN_METHODS: Record<
   string,
-  { permission?: string; reference: boolean; selfJoin: boolean }
+  { arguments: string[]; permission?: string; selfJoin: boolean }
 > = {
-  added: { permission: 'manage_members', reference: false, selfJoin: false },
-  approval: { permission: 'approve_members', reference: true, selfJoin: false },
-  automatic: { reference: false, selfJoin: true },
-  invitation: { reference: true, selfJoin: true },
-  invite_link: { reference: true, selfJoin: true },
+  added: {
+    arguments: ['identityId', 'method'],
+    permission: 'manage_members',
+    selfJoin: false,
+  },
+  approval: {
+    arguments: ['identityId', 'method', 'reference'],
+    permission: 'approve_members',
+    selfJoin: false,
+  },
+  automatic: { arguments: ['identityId', 'method'], selfJoin: true },
+  invitation: {
+    arguments: [
+      'consent',
+      'identityId',
+      'invitationId',
+      'method',
+      'possession',
+    ],
+    permission: 'manage_members',
+    selfJoin: false,
+  },
 };
 
 /**
@@ -98,7 +118,14 @@ export class CommunityAuthority {
 
   /** An identity, in the one form the node compares identities in. */
   private static identity(value: unknown): string {
-    return IdentityId.normalize(CommunityAuthority.text(value));
+    const identityId = IdentityId.normalize(CommunityAuthority.text(value));
+
+    assert(
+      IdentityId.isCanonical(identityId),
+      new CommunityOperationRejectedError(),
+    );
+
+    return identityId;
   }
 
   /** The `identityId`, the only argument of a member change. */
@@ -151,25 +178,25 @@ export class CommunityAuthority {
     }
 
     return new CommunityAuthority(
-      genesis,
+      {
+        communityId: genesis.getCommunityId(),
+        networkId: genesis.getNetworkId(),
+        ownerId: CommunityAuthority.identity(genesis.getAuthorIdentityId()),
+      },
       CommunityAuthority.flag(args.autoJoinEnabled),
       visibility,
     );
   }
 
   private constructor(
-    genesis: CommunityOperation,
+    identity: { communityId: string; networkId: string; ownerId: string },
     private autoJoinEnabled: boolean,
     private readonly visibility: CommunityVisibility,
   ) {
-    this.communityId = genesis.getCommunityId();
-    this.networkId = genesis.getNetworkId();
-    this.ownerId = genesis.getAuthorIdentityId();
+    this.communityId = identity.communityId;
+    this.networkId = identity.networkId;
+    this.ownerId = identity.ownerId;
     this.members = [this.ownerId];
-  }
-
-  private isMember(identityId: string): boolean {
-    return this.members.includes(identityId);
   }
 
   private role(roleId: string): CommunityRoleGrant | undefined {
@@ -201,21 +228,31 @@ export class CommunityAuthority {
     this.assignments.delete(identityId);
   }
 
-  private join(author: string, args: Readonly<Record<string, unknown>>): void {
-    const { identityId, method, reference } = CommunityAuthority.read(
-      args,
-      ['identityId', 'method'],
-      ['reference'],
+  /** The fields an invitation admission signs beyond the joiner's id. */
+  private checkInvitation(read: Readonly<Record<string, unknown>>): void {
+    CommunityAuthority.text(read.consent);
+    CommunityAuthority.text(read.possession);
+    this.require(
+      CommunityOperation.DIGEST.test(
+        CommunityAuthority.text(read.invitationId),
+      ),
     );
-    const member = CommunityAuthority.identity(identityId);
-    const name = CommunityAuthority.text(method);
+  }
 
-    this.require(Object.keys(JOIN_METHODS).includes(name));
-    const rule = JOIN_METHODS[name];
+  private join(author: string, args: Readonly<Record<string, unknown>>): void {
+    const name = CommunityAuthority.text(args.method);
 
-    this.require((reference !== undefined) === rule.reference);
+    this.require(Object.prototype.hasOwnProperty.call(JOIN_METHODS, name));
+    const read = CommunityAuthority.read(args, JOIN_METHODS[name].arguments);
+    const member = CommunityAuthority.identity(read.identityId);
 
-    if (reference !== undefined) CommunityAuthority.text(reference);
+    if (name === 'approval') CommunityAuthority.text(read.reference);
+
+    if (name === 'invitation') {
+      this.checkInvitation(read);
+      // An admission only adds a newcomer: no member is let in twice.
+      this.require(!this.isMember(member));
+    }
 
     this.require(this.mayJoin(author, member, name));
 
@@ -442,11 +479,37 @@ export class CommunityAuthority {
       visibleRoleIds.length > 0 ? [...visibleRoleIds] : [EVERYONE];
   }
 
+  /** An invitation is issued by a member who may create invites. */
+  private createInvitation(operation: CommunityOperation): void {
+    CommunityInvitation.fromOperation(operation);
+    this.require(
+      this.hasPermission(
+        IdentityId.normalize(operation.getAuthorIdentityId()),
+        'create_invites',
+      ),
+    );
+  }
+
+  /**
+   * A revocation names an invitation by its digest; whether the author may
+   * close it depends on the invitations of the causal past, which the fold
+   * checks.
+   */
+  private revokeInvitation(args: Readonly<Record<string, unknown>>): void {
+    this.require(
+      CommunityOperation.DIGEST.test(
+        CommunityAuthority.text(
+          CommunityAuthority.read(args, ['invitationId']).invitationId,
+        ),
+      ),
+    );
+  }
+
   /** How each action that changes the authority applies `operation`. */
   private handlersFor(
     operation: CommunityOperation,
   ): Record<string, () => void> {
-    const author = operation.getAuthorIdentityId();
+    const author = IdentityId.normalize(operation.getAuthorIdentityId());
     const args = operation.getArguments();
     const member = (): string => CommunityAuthority.member(args);
 
@@ -457,6 +520,8 @@ export class CommunityAuthority {
         this.updateChannelPermissions(author, args),
       channel_renamed: () => this.renameChannel(author, args),
       community_updated: () => this.updateProfile(author, args),
+      invitation_created: () => this.createInvitation(operation),
+      invitation_revoked: () => this.revokeInvitation(args),
       member_banned: () => this.ban(author, member()),
       member_joined: () => this.join(author, args),
       member_kicked: () => this.kick(author, member()),
@@ -486,6 +551,11 @@ export class CommunityAuthority {
     );
   }
 
+  /** Whether no one is left: a deleted community takes no more operations. */
+  public isDeleted(): boolean {
+    return this.members.length === 0;
+  }
+
   /**
    * Applies one operation of this community, or throws and changes nothing
    * when the state does not allow its author to make it.
@@ -496,6 +566,7 @@ export class CommunityAuthority {
 
     this.require(
       !operation.isGenesis() &&
+        IdentityId.isCanonical(operation.getAuthorIdentityId()) &&
         operation.getCommunityId() === this.communityId &&
         operation.getNetworkId() === this.networkId &&
         Object.prototype.hasOwnProperty.call(handlers, action),
@@ -503,9 +574,48 @@ export class CommunityAuthority {
     handlers[action]();
   }
 
-  /** Whether no one is left: a deleted community takes no more operations. */
-  public isDeleted(): boolean {
-    return this.members.length === 0;
+  /** An independent copy: applying to it never changes this authority. */
+  public clone(): CommunityAuthority {
+    const copy = new CommunityAuthority(
+      {
+        communityId: this.communityId,
+        networkId: this.networkId,
+        ownerId: this.ownerId,
+      },
+      this.autoJoinEnabled,
+      this.visibility,
+    );
+
+    copy.members.splice(0, copy.members.length, ...this.members);
+    copy.banned.push(...this.banned);
+    copy.roles.splice(
+      0,
+      copy.roles.length,
+      ...this.roles.map((role) => ({
+        ...role,
+        permissions: [...role.permissions],
+      })),
+    );
+    copy.channels.push(
+      ...this.channels.map((channel) => ({
+        ...channel,
+        visibleRoleIds: [...channel.visibleRoleIds],
+      })),
+    );
+
+    for (const [identityId, roleIds] of this.assignments) {
+      copy.assignments.set(identityId, [...roleIds]);
+    }
+
+    return copy;
+  }
+
+  public isMember(identityId: string): boolean {
+    return this.members.includes(identityId);
+  }
+
+  public isBanned(identityId: string): boolean {
+    return this.banned.includes(identityId);
   }
 
   public getOwnerIdentityId(): string {

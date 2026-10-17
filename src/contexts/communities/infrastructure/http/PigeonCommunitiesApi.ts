@@ -492,6 +492,14 @@ export class PigeonCommunitiesApi {
     return (await this.readFrontier(session, communityId)).frontier;
   }
 
+  /** The frontier of the community and the network it lives on. */
+  public async head(
+    session: Session,
+    communityId: string,
+  ): Promise<{ frontier: string[]; networkId: string }> {
+    return await this.readFrontier(session, communityId);
+  }
+
   public async list(session: Session): Promise<Community[]> {
     const path = '/communities';
     const result = await this.cachedRequest(
@@ -679,50 +687,6 @@ export class PigeonCommunitiesApi {
       'PATCH',
       path,
       body,
-    );
-  }
-
-  public async inviteMember(
-    session: Session,
-    communityId: string,
-    identityId: string,
-  ): Promise<CommunityMembershipRequest> {
-    const path = `/communities/${encodeURIComponent(communityId)}/members`;
-    const creatorIdentityId = this.mutations.authorOf(session);
-    const createdAt = Date.now();
-    const record = this.membershipRequestRecord({
-      communityId,
-      createdAt,
-      creatorIdentityId,
-      id: CommitmentId.communityRequest(
-        communityId,
-        'invitation',
-        creatorIdentityId,
-        identityId,
-        createdAt,
-      ),
-      identityId,
-      status: 'pending',
-      type: 'invitation',
-      updatedAt: createdAt,
-    });
-
-    return await this.sendMembershipRequest<CommunityMembershipRequest>(
-      session,
-      'POST',
-      path,
-      record,
-      {
-        createdAt,
-        identityId,
-        moderationLog: await this.moderationLogs.sign(session, {
-          action: 'invitation_created',
-          communityId,
-          createdAt,
-          details: { identityId },
-          target: { id: record.id as string, type: 'membership_request' },
-        }),
-      },
     );
   }
 
@@ -933,7 +897,7 @@ export class PigeonCommunitiesApi {
             'member_joined',
             {
               identityId: current.identityId,
-              method: current.type === 'request' ? 'approval' : 'invitation',
+              method: 'approval',
               reference: requestId,
             },
             updatedAt,

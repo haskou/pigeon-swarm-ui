@@ -6,7 +6,7 @@ export interface CommunityModerationLogInput {
     | 'channel_renamed'
     | 'community_updated'
     | 'invitation_created'
-    | 'invite_link_created'
+    | 'invitation_revoked'
     | 'member_banned'
     | 'member_kicked'
     | 'member_roles_updated'
@@ -25,7 +25,7 @@ export interface CommunityModerationLogInput {
     type:
       | 'channel'
       | 'community'
-      | 'invite'
+      | 'invitation'
       | 'member'
       | 'membership_request'
       | 'message'

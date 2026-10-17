@@ -1,9 +1,7 @@
 import { Enum, ValueNotInEnumError } from '@haskou/value-objects';
 
-export class CommunityMembershipRequestType extends Enum<
-  'invitation' | 'request'
-> {
-  private static readonly values = ['invitation', 'request'] as const;
+export class CommunityMembershipRequestType extends Enum<'request'> {
+  private static readonly values = ['request'] as const;
 
   public static fromPrimitives(value: string): CommunityMembershipRequestType {
     const type = CommunityMembershipRequestType.values.find(

@@ -1,28 +1,34 @@
 import {
-  CommitmentId,
-  CommunityInviteReference,
+  CommunityInvitationConsent,
+  CommunityInvitationKey,
+  type CommunityInvitationFields,
+  PrivateKey,
 } from '@haskou/pigeon-swarm-crypto';
-import { Buffer } from 'buffer';
 
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { Session } from '../../../identities/infrastructure/session/Session';
-import type { CommunityInviteLinkInput } from './CommunityInviteLinkInput';
+import type { CommunityInvitationInput } from './CommunityInvitationInput';
+import type { CommunityOperationBody } from './CommunityOperationBody';
 import type { PigeonCommunitiesApi } from './PigeonCommunitiesApi';
-import type { CommunityInviteLinkResource } from './resources/CommunityInviteLinkResource';
-import type { CommunityResource as Community } from './resources/CommunityResource';
+import type { CommunityInvitationClaimResource } from './resources/CommunityInvitationClaimResource';
+import type { CommunityInvitationPreviewResource } from './resources/CommunityInvitationPreviewResource';
+import type { CommunityInvitationResource } from './resources/CommunityInvitationResource';
 
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import { ScopeFrontierReader } from '../../../../shared/infrastructure/http/ScopeFrontierReader';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 import { NotificationMutationSigner } from '../../../notifications/infrastructure/http/NotificationMutationSigner';
-import { buildCommunityInviteLinkBody } from './buildCommunityInviteLinkBody';
 import { CommunityModerationLogSigner } from './CommunityModerationLogSigner';
 import { CommunityOperationSigner } from './CommunityOperationSigner';
 
+/**
+ * The signed invitations of a community: an issuer creates and revokes them,
+ * a link holder previews and claims one, and a member who manages members
+ * admits the claimants. The link secret stays on the device that holds it:
+ * the node only ever sees the invitation's public key.
+ */
 export class PigeonCommunityInvitationApi {
-  private readonly notificationPath = '/notifications';
-
   private readonly moderationLogs: CommunityModerationLogSigner;
 
   private readonly notifications: NotificationMutationSigner;
@@ -32,10 +38,7 @@ export class PigeonCommunityInvitationApi {
   public constructor(
     private readonly http: HttpJsonClient,
     private readonly signer: RequestSigner,
-    private readonly communities: Pick<
-      PigeonCommunitiesApi,
-      'frontier' | 'get' | 'inviteMember'
-    >,
+    private readonly communities: Pick<PigeonCommunitiesApi, 'head'>,
     private readonly mutations: PublicMutationSigner,
     private readonly frontiers = new ScopeFrontierReader(http, signer),
   ) {
@@ -47,214 +50,143 @@ export class PigeonCommunityInvitationApi {
     this.operations = new CommunityOperationSigner(mutations);
   }
 
-  private async postInviteLink(
+  private basePath(communityId: string): string {
+    return `/communities/${encodeURIComponent(communityId)}`;
+  }
+
+  private async signedRequest<T>(
+    session: Session,
+    method: 'GET' | 'POST',
+    path: string,
+    body?: unknown,
+  ): Promise<T> {
+    return await this.http.request<T>(path, {
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      headers: await this.signer.headers(session, method, path, body),
+      method,
+    });
+  }
+
+  private async signOperation(
     session: Session,
     communityId: string,
-    path: string,
-    input: CommunityInviteLinkInput,
-  ): Promise<CommunityInviteLinkResource> {
-    const creatorIdentityId = this.mutations.authorOf(session);
-    const nonce = this.createNonce();
-    const createdAt = Date.now();
-    const optional = buildCommunityInviteLinkBody(input);
-    const maxUses = input.maxUses ?? 1;
-    const token = CommitmentId.communityInviteToken(
+    action: string,
+    args: Record<string, unknown>,
+    createdAt: number,
+  ): Promise<CommunityOperationBody> {
+    const { frontier, networkId } = await this.communities.head(
+      session,
       communityId,
-      creatorIdentityId,
-      nonce,
-      maxUses,
-      optional.expiresAt,
     );
-    const record = {
+
+    return await this.operations.sign(session, {
+      action,
+      args,
       communityId,
       createdAt,
-      creatorIdentityId,
-      id: token,
-      maxUses,
-      nonce,
-      scopeType: 'community_invite',
-      token,
-      ...(optional.expiresAt !== undefined
-        ? { expiresAt: optional.expiresAt }
-        : {}),
-    };
-    let response: CommunityInviteLinkResource | undefined;
-    const frontier = await this.frontiers.community(session, communityId);
-
-    await submitPublicMutation(
-      PublicMutationSigner.FIRST_POSITION,
-      (position) =>
-        this.mutations.sign(
-          session,
-          {
-            frontier,
-            kind: 'put',
-            payload: record,
-            recordId: token,
-            store: 'requests',
-          },
-          position,
-        ),
-      async (mutation) => {
-        const body = {
-          createdAt,
-          moderationLog: await this.moderationLogs.sign(session, {
-            action: 'invite_link_created',
-            communityId,
-            createdAt,
-            details: {
-              expiresAt: optional.expiresAt || undefined,
-              maxUses: input.maxUses || undefined,
-            },
-            target: {
-              id: CommunityInviteReference.of(token),
-              type: 'invite',
-            },
-          }),
-          mutation,
-          nonce,
-          ...optional,
-          ...(input.maxUses === undefined ? {} : { maxUses: input.maxUses }),
-        };
-
-        response = await this.http.request<CommunityInviteLinkResource>(path, {
-          body: JSON.stringify(body),
-          headers: await this.signer.headers(session, 'POST', path, body),
-          method: 'POST',
-        });
-      },
-    );
-
-    return response as CommunityInviteLinkResource;
-  }
-
-  private createNonce(): string {
-    const bytes = new Uint8Array(24);
-
-    crypto.getRandomValues(bytes);
-
-    return Buffer.from(bytes)
-      .toString('base64')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
-  }
-
-  private async sendCommunityInvitation(
-    session: Session,
-    communityId: string,
-    recipientIdentityId: string,
-  ): Promise<void> {
-    const invitation = await this.notifications.invitation(session, {
-      recipientIdentityId,
-      subjectId: communityId,
-      type: 'community_invitation',
+      networkId,
+      parents: frontier,
     });
-    const body = {
-      communityId,
-      inviterIdentityId: invitation.inviterIdentityId,
-      mutation: invitation.mutation,
-      nonce: invitation.nonce,
-      recipientIdentityId: invitation.recipientIdentityId,
-      type: 'community_invitation',
-    };
-
-    await this.http.request(this.notificationPath, {
-      body: JSON.stringify(body),
-      headers: await this.signer.headers(
-        session,
-        'POST',
-        this.notificationPath,
-        body,
-      ),
-      method: 'POST',
-    });
-  }
-
-  private async isPublic(session: Session, communityId: string) {
-    return (
-      (await this.communities.get(session, communityId)).visibility === 'public'
-    );
   }
 
   public async create(
     session: Session,
     communityId: string,
-    recipientIdentityId: string,
-  ): Promise<void> {
-    const recipient = recipientIdentityId.trim();
-
-    await this.communities.inviteMember(session, communityId, recipient);
-
-    if (await this.isPublic(session, communityId)) return;
-
-    await this.sendCommunityInvitation(session, communityId, recipient);
-  }
-
-  public async notifyMember(
-    session: Session,
-    communityId: string,
-    recipientIdentityId: string,
-  ): Promise<void> {
-    await this.sendCommunityInvitation(
+    input: CommunityInvitationInput,
+  ): Promise<CommunityInvitationResource> {
+    const createdAt = Date.now();
+    const operation = await this.signOperation(
       session,
       communityId,
-      recipientIdentityId,
+      'invitation_created',
+      Object.fromEntries(
+        Object.entries(input).filter(([, value]) => value !== undefined),
+      ),
+      createdAt,
+    );
+    const body = {
+      ...input,
+      moderationLog: await this.moderationLogs.sign(session, {
+        action: 'invitation_created',
+        communityId,
+        createdAt,
+        details: { expiresAt: input.expiresAt, maxUses: input.maxUses },
+        // The invitation is named by the digest of the operation that creates
+        // it: the hash its record id `community:<id>:op:<hash>` ends with.
+        target: {
+          id: operation.mutation.recordId.split(':op:')[1] as string,
+          type: 'invitation',
+        },
+      }),
+      operation,
+    };
+
+    return await this.signedRequest<CommunityInvitationResource>(
+      session,
+      'POST',
+      `${this.basePath(communityId)}/invitations`,
+      body,
     );
   }
 
-  public async createInviteLink(
+  public async list(
     session: Session,
     communityId: string,
-    input: CommunityInviteLinkInput = {},
-  ): Promise<CommunityInviteLinkResource> {
-    const path = `/communities/${encodeURIComponent(communityId)}/invites`;
+  ): Promise<CommunityInvitationResource[]> {
+    const { invitations } = await this.signedRequest<{
+      invitations: CommunityInvitationResource[];
+    }>(session, 'GET', `${this.basePath(communityId)}/invitations`);
 
-    return await this.postInviteLink(session, communityId, path, input);
+    return invitations;
   }
 
-  public async getInviteLink(
-    inviteToken: string,
-  ): Promise<CommunityInviteLinkResource> {
-    return await this.http.request<CommunityInviteLinkResource>(
-      `/communities/invites/${encodeURIComponent(inviteToken)}`,
+  /** What the link names; the node answers only to the invitation's key. */
+  public async preview(
+    communityId: string,
+    invitationKey: string,
+  ): Promise<CommunityInvitationPreviewResource> {
+    return await this.http.request<CommunityInvitationPreviewResource>(
+      `${this.basePath(communityId)}/invitation-preview`,
+      { headers: { Authorization: `Bearer ${invitationKey}` }, method: 'GET' },
     );
   }
 
-  public async acceptInviteLink(
+  /**
+   * Claims an invitation: the possession proof shows the claimant holds the
+   * link, the consent that the claimant itself asks to join.
+   */
+  public async claim(
     session: Session,
-    inviteToken: string,
-  ): Promise<Community> {
-    const path = `/communities/invites/${encodeURIComponent(
-      inviteToken,
-    )}/accept`;
-    const invite = await this.getInviteLink(inviteToken);
-    const token = invite.token ?? invite.inviteToken ?? inviteToken;
+    preview: CommunityInvitationPreviewResource,
+    secret: string,
+  ): Promise<void> {
+    const { communityId, invitationId, networkId } = preview;
     const identityId = this.mutations.authorOf(session);
-    const usedAt = Date.now();
-    const communityId = invite.communityId as string;
-    const networkId = invite.networkId as string;
-    const operation = await this.operations.sign(session, {
-      action: 'member_joined',
-      args: {
-        identityId,
-        method: 'invite_link',
-        reference: CommunityInviteReference.of(token),
-      },
+    const fields: CommunityInvitationFields = {
       communityId,
-      createdAt: usedAt,
-      networkId,
-      parents: await this.communities.frontier(session, communityId),
-    });
-    const record = {
-      communityId: invite.communityId,
-      id: `invite-use:${token}:${identityId}`,
       identityId,
-      scopeType: 'community_invite_use',
-      token,
-      usedAt,
+      invitationId,
+      networkId,
     };
-    let community: Community | undefined;
+    const proofs = {
+      consent: CommunityInvitationConsent.sign(
+        fields,
+        new PrivateKey(session.keyPair.toPrimitives().privateKey),
+      ),
+      possession:
+        CommunityInvitationKey.fromSecret(secret).signPossession(fields),
+    };
+    const record = {
+      communityId,
+      ...proofs,
+      id: `invitation-claim:${invitationId}:${identityId}`,
+      identityId,
+      invitationId,
+      scopeType: 'community_invitation_claim',
+    };
+    const path = `${this.basePath(communityId)}/invitations/${encodeURIComponent(
+      invitationId,
+    )}/claims`;
     const frontier = await this.frontiers.community(session, communityId);
 
     await submitPublicMutation(
@@ -272,16 +204,102 @@ export class PigeonCommunityInvitationApi {
           position,
         ),
       async (mutation) => {
-        const body = { mutation, operation, usedAt };
-
-        community = await this.http.request<Community>(path, {
-          body: JSON.stringify(body),
-          headers: await this.signer.headers(session, 'POST', path, body),
-          method: 'POST',
+        await this.signedRequest(session, 'POST', path, {
+          ...proofs,
+          mutation,
         });
       },
     );
+  }
 
-    return community as Community;
+  public async listClaims(
+    session: Session,
+    communityId: string,
+  ): Promise<CommunityInvitationClaimResource[]> {
+    const { claims } = await this.signedRequest<{
+      claims: CommunityInvitationClaimResource[];
+    }>(session, 'GET', `${this.basePath(communityId)}/invitation-claims`);
+
+    return claims;
+  }
+
+  /** Admits a claimant: a signed `member_joined` that carries its proofs. */
+  public async admit(
+    session: Session,
+    claim: CommunityInvitationClaimResource,
+  ): Promise<void> {
+    const { communityId, consent, identityId, invitationId, possession } =
+      claim;
+    const operation = await this.signOperation(
+      session,
+      communityId,
+      'member_joined',
+      { consent, identityId, invitationId, method: 'invitation', possession },
+      Date.now(),
+    );
+
+    await this.signedRequest(
+      session,
+      'POST',
+      `${this.basePath(communityId)}/invitations/${encodeURIComponent(
+        invitationId,
+      )}/admissions`,
+      { consent, identityId, operation, possession },
+    );
+  }
+
+  public async revoke(
+    session: Session,
+    communityId: string,
+    invitationId: string,
+  ): Promise<void> {
+    const createdAt = Date.now();
+    const body = {
+      moderationLog: await this.moderationLogs.sign(session, {
+        action: 'invitation_revoked',
+        communityId,
+        createdAt,
+        details: {},
+        target: { id: invitationId, type: 'invitation' },
+      }),
+      operation: await this.signOperation(
+        session,
+        communityId,
+        'invitation_revoked',
+        { invitationId },
+        createdAt,
+      ),
+    };
+
+    await this.signedRequest(
+      session,
+      'POST',
+      `${this.basePath(communityId)}/invitations/${encodeURIComponent(
+        invitationId,
+      )}/revocation`,
+      body,
+    );
+  }
+
+  /** Tells an identity that its request to join the community was accepted. */
+  public async notifyMember(
+    session: Session,
+    communityId: string,
+    recipientIdentityId: string,
+  ): Promise<void> {
+    const invitation = await this.notifications.invitation(session, {
+      recipientIdentityId,
+      subjectId: communityId,
+      type: 'community_invitation',
+    });
+
+    await this.signedRequest(session, 'POST', '/notifications', {
+      communityId,
+      inviterIdentityId: invitation.inviterIdentityId,
+      mutation: invitation.mutation,
+      nonce: invitation.nonce,
+      recipientIdentityId: invitation.recipientIdentityId,
+      type: 'community_invitation',
+    });
   }
 }

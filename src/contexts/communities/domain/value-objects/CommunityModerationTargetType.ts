@@ -3,7 +3,7 @@ import { Enum, ValueNotInEnumError } from '@haskou/value-objects';
 const values = [
   'channel',
   'community',
-  'invite',
+  'invitation',
   'member',
   'membership_request',
   'message',

@@ -1,6 +1,7 @@
 import { Buffer } from 'buffer';
 import { mock } from 'jest-mock-extended';
 
+import type { CommunityInvitationAdmitter } from '../../../../app/composition/communities/CommunityInvitationAdmitter';
 import type { PigeonCommunityOperationsApi } from '../../../../contexts/communities/infrastructure/http/PigeonCommunityOperationsApi';
 import type { PigeonMlsRecordsApi } from '../../../../contexts/communities/infrastructure/http/PigeonMlsRecordsApi';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
@@ -34,7 +35,11 @@ describe('PigeonMlsFacade', () => {
     operations.list.mockImplementation(() =>
       Promise.resolve(history.operations()),
     );
-    facade = new PigeonMlsFacade(mock<PigeonMlsRecordsApi>(), operations);
+    facade = new PigeonMlsFacade(
+      mock<PigeonMlsRecordsApi>(),
+      operations,
+      mock<Pick<CommunityInvitationAdmitter, 'admitPending'>>(),
+    );
     session = {
       deviceCredentialKeyPair: owner.deviceKeyPair(),
       identity: { id: owner.id },
