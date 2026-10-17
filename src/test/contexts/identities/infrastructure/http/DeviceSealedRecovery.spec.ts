@@ -117,6 +117,16 @@ describe(DeviceSealedRecovery.name, () => {
 
       expect(store.read(identityId)).toEqual({});
     });
+
+    it('forgets the root this device trusted for the identity', () => {
+      const { deviceSealedRoot, recovery } = harness();
+
+      recovery.discard(identityId);
+
+      expect(deviceSealedRoot.forgetTrustedRoot).toHaveBeenCalledWith(
+        identityId,
+      );
+    });
   });
 
   describe('rewrapAfterRevoke', () => {

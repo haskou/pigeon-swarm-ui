@@ -1296,6 +1296,8 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
 
     describe('the publisher of a device-sealed secret', () => {
       const unauthorized = 'Device sealed secret publisher is not authorized.';
+      const revoked =
+        'Device sealed secret publisher was revoked after the entry revision.';
       const credentialOf = (pair: KeyPair): DeviceCredential =>
         DeviceCredential.fromString(pair.toPrimitives().publicKey);
       const at = (revision: number): DeviceAuthorizationRevision =>
@@ -1367,6 +1369,36 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
         await expect(
           api.verifyPublisher(session, credentialOf(genesisDevice), at(2)),
         ).rejects.toThrow(unauthorized);
+      });
+
+      it('refuses a device another device revoked later, at a revision that still authorized it', async () => {
+        const { api, genesisDevice, session } = await revoking('laptop');
+
+        await expect(
+          api.verifyPublisher(session, credentialOf(genesisDevice), at(1)),
+        ).rejects.toThrow(revoked);
+        await expect(
+          api.verifyPublisher(session, credentialOf(genesisDevice), at(0)),
+        ).rejects.toThrow(revoked);
+      });
+
+      it('refuses an entry a device published before it retired itself', async () => {
+        const { api, genesisDevice, session } = await revoking('genesis');
+
+        await expect(
+          api.verifyPublisher(session, credentialOf(genesisDevice), at(1)),
+        ).rejects.toThrow(revoked);
+      });
+
+      it('still accepts an earlier entry of a device the head authorizes', async () => {
+        const { api, laptop, session } = await revoking('laptop');
+
+        await expect(
+          api.verifyPublisher(session, credentialOf(laptop), at(1)),
+        ).resolves.toBeUndefined();
+        await expect(
+          api.verifyPublisher(session, credentialOf(laptop), at(2)),
+        ).resolves.toBeUndefined();
       });
 
       it('refuses any publisher when the log cannot be proven', async () => {
