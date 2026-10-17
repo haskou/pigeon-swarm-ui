@@ -84,6 +84,13 @@ describe('GroupMailboxOutbox', () => {
         [current, current - 1].filter((i) => i >= 0).map(generation),
       ),
     );
+    engine.branchGenerations.mockImplementation(() =>
+      Promise.resolve(
+        Array.from({ length: current + 1 }, (_, back) =>
+          generation(current - back),
+        ),
+      ),
+    );
     engine.members.mockResolvedValue(['alice', 'bob']);
     engine.roster.mockImplementation(() => Promise.resolve(roster));
     engine.awaitsConfirmation.mockResolvedValue(false);
@@ -125,7 +132,7 @@ describe('GroupMailboxOutbox', () => {
     outbox.stop();
   });
 
-  it('persists a message before its first append and forgets it once delivered', async () => {
+  it('persists a message before its first append and keeps it, delivered, only while a rival commit could strand a copy', async () => {
     channel.send.mockImplementationOnce(() => {
       expect([...rows.values()].map(({ reference }) => reference)).toEqual([
         'm1',
@@ -137,7 +144,135 @@ describe('GroupMailboxOutbox', () => {
     await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
 
     expect(channel.send).toHaveBeenCalledTimes(2);
+    expect(outbox.items(CONVERSATION)).toEqual([]);
+    expect(
+      [...rows.values()].map(({ copies, landed }) => [copies, landed]),
+    ).toEqual([
+      [
+        [],
+        ['alice', 'bob'].map((identityId) => ({
+          epoch: '0',
+          generation: generation(0).secret.fingerprint(),
+          identityId,
+        })),
+      ],
+    ]);
+
+    current = 7;
+    await outbox.flush();
+    expect(rows.size).toBe(1);
+
+    current = 8;
+    await outbox.flush();
     expect(rows.size).toBe(0);
+    expect(channel.send).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends a delivered message again, once, in the generation of the rival commit that won its epoch', async () => {
+    const rival = new GroupMailboxGeneration(
+      0,
+      GroupMailboxGenerationSecret.fromBytes(new Uint8Array(32).fill(99)),
+      0n,
+      'tree',
+    );
+    const rivalInbox = (identityId: string) =>
+      MailboxKeySchedule.groupInbox(rival.secret.toSymmetricKey(), identityId)
+        .mailboxId;
+
+    await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
+    engine.generation.mockResolvedValue(rival);
+    engine.readableGenerations.mockResolvedValue([rival]);
+    engine.branchGenerations.mockResolvedValue([rival]);
+    sent = [];
+
+    await outbox.flush();
+    await outbox.flush();
+
+    expect(sent).toEqual([rivalInbox('alice'), rivalInbox('bob')]);
+    expect(engine.encrypt).toHaveBeenCalledTimes(2);
+    expect([...rows.values()].map(({ landed }) => landed)).toEqual([
+      ['alice', 'bob'].map((identityId) => ({
+        epoch: '0',
+        generation: rival.secret.fingerprint(),
+        identityId,
+      })),
+    ]);
+  });
+
+  it('sends a delivered commit once and forgets it', async () => {
+    await outbox.enqueueCommit(CONVERSATION, commitTo(['bob']));
+    await outbox.flush();
+
+    expect(sent).toEqual([inboxOf(0, 'bob')]);
+    expect(rows.size).toBe(0);
+  });
+
+  it('sends a message an older build queued again in the current epoch to its pending recipients', async () => {
+    // As stored before rows carried a generation fingerprint and landings.
+    const old = {
+      attempts: 0,
+      body: 'AQ',
+      conversationId: CONVERSATION,
+      copies: [{ envelopeId: 'e', identityId: 'bob' }],
+      createdAt: now,
+      generationIndex: 0,
+      id: 'old',
+      record: 'AQ',
+      reference: 'm0',
+      retryAt: 0,
+    };
+
+    current = 1;
+    rows.set('old', old as unknown as GroupMailboxOutboxRow);
+
+    await outbox.resume();
+
+    expect(sent).toEqual([inboxOf(1, 'bob')]);
+    expect(engine.encrypt).toHaveBeenCalledTimes(1);
+    expect([...rows.values()].map(({ landed }) => landed)).toEqual([
+      [
+        {
+          epoch: '1',
+          generation: generation(1).secret.fingerprint(),
+          identityId: 'bob',
+        },
+      ],
+    ]);
+  });
+
+  it('sends a commit an older build queued in the generation of its index, and drops it once that one drained', async () => {
+    await outbox.enqueueCommit(CONVERSATION, commitTo(['bob']));
+    outbox.stop();
+    const [queued] = [...rows.values()];
+    // As stored before rows carried a generation fingerprint and landings.
+    const old = Object.fromEntries(
+      Object.entries(queued).filter(
+        ([key]) => key !== 'generation' && key !== 'landed',
+      ),
+    );
+
+    rows.set(queued.id, old as unknown as GroupMailboxOutboxRow);
+    await build().resume();
+    expect(sent).toEqual([inboxOf(0, 'bob')]);
+    expect(rows.size).toBe(0);
+
+    sent = [];
+    current = 2;
+    rows.set(queued.id, old as unknown as GroupMailboxOutboxRow);
+    await build().resume();
+    expect(sent).toEqual([]);
+    expect(rows.size).toBe(0);
+  });
+
+  it('sends a delivered message again when a rival won the epoch of its copies, however long ago', async () => {
+    await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
+    current = 20;
+    engine.branchGenerations.mockResolvedValue([generation(20)]);
+    sent = [];
+
+    await outbox.flush();
+
+    expect(sent).toEqual([inboxOf(20, 'alice'), inboxOf(20, 'bob')]);
   });
 
   it.each([
@@ -234,8 +369,8 @@ describe('GroupMailboxOutbox', () => {
 
     await outbox.resume();
 
-    expect(rows.size).toBe(0);
     expect(outbox.items(CONVERSATION)).toEqual([]);
+    expect([...rows.values()].map(({ copies }) => copies)).toEqual([[]]);
   });
 
   it('re-encrypts a stranded message for its pending recipients still in the group', async () => {

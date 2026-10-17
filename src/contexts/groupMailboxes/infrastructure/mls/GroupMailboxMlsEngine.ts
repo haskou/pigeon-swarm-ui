@@ -1101,6 +1101,16 @@ export class GroupMailboxMlsEngine {
   }
 
   /**
+   * Newest first: every generation this device holds, none that a rival
+   * commit which won made it forget; none without a group.
+   */
+  public async branchGenerations(
+    conversationId: string,
+  ): Promise<GroupMailboxGeneration[]> {
+    return (await this.reconciledLog(conversationId)).branch();
+  }
+
+  /**
    * Removes every device of the given identities, which the roster must no
    * longer list, and advances the generation; undefined when none of them
    * holds a leaf. The commit is kept only once `publish` has queued it.

@@ -24,6 +24,19 @@ describe(GroupMailboxGenerationSecret.name, () => {
     ).toEqual(secretBytes);
   });
 
+  it('tells two secrets apart by a fingerprint that is not the secret', () => {
+    const secret = GroupMailboxGenerationSecret.fromString(encoded);
+    const rival = GroupMailboxGenerationSecret.fromBytes(
+      new Uint8Array(32).fill(0x23),
+    );
+
+    expect(secret.fingerprint()).toBe(
+      GroupMailboxGenerationSecret.fromBytes(secretBytes).fingerprint(),
+    );
+    expect(secret.fingerprint()).not.toBe(rival.fingerprint());
+    expect(secret.fingerprint()).not.toContain(encoded);
+  });
+
   it.each([31, 33])('rejects %p bytes', (length) => {
     expect(() =>
       GroupMailboxGenerationSecret.fromBytes(new Uint8Array(length)),

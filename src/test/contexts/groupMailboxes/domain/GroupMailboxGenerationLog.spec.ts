@@ -47,6 +47,23 @@ describe(GroupMailboxGenerationLog.name, () => {
     expect(log.readable(Number.MAX_SAFE_INTEGER)).toHaveLength(1);
   });
 
+  it('lists as its branch every generation it holds, newest first, none a rewind forgot', () => {
+    const log = GroupMailboxGenerationLog.empty()
+      .start(secret(1), 0n, 'tree-0')
+      .advance(secret(2), 2n, 'tree-2', 5)
+      .advance(secret(3), 9n, 'tree-9', 6);
+
+    expect(GroupMailboxGenerationLog.RIVAL_EPOCHS).toBe(8n);
+    expect(GroupMailboxGenerationLog.empty().branch()).toEqual([]);
+    expect(log.branch().map(({ index }) => index)).toEqual([2, 1, 0]);
+    expect(
+      log
+        .rewind(2n)
+        .branch()
+        .map(({ index }) => index),
+    ).toEqual([1, 0]);
+  });
+
   it('round-trips through primitives without changing a generation', () => {
     const log = GroupMailboxGenerationLog.empty()
       .start(secret(1), 0n, 'tree-0')

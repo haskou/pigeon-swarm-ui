@@ -11,6 +11,14 @@ import { GroupMailboxGeneration } from './GroupMailboxGeneration';
  * MLS group for.
  */
 export class GroupMailboxGenerationLog {
+  /**
+   * Epochs back from the current one whose commit a rival commit can still
+   * win: the group keeps the state before each of the last 8 commits it
+   * applied (the library's `RETAINED_EPOCHS`) to switch to a rival, so a
+   * rewind forgets only generations exported after the oldest of them.
+   */
+  public static readonly RIVAL_EPOCHS = 8n;
+
   public static empty(): GroupMailboxGenerationLog {
     return new GroupMailboxGenerationLog([]);
   }
@@ -92,6 +100,15 @@ export class GroupMailboxGenerationLog {
       ...kept.slice(0, -1),
       current.reinstate(),
     ]);
+  }
+
+  /**
+   * Newest first: every generation this device holds. One a rewind forgot,
+   * as exported by a commit a rival won, is not among them. Empty for the
+   * empty log.
+   */
+  public branch(): GroupMailboxGeneration[] {
+    return [...this.generations].reverse();
   }
 
   /** Records the first generation: the epoch this device created or joined. */
