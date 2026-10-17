@@ -8,31 +8,34 @@ import { concatBytes, utf8ToBytes } from '@noble/hashes/utils.js';
 import { encodeBase64Url } from '../../../../shared/infrastructure/encoding/base64url';
 import { scopeClientStorageKey } from '../../../../shared/infrastructure/storage/ClientStorageScope';
 
-const storagePrefix = 'pigeon-swarm:device-sealed-root-trust:v2';
-const fingerprintLabel = utf8ToBytes('pigeon-swarm/device-sealed-root-trust');
-const subkeyInfo = utf8ToBytes('pigeon-swarm/device-sealed-root-trust/v2');
+const storagePrefix = 'pigeon-swarm:device-sealed-root-trust';
+const storageVersion = 'v3';
+const earlierStorageVersions = ['v1', 'v2'] as const;
+const fingerprintLabel = 'pigeon-swarm/device-sealed-root-trust';
+const subkeyInfo = utf8ToBytes('pigeon-swarm/device-sealed-root-trust/v3');
 const subkeyLength = 32;
-const recordPattern = /^(0|[1-9]\d*)\.([\w-]+)$/;
+const recordPattern = /^(0|[1-9]\d*)\.([\w-]+)\.([\w-]+)$/;
 
 /**
  * Remembers, per local identity on this device, the one device-sealed root
  * this device last opened from an entry whose publisher the signed
- * transitions authorized, or published itself, with the authorization
- * revision of that entry. Only a fingerprint is kept, keyed by a subkey
- * derived from the vault root key, never by that key itself. That key is the
- * identity root every paired device shares, not a key of this device alone:
- * the record reveals nothing about the root, and a record planted without
- * that key matches nothing. Reads never throw: unreadable or unparseable
- * data, including a record of an earlier version, trusts nothing and
- * supersedes nothing. Writes throw when the browser refuses them.
+ * transitions authorized, or published itself, at the highest authorization
+ * revision this device reached with a trusted root. A root at a lower
+ * revision leaves the record as it is, so a node that rolls an entry back
+ * neither lowers that revision nor replaces the root trusted there, and
+ * cannot reopen a hand-over below it. Only a fingerprint of the root is kept,
+ * with a tag over the revision, both keyed by a subkey derived from the vault
+ * root key, never by that key itself. That key is the identity root every
+ * paired device shares, not a key of this device alone: the record reveals
+ * nothing about the root, and a record or revision planted without that key
+ * counts for nothing. Reads never throw: unreadable, unparseable or
+ * unauthenticated data trusts nothing and supersedes nothing. Records of
+ * earlier versions are never read; removing them when the identity's record
+ * is written or forgotten is best effort. Writing or removing the record
+ * itself throws when the browser refuses it.
  */
 export class DeviceSealedRootTrustStore {
-  private static fingerprint(
-    identityId: string,
-    vaultRootKey: SymmetricKey,
-    root: SymmetricKey,
-    revision: number,
-  ): string {
+  private static mac(vaultRootKey: SymmetricKey, message: Uint8Array): string {
     return encodeBase64Url(
       hmac(
         sha256,
@@ -43,11 +46,33 @@ export class DeviceSealedRootTrustStore {
           subkeyInfo,
           subkeyLength,
         ),
-        concatBytes(
-          fingerprintLabel,
-          utf8ToBytes(`:${identityId}:${revision}:`),
-          root.getBuffer(),
-        ),
+        message,
+      ),
+    );
+  }
+
+  private static revisionTag(
+    identityId: string,
+    vaultRootKey: SymmetricKey,
+    revision: number,
+  ): string {
+    return this.mac(
+      vaultRootKey,
+      utf8ToBytes(`${fingerprintLabel}/revision:${identityId}:${revision}`),
+    );
+  }
+
+  private static fingerprint(
+    identityId: string,
+    vaultRootKey: SymmetricKey,
+    root: SymmetricKey,
+    revision: number,
+  ): string {
+    return this.mac(
+      vaultRootKey,
+      concatBytes(
+        utf8ToBytes(`${fingerprintLabel}:${identityId}:${revision}:`),
+        root.getBuffer(),
       ),
     );
   }
@@ -59,44 +84,79 @@ export class DeviceSealedRootTrustStore {
     >,
   ) {}
 
-  private key(identityId: string): string {
-    return scopeClientStorageKey(`${storagePrefix}:${identityId}`);
+  private key(identityId: string, version: string = storageVersion): string {
+    return scopeClientStorageKey(`${storagePrefix}:${version}:${identityId}`);
   }
 
-  private kept(
-    identityId: string,
-  ): { fingerprint: string; revision: number } | null {
-    let kept: string | null;
-
+  private read(identityId: string): string | null {
     try {
-      kept = this.storage.getItem(this.key(identityId));
+      return this.storage.getItem(this.key(identityId));
     } catch {
       return null;
     }
+  }
 
-    const match = kept === null ? null : recordPattern.exec(kept);
+  /** The kept record once its revision tag authenticates; null otherwise. */
+  private kept(
+    identityId: string,
+    vaultRootKey: SymmetricKey,
+  ): { fingerprint: string; revision: number } | null {
+    const record = this.read(identityId);
+    const match = record === null ? null : recordPattern.exec(record);
     const revision = match ? Number(match[1]) : Number.NaN;
 
-    return match && Number.isSafeInteger(revision)
-      ? { fingerprint: match[2], revision }
+    return match &&
+      Number.isSafeInteger(revision) &&
+      match[2] ===
+        DeviceSealedRootTrustStore.revisionTag(
+          identityId,
+          vaultRootKey,
+          revision,
+        )
+      ? { fingerprint: match[3], revision }
       : null;
   }
 
+  /** Never throws: an earlier record is never read, so a left one is inert. */
+  private removeEarlierVersions(identityId: string): void {
+    for (const version of earlierStorageVersions) {
+      try {
+        this.storage.removeItem(this.key(identityId, version));
+      } catch {
+        // eslint-disable-next-line no-console
+        console.debug('Could not remove an earlier device-sealed trust record');
+      }
+    }
+  }
+
+  /** Keeps the root unless a root is kept at a higher revision. */
   public remember(
     identityId: string,
     vaultRootKey: SymmetricKey,
     root: SymmetricKey,
     revision: number,
   ): void {
+    const kept = this.kept(identityId, vaultRootKey);
+
+    if (kept !== null && kept.revision > revision) return;
     this.storage.setItem(
       this.key(identityId),
-      `${revision}.${DeviceSealedRootTrustStore.fingerprint(
-        identityId,
-        vaultRootKey,
-        root,
+      [
         revision,
-      )}`,
+        DeviceSealedRootTrustStore.revisionTag(
+          identityId,
+          vaultRootKey,
+          revision,
+        ),
+        DeviceSealedRootTrustStore.fingerprint(
+          identityId,
+          vaultRootKey,
+          root,
+          revision,
+        ),
+      ].join('.'),
     );
+    this.removeEarlierVersions(identityId);
   }
 
   /**
@@ -108,7 +168,7 @@ export class DeviceSealedRootTrustStore {
     vaultRootKey: SymmetricKey,
     root: SymmetricKey,
   ): boolean {
-    const kept = this.kept(identityId);
+    const kept = this.kept(identityId, vaultRootKey);
 
     return (
       kept !== null &&
@@ -132,7 +192,7 @@ export class DeviceSealedRootTrustStore {
     root: SymmetricKey,
     revision: number,
   ): boolean {
-    const kept = this.kept(identityId);
+    const kept = this.kept(identityId, vaultRootKey);
 
     return (
       kept !== null &&
@@ -143,5 +203,6 @@ export class DeviceSealedRootTrustStore {
 
   public forget(identityId: string): void {
     this.storage.removeItem(this.key(identityId));
+    this.removeEarlierVersions(identityId);
   }
 }

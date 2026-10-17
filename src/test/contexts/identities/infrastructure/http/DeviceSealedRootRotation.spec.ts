@@ -1047,5 +1047,44 @@ describe('DeviceSealedRootRotation', () => {
         plain.getBuffer(),
       );
     });
+
+    it('bounds the generation of a hand-over to a day past the clock, so a forged one near MAX_SAFE_INTEGER neither stamps the session nor stalls publishes', async () => {
+      const { root, rotation, sealedSecrets } = handedOver();
+
+      sealedSecrets.fetchOwn.mockResolvedValue({
+        ...entryOf(root),
+        generation: Number.MAX_SAFE_INTEGER - 1,
+      });
+
+      const opened = await rotation.current(makeSession(4));
+      await rotation.rotate(makeSession(4));
+
+      expect(opened.deviceSealedRootGeneration?.valueOf()).toBe(1_000 + DAY);
+      expect(sealedSecrets.publish.mock.calls[0][1].generation).toBe(
+        1_000 + DAY + 1,
+      );
+    });
+
+    it('still refuses a hand-over at the trusted revision after the node rolled back to a lower plain entry', async () => {
+      const { deviceAuthorization, rotation, sealedSecrets } = handedOver();
+      const rolledBack = SymmetricKey.generate();
+
+      deviceAuthorization.verifyPublisher.mockResolvedValue('authorized');
+      sealedSecrets.fetchOwn.mockResolvedValue(
+        entryOf(SymmetricKey.generate(), 5),
+      );
+      await rotation.current(makeSession(5));
+      sealedSecrets.fetchOwn.mockResolvedValue(entryOf(rolledBack, 4));
+      await rotation.current(makeSession(4));
+
+      deviceAuthorization.verifyPublisher.mockResolvedValue('retired');
+      sealedSecrets.fetchOwn.mockResolvedValue(
+        entryOf(SymmetricKey.generate(), 5),
+      );
+
+      await expect(rotation.current(makeSession(5))).rejects.toThrow(
+        SUPERSEDED,
+      );
+    });
   });
 });
