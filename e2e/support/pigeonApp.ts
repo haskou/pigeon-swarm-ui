@@ -325,13 +325,17 @@ export async function reviewDevicePairing(
 
 /**
  * Confirms the reviewed pairing with the password and signs in on the fresh
- * device with the completion code.
+ * device with the completion code. The history choice is left at its
+ * default, so pairing takes no extra step.
  */
 export async function authorizeDevicePairing(
   authorized: Page,
   fresh: Page,
   identity: TestIdentity,
 ): Promise<void> {
+  await expect(
+    authorized.getByTestId('device-pairing-history-select'),
+  ).toHaveValue('last-30-days');
   await authorized
     .getByTestId('device-pairing-password-input')
     .fill(identity.password);
