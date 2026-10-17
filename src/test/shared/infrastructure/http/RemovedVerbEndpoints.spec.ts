@@ -11,7 +11,7 @@ const removedPaths: [string, RegExp][] = [
   ['POST /communities/{id}/channels/voice', /\/channels\/voice\b/],
   ['DELETE /communities/{id}/members/{identityId}/kick', /\/kick(?![-\w])/],
   ['GET /communities/discover', /\/communities\/discover\b/],
-  ['POST /polls/{pollId}/close', /\/polls\/.*\/close\b/],
+  ['POST /polls/{pollId}/close', /\/polls\/(?:\$\{[^}]+\}|[\w-]+)\/close['"`]/],
   [
     'POST /calls/{id}/participants/me/heartbeat',
     /\/participants\/me\/heartbeat/,
