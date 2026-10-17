@@ -146,11 +146,13 @@ export class PigeonNodeApi {
   }
 
   public async createPublicNetwork(session?: Session): Promise<void> {
-    const path = '/node/networks/public';
+    const path = '/node/networks';
+    const body = { name: 'public' };
 
     await this.http.request(path, {
+      body: JSON.stringify(body),
       headers: session
-        ? await this.signer.headers(session, 'POST', path)
+        ? await this.signer.headers(session, 'POST', path, body)
         : undefined,
       method: 'POST',
     });

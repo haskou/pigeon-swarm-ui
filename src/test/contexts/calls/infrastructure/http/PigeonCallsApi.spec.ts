@@ -113,6 +113,37 @@ describe(PigeonCallsApi.name, () => {
     expect(bodyOf(request, 2)).toEqual({ at: 9, mutation });
   });
 
+  it('patches the participant resource for heartbeats and signs that method and path', async () => {
+    const { api, request, signer } = build([undefined]);
+
+    await api.heartbeat(session, 'call-a', []);
+
+    expect(request.mock.calls[0]).toEqual([
+      '/calls/call-a/participants/me',
+      expect.objectContaining({ method: 'PATCH' }),
+    ]);
+    expect(bodyOf(request, 0)).toEqual({ mediaConnections: [] });
+    expect((signer.headers as jest.Mock).mock.calls[0].slice(1, 3)).toEqual([
+      'PATCH',
+      '/calls/call-a/participants/me',
+    ]);
+  });
+
+  it('reads ICE servers from the call-ice-servers resource', async () => {
+    const { api, request, signer } = build([{ iceServers: [] }]);
+
+    await api.getIceServers(session);
+
+    expect(request.mock.calls[0]).toEqual([
+      '/call-ice-servers',
+      expect.objectContaining({ method: 'GET' }),
+    ]);
+    expect((signer.headers as jest.Mock).mock.calls[0].slice(1, 3)).toEqual([
+      'GET',
+      '/call-ice-servers',
+    ]);
+  });
+
   it('signs leave states and end', async () => {
     const { api, events, request } = build([undefined, undefined, undefined]);
     const participant = jest

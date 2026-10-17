@@ -69,11 +69,11 @@ describe(PigeonPublicFilesClient.name, () => {
     expect(signer.headers).toHaveBeenCalledWith(
       session,
       'POST',
-      '/ipfs/public',
+      '/ipfs/contents',
       bytes,
     );
     expect(http.request).toHaveBeenCalledWith(
-      '/ipfs/public',
+      '/ipfs/contents',
       expect.objectContaining({ body: bytes, method: 'POST' }),
     );
     expect(replication.register).toHaveBeenCalledTimes(2);

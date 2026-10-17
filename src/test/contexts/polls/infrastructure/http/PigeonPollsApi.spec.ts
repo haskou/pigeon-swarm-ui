@@ -99,6 +99,21 @@ describe(PigeonPollsApi.name, () => {
     });
   });
 
+  it('closes a poll by patching its status', async () => {
+    const { api, http, session, signer } = await setup();
+
+    await api.close(session, 'poll-a', CHANNEL, 300);
+
+    const [path, init] = http.request.mock.calls[0];
+    expect(path).toBe('/polls/poll-a');
+    expect(init?.method).toBe('PATCH');
+    expect(sentBody(http).status).toBe('closed');
+    expect(signer.headers.mock.calls[0].slice(1, 3)).toEqual([
+      'PATCH',
+      '/polls/poll-a',
+    ]);
+  });
+
   it('signs creation with the client-chosen poll id as record id', async () => {
     const { api, http, session } = await setup();
 

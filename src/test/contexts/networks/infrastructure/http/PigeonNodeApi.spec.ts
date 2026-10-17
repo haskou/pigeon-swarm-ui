@@ -120,6 +120,27 @@ describe(PigeonNodeApi.name, () => {
     });
   });
 
+  it('creates the public network by posting it to the networks collection', async () => {
+    const request = jest.fn().mockResolvedValue(undefined);
+    const headers = jest.fn().mockResolvedValue({});
+    const api = new PigeonNodeApi(
+      { request } as unknown as HttpJsonClient,
+      { headers } as unknown as RequestSigner,
+    );
+    const session = { identity: { id: 'identity-1' } } as never;
+
+    await api.createPublicNetwork(session);
+
+    expect(request).toHaveBeenCalledWith('/node/networks', {
+      body: JSON.stringify({ name: 'public' }),
+      headers: {},
+      method: 'POST',
+    });
+    expect(headers).toHaveBeenCalledWith(session, 'POST', '/node/networks', {
+      name: 'public',
+    });
+  });
+
   it('updates relay configuration with the canonical request path', async () => {
     const configuration = defaultNodeRelayConfiguration();
     configuration.callsRelay.port = 3478;

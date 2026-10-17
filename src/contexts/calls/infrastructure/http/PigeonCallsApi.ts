@@ -100,7 +100,7 @@ export class PigeonCallsApi {
   }
 
   public async getIceServers(session: Session): Promise<CallIceServerConfig> {
-    const path = '/calls/ice-servers';
+    const path = '/call-ice-servers';
 
     return await this.http.request<CallIceServerConfig>(path, {
       headers: await this.signer.headers(session, 'GET', path),
@@ -234,15 +234,13 @@ export class PigeonCallsApi {
     callId: string,
     mediaConnections: CallParticipantMediaConnection[],
   ): Promise<void> {
-    const path = `/calls/${encodeURIComponent(
-      callId,
-    )}/participants/me/heartbeat`;
+    const path = `/calls/${encodeURIComponent(callId)}/participants/me`;
     const body = { mediaConnections };
 
     await this.http.request<void>(path, {
       body: JSON.stringify(body),
-      headers: await this.signer.headers(session, 'POST', path, body),
-      method: 'POST',
+      headers: await this.signer.headers(session, 'PATCH', path, body),
+      method: 'PATCH',
     });
   }
 

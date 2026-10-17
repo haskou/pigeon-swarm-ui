@@ -227,28 +227,28 @@ describe(RequestSigner.name, () => {
     const raw = SignedHttpRequestSignature.signingContent({
       body: Uint8Array.from([1, 2, 3]),
       method: 'POST',
-      path: '/ipfs/public',
+      path: '/ipfs/contents',
       timestamp: 123,
     });
 
     expect(
       signer.payload(
         'POST',
-        '/ipfs/public',
+        '/ipfs/contents',
         123,
         Uint8Array.from([1, 2, 3]).buffer,
       ),
     ).toBe(raw);
-    expect(signer.payload('POST', '/ipfs/public', 123, view)).toBe(raw);
+    expect(signer.payload('POST', '/ipfs/contents', 123, view)).toBe(raw);
     expect(
       signer.payload(
         'POST',
-        '/ipfs/public',
+        '/ipfs/contents',
         123,
         new DataView(bytes.buffer, 1, 3),
       ),
     ).toBe(raw);
-    expect(signer.payload('POST', '/ipfs/public', 123, [1, 2, 3])).not.toBe(
+    expect(signer.payload('POST', '/ipfs/contents', 123, [1, 2, 3])).not.toBe(
       raw,
     );
   });

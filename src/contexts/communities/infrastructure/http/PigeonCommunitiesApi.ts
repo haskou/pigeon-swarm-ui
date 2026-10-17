@@ -267,6 +267,7 @@ export class PigeonCommunitiesApi {
     moderationLog: CommunityModerationLogBody;
     name: string;
     operation: CommunityOperationBody;
+    type: 'text' | 'voice';
   }> {
     const createdAt = Date.now();
     const channelId = CommunityChannelId.derive(
@@ -291,6 +292,7 @@ export class PigeonCommunitiesApi {
         { channelId, name, type },
         createdAt,
       ),
+      type,
     };
   }
 
@@ -556,7 +558,7 @@ export class PigeonCommunitiesApi {
     session: Session,
     input: { networkId?: string; query?: string },
   ): Promise<CommunityDiscoveryResource[]> {
-    const path = '/communities/discover';
+    const path = '/discoverable-communities';
     const query = new URLSearchParams();
     const body = {};
 
@@ -766,7 +768,7 @@ export class PigeonCommunitiesApi {
   ): Promise<Community> {
     const path = `/communities/${encodeURIComponent(
       communityId,
-    )}/members/${encodeURIComponent(identityId)}/kick`;
+    )}/members/${encodeURIComponent(identityId)}`;
     const createdAt = Date.now();
     const body = {
       moderationLog: await this.moderationLogs.sign(session, {
@@ -1135,9 +1137,7 @@ export class PigeonCommunitiesApi {
     communityId: string,
     name: string,
   ): Promise<CommunityTextChannel> {
-    const path = `/communities/${encodeURIComponent(
-      communityId,
-    )}/channels/text`;
+    const path = `/communities/${encodeURIComponent(communityId)}/channels`;
     const body = await this.channelCreationBody(
       session,
       communityId,
@@ -1161,9 +1161,7 @@ export class PigeonCommunitiesApi {
     communityId: string,
     name: string,
   ): Promise<CommunityVoiceChannel> {
-    const path = `/communities/${encodeURIComponent(
-      communityId,
-    )}/channels/voice`;
+    const path = `/communities/${encodeURIComponent(communityId)}/channels`;
     const body = await this.channelCreationBody(
       session,
       communityId,
