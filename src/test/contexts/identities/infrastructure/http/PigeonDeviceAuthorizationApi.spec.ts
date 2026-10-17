@@ -1343,10 +1343,10 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
 
         await expect(
           api.verifyPublisher(session, credentialOf(genesisDevice), at(0)),
-        ).resolves.toBeUndefined();
+        ).resolves.toBe('authorized');
         await expect(
           api.verifyPublisher(session, credentialOf(laptop), at(1)),
-        ).resolves.toBeUndefined();
+        ).resolves.toBe('authorized');
         await expect(
           api.verifyPublisher(session, credentialOf(laptop), at(0)),
         ).rejects.toThrow(unauthorized);
@@ -1355,12 +1355,12 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
         ).rejects.toThrow(unauthorized);
       });
 
-      it('accepts the hand-over of a device that retired itself at the entry revision', async () => {
+      it('accepts the hand-over of a device that retired itself at the entry revision, as a retired publisher', async () => {
         const { api, genesisDevice, session } = await revoking('genesis');
 
         await expect(
           api.verifyPublisher(session, credentialOf(genesisDevice), at(2)),
-        ).resolves.toBeUndefined();
+        ).resolves.toBe('retired');
       });
 
       it('refuses a device another device revoked at the entry revision', async () => {
@@ -1395,10 +1395,10 @@ describe(PigeonDeviceAuthorizationApi.name, () => {
 
         await expect(
           api.verifyPublisher(session, credentialOf(laptop), at(1)),
-        ).resolves.toBeUndefined();
+        ).resolves.toBe('authorized');
         await expect(
           api.verifyPublisher(session, credentialOf(laptop), at(2)),
-        ).resolves.toBeUndefined();
+        ).resolves.toBe('authorized');
       });
 
       it('refuses any publisher when the log cannot be proven', async () => {

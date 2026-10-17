@@ -28,6 +28,7 @@ const RECIPIENTS = [
 const PUBLISHER = { id: 'publisher' } as unknown as DeviceCredential;
 const UNAUTHORIZED = 'Device sealed secret publisher is not authorized.';
 const MASTER_KEY = SymmetricKey.generate();
+const DAY = 86_400_000;
 
 const makeSession = (revision: number): SessionWithRoot =>
   ({
@@ -813,12 +814,12 @@ describe('DeviceSealedRootRotation', () => {
   describe('an own entry whose publisher was revoked after the entry revision', () => {
     const REVOKED =
       'Device sealed secret publisher was revoked after the entry revision.';
-    const revokedLater = (root: SymmetricKey) => {
+    const revokedLater = (root: SymmetricKey, generation = 9_000) => {
       const context = setup(1_000);
 
       context.sealedSecrets.fetchOwn.mockResolvedValue({
         authorizationRevision: 4,
-        generation: 9_000,
+        generation,
         payload: encodeBase64Url(root.getBuffer()),
         publisherCredential: PUBLISHER,
       });
@@ -901,6 +902,54 @@ describe('DeviceSealedRootRotation', () => {
       expect(sealedSecrets.publish.mock.calls[0][1].generation).toBe(9_001);
     });
 
+    it('neither stalls publishes nor hands over above a day past the clock for a forged generation near MAX_SAFE_INTEGER', async () => {
+      const root = SymmetricKey.generate();
+      const { deviceAuthorization, rotation, sealedSecrets } = revokedLater(
+        root,
+        Number.MAX_SAFE_INTEGER - 1,
+      );
+
+      deviceAuthorization.verifyPublisher.mockResolvedValueOnce('authorized');
+      await rotation.current(makeSession(4));
+      await rotation.rotate(makeSession(5));
+      await rotation.handOver(makeSession(5), {
+        authorizationRevision: 6,
+        recipients: RECIPIENTS,
+      });
+
+      expect(sealedSecrets.publish.mock.calls[0][1].generation).toBe(
+        1_000 + DAY + 1,
+      );
+      expect(sealedSecrets.sealHandOver.mock.calls[0][1].generation).toBe(
+        1_000 + DAY + 1,
+      );
+    });
+
+    it('never adopts the root or the generation of that entry on a stale session, which moves off it instead', async () => {
+      const root = SymmetricKey.generate();
+      const { deviceAuthorization, rotation, sealedSecrets } = revokedLater(
+        root,
+        Number.MAX_SAFE_INTEGER - 1,
+      );
+      const synced = makeSession(5);
+
+      deviceAuthorization.verifyPublisher.mockResolvedValueOnce('authorized');
+      await rotation.current(makeSession(4));
+      deviceAuthorization.synchronize.mockResolvedValue(synced);
+
+      const current = await rotation.current(makeSession(4));
+
+      expect(current).toBe(synced);
+      expect(current.deviceSealedRootKey).toBeUndefined();
+      expect(current.deviceSealedRootGeneration).toBeUndefined();
+      expect(sealedSecrets.publish).not.toHaveBeenCalled();
+      expect(
+        (await rotation.laggingRoot(synced))
+          ?.getBuffer()
+          .equals(root.getBuffer()),
+      ).toBe(true);
+    });
+
     it('keeps the trusted root apart per identity', async () => {
       const root = SymmetricKey.generate();
       const { deviceAuthorization, rotation } = revokedLater(root);
@@ -913,6 +962,90 @@ describe('DeviceSealedRootRotation', () => {
       await rotation.current(makeSession(4));
 
       await expect(rotation.laggingRoot(other)).rejects.toThrow(REVOKED);
+    });
+  });
+
+  describe('a hand-over from a device that retired itself', () => {
+    const SUPERSEDED =
+      'Device sealed root hand-over is superseded by a root this device trusts.';
+    const entryOf = (root: SymmetricKey, revision = 4) => ({
+      authorizationRevision: revision,
+      generation: 9_000,
+      payload: encodeBase64Url(root.getBuffer()),
+      publisherCredential: PUBLISHER,
+    });
+    const handedOver = () => {
+      const context = setup(1_000);
+      const root = SymmetricKey.generate();
+
+      context.sealedSecrets.fetchOwn.mockResolvedValue(entryOf(root));
+      context.deviceAuthorization.verifyPublisher.mockResolvedValue('retired');
+
+      return { ...context, root };
+    };
+
+    it('opens the hand-over above the revision of the root this device trusts, and again while it trusts that hand-over', async () => {
+      const { deviceAuthorization, rotation, sealedSecrets, root } =
+        handedOver();
+
+      sealedSecrets.fetchOwn.mockResolvedValueOnce(
+        entryOf(SymmetricKey.generate(), 3),
+      );
+      deviceAuthorization.verifyPublisher.mockResolvedValueOnce('authorized');
+      await rotation.current(makeSession(3));
+
+      const opened = await rotation.current(makeSession(4));
+      const reopened = await rotation.current(makeSession(4));
+
+      expect(opened.deviceSealedRootKey?.getBuffer()).toEqual(root.getBuffer());
+      expect(reopened.deviceSealedRootKey?.getBuffer()).toEqual(
+        root.getBuffer(),
+      );
+    });
+
+    it('refuses a hand-over at or below the revision of another root this device trusts, so a retired key cannot re-sign one', async () => {
+      const { keychains, rotation, sealedSecrets } = handedOver();
+
+      await rotation.current(makeSession(4));
+      await rotation.rotate(makeSession(4));
+
+      for (const revision of [4, 3]) {
+        sealedSecrets.fetchOwn.mockResolvedValue(
+          entryOf(SymmetricKey.generate(), revision),
+        );
+
+        await expect(rotation.current(makeSession(revision))).rejects.toThrow(
+          SUPERSEDED,
+        );
+        await expect(rotation.laggingRoot(makeSession(5))).rejects.toThrow(
+          SUPERSEDED,
+        );
+        await expect(
+          rotation.handOver(makeSession(5), {
+            authorizationRevision: 6,
+            recipients: RECIPIENTS,
+          }),
+        ).rejects.toThrow(SUPERSEDED);
+      }
+
+      expect(sealedSecrets.publish).toHaveBeenCalledTimes(1);
+      expect(sealedSecrets.sealHandOver).not.toHaveBeenCalled();
+      expect(keychains.readHead).not.toHaveBeenCalled();
+    });
+
+    it('still opens a plain entry an authorized device published at that revision after the hand-over', async () => {
+      const { deviceAuthorization, rotation, sealedSecrets } = handedOver();
+      const plain = SymmetricKey.generate();
+
+      await rotation.current(makeSession(4));
+      sealedSecrets.fetchOwn.mockResolvedValue(entryOf(plain));
+      deviceAuthorization.verifyPublisher.mockResolvedValue('authorized');
+
+      const opened = await rotation.current(makeSession(4));
+
+      expect(opened.deviceSealedRootKey?.getBuffer()).toEqual(
+        plain.getBuffer(),
+      );
     });
   });
 });
