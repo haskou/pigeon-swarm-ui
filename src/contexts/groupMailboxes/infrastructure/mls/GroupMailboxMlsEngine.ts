@@ -1101,14 +1101,13 @@ export class GroupMailboxMlsEngine {
   }
 
   /**
-   * The current generation first, then every other one a rival commit that
-   * wins an epoch back could still make this device forget; none without a
-   * group.
+   * Newest first: every generation this device holds, none that a rival
+   * commit which won made it forget; none without a group.
    */
-  public async rewindableGenerations(
+  public async branchGenerations(
     conversationId: string,
   ): Promise<GroupMailboxGeneration[]> {
-    return (await this.reconciledLog(conversationId)).rewindable();
+    return (await this.reconciledLog(conversationId)).branch();
   }
 
   /**

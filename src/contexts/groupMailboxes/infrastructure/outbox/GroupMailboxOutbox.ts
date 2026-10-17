@@ -211,13 +211,13 @@ export class GroupMailboxOutbox {
   private async attemptAll(): Promise<void> {
     const now = this.clock();
     const attempts: GroupMailboxOutboxAttempt[] = [];
-    const rewindable = new Map<string, Promise<GroupMailboxGeneration[]>>();
+    const branches = new Map<string, Promise<GroupMailboxGeneration[]>>();
     const generations = (conversationId: string) => {
       const known =
-        rewindable.get(conversationId) ??
-        this.engine.rewindableGenerations(conversationId);
+        branches.get(conversationId) ??
+        this.engine.branchGenerations(conversationId);
 
-      rewindable.set(conversationId, known);
+      branches.set(conversationId, known);
 
       return known;
     };
@@ -431,10 +431,10 @@ export class GroupMailboxOutbox {
   private async prepared(
     persisted: GroupMailboxOutboxRow,
     now: number,
-    rewindable: (conversationId: string) => Promise<GroupMailboxGeneration[]>,
+    branch: (conversationId: string) => Promise<GroupMailboxGeneration[]>,
   ): Promise<GroupMailboxOutboxAttempt | undefined> {
     const expired = now - persisted.createdAt >= GroupMailboxOutbox.EXPIRY_MS;
-    const row = await this.watched(persisted, expired, rewindable);
+    const row = await this.watched(persisted, expired, branch);
 
     if (!row) return undefined;
 
@@ -457,26 +457,29 @@ export class GroupMailboxOutbox {
   }
 
   /**
-   * The row with the landings it still watches. One in a generation no
-   * rival commit can make this device forget any more is dropped. One in a
-   * generation a rival commit made it forget is queued again, as no member
-   * reads that inbox any more, and the row's generation is cleared so it is
-   * re-sealed in the current epoch.
+   * The row with the landings it still watches. One in a generation a rival
+   * commit made this device forget is queued again, however old, as no
+   * member reads that inbox any more, and the row's generation is cleared
+   * so it is re-sealed in the current epoch. Of the others, one in a
+   * generation no rival commit can make it forget any more is dropped.
    */
   private async reclaimed(
     row: GroupMailboxOutboxRow,
-    rewindable: (conversationId: string) => Promise<GroupMailboxGeneration[]>,
+    branch: (conversationId: string) => Promise<GroupMailboxGeneration[]>,
   ): Promise<GroupMailboxOutboxRow> {
     if (row.landed.length === 0) return row;
-    const generations = await rewindable(row.conversationId);
+    const generations = await branch(row.conversationId);
     const latest = generations[0]?.epoch;
     const held = new Set(generations.map(({ secret }) => secret.fingerprint()));
+    const stranded = row.landed.filter(
+      ({ generation }) => !held.has(generation),
+    );
     const landed = row.landed.filter(
-      ({ epoch }) =>
+      ({ epoch, generation }) =>
+        held.has(generation) &&
         latest !== undefined &&
         latest - BigInt(epoch) < GroupMailboxGenerationLog.RIVAL_EPOCHS,
     );
-    const stranded = landed.filter(({ generation }) => !held.has(generation));
 
     if (stranded.length === 0) {
       return landed.length === row.landed.length ? row : { ...row, landed };
@@ -492,8 +495,39 @@ export class GroupMailboxOutbox {
           .map(({ identityId }) => ({ envelopeId: '', identityId })),
       ],
       generation: '',
-      landed: landed.filter((landing) => !stranded.includes(landing)),
+      landed,
     };
+  }
+
+  /**
+   * A row as this build keeps it. One an older build queued has neither a
+   * generation fingerprint nor landings: a message gets no fingerprint, so
+   * it is sealed again in the current epoch for its pending recipients; a
+   * commit takes the fingerprint of the readable generation of its index,
+   * or none once that one drained, and is then dropped like any commit of
+   * a drained generation. The upgraded row is stored.
+   */
+  private async upgraded(
+    row: GroupMailboxOutboxRow,
+  ): Promise<GroupMailboxOutboxRow> {
+    if (typeof row.generation === 'string' && Array.isArray(row.landed)) {
+      return row;
+    }
+    const generation =
+      row.body === undefined
+        ? (await this.engine.readableGenerations(row.conversationId)).find(
+            ({ index }) => index === row.generationIndex,
+          )
+        : undefined;
+    const upgraded = {
+      ...row,
+      generation: generation?.secret.fingerprint() ?? '',
+      landed: [],
+    };
+
+    await this.store.save(this.session(), upgraded).catch(() => undefined);
+
+    return upgraded;
   }
 
   /** Runs one pass after any pass already queued. */
@@ -608,11 +642,9 @@ export class GroupMailboxOutbox {
   private async watched(
     persisted: GroupMailboxOutboxRow,
     expired: boolean,
-    rewindable: (conversationId: string) => Promise<GroupMailboxGeneration[]>,
+    branch: (conversationId: string) => Promise<GroupMailboxGeneration[]>,
   ): Promise<GroupMailboxOutboxRow | undefined> {
-    const row = await this.reclaimed(persisted, rewindable).catch(
-      () => persisted,
-    );
+    const row = await this.reclaimed(persisted, branch).catch(() => persisted);
     const queued = GroupMailboxOutbox.isQueued(row);
 
     if (!queued && (expired || row.landed.length === 0)) {
@@ -820,17 +852,16 @@ export class GroupMailboxOutbox {
 
   /**
    * Loads the persisted queue and retries it. A row queued by an older
-   * build, without the generation fingerprint and the landings, is dropped
-   * and reported as failed, so a message in it can be sent again.
+   * build is upgraded first (`upgraded`); one that cannot be upgraded for
+   * now stays stored for the next resume.
    */
   public async resume(): Promise<void> {
     this.stopped = false;
 
-    for (const row of await this.store.load(this.session())) {
-      if (typeof row.generation !== 'string' || !Array.isArray(row.landed)) {
-        await this.fail(row);
-        continue;
-      }
+    for (const stored of await this.store.load(this.session())) {
+      const row = await this.upgraded(stored).catch(() => undefined);
+
+      if (!row) continue;
 
       if (!this.rows.has(row.id)) this.rows.set(row.id, row);
       this.lastCreatedAt = Math.max(this.lastCreatedAt, row.createdAt);

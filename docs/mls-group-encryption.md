@@ -189,13 +189,15 @@ grant `manage_members`.
   generation of an update that then lost is not lost with it: the outbox
   keeps each delivered message, with the members its copies reached, while
   a rival commit could still win the epoch of their generation (8 epochs,
-  the states the group keeps to switch to a rival), and once one wins it
-  re-encrypts the message in the epoch that won and sends it again to those
-  members; a member that already read it keeps one copy, by its record id.
-  One it can no longer encrypt, as after this device's removal, is dropped
-  and reported like any record the outbox drops (`opaque-mailboxes-client.md`,
-  Outbox). Queued rows of an older build lack that state and are dropped and
-  reported the same way on load. In a community a manager's device also
+  the states the group keeps to switch to a rival), and once a rival won,
+  however long ago, it re-encrypts the message in the epoch that won and
+  sends it again to those members; a member that already read it keeps one
+  copy, by its record id. One it can no longer encrypt, as after this
+  device's removal, is dropped like any record the outbox drops
+  (`opaque-mailboxes-client.md`, Outbox). A message an older build queued
+  lacks that state: on load it is re-encrypted in the current epoch for the
+  members its copies had not reached, and a commit takes the generation of
+  its index, or is dropped once that one drained. In a community a manager's device also
   commits an update when the roster revision the group bound
   grants other rights than the latest, or when the group took an add by a
   member the latest roster no longer lets add members and no member it lets

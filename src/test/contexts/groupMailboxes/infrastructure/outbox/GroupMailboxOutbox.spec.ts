@@ -84,11 +84,11 @@ describe('GroupMailboxOutbox', () => {
         [current, current - 1].filter((i) => i >= 0).map(generation),
       ),
     );
-    engine.rewindableGenerations.mockImplementation(() =>
+    engine.branchGenerations.mockImplementation(() =>
       Promise.resolve(
-        Array.from({ length: 8 }, (_, back) => current - back)
-          .filter((i) => i >= 0)
-          .map(generation),
+        Array.from({ length: current + 1 }, (_, back) =>
+          generation(current - back),
+        ),
       ),
     );
     engine.members.mockResolvedValue(['alice', 'bob']);
@@ -182,7 +182,7 @@ describe('GroupMailboxOutbox', () => {
     await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
     engine.generation.mockResolvedValue(rival);
     engine.readableGenerations.mockResolvedValue([rival]);
-    engine.rewindableGenerations.mockResolvedValue([rival]);
+    engine.branchGenerations.mockResolvedValue([rival]);
     sent = [];
 
     await outbox.flush();
@@ -207,8 +207,7 @@ describe('GroupMailboxOutbox', () => {
     expect(rows.size).toBe(0);
   });
 
-  it('reports a row an older build queued as failed, so its message can be sent again', async () => {
-    const failures: string[] = [];
+  it('sends a message an older build queued again in the current epoch to its pending recipients', async () => {
     // As stored before rows carried a generation fingerprint and landings.
     const old = {
       attempts: 0,
@@ -223,14 +222,57 @@ describe('GroupMailboxOutbox', () => {
       retryAt: 0,
     };
 
+    current = 1;
     rows.set('old', old as unknown as GroupMailboxOutboxRow);
-    outbox.subscribe(({ reference }) => failures.push(reference));
 
     await outbox.resume();
 
-    expect(failures).toEqual(['m0']);
+    expect(sent).toEqual([inboxOf(1, 'bob')]);
+    expect(engine.encrypt).toHaveBeenCalledTimes(1);
+    expect([...rows.values()].map(({ landed }) => landed)).toEqual([
+      [
+        {
+          epoch: '1',
+          generation: generation(1).secret.fingerprint(),
+          identityId: 'bob',
+        },
+      ],
+    ]);
+  });
+
+  it('sends a commit an older build queued in the generation of its index, and drops it once that one drained', async () => {
+    await outbox.enqueueCommit(CONVERSATION, commitTo(['bob']));
+    outbox.stop();
+    const [queued] = [...rows.values()];
+    // As stored before rows carried a generation fingerprint and landings.
+    const old = Object.fromEntries(
+      Object.entries(queued).filter(
+        ([key]) => key !== 'generation' && key !== 'landed',
+      ),
+    );
+
+    rows.set(queued.id, old as unknown as GroupMailboxOutboxRow);
+    await build().resume();
+    expect(sent).toEqual([inboxOf(0, 'bob')]);
     expect(rows.size).toBe(0);
-    expect(channel.send).not.toHaveBeenCalled();
+
+    sent = [];
+    current = 2;
+    rows.set(queued.id, old as unknown as GroupMailboxOutboxRow);
+    await build().resume();
+    expect(sent).toEqual([]);
+    expect(rows.size).toBe(0);
+  });
+
+  it('sends a delivered message again when a rival won the epoch of its copies, however long ago', async () => {
+    await outbox.enqueueMessage(CONVERSATION, 'm1', new Uint8Array([1]));
+    current = 20;
+    engine.branchGenerations.mockResolvedValue([generation(20)]);
+    sent = [];
+
+    await outbox.flush();
+
+    expect(sent).toEqual([inboxOf(20, 'alice'), inboxOf(20, 'bob')]);
   });
 
   it.each([

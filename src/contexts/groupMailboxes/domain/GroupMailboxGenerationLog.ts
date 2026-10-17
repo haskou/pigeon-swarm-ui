@@ -103,18 +103,12 @@ export class GroupMailboxGenerationLog {
   }
 
   /**
-   * Newest first: the generations exported in the last `RIVAL_EPOCHS`
-   * epochs, the only ones a rewind can still forget. Empty for the empty
-   * log.
+   * Newest first: every generation this device holds. One a rewind forgot,
+   * as exported by a commit a rival won, is not among them. Empty for the
+   * empty log.
    */
-  public rewindable(): GroupMailboxGeneration[] {
-    if (this.isEmpty()) return [];
-    const oldest =
-      this.current().epoch - GroupMailboxGenerationLog.RIVAL_EPOCHS;
-
-    return this.generations
-      .filter((generation) => generation.epoch > oldest)
-      .reverse();
+  public branch(): GroupMailboxGeneration[] {
+    return [...this.generations].reverse();
   }
 
   /** Records the first generation: the epoch this device created or joined. */
