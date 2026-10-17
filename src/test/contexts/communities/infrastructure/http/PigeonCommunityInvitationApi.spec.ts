@@ -2,6 +2,7 @@ import {
   CommunityInvitationKey,
   CommunityInvitationPossession,
   KeyPair,
+  PrivateKey,
 } from '@haskou/pigeon-swarm-crypto';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
@@ -9,7 +10,9 @@ import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/H
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
 import { CommunityModerationLogSigner } from '../../../../../contexts/communities/infrastructure/http/CommunityModerationLogSigner';
+import { CommunityOperationSigner } from '../../../../../contexts/communities/infrastructure/http/CommunityOperationSigner';
 import { PigeonCommunityInvitationApi } from '../../../../../contexts/communities/infrastructure/http/PigeonCommunityInvitationApi';
+import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 import { ScopeFrontierReader } from '../../../../../shared/infrastructure/http/ScopeFrontierReader';
 import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
@@ -22,10 +25,13 @@ interface SentRequest {
 
 async function sessionOf(): Promise<Session> {
   const keyPair = await KeyPair.generate();
+  const identityId = IdentityId.fromString(
+    new PrivateKey(keyPair.toPrimitives().privateKey).getPublicKey().toString(),
+  ).valueOf();
 
   return {
     deviceCredentialKeyPair: keyPair,
-    identity: { id: 'identity-1' },
+    identity: { id: identityId },
     keyPair,
   } as unknown as Session;
 }
@@ -61,6 +67,7 @@ beforeEach(() => {
 describe(PigeonCommunityInvitationApi.name, () => {
   it('creates an invitation that names the key, not the secret', async () => {
     const log = jest.spyOn(CommunityModerationLogSigner.prototype, 'sign');
+    const signed = jest.spyOn(CommunityOperationSigner.prototype, 'sign');
     const request = jest.fn().mockResolvedValue({});
     const { key, secret } = CommunityInvitationKey.generate();
 
@@ -72,17 +79,17 @@ describe(PigeonCommunityInvitationApi.name, () => {
 
     const { body, path } = sent(request);
     const operation = body.operation as {
-      action: string;
-      args: Record<string, unknown>;
       mutation: { recordId: string; store: string };
     };
 
     expect(path).toBe('/communities/community-1/invitations');
-    expect(operation.action).toBe('invitation_created');
-    expect(operation.args).toEqual({
-      expiresAt: 5_000,
-      invitationKey: key.publicKey(),
-      maxUses: 3,
+    expect(signed.mock.calls[0]?.[1]).toMatchObject({
+      action: 'invitation_created',
+      args: {
+        expiresAt: 5_000,
+        invitationKey: key.publicKey(),
+        maxUses: 3,
+      },
     });
     expect(operation.mutation.store).toBe('communityOperations');
     expect(log.mock.calls[0]?.[1].target).toEqual({
@@ -107,26 +114,29 @@ describe(PigeonCommunityInvitationApi.name, () => {
     const request = jest.fn().mockResolvedValue({});
     const session = await sessionOf();
     const { key, secret } = CommunityInvitationKey.generate();
+    const invitationId = 'A'.repeat(43);
+    const networkId = '3f2b8c1e-5d4a-4c7e-9b1a-0a1b2c3d4e5f';
     const preview = {
       communityId: 'community-1',
       communityName: 'Guild',
       expiresAt: 5_000,
-      invitationId: 'invitation-1',
-      networkId: 'network-1',
+      invitationId,
+      networkId,
     };
 
     await apiOver(request).claim(session, preview, secret);
 
     const { body, path } = sent(request);
+    const identityId = session.identity.id;
     const fields = {
       communityId: 'community-1',
-      identityId: 'identity-1',
-      invitationId: 'invitation-1',
-      networkId: 'network-1',
+      identityId,
+      invitationId,
+      networkId,
     };
 
     expect(path).toBe(
-      '/communities/community-1/invitations/invitation-1/claims',
+      `/communities/community-1/invitations/${invitationId}/claims`,
     );
     expect(() =>
       CommunityInvitationPossession.verify(
@@ -139,13 +149,14 @@ describe(PigeonCommunityInvitationApi.name, () => {
     expect(body.mutation).toMatchObject({
       frontier: [FRONTIER],
       kind: 'put',
-      recordId: 'invitation-claim:invitation-1:identity-1',
+      recordId: `invitation-claim:${invitationId}:${identityId}`,
       store: 'requests',
     });
     expect(JSON.stringify(body)).not.toContain(secret);
   });
 
   it('admits a claimant with a member_joined operation carrying its proofs', async () => {
+    const signed = jest.spyOn(CommunityOperationSigner.prototype, 'sign');
     const request = jest.fn().mockResolvedValue({});
     const claim = {
       communityId: 'community-1',
@@ -166,23 +177,24 @@ describe(PigeonCommunityInvitationApi.name, () => {
     expect(body).toMatchObject({
       consent: 'consent',
       identityId: 'identity-2',
-      operation: {
-        action: 'member_joined',
-        args: {
-          consent: 'consent',
-          identityId: 'identity-2',
-          invitationId: 'invitation-1',
-          method: 'invitation',
-          possession: 'possession',
-        },
-        parents: [FRONTIER],
-      },
       possession: 'possession',
+    });
+    expect(signed.mock.calls[0]?.[1]).toMatchObject({
+      action: 'member_joined',
+      args: {
+        consent: 'consent',
+        identityId: 'identity-2',
+        invitationId: 'invitation-1',
+        method: 'invitation',
+        possession: 'possession',
+      },
+      parents: [FRONTIER],
     });
   });
 
   it('revokes with an operation and a log naming the invitation', async () => {
     const log = jest.spyOn(CommunityModerationLogSigner.prototype, 'sign');
+    const signed = jest.spyOn(CommunityOperationSigner.prototype, 'sign');
     const request = jest.fn().mockResolvedValue({});
 
     await apiOver(request).revoke(
@@ -191,12 +203,10 @@ describe(PigeonCommunityInvitationApi.name, () => {
       'invitation-1',
     );
 
-    const { body, path } = sent(request);
-
-    expect(path).toBe(
+    expect(sent(request).path).toBe(
       '/communities/community-1/invitations/invitation-1/revocation',
     );
-    expect(body.operation).toMatchObject({
+    expect(signed.mock.calls[0]?.[1]).toMatchObject({
       action: 'invitation_revoked',
       args: { invitationId: 'invitation-1' },
     });
