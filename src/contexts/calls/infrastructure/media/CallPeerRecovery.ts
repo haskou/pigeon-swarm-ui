@@ -14,9 +14,9 @@ const politeDisruptionDelayMs = 3_000;
 
 /**
  * Three recovery attempts may each replace both ends' connection once, with
- * room to spare. Beyond it a peer is changing its DTLS certificate for the
- * sake of it: every replacement costs a connection, a configuration fetch and
- * a relay allocation.
+ * room to spare. Beyond it a peer is changing its DTLS certificate, or
+ * signalling again after every refusal, for the sake of it: every rebuilt
+ * connection costs a configuration fetch and a relay allocation.
  */
 const maximumPeerReplacements = 10;
 
@@ -210,12 +210,7 @@ export class CallPeerRecovery {
   }
 
   private release(peerIdentityId: string): void {
-    this.cancel(peerIdentityId);
-    this.inFlight.get(peerIdentityId)?.abort();
-    this.inFlight.delete(peerIdentityId);
-    this.attempts.delete(peerIdentityId);
-    this.exhausted.delete(peerIdentityId);
-    this.retryNotBefore.delete(peerIdentityId);
+    this.abandon(peerIdentityId);
     this.replacements.delete(peerIdentityId);
   }
 
@@ -245,10 +240,23 @@ export class CallPeerRecovery {
   }
 
   /**
-   * Whether the connection to a peer may be replaced once more. The
-   * replacements of a peer are counted until one of its connections turns
-   * healthy or the user retries; past the limit the peer is given up as
-   * exhausted and keeps the connection it has.
+   * Drops the recovery of a peer whose connection is removed. Its rebuilt
+   * connections stay counted: a peer that is refused and signals again would
+   * otherwise get a fresh connection, and a fresh budget, with every signal.
+   */
+  public abandon(peerIdentityId: string): void {
+    this.detach(peerIdentityId);
+    this.attempts.delete(peerIdentityId);
+    this.exhausted.delete(peerIdentityId);
+    this.retryNotBefore.delete(peerIdentityId);
+  }
+
+  /**
+   * Whether a connection may be rebuilt for a peer once more, by replacing
+   * the one it has or by creating it again after it was removed. The
+   * rebuilds of a peer are counted until one of its connections turns
+   * healthy, the user retries or the peer leaves the call; past the limit the
+   * peer is given up as exhausted and keeps the connection it has.
    */
   public allowReplacement(peerIdentityId: string): boolean {
     const replacements = (this.replacements.get(peerIdentityId) ?? 0) + 1;
@@ -269,6 +277,15 @@ export class CallPeerRecovery {
   public forget(peerIdentityId: string): void {
     this.release(peerIdentityId);
     this.lastRestartAt.delete(peerIdentityId);
+  }
+
+  /** Forgets the peers that are no longer in the call. */
+  public retain(peerIdentityIds: Set<string>): void {
+    for (const peerIdentityId of this.replacements.keys()) {
+      if (!peerIdentityIds.has(peerIdentityId)) {
+        this.forget(peerIdentityId);
+      }
+    }
   }
 
   public reconcile(

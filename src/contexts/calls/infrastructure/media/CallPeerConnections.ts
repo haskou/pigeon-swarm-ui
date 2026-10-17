@@ -346,6 +346,10 @@ export class CallPeerConnections {
 
   private removePeer(peerIdentityId: string): void {
     this.recovery.forget(peerIdentityId);
+    this.discardPeer(peerIdentityId);
+  }
+
+  private discardPeer(peerIdentityId: string): void {
     this.closePeer(peerIdentityId);
     this.iceCandidates.forget(peerIdentityId);
     this.mediaEncryption.forget(peerIdentityId);
@@ -446,8 +450,19 @@ export class CallPeerConnections {
         senderIdentityId,
         signalType,
       });
-      this.removePeer(senderIdentityId);
+      this.recovery.abandon(senderIdentityId);
+      this.discardPeer(senderIdentityId);
 
+      return;
+    }
+
+    // A peer that signals again after a refusal gets a new connection with
+    // every signal, so the connections created for it count like replacements.
+    if (
+      !this.peers.has(senderIdentityId) &&
+      !this.pendingPeerCreations.has(senderIdentityId) &&
+      !this.recovery.allowReplacement(senderIdentityId)
+    ) {
       return;
     }
 
@@ -520,6 +535,7 @@ export class CallPeerConnections {
         this.removePeer(peerIdentityId);
       }
     }
+    this.recovery.retain(peerIdentityIds);
   }
 
   public retryConnections(): void {

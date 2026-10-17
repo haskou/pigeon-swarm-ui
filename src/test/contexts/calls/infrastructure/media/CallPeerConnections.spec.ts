@@ -2412,6 +2412,46 @@ describe(CallPeerConnections.name, () => {
     },
   );
 
+  it('stops building connections for a peer of a private call that alternates refused and valid offers', async () => {
+    const peers: FakePeerConnection[] = [];
+
+    installEncodedStreamSupport();
+    installScriptTransformSupport();
+    installSessionDescriptionMock();
+    installPeerConnectionMock(peers);
+    const manager = callPeerConnectionManager();
+    const sendSignal = jest.fn(() =>
+      Promise.resolve(),
+    ) as unknown as jest.MockedFunction<SignalSender>;
+
+    manager.configure(() => Promise.resolve({ iceServers: [] }));
+    manager.configureMediaEncryption(ownCall, callKey());
+
+    for (let round = 0; round < 30; round += 1) {
+      await manager.handleSignal(
+        'peer-identity-id',
+        'offer',
+        { sdp: 'plaintext-offer', type: 'offer' },
+        sendSignal,
+        'current-identity-id',
+      );
+      await manager.handleSignal(
+        'peer-identity-id',
+        'offer',
+        {
+          mediaEncryption: encryptedMedia,
+          sdp: 'encrypted-offer',
+          type: 'offer',
+        },
+        sendSignal,
+        'current-identity-id',
+      );
+    }
+
+    expect(peers).toHaveLength(10);
+    manager.reset();
+  });
+
   it('refuses a peer of a private call whose answer does not announce encrypted media', async () => {
     const peers: FakePeerConnection[] = [];
 

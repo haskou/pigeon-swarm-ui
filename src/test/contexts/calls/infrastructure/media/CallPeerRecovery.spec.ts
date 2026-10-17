@@ -487,6 +487,19 @@ describe('CallPeerRecovery', () => {
     expect(recovery.allowReplacement('noisy')).toBe(true);
   });
 
+  it('keeps counting the replacements of a peer whose recovery is abandoned until it leaves the call', () => {
+    const recovery = new CallPeerRecovery(jest.fn(() => Promise.resolve()));
+
+    Array.from({ length: 10 }, () => recovery.allowReplacement('peer'));
+    recovery.abandon('peer');
+
+    expect(recovery.allowReplacement('peer')).toBe(false);
+
+    recovery.retain(new Set(['other']));
+
+    expect(recovery.allowReplacement('peer')).toBe(true);
+  });
+
   it('restarts a negotiated unhealthy peer at once after a disruption, even when recovery was exhausted', async () => {
     jest.useFakeTimers();
     const restart = jest.fn(() => Promise.resolve());
