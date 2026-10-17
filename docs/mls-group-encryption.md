@@ -147,23 +147,45 @@ conversations do (#380, #418):
   commit: the pending is dropped, never adopted, and the device syncs as
   usual. While the group stays in the pending's epoch the pending is kept.
   Once the group moved on, the welcome is sent again (welcome record ids are
-  idempotent) if the group took this device's commit, and the pending is
-  dropped.
+  idempotent) only if this device's commit won its epoch, and the pending is
+  dropped once it is sent. It won once the group took it, in that sync or as
+  the record of what the group took says, until a rival replaced it or a
+  commit of an earlier epoch undid it; the record forgetting that epoch as
+  the group moves on, two epochs later, does not make it lose, so a sync that
+  applies many commits after it still sends the welcome. The pending is
+  marked won before the group is saved, and the welcome goes out after: a
+  welcome the node refuses leaves the group saved, so the device still takes
+  later commits (a removal of a revoked device among them), and every sync
+  sends it again until the node accepts it, also once the record forgot the
+  epoch. Until then the pending refuses this device's new commits.
+  A commit that lost its epoch is not in the group, so neither is the joiner
+  it named, and a manager's `reconcile` admits that joiner again.
 - A commit that never reached the node is not re-sent. The device stays in the
   previous epoch and `reconcile` makes the change again from the roster.
   `admit` and `remove` sync first, whoever calls them, so a commit that did
   land is adopted before a new commit is built, in the epoch the others are
   in, and replaces the pending.
+- One device commits one change at a time per group. A call that caught up
+  before another call of the same device committed would build on that
+  commit's group; if the other commit is still pending, because its welcome
+  was not sent or its answer was lost and the node lists it, the commit is
+  refused (`MlsRejectedError`) rather than replacing the pending, and the
+  next sync settles it first. A pending in the group's epoch that the node
+  does not list never reached it and is replaced.
 - Once sync finds the device removed, it deletes `<groupId>#pending`, with
   the welcome in it, so a device admitted again never sends a welcome from
-  its earlier membership. A device that forgets an identity deletes every
-  group of it, pending commits included.
+  its earlier membership. A welcome that lets the device in again deletes it
+  too, as well as what its earlier group took, even when the sync that
+  would have seen the removal never ran. A device that forgets an identity
+  deletes every group of it, pending commits included.
 - Which commit the group took in each epoch sync still lists is kept under
-  `<groupId>#taken` (`MlsTakenCommits`), saved after the group state and
-  only trusted for the epoch that state is in. Across a restart, sync skips
-  a commit the group already took rather than applying it again, and judges
-  whether its own pending commit won the epoch by that record rather than
-  by which commits it could still apply.
+  `<groupId>#taken` (`MlsTakenCommits`), saved before the group state and
+  only trusted for the epoch that state is in: a stop between the two saves
+  leaves the group in the epoch it was in, whose record it ignores, never a
+  group past an epoch whose commit it does not know. Across a restart, sync
+  skips a commit the group already took rather than applying it again, and
+  judges whether its own pending commit won the epoch by that record rather
+  than by which commits it could still apply.
 
 ### Who commits
 
@@ -191,11 +213,13 @@ grant `manage_members`.
   its first pass. Before a due update the device catches up: a community
   syncs its commits, and a group conversation reads its inboxes, keeping the
   records it read for the next sync, so the update is made in the epoch the
-  other members are in. A failed read still lets it update, as it does
-  offline. In a group conversation's reconcile the update comes after the
-  lead device's removals of revoked devices, so a failing update never holds
-  one back. When the update a group message needs fails, the message is not
-  queued: it shows as failed with a retry, and the update stays due. The
+  other members are in. A read that ends after its identity stopped keeps
+  nothing; the history replays what it read. A failed read still lets it
+  update, as it does offline. In a group conversation's reconcile the update
+  comes after the lead device's removals of revoked devices, so a failing
+  update never holds one back. When the update a group message needs fails,
+  the message is not queued: it shows as failed with a retry, and the update
+  stays due. The
   cadence is sealed next to the group state; a group without a readable
   cadence is due. Two devices updating in the same epoch race like any
   commits: the losing device's update is undone, its cadence is due again

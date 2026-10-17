@@ -240,7 +240,8 @@ export class GroupConversationMailbox {
    * Commits this device's leaf update before a write when its cadence is
    * due. It reads the conversation's inboxes first, so it applies the
    * commits the other members made and the update is made in the epoch they
-   * are in; the records that read keeps for the next `sync`. A failed read
+   * are in; the records that read keeps for the next `sync`, unless the
+   * identity stopped meanwhile: its history replays them. A failed read
    * lets the update go ahead, as it does offline. Rejects with
    * `GroupMailboxUpdateFailedError` when the update cannot be committed or
    * queued; it stays due.
@@ -258,11 +259,13 @@ export class GroupConversationMailbox {
           member.inbox.sync(
             conversationId,
             new AbortController().signal,
-            (records) =>
+            (records) => {
+              if (this.members.get(session.identity.id) !== member) return;
               this.caughtUp.set(key, [
                 ...(this.caughtUp.get(key) ?? []),
                 ...records,
-              ]),
+              ]);
+            },
           ),
         ).catch(() => GroupConversationMailbox.fail('read before an update'));
       }

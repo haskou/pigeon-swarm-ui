@@ -5,9 +5,10 @@ import { MlsTakenCommits } from '../../domain/MlsTakenCommits';
 
 /**
  * The commits each MLS group this device holds took, sealed in the device's
- * MLS state store next to the group state, which is saved first. A record
- * that is unreadable, or kept for another epoch than the stored group's,
- * as one a crash left behind between the two saves, knows no commit.
+ * MLS state store next to the group state, which is saved after it. A
+ * record that is unreadable, or kept for another epoch than the stored
+ * group's, as one a crash left behind between the two saves, knows no
+ * commit.
  */
 export class MlsTakenCommitsStore {
   private static key(groupId: string): string {

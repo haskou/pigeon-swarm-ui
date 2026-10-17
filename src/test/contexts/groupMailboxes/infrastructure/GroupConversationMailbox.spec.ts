@@ -32,6 +32,7 @@ import { GroupMailboxControl } from '../../../../contexts/groupMailboxes/infrast
 import { GroupMailboxUpdateFailedError } from '../../../../contexts/groupMailboxes/infrastructure/control/GroupMailboxUpdateFailedError';
 import { GroupConversationMailbox } from '../../../../contexts/groupMailboxes/infrastructure/GroupConversationMailbox';
 import { GroupMessageHistoryStore } from '../../../../contexts/groupMailboxes/infrastructure/history/GroupMessageHistoryStore';
+import { GroupMailboxInboxSync } from '../../../../contexts/groupMailboxes/infrastructure/inbox/GroupMailboxInboxSync';
 import { GroupMailboxOutbox } from '../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutbox';
 import { GroupMailboxOutboxStore } from '../../../../contexts/groupMailboxes/infrastructure/outbox/GroupMailboxOutboxStore';
 import { DeviceAuthorizationEpoch } from '../../../../contexts/identities/domain/value-objects/DeviceAuthorizationEpoch';
@@ -1726,6 +1727,49 @@ describe('GroupConversationMailbox', () => {
       expect.arrayContaining(['message:before', 'message:from bob']),
     );
     expect(texts(bob)).toContain('message:from alice');
+  });
+
+  it('keeps nothing a read before a leaf update takes once its identity stopped, and replays it from the history', async () => {
+    await formGroup();
+    await idle();
+    await alice.mailbox.send(alice.session, conversation(), 'while out', {});
+    const read = GroupMailboxInboxSync.prototype.sync;
+
+    jest
+      .spyOn(GroupMailboxInboxSync.prototype, 'sync')
+      .mockImplementationOnce(function (
+        this: GroupMailboxInboxSync,
+        conversationId,
+        signal,
+        apply,
+      ) {
+        return read.call(this, conversationId, signal, (records) => {
+          bob.mailbox.stop(bob.id);
+          apply(records);
+        });
+      });
+    now += MlsUpdateCadence.INTERVAL_MS + MlsUpdateCadence.JITTER_MS + 1;
+    await bob.mailbox
+      .send(bob.session, conversation(), 'from bob', {})
+      .catch(() => undefined);
+    jest.mocked(GroupMailboxInboxSync.prototype.sync).mockRestore();
+    await sync(bob);
+    const restored: DirectMessageTimelineChange[] = [];
+
+    await bob.mailbox.restore(
+      bob.session,
+      CONVERSATION,
+      new AbortController().signal,
+      (changes) => restored.push(...changes),
+    );
+
+    expect(texts(bob)).not.toContain('message:while out');
+    expect(restored).toContainEqual(
+      expect.objectContaining({
+        kind: 'message',
+        message: expect.objectContaining({ content: 'while out' }),
+      }),
+    );
   });
 
   // Which of the racing updates wins depends on the commit ids, so a few
