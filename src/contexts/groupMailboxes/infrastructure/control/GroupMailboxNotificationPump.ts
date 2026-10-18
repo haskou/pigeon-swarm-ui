@@ -7,6 +7,7 @@ import {
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { GroupConversationInvitationNotificationResource } from '../../../notifications/infrastructure/http/resources/GroupConversationInvitationNotificationResource';
 import type { NotificationResource } from '../../../notifications/infrastructure/http/resources/NotificationResource';
+import type { NotificationsResource } from '../../../notifications/infrastructure/http/resources/NotificationsResource';
 import type { GroupMailboxControl } from './GroupMailboxControl';
 import type { GroupMailboxControlFields } from './GroupMailboxControlFields';
 import type { GroupMailboxControlOutcome } from './GroupMailboxControlOutcome';
@@ -65,7 +66,6 @@ export class GroupMailboxNotificationPump {
   public static readonly LETTER_WINDOW_MS = 30 * 24 * 60 * 60_000;
   /** Pages one run reads at most, so a node cannot keep it reading. */
   public static readonly MAX_PAGES = 200;
-  public static readonly PAGE_SIZE = 100;
 
   private again = false;
   /** The deferred requests, by notification id, as the last run left them. */
@@ -105,6 +105,25 @@ export class GroupMailboxNotificationPump {
       default:
         return undefined;
     }
+  }
+
+  /** The cursor to read after `page`, or undefined when the scan must stop. */
+  private static nextCursor(
+    page: NotificationsResource,
+    seen: ReadonlySet<string>,
+    pages: number,
+  ): string | undefined {
+    const next = page.nextCursor ?? undefined;
+
+    if (
+      next === undefined ||
+      seen.has(next) ||
+      pages >= GroupMailboxNotificationPump.MAX_PAGES
+    ) {
+      return undefined;
+    }
+
+    return next;
   }
 
   public constructor(
@@ -298,12 +317,10 @@ export class GroupMailboxNotificationPump {
 
   private async scan(): Promise<void> {
     this.found = new Map();
-    const size = GroupMailboxNotificationPump.PAGE_SIZE;
-    let before: string | undefined;
+    const seen = new Set<string>();
+    let cursor: string | undefined;
     let failed = 0;
     let pages = 0;
-    let page: NotificationResource[];
-    let previous: string | undefined;
 
     try {
       await this.letters.prune(this.now());
@@ -312,18 +329,21 @@ export class GroupMailboxNotificationPump {
       console.debug('Group control letters left to prune on the next run.');
     }
 
-    do {
-      page = await this.notifications.listPage(this.session(), size, before);
+    for (;;) {
+      const page = await this.notifications.listPage(this.session(), cursor);
+
       pages += 1;
-      for (const notification of page)
+      for (const notification of page.results)
         failed += await this.handle(notification);
-      previous = before;
-      before = page[page.length - 1]?.id;
-    } while (
-      page.length === size &&
-      before !== previous &&
-      pages < GroupMailboxNotificationPump.MAX_PAGES
-    );
+
+      cursor = GroupMailboxNotificationPump.nextCursor(page, seen, pages);
+
+      if (cursor === undefined) {
+        break;
+      }
+
+      seen.add(cursor);
+    }
 
     this.deferred = this.found;
 

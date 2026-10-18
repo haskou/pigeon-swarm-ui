@@ -156,7 +156,7 @@ export class PigeonConversationCommandsApi {
       ),
       method: 'POST',
     });
-    this.requestCache.invalidateForSession('/conversations?limit=30', session);
+    this.requestCache.invalidateForSession('/conversations', session);
 
     return this.conversations.resource(created);
   }

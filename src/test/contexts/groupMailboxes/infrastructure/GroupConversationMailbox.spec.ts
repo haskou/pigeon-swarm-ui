@@ -260,12 +260,13 @@ const device = (storage: string): GroupConversationMailbox =>
         post(from(), conversationId, peer, plaintext),
     }),
     notifications: {
-      listPage: (owner, limit, before) =>
-        Promise.resolve(
-          (letters.get(owner.identity.id) ?? [])
-            .filter(({ id }) => before === undefined || id < before)
-            .slice(0, limit),
-        ),
+      listPage: (owner, cursor) =>
+        Promise.resolve({
+          nextCursor: null,
+          results: (letters.get(owner.identity.id) ?? []).filter(
+            ({ id }) => cursor === undefined || id < cursor,
+          ),
+        }),
       /** Like the node: the first resolution of a notification stays. */
       update: (owner, notificationId, state) => {
         const inbox = letters.get(owner.identity.id) ?? [];

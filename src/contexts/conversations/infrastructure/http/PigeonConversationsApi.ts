@@ -3,6 +3,10 @@ import type { RequestSigner } from '../../../../shared/infrastructure/http/Reque
 import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { ConversationMapper } from './ConversationMapper';
 import type { ConversationResource } from './ConversationResource';
+import type { ConversationsResource } from './ConversationsResource';
+
+import { pagedPath } from '../../../../shared/infrastructure/http/pagedPath';
+import { readAllPages } from '../../../../shared/infrastructure/http/readAllPages';
 
 export class PigeonConversationsApi {
   public constructor(
@@ -12,12 +16,17 @@ export class PigeonConversationsApi {
   ) {}
 
   public async list(session: Session): Promise<ConversationResource[]> {
-    const path = '/conversations?limit=30';
-    const raw = await this.http.request<unknown>(path, {
-      headers: await this.signer.headers(session, 'GET', path),
-      method: 'GET',
+    const path = '/conversations';
+    const pages = await readAllPages<ConversationsResource>(async (cursor) => {
+      return await this.http.request<ConversationsResource>(
+        pagedPath(path, cursor),
+        {
+          headers: await this.signer.headers(session, 'GET', path),
+          method: 'GET',
+        },
+      );
     });
 
-    return this.mapper.list(raw);
+    return pages.flatMap((page) => this.mapper.list(page));
   }
 }

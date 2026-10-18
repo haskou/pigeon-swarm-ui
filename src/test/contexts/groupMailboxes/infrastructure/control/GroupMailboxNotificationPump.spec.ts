@@ -161,13 +161,18 @@ const setup = (
   const database = device.database ?? `group-control-${randomUUID()}`;
 
   control.receiveDirect.mockResolvedValue('applied');
-  notifications.listPage.mockImplementation((_session, _limit, before) => {
+  notifications.listPage.mockImplementation((_session, cursor) => {
     const index =
-      before === undefined
+      cursor === undefined
         ? 0
-        : pages.findIndex((page) => page[page.length - 1]?.id === before) + 1;
+        : pages.findIndex((page) => page[page.length - 1]?.id === cursor) + 1;
+    const results = pages[index] ?? [];
+    const last = results[results.length - 1];
 
-    return Promise.resolve(pages[index] ?? []);
+    return Promise.resolve({
+      nextCursor: last === undefined ? null : last.id,
+      results,
+    });
   });
   notifications.update.mockImplementation((_session, id) =>
     Promise.resolve(other(id)),
@@ -659,7 +664,7 @@ describe('GroupMailboxNotificationPump', () => {
   });
 
   it('reads every page of notifications', async () => {
-    const size = GroupMailboxNotificationPump.PAGE_SIZE;
+    const size = 100;
     const first = Array.from({ length: size }, (_, index) =>
       other(`other-${index}`),
     );
@@ -672,39 +677,44 @@ describe('GroupMailboxNotificationPump', () => {
 
     expect(notifications.listPage).toHaveBeenCalledWith(
       bob.session,
-      size,
       `other-${size - 1}`,
     );
     expect(control.receiveDirect).toHaveBeenCalledTimes(1);
   });
 
   it('stops when the node does not move past the cursor', async () => {
-    const size = GroupMailboxNotificationPump.PAGE_SIZE;
+    const size = 100;
     const page = Array.from({ length: size }, (_, index) =>
       other(`other-${index}`),
     );
     const { notifications, pump } = setup([page]);
 
-    notifications.listPage.mockResolvedValue(page);
+    notifications.listPage.mockResolvedValue({
+      nextCursor: page[size - 1].id,
+      results: page,
+    });
     await pump.run();
 
     expect(notifications.listPage).toHaveBeenCalledTimes(2);
   });
 
   it('reads at most MAX_PAGES pages in one run', async () => {
-    const size = GroupMailboxNotificationPump.PAGE_SIZE;
+    const size = 100;
     const { notifications, pump } = setup([]);
     let next = 1_000_000_000;
 
-    notifications.listPage.mockImplementation(() =>
-      Promise.resolve(
-        Array.from({ length: size }, () => {
-          next -= 1;
+    notifications.listPage.mockImplementation(() => {
+      const results = Array.from({ length: size }, () => {
+        next -= 1;
 
-          return other(`other-${next}`);
-        }),
-      ),
-    );
+        return other(`other-${next}`);
+      });
+
+      return Promise.resolve({
+        nextCursor: results[results.length - 1].id,
+        results,
+      });
+    });
     await pump.run();
 
     expect(notifications.listPage).toHaveBeenCalledTimes(

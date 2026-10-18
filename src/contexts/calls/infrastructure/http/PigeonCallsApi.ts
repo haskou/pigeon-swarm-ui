@@ -10,8 +10,11 @@ import type { CallIceServerResource as CallIceServerConfig } from './resources/C
 import type { CallParticipantMediaConnectionResource as CallParticipantMediaConnection } from './resources/CallParticipantMediaConnectionResource';
 import type { CallResource } from './resources/CallResource';
 import type { CallSignalDeliveryResource as CallSignalDelivery } from './resources/CallSignalDeliveryResource';
+import type { CallsResource } from './resources/CallsResource';
 
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
+import { pagedPath } from '../../../../shared/infrastructure/http/pagedPath';
+import { readAllPages } from '../../../../shared/infrastructure/http/readAllPages';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 import { CallEventSigner } from './CallEventSigner';
 import { CallSignalRequestBody } from './CallSignalRequestBody';
@@ -82,12 +85,14 @@ export class PigeonCallsApi {
 
   public async list(session: Session): Promise<CallResource[]> {
     const path = '/calls';
-    const result = await this.http.request<{ calls: CallResource[] }>(path, {
-      headers: await this.signer.headers(session, 'GET', path),
-      method: 'GET',
+    const pages = await readAllPages<CallsResource>(async (cursor) => {
+      return await this.http.request<CallsResource>(pagedPath(path, cursor), {
+        headers: await this.signer.headers(session, 'GET', path),
+        method: 'GET',
+      });
     });
 
-    return result.calls;
+    return pages.flatMap((page) => page.calls);
   }
 
   public async get(session: Session, callId: string): Promise<CallResource> {

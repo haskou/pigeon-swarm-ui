@@ -7,8 +7,11 @@ import type { NotificationScopeSettingInputResource as NotificationScopeSettingI
 import type { NotificationScopeSettingResource as NotificationScopeSetting } from './resources/NotificationScopeSettingResource';
 import type { NotificationScopeSettingsResource } from './resources/NotificationScopeSettingsResource';
 import type { NotificationSettingScopeResource as NotificationSettingScope } from './resources/NotificationSettingScopeResource';
+import type { NotificationsResource } from './resources/NotificationsResource';
 
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
+import { pagedPath } from '../../../../shared/infrastructure/http/pagedPath';
+import { readAllPages } from '../../../../shared/infrastructure/http/readAllPages';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 import { NotificationMutationSigner } from './NotificationMutationSigner';
 
@@ -76,29 +79,27 @@ export class PigeonNotificationsApi {
   }
 
   public async list(session: Session): Promise<NotificationResource[]> {
-    return await this.listPage(session, 30);
+    const pages = await readAllPages<NotificationsResource>(
+      async (cursor) => await this.listPage(session, cursor),
+    );
+
+    return pages.flatMap((page) => page.results);
   }
 
-  /** Up to `limit` notifications, newest id first, after `before` if set. */
+  /** One page of notifications, newest id first, from `cursor` if set. */
   public async listPage(
     session: Session,
-    limit: number,
-    beforeNotificationId?: string,
-  ): Promise<NotificationResource[]> {
-    const before =
-      beforeNotificationId === undefined
-        ? ''
-        : `&beforeNotificationId=${encodeURIComponent(beforeNotificationId)}`;
-    const path = `/notifications?limit=${limit}${before}`;
-    const result = await this.http.request<{ results: NotificationResource[] }>(
-      path,
+    cursor?: string,
+  ): Promise<NotificationsResource> {
+    const path = '/notifications';
+
+    return await this.http.request<NotificationsResource>(
+      pagedPath(path, cursor),
       {
         headers: await this.signer.headers(session, 'GET', path),
         method: 'GET',
       },
     );
-
-    return result.results;
   }
 
   public async listSettings(

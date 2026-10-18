@@ -25,9 +25,9 @@ describe(PigeonConversationsApi.name, () => {
     expect(signer.headers).toHaveBeenCalledWith(
       session,
       'GET',
-      '/conversations?limit=30',
+      '/conversations',
     );
-    expect(http.request).toHaveBeenCalledWith('/conversations?limit=30', {
+    expect(http.request).toHaveBeenCalledWith('/conversations?limit=100', {
       headers: { signature: 'signed' },
       method: 'GET',
     });
