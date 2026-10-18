@@ -65,7 +65,7 @@ export class PigeonCommunitiesGateway {
   public async listCommunityModerationLogs(
     session: Session,
     communityId: string,
-    input?: { beforeLogId?: string; limit?: number },
+    input?: { cursor?: string; limit?: number },
   ): Promise<CommunityModerationLogPage> {
     return await this.communities.listModerationLogs(
       session,

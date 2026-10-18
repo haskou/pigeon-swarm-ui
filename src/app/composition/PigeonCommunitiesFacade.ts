@@ -128,7 +128,7 @@ export class PigeonCommunitiesFacade {
   public async listModerationLogs(
     session: Session,
     communityId: string,
-    input?: { beforeLogId?: string; limit?: number },
+    input?: { cursor?: string; limit?: number },
   ): Promise<CommunityModerationLogPage> {
     return await this.moderationLogs.listCommunityModerationLogs(
       session,

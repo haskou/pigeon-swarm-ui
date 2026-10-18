@@ -146,9 +146,9 @@ export function ManageCommunityDialog({
   const [moderationLogs, setModerationLogs] = useState<
     CommunityModerationLog[]
   >([]);
-  const [nextModerationLogId, setNextModerationLogId] = useState<
-    string | undefined
-  >(undefined);
+  const [nextModerationLogCursor, setNextModerationLogCursor] = useState<
+    string | null
+  >(null);
   const [invitations, setInvitations] = useState<CommunityInvitation[]>([]);
   const [creatingInvitation, setCreatingInvitation] = useState(false);
   const [channelDrafts, setChannelDrafts] = useState<Record<string, string>>(
@@ -607,7 +607,7 @@ export function ManageCommunityDialog({
       );
 
       setModerationLogs(page.logs);
-      setNextModerationLogId(page.nextBeforeLogId);
+      setNextModerationLogCursor(page.nextCursor);
     } catch (caught) {
       setError(
         toUserErrorMessage(caught, copy.communities.moderationLogsError),
@@ -618,7 +618,7 @@ export function ManageCommunityDialog({
   };
 
   const loadMoreModerationLogs = async () => {
-    if (!nextModerationLogId || state === 'loading') return;
+    if (!nextModerationLogCursor || state === 'loading') return;
 
     setState('loading');
     setError(null);
@@ -626,11 +626,11 @@ export function ManageCommunityDialog({
       const page = await applicationContainer.communities.listModerationLogs(
         session,
         community.id,
-        { beforeLogId: nextModerationLogId, limit: 50 },
+        { cursor: nextModerationLogCursor, limit: 50 },
       );
 
       setModerationLogs((current) => [...current, ...page.logs]);
-      setNextModerationLogId(page.nextBeforeLogId);
+      setNextModerationLogCursor(page.nextCursor);
     } catch (caught) {
       setError(
         toUserErrorMessage(caught, copy.communities.moderationLogsError),
@@ -666,7 +666,9 @@ export function ManageCommunityDialog({
       );
       await refreshInvitations();
     } catch (caught) {
-      setError(toUserErrorMessage(caught, copy.communities.inviteLinkRevokeError));
+      setError(
+        toUserErrorMessage(caught, copy.communities.inviteLinkRevokeError),
+      );
     } finally {
       setState('idle');
     }
@@ -1173,7 +1175,9 @@ export function ManageCommunityDialog({
                   onDecline={(requestId) =>
                     void updateMembershipRequest(requestId, 'declined')
                   }
-                  onRevoke={(invitationId) => void revokeInvitation(invitationId)}
+                  onRevoke={(invitationId) =>
+                    void revokeInvitation(invitationId)
+                  }
                   requests={membershipRequests}
                   state={state}
                 />
@@ -1194,7 +1198,7 @@ export function ManageCommunityDialog({
                   identityLookup={memberIdentities}
                   loading={state === 'loading'}
                   logs={moderationLogs}
-                  nextBeforeLogId={nextModerationLogId}
+                  nextCursor={nextModerationLogCursor}
                   onLoadMore={() => void loadMoreModerationLogs()}
                   roles={roles}
                 />

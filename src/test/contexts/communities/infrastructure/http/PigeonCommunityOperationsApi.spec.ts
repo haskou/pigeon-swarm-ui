@@ -9,19 +9,22 @@ import { PigeonCommunityOperationsApi } from '../../../../../contexts/communitie
 import { MlsTestIdentity } from '../mls/MlsTestIdentity';
 import { CommunityOperationHistory } from './CommunityOperationHistory';
 
+/** One page as the node answers it: its operations and where it continues. */
+type ServedPage = { nextCursor?: string | null; operations: unknown[] };
+
 describe(PigeonCommunityOperationsApi.name, () => {
   const session = mock<Session>();
   let cast: Record<string, MlsTestIdentity>;
   let history: CommunityOperationHistory;
 
   /** A node that serves `pages` in order, one per request. */
-  const serving = (pages: unknown[][]) => {
+  const serving = (pages: ServedPage[]) => {
     const http = mock<HttpJsonClient>();
     const signer = mock<RequestSigner>();
 
     signer.headers.mockResolvedValue({});
-    for (const operations of pages) {
-      http.request.mockResolvedValueOnce({ operations });
+    for (const page of pages) {
+      http.request.mockResolvedValueOnce(page);
     }
 
     return { api: new PigeonCommunityOperationsApi(http, signer), http };
@@ -37,7 +40,7 @@ describe(PigeonCommunityOperationsApi.name, () => {
   });
 
   it('reads one signed page and keeps every operation that proves itself', async () => {
-    const { api, http } = serving([history.documents]);
+    const { api, http } = serving([{ operations: history.documents }]);
 
     const operations = await api.list(session, history.communityId);
 
@@ -45,7 +48,7 @@ describe(PigeonCommunityOperationsApi.name, () => {
       history.documents.map(CommunityOperationHistory.digestOf),
     );
     expect(pathsOf(http)).toEqual([
-      `/communities/${encodeURIComponent(history.communityId)}/operations?limit=500`,
+      `/communities/${encodeURIComponent(history.communityId)}/operations?limit=100`,
     ]);
   });
 
@@ -55,7 +58,9 @@ describe(PigeonCommunityOperationsApi.name, () => {
       ...bob,
       identitySignature: carol.identitySignature,
     };
-    const { api } = serving([[genesis, forged, { id: 'x' }, 'junk', carol]]);
+    const { api } = serving([
+      { operations: [genesis, forged, { id: 'x' }, 'junk', carol] },
+    ]);
 
     const operations = await api.list(session, history.communityId);
 
@@ -64,23 +69,28 @@ describe(PigeonCommunityOperationsApi.name, () => {
     );
   });
 
-  it('pages after the digest of the last operation served', async () => {
+  it('pages after the cursor the node serves', async () => {
     const [genesis] = history.documents;
-    const full = Array.from({ length: 500 }, () => genesis);
-    const { api, http } = serving([full, history.documents.slice(1)]);
+    const full = Array.from({ length: 100 }, () => genesis);
+    const { api, http } = serving([
+      { nextCursor: 'cursor-1', operations: full },
+      { operations: history.documents.slice(1) },
+    ]);
 
     await expect(api.list(session, history.communityId)).resolves.toHaveLength(
-      502,
+      102,
     );
-    expect(pathsOf(http)[1]).toContain(
-      `after=${CommunityOperationHistory.digestOf(genesis)}`,
-    );
+    expect(pathsOf(http)[1]).toContain('cursor=cursor-1');
   });
 
-  it('stops when a full page does not move the cursor forward', async () => {
+  it('stops when a node repeats the cursor it was given', async () => {
     const [genesis] = history.documents;
-    const full = Array.from({ length: 500 }, () => genesis);
-    const { api, http } = serving([full, full, full]);
+    const full = Array.from({ length: 100 }, () => genesis);
+    const { api, http } = serving([
+      { nextCursor: 'cursor-1', operations: full },
+      { nextCursor: 'cursor-1', operations: full },
+      { nextCursor: 'cursor-1', operations: full },
+    ]);
 
     await api.list(session, history.communityId);
 
@@ -88,7 +98,7 @@ describe(PigeonCommunityOperationsApi.name, () => {
   });
 
   it('reads nothing from a node that answers without operations', async () => {
-    const { api } = serving([[]]);
+    const { api } = serving([{ operations: [] }]);
 
     await expect(api.list(session, history.communityId)).resolves.toEqual([]);
   });

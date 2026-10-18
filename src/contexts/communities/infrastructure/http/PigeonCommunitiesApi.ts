@@ -534,7 +534,7 @@ export class PigeonCommunitiesApi {
   public async listModerationLogs(
     session: Session,
     communityId: string,
-    input: { beforeLogId?: string; limit?: number } = {},
+    input: { cursor?: string; limit?: number } = {},
   ): Promise<CommunityModerationLogPage> {
     const path = `/communities/${encodeURIComponent(
       communityId,
@@ -543,7 +543,7 @@ export class PigeonCommunitiesApi {
 
     if (input.limit) query.set('limit', String(input.limit));
 
-    if (input.beforeLogId) query.set('beforeLogId', input.beforeLogId);
+    if (input.cursor) query.set('cursor', input.cursor);
 
     return await this.http.request<CommunityModerationLogPage>(
       `${path}${query.size > 0 ? `?${query.toString()}` : ''}`,

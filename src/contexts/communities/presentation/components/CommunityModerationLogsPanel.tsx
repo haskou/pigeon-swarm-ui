@@ -18,7 +18,7 @@ export function CommunityModerationLogsPanel({
   identityLookup,
   loading,
   logs,
-  nextBeforeLogId,
+  nextCursor,
   onLoadMore,
   roles,
 }: {
@@ -26,7 +26,7 @@ export function CommunityModerationLogsPanel({
   identityLookup: Record<string, IdentityResource>;
   loading: boolean;
   logs: CommunityModerationLog[];
-  nextBeforeLogId?: string;
+  nextCursor?: string | null;
   onLoadMore: () => void;
   roles: CommunityRoleResource[];
 }) {
@@ -59,7 +59,7 @@ export function CommunityModerationLogsPanel({
           ))}
         </div>
       )}
-      {nextBeforeLogId && (
+      {nextCursor && (
         <button
           type="button"
           onClick={onLoadMore}

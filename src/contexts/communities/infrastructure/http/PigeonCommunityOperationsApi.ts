@@ -6,7 +6,7 @@ import type { CommunityOperation } from '../../domain/operations/CommunityOperat
 import { CommunityOperationProof } from './CommunityOperationProof';
 
 /** Operations the node returns per page, its maximum. */
-const PAGE_SIZE = 500;
+const PAGE_SIZE = 100;
 
 /**
  * Reads the signed operations of one community from the node, the history
@@ -14,37 +14,37 @@ const PAGE_SIZE = 500;
  * a node can withhold operations, never forge or alter one.
  */
 export class PigeonCommunityOperationsApi {
-  /** The digest of the last operation of `page`, where the next one starts. */
-  private static cursorOf(page: readonly unknown[]): string | undefined {
-    const last: unknown = (
-      page[page.length - 1] as { id?: unknown } | undefined
-    )?.id;
-
-    return typeof last === 'string' ? last.split(':op:')[1] : undefined;
-  }
-
   public constructor(
     private readonly http: HttpJsonClient,
     private readonly signer: RequestSigner,
   ) {}
 
-  /** The documents the node serves after `after`, unverified. */
+  /**
+   * The documents the node serves after `cursor`, unverified, and where the
+   * next page starts.
+   */
   private async page(
     session: Session,
     communityId: string,
-    after: string | undefined,
-  ): Promise<unknown[]> {
+    cursor: string | undefined,
+  ): Promise<{ nextCursor: string | null; operations: unknown[] }> {
     const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
 
-    if (after !== undefined) params.set('after', after);
+    if (cursor !== undefined) params.set('cursor', cursor);
 
     const path = `/communities/${encodeURIComponent(communityId)}/operations?${params.toString()}`;
-    const result = await this.http.request<{ operations?: unknown[] }>(path, {
+    const result = await this.http.request<{
+      nextCursor?: string | null;
+      operations?: unknown[];
+    }>(path, {
       headers: await this.signer.headers(session, 'GET', path),
       method: 'GET',
     });
 
-    return Array.isArray(result.operations) ? result.operations : [];
+    return {
+      nextCursor: result.nextCursor ?? null,
+      operations: Array.isArray(result.operations) ? result.operations : [],
+    };
   }
 
   /** Every operation of the community the node stores, verified. */
@@ -53,30 +53,25 @@ export class PigeonCommunityOperationsApi {
     communityId: string,
   ): Promise<CommunityOperation[]> {
     const operations: CommunityOperation[] = [];
-    let after: string | undefined;
+    let cursor: string | undefined;
 
     for (;;) {
-      const page = await this.page(session, communityId, after);
+      const page = await this.page(session, communityId, cursor);
 
       operations.push(
-        ...page.flatMap(
+        ...page.operations.flatMap(
           (document) =>
             CommunityOperationProof.open(document, communityId) ?? [],
         ),
       );
 
-      const cursor = PigeonCommunityOperationsApi.cursorOf(page);
-
-      // The node pages by digest; a cursor that does not move ends the read.
-      if (
-        page.length < PAGE_SIZE ||
-        cursor === undefined ||
-        (after !== undefined && cursor <= after)
-      ) {
+      // The node pages by an opaque cursor; a cursor that does not move ends
+      // the read.
+      if (page.nextCursor === null || page.nextCursor === cursor) {
         return operations;
       }
 
-      after = cursor;
+      cursor = page.nextCursor;
     }
   }
 }
