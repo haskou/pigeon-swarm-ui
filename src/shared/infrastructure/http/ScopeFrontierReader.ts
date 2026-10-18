@@ -16,11 +16,13 @@ export class ScopeFrontierReader {
   public async community(
     session: Session,
     communityId: string,
+    init: Pick<RequestInit, 'signal'> = {},
   ): Promise<string[]> {
     const path = `/communities/${encodeURIComponent(communityId)}/frontier`;
     const result = await this.http.request<{ frontier: string[] }>(path, {
       headers: await this.signer.headers(session, 'GET', path),
       method: 'GET',
+      ...init,
     });
 
     return result.frontier;
