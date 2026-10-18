@@ -6,12 +6,14 @@ describe(readAllPages.name, () => {
       { nextCursor: 'a' },
       { nextCursor: null },
     ];
-    const fetchPage = async (): Promise<{ nextCursor: string | null }> => {
+    const fetchPage = (): Promise<{ nextCursor: string | null }> => {
       const response = responses.shift();
 
-      if (response === undefined) throw new Error('unexpected fetch');
+      if (response === undefined) {
+        return Promise.reject(new Error('unexpected fetch'));
+      }
 
-      return response;
+      return Promise.resolve(response);
     };
 
     await expect(readAllPages(fetchPage)).resolves.toHaveLength(2);
@@ -19,10 +21,10 @@ describe(readAllPages.name, () => {
 
   it('refuses to read past 1000 pages', async () => {
     let calls = 0;
-    const fetchPage = async (): Promise<{ nextCursor: string | null }> => {
+    const fetchPage = (): Promise<{ nextCursor: string | null }> => {
       calls += 1;
 
-      return { nextCursor: `cursor-${calls}` };
+      return Promise.resolve({ nextCursor: `cursor-${calls}` });
     };
 
     await expect(readAllPages(fetchPage)).rejects.toThrow(
