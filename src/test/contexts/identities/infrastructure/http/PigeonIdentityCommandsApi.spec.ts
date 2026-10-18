@@ -17,6 +17,7 @@ import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/H
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
 import { Identity } from '../../../../../contexts/identities/domain/Identity';
+import { IdentityAdmissionDifficultyPolicy } from '../../../../../contexts/identities/domain/IdentityAdmissionDifficultyPolicy';
 import { IdentityProfile } from '../../../../../contexts/identities/domain/profile/IdentityProfile';
 import { DeviceAuthorizationEpoch } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationRevision } from '../../../../../contexts/identities/domain/value-objects/DeviceAuthorizationRevision';
@@ -230,7 +231,19 @@ describe(`${PigeonIdentityCommandsApi.name} admission difficulty`, () => {
     ) as IdentityResource;
   }
 
+  let defaultDifficulty: { restore: () => void };
+
+  // Real PoW at the 16-bit protocol default is slow on loaded runners. The
+  // retry only needs the default below the re-mined value, so lower it here.
+  beforeEach(() => {
+    defaultDifficulty = jest.replaceProperty<
+      { DEFAULT_DIFFICULTY_BITS: number },
+      'DEFAULT_DIFFICULTY_BITS'
+    >(IdentityAdmissionDifficultyPolicy, 'DEFAULT_DIFFICULTY_BITS', 8);
+  });
+
   afterEach(() => {
+    defaultDifficulty.restore();
     jest.restoreAllMocks();
   });
 
@@ -238,7 +251,7 @@ describe(`${PigeonIdentityCommandsApi.name} admission difficulty`, () => {
     const http = {
       request: jest
         .fn()
-        .mockRejectedValueOnce(busy(17))
+        .mockRejectedValueOnce(busy(9))
         .mockResolvedValueOnce(identity()),
     } as unknown as HttpJsonClient;
     const commands = commandsWith(http);
@@ -256,12 +269,12 @@ describe(`${PigeonIdentityCommandsApi.name} admission difficulty`, () => {
     expect(
       ProofOfWork.identityAdmission(retried.id, retried.networks).verify(
         retried.admissionNonce,
-        17,
+        9,
       ),
     ).toBe(true);
     expect(progress).toHaveBeenCalledWith({
       attempt: 1,
-      difficultyBits: 17,
+      difficultyBits: 9,
       maximumAttempts: 2,
     });
   });
@@ -282,7 +295,7 @@ describe(`${PigeonIdentityCommandsApi.name} admission difficulty`, () => {
     const http = {
       request: jest
         .fn()
-        .mockRejectedValueOnce(busy(17))
+        .mockRejectedValueOnce(busy(9))
         .mockResolvedValueOnce(current),
     } as unknown as HttpJsonClient;
     const identities = {
@@ -305,7 +318,7 @@ describe(`${PigeonIdentityCommandsApi.name} admission difficulty`, () => {
     expect(
       ProofOfWork.identityAdmission(retried.id, retried.networks).verify(
         retried.admissionNonce,
-        17,
+        9,
       ),
     ).toBe(true);
   });
