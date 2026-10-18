@@ -9,13 +9,32 @@ import type {
   NodeBlockApprovalResource,
   NodeBlockExceptionsResource,
   NodeBlockSourceResource,
+  NodeBlockSourcesPageResource,
   NodeRegistrationCodeResource,
+  NodeRegistrationCodesPageResource,
   NodeRegistrationModeResource,
+  PendingNodeBlockEntriesPageResource,
   PendingNodeBlockEntriesResource,
   SignedNodeBlockListResource,
 } from './resources/NodeAccessResources';
 
+import {
+  pagedPath,
+  prefixedPagedPath,
+} from '../../../../shared/infrastructure/http/pagedPath';
+import { readAllPages } from '../../../../shared/infrastructure/http/readAllPages';
+
 type Method = 'DELETE' | 'GET' | 'POST' | 'PUT';
+
+type PendingArrayName = 'blockedIdentityIds' | 'blockedNodePeerIds';
+
+const PENDING_NEXT_CURSOR: Record<
+  PendingArrayName,
+  'blockedIdentityIdsNextCursor' | 'blockedNodePeerIdsNextCursor'
+> = {
+  blockedIdentityIds: 'blockedIdentityIdsNextCursor',
+  blockedNodePeerIds: 'blockedNodePeerIdsNextCursor',
+};
 
 /** The node owner's registration, blocking and block sharing routes. */
 export class PigeonNodeAccessApi {
@@ -67,13 +86,19 @@ export class PigeonNodeAccessApi {
   public async getRegistrationCodes(
     session: Session,
   ): Promise<NodeRegistrationCodeResource[]> {
-    const result = await this.signed<{ codes: NodeRegistrationCodeResource[] }>(
-      session,
-      'GET',
-      '/node/registration-codes',
+    const path = '/node/registration-codes';
+    const pages = await readAllPages<NodeRegistrationCodesPageResource>(
+      async (cursor) =>
+        await this.http.request<NodeRegistrationCodesPageResource>(
+          pagedPath(path, cursor),
+          {
+            headers: await this.signer.headers(session, 'GET', path),
+            method: 'GET',
+          },
+        ),
     );
 
-    return result.codes;
+    return pages.flatMap((page) => page.codes);
   }
 
   public async deleteRegistrationCode(
@@ -150,13 +175,19 @@ export class PigeonNodeAccessApi {
   public async getSources(
     session: Session,
   ): Promise<NodeBlockSourceResource[]> {
-    const result = await this.signed<{ sources: NodeBlockSourceResource[] }>(
-      session,
-      'GET',
-      '/node/block-sources',
+    const path = '/node/block-sources';
+    const pages = await readAllPages<NodeBlockSourcesPageResource>(
+      async (cursor) =>
+        await this.http.request<NodeBlockSourcesPageResource>(
+          pagedPath(path, cursor),
+          {
+            headers: await this.signer.headers(session, 'GET', path),
+            method: 'GET',
+          },
+        ),
     );
 
-    return result.sources;
+    return pages.flatMap((page) => page.sources);
   }
 
   public async putSource(
@@ -189,11 +220,53 @@ export class PigeonNodeAccessApi {
     ownerIdentityId: string,
     session: Session,
   ): Promise<PendingNodeBlockEntriesResource> {
-    return await this.signed<PendingNodeBlockEntriesResource>(
+    const path = `${PigeonNodeAccessApi.sourcePath(ownerIdentityId)}/pending-entries`;
+    const identityPages = await this.readPendingArray(
+      path,
       session,
-      'GET',
-      `${PigeonNodeAccessApi.sourcePath(ownerIdentityId)}/pending-entries`,
+      'blockedIdentityIds',
     );
+    const nodePeerPages = await this.readPendingArray(
+      path,
+      session,
+      'blockedNodePeerIds',
+    );
+    const [head] = identityPages;
+
+    return {
+      blockedIdentityIds: identityPages.flatMap(
+        (page) => page.blockedIdentityIds,
+      ),
+      blockedNodePeerIds: nodePeerPages.flatMap(
+        (page) => page.blockedNodePeerIds,
+      ),
+      ownerIdentityId: head.ownerIdentityId,
+      version: head.version,
+    };
+  }
+
+  /**
+   * Reads every page of one pending array. Each response also carries the
+   * other array's first page, which this read does not keep.
+   */
+  private async readPendingArray(
+    path: string,
+    session: Session,
+    name: PendingArrayName,
+  ): Promise<PendingNodeBlockEntriesPageResource[]> {
+    return await readAllPages<
+      PendingNodeBlockEntriesPageResource & { nextCursor: string | null }
+    >(async (cursor) => {
+      const page = await this.http.request<PendingNodeBlockEntriesPageResource>(
+        prefixedPagedPath(path, name, cursor),
+        {
+          headers: await this.signer.headers(session, 'GET', path),
+          method: 'GET',
+        },
+      );
+
+      return { ...page, nextCursor: page[PENDING_NEXT_CURSOR[name]] };
+    });
   }
 
   public async postApproval(

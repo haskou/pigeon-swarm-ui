@@ -18,3 +18,21 @@ export function pagedPath(
 
   return `${path}?${query.toString()}`;
 }
+
+/**
+ * `path` with the page query for one array of a node response that pages
+ * several arrays on its own: `<name>Limit` and `<name>Cursor`.
+ */
+export function prefixedPagedPath(
+  path: string,
+  name: string,
+  cursor: string | undefined,
+): string {
+  const query = new URLSearchParams();
+
+  query.set(`${name}Limit`, String(PAGE_LIMIT));
+
+  if (cursor !== undefined) query.set(`${name}Cursor`, cursor);
+
+  return `${path}?${query.toString()}`;
+}
