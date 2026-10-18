@@ -3,11 +3,11 @@ import {
   CommitmentId,
   KeyPair,
 } from '@haskou/pigeon-swarm-crypto';
+import vectors from '@haskou/pigeon-swarm-crypto/vectors/notification.json';
 
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { NotificationMutationSigner } from '../../../../../contexts/notifications/infrastructure/http/NotificationMutationSigner';
-import vectors from '../../../../fixtures/notification-vectors.json';
 import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
 describe(NotificationMutationSigner.name, () => {
