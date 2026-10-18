@@ -84,6 +84,14 @@ jobs:
           yarn test:e2e e2e/call-media-encryption.spec.ts
           --project=desktop-chromium --project=desktop-firefox
 
+      - name: Upload Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: node_modules/.cache/pigeon-swarm-playwright-results
+          retention-days: 7
+
       - name: Build
         run: yarn build
 
