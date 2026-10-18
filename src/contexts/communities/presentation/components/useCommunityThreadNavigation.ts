@@ -114,7 +114,7 @@ export function useCommunityThreadNavigation({
 
       if (loadedRoot) return loadedRoot;
 
-      let beforeMessageId: null | string | undefined;
+      let cursor: null | string | undefined;
 
       for (let page = 0; page < 8; page += 1) {
         const result =
@@ -122,7 +122,7 @@ export function useCommunityThreadNavigation({
             session,
             communityId,
             channelId,
-            { beforeMessageId: beforeMessageId ?? undefined },
+            { cursor: cursor ?? undefined },
           );
         const loadedMessages = await projectMessages(
           channelId,
@@ -134,9 +134,9 @@ export function useCommunityThreadNavigation({
 
         if (root) return root;
 
-        if (!result.nextBeforeMessageId) break;
+        if (!result.nextCursor) break;
 
-        beforeMessageId = result.nextBeforeMessageId;
+        cursor = result.nextCursor;
       }
 
       return null;

@@ -35,7 +35,7 @@ describe(PigeonCommunitiesApi.name, () => {
     const http = {
       request: jest.fn().mockResolvedValue({
         messages,
-        nextBeforeMessageId: 'backend-cursor',
+        nextCursor: 'backend-cursor',
       }),
     } as unknown as HttpJsonClient;
     const signer = {
@@ -55,7 +55,7 @@ describe(PigeonCommunitiesApi.name, () => {
       api.listChannelMessages(session, 'community-1', 'channel-1'),
     ).resolves.toEqual({
       messages,
-      nextBeforeMessageId: 'backend-cursor',
+      nextCursor: 'backend-cursor',
     });
   });
 
@@ -67,7 +67,7 @@ describe(PigeonCommunitiesApi.name, () => {
     const http = {
       request: jest
         .fn()
-        .mockResolvedValue({ messages, nextBeforeMessageId: 'message-2' }),
+        .mockResolvedValue({ messages, nextCursor: 'message-2' }),
     } as unknown as HttpJsonClient;
     const signer = {
       headers: jest.fn().mockResolvedValue({ 'X-Identity-Id': 'identity-1' }),
@@ -88,7 +88,7 @@ describe(PigeonCommunitiesApi.name, () => {
       }),
     ).resolves.toEqual({
       messages,
-      nextBeforeMessageId: 'message-2',
+      nextCursor: 'message-2',
     });
   });
 
@@ -116,7 +116,7 @@ describe(PigeonCommunitiesApi.name, () => {
       }),
     ).resolves.toEqual({
       messages,
-      nextBeforeMessageId: null,
+      nextCursor: null,
     });
   });
 
@@ -349,7 +349,6 @@ describe(PigeonCommunitiesApi.name, () => {
       channelId: 'channel-1',
       communityId: 'community-1',
       messages: [{ id: 'reply-1', replyToMessageId: 'message-1' }],
-      nextBeforeMessageId: 'reply-1',
     };
     const http = {
       request: jest.fn().mockResolvedValue(response),
@@ -376,7 +375,6 @@ describe(PigeonCommunitiesApi.name, () => {
       ),
     ).resolves.toEqual({
       messages: response.messages,
-      nextBeforeMessageId: 'reply-1',
     });
 
     expect(signer.headers).toHaveBeenCalledWith(

@@ -502,10 +502,10 @@ export class PigeonCommunitiesFacade {
     session: Session,
     communityId: string,
     channelId: string,
-    options: { beforeMessageId?: string; limit?: number } = {},
+    options: { cursor?: string; limit?: number } = {},
   ): Promise<{
     messages: MessageResource[];
-    nextBeforeMessageId?: null | string;
+    nextCursor?: null | string;
   }> {
     return await this.channelReads.listCommunityChannelMessages(
       session,
@@ -523,7 +523,6 @@ export class PigeonCommunitiesFacade {
     options: { limit?: number } = {},
   ): Promise<{
     messages: MessageResource[];
-    nextBeforeMessageId?: null | string;
   }> {
     return await this.channelReads.listCommunityChannelMessageThread(
       session,
@@ -614,7 +613,6 @@ export class PigeonCommunitiesFacade {
   ): Promise<{
     channelId?: string;
     messages: MessageResource[];
-    nextBeforeMessageId?: null | string;
   }> {
     return await this.channelReads.searchCommunityChannelMessages(
       session,
@@ -631,7 +629,6 @@ export class PigeonCommunitiesFacade {
   ): Promise<{
     channelId?: string;
     messages: MessageResource[];
-    nextBeforeMessageId?: null | string;
   }> {
     return await this.channelReads.searchCommunityMessages(
       session,
