@@ -29,7 +29,7 @@ export class CommunityThreadRootLabelLoader {
     const hiddenKeys: string[] = [];
     const labels: Record<string, string> = {};
     const remainingMessageIds = new Set(channel.rootMessageIds);
-    let beforeMessageId: string | undefined;
+    let cursor: string | undefined;
 
     for (let page = 0; page < MAX_THREAD_ROOT_PAGES; page += 1) {
       if (cancelled() || remainingMessageIds.size === 0) break;
@@ -38,7 +38,7 @@ export class CommunityThreadRootLabelLoader {
         this.session,
         this.communityId,
         channel.channelId,
-        { beforeMessageId },
+        { cursor },
       );
       const messages = await this.projectMessages(
         channel.channelId,
@@ -56,9 +56,9 @@ export class CommunityThreadRootLabelLoader {
       hiddenKeys.push(...classification.hiddenKeys);
       Object.assign(labels, classification.labels);
 
-      if (!result.nextBeforeMessageId) break;
+      if (!result.nextCursor) break;
 
-      beforeMessageId = result.nextBeforeMessageId;
+      cursor = result.nextCursor;
     }
 
     return {

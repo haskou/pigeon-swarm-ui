@@ -28,7 +28,7 @@ export type LoadedCommunityChannelMessages = {
 
 export type LoadCommunityChannelMessages = (
   channelId: string,
-  beforeMessageId?: string,
+  cursor?: string,
   options?: { limit?: number },
 ) => Promise<LoadedCommunityChannelMessages>;
 

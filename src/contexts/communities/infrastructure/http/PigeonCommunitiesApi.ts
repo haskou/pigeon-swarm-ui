@@ -1394,19 +1394,18 @@ export class PigeonCommunitiesApi {
     session: Session,
     communityId: string,
     channelId: string,
-    options: { beforeMessageId?: string; limit?: number } = {},
+    options: { cursor?: string; limit?: number } = {},
   ): Promise<{
     messages: MessageResource[];
-    nextBeforeMessageId?: null | string;
+    nextCursor?: null | string;
   }> {
     const query = new URLSearchParams({
       limit: String(options.limit ?? 50),
     });
 
-    if (options.beforeMessageId) {
-      query.set('beforeMessageId', options.beforeMessageId);
+    if (options.cursor) {
+      query.set('cursor', options.cursor);
     }
-
     const path = `/communities/${encodeURIComponent(
       communityId,
     )}/channels/${encodeURIComponent(channelId)}/messages?${query.toString()}`;
@@ -1415,7 +1414,7 @@ export class PigeonCommunitiesApi {
       async () =>
         await this.http.request<{
           messages: MessageResource[];
-          nextBeforeMessageId?: string;
+          nextCursor?: string;
         }>(path, {
           headers: await this.signer.headers(session, 'GET', path),
           method: 'GET',
@@ -1425,7 +1424,7 @@ export class PigeonCommunitiesApi {
 
     return {
       messages: result.messages,
-      nextBeforeMessageId: result.nextBeforeMessageId ?? null,
+      nextCursor: result.nextCursor ?? null,
     };
   }
 
@@ -1437,7 +1436,6 @@ export class PigeonCommunitiesApi {
     options: { limit?: number } = {},
   ): Promise<{
     messages: MessageResource[];
-    nextBeforeMessageId?: null | string;
   }> {
     const path = `/communities/${encodeURIComponent(
       communityId,
@@ -1449,7 +1447,6 @@ export class PigeonCommunitiesApi {
     });
     const result = await this.http.request<{
       messages?: MessageResource[];
-      nextBeforeMessageId?: null | string;
     }>(`${path}?${query.toString()}`, {
       headers: await this.signer.headers(session, 'GET', path),
       method: 'GET',
@@ -1457,7 +1454,6 @@ export class PigeonCommunitiesApi {
 
     return {
       messages: result.messages ?? [],
-      nextBeforeMessageId: result.nextBeforeMessageId ?? null,
     };
   }
 
