@@ -1,3 +1,4 @@
+import { PrivateBlobUploadIncompleteError } from '../../../contexts/attachments/domain/errors/PrivateBlobUploadIncompleteError';
 import { NodeOwnerIdentityCannotBeBlockedError } from '../../../contexts/nodeAccess/domain/errors/NodeOwnerIdentityCannotBeBlockedError';
 import { HttpJsonError } from '../../../shared/infrastructure/http/HttpJsonError';
 import { copy } from '../../../shared/presentation/i18n/copy';
@@ -133,6 +134,20 @@ describe(toUserErrorMessage.name, () => {
   it('uses a network message for fetch failures', () => {
     expect(toUserErrorMessage(new TypeError('Failed to fetch'))).toBe(
       copy.errors.network,
+    );
+  });
+
+  it('shows the reasons a private blob upload failed', () => {
+    expect(
+      toUserErrorMessage(
+        new PrivateBlobUploadIncompleteError(['HTTP 500', 'TypeError']),
+      ),
+    ).toBe('Private blob upload is incomplete (HTTP 500, TypeError).');
+  });
+
+  it('keeps the plain message when no reason was recorded', () => {
+    expect(toUserErrorMessage(new PrivateBlobUploadIncompleteError())).toBe(
+      'Private blob upload is incomplete.',
     );
   });
 

@@ -6,6 +6,8 @@ import type { IdentityWorkspaceSource } from './IdentityWorkspaceSource';
 import type { KeychainResource } from './resources/KeychainResource';
 import type { LoginResult } from './resources/LoginResult';
 
+import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
+import { waitBeforeRetry } from '../../../../shared/infrastructure/http/waitBeforeRetry';
 import { IdentitySnapshotSelection } from '../../domain/IdentitySnapshotSelection';
 import { KeychainVersion } from '../../domain/value-objects/KeychainVersion';
 
@@ -14,13 +16,33 @@ const emptyKeychain: LocalKeychain = {
   version: 0,
 };
 
+// The node answers 503020 while its replicated state is still opening after a
+// restart. That clears within seconds, so the conversation list is retried on
+// this schedule (about 10s in total) before the error is reported.
+const replicatedStateNotReadyCode = '503020';
+const conversationListRetryDelaysMs = [250, 500, 1000, 2000, 3000, 3000];
+
 export class PigeonIdentityWorkspaceSessionApi {
   public constructor(private readonly workspace: IdentityWorkspaceSource) {}
 
   private async listConversations(
     session: Session,
   ): Promise<ConversationResource[]> {
-    return await this.workspace.listConversations(session).catch(() => []);
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.workspace.listConversations(session);
+      } catch (caught: unknown) {
+        const notReady =
+          caught instanceof HttpJsonError &&
+          String(caught.code) === replicatedStateNotReadyCode;
+
+        if (!notReady || attempt >= conversationListRetryDelaysMs.length) {
+          throw caught;
+        }
+
+        await waitBeforeRetry(conversationListRetryDelaysMs[attempt]);
+      }
+    }
   }
 
   private hydrateKeychain(
@@ -74,6 +96,9 @@ export class PigeonIdentityWorkspaceSessionApi {
   ): Promise<LoginResult> {
     onProgress?.('loading-keychain');
     const conversationsPromise = this.listConversations(session);
+    // Handle a failed list now so it cannot go unhandled while the keychain
+    // loads; the await below still rethrows it.
+    void conversationsPromise.catch(() => undefined);
     const keychainResource = await this.workspace.loadKeychain(session);
     const hydratedSession = this.hydrateKeychain(session, keychainResource);
 

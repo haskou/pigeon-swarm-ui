@@ -6,6 +6,7 @@ import type { LocalKeychain } from '../../../../../contexts/identities/infrastru
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
 import { PigeonIdentityWorkspaceSessionApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityWorkspaceSessionApi';
+import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 
 describe(PigeonIdentityWorkspaceSessionApi.name, () => {
   const session = {
@@ -139,6 +140,74 @@ describe(PigeonIdentityWorkspaceSessionApi.name, () => {
         keychain: { conversations: {}, version: 0 },
         keychainExternalIdentifier: null,
       },
+    });
+  });
+
+  describe('when the node has not finished opening its replicated state', () => {
+    const notReady = new HttpJsonError(
+      503,
+      'Service Unavailable',
+      JSON.stringify({ code: 503020 }),
+    );
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('retries the conversation list until the node answers', async () => {
+      const workspace = port();
+      workspace.listConversations
+        .mockRejectedValueOnce(notReady)
+        .mockRejectedValueOnce(notReady)
+        .mockResolvedValue(conversations);
+      const api = new PigeonIdentityWorkspaceSessionApi(workspace);
+
+      const pending = api.hydrate(session);
+      await jest.advanceTimersByTimeAsync(10_000);
+
+      await expect(pending).resolves.toMatchObject({ conversations });
+      expect(workspace.listConversations).toHaveBeenCalledTimes(3);
+    });
+
+    it('rejects instead of returning an empty list once retries are exhausted', async () => {
+      const workspace = port();
+      workspace.listConversations.mockRejectedValue(notReady);
+      const api = new PigeonIdentityWorkspaceSessionApi(workspace);
+
+      const pending = api.hydrate(session).catch((caught: unknown) => caught);
+      await jest.advanceTimersByTimeAsync(10_000);
+
+      await expect(pending).resolves.toBe(notReady);
+      expect(workspace.listConversations).toHaveBeenCalledTimes(7);
+    });
+
+    it('rejects a refresh once retries are exhausted', async () => {
+      const workspace = port();
+      workspace.listConversations.mockRejectedValue(notReady);
+      const api = new PigeonIdentityWorkspaceSessionApi(workspace);
+
+      const pending = api.refresh(session).catch((caught: unknown) => caught);
+      await jest.advanceTimersByTimeAsync(10_000);
+
+      await expect(pending).resolves.toBe(notReady);
+    });
+
+    it('does not retry failures other than 503020', async () => {
+      const failure = new HttpJsonError(
+        500,
+        'Internal Server Error',
+        JSON.stringify({ code: 'Error' }),
+      );
+      const workspace = port();
+      workspace.listConversations.mockRejectedValue(failure);
+      const api = new PigeonIdentityWorkspaceSessionApi(workspace);
+
+      await expect(api.hydrate(session)).rejects.toBe(failure);
+      expect(workspace.listConversations).toHaveBeenCalledTimes(1);
     });
   });
 });
