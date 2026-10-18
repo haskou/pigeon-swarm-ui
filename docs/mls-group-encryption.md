@@ -594,10 +594,13 @@ call key. Safari is not covered by CI.
     that this device has not read stays unreadable, also from the stored
     state. Within those epochs, MLS keeps the keys of up to 10 skipped
     messages per sender (`retainKeysForGenerations`).
-  - In memory, a group also keeps the state before every commit it applied
-    in this app session, so that it can switch to a competing commit. Those
-    states hold older epoch secrets, call-media exporters included, until the
-    app reloads (#479).
+  - In memory, a group keeps the state before a commit only for its last 8
+    commits (`RETAINED_EPOCHS` in the library, the window of
+    `retainKeysForEpochs`), so that it can switch to a competing commit
+    within them. The state before an older commit is dropped and only its
+    roster change, which holds no secrets, is kept: a rival commit for an
+    older epoch is ignored as stale, which is also what a restarted device
+    does for every past epoch.
   - Forward secrecy covers keys, not what was read. The community engine
     keeps every plaintext it sent or decrypted (the plaintext cache, sealed
     as below), so a restarted device reads a message again after its key is
@@ -664,7 +667,8 @@ call key. Safari is not covered by CI.
   root drops the identity's rows. Forgetting the device deletes them. Rows
   stored unsealed before #376 are dropped by the database upgrade, never read.
   XSS in an unlocked session still reads the state in memory, including the
-  states before earlier commits (#479).
+  state before each of its last 8 commits; the state before an older commit
+  is dropped.
 - The roster, not MLS, is authoritative. Clients refuse to add identities that
   are not on the roster. Every commit, made or received, in a community or a
   group conversation, is judged by verified leaf owners only: the committer's
