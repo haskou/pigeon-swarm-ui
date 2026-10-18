@@ -4,5 +4,4 @@ import type { MessageResource } from '../../../messages/infrastructure/http/Mess
 export type CommunityChannelMessageSearchResult = {
   channelId?: string;
   messages: MessageResource[];
-  nextBeforeMessageId?: null | string;
 };

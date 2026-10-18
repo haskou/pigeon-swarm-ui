@@ -347,10 +347,10 @@ export class PigeonCommunitiesGateway {
     session: Session,
     communityId: string,
     channelId: string,
-    options: { beforeMessageId?: string; limit?: number } = {},
+    options: { cursor?: string; limit?: number } = {},
   ): Promise<{
     messages: MessageResource[];
-    nextBeforeMessageId?: null | string;
+    nextCursor?: null | string;
   }> {
     return await this.communities.listChannelMessages(
       session,
@@ -368,7 +368,6 @@ export class PigeonCommunitiesGateway {
     options: { limit?: number } = {},
   ): Promise<{
     messages: MessageResource[];
-    nextBeforeMessageId?: null | string;
   }> {
     return await this.communities.listChannelMessageThread(
       session,
@@ -463,7 +462,6 @@ export class PigeonCommunitiesGateway {
   ): Promise<{
     channelId?: string;
     messages: MessageResource[];
-    nextBeforeMessageId?: null | string;
   }> {
     return await this.communities.searchChannelMessages(
       session,
@@ -480,7 +478,6 @@ export class PigeonCommunitiesGateway {
   ): Promise<{
     channelId?: string;
     messages: MessageResource[];
-    nextBeforeMessageId?: null | string;
   }> {
     return await this.communities.searchCommunityMessages(
       session,

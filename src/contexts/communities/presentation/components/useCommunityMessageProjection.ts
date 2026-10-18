@@ -16,7 +16,7 @@ type UseCommunityMessageProjectionInput = {
 type UseCommunityMessageProjectionResult = {
   loadChannelMessages: (
     channelId: string,
-    beforeMessageId?: string,
+    cursor?: string,
     options?: { limit?: number },
   ) => Promise<{ cursor: null | string; loadedMessages: ChatMessage[] }>;
   projectChannelMessage: (
@@ -71,14 +71,14 @@ export function useCommunityMessageProjection({
   const loadChannelMessages = useCallback(
     async (
       channelId: string,
-      beforeMessageId?: string,
+      cursor?: string,
       options: { limit?: number } = {},
     ) => {
       const result = await applicationContainer.communities.listChannelMessages(
         session,
         communityId,
         channelId,
-        { beforeMessageId, limit: options.limit },
+        { cursor, limit: options.limit },
       );
       const loadedMessages = await projectChannelMessages(
         channelId,
@@ -86,7 +86,7 @@ export function useCommunityMessageProjection({
       );
 
       return {
-        cursor: result.nextBeforeMessageId ?? null,
+        cursor: result.nextCursor ?? null,
         loadedMessages,
       };
     },
