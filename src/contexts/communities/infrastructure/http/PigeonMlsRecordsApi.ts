@@ -15,6 +15,9 @@ import { submitPublicMutation } from '../../../../shared/infrastructure/http/sub
 const recordsPath = (communityId: string): string =>
   `/communities/${encodeURIComponent(communityId)}/mls/records`;
 
+/** Longest wait for one record request, so a stalled one frees its queue. */
+const MLS_REQUEST_TIMEOUT_MS = 15_000;
+
 /** Publishes and reads the opaque MLS records the node transports. */
 export class PigeonMlsRecordsApi {
   public constructor(
@@ -22,7 +25,13 @@ export class PigeonMlsRecordsApi {
     private readonly signer: RequestSigner,
     private readonly mutations: PublicMutationSigner,
     private readonly frontiers = new ScopeFrontierReader(http, signer),
+    private readonly requestTimeoutMs = MLS_REQUEST_TIMEOUT_MS,
   ) {}
+
+  /** A fresh deadline per request, so a stalled answer fails, not hangs. */
+  private deadline(): AbortSignal {
+    return AbortSignal.timeout(this.requestTimeoutMs);
+  }
 
   public async list(
     session: Session,
@@ -40,6 +49,7 @@ export class PigeonMlsRecordsApi {
     const result = await this.http.request<MlsRecordsResource>(path, {
       headers: await this.signer.headers(session, 'GET', path),
       method: 'GET',
+      signal: this.deadline(),
     });
 
     return result.records ?? [];
@@ -68,7 +78,9 @@ export class PigeonMlsRecordsApi {
       scopeType: 'community_mls',
     };
     let stored: MlsRecordResource | undefined;
-    const frontier = await this.frontiers.community(session, communityId);
+    const frontier = await this.frontiers.community(session, communityId, {
+      signal: this.deadline(),
+    });
 
     await submitPublicMutation(
       PublicMutationSigner.FIRST_POSITION,
@@ -91,6 +103,7 @@ export class PigeonMlsRecordsApi {
           body: JSON.stringify(body),
           headers: await this.signer.headers(session, 'POST', path, body),
           method: 'POST',
+          signal: this.deadline(),
         });
       },
     );

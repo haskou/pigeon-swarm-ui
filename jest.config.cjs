@@ -94,6 +94,7 @@ const REAL_CRYPTO_SPECS = [
   'PigeonIdentitySessionApi',
   'PigeonKeychainApi',
   'PigeonMlsFacade',
+  'PigeonMlsRecordsApi',
   'PigeonNotificationsApi',
   'PigeonPollsApi',
   'PigeonStickersApi',
