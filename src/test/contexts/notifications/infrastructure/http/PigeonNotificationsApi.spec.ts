@@ -13,6 +13,8 @@ import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto
 describe(PigeonNotificationsApi.name, () => {
   const session = { identity: { id: 'recipient' } } as Session;
 
+  const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
   it('starts an independent signed list read while an older startup read is pending', async () => {
     const http = mock<HttpJsonClient>();
     const signer = mock<RequestSigner>();
@@ -35,24 +37,21 @@ describe(PigeonNotificationsApi.name, () => {
       .mockResolvedValue({ results: [invitation] });
     signer.headers.mockResolvedValue({ signature: 'signed' });
     const oldRead = api.list(session);
-    await Promise.resolve();
-    await Promise.resolve();
+    await settle();
     const newRead = api.list(session);
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
+    await settle();
 
     expect(http.request).toHaveBeenCalledTimes(2);
     expect(await newRead).toEqual([invitation]);
     resolveOld({ results: [] });
     expect(await oldRead).toEqual([]);
-    expect(http.request).toHaveBeenLastCalledWith('/notifications?limit=30', {
+    expect(http.request).toHaveBeenLastCalledWith('/notifications?limit=100', {
       headers: { signature: 'signed' },
       method: 'GET',
     });
   });
 
-  it('reads a signed page of notifications before a given id', async () => {
+  it('reads a signed page of notifications after a given cursor', async () => {
     const http = mock<HttpJsonClient>();
     const signer = mock<RequestSigner>();
     const cache = new RequestCache();
@@ -63,15 +62,19 @@ describe(PigeonNotificationsApi.name, () => {
       publicMutationSignerAt(),
     );
     const invitation = { id: 'invitation' } as NotificationResource;
-    const path = '/notifications?limit=100&beforeNotificationId=invitation%3Aa';
+    const path = '/notifications?limit=100&cursor=invitation%3Aa';
 
     http.request.mockResolvedValue({ results: [invitation] });
     signer.headers.mockResolvedValue({ signature: 'signed' });
 
-    expect(await api.listPage(session, 100, 'invitation:a')).toEqual([
-      invitation,
-    ]);
-    expect(signer.headers).toHaveBeenCalledWith(session, 'GET', path);
+    expect(await api.listPage(session, 'invitation:a')).toEqual({
+      results: [invitation],
+    });
+    expect(signer.headers).toHaveBeenCalledWith(
+      session,
+      'GET',
+      '/notifications',
+    );
     expect(http.request).toHaveBeenCalledWith(path, {
       headers: { signature: 'signed' },
       method: 'GET',

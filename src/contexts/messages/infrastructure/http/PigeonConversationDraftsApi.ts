@@ -10,6 +10,8 @@ import type { Session } from '../../../identities/infrastructure/session/Session
 import type { ConversationDraftsResource } from './ConversationDraftsResource';
 import type { ConversationDraftProjection } from './resources/ConversationDraftProjection';
 
+import { pagedPath } from '../../../../shared/infrastructure/http/pagedPath';
+import { readAllPages } from '../../../../shared/infrastructure/http/readAllPages';
 import { sessionRootKey } from '../../../identities/infrastructure/session/sessionRootKey';
 
 const readCacheTtlMs = 1500;
@@ -53,32 +55,37 @@ export class PigeonConversationDraftsApi {
     return await this.requestCache.load(
       this.requestCache.keyForSession(draftsPath, session),
       async () => {
-        const result = await this.http.request<ConversationDraftsResource>(
-          draftsPath,
-          {
-            headers: await this.signer.headers(session, 'GET', draftsPath),
-            method: 'GET',
-          },
+        const pages = await readAllPages<ConversationDraftsResource>(
+          async (cursor) =>
+            await this.http.request<ConversationDraftsResource>(
+              pagedPath(draftsPath, cursor),
+              {
+                headers: await this.signer.headers(session, 'GET', draftsPath),
+                method: 'GET',
+              },
+            ),
         );
 
-        return result.drafts.flatMap((draft) => {
-          const opened = this.opened(
-            session,
-            draft.draftKey,
-            draft.encryptedPayload,
-          );
+        return pages
+          .flatMap((page) => page.drafts)
+          .flatMap((draft) => {
+            const opened = this.opened(
+              session,
+              draft.draftKey,
+              draft.encryptedPayload,
+            );
 
-          return opened === undefined
-            ? []
-            : [
-                {
-                  content: opened.content,
-                  conversationId: opened.conversationId,
-                  encryptedPayload: draft.encryptedPayload,
-                  updatedAt: draft.updatedAt,
-                },
-              ];
-        });
+            return opened === undefined
+              ? []
+              : [
+                  {
+                    content: opened.content,
+                    conversationId: opened.conversationId,
+                    encryptedPayload: draft.encryptedPayload,
+                    updatedAt: draft.updatedAt,
+                  },
+                ];
+          });
       },
       { ttlMs: readCacheTtlMs },
     );

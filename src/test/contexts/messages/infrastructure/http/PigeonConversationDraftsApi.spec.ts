@@ -68,7 +68,7 @@ describe(PigeonConversationDraftsApi.name, () => {
       },
     ]);
     expect(request).toHaveBeenCalledWith(
-      '/conversation-drafts',
+      '/conversation-drafts?limit=100',
       expect.objectContaining({ method: 'GET' }),
     );
   });

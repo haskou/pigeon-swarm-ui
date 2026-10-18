@@ -24,7 +24,7 @@ describe(ConversationMapper.name, () => {
     expect(
       mapper.list({
         conversations: [group, oneToOne],
-        nextBeforeConversationId: 'x',
+        nextCursor: 'x',
       }),
     ).toEqual([oneToOne]);
   });

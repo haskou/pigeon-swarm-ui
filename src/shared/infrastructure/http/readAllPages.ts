@@ -1,7 +1,9 @@
+const MAX_PAGES = 1000;
+
 /**
  * Fetches every page of a cursor-paged node list, following `nextCursor` until
  * the node reports none. Stops when the node repeats a cursor, so a faulty
- * node cannot loop the client.
+ * node cannot loop the client. Refuses to read past MAX_PAGES pages.
  */
 export async function readAllPages<Page extends { nextCursor: string | null }>(
   fetchPage: (cursor: string | undefined) => Promise<Page>,
@@ -11,6 +13,10 @@ export async function readAllPages<Page extends { nextCursor: string | null }>(
   let cursor: string | undefined;
 
   for (;;) {
+    if (pages.length >= MAX_PAGES) {
+      throw new Error(`Node list exceeded ${MAX_PAGES} pages`);
+    }
+
     const page = await fetchPage(cursor);
 
     pages.push(page);
