@@ -25,6 +25,14 @@ import { RemoteCallAudio } from './RemoteCallAudio';
 
 export type { PeerMediaStats } from './collectPeerMediaStats';
 
+/**
+ * How long an answered offer holds its peer through snapshots that omit its
+ * participant. The offer proves the join, but a snapshot taken before the join
+ * can still omit it. The first snapshot that shows the participant ends the
+ * hold. A leave that no snapshot showed joined is released when this ends.
+ */
+const answeredPeerRetentionMs = 10_000;
+
 export class CallPeerConnections {
   private readonly iceCandidates: CallIceCandidates;
   private readonly localTracks: CallLocalTracks;
@@ -48,6 +56,9 @@ export class CallPeerConnections {
   private readonly remoteStreams = new Map<string, MediaStream>();
   private readonly screenShareStreams: CallScreenShareStreams;
   private rtcConfigurationProvider: RtcConfigurationProvider | null = null;
+  private readonly answeredAt = new Map<string, number>();
+  private lastRetainedPeerIdentityIds = new Set<string>();
+  private stopAnswerRelease: (() => void) | undefined;
 
   /** Browsers with WebRTC turned off, such as Tor Browser, expose no peers. */
   public static supported(): boolean {
@@ -341,6 +352,7 @@ export class CallPeerConnections {
   private closePeer(peerIdentityId: string): void {
     this.peers.get(peerIdentityId)?.close();
     this.peers.delete(peerIdentityId);
+    this.answeredAt.delete(peerIdentityId);
     this.remoteStreams.delete(peerIdentityId);
     this.screenShareStreams.forget(peerIdentityId);
     this.remoteAudio.removePeer(peerIdentityId);
@@ -357,6 +369,64 @@ export class CallPeerConnections {
     this.mediaEncryption.forget(peerIdentityId);
     this.negotiation.forget(peerIdentityId);
     this.peerSignalSenders.delete(peerIdentityId);
+  }
+
+  /** Records when this side answers an offer, which proves the join. */
+  private markAnsweredOffer(
+    peerIdentityId: string,
+    signalType: CallSignalType,
+  ): void {
+    if (signalType === 'offer') {
+      this.answeredAt.set(peerIdentityId, Date.now());
+    }
+  }
+
+  /** Whether an answered peer outlives the snapshot that omits it. */
+  private isAnswerRetained(peerIdentityId: string, now: number): boolean {
+    const answeredAt = this.answeredAt.get(peerIdentityId);
+
+    return (
+      answeredAt !== undefined && now - answeredAt < answeredPeerRetentionMs
+    );
+  }
+
+  /**
+   * Re-runs the retention when the earliest answered peer that the snapshot
+   * omits leaves its window, since no later snapshot is guaranteed to arrive.
+   */
+  private scheduleAnswerRelease(
+    snapshotPeerIdentityIds: Set<string>,
+    now: number,
+  ): void {
+    this.cancelAnswerRelease();
+    let nextRelease: number | undefined;
+
+    for (const peerIdentityId of this.peers.keys()) {
+      const answeredAt = this.answeredAt.get(peerIdentityId);
+
+      if (
+        answeredAt === undefined ||
+        snapshotPeerIdentityIds.has(peerIdentityId)
+      ) {
+        continue;
+      }
+
+      const release = answeredAt + answeredPeerRetentionMs;
+      nextRelease = Math.min(nextRelease ?? release, release);
+    }
+
+    if (nextRelease === undefined) return;
+
+    const timeout = setTimeout(() => {
+      this.stopAnswerRelease = undefined;
+      this.retainPeers(this.lastRetainedPeerIdentityIds);
+    }, nextRelease - now);
+    this.stopAnswerRelease = () => clearTimeout(timeout);
+  }
+
+  private cancelAnswerRelease(): void {
+    this.stopAnswerRelease?.();
+    this.stopAnswerRelease = undefined;
   }
 
   private async replacePeer(
@@ -505,6 +575,8 @@ export class CallPeerConnections {
       return;
     }
 
+    this.markAnsweredOffer(senderIdentityId, signalType);
+
     await this.negotiation.handleDescriptionSignal(
       senderIdentityId,
       payload as unknown as DescriptionSignalPayload,
@@ -545,6 +617,9 @@ export class CallPeerConnections {
     this.iceCandidates.reset();
     this.negotiation.reset();
     this.peerSignalSenders.clear();
+    this.cancelAnswerRelease();
+    this.answeredAt.clear();
+    this.lastRetainedPeerIdentityIds = new Set();
 
     this.remoteAudio.reset();
     this.remoteStreams.clear();
@@ -555,12 +630,26 @@ export class CallPeerConnections {
   }
 
   public retainPeers(peerIdentityIds: Set<string>): void {
+    const now = Date.now();
+    this.lastRetainedPeerIdentityIds = new Set(peerIdentityIds);
+    for (const peerIdentityId of peerIdentityIds) {
+      this.answeredAt.delete(peerIdentityId);
+    }
+
+    const retained = new Set(peerIdentityIds);
     for (const peerIdentityId of this.peers.keys()) {
-      if (!peerIdentityIds.has(peerIdentityId)) {
+      if (this.isAnswerRetained(peerIdentityId, now)) {
+        retained.add(peerIdentityId);
+      }
+    }
+
+    for (const peerIdentityId of this.peers.keys()) {
+      if (!retained.has(peerIdentityId)) {
         this.removePeer(peerIdentityId);
       }
     }
-    this.recovery.retain(peerIdentityIds);
+    this.recovery.retain(retained);
+    this.scheduleAnswerRelease(peerIdentityIds, now);
   }
 
   public retryConnections(): void {
