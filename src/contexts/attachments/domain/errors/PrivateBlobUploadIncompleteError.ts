@@ -8,7 +8,11 @@ export class PrivateBlobUploadIncompleteError extends DomainError {
   public readonly reasons: readonly string[];
 
   public constructor(reasons: readonly string[] = []) {
-    super('Private blob upload is incomplete.');
+    super(
+      reasons.length === 0
+        ? 'Private blob upload is incomplete.'
+        : `Private blob upload is incomplete (${reasons.join(', ')}).`,
+    );
     this.reasons = reasons;
   }
 }
