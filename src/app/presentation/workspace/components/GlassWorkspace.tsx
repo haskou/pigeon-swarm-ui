@@ -1180,6 +1180,7 @@ export function GlassWorkspace({
               )
             }
             onChannelViewed={clearCommunityChannelUnread}
+            onCommunitiesRetry={onCommunitiesReload}
             onCommunityChannelsUpdated={updateCommunityChannels}
             onCommunityLeft={removeCommunity}
             onCommunityUpdated={updateCommunity}

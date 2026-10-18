@@ -48,6 +48,7 @@ type CommunityWorkspaceContentProps = {
   notificationSettingsByScopeKey: NotificationSettingMap;
   onChannelSelected: (communityId: string, channelId: string) => void;
   onChannelViewed: (communityId: string, channelId: string) => void;
+  onCommunitiesRetry: () => void;
   onCommunityChannelsUpdated: Parameters<
     typeof CommunityWorkspace
   >[0]['onCommunityChannelsUpdated'];
@@ -111,6 +112,7 @@ export function CommunityWorkspaceContent({
   notificationSettingsByScopeKey,
   onChannelSelected,
   onChannelViewed,
+  onCommunitiesRetry,
   onCommunityChannelsUpdated,
   onCommunityLeft,
   onCommunityUpdated,
@@ -143,7 +145,20 @@ export function CommunityWorkspaceContent({
   if (!activeCommunity) {
     return (
       <div className="glass-panel-strong col-span-3 flex h-full flex-col justify-center rounded-none p-4 text-center text-sm text-white/55">
-        {error?.message ?? copy.communities.empty}
+        {error ? (
+          <div className="flex flex-col items-center gap-4">
+            <p role="alert">{error.message}</p>
+            <button
+              type="button"
+              onClick={onCommunitiesRetry}
+              className="glass-button rounded-xl bg-fuchsia-500 px-5 py-2 text-sm font-black text-white"
+            >
+              {copy.communities.retryLoad}
+            </button>
+          </div>
+        ) : (
+          copy.communities.empty
+        )}
       </div>
     );
   }

@@ -360,6 +360,25 @@ describe(PigeonKeychainApi.name, () => {
       expect(request).toHaveBeenCalledTimes(7);
     });
 
+    it('retries a 503020 read when the session holds no keychain pointer', async () => {
+      const request = jest
+        .fn()
+        .mockRejectedValueOnce(
+          new HttpJsonError(
+            503,
+            'Service Unavailable',
+            JSON.stringify({ code: 503020 }),
+          ),
+        )
+        .mockResolvedValueOnce(keychainResource);
+      const pending = apiFor(request).loadOptional(session);
+
+      await jest.runAllTimersAsync();
+
+      await expect(pending).resolves.toBe(keychainResource);
+      expect(request).toHaveBeenCalledTimes(2);
+    });
+
     it('reads once when the session holds no keychain pointer so login and registration are not delayed', async () => {
       const request = jest.fn().mockRejectedValue(lagError());
       const startedAt = Date.now();

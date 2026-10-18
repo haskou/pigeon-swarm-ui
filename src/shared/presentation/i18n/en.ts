@@ -610,6 +610,7 @@ export const en = {
     publicCommunityHelp:
       'It can appear in Discover and accept requests depending on its settings.',
     publicProfile: 'Profile',
+    retryLoad: 'Retry',
     role: 'Role',
     roleDeleteConfirm: 'Delete this role?',
     roleDeleteError: 'The role could not be deleted.',
