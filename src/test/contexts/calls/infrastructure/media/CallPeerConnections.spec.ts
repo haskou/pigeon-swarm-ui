@@ -2757,7 +2757,7 @@ describe(CallPeerConnections.name, () => {
     await manager.ensurePeer('peer-identity-id', false, () =>
       Promise.resolve(),
     );
-    manager.retainPeers(new Set());
+    manager.retainPeers(new Set(), new Set());
 
     expect(lastCipherWorker().postMessage).toHaveBeenCalledWith({
       senderId: 'peer-identity-id',
@@ -2806,8 +2806,8 @@ describe(CallPeerConnections.name, () => {
     it('keeps an answered peer when a snapshot that predates its join omits it', async () => {
       const answered = await answerOfferFromBob();
 
-      manager.retainPeers(new Set());
-      manager.retainPeers(new Set(['bob']));
+      manager.retainPeers(new Set(), new Set());
+      manager.retainPeers(new Set(['bob']), new Set());
 
       expect(answered.close).not.toHaveBeenCalled();
       expect(peers).toHaveLength(1);
@@ -2816,7 +2816,7 @@ describe(CallPeerConnections.name, () => {
     it('releases an answered peer once its participant stays gone past the window', async () => {
       const answered = await answerOfferFromBob();
 
-      manager.retainPeers(new Set());
+      manager.retainPeers(new Set(), new Set());
       await jest.advanceTimersByTimeAsync(9_999);
 
       expect(answered.close).not.toHaveBeenCalled();
@@ -2829,8 +2829,8 @@ describe(CallPeerConnections.name, () => {
     it('releases an answered peer at once when a snapshot showed its participant joined first', async () => {
       const answered = await answerOfferFromBob();
 
-      manager.retainPeers(new Set(['bob']));
-      manager.retainPeers(new Set());
+      manager.retainPeers(new Set(['bob']), new Set());
+      manager.retainPeers(new Set(), new Set());
 
       expect(answered.close).toHaveBeenCalledTimes(1);
     });
@@ -2838,7 +2838,7 @@ describe(CallPeerConnections.name, () => {
     it('arms the answer hold once, so a later offer does not extend it', async () => {
       const answered = await answerOfferFromBob();
 
-      manager.retainPeers(new Set());
+      manager.retainPeers(new Set(), new Set());
       await jest.advanceTimersByTimeAsync(6_000);
       await manager.handleSignal(
         'bob',
@@ -2859,7 +2859,7 @@ describe(CallPeerConnections.name, () => {
     it('refuses a re-offer from a peer whose hold expired while the snapshot still omits it', async () => {
       const answered = await answerOfferFromBob();
 
-      manager.retainPeers(new Set());
+      manager.retainPeers(new Set(), new Set());
       await jest.advanceTimersByTimeAsync(10_000);
       await manager.handleSignal(
         'bob',
@@ -2868,7 +2868,7 @@ describe(CallPeerConnections.name, () => {
         sendSignal,
         'alice',
       );
-      manager.retainPeers(new Set());
+      manager.retainPeers(new Set(), new Set());
 
       expect(answered.close).toHaveBeenCalledTimes(1);
       expect(peers).toHaveLength(1);
@@ -3201,7 +3201,7 @@ describe(CallPeerConnections.name, () => {
       'track',
     )(remoteTrackEvent(remoteTrack, [remoteStream]) as unknown as Event);
 
-    manager.retainPeers(new Set());
+    manager.retainPeers(new Set(), new Set());
 
     expect(peers[0]?.close).toHaveBeenCalledTimes(1);
     expect(manager.remoteMediaStreams()).toEqual({});
