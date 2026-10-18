@@ -2873,6 +2873,49 @@ describe(CallPeerConnections.name, () => {
       expect(answered.close).toHaveBeenCalledTimes(1);
       expect(peers).toHaveLength(1);
     });
+
+    it('releases an answered peer at once when an explicit status releases it', async () => {
+      const answered = await answerOfferFromBob();
+
+      manager.retainPeers(new Set(), new Set(['bob']));
+
+      expect(answered.close).toHaveBeenCalledTimes(1);
+    });
+
+    it('sends no local tracks to a peer that an explicit status released', async () => {
+      manager.setLocalStream(
+        mediaStreamWithTracks([mediaTrack('microphone', 'audio')]),
+      );
+      const answered = await answerOfferFromBob();
+      const [sender] = answered.senders as unknown as FakeSender[];
+
+      expect(answered.addTrack).toHaveBeenCalledTimes(1);
+
+      manager.retainPeers(new Set(), new Set(['bob']));
+      manager.setLocalStream(
+        mediaStreamWithTracks([mediaTrack('microphone-2', 'audio')]),
+      );
+
+      expect(answered.addTrack).toHaveBeenCalledTimes(1);
+      expect(sender.replaceTrack).not.toHaveBeenCalled();
+    });
+
+    it('refuses a stale offer from a peer that an explicit status released', async () => {
+      const answered = await answerOfferFromBob();
+
+      manager.retainPeers(new Set(), new Set(['bob']));
+
+      expect(answered.close).toHaveBeenCalledTimes(1);
+      await manager.handleSignal(
+        'bob',
+        'offer',
+        { sdp: 'bob-offer-stale', type: 'offer' },
+        sendSignal,
+        'alice',
+      );
+
+      expect(peers).toHaveLength(1);
+    });
   });
 
   it('keeps its cipher when handed a call key it cannot read', () => {
