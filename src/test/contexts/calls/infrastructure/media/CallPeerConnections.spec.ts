@@ -2834,6 +2834,45 @@ describe(CallPeerConnections.name, () => {
 
       expect(answered.close).toHaveBeenCalledTimes(1);
     });
+
+    it('arms the answer hold once, so a later offer does not extend it', async () => {
+      const answered = await answerOfferFromBob();
+
+      manager.retainPeers(new Set());
+      await jest.advanceTimersByTimeAsync(6_000);
+      await manager.handleSignal(
+        'bob',
+        'offer',
+        { sdp: 'bob-offer-sdp-again', type: 'offer' },
+        sendSignal,
+        'alice',
+      );
+      await jest.advanceTimersByTimeAsync(3_999);
+
+      expect(answered.close).not.toHaveBeenCalled();
+
+      await jest.advanceTimersByTimeAsync(1);
+
+      expect(answered.close).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses a re-offer from a peer whose hold expired while the snapshot still omits it', async () => {
+      const answered = await answerOfferFromBob();
+
+      manager.retainPeers(new Set());
+      await jest.advanceTimersByTimeAsync(10_000);
+      await manager.handleSignal(
+        'bob',
+        'offer',
+        { sdp: 'bob-offer-sdp-again', type: 'offer' },
+        sendSignal,
+        'alice',
+      );
+      manager.retainPeers(new Set());
+
+      expect(answered.close).toHaveBeenCalledTimes(1);
+      expect(peers).toHaveLength(1);
+    });
   });
 
   it('keeps its cipher when handed a call key it cannot read', () => {
