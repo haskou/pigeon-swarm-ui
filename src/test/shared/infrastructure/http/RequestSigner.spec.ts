@@ -66,13 +66,25 @@ describe(RequestSigner.name, () => {
     );
   });
 
-  it('signs only the request path and leaves query params out', () => {
+  it('signs the request path and the raw query string', () => {
     const signer = new RequestSigner(() => 123);
 
     expect(signer.payload('GET', '/notifications?limit=30', 123)).toBe(
       SignedHttpRequestSignature.signingContent({
         method: 'GET',
-        path: '/notifications',
+        path: '/notifications?limit=30',
+        timestamp: 123,
+      }),
+    );
+  });
+
+  it('drops the fragment and keeps the query string under a route prefix', () => {
+    const signer = new RequestSigner(() => 123, '/api');
+
+    expect(signer.payload('GET', '/keychains/id?limit=1#top', 123)).toBe(
+      SignedHttpRequestSignature.signingContent({
+        method: 'GET',
+        path: '/api/keychains/id?limit=1',
         timestamp: 123,
       }),
     );
@@ -111,10 +123,10 @@ describe(RequestSigner.name, () => {
     );
   });
 
-  it('signs only the URL pathname when passed an absolute URL, even under a prefix', () => {
+  it('signs the URL pathname and query when passed an absolute URL, even under a prefix', () => {
     const expected = SignedHttpRequestSignature.signingContent({
       method: 'GET',
-      path: '/keychains/id',
+      path: '/keychains/id?limit=1',
       timestamp: 123,
     });
 
