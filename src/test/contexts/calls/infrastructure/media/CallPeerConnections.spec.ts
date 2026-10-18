@@ -2766,6 +2766,76 @@ describe(CallPeerConnections.name, () => {
     manager.reset();
   });
 
+  describe('answered peers across snapshot omissions', () => {
+    let peers: FakePeerConnection[];
+    let manager: CallPeerConnections;
+    let sendSignal: jest.Mock<Promise<void>, Parameters<SignalSender>>;
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      peers = [];
+      installEncodedStreamSupport();
+      installScriptTransformSupport();
+      installSessionDescriptionMock();
+      installPeerConnectionMock(peers);
+      manager = callPeerConnectionManager();
+      sendSignal = jest
+        .fn<Promise<void>, Parameters<SignalSender>>()
+        .mockResolvedValue(undefined);
+      manager.configure(() => Promise.resolve({ iceServers: [] }));
+    });
+
+    afterEach(() => {
+      manager.reset();
+      jest.useRealTimers();
+    });
+
+    /** Answers the offer of bob, whose join the snapshots may not show yet. */
+    async function answerOfferFromBob(): Promise<FakePeerConnection> {
+      await manager.handleSignal(
+        'bob',
+        'offer',
+        { sdp: 'bob-offer-sdp', type: 'offer' },
+        sendSignal,
+        'alice',
+      );
+
+      return peers[0];
+    }
+
+    it('keeps an answered peer when a snapshot that predates its join omits it', async () => {
+      const answered = await answerOfferFromBob();
+
+      manager.retainPeers(new Set());
+      manager.retainPeers(new Set(['bob']));
+
+      expect(answered.close).not.toHaveBeenCalled();
+      expect(peers).toHaveLength(1);
+    });
+
+    it('releases an answered peer once its participant stays gone past the window', async () => {
+      const answered = await answerOfferFromBob();
+
+      manager.retainPeers(new Set());
+      await jest.advanceTimersByTimeAsync(9_999);
+
+      expect(answered.close).not.toHaveBeenCalled();
+
+      await jest.advanceTimersByTimeAsync(1);
+
+      expect(answered.close).toHaveBeenCalledTimes(1);
+    });
+
+    it('releases an answered peer at once when a snapshot showed its participant joined first', async () => {
+      const answered = await answerOfferFromBob();
+
+      manager.retainPeers(new Set(['bob']));
+      manager.retainPeers(new Set());
+
+      expect(answered.close).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('keeps its cipher when handed a call key it cannot read', () => {
     installEncodedStreamSupport();
     installScriptTransformSupport();
