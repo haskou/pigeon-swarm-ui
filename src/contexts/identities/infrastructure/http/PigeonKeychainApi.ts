@@ -12,13 +12,9 @@ import type { Session } from '../session/Session';
 import type { KeychainResource } from './resources/KeychainResource';
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
-import { waitBeforeRetry } from '../../../../shared/infrastructure/http/waitBeforeRetry';
+import { retryReplicatedStateRead } from '../../../../shared/infrastructure/http/retryReplicatedStateRead';
 
 const remoteKeychainCacheTtlMs = 1500;
-// A keychain this session already knows about can be briefly unreadable right
-// after it was written. Such reads are retried on this schedule (about 10s in
-// total) before being reported missing.
-const keychainLagRetryDelaysMs = [250, 500, 1000, 2000, 3000, 3000];
 
 function keychainPath(session: Session): string {
   return `/keychains/${encodeURIComponent(session.identity.id)}`;
@@ -100,23 +96,14 @@ export class PigeonKeychainApi {
     signal?: AbortSignal,
   ): Promise<T | undefined> {
     // Only a session that already holds a keychain pointer knows a keychain
-    // exists. Sessions without one (login, registration) read once and are
-    // never delayed.
+    // exists, so only it reads a missing keychain as lag. Sessions without a
+    // pointer (login, registration) read once and are never delayed.
     const expected = Boolean(session.keychainExternalIdentifier);
 
-    for (let attempt = 0; ; attempt++) {
-      const value = await this.undefinedWhenMissing(read);
-
-      if (
-        value !== undefined ||
-        !expected ||
-        attempt >= keychainLagRetryDelaysMs.length
-      ) {
-        return value;
-      }
-
-      await waitBeforeRetry(keychainLagRetryDelaysMs[attempt], signal);
-    }
+    return await retryReplicatedStateRead(
+      async () => await this.undefinedWhenMissing(read),
+      { isPending: (value) => expected && value === undefined, signal },
+    );
   }
 
   private async postKeychain(

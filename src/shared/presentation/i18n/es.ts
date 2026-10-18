@@ -618,6 +618,7 @@ export const es = {
     publicCommunityHelp:
       'Puede mostrarse en Descubrir y aceptar solicitudes según la configuración.',
     publicProfile: 'Perfil',
+    retryLoad: 'Reintentar',
     role: 'Rol',
     roleDeleteConfirm: '¿Eliminar este rol?',
     roleDeleteError: 'No se pudo eliminar el rol.',

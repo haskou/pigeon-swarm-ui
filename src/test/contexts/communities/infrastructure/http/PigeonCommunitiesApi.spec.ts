@@ -10,6 +10,7 @@ import type { RequestSigner } from '../../../../../shared/infrastructure/http/Re
 
 import { PigeonCommunitiesApi } from '../../../../../contexts/communities/infrastructure/http/PigeonCommunitiesApi';
 import { DraftPayloadCipher } from '../../../../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
+import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 import { RequestCache } from '../../../../../shared/infrastructure/http/RequestCache';
 import { ScopeFrontierReader } from '../../../../../shared/infrastructure/http/ScopeFrontierReader';
 import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
@@ -117,6 +118,74 @@ describe(PigeonCommunitiesApi.name, () => {
     ).resolves.toEqual({
       messages,
       nextCursor: null,
+    });
+  });
+
+  describe('when the node has not finished opening its replicated state', () => {
+    const session = { identity: { id: 'identity-1' } } as unknown as Session;
+    const notReadyError = (): HttpJsonError =>
+      new HttpJsonError(
+        503,
+        'Service Unavailable',
+        JSON.stringify({ code: 503020 }),
+      );
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    function apiFor(
+      request: jest.Mock,
+      headers: jest.Mock,
+    ): PigeonCommunitiesApi {
+      return new PigeonCommunitiesApi(
+        { request } as unknown as HttpJsonClient,
+        { headers } as unknown as RequestSigner,
+        async (_key, loader) => await loader(),
+        publicMutationSignerAt(),
+      );
+    }
+
+    it('signs each attempt of a community list read afresh', async () => {
+      const request = jest
+        .fn()
+        .mockRejectedValueOnce(notReadyError())
+        .mockResolvedValueOnce({ communities: [{ id: 'community-1' }] });
+      const headers = jest
+        .fn()
+        .mockResolvedValue({ 'X-Identity-Id': 'identity-1' });
+      const pending = apiFor(request, headers).list(session);
+
+      await jest.runAllTimersAsync();
+
+      await expect(pending).resolves.toEqual([{ id: 'community-1' }]);
+      expect(request).toHaveBeenCalledTimes(2);
+      expect(headers).toHaveBeenCalledTimes(2);
+    });
+
+    it('retries a channel message read the node is still opening', async () => {
+      const request = jest
+        .fn()
+        .mockRejectedValueOnce(notReadyError())
+        .mockResolvedValueOnce({ messages: [] });
+      const headers = jest.fn().mockResolvedValue({});
+      const pending = apiFor(request, headers).listChannelMessages(
+        session,
+        'community-1',
+        'channel-1',
+      );
+
+      await jest.runAllTimersAsync();
+
+      await expect(pending).resolves.toEqual({
+        messages: [],
+        nextCursor: null,
+      });
+      expect(request).toHaveBeenCalledTimes(2);
     });
   });
 
