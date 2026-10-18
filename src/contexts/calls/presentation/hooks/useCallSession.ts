@@ -21,7 +21,10 @@ import { watchMicrophoneAvailability } from '../../infrastructure/media/micropho
 import { watchNetworkChanges } from '../../infrastructure/media/networkChanges';
 import { RemoteCallAudio } from '../../infrastructure/media/RemoteCallAudio';
 import { loadCallMicrophoneDeviceId } from '../../infrastructure/storage/callAudioPreference';
-import { retainedRemotePeerIdentityIds } from './callPeerConnectionPlan';
+import {
+  releasedRemotePeerIdentityIds,
+  retainedRemotePeerIdentityIds,
+} from './callPeerConnectionPlan';
 import {
   callMediaEncryptionState,
   callSessionForJoinedPeerConnection,
@@ -298,6 +301,7 @@ export function useCallSession(): CallSessionControls {
       if (currentIdentityId) {
         peerManager.retainPeers(
           new Set(retainedRemotePeerIdentityIds(call, currentIdentityId)),
+          new Set(releasedRemotePeerIdentityIds(call, currentIdentityId)),
         );
       }
 

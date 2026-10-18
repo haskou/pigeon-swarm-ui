@@ -2757,13 +2757,191 @@ describe(CallPeerConnections.name, () => {
     await manager.ensurePeer('peer-identity-id', false, () =>
       Promise.resolve(),
     );
-    manager.retainPeers(new Set());
+    manager.retainPeers(new Set(), new Set());
 
     expect(lastCipherWorker().postMessage).toHaveBeenCalledWith({
       senderId: 'peer-identity-id',
       type: 'forget',
     });
     manager.reset();
+  });
+
+  describe('answered peers across snapshot omissions', () => {
+    let peers: FakePeerConnection[];
+    let manager: CallPeerConnections;
+    let sendSignal: jest.Mock<Promise<void>, Parameters<SignalSender>>;
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      peers = [];
+      installEncodedStreamSupport();
+      installScriptTransformSupport();
+      installSessionDescriptionMock();
+      installPeerConnectionMock(peers);
+      manager = callPeerConnectionManager();
+      sendSignal = jest
+        .fn<Promise<void>, Parameters<SignalSender>>()
+        .mockResolvedValue(undefined);
+      manager.configure(() => Promise.resolve({ iceServers: [] }));
+    });
+
+    afterEach(() => {
+      manager.reset();
+      jest.useRealTimers();
+    });
+
+    /** Answers the offer of bob, whose join the snapshots may not show yet. */
+    async function answerOfferFromBob(): Promise<FakePeerConnection> {
+      await manager.handleSignal(
+        'bob',
+        'offer',
+        { sdp: 'bob-offer-sdp', type: 'offer' },
+        sendSignal,
+        'alice',
+      );
+
+      return peers[0];
+    }
+
+    it('keeps an answered peer when a snapshot that predates its join omits it', async () => {
+      const answered = await answerOfferFromBob();
+
+      manager.retainPeers(new Set(), new Set());
+      manager.retainPeers(new Set(['bob']), new Set());
+
+      expect(answered.close).not.toHaveBeenCalled();
+      expect(peers).toHaveLength(1);
+    });
+
+    it('releases an answered peer once its participant stays gone past the window', async () => {
+      const answered = await answerOfferFromBob();
+
+      manager.retainPeers(new Set(), new Set());
+      await jest.advanceTimersByTimeAsync(9_999);
+
+      expect(answered.close).not.toHaveBeenCalled();
+
+      await jest.advanceTimersByTimeAsync(1);
+
+      expect(answered.close).toHaveBeenCalledTimes(1);
+    });
+
+    it('releases an answered peer at once when a snapshot showed its participant joined first', async () => {
+      const answered = await answerOfferFromBob();
+
+      manager.retainPeers(new Set(['bob']), new Set());
+      manager.retainPeers(new Set(), new Set());
+
+      expect(answered.close).toHaveBeenCalledTimes(1);
+    });
+
+    it('arms the answer hold once, so a later offer does not extend it', async () => {
+      const answered = await answerOfferFromBob();
+
+      manager.retainPeers(new Set(), new Set());
+      await jest.advanceTimersByTimeAsync(6_000);
+      await manager.handleSignal(
+        'bob',
+        'offer',
+        { sdp: 'bob-offer-sdp-again', type: 'offer' },
+        sendSignal,
+        'alice',
+      );
+      await jest.advanceTimersByTimeAsync(3_999);
+
+      expect(answered.close).not.toHaveBeenCalled();
+
+      await jest.advanceTimersByTimeAsync(1);
+
+      expect(answered.close).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses a re-offer from a peer whose hold expired while the snapshot still omits it', async () => {
+      const answered = await answerOfferFromBob();
+
+      manager.retainPeers(new Set(), new Set());
+      await jest.advanceTimersByTimeAsync(10_000);
+      await manager.handleSignal(
+        'bob',
+        'offer',
+        { sdp: 'bob-offer-sdp-again', type: 'offer' },
+        sendSignal,
+        'alice',
+      );
+      manager.retainPeers(new Set(), new Set());
+
+      expect(answered.close).toHaveBeenCalledTimes(1);
+      expect(peers).toHaveLength(1);
+    });
+
+    it('releases an answered peer at once when an explicit status releases it', async () => {
+      const answered = await answerOfferFromBob();
+
+      manager.retainPeers(new Set(), new Set(['bob']));
+
+      expect(answered.close).toHaveBeenCalledTimes(1);
+    });
+
+    it('sends no local tracks to a peer that an explicit status released', async () => {
+      manager.setLocalStream(
+        mediaStreamWithTracks([mediaTrack('microphone', 'audio')]),
+      );
+      const answered = await answerOfferFromBob();
+      const [sender] = answered.senders as unknown as FakeSender[];
+
+      expect(answered.addTrack).toHaveBeenCalledTimes(1);
+
+      manager.retainPeers(new Set(), new Set(['bob']));
+      manager.setLocalStream(
+        mediaStreamWithTracks([mediaTrack('microphone-2', 'audio')]),
+      );
+
+      expect(answered.addTrack).toHaveBeenCalledTimes(1);
+      expect(sender.replaceTrack).not.toHaveBeenCalled();
+    });
+
+    it('refuses a stale offer from a peer that an explicit status released', async () => {
+      const answered = await answerOfferFromBob();
+
+      manager.retainPeers(new Set(), new Set(['bob']));
+
+      expect(answered.close).toHaveBeenCalledTimes(1);
+      await manager.handleSignal(
+        'bob',
+        'offer',
+        { sdp: 'bob-offer-stale', type: 'offer' },
+        sendSignal,
+        'alice',
+      );
+
+      expect(peers).toHaveLength(1);
+    });
+
+    it('creates no connection for a peer that an explicit status releases while its configuration loads', async () => {
+      let loadConfiguration: () => void = () => undefined;
+      const configuration = new Promise<{ iceServers: [] }>((resolve) => {
+        loadConfiguration = () => resolve({ iceServers: [] });
+      });
+
+      manager.configure(() => configuration);
+      manager.setLocalStream(
+        mediaStreamWithTracks([mediaTrack('microphone', 'audio')]),
+      );
+      const answering = manager.handleSignal(
+        'bob',
+        'offer',
+        { sdp: 'bob-offer-sdp', type: 'offer' },
+        sendSignal,
+        'alice',
+      );
+
+      manager.retainPeers(new Set(), new Set(['bob']));
+      loadConfiguration();
+      await answering;
+
+      expect(peers).toHaveLength(0);
+      expect(sendSignal).not.toHaveBeenCalled();
+    });
   });
 
   it('keeps its cipher when handed a call key it cannot read', () => {
@@ -3049,7 +3227,7 @@ describe(CallPeerConnections.name, () => {
       'track',
     )(remoteTrackEvent(remoteTrack, [remoteStream]) as unknown as Event);
 
-    manager.retainPeers(new Set());
+    manager.retainPeers(new Set(), new Set());
 
     expect(peers[0]?.close).toHaveBeenCalledTimes(1);
     expect(manager.remoteMediaStreams()).toEqual({});

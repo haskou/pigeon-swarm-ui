@@ -3,6 +3,7 @@ import type { CallResource } from '../../../../../contexts/calls/infrastructure/
 import {
   joinedRemotePeerIdentityIds,
   participantJoinWasAccepted,
+  releasedRemotePeerIdentityIds,
   retainedRemotePeerIdentityIds,
   signalingRemotePeerIdentityIds,
   shouldCreateInitialOffer,
@@ -135,7 +136,7 @@ describe('callPeerConnectionPlan', () => {
     expect(retainedRemotePeerIdentityIds(call, 'alice')).toEqual(['bob']);
   });
 
-  it('retains a connected peer when its lifecycle status is stale', () => {
+  it('releases a connected peer whose status is left', () => {
     const call = callResource({
       currentIdentityId: 'alice',
       remoteIdentityId: 'bob',
@@ -143,8 +144,8 @@ describe('callPeerConnectionPlan', () => {
 
     call.participants[1].status = 'left';
 
-    expect(signalingRemotePeerIdentityIds(call, 'alice')).toEqual(['bob']);
-    expect(retainedRemotePeerIdentityIds(call, 'alice')).toEqual(['bob']);
+    expect(signalingRemotePeerIdentityIds(call, 'alice')).toEqual([]);
+    expect(retainedRemotePeerIdentityIds(call, 'alice')).toEqual([]);
   });
 
   it('releases peers that have left the call', () => {
@@ -156,6 +157,37 @@ describe('callPeerConnectionPlan', () => {
     call.participants[1].connected = false;
     call.participants[1].status = 'left';
 
+    expect(retainedRemotePeerIdentityIds(call, 'alice')).toEqual([]);
+  });
+
+  it('releases declined and missed peers at once, whatever their lease says', () => {
+    const call = callResource({
+      currentIdentityId: 'alice',
+      remoteIdentityId: 'bob',
+    });
+
+    call.participants[1].status = 'declined';
+
+    expect(releasedRemotePeerIdentityIds(call, 'alice')).toEqual(['bob']);
+    expect(signalingRemotePeerIdentityIds(call, 'alice')).toEqual([]);
+    expect(retainedRemotePeerIdentityIds(call, 'alice')).toEqual([]);
+
+    call.participants[1].status = 'missed';
+
+    expect(releasedRemotePeerIdentityIds(call, 'alice')).toEqual(['bob']);
+    expect(retainedRemotePeerIdentityIds(call, 'alice')).toEqual([]);
+  });
+
+  it('does not release a ringing peer, since an answered offer proves a join the snapshot may predate', () => {
+    const call = callResource({
+      currentIdentityId: 'alice',
+      remoteIdentityId: 'bob',
+    });
+
+    call.participants[1].connected = false;
+    call.participants[1].status = 'ringing';
+
+    expect(releasedRemotePeerIdentityIds(call, 'alice')).toEqual([]);
     expect(retainedRemotePeerIdentityIds(call, 'alice')).toEqual([]);
   });
 

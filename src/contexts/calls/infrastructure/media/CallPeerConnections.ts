@@ -25,6 +25,14 @@ import { RemoteCallAudio } from './RemoteCallAudio';
 
 export type { PeerMediaStats } from './collectPeerMediaStats';
 
+/**
+ * How long an answered offer holds its peer through snapshots that omit its
+ * participant. The offer proves the join, but a snapshot taken before the join
+ * can still omit it. The first snapshot that shows the participant ends the
+ * hold. A leave that no snapshot showed joined is released when this ends.
+ */
+const answeredPeerRetentionMs = 10_000;
+
 export class CallPeerConnections {
   private readonly iceCandidates: CallIceCandidates;
   private readonly localTracks: CallLocalTracks;
@@ -42,12 +50,25 @@ export class CallPeerConnections {
   private readonly peerSignalSenders = new Map<string, SignalSender>();
   private readonly pendingPeerCreations = new Map<
     string,
-    Promise<RTCPeerConnection>
+    Promise<RTCPeerConnection | undefined>
   >();
 
   private readonly remoteStreams = new Map<string, MediaStream>();
   private readonly screenShareStreams: CallScreenShareStreams;
   private rtcConfigurationProvider: RtcConfigurationProvider | null = null;
+  private readonly answeredAt = new Map<string, number>();
+  /**
+   * Peers whose answer hold ended or that a snapshot released. Their offers are
+   * refused until a snapshot lists them joined again.
+   */
+  private readonly spentAnswerHolds = new Set<string>();
+  /**
+   * Counts the resets. A connection whose creation began before a reset is
+   * never built, since the call it served has ended.
+   */
+  private resets = 0;
+  private lastRetainedPeerIdentityIds = new Set<string>();
+  private stopAnswerRelease: (() => void) | undefined;
 
   /** Browsers with WebRTC turned off, such as Tor Browser, expose no peers. */
   public static supported(): boolean {
@@ -83,7 +104,7 @@ export class CallPeerConnections {
   private async createPeer(
     peerIdentityId: string,
     sendSignal: SignalSender,
-  ): Promise<RTCPeerConnection> {
+  ): Promise<RTCPeerConnection | undefined> {
     if (!this.rtcConfigurationProvider) {
       logCallError(
         'peer-manager:create-peer:missing-rtc-configuration',
@@ -93,9 +114,19 @@ export class CallPeerConnections {
       throw new Error('RTCPeerConnection configuration is not loaded.');
     }
 
-    const rtcConfiguration = this.mediaEncryption.peerConfiguration(
-      await this.rtcConfigurationProvider(),
-    );
+    const resets = this.resets;
+    const configuration = await this.rtcConfigurationProvider();
+
+    // A peer released, or a call reset, while its configuration loaded gets
+    // no connection: nothing could release a connection not yet in peers.
+    if (resets !== this.resets || this.spentAnswerHolds.has(peerIdentityId)) {
+      logCallDebug('peer-manager:create-peer:abandoned', { peerIdentityId });
+
+      return undefined;
+    }
+
+    const rtcConfiguration =
+      this.mediaEncryption.peerConfiguration(configuration);
     const peer = new RTCPeerConnection(rtcConfiguration);
 
     this.peerSignalSenders.set(peerIdentityId, sendSignal);
@@ -213,7 +244,7 @@ export class CallPeerConnections {
   private async getOrCreatePeer(
     peerIdentityId: string,
     sendSignal: SignalSender,
-  ): Promise<RTCPeerConnection> {
+  ): Promise<RTCPeerConnection | undefined> {
     const existing = this.peers.get(peerIdentityId);
 
     if (existing) return existing;
@@ -229,7 +260,10 @@ export class CallPeerConnections {
     try {
       return await peerCreation;
     } finally {
-      this.pendingPeerCreations.delete(peerIdentityId);
+      // A reset may have cleared the entry, and a newer creation may own it.
+      if (this.pendingPeerCreations.get(peerIdentityId) === peerCreation) {
+        this.pendingPeerCreations.delete(peerIdentityId);
+      }
     }
   }
 
@@ -336,7 +370,8 @@ export class CallPeerConnections {
   /**
    * Drops the connection and what hangs on it. What outlives it is what a
    * connection that replaces it needs: the remote peer's admission to a
-   * private call and the ICE candidates it sent for the new connection.
+   * private call, the ICE candidates it sent for the new connection, and its
+   * answer hold, which belongs to the snapshot rather than the connection.
    */
   private closePeer(peerIdentityId: string): void {
     this.peers.get(peerIdentityId)?.close();
@@ -357,6 +392,74 @@ export class CallPeerConnections {
     this.mediaEncryption.forget(peerIdentityId);
     this.negotiation.forget(peerIdentityId);
     this.peerSignalSenders.delete(peerIdentityId);
+  }
+
+  /**
+   * Starts the answer hold on the first answered offer of an omission. Later
+   * offers never restart it, so a sender cannot keep an omitted peer connected
+   * by signaling again.
+   */
+  private markAnsweredOffer(
+    peerIdentityId: string,
+    signalType: CallSignalType,
+  ): void {
+    if (signalType === 'offer' && !this.answeredAt.has(peerIdentityId)) {
+      this.answeredAt.set(peerIdentityId, Date.now());
+    }
+  }
+
+  /**
+   * Whether a signal may create or keep a connection. A peer that a snapshot
+   * released, or whose hold ended, is refused until a snapshot lists it again.
+   * A peer that signals again after a refusal gets a new connection with every
+   * signal, so the connections created for it count like replacements.
+   */
+  private admitsSignalFrom(senderIdentityId: string): boolean {
+    if (this.spentAnswerHolds.has(senderIdentityId)) return false;
+
+    return (
+      this.peers.has(senderIdentityId) ||
+      this.pendingPeerCreations.has(senderIdentityId) ||
+      this.recovery.allowReplacement(senderIdentityId)
+    );
+  }
+
+  /** Ends the holds whose window has passed. An ended hold never re-arms. */
+  private endExpiredAnswerHolds(now: number): void {
+    for (const [peerIdentityId, answeredAt] of this.answeredAt) {
+      if (now - answeredAt < answeredPeerRetentionMs) continue;
+
+      this.answeredAt.delete(peerIdentityId);
+      this.spentAnswerHolds.add(peerIdentityId);
+    }
+  }
+
+  /**
+   * Re-runs the retention when the earliest open hold leaves its window, since
+   * no later snapshot is guaranteed to arrive.
+   */
+  private scheduleAnswerRelease(): void {
+    this.cancelAnswerRelease();
+    let nextRelease: number | undefined;
+
+    for (const answeredAt of this.answeredAt.values()) {
+      const release = answeredAt + answeredPeerRetentionMs;
+
+      nextRelease = Math.min(nextRelease ?? release, release);
+    }
+
+    if (nextRelease === undefined) return;
+
+    const timeout = setTimeout(() => {
+      this.stopAnswerRelease = undefined;
+      this.retainPeers(this.lastRetainedPeerIdentityIds, new Set());
+    }, nextRelease - Date.now());
+    this.stopAnswerRelease = () => clearTimeout(timeout);
+  }
+
+  private cancelAnswerRelease(): void {
+    this.stopAnswerRelease?.();
+    this.stopAnswerRelease = undefined;
   }
 
   private async replacePeer(
@@ -438,6 +541,8 @@ export class CallPeerConnections {
     this.negotiation.configureState(peerIdentityId, !shouldOffer);
     const peer = await this.getOrCreatePeer(peerIdentityId, sendSignal);
 
+    if (!peer) return;
+
     await this.negotiation.offerIfNeeded(
       peerIdentityId,
       peer,
@@ -481,18 +586,12 @@ export class CallPeerConnections {
       return;
     }
 
-    // A peer that signals again after a refusal gets a new connection with
-    // every signal, so the connections created for it count like replacements.
-    if (
-      !this.peers.has(senderIdentityId) &&
-      !this.pendingPeerCreations.has(senderIdentityId) &&
-      !this.recovery.allowReplacement(senderIdentityId)
-    ) {
-      return;
-    }
+    if (!this.admitsSignalFrom(senderIdentityId)) return;
 
     this.peerSignalSenders.set(senderIdentityId, sendSignal);
     const peer = await this.getOrCreatePeer(senderIdentityId, sendSignal);
+
+    if (!peer) return;
 
     if (signalType === 'ice_candidate') {
       await this.iceCandidates.handleSignal(
@@ -504,6 +603,8 @@ export class CallPeerConnections {
 
       return;
     }
+
+    this.markAnsweredOffer(senderIdentityId, signalType);
 
     await this.negotiation.handleDescriptionSignal(
       senderIdentityId,
@@ -541,10 +642,15 @@ export class CallPeerConnections {
     this.peers.clear();
     this.mediaEncryption.reset();
     this.pendingPeerCreations.clear();
+    this.resets += 1;
     this.recovery.reset();
     this.iceCandidates.reset();
     this.negotiation.reset();
     this.peerSignalSenders.clear();
+    this.cancelAnswerRelease();
+    this.answeredAt.clear();
+    this.spentAnswerHolds.clear();
+    this.lastRetainedPeerIdentityIds = new Set();
 
     this.remoteAudio.reset();
     this.remoteStreams.clear();
@@ -554,13 +660,45 @@ export class CallPeerConnections {
     this.rtcConfigurationProvider = null;
   }
 
-  public retainPeers(peerIdentityIds: Set<string>): void {
+  /**
+   * Applies a snapshot. Listed peers stay. Released peers go at once and stay
+   * refused until a snapshot lists them joined again. An answered peer that the
+   * snapshot omits stays for one window from its first answered offer.
+   */
+  public retainPeers(
+    peerIdentityIds: Set<string>,
+    releasedPeerIdentityIds: Set<string>,
+  ): void {
+    const now = Date.now();
+    const listed = new Set(peerIdentityIds);
+
+    for (const peerIdentityId of releasedPeerIdentityIds) {
+      listed.delete(peerIdentityId);
+      this.answeredAt.delete(peerIdentityId);
+      this.spentAnswerHolds.add(peerIdentityId);
+      this.peerSignalSenders.delete(peerIdentityId);
+    }
+
+    for (const peerIdentityId of listed) {
+      this.answeredAt.delete(peerIdentityId);
+      this.spentAnswerHolds.delete(peerIdentityId);
+    }
+    this.endExpiredAnswerHolds(now);
+    this.lastRetainedPeerIdentityIds = listed;
+
+    const retained = new Set(listed);
+
+    for (const peerIdentityId of this.answeredAt.keys()) {
+      retained.add(peerIdentityId);
+    }
+
     for (const peerIdentityId of this.peers.keys()) {
-      if (!peerIdentityIds.has(peerIdentityId)) {
+      if (!retained.has(peerIdentityId)) {
         this.removePeer(peerIdentityId);
       }
     }
-    this.recovery.retain(peerIdentityIds);
+    this.recovery.retain(retained);
+    this.scheduleAnswerRelease();
   }
 
   public retryConnections(): void {
