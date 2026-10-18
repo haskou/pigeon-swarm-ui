@@ -56,14 +56,14 @@ export class PigeonConversationDraftsApi {
       this.requestCache.keyForSession(draftsPath, session),
       async () => {
         const pages = await readAllPages<ConversationDraftsResource>(
-          async (cursor) =>
-            await this.http.request<ConversationDraftsResource>(
-              pagedPath(draftsPath, cursor),
-              {
-                headers: await this.signer.headers(session, 'GET', draftsPath),
-                method: 'GET',
-              },
-            ),
+          async (cursor) => {
+            const target = pagedPath(draftsPath, cursor);
+
+            return await this.http.request<ConversationDraftsResource>(target, {
+              headers: await this.signer.headers(session, 'GET', target),
+              method: 'GET',
+            });
+          },
         );
 
         return pages

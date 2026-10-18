@@ -2,8 +2,8 @@
 export const PAGE_LIMIT = 100;
 
 /**
- * `path` with its page query. The signer signs only the path before `?`, so
- * the same string serves for both the signature and the request.
+ * `path` with its page query. The signer signs the whole target, query
+ * included, so callers sign and request this same string.
  */
 export function pagedPath(
   path: string,

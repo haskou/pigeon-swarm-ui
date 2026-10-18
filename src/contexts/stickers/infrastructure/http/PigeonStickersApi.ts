@@ -288,8 +288,10 @@ export class PigeonStickersApi {
       query.set('savedPacksCursor', cursors.savedPacks);
     }
 
-    return await this.http.request<LibraryPage>(`${path}?${query.toString()}`, {
-      headers: await this.signer.headers(session, 'GET', path),
+    const target = `${path}?${query.toString()}`;
+
+    return await this.http.request<LibraryPage>(target, {
+      headers: await this.signer.headers(session, 'GET', target),
       method: 'GET',
     });
   }

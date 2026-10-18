@@ -32,14 +32,17 @@ export class RequestSigner {
     ).toString();
   }
 
-  private signablePath(path: string): string {
-    if (/^https?:\/\//i.test(path)) {
-      return ApiUrlBuilder.normalizePath(new URL(path).pathname);
-    }
-
-    return this.applyPathPrefix(
-      ApiUrlBuilder.normalizePath(path.split(/[?#]/)[0] ?? path),
+  private signableTarget(path: string): string {
+    const absolute = /^https?:\/\//i.test(path);
+    const url = new URL(
+      absolute ? path : ApiUrlBuilder.normalizePath(path),
+      'http://localhost',
     );
+    url.hash = '';
+    const query = url.search || (url.href.endsWith('?') ? '?' : '');
+    const pathname = ApiUrlBuilder.normalizePath(url.pathname);
+
+    return `${absolute ? pathname : this.applyPathPrefix(pathname)}${query}`;
   }
 
   private applyPathPrefix(path: string): string {
@@ -72,7 +75,7 @@ export class RequestSigner {
     return {
       body: this.signableBody(body),
       method: method.toUpperCase(),
-      path: this.signablePath(path),
+      path: this.signableTarget(path),
       timestamp,
     };
   }

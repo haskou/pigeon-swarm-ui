@@ -335,10 +335,8 @@ describe(PigeonStickersApi.name, () => {
         '/stickers/library?favoriteStickersLimit=100&savedPacksLimit=100',
         '/stickers/library?favoriteStickersLimit=100&savedPacksLimit=100&favoriteStickersCursor=fav-next',
       ]);
-      expect(signer.headers).toHaveBeenCalledWith(
-        session,
-        'GET',
-        '/stickers/library',
+      expect(signer.headers.mock.calls.map(([, , target]) => target)).toEqual(
+        request.mock.calls.map(([path]) => path),
       );
     });
   });

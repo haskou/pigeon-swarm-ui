@@ -93,13 +93,12 @@ export class PigeonNotificationsApi {
   ): Promise<NotificationsResource> {
     const path = '/notifications';
 
-    return await this.http.request<NotificationsResource>(
-      pagedPath(path, cursor),
-      {
-        headers: await this.signer.headers(session, 'GET', path),
-        method: 'GET',
-      },
-    );
+    const target = pagedPath(path, cursor);
+
+    return await this.http.request<NotificationsResource>(target, {
+      headers: await this.signer.headers(session, 'GET', target),
+      method: 'GET',
+    });
   }
 
   public async listSettings(

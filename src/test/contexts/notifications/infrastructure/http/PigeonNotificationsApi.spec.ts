@@ -73,7 +73,7 @@ describe(PigeonNotificationsApi.name, () => {
     expect(signer.headers).toHaveBeenCalledWith(
       session,
       'GET',
-      '/notifications',
+      '/notifications?limit=100&cursor=invitation%3Aa',
     );
     expect(http.request).toHaveBeenCalledWith(path, {
       headers: { signature: 'signed' },

@@ -88,14 +88,17 @@ export class PigeonNodeAccessApi {
   ): Promise<NodeRegistrationCodeResource[]> {
     const path = '/node/registration-codes';
     const pages = await readAllPages<NodeRegistrationCodesPageResource>(
-      async (cursor) =>
-        await this.http.request<NodeRegistrationCodesPageResource>(
-          pagedPath(path, cursor),
+      async (cursor) => {
+        const target = pagedPath(path, cursor);
+
+        return await this.http.request<NodeRegistrationCodesPageResource>(
+          target,
           {
-            headers: await this.signer.headers(session, 'GET', path),
+            headers: await this.signer.headers(session, 'GET', target),
             method: 'GET',
           },
-        ),
+        );
+      },
     );
 
     return pages.flatMap((page) => page.codes);
@@ -177,14 +180,14 @@ export class PigeonNodeAccessApi {
   ): Promise<NodeBlockSourceResource[]> {
     const path = '/node/block-sources';
     const pages = await readAllPages<NodeBlockSourcesPageResource>(
-      async (cursor) =>
-        await this.http.request<NodeBlockSourcesPageResource>(
-          pagedPath(path, cursor),
-          {
-            headers: await this.signer.headers(session, 'GET', path),
-            method: 'GET',
-          },
-        ),
+      async (cursor) => {
+        const target = pagedPath(path, cursor);
+
+        return await this.http.request<NodeBlockSourcesPageResource>(target, {
+          headers: await this.signer.headers(session, 'GET', target),
+          method: 'GET',
+        });
+      },
     );
 
     return pages.flatMap((page) => page.sources);
@@ -257,10 +260,11 @@ export class PigeonNodeAccessApi {
     return await readAllPages<
       PendingNodeBlockEntriesPageResource & { nextCursor: string | null }
     >(async (cursor) => {
+      const target = prefixedPagedPath(path, name, cursor);
       const page = await this.http.request<PendingNodeBlockEntriesPageResource>(
-        prefixedPagedPath(path, name, cursor),
+        target,
         {
-          headers: await this.signer.headers(session, 'GET', path),
+          headers: await this.signer.headers(session, 'GET', target),
           method: 'GET',
         },
       );

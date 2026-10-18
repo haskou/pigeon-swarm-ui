@@ -259,7 +259,7 @@ describe(PigeonCommunitiesApi.name, () => {
     });
   });
 
-  it('signs public channel message search without query parameters', async () => {
+  it('signs public channel message search with its query string', async () => {
     const response = {
       channelId: 'channel-1',
       communityId: 'community-1',
@@ -291,7 +291,7 @@ describe(PigeonCommunitiesApi.name, () => {
     expect(signer.headers).toHaveBeenCalledWith(
       session,
       'GET',
-      '/communities/community-1/channels/channel-1/messages',
+      '/communities/community-1/channels/channel-1/messages?limit=20&query=hello+there',
     );
     expect(http.request).toHaveBeenCalledWith(
       '/communities/community-1/channels/channel-1/messages?limit=20&query=hello+there',
@@ -302,7 +302,7 @@ describe(PigeonCommunitiesApi.name, () => {
     );
   });
 
-  it('signs public community message search without query parameters', async () => {
+  it('signs public community message search with its query string', async () => {
     const response = {
       communityId: 'community-1',
       messages: [],
@@ -333,7 +333,7 @@ describe(PigeonCommunitiesApi.name, () => {
     expect(signer.headers).toHaveBeenCalledWith(
       session,
       'GET',
-      '/communities/community-1/messages',
+      '/communities/community-1/messages?limit=20&query=hello+there',
     );
     expect(http.request).toHaveBeenCalledWith(
       '/communities/community-1/messages?limit=20&query=hello+there',
@@ -344,7 +344,7 @@ describe(PigeonCommunitiesApi.name, () => {
     );
   });
 
-  it('loads community channel message threads without signing query parameters', async () => {
+  it('loads community channel message threads with their query string signed', async () => {
     const response = {
       channelId: 'channel-1',
       communityId: 'community-1',
@@ -380,7 +380,7 @@ describe(PigeonCommunitiesApi.name, () => {
     expect(signer.headers).toHaveBeenCalledWith(
       session,
       'GET',
-      '/communities/community-1/channels/channel-1/messages/message-1/thread',
+      '/communities/community-1/channels/channel-1/messages/message-1/thread?limit=50',
     );
     expect(http.request).toHaveBeenCalledWith(
       '/communities/community-1/channels/channel-1/messages/message-1/thread?limit=50',
